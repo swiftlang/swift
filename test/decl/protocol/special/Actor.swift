@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift 
+// RUN: %target-typecheck-verify-swift
 // REQUIRES: concurrency
 
 // Synthesis of conformances for actors.

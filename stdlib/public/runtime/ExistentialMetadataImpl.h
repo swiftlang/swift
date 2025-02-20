@@ -415,7 +415,7 @@ struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBoxBase
     auto newValue = *src->getValueSlot();
     *dest->getValueSlot() = newValue;
     swift_unknownObjectRetain(newValue);
-    return dest;  
+    return dest;
   }
 
   template <class Container, class... A>
@@ -497,7 +497,7 @@ struct SWIFT_LIBRARY_VISIBILITY NonFixedClassExistentialBox
     ClassExistentialContainer Header;
 
     static unsigned getNumWitnessTables(const Metadata *self) {
-      auto castSelf = static_cast<const ExistentialTypeMetadata*>(self); 
+      auto castSelf = static_cast<const ExistentialTypeMetadata*>(self);
       return castSelf->Flags.getNumWitnessTables();
     }
 
@@ -542,7 +542,7 @@ struct SWIFT_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
                                        A... args) {
     src->copyTypeInto(dest, args...);
     *dest->getValueSlot() = *src->getValueSlot();
-    return dest;  
+    return dest;
   }
 
   template <class Container, class... A>
@@ -620,7 +620,7 @@ struct SWIFT_LIBRARY_VISIBILITY NonFixedExistentialMetatypeBox
     ExistentialMetatypeContainer Header;
 
     static unsigned getNumWitnessTables(const Metadata *self) {
-      auto castSelf = static_cast<const ExistentialMetatypeMetadata*>(self); 
+      auto castSelf = static_cast<const ExistentialMetatypeMetadata*>(self);
       return castSelf->Flags.getNumWitnessTables();
     }
 

@@ -26,7 +26,7 @@ struct S : ~Copyable {
         _modify {
             fatalError()
         }
-    }    
+    }
 }
 
 func foo(_ arg: String, _ consumingArg: consuming String, _ borrowingArg: borrowing String, _ inoutArg: inout String) {

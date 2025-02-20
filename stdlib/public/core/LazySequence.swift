@@ -20,7 +20,7 @@
 ///
 ///     let doubled = [1, 2, 3].lazy.map { $0 * 2 }
 ///
-/// Each time an element of the lazy sequence `doubled` is accessed, the 
+/// Each time an element of the lazy sequence `doubled` is accessed, the
 /// closure accesses and transforms an element of the underlying array.
 ///
 /// Sequence operations that take closure arguments, such as `map(_:)` and
@@ -75,7 +75,7 @@
 ///             var nextElement: Result?
 ///             let nextPartialResult:
 ///                 (Result, Base.Element) -> Result
-///             
+///
 ///             mutating func next() -> Result? {
 ///                 return nextElement.map { result in
 ///                     nextElement = base.next().map {
@@ -85,7 +85,7 @@
 ///                 }
 ///             }
 ///         }
-///         
+///
 ///         func makeIterator() -> Iterator {
 ///             return Iterator(
 ///                 base: base.makeIterator(),
@@ -95,7 +95,7 @@
 ///     }
 ///
 /// Finally, you can give all lazy sequences a lazy `scan(_:_:)` method:
-///     
+///
 ///     extension LazySequenceProtocol {
 ///         func scan<Result>(
 ///             _ initial: Result,
@@ -110,9 +110,9 @@
 /// sequence to create a lazily computed scan. The resulting `LazyScanSequence`
 /// is itself lazy, too, so further sequence operations also defer computation.
 ///
-/// The explicit permission to implement operations lazily applies 
+/// The explicit permission to implement operations lazily applies
 /// only in contexts where the sequence is statically known to conform to
-/// `LazySequenceProtocol`. In the following example, because the extension 
+/// `LazySequenceProtocol`. In the following example, because the extension
 /// applies only to `Sequence`, side-effects such as the accumulation of
 /// `result` are never unexpectedly dropped or deferred:
 ///
@@ -124,9 +124,9 @@
 ///         }
 ///     }
 ///
-/// Don't actually use `map` for this purpose, however, because it creates 
-/// and discards the resulting array. Instead, use `reduce` for summing 
-/// operations, or `forEach` or a `for`-`in` loop for operations with side 
+/// Don't actually use `map` for this purpose, however, because it creates
+/// and discards the resulting array. Instead, use `reduce` for summing
+/// operations, or `forEach` or a `for`-`in` loop for operations with side
 /// effects.
 public protocol LazySequenceProtocol: Sequence {
   /// A `Sequence` that can contain the same elements as this one,
@@ -213,7 +213,7 @@ extension LazySequence: Sequence {
   }
 
   @inlinable // lazy-performance
-  public func _customContainsEquatableElement(_ element: Element) -> Bool? { 
+  public func _customContainsEquatableElement(_ element: Element) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
 

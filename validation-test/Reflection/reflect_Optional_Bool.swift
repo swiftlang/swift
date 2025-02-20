@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -g -lswiftSwiftReflectionTest %s -o %t/reflect_Optional_Bool
 // RUN: %target-codesign %t/reflect_Optional_Bool
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_Optional_Bool | %FileCheck %s 
+// RUN: %target-run %target-swift-reflection-test %t/reflect_Optional_Bool | %FileCheck %s
 
 
 // REQUIRES: reflection_test_support
@@ -84,7 +84,7 @@ reflect(enum: optNil)
 // CHECK: Demangled name: Swift.Optional<Swift.Bool>
 
 // CHECK: Enum value:
-// CHECK: (enum_value name=none index=1) 
+// CHECK: (enum_value name=none index=1)
 
 let optOptFalse: Bool?? = false
 reflect(enum: optOptFalse)

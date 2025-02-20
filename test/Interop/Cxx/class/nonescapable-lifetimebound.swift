@@ -95,7 +95,7 @@ struct SWIFT_NONESCAPABLE CaptureView {
     }
 
     void handOut(View &v) const [[clang::lifetime_capture_by(v)]] {
-       v = view; 
+       v = view;
     }
 
     View view;

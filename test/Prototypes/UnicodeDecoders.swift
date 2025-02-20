@@ -17,10 +17,10 @@
 // Benchmarking: use the following script with your swift-4-enabled swiftc.
 // The BASELINE timings come from the existing standard library Codecs
 
-/* 
-  for x in BASELINE FORWARD REVERSE SEQUENCE COLLECTION REVERSE_COLLECTION ; do 
+/*
+  for x in BASELINE FORWARD REVERSE SEQUENCE COLLECTION REVERSE_COLLECTION ; do
     echo $x
-    swiftc -DBENCHMARK -D$x -O -swift-version 4 UnicodeDecoders.swift -o /tmp/u3-$x 
+    swiftc -DBENCHMARK -D$x -O -swift-version 4 UnicodeDecoders.swift -o /tmp/u3-$x
     for i in {1..3}; do
       (time nice -19 /tmp/u3-$x) 2>&1 | grep user
     done
@@ -40,7 +40,7 @@ extension Unicode {
   @frozen
   public // @testable
   struct _ParsingIterator<
-    CodeUnitIterator : IteratorProtocol, 
+    CodeUnitIterator : IteratorProtocol,
     Parser: Unicode.Parser
   > where Parser.Encoding.CodeUnit == CodeUnitIterator.Element {
     @inline(__always)

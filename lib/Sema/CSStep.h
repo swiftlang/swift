@@ -803,7 +803,7 @@ private:
 };
 
 /// Retrieves the DeclContext that a conjunction should be solved within.
-static DeclContext *getDeclContextForConjunction(ConstraintLocator *loc) {  
+static DeclContext *getDeclContextForConjunction(ConstraintLocator *loc) {
   // Closures introduce a new DeclContext that needs switching into.
   auto anchor = loc->getAnchor();
   if (loc->directlyAt<ClosureExpr>())

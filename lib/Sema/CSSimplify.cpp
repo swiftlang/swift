@@ -6047,7 +6047,7 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::KeyPathRoot: {
-    // The root mismatch is from base U? to U or a subtype of U in keypath 
+    // The root mismatch is from base U? to U or a subtype of U in keypath
     // application so let's suggest an unwrap the optional fix.
     if (auto unwrapFix = UnwrapOptionalBaseKeyPathApplication::attempt(
             *this, lhs, rhs, getConstraintLocator(locator))) {
@@ -7950,7 +7950,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                   increaseScore(ScoreKind::SK_ValueToPointerConversion,
                                 locator);
                 conversionsOrFixes.push_back(
-                  ConversionRestrictionKind::PointerToPointer);              
+                  ConversionRestrictionKind::PointerToPointer);
               }
             }
             // UnsafePointer and UnsafeRawPointer can also be converted from an
@@ -8084,7 +8084,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // a single expression body closure, in which case we still allow the
       // Never conversion.
       auto *loc = getConstraintLocator(locator);
-      if (elt->is<LocatorPathElt::ClosureBody>() || 
+      if (elt->is<LocatorPathElt::ClosureBody>() ||
           loc->isForContextualType(CTP_ReturnStmt) ||
           loc->isForContextualType(CTP_ClosureResult) ||
           loc->isForSingleValueStmtBranch()) {
@@ -8391,7 +8391,7 @@ ConstraintSystem::simplifyConstructionConstraint(
                            useDC, functionRefInfo,
                            /*outerAlternatives=*/{},
                            getConstraintLocator(
-                             fnLocator, 
+                             fnLocator,
                              ConstraintLocator::ConstructorMember));
 
   // HACK: Bind the function's parameter list as a tuple to a type variable.
@@ -14300,7 +14300,7 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   return SolutionKind::Solved;
 }
 
-ConstraintSystem::SolutionKind 
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyLValueObjectConstraint(
     Type type1, Type type2, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
@@ -14800,10 +14800,10 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                           LocatorPathElt::GenericArgument(0)));
   }
 
-  // K1 < K2 && V1 < V2 || K1 bridges to K2 && V1 bridges to V2 ===> 
+  // K1 < K2 && V1 < V2 || K1 bridges to K2 && V1 bridges to V2 ===>
   //   Dictionary<K1, V1> <c Dictionary<K2, V2>
   case ConversionRestrictionKind::DictionaryUpcast: {
-    auto t1 = type1->getDesugaredType();    
+    auto t1 = type1->getDesugaredType();
     Type key1, value1;
     std::tie(key1, value1) = *isDictionaryType(t1);
 

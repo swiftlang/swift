@@ -17,6 +17,6 @@ actor TestActor : TestableAsync {
 @available(SwiftStdlib 5.1, *)
 @MainActor class TestClass : TestableAsync {
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s4test9TestClassCAA13TestableAsyncA2aDPAAyyYaFTW : $@convention(witness_method: TestableAsync) @async (@in_guaranteed TestClass) -> ()
-  // CHECK: hop_to_executor {{%.*}} : $MainActor 
+  // CHECK: hop_to_executor {{%.*}} : $MainActor
   func test() { }
 }

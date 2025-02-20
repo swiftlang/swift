@@ -179,7 +179,7 @@ var fnlPkgKlass = FinalPkgKlass(9)
 let prevPkgDataFnl = fnlPkgKlass.data
 fnlPkgKlass.data = 11
 
-print(a, b, c, x, y, 
+print(a, b, c, x, y,
       prevPub, prevFrPub, prevPkg, prevPubData,
       prevPkgData, prevPubDataFnl, prevPkgDataFnl)
 

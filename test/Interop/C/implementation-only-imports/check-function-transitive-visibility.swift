@@ -10,7 +10,7 @@
 
 // This test, as well as `check-function-transitive-visibility-inversed.swift`
 // ensures that Swift looks into the transitive visible modules as well
-// when looking for the `getFortyTwo()` decl. 
+// when looking for the `getFortyTwo()` decl.
 
 import UseModuleA
 @_implementationOnly import UseModuleB

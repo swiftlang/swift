@@ -6,7 +6,7 @@
 // REQUIRES: CPU=x86_64 || CPU=arm64
 
 public func getVegetables() async -> [String] {
-  return ["leek", "carrot"]  
+  return ["leek", "carrot"]
 }
 
 // CHECK: define {{.*}} @"$s1M14chopVegetablesSaySSGyYaKFTQ0_"

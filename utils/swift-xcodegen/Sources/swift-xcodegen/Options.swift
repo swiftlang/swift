@@ -165,7 +165,7 @@ struct ProjectOptions: ParsableArguments {
     help: """
       Generate targets for Swift files in the standard library. This requires
       using Xcode with a main development Swift snapshot, and as such is
-      disabled by default. 
+      disabled by default.
 
       A development snapshot is necessary to avoid spurious build/live issues
       due to the fact that the stdlib is built using the just-built Swift
@@ -216,7 +216,7 @@ struct ProjectOptions: ParsableArguments {
       project.
 
       Only supported for targets that have no per-file build settings. This
-      unfortunately means some Clang targes such as 'lib/Basic' and 'stdlib' 
+      unfortunately means some Clang targes such as 'lib/Basic' and 'stdlib'
       cannot currently use buildable folders.
       """
   )

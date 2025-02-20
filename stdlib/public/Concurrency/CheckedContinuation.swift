@@ -44,7 +44,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
     let tailPtr = UnsafeMutableRawPointer(
       Builtin.projectTailElems(self, (UnsafeRawPointer?, String).self))
 
-    let functionPtr = tailPtr 
+    let functionPtr = tailPtr
         + MemoryLayout<(UnsafeRawPointer?, String)>.offset(of: \(UnsafeRawPointer?, String).1)!
 
     return functionPtr.assumingMemoryBound(to: String.self)

@@ -77,7 +77,7 @@ func storedProperties<T>(_: T) {
 func computedProperties<T: P>(_: T) {
   // CHECK: keypath $ReferenceWritableKeyPath<C<T>, S<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $C<τ_0_0>;
-  // CHECK-SAME: settable_property $S<τ_0_0>, 
+  // CHECK-SAME: settable_property $S<τ_0_0>,
   // CHECK-SAME:   id #C.nonfinal!getter : <T> (C<T>) -> () -> S<T>,
   // CHECK-SAME:   getter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
   // CHECK-SAME:   setter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTk : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
@@ -94,7 +94,7 @@ func computedProperties<T: P>(_: T) {
 
   // CHECK: keypath $ReferenceWritableKeyPath<C<T>, S<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $C<τ_0_0>;
-  // CHECK-SAME: settable_property $S<τ_0_0>, 
+  // CHECK-SAME: settable_property $S<τ_0_0>,
   // CHECK-SAME:   id #C.observed!getter : <T> (C<T>) -> () -> S<T>,
   // CHECK-SAME:   getter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
   // CHECK-SAME:   setter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTk : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
@@ -110,7 +110,7 @@ func computedProperties<T: P>(_: T) {
 
   // CHECK: keypath $ReferenceWritableKeyPath<C<T>, () -> ()>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $C<τ_0_0>;
-  // CHECK-SAME: settable_property $() -> (), 
+  // CHECK-SAME: settable_property $() -> (),
   // CHECK-SAME:   id ##C.reabstracted,
   // CHECK-SAME:   getter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>,
   // CHECK-SAME:   setter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTk : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>, @in_guaranteed C<τ_0_0>) -> ()
@@ -148,7 +148,7 @@ func computedProperties<T: P>(_: T) {
 
   // CHECK: keypath $KeyPath<T, Int>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $τ_0_0;
-  // CHECK-SAME: gettable_property $Int, 
+  // CHECK-SAME: gettable_property $Int,
   // CHECK-SAME:   id #P.x!getter : <Self where Self : P> (Self) -> () -> Int,
   // CHECK-SAME:   getter @$s8keypaths1PP1xSivpAaBRzlxTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Int
   // CHECK-SAME: ) <T>

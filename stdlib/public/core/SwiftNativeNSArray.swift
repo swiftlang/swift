@@ -28,7 +28,7 @@ internal func _isValidArrayIndex(_ index: Int, count: Int) -> Bool {
   return (index >= 0) && (index <= count)
 }
 
-/// Returns `true` if the given `index` is valid for subscripting 
+/// Returns `true` if the given `index` is valid for subscripting
 /// (`0 ≤ index < count`); otherwise, returns `false`.
 @usableFromInline @_transparent
 internal func _isValidArraySubscript(_ index: Int, count: Int) -> Bool {
@@ -63,7 +63,7 @@ internal class __SwiftNativeNSArrayWithContiguousStorage
 
 private let NSNotFound: Int = .max
 
-// Implement the APIs required by NSArray 
+// Implement the APIs required by NSArray
 extension __SwiftNativeNSArrayWithContiguousStorage {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
@@ -506,7 +506,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage: Sendable {}
 
 #endif
 
-/// Base class of the heap buffer backing arrays.  
+/// Base class of the heap buffer backing arrays.
 ///
 /// NOTE: older runtimes called this _ContiguousArrayStorageBase. The
 /// two must coexist, so it was renamed. The old name must not be used

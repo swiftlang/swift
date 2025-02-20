@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %swift_driver %s >%t/static_enums.swift
 
 // RUN: %target-build-swift -parse-as-library -O %t/static_enums.swift -module-name=test -o %t/a.out

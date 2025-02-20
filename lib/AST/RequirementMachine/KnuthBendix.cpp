@@ -13,7 +13,7 @@
 // This implements completion in the rewriting system sense, not code
 // completion.
 //
-// We use a variation of the Knuth-Bendix algorithm 
+// We use a variation of the Knuth-Bendix algorithm
 // (https://en.wikipedia.org/wiki/Knuth–Bendix_completion_algorithm).
 //
 // The goal is to find 'overlapping' rules which would allow the same term to
@@ -146,7 +146,7 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
                                          /*inverse=*/true));
     // (2) Now, apply the right hand side in the forward direction:
     //
-    //     T.(U => Y).V 
+    //     T.(U => Y).V
     path.add(RewriteStep::forRewriteRule(t.size(), v.size(),
                                          getRuleID(rhs),
                                          /*inverse=*/false));

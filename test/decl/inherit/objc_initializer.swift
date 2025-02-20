@@ -10,5 +10,5 @@ class Foo : NSObject {
   init(value: String) { }
 }
 
-class Bar : Foo { // okay: 
+class Bar : Foo { // okay:
 }

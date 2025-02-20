@@ -902,7 +902,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
-llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF, 
+llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
                                                llvm::Value *metadata,
                                                SILType selfType,
                                                bool objc,
@@ -1779,7 +1779,7 @@ namespace {
     }
 
     /// Destructors need to be collected into the instance methods
-    /// list 
+    /// list
     void visitDestructorDecl(DestructorDecl *destructor) {
       auto classDecl = cast<ClassDecl>(destructor->getDeclContext()->getImplementedObjCContext());
       if (Lowering::usesObjCAllocator(classDecl) &&
@@ -2345,7 +2345,7 @@ namespace {
                         llvm::GlobalValue::LinkageTypes linkage) {
       llvm::SmallString<64> nameBuffer;
       auto var =
-        fields.finishAndCreateGlobal(Twine(nameBase) 
+        fields.finishAndCreateGlobal(Twine(nameBase)
                                       + getEntityName(nameBuffer)
                                       + (TheExtension
                                            ? Twine("_$_") + CategoryName.str()

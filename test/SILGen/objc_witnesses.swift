@@ -24,7 +24,7 @@ class Phoûx : NSObject, Fooable {
 
 // witness for Phoûx.foo uses the Swift vtable
 // CHECK-LABEL: $s14objc_witnesses008Phox_xraC3foo{{[_0-9a-zA-Z]*}}F
-// CHECK:      bb0([[IN_ADDR:%.*]] : 
+// CHECK:      bb0([[IN_ADDR:%.*]] :
 // CHECK:         [[VALUE:%.*]] = load_borrow [[IN_ADDR]]
 // CHECK:         [[CLS_METHOD:%.*]] = class_method [[VALUE]] : $Phoûx, #Phoûx.foo :
 // CHECK:         apply [[CLS_METHOD]]([[VALUE]])
@@ -45,10 +45,10 @@ extension Gizmo : Bells {
 // CHECK:   switch_enum [[IUO_RESULT]]
 // CHECK: bb1:
 // CHECK-NEXT:   [[FILESTR:%.*]] = string_literal utf8 "
-// CHECK-NEXT:   [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
-// CHECK-NEXT:   [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
-// CHECK-NEXT:   [[LINE:%.*]] = integer_literal $Builtin.Word, 
-// CHECK-NEXT:   [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:   [[FILESIZ:%.*]] = integer_literal $Builtin.Word,
+// CHECK-NEXT:   [[FILEASC:%.*]] = integer_literal $Builtin.Int1,
+// CHECK-NEXT:   [[LINE:%.*]] = integer_literal $Builtin.Word,
+// CHECK-NEXT:   [[COLUMN:%.*]] = integer_literal $Builtin.Word,
 // CHECK-NEXT:   [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:   [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:   apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])

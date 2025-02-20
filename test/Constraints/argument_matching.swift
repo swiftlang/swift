@@ -8,7 +8,7 @@ struct X1 {
   init(_ a: Int) { }
   func f1(_ a: Int) {}
 }
-X1(a: 5).f1(b: 5) 
+X1(a: 5).f1(b: 5)
 // expected-error@-1 {{extraneous argument label 'a:' in call}} {{4-7=}}
 // expected-error@-2 {{extraneous argument label 'b:' in call}} {{13-16=}}
 
@@ -148,7 +148,7 @@ struct ReorderAndAllLabels {
 func defargs1(x: Int = 1, y: Int = 2, z: Int = 3) {}
 
 // Using defaults (in-order)
-defargs1() 
+defargs1()
 defargs1(x: 1)
 defargs1(x: 1, y: 2)
 
@@ -501,7 +501,7 @@ func testLabelErrorVariadic() {
 }
 
 // -------------------------------------------
-// Positions around defaults and variadics 
+// Positions around defaults and variadics
 // -------------------------------------------
 
 struct PositionsAroundDefaultsAndVariadics {
@@ -1538,7 +1538,7 @@ struct RelabelAndTrailingClosure {
 // -------------------------------------------
 func testValuesOfFunctionType(_ f1: (_: Int, _ arg: Int) -> () ) {
   f1(3, arg: 5) // expected-error{{extraneous argument label 'arg:' in call}}{{9-14=}}
-  f1(x: 3, 5) // expected-error{{extraneous argument label 'x:' in call}} {{6-9=}} 
+  f1(x: 3, 5) // expected-error{{extraneous argument label 'x:' in call}} {{6-9=}}
   f1(3, 5)
 }
 

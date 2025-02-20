@@ -4366,7 +4366,7 @@ public:
 
     // The method ought to appear in the class vtable.
     require(VerifyClassMethodVisitor(member).Seen,
-            "method does not appear in the class's vtable");    
+            "method does not appear in the class's vtable");
   }
 
   void checkObjCMethodInst(ObjCMethodInst *OMI) {
@@ -4564,7 +4564,7 @@ public:
 
     CanType operandInstTy =
       operandType.castTo<ExistentialMetatypeType>().getInstanceType();
-    CanType resultInstTy = 
+    CanType resultInstTy =
       resultType.castTo<MetatypeType>().getInstanceType();
 
     while (auto operandMetatype =
@@ -5442,8 +5442,8 @@ public:
     require(Ty.is<BuiltinIntegerType>(),
             "switch_value operand should be an integer");
 
-    auto ult = [](const SILValue &a, const SILValue &b) { 
-      return a == b || a < b; 
+    auto ult = [](const SILValue &a, const SILValue &b) {
+      return a == b || a < b;
     };
 
     std::set<SILValue, decltype(ult)> cases(ult);
@@ -6981,7 +6981,7 @@ public:
                 // We check the yield_once rule in the mandatory analyses,
                 // so we can't assert it yet in the raw stage.
                 } else if (F->getLoweredFunctionType()->getCoroutineKind()
-                             == SILCoroutineKind::YieldOnce && 
+                             == SILCoroutineKind::YieldOnce &&
                            F->getModule().getStage() != SILStage::Raw) {
                   insertResult.first->second.CFG = VerifyFlowSensitiveRulesDetails::YieldOnceResume;
                 }
@@ -7138,7 +7138,7 @@ public:
         continue;
       }
       if (DS != LastSeenScope) {
-        llvm::errs() << "Broken instruction!\n"; 
+        llvm::errs() << "Broken instruction!\n";
         SI.dump();
 #ifndef NDEBUG
         llvm::errs() << "in scope\n";

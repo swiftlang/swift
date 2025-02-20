@@ -618,7 +618,7 @@ bool Parser::consumeIfAttributeLParen() {
 
 SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
   // Consumes prefix of token and returns its location.
-  // (like '?', '<', '>' or '!' immediately followed by '<') 
+  // (like '?', '<', '>' or '!' immediately followed by '<')
   assert(Len >= 1);
 
   // Current token can be either one-character token we want to consume...
@@ -791,7 +791,7 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
 
     if (isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false)) {
 
-      // Could have encountered something like `_ var:` 
+      // Could have encountered something like `_ var:`
       // or `let foo:` or `var:`
       if (Tok.isAny(tok::kw_var, tok::kw_let) ||
           (Context.LangOpts.hasFeature(Feature::ReferenceBindings) &&

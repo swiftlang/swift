@@ -5,7 +5,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
 
-// Test requires _swift_task_enterThreadLocalContext which is not available 
+// Test requires _swift_task_enterThreadLocalContext which is not available
 // in the back deployment runtime.
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: back_deploy_concurrency

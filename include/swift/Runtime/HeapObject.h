@@ -26,7 +26,7 @@
 #include <objc/objc.h>
 #endif // SWIFT_OBJC_INTEROP
 
-// Bring in the definition of HeapObject 
+// Bring in the definition of HeapObject
 #include "swift/shims/HeapObject.h"
 #include "swift/shims/Visibility.h"
 

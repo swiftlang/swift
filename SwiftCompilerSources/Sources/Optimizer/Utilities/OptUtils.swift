@@ -791,7 +791,7 @@ extension InstructionRange {
 ///   %i = some_const_initializer_insts
 ///   store %i to %a
 /// ```
-/// 
+///
 /// For all other instructions `handleUnknownInstruction` is called and such an instruction
 /// is accepted if `handleUnknownInstruction` returns true.
 func getGlobalInitialization(

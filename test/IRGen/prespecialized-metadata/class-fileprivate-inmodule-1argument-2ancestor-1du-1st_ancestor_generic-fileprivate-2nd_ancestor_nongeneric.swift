@@ -8,7 +8,7 @@
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-//              CHECK: @"$s4main5Value[[UNIQUE_ID_1:[A-Za-z_0-9]+]]LLCySiGMf" = linkonce_odr hidden 
+//              CHECK: @"$s4main5Value[[UNIQUE_ID_1:[A-Za-z_0-9]+]]LLCySiGMf" = linkonce_odr hidden
 //   CHECK-apple-SAME: global
 // CHECK-unknown-SAME: constant
 //         CHECK-SAME: <{

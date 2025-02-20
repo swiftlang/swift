@@ -393,7 +393,7 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 
 //
 // Not implemented in Swift
-// 
+//
 
 // NEGATIVE-NOT: Category2
 // NEGATIVE-NOT: NoImplClass

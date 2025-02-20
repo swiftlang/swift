@@ -12,7 +12,7 @@ public final class CompletelyHollowActorSystem: DistributedActorSystem {
   // expected-error@-3{{class 'CompletelyHollowActorSystem' is missing witness for protocol requirement 'remoteCall'}}
   // expected-note@-4{{add stubs for conformance}}
   // expected-error@-5{{class 'CompletelyHollowActorSystem' is missing witness for protocol requirement 'remoteCallVoid'}}
-  // expected-note@-6{{add stubs for conformance}}  
+  // expected-note@-6{{add stubs for conformance}}
 
   public typealias ActorID = String
   public typealias InvocationEncoder = Encoder
@@ -37,7 +37,7 @@ public final class CompletelyHollowActorSystem: DistributedActorSystem {
 
   public struct ResultHandler: DistributedTargetInvocationResultHandler {
     // expected-error@-1{{type 'CompletelyHollowActorSystem.ResultHandler' does not conform to protocol 'DistributedTargetInvocationResultHandler'}}
-    // expected-note@-2{{add stubs for conformance}}  
+    // expected-note@-2{{add stubs for conformance}}
     // expected-error@-3{{struct 'ResultHandler' is missing witness for protocol requirement 'onReturn'}}
     // expected-note@-4{{add stubs for conformance}}
   }
@@ -48,7 +48,7 @@ public final class CompletelyHollowActorSystem_NotEvenTypes: DistributedActorSys
   // expected-error@-1{{type 'CompletelyHollowActorSystem_NotEvenTypes' does not conform to protocol 'DistributedActorSystem'}}
   // expected-note@-2{{add stubs for conformance}}
   // expected-error@-3{{class 'CompletelyHollowActorSystem_NotEvenTypes' is missing witness for protocol requirement 'remoteCallVoid'}}
-  // expected-note@-4{{add stubs for conformance}}  
+  // expected-note@-4{{add stubs for conformance}}
   // expected-error@-5{{class 'CompletelyHollowActorSystem_NotEvenTypes' is missing witness for protocol requirement 'remoteCall'}}
   // expected-note@-6{{add stubs for conformance}}
 }

@@ -137,14 +137,14 @@ internal class __EmptySetSingleton: __RawSetStorage {
 public var _swiftEmptySetSingleton: (Int, Int, Int, Int, UInt8, UInt8, UInt16, UInt32, Int, Int, Int) =
     (
       /*isa*/0, /*refcount*/-1, // HeapObject header
-      /*count*/0, 
-      /*capacity*/0, 
-      /*scale*/0, 
-      /*reservedScale*/0, 
-      /*extra*/0, 
-      /*age*/0, 
-      /*seed*/0, 
-      /*rawElements*/1, 
+      /*count*/0,
+      /*capacity*/0,
+      /*scale*/0,
+      /*reservedScale*/0,
+      /*extra*/0,
+      /*age*/0,
+      /*seed*/0,
+      /*rawElements*/1,
       /*metadata*/~1
     )
 #endif

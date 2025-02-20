@@ -49,7 +49,7 @@ extension RangeSet {
       // might be no-ops, if no empty or overlapping ranges have been found.)
       _storage.swapAt(0, firstNonEmpty)
 
-      // That single range is now a valid range set, so we set up three sections 
+      // That single range is now a valid range set, so we set up three sections
       // of the storage array:
       //
       //    1: a processed, valid range set (0...lastValid)
@@ -78,7 +78,7 @@ extension RangeSet {
           _storage[lastValid] = Range(
             uncheckedBounds: (_storage[lastValid].lowerBound, newUpper))
         } else {
-          // Otherwise, this is a valid new range to add to the range set: 
+          // Otherwise, this is a valid new range to add to the range set:
           // swap it into place at the end of the valid section.
           lastValid += 1
           _storage.swapAt(current, lastValid)

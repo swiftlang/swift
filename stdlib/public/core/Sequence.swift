@@ -478,9 +478,9 @@ public struct DropFirstSequence<Base: Sequence> {
   @usableFromInline
   internal let _limit: Int
 
-  @inlinable 
+  @inlinable
   public init(_ base: Base, dropping limit: Int) {
-    _precondition(limit >= 0, 
+    _precondition(limit >= 0,
       "Can't drop a negative number of elements from a sequence")
     _base = base
     _limit = limit
@@ -548,7 +548,7 @@ extension PrefixSequence {
       _base = base
       _remaining = maxLength
     }
-  }  
+  }
 }
 
 extension PrefixSequence.Iterator: Sendable where Base.Iterator: Sendable {}
@@ -564,7 +564,7 @@ extension PrefixSequence.Iterator: IteratorProtocol {
     } else {
       return nil
     }
-  }  
+  }
 }
 
 extension PrefixSequence: Sequence {
@@ -973,8 +973,8 @@ extension Sequence {
     _precondition(maxSplits >= 0, "Must take zero or more splits")
     let whole = Array(self)
     return try whole.split(
-                  maxSplits: maxSplits, 
-                  omittingEmptySubsequences: omittingEmptySubsequences, 
+                  maxSplits: maxSplits,
+                  omittingEmptySubsequences: omittingEmptySubsequences,
                   whereSeparator: isSeparator)
   }
 
@@ -1248,7 +1248,7 @@ extension Sequence {
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return nil
-  }  
+  }
 }
 
 // FIXME(ABI)#182

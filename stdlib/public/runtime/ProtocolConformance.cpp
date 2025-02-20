@@ -1827,7 +1827,7 @@ checkInvertibleRequirementsStructural(const Metadata *type,
 /// Check that the given `type` meets all invertible protocol requirements
 /// that haven't been explicitly suppressed by `ignored`.
 std::optional<TypeLookupError>
-checkInvertibleRequirements(const Metadata *type, 
+checkInvertibleRequirements(const Metadata *type,
                               InvertibleProtocolSet ignored) {
   auto contextDescriptor = type->getTypeContextDescriptor();
   if (!contextDescriptor)

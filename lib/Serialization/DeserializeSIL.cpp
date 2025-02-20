@@ -336,7 +336,7 @@ SILBasicBlock *SILDeserializer::getBBForDefinition(SILFunction *Fn,
   // If the block has never been named yet, just create it.
   if (BB == nullptr) {
     if (Prev) {
-      BB = Fn->createBasicBlockAfter(Prev);      
+      BB = Fn->createBasicBlockAfter(Prev);
     } else {
       BB = Fn->createBasicBlock();
     }
@@ -3420,8 +3420,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto *failureBB = getBBForReference(Fn, ListOfValues[7]);
 
     ResultInst =
-        Builder.createCheckedCastBranch(Loc, isExact, op, sourceFormalType, 
-                                        targetLoweredType, targetFormalType, 
+        Builder.createCheckedCastBranch(Loc, isExact, op, sourceFormalType,
+                                        targetLoweredType, targetFormalType,
                                         successBB, failureBB,
                                         forwardingOwnership);
     break;

@@ -76,7 +76,7 @@ struct PointerInfo {
   /// Given the address of storage for a pointer with these
   /// properties, return the extra inhabitant index of the
   /// value, or -1 if the value is a valid pointer.  Always
-  /// produces an i32. 
+  /// produces an i32.
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                        Address src) const;
 

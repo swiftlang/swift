@@ -6,11 +6,11 @@
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
 // CHECK-DAG: @"$s4main9Ancestor1[[UNIQUE_ID_1:[0-9a-zA-Z_]+]]CySiGMf" =
-// CHECK-DAG: @"$s4main9Ancestor2[[UNIQUE_ID_1]]CySdGMf" = 
+// CHECK-DAG: @"$s4main9Ancestor2[[UNIQUE_ID_1]]CySdGMf" =
 
-//              CHECK: @"$s4main5Value[[UNIQUE_ID_1]]CySSGMf" = linkonce_odr hidden 
-// CHECK-unknown-SAME: constant 
-//   CHECK-apple-SAME: global 
+//              CHECK: @"$s4main5Value[[UNIQUE_ID_1]]CySSGMf" = linkonce_odr hidden
+// CHECK-unknown-SAME: constant
+//   CHECK-apple-SAME: global
 //         CHECK-SAME: <{
 //         CHECK-SAME:   ptr,
 //         CHECK-SAME:   ptr,
@@ -114,7 +114,7 @@ func consume<T>(_ t: T) {
 // CHECK:   [[METADATA_RESPONSE:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CySSGMb"([[INT]] 0)
 // CHECK:   [[METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
+// CHECK-SAME:     ptr noalias {{%[0-9]+}},
 // CHECK-SAME:     ptr [[METADATA]])
 // CHECK: }
 func doit() {
@@ -128,7 +128,7 @@ doit()
 //     CHECK-NOT:   call swiftcc %swift.metadata_response @"$s4main9Ancestor2[[UNIQUE_ID_1]]CySiGMb"([[INT]] 0)
 // CHECK-unknown:   ret
 //   CHECK-apple:  [[INITIALIZED_CLASS:%[0-9]+]] = call ptr @objc_opt_self(
-//    CHECK-SAME:        @"$s4main5Value[[UNIQUE_ID_1]]CySSGMf" 
+//    CHECK-SAME:        @"$s4main5Value[[UNIQUE_ID_1]]CySSGMf"
 //   CHECK-apple:   [[PARTIAL_METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response undef, ptr [[INITIALIZED_CLASS]], 0
 //   CHECK-apple:   [[METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response [[PARTIAL_METADATA_RESPONSE]], [[INT]] 0, 1
 //   CHECK-apple:   ret %swift.metadata_response [[METADATA_RESPONSE]]
@@ -137,12 +137,12 @@ doit()
 //      CHECK: define internal swiftcc %swift.metadata_response @"$s4main9Ancestor2[[UNIQUE_ID_1]]CMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 //      CHECK: entry:
 //      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
-// CHECK-SAME:     [[INT]] [[METADATA_REQUEST]], 
-// CHECK-SAME:     ptr %1, 
-// CHECK-SAME:     ptr undef, 
-// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     [[INT]] [[METADATA_REQUEST]],
+// CHECK-SAME:     ptr %1,
+// CHECK-SAME:     ptr undef,
+// CHECK-SAME:     ptr undef,
 //           :     ptr bitcast (
-//           :       <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8, i32, i32, %swift.method_descriptor }>* 
+//           :       <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8, i32, i32, %swift.method_descriptor }>*
 // CHECK-SAME:       $s4main9Ancestor2[[UNIQUE_ID_1]]CMn
 //           :       to ptr
 //           :     )
@@ -153,10 +153,10 @@ doit()
 //      CHECK: define internal swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]CMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 //      CHECK: entry:
 //      CHECK:   call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
-// CHECK-SAME:     [[INT]] [[METADATA_REQUEST]], 
-// CHECK-SAME:     ptr %1, 
-// CHECK-SAME:     ptr undef, 
-// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     [[INT]] [[METADATA_REQUEST]],
+// CHECK-SAME:     ptr %1,
+// CHECK-SAME:     ptr undef,
+// CHECK-SAME:     ptr undef,
 // CHECK-SAME:     $s4main9Ancestor1[[UNIQUE_ID_1]]CMn
 // CHECK-SAME:   )
 //      CHECK:   ret %swift.metadata_response {{%[0-9]+}}
@@ -165,10 +165,10 @@ doit()
 //      CHECK: define internal swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 //      CHECK: entry:
 //      CHECK:   call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
-// CHECK-SAME:     [[INT]] [[METADATA_REQUEST]], 
-// CHECK-SAME:     ptr %1, 
-// CHECK-SAME:     ptr undef, 
-// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     [[INT]] [[METADATA_REQUEST]],
+// CHECK-SAME:     ptr %1,
+// CHECK-SAME:     ptr undef,
+// CHECK-SAME:     ptr undef,
 // CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]CMn
 // CHECK-SAME:   )
 //      CHECK:   ret %swift.metadata_response {{%[0-9]+}}

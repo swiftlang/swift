@@ -35,7 +35,7 @@ func use(_ o : borrowing BV)
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test13bv_borrow_var1p1iySV_SitF : $@convention(thin) (UnsafeRawPointer, Int) -> () {
 // CHECK: [[A:%.*]] = begin_access [read] [unknown] %{{.*}} : $*NC
-// CHECK: [[U:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[A]] : $*NC 
+// CHECK: [[U:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[A]] : $*NC
 // CHECK: [[L:%.*]] = load [copy] [[U]] : $*NC
 // CHECK:   [[R:%.*]] = apply %{{.*}}([[L]]) : $@convention(method) (@guaranteed NC) -> @lifetime(borrow 0) @owned BV
 // CHECK:   [[M:%.*]] = mark_dependence [unresolved] [[R]] : $BV on [[A]] : $*NC

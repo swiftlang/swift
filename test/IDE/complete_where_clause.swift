@@ -229,15 +229,15 @@ extension TA2.Inner2 where #^NOMINAL_TYPEALIAS_NESTED2_EXT^# {}
 protocol WithAssoc {
   associatedtype T: Assoc
 }
-extension WithAssoc where T.#^EXT_ASSOC_MEMBER_1^# 
+extension WithAssoc where T.#^EXT_ASSOC_MEMBER_1^#
 // EXT_ASSOC_MEMBER: Begin completions, 2 items
 // EXT_ASSOC_MEMBER-DAG: Decl[AssociatedType]/CurrNominal:   Q;
 // EXT_ASSOC_MEMBER-DAG: Keyword/None:                       Type[#Self.T.Type#];
 
-extension WithAssoc where Int == T.#^EXT_ASSOC_MEMBER_2^# 
+extension WithAssoc where Int == T.#^EXT_ASSOC_MEMBER_2^#
 // Same as EXT_ASSOC_MEMBER
 
-extension WithAssoc where Int == #^EXT_SECONDTYPE^# 
+extension WithAssoc where Int == #^EXT_SECONDTYPE^#
 // EXT_SECONDTYPE-DAG: Decl[AssociatedType]/CurrNominal:   T;
 
 func foo<K: WithAssoc>(_ key: K.Type) where K.#^WHERE_CLAUSE_WITH_EQUAL^# == S1 {}

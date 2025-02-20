@@ -28,7 +28,7 @@ struct Owl<T : Runcible, U> {
 }
 
 class Pussycat<T : Runcible, U> {
-  init() {} 
+  init() {}
 
   // CHECK: define hidden swiftcc void @"$s16associated_types8PussycatC3eat{{[_0-9a-zA-Z]*}}F"(ptr noalias %0, ptr noalias %1, ptr noalias %2, ptr swiftself %3)
   func eat(_ what: T.RuncerType.Runcee, and: T.RuncerType, with: T) { }

@@ -66,7 +66,7 @@ public struct AsyncThrowingFilterSequence<Base: AsyncSequence> {
 
   @usableFromInline
   init(
-    _ base: Base, 
+    _ base: Base,
     isIncluded: @escaping (Base.Element) async throws -> Bool
   ) {
     self.base = base
@@ -173,11 +173,11 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingFilterSequence: @unchecked Sendable 
-  where Base: Sendable, 
+extension AsyncThrowingFilterSequence: @unchecked Sendable
+  where Base: Sendable,
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingFilterSequence.Iterator: @unchecked Sendable 
-  where Base.AsyncIterator: Sendable, 
+extension AsyncThrowingFilterSequence.Iterator: @unchecked Sendable
+  where Base.AsyncIterator: Sendable,
         Base.Element: Sendable { }

@@ -58,7 +58,7 @@ func test(consuming foo: consuming Bar) { // expected-error{{'foo' used after co
     case .payload(.payload(let x))
       where condition(x):
         nibble(payload: x)
-    // can't consume borrowed bindings in either `where` condition 
+    // can't consume borrowed bindings in either `where` condition
     // or body
     case .payload(.payload(let x)) // expected-error{{cannot be consumed}}
       where hungryCondition(x): // expected-note{{consumed here}}
@@ -95,7 +95,7 @@ func test(consuming foo: consuming Bar) { // expected-error{{'foo' used after co
 }
 
 @_silgen_name("nibble_bar")
-func nibble(bar: borrowing Bar) 
+func nibble(bar: borrowing Bar)
 
 func test(borrowing foo: borrowing Bar) { // expected-error{{'foo' is borrowed and cannot be consumed}}
     // can't use consuming patterns on a borrow

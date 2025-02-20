@@ -38,18 +38,18 @@ ResultTests.test("Construction") {
   let result2: Result<String, Err> = .failure(.err)
   let string1: String? = {
     switch result1 {
-      case let .success(string): 
+      case let .success(string):
         return string
-      case .failure: 
+      case .failure:
         expectUnreachable()
         return nil
     }
   }()
   let error: Err? = {
     switch result2 {
-      case let .failure(failure): 
+      case let .failure(failure):
         return failure
-      case .success: 
+      case .success:
         expectUnreachable()
         return nil
     }

@@ -293,7 +293,7 @@ func testScopedOfInheritedWithLet(_ arg: [Int] ) {
   // TODO: should be // ✅ Safe: 'copySpan' result should be borrowed over `result`
   // rdar://128821299 ([nonescaping] extend borrowed arguments that are the source of a scoped dependence)
   let result = reborrowSpan(copySpan(span)) // expected-error {{lifetime-dependent variable 'result' escapes its scope}}
-  // expected-note @-1{{it depends on the lifetime of this parent value}}  
+  // expected-note @-1{{it depends on the lifetime of this parent value}}
   _ = result
 } // expected-note {{this use of the lifetime-dependent value is out of scope}}
 

@@ -1181,7 +1181,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
         selfTypeForAccess = MetatypeType::get(selfTypeForAccess);
 
     // Otherwise do a self-reference, which is dynamically bogus but
-    // should be statically valid.  This should only happen in invalid cases.    
+    // should be statically valid.  This should only happen in invalid cases.
     } else {
       semantics = AccessSemantics::Ordinary;
       selfAccessKind = SelfAccessorKind::Peer;

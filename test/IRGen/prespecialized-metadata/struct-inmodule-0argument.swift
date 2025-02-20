@@ -17,18 +17,18 @@ func consume<T>(_ t: T) {
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:   ptr noalias %{{[0-9]+}}, 
+// CHECK-SAME:   ptr noalias %{{[0-9]+}},
 // CHECK-SAME:   ptr getelementptr inbounds (
-// CHECK-SAME:     <{ 
-// CHECK-SAME:       ptr, 
-// CHECK-SAME:       ptr, 
-// CHECK-SAME:       [[INT]], 
-// CHECK-SAME:       ptr, 
+// CHECK-SAME:     <{
+// CHECK-SAME:       ptr,
+// CHECK-SAME:       ptr,
+// CHECK-SAME:       [[INT]],
+// CHECK-SAME:       ptr,
 // CHECK-SAME:       i32
-// CHECK-SAME:       i64 
-// CHECK-SAME:     }>, 
-// CHECK-SAME:     ptr @"$s4main5ValueVMf", 
-// CHECK-SAME:     i32 0, 
+// CHECK-SAME:       i64
+// CHECK-SAME:     }>,
+// CHECK-SAME:     ptr @"$s4main5ValueVMf",
+// CHECK-SAME:     i32 0,
 // CHECK-SAME:     i32 2
 // CHECK-SAME:   )
 // CHECK-SAME: )

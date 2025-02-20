@@ -3,7 +3,7 @@
 @unknown func f0() {} // expected-error{{unknown attribute 'unknown'}}
 @unknown(x,y) func f1() {} // expected-error{{unknown attribute 'unknown'}}
 
-enum binary { 
+enum binary {
   case Zero
   case One
   init() { self = .Zero }
@@ -366,7 +366,7 @@ struct I65705 {
   func f2(_: @discardableResult Int) {} // expected-error {{attribute can only be applied to declarations, not types}} {{14-33=}} {{3-3=@discardableResult }} {{none}}
 
   func stmt(_ a: Int?) {
-    if let _: @discardableResult Int = a { // expected-error {{attribute can only be applied to declarations, not types}} {{15-34=}} 
+    if let _: @discardableResult Int = a { // expected-error {{attribute can only be applied to declarations, not types}} {{15-34=}}
     }
     if var _: @discardableResult Int = a { // expected-error {{attribute can only be applied to declarations, not types}} {{15-34=}}
     }

@@ -400,7 +400,7 @@ inline void *RootObjectBuilder::finishImpl() {
 
 inline void RootObjectBuilder::fillReference(const Reference &ref) {
   assert(ref.referent->hasAssignedOffset());
-  ptrdiff_t difference = 
+  ptrdiff_t difference =
     (ptrdiff_t) (ref.referent->assignedOffset + ref.addend - ref.offset);
   auto truncated = (RelativeReferenceType) difference;
   assert(difference == truncated && "built object > 2GB?");

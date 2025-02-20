@@ -103,7 +103,7 @@ void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddBoolean(true);
     addressableParamIndicesAndImmortal.getPointer()->Profile(ID);
   } else {
-    ID.AddBoolean(false);  
+    ID.AddBoolean(false);
   }
 }
 
@@ -210,7 +210,7 @@ void LifetimeDependenceInfo::getConcatenatedData(
     pushData(scopeLifetimeParamIndices);
   }
   if (hasAddressableParamIndices()) {
-    pushData(addressableParamIndicesAndImmortal.getPointer());  
+    pushData(addressableParamIndicesAndImmortal.getPointer());
   }
 }
 

@@ -99,7 +99,7 @@ func _finalizeUninitializedArray<Element>(
 #endif
 
 @_unavailableInEmbedded
-extension Collection {  
+extension Collection {
   // Utility method for collections that wish to implement
   // CustomStringConvertible and CustomDebugStringConvertible using a bracketed
   // list of elements, like an array.
@@ -271,7 +271,7 @@ extension _ArrayBufferProtocol {
     _ dest: inout _ContiguousArrayBuffer<Element>,
     _ headCount: Int, // Count of initial source elements to copy/move
     _ newCount: Int,  // Number of new elements to insert
-    _ initializeNewElements: 
+    _ initializeNewElements:
         ((UnsafeMutablePointer<Element>, _ count: Int) -> ()) = { ptr, count in
       _internalInvariant(count == 0)
     }
@@ -371,7 +371,7 @@ extension _ArrayBufferProtocol {
 
       // grow capacity, first time around and when filled
       var newBuffer = _forceCreateUniqueMutableBuffer(
-        countForNewBuffer: newCount, 
+        countForNewBuffer: newCount,
         // minNewCapacity handles the exponential growth, just
         // need to request 1 more than current count/capacity
         minNewCapacity: newCount + 1)

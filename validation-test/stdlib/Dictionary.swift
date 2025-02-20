@@ -1861,7 +1861,7 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
     assert(d[1111] == nil)
   }
   do {
-    var d = Dictionary(dictionaryLiteral: 
+    var d = Dictionary(dictionaryLiteral:
         (10, 1010), (20, 1020))
     assert(d.count == 2)
     assert(d[10]! == 1010)
@@ -1869,7 +1869,7 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
     assert(d[1111] == nil)
   }
   do {
-    var d = Dictionary(dictionaryLiteral: 
+    var d = Dictionary(dictionaryLiteral:
         (10, 1010), (20, 1020), (30, 1030))
     assert(d.count == 3)
     assert(d[10]! == 1010)
@@ -1878,7 +1878,7 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
     assert(d[1111] == nil)
   }
   do {
-    var d = Dictionary(dictionaryLiteral: 
+    var d = Dictionary(dictionaryLiteral:
         (10, 1010), (20, 1020), (30, 1030), (40, 1040))
     assert(d.count == 4)
     assert(d[10]! == 1010)

@@ -417,11 +417,11 @@ do {
 struct Test7 {
   @Builder<Int> dynamic func function() -> Result { 1 }
 
-  @Builder<Int> 
+  @Builder<Int>
   dynamic var property1: Result { 1 }
   dynamic var property2: Result { @Builder<Int> get { 1 } }
 
-  @Builder<Int> 
+  @Builder<Int>
   dynamic subscript(subscript1 _: Int) -> Result { 1 }
   dynamic subscript(subscript2 _: Int) -> Result { @Builder<Int> get { 1 } }
 }

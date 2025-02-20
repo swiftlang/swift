@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: echo 'print("Hello, World!")' >%t/main.swift
-// RUN: echo "" > %t/𝔼-file-01.swift 
-// RUN: echo "" > %t/😂-file-02.swift 
+// RUN: echo "" > %t/𝔼-file-01.swift
+// RUN: echo "" > %t/😂-file-02.swift
 // RUN: echo "" > %t/Ω-file-03.swift
 //
 // If the supplementary output file map does not escape the characters in the

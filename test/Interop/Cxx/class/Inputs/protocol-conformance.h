@@ -69,7 +69,7 @@ struct HasOperatorPlusEqual {
 using HasOperatorPlusEqualInt = HasOperatorPlusEqual<int>;
 
 struct HasVirtualMethod {
-  virtual int return42() { return 42; } 
+  virtual int return42() { return 42; }
 };
 
 struct HasStaticOperatorCall {

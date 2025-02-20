@@ -258,7 +258,7 @@ MetadataDependency MetadataDependencyCollector::finish(IRGenFunction &IGF) {
 
   // Clear RequiredMetadata to tell the destructor that we finished.
   // We leave RequiredState in place so that we can detect attempts to
-  // add 
+  // add
   RequiredMetadata = nullptr;
 
   return result;
@@ -3434,7 +3434,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   return emitCallToTypeMetadataAccessFunction(*this, type, request);
 }
 
-/// Return the address of a function that will return type metadata 
+/// Return the address of a function that will return type metadata
 /// for the given non-dependent type.
 llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
                                                              CanType type) {

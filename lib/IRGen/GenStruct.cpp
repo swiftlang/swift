@@ -1423,7 +1423,7 @@ private:
         } else {
           swiftField = nullptr;
         }
-      } 
+      }
 
       // Try to position this field.  If this fails, it's because we
       // didn't lay out padding correctly.

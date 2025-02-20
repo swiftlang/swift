@@ -14,9 +14,9 @@
 /// A sequence whose elements consist of the initial consecutive elements of
 /// some base sequence that satisfy a given predicate.
 ///
-/// - Note: When `LazyPrefixWhileSequence` wraps a collection type, the 
-///   performance of accessing `endIndex` depends on how many 
-///   elements satisfy the predicate at the start of the collection, and might 
+/// - Note: When `LazyPrefixWhileSequence` wraps a collection type, the
+///   performance of accessing `endIndex` depends on how many
+///   elements satisfy the predicate at the start of the collection, and might
 ///   not offer the usual performance given by the `Collection` protocol.
 ///   Accessing `endIndex`, the `last` property, or calling methods that
 ///   depend on moving indices might not have the documented complexity.
@@ -113,8 +113,8 @@ extension LazySequenceProtocol {
 /// A lazy collection wrapper that includes the initial consecutive
 /// elements of an underlying collection that satisfy a predicate.
 ///
-/// - Note: The performance of accessing `endIndex` depends on how many 
-///   elements satisfy the predicate at the start of the collection, and might 
+/// - Note: The performance of accessing `endIndex` depends on how many
+///   elements satisfy the predicate at the start of the collection, and might
 ///   not offer the usual performance given by the `Collection` protocol.
 ///   Accessing `endIndex`, the `last` property, or calling methods that
 ///   depend on moving indices might not have the documented complexity.
@@ -164,7 +164,7 @@ extension LazyPrefixWhileSequence.Index: Sendable
 extension LazyPrefixWhileSequence.Index: Comparable where Base: Collection {
   @inlinable // lazy-performance
   public static func == (
-    lhs: LazyPrefixWhileCollection<Base>.Index, 
+    lhs: LazyPrefixWhileCollection<Base>.Index,
     rhs: LazyPrefixWhileCollection<Base>.Index
   ) -> Bool {
     switch (lhs._value, rhs._value) {
@@ -179,7 +179,7 @@ extension LazyPrefixWhileSequence.Index: Comparable where Base: Collection {
 
   @inlinable // lazy-performance
   public static func < (
-    lhs: LazyPrefixWhileCollection<Base>.Index, 
+    lhs: LazyPrefixWhileCollection<Base>.Index,
     rhs: LazyPrefixWhileCollection<Base>.Index
   ) -> Bool {
     switch (lhs._value, rhs._value) {

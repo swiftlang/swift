@@ -7,7 +7,7 @@ protocol A { func a() }
 protocol B { func b() }
 protocol C : class { func c() }
 @objc protocol O { func o() }
-@objc protocol OPT { 
+@objc protocol OPT {
   @objc optional func opt()
   @objc optional static func static_opt()
 

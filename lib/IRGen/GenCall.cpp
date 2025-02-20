@@ -6171,7 +6171,7 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
   case BasicKind::AsyncFunctionPointer: {
     if (auto *rawFunction = getRawAsyncFunction()) {
       // If the pointer to the underlying function is available, it means that
-      // this FunctionPointer instance was created via 
+      // this FunctionPointer instance was created via
       // FunctionPointer::forDirect and as such has no AuthInfo.
       assert(!AuthInfo && "have PointerAuthInfo for an async FunctionPointer "
                           "for which the raw function is known");

@@ -130,7 +130,7 @@ private:
 protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
 
-  template <class... As> 
+  template <class... As>
   RecordTypeInfoImpl(ArrayRef<FieldImpl> fields,
                      FieldsAreABIAccessible_t fieldsABIAccessible,
                      As&&...args)
@@ -660,7 +660,7 @@ class RecordTypeInfo<Impl, Base, FieldImpl,
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
   using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
 protected:
-  template <class... As> 
+  template <class... As>
   RecordTypeInfo(ArrayRef<FieldImpl> fields, As &&...args)
     : super(fields, std::forward<As>(args)...) {}
 
@@ -761,7 +761,7 @@ public:
   }
 };
 
-/// An implementation of RecordTypeInfo for loadable types. 
+/// An implementation of RecordTypeInfo for loadable types.
 template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ true, /*IsLoadable*/ true>
@@ -773,7 +773,7 @@ class RecordTypeInfo<Impl, Base, FieldImpl,
 protected:
   using super::asImpl;
 
-  template <class... As> 
+  template <class... As>
   RecordTypeInfo(ArrayRef<FieldImpl> fields,
                  unsigned explosionSize,
                  As &&...args)
@@ -990,7 +990,7 @@ public:
       return asImpl()->createNonFixed(fields, fieldsABIAccessible,
                                       std::move(layout));
     }
-  }  
+  }
 };
 
 } // end namespace irgen

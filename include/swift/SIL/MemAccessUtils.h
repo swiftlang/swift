@@ -31,9 +31,9 @@
 ///   %address = struct_element_addr %access : $*S, #.field
 ///   %value   = load [trivial] %address : $*Int64
 ///   end_access %access : $*S
-/// 
+///
 /// OR
-/// 
+///
 ///   %root    = alloc_box $S
 ///   %base    = project_box %root : ${ var S }
 ///   %access  = begin_access [read] [static] %base : $*S

@@ -473,7 +473,7 @@ public:
   };
 
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wreturn-type-c-linkage" 
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
   /// Retrieve the type metadata described by the given demangled type name.
   ///
   /// \p substGenericParam Function that provides generic argument metadata

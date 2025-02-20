@@ -1620,7 +1620,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
   SILBasicBlock &throwBB = *ThrowDest.getBlock();
   SILType destErrorType =  indirectErrorAddr
       ? indirectErrorAddr->getType().getObjectType()
-      : !throwBB.getArguments().empty() 
+      : !throwBB.getArguments().empty()
         ? throwBB.getArguments()[0]->getType().getObjectType()
         : exnType;
 

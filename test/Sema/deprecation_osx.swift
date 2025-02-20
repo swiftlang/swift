@@ -180,7 +180,7 @@ class I59843_A {
 
   func f() {
     self.method(a: "a", b: "b") // expected-warning{{'method(a:b:)' was deprecated in macOS 51: renamed to 'method(with:)' [DeprecatedDeclaration]}}
-    // expected-note@-1{{use 'method(with:)' instead}} {{none}} 
+    // expected-note@-1{{use 'method(with:)' instead}} {{none}}
   }
 }
 

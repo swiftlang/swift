@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift(-O)
 // REQUIRES: executable_test
 
-// We were crashing here due to not preserving rc identity. 
+// We were crashing here due to not preserving rc identity.
 // rdar://41328987
 
 func takeEscaping(closure: @escaping (String) -> Void) {}

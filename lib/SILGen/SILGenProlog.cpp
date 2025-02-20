@@ -1673,7 +1673,7 @@ uint16_t SILGenFunction::emitBasicProlog(
                        std::move(scopedDependencyParams))
       .emitParams(origClosureType, paramList, selfParam);
 
-  // Record the ArgNo of the artificial $error inout argument. 
+  // Record the ArgNo of the artificial $error inout argument.
   if (errorType && IndirectErrorResult == nullptr) {
     CanType errorTypeInContext =
       DC->mapTypeIntoContext(*errorType)->getCanonicalType();

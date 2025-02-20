@@ -92,7 +92,7 @@ func test_simpleCodableSupport() {
     expectNotNil(roundtrip)
     if let rt = roundtrip {
         expectEqual(rt, s)
-    } 
+    }
 
     // also ask for something that is not there
     let notThere = unarchiver.decodeDecodable(Simple.self, forKey: "not-there")
@@ -159,7 +159,7 @@ func test_toplevelAPIVariants() {
       if let rt = roundtrip {
         expectEqual(rt, s)
       }
-    }    
+    }
   }
 }
 

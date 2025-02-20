@@ -3,7 +3,7 @@ import StdlibUnittest
 fileprivate var COWLoggingArray_CopyCount = 0
 
 public func expectNoCopyOnWrite<T>(
-  _ elements: [T], 
+  _ elements: [T],
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,

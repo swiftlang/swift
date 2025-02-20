@@ -349,7 +349,7 @@ public class TestRebindingSelfIsDisallowed {
 
     doVoidStuffNonEscaping {
       staticMember() // expected-error{{cannot find 'staticMember' in scope}}
-      self.staticMember()      
+      self.staticMember()
     }
 
     doVoidStuff { [weak self] in
@@ -508,7 +508,7 @@ class TestGithubIssue70089 {
 
       doVoidStuff { [weak self] in
         doVoidStuff { [self] in
-          self.x += 1 // expected-error {{value of optional type 'TestGithubIssue70089?' must be unwrapped to refer to member 'x' of wrapped base type 'TestGithubIssue70089'}} expected-note {{chain the optional using '?' to access member 'x' only for non-'nil' base values}} expected-note{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} 
+          self.x += 1 // expected-error {{value of optional type 'TestGithubIssue70089?' must be unwrapped to refer to member 'x' of wrapped base type 'TestGithubIssue70089'}} expected-note {{chain the optional using '?' to access member 'x' only for non-'nil' base values}} expected-note{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
         }
       }
 

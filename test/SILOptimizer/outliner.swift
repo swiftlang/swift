@@ -79,18 +79,18 @@ public func testOutlining() {
 
 // CHECK-LABEL: sil shared [noinline] @$sSo5GizmoC14stringPropertySSSgvgToTeob_ : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
-// CHECK:         [[GIZME_STRINGPROPERTY_GETTER:%[^,]+]] = objc_method [[INSTANCE]] : $Gizmo, #Gizmo.stringProperty!getter.foreign 
+// CHECK:         [[GIZME_STRINGPROPERTY_GETTER:%[^,]+]] = objc_method [[INSTANCE]] : $Gizmo, #Gizmo.stringProperty!getter.foreign
 // CHECK:         [[MAYBE_NSSTRING:%[^,]+]] = apply [[GIZME_STRINGPROPERTY_GETTER]]([[INSTANCE]])
 // CHECK:         strong_release [[INSTANCE]]
 // CHECK:         switch_enum [[MAYBE_NSSTRING]] : $Optional<NSString>, case #Optional.some!enumelt: [[SOME_BLOCK:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BLOCK:bb[0-9]+]]
-// CHECK:       [[SOME_BLOCK]]([[REGISTER_5:%[^,]+]] : $NSString):                              
+// CHECK:       [[SOME_BLOCK]]([[REGISTER_5:%[^,]+]] : $NSString):
 // CHECK:         [[STRING_FROM_NSSTRING:%[^,]+]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
 // CHECK:         [[STRING_TYPE:%[^,]+]] = metatype $@thin String.Type
 // CHECK:         [[STRING:%[^,]+]] = apply [[STRING_FROM_NSSTRING]]([[MAYBE_NSSTRING]], [[STRING_TYPE]])
 // CHECK:         release_value [[MAYBE_NSSTRING]]
 // CHECK:         [[SOME_STRING:%[^,]+]] = enum $Optional<String>, #Optional.some!enumelt, [[STRING]]
 // CHECK:         br [[EXIT:bb[0-9]+]]([[SOME_STRING]] : $Optional<String>)
-// CHECK:       [[NONE_BLOCK]]:                                              
+// CHECK:       [[NONE_BLOCK]]:
 // CHECK:         [[NONE_STRING:%[^,]+]] = enum $Optional<String>, #Optional.none!enumelt
 // CHECK:         br [[EXIT]]([[NONE_STRING]] : $Optional<String>)
 // CHECK:       [[EXIT]]([[MAYBE_STRING:%[^,]+]] :

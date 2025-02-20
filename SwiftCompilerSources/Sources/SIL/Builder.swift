@@ -359,10 +359,10 @@ public struct Builder {
 
   public func createPartialApply(
     function: Value,
-    substitutionMap: SubstitutionMap, 
-    capturedArguments: [Value], 
-    calleeConvention: ArgumentConvention, 
-    hasUnknownResultIsolation: Bool, 
+    substitutionMap: SubstitutionMap,
+    capturedArguments: [Value],
+    calleeConvention: ArgumentConvention,
+    hasUnknownResultIsolation: Bool,
     isOnStack: Bool
   ) -> PartialApplyInst {
     return capturedArguments.withBridgedValues { capturedArgsRef in

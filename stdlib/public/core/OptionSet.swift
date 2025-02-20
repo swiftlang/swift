@@ -350,7 +350,7 @@ extension OptionSet where RawValue: FixedWidthInteger {
     self = Self(rawValue: self.rawValue | other.rawValue)
   }
 
-  /// Removes all elements of this option set that are not 
+  /// Removes all elements of this option set that are not
   /// also present in the given set.
   ///
   /// This method is implemented as a `&` (bitwise AND) operation on the
@@ -362,7 +362,7 @@ extension OptionSet where RawValue: FixedWidthInteger {
     self = Self(rawValue: self.rawValue & other.rawValue)
   }
 
-  /// Replaces this set with a new set containing all elements 
+  /// Replaces this set with a new set containing all elements
   /// contained in either this set or the given set, but not in both.
   ///
   /// This method is implemented as a `^` (bitwise XOR) operation on the two

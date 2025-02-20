@@ -694,7 +694,7 @@ private:
       }
 
       // Swift.ImplicitlyUnwrappedOptional
-      if (isIdentifier(unboundType->getChild(1), 
+      if (isIdentifier(unboundType->getChild(1),
                        "ImplicitlyUnwrappedOptional") &&
           typeArgs->getNumChildren() == 1 &&
           isSwiftModule(unboundType->getChild(0))) {
@@ -2842,7 +2842,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::ImplErasedIsolation:
     Printer << "@isolated(any)";
-    return nullptr;    
+    return nullptr;
   case Node::Kind::ImplCoroutineKind:
     // Skip if text is empty.
     if (Node->getText().empty())

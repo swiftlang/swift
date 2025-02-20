@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  
+//
 //
 //===----------------------------------------------------------------------===//
 
@@ -233,7 +233,7 @@ public protocol SetAlgebra<Element>: Equatable, ExpressibleByArrayLiteral {
   ///   comparison or some other means.
   ///
   ///   For sets where the set type and element type are the same, like
-  ///   `OptionSet` types, this method returns any intersection between the 
+  ///   `OptionSet` types, this method returns any intersection between the
   ///   set and `[newMember]`, or `nil` if the intersection is empty.
   @discardableResult
   mutating func update(with newMember: __owned Element) -> Element?
@@ -584,5 +584,5 @@ extension SetAlgebra where Element == ArrayLiteralElement {
   @inlinable // protocol-only
   public init(arrayLiteral: Element...) {
     self.init(arrayLiteral)
-  }  
+  }
 }

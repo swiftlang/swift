@@ -307,7 +307,7 @@ extension UnusedGenericDeriveExtension: Hashable {}
 // Cross-file synthesis is disallowed for conditional cases just as it is for
 // non-conditional ones.
 extension GenericOtherFileNonconforming: Equatable where T: Equatable {}
-// expected-error@-1{{extension outside of file declaring generic enum 'GenericOtherFileNonconforming' prevents automatic synthesis of '==' for protocol 'Equatable'}} 
+// expected-error@-1{{extension outside of file declaring generic enum 'GenericOtherFileNonconforming' prevents automatic synthesis of '==' for protocol 'Equatable'}}
 // expected-note@-2 {{add stubs for conformance}}
 
 // rdar://problem/41852654

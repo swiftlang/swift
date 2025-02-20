@@ -487,7 +487,7 @@ extension Array: _ArrayProtocol {
     @inlinable // FIXME(inline-always)
     @inline(__always)
     get {
-      return _buffer.owner      
+      return _buffer.owner
     }
   }
 
@@ -1236,14 +1236,14 @@ extension Array: RangeReplaceableCollection {
     let oldCount = _buffer.mutableCount
     let startNewElements = _buffer.mutableFirstElementAddress + oldCount
     let buf = UnsafeMutableBufferPointer(
-                start: startNewElements, 
+                start: startNewElements,
                 count: _buffer.mutableCapacity - oldCount)
 
     var (remainder,writtenUpTo) = buf.initialize(from: newElements)
 
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
-    _precondition(newElementsCount <= writtenCount, 
+    _precondition(newElementsCount <= writtenCount,
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
 
@@ -1720,7 +1720,7 @@ extension Array {
     // a precondition and Array never lies about its count.
     guard var p = buffer.baseAddress
       else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
-    _precondition(self.count <= buffer.count, 
+    _precondition(self.count <= buffer.count,
       "Insufficient space allocated to copy array contents")
 
     if let s = _baseAddressIfContiguous {

@@ -571,7 +571,7 @@ ArrayTestSuite.test("COW.Smoke") {
   expectEqual(identity1, a1._rawIdentifier())
 
   _blackHole(a1)
-  _blackHole(a2)  
+  _blackHole(a2)
 }
 
 ArrayTestSuite.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
@@ -887,7 +887,7 @@ ArrayTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
 //===----------------------------------------------------------------------===//
 // Index tests
 //===----------------------------------------------------------------------===//
-public struct ArrayIndexTest<T: Collection> {  
+public struct ArrayIndexTest<T: Collection> {
   public enum Operation {
     case append(Int)
     case insert(Int, at: Int)
@@ -909,7 +909,7 @@ public struct ArrayIndexTest<T: Collection> {
   public let operation: Operation
   public let loc: SourceLoc
 
-  public init(data: T, expectedStart: Int, expectedEnd: Int, 
+  public init(data: T, expectedStart: Int, expectedEnd: Int,
         operation: Operation, range: Range<Int>? = nil,
         file: String = #file, line: UInt = #line) {
     self.data = data
@@ -944,7 +944,7 @@ let indexTests: [ArrayIndexTest<[Int]>] = [
     operation: .partition(by: { $0.value > 3000 }),
     range: 1..<3
   ),
-  // Check how partition(by:) affects indices. 
+  // Check how partition(by:) affects indices.
   ArrayIndexTest(
     data: [ 10, 2, -33, 44, -5 ],
     expectedStart: 0,
@@ -1260,8 +1260,8 @@ ArrayTestSuite.test("ArrayIndexTests") {
     case let .insert(v, index):
       a.insert(OpaqueValue(v), at: index)
     case let .partition(c):
-      expectDoesNotThrow({ 
-        _ = try a.partition(by: c) 
+      expectDoesNotThrow({
+        _ = try a.partition(by: c)
       })
     case .removeFirst:
       a.removeFirst()

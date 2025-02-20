@@ -104,7 +104,7 @@ inline IsCopyable_t &operator&=(IsCopyable_t &l, IsCopyable_t r) {
 
 enum IsABIAccessible_t : bool {
   IsNotABIAccessible = false,
-  IsABIAccessible = true  
+  IsABIAccessible = true
 };
 
 /// The atomicity of a reference counting operation to be used.

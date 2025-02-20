@@ -70,8 +70,8 @@ reflect(enum: AppearanceBasedConfiguration<S>.appearanceBased(light: S(), dark: 
 
 // CHECK: Enum value:
 // CHECK-NEXT: (enum_value name=appearanceBased index=1
-// CHECK-NEXT: (tuplelight = 
-// CHECK-NEXT:   (struct reflect_Enum_MultiPayload_generic_empty.S)dark = 
+// CHECK-NEXT: (tuplelight =
+// CHECK-NEXT:   (struct reflect_Enum_MultiPayload_generic_empty.S)dark =
 // CHECK-NEXT:   (struct reflect_Enum_MultiPayload_generic_empty.S))
 // CHECK-NEXT: )
 

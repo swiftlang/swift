@@ -303,7 +303,7 @@ public:
   // Gratuitous template parameter is to delay instantiating `mapped_iterator`
   // on the incomplete type SILResultTypeFunc.
   template<bool _ = false>
-  using IndirectSILResultTypeIter = typename delay_template_expansion<_, 
+  using IndirectSILResultTypeIter = typename delay_template_expansion<_,
       llvm::mapped_iterator, IndirectSILResultIter, SILResultTypeFunc>::type;
   template<bool _ = false>
   using IndirectSILResultTypeRange = iterator_range<IndirectSILResultTypeIter<_>>;
@@ -345,7 +345,7 @@ public:
   }
 
   template<bool _ = false>
-  using DirectSILResultTypeIter = typename delay_template_expansion<_, 
+  using DirectSILResultTypeIter = typename delay_template_expansion<_,
       llvm::mapped_iterator, DirectSILResultIter, SILResultTypeFunc>::type;
   template<bool _ = false>
   using DirectSILResultTypeRange = iterator_range<DirectSILResultTypeIter<_>>;

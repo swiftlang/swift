@@ -9,7 +9,7 @@ extension P1 {
   func bar() {} // okay
 }
 
-struct P1Conformer : P1 {} // expected-error {{does not conform}} expected-note {{add stubs for conformance}} 
+struct P1Conformer : P1 {} // expected-error {{does not conform}} expected-note {{add stubs for conformance}}
 
 
 protocol P2 {
@@ -22,7 +22,7 @@ extension P2 where Self : P2Helper {
   func bar() {} // expected-note {{candidate}}
 }
 
-struct P2Conformer : P2 {} // expected-error {{does not conform}} expected-note {{add stubs for conformance}} 
+struct P2Conformer : P2 {} // expected-error {{does not conform}} expected-note {{add stubs for conformance}}
 
 
 protocol P3 {
@@ -36,7 +36,7 @@ extension P3 {
   func bar() {} // okay
 }
 
-struct P3Conformer : P3 { // expected-error {{does not conform}} expected-note {{add stubs for conformance}} 
+struct P3Conformer : P3 { // expected-error {{does not conform}} expected-note {{add stubs for conformance}}
   func baz() -> Int { return 0 }
 }
 
@@ -53,7 +53,7 @@ extension P4 where Self : P4Helper {
   func bar() {} // expected-note {{candidate}}
 }
 
-struct P4Conformer : P4 { // expected-error {{does not conform}} expected-note {{add stubs for conformance}} 
+struct P4Conformer : P4 { // expected-error {{does not conform}} expected-note {{add stubs for conformance}}
   func baz() -> Int { return 0 }
 }
 
@@ -69,7 +69,7 @@ extension P5 {
   func bar() -> Foo { return foo() } // okay
 }
 
-struct P5Conformer : P5 { // expected-error {{does not conform}} expected-note {{add stubs for conformance}} 
+struct P5Conformer : P5 { // expected-error {{does not conform}} expected-note {{add stubs for conformance}}
   func baz() -> Int { return 0 }
 }
 
@@ -88,12 +88,12 @@ extension P6 {
   func bar() -> Bar? { return nil }
 }
 
-struct P6Conformer : P6 { // expected-error 2 {{does not conform}} expected-note {{add stubs for conformance}} 
+struct P6Conformer : P6 { // expected-error 2 {{does not conform}} expected-note {{add stubs for conformance}}
   func foo() {}
 }
 
 // rdar://problem/23033862
-// expected-note@+3 {{add stubs for conformance}} 
+// expected-note@+3 {{add stubs for conformance}}
 // expected-error@+2{{type 'A' does not conform to protocol 'OptionSet'}}
 // expected-error@+1{{type 'A' does not conform to protocol 'RawRepresentable'}}
 struct A: OptionSet {
@@ -107,27 +107,27 @@ protocol PA {
   associatedtype A // expected-note 3 {{protocol requires nested type 'A'}}
 }
 
-struct BadCase1 : PA { // expected-error {{type 'BadCase1' does not conform to protocol 'PA'}} expected-note {{add stubs for conformance}} 
+struct BadCase1 : PA { // expected-error {{type 'BadCase1' does not conform to protocol 'PA'}} expected-note {{add stubs for conformance}}
   struct A<T> {}
 }
 
-struct BadCase2 : PA { // expected-error {{type 'BadCase2' does not conform to protocol 'PA'}} expected-note {{add stubs for conformance}} 
+struct BadCase2 : PA { // expected-error {{type 'BadCase2' does not conform to protocol 'PA'}} expected-note {{add stubs for conformance}}
   typealias A<T> = T
 }
 
 // Variation on the above
 struct G<T> {}
 
-struct BadCase3 : PA { // expected-error {{type 'BadCase3' does not conform to protocol 'PA'}} expected-note {{add stubs for conformance}} 
+struct BadCase3 : PA { // expected-error {{type 'BadCase3' does not conform to protocol 'PA'}} expected-note {{add stubs for conformance}}
   typealias A = G
 }
 
 // rdar://problem/32215763
 extension UInt32: @retroactive ExpressibleByStringLiteral {}
-// expected-error@-1 {{type 'UInt32' does not conform to protocol 'ExpressibleByStringLiteral'}} 
+// expected-error@-1 {{type 'UInt32' does not conform to protocol 'ExpressibleByStringLiteral'}}
 // expected-error@-2 {{type 'UInt32' does not conform to protocol 'ExpressibleByExtendedGraphemeClusterLiteral'}}
 // expected-error@-3 {{type 'UInt32' does not conform to protocol 'ExpressibleByUnicodeScalarLiteral'}}
-// expected-note@-4 {{add stubs for conformance}} 
+// expected-note@-4 {{add stubs for conformance}}
 
 // After successfully type-checking this (due to the presumption of
 // the type actually conforming), do not crash when failing to find
@@ -150,7 +150,7 @@ protocol P7 {
   func method4(_: Never) // expected-note {{protocol requires function 'method4' with type '(Never) -> ()'}}
 }
 do {
-  struct Conformer: P7 {} // expected-error {{type 'Conformer' does not conform to protocol 'P7'}} expected-note {{add stubs for conformance}} 
+  struct Conformer: P7 {} // expected-error {{type 'Conformer' does not conform to protocol 'P7'}} expected-note {{add stubs for conformance}}
 }
 
 protocol P8 {
@@ -167,7 +167,7 @@ do {
     // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P8'}}
     // expected-error@-2 {{'P8' requires the types 'Bool' and 'Never' be equivalent}}
     // expected-note@-3 {{requirement specified as 'Self.A.Element' == 'Never' [with Self = Conformer]}}
-    // expected-note@-4 {{add stubs for conformance}} 
+    // expected-note@-4 {{add stubs for conformance}}
     typealias A = Array<Bool>
   }
 }
@@ -190,7 +190,7 @@ do {
   struct Conformer: P9b {
     // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P9b'}}
     // expected-error@-2 {{type 'Conformer.A' (aka 'Bool') does not conform to protocol 'Sequence'}}
-    // expected-note@-3 {{add stubs for conformance}} 
+    // expected-note@-3 {{add stubs for conformance}}
     typealias A = Bool
   }
 }
@@ -210,7 +210,7 @@ do {
     // expected-error@-1 {{type 'Conformer' does not conform to protocol 'P10b'}}
     // expected-error@-2 {{'P10b' requires the types 'Bool' and 'Never' be equivalent}}
     // expected-note@-3 {{requirement specified as 'Self.A.Element' == 'Never' [with Self = Conformer]}}
-    // expected-note@-4 {{add stubs for conformance}} 
+    // expected-note@-4 {{add stubs for conformance}}
     typealias A = Array<Bool>
   }
 }
@@ -229,7 +229,7 @@ do {
     // expected-error@-3 {{'P11' requires that 'any P11' conform to 'Equatable'}}
     // expected-note@-4 {{requirement specified as 'any P11' : 'Equatable'}}
     // expected-note@-5 {{requirement from conditional conformance of 'Conformer.A' (aka 'Array<any P11>') to 'Equatable'}}
-    // expected-note@-6 {{add stubs for conformance}} 
+    // expected-note@-6 {{add stubs for conformance}}
     typealias A = Array<any P11>
   }
 }
@@ -249,7 +249,7 @@ protocol P12 {
   var prop: (Self) -> A.Element { get }
 }
 do {
-  struct Conformer: P12 { // expected-error {{type 'Conformer' does not conform to protocol 'P12'}} expected-note {{add stubs for conformance}} 
+  struct Conformer: P12 { // expected-error {{type 'Conformer' does not conform to protocol 'P12'}} expected-note {{add stubs for conformance}}
     typealias A = Bool // expected-note {{possibly intended match 'Conformer.A' (aka 'Bool') does not conform to 'Sequence'}}
   }
 }

@@ -227,7 +227,7 @@ extension Task {
   /// recommended that callers release any locks they might be
   /// holding before they call cancel.
   ///
-  /// If the task has already run past the last point where it could have 
+  /// If the task has already run past the last point where it could have
   /// performed a cancellation check, cancelling it may have no observable effects.
   ///
   /// - SeeAlso: `Task.checkCancellation()`

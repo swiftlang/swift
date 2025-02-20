@@ -757,7 +757,7 @@ void PerformanceDiagnostics::checkNonAnnotatedFunction(SILFunction *function) {
   }
 }
 
-void PerformanceDiagnostics::diagnose(LocWithParent loc, Diagnostic &&D) {  
+void PerformanceDiagnostics::diagnose(LocWithParent loc, Diagnostic &&D) {
   // Start with a valid location in the call tree.
   LocWithParent *validLoc = &loc;
   while (!validLoc->loc.isValid() && validLoc->parent) {

@@ -309,7 +309,7 @@ namespace sil_block {
     ValueIDField, /// Column.
     ValueIDField, /// FName.
     TypeIDField,
-    SILTypeCategoryField 
+    SILTypeCategoryField
   >;
 
   using SourceLocLayout = BCRecordLayout<

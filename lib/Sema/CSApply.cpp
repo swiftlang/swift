@@ -4222,7 +4222,7 @@ namespace {
     };
 
     /// Handle optional operands and results in an explicit cast.
-    Expr *handleOptionalBindingsForCast(ExplicitCastExpr *cast, 
+    Expr *handleOptionalBindingsForCast(ExplicitCastExpr *cast,
                                         Type finalResultType,
                                         OptionalBindingsCastKind castKind) {
       return handleOptionalBindings(cast->getSubExpr(), finalResultType,

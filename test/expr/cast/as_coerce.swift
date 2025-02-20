@@ -5,10 +5,10 @@
   func foo()
 }
 
-class A : P1 { 
+class A : P1 {
   @objc func foo() { }
 }
-@objc class B : A { 
+@objc class B : A {
   func bar() { }
 }
 
@@ -38,7 +38,7 @@ var i32 = 1 as Int32
 var i8 = -1 as Int8
 
 // Coerce to a superclass with generic parameter inference
-class C1<T> { 
+class C1<T> {
   func f(_ x: T) { }
 }
 class C2<T> : C1<Int> { }
@@ -72,14 +72,14 @@ var c: AnyObject = C3()
 //if let castX = c as! C4? {}
 
 // XXX TODO: Only suggest replacing 'as' with 'as!' if it would fix the error.
-C3() as C4 // expected-error {{'C3' is not convertible to 'C4'}} 
+C3() as C4 // expected-error {{'C3' is not convertible to 'C4'}}
 // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{6-8=as!}}
 C3() as C5 // expected-error {{cannot convert value of type 'C3' to type 'C5' in coercion}}
 
 // Diagnostic shouldn't include @lvalue in type of c3.
 var c3 = C3()
 // XXX TODO: This should not suggest `as!`
-c3 as C4 // expected-error {{'C3' is not convertible to 'C4'}} 
+c3 as C4 // expected-error {{'C3' is not convertible to 'C4'}}
 // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{4-6=as!}}
 
 // <rdar://problem/19495142> Various incorrect diagnostics for explicit type conversions
@@ -104,13 +104,13 @@ _ = "hello" as! String // expected-warning{{forced cast of 'String' to same type
 
 // <rdar://problem/19499340> QoI: Nimble as -> as! changes not covered by Fix-Its
 func f(_ x : String) {}
-f("what" as Any as String) // expected-error {{'Any' is not convertible to 'String'}} 
+f("what" as Any as String) // expected-error {{'Any' is not convertible to 'String'}}
 // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{17-19=as!}}
 f(1 as String) // expected-error{{cannot convert value of type 'Int' to type 'String' in coercion}}
 
 // <rdar://problem/19650402> Swift compiler segfaults while running the annotation tests
 let s : AnyObject = C3()
-s as C3 // expected-error{{'AnyObject' is not convertible to 'C3'}} 
+s as C3 // expected-error{{'AnyObject' is not convertible to 'C3'}}
 // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{3-5=as!}}
 
 // https://github.com/apple/swift/issues/48579
@@ -185,7 +185,7 @@ do {
   func fn(_: Bool) {} // expected-note {{found candidate with type '(Bool) -> ()'}}
   // expected-note@-1 {{candidate '(Bool) -> ()' has 1 parameter, but context '() -> Void' has 0}}
 
-  func fn_1(_: Bool) {} 
+  func fn_1(_: Bool) {}
 
   let i = 0
   // Missing parameters.

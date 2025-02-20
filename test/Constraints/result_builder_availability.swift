@@ -80,7 +80,7 @@ tuplify(true) { cond in
   if #available(OSX 51, *) {
     globalFuncAvailableOn51()
     tuplify(false) { cond2 in
-      if cond, #available(OSX 52, *) { 
+      if cond, #available(OSX 52, *) {
         // expected-warning@-1{{result builder 'TupleBuilder' does not implement 'buildLimitedAvailability'; this code may crash on earlier versions of the OS}}
         cond2
         globalFuncAvailableOn52()
@@ -94,7 +94,7 @@ tuplify(true) { cond in
         globalFuncAvailableOn52() // expected-error{{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
         // expected-note@-1{{add 'if #available' version check}}
       }
-      if cond, #unavailable(OSX 52) { 
+      if cond, #unavailable(OSX 52) {
         // expected-warning@-1{{result builder 'TupleBuilder' does not implement 'buildLimitedAvailability'; this code may crash on earlier versions of the OS}}
         cond2
         globalFuncAvailableOn52() // expected-error{{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}

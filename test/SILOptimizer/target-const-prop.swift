@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
 
 // Make a runtime test to check that the values are correct.
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
@@ -41,7 +41,7 @@ public func noConstantSize<T>(_ t: T.Type) -> Int {
 
 // CHECK-LABEL: sil {{.*}} @$s4test7getSizeySixmlF
 // CHECK:         builtin "sizeof"<T>
-// CHECK:       } // end sil function '$s4test7getSizeySixmlF' 
+// CHECK:       } // end sil function '$s4test7getSizeySixmlF'
 @_optimize(none)
 func getSize<T>(_ t: T.Type) -> Int {
   return MemoryLayout<T>.size
@@ -49,7 +49,7 @@ func getSize<T>(_ t: T.Type) -> Int {
 
 // CHECK-LABEL: sil {{.*}} @$s4test12getAlignmentySixmlF
 // CHECK:         builtin "alignof"<T>
-// CHECK:       } // end sil function '$s4test12getAlignmentySixmlF' 
+// CHECK:       } // end sil function '$s4test12getAlignmentySixmlF'
 @_optimize(none)
 func getAlignment<T>(_ t: T.Type) -> Int {
   return MemoryLayout<T>.alignment
@@ -57,7 +57,7 @@ func getAlignment<T>(_ t: T.Type) -> Int {
 
 // CHECK-LABEL: sil {{.*}} @$s4test9getStrideySixmlF
 // CHECK:         builtin "strideof"<T>
-// CHECK:       } // end sil function '$s4test9getStrideySixmlF' 
+// CHECK:       } // end sil function '$s4test9getStrideySixmlF'
 @_optimize(none)
 func getStride<T>(_ t: T.Type) -> Int {
   return MemoryLayout<T>.stride

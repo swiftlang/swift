@@ -239,7 +239,7 @@ struct TestNominalMember: P {
 // MEMBERDECL_SAMELINE: Begin completions, 4 items
 // MEMBERDECL_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn2: (() -> String)? {|}#}[#(() -> String)?#]; name=fn2:
 // MEMBERDECL_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:   .enumFunc()[#Void#]; name=enumFunc()
-// MEMBERDECL_SAMELINE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#SimpleEnum#}[#SimpleEnum#]; name=+ 
+// MEMBERDECL_SAMELINE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#SimpleEnum#}[#SimpleEnum#]; name=+
 // MEMBERDECL_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#SimpleEnum#]; name=self
 
 // FIXME-MEMBERDECL_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: (() -> String)? {|}#}[#(() -> String)?#]; name=fn2:

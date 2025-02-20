@@ -182,7 +182,7 @@ class SomeClass {
 
 
 // Implicit conversions (in this case to @convention(block)) are ok.
-@_silgen_name("whatever") 
+@_silgen_name("whatever")
 func takeNoEscapeAsObjCBlock(_: @noescape @convention(block) () -> Void)  // expected-error{{unknown attribute 'noescape'}}
 func takeNoEscapeTest2(_ fn : @noescape () -> ()) {  // expected-error{{unknown attribute 'noescape'}}
   takeNoEscapeAsObjCBlock(fn)
@@ -272,7 +272,7 @@ func curriedFlatMap2<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expec
 
 func bad(_ a : @escaping (Int)-> Int) -> Int { return 42 }
 func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int { // expected-error{{unknown attribute 'noescape'}}
-  return { f in // expected-note {{parameter 'f' is implicitly non-escaping}} 
+  return { f in // expected-note {{parameter 'f' is implicitly non-escaping}}
     bad(f) // expected-error {{passing non-escaping parameter 'f' to function expecting an @escaping closure}}
   }
 }
@@ -295,7 +295,7 @@ var escapeOther : CompletionHandler
 func doThing1(_ completion: (_ success: Bool) -> ()) { // expected-note {{parameter 'completion' is implicitly non-escaping}}
   escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an @escaping closure}}
 }
-func doThing2(_ completion: CompletionHandlerNE) { // expected-note {{parameter 'completion' is implicitly non-escaping}} 
+func doThing2(_ completion: CompletionHandlerNE) { // expected-note {{parameter 'completion' is implicitly non-escaping}}
   escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an @escaping closure}}
 }
 func doThing3(_ completion: CompletionHandler) { // expected-note {{parameter 'completion' is implicitly non-escaping}}

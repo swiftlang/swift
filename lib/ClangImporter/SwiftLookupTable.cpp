@@ -362,7 +362,7 @@ bool SwiftLookupTable::resolveUnresolvedEntries(
   //   } FooSomeEnumeration;
   //
   //   typedef struct Foo {
-  //     
+  //
   //   } Foo;
   // \endcode
   //
@@ -1602,7 +1602,7 @@ SwiftLookupTable::mapStoredMacro(StoredSingleEntry &entry, bool assumeModule) {
   // MacroInfos and not ModuleMacros.
   assert(!isPCH(*Reader));
   clang::IdentifierInfo *name =
-      astReader.getLocalIdentifier(Reader->getModuleFile(), 
+      astReader.getLocalIdentifier(Reader->getModuleFile(),
                                    entry.getSerializationID());
   auto submoduleID = astReader.getGlobalSubmoduleID(Reader->getModuleFile(),
                                    entry.getModuleID());
@@ -2041,7 +2041,7 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
 
       // If we're in a module, we really need moduleMacro to be valid.
       if (isModule && !moduleMacro) {
-        // FIXME: "public" visibility macros should actually be added to the 
+        // FIXME: "public" visibility macros should actually be added to the
         // table.
         return;
       }

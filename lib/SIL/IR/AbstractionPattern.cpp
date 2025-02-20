@@ -791,7 +791,7 @@ AbstractionPattern::getPackElementType(unsigned index) const {
       return AbstractionPattern::getOpaque();
     return AbstractionPattern(getGenericSubstitutions(),
                               getGenericSignature(),
-                              getAnyCanPackElementType(getType(), index)); 
+                              getAnyCanPackElementType(getType(), index));
   }
   llvm_unreachable("bad kind");
 }
@@ -1199,7 +1199,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
     return AbstractionPattern(getGenericSubstitutions(),
                               getGenericSignatureForFunctionComponent(),
                               getResultType(getType()),
-                              clangFunctionType->getReturnType().getTypePtr());    
+                              clangFunctionType->getReturnType().getTypePtr());
   }
   case Kind::CXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
@@ -1681,7 +1681,7 @@ AbstractionPattern::isFunctionParamAddressable(TypeConverter &TC,
     if (type->isTypeParameter() || type->is<ArchetypeType>()) {
       // If the function abstraction pattern is completely opaque, assume we
       // may need to preserve the address for dependencies.
-      return true;    
+      return true;
     }
 
     auto fnTy = cast<AnyFunctionType>(getType());

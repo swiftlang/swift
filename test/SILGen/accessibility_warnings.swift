@@ -169,7 +169,7 @@ public class PublicClass {
   // CHECK-NONRES-DAG: sil hidden [transparent] [ossa] @$s22accessibility_warnings11PublicClassC19publicVarPrivateSetSivs
   public private(set) var publicVarPrivateSet = 0
 
-  // CHECK-RES-DAG: sil [ossa] @$s22accessibility_warnings11PublicClassC20publicVarInternalSetSivg 
+  // CHECK-RES-DAG: sil [ossa] @$s22accessibility_warnings11PublicClassC20publicVarInternalSetSivg
   // CHECK-NONRES-DAG: sil [transparent] [serialized] [ossa] @$s22accessibility_warnings11PublicClassC20publicVarInternalSetSivg
   // CHECK-RES-DAG: sil hidden [ossa] @$s22accessibility_warnings11PublicClassC20publicVarInternalSetSivs
   // CHECK-NONRES-DAG: sil hidden [transparent] [ossa] @$s22accessibility_warnings11PublicClassC20publicVarInternalSetSivs

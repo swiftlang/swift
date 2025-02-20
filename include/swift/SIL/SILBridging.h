@@ -1167,7 +1167,7 @@ struct BridgedBuilder{
                                                                            BridgedArgumentConvention calleeConvention,
                                                                            BridgedSubstitutionMap bridgedSubstitutionMap = BridgedSubstitutionMap(),
                                                                            bool hasUnknownIsolation = true,
-                                                                           bool isOnStack = false) const;                                                                                  
+                                                                           bool isOnStack = false) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBranch(BridgedBasicBlock destBlock,
                                                                      BridgedValueArray arguments) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUnreachable() const;

@@ -24,12 +24,12 @@ ErrorHandlingTests.test("tryCatch") {
   do {
     try expectEqual(furball(false), LifetimeTracked(1))
   } catch {
-    expectUnreachable() 
+    expectUnreachable()
   }
 
   do {
     try furball(true)
-    expectUnreachable() 
+    expectUnreachable()
   } catch let e {
     if case Excuse.CatAteHomework(let c) = e {
       expectEqual(c, LifetimeTracked(0))

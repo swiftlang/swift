@@ -6,7 +6,7 @@
 //##-- Prepare the macro plugin.
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/plugins/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -plugin-path %t/plugins -parse-as-library 
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -plugin-path %t/plugins -parse-as-library
 
 @freestanding(declaration, names: named(A), named(B), named(foo), named(addOne))
 macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")

@@ -60,7 +60,7 @@ public:
   size_t getBitWidth() const { return Flags.getBitWidth(); }
 };
 
-SWIFT_RUNTIME_EXPORT SWIFT_CC(swift) 
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 float swift_intToFloat32(IntegerLiteral value);
 
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)

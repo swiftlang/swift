@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
 
 // Also do an end-to-end test to check if the generated code is correct.
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
@@ -63,7 +63,7 @@ func testGenStr(_ mymap: ((GenStr<Int>)->Int) -> ()) {
 @inline(never)
 func testGenericEscapingClosure() -> GetID<[Str], Int> {
     GetID(id: \.i)
-} 
+}
 
 // CHECK-LABEL: sil {{.*}} @$s4test0A7GenericyyyxAA6GenStrVyxGXEXElF :
 // CHECK:         keypath

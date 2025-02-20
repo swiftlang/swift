@@ -240,7 +240,7 @@ public actor WithCheckedThrowingContinuationErrorAvoidance {
 
   // make sure that we do not emit any errors on the following code.
   func noError() async throws -> Int {
-    return try await withCheckedThrowingContinuation { continuation in 
+    return try await withCheckedThrowingContinuation { continuation in
       handle { result in
         continuation.resume(returning: result)
       }

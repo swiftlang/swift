@@ -51,7 +51,7 @@ public func isConcrete_false<T>(_ x: T) -> Builtin.Int1 {
 // CHECK-O:             return [[RESULT]]
 // CHECK-O:           } // end sil function '$s27constant_propagation_stdlib25isConcrete_generic_calleryBi1_xlF'
 public func isConcrete_generic_caller<T>(_ x: T) -> Builtin.Int1 {
-  return isConcrete_false(x)  
+  return isConcrete_false(x)
 }
 
 // CHECK-ONONE-LABEL: sil @$s27constant_propagation_stdlib26isConcrete_concrete_calleryBi1_AA5MyIntVF : $@convention(thin) (MyInt) -> Builtin.Int1 {

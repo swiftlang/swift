@@ -11,7 +11,7 @@ func borrow(_ c: __shared C)
 func barrier()
 
 // CHECK-LABEL: sil {{.*}} [lexical_lifetimes] @funky : {{.*}} {
-// CHECK:         [[INSTANCE:%[^,]+]] = alloc_ref $C                               
+// CHECK:         [[INSTANCE:%[^,]+]] = alloc_ref $C
 // CHECK:         [[EI:%.*]] = end_init_let_ref [[INSTANCE]]
 // CHECK:         [[BORROW:%[^,]+]] = function_ref @borrow
 // CHECK:         apply [[BORROW]]([[EI]])

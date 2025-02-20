@@ -21,25 +21,25 @@ jkl
 #if swift(>=4)
 aoeu // expected-error {{cannot find 'aoeu' in scope}}
 #else
-htn 
+htn
 #endif
 
 #if swift(>=4.1)
 aoeu // expected-error {{cannot find 'aoeu' in scope}}
 #else
-htn 
+htn
 #endif
 
 #if swift(>=4.2)
 aoeu // expected-error {{cannot find 'aoeu' in scope}}
 #else
-htn 
+htn
 #endif
 
 #if swift(>=5)
 aoeu // expected-error {{cannot find 'aoeu' in scope}}
 #else
-htn 
+htn
 #endif
 
 #if swift(>=6)

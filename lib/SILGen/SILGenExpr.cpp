@@ -1077,7 +1077,7 @@ RValue RValueEmitter::visitFloatLiteralExpr(FloatLiteralExpr *E,
   return SGF.emitLiteral(E, C);
 }
 
-RValue RValueEmitter::visitBooleanLiteralExpr(BooleanLiteralExpr *E, 
+RValue RValueEmitter::visitBooleanLiteralExpr(BooleanLiteralExpr *E,
                                               SGFContext C) {
   return SGF.emitLiteral(E, C);
 }
@@ -2665,7 +2665,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
                                                CanType resultType,
                                                bool implicitlyAsync,
                                                SGFContext C) {
-  SILDeclRef generator 
+  SILDeclRef generator
     = SILDeclRef::getDefaultArgGenerator(defaultArgsOwner.getDecl(),
                                          destIndex);
 
@@ -6654,7 +6654,7 @@ RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
   SGF.emitStmt(E->getBody());
 
   // Retrieve and return the var, making it +1 so it survives the scope.
-  auto result = SGF.emitRValueForDecl(SILLocation(E), Var, 
+  auto result = SGF.emitRValueForDecl(SILLocation(E), Var,
                                       VarType, AccessSemantics::Ordinary, C);
   result = std::move(result).ensurePlusOne(SGF, SILLocation(E));
   return outerScope.popPreservingValue(std::move(result));

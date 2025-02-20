@@ -88,7 +88,7 @@ check(sub: 1) { _ = Sub(swiftToConvenience: ()) }
 // CHECK-NEXT: init Sub
 check(sub: 1) { _ = Sub(swiftToConvenienceFactory: ()) }
 
-// FIXME: This shouldn't be allowed in the first place; see the definition 
+// FIXME: This shouldn't be allowed in the first place; see the definition
 // above.
 // CHECK-NEXT: init(swiftToNormalFactory:) Base
 // CHECK-NEXT: +[Base baseWithNormalFactory:]
@@ -111,7 +111,7 @@ check(sub: 1) { _ = Sub(objcToConvenience: ()) }
 // CHECK-NEXT: init Sub
 check(sub: 2) { _ = Sub(objcToConvenienceFactory: ()) }
 
-// FIXME: This shouldn't be allowed in the first place; see the definition 
+// FIXME: This shouldn't be allowed in the first place; see the definition
 // above.
 // CHECK-NEXT: init(objcToNormalFactory:) Base
 // CHECK-NEXT: +[Base baseWithNormalFactory:]

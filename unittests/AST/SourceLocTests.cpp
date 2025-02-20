@@ -189,7 +189,7 @@ TEST(SourceLoc, StmtConditionElement) {
   EXPECT_EQ(SourceLoc(), introducerStmtInvalid.getEndLoc());
   EXPECT_EQ(SourceRange(), introducerStmtInvalid.getSourceRange());
 
-  // If the IntroducerLoc is invalid, the pattern is valid, but the stmt cond 
+  // If the IntroducerLoc is invalid, the pattern is valid, but the stmt cond
   // init is invalid.
   auto patternStmtInvalid =
       StmtConditionElement(ConditionalPatternBindingInfo::create(

@@ -756,7 +756,7 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
 ///
 ///   stmt-return:
 ///     'return' expr?
-///   
+///
 ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
   SourceLoc ReturnLoc = consumeToken(tok::kw_return);
 
@@ -1450,7 +1450,7 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
         }
       }
       break;
-    case AvailabilitySpecSource::Macro: 
+    case AvailabilitySpecSource::Macro:
       break;
     }
 
@@ -1719,7 +1719,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     Status.setHasCodeCompletionAndIsError();
 
     // Skip to '=' so that the completion can see the expected type of the
-    // pattern which is determined by the initializer. 
+    // pattern which is determined by the initializer.
     skipUntilDeclStmtRBrace(tok::equal, tok::l_brace);
   }
 
@@ -1927,13 +1927,13 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     }
 
     break;
-  }; 
+  };
 
   Condition = Context.AllocateCopy(result);
   return Status;
 }
 
-/// 
+///
 ///   stmt-if:
 ///     'if' condition stmt-brace stmt-if-else?
 ///   stmt-if-else:
@@ -2103,7 +2103,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
               new (Context) GuardStmt(GuardLoc, Condition, Body.get()));
 }
 
-/// 
+///
 ///   stmt-while:
 ///     (identifier ':')? 'while' expr-basic stmt-brace
 ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
@@ -2193,7 +2193,7 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
                                     whileLoc, body.get()));
 }
 
-/// 
+///
 ///   stmt-do:
 ///     (identifier ':')? 'do' throws-clause? stmt-brace
 ///     (identifier ':')? 'do' throws-clause? stmt-brace stmt-catch+
@@ -2378,7 +2378,7 @@ static bool isStmtForCStyle(Parser &P) {
   }
 }
 
-/// 
+///
 ///   stmt-for-each:
 ///     (identifier ':')? 'for' pattern 'in' expr-basic \
 ///             ('where' expr-basic)? stmt-brace

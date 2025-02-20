@@ -115,7 +115,7 @@ enum class CheckedCastKind : unsigned {
 /// What are the high-level semantics of this access?
 enum class AccessSemantics : uint8_t {
   /// On a storage reference, this is a direct access to the underlying
-  /// physical storage, bypassing any observers.  The declaration must be 
+  /// physical storage, bypassing any observers.  The declaration must be
   /// a variable with storage.
   ///
   /// On a function reference, this is a non-polymorphic access to a
@@ -291,9 +291,9 @@ protected:
     /// request returned a pair of null pointers.
     NoGlobalActorAttribute : 1,
 
-    /// Indicates whether this closure literal would require dynamic actor 
+    /// Indicates whether this closure literal would require dynamic actor
     /// isolation checks when it either specifies or inherits isolation
-    /// and was passed as an argument to a function that is not fully 
+    /// and was passed as an argument to a function that is not fully
     /// concurrency checked.
     RequiresDynamicIsolationChecking : 1
   );
@@ -2336,15 +2336,15 @@ class TupleExpr final : public Expr,
 public:
   /// Create a tuple.
   static TupleExpr *create(ASTContext &ctx,
-                           SourceLoc LParenLoc, 
+                           SourceLoc LParenLoc,
                            ArrayRef<Expr *> SubExprs,
-                           ArrayRef<Identifier> ElementNames, 
+                           ArrayRef<Identifier> ElementNames,
                            ArrayRef<SourceLoc> ElementNameLocs,
                            SourceLoc RParenLoc, bool Implicit,
                            Type Ty = Type());
 
   /// Create an empty tuple.
-  static TupleExpr *createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
+  static TupleExpr *createEmpty(ASTContext &ctx, SourceLoc LParenLoc,
                                 SourceLoc RParenLoc, bool Implicit);
 
   /// Create an implicit tuple with no source information.
@@ -2376,12 +2376,12 @@ public:
   }
 
   /// Whether this tuple has element names.
-  bool hasElementNames() const { 
+  bool hasElementNames() const {
     return Bits.TupleExpr.HasElementNames;
   }
 
   /// Retrieve the element names for a tuple.
-  ArrayRef<Identifier> getElementNames() const { 
+  ArrayRef<Identifier> getElementNames() const {
     return const_cast<TupleExpr *>(this)->getElementNamesBuffer();
   }
 
@@ -2391,7 +2391,7 @@ public:
   }
 
   /// Whether this tuple has element name locations.
-  bool hasElementNameLocs() const { 
+  bool hasElementNameLocs() const {
     return Bits.TupleExpr.HasElementNameLocations;
   }
 
@@ -2748,7 +2748,7 @@ public:
   void setBase(Expr *e) { SubExpr = e; }
 
   unsigned getFieldNumber() const { return Bits.TupleElementExpr.FieldNo; }
-  SourceLoc getNameLoc() const { return NameLoc; }  
+  SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
 
   SourceLoc getStartLoc() const { return getBase()->getStartLoc(); }
@@ -2797,11 +2797,11 @@ public:
   SourceLoc getEndLoc() const {
     return (QuestionLoc.isInvalid() ? SubExpr->getEndLoc() : QuestionLoc);
   }
-  SourceLoc getLoc() const { 
+  SourceLoc getLoc() const {
     if (isImplicit())
       return SubExpr->getLoc();
 
-    return getQuestionLoc(); 
+    return getQuestionLoc();
   }
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
 
@@ -2986,7 +2986,7 @@ public:
                       Expr *subExpr,
                       Type subExprTy)
     : Expr(ExprKind::OpenExistential, /*Implicit=*/ true, subExprTy),
-      ExistentialValue(existentialValue), OpaqueValue(opaqueValue), 
+      ExistentialValue(existentialValue), OpaqueValue(opaqueValue),
       SubExpr(subExpr) { }
 
   SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
@@ -4361,7 +4361,7 @@ public:
     Bits.ClosureExpr.IsPassedToSendingParameter = value;
   }
 
-  /// True if this is an isolated closure literal that is passed 
+  /// True if this is an isolated closure literal that is passed
   /// to a callee that has not been concurrency checked.
   bool requiresDynamicIsolationChecking() const {
     return Bits.ClosureExpr.RequiresDynamicIsolationChecking;
@@ -4974,7 +4974,7 @@ public:
   /// instance's synchronous method. Such calls are conceptually treated as if
   /// they are wrapped with an async closure. For example,
   ///
-  ///   act.syncMethod(a, b) 
+  ///   act.syncMethod(a, b)
   ///
   /// is equivalent to the eta-expanded version of act.syncMethod,
   ///
@@ -5073,8 +5073,8 @@ public:
     return (argLoc.isValid() ? argLoc : getFn()->getEndLoc());
   }
 
-  SourceLoc getLoc() const { 
-    SourceLoc FnLoc = getFn()->getLoc(); 
+  SourceLoc getLoc() const {
+    SourceLoc FnLoc = getFn()->getLoc();
     return FnLoc.isValid() ? FnLoc : getArgs()->getStartLoc();
   }
 
@@ -5205,7 +5205,7 @@ class DotSyntaxCallExpr : public SelfApplyExpr {
 
 public:
   /// Create a new method reference to \p fnExpr on the base value \p baseArg.
-  /// 
+  ///
   /// If this is for a 'mutating' method, \p baseArg should be created using
   /// \c Argument::implicitInOut. Otherwise, \p Argument::unlabeled should be
   /// used. \p baseArg must not be labeled.
@@ -5633,7 +5633,7 @@ class AssignExpr : public Expr {
   Expr *Src;
   SourceLoc EqualLoc;
 
-public:  
+public:
   AssignExpr(Expr *Dest, SourceLoc EqualLoc, Expr *Src, bool Implicit)
     : Expr(ExprKind::Assign, Implicit),
       Dest(Dest), Src(Src), EqualLoc(EqualLoc) {}

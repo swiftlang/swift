@@ -22,7 +22,7 @@ public extension String {
 // CHECK-NEXT: "uri"
 // CHECK-NEXT: "position"
 // CHECK-NEXT:   "line": 5
-// CHECK-NEXT:   "character": 14 
+// CHECK-NEXT:   "character": 14
 
 // EXTENSION-LABEL: "swift.extension"
 // EXTENSION: "location"

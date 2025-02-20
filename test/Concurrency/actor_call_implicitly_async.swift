@@ -44,7 +44,7 @@ actor BankAccount {
     return curBalance
   }
 
-  func canWithdraw(_ amount : Int) -> Bool { 
+  func canWithdraw(_ amount : Int) -> Bool {
     // call 'balance' from sync through self
     return self.balance() >= amount
   }
@@ -342,7 +342,7 @@ func walkChain(chain : Chain) async {
 // check various curried applications to ensure we mark the right expression.
 
 actor Calculator {
-  func addCurried(_ x : Int) -> ((Int) -> Int) { 
+  func addCurried(_ x : Int) -> ((Int) -> Int) {
     return { (_ y : Int) in x + y }
   }
 
@@ -351,7 +351,7 @@ actor Calculator {
   }
 }
 
-@BananaActor func bananaAdd(_ x : Int) -> ((Int) -> Int) { 
+@BananaActor func bananaAdd(_ x : Int) -> ((Int) -> Int) {
   return { (_ y : Int) in x + y }
 }
 

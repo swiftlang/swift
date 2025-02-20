@@ -159,7 +159,7 @@ func bauble<T: P & Q & Marker, U: Q>(z: T, u: U) -> [(some P & Q & Marker, (some
 }
 
 // Ensure the local type's opaque descriptor gets emitted.
-// CHECK-LABEL: @"$s18opaque_result_type11localOpaqueQryF0D0L_QryFQOMQ" = 
+// CHECK-LABEL: @"$s18opaque_result_type11localOpaqueQryF0D0L_QryFQOMQ" =
 func localOpaque() -> some P {
   func local() -> some P {
     return "local"

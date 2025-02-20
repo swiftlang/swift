@@ -901,7 +901,7 @@ bool Parser::parseSpecializeAttribute(
   if (DiscardAttribute) {
     Attr = nullptr;
     return false;
-  }  
+  }
 
   // Store the attribute.
   Attr = SpecializeAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
@@ -4203,7 +4203,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   // Historical name for 'nonisolated'.
   if (!DK && Tok.getText() == "actorIndependent") {
     diagnose(
-        Tok, diag::attr_renamed_to_modifier_warning, "actorIndependent", 
+        Tok, diag::attr_renamed_to_modifier_warning, "actorIndependent",
         "nonisolated")
       .fixItReplace(SourceRange(AtLoc, Tok.getLoc()), "nonisolated");
     DK = DeclAttrKind::Nonisolated;
@@ -5628,7 +5628,7 @@ static void skipAttribute(Parser &P) {
   // Parse the attribute name, which can be qualified, have
   // generic arguments, and so on.
   do {
-    if (!(P.consumeIf(tok::identifier) || P.consumeIf(tok::kw_rethrows)) && 
+    if (!(P.consumeIf(tok::identifier) || P.consumeIf(tok::kw_rethrows)) &&
         !P.consumeIf(tok::code_complete))
       return;
 
@@ -7070,7 +7070,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
 ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
   bool isError = Tok.is(tok::pound_error);
-  SourceLoc startLoc = 
+  SourceLoc startLoc =
     consumeToken(isError ? tok::pound_error : tok::pound_warning);
 
   SourceLoc lParenLoc = Tok.getLoc();
@@ -7084,7 +7084,7 @@ ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
 
     SourceLoc wordsEndLoc = getEndOfPreviousLoc();
 
-    auto diag = diagnose(wordsStartLoc, 
+    auto diag = diagnose(wordsStartLoc,
                           diag::pound_diagnostic_expected_string, isError);
     if (wordsEndLoc != wordsStartLoc) {
       diag.fixItInsert(wordsStartLoc, hadLParen ? "\"" : "(\"")
@@ -8451,7 +8451,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
                Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass)
-        diagnose(Tok, diag::class_var_not_in_class, 
+        diagnose(Tok, diag::class_var_not_in_class,
                  Flags.contains(PD_InProtocol))
             .fixItReplace(StaticLoc, "static");
     }
@@ -9526,7 +9526,7 @@ ParserStatus Parser::parsePrimaryAssociatedTypeList(
 ///
 ///   protocol-head:
 ///     attribute-list 'protocol' identifier primary-associated-type-list?
-///     inheritance? 
+///     inheritance?
 ///
 ///   primary-associated-type-list:
 ///     '<' identifier+ '>'
@@ -9986,7 +9986,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   return makeParserResult(DD);
 }
 
-ParserResult<OperatorDecl> 
+ParserResult<OperatorDecl>
 Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc OperatorLoc = consumeToken(tok::kw_operator);
   bool AllowTopLevel = Flags.contains(PD_AllowTopLevel);
@@ -10258,7 +10258,7 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
   };
 
   auto parseAttributePrefix = [&](SourceLoc &attrKeywordLoc) {
-    auto attrName = Tok.getText(); 
+    auto attrName = Tok.getText();
     if (attrKeywordLoc.isValid()) {
       diagnose(Tok, diag::precedencegroup_attribute_redeclared, attrName);
       // We want to continue parsing after this.

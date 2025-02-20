@@ -522,7 +522,7 @@ ManagedValue Transform::transform(ManagedValue v,
     // @objc witnesses/overrides that we're handling here only allows IUOs,
     // not explicit Optionals.
     v = SGF.emitCheckedGetOptionalValueFrom(Loc, v,
-                                            /*isImplicitUnwrap*/ true, 
+                                            /*isImplicitUnwrap*/ true,
                                             SGF.getTypeLowering(v.getType()),
                                             SGFContext());
 
@@ -4805,7 +4805,7 @@ ResultPlanner::planSingleIntoIndirect(AbstractionPattern innerOrigType,
     } else {
       addReabstractDirectToIndirect(innerOrigType, innerSubstType,
                                     outerOrigType, outerSubstType,
-                                    innerResult, outerResultAddr);      
+                                    innerResult, outerResultAddr);
     }
   }
 }
@@ -6747,7 +6747,7 @@ RValue SILGenFunction::emitSubstToOrigValue(SILLocation loc, RValue &&v,
 
 ManagedValue
 SILGenFunction::emitMaterializedRValueAsOrig(Expr *expr,
-                                             AbstractionPattern origType) {  
+                                             AbstractionPattern origType) {
   // Create a temporary.
   auto &origTL = getTypeLowering(origType, expr->getType());
   auto temporary = emitTemporary(expr, origTL);
@@ -6818,7 +6818,7 @@ SILGenFunction::emitTransformedValue(SILLocation loc, RValue &&v,
                                          inputOrigType,
                                          inputSubstType,
                                          outputOrigType,
-                                         outputSubstType, 
+                                         outputSubstType,
                                          outputLoweredTy, ctxt);
 }
 

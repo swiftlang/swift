@@ -96,7 +96,7 @@ extension RangeExpression {
   @inlinable
   public static func ~= (pattern: Self, value: Bound) -> Bool {
     return pattern.contains(value)
-  }  
+  }
 }
 
 /// A half-open interval from a lower bound up to, but not including, an upper
@@ -364,7 +364,7 @@ extension Range {
   @inlinable // trivial-implementation
   @inline(__always)
   public func clamped(to limits: Range) -> Range {
-    let lower =         
+    let lower =
       limits.lowerBound > self.lowerBound ? limits.lowerBound
           : limits.upperBound < self.lowerBound ? limits.upperBound
           : self.lowerBound
@@ -546,7 +546,7 @@ extension PartialRangeUpTo: Encodable where Bound: Encodable {
 ///     print(numbers[...3])
 ///     // Prints "[10, 20, 30, 40]"
 @frozen
-public struct PartialRangeThrough<Bound: Comparable> {  
+public struct PartialRangeThrough<Bound: Comparable> {
   public let upperBound: Bound
 
   @inlinable // trivial-implementation
@@ -712,8 +712,8 @@ extension PartialRangeFrom: Sequence
 
   /// Returns an iterator for this sequence.
   @inlinable
-  public __consuming func makeIterator() -> Iterator { 
-    return Iterator(_current: lowerBound) 
+  public __consuming func makeIterator() -> Iterator {
+    return Iterator(_current: lowerBound)
   }
 }
 

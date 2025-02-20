@@ -59,7 +59,7 @@
 // These are used from the implementations of RequirementSignatureRequest,
 // AbstractGenericSignatureRequest and InferredGenericSignatureRequest
 // in RequirementMachineRequests.cpp.
-// 
+//
 // Both kinds of requirement machines undergo a multi-stage construction
 // process which is best understood as a series of state transitions:
 //

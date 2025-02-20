@@ -131,7 +131,7 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
     // Public declarations are accessible from everywhere.
     case FormalLinkage::PublicUnique:
     case FormalLinkage::PublicNonUnique:
-    case FormalLinkage::PackageUnique: 
+    case FormalLinkage::PackageUnique:
       return false;
 
     // Hidden declarations are inaccessible from different modules.

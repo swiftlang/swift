@@ -449,7 +449,7 @@ protected:
   SWIFT_INLINE_BITFIELD(ValueDecl, Decl, 1+1+1+1,
     AlreadyInLookupTable : 1,
 
-    /// Whether we have already checked whether this declaration is a 
+    /// Whether we have already checked whether this declaration is a
     /// redeclaration.
     CheckedRedeclaration : 1,
 
@@ -1708,7 +1708,7 @@ public:
   }
 
   /// Retrieves the import path as written in the source code.
-  /// 
+  ///
   /// \returns An \c ImportPath corresponding to this import decl. If module aliasing
   ///          was used, this will contain the aliased name of the module; for instance,
   ///          if you wrote 'import Foo' but passed '-module-alias Foo=Bar', this import
@@ -1720,7 +1720,7 @@ public:
   }
 
   /// Retrieves the import path, replacing any module aliases with real names.
-  /// 
+  ///
   /// \param scratch An \c ImportPath::Builder which may, if necessary, be used to
   ///        construct the return value. It may go unused, so you should not try to
   ///        read the result from it; use the return value instead.
@@ -1733,7 +1733,7 @@ public:
 
   /// Retrieves the part of the import path that contains the module name,
   /// as written in the source code.
-  /// 
+  ///
   /// \returns A \c ImportPath::Module corresponding to this import decl. If module
   ///          aliasing was used, this will contain the aliased name of the module; for
   ///          instance, if you wrote 'import Foo' but passed '-module-alias Foo=Bar',
@@ -1745,7 +1745,7 @@ public:
 
   /// Retrieves the part of the import path that contains the module name,
   /// replacing any module aliases with real names.
-  /// 
+  ///
   /// \param scratch An \c ImportPath::Builder which may, if necessary, be used to
   ///        construct the return value. It may go unused, so you should not try to
   ///        read the result from it; use the return value instead.
@@ -1933,7 +1933,7 @@ public:
 
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
-/// there are no runtime values of the Extension's type.  
+/// there are no runtime values of the Extension's type.
 class ExtensionDecl final : public GenericContext, public Decl,
                             public IterableDeclContext {
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
@@ -2152,7 +2152,7 @@ public:
     return false;
   }
   static bool classof(const IterableDeclContext *C) {
-    return C->getIterableContextKind() 
+    return C->getIterableContextKind()
              == IterableDeclContextKind::ExtensionDecl;
   }
 
@@ -2812,7 +2812,7 @@ public:
     : Decl(DeclKind::PoundDiagnostic, Parent), StartLoc(StartLoc),
       EndLoc(EndLoc), Message(Message) {
       Bits.PoundDiagnosticDecl.IsError = IsError;
-      Bits.PoundDiagnosticDecl.HasBeenEmitted = false; 
+      Bits.PoundDiagnosticDecl.HasBeenEmitted = false;
     }
 
   DiagnosticKind getKind() const {
@@ -4472,7 +4472,7 @@ public:
   /// \param conformances Will be populated with the set of protocol
   /// conformances found for this protocol.
   ///
-  /// \returns true if any conformances were found. 
+  /// \returns true if any conformances were found.
   bool lookupConformance(
          ProtocolDecl *protocol,
          SmallVectorImpl<ProtocolConformance *> &conformances) const;
@@ -5237,7 +5237,7 @@ public:
 
   /// Returns true if this class cannot be used with weak or unowned
   /// references.
-  /// 
+  ///
   /// Note that this is true if this class or any of its ancestor classes
   /// are marked incompatible.
   bool isIncompatibleWithWeakReferences() const;
@@ -5296,7 +5296,7 @@ public:
   getImportedObjCCategory(Identifier name) const;
 
   /// Return a map of category names to extensions with that category name,
-  /// whether imported or otherwise. 
+  /// whether imported or otherwise.
   llvm::DenseMap<Identifier, llvm::TinyPtrVector<ExtensionDecl *>>
   getObjCCategoryNameMap();
 
@@ -6852,8 +6852,8 @@ public:
   static VarDecl *createImplicitStringInterpolationVar(DeclContext *DC);
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { 
-    return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param;
   }
 };
 
@@ -7325,7 +7325,7 @@ public:
   AnyFunctionType::Param toFunctionParam(Type type = Type()) const;
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { 
+  static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Param;
   }
 
@@ -8909,8 +8909,8 @@ public:
 
   static ConstructorDecl *
   createImported(ASTContext &ctx, ClangNode clangNode, DeclName name,
-                 SourceLoc constructorLoc, 
-                 bool failable, SourceLoc failabilityLoc, 
+                 SourceLoc constructorLoc,
+                 bool failable, SourceLoc failabilityLoc,
                  bool async, SourceLoc asyncLoc,
                  bool throws, SourceLoc throwsLoc,
                  Type thrownTy,

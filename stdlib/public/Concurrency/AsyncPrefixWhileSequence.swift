@@ -32,7 +32,7 @@ extension AsyncSequence {
   ///         print(number, terminator: " ")
   ///     }
   ///     // Prints "1 2 3 4 5 "
-  ///     
+  ///
   /// - Parameter predicate: A closure that takes an element as a parameter and
   ///   returns a Boolean value indicating whether the element should be
   ///   included in the modified sequence.
@@ -59,7 +59,7 @@ public struct AsyncPrefixWhileSequence<Base: AsyncSequence> {
 
   @usableFromInline
   init(
-    _ base: Base, 
+    _ base: Base,
     predicate: @escaping (Base.Element) async -> Bool
   ) {
     self.base = base
@@ -96,7 +96,7 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
 
     @usableFromInline
     init(
-      _ baseIterator: Base.AsyncIterator, 
+      _ baseIterator: Base.AsyncIterator,
       predicate: @escaping (Base.Element) async -> Bool
     ) {
       self.baseIterator = baseIterator
@@ -148,11 +148,11 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncPrefixWhileSequence: @unchecked Sendable 
-  where Base: Sendable, 
+extension AsyncPrefixWhileSequence: @unchecked Sendable
+  where Base: Sendable,
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncPrefixWhileSequence.Iterator: @unchecked Sendable 
-  where Base.AsyncIterator: Sendable, 
+extension AsyncPrefixWhileSequence.Iterator: @unchecked Sendable
+  where Base.AsyncIterator: Sendable,
         Base.Element: Sendable { }

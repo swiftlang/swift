@@ -329,7 +329,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   static var greatestFiniteMagnitude: Self { get }
 
   /// The mathematical constant pi (π), approximately equal to 3.14159.
-  /// 
+  ///
   /// When measuring an angle in radians, π is equivalent to a half-turn.
   ///
   /// This value is rounded toward zero to keep user computations with angles

@@ -814,8 +814,8 @@ public enum NonExhaustivePayload {
 // case.
 @inlinable
 public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePayload, for interval: TemporalProxy, flag: Bool) {
-  switch value { 
-  // expected-error@-1 {{switch must be exhaustive}} {{none}} 
+  switch value {
+  // expected-error@-1 {{switch must be exhaustive}} {{none}}
   // expected-note@-2 {{add missing case: '.b'}} {{+6:3-3=case .b:\n<#code#>\n}}
   // expected-note@-3 {{handle unknown values using "@unknown default"}} {{+6:3-3=@unknown default:\n<#fatalError()#>\n}}
   // expected-note@-4 {{add missing cases}} {{+6:3-3=case .b:\n<#code#>\n@unknown default:\n<#fatalError()#>\n}}
@@ -844,8 +844,8 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break
   }
 
-  switch value { 
-  // expected-warning@-1 {{switch must be exhaustive}} {{none}} 
+  switch value {
+  // expected-warning@-1 {{switch must be exhaustive}} {{none}}
   // expected-note@-2 {{add missing case: '.a'}} {{+5:3-3=case .a:\n<#code#>\n}}
   // expected-note@-3 {{add missing case: '.b'}} {{+5:3-3=case .b:\n<#code#>\n}}
   // expected-note@-4 {{add missing cases}} {{+5:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n}}
@@ -914,8 +914,8 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   } // no-warning
 
   // Test payloaded enums.
-  switch payload { 
-  // expected-error@-1 {{switch must be exhaustive}} {{none}} 
+  switch payload {
+  // expected-error@-1 {{switch must be exhaustive}} {{none}}
   // expected-note@-2 {{add missing case: '.b(_)'}} {{+6:3-3=case .b(_):\n<#code#>\n}}
   // expected-note@-3 {{handle unknown values using "@unknown default"}} {{+6:3-3=@unknown default:\n<#fatalError()#>\n}}
   // expected-note@-4 {{add missing cases}} {{+6:3-3=case .b(_):\n<#code#>\n@unknown default:\n<#fatalError()#>\n}}
@@ -944,8 +944,8 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break
   }
 
-  switch payload { 
-  // expected-error@-1 {{switch must be exhaustive}} {{none}} 
+  switch payload {
+  // expected-error@-1 {{switch must be exhaustive}} {{none}}
   // expected-note@-2 {{add missing case: '.b(true)'}} {{+7:3-3=case .b(true):\n<#code#>\n}}
   // expected-note@-3 {{handle unknown values using "@unknown default"}} {{+7:3-3=@unknown default:\n<#fatalError()#>\n}}
   // expected-note@-4 {{add missing cases}} {{+7:3-3=case .b(true):\n<#code#>\n@unknown default:\n<#fatalError()#>\n}}
@@ -1012,9 +1012,9 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   @unknown case _: break
   }
 
-  switch value { 
-  // expected-warning@-1 {{switch must be exhaustive}} {{none}} 
-  // expected-note@-2 {{add missing case: '.a'}} {{+5:3-3=case .a:\n<#code#>\n}} 
+  switch value {
+  // expected-warning@-1 {{switch must be exhaustive}} {{none}}
+  // expected-note@-2 {{add missing case: '.a'}} {{+5:3-3=case .a:\n<#code#>\n}}
   // expected-note@-3 {{add missing case: '.b'}} {{+5:3-3=case .b:\n<#code#>\n}}
   // expected-note@-4 {{add missing cases}} {{+5:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n}}
   @unknown case _: break

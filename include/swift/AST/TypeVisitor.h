@@ -23,7 +23,7 @@
 namespace swift {
 
 /// TypeVisitor - This is a simple visitor class for Swift types.
-template<typename ImplClass, typename RetTy = void, typename... Args> 
+template<typename ImplClass, typename RetTy = void, typename... Args>
 class TypeVisitor {
 public:
 

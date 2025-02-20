@@ -746,7 +746,7 @@ bool Constraint::isExplicitConversion() const {
   return false;
 }
 
-Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind, 
+Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
                                Type first, Type second,
                                ConstraintLocator *locator,
                                ArrayRef<TypeVariableType *> extraTypeVars) {
@@ -820,7 +820,7 @@ Constraint *Constraint::createMemberOrOuterDisjunction(
   return Constraint::createDisjunction(cs, constraints, locator, ForgetChoice);
 }
 
-Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind, 
+Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind,
                                      Type first, Type second,
                                      DeclNameRef member, DeclContext *useDC,
                                      FunctionRefInfo functionRefInfo,
@@ -863,8 +863,8 @@ Constraint *Constraint::createValueWitness(
                               functionRefInfo, locator, typeVars);
 }
 
-Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type, 
-                                           OverloadChoice choice, 
+Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
+                                           OverloadChoice choice,
                                            DeclContext *useDC,
                                            ConstraintFix *fix,
                                            ConstraintLocator *locator) {
@@ -884,10 +884,10 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
   return new (mem) Constraint(type, choice, useDC, fix, locator, typeVars);
 }
 
-Constraint *Constraint::createRestricted(ConstraintSystem &cs, 
-                                         ConstraintKind kind, 
+Constraint *Constraint::createRestricted(ConstraintSystem &cs,
+                                         ConstraintKind kind,
                                          ConversionRestrictionKind restriction,
-                                         Type first, Type second, 
+                                         Type first, Type second,
                                          ConstraintLocator *locator) {
   // Collect type variables.
   SmallPtrSet<TypeVariableType *, 4> typeVars;

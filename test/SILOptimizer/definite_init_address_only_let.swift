@@ -19,7 +19,7 @@ func bar<T>(a: Bool, t: T) {
 }
 
 func bas<T>(a: Bool, t: T) {
-  let x: T 
+  let x: T
   defer { print(x) }
 
   if a {

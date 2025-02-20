@@ -78,7 +78,7 @@ class Super {
 
 class Sub: Super { // expected-note{{make class 'Sub' @unsafe to allow unsafe overrides of safe superclass methods}}{{1-1=@unsafe }}
   @unsafe override func f() { } // expected-warning{{override of safe instance method with unsafe instance method [Unsafe]}}
-  @unsafe override func g() { }  
+  @unsafe override func g() { }
 }
 
 // -----------------------------------------------------------------------

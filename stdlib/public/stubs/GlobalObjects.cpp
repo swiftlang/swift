@@ -48,7 +48,7 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
 
   // _SwiftArrayBodyStorage body;
   {
-    0, // int count;                                    
+    0, // int count;
     1  // unsigned int _capacityAndFlags; 1 means elementTypeIsBridgedVerbatim
   }
 };
@@ -99,7 +99,7 @@ swift::_SwiftEmptyDictionarySingleton swift::_swiftEmptyDictionarySingleton = {
     // storage consists of a single unoccupied bucket. The capacity is set to
     // 0 so that any insertion will lead to real storage being allocated.
     0, // int count;
-    0, // int capacity;                                    
+    0, // int capacity;
     0, // int8 scale;
     0, // int8 reservedScale;
     0, // int16 extra;
@@ -110,7 +110,7 @@ swift::_SwiftEmptyDictionarySingleton swift::_swiftEmptyDictionarySingleton = {
   },
 
   // bucket 0 is unoccupied; other buckets are out-of-bounds
-  static_cast<__swift_uintptr_t>(~1) // int metadata; 
+  static_cast<__swift_uintptr_t>(~1) // int metadata;
 };
 
 SWIFT_RUNTIME_STDLIB_API
@@ -127,7 +127,7 @@ swift::_SwiftEmptySetSingleton swift::_swiftEmptySetSingleton = {
     // storage consists of a single unoccupied bucket. The capacity is set to
     // 0 so that any insertion will lead to real storage being allocated.
     0, // int count;
-    0, // int capacity;                                    
+    0, // int capacity;
     0, // int8 scale;
     0, // int8 reservedScale;
     0, // int16 extra;

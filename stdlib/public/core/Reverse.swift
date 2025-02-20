@@ -209,7 +209,7 @@ extension ReversedCollection.Index: Hashable where Base.Index: Hashable {
   }
 }
 
-extension ReversedCollection: BidirectionalCollection {  
+extension ReversedCollection: BidirectionalCollection {
   @inlinable
   public var startIndex: Index {
     return Index(_base.endIndex)

@@ -11,8 +11,8 @@
 import PlaygroundSupport
 
 var a = "a"
-var b = "b" 
-a += b 
+var b = "b"
+a += b
 // CHECK: [{{.*}}] __builtin_log[a='a']
 // CHECK-NEXT: [{{.*}}] __builtin_log[b='b']
 // CHECK-NEXT: [{{.*}}] __builtin_log[a='ab']

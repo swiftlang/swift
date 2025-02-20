@@ -42,7 +42,7 @@
 func test() {
   let _: String = #testString(123)
   let _: String = #testStringWithError(321)
-  // expected-error @-1 {{message from plugin}} 
+  // expected-error @-1 {{message from plugin}}
 }
 
 //--- plugin.c

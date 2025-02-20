@@ -45,7 +45,7 @@ protocol P2 {
 }
 
 struct XP2 : P2 { // expected-error{{initializer 'init(foo:)' has different argument labels from those required by protocol 'P2' ('init(_:)')}}
-  let foo: Int 
+  let foo: Int
 }
 
 // rdar://problem/22981205

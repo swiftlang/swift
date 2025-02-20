@@ -194,7 +194,7 @@ public func testCompareComparable() -> Bool {
 }
 
 public func BooCall<T:Simple>(_ x:T, _ y:T) -> Bool {
-  return x.boo(y, y) 
+  return x.boo(y, y)
 }
 
 // Check that a call of inherited Simple.boo can be devirtualized.

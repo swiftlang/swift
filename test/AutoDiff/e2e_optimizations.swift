@@ -116,5 +116,5 @@ func test_gradient_array_loop() {
 // CHECK-LABEL: sil hidden @test_gradient_array_loop : $@convention(thin) () -> ()
 // CHECK: [[VJP_FN_REF:%.*]] = function_ref @{{.*}}10array_loopySfSaySfGFTJrSpSr : $@convention(thin) (@guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> @owned Array<Float>.DifferentiableView)
 // CHECK: [[VJP_RESULT:%.*]] = apply [[VJP_FN_REF]]
-// CHECK-LABEL: } // end sil function 'test_gradient_array_loop' 
+// CHECK-LABEL: } // end sil function 'test_gradient_array_loop'
 

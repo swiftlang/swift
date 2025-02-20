@@ -16,7 +16,7 @@ import Dispatch
 /// false or just crash the program with non-zero exit code, depending on SDK.
 func checkIfMainQueue(expectedAnswer expected: Bool) -> Bool {
   if #available(macOS 10.12, iOS 10, tvOS 10, watchOS 3, *) {
-    dispatchPrecondition(condition: expected ? .onQueue(DispatchQueue.main) 
+    dispatchPrecondition(condition: expected ? .onQueue(DispatchQueue.main)
                                              : .notOnQueue(DispatchQueue.main))
   }
   return true

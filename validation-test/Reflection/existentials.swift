@@ -102,7 +102,7 @@ reflect(any: mc, shouldUnwrapClassExistential: true)
 // CHECK-64: Mangled name: $s12existentials7MyClassCyS2iG
 // CHECK-64: Demangled name: existentials.MyClass<Swift.Int, Swift.Int>
 
-// CHECK-64: Start of instance data: 
+// CHECK-64: Start of instance data:
 // CHECK-64-NOT: ![[ADDR]]
 
 // CHECK-32: Reflecting an existential and unwrapping class.
@@ -116,7 +116,7 @@ reflect(any: mc, shouldUnwrapClassExistential: true)
 // CHECK-32: Mangled name: $s12existentials7MyClassCyS2iG
 // CHECK-32: Demangled name: existentials.MyClass<Swift.Int, Swift.Int>
 
-// CHECK-32: Start of instance data: 
+// CHECK-32: Start of instance data:
 // CHECK-32-NOT: ![[ADDR]]
 
 // This value fits in the 3-word buffer in the container.
@@ -205,7 +205,7 @@ reflect(any: smallStruct, shouldUnwrapClassExistential: true)
 // CHECK-64-NEXT:   Mangled name:  $s12existentials8MyStructVyS3iG
 // CHECK-64-NEXT:   Demangled name:  existentials.MyStruct<Swift.Int, Swift.Int, Swift.Int>
 
-// CHECK-64: Start of instance data: 
+// CHECK-64: Start of instance data:
 // CHECK-64-NOT: ![[ADDR]]
 
 // CHECK-32: Reflecting an existential and unwrapping class.
@@ -233,7 +233,7 @@ reflect(any: smallStruct, shouldUnwrapClassExistential: true)
 // CHECK-32-NEXT:   Mangled name:  $s12existentials8MyStructVyS3iG
 // CHECK-32-NEXT:   Demangled name:  existentials.MyStruct<Swift.Int, Swift.Int, Swift.Int>
 
-// CHECK-32: Start of instance data: 
+// CHECK-32: Start of instance data:
 // CHECK-32-NOT: ![[ADDR]]
 
 // This value will be copied into a heap buffer, with a
@@ -437,7 +437,7 @@ reflect(any: largeStruct, shouldUnwrapClassExistential: true)
 // CHECK-64-NEXT:   Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itG
 // CHECK-64-NEXT:   Demangled name: existentials.MyStruct<(Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int)>
 
-// CHECK-64: Start of instance data: 
+// CHECK-64: Start of instance data:
 // CHECK-64-NOT: ![[ADDR]]
 
 // CHECK-32: Reflecting an existential and unwrapping class.
@@ -503,7 +503,7 @@ reflect(any: largeStruct, shouldUnwrapClassExistential: true)
 // CHECK-32-NEXT:   Mangled name: $s12existentials8MyStructVySi_S2itSi_S2itSi_S2itG
 // CHECK-32-NEXT:   Demangled name: existentials.MyStruct<(Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int), (Swift.Int, Swift.Int, Swift.Int)>
 
-// CHECK-32: Start of instance data: 
+// CHECK-32: Start of instance data:
 // CHECK-32-NOT: ![[ADDR]]
 
 // Function type:
@@ -664,7 +664,7 @@ reflect(any: he, shouldUnwrapClassExistential: true)
 // CHECK-64-NEXT:   Mangled name: $s12existentials8HasErrorV
 // CHECK-64-NEXT:   Demangled name: existentials.HasError
 
-// CHECK-64: Start of instance data: 
+// CHECK-64: Start of instance data:
 // CHECK-64-NOT: ![[ADDR]]
 
 // CHECK-32: Reflecting an existential and unwrapping class.
@@ -703,7 +703,7 @@ reflect(any: he, shouldUnwrapClassExistential: true)
 // CHECK-32-NEXT:   Mangled name: $s12existentials8HasErrorV
 // CHECK-32-NEXT:   Demangled name: existentials.HasError
 
-// CHECK-32: Start of instance data: 
+// CHECK-32: Start of instance data:
 // CHECK-32-NOT: ![[ADDR]]
 
 let error = MyError()
@@ -756,7 +756,7 @@ reflectUnwrappingClassExistential(error: error)
 // CHECK-64-NEXT:   Mangled name: $s12existentials7MyErrorV
 // CHECK-64-NEXT:   Demangled name: existentials.MyError
 
-// CHECK-64: Start of instance data: 
+// CHECK-64: Start of instance data:
 // CHECK-64-NOT: ![[ADDR]]
 
 // CHECK-32: Reflecting an error existential and unwrapping class.
@@ -773,7 +773,7 @@ reflectUnwrappingClassExistential(error: error)
 // CHECK-32-NEXT:   Mangled name: $s12existentials7MyErrorV
 // CHECK-32-NEXT:   Demangled name: existentials.MyError
 
-// CHECK-32: Start of instance data: 
+// CHECK-32: Start of instance data:
 // CHECK-32-NOT: ![[ADDR]]
 
 doneReflecting()

@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-objc-interop
 
-class B { 
-  init() {} 
+class B {
+  init() {}
 }
 class D : B {
   override init() { super.init() }
@@ -20,7 +20,7 @@ var bad_b_as_d : D = B()  // expected-error{{cannot convert value of type 'B' to
 var d = D()
 var b = B()
 
-var d_as_b_2 : B = d 
+var d_as_b_2 : B = d
 var b_as_d_2 = b as! D
 
 var b_is_d:Bool = B() is D
@@ -168,7 +168,7 @@ func dynamic_lookup_cast(_ dl: AnyObject) {
 
 // Cast to subclass with generic parameter inference
 class C2<T> : B { }
-class C3<T> : C2<[T]> { 
+class C3<T> : C2<[T]> {
   func f(_ x: T) { }
 }
 var c2i : C2<[Int]> = C3()
@@ -416,7 +416,7 @@ func test_always_fail_casts() {
   func encodable(_ value: Encodable) {
     _ = value as! [String : Encodable] // Ok
     _ = value as? [String: Encodable] // Ok
-  }   
+  }
 
   // https://github.com/apple/swift/issues/55470
   func coordinate(_ event: AnyEvent, from c: AnyC) {
@@ -621,7 +621,7 @@ func decodeStringOrInt<T: FixedWidthInteger>() -> [T] {
   }
 }
 
-// Set 
+// Set
 func decodeStringOrIntSet<T: FixedWidthInteger>() -> Set<T> {
   let stringWrapped = [String]()
   if let values = Set(stringWrapped.map({ $0.isEmpty ? 0 : T($0) })) as? Set<T> { // OK

@@ -109,7 +109,7 @@ testB()
 // Propagating nil init out of a superclass initialization.
 class MyNSData : NSData {
   init?(base64EncodedString str: String) {
-    super.init(base64Encoded:str, 
+    super.init(base64Encoded:str,
                options:[])
     print("MyNSData code should not be executed")
   }
@@ -130,7 +130,7 @@ if let myNSData = MyNSData(base64EncodedString:"\n\n\n") {
 // Propagating nil out of delegating initialization.
 extension NSData {
   convenience init?(myString str: String) {
-    self.init(base64Encoded:str, 
+    self.init(base64Encoded:str,
               options:[])
     print("NSData code should not be executed")
   }

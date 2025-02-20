@@ -46,7 +46,7 @@
 ///             default: fatalError("Index out of bounds.")
 ///             }
 ///         }
-///         
+///
 ///         func index(after i: Int) -> Int {
 ///             precondition(i < endIndex, "Can't advance beyond endIndex")
 ///             return i + 1
@@ -339,7 +339,7 @@ public protocol Collection<Element>: Sequence {
   // FIXME: ideally this would be in MigrationSupport.swift, but it needs
   // to be on the protocol instead of as an extension
   @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
-  typealias IndexDistance = Int  
+  typealias IndexDistance = Int
 
   // FIXME: Associated type inference requires this.
   override associatedtype Element
@@ -466,7 +466,7 @@ public protocol Collection<Element>: Sequence {
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices: Collection = DefaultIndices<Self>
-    where Indices.Element == Index, 
+    where Indices.Element == Index,
           Indices.Index == Index,
           Indices.SubSequence == Indices
 
@@ -1298,7 +1298,7 @@ extension Collection {
     var start = startIndex
     while try start != endIndex && predicate(self[start]) {
       formIndex(after: &start)
-    } 
+    }
     return self[start..<endIndex]
   }
 

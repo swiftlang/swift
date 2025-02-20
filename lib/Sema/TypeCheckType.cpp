@@ -3461,7 +3461,7 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     else
       ty = resolveASTFunctionType(fnRepr, options, &attrs);
 
-  // Boxes 
+  // Boxes
   } else if (auto boxRepr = dyn_cast<SILBoxTypeRepr>(repr)) {
     ty = resolveSILBoxType(boxRepr, options, &attrs);
 

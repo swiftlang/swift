@@ -101,7 +101,7 @@ public var irm: Int {
 // CHECK-SAME:   [[TOKEN:%[^,]+]],
 // CHECK-SAME:   [[ALLOCATION:%[^)]+]])
 // CHECK-SAME:  = begin_apply [[MODIFY_ACCESSOR]]([[SELF_ACCESS]])
-// CHECK:       yield [[VALUE_ADDRESS]] 
+// CHECK:       yield [[VALUE_ADDRESS]]
 // CHECK-SAME:      resume [[RESUME_BB:bb[0-9]+]]
 // CHECK-SAME:      unwind [[UNWIND_BB:bb[0-9]+]]
 // CHECK:     [[RESUME_BB]]:
@@ -238,7 +238,7 @@ class OverridableReader : GettableTitle {
 
 // CHECK-LABEL: sil_default_witness_table ReadableField {
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #ReadableField.field!read2 
+// CHECK-NEXT:    method #ReadableField.field!read2
 // CHECK-SAME:        : @$s19coroutine_accessors13ReadableFieldP5fieldSivy
 // CHECK-NEXT:  }
 public protocol ReadableField {

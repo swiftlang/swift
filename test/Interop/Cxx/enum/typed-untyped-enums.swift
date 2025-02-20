@@ -1,4 +1,4 @@
-// Test that typed and untyped enums cannot be assigned to each other. 
+// Test that typed and untyped enums cannot be assigned to each other.
 
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop
 

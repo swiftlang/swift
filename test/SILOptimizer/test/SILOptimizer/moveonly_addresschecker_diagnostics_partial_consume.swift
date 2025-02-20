@@ -78,7 +78,7 @@ package struct Agg_Package : ~Copyable {
 //   package var u1: Ur
 //   package var u2: Ur
 // }
-// 
+//
 // =====END===================== Agg_Package_Frozen ==========================}}
 
 // =====BEGIN================ Agg_Internal_UFI_Frozen ========================{{

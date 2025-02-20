@@ -109,7 +109,7 @@ public:
   /// another kind of invertible protocol. The Swift runtime will need to
   /// step lightly around protocol sets with unknown protocols.
   bool hasUnknownProtocols() const {
-    return !(*this - allKnown()).empty();    
+    return !(*this - allKnown()).empty();
   }
 
   class iterator {

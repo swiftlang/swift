@@ -545,7 +545,7 @@ class FunctionTypeRepr : public TypeRepr {
 
 public:
   FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
-                   SourceLoc asyncLoc, SourceLoc throwsLoc, 
+                   SourceLoc asyncLoc, SourceLoc throwsLoc,
                    TypeRepr *thrownTy,
                    SourceLoc arrowLoc,
                    TypeRepr *retTy,

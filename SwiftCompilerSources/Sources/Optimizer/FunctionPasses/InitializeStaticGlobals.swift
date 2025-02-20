@@ -117,7 +117,7 @@ private func getGlobalInitializerInfo(
     return nil
   }
 
-  return (allocInst, storeToGlobal, inlineArrays)   
+  return (allocInst, storeToGlobal, inlineArrays)
 }
 
 /// Represents an inline array which is initialized by a literal.
@@ -146,13 +146,13 @@ private func lowerInlineArray(array: InlineArray, _ context: FunctionPassContext
     assert(array.elements.count % numTupleElements == 0)
     var tuples: [TupleInst] = []
     for tupleIdx in 0..<(array.elements.count / numTupleElements) {
-      let range = (tupleIdx * numTupleElements) ..< ((tupleIdx + 1) * numTupleElements) 
+      let range = (tupleIdx * numTupleElements) ..< ((tupleIdx + 1) * numTupleElements)
       let tuple = builder.createTuple(type: array.elementType, elements: Array(array.elements[range]))
       tuples.append(tuple)
     }
     vector = builder.createVector(type: array.elementType, arguments: tuples)
   } else {
-    vector = builder.createVector(type: array.elementType, arguments: array.elements)      
+    vector = builder.createVector(type: array.elementType, arguments: array.elements)
   }
   array.finalArrayLoad.uses.replaceAll(with: vector, context)
   context.erase(instructionIncludingAllUsers: array.stackLoocation)
@@ -199,7 +199,7 @@ private func getInlineArrayInfo(of allocStack: AllocStackInst) -> InlineArray? {
   }
   guard let arrayLoad, let elementStorage else {
     return nil
-  } 
+  }
 
   var stores = Array<StoreInst?>()
   if !findArrayElementStores(toElementAddress: elementStorage, elementIndex: 0, stores: &stores) {
@@ -222,7 +222,7 @@ private func getInlineArrayInfo(of allocStack: AllocStackInst) -> InlineArray? {
 
 /// Recursively traverses all uses of `elementAddr` and finds all stores to an inline array storage.
 /// The element store instructions are put into `stores` - one store for each element.
-/// In case the element type is a tuple, the tuples are flattened. See `InlineArray.elements`.  
+/// In case the element type is a tuple, the tuples are flattened. See `InlineArray.elements`.
 private func findArrayElementStores(
   toElementAddress elementAddr: Value,
   elementIndex: Int,

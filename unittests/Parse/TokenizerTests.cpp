@@ -77,7 +77,7 @@ public:
       Actual += "\n";
     }
     EXPECT_EQ(Expected, Actual)
-      << "---- Expected: \n" << Expected << "\n" 
+      << "---- Expected: \n" << Expected << "\n"
       << "---- Actual: \n" << Actual << "\n";
   }
 
@@ -89,9 +89,9 @@ public:
   }
 
   std::vector<Token> tokenize(unsigned BufID, const std::vector<Token> &SplitTokens = {}) {
-    return swift::tokenize(LangOpts, 
-                           SM, 
-                           BufID, 
+    return swift::tokenize(LangOpts,
+                           SM,
+                           BufID,
                            /* Offset = */ 0,
                            /* EndOffset = */ 0,
                            /* Diags = */nullptr,

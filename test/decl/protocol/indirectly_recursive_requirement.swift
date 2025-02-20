@@ -22,7 +22,7 @@ protocol _RandomAccessIndex : _BidirectionalIndex {
   associatedtype Distance
 }
 
-protocol RandomAccessIndex 
+protocol RandomAccessIndex
   : BidirectionalIndex, _RandomAccessIndex {}
 
 struct MyInt : RandomAccessIndex

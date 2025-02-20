@@ -31,7 +31,7 @@ struct S_Implicit_With_C_Implicit {
   var guts: C_Implicit
 }
 
-func passS_Implicit_With_C_Implicit(_ s: S_Implicit_With_C_Implicit) { 
+func passS_Implicit_With_C_Implicit(_ s: S_Implicit_With_C_Implicit) {
   take1(s) // expected-error    {{type_does_not_conform_decl_owner}}
            // expected-note@-21 {{where_requirement_failure_one_subst}}
 }

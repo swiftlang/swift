@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t/batch-code-completion) 
+// RUN: %empty-directory(%t/batch-code-completion)
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t/batch-code-completion
 
 // REQUIRES: objc_interop

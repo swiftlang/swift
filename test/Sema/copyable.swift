@@ -1,24 +1,24 @@
 // RUN: %target-typecheck-verify-swift
 
-protocol P: Copyable {} 
+protocol P: Copyable {}
 struct S: P {}
 
-typealias PleaseLetMeDoIt = Copyable 
-typealias WhatIfIQualify = Swift.Copyable 
+typealias PleaseLetMeDoIt = Copyable
+typealias WhatIfIQualify = Swift.Copyable
 
-class C: Copyable {} 
+class C: Copyable {}
 
 struct MOStruct: Copyable, ~Copyable {}
 // expected-error@-1 {{struct 'MOStruct' required to be 'Copyable' but is marked with '~Copyable'}}
 
 
-func whatever<T>(_ t: T) where T: Copyable {} 
-func vatever<T: Copyable>(_ t: T) {} 
+func whatever<T>(_ t: T) where T: Copyable {}
+func vatever<T: Copyable>(_ t: T) {}
 func buttever(_ t: any Copyable) {}
 func zuttever(_ t: some Copyable) {}
 
-enum RockNRoll<T: Copyable> { 
- case isNoisePollution(Copyable) 
+enum RockNRoll<T: Copyable> {
+ case isNoisePollution(Copyable)
  case isMusic(T)
 }
 

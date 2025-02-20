@@ -32,7 +32,7 @@ import gizmo
 
   // Bridging set results
   // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_set_bridging3FooC17bridge_Set_result{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet {
-  @objc func bridge_Set_result() -> Set<Foo> { 
+  @objc func bridge_Set_result() -> Set<Foo> {
     // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Foo
     // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]

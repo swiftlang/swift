@@ -2306,7 +2306,7 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
   switch (OK) {
   case OverloadedBuiltinKind::None:
-    return false;  // always fail. 
+    return false;  // always fail.
   case OverloadedBuiltinKind::Integer:
     return T->is<BuiltinIntegerType>();
   case OverloadedBuiltinKind::IntegerOrVector:
@@ -2626,7 +2626,7 @@ static bool isUnknownOrUnordered(llvm::AtomicOrdering ordering) {
   llvm_unreachable("Unhandled AtomicOrdering in switch.");
 }
 
-static bool isValidCmpXChgOrdering(StringRef SuccessString, 
+static bool isValidCmpXChgOrdering(StringRef SuccessString,
                                    StringRef FailureString) {
   using namespace llvm;
   AtomicOrdering SuccessOrdering = decodeLLVMAtomicOrdering(SuccessString);

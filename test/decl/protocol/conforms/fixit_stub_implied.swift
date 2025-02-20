@@ -10,7 +10,7 @@ protocol P2 {
   func bar2() // expected-note{{protocol requires function 'bar2()' with type '() -> ()}}
 }
 
-class C1 : P1, P2 {} 
-// expected-error@-1 {{type 'C1' does not conform to protocol 'P1'}} 
-// expected-error@-2 {{type 'C1' does not conform to protocol 'P2'}} 
+class C1 : P1, P2 {}
+// expected-error@-1 {{type 'C1' does not conform to protocol 'P1'}}
+// expected-error@-2 {{type 'C1' does not conform to protocol 'P2'}}
 // expected-note@-3 {{add stubs for conformance}}{{20-20=\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n\n    func bar1() {\n        <#code#>\n    \}\n\n    func bar2() {\n        <#code#>\n    \}\n}}

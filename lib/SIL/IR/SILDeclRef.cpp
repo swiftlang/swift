@@ -416,7 +416,7 @@ bool SILDeclRef::shouldBeEmittedForDebugger() const {
   if (getLinkage(ForDefinition) == SILLinkage::Shared)
     return false;
 
-  if (auto decl = getDecl()) 
+  if (auto decl = getDecl())
     if (!decl->isImplicit())
       return true;
 

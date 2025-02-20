@@ -766,7 +766,7 @@ protected:
 
   void beginManglingWithAutoDiffOriginalFunction(
       const AbstractFunctionDecl *afd);
-  void appendAutoDiffFunctionParts(StringRef op, 
+  void appendAutoDiffFunctionParts(StringRef op,
                                    Demangle::AutoDiffFunctionKind kind,
                                    const AutoDiffConfig &config);
   void appendIndexSubset(IndexSubset *indexSubset);

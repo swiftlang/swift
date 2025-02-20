@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-ir -verify -I %t/Inputs %t/test.swift 
+// RUN: %target-swift-frontend -emit-ir -verify -I %t/Inputs %t/test.swift
 
 // REQUIRES: objc_interop
 

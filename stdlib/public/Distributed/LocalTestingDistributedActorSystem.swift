@@ -302,7 +302,7 @@ fileprivate class _Lock {
 
     defer {
       #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-      os_unfair_lock_unlock(self.underlying)    
+      os_unfair_lock_unlock(self.underlying)
       #elseif os(Windows)
       ReleaseSRWLockExclusive(self.underlying)
       #elseif os(WASI)

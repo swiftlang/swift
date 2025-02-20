@@ -16,10 +16,10 @@ typedef NS_OPTIONS(NSUInteger, UIViewAnimationOptions) {
 
 @interface UIView(UIViewAnimationWithBlocks)
 
-+ (void)animateWithDuration:(NSTimeInterval)duration 
-                      delay:(NSTimeInterval)delay 
-                    options:(UIViewAnimationOptions)options 
-                 animations:(void (^)(void))animations 
++ (void)animateWithDuration:(NSTimeInterval)duration
+                      delay:(NSTimeInterval)delay
+                    options:(UIViewAnimationOptions)options
+                 animations:(void (^)(void))animations
                  completion:(void (^)(BOOL finished))completion;
 
 @end

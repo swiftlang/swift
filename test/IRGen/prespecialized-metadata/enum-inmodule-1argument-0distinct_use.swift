@@ -25,10 +25,10 @@ doit()
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK: entry:
 // CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
-// CHECK-SAME:     [[INT]] %0, 
-// CHECK-SAME:     ptr %1, 
-// CHECK-SAME:     ptr undef, 
-// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     [[INT]] %0,
+// CHECK-SAME:     ptr %1,
+// CHECK-SAME:     ptr undef,
+// CHECK-SAME:     ptr undef,
 // CHECK-SAME:     $s4main5ValueOMn
 // CHECK-SAME:   )
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}

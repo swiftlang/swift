@@ -435,40 +435,40 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
   IntegerLiteralInst *builtinArg;
   if (match(BI, m_CombineOr(
                     // x == NaN
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OEQ, 
+                    m_BuiltinInst(BuiltinValueKind::FCMP_OEQ,
                                   m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                     // x == NaN
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OGT, 
+                    m_BuiltinInst(BuiltinValueKind::FCMP_OGT,
                                   m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                     // x >= NaN
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OGE, 
+                    m_BuiltinInst(BuiltinValueKind::FCMP_OGE,
                                   m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                     // x < NaN
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OLT, 
+                    m_BuiltinInst(BuiltinValueKind::FCMP_OLT,
                                   m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                     // x <= NaN
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OLE, 
+                    m_BuiltinInst(BuiltinValueKind::FCMP_OLE,
                                   m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                     // x != NaN
-                    m_BuiltinInst(BuiltinValueKind::FCMP_ONE, 
+                    m_BuiltinInst(BuiltinValueKind::FCMP_ONE,
                                   m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                     // NaN == x
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OEQ, 
+                    m_BuiltinInst(BuiltinValueKind::FCMP_OEQ,
                                   m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                     // NaN > x
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OGT, 
+                    m_BuiltinInst(BuiltinValueKind::FCMP_OGT,
                                   m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                     // NaN >= x
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OGE, 
+                    m_BuiltinInst(BuiltinValueKind::FCMP_OGE,
                                   m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                     // NaN < x
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OLT, 
+                    m_BuiltinInst(BuiltinValueKind::FCMP_OLT,
                                   m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                     // NaN <= x
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OLE, 
+                    m_BuiltinInst(BuiltinValueKind::FCMP_OLE,
                                   m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                     // NaN != x
-                    m_BuiltinInst(BuiltinValueKind::FCMP_ONE, 
+                    m_BuiltinInst(BuiltinValueKind::FCMP_ONE,
                                   m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other))))) {
     APInt val = builtinArg->getValue();
     if (hasIEEEFloatNanBitRepr(val)) {
@@ -495,43 +495,43 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
   }
 
   // Unordered comparisons with NaN always return true
-  if (match(BI, 
+  if (match(BI,
             m_CombineOr(
                 // x == NaN
-                m_BuiltinInst(BuiltinValueKind::FCMP_UEQ, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UEQ,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // x == NaN
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UGT,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // x >= NaN
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UGE,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // x < NaN
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_ULT,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // x <= NaN
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_ULE,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // x != NaN
-                m_BuiltinInst(BuiltinValueKind::FCMP_UNE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UNE,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // NaN == x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UEQ, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UEQ,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // NaN > x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UGT,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // NaN >= x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UGE,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // NaN < x
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_ULT,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // NaN <= x
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_ULE,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // NaN != x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UNE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UNE,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other))))) {
     APInt val = builtinArg->getValue();
     if (hasIEEEFloatNanBitRepr(val)) {
@@ -561,25 +561,25 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
   IntegerLiteralInst *inf1;
   IntegerLiteralInst *inf2;
 
-  if (match(BI, 
+  if (match(BI,
             m_CombineOr(
                 // Inf == Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OEQ, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_OEQ,
                               m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
                 // Inf >= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OGE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_OGE,
                               m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
                 // Inf <= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OLE, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),                                                            
+                m_BuiltinInst(BuiltinValueKind::FCMP_OLE,
+                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
                 // Inf == Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UEQ, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UEQ,
                               m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
                 // Inf >= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UGE,
                               m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
                 // Inf <= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_ULE,
                               m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2)))))) {
     APInt val1 = inf1->getValue();
     APInt val2 = inf2->getValue();
@@ -591,25 +591,25 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
   }
 
   // Infinity cannot be unequal to, greater than or less than itself
-  if (match(BI, 
+  if (match(BI,
             m_CombineOr(
                 // Inf != Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_ONE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_ONE,
                               m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
                 // Inf > Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OGT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_OGT,
                               m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
                 // Inf < Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OLT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_OLT,
                               m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
                 // Inf != Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UNE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UNE,
                               m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
                 // Inf > Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UGT,
                               m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
                 // Inf < Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_ULT,
                               m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2)))))) {
     APInt val1 = inf1->getValue();
     APInt val2 = inf2->getValue();
@@ -624,28 +624,28 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
   if (match(BI,
             m_CombineOr(
                 // Inf > x
-                m_BuiltinInst(BuiltinValueKind::FCMP_OGT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_OGT,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // Inf >= x
-                m_BuiltinInst(BuiltinValueKind::FCMP_OGE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_OGE,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // x < Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OLT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_OLT,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // x <= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OLE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_OLE,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // Inf > x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UGT,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // Inf >= x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UGE,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // x < Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_ULT,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // x <= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_ULE,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg)))))) {
     APInt val = builtinArg->getValue();
     if (hasIEEEFloatPosInfBitRepr(val) &&
@@ -657,31 +657,31 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
   }
 
   // Positive infinity is not less than or less than equal to anything
-  if (match(BI, 
+  if (match(BI,
             m_CombineOr(
                 // x > Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OGT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_OGT,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // x >= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OGE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_OGE,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // Inf < x
-                m_BuiltinInst(BuiltinValueKind::FCMP_OLT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_OLT,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // Inf <= x
-                m_BuiltinInst(BuiltinValueKind::FCMP_OLE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_OLE,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // x > Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UGT,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // x >= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_UGE,
                               m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
                 // Inf < x
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULT, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_ULT,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
                 // Inf <= x
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
+                m_BuiltinInst(BuiltinValueKind::FCMP_ULE,
                               m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other))))) {
     APInt val = builtinArg->getValue();
     if (hasIEEEFloatPosInfBitRepr(val) &&

@@ -5,17 +5,17 @@ func singleBlock() -> Int {
 } // expected-error {{missing return in global function expected to return 'Int'}}
 
 func singleBlock2() -> Int {
-  var y = 0 
+  var y = 0
   y += 1
 } // expected-error {{missing return in global function expected to return 'Int'}}
 
 enum NoCasesButNotNever {}
 
 func diagnoseNoCaseEnumMissingReturn() -> NoCasesButNotNever {
-} // expected-error {{function with uninhabited return type 'NoCasesButNotNever' is missing call to another never-returning function on all paths}} 
+} // expected-error {{function with uninhabited return type 'NoCasesButNotNever' is missing call to another never-returning function on all paths}}
 
 func diagnoseNeverMissingBody() -> Never {
-} // expected-error {{function with uninhabited return type 'Never' is missing call to another never-returning function on all paths}} 
+} // expected-error {{function with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
 
 _ = { () -> Never in
 }() // expected-error {{closure with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}-
@@ -30,8 +30,8 @@ func diagnoseNeverWithBody(i : Int) -> Never {
     case 1:
       fatalError()
     default:
-      repeat { } while true 
-    } 
+      repeat { } while true
+    }
   }
 } // expected-error {{function with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
 
@@ -40,7 +40,7 @@ class MyClassWithClosure {
 }
 
 func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
-  var y = 0 
+  var y = 0
   if b {
     return ("a", 1)
   } else if (y == 0) {
@@ -49,7 +49,7 @@ func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
 } // expected-error {{missing return in global function expected to return '(String, Int)'}}
 
 func multipleBlocksAllMissing(x: Int) -> Int {
-  var y : Int = x + 1 
+  var y : Int = x + 1
   while (y > 0 ) {
     y -= 1
     break
@@ -62,8 +62,8 @@ func multipleBlocksAllMissing(x: Int) -> Int {
 
 func diagnose_missing_return_in_the_else_branch(i: Bool) -> Int {
   if (i) {
-    exit() 
-  } 
+    exit()
+  }
 } // expected-error {{missing return in global function expected to return 'Int'}}
 
 func diagnose_missing_return_no_error_after_noreturn(i: Bool) -> Int {
@@ -118,7 +118,7 @@ func testUnreachableAfterNoReturn(x: Int) -> Int {
 func testUnreachableAfterNoReturnInADifferentBlock() -> Int {
   let x:Int = 5
   if 1 == 1 {  // expected-note {{condition always evaluates to true}}
-    exit(); 
+    exit();
   }
   return x; // expected-warning {{will never be executed}}
 }
@@ -183,14 +183,14 @@ func f_56150() {
     // expected-warning@-2 {{setter argument 'newValue' was never used, but the property was accessed}}
     // expected-note@-3 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
     // expected-warning@-4 {{variable is unused}}
-  } 
+  }
 
   let _ : () -> Int = {
     var x : UInt {
       get { 0 }
       set { }
     }
-    x 
+    x
     // expected-warning@-1 {{setter argument 'newValue' was never used, but the property was accessed}}
     // expected-note@-2 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
     // expected-warning@-3 {{variable is unused}}
@@ -201,7 +201,7 @@ func f_56150() {
         get { 0 }
         set { }
     }
-    x 
+    x
     // expected-warning@-1 {{setter argument 'newValue' was never used, but the property was accessed}}
     // expected-note@-2 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
     // expected-warning@-3 {{variable is unused}}
@@ -241,7 +241,7 @@ struct S_56857 {
             }
         } // expected-error {{missing return in getter expected to return 'Int'}}
         set {}
-    } 
+    }
 }
 
 class C_56857 {

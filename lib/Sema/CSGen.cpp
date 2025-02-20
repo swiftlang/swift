@@ -199,8 +199,8 @@ namespace {
             LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
           }
           return Action::SkipNode(expr);
-        } 
-      }             
+        }
+      }
 
       // In the case of a function application, we would have already captured
       // the return type during constraint generation, so there's no use in
@@ -213,7 +213,7 @@ namespace {
 
       if (auto *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
         LTI.binaryExprs.push_back(binaryExpr);
-      }  
+      }
 
       if (auto favoredType = CS.getFavoredType(expr)) {
         LTI.collectedTypes.insert(favoredType);
@@ -227,7 +227,7 @@ namespace {
         CS.optimizeConstraints(IE->getThenExpr());
         CS.optimizeConstraints(IE->getElseExpr());
         return Action::SkipNode(expr);
-      }      
+      }
 
       // For exprs of a tuple, avoid favoring. (We need to allow for cases like
       // (Int, Int32).)
@@ -1087,7 +1087,7 @@ namespace {
 
         if (auto elementTy = baseObjTy->isArrayType()) {
 
-          if (auto arraySliceTy = 
+          if (auto arraySliceTy =
                 dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
             baseObjTy = arraySliceTy->getDesugaredType();
           }
@@ -2295,7 +2295,7 @@ namespace {
       // been merged.
       llvm::DenseSet<Expr *> mergedElements;
 
-      // If no contextual type is present, Merge equivalence classes of key 
+      // If no contextual type is present, Merge equivalence classes of key
       // and value types as necessary.
       if (!CS.getContextualType(expr, /*forConstraint=*/false)) {
         for (auto element1 : expr->getElements()) {
@@ -2334,7 +2334,7 @@ namespace {
 
               if (elemExpr1->getKind() == elemExpr2->getKind() &&
                 isMergeableValueKind(elemExpr1)) {
-                mergedValue = mergeRepresentativeEquivalenceClasses(CS, 
+                mergedValue = mergeRepresentativeEquivalenceClasses(CS,
                                 valueTyvar1, valueTyvar2);
               }
 
@@ -2343,7 +2343,7 @@ namespace {
             }
           }
         }
-      }      
+      }
 
       // Introduce conversions from each element to the element type of the
       // dictionary. (If the equivalence class of an element has already been
@@ -4602,7 +4602,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   // Now, result type of `.makeIterator()` is used to form a call to
   // `.next()`. `next()` is called on each iteration of the loop.
   {
-    FuncDecl *nextFn = 
+    FuncDecl *nextFn =
         TypeChecker::getForEachIteratorNextFunction(dc, stmt->getForLoc(), isAsync);
     Identifier nextId = nextFn ? nextFn->getName().getBaseIdentifier()
                                : ctx.Id_next;

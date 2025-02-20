@@ -9,4 +9,4 @@ extension BadError: LocalizedError {}
 // CHECK:           associated_conformance (Code: _ErrorCodeProtocol): BadError.Code: _ErrorCodeProtocol module __ObjC
 // CHECK:       }
 // -- so we have to emit that too
-// CHECK-LABEL: sil_witness_table shared [serialized] BadError.Code: _ErrorCodeProtocol module __ObjC 
+// CHECK-LABEL: sil_witness_table shared [serialized] BadError.Code: _ErrorCodeProtocol module __ObjC

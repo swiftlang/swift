@@ -816,7 +816,7 @@ void Lexer::lexOperatorIdentifier() {
   } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
 
   if (CurPtr-TokStart > 2) {
-    // If there is a "//" or "/*" in the middle of an identifier token, 
+    // If there is a "//" or "/*" in the middle of an identifier token,
     // it starts a comment.
     for (auto Ptr = TokStart+1; Ptr != CurPtr-1; ++Ptr) {
       if (Ptr[0] == '/' && (Ptr[1] == '/' || Ptr[1] == '*')) {
@@ -1328,7 +1328,7 @@ static bool advanceIfMultilineDelimiter(unsigned CustomDelimiterLen,
 /// 'StopQuote'), this returns ~0U and advances 'CurPtr' pointing to the end of
 /// terminal quote.  If this is a malformed character sequence, it emits a
 /// diagnostic (when EmitDiagnostics is true) and returns ~1U.
-/// 
+///
 ///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]' | [\]0
 ///   character_escape  ::= unicode_character_escape
 unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
@@ -1679,10 +1679,10 @@ getMultilineTrailingIndent(StringRef Bytes, DiagnosticEngine *Diags = nullptr,
 
 /// diagnoseInvalidMultilineIndents:
 /// Emit errors for a group of multiline indents with the same MistakeOffset.
-/// Note: Does not emit an error if MistakeOffset does not lie within 
+/// Note: Does not emit an error if MistakeOffset does not lie within
 /// ExpectedIndent.
 static void diagnoseInvalidMultilineIndents(
-                                            DiagnosticEngine *Diags, 
+                                            DiagnosticEngine *Diags,
                                             StringRef ExpectedIndent,
                                             SourceLoc IndentLoc,
                                             StringRef Bytes,
@@ -1715,8 +1715,8 @@ static void diagnoseInvalidMultilineIndents(
                   LineStarts.size() != 1, LineStarts.size(),
                   classify(Bytes[LineStarts[0] + MistakeOffset]));
 
-  Diags->diagnose(IndentLoc.getAdvancedLoc(MistakeOffset), 
-                  diag::lex_multiline_string_indent_should_match_here, 
+  Diags->diagnose(IndentLoc.getAdvancedLoc(MistakeOffset),
+                  diag::lex_multiline_string_indent_should_match_here,
                   classify(ExpectedIndent[MistakeOffset]));
 
   auto fix = Diags->diagnose(getLoc(LineStarts[0] + MistakeOffset),
@@ -1724,11 +1724,11 @@ static void diagnoseInvalidMultilineIndents(
                              LineStarts.size() != 1);
 
   assert(MistakeOffset <= ActualIndent.size());
-  assert(ExpectedIndent.substr(0, MistakeOffset) == 
+  assert(ExpectedIndent.substr(0, MistakeOffset) ==
          ActualIndent.substr(0, MistakeOffset));
 
   for (auto line : LineStarts) {
-    fix.fixItReplaceChars(getLoc(line + MistakeOffset), 
+    fix.fixItReplaceChars(getLoc(line + MistakeOffset),
                           getLoc(line + ActualIndent.size()),
                           ExpectedIndent.substr(MistakeOffset));
   }
@@ -1745,10 +1745,10 @@ static void validateMultilineIndents(const Token &Str,
     return;
   SourceLoc IndentStartLoc = Lexer::getSourceLoc(Indent.data());
 
-  // The offset into the previous line where it experienced its first indentation 
+  // The offset into the previous line where it experienced its first indentation
   // error, or Indent.size() if every character matched.
   size_t lastMistakeOffset = std::numeric_limits<size_t>::max();
-  // Offsets for each consecutive previous line with its first error at 
+  // Offsets for each consecutive previous line with its first error at
   // lastMatchLength.
   SmallVector<size_t, 4> linesWithLastMistakeOffset = {};
   // Prefix of indentation that's present on all lines in linesWithLastMatchLength.
@@ -1769,8 +1769,8 @@ static void validateMultilineIndents(const Token &Str,
     // Are we starting a new run?
     if (errorOffset != lastMistakeOffset) {
       // Diagnose problems in the just-finished run of lines.
-      diagnoseInvalidMultilineIndents(Diags, Indent, IndentStartLoc, Bytes, 
-                                      linesWithLastMistakeOffset, lastMistakeOffset, 
+      diagnoseInvalidMultilineIndents(Diags, Indent, IndentStartLoc, Bytes,
+                                      linesWithLastMistakeOffset, lastMistakeOffset,
                                       commonIndentation);
 
       // Set up for a new run.
@@ -1792,8 +1792,8 @@ static void validateMultilineIndents(const Token &Str,
   }
 
   // Handle the last run.
-  diagnoseInvalidMultilineIndents(Diags, Indent, IndentStartLoc, Bytes, 
-                                  linesWithLastMistakeOffset, lastMistakeOffset, 
+  diagnoseInvalidMultilineIndents(Diags, Indent, IndentStartLoc, Bytes,
+                                  linesWithLastMistakeOffset, lastMistakeOffset,
                                   commonIndentation);
 }
 
@@ -2511,7 +2511,7 @@ StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
       break;
     }
 
-    if (CharValue < 0x80) 
+    if (CharValue < 0x80)
       TempString.push_back(CharValue);
     else
       EncodeToUTF8(CharValue, TempString);

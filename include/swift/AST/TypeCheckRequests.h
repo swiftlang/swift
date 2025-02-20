@@ -465,7 +465,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool 
+  bool
   evaluate(Evaluator &evaluator, EffectKind kind,
            ProtocolConformance *conformance) const;
 
@@ -3208,7 +3208,7 @@ public:
 private:
   friend SimpleRequest;
 
-  ActorIsolation evaluate(Evaluator &evaluator, 
+  ActorIsolation evaluate(Evaluator &evaluator,
                           VarDecl *) const;
 
 public:

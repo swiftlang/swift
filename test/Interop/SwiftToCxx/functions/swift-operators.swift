@@ -18,11 +18,11 @@ public struct IntBox {
 
   public subscript(x: CInt) -> CInt {
     return x
-  } 
+  }
 
   public subscript(x: CInt, _: CInt) -> CInt {
     return x
-  } 
+  }
 }
 
 public struct CustomArray<Element> where Element : ~Copyable {

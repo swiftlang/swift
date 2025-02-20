@@ -20,12 +20,12 @@
 ///
 /// Another possibility is to implement these optimizations as separate passes,
 /// but then we would send slightly different functions to the pass pipeline
-/// multiple times through notifyPassManagerOfFunction. 
+/// multiple times through notifyPassManagerOfFunction.
 ///
 /// TODO: Optimize function with generic parameters.
 ///
 /// TODO: Improve epilogue release matcher, i.e. do a data flow instead of
-/// only finding releases in the return block. 
+/// only finding releases in the return block.
 ///
 //===----------------------------------------------------------------------===//
 

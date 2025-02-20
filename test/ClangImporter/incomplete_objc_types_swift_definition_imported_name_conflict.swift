@@ -15,7 +15,7 @@ takeAConflictingTypeName(qux)
 // CHECK:      incomplete_objc_types_swift_definition_imported_name_conflict.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'takeAConflictingTypeName' in scope
 // CHECK-NEXT: takeAConflictingTypeName(qux)
 // CHECK-NEXT: ^~~~~~~~~~~~~~~~~~~~~~~~
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'takeAConflictingTypeName' unavailable (cannot import) 
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'takeAConflictingTypeName' unavailable (cannot import)
 // CHECK-NEXT: void takeAConflictingTypeName(ConflictingTypeName *param);
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: parameter 'param' unavailable (cannot import)
@@ -35,7 +35,7 @@ _ = returnAConflictingTypeName()
 // CHECK:      incomplete_objc_types_swift_definition_imported_name_conflict.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'returnAConflictingTypeName' in scope
 // CHECK-NEXT: _ = returnAConflictingTypeName()
 // CHECK-NEXT:     ^~~~~~~~~~~~~~~~~~~~~~~~~~
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnAConflictingTypeName' unavailable (cannot import) 
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnAConflictingTypeName' unavailable (cannot import)
 // CHECK-NEXT: ConflictingTypeName *returnAConflictingTypeName();
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: return type unavailable (cannot import)
@@ -55,7 +55,7 @@ _ = returnAProtocolConflictingTypeName()
 // CHECK:     incomplete_objc_types_swift_definition_imported_name_conflict.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'returnAProtocolConflictingTypeName' in scope
 // CHECK-NEXT: _ = returnAProtocolConflictingTypeName()
 // CHECK-NEXT:     ^~~~~~~~~~~~~~~~~~
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnAProtocolConflictingTypeName' unavailable (cannot import) 
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnAProtocolConflictingTypeName' unavailable (cannot import)
 // CHECK-NEXT: id<ProtocolConflictingTypeName> returnAProtocolConflictingTypeName();
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: return type unavailable (cannot import)

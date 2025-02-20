@@ -129,8 +129,8 @@ protocol GiveSendable<T> {
 }
 
 // make sure witnessing associatedtypes is still prevented, even though we meet the explicit constraint.
-class Bad: GiveSendable { 
-  // expected-error@-1 {{type 'Bad' does not conform to protocol 'GiveSendable'}} 
+class Bad: GiveSendable {
+  // expected-error@-1 {{type 'Bad' does not conform to protocol 'GiveSendable'}}
   // expected-note@-2 {{add stubs for conformance}}
   typealias T = FileDescriptor // expected-note {{possibly intended match 'Bad.T' (aka 'FileDescriptor') does not conform to 'Copyable'}}
   func give() -> FileDescriptor { return FileDescriptor(id: -1) }

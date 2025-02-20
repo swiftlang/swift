@@ -56,7 +56,7 @@ func alwaysSucceedingConditionalCasts(f: CGFloat, n: NSNumber) {
 }
 
 func optionalityReducingCasts(f: CGFloat?, n: NSNumber?) {
-  let _ = f as? NSNumber 
+  let _ = f as? NSNumber
   let _ = f as! NSNumber // expected-warning{{forced cast from 'CGFloat?' to 'NSNumber' only unwraps and bridges; did you mean to use '!' with 'as'?}}
   let _ = n as? CGFloat
   let _ = n as! CGFloat
@@ -78,7 +78,7 @@ func optionalityMatchingCastsIUO(f: CGFloat?!, n: NSNumber?!) {
   let _ = n as! CGFloat?
 }
 
-func optionalityMismatchingCasts(f: CGFloat, n: NSNumber, fooo: CGFloat???, 
+func optionalityMismatchingCasts(f: CGFloat, n: NSNumber, fooo: CGFloat???,
                                  nooo: NSNumber???) {
   _ = f as NSNumber?
   _ = f as NSNumber??

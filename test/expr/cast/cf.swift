@@ -36,7 +36,7 @@ func testCFToNative(_ cfStr: CFString, cfMutableStr: CFMutableString) {
 
 func testNativeToCF(_ str: String) {
   var cfStr = str as CFString
-  var cfMutableStr = str as CFMutableString // expected-error{{'String' is not convertible to 'CFMutableString'}} 
+  var cfMutableStr = str as CFMutableString // expected-error{{'String' is not convertible to 'CFMutableString'}}
   // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{26-28=as!}}
 }
 
@@ -54,13 +54,13 @@ func testAnyObjectToCF(_ anyObject: AnyObject) {
   var _: CFTree = anyObject as! CFTree
 
   // No implicit conversions.
-  cfStr = anyObject // expected-error{{'AnyObject' is not convertible to 'CFString'}} 
+  cfStr = anyObject // expected-error{{'AnyObject' is not convertible to 'CFString'}}
   // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{20-20= as! CFString}}
   _ = cfStr
 }
 
 func testUncheckableCasts(_ anyObject: AnyObject, nsObject: NSObject,
-                          anyObjectType: AnyObject.Type, 
+                          anyObjectType: AnyObject.Type,
                           nsObjectType: NSObject.Type) {
   if let _ = anyObject as? CFString { } // expected-error{{conditional downcast to CoreFoundation type 'CFString' will always succeed}} expected-note{{did you mean to explicitly compare the CFTypeIDs of 'anyObject' and 'CFString'}}
   if let _ = nsObject as? CFString { } // expected-error{{conditional downcast to CoreFoundation type 'CFString' will always succeed}} expected-note{{did you mean to explicitly compare the CFTypeIDs of 'nsObject' and 'CFString'}}

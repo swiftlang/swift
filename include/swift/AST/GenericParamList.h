@@ -119,7 +119,7 @@ public:
 
   /// Construct a new layout-constraint requirement.
   ///
-  /// \param Subject The type that must conform to the given layout 
+  /// \param Subject The type that must conform to the given layout
   /// requirement.
   /// \param ColonLoc The location of the ':', or an invalid location if
   /// this requirement was implied.

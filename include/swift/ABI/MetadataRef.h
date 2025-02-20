@@ -277,7 +277,7 @@ class RelativeTargetProtocolDescriptorPointer {
     /// an Objective-C protocol.
     RelativeContextPointerIntPair<Runtime, bool, TargetProtocolDescriptor>
       swiftPointer;
-#if SWIFT_OBJC_INTEROP    
+#if SWIFT_OBJC_INTEROP
     /// Relative pointer to an ObjC protocol descriptor.
     /// The \c bool value will be false to indicate that the protocol
     /// is a Swift protocol, or true to indicate that this references

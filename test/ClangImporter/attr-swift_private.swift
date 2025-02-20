@@ -15,7 +15,7 @@
 
 import SwiftPrivateAttr
 
-// Note: The long-term plan is for these to only be available from the Swift 
+// Note: The long-term plan is for these to only be available from the Swift
 // half of a module, or from an overlay. At that point we should test that these
 // are available in that case and /not/ in the normal import case.
 

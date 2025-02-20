@@ -95,7 +95,7 @@ class X : NSDocument {
   }
 }
 
-func makeProgress<T: NSProgressReporting>(thing: T) {} // expected-error {{'NSProgressReporting' has been renamed to 'ProgressReporting'}} {{22-41=ProgressReporting}} 
+func makeProgress<T: NSProgressReporting>(thing: T) {} // expected-error {{'NSProgressReporting' has been renamed to 'ProgressReporting'}} {{22-41=ProgressReporting}}
 
 func useLowercasedEnumCase(x: NSRuncingMode) {
   switch x { // expected-error {{switch must be exhaustive}}

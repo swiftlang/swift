@@ -505,7 +505,7 @@ if #available(SwiftStdlib 5.1, *) {
   testSuite.test("testScanCharactersFromSet") { handler.testScanCharactersFromSet() }
   testSuite.test("testScanUpToCharactersFromSet") { handler.testScanUpToCharactersFromSet() }
 
-  runAllTests()  
+  runAllTests()
 }
 #endif
 

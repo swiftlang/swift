@@ -56,14 +56,14 @@ func canThrow() throws {}
 
 func testDo() {
   do {
-    try canThrow() 
+    try canThrow()
   } catch is UnknownError {
-    return 
+    return
   } catch where error is UnknownError {
-    return 
+    return
   } catch let error, {
     _ = error
-    return 
+    return
   } catch {
     return
   }

@@ -543,7 +543,7 @@ func testAddressOnlyConsumeOperator<T>(_ x: consuming GenericNonTrivialStruct<T>
 }
 
 func testAddressOnlyCopyOperator<T>(_ x: consuming GenericNonTrivialStruct<T>) {
-    _ = copy x 
+    _ = copy x
 }
 
 ///////////////////////////////

@@ -147,7 +147,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     }
   }
 
-  var languageVersion: VersionTuple { 
+  var languageVersion: VersionTuple {
     var componentsBuf: UnsafeMutablePointer<SwiftInt>? = nil
     let count = ctx.langOptsGetLanguageVersion(&componentsBuf)
     let version = VersionTuple(
@@ -157,7 +157,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     return version
   }
 
-  var compilerVersion: VersionTuple { 
+  var compilerVersion: VersionTuple {
     var componentsBuf: UnsafeMutablePointer<SwiftInt>? = nil
     let count = ctx.langOptsGetCompilerVersion(&componentsBuf)
     let version = VersionTuple(

@@ -14,7 +14,7 @@ public struct Nicate {
   public var isInitializing: Bool
 
   // CHECK-LABEL: sil @$s31closure_lifetime_fixup_copyelim6NicateV4slowyS2iF :
-  // CHECK-NOT: copy_addr 
+  // CHECK-NOT: copy_addr
   // CHECK-LABEL: } // end sil function '$s31closure_lifetime_fixup_copyelim6NicateV4slowyS2iF'
   public func slow(_ x: Int) -> Int {
     let foo = frob.foo(x)

@@ -266,8 +266,8 @@ public:
 
   /// Only allow placement new.
   void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem); 
-    return Mem; 
+    assert(Mem);
+    return Mem;
   }
 
   /// For an opaque or pack element archetype environment, apply the

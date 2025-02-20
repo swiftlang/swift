@@ -113,7 +113,7 @@ static_assert(CheckClassOfPattern<ID##Pattern::classof>::IsImplemented, \
 // Metaprogram to verify that every concrete class implements
 // 'SourceRange getSourceRange()'.
 typedef const char (&TwoChars)[2];
-template<typename Class> 
+template<typename Class>
 inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Pattern::*)() const);
 
@@ -815,7 +815,7 @@ Pattern::getOwnership(
 
       case VarDecl::Introducer::Borrowing:
         // `borrow` bindings borrow parts of the value in-place.
-        increaseOwnership(ValueOwnership::Shared, p);        
+        increaseOwnership(ValueOwnership::Shared, p);
         break;
       }
     }

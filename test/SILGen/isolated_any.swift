@@ -86,7 +86,7 @@ func convertFromMainActor(fn: @escaping @Sendable @MainActor () async -> ())
 // CHECK-NEXT:    [[ERASED_MAIN_ACTOR:%.*]] = init_existential_ref [[MAIN_ACTOR]] :
 // CHECK-NEXT:    [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ERASED_MAIN_ACTOR]] : $any Actor
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sSiIeghHd_SiSgIeAghHd_TR : 
+// CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sSiIeghHd_SiSgIeAghHd_TR :
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[THUNK]]([[ISOLATION]], [[FN_COPY]])
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@isolated(any) @Sendable @async @callee_guaranteed () -> Optional<Int>
 func convertFromMainActorWithOtherChanges(fn: @escaping @Sendable @MainActor () async -> Int)
@@ -119,7 +119,7 @@ func convertToNonIsolated(fn: @escaping @isolated(any) @Sendable () async -> ())
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[FN_COPY:%.*]] = copy_value %0 :
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sSiIeAghHd_SiSgIeghHd_TR : 
+// CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sSiIeAghHd_SiSgIeghHd_TR :
 // CHECK-NEXT:    [[THUNKED_FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FN_COPY]])
 // CHECK-NEXT:    return [[THUNKED_FN]] : $@Sendable @async @callee_guaranteed () -> Optional<Int>
 

@@ -86,7 +86,7 @@ struct MatchAnyOne<T : Equatable, Index : Comparable> : Pattern {
   typealias Element = T
 
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
-  where C.Index == Index, C.Element == Element 
+  where C.Index == Index, C.Element == Element
   {
     return c.isEmpty
     ? .notFound(resumeAt: c.endIndex)
@@ -277,7 +277,7 @@ struct MatchStaticString : Pattern {
   init(_ x: StaticString) { content = x }
 
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
-  where C.Index == Index, C.Element == Element 
+  where C.Index == Index, C.Element == Element
 {
     return content.withUTF8Buffer {
       LiteralMatch<Buffer, Index>($0).matched(atStartOf: c)
@@ -290,7 +290,7 @@ extension MatchStaticString : CustomStringConvertible {
 
 // A way to force string literals to be interpreted as StaticString
 prefix operator %
-extension StaticString {  
+extension StaticString {
   static prefix func %(x: StaticString) -> MatchStaticString {
     return MatchStaticString(x)
   }
@@ -345,7 +345,7 @@ let source2 = Array("hack hack cough cough cough spork".utf8)
 (%"cough ")+.searchTest(in: source2)
 
 let fancyPattern
-  = %"quick "..((%"brown" | %"black" | %"fox" | %"chicken") .. %" ")+ 
+  = %"quick "..((%"brown" | %"black" | %"fox" | %"chicken") .. %" ")+
   .. (%__)
 
 fancyPattern.searchTest(in: source)

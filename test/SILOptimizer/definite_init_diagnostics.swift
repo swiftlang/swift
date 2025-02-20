@@ -17,7 +17,7 @@ func takes_inout(_ a: inout Int) {}
 func takes_inout_any(_ a: inout Any) {}
 func takes_closure(_ fn: () -> ()) {}
 
-class SomeClass { 
+class SomeClass {
   var x : Int   // expected-note {{'self.x' not initialized}}
 
   var computedProperty : Int { return 42 }
@@ -358,7 +358,7 @@ extension NotInitializedUnion {
 }
 
 enum NotInitializedGenericUnion<T> {
-  init() { 
+  init() {
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
   case X
 }
@@ -366,7 +366,7 @@ enum NotInitializedGenericUnion<T> {
 
 class SomeDerivedClass : SomeClass {
   var y : Int
-  override init() { 
+  override init() {
     y = 42  // ok
     super.init()
   }
@@ -608,7 +608,7 @@ class DerivedUsingConvenienceInits : BaseWithConvenienceInits {
 
 // <rdar://problem/16660680> QoI: preconditionFailure() in init method complains about super.init being called multiple times
 class ClassWhoseInitDoesntReturn : BaseWithConvenienceInits {
-  init() {  
+  init() {
     preconditionFailure("leave me alone dude");
   }
 }

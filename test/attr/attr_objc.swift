@@ -2000,7 +2000,7 @@ class Class_ObjC2 {
 }
 
 @objc() // expected-error {{expected name within parentheses of @objc attribute}}
-class Class_ObjC3 { 
+class Class_ObjC3 {
 }
 
 // @objc with selector names
@@ -2381,7 +2381,7 @@ class ImplicitClassThrows1 {
 
   // CHECK: {{^}} func methodReturnStaticBridged() throws -> (Int) -> (Int) -> Int
   func methodReturnStaticBridged() throws -> ((Int) -> (Int) -> Int) {
-    func add(x: Int) -> (Int) -> Int { 
+    func add(x: Int) -> (Int) -> Int {
       return { x + $0 }
     }
   }

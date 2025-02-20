@@ -1,7 +1,7 @@
 // RUN: %target-build-swift -O %s -module-name=test -Xfrontend -sil-verify-all -emit-sil | %FileCheck %s
 // RUN: %target-build-swift -O %s -module-name=test -Xfrontend -sil-verify-all -emit-sil -Xfrontend -enable-ossa-modules | %FileCheck %s
 
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
@@ -42,7 +42,7 @@ public func testTypeNameInterpolation() -> String {
   return "-\(Outer.Inner.self)+"
 }
 
-// CHECK-LABEL: sil [noinline] @$s4test0A25FoldCompleteInterpolationSSyF 
+// CHECK-LABEL: sil [noinline] @$s4test0A25FoldCompleteInterpolationSSyF
 // CHECK-NOT: apply
 // CHECK-NOT: bb1
 // CHECK: } // end sil function '$s4test0A25FoldCompleteInterpolationSSyF'
@@ -79,7 +79,7 @@ func testInterpolationInLongString() -> String {
   return "\(#function) used in a veeeeeeeeeeeeeeeeeeeery long string"
 }
 
-// CHECK-LABEL: sil [noinline] @$s4test0A19UnqualifiedTypeNameSSyF 
+// CHECK-LABEL: sil [noinline] @$s4test0A19UnqualifiedTypeNameSSyF
 // CHECK-NOT: apply
 // CHECK-NOT: bb1
 // CHECK: } // end sil function '$s4test0A19UnqualifiedTypeNameSSyF'
@@ -88,7 +88,7 @@ public func testUnqualifiedTypeName() -> String {
   return _typeName(Outer.Inner.self, qualified: false)
 }
 
-// CHECK-LABEL: sil [noinline] @$s4test0A17QualifiedTypeNameSSyF 
+// CHECK-LABEL: sil [noinline] @$s4test0A17QualifiedTypeNameSSyF
 // CHECK-NOT: apply
 // CHECK-NOT: bb1
 // CHECK: } // end sil function '$s4test0A17QualifiedTypeNameSSyF'
@@ -174,7 +174,7 @@ printEmbedded(C().f())
 
 #if _runtime(_ObjC)
 
-// Can't use check-output here, because for non ObjC runtimes it would not match.  
+// Can't use check-output here, because for non ObjC runtimes it would not match.
 if testObjcClassName(qualified: false) != "NSObject" {
   fatalError()
 }

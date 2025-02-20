@@ -5,7 +5,7 @@
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-//     CHECK: @"$s4main6EitherOMP" = internal constant <{ 
+//     CHECK: @"$s4main6EitherOMP" = internal constant <{
 // Ensure that there is no reference to an anonymous global from within
 // s4main4PairVMP.  It would be better to use CHECK-NOT-SAME, if such a thing
 // existed.

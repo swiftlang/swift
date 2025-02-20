@@ -45,7 +45,7 @@
 /// To add conformance to the `MutableCollection` protocol to your own
 /// custom collection, upgrade your type's subscript to support both read
 /// and write access.
-/// 
+///
 /// A value stored into a subscript of a `MutableCollection` instance must
 /// subsequently be accessible at that same position. That is, for a mutable
 /// collection instance `a`, index `i`, and value `x`, the two sets of
@@ -53,7 +53,7 @@
 ///
 ///     a[i] = x
 ///     let y = a[i]
-///     
+///
 ///     // Must be equivalent to:
 ///     a[i] = x
 ///     let y = x

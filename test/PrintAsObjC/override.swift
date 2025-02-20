@@ -82,7 +82,7 @@ class B_EmptyChild : Base {
 // CHECK-LABEL: @interface B_GrandchildViaEmpty : B_EmptyChild
 class B_GrandchildViaEmpty : B_EmptyChild {
   // CHECK-NEXT: @property (nonatomic, getter=getProp) NSUInteger prop;
-  override var prop: Int { 
+  override var prop: Int {
     get { return 0 }
     set {}
   }

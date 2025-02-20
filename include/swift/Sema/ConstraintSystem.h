@@ -399,8 +399,8 @@ public:
   constraints::ConstraintGraphNode *getGraphNode() const { return GraphNode; }
 
   /// Set the corresponding node in the constraint graph.
-  void setGraphNode(constraints::ConstraintGraphNode *newNode) { 
-    GraphNode = newNode; 
+  void setGraphNode(constraints::ConstraintGraphNode *newNode) {
+    GraphNode = newNode;
   }
 
   /// Check whether this type variable either has a representative that
@@ -2858,7 +2858,7 @@ private:
   /// able to emit an error message, or false if none of the fixits worked out.
   bool applySolutionFixes(const Solution &solution);
 
-  /// If there is more than one viable solution, attempt 
+  /// If there is more than one viable solution, attempt
   /// to pick the best solution and remove all of the rest.
   ///
   /// \param solutions The set of solutions to filter.
@@ -4933,10 +4933,10 @@ private:
   ///
   /// \param flags A set of flags composed from the TMF_* constants, which
   /// indicates how the constraint should be simplified.
-  /// 
+  ///
   /// \param locator Locator describing where this construction
   /// occurred.
-  SolutionKind simplifyConstructionConstraint(Type valueType, 
+  SolutionKind simplifyConstructionConstraint(Type valueType,
                                               FunctionType *fnType,
                                               TypeMatchOptions flags,
                                               DeclContext *DC,

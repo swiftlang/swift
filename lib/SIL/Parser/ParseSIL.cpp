@@ -3950,7 +3950,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseSILQualifier<MarkDependenceKind>(dependenceKind,
                                               parseDependenceKind)
         || parseTypedValueRef(Val, B) || parseVerbatim("on")
-        || parseTypedValueRef(Base, B)) { 
+        || parseTypedValueRef(Base, B)) {
       return true;
     }
     if (!dependenceKind) {
@@ -8365,7 +8365,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
   return false;
 }
 
-/// decl-sil-default-witness ::= 'sil_default_witness_table' 
+/// decl-sil-default-witness ::= 'sil_default_witness_table'
 ///                              sil-linkage identifier
 ///                              decl-sil-default-witness-body
 /// decl-sil-default-witness-body:

@@ -58,7 +58,7 @@ public func catching() {
     try throwing(which: 2)
   } catch let e as MyError {
     if case .c(let n) = e {
-      print(n == 42 ? "OK4" : "???") 
+      print(n == 42 ? "OK4" : "???")
     } else {
       print("???")
     }

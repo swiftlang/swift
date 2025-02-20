@@ -9,4 +9,4 @@
 // CHECK-VAR-SET:       !DICompileUnit({{.*}}producer: "{{[^"]*Swift version [^"]+}}"
 // CHECK-VAR-SET-SAME:                 flags: "
 // CHECK-VAR-SET-NOT:                  "
-// CHECK-VAR-SET-SAME:                 -resource-dir 
+// CHECK-VAR-SET-SAME:                 -resource-dir

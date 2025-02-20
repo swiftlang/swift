@@ -846,7 +846,7 @@ class RequiredInitClass {
 protocol ProtoDelegatesToRequired { }
 
 extension ProtoDelegatesToRequired where Self : RequiredInitClass {
-  // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions24ProtoDelegatesToRequiredPA2A0F9InitClassC{{[_0-9a-zA-Z]*}}fC 
+  // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions24ProtoDelegatesToRequiredPA2A0F9InitClassC{{[_0-9a-zA-Z]*}}fC
   // CHECK: bb0([[STR:%[0-9]+]] : @owned $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
   // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : RequiredInitClass, τ_0_0 : ProtoDelegatesToRequired> { var τ_0_0 } <Self>

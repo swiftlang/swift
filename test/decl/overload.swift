@@ -14,7 +14,7 @@ var var_redecl3: (Int) -> () { get {} } // expected-note {{previously declared h
 var var_redecl3: () -> () { get {} } // expected-error {{invalid redeclaration of 'var_redecl3'}}
 
 var var_redecl4: Int // expected-note 2{{previously declared here}}
-var var_redecl4: Int // expected-error {{invalid redeclaration of 'var_redecl4'}} 
+var var_redecl4: Int // expected-error {{invalid redeclaration of 'var_redecl4'}}
 var var_redecl4: Int // expected-error {{invalid redeclaration of 'var_redecl4'}}
 
 
@@ -173,7 +173,7 @@ struct X2 {
   typealias IntAlias = Int
   func f(a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
 }
-struct X3 { 
+struct X3 {
   func f(a : Int) {} // expected-note{{previously declared here}}
   func f(a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
   typealias IntAlias = Int
@@ -378,23 +378,23 @@ func inout2(x: inout Int) { }
 
 // optionals
 func optional(x: Int?) { } // expected-note{{previously declared}}
-func optional(x: Int!) { } 
+func optional(x: Int!) { }
 // expected-error@-1{{invalid redeclaration of 'optional(x:)'}}
 // expected-note@-2 {{implicitly unwrapped optional parameter is of same type as optional parameter}}
 
 func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
-func optionalInOut(x: inout Int!) { } 
+func optionalInOut(x: inout Int!) { }
 // expected-error@-1{{invalid redeclaration of 'optionalInOut(x:)'}}
 // expected-note@-2 {{implicitly unwrapped optional parameter is of same type as optional parameter}}
 
 class optionalOverloads {
   class func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
-  class func optionalInOut(x: inout Int!) { } 
+  class func optionalInOut(x: inout Int!) { }
   // expected-error@-1{{invalid redeclaration of 'optionalInOut(x:)'}}
   // expected-note@-2 {{implicitly unwrapped optional parameter is of same type as optional parameter}}
 
   func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
-  func optionalInOut(x: inout Int!) { } 
+  func optionalInOut(x: inout Int!) { }
   // expected-error@-1{{invalid redeclaration of 'optionalInOut(x:)'}}
   // expected-note@-2 {{implicitly unwrapped optional parameter is of same type as optional parameter}}
 }
@@ -570,12 +570,12 @@ enum E6_52486 {
 
 enum E7_52486 {
   case E // expected-note {{'E' previously declared here}}
-  class E {} // expected-error {{invalid redeclaration of 'E'}} 
+  class E {} // expected-error {{invalid redeclaration of 'E'}}
 }
 
 enum E8_52486 {
   case F // expected-note {{'F' previously declared here}}
-  struct F {} // expected-error {{invalid redeclaration of 'F'}} 
+  struct F {} // expected-error {{invalid redeclaration of 'F'}}
 }
 
 enum E9_52486 {

@@ -493,7 +493,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   }
 
   // Check if the substitution contains any generic types that are too deep.
-  // If this is the case, bail to avoid the explosion in the number of 
+  // If this is the case, bail to avoid the explosion in the number of
   // generated specializations.
   for (auto Replacement : ParamSubs.getReplacementTypes()) {
     if (isTypeTooComplex(Replacement)) {

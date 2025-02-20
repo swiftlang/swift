@@ -138,7 +138,7 @@ extension ApplySite {
   }
 
   public var isCalleeNoReturn: Bool {
-    bridged.ApplySite_isCalleeNoReturn()  
+    bridged.ApplySite_isCalleeNoReturn()
   }
 
   public var isCalleeTrapNoReturn: Bool {
@@ -263,7 +263,7 @@ extension ApplySite {
   ///  %a = apply         %pa    (a, b)
   /// ```
   ///
-  /// TODO: delete this API and rewrite the users. 
+  /// TODO: delete this API and rewrite the users.
   public func operand(forCalleeArgumentIndex calleeArgIdx: Int) -> Operand? {
     let callerArgIdx = calleeArgIdx - operandConventions.unappliedArgumentCount
     guard callerArgIdx >= 0 && callerArgIdx < numArguments else { return nil }
@@ -278,7 +278,7 @@ extension ApplySite {
   /// Warning: the returned integer can be misused as an index into
   /// the wrong collection. Replace uses of this API with safer APIs.
   ///
-  /// TODO: delete this API and rewrite the users. 
+  /// TODO: delete this API and rewrite the users.
   public func calleeArgumentIndex(of operand: Operand) -> Int? {
     operandConventions.calleeArgumentIndex(of: operand)
   }

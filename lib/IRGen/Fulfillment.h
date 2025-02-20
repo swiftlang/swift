@@ -12,7 +12,7 @@
 //
 // This file defines interfaces for deriving type metadata and protocol
 // witness tables from various sources.
-// 
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_IRGEN_FULFILLMENT_H

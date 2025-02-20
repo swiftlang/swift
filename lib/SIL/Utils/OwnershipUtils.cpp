@@ -2183,7 +2183,7 @@ static FunctionTest FindBorrowIntroducers(
 /// Given a phi, 'outerPhi', it can be determined to have an inner adjacent phi,
 /// 'innerPhi' if and only if: on any path, the operand of 'outerPhi' is the
 /// enclosing definition of the operand of 'innerPhi' on the same path.
-///      
+///
 bool swift::isInnerAdjacentPhi(SILArgument *innerPhiVal,
                                SILArgument *outerPhiVal) {
   auto innerPhi = PhiValue(innerPhiVal);

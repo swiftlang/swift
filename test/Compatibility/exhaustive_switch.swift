@@ -525,7 +525,7 @@ func quiteBigEnough() -> Bool {
   case (_, .case11): return true
   }
 
-  // No diagnostic 
+  // No diagnostic
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) {
   case (_, _): return true
   }
@@ -539,7 +539,7 @@ func quiteBigEnough() -> Bool {
   case _: return true
   }
 
-  // No diagnostic 
+  // No diagnostic
   switch ContainsOverlyLargeEnum.one(.case0) {
   case .one: return true
   case .two: return true
@@ -846,7 +846,7 @@ public enum NonExhaustivePayload {
 // case.
 @inlinable
 public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePayload, for interval: TemporalProxy, flag: Bool) {
-  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{+2:3-3=case .b:\n<#code#>\n}} 
+  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{+2:3-3=case .b:\n<#code#>\n}}
   case .a: break
   }
 
@@ -867,15 +867,15 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break // no-warning
   }
 
-  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{+2:3-3=case .b:\n<#code#>\n}} 
+  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{+2:3-3=case .b:\n<#code#>\n}}
   case .a: break
   @unknown case _: break
   }
 
-  switch value { 
+  switch value {
   // expected-warning@-1 {{switch must be exhaustive}} {{none}}
-  // expected-note@-2 {{add missing case: '.a'}} {{+5:3-3=case .a:\n<#code#>\n}} 
-  // expected-note@-3 {{add missing case: '.b'}} {{+5:3-3=case .b:\n<#code#>\n}} 
+  // expected-note@-2 {{add missing case: '.a'}} {{+5:3-3=case .a:\n<#code#>\n}}
+  // expected-note@-3 {{add missing case: '.b'}} {{+5:3-3=case .b:\n<#code#>\n}}
   // expected-note@-4 {{add missing cases}} {{+5:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n}}
   @unknown case _: break
   }
@@ -942,7 +942,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   } // no-warning
 
   // Test payloaded enums.
-  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{+2:3-3=case .b(_):\n<#code#>\n}} 
+  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{+2:3-3=case .b(_):\n<#code#>\n}}
   case .a: break
   }
 
@@ -963,17 +963,17 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break // no-warning
   }
 
-  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{+2:3-3=case .b(_):\n<#code#>\n}} 
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{+2:3-3=case .b(_):\n<#code#>\n}}
   case .a: break
   @unknown case _: break
   }
 
-  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{+3:3-3=case .b(true):\n<#code#>\n}} 
+  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{+3:3-3=case .b(true):\n<#code#>\n}}
   case .a: break
   case .b(false): break
   }
 
-  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{+3:3-3=case .b(true):\n<#code#>\n}} 
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{+3:3-3=case .b(true):\n<#code#>\n}}
   case .a: break
   case .b(false): break
   @unknown case _: break
@@ -1027,14 +1027,14 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   @unknown case _: break // no-warning
   }
 
-  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{+2:3-3=case .b:\n<#code#>\n}} 
+  switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{+2:3-3=case .b:\n<#code#>\n}}
   case .a: break
   @unknown case _: break
   }
 
-  switch value { // expected-warning {{switch must be exhaustive}} {{none}} 
-  // expected-note@-1 {{add missing case: '.a'}} {{+4:3-3=case .a:\n<#code#>\n}} 
-  // expected-note@-2 {{add missing case: '.b'}} {{+4:3-3=case .b:\n<#code#>\n}} 
+  switch value { // expected-warning {{switch must be exhaustive}} {{none}}
+  // expected-note@-1 {{add missing case: '.a'}} {{+4:3-3=case .a:\n<#code#>\n}}
+  // expected-note@-2 {{add missing case: '.b'}} {{+4:3-3=case .b:\n<#code#>\n}}
   // expected-note@-3 {{add missing cases}} {{+4:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n}}
   @unknown case _: break
   }

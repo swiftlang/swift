@@ -93,7 +93,7 @@ func discard_binding() {
   for _ in [0] {}
 }
 
-struct X<T> { 
+struct X<T> {
   var value: T
 }
 

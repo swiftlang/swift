@@ -19,7 +19,7 @@ import resilient_objc_class
 
 // CHECK-LABEL: @"$s31class_update_callback_with_stub17ResilientSubclassCMn" = constant <{
 // -- flags
-// CHECK-SAME: i32 1644232784, 
+// CHECK-SAME: i32 1644232784,
 // -- parent
 // CHECK-SAME: @"$s31class_update_callback_with_stubMXM"
 // -- name

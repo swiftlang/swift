@@ -300,7 +300,7 @@ postfix func <*> (_: Test<True>) -> String? { return .none }
 class Test<C: Bool_> : MetaFunction {
   typealias Result = Int
 } // picks first <*>
-typealias Inty = Test<True>.Result 
+typealias Inty = Test<True>.Result
 var iy : Inty = 5 // okay, because we picked the first <*>
 var iy2 : Inty = "hello" // expected-error{{cannot convert value of type 'String' to specified type 'Inty' (aka 'Int')}}
 

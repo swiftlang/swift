@@ -74,7 +74,7 @@ private:
 
 } // end anonymous namespace
 
-SILValue 
+SILValue
 SROAMemoryUseAnalyzer::createAgg(SILBuilder &B, SILLocation Loc,
                                  SILType Ty,
                                  ArrayRef<SILValue> Elements) {

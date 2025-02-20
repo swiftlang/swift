@@ -338,7 +338,7 @@ protocol ErrorP {
 
 typealias ErrorA<T: ErrorP> = T.X.Y
 
-struct ErrorB : ErrorP { 
+struct ErrorB : ErrorP {
   // expected-error@-1 {{type 'ErrorB' does not conform to protocol 'ErrorP'}}
   // expected-note@-2 {{add stubs for conformance}}
   typealias X = ErrorC // expected-note {{possibly intended match 'ErrorB.X' (aka 'ErrorC') does not conform to 'ErrorQ'}}

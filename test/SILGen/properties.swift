@@ -499,7 +499,7 @@ class rdar16151899Derived : rdar16151899Base {
         // CHECK: load{{.*}}Int
         // CHECK-NEXT: end_access {{.*}} : $*Int
         // CHECK-NEXT: [[SETTER:%[0-9]+]] = class_method {{.*}} : $rdar16151899Base, #rdar16151899Base.x!setter : (rdar16151899Base)
-        // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]]) 
+        // CHECK-NEXT: apply [[SETTER]]({{.*}}, [[BASEPTR]])
     }
 }
 
@@ -522,7 +522,7 @@ class DerivedProperty : BaseProperty {
 // CHECK:   [[SELF_COPY:%[0-9]+]] = copy_value [[SELF]]
 // CHECK:   [[BASEPTR:%[0-9]+]] = upcast [[SELF_COPY]] : $DerivedProperty to $BaseProperty
 // CHECK:   [[BORROW:%[0-9]+]] = begin_borrow [[BASEPTR]]
-// CHECK:   [[FN:%[0-9]+]] = function_ref @$s10properties12BasePropertyC1xSivg : $@convention(method) (@guaranteed BaseProperty) -> Int 
+// CHECK:   [[FN:%[0-9]+]] = function_ref @$s10properties12BasePropertyC1xSivg : $@convention(method) (@guaranteed BaseProperty) -> Int
 // CHECK:   [[RESULT:%.*]] = apply [[FN]]([[BORROW]]) : $@convention(method) (@guaranteed BaseProperty) -> Int
 // CHECK:   destroy_value [[BASEPTR]]
 // CHECK:   return [[RESULT]] : $Int

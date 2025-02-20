@@ -46,7 +46,7 @@ extension CxxRandomAccessCollection {
     return rawIterator
   }
 
-  /// A C++ implementation of the subscript might be more performant. This 
+  /// A C++ implementation of the subscript might be more performant. This
   /// overload should only be used if the C++ type does not define `operator[]`.
   @inlinable
   public subscript(_ index: Int) -> Element {
@@ -69,7 +69,7 @@ public protocol CxxMutableRandomAccessCollection<Element>:
 }
 
 extension CxxMutableRandomAccessCollection {
-  /// A C++ implementation of the subscript might be more performant. This 
+  /// A C++ implementation of the subscript might be more performant. This
   /// overload should only be used if the C++ type does not define `operator[]`.
   @inlinable
   public subscript(_ index: Int) -> Element {

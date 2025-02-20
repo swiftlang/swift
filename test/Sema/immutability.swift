@@ -707,7 +707,7 @@ protocol JustAProtocol {
 extension JustAProtocol {
   var foo: String {
     get { return name }
-    nonmutating set { name = newValue } // expected-error {{cannot assign to property: 'self' is immutable}} 
+    nonmutating set { name = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
     // expected-note@-1 {{mark setter 'mutating' to make 'self' mutable}}{{5-16=mutating}}
   }
 

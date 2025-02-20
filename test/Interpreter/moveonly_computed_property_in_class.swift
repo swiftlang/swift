@@ -13,7 +13,7 @@ final class Wrapper {
   var val: FileDescriptor = FileDescriptor(desc: 0)
 
   func isEmpty_bug() -> Bool {
-    // error: 'self.val' has consuming use that cannot 
+    // error: 'self.val' has consuming use that cannot
     // be eliminated due to a tight exclusivity scope
     return val.empty // note: consuming use here
   }

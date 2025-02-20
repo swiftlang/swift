@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-print-types -emit-sil >%t/output.sil
 // RUN: %FileCheck %s < %t/output.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output.sil

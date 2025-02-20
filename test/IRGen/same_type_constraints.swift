@@ -3,7 +3,7 @@
 
 // Ensure that same-type constraints between generic arguments get reflected
 // correctly in the type context descriptor.
-// CHECK-LABEL: @"$s21same_type_constraints4SG11VA2A2P2Rzq_RszrlE13InnerTEqualsUVMn" = 
+// CHECK-LABEL: @"$s21same_type_constraints4SG11VA2A2P2Rzq_RszrlE13InnerTEqualsUVMn" =
 //                  T       U(==T) V        padding
 // CHECK-SAME:    , i8 -128, i8 0, i8 -128, i8 0,
 

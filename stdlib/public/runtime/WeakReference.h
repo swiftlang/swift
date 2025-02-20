@@ -47,13 +47,13 @@ namespace swift {
 //   or *two* bits (32-bit) all clear.
 
 // Thread-safety:
-// 
+//
 // Reading a weak reference must be thread-safe with respect to:
 //  * concurrent readers
 //  * concurrent weak reference zeroing due to deallocation of the
 //    pointed-to object
 //  * concurrent ObjC readers or zeroing (for non-native weak storage)
-// 
+//
 // Reading a weak reference is NOT thread-safe with respect to:
 //  * concurrent writes to the weak variable other than zeroing
 //  * concurrent destruction of the weak variable

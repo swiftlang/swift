@@ -241,7 +241,7 @@ var global: ((() -> Void) -> Void)? = nil
 class C_57070 {
   let ok: (@escaping () -> Void) -> Void // OK
   let callback: (() -> Void) -> Void // expected-note {{add explicit @escaping to function parameter #0}} {{18-18=@escaping }}
-  let callback1: (() -> Void, () -> Void) -> Void // expected-note {{add explicit @escaping to function parameter #1}} {{31-31=@escaping }} 
+  let callback1: (() -> Void, () -> Void) -> Void // expected-note {{add explicit @escaping to function parameter #1}} {{31-31=@escaping }}
   let callbackAuto: (@autoclosure () -> Void) -> Void // expected-note {{add explicit @escaping to function parameter #0}} {{34-34= @escaping}}
   let callbackOpt: ((() -> Void) -> Void)? // expected-note{{add explicit @escaping to function parameter #0}} {{22-22=@escaping }}
 
@@ -253,7 +253,7 @@ class C_57070 {
 
   init(af: @escaping (@escaping() -> Void) -> Void) {
     self.callbackOpt = af // expected-error{{cannot assign value of type '(@escaping () -> Void) -> Void' to type '(() -> Void) -> Void'}}
-    // expected-note@-1{{parameter #0 expects escaping value of type '() -> Void'}}  
+    // expected-note@-1{{parameter #0 expects escaping value of type '() -> Void'}}
   }
 
   init(ag: @escaping (@escaping() -> Void) -> Void) {

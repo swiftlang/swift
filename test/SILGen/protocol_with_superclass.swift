@@ -135,7 +135,7 @@ class GoodConformingClass : Generic<Int>, ProtoRefinesClass {
 protocol ProtoRefinesProtoWithClass : ProtoRefinesClass {}
 
 extension ProtoRefinesProtoWithClass {
-  // CHECK-LABEL: sil hidden [ossa] @$s24protocol_with_superclass012ProtoRefinesD9WithClassPAAE026anotherExtensionMethodUsesG5TypesyySS_Si_SittF : $@convention(method) <Self where Self : ProtoRefinesProtoWithClass> (@guaranteed String, Int, Int, @guaranteed Self) -> () 
+  // CHECK-LABEL: sil hidden [ossa] @$s24protocol_with_superclass012ProtoRefinesD9WithClassPAAE026anotherExtensionMethodUsesG5TypesyySS_Si_SittF : $@convention(method) <Self where Self : ProtoRefinesProtoWithClass> (@guaranteed String, Int, Int, @guaranteed Self) -> ()
   func anotherExtensionMethodUsesClassTypes(_ x: ConcreteAlias, _ y: GenericAlias) {
     _ = ConcreteAlias.self
     _ = GenericAlias.self

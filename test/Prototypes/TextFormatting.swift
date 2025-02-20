@@ -194,7 +194,7 @@ public struct IntegerFormat<T: Integer> : TextOutputStreamable {
     let nDigits = _writePositive(rest, &stream)
     let digit = UInt32(value % radix)
     let baseCharOrd : UInt32 = digit <= 9
-      ? UnicodeScalar("0").value 
+      ? UnicodeScalar("0").value
       : UnicodeScalar("A").value - 10
     stream.write(String(UnicodeScalar(baseCharOrd + digit)!))
     return nDigits + 1

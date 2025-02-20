@@ -1,4 +1,4 @@
-// REQUIRES: VENDOR=apple 
+// REQUIRES: VENDOR=apple
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module -validate-tbd-against-ir=all %s
 // RUN: %target-swift-frontend -enable-library-evolution -emit-ir -o/dev/null -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module -validate-tbd-against-ir=all %s
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module -validate-tbd-against-ir=all %s -enable-testing

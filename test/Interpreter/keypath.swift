@@ -150,7 +150,7 @@ print(\Controller.fourthLabel!.isVisible)
 print(\S.Type.b)
 // CHECK: {{\\Controller\.(fifthLabel|<computed .* \(Optional<MyLabel\.Type>\)>)\?\.<computed .* \(Bool\)>?}}
 print(\Controller.fifthLabel?.isVisible)
-// CHECK: \Int.Type.<computed {{.*}} (Int)> 
+// CHECK: \Int.Type.<computed {{.*}} (Int)>
 print(\Int.Type.zero)
 
 

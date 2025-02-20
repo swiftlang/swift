@@ -13,10 +13,10 @@
 /// A class of types whose instances hold the value of an entity with stable
 /// identity.
 ///
-/// Use the `Identifiable` protocol to provide a stable notion of identity to a 
+/// Use the `Identifiable` protocol to provide a stable notion of identity to a
 /// class or value type. For example, you could define a `User` type with an `id`
-/// property that is stable across your app and your app's database storage. 
-/// You could use the `id` property to identify a particular user even if other 
+/// property that is stable across your app and your app's database storage.
+/// You could use the `id` property to identify a particular user even if other
 /// data fields change, such as the user's name.
 ///
 /// `Identifiable` leaves the duration and scope of the identity unspecified.

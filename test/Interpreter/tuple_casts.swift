@@ -89,7 +89,7 @@ func castToThreeOpt<T, U, V>(_ x: Any, _: T.Type, _: U.Type, _: V.Type)
 class LifetimeA {
   var tracked: LifetimeTracked
 
-  init(value: Int) { 
+  init(value: Int) {
     tracked = LifetimeTracked(value)
   }
 }

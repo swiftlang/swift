@@ -1401,7 +1401,7 @@ public:
     *this << "-> ";
     print(node);
 
-    if (auto V = dyn_cast<ValueBase>(node)) {    
+    if (auto V = dyn_cast<ValueBase>(node)) {
       auto users = map<SmallVector<const SILInstruction*,4>>(V->getUses(),
                                                        [](Operand *o) {
                                                          return o->getUser();
@@ -2793,7 +2793,7 @@ public:
           << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
           << (BAI->isFromBuiltin() ? "[builtin] " : "")
-          << getIDAndType(BAI->getSource()) << ", " 
+          << getIDAndType(BAI->getSource()) << ", "
           << getIDAndType(BAI->getBuffer());
   }
   void visitEndUnpairedAccessInst(EndUnpairedAccessInst *EAI) {

@@ -165,24 +165,24 @@ func testStaticMethodsWithAttrubuteReturnsUnretained() {
 
 func testFreeFunctionsReturningNonFRT() {
     let frtLocalVar1 = global_function_returning_non_FRT()
-    // CHECK: function_ref @{{.*}}global_function_returning_non_FRT{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
+    // CHECK: function_ref @{{.*}}global_function_returning_non_FRT{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct>
 
     let frtLocalVar4 = global_function_returning_non_FRT_create()
-    // CHECK: function_ref @{{.*}}global_function_returning_non_FRT_create{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
+    // CHECK: function_ref @{{.*}}global_function_returning_non_FRT_create{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct>
 
     let frtLocalVar5 = global_function_returning_non_FRT_copy()
-    // CHECK: function_ref @{{.*}}global_function_returning_non_FRT_copy{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
+    // CHECK: function_ref @{{.*}}global_function_returning_non_FRT_copy{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct>
 }
 
 func testStaticMethodsReturningNonFRT() {
     let frtLocalVar1 = StructWithStaticMethodsReturningNonFRT.StaticMethodReturningNonFRT()
-    // CHECK: function_ref @{{.*}}StaticMethodReturningNonFRT{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
+    // CHECK: function_ref @{{.*}}StaticMethodReturningNonFRT{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct>
 
     let frtLocalVar4 = StructWithStaticMethodsReturningNonFRT.StaticMethodReturningNonFRT_create()
-    // CHECK: function_ref @{{.*}}StaticMethodReturningNonFRT_create{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
+    // CHECK: function_ref @{{.*}}StaticMethodReturningNonFRT_create{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct>
 
     let frtLocalVar5 = StructWithStaticMethodsReturningNonFRT.StaticMethodReturningNonFRT_copy()
-    // CHECK: function_ref @{{.*}}StaticMethodReturningNonFRT_copy{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct> 
+    // CHECK: function_ref @{{.*}}StaticMethodReturningNonFRT_copy{{.*}} : $@convention(c) () -> UnsafeMutablePointer<NonFRTStruct>
 }
 
 func testtFreeFunctionsTemplated(frt : FRTStruct) {

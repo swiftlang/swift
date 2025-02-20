@@ -6,7 +6,7 @@ protocol CustomStringConvertible {
 
 struct TestFormat {}
 
-protocol FormattedPrintable : CustomStringConvertible { 
+protocol FormattedPrintable : CustomStringConvertible {
   func print(_: TestFormat)
 }
 

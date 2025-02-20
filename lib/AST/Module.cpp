@@ -1337,7 +1337,7 @@ void ModuleDecl::populateObjCNameLookupCache() {
       // have compound names, but not allowed to have @objc attributes. Thus we
       // are sure to not hit asserts getting the simple name.
       //
-      // Similarly, init, dealloc and subscript (the special names) can't be top 
+      // Similarly, init, dealloc and subscript (the special names) can't be top
       // level decls, so we won't hit asserts getting the base identifier out of the
       // value decl.
       const Identifier &declObjCName =

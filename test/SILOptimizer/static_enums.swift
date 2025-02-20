@@ -1,6 +1,6 @@
 // RUN: %target-build-swift -parse-as-library -O %s -module-name=test -emit-sil | %FileCheck %s
 
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -parse-as-library -O -module-name=test %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 

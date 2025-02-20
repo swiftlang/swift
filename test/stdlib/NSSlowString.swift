@@ -100,8 +100,8 @@ tests.test("Zalgo")
 		zalgo.append(String(UnicodeScalar(combo)!))
 	}
 	check(
-		NSSlowString(string: zalgo) as String, 
-		expectedCount: 3, 
+		NSSlowString(string: zalgo) as String,
+		expectedCount: 3,
 		expectedCodeUnitCount: 125
 	)
 

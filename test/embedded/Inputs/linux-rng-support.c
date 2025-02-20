@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <stdint.h>
 
-#ifdef __linux__ 
+#ifdef __linux__
 
 ssize_t getrandom(void *buf, size_t len, unsigned int flags);
 

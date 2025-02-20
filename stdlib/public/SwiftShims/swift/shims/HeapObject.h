@@ -61,7 +61,7 @@ struct HeapObject {
   HeapObject() = default;
 
   // Initialize a HeapObject header as appropriate for a newly-allocated object.
-  constexpr HeapObject(HeapMetadata const *newMetadata) 
+  constexpr HeapObject(HeapMetadata const *newMetadata)
     : metadata(newMetadata)
     , refCounts(InlineRefCounts::Initialized)
   { }

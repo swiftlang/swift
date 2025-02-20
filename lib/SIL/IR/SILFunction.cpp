@@ -925,7 +925,7 @@ bool SILFunction::hasName(const char *Name) const {
 
 /*
  Checks if this (callee) function body can be inlined into the caller
- by comparing their SerializedKind_t values. 
+ by comparing their SerializedKind_t values.
 
  If both callee and caller are not_serialized, the callee can be inlined
  into the caller during SIL inlining passes even if it (and the caller)

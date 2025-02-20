@@ -202,12 +202,12 @@ public enum _DebuggerSupport {
     refsAlreadySeen: inout Set<ObjectIdentifier>,
     maxItemCounter: inout Int,
     target: inout StreamType
-  ) {    
+  ) {
     guard maxItemCounter > 0 else { return }
 
     guard shouldExpand(mirror: mirror,
                        collectionStatus: parentCollectionStatus,
-                       isRoot: isRoot) 
+                       isRoot: isRoot)
     else { return }
 
     maxItemCounter -= 1

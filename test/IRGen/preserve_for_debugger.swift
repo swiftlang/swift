@@ -25,7 +25,7 @@ public class User {
 
   func f() {
     // Force the generation of the getter
-    _ = self.number 
+    _ = self.number
   }
 }
 let c = User()

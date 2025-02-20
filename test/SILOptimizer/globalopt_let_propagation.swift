@@ -97,11 +97,11 @@ struct B {
 
  static let maxSize = Int.max >> 1
 
- static var PROP1: Double { 
+ static var PROP1: Double {
    return PI
  }
 
- static var PROP2: Int { 
+ static var PROP2: Int {
    return I * J - I
  }
 
@@ -138,11 +138,11 @@ class C {
 
  static let maxSize = Int.max >> 1
 
- static var PROP1: Double { 
+ static var PROP1: Double {
    return PI
  }
 
- static var PROP2: Int { 
+ static var PROP2: Int {
    return I * J - I
  }
 
@@ -302,11 +302,11 @@ public func test_static_class_let_int_complex() -> Int {
 // CHECK-NEXT: load
 @inline(never)
 public func test_var_double() -> Double {
-  return VPI + 1.0 
+  return VPI + 1.0
 }
 
 // CHECK-LABEL: sil [noinline] @$s25globalopt_let_propagation12test_var_intSiyF
-// CHECK: bb0: 
+// CHECK: bb0:
 // CHECK-NEXT: global_addr
 // CHECK-NEXT: begin_access [read] [dynamic]
 // CHECK-NEXT: struct_element_addr

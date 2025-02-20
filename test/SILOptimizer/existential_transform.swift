@@ -52,7 +52,7 @@ internal class SomeNoClass: SomeNoClassProtocol {
 }
 
 @inline(never) internal func wrap_foo_ncp(a:SomeNoClassProtocol) -> Int{
- return a.foo() 
+ return a.foo()
 }
 
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform3ncpyyF : $@convention(thin) () -> () {
@@ -62,7 +62,7 @@ internal class SomeNoClass: SomeNoClassProtocol {
 // CHECK: debug_value
 // CHECK: init_existential_addr
 // CHECK: store
-// CHECK: function_ref @$s21existential_transform12wrap_foo_ncp1aSiAA19SomeNoClassProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int 
+// CHECK: function_ref @$s21existential_transform12wrap_foo_ncp1aSiAA19SomeNoClassProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: open_existential_addr
 // CHECK: apply
 // CHECK: destroy_addr
@@ -103,8 +103,8 @@ internal class SomeClassComp: SomeClassProtocolComp, SomeOtherClassProtocolComp 
 // CHECK:   debug_value
 // CHECK:   init_existential_ref
 // CHECK:   debug_value
-// CHECK:   function_ref @$s21existential_transform16wrap_foo_bar_cpc1aSiAA21SomeClassProtocolComp_AA0g5OtherhiJ0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeClassProtocolComp, τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int 
-// CHECK:   open_existential_ref 
+// CHECK:   function_ref @$s21existential_transform16wrap_foo_bar_cpc1aSiAA21SomeClassProtocolComp_AA0g5OtherhiJ0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeClassProtocolComp, τ_0_0 : SomeOtherClassProtocolComp> (@guaranteed τ_0_0) -> Int
+// CHECK:   open_existential_ref
 // CHECK:   apply
 // CHECK:   set_deallocating
 // CHECK:   debug_value
@@ -199,7 +199,7 @@ internal class KK : PP {
 // CHECK: debug_value {{.*}} expr op_deref
 // CHECK: load
 // CHECK: [[O1:%.*]] = open_existential_ref
-// CHECK:  witness_method $@opened("{{.*}}", PP) Self, #PP.foo : <Self where Self : PP> (Self) -> () -> Int, %3 : $@opened("{{.*}}PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int 
+// CHECK:  witness_method $@opened("{{.*}}", PP) Self, #PP.foo : <Self where Self : PP> (Self) -> () -> Int, %3 : $@opened("{{.*}}PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> Int
 // CHECK: apply
 // CHECK: return
 // CHECK-LABEL: } // end sil function '$s21existential_transform13wrap_inout_cp1aSiAA2PP_pz_tF'
@@ -214,7 +214,7 @@ internal class KK : PP {
 // CHECK: debug_value
 // CHECK: init_existential_ref
 // CHECK: store
-// CHECK: function_ref @$s21existential_transform13wrap_inout_cp1aSiAA2PP_pz_tF : $@convention(thin) (@inout PP) -> Int 
+// CHECK: function_ref @$s21existential_transform13wrap_inout_cp1aSiAA2PP_pz_tF : $@convention(thin) (@inout PP) -> Int
 // CHECK: apply
 // CHECK: set_deallocating
 // CHECK: debug_value
@@ -299,9 +299,9 @@ func wrap_gcp<T:GP>(_ a:T,_ b:GP) -> Int {
 // CHECK: store [[REF]] to [[EADR]]
 // CHECK: [[F:%.*]] = function_ref @$s21existential_transform8wrap_gcpySix_AA2GP_ptAaCRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : GP> (@in_guaranteed τ_0_0, @in_guaranteed GP) -> Int
 // CHECK: apply [[F]]<T>(%0, [[E]]) : $@convention(thin) <τ_0_0 where τ_0_0 : GP> (@in_guaranteed τ_0_0, @in_guaranteed GP) -> Int
-// CHECK: destroy_addr 
+// CHECK: destroy_addr
 // CHECK: dealloc_stack
-// CHECK: return 
+// CHECK: return
 // CHECK: } // end sil function '$s21existential_transform3gcpySixAA2GPRzlF'
 @inline(never) func gcp<T:GP>(_ a:T) -> Int {
   let k:GC = GC()
@@ -423,7 +423,7 @@ class RC: RP {
 // CHECK:   function_ref @$s21existential_transform4find4base4mult4Obj1Sbs5Int32V_AgA2RP_ptFTf4nne_n : $@convention(thin) <τ_0_0 where τ_0_0 : RP> (Int32, Int32, @in_guaranteed τ_0_0) -> Bool
 // CHECK:   open_existential_addr
 // CHECK:   apply
-// CHECK:   br 
+// CHECK:   br
 // CHECK-LABEL: } // end sil function '$s21existential_transform4find4base4mult4Obj1Sbs5Int32V_AgA2RP_ptFTf4nne_n'
 @inline(never) func find(base:Int32, mult:Int32, Obj1: RP) -> Bool {
   if base * mult > Obj1.val {
@@ -436,7 +436,7 @@ class RC: RP {
 }
 @inline(never) func find_wrapper() -> Bool {
   let ab = RC(val: 100)
-  return find(base: 3, mult: 1, Obj1: ab) 
+  return find(base: 3, mult: 1, Obj1: ab)
 }
 @_optimize(none) public func foo() -> Int {
 cp()
@@ -450,7 +450,7 @@ inout_ncp()
 struct_inout_ncp()
 let y:Int = gcp(GC())
 var a:Array<GC> = [GC()]
-let z:Int = gcp_arch(GC(), &a) 
+let z:Int = gcp_arch(GC(), &a)
 let zz:Int32 = getName_wrapper()
 let _ = find_wrapper()
 return x + y + z + Int(zz)

@@ -651,7 +651,7 @@ func useEnums() {
       case .WithAvailableByEnumElementPayload(let p):
         markUsed("WithAvailableByEnumElementPayload")
 
-        // For the moment, we do not incorporate enum element availability into 
+        // For the moment, we do not incorporate enum element availability into
         // scope construction. Perhaps we should?
         functionTakingEnumIntroducedOn52(p)  // expected-error {{'functionTakingEnumIntroducedOn52' is only available in macOS 52 or newer}}
 
@@ -711,7 +711,7 @@ func classAvailability() {
   o51.someMethod()
 
   let _ = o10_9.someProp
-  let _ = o51.someProp 
+  let _ = o51.someProp
 }
 
 func castingPotentiallyUnavailableClass(_ o : AnyObject) {
@@ -996,7 +996,7 @@ class SubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
 
   @available(OSX, introduced: 10.9)
   override var someProperty: Int {
-    get { 
+    get {
       let _ = super.someProperty // expected-error {{'someProperty' is only available in macOS 51 or newer}}
           // expected-note@-1 {{add 'if #available' version check}}
 

@@ -28,7 +28,7 @@ struct Value<T> {
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
 // CHECK:   [[TYPE:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s4main5ValueVySo12NSDictionaryCGMD")
 // CHECK:      call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:   ptr noalias {{%.*}}, 
+// CHECK-SAME:   ptr noalias {{%.*}},
 // CHECK-SAME:   ptr [[TYPE]])
 // CHECK: }
 func doit() {
@@ -40,10 +40,10 @@ doit()
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueVMa"([[INT]] %0, ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK: entry:
 // CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
-// CHECK-SAME:   [[INT]] %0, 
-// CHECK-SAME:   ptr %1, 
-// CHECK-SAME:   ptr undef, 
-// CHECK-SAME:   ptr undef, 
+// CHECK-SAME:   [[INT]] %0,
+// CHECK-SAME:   ptr %1,
+// CHECK-SAME:   ptr undef,
+// CHECK-SAME:   ptr undef,
 // CHECK-SAME:   $s4main5ValueVMn
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

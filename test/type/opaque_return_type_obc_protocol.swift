@@ -11,6 +11,6 @@ public protocol MyProtocol {}
 
 extension NSIndexSet: MyProtocol {}
 
-public func toSomeMyProtocol() -> some MyProtocol { 
+public func toSomeMyProtocol() -> some MyProtocol {
     return NSIndexSet(index: 7)
 }

@@ -83,7 +83,7 @@ public func getAnyP() -> any P {
 
 struct I : P {
   var i : Int = 0
-  subscript(i : Int) -> Int { 
+  subscript(i : Int) -> Int {
     _read {
       let i = 0
       yield i

@@ -34,7 +34,7 @@ func foo() {
 // CHECK-NEXT:      "linkLibraries": [
 // CHECK:           "details": {
 // CHECK-NEXT:        "swift": {
-// CHECK-NEXT:          "moduleInterfacePath": 
+// CHECK-NEXT:          "moduleInterfacePath":
 // CHECK-NEXT:          "compiledModuleCandidates": [
 // CHECK-NEXT:          ],
 // CHECK-NEXT:          "commandLine": [

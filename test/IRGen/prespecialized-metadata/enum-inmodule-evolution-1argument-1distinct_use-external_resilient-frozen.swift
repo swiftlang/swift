@@ -10,19 +10,19 @@
 
 import TestModule
 
-// CHECK: @"$s4main5ValueOy10TestModule7IntegerVGMf" = linkonce_odr hidden constant <{ 
-// CHECK-SAME:   ptr, 
-// CHECK-SAME:   [[INT]], 
-// CHECK-SAME:   ptr, 
-// CHECK-SAME:   ptr, 
-// CHECK-SAME:   i64 
-// CHECK-SAME: }> 
-// CHECK-SAME: <{ 
+// CHECK: @"$s4main5ValueOy10TestModule7IntegerVGMf" = linkonce_odr hidden constant <{
+// CHECK-SAME:   ptr,
+// CHECK-SAME:   [[INT]],
+// CHECK-SAME:   ptr,
+// CHECK-SAME:   ptr,
+// CHECK-SAME:   i64
+// CHECK-SAME: }>
+// CHECK-SAME: <{
 // CHECK-SAME:   $s4main5ValueOy10TestModule7IntegerVGWV
-// CHECK-SAME:   [[INT]] 513, 
+// CHECK-SAME:   [[INT]] 513,
 // CHECK-SAME:   $s4main5ValueOMn
 // CHECK-SAME:   $s10TestModule7IntegerVN
-// CHECK-SAME:   i64 3 
+// CHECK-SAME:   i64 3
 // CHECK-SAME: }>, align [[ALIGNMENT]]
 
 @inline(never)
@@ -37,11 +37,11 @@ enum Value<First> {
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:   ptr noalias %{{[0-9]+}}, 
+// CHECK-SAME:   ptr noalias %{{[0-9]+}},
 // CHECK-SAME:   ptr getelementptr inbounds (
-// CHECK-SAME:     %swift.full_type, 
+// CHECK-SAME:     %swift.full_type,
 // CHECK-SAME:     $s4main5ValueOy10TestModule7IntegerVGMf
-// CHECK-SAME:     i32 0, 
+// CHECK-SAME:     i32 0,
 // CHECK-SAME:     i32 2
 // CHECK-SAME:   )
 // CHECK-SAME: )
@@ -55,10 +55,10 @@ doit()
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK: entry:
 // CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
-// CHECK-SAME:   [[INT]] %0, 
-// CHECK-SAME:   ptr %1, 
-// CHECK-SAME:   ptr undef, 
-// CHECK-SAME:   ptr undef, 
+// CHECK-SAME:   [[INT]] %0,
+// CHECK-SAME:   ptr %1,
+// CHECK-SAME:   ptr undef,
+// CHECK-SAME:   ptr undef,
 // CHECK-SAME:   $s4main5ValueOMn
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

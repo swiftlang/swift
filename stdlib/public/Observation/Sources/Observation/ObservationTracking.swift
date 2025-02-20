@@ -75,7 +75,7 @@ public struct ObservationTracking: Sendable {
     willSet: (@Sendable (ObservationTracking) -> Void)? = nil,
     didSet: (@Sendable (ObservationTracking) -> Void)? = nil
   ) {
-    let values = tracking.list.entries.mapValues { 
+    let values = tracking.list.entries.mapValues {
       switch (willSet, didSet) {
       case (.some(let willSetObserver), .some(let didSetObserver)):
         return Id.full($0.addWillSetObserver { keyPath in
@@ -97,7 +97,7 @@ public struct ObservationTracking: Sendable {
         })
       case (.none, .none):
         fatalError()
-      }  
+      }
     }
 
     tracking.install(values)
@@ -192,7 +192,7 @@ fileprivate func generateAccessList<T>(_ apply: () -> T) -> (T, ObservationTrack
 /// of the `onChange` closure. For example, the following code tracks changes
 /// to the name of cars, but it doesn't track changes to any other property of
 /// `Car`:
-/// 
+///
 ///     func render() {
 ///         withObservationTracking {
 ///             for car in cars {

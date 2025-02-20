@@ -42,7 +42,7 @@ struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
 func == (x: BridgedSwift, y: BridgedSwift) -> Bool { return true }
 
 // CHECK-LABEL: sil hidden [ossa] @$s17collection_upcast15testArrayUpcast{{.*}}F :
-// CHECK: bb0([[ARRAY:%[0-9]+]] : @guaranteed $Array<BridgedObjC>): 
+// CHECK: bb0([[ARRAY:%[0-9]+]] : @guaranteed $Array<BridgedObjC>):
 func testArrayUpcast(_ array: [BridgedObjC]) {
   // CHECK: [[ARRAY_COPY:%.*]] = copy_value [[ARRAY]]
   // CHECK: [[UPCAST_FN:%[0-9]+]] = function_ref @$ss15_arrayForceCast{{.*}}F : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>

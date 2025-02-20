@@ -828,7 +828,7 @@ extension InoutParameters {
 
 extension InoutParameters {
   // expected-note @+2 {{'mutatingMethod' defined here}}
-  // expected-note @+1 {{'mutatingMethod' defined here}}  
+  // expected-note @+1 {{'mutatingMethod' defined here}}
   mutating func mutatingMethod(_ other: Self) {}
 
   // Test wrt `inout` `self` parameter.

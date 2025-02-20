@@ -739,7 +739,7 @@ public:
 class DeclIterator {
   Decl *Current;
 
-public: 
+public:
   typedef std::forward_iterator_tag iterator_category;
   typedef Decl *value_type;
   typedef Decl *reference;
@@ -760,7 +760,7 @@ public:
   }
 
   friend bool operator==(DeclIterator lhs, DeclIterator rhs) {
-    return lhs.Current == rhs.Current; 
+    return lhs.Current == rhs.Current;
   }
 
   friend bool operator!=(DeclIterator lhs, DeclIterator rhs) {
@@ -773,7 +773,7 @@ public:
 using DeclRange = iterator_range<DeclIterator>;
 
 /// The kind of an \c IterableDeclContext.
-enum class IterableDeclContextKind : uint8_t {  
+enum class IterableDeclContextKind : uint8_t {
   NominalTypeDecl = 0,
   ExtensionDecl,
 };

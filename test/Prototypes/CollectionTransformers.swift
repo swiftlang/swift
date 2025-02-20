@@ -101,7 +101,7 @@ public protocol CollectionBuilder {
   /// Complexity: amortized O(n), where `n` is equal to `count(elements)`.
   mutating func append<
     C : Collection
-  >(contentsOf elements: C)    
+  >(contentsOf elements: C)
   where C.Iterator.Element == Element
 
 

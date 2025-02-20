@@ -1336,7 +1336,7 @@ public:
     case Kind::PartialCurriedCXXMethodType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
-      llvm_unreachable("pattern is not a tuple");      
+      llvm_unreachable("pattern is not a tuple");
     case Kind::Tuple:
       return getNumTupleElements_Stored();
     case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1638,7 +1638,7 @@ public:
   /// which will generally only work in specific situations.
   size_t getNumPackExpandedComponents() const;
 
-  /// If this pattern refers to a foreign ObjC method that was imported as 
+  /// If this pattern refers to a foreign ObjC method that was imported as
   /// async, return the bridged-back-to-ObjC completion handler type.
   CanType getObjCMethodAsyncCompletionHandlerForeignType(
       ForeignAsyncConvention convention,

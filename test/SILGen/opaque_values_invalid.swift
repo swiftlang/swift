@@ -10,7 +10,7 @@ func forward_capture_generic_let<U>(with u: U) -> [U] {
   func f() { g() } // expected-error {{closure captures 'x' before it is declared}}
   f()
   let x = u // expected-note{{captured value declared here}}
-  func g() { 
+  func g() {
     take(x) // expected-note {{captured here}}
   }
 }

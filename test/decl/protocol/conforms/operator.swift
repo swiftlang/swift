@@ -5,11 +5,11 @@ protocol P0 {
 }
 
 // Satisfy operator requirement with a global function.
-struct S0a : P0 { } 
+struct S0a : P0 { }
 func <<(lhs: S0a, rhs: S0a) -> S0a { return lhs }
 
 // Satisfy operator requirement with a static method.
-struct S0b : P0 { 
+struct S0b : P0 {
   static func <<(lhs: S0b, rhs: S0b) -> S0b { return lhs }
 }
 

@@ -36,7 +36,7 @@ func testF3(a: Int, b: Int) {
 
     _ = i
   } catch {
-  } 
+  }
 }
 
 // Test overloaded global function references.

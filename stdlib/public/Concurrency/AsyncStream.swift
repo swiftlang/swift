@@ -536,7 +536,7 @@ public struct AsyncStream<Element> {
   @available(SwiftStdlib 5.1, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
-    unfolding produce: @escaping () async -> Element?, 
+    unfolding produce: @escaping () async -> Element?,
     onCancel: (@Sendable () -> Void)? = nil
   ) {
     fatalError("Unavailable in task-to-thread concurrency model")

@@ -1316,7 +1316,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       break;
     default:
       llvm_unreachable("out of sync with if condition");
-    }    
+    }
     return;
   }
 

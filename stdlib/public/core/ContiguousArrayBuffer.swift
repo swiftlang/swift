@@ -287,7 +287,7 @@ internal final class _ContiguousArrayStorage<
 #if _runtime(_ObjC)
     return proposedElementType is Element.Type
 #else
-    // FIXME: Dynamic casts don't currently work without objc. 
+    // FIXME: Dynamic casts don't currently work without objc.
     // rdar://problem/18801510
     return false
 #endif
@@ -383,7 +383,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// body part of the storage initialized, but not the elements.
   ///
   /// - Warning: The result has uninitialized elements.
-  /// 
+  ///
   /// - Warning: storage may have been stack-allocated, so it's
   ///   crucial not to call, e.g., `malloc_size` on it.
   @inlinable
@@ -1027,7 +1027,7 @@ internal func += <Element, C: Collection>(
 
   // ensure that exactly rhs.count elements were written
   _precondition(remainders.next() == nil, "rhs underreported its count")
-  _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")    
+  _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
 }
 
 extension _ContiguousArrayBuffer: RandomAccessCollection {
@@ -1218,7 +1218,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       result.mutableCount = result.capacity - remainingCapacity
     } else {
       _internalInvariant(remainingCapacity == 0)
-      _internalInvariant(result.count == 0)      
+      _internalInvariant(result.count == 0)
     }
 
     return finishWithOriginalCount()

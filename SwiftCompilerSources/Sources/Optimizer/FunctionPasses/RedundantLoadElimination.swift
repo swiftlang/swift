@@ -716,7 +716,7 @@ private struct Liverange {
 private extension CopyAddrInst {
   var canProvideValue: Bool {
     if !source.type.isLoadable(in: parentFunction) {
-      // Although the original load's type is loadable (obviously), it can be projected-out 
+      // Although the original load's type is loadable (obviously), it can be projected-out
       // from the copy_addr's type which might be not loadable.
       return false
     }

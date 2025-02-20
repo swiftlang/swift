@@ -312,7 +312,7 @@ func testAcceptColorTagged(b: Bool, i: Int, s: String, d: Double) {
   }
 
   // CHECK: Tagged<
-  TagAccepter<Color>.acceptTagged { () -> Tagged<Color, Int> in 
+  TagAccepter<Color>.acceptTagged { () -> Tagged<Color, Int> in
     if b {
       return i.tag(Color.green)
     } else {

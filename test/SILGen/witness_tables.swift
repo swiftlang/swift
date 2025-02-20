@@ -527,7 +527,7 @@ protocol Initializer {
 // TABLE-NEXT:  method #Initializer.init!allocator: {{.*}} : @$s14witness_tables20HasInitializerStructVAA0D0A2aDP{{[_0-9a-zA-Z]*}}fCTW
 // TABLE-NEXT: }
 // SYMBOL: sil private [transparent] [thunk] [ossa] @$s14witness_tables20HasInitializerStructVAA0D0A2aDP{{[_0-9a-zA-Z]*}}fCTW :
-struct HasInitializerStruct : Initializer { 
+struct HasInitializerStruct : Initializer {
   init(arg: Arg) { }
 }
 

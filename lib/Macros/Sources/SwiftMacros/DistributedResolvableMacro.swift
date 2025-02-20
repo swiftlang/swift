@@ -232,7 +232,7 @@ extension DistributedResolvableMacro {
 
     return [
       """
-      \(proto.modifiers) distributed actor $\(proto.name.trimmed)\(raw: typeParamsClause): \(proto.name.trimmed), 
+      \(proto.modifiers) distributed actor $\(proto.name.trimmed)\(raw: typeParamsClause): \(proto.name.trimmed),
         Distributed._DistributedActorStub \(raw: whereClause)
       {
         \(raw: stubActorBody)

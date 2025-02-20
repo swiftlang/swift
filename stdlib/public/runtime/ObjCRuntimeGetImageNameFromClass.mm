@@ -165,9 +165,9 @@ static void patchLazyPointers(const mach_header *mh, const char *symbolName,
   for (uint32_t i = 0; i < cmd_count; ++i) {
     if (cmd->cmd == LC_SEGMENT_COMMAND) {
       const macho_segment_command *seg = (const macho_segment_command *)cmd;
-      if (strcmp(seg->segname, "__TEXT") == 0) 
+      if (strcmp(seg->segname, "__TEXT") == 0)
         slide = (uintptr_t)mh - seg->vmaddr;
-      else if (strcmp(seg->segname,"__LINKEDIT") == 0) 
+      else if (strcmp(seg->segname,"__LINKEDIT") == 0)
         linkEditBase = (const uint8_t *)(seg->vmaddr + slide - seg->fileoff);
     }
     cmd = (const load_command *)(((const char *)cmd)+cmd->cmdsize);
@@ -212,7 +212,7 @@ static void patchLazyPointers(const mach_header *mh, const char *symbolName,
   for (uint32_t i = 0; i < cmd_count; ++i) {
     if (cmd->cmd == LC_SEGMENT_COMMAND) {
       const macho_segment_command *seg = (const macho_segment_command *)cmd;
-      const macho_section * const sectionsStart = 
+      const macho_section * const sectionsStart =
           (const macho_section *)(seg + 1);
       ArrayRef<macho_section> sections(sectionsStart, seg->nsects);
 
@@ -233,10 +233,10 @@ static void patchLazyPointers(const mach_header *mh, const char *symbolName,
           }
 
           // Found symbol for this lazy pointer, now lookup address.
-          const char *lazyTargetName = 
+          const char *lazyTargetName =
               &stringTable[symbolTable[symbolIndex].n_un.n_strx];
           if (strcmp(symbolName, lazyTargetName) == 0) {
-            // Can't use the value currently stored here because it may 
+            // Can't use the value currently stored here because it may
             // be a dyld stub binder that will undo our patch if called.
             symbolPointers[lazyIndex] = (uintptr_t)newValue;
           }
@@ -265,7 +265,7 @@ static BOOL callUnpatchedGetImageNameFromClass(
   return outImageName != nullptr;
 }
 
-/// A patched version of class_getImageName that always uses the Swift 
+/// A patched version of class_getImageName that always uses the Swift
 /// implementation.
 ///
 /// The Swift implementation is always set up to chain to another
@@ -365,7 +365,7 @@ void swift::setUpObjCRuntimeGetImageNameFromClass() {
 
   } else {
     // On older OSs, manually patch in our new implementation of
-    // class_getImageName, and set it up to chain to the original system 
+    // class_getImageName, and set it up to chain to the original system
     // version.
 
     // This assignment happens through a volatile pointer to make sure it occurs

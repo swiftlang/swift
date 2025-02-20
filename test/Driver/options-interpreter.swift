@@ -27,7 +27,7 @@
 // RUN: %swift_driver_plain -sdk "" -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s | %FileCheck -check-prefix=CHECK-L2 %s
 // CHECK-L2: # DYLD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/macosx}}  DYLD_FRAMEWORK_PATH=/System/Library/Frameworks
 
-// RUN: env DYLD_LIBRARY_PATH=/abc/ SDKROOT=/sdkroot %swift_driver_plain -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s 2>&1 | %FileCheck -check-prefix=CHECK-L2-ENV %s 
+// RUN: env DYLD_LIBRARY_PATH=/abc/ SDKROOT=/sdkroot %swift_driver_plain -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s 2>&1 | %FileCheck -check-prefix=CHECK-L2-ENV %s
 // CHECK-L2-ENV: # DYLD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/macosx:/sdkroot/usr/lib/swift:/abc/}} DYLD_FRAMEWORK_PATH=/System/Library/Frameworks
 
 // RUN: %swift_driver_plain -### -target x86_64-apple-macosx10.9 -F/foo/ %s | %FileCheck -check-prefix=CHECK-F %s

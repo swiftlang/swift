@@ -90,7 +90,7 @@ func passConcreteClosureToVariadic(fn: (Int, String) -> Int) {
   takesVariadicFunction {x,y in fn(x, y)}
 }
 
-// CHECK-LABEL: sil{{.*}} @$s4main29passConcreteClosureToVariadic2fnyS2i_SStXE_tFS2i_SStXEfU_ : 
+// CHECK-LABEL: sil{{.*}} @$s4main29passConcreteClosureToVariadic2fnyS2i_SStXE_tFS2i_SStXEfU_ :
 // CHECK:       bb0(%0 : $*Pack{Int, String}, %1 : @closureCapture @guaranteed $@noescape @callee_guaranteed (Int, @guaranteed String) -> Int):
 // CHECK-NEXT:    [[INT_INDEX:%.*]] = scalar_pack_index 0 of $Pack{Int, String}
 // CHECK-NEXT:    [[INT_ADDR:%.*]] = pack_element_get [[INT_INDEX]] of %0 : $*Pack{Int, String} as $*Int

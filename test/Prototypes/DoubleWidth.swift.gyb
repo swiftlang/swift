@@ -261,7 +261,7 @@ extension DoubleWidth.Words: RandomAccessCollection {
     if Base.bitWidth < UInt.bitWidth {
       precondition(i == 0, "Invalid index")
       assert(2 * Base.bitWidth <= UInt.bitWidth)
-      return _low.first! | (_high.first! &<< Base.bitWidth._lowWord) 
+      return _low.first! | (_high.first! &<< Base.bitWidth._lowWord)
     }
     if i < _low.count {
       return _low[i + _low.startIndex]

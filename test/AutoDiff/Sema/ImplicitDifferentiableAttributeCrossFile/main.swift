@@ -41,7 +41,7 @@ public final class ConformingStructWithSupersetAttr: Protocol2 {}
 
 // rdar://70348904: Witness mismatch failure when a matching witness with a *superset* `@differentiable`
 // attribute is specified.
-// 
+//
 // Note that public witnesses are required to explicitly specify `@differentiable` attributes except
 // those w.r.t. parameters that have already been covered by an existing `@differentiable` attribute.
 extension ConformingStructWithSupersetAttr {

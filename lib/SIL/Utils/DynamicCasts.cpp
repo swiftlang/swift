@@ -951,7 +951,7 @@ namespace {
 
     Source emitTopLevel(Source source, Target target) {
       unsigned sourceOptDepth = getOptionalDepth(source.FormalType);
-      unsigned targetOptDepth = getOptionalDepth(target.FormalType);      
+      unsigned targetOptDepth = getOptionalDepth(target.FormalType);
 
       assert(sourceOptDepth <= targetOptDepth);
       return emitAndInjectIntoOptionals(source, target,
@@ -1179,7 +1179,7 @@ namespace {
     // None, then the result may still be Guaranteed for nontrivial types.
     Source emitSome(Source source, Target target, EmitSomeState &state) {
       // If our target is an address, prepareForEmitSome should have set this
-      // up so that we emitted directly into 
+      // up so that we emitted directly into
       if (target.isAddress()) {
         B.createInjectEnumAddr(Loc, target.Address, state.SomeDecl);
         return target.asAddressSource();

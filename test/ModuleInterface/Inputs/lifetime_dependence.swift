@@ -29,7 +29,7 @@ public struct AnotherView : ~Escapable {
 public struct BufferView : ~Escapable {
   @usableFromInline let _ptr: UnsafeRawBufferPointer
   @usableFromInline let _count: Int
-  @usableFromInline 
+  @usableFromInline
   @lifetime(borrow ptr)
   internal init(_ ptr: UnsafeRawBufferPointer, _ count: Int) {
     self._ptr = ptr

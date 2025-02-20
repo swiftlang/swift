@@ -1537,7 +1537,7 @@ private:
   }
 
 public:
-  Parameter *getParameters() { 
+  Parameter *getParameters() {
     return this->template getTrailingObjects<Parameter>();
   }
 
@@ -3330,7 +3330,7 @@ public:
 
   llvm::StringRef getUnderlyingTypeArgument(unsigned i) const {
     assert(i < getNumUnderlyingTypeArguments());
-    const char *ptr = getUnderlyingTypeArgumentMangledName(i);    
+    const char *ptr = getUnderlyingTypeArgumentMangledName(i);
     return Demangle::makeSymbolicMangledNameStringRef(ptr);
   }
 
@@ -4162,9 +4162,9 @@ public:
     TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>, /*Nullable*/ false>;
   using MetadataListCount =
     TargetCanonicalSpecializedMetadatasListCount<Runtime>;
-  using MetadataListEntry = 
+  using MetadataListEntry =
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
-  using MetadataAccessor = 
+  using MetadataAccessor =
     TargetCompactFunctionPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false>;
   using MetadataAccessorListEntry =
       TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>;
@@ -4706,7 +4706,7 @@ private:
                                         ForeignMetadataInitialization,
                                         SingletonMetadataInitialization,
                                         MetadataListCount,
-                                        MetadataListEntry, 
+                                        MetadataListEntry,
                                         MetadataCachingOnceToken,
                                         InvertibleProtocolSet>;
 
@@ -4865,7 +4865,7 @@ TargetContextDescriptor<Runtime>::getGenericContext() const {
   case ContextDescriptorKind::OpaqueType:
     return llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)
         ->getGenericContext();
-  default:    
+  default:
     // We don't know about this kind of descriptor.
     return nullptr;
   }
@@ -4932,7 +4932,7 @@ TargetTypeContextDescriptor<Runtime>::getFullGenericContextHeader() const {
 }
 
 template <typename Runtime>
-llvm::ArrayRef<GenericParamDescriptor> 
+llvm::ArrayRef<GenericParamDescriptor>
 TargetTypeContextDescriptor<Runtime>::getGenericParams() const {
   switch (this->getKind()) {
   case ContextDescriptorKind::Class:

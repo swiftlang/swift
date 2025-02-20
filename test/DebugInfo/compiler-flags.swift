@@ -7,13 +7,13 @@
 // CHECK:          !DICompileUnit({{.*}}producer: "{{[^"]*Swift version [^"]+}}"
 // CHECK-SAME:                    flags: "
 // CHECK-NOT:                     "
-// CHECK-SAME:                    -resource-dir 
+// CHECK-SAME:                    -resource-dir
 // CHECK-EXPLICIT: !DICompileUnit({{.*}}producer: "{{[^"]*Swift version [^"]+}}"
 // CHECK-EXPLICIT-SAME:           flags: "
 // CHECK-EXPLICIT-NOT:            "
 // CHECK-EXPLICIT-SAME:           -sdk \22/Weird Location/SDK\22
 // CHECK-EXPLICIT-NOT:            "
-// CHECK-EXPLICIT-SAME:           -resource-dir 
+// CHECK-EXPLICIT-SAME:           -resource-dir
 
 // Check that we don't write temporary file names in the debug info
 // RUN: env TMP=abc/def TMPDIR=abc/def %target-swift-frontend %s -I abc/def/xyz -g -emit-ir -debug-info-store-invocation -o - | %FileCheck --check-prefix CHECK-TEMP %s

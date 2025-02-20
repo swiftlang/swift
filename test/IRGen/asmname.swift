@@ -13,7 +13,7 @@ _ = atan2test(0.0, 0.0)
 
 
 // Ordinary Swift definitions
-// The unused internal and private functions are expected to be kept as they 
+// The unused internal and private functions are expected to be kept as they
 // may be used from the debugger in unoptimized builds.
 
 public   func PlainPublic()   { }
@@ -25,7 +25,7 @@ private  func PlainPrivate()  { }
 
 
 // Swift _silgen_name definitions
-// The private function is expected 
+// The private function is expected
 // to be eliminated as it may be used from the
 // debugger in unoptimized builds,
 // and the internal function must survive for C use.

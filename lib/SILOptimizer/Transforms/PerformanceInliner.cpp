@@ -371,8 +371,8 @@ bool SILPerformanceInliner::isAutoDiffLinearMapWithControlFlow(
 // or partial applies.
 //
 // Returns true if the number of allocated objects or partial applies is
-// greater than 0, and false otherwise. 
-// 
+// greater than 0, and false otherwise.
+//
 // Returns false if the value is not a tuple.
 bool SILPerformanceInliner::isTupleWithAllocsOrPartialApplies(SILValue val) {
   if (auto *ti = dyn_cast<TupleInst>(val)) {
@@ -608,7 +608,7 @@ bool SILPerformanceInliner::isProfitableToInline(
         }
 
         // Check if inlining the callee would allow for further
-        // optimizations like devirtualization or generic specialization. 
+        // optimizations like devirtualization or generic specialization.
         if (!def)
           def = dyn_cast_or_null<SingleValueInstruction>(FAI.getCallee());
 
@@ -739,7 +739,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   // cubic function on the number of caller blocks. This starts to prevent
   // inlining at about 800 - 1000 caller blocks.
   if (NumCallerBlocks < BlockLimitMaxIntNumerator)
-    Benefit -= 
+    Benefit -=
       (NumCallerBlocks * NumCallerBlocks) / BlockLimitDenominator *
                           NumCallerBlocks / BlockLimitDenominator;
   else

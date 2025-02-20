@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -O -emit-ir  %s | %FileCheck %s
 // RUN: %target-swift-frontend -Osize -emit-ir  %s | %FileCheck %s
 
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 

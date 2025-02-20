@@ -44,7 +44,7 @@ func valueToValue(x: C) -> some Q {
 
 // CHECK-LABEL: sil hidden {{.*}}13reabstraction1xQr
 func reabstraction(x: @escaping () -> ()) -> some Any {
-  // CHECK: bb0([[ARG0:%[0-9]+]] : 
+  // CHECK: bb0([[ARG0:%[0-9]+]] :
   // CHECK: [[VALUE_COPY:%.*]] = copy_value [[ARG1]]
   // CHECK: [[REABSTRACT:%.*]] = function_ref @$sIeg_ytIegr_TR
   // CHECK: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT]]([[VALUE_COPY]])

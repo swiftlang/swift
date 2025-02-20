@@ -143,8 +143,8 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
 
   // Ok, we need to perform the full cast optimization. This means that we are
   // going to replace the cast terminator in inst_block with a checked_cast_br.
-  auto *ccbi = builder.createCheckedCastBranch(loc, false, load, 
-                                               dynamicCast.getBridgedSourceType(), 
+  auto *ccbi = builder.createCheckedCastBranch(loc, false, load,
+                                               dynamicCast.getBridgedSourceType(),
                                                silBridgedTy,
                                                dynamicCast.getBridgedTargetType(),
                                                castSuccessBB, castFailBB);

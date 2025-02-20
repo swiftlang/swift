@@ -903,7 +903,7 @@ public func run_SetIsDisjointInt(
     }
 }
 
-// Run isDisjoint Int switching the order of the two sets.  
+// Run isDisjoint Int switching the order of the two sets.
 @inline(never)
 public func run_SetIsDisjointIntCommutative(
     _ a: Set<Int>,
@@ -1119,7 +1119,7 @@ func run_SetIsDisjointBox(
     }
 }
 
-// Run isDisjoint Box switching the order of the two sets.  
+// Run isDisjoint Box switching the order of the two sets.
 @inline(never)
 func run_SetIsDisjointBoxCommutative(
     _ a: Set<Box<Int>>,

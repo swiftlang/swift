@@ -614,7 +614,7 @@ extension Collection {
   /// predicate, as if `self.partition(by: predicate)` had already
   /// been called.
   ///
-  /// - Efficiency: At most log(N) invocations of `predicate`, where 
+  /// - Efficiency: At most log(N) invocations of `predicate`, where
   ///   N is the length of `self`.  At most log(N) index offsetting
   ///   operations if `self` conforms to `RandomAccessCollection`;
   ///   at most N such operations otherwise.

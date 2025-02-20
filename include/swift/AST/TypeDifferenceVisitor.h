@@ -207,7 +207,7 @@ public:
   bool visitAnyMetatypeType(CanAnyMetatypeType type1,
                             CanAnyMetatypeType type2) {
     if (type1->hasRepresentation() != type2->hasRepresentation() ||
-        (type1->hasRepresentation() && 
+        (type1->hasRepresentation() &&
          type1->getRepresentation() != type2->getRepresentation()))
       return asImpl().visitDifferentTypeStructure(type1, type2);
 

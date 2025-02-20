@@ -341,8 +341,8 @@ extension ImposeClassReq2 {
 // Reject extension of nominal type via typealias with dependent underlying type
 
 struct Nest<Egg> { typealias Contents = Egg }
-struct Tree { 
-  typealias LimbContent = Nest<Int> 
+struct Tree {
+  typealias LimbContent = Nest<Int>
   typealias BoughPayload = Nest<Nest<Int>>
 }
 

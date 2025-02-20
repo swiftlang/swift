@@ -2367,7 +2367,7 @@ public:
     using value_type = SILParameterInfo;
     using difference_type = std::ptrdiff_t;
     using pointer = value_type*;
-    using reference = value_type&;    
+    using reference = value_type&;
 
     const SILParameterInfo *Base;
     unsigned I, SkipParamIndex;
@@ -4998,8 +4998,8 @@ public:
     return (callee.kind == Callee::Kind::EnumElement);
   }
 
-  /// Sets a flag that indicates whether this call be treated as being 
-  /// implicitly async, i.e., it requires a hop_to_executor prior to 
+  /// Sets a flag that indicates whether this call be treated as being
+  /// implicitly async, i.e., it requires a hop_to_executor prior to
   /// invoking the sync callee, etc.
   void
   setImplicitlyAsync(std::optional<ActorIsolation> implicitActorHopTarget) {
@@ -6101,7 +6101,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
       // If the outer error is returned indirectly, copy from the converted
       // inner error to the outer error slot.
       if (IndirectErrorResult) {
-        emitSemanticStore(loc, outerError, IndirectErrorResult, 
+        emitSemanticStore(loc, outerError, IndirectErrorResult,
                           getTypeLowering(outerErrorType), IsInitialization);
       }
     }
@@ -6457,7 +6457,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
         } else if (payloadTy.isLoadable(F)) {
           // The payload of this specific enum case might be loadable
           // even if the overall enum is address-only.
-          auto payloadMV = 
+          auto payloadMV =
             emitEnumElementPayloads(*this, loc, element, payloads,
                                     origPayloadType, payloadTy,
                                     /*emit into*/ nullptr);

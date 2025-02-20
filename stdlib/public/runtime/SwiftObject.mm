@@ -1646,7 +1646,7 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
 
 struct ClassExtents {
   size_t negative;
-  size_t positive; 
+  size_t positive;
 };
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI

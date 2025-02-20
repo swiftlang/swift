@@ -205,7 +205,7 @@ class LazyVarContainer {
 }
 
 // Make sure we can still access a synthesized variable with the same name as a lazy storage variable
-// i.e. $__lazy_storage_$_{property_name} when using property wrapper where the property name is 
+// i.e. $__lazy_storage_$_{property_name} when using property wrapper where the property name is
 // '__lazy_storage_$_{property_name}'.
 @propertyWrapper
 struct Wrapper {

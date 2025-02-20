@@ -44,12 +44,12 @@ func mainActorAsyncFunc3() async -> ((Int) -> Int) {
 // MARK: Tests //
 /////////////////
 
-@MainActor func mainActorResult(_ x : Int) -> ((Int) -> Int) { 
+@MainActor func mainActorResult(_ x : Int) -> ((Int) -> Int) {
   return { (_ y : Int) in x + y }
 }
 
 actor Calculator {
-  func addCurried(_ x : Int) -> ((Int) -> Int) { 
+  func addCurried(_ x : Int) -> ((Int) -> Int) {
     return { (_ y : Int) in x + y }
   }
 

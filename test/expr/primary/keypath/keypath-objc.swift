@@ -67,7 +67,7 @@ func testKeyPath(a: A, b: B) {
     case (#keyPath(A.propString))?: break
     case #keyPath(A.propString)?: break
     default: break
-    } 
+    }
   }
 
   // Array property (make sure we look at the array element).
@@ -84,9 +84,9 @@ func testKeyPath(a: A, b: B) {
 
   // AnyObject property
   let _: String = #keyPath(A.propAnyObject.URLsInText) // expected-warning{{'URLsInText' has been renamed to 'urlsInText'}}
-  let _: String = #keyPath(A.propAnyObject.propA)  
-  let _: String = #keyPath(A.propAnyObject.propB)  
-  let _: String = #keyPath(A.propAnyObject.description)  
+  let _: String = #keyPath(A.propAnyObject.propA)
+  let _: String = #keyPath(A.propAnyObject.propB)
+  let _: String = #keyPath(A.propAnyObject.description)
 
   // NSString property
   let _: String = #keyPath(A.propNSString.URLsInText) // expected-warning{{'URLsInText' has been renamed to 'urlsInText'}}

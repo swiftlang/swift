@@ -23,6 +23,6 @@ public struct S5 {}
 // CHECK-NEXT:   "line": 7
 // CHECK-NEXT:   "character": 3
 // CHECK: end
-// CHECK-NEXT:   "line": 7 
+// CHECK-NEXT:   "line": 7
 // CHECK-NEXT:   "character": 25
 // CHECK: "text": "with more indentation."

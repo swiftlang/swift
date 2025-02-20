@@ -62,8 +62,8 @@ struct ImmutableStoredProperties: Differentiable {
 }
 func testImmutableStoredProperties() {
   _ = ImmutableStoredProperties.TangentVector(
-    okay: 1, 
-    nonmutatingMoveAlongStruct: Empty.TangentVector(), 
+    okay: 1,
+    nonmutatingMoveAlongStruct: Empty.TangentVector(),
     inheritedNonmutatingMoveAlongStruct: Empty.TangentVector(),
     diffClass: EmptyClass.TangentVector())
 }

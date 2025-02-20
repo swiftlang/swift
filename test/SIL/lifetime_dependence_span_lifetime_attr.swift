@@ -130,9 +130,9 @@ extension Span {
   public typealias SubSequence = Self
 
   public var startIndex: Index { start }
-  public var endIndex: Index { start.advanced(by: count) }  
+  public var endIndex: Index { start.advanced(by: count) }
 
-  @inlinable @inline(__always) 
+  @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> Int {
     start.distance(to: end)
   }

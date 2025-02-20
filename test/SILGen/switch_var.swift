@@ -177,7 +177,7 @@ func test_var_3() {
   // CHECK: [[NO_CASE3]]:
   // CHECK:   destroy_value [[WADDR]]
   case var v:
-  // CHECK:   [[VADDR:%.*]] = alloc_box ${ var (Int, Int) } 
+  // CHECK:   [[VADDR:%.*]] = alloc_box ${ var (Int, Int) }
   // CHECK:   [[VLIFETIME:%.*]] = begin_borrow [var_decl] [[VADDR]]
   // CHECK:   [[V:%.*]] = project_box [[VLIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[V]]
@@ -521,7 +521,7 @@ func test_mixed_let_var() {
   // CHECK:   end_borrow [[BORROWED_VAL_MOVE]]
   // CHECK:   destroy_value [[VAL_MOVE]]
   // CHECK:   destroy_value [[VAL]]
-  // CHECK:   br [[CONT]]  
+  // CHECK:   br [[CONT]]
   b(x: y)
 
   // CHECK: [[NOCASE2]]:

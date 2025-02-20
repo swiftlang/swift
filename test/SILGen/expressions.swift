@@ -15,7 +15,7 @@ struct SillyString : _ExpressibleByBuiltinStringLiteral, ExpressibleByStringLite
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
-  ) { 
+  ) {
   }
 
   init(extendedGraphemeClusterLiteral value: SillyString) { }
@@ -23,7 +23,7 @@ struct SillyString : _ExpressibleByBuiltinStringLiteral, ExpressibleByStringLite
   init(
     _builtinStringLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
-    isASCII: Builtin.Int1) { 
+    isASCII: Builtin.Int1) {
   }
 
   init(stringLiteral value: SillyString) { }

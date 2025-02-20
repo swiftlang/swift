@@ -15,7 +15,7 @@
 #if _runtime(_ObjC)
 import Foundation
 
-// Cache of opened files 
+// Cache of opened files
 var cachedFiles: [String: String] = [:]
 
 func readInputFile(_ filename: String) -> String {

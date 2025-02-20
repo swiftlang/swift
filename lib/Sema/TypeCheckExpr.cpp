@@ -318,7 +318,7 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
       assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     }
     assert(RHS == as && "'as' with non-type RHS?!");
-    as->setSubExpr(LHS);    
+    as->setSubExpr(LHS);
     return as;
   }
 
@@ -484,7 +484,7 @@ static Expr *foldSequence(DeclContext *DC,
       Ctx.Diags.diagnose(op1.op->getLoc(),
                          diag::unordered_adjacent_operators,
                          op1.precedence->getName(), op2.precedence->getName())
-        .highlight(SourceRange(op2.op->getLoc(), op2.op->getLoc()));      
+        .highlight(SourceRange(op2.op->getLoc(), op2.op->getLoc()));
     }
 
     // Recover by arbitrarily binding the first two.
@@ -538,7 +538,7 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
   }
 
   Decls = Context.AllocateCopy(Decls);
-  auto result = new (Context) OverloadedDeclRefExpr(Decls, NameLoc, 
+  auto result = new (Context) OverloadedDeclRefExpr(Decls, NameLoc,
                                                     functionRefInfo,
                                                     Implicit);
   return result;

@@ -55,7 +55,7 @@ deriveBodyComparable_enum_uninhabited_lt(AbstractFunctionDecl *ltDecl, void *) {
 /// and compares them, which produces an optimal single icmp instruction.
 static std::pair<BraceStmt *, bool>
 deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
-                                               void *) { 
+                                               void *) {
   auto parentDC = ltDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -161,14 +161,14 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
       auto rhsVar = rhsPayloadVars[varIdx];
       auto rhsExpr = new (C) DeclRefExpr(rhsVar, DeclNameLoc(),
                                          /*Implicit*/true);
-      auto guardStmt = DerivedConformance::returnComparisonIfNotEqualGuard(C, 
+      auto guardStmt = DerivedConformance::returnComparisonIfNotEqualGuard(C,
           lhsExpr, rhsExpr);
       statementsInCase.emplace_back(guardStmt);
     }
 
     // If none of the guard statements caused an early exit, then all the pairs
     // were true. (equal)
-    // return false 
+    // return false
     auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                                /*Implicit*/true);
     auto *returnStmt = ReturnStmt::createImplicit(C, falseExpr);
@@ -281,9 +281,9 @@ deriveComparable_lt(
   return comparableDecl;
 }
 
-// for now, only enums can synthesize `Comparable`, so this function can take 
+// for now, only enums can synthesize `Comparable`, so this function can take
 // an `EnumDecl` instead of a `NominalTypeDecl`
-bool 
+bool
 DerivedConformance::canDeriveComparable(DeclContext *context, EnumDecl *enumeration) {
   // The type must be an enum.
   if (!enumeration) {

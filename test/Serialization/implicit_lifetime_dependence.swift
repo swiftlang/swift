@@ -3,7 +3,7 @@
 // RUN: -enable-experimental-feature LifetimeDependence \
 // RUN: -disable-lifetime-dependence-diagnostics
 
-// RUN: llvm-bcanalyzer %t/def_implicit_lifetime_dependence.swiftmodule 
+// RUN: llvm-bcanalyzer %t/def_implicit_lifetime_dependence.swiftmodule
 
 // RUN: %target-swift-frontend -module-name lifetime-dependence -emit-sil -I %t %s \
 // RUN: -enable-experimental-feature LifetimeDependence \
@@ -22,7 +22,7 @@ func testBasic() {
     let view = BufferView($0, a.count)
     let derivedView = derive(view)
     let consumedView = consumeAndCreate(derivedView)
-    let borrowedView = borrowAndCreate(consumedView) 
+    let borrowedView = borrowAndCreate(consumedView)
     use(borrowedView)
   }
 }

@@ -509,7 +509,7 @@ public:
   Address indexArray(IRGenFunction &IGF, Address base, llvm::Value *offset,
                      SILType T) const;
 
-  /// Round up the address value \p base to the alignment of type \p T. 
+  /// Round up the address value \p base to the alignment of type \p T.
   Address roundUpToTypeAlignment(IRGenFunction &IGF, Address base,
                                  SILType T) const;
 

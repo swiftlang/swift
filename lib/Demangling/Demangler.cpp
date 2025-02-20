@@ -4252,14 +4252,14 @@ NodePointer Demangler::demangleGenericRequirement() {
     case 'P': ConstraintKind = Protocol; TypeKind = CompoundAssoc; break;
     case 'Q': ConstraintKind = Protocol; TypeKind = Substitution; break;
     case 'h': ConstraintKind = SameShape; TypeKind = Generic; break;
-    case 'i': 
+    case 'i':
       ConstraintKind = Inverse;
       TypeKind = Generic;
       inverseKind = demangleIndexAsNode();
       if (!inverseKind)
         return nullptr;
       break;
-    case 'I': 
+    case 'I':
       ConstraintKind = Inverse;
       TypeKind = Substitution;
       inverseKind = demangleIndexAsNode();

@@ -35,7 +35,7 @@ public protocol _UnicodeEncoding {
   /// Converts a scalar from another encoding's representation, returning
   /// `nil` if the scalar can't be represented in this encoding.
   ///
-  /// A default implementation of this method will be provided 
+  /// A default implementation of this method will be provided
   /// automatically for any conforming type that does not implement one.
   static func transcode<FromEncoding: Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type

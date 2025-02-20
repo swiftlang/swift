@@ -2040,7 +2040,7 @@ void IRGenerator::emitEagerClassInitialization() {
     llvm::Value *MetaData = RegisterIGF.emitTypeMetadataRef(Ty);
     assert(CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>());
 
-    // Get the metadata to make sure that the class is registered. We need to 
+    // Get the metadata to make sure that the class is registered. We need to
     // add a use (empty inline asm instruction) for the metadata. Otherwise
     // llvm would optimize the metadata accessor call away because it's
     // defined as "readnone".
@@ -2762,7 +2762,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // Mark as llvm.used if @_used, set section if @_section
     if (var->markedAsUsed())
       addUsedGlobal(gvar);
-    else if (var->shouldBePreservedForDebugger() && forDefinition) 
+    else if (var->shouldBePreservedForDebugger() && forDefinition)
       addUsedGlobal(gvar);
     if (auto *sectionAttr = var->getSectionAttr())
       gvar->setSection(sectionAttr->Name);
@@ -3525,7 +3525,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     // If we have an Objective-C Clang declaration, it must be a direct
     // method and we want to generate the IR declaration ourselves.
     if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-      isObjCDirect = true; 
+      isObjCDirect = true;
       assert(objcDecl->isDirectMethod());
     } else {
       auto globalDecl = getClangGlobalDeclForFunction(clangDecl);
@@ -3935,7 +3935,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   }
 
   // If we have an existing entry, destroy it, replacing it with the
-  // new variable.  We only really have to do 
+  // new variable.  We only really have to do
   if (existingGlobal) {
     auto existing = cast<llvm::GlobalValue>(existingGlobal);
     auto castVar = llvm::ConstantExpr::getBitCast(var, existing->getType());
@@ -6018,8 +6018,8 @@ bool IRGenModule::hasResilientMetadata(ClassDecl *D,
     return false;
   }
 
-  // Because the debugger can extend non public types outside of their module, 
-  // also check that "D" is *not* resilient  from the module that contains 
+  // Because the debugger can extend non public types outside of their module,
+  // also check that "D" is *not* resilient  from the module that contains
   // "asViewedFromRootClass".
   if (Context.LangOpts.DebuggerSupport && asViewedFromRootClass &&
       !D->hasResilientMetadata(asViewedFromRootClass->getModuleContext(),

@@ -1,7 +1,7 @@
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name sil_locations -Xllvm -sil-print-debuginfo -emit-verbose-sil %s | %FileCheck %s
 
-// FIXME: Not sure if this an ideal source info for the branch - 
+// FIXME: Not sure if this an ideal source info for the branch -
 // it points to if, not the last instruction in the block.
 func ifexpr() -> Int {
   var x : Int = 0
@@ -35,8 +35,8 @@ func ifelseexpr() -> Int {
   // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE-7]]:3, {{.*}}:return
 }
 
-// The source locations are handled differently here - since 
-// the return is unified, we keep the location of the return(not the if) 
+// The source locations are handled differently here - since
+// the return is unified, we keep the location of the return(not the if)
 // in the branch.
 func ifexpr_return() -> Int {
   if true {
@@ -117,7 +117,7 @@ func multipleReturnsImplicitAndExplicit() {
 }
 
 func simplifiedImplicitReturn() -> () {
-  var y = 0 
+  var y = 0
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations24simplifiedImplicitReturnyyF
   // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE+1]]:1, {{.*}}:imp_return
 }
@@ -159,7 +159,7 @@ func testIf() {
   // FIXME: Missing location info here.
   // CHECK: function_ref
   // CHECK: apply
-  // 
+  //
   //
   //
   // CHECK: br {{.*}}, loc "{{.*}}":[[@LINE-13]]:6
@@ -196,7 +196,7 @@ func testTuples() {
   // CHECK: integer_literal $Builtin.IntLiteral, 2, loc "{{.*}}":[[@LINE-5]]:12
   // CHECK: integer_literal $Builtin.IntLiteral, 3, loc "{{.*}}":[[@LINE-6]]:14
   // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-6]]:12
-  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-7]]:16  
+  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-7]]:16
 }
 
 // Test tuple imploding/exploding.
@@ -247,7 +247,7 @@ func interpolated_string(_ x: Int, y: String) -> String {
 
 
 func int(_ x: Int) {}
-func tuple() -> (Int, Float) { return (1, 1.0) }  
+func tuple() -> (Int, Float) { return (1, 1.0) }
 func tuple_element(_ x: (Int, Float)) {
   int(tuple().0)
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations13tuple_element{{[_0-9a-zA-Z]*}}F

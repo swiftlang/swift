@@ -1,14 +1,14 @@
 // RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
-protocol P1 { 
+protocol P1 {
   func p1()
 }
 
 protocol P2 : P1 { }
 
 
-struct X1<T : P1> { 
+struct X1<T : P1> {
   func getT() -> T { }
 }
 
@@ -18,7 +18,7 @@ class X2<T : P1> {
 
 class X3 { }
 
-struct X4<T : X3> { 
+struct X4<T : X3> {
   func getT() -> T { }
 }
 

@@ -68,7 +68,7 @@ extension LoggingIterator: IteratorProtocol {
 // Sequence and Collection logs
 //===----------------------------------------------------------------------===//
 
-// FIXME: it's not clear if it's really worth this hierarchy. the 
+// FIXME: it's not clear if it's really worth this hierarchy. the
 // test.log pattern requires all the static properties be at the top
 // since Log is an associated type that cannot be refined in extensions
 // that add functionality.
@@ -86,7 +86,7 @@ public class SequenceLogBase {
   public static var withContiguousStorageIfAvailable = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _copyToContiguousArray = TypeIndexed(0)
-  public static var _copyContents = TypeIndexed(0)  
+  public static var _copyContents = TypeIndexed(0)
   // Collection
   public static var startIndex = TypeIndexed(0)
   public static var endIndex = TypeIndexed(0)
@@ -248,7 +248,7 @@ extension LoggingSequence: Sequence {
 
 public typealias LoggingCollection<Base: Collection> = LoggingSequence<Base>
 
-extension LoggingCollection: Collection {  
+extension LoggingCollection: Collection {
   public typealias Index = Base.Index
   public typealias Indices = Base.Indices
   public typealias SubSequence = Base.SubSequence
@@ -349,7 +349,7 @@ extension LoggingBidirectionalCollection: BidirectionalCollection {
   }
 }
 
-public typealias LoggingRandomAccessCollection<Base: RandomAccessCollection> 
+public typealias LoggingRandomAccessCollection<Base: RandomAccessCollection>
   = LoggingBidirectionalCollection<Base>
 
 extension LoggingRandomAccessCollection: RandomAccessCollection { }
@@ -535,7 +535,7 @@ public typealias LoggingRangeReplaceableRandomAccessCollection<
 public struct BufferAccessLoggingMutableCollection<
   Base : MutableCollection
 > {
-  public var base: Base  
+  public var base: Base
 }
 
 extension BufferAccessLoggingMutableCollection: LoggingType {

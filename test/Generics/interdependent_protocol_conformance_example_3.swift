@@ -21,7 +21,7 @@ public protocol MultiPoint {
 
   associatedtype X: NonEmptyProtocol
     where X.C: NonEmptyProtocol,
-          X.Element == Self.P 
+          X.Element == Self.P
 }
 
 // CHECK-LABEL: .CoordinateSystem@
@@ -58,7 +58,7 @@ public protocol BoundingBox {
 // CHECK-LABEL: .Point@
 // CHECK-NEXT: Requirement signature: <Self where Self == Self.[Point]C.[CoordinateSystem]P, Self.[Point]C : CoordinateSystem>
 
-public protocol Point { 
+public protocol Point {
   associatedtype C: CoordinateSystem where Self.C.P == Self
 }
 

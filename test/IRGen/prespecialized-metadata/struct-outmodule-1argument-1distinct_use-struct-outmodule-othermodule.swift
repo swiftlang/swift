@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -prespecialize-generic-metadata -target %module-target-future %S/Inputs/struct-public-nonfrozen-1argument.swift -emit-library -o %t/%target-library-name(Generic) -emit-module -module-name Generic -emit-module-path %t/Generic.swiftmodule
 // RUN: %target-build-swift -Xfrontend -prespecialize-generic-metadata -target %module-target-future %S/Inputs/struct-public-nonfrozen-0argument.swift -emit-library -o %t/%target-library-name(Argument) -emit-module -module-name Argument -emit-module-path %t/Argument.swiftmodule
-// RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s -L %t -I %t -lGeneric -lArgument | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment 
+// RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s -L %t -I %t -lGeneric -lArgument | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
 
 // REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
@@ -19,7 +19,7 @@
 // CHECK-SAME: }> <{
 //           :   ptr getelementptr inbounds (
 //           :     %swift.vwtable,
-//           :     
+//           :
 // CHECK-SAME:     $s7Generic11OneArgumentVy0C07IntegerVGWV
 //           :     ",
 //           :     i32 0,
@@ -45,7 +45,7 @@ import Argument
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
 //      CHECK:   [[CANONICALIZED_METADATA_RESPONSE:%[0-9]+]] = call swiftcc %swift.metadata_response @swift_getCanonicalSpecializedMetadata(
-// CHECK-SAME:     [[INT]] 0, 
+// CHECK-SAME:     [[INT]] 0,
 // CHECK-SAME:     ptr getelementptr inbounds (
 // CHECK-SAME:       %swift.full_type,
 // CHECK-SAME:       $s7Generic11OneArgumentVy0C07IntegerVGMN
@@ -55,7 +55,7 @@ import Argument
 // CHECK-SAME:     $s7Generic11OneArgumentVy0C07IntegerVGMJ
 // CHECK-NEXT:   [[CANONICALIZED_METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[CANONICALIZED_METADATA_RESPONSE]], 0
 // CHECK-NEXT:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
+// CHECK-SAME:     ptr noalias {{%[0-9]+}},
 // CHECK-SAME:     ptr [[CANONICALIZED_METADATA]]
 // CHECK-SAME:   )
 // CHECK: }

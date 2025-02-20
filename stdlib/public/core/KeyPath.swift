@@ -3161,7 +3161,7 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
     default:
       offset = .inline(header.storedOffsetPayload)
     }
-    let kind: KeyPathStructOrClass = header.kind == .struct 
+    let kind: KeyPathStructOrClass = header.kind == .struct
       ? .struct : .class
     walker.visitStoredComponent(kind: kind,
                                 mutable: header.isStoredMutable,

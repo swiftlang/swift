@@ -806,7 +806,7 @@ void Decl::setInvalid() {
   llvm_unreachable("Unknown decl kind");
 }
 
-void Decl::setDeclContext(DeclContext *DC) { 
+void Decl::setDeclContext(DeclContext *DC) {
   Context = DC;
   // If this Decl is also a DeclContext, we need to update its parent too.
   if (auto *thisDC = dyn_cast<DeclContext>(this))
@@ -875,7 +875,7 @@ DiagnosticEngine &Decl::getDiags() const {
 // Helper functions to verify statically whether source-location
 // functions have been overridden.
 typedef const char (&TwoChars)[2];
-template<typename Class> 
+template<typename Class>
 inline char checkSourceLocType(SourceLoc (Class::*)() const);
 inline TwoChars checkSourceLocType(SourceLoc (Decl::*)() const);
 
@@ -883,7 +883,7 @@ template<typename Class>
 inline char checkSourceLocType(SourceLoc (Class::*)(bool) const);
 inline TwoChars checkSourceLocType(SourceLoc (Decl::*)(bool) const);
 
-template<typename Class> 
+template<typename Class>
 inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Decl::*)() const);
 
@@ -1920,7 +1920,7 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
 
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                          uint64_t contextData) {
-  assert(!Bits.ExtensionDecl.HasLazyConformances && 
+  assert(!Bits.ExtensionDecl.HasLazyConformances &&
          "Already have lazy conformances");
   Bits.ExtensionDecl.HasLazyConformances = true;
 
@@ -3405,7 +3405,7 @@ bool AbstractStorageDecl::isSetterMutating() const {
     IsSetterMutatingRequest{const_cast<AbstractStorageDecl *>(this)}, {});
 }
 
-StorageMutability 
+StorageMutability
 AbstractStorageDecl::mutability(const DeclContext *useDC,
                                 std::optional<const DeclRefExpr *> base ) const {
   if (auto vd = dyn_cast<VarDecl>(this))
@@ -10966,7 +10966,7 @@ ConstructorDecl *ConstructorDecl::createImported(
       ctx, sizeof(ConstructorDecl), true);
   auto ctor = ::new (declPtr)
       ConstructorDecl(name, constructorLoc,
-                      failable, failabilityLoc, 
+                      failable, failabilityLoc,
                       async, asyncLoc,
                       throws, throwsLoc, TypeLoc::withoutLoc(thrownType),
                       bodyParams, genericParams, parent);
@@ -11878,7 +11878,7 @@ static MacroRoles freestandingMacroRoles =
 #define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)
 #include "swift/Basic/MacroRoles.def"
    );
-static MacroRoles attachedMacroRoles = 
+static MacroRoles attachedMacroRoles =
   (MacroRoles()
 #define ATTACHED_MACRO_ROLE(Name, Description, MangledChar) | MacroRole::Name
 #define FREESTANDING_MACRO_ROLE(Name, Description)

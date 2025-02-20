@@ -2493,8 +2493,8 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
       // replace with a "call" to the type (instead of writing `.init`)
       diag.fixItReplace(CE->getFn()->getSourceRange(), parsed.ContextName);
     } else if (auto *dotCall = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
-      // if it's a dot call, and the left side is a type (and not `self` or 
-      // `super`, for example), just remove the dot and the right side, again 
+      // if it's a dot call, and the left side is a type (and not `self` or
+      // `super`, for example), just remove the dot and the right side, again
       // in order to make it a "call" to the type
       if (isa<TypeExpr>(dotCall->getBase())) {
         SourceLoc removeLoc = dotCall->getDotLoc();

@@ -317,7 +317,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
       Result.Freestanding = true;
     break;
   }
-  case GeneratedSourceInfo::DeclarationMacroExpansion: 
+  case GeneratedSourceInfo::DeclarationMacroExpansion:
   case GeneratedSourceInfo::CodeItemMacroExpansion: {
     auto expansion = cast<MacroExpansionDecl>(
         ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>());

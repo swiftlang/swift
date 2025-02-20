@@ -132,7 +132,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   case PatternKind::Typed:
   case PatternKind::Binding:
     return isDirectlyRefutablePattern(p->getSemanticsProvidingPattern());
-  }  
+  }
   llvm_unreachable("bad pattern");
 }
 
@@ -193,7 +193,7 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   case PatternKind::Typed:
   case PatternKind::Binding:
     return getNumSpecializationsRecursive(p->getSemanticsProvidingPattern(), n);
-  }  
+  }
   llvm_unreachable("bad pattern");
 }
 
@@ -610,7 +610,7 @@ public:
     Columns.push_back(CasePattern);
     if (CaseGuardExpr)
       NumRemainingSpecializations = AlwaysRefutable;
-    else 
+    else
       NumRemainingSpecializations = getNumSpecializations(Columns[0]);
   }
 

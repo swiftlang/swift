@@ -28,8 +28,8 @@ struct Mirror {
   const MirrorWitnessTable *MirrorWitness;
 };
 
-// Swift assumes Mirror is returned in memory. 
-// Use MirrorReturn to guarantee that even on architectures 
+// Swift assumes Mirror is returned in memory.
+// Use MirrorReturn to guarantee that even on architectures
 // where Mirror would be returned in registers.
 struct MirrorReturn {
   Mirror mirror;

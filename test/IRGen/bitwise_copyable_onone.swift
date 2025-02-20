@@ -8,8 +8,8 @@
 
 
 // CHECK-LABEL: define{{.*}} ptr @"$s22bitwise_copyable_onone1EOy1AQzGAA1PRzs15BitwiseCopyableAERQlWOh"(
-// CHECK-SAME:      ptr %0, 
-// CHECK-SAME:      ptr %I.A, 
+// CHECK-SAME:      ptr %0,
+// CHECK-SAME:      ptr %I.A,
 // CHECK-SAME:      ptr %"E<I.A>"
 // CHECK-SAME:  )
 enum E<Element> {

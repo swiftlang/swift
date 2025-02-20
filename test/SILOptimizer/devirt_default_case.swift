@@ -12,10 +12,10 @@ open class Base1 {
 // Check that call to Base1.middle cannot be devirtualized
 //
 // CHECK-LABEL: sil @$s19devirt_default_case5Base1C5outer{{[_0-9a-zA-Z]*}}F
-// CHECK: class_method 
+// CHECK: class_method
 // CHECK: } // end sil function '$s19devirt_default_case5Base1C5outer{{[_0-9a-zA-Z]*}}F'
-  public func outer() { 
-    middle() 
+  public func outer() {
+    middle()
   }
 }
 
@@ -119,7 +119,7 @@ public func testfoo3() -> Int {
 
 class Base4 {
   @inline(never)
-  func test() { 
+  func test() {
 // Check that call to foo() can be devirtualized
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @$s19devirt_default_case5Base4C4testyyF
@@ -128,14 +128,14 @@ class Base4 {
 // CHECK-NORMAL-NOT: class_method
 // CHECK-TESTABLE: class_method %0 : $Base4, #Base4.foo
 // CHECK: } // end sil function '$s19devirt_default_case5Base4C4testyyF'
-    foo() 
+    foo()
   }
 
   @inline(never) func foo() { }
 }
 
 
-// A, C,D,E all use the same implementation. 
+// A, C,D,E all use the same implementation.
 // B has its own implementation.
 @inline(never)
 func foo(_ a: A3) -> Int {
@@ -148,8 +148,8 @@ class Derived4 : Base4 {
 
 open class Base5 {
   @inline(never)
-  open func test() { 
-    foo() 
+  open func test() {
+    foo()
   }
 
   @inline(never) public final func foo() { }
@@ -158,16 +158,16 @@ open class Base5 {
 class Derived5 : Base5 {
 }
 
-open class C6 { 
-  func bar() -> Int { return 1 } 
+open class C6 {
+  func bar() -> Int { return 1 }
 }
 
-class D6 : C6 { 
-  override func bar() -> Int { return 2 } 
+class D6 : C6 {
+  override func bar() -> Int { return 2 }
 }
 
 @inline(never)
-func check_static_class_devirt(_ c: C6) -> Int { 
+func check_static_class_devirt(_ c: C6) -> Int {
 // Check that C.bar() and D.bar() are devirtualized.
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @$s19devirt_default_case019check_static_class_A0ySiAA2C6CF
@@ -175,7 +175,7 @@ func check_static_class_devirt(_ c: C6) -> Int {
 // CHECK: checked_cast_br [exact] C6 in %0 : $C6 to D6
 // CHECK: class_method
 // CHECK: } // end sil function '$s19devirt_default_case019check_static_class_A0ySiAA2C6CF'
-  return c.bar() 
+  return c.bar()
 }
 
 public func test_check_static_class_devirt() -> Int {

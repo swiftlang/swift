@@ -166,7 +166,7 @@ extension Range where Bound: Strideable, Bound.Stride: SignedInteger {
   @available(swift, deprecated: 4.2, obsoleted: 5.0, message: "CountableRange is now a Range. No need to convert any more.")
   public init(_ other: Range<Bound>) {
     self = other
-  }  
+  }
 }
 
 extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
@@ -176,7 +176,7 @@ extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
   @available(swift, deprecated: 4.2, obsoleted: 5.0, message: "CountableClosedRange is now a ClosedRange. No need to convert any more.")
   public init(_ other: ClosedRange<Bound>) {
     self = other
-  }  
+  }
 }
 
 #if !$Embedded
@@ -350,18 +350,18 @@ extension Collection {
 
 extension UnsafeMutablePointer {
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "initialize(repeating:count:)")
-  public func initialize(to newValue: Pointee, count: Int = 1) { 
+  public func initialize(to newValue: Pointee, count: Int = 1) {
     initialize(repeating: newValue, count: count)
   }
 
-  @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "the default argument to deinitialize(count:) has been removed, please specify the count explicitly") 
+  @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "the default argument to deinitialize(count:) has been removed, please specify the count explicitly")
   @discardableResult
   public func deinitialize() -> UnsafeMutableRawPointer {
     return deinitialize(count: 1)
   }
 
   @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
-  public func deallocate(capacity _: Int) { 
+  public func deallocate(capacity _: Int) {
     self.deallocate()
   }
 
@@ -434,8 +434,8 @@ extension UnsafeMutableRawPointer: _CustomPlaygroundQuickLookable {
 extension UnsafePointer: _CustomPlaygroundQuickLookable {
   private var summary: String {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
-    return ptrValue == 0 
-    ? "UnsafePointer(nil)" 
+    return ptrValue == 0
+    ? "UnsafePointer(nil)"
     : "UnsafePointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
@@ -448,8 +448,8 @@ extension UnsafePointer: _CustomPlaygroundQuickLookable {
 extension UnsafeMutablePointer: _CustomPlaygroundQuickLookable {
   private var summary: String {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
-    return ptrValue == 0 
-    ? "UnsafeMutablePointer(nil)" 
+    return ptrValue == 0
+    ? "UnsafeMutablePointer(nil)"
     : "UnsafeMutablePointer(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
@@ -475,7 +475,7 @@ extension UnsafeMutableRawPointer {
   }
 
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "deallocate()", message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
-  public func deallocate(bytes _: Int, alignedTo _: Int) { 
+  public func deallocate(bytes _: Int, alignedTo _: Int) {
     self.deallocate()
   }
 
@@ -488,7 +488,7 @@ extension UnsafeMutableRawPointer {
   @discardableResult
   public func initializeMemory<T>(
     as type: T.Type, at offset: Int = 0, count: Int = 1, to repeatedValue: T
-  ) -> UnsafeMutablePointer<T> { 
+  ) -> UnsafeMutablePointer<T> {
     return (self + offset * MemoryLayout<T>.stride).initializeMemory(
       as: type, repeating: repeatedValue, count: count)
   }
@@ -511,7 +511,7 @@ extension UnsafeMutableRawPointer {
 
 extension UnsafeMutableRawBufferPointer {
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "allocate(byteCount:alignment:)")
-  public static func allocate(count: Int) -> UnsafeMutableRawBufferPointer { 
+  public static func allocate(count: Int) -> UnsafeMutableRawBufferPointer {
     return UnsafeMutableRawBufferPointer.allocate(
       byteCount: count, alignment: MemoryLayout<UInt>.alignment)
   }

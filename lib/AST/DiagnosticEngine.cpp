@@ -589,7 +589,7 @@ void DiagnosticEngine::setWarningsAsErrorsRules(
 ///
 /// \returns The string leading up to the delimiter, or the empty string
 /// if no delimiter is found.
-static StringRef 
+static StringRef
 skipToDelimiter(StringRef &Text, char Delim, bool *FoundDelim = nullptr) {
   unsigned Depth = 0;
   if (FoundDelim)
@@ -1138,7 +1138,7 @@ void DiagnosticEngine::formatDiagnosticText(
 
     // Find the digit sequence, and parse it into an argument index.
     size_t Length = InText.find_if_not(isdigit);
-    unsigned ArgIndex;      
+    unsigned ArgIndex;
     bool IndexParseFailed = InText.substr(0, Length).getAsInteger(10, ArgIndex);
 
     if (IndexParseFailed) {

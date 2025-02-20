@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -O -target %target-cpu-apple-macos10.15 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_15 --check-prefix=CHECK-macosx10_15_opt %s
 // RUN: %target-swift-frontend -O -target %target-cpu-apple-macos10.14 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_14 %s
 
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -O -target %target-cpu-apple-macos10.15 -module-name=Test -emit-module -emit-module-path %t/Test.swiftmodule %s
 // RUN: %sil-opt -target %target-cpu-apple-macos10.15 %t/Test.swiftmodule | %FileCheck --check-prefix=CHECK-inlinable %s
 

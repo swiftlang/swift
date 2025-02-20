@@ -220,7 +220,7 @@ extension Value {
 }
 
 extension Type: Equatable {
-  public static func ==(lhs: Type, rhs: Type) -> Bool { 
+  public static func ==(lhs: Type, rhs: Type) -> Bool {
     lhs.bridged.opaqueValue == rhs.bridged.opaqueValue
   }
 }

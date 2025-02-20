@@ -64,7 +64,7 @@ extension ForwardingInstruction {
 
 extension Value {
   // If this value is produced by a ForwardingInstruction, return that instruction. This is convenient for following the forwarded value chain.
-  // Unlike definingInstruction, a value's forwardingInstruction is not necessarily a valid insertion point. 
+  // Unlike definingInstruction, a value's forwardingInstruction is not necessarily a valid insertion point.
   public var forwardingInstruction: ForwardingInstruction? {
     if let inst = definingInstructionOrTerminator {
       return inst as? ForwardingInstruction

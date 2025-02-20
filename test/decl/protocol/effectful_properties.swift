@@ -64,7 +64,7 @@ class CT_A : A    { typealias V = Int; var someProp : Int { get throws {0} } }
 class CT_AT : AT   { typealias V = Int; var someProp : Int { get throws {0} } }
 // ------ ------ ------ ------ ------ ------ ------ ------ ------ ------
 
-// expected-note@+3 {{add stubs for conformance}} 
+// expected-note@+3 {{add stubs for conformance}}
 // expected-note@+2 3 {{candidate is 'async', but protocol requirement is not}}
 // expected-error@+1 {{type 'CA_N' does not conform to protocol 'None'}}
 struct CA_N : None { typealias V = Int; var someProp : Int { get async {0} } }

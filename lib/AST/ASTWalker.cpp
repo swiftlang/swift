@@ -81,7 +81,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   ASTWalker &Walker;
 
-  /// RAII object that sets the parent of the walk context 
+  /// RAII object that sets the parent of the walk context
   /// appropriately.
   class SetParentRAII {
     ASTWalker &Walker;
@@ -1067,7 +1067,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     E2 = doIt(E->getRHS());
     if (E2 == nullptr) return nullptr;
     E->setRHS(E2);
-    return E;      
+    return E;
   }
 
   Expr *visitExplicitCastExpr(ExplicitCastExpr *E) {

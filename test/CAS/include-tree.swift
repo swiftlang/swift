@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache %t/main.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   -o %t/deps.json -I %t/include -swift-version 4 -cache-compile-job -cas-path %t/cas 
+// RUN:   -o %t/deps.json -I %t/include -swift-version 4 -cache-compile-job -cas-path %t/cas
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:DotDot > %t/DotDot.cmd
 // RUN: %swift_frontend_plain @%t/DotDot.cmd
 

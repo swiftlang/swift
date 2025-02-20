@@ -240,14 +240,14 @@
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodInUnavailableClassWithPrimitiveParameters' has been renamed to 'ReplacementAvailableProtocol.methodReplacingInReplacementProtocol(first:second:)': use method in another class instead");
 // CHECK-NEXT: @end
 
-// CHECK-LABEL: SWIFT_CLASS("{{.+}}WholeClassAvailability") 
+// CHECK-LABEL: SWIFT_CLASS("{{.+}}WholeClassAvailability")
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=999)
 // CHECK-NEXT: @interface WholeClassAvailability
 // CHECK-NEXT: - (void)wholeClassAvailability:(id <WholeProtoAvailability> _Nonnull)_;
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 
-// CHECK-LABEL: SWIFT_PROTOCOL("{{.+}}WholeProtoAvailability{{.*}}") 
+// CHECK-LABEL: SWIFT_PROTOCOL("{{.+}}WholeProtoAvailability{{.*}}")
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=999)
 // CHECK-NEXT: @protocol WholeProtoAvailability
 // CHECK-NEXT: - (void)wholeProtoAvailability:(WholeClassAvailability * _Nonnull)_;

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // RUN: %empty-directory(%t)
-// 
+//
 // RUN: %target-clang %S/Inputs/SwiftObjectNSObject/SwiftObjectNSObject.m -c -o %t/SwiftObjectNSObject.o -g
 // RUN: %target-build-swift %s -g -I %S/Inputs/SwiftObjectNSObject/ -Xlinker %t/SwiftObjectNSObject.o -o %t/SwiftObjectNSObject
 // RUN: %target-codesign %t/SwiftObjectNSObject
@@ -61,7 +61,7 @@ import Foundation
 
 var legacy: Bool = false
 
-class C { 
+class C {
   @objc func cInstanceMethod() -> Int { return 1 }
   @objc class func cClassMethod() -> Int { return 2 }
   @objc func cInstanceOverride() -> Int { return 3 }

@@ -66,7 +66,7 @@ func forceHasMemberwiseInit() {
 // CHECK: return {{%.*}} : $Wrapper<Bool>
 
 // variable initialization expression of HasMemberwiseInit.$y
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_y33_{{.*}}23WrapperWithInitialValueVyxGvpfi : $@convention(thin) <T where T : DefaultInit> () -> @out 
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_y33_{{.*}}23WrapperWithInitialValueVyxGvpfi : $@convention(thin) <T where T : DefaultInit> () -> @out
 // CHECK: bb0(%0 : $*T):
 // CHECK-NOT: return
 // CHECK: witness_method $T, #DefaultInit.init!allocator : <Self where Self : DefaultInit> (Self.Type) -> () -> Self : $@convention(witness_method: DefaultInit) <τ_0_0 where τ_0_0 : DefaultInit> (@thick τ_0_0.Type) -> @out τ_0_0
@@ -111,7 +111,7 @@ func forceHasMemberwiseInit() {
 
 
 // default argument 0 of HasMemberwiseInit.init(x:y:z:)
-// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitV1x1y1zACyxGAA7WrapperVySbG_xAA0F16WithInitialValueVySiGtcfcfA_ : $@convention(thin) <T where T : DefaultInit> () -> Wrapper<Bool> 
+// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitV1x1y1zACyxGAA7WrapperVySbG_xAA0F16WithInitialValueVySiGtcfcfA_ : $@convention(thin) <T where T : DefaultInit> () -> Wrapper<Bool>
 
 // default argument 1 of HasMemberwiseInit.init(x:y:z:)
 // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitV1x1y1zACyxGAA7WrapperVySbG_xAA0F16WithInitialValueVySiGtcfcfA0_ : $@convention(thin) <T where T : DefaultInit> () -> @out T {
@@ -354,7 +354,7 @@ extension ClassUsingWrapper {
   }
 }
 
-// 
+//
 @propertyWrapper
 struct WrapperWithDefaultInit<T> {
   private var storage: T?

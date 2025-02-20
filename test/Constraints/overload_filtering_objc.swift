@@ -4,7 +4,7 @@
 // REQUIRES: objc_interop
 
 // This test ensures that we are filtering out overloads based on argument
-// labels, arity, etc., before those terms are visited. 
+// labels, arity, etc., before those terms are visited.
 
 import Foundation
 

@@ -112,7 +112,7 @@ package protocol PkgProto {
 }
 
 package class PkgKlass: PkgProto {
-  // Similar to PublicKlass, key path getter/setter for PkgKlass are only emitted 
+  // Similar to PublicKlass, key path getter/setter for PkgKlass are only emitted
   // when resilient.
 
   // key path getter for PkgKlass.data : PkgKlass

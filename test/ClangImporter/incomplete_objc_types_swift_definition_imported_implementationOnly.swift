@@ -13,7 +13,7 @@ _ = returnAFoo()
 // CHECK:      incomplete_objc_types_swift_definition_imported_implementationOnly.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'returnAFoo' in scope
 // CHECK-NEXT: _ = returnAFoo()
 // CHECK-NEXT:     ^~~~~~~~~~
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnAFoo' unavailable (cannot import) 
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnAFoo' unavailable (cannot import)
 // CHECK-NEXT: Foo *returnAFoo();
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: return type unavailable (cannot import)

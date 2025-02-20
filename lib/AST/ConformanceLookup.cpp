@@ -391,7 +391,7 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
       // cannot assume that metatypes based on type parameters are Sendable.
       // Therefore, check for conformance to SendableMetatype.
       if (ctx.LangOpts.hasFeature(Feature::StrictSendableMetatypes)) {
-        auto sendableMetatypeProto = 
+        auto sendableMetatypeProto =
             ctx.getProtocol(KnownProtocolKind::SendableMetatype);
         if (sendableMetatypeProto) {
           Type instanceType = metatypeType->getInstanceType();

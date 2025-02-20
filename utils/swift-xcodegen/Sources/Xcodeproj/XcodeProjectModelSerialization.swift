@@ -126,7 +126,7 @@ extension Xcode.Reference: PropertyListSerializable {
         try .identifier(serializer.serialize(object: reference))
       }))
     case let fileRef as Xcode.FileReference:
-      xcodeClassName = fileRef.isBuildableFolder 
+      xcodeClassName = fileRef.isBuildableFolder
         ? "PBXFileSystemSynchronizedRootGroup" : "PBXFileReference"
       if let fileType = fileRef.fileType {
         dict["explicitFileType"] = .string(fileType)

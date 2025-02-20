@@ -2231,7 +2231,7 @@ public struct InitializableMacro: ExtensionMacro {
     conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
-    let ext: DeclSyntax = 
+    let ext: DeclSyntax =
       """
       extension \(type.trimmed): Initializable {
         init(value: Int) {}
@@ -2550,7 +2550,7 @@ public struct GenerateStubsForProtocolRequirementsMacro: PeerMacro, ExtensionMac
     return [
       """
       struct __\(proto.name): \(proto.name), _TestStub {
-        init() {} 
+        init() {}
       }
       """
     ]

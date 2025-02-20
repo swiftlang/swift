@@ -26,9 +26,9 @@
 // CHECK-SAME:   $s4main5ValueVMn
 // CHECK-SAME:   $sSiN
 // CHECK-SAME:   $sSiN
-// CHECK-SAME:   i32 0, 
-// CHECK-SAME:   i32 [[ALIGNMENT]], 
-// CHECK-SAME:   i64 3 
+// CHECK-SAME:   i32 0,
+// CHECK-SAME:   i32 [[ALIGNMENT]],
+// CHECK-SAME:   i64 3
 // CHECK-SAME: }>, align [[ALIGNMENT]]
 struct Value<First, Second> {
   let first: First
@@ -43,11 +43,11 @@ func consume<T>(_ t: T) {
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
 // CHECK:      call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:   ptr noalias %{{[0-9]+}}, 
+// CHECK-SAME:   ptr noalias %{{[0-9]+}},
 // CHECK-SAME:   ptr getelementptr inbounds (
-// CHECK-SAME:     %swift.full_type, 
+// CHECK-SAME:     %swift.full_type,
 // CHECK-SAME:     $s4main5ValueVyS2iGMf
-// CHECK-SAME:     i32 0, 
+// CHECK-SAME:     i32 0,
 // CHECK-SAME:     i32 2
 // CHECK-SAME:   )
 // CHECK-SAME: )
@@ -61,10 +61,10 @@ doit()
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueVMa"([[INT]] %0, ptr %1, ptr %2) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK: entry:
 // CHECK:      call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
-// CHECK-SAME:   [[INT]] %0, 
-// CHECK-SAME:   ptr %1, 
-// CHECK-SAME:   ptr %2, 
-// CHECK-SAME:   ptr undef, 
+// CHECK-SAME:   [[INT]] %0,
+// CHECK-SAME:   ptr %1,
+// CHECK-SAME:   ptr %2,
+// CHECK-SAME:   ptr undef,
 // CHECK-SAME:   $s4main5ValueVMn
 // CHECK-SAME:   $s4main5ValueVMz
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}

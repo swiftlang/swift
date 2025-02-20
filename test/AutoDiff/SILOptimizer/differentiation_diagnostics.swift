@@ -672,7 +672,7 @@ struct Struct: Differentiable {
   // expected-error @+4 {{expression is not differentiable}}
   // expected-error @+3 {{expression is not differentiable}}
   // expected-note @+2 {{cannot differentiate access to property 'Struct._x' because 'Struct.TangentVector' does not have a stored property named '_x'}}
-  // expected-note @+1 {{cannot differentiate access to property 'Struct._x' because 'Struct.TangentVector' does not have a stored property named '_x'}}  
+  // expected-note @+1 {{cannot differentiate access to property 'Struct._x' because 'Struct.TangentVector' does not have a stored property named '_x'}}
   @DifferentiableWrapper @DifferentiableWrapper var x: Float = 10
 
   @Wrapper var y: Float = 20

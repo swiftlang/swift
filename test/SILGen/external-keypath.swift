@@ -17,7 +17,7 @@ func externalKeyPaths<T: Hashable, U>(_ x: T, _ y: U, _ z: Int) {
   // CHECK: keypath $WritableKeyPath<External<Int>, Int>, (root $External<Int>; {{.*}} external #External.intProperty<Int>)
   _ = \External<Int>.intProperty
 
-  // CHECK: keypath $WritableKeyPath<External<T>, T>, <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (root $External<τ_0_0>; {{.*}} external #External.property<T>) <T, U> 
+  // CHECK: keypath $WritableKeyPath<External<T>, T>, <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (root $External<τ_0_0>; {{.*}} external #External.property<T>) <T, U>
   _ = \External<T>.property
 
   // CHECK: keypath $WritableKeyPath<External<T>, Int>, <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (root $External<τ_0_0>; {{.*}} external #External.intProperty<T>) <T, U>

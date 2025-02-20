@@ -2684,7 +2684,7 @@ namespace {
 
       auto infersIsolationFromContext =
           [](const DeclContext *dc) -> bool {
-            // Isolation for declarations is based solely on explicit 
+            // Isolation for declarations is based solely on explicit
             // annotations; only infer isolation for initializer expressions
             // and closures.
             if (dc->getAsDecl())

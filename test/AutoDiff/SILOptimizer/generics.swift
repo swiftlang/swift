@@ -51,7 +51,7 @@ func foo<T>(_ x: Wrapper<T>) {
 
 // Test case where associated derivative function's requirements are met.
 extension Wrapper where Scalar : Numeric {
-  @differentiable(reverse, wrt: self where Scalar : Differentiable & FloatingPoint) 
+  @differentiable(reverse, wrt: self where Scalar : Differentiable & FloatingPoint)
   func mean() -> Wrapper {
     return self
   }

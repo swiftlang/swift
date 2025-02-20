@@ -600,7 +600,7 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
       extraDataPattern->OffsetInWords + extraDataPattern->SizeInWords;
   }
 
-  auto bytes = (char*) 
+  auto bytes = (char*)
     MetadataAllocator(GenericClassMetadataTag)
       .Allocate(allocationBounds.getTotalSizeInBytes(), alignof(void*));
 
@@ -6410,7 +6410,7 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
   // as of the Swift 5.3 ABI. However, we can check whether the conforming
   // type is generic; a nongeneric type's conformance can never be dependent (at
   // least, not today). However, a generic type conformance may also be
-  // nondependent if it 
+  // nondependent if it
   auto typeDescription = conformance->getTypeDescriptor();
   if (typeDescription && !typeDescription->isGeneric() &&
       genericTable->PrivateData != nullptr) {
@@ -7765,7 +7765,7 @@ void swift::blockOnMetadataDependency(MetadataDependency root,
       // In the special case where it's the first link that doesn't have
       // a known dependency and its current metadata state now satisfies
       // the dependency leading to it, we can skip waiting.
-      if (links.size() == 2 && 
+      if (links.size() == 2 &&
           satisfies(checkResult.NewState, links.back().Requirement))
         return;
 

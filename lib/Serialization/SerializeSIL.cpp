@@ -229,7 +229,7 @@ namespace {
 
     llvm::DenseMap<PointerUnion<const SILDebugScope *, SILFunction *>, DeclID>
         DebugScopeMap;
-    llvm::DenseMap<const void *, unsigned> SourceLocMap;  
+    llvm::DenseMap<const void *, unsigned> SourceLocMap;
 
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock *, unsigned> BasicBlockMap;

@@ -15,19 +15,19 @@ public struct CGFloat {
 #error("Unknown platform")
 #endif
 
-  public init() { 
+  public init() {
     self.value = 0.0
   }
 
-  public init(_ value: Int) { 
+  public init(_ value: Int) {
     self.value = UnderlyingType(value)
   }
 
-  public init(_ value: Float) { 
+  public init(_ value: Float) {
     self.value = UnderlyingType(value)
   }
 
-  public init(_ value: Double) { 
+  public init(_ value: Double) {
     self.value = UnderlyingType(value)
   }
 

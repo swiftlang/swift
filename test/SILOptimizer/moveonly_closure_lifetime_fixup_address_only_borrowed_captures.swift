@@ -22,7 +22,7 @@ func borrow<T>(_: borrowing E<T>) {}
 func borrow<T>(_: borrowing C<T>) {}
 func mutate<T>(_: inout C<T>) {}
 
-// CHECK-LABEL: sil {{.*}}14testCopySafetyyyAA1CVyxGlF : 
+// CHECK-LABEL: sil {{.*}}14testCopySafetyyyAA1CVyxGlF :
 // CHECK: [[STK1:%.*]] = alloc_stack {{.*}} $C<T>
 // CHECK: copy_addr %0 to [init] [[STK1]]
 // CHECK: partial_apply {{.*}}[on_stack] {{.*}}([[STK1]]) : $@convention(thin) <τ_0_0> (@inout_aliasable C<τ_0_0>) -> ()

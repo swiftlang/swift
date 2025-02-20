@@ -61,7 +61,7 @@ class A {
     }
 }
 
-func retV() { return true } 
+func retV() { return true }
 // expected-error@-1 {{unexpected non-void return value in void function}}
 // expected-note@-2 {{did you mean to add a return type?}}
 
@@ -72,7 +72,7 @@ func retAI() -> Int {
 }
 
 func bad_return1() {
-  return 42  
+  return 42
   // expected-error@-1 {{unexpected non-void return value in void function}}
   // expected-note@-2 {{did you mean to add a return type?}}
 }
@@ -83,7 +83,7 @@ func bad_return2() -> (Int, Int) {
 
 // <rdar://problem/14096697> QoI: Diagnostics for trying to return values from void functions
 func bad_return3(lhs: Int, rhs: Int) {
-  return lhs != 0  
+  return lhs != 0
   // expected-error@-1 {{unexpected non-void return value in void function}}
   // expected-note@-2 {{did you mean to add a return type?}}
 }

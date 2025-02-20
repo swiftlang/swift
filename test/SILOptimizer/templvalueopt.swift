@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -module-name=test -O -enable-ossa-modules -Xllvm -sil-print-types -emit-sil  %s | %FileCheck %s
 
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 

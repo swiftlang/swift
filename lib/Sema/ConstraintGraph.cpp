@@ -454,7 +454,7 @@ void ConstraintGraph::mergeNodesPre(TypeVariableType *typeVar2) {
   }
 }
 
-void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
+void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
                                  TypeVariableType *typeVar2) {
   // Retrieve the node for the representative that we're merging into.
   ASSERT(CS.getRepresentative(typeVar1) == typeVar1);

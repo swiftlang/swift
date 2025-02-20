@@ -1,4 +1,4 @@
-// REQUIRES: concurrency 
+// REQUIRES: concurrency
 
 // RUN: %batch-code-completion -warn-concurrency
 

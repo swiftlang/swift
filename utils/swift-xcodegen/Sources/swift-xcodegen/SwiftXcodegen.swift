@@ -83,7 +83,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
     let buildDir = try ninja.buildDir(for: .swift)
 
     // Check to see if we have a separate runnable build dir.
-    let runnableBuildDirPath = 
+    let runnableBuildDirPath =
       self.runnableBuildDir?.absoluteInWorkingDir.resolvingSymlinks
     let runnableBuildDir = try runnableBuildDirPath.map {
       try NinjaBuildDir(at: $0, projectRootDir: ninja.projectRootDir)
@@ -143,7 +143,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       spec.addReference(to: "validation-test")
     }
 
-    for blueFolder in self.blueFolders.components(separatedBy: ",") 
+    for blueFolder in self.blueFolders.components(separatedBy: ",")
     where !blueFolder.isEmpty {
       spec.addReference(to: RelativePath(blueFolder))
     }

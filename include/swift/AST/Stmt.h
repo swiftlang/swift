@@ -491,7 +491,7 @@ class alignas(8) PoundAvailableInfo final :
   /// This is filled in by Sema.
   VersionRange VariantAvailableRange;
 
-  /// Indicates that the expression is checking if a version range 
+  /// Indicates that the expression is checking if a version range
   /// is **not** available.
   bool _isUnavailability;
 
@@ -500,7 +500,7 @@ class alignas(8) PoundAvailableInfo final :
                      bool isUnavailability)
    : PoundLoc(PoundLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
      NumQueries(queries.size()), AvailableRange(VersionRange::empty()),
-     VariantAvailableRange(VersionRange::empty()), 
+     VariantAvailableRange(VersionRange::empty()),
      _isUnavailability(isUnavailability) {
     std::uninitialized_copy(queries.begin(), queries.end(),
                             getTrailingObjects<AvailabilitySpec *>());

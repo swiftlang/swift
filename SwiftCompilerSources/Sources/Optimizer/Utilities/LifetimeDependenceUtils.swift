@@ -95,7 +95,7 @@ struct LifetimeDependence : CustomStringConvertible {
       case let .caller(argument):
         precondition(argument.ownership != .owned, "only guaranteed or inout arguments have a caller scope")
       case .access, .local, .global, .unknown:
-        break        
+        break
       case let .yield(value):
         precondition(value.definingInstruction is BeginApplyInst)
       case let .owned(value):
@@ -189,7 +189,7 @@ extension LifetimeDependence {
     case .Escaping:
       return nil
     }
-  }  
+  }
 
   /// Compute the range of the dependence scope.
   ///
@@ -372,7 +372,7 @@ extension LifetimeDependence.Scope {
 }
 
 extension LifetimeDependence.Scope {
-  /// Compute the range of the dependence scope. 
+  /// Compute the range of the dependence scope.
   ///
   /// Returns nil if the dependence scope covers the entire function. Returns an empty range for an unknown scope.
   ///
@@ -720,7 +720,7 @@ extension LifetimeDependenceDefUseWalker {
       return .abortWalk
     }
     return walkDownUses(of: value, using: operand)
-  }    
+  }
 
   mutating func loadedAddressUse(of operand: Operand, into address: Operand)
     -> WalkResult {
@@ -741,7 +741,7 @@ extension LifetimeDependenceDefUseWalker {
   mutating func dependentAddressUse(of operand: Operand, into value: Value)
     -> WalkResult {
     walkDownUses(of: value, using: operand)
-  }    
+  }
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
     if let mdi = operand.instruction as? MarkDependenceInst {

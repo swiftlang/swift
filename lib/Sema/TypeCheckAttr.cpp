@@ -2763,7 +2763,7 @@ void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
       && !proto->getAttrs().hasAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(),
              diag::no_objc_tagged_pointer_not_class_protocol);
-    attr->setInvalid();    
+    attr->setInvalid();
   }
 }
 

@@ -111,7 +111,7 @@ RandomTests.test("random integers in ranges") {
 
 // Random floating points in ranges
 
-func floatingPointRangeTest<T: BinaryFloatingPoint>(_ type: T.Type) 
+func floatingPointRangeTest<T: BinaryFloatingPoint>(_ type: T.Type)
   where T.RawSignificand: FixedWidthInteger {
 
   let testRange = 0 ..< 1_000

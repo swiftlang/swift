@@ -8248,7 +8248,7 @@ static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
 
       case ExplicitSafety::Safe:
       case ExplicitSafety::Unspecified:
-        return false;        
+        return false;
     }
   }
 

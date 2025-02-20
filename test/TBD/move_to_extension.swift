@@ -2,12 +2,12 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -typecheck %s -emit-tbd -tbd-install_name Foo -emit-tbd-path %t/before_move.tbd -D BEFORE_MOVE -module-name Foo -enable-library-evolution -emit-sil -o %t/before_move.sil
-// RUN: %llvm-nm %t/before_move.tbd | %FileCheck %s 
+// RUN: %llvm-nm %t/before_move.tbd | %FileCheck %s
 // RUN: %FileCheck %s --check-prefix=CHECK-SIL < %t/before_move.sil
 
 // RUN: %target-swift-frontend %s -emit-module -emit-module-path %t/FooCore.swiftmodule -D AFTER_MOVE_FOO_CORE -module-name FooCore -enable-library-evolution
 // RUN: %target-swift-frontend -typecheck %s -tbd-install_name Foo -emit-tbd -emit-tbd-path %t/after_move.tbd -D AFTER_MOVE_FOO -module-name Foo -I %t -enable-library-evolution -emit-sil -o %t/after_move.sil
-// RUN: %llvm-nm %t/after_move.tbd | %FileCheck %s 
+// RUN: %llvm-nm %t/after_move.tbd | %FileCheck %s
 // RUN: %FileCheck %s --check-prefix=CHECK-SIL < %t/after_move.sil
 
 // CHECK: _$s3Foo4DateC14getCurrentYearSiyFZ

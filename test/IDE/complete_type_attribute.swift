@@ -32,7 +32,7 @@
 
 struct MyStruct : @#^STRUCT_INHERIT?check=TYPEATTR_INHERIT^# {}
 
-class C : @#^CLASS_INHERIT?check=TYPEATTR_INHERIT^#, 
+class C : @#^CLASS_INHERIT?check=TYPEATTR_INHERIT^#,
           Array<@#^GENERIC_ARG_INHERIT?check=TYPEATTR^#>,
           @unchecked @#^CLASS_INHERIT2?check=TYPEATTR_INHERIT^# {}
 

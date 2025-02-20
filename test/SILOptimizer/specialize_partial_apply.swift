@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -Xllvm -sil-print-types -emit-sil -primary-file %s | %FileCheck %s
 
 // Also do an end-to-end test to check all components, including IRGen.
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT

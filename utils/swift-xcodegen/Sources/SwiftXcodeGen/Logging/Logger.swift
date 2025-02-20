@@ -122,7 +122,7 @@ extension Logger.LogLevel: Loggable, CustomStringConvertible {
     }
   }
   public func write(to stream: LoggableStream, useColor: Bool) {
-    let str = useColor 
+    let str = useColor
       ? "\(fg: ansiColor)\(weight: .bold)\(self)\(fg: .normal)\(weight: .normal)"
       : "\(self)"
     stream.write(str)

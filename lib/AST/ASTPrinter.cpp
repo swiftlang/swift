@@ -1013,7 +1013,7 @@ public:
   }
 
   /// The default generic signature flags for printing requirements.
-  static unsigned 
+  static unsigned
   defaultGenericRequirementFlags(const PrintOptions &options) {
     return PrintRequirements | PrintInverseRequirements;
   }

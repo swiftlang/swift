@@ -69,7 +69,7 @@ extension Adopter6: ProtocolWithSelfRequirement2 { //expected-error{{type 'Adopt
 
 
 protocol ProtocolWithSelfRequirement3 {
-  func foo() -> Self // expected-note{{protocol requires function 'foo()' with type '() -> Self'}} 
+  func foo() -> Self // expected-note{{protocol requires function 'foo()' with type '() -> Self'}}
   func foo(lhs: Self, rhs: Self) -> Self //expected-note{{protocol requires function 'foo(lhs:rhs:)' with type '(Adopter7, Adopter7) -> Self'}}
 }
 class Adopter7: ProtocolWithSelfRequirement3 { //expected-error{{type 'Adopter7' does not conform to protocol 'ProtocolWithSelfRequirement3'}} expected-note {{add stubs for conformance}} {{47-47=\n    func foo() -> Self {\n        <#code#>\n    \}\n\n    func foo(lhs: Adopter7, rhs: Adopter7) -> Self {\n        <#code#>\n    \}\n}}
@@ -77,18 +77,18 @@ class Adopter7: ProtocolWithSelfRequirement3 { //expected-error{{type 'Adopter7'
 
 
 public protocol ProtocolWithPublicAccess1 {
-  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'}} 
+  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'}}
 }
 public protocol ProtocolWithPublicAccess2 {
   associatedtype AssocType //expected-note{{protocol requires nested type 'AssocType'}}
 }
 class Adopter8: ProtocolWithPublicAccess1, ProtocolWithPublicAccess2 {
   // expected-error@-1{{type 'Adopter8' does not conform to protocol 'ProtocolWithPublicAccess1'}} expected-note@-1 {{add stubs for conformance}} {{71-71=\n    func foo() {\n        <#code#>\n    \}\n\n    typealias AssocType = <#type#>\n}}
-  // expected-error@-2{{type 'Adopter8' does not conform to protocol 'ProtocolWithPublicAccess2'}} 
+  // expected-error@-2{{type 'Adopter8' does not conform to protocol 'ProtocolWithPublicAccess2'}}
 }
 
 public protocol ProtocolWithPublicAccess3 {
-  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'}} 
+  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'}}
 }
 public protocol ProtocolWithPublicAccess4 {
   associatedtype AssocType //expected-note{{protocol requires nested type 'AssocType'}}
@@ -99,7 +99,7 @@ public class Adopter9: ProtocolWithPublicAccess3, ProtocolWithPublicAccess4 {
 }
 
 private protocol ProtocolWithPrivateAccess1 {
-  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'}} 
+  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'}}
 }
 private protocol ProtocolWithPrivateAccess2 {
   associatedtype AssocType //expected-note{{protocol requires nested type 'AssocType'}}

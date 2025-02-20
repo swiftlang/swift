@@ -311,7 +311,7 @@ for _ in 1...10 {
 }
 
 if true {} #^TOP_LEVEL_AFTER_IF_1?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN;check=KW_NO_IN^#
-if true {} 
+if true {}
 #^TOP_LEVEL_AFTER_IF_2?check=KW_DECL_STMT_TOPLEVEL;check=KW_NO_RETURN;check=KW_NO_IN^#
 
 

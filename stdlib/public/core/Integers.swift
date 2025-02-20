@@ -1551,7 +1551,7 @@ extension BinaryInteger {
     // (1) a fixed-width signed type can't represent the largest values of
     //     a fixed-width unsigned type of equal bit width; and
     // (2) an unsigned type (obviously) can't represent a negative value.
-    if Self.isSigned {    
+    if Self.isSigned {
       return lhs.bitWidth > rhs.bitWidth ? // (1)
         lhs == Self(truncatingIfNeeded: rhs) :
         (lhs >= (0 as Self) && Other(truncatingIfNeeded: lhs) == rhs) // (2)
@@ -3354,7 +3354,7 @@ extension SignedInteger where Self: FixedWidthInteger {
 /// type.
 ///
 /// Calling the `numericCast(_:)` function is equivalent to calling an
-/// initializer for the destination type. `numericCast(_:)` traps on overflow 
+/// initializer for the destination type. `numericCast(_:)` traps on overflow
 /// in `-O` and `-Onone` builds.
 ///
 /// - Parameter x: The integer to convert, an instance of type `T`.

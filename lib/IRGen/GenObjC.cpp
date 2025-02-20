@@ -1600,7 +1600,7 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
                                               llvm::Function *objcImpl,
                                               bool isDestroyer) {
   /// The first element is the selector.
-  SILDeclRef declRef = SILDeclRef(cd, 
+  SILDeclRef declRef = SILDeclRef(cd,
                                   isDestroyer? SILDeclRef::Kind::IVarDestroyer
                                              : SILDeclRef::Kind::IVarInitializer,
                                   /*foreign*/ true);

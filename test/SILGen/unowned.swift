@@ -68,13 +68,13 @@ func test0(c c: C) {
 
   a.x = x
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBX]]
-  // CHECK:   [[T2:%.*]] = load_borrow [[READ]] : $*@sil_unowned C     
-  // CHECK:   [[T3:%.*]] = strong_copy_unowned_value  [[T2]] : $@sil_unowned C  
+  // CHECK:   [[T2:%.*]] = load_borrow [[READ]] : $*@sil_unowned C
+  // CHECK:   [[T3:%.*]] = strong_copy_unowned_value  [[T2]] : $@sil_unowned C
   // CHECK:   end_borrow [[T2]]
   // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBA]]
   // CHECK:   [[XP:%.*]] = struct_element_addr [[WRITE]] : $*A, #A.x
   // CHECK:   [[T4:%.*]] = ref_to_unowned [[T3]] : $C to $@sil_unowned C
-  // CHECK:   [[T4_COPY:%.*]] = copy_value [[T4]] : $@sil_unowned C  
+  // CHECK:   [[T4_COPY:%.*]] = copy_value [[T4]] : $@sil_unowned C
   // CHECK:   assign [[T4_COPY]] to [[XP]] : $*@sil_unowned C
   // CHECK:   destroy_value [[T3]] : $C
   // CHECK:   end_borrow [[X_LIFETIME]]

@@ -166,7 +166,7 @@ ExclusiveAccessTestSuite.test("InoutReadEscapeWrite")
   var x = 3
   let c = { x = 42 }
   expectCrashLater()
-  readAndPerform(&x, closure: c) 
+  readAndPerform(&x, closure: c)
   _blackHole(x)
 }
 

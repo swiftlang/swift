@@ -70,10 +70,10 @@ func acceptsRandomAccessCollection<C: RandomAccessCollection>(_: C) {}
 
 func testStringCollectionTypes(s: String) {
   acceptsCollection(s.utf8)
-  acceptsBidirectionalCollection(s.utf8) 
+  acceptsBidirectionalCollection(s.utf8)
   acceptsRandomAccessCollection(s.utf8) // expected-error{{global function 'acceptsRandomAccessCollection' requires that 'String.UTF8View' conform to 'RandomAccessCollection'}}
 
-  acceptsCollection(s.utf16) 
+  acceptsCollection(s.utf16)
   acceptsBidirectionalCollection(s.utf16)
   acceptsRandomAccessCollection(s.utf16) // expected-error{{global function 'acceptsRandomAccessCollection' requires that 'String.UTF16View' conform to 'RandomAccessCollection'}}
 

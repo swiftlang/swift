@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking)
 // REQUIRES: executable_test
 
-// This test requires the new existential shape metadata accessors which are 
+// This test requires the new existential shape metadata accessors which are
 // not available in on-device runtimes, or in the back-deployment runtime.
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

@@ -75,7 +75,7 @@ public struct Container<each T> {
 
 //   Setter for Container.storage
 // CHECK-LABEL: sil {{.*}}@$s4main9ContainerV7storageAA6StoredVyxGxQp_tvs
-// CHECK-SAME:    $@convention(method) <each T> (@pack_owned Pack{repeat Stored<each T>}, @inout Container<repeat each T>) -> () 
+// CHECK-SAME:    $@convention(method) <each T> (@pack_owned Pack{repeat Stored<each T>}, @inout Container<repeat each T>) -> ()
 //   Materialize the pack into a local tuple.
 // CHECK:         [[ARG_COPY:%.*]] = alloc_stack [var_decl] $(repeat Stored<each T>), let,
 // CHECK-NEXT:    [[ZERO:%.*]] = integer_literal $Builtin.Word, 0

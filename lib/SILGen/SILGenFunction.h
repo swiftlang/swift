@@ -1169,7 +1169,7 @@ public:
   /// out to be unneeded.
   ///
   /// This should be called instead of eraseFromParent() in order to
-  /// keep SILGen's internal bookkeeping consistent. 
+  /// keep SILGen's internal bookkeeping consistent.
   ///
   /// The block should be empty and have no predecessors.
   void eraseBasicBlock(SILBasicBlock *block);

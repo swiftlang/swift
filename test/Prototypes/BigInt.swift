@@ -673,7 +673,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     assert(UInt.bitWidth % Word.bitWidth == 0)
     let twosComplementData = _dataAsTwosComplement()
     var words: [UInt] = []
-    words.reserveCapacity((twosComplementData.count * Word.bitWidth 
+    words.reserveCapacity((twosComplementData.count * Word.bitWidth
       + UInt.bitWidth - 1) / UInt.bitWidth)
     var word: UInt = 0
     var shift = 0

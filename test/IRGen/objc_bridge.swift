@@ -83,14 +83,14 @@ import Foundation
 // CHECK-noptrauth: ptr @"$s11objc_bridge3BasC8nsstrArg1sySo8NSStringC_tFTo"
 // CHECK-ptrauth:   ptr @"$s11objc_bridge3BasC8nsstrArg1sySo8NSStringC_tFTo.ptrauth"
 // CHECK:     },
-// CHECK:     { ptr, ptr, ptr } { 
-// CHECK:       ptr @"\01L_selector_data(init)", 
+// CHECK:     { ptr, ptr, ptr } {
+// CHECK:       ptr @"\01L_selector_data(init)",
 // CHECK:       ptr @".str.7.@16@0:8",
 // CHECK-noptrauth: ptr @"$s11objc_bridge3BasCACycfcTo"
 // CHECK-ptrauth:   ptr @"$s11objc_bridge3BasCACycfcTo.ptrauth"
 // CHECK:     },
-// CHECK:     { ptr, ptr, ptr } { 
-// CHECK:       ptr @"\01L_selector_data(dealloc)", 
+// CHECK:     { ptr, ptr, ptr } {
+// CHECK:       ptr @"\01L_selector_data(dealloc)",
 // CHECK:       ptr @".str.7.v16@0:8",
 // CHECK-noptrauth: ptr @"$s11objc_bridge3BasCfDTo"
 // CHECK-ptrauth:   ptr @"$s11objc_bridge3BasCfDTo.ptrauth"
@@ -101,8 +101,8 @@ import Foundation
 // CHECK-noptrauth: ptr @"$s11objc_bridge3BasC9acceptSetyyShyACGFTo"
 // CHECK-ptrauth:   ptr @"$s11objc_bridge3BasC9acceptSetyyShyACGFTo.ptrauth"
 // CHECK:     }
-// CHECK:     { ptr, ptr, ptr } { 
-// CHECK:       ptr @"\01L_selector_data(.cxx_destruct)", 
+// CHECK:     { ptr, ptr, ptr } {
+// CHECK:       ptr @"\01L_selector_data(.cxx_destruct)",
 // CHECK:       ptr @"{{[^"]*}}",
 // CHECK-noptrauth: ptr @"$s11objc_bridge3BasCfETo"
 // CHECK-ptrauth:   ptr @"$s11objc_bridge3BasCfETo.ptrauth"
@@ -195,7 +195,7 @@ class Bas : NSObject {
   // CHECK: define internal void @"$s11objc_bridge3BasC8nsstrArg1sySo8NSStringC_tFTo"(ptr %0, ptr %1, ptr %2) {{[#0-9]*}} {
   @objc func nsstrArg(s s: NSString) { }
 
-  override init() { 
+  override init() {
     strRealProp = String()
     nsstrRealProp = NSString()
     super.init()

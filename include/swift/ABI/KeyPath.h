@@ -43,7 +43,7 @@ public:
                                 bool hasReferencePrefix)
     : Data((validateSize(size) & _SwiftKeyPathBufferHeader_SizeMask)
            | (trivialOrInstantiableInPlace ? _SwiftKeyPathBufferHeader_TrivialFlag : 0)
-           | (hasReferencePrefix ? _SwiftKeyPathBufferHeader_HasReferencePrefixFlag : 0)) 
+           | (hasReferencePrefix ? _SwiftKeyPathBufferHeader_HasReferencePrefixFlag : 0))
   {
   }
 

@@ -174,7 +174,7 @@ public struct FindTest {
     self.expected = expected
     self.element = MinimalEquatableValue(element)
     self.sequence = sequence.enumerated().map {
-      return MinimalEquatableValue($1, identity: $0) 
+      return MinimalEquatableValue($1, identity: $0)
     }
     self.expectedLeftoverSequence = expectedLeftoverSequence.map(
       MinimalEquatableValue.init)
@@ -193,13 +193,13 @@ public struct CollectionBinaryOperationTest {
     file: String = #file, line: UInt = #line
   ) {
     self.expected = expected.enumerated().map {
-      return MinimalEquatableValue($1, identity: $0) 
+      return MinimalEquatableValue($1, identity: $0)
     }
     self.lhs = lhs.map {
-      return MinimalEquatableValue($0, identity: $0) 
+      return MinimalEquatableValue($0, identity: $0)
     }
     self.rhs = rhs.map {
-      return MinimalEquatableValue($0, identity: $0) 
+      return MinimalEquatableValue($0, identity: $0)
     }
     self.loc = SourceLoc(file, line, comment: "test data")
   }
@@ -217,10 +217,10 @@ public struct CollectionPredicateTest {
   ) {
     self.expected = expected
     self.lhs = lhs.enumerated().map {
-      return MinimalEquatableValue($1, identity: $0) 
+      return MinimalEquatableValue($1, identity: $0)
     }
     self.rhs = rhs.enumerated().map {
-      return MinimalEquatableValue($1, identity: $0) 
+      return MinimalEquatableValue($1, identity: $0)
     }
     self.loc = SourceLoc(file, line, comment: "test data")
   }

@@ -112,11 +112,11 @@ struct Goo {
   var y: Int32
 }
 
-struct Foo { 
+struct Foo {
   var g: Goo
 }
 
-struct Bar { 
+struct Bar {
   let f: Foo
   var h: Foo
 
@@ -260,7 +260,7 @@ struct S {
 // of struct type properly.
 // CHECK-LABEL: sil {{.*}}testStructWithLetElement
 // CHECK-NOT: function_ref @{{.*}}oops
-// CHECK: return 
+// CHECK: return
 public func testStructWithLetElement() -> Int32 {
     var someVar = S(elt: 12)
     let tmp1 = someVar.elt
@@ -271,7 +271,7 @@ public func testStructWithLetElement() -> Int32 {
     // This check should get eliminated
     if (tmp2 == tmp1) {
        // If we get here, the compiler has propagated
-       // the old value someVar.elt into tmp2, which 
+       // the old value someVar.elt into tmp2, which
        // is wrong.
        oops()
     }

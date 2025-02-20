@@ -120,7 +120,7 @@ func getBurningShipIterations(_ c: Complex, maxIterations: Int) -> Int {
 print("\n== BURNING SHIP ==\n\n", terminator: "")
 
 fractal(getBurningShipIterations,
-        xMin: -2.0, xMax: 1.2, yMin: -2.1, yMax: 1.2, rows: 40, cols: 80, 
+        xMin: -2.0, xMax: 1.2, yMin: -2.1, yMax: 1.2, rows: 40, cols: 80,
         maxIterations: 200)
 
 // CHECK: ################################################################################

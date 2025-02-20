@@ -180,7 +180,7 @@ public func letSimpleTest<T>(_ msg: __owned T) async {
 // DWARF9: DW_TAG_formal_parameter
 // DWARF9-NEXT: DW_AT_location	(DW_OP_entry_value([[ASYNC_REG:.*]]), DW_OP_deref, DW_OP_plus_uconst 0x[[MSG_LOC:[a-f0-9]+]], DW_OP_deref)
 // DWARF9-NEXT: DW_AT_name	("msg")
-// 
+//
 // RUN: %llvm-dwarfdump -c --name='$s3out13varSimpleTestyyxz_xtYalFTY5_' %t/out.o | %FileCheck -check-prefix=DWARF10 %s
 // DWARF10: DW_AT_linkage_name	("$s3out13varSimpleTestyyxz_xtYalFTY5_")
 // DWARF10: DW_AT_name	("varSimpleTest")

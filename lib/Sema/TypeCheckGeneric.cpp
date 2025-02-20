@@ -1104,7 +1104,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
 }
 
 Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
-                                     TypeAliasDecl *typeAlias) const {  
+                                     TypeAliasDecl *typeAlias) const {
   TypeResolutionOptions options((typeAlias->getGenericParams()
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));

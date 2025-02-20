@@ -14,7 +14,7 @@ do {
 
 struct MyStruct<T> {
     var propOpt: Int?
-    var propNonOpt: Int 
+    var propNonOpt: Int
     var propGenOpt: T?
     var propGenNonOpt: T
 

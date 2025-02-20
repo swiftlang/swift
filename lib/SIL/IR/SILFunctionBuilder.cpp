@@ -252,7 +252,7 @@ void SILFunctionBuilder::addFunctionAttributes(
     return;
 
   // Only assign replacements when the thing being replaced is function-like and
-  // explicitly declared.  
+  // explicitly declared.
   auto *origDecl = decl->getDynamicallyReplacedDecl();
   if (auto *replacedDecl = dyn_cast_or_null<AbstractFunctionDecl>(origDecl)) {
     // For @objc method replacement we normally use categories to perform the

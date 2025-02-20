@@ -23,5 +23,5 @@ extension Q {
 // foo is not a requirement of P nor a default implementation for any requirement.
 // Neither is bar for Q.
 // CHECK-NOT: requirementOf
-// CHECK-NOT: defaultImplementationOf 
+// CHECK-NOT: defaultImplementationOf
 

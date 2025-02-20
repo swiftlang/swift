@@ -981,7 +981,7 @@ static void validateTargetVariant(const toolchains::Darwin &TC,
   }
 }
 
-void 
+void
 toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
                                       const llvm::opt::ArgList &args,
                                       StringRef defaultTarget) const {

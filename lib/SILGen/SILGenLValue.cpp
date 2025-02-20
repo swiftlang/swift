@@ -2300,7 +2300,7 @@ makeBaseConsumableMaterializedRValue(SILGenFunction &SGF,
       && !base.isLValue()) {
     return SGF.emitLoad(loc, base.getValue(),
                         SGF.getTypeLowering(base.getType()), SGFContext(),
-                        IsNotTake);    
+                        IsNotTake);
   }
 
   bool isBorrowed = base.isPlusZeroRValueOrTrivial()
@@ -4418,7 +4418,7 @@ LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e,
   LValueTypeData typeData =
     getOptionalObjectTypeData(SGF, accessKind, lv.getTypeData());
   bool isImplicitUnwrap = e->isImplicit() &&
-    e->isForceOfImplicitlyUnwrappedOptional(); 
+    e->isForceOfImplicitlyUnwrappedOptional();
   lv.add<ForceOptionalObjectComponent>(typeData, isImplicitUnwrap);
   return lv;
 }

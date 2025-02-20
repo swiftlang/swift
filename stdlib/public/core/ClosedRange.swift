@@ -225,7 +225,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger
       return x == upperBound
         ? .pastEnd
         : .inRange(x.advanced(by: 1))
-    case .pastEnd: 
+    case .pastEnd:
       _preconditionFailure("Incrementing past end index")
     }
   }
@@ -236,7 +236,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger
     case .inRange(let x):
       _precondition(x > lowerBound, "Incrementing past start index")
       return .inRange(x.advanced(by: -1))
-    case .pastEnd: 
+    case .pastEnd:
       _precondition(upperBound >= lowerBound, "Incrementing past start index")
       return .inRange(upperBound)
     }
@@ -258,7 +258,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger
     case .pastEnd:
       if distance == 0 {
         return i
-      } 
+      }
       if distance < 0 {
         return index(.inRange(upperBound), offsetBy: numericCast(distance + 1))
       }
@@ -385,7 +385,7 @@ extension ClosedRange {
   }
 }
 
-extension Comparable {  
+extension Comparable {
   /// Returns a closed range that contains both of its bounds.
   ///
   /// Use the closed range operator (`...`) to create a closed range of any type
@@ -488,7 +488,7 @@ extension ClosedRange {
   @inlinable // trivial-implementation
   @inline(__always)
   public func clamped(to limits: ClosedRange) -> ClosedRange {
-    let lower =         
+    let lower =
       limits.lowerBound > self.lowerBound ? limits.lowerBound
           : limits.upperBound < self.lowerBound ? limits.upperBound
           : self.lowerBound

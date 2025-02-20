@@ -401,7 +401,7 @@ CreateThings {
         point.#^MULTICLOSURE_FUNCBUILDER_ERROR?check=POINT_MEMBER^#
       }
     }
-    Thing { point in 
+    Thing { point in
       print("hello")
       point. // ErrorExpr
     }

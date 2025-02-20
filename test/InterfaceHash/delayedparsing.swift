@@ -8,7 +8,7 @@
 // RUN: cmp %t/a.hash %t/c.hash
 // RUN: cmp %t/a.hash %t/d.hash
 
-// Make sure "interface hash" doesn't change after modifying type members, and 
+// Make sure "interface hash" doesn't change after modifying type members, and
 
 // BEGIN a.swift
 class C {

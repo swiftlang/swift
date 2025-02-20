@@ -13,14 +13,14 @@ func writeUInt8(_ pointer: UnsafeMutablePointer<UInt8>) {}
 
 // These implicit casts never worked and will continue to be unsupported.
 func test_unsupported<T>(arg: T) {
-    var t: T = arg 
+    var t: T = arg
     readInt8(&t) // expected-error {{cannot convert value of type 'UnsafePointer<T>' to expected argument type 'UnsafePointer<Int8>'}}
                  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('T' and 'Int8') are expected to be equal}}
     writeInt8(&t) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<T>' to expected argument type 'UnsafeMutablePointer<Int8>'}}
                   // expected-note@-1 {{arguments to generic parameter 'Pointee' ('T' and 'Int8') are expected to be equal}}
     readUInt8(&t) // expected-error {{cannot convert value of type 'UnsafePointer<T>' to expected argument type 'UnsafePointer<UInt8>'}}
                   // expected-note@-1 {{arguments to generic parameter 'Pointee' ('T' and 'UInt8') are expected to be equal}}
-    writeUInt8(&t) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<T>' to expected argument type 'UnsafeMutablePointer<UInt8>'}} 
+    writeUInt8(&t) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<T>' to expected argument type 'UnsafeMutablePointer<UInt8>'}}
                    // expected-note@-1 {{arguments to generic parameter 'Pointee' ('T' and 'UInt8') are expected to be equal}}
 
     let constArray: [UInt8] = [0]

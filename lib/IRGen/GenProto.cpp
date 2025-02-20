@@ -3529,7 +3529,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
   case Component::Kind::Impossible:
     llvm_unreachable("following an impossible path!");
 
-  } 
+  }
   llvm_unreachable("bad metadata path component");
 }
 
@@ -3948,7 +3948,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
       /*pattern subs*/ SubstitutionMap(),
       /*invocation subs*/ SubstitutionMap(), IGM.Context);
 
-  // Figure out what we're actually still required to pass 
+  // Figure out what we're actually still required to pass
   PolymorphicConvention convention(IGM, fnType);
   convention.enumerateUnfulfilledRequirements([&](GenericRequirement reqt) {
     assert(generics->isReducedType(reqt.getTypeParameter()));

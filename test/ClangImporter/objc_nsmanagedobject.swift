@@ -18,14 +18,14 @@ class MyManagedObject : NSManagedObject {
   var bar: String // expected-error{{stored property 'bar' requires an initial value}}
 #endif
 
-  @NSManaged var managed: String 
+  @NSManaged var managed: String
 
-  override init() { 
+  override init() {
 #if !NO_ERROR
     foo = "1"
     bar = "2"
 #endif
-    super.init() 
+    super.init()
   }
 
   var wibble: String {

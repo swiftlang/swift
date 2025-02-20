@@ -96,8 +96,8 @@ open class InvalidOpenSubClass : ExternalOpenClass {
 
 open class OpenSubClassFinalMembers : ExternalOpenClass {
   final public override func openMethod() {}
-  final public override var openProperty: Int { get{return 0} set{} } 
-  final public override subscript(index: MarkerForOpenSubscripts) -> Int { 
+  final public override var openProperty: Int { get{return 0} set{} }
+  final public override subscript(index: MarkerForOpenSubscripts) -> Int {
     get { return 0 }
     set {}
   }

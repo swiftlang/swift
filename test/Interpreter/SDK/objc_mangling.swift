@@ -74,6 +74,6 @@ checkProtocolName(RadicalHeart⺖.self, "MangleTest.RadicalHeart⺖", "_TtP10Man
 @objc class RadicalSheep⽺ : NSObject, RadicalHeart⺖ {
   var ⽺x: Int = 0
 }
-checkClassName(RadicalSheep⽺.self, 
+checkClassName(RadicalSheep⽺.self,
   "MangleTest.RadicalSheep⽺", "_TtC10MangleTest15RadicalSheep⽺")
 checkIvarName(RadicalSheep⽺.self, "⽺x")

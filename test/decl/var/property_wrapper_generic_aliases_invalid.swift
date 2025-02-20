@@ -2,11 +2,11 @@
 
 @propertyWrapper
 struct SomeStruct<T> {
-  var wrappedValue: T 
+  var wrappedValue: T
 
-  init(wrappedValue: T) { 
+  init(wrappedValue: T) {
     self.wrappedValue = wrappedValue
-  } 
+  }
 }
 
 typealias Invalid1<T> = (T) -> ()

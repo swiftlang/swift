@@ -2600,7 +2600,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
 
   // 4. Construct a Job which produces the right CommandOutput.
   std::unique_ptr<Job> ownedJob = TC.constructJob(*JA, C, std::move(InputJobs),
-                                                  InputActions, 
+                                                  InputActions,
                                                   std::move(Output), OI);
   Job *J = C.addJob(std::move(ownedJob));
 
@@ -3149,7 +3149,7 @@ void Driver::printHelp(bool ShowHidden) const {
                       IncludedFlagsBitmask, ExcludedFlagsBitmask,
                       /*ShowAllAliases*/false);
 
-  // These strings match the descriptions found in the corresponding swiftpm 
+  // These strings match the descriptions found in the corresponding swiftpm
   // help pages
   if (driverKind == DriverKind::Interactive) {
     llvm::outs() << "\nSEE ALSO - PACKAGE MANAGER COMMANDS: \n"
@@ -3158,7 +3158,7 @@ void Driver::printHelp(bool ShowHidden) const {
         "\t\"swift run\" Build and run an executable product \n"
         "\t\"swift test\" Build and run tests \n";
   } else {
-    llvm::outs() << "\nSEE ALSO: swift build, swift run, swift package, " 
+    llvm::outs() << "\nSEE ALSO: swift build, swift run, swift package, "
                     "swift test \n";
   }
 

@@ -287,10 +287,10 @@ public:
   PreWalkResult<Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
     auto *D = DRE->getDecl();
 
-    // HACK: $interpolation variables are seen as needing to be captured. 
-    // The good news is, we literally never need to capture them, so we 
+    // HACK: $interpolation variables are seen as needing to be captured.
+    // The good news is, we literally never need to capture them, so we
     // can safely ignore them.
-    // FIXME(TapExpr): This is probably caused by the scoping 
+    // FIXME(TapExpr): This is probably caused by the scoping
     // algorithm's ignorance of TapExpr. We should fix that.
     if (D->getBaseName() == Context.Id_dollarInterpolation)
       return Action::SkipNode(DRE);

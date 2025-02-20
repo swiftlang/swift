@@ -5,7 +5,7 @@
 func duplicatesemantics() {}
 
 func func_with_nested_semantics_1() {
-   @_semantics("exit") 
+   @_semantics("exit")
    func exit(_ code : UInt32) -> Void
    exit(0)
 }
@@ -15,7 +15,7 @@ func func_with_nested_semantics_1() {
 func somethingThatShouldParseFine() {}
 
 func func_with_nested_semantics_2() {
-   @_semantics("exit") 
+   @_semantics("exit")
    func exit(_ code : UInt32) -> Void
    exit(0)
 }

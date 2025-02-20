@@ -31,7 +31,7 @@ import Bar
 // 'Bar' can only be imported if the explicitly-loaded 'Foo' is known to be over 9000
 // POSITIVE-CHECK: remark: loaded module 'Bar'
 
-// Re-build Foo with a lower version and ensure we do not import `Bar` 
+// Re-build Foo with a lower version and ensure we do not import `Bar`
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/inputs/Foo.swiftmodule -emit-module-doc-path %t/inputs/Foo.swiftdoc -emit-module-source-info -emit-module-source-info-path %t/inputs/Foo.swiftsourceinfo -module-cache-path %t.module-cache %t/foo.swift -module-name Foo -user-module-version 7000
 // RUN: %target-swift-frontend -typecheck %s -explicit-swift-module-map-file %t/inputs/map.json -I %t/barinputs -Rmodule-loading 2>&1 | %FileCheck -check-prefix=NEGATIVE-CHECK %s
 

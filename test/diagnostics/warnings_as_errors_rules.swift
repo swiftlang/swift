@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -typecheck -diagnostic-style llvm -warnings-as-errors -no-warnings-as-errors %s 2>&1 | %FileCheck %s --check-prefix=CHECK-WAE-NWAE
 // RUN: %target-swift-frontend -typecheck -diagnostic-style llvm -warnings-as-errors -Wwarning DeprecatedDeclaration %s 2>&1 | %FileCheck %s --check-prefix=CHECK-WAE-WW-GROUP
 
-// This test verifies that the warning control flags apply with respect to 
+// This test verifies that the warning control flags apply with respect to
 // the order they are specified in the cmd line.
 // Naming:
 // WAE: -warnings-as-errors

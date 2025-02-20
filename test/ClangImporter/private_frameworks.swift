@@ -27,7 +27,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -o /dev/null -F %S/Inputs/privateframeworks/withprivate -swift-version 4 %s -import-objc-header %S/Inputs/privateframeworks/bridging-somekitcore.h
 
 // Use the overlay without private frameworks.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -o /dev/null -F %S/Inputs/privateframeworks/withoutprivate -swift-version 4 %s -import-objc-header %S/Inputs/privateframeworks/bridging-somekit.h 
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -o /dev/null -F %S/Inputs/privateframeworks/withoutprivate -swift-version 4 %s -import-objc-header %S/Inputs/privateframeworks/bridging-somekit.h
 
 // Use something that uses the overlay.
 // RUN: echo 'import private_frameworks; testErrorConformance()' > %t/main.swift

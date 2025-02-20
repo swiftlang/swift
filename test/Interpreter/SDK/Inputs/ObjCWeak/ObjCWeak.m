@@ -1,7 +1,7 @@
 #include "ObjCWeak.h"
 #include <objc/runtime.h>
 
-extern id _Nullable 
+extern id _Nullable
 objc_initWeak(id _Nullable * _Nonnull location, id _Nullable val);
 
 void tryWeakReferencing(id (^makeThing)(void)) {

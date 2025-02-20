@@ -416,7 +416,7 @@ public:
 
   RemoteAbsolutePointer stripSignedPointer(const RemoteAbsolutePointer &P) {
     if (P.isResolved()) {
-      return RemoteAbsolutePointer("", 
+      return RemoteAbsolutePointer("",
         P.getResolvedAddress().getAddressData() & PtrAuthMask);
     }
     return P;

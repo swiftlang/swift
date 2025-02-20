@@ -1983,7 +1983,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
         new (Context) UnresolvedDotExpr(InterpolationVarRef,
                                         /*dotloc=*/SourceLoc(),
                                         appendLiteral,
-                                        /*nameloc=*/DeclNameLoc(), 
+                                        /*nameloc=*/DeclNameLoc(),
                                         /*Implicit=*/true);
       auto *ArgList = ArgumentList::forImplicitUnlabeled(Context, {Literal});
       auto AppendLiteralCall =
@@ -2129,7 +2129,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     Stmts.push_back(InterpolationVar);
 
     // Collect all string segments.
-    Status = parseStringSegments(Segments, EntireTok, InterpolationVar, 
+    Status = parseStringSegments(Segments, EntireTok, InterpolationVar,
                                  Stmts, LiteralCapacity, InterpolationCount);
 
     auto Body = BraceStmt::create(Context, /*LBLoc=*/SourceLoc(), Stmts,

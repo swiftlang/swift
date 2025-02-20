@@ -712,7 +712,7 @@ func test_55680_ArgsFn() -> Int {
 
 func test_55680_MultiExpr() -> Int {
   callit {
-    print("hello") 
+    print("hello")
     return print("hello") // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
   }
 }
@@ -1171,9 +1171,9 @@ func f59716() -> some BinaryInteger { // expected-note{{required by opaque retur
 }
 
 func f59716_1() -> some BinaryInteger {
-  return producer { s in 
+  return producer { s in
     if s == "1" { return 1 }
-    return s.count 
+    return s.count
   }
 }
 
@@ -1554,7 +1554,7 @@ final class AutoclosureTests {
       }
     }
 
-    doVoidStuff { [weak self] in      
+    doVoidStuff { [weak self] in
       guard let self else { return }
 
       withNonEscapingAutoclosure(bar())

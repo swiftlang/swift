@@ -76,7 +76,7 @@ public func testtwoboxes() -> Int {
   @inline(never)
   func bar() -> Int {
     blackhole(x)
-    return x + y 
+    return x + y
   }
   @inline(never)
   func bas() -> Int {
@@ -150,7 +150,7 @@ public func testdfs1() -> Int {
 // We don't optimize this case now, because we don't have additional logic to correctly construct AppliesToSpecialize
 // Order of function calls constructed in PromotedOperands: bar innercommon local1 bas innercommon local2
 // AppliesToSpecialize should have the order: bar bas innercommon local1 local2
-// Since we don't maintain any tree like data structure with more info on the call tree, this is not possible to construct today 
+// Since we don't maintain any tree like data structure with more info on the call tree, this is not possible to construct today
 // CHECK-LABEL: sil [noinline] @$s26allocboxtostack_localapply8testdfs2SiyF :
 // CHECK: alloc_box ${ var Int }, var, name "x"
 // CHECK: alloc_box ${ var Int }, var, name "y"

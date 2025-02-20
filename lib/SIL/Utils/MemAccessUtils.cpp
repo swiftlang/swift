@@ -463,8 +463,8 @@ bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
   if (isa<BuiltinInst>(instruction)) {
     return instruction->mayReadOrWriteMemory();
   }
-  return isa<LoadWeakInst>(instruction) 
-      || isa<LoadUnownedInst>(instruction) 
+  return isa<LoadWeakInst>(instruction)
+      || isa<LoadUnownedInst>(instruction)
       || isa<StrongCopyUnownedValueInst>(instruction)
       || isa<StrongCopyUnmanagedValueInst>(instruction);
 }

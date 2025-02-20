@@ -35,7 +35,7 @@ func setF(_ x: inout Foo<Int, Int>, f: @escaping (Int) -> Int) {
 
 func inOutFunc(_ f: inout ((Int) -> Int)) { }
 
-// CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction6inOutF{{[_0-9a-zA-Z]*}}F : 
+// CHECK-LABEL: sil hidden [ossa] @$s20property_abstraction6inOutF{{[_0-9a-zA-Z]*}}F :
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Foo<Int, Int>):
 // CHECK:   [[XBOX:%.*]] = alloc_box ${ var Foo<Int, Int> }, var, name "x"
 // CHECK:   [[XBOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[XBOX]]

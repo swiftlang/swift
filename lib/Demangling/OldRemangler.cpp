@@ -1521,7 +1521,7 @@ ManglingError Remangler::mangleType(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1);
 }
 
-template <size_t N> 
+template <size_t N>
 static bool stripPrefix(StringRef &string, const char (&data)[N]) {
   constexpr size_t prefixLength = N - 1;
   if (!string.starts_with(StringRef(data, prefixLength)))

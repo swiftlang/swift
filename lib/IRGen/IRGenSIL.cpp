@@ -4156,7 +4156,7 @@ static bool isSimplePartialApply(IRGenFunction &IGF, PartialApplyInst *i) {
   if (calleeTy->getRepresentation() != SILFunctionTypeRepresentation::Method)
     return false;
 
-  // Partially applying a polymorphic function entails capturing its generic 
+  // Partially applying a polymorphic function entails capturing its generic
   // arguments (it is not legal to leave any polymorphic arguments unbound)
   // which means that both self and those generic arguments would need to be
   // captured.
@@ -7172,7 +7172,7 @@ static bool isStructurallySame(const llvm::Type *T1, const llvm::Type *T2) {
 }
 
 // Emit a trap in the event a type does not match expected layout constraints.
-// 
+//
 // We can hit this case in specialized functions even for correct user code.
 // If the user dynamically checks for correct type sizes in the generic
 // function, a specialized function can contain the (not executed) bitcast
@@ -7368,7 +7368,7 @@ void IRGenSILFunction::visitObjCToThickMetatypeInst(
   Explosion to;
   auto metadata = emitObjCMetadataRefForMetadata(*this, classPtr);
   to.add(metadata);
-  setLoweredExplosion(i, to);  
+  setLoweredExplosion(i, to);
 }
 
 void IRGenSILFunction::visitUnconditionalCheckedCastInst(

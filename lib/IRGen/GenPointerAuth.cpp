@@ -627,7 +627,7 @@ static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
     out << ":";
   }
 
-  return clang::CodeGen::computeStableStringHash(out.str());  
+  return clang::CodeGen::computeStableStringHash(out.str());
 }
 
 llvm::ConstantInt *

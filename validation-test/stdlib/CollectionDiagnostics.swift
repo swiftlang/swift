@@ -50,7 +50,7 @@ func sortResultIgnored<
 
 // expected-warning@+2 {{'Indexable' is deprecated: renamed to 'Collection'}}
 // expected-note@+1 {{use 'Collection' instead}}
-struct GoodIndexable : Indexable { 
+struct GoodIndexable : Indexable {
   func index(after i: Int) -> Int { return i + 1 }
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }

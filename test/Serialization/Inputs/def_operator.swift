@@ -5,7 +5,7 @@ infix operator *- : LowPrecedence
 precedencegroup LowPrecedence {
   associativity: left
   lowerThan: AssignmentPrecedence
-  higherThan: LollipopPrecedence 
+  higherThan: LollipopPrecedence
 }
 
 infix operator -* : LollipopPrecedence

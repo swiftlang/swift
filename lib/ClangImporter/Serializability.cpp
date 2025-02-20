@@ -216,7 +216,7 @@ ClangImporter::resolveStableSerializationPath(
 
   // Perform a lookup in the current context (`decl` if set, and
   // otherwise the translation unit).
-  auto lookup = [&](Identifier name) -> clang::DeclContext::lookup_result {    
+  auto lookup = [&](Identifier name) -> clang::DeclContext::lookup_result {
     if (name.empty()) return clang::DeclContext::lookup_result();
 
     const clang::DeclContext *dc;

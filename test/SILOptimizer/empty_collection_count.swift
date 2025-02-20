@@ -9,7 +9,7 @@
 
 // CHECK-LABEL: sil @{{.*}}testArray
 // CHECK-NOT: global_addr
-// CHECK: [[Z:%[0-9]+]] = integer_literal $Builtin.Int{{[0-9]*}}, 0 
+// CHECK: [[Z:%[0-9]+]] = integer_literal $Builtin.Int{{[0-9]*}}, 0
 // CHECK: [[I:%[0-9]+]] = struct $Int ([[Z]] : $Builtin.Int{{[0-9]*}})
 // CHECK: return [[I]]
 public func testArray() -> Int {
@@ -19,7 +19,7 @@ public func testArray() -> Int {
 
 // CHECK-LABEL: sil @{{.*}}testDictionary
 // CHECK-NOT: global_addr
-// CHECK: [[Z:%[0-9]+]] = integer_literal $Builtin.Int{{[0-9]*}}, 0 
+// CHECK: [[Z:%[0-9]+]] = integer_literal $Builtin.Int{{[0-9]*}}, 0
 // CHECK: [[I:%[0-9]+]] = struct $Int ([[Z]] : $Builtin.Int{{[0-9]*}})
 // CHECK: return [[I]]
 public func testDictionary() -> Int {
@@ -29,7 +29,7 @@ public func testDictionary() -> Int {
 
 // CHECK-LABEL: sil @{{.*}}testSet
 // CHECK-NOT: global_addr
-// CHECK: [[Z:%[0-9]+]] = integer_literal $Builtin.Int{{[0-9]*}}, 0 
+// CHECK: [[Z:%[0-9]+]] = integer_literal $Builtin.Int{{[0-9]*}}, 0
 // CHECK: [[I:%[0-9]+]] = struct $Int ([[Z]] : $Builtin.Int{{[0-9]*}})
 // CHECK: return [[I]]
 public func testSet() -> Int {

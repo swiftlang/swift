@@ -15,4 +15,4 @@ struct Main {
   }
 }
 
-// CHECK: hello hello hello hello hello hello hello hello hello hello hello hello hello hello hello hello 
+// CHECK: hello hello hello hello hello hello hello hello hello hello hello hello hello hello hello hello

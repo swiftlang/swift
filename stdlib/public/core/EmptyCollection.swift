@@ -36,7 +36,7 @@ extension EmptyCollection {
     /// Creates an instance.
     @inlinable // trivial-implementation
     public init() {}
-  }  
+  }
 }
 
 extension EmptyCollection.Iterator: IteratorProtocol, Sequence {

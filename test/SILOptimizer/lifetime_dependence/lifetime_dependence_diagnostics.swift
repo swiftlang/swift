@@ -70,7 +70,7 @@ func takeClosure(_: () -> ()) {}
 // CHECK-LABEL: } // end sil function '$s4test14bv_borrow_copyyAA2BVVADF'
 @lifetime(borrow bv)
 func bv_borrow_copy(_ bv: borrowing BV) -> BV {
-  bv_copy(bv) 
+  bv_copy(bv)
 }
 
 // The mark_dependence for the borrow scope should be marked

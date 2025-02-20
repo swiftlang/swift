@@ -20,7 +20,7 @@ private struct ShouldntAppear {
 
 // CHECK: ShouldAppear
 // CHECK: ShouldAlsoAppear
-// CHECK-NOT: ShouldntAppear 
+// CHECK-NOT: ShouldntAppear
 
 @testable import Internal
 

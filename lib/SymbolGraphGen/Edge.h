@@ -147,7 +147,7 @@ struct Edge {
   void serialize(llvm::json::OStream &OS) const;
 };
 
-} // end namespace symbolgraphgen 
+} // end namespace symbolgraphgen
 } // end namespace swift
 
 namespace llvm {

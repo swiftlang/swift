@@ -42,7 +42,7 @@ enum MoveOnlyEnum: ~Copyable {
         var y = MoveOnlyEnum.lhs(Klass())
         y = self // expected-note {{consumed here}}
         // expected-note @-1 {{consumed again here}}
-        _ = y 
+        _ = y
         globalMoveOnlyEnum = self // expected-note {{consumed here}}
         // expected-note @-1 {{consumed again here}}
     } // expected-note {{used here}}

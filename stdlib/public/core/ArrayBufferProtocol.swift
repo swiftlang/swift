@@ -14,7 +14,7 @@
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
 @usableFromInline
 internal protocol _ArrayBufferProtocol
-  : MutableCollection, RandomAccessCollection 
+  : MutableCollection, RandomAccessCollection
 where Indices == Range<Int> {
 
   /// Create an empty buffer.

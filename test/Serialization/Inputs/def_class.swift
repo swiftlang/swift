@@ -139,7 +139,7 @@ open class OtherBoolPair<T> : OtherPair<Bool, Bool> {
 
 open class RequiresPairLike<P : PairLike> { }
 
-public func getReqPairLike() -> RequiresPairLike<OtherBoolPair<Bool>> { 
+public func getReqPairLike() -> RequiresPairLike<OtherBoolPair<Bool>> {
   return RequiresPairLike<OtherBoolPair<Bool>>()
 }
 

@@ -39,7 +39,7 @@ namespace detail {
     /*implicit*/ ClangNodeBox(const T *V) : value(V) {}
 
     explicit operator bool() const { return value; }
-  };  
+  };
 }
 
 /// Represents a clang declaration, macro, or module. A macro definition

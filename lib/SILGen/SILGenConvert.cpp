@@ -101,7 +101,7 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
   B.createInjectEnumAddr(loc, dest, someDecl);
 }
 
-void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc, 
+void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
                                                    SILValue dest,
                                                    const TypeLowering &optTL) {
   assert(optTL.getLoweredType().getOptionalObjectType());
@@ -760,7 +760,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         // Receive the error value.  It's typed as an 'AnyObject' for
         // layering reasons, so perform an unchecked cast down to NSError.
         auto nsError = B.createOptionalSomeResult(switchEnum);
-        nsError = B.createUncheckedRefCast(loc, nsError, 
+        nsError = B.createUncheckedRefCast(loc, nsError,
                                            getLoweredType(nsErrorType));
 
         branchArg = emitBridgedToNativeError(loc, nsError).forward(*this);

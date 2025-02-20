@@ -1366,7 +1366,7 @@ bool SILInstruction::mayRequirePackMetadata(SILFunction const &F) const {
     return false;
   }
   case SILInstructionKind::ClassMethodInst:
-  case SILInstructionKind::DebugValueInst: 
+  case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::DestroyValueInst:
   // Unary instructions.

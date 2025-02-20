@@ -24,7 +24,7 @@ class Grandchild : Child {
   override class func foo() {
     // CHECK: sil hidden @$s18super_class_method10GrandchildC3fooyyFZ : $@convention(method) (@thick Grandchild.Type) -> () {
     // CHECK-NOT: super_method %0 : $@thick Grandchild.Type, #Parent.foo : Parent.Type -> () -> (), $@convention(method) (@thick Parent.Type) -> ()
-    // CHECK: function_ref @$s18super_class_method6ParentC3fooyyFZ 
+    // CHECK: function_ref @$s18super_class_method6ParentC3fooyyFZ
     super.foo()
   }
 }

@@ -348,7 +348,7 @@ extension MutableCollection {
       formIndex(after: &j)
     }
     return i
-  }  
+  }
 }
 
 extension MutableCollection where Self: BidirectionalCollection {

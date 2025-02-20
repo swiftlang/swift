@@ -177,8 +177,8 @@ PolymorphicEffectKindRequest::evaluate(Evaluator &evaluator,
   return PolymorphicEffectKind::Invalid;
 }
 
-static bool classifyWitness(ModuleDecl *module, 
-                            ProtocolConformance *conformance, 
+static bool classifyWitness(ModuleDecl *module,
+                            ProtocolConformance *conformance,
                             AbstractFunctionDecl *req,
                             EffectKind kind) {
   auto declRef = conformance->getWitnessDeclRef(req);
@@ -280,7 +280,7 @@ bool ConformanceHasEffectRequest::evaluate(
     }
 
     for (auto pair : list.getConformances()) {
-      auto assocConf = 
+      auto assocConf =
           current->getAssociatedConformance(
               pair.first, pair.second);
       if (!assocConf.isConcrete())

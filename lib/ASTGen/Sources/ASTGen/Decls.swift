@@ -675,7 +675,7 @@ extension ASTGenVisitor {
       thrownType: thrownType,
       returnType: returnType
     )
-  } 
+  }
 
   func generate(functionDecl node: FunctionDeclSyntax) -> BridgedFuncDecl? {
     var attrs = self.generateDeclAttributes(node, allowStatic: true)

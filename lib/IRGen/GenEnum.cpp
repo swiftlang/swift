@@ -3241,7 +3241,7 @@ namespace {
         {
           ConditionalDominanceScope condition(IGF);
           emitPrimitiveCopy(IGF, dest, src, T);
-          IGF.Builder.CreateBr(endBB);        
+          IGF.Builder.CreateBr(endBB);
         }
 
         IGF.Builder.emitBlock(endBB);

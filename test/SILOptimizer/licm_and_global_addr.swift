@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %S/Inputs/licm_and_global_addr/test.swift -parse-as-library -wmo -enable-library-evolution -module-name=Test -emit-module -emit-module-path=%t/Test.swiftmodule -c -o %t/test.o
 // RUN: %target-build-swift -O %S/Inputs/licm_and_global_addr/main.swift %s -I%t %t/test.o -o %t/a.out
 // RUN: %target-codesign %t/a.out
@@ -17,7 +17,7 @@ var a = Abc()
 @inline(never)
 func testit(_ n: Int) {
   for _ in 0..<n {
-    // Prevent hoisting the initialization of 'a', 
+    // Prevent hoisting the initialization of 'a',
     // which would defeat the purpose of the test.
     unknown()
 

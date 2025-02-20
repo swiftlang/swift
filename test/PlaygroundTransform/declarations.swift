@@ -12,7 +12,7 @@ import PlaygroundSupport
 
 var a = 2
 var b = 3
-a + b 
+a + b
 // CHECK: [{{.*}}] __builtin_log[a='2']
 // CHECK-NEXT: [{{.*}}] __builtin_log[b='3']
 // CHECK-NEXT: [{{.*}}] __builtin_log[='5']

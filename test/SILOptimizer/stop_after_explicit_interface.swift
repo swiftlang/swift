@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -compile-module-from-interface -module-name Foo -o %t/Foo/FooFromInterface.swiftmodule -O -Xllvm -sil-print-after=inline %t/Foo/Foo.swiftinterface 2>&1 | %FileCheck %s --check-prefix SKIPPING
 
 // This test ensures that we don't run the Perf Inliner after serializing a
-// module, if we're stopping optimizations after serializing. 
+// module, if we're stopping optimizations after serializing.
 
 @inline(never)
 public func _blackHole(_ x: Int) {}

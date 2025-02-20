@@ -2402,7 +2402,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
         return;
       }
     }
-  }  
+  }
   llvm_unreachable("unhandled case");
 }
 

@@ -1040,7 +1040,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
 
     if (isa<BeginApplyInst>(inst))
-      rt |= RuntimeEffect::Allocating;      
+      rt |= RuntimeEffect::Allocating;
 
     if (auto *pa = dyn_cast<PartialApplyInst>(inst)) {
       if (pa->isOnStack()) {

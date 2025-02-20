@@ -32,8 +32,8 @@ struct Conditional<T> {
 }
 extension Conditional : BitwiseCopyable where T : BitwiseCopyable {}
 
-func doit() -> B<Conditional<Int>> { 
-  .init(t: .init(t: 0)) 
+func doit() -> B<Conditional<Int>> {
+  .init(t: .init(t: 0))
 }
 
 enum Context<T> {

@@ -76,8 +76,8 @@ class Subclass : NSObject {
 
 // CHECK-CONTEXT_SELECTOR: Keyword/None/TypeRelation[Convertible]: #selector({#@objc method#})[#Selector#]; name=#selector()
 
-// CHECK-SELECTOR_BASIC: Keyword/None:                       getter: {#@objc property#}; name=getter: 
-// CHECK-SELECTOR_BASIC: Keyword/None:                       setter: {#@objc property#}; name=setter: 
+// CHECK-SELECTOR_BASIC: Keyword/None:                       getter: {#@objc property#}; name=getter:
+// CHECK-SELECTOR_BASIC: Keyword/None:                       setter: {#@objc property#}; name=setter:
 
 // CHECK-IN_SELECTOR-NOT: getter:
 // CHECK-IN_SELECTOR: Decl[Constructor]/CurrNominal/IsSystem:    {{.?}}init[#(NSObject.Type) -> () -> NSObject#]; name=init

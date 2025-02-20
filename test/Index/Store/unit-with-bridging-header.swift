@@ -8,8 +8,8 @@
 
 // PCH-RECORD: bridge-include.h
 // PCH-RECORD: ------------
-// PCH-RECORD: function/C | includedFunc | {{.*}} | <no-cgname> | Decl - 
-// PCH-RECORD: variable/C | MY_CONST | {{.*}} | <no-cgname> | Def - 
+// PCH-RECORD: function/C | includedFunc | {{.*}} | <no-cgname> | Decl -
+// PCH-RECORD: variable/C | MY_CONST | {{.*}} | <no-cgname> | Def -
 // PCH-RECORD: ------------
 // PCH-RECORD: 1:5 | function/C | {{.*}} | Decl | rel: 0
 // PCH-RECORD: 2:5 | variable/C | {{.*}} | Def | rel: 0

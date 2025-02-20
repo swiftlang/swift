@@ -49,7 +49,7 @@ class UnsoundAbleToHaveAssocObjectsParentClass2 {
 // This has normal metadata. We must at runtime add the flags of the subclass to
 // the child.
 //
-// CHECK: @_DATA__TtC31class_forbid_objc_assoc_objects40UnsoundUnableToHaveAssocObjectsSubClass2 = internal constant { {{.*}} } { i32 128, 
+// CHECK: @_DATA__TtC31class_forbid_objc_assoc_objects40UnsoundUnableToHaveAssocObjectsSubClass2 = internal constant { {{.*}} } { i32 128,
 final class UnsoundUnableToHaveAssocObjectsSubClass2 : UnsoundAbleToHaveAssocObjectsParentClass2 {
 }
 

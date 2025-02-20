@@ -29,11 +29,11 @@ SynthesizedComparableTests.test("Simple Enum sorting with duplicates") {
 }
 
 SynthesizedComparableTests.test("Associated Values Enum sorting") {
-  enum Bar:Comparable 
+  enum Bar:Comparable
   {
     case a(Int, Int)
     case b(Int)
-    case c 
+    case c
   }
 
   let unsorted:[Bar] = [.b(89), .a(12, 4), .c, .a(5, 4), .b(9), .a(5, 1)]

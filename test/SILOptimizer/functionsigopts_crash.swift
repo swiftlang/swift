@@ -22,9 +22,9 @@ public struct S : P {
 // Following specializations should be done:
 //   * FSO: existential to protocol constrained generic
 //   * generic specialization <S>
-//   * FSO: argument explosion 
+//   * FSO: argument explosion
 
-// CHECK-LABEL: sil shared [noinline] @$s4main6testityyAA1P_pFTf4e_nAA1SV_Tg5Tf4x_n : $@convention(thin) (Int) -> () { 
+// CHECK-LABEL: sil shared [noinline] @$s4main6testityyAA1P_pFTf4e_nAA1SV_Tg5Tf4x_n : $@convention(thin) (Int) -> () {
 // CHECK:       // %0 "p"
 // CHECK:       } // end sil function '$s4main6testityyAA1P_pFTf4e_nAA1SV_Tg5Tf4x_n'
 @inline(never)

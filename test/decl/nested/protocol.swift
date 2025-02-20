@@ -35,7 +35,7 @@ func testDifferent() {
 
 enum OuterEnum {
   protocol C {}
-  case C(C) 
+  case C(C)
   // expected-error@-1{{invalid redeclaration of 'C'}}
   // expected-note@-3{{'C' previously declared here}}
 }
@@ -277,7 +277,7 @@ extension OtherGenericClass {
 protocol HasAssoc {
   associatedtype A // expected-note {{protocol requires nested type 'A'}}
 }
-struct ConformsToHasAssoc: HasAssoc { // expected-error {{type 'ConformsToHasAssoc' does not conform to protocol 'HasAssoc'}} expected-note {{add stubs for conformance}} 
+struct ConformsToHasAssoc: HasAssoc { // expected-error {{type 'ConformsToHasAssoc' does not conform to protocol 'HasAssoc'}} expected-note {{add stubs for conformance}}
   protocol A {}
 }
 

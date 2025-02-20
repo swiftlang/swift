@@ -441,7 +441,7 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   mutable llvm::StringSet<> FailedModuleImportNames;
 
-  /// Versions of the modules found during versioned canImport checks. 
+  /// Versions of the modules found during versioned canImport checks.
   struct ImportedModuleVersionInfo {
     llvm::VersionTuple Version;
     llvm::VersionTuple UnderlyingVersion;
@@ -809,7 +809,7 @@ public:
   bool isObjCClassWithMultipleSwiftBridgedTypes(Type t);
 
   /// Get the Objective-C type that a Swift type bridges to, if any.
-  /// 
+  ///
   /// \param dc The context in which bridging is occurring.
   /// \param type The Swift for which we are querying bridging behavior.
   /// \param bridgedValueType The specific value type that is bridged,

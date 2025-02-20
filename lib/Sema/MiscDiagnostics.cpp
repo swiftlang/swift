@@ -5552,12 +5552,12 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       auto uncurriedType = fnDecl->getInterfaceType()->getAs<AnyFunctionType>();
       auto curriedType = uncurriedType->getResult()->getAs<AnyFunctionType>();
 
-      // I don't know why you'd use a zero-arg interpolator, but it obviously 
+      // I don't know why you'd use a zero-arg interpolator, but it obviously
       // doesn't interpolate an optional.
       if (curriedType->getNumParams() == 0)
         return false;
 
-      // If the first parameter explicitly accepts the type, this method 
+      // If the first parameter explicitly accepts the type, this method
       // presumably doesn't want us to warn about optional use.
       auto firstParamType =
         curriedType->getParams().front().getPlainType()->getRValueType();
@@ -5575,7 +5575,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
     Expr *
     getFirstArgIfUnintendedInterpolation(ArgumentList *args,
                                          UnintendedInterpolationKind kind) {
-      // Just check the first argument, which is usually the value 
+      // Just check the first argument, which is usually the value
       // being interpolated.
       if (args->empty())
         return nullptr;

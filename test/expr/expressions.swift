@@ -413,7 +413,7 @@ var fl_c: Float = 2.0
 // FIXME: crummy diagnostic
 var fl_d: Float = 2.0.0 // expected-error {{expected named member of numeric literal}}
 var fl_e: Float = 1.0e42
-var fl_f: Float = 1.0e+  // expected-error {{expected a digit in floating point exponent}} 
+var fl_f: Float = 1.0e+  // expected-error {{expected a digit in floating point exponent}}
 var fl_g: Float = 1.0E+42
 var fl_h: Float = 2e-42
 var vl_i: Float = -.45   // expected-error {{'.45' is not a valid floating point literal; it must be written '0.45'}} {{20-20=0}}
@@ -722,7 +722,7 @@ func unusedExpressionResults() {
 // Collection Literals
 //===----------------------------------------------------------------------===//
 
-func arrayLiterals() { 
+func arrayLiterals() {
   let _ = [1,2,3]
   let _ : [Int] = []
   let _ = []  // expected-error {{empty collection literal requires an explicit type}}

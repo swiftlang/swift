@@ -39,7 +39,7 @@ func getDescription(_ o: NSObject) -> String {
 //
 // CHECK: [[SOME_BB]]([[NATIVE:%.*]] : @owned $String):
 // CHECK-NOT:    destroy_value [[ARG]]
-// CHECK:    return [[NATIVE]] 
+// CHECK:    return [[NATIVE]]
 // CHECK:}
 
 func getUppercaseString(_ s: NSString) -> String {

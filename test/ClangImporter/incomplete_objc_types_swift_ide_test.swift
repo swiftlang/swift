@@ -1,4 +1,4 @@
-// This test checks that swift-ide-test output under either -swift-version 6 or 
+// This test checks that swift-ide-test output under either -swift-version 6 or
 // -enable-upcoming-feature ImportObjCForwardDeclarations the output matches the
 // import capabilities of the compiler.
 

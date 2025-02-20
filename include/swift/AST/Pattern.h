@@ -415,9 +415,9 @@ public:
   SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
 
-  /// True if this is an "async let _ pattern since `async let _` could be a 
-  /// subPattern of a \c TypedPattern represented as \c AnyPattern e.g. 
-  /// "async let _: Type = <expr>" or simply just an \c AnyPattern in 
+  /// True if this is an "async let _ pattern since `async let _` could be a
+  /// subPattern of a \c TypedPattern represented as \c AnyPattern e.g.
+  /// "async let _: Type = <expr>" or simply just an \c AnyPattern in
   /// "async let _ = <expr>" case.
   bool isAsyncLet() const { return bool(Bits.AnyPattern.IsAsyncLet); }
 

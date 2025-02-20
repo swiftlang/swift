@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A collection of insertions and removals that describe the difference 
+/// A collection of insertions and removals that describe the difference
 /// between two ordered collection states.
 @available(SwiftStdlib 5.1, *)
 public struct CollectionDifference<ChangeElement> {
@@ -21,14 +21,14 @@ public struct CollectionDifference<ChangeElement> {
     ///
     /// The `offset` value is the offset of the inserted element in the final
     /// state of the collection after the difference is fully applied.
-    /// A non-`nil` `associatedWith` value is the offset of the complementary 
+    /// A non-`nil` `associatedWith` value is the offset of the complementary
     /// change.
     case insert(offset: Int, element: ChangeElement, associatedWith: Int?)
 
     /// A removal.
     ///
     /// The `offset` value is the offset of the element to be removed in the
-    /// original state of the collection. A non-`nil` `associatedWith` value is 
+    /// original state of the collection. A non-`nil` `associatedWith` value is
     /// the offset of the complementary change.
     case remove(offset: Int, element: ChangeElement, associatedWith: Int?)
 
@@ -71,7 +71,7 @@ public struct CollectionDifference<ChangeElement> {
     }
   }
 
-  /// The insertions contained by this difference, from lowest offset to 
+  /// The insertions contained by this difference, from lowest offset to
   /// highest.
   public let insertions: [Change]
 
@@ -80,11 +80,11 @@ public struct CollectionDifference<ChangeElement> {
 
   /// Creates a new collection difference from a collection of changes.
   ///
-  /// To find the difference between two collections, use the 
+  /// To find the difference between two collections, use the
   /// `difference(from:)` method declared on the `BidirectionalCollection`
   /// protocol.
   ///
-  /// The collection of changes passed as `changes` must meet these 
+  /// The collection of changes passed as `changes` must meet these
   /// requirements:
   ///
   /// - All insertion offsets are unique
@@ -189,7 +189,7 @@ public struct CollectionDifference<ChangeElement> {
       case .insert(_, _, _):
         if insertOffset.contains(offset) { return false }
         insertOffset.insert(offset)
-      } 
+      }
 
       if let assoc = change._associatedOffset {
         if assoc < 0 { return false }

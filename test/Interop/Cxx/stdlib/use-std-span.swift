@@ -17,7 +17,7 @@ import CxxStdlib
 
 var StdSpanTestSuite = TestSuite("StdSpan")
 
-func checkSpan<T: RandomAccessCollection, E: Equatable>(_ s : T, _ arr: [E]) 
+func checkSpan<T: RandomAccessCollection, E: Equatable>(_ s : T, _ arr: [E])
                     where T.Index == Int, T.Element == E {
   expectFalse(s.isEmpty)
   expectEqual(s.count, arr.count)
@@ -124,9 +124,9 @@ func returnsSpanOfString(_ arr: inout [std.string]) -> SpanOfString {
   }
 }
 
-func accessSpanAsGenericParam<T: RandomAccessCollection>(_ col: T) 
+func accessSpanAsGenericParam<T: RandomAccessCollection>(_ col: T)
                                               where T.Index == Int, T.Element == Int32 {
-  expectEqual(col.count, 3)                     
+  expectEqual(col.count, 3)
   expectFalse(col.isEmpty)
 
   expectEqual(col[0], 1)
@@ -134,9 +134,9 @@ func accessSpanAsGenericParam<T: RandomAccessCollection>(_ col: T)
   expectEqual(col[2], 3)
 }
 
-func accessSpanAsGenericParam<T: RandomAccessCollection>(_ col: T) 
+func accessSpanAsGenericParam<T: RandomAccessCollection>(_ col: T)
                                               where T.Index == Int, T.Element == std.string {
-  expectEqual(col.count, 3)                     
+  expectEqual(col.count, 3)
   expectFalse(col.isEmpty)
 
   expectEqual(col[0], "")
@@ -145,7 +145,7 @@ func accessSpanAsGenericParam<T: RandomAccessCollection>(_ col: T)
 }
 
 func accessSpanAsSomeGenericParam(_ col: some CxxRandomAccessCollection) {
-  expectEqual(col.count, 3)                     
+  expectEqual(col.count, 3)
   expectFalse(col.isEmpty)
 
   if let el = col[0] as? Int32 {
@@ -281,12 +281,12 @@ StdSpanTestSuite.test("Return SpanOfString") {
 StdSpanTestSuite.test("SpanOfInt.init(addr, count)") {
   var arr: [Int32] = [1, 2, 3]
   arr.withUnsafeBufferPointer { ubpointer in
-    let cs = ConstSpanOfInt(ubpointer.baseAddress!, ubpointer.count)    
+    let cs = ConstSpanOfInt(ubpointer.baseAddress!, ubpointer.count)
     checkSpan(cs, arr)
   }
 
   let arrCopy = arr
-  arr.withUnsafeMutableBufferPointer { ubpointer in 
+  arr.withUnsafeMutableBufferPointer { ubpointer in
     let s = SpanOfInt(ubpointer.baseAddress!, ubpointer.count)
     checkSpan(s, arrCopy)
     let cs = ConstSpanOfInt(ubpointer.baseAddress!, ubpointer.count)
@@ -296,9 +296,9 @@ StdSpanTestSuite.test("SpanOfInt.init(addr, count)") {
 
 StdSpanTestSuite.test("SpanOfInt.init(ubpointer)") {
   var arr: [Int32] = [1, 2, 3]
-  arr.withUnsafeBufferPointer { ubpointer in 
+  arr.withUnsafeBufferPointer { ubpointer in
     let cs = ConstSpanOfInt(ubpointer)
-    checkSpan(cs, arr)  
+    checkSpan(cs, arr)
   }
 
   let arrCopy = arr
@@ -312,9 +312,9 @@ StdSpanTestSuite.test("SpanOfInt.init(ubpointer)") {
 
 StdSpanTestSuite.test("SpanOfString.init(addr, count)") {
   var arr: [std.string] = ["", "a", "ab", "abc"]
-  arr.withUnsafeBufferPointer { ubpointer in 
+  arr.withUnsafeBufferPointer { ubpointer in
     let cs = ConstSpanOfString(ubpointer.baseAddress!, ubpointer.count)
-    checkSpan(cs, arr)  
+    checkSpan(cs, arr)
   }
 
   let arrCopy = arr
@@ -588,7 +588,7 @@ StdSpanTestSuite.test("Span inside Swift struct") {
 
   let spb = SpanBox(
     icspan: icspan,
-    ispan: ispan, 
+    ispan: ispan,
     scspan: scspan,
     sspan: sspan)
 

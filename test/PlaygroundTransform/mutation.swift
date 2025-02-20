@@ -37,5 +37,5 @@ b.mutateIvar()
 // CHECK-NEXT: [{{.*}}] __builtin_log_scope_entry
 // CHECK-NEXT: [{{.*}}] __builtin_log_scope_exit
 // CHECK-NEXT: [{{.*}}] __builtin_log[a='main.A']
-// CHECK-NEXT: [{{.*}}] __builtin_log_scope_exit 
+// CHECK-NEXT: [{{.*}}] __builtin_log_scope_exit
 // CHECK-NEXT: [{{.*}}] __builtin_log[b='main.B']

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift 
+// RUN: %target-typecheck-verify-swift
 
 // https://github.com/apple/swift/issues/63753
 

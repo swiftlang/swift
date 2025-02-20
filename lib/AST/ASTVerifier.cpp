@@ -2931,7 +2931,7 @@ public:
           if (!normal->hasTypeWitness(assocType)) {
             dumpRef(decl);
             Out << " is missing type witness for "
-                << conformance->getProtocol()->getName().str() 
+                << conformance->getProtocol()->getName().str()
                 << "." << assocType->getName().str()
                 << "\n";
             abort();
@@ -2968,7 +2968,7 @@ public:
 
             dumpRef(decl);
             Out << " is missing witness for "
-                << conformance->getProtocol()->getName().str() 
+                << conformance->getProtocol()->getName().str()
                 << "." << req->getBaseName()
                 << "\n";
             abort();
@@ -3182,7 +3182,7 @@ public:
         }
 
         // Also check the interface type.
-        if (auto genericFn 
+        if (auto genericFn
               = CD->getInterfaceType()->getAs<GenericFunctionType>()) {
           resultIsOptional = (bool) genericFn->getResult()
               ->castTo<AnyFunctionType>()

@@ -1242,7 +1242,7 @@ ObjectLiteralExpr::create(ASTContext &ctx, SourceLoc poundLoc, LiteralKind kind,
 StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
   switch (getLiteralKind()) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return #Name;
-#include "swift/AST/TokenKinds.def"    
+#include "swift/AST/TokenKinds.def"
   }
   llvm_unreachable("unspecified literal");
 }
@@ -1251,7 +1251,7 @@ StringRef ObjectLiteralExpr::
 getLiteralKindPlainName(ObjectLiteralExpr::LiteralKind kind) {
   switch (kind) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return Desc;
-#include "swift/AST/TokenKinds.def"    
+#include "swift/AST/TokenKinds.def"
   }
   llvm_unreachable("unspecified literal");
 }
@@ -1480,7 +1480,7 @@ SourceRange TupleExpr::getSourceRange() const {
 
 TupleExpr::TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
                      ArrayRef<Expr *> SubExprs,
-                     ArrayRef<Identifier> ElementNames, 
+                     ArrayRef<Identifier> ElementNames,
                      ArrayRef<SourceLoc> ElementNameLocs,
                      bool Implicit, Type Ty)
   : Expr(ExprKind::Tuple, Implicit, Ty),
@@ -1492,7 +1492,7 @@ TupleExpr::TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
   assert(LParenLoc.isValid() == RParenLoc.isValid() &&
          "Mismatched parenthesis location information validity");
   assert(ElementNames.empty() || ElementNames.size() == SubExprs.size());
-  assert(ElementNameLocs.empty() || 
+  assert(ElementNameLocs.empty() ||
          ElementNames.size() == ElementNameLocs.size());
 
   // Copy elements.
@@ -1540,7 +1540,7 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
                              ElementNameLocs, Implicit, Ty);
 }
 
-TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
+TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc,
                                   SourceLoc RParenLoc, bool Implicit) {
   return create(ctx, LParenLoc, {}, {}, {}, RParenLoc, Implicit,
                 TupleType::getEmpty(ctx));
@@ -2752,7 +2752,7 @@ ArrayRef<Expr *> SingleValueStmtExpr::getResultExprs(
   return scratch;
 }
 
-void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx, 
+void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx,
     llvm::function_ref<void(bool, CallExpr *)> callback) {
   auto appendingExpr = getAppendingExpr();
   for (auto stmt : appendingExpr->getBody()->getElements()) {

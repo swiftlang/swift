@@ -244,7 +244,7 @@ class ModuleDecl
 
   mutable Identifier PublicModuleName;
 
-  /// Indicates a version of the Swift compiler used to generate 
+  /// Indicates a version of the Swift compiler used to generate
   /// .swiftinterface file that this module was produced from (if any).
   mutable version::Version InterfaceCompilerVersion;
 

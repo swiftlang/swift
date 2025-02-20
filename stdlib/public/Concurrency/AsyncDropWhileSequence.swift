@@ -41,7 +41,7 @@ extension AsyncSequence {
   ///   modified sequence.
   /// - Returns: An asynchronous sequence that skips over values from the
   ///   base sequence until the provided closure returns `false`.
-  @preconcurrency 
+  @preconcurrency
   @inlinable
   public __consuming func drop(
     while predicate: @Sendable @escaping (Element) async -> Bool
@@ -63,7 +63,7 @@ public struct AsyncDropWhileSequence<Base: AsyncSequence> {
 
   @usableFromInline
   init(
-    _ base: Base, 
+    _ base: Base,
     predicate: @escaping (Base.Element) async -> Bool
   ) {
     self.base = base
@@ -98,7 +98,7 @@ extension AsyncDropWhileSequence: AsyncSequence {
 
     @usableFromInline
     init(
-      _ baseIterator: Base.AsyncIterator, 
+      _ baseIterator: Base.AsyncIterator,
       predicate: @escaping (Base.Element) async -> Bool
     ) {
       self.baseIterator = baseIterator
@@ -160,11 +160,11 @@ extension AsyncDropWhileSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncDropWhileSequence: @unchecked Sendable 
-  where Base: Sendable, 
+extension AsyncDropWhileSequence: @unchecked Sendable
+  where Base: Sendable,
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncDropWhileSequence.Iterator: @unchecked Sendable 
-  where Base.AsyncIterator: Sendable, 
+extension AsyncDropWhileSequence.Iterator: @unchecked Sendable
+  where Base.AsyncIterator: Sendable,
         Base.Element: Sendable { }

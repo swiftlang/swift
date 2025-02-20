@@ -2,39 +2,39 @@
 
 // REQUIRES: PTRSIZE=64
 
-// CHECK: @_INSTANCE_METHODS__TtC15objc_subscripts10SomeObject = 
-// CHECK:   internal constant { i32, i32, [5 x { ptr, ptr, ptr }] } 
-// CHECK:   { i32 24, i32 5, [5 x { ptr, ptr, ptr }] 
+// CHECK: @_INSTANCE_METHODS__TtC15objc_subscripts10SomeObject =
+// CHECK:   internal constant { i32, i32, [5 x { ptr, ptr, ptr }] }
+// CHECK:   { i32 24, i32 5, [5 x { ptr, ptr, ptr }]
 // CHECK:     [
-// CHECK:       { ptr, ptr, ptr } 
-// CHECK:         { 
-// CHECK:           ptr @"\01L_selector_data(objectAtIndexedSubscript:)", 
+// CHECK:       { ptr, ptr, ptr }
+// CHECK:         {
+// CHECK:           ptr @"\01L_selector_data(objectAtIndexedSubscript:)",
 // CHECK:           ptr @".str.10.@24@0:8q16",
 // CHECK-noptrauth: ptr @"$s15objc_subscripts10SomeObjectCyACSicigTo"
 // CHECK-ptrauth:   ptr @"$s15objc_subscripts10SomeObjectCyACSicigTo.ptrauth"
-// CHECK:         }, 
-// CHECK:       { ptr, ptr, ptr } 
-// CHECK:         { 
-// CHECK:           ptr @"\01L_selector_data(setObject:atIndexedSubscript:)", 
+// CHECK:         },
+// CHECK:       { ptr, ptr, ptr }
+// CHECK:         {
+// CHECK:           ptr @"\01L_selector_data(setObject:atIndexedSubscript:)",
 // CHECK:           ptr @".str.13.v32@0:8@16q24",
 // CHECK-noptrauth: ptr @"$s15objc_subscripts10SomeObjectCyACSicisTo"
 // CHECK-ptrauth:   ptr @"$s15objc_subscripts10SomeObjectCyACSicisTo.ptrauth"
 // CHECK:         },
-// CHECK:       { ptr, ptr, ptr } 
-// CHECK:         { 
-// CHECK:           ptr @"\01L_selector_data(objectForKeyedSubscript:)", 
+// CHECK:       { ptr, ptr, ptr }
+// CHECK:         {
+// CHECK:           ptr @"\01L_selector_data(objectForKeyedSubscript:)",
 // CHECK:           ptr @".str.10.q24@0:8@16",
 // CHECK-noptrauth: ptr @"$s15objc_subscripts10SomeObjectCySiACcigTo"
 // CHECK-ptrauth:   ptr @"$s15objc_subscripts10SomeObjectCySiACcigTo.ptrauth"
-// CHECK:         }, 
-// CHECK:       { ptr, ptr, ptr } 
-// CHECK:         { 
-// CHECK:           ptr @"\01L_selector_data(setObject:forKeyedSubscript:)", 
+// CHECK:         },
+// CHECK:       { ptr, ptr, ptr }
+// CHECK:         {
+// CHECK:           ptr @"\01L_selector_data(setObject:forKeyedSubscript:)",
 // CHECK:           ptr @".str.13.v32@0:8q16@24",
 // CHECK-noptrauth: ptr @"$s15objc_subscripts10SomeObjectCySiACcisTo"
 // CHECK-ptrauth:   ptr @"$s15objc_subscripts10SomeObjectCySiACcisTo.ptrauth"
 // CHECK:         },
-// CHECK:       { ptr, ptr, ptr } 
+// CHECK:       { ptr, ptr, ptr }
 // CHECK:         {
 // CHECK:           ptr @"\01L_selector_data(init)",
 // CHECK:           ptr @".str.7.@16@0:8",

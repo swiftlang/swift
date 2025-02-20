@@ -3239,7 +3239,7 @@ static void emitInitializeRawLayoutOldOld(IRGenFunction &IGF, SILType likeType,
 
   // We need to make a temporary type layout with most of the same information
   // from the type we're like.
-  auto ourTypeLayout = IGF.createAlloca(IGM.TypeLayoutTy, 
+  auto ourTypeLayout = IGF.createAlloca(IGM.TypeLayoutTy,
                                         IGM.getPointerAlignment(),
                                         "ourTypeLayout");
   IGF.Builder.CreateLifetimeStart(ourTypeLayout, IGM.getPointerSize());
@@ -5950,9 +5950,9 @@ namespace {
 
       auto &layout = IGM.getMetadataLayout(Target);
 
-      bool offsetUpToTrailingFlags = hasTrailingFlags() && !hasKnownFieldOffsets(); 
+      bool offsetUpToTrailingFlags = hasTrailingFlags() && !hasKnownFieldOffsets();
       Size zeroingStart = IGM.getOffsetOfStructTypeSpecificMetadataMembers();
-      Offset zeroingEnd = offsetUpToTrailingFlags 
+      Offset zeroingEnd = offsetUpToTrailingFlags
                             ? layout.getTrailingFlagsOffset()
                             : layout.getFieldOffsetVectorOffset();
       auto offset = zeroingEnd.getStatic() - zeroingStart;
@@ -6370,9 +6370,9 @@ namespace {
       auto global = init.finishAndCreateGlobal("", IGM.getPointerAlignment(),
                                                /*constant*/ true);
 
-      bool offsetUpToTrailingFlags = hasTrailingFlags() && !hasKnownPayloadSize(); 
+      bool offsetUpToTrailingFlags = hasTrailingFlags() && !hasKnownPayloadSize();
       Size zeroingStart = IGM.getOffsetOfEnumTypeSpecificMetadataMembers();
-      Offset zeroingEnd = offsetUpToTrailingFlags 
+      Offset zeroingEnd = offsetUpToTrailingFlags
                             ? layout.getTrailingFlagsOffset()
                             : layout.getPayloadSizeOffset();
       auto offset = zeroingEnd.getStatic() - zeroingStart;
@@ -7333,7 +7333,7 @@ GenericArgumentMetadata irgen::addGenericRequirements(
         genericParam->isValue());
     addGenericRequirement(IGM, B, metadata, sig, flags,
                           Type(genericParam),
-     [&]{ 
+     [&]{
       B.addInt16(index);
       B.addInt16(suppressed[index].rawBits());
     });

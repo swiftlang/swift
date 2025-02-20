@@ -24,8 +24,8 @@ struct Free<T> {}
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="Free<T>" protocol="Escapable"))
 // CHECK-NEXT:    (requirement "T" conforms_to "P1"))
-extension Free: P2 where T: P1 {} 
-// expected-note@-1 {{requirement from conditional conformance of 'Free<U>' to 'P2'}} 
+extension Free: P2 where T: P1 {}
+// expected-note@-1 {{requirement from conditional conformance of 'Free<U>' to 'P2'}}
 // expected-note@-2 {{requirement from conditional conformance of 'Free<T>' to 'P2'}}
 func free_good<U: P1>(_: U) {
     takes_P2(Free<U>())

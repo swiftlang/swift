@@ -11,7 +11,7 @@
 
 public protocol ExpressibleByNilLiteral: ~Copyable & ~Escapable {
   @lifetime(immortal)
-  init(nilLiteral: ()) 
+  init(nilLiteral: ())
 }
 
 @frozen

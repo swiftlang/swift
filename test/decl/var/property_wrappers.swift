@@ -1094,7 +1094,7 @@ struct Test52969503 {
 }
 
 
-// 
+//
 // ---------------------------------------------------------------------------
 // Property wrapper composition
 // ---------------------------------------------------------------------------
@@ -1578,7 +1578,7 @@ struct AllCompositionsStruct {
   var mgms_mgms: Int
 
   func readonlyContext(x: Int) { // expected-note *{{}}
-    _ = ngxs_ngxs 
+    _ = ngxs_ngxs
     // _ = ngxs_mgxs
     _ = ngxs_ngns
     // _ = ngxs_mgns
@@ -1668,7 +1668,7 @@ struct AllCompositionsStruct {
   }
 
   mutating func mutatingContext(x: Int) {
-    _ = ngxs_ngxs 
+    _ = ngxs_ngxs
     // _ = ngxs_mgxs
     _ = ngxs_ngns
     // _ = ngxs_mgns
@@ -1885,7 +1885,7 @@ struct NonMutatingProjectedValueSetWrapper<Value> {
   var wrappedValue: Value
   var projectedValue: Value {
     get { wrappedValue }
-    nonmutating set { } 
+    nonmutating set { }
   }
 }
 

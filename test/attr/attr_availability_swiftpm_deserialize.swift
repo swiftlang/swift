@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/PackageDescription.swiftmodule -module-name PackageDescription %S/Inputs/PackageDescription.swift 
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/PackageDescription.swiftmodule -module-name PackageDescription %S/Inputs/PackageDescription.swift
 // RUN: not %target-swift-frontend -typecheck -I %t -package-description-version 4.2 %s 2>&1 | %FileCheck -check-prefix FOURTWO %s
 // RUN: not %target-swift-frontend -typecheck -I %t -package-description-version 5 %s 2>&1 | %FileCheck -check-prefix FIVE %s
 // RUN: %target-swift-ide-test -print-module -module-to-print PackageDescription -source-filename x -I %t | %FileCheck %S/Inputs/PackageDescription.swift

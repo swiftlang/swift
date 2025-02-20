@@ -1834,7 +1834,7 @@ static void diagnoseRetroactiveConformances(
 
     auto proto =
         dyn_cast_or_null<ProtocolDecl>(entry.getType()->getAnyNominal());
-    if (!proto) {  
+    if (!proto) {
       continue;
     }
 
@@ -3346,7 +3346,7 @@ public:
       if (!pbd)
         continue;
 
-      if (pbd->isStatic() || !pbd->hasStorage() || 
+      if (pbd->isStatic() || !pbd->hasStorage() ||
           pbd->isDefaultInitializable() || pbd->isInvalid())
         continue;
 

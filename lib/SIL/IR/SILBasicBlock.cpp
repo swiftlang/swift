@@ -34,7 +34,7 @@ using namespace swift;
 // SILBasicBlock Implementation
 //===----------------------------------------------------------------------===//
 
-SwiftMetatype SILBasicBlock::registeredMetatype;    
+SwiftMetatype SILBasicBlock::registeredMetatype;
 
 SILBasicBlock::SILBasicBlock() :
   SwiftObjectHeader(registeredMetatype), Parent(nullptr) {}

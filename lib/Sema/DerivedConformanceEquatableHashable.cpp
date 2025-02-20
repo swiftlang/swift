@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file implements implicit derivation of the Equatable and Hashable
-//  protocols. 
+//  protocols.
 //
 //===----------------------------------------------------------------------===//
 
@@ -229,7 +229,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
       auto rhsVar = rhsPayloadVars[varIdx];
       auto rhsExpr = new (C) DeclRefExpr(rhsVar, DeclNameLoc(),
                                          /*Implicit*/true);
-      auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C, 
+      auto guardStmt = DerivedConformance::returnFalseIfNotEqualGuard(C,
           lhsExpr, rhsExpr);
       statementsInCase.emplace_back(guardStmt);
     }
@@ -1018,7 +1018,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
                                        &deriveBodyHashable_struct_hashInto);
       else // This should've been caught by canDeriveHashable above.
         llvm_unreachable("Attempt to derive Hashable for a type other "
-                         "than a struct or enum");      
+                         "than a struct or enum");
     } else {
       // hashValue has an explicit implementation, but hash(into:) doesn't.
       // Emit a deprecation warning, then derive hash(into:) in terms of

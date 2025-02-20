@@ -44,7 +44,7 @@ func testMethodResult(dummy: DummyClass) {
   // CHECK-NEXT: apply [[USE]]([[ANYOBJECT]])
   useOptAnyObject(dummy.fetchNullableString() as AnyObject?)
 
-  // CHECK: [[METHOD:%.*]] = objc_method 
+  // CHECK: [[METHOD:%.*]] = objc_method
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = unchecked_ref_cast [[RESULT]] : $Optional<NSString> to $Optional<AnyObject>
   // CHECK:      [[USE:%.*]] = function_ref @$s22objc_bridging_peephole15useOptAnyObjectyyyXlSgF

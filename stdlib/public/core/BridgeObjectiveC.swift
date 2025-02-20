@@ -802,7 +802,7 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
 
   if let dynamicSource = _extractDynamicValue(x) {
     result = dynamicSource as AnyObject
-    done = true 
+    done = true
   }
 
   if !done, let wrapper = source as? _Unwrappable {

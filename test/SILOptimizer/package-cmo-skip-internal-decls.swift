@@ -27,7 +27,7 @@
 
 import Lib
 
-/// There should be no linker error on a public function 
+/// There should be no linker error on a public function
 /// that contains symbols internal to Lib module.
 ///
 
@@ -155,7 +155,7 @@ public class Base {
   }
 }
 
-@usableFromInline 
+@usableFromInline
 class UFIKlass: Base {
   override init() {}
 

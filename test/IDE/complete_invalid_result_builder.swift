@@ -39,7 +39,7 @@ enum ArrayBuilder<E>: ResultBuilder {
 }
 
 func test(@ArrayBuilder<Int> a: () -> [Int]) {}
-enum MyEnum { case a, b } 
+enum MyEnum { case a, b }
 
 test {
   switch MyEnum.a {

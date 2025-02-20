@@ -15,7 +15,7 @@ public struct ChangeEmptyToNonEmpty {
 
 public struct ChangeEmptyToNonEmpty {
   public init() {
-    property = 0 
+    property = 0
   }
 
   public var property: Int
@@ -66,7 +66,7 @@ public struct ChangeSize {
     return (padding1 == 17 &&
             padding2 == -12 &&
             padding3 == 108 &&
-            padding4 == -7592)  
+            padding4 == -7592)
   }
 
   // Some padding to grow the struct beyond what a fixed-size buffer

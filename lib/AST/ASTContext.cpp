@@ -5429,7 +5429,7 @@ VariadicSequenceType *VariadicSequenceType::get(Type base) {
 }
 
 DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
-  auto properties = keyType->getRecursiveProperties() 
+  auto properties = keyType->getRecursiveProperties()
                   | valueType->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -5439,7 +5439,7 @@ DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
     = C.getImpl().getArena(arena).DictionaryTypes[{keyType, valueType}];
   if (entry) return entry;
 
-  return entry = new (C, arena) DictionaryType(C, keyType, valueType, 
+  return entry = new (C, arena) DictionaryType(C, keyType, valueType,
                                                properties);
 }
 
@@ -5986,7 +5986,7 @@ DeclName::DeclName(ASTContext &C, DeclBaseName baseName,
 }
 
 /// Find the implementation of the named type in the given module.
-static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx, 
+static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx,
                                                    Identifier name,
                                                    ModuleDecl *module) {
   // Find all of the declarations with this name in the Swift module.
@@ -6110,7 +6110,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
           addTrivial(getIdentifier(name), simd);                        \
         }                                                               \
       }
-#include "swift/ClangImporter/SIMDMappedTypes.def"      
+#include "swift/ClangImporter/SIMDMappedTypes.def"
     }
   }
 
@@ -6192,7 +6192,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     known = getImpl().ForeignRepresentableCache.insert({ nominal, *result }).first;
   }
 
-  // Map a cache entry to a result for this specific 
+  // Map a cache entry to a result for this specific
   auto entry = known->second;
   if (entry.getKind() == ForeignRepresentableKind::None)
     return entry;
@@ -6507,7 +6507,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   return elementSig;
 }
 
-GenericSignature 
+GenericSignature
 ASTContext::getOverrideGenericSignature(const ValueDecl *base,
                                         const ValueDecl *derived) {
   assert(isa<AbstractFunctionDecl>(base) || isa<SubscriptDecl>(base));

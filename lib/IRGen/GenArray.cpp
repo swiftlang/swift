@@ -565,7 +565,7 @@ public:
     auto startBB = IGF.Builder.GetInsertBlock();
     auto no = llvm::ConstantInt::getBool(IGF.IGM.getLLVMContext(),
                                          false);
-    // Prefetch the necessary info from the element type info. 
+    // Prefetch the necessary info from the element type info.
     auto isBT = getIsBitwiseTakable(IGF, T);
     auto size = getSize(IGF, T);
     auto align = getAlignmentMask(IGF, T);

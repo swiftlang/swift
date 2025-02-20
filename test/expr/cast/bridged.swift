@@ -16,7 +16,7 @@ public extension _ObjectiveCBridgeable {
 
 class NSObject { }
 
-class BridgedClass : NSObject { 
+class BridgedClass : NSObject {
 }
 
 class SubclassOfBridgedClass : BridgedClass { }
@@ -43,7 +43,7 @@ protocol P { }
 
 extension NSObject : P { }
 
-func testBridgeDowncast(_ obj: AnyObject, objOpt: AnyObject?, 
+func testBridgeDowncast(_ obj: AnyObject, objOpt: AnyObject?,
                         objImplicitOpt: AnyObject!) -> BridgedStruct? {
   let s1Opt = obj as? BridgedStruct
   var s2Opt = objOpt as? BridgedStruct
@@ -59,7 +59,7 @@ func testBridgeDowncast(_ obj: AnyObject, objOpt: AnyObject?,
   return s1Opt
 }
 
-func testBridgeIsa(_ obj: AnyObject, objOpt: AnyObject?, 
+func testBridgeIsa(_ obj: AnyObject, objOpt: AnyObject?,
                    objImplicitOpt: AnyObject!) {
   if obj is BridgedStruct { }
   if objOpt is BridgedStruct { }
@@ -67,7 +67,7 @@ func testBridgeIsa(_ obj: AnyObject, objOpt: AnyObject?,
 }
 
 func testBridgeDowncastSuperclass(_ obj: NSObject, objOpt: NSObject?,
-                                  objImplicitOpt: NSObject!) 
+                                  objImplicitOpt: NSObject!)
        -> BridgedStruct? {
   _ = obj as? BridgedStruct
   _ = objOpt as? BridgedStruct

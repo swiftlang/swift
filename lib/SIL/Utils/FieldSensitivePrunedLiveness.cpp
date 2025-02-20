@@ -839,7 +839,7 @@ void FieldSensitivePrunedLivenessBoundary::print(llvm::raw_ostream &OS) const {
   for (auto pair : lastUsers) {
     auto *user = pair.first;
     auto bits = pair.second;
-    OS << "last user: " << *user 
+    OS << "last user: " << *user
        << "\tat " << bits << "\n";
   }
   for (auto pair : boundaryEdges) {
@@ -853,7 +853,7 @@ void FieldSensitivePrunedLivenessBoundary::print(llvm::raw_ostream &OS) const {
     for (auto pair : deadDefs) {
       auto *deadDef = pair.first;
       auto bits = pair.second;
-      OS << "dead def: " << *deadDef 
+      OS << "dead def: " << *deadDef
          << "\tat " << bits << "\n";
     }
   }

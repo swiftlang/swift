@@ -23,8 +23,8 @@ public func produceSomeEmptyNontrivialAddronlyEnumInstance(_ one: EnumNontrivial
 }
 
 // CHECK-LABEL: sil [ossa] @produceNoneEmptyAddronlyEnumInstance : {{.*}} {
-// CHECK:         [[NONE:%[^,]+]] = enum $Optional<EnumNontrivialWithEmptyCases>, #Optional.none!enumelt 
-// CHECK:         return [[NONE]] : $Optional<EnumNontrivialWithEmptyCases> 
+// CHECK:         [[NONE:%[^,]+]] = enum $Optional<EnumNontrivialWithEmptyCases>, #Optional.none!enumelt
+// CHECK:         return [[NONE]] : $Optional<EnumNontrivialWithEmptyCases>
 // CHECK-LABEL: } // end sil function 'produceNoneEmptyAddronlyEnumInstance'
 @_silgen_name("produceNoneEmptyAddronlyEnumInstance")
 public func produceNoneEmptyAddronlyEnumInstance() -> EnumNontrivialWithEmptyCases? {

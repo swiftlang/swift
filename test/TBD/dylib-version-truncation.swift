@@ -17,7 +17,7 @@
 // TWOPOINTZERO: current_versions
 // TWOPOINTZERO: "version": "2"
 
-// TWENTYPOINTTEN: current_versions 
+// TWENTYPOINTTEN: current_versions
 // TWENTYPOINTTEN: "version": "20.10"
 
 // TWOPOINTZEROCOMPAT: compatibility_versions

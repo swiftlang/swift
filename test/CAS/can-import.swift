@@ -126,7 +126,7 @@ void simple(void);
 //--- frameworks/Simple.framework/Simple.tbd
 --- !tapi-tbd
 tbd-version:     4
-targets:         [ arm64-macos, arm64-ios, arm64-watchos, arm64-tvos, 
+targets:         [ arm64-macos, arm64-ios, arm64-watchos, arm64-tvos,
                    arm64-ios-simulator, arm64-watchos-simulator, arm64-tvos-simulator ]
 flags:           [ not_app_extension_safe ]
 install-name:    '/System/Library/Frameworks/Simple.framework/Versions/A/Simple'

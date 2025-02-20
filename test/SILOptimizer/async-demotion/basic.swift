@@ -36,12 +36,12 @@ func fib(_ n: Int) async -> Int {
 
 
 @inline(never)
-@MainActor 
-public 
+@MainActor
+public
 func leaf() async {}
 
-@MainActor 
-public 
+@MainActor
+public
 func start() async {
   await leaf()
 
@@ -51,7 +51,7 @@ func start() async {
 }
 
 
-public 
+public
 func checkIt(_ t: Task<Int, Never>) async -> Int {
   await t.value
 }

@@ -3,7 +3,7 @@
 private var _storage: String? = nil
 
 
-// CHECK-LABEL: sil [noinline] @$s29functionsigopts_string_public10setStorage2toySS_tF : $@convention(thin) (@guaranteed String) -> () { 
+// CHECK-LABEL: sil [noinline] @$s29functionsigopts_string_public10setStorage2toySS_tF : $@convention(thin) (@guaranteed String) -> () {
 // CHECK-LABEL: } // end sil function '$s29functionsigopts_string_public10setStorage2toySS_tF'
 @inline(never)
 public func setStorage(to newValue: String) {

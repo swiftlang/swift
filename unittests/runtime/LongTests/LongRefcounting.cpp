@@ -462,10 +462,10 @@ class WeakReference {
 } // namespace swift
 
 // Lifecycle paths. One test each.
-// 
+//
 // LIVE -> DEINITING                      -> DEAD, no side table
 // LIVE -> DEINITING -> DEINITED          -> DEAD, no side table
-// 
+//
 // LIVE -> DEINITING                      -> DEAD, with side table
 // LIVE -> DEINITING -> DEINITED          -> DEAD, with side table
 // LIVE -> DEINITING             -> FREED -> DEAD, with side table
@@ -490,7 +490,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_no_side_DeathTest) {
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);  
+  swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
@@ -533,7 +533,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_no_side_DeathTest) {
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);  
+  swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
 
@@ -600,7 +600,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_with_side_DeathTest) {
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);  
+  swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   // Remaining releases are performed after the side table is allocated.
@@ -636,7 +636,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_with_side_DeathTest) {
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);  
+  swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
@@ -693,7 +693,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_with_side_DeathTest)
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);  
+  swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   // Remaining releases are performed during DEINITED.
@@ -729,7 +729,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_with_side_DeathTest)
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);  
+  swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
@@ -811,7 +811,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_freed_with_side_DeathTest) {
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);  
+  swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
@@ -848,7 +848,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_freed_with_side_DeathTest) {
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);  
+  swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
@@ -928,7 +928,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_freed_with_side_Deat
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);  
+  swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   // Remaining releases are performed during DEINITED.
@@ -948,7 +948,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_freed_with_side_Deat
   WeakReference w_deinit;
   swift_weakInit(&w_deinit, object);
   object->WeakRef = &w_deinit;
-  // destroyed during deinit  
+  // destroyed during deinit
 
   // RC increment ok
   // RC decrement ok
@@ -964,7 +964,7 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_freed_with_side_Deat
   // URC decrement OK
   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
-  swift_unownedRetain(object);   swift_unownedCheck(object);  
+  swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRetain(object);   swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);
   swift_unownedRelease(object);  swift_unownedCheck(object);

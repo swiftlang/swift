@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -prespecialize-generic-metadata -target %module-target-future %S/Inputs/struct-public-nonfrozen-1argument-1constraint.swift %S/Inputs/struct-public-nonfrozen-0argument.swift %S/Inputs/protocol-public-empty.swift -emit-library -o %t/%target-library-name(Module) -emit-module -module-name Module -emit-module-path %t/Module.swiftmodule
-// RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s %S/Inputs/main.swift %S/Inputs/struct-public-nonfrozen-0argument-conformance-empty.swift -module-name main -L %t -I %t -lModule -DIMPORT_MODULE | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment 
+// RUN: %swift -prespecialize-generic-metadata -target %module-target-future -emit-ir %s %S/Inputs/main.swift %S/Inputs/struct-public-nonfrozen-0argument-conformance-empty.swift -module-name main -L %t -I %t -lModule -DIMPORT_MODULE | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
 
 // REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
@@ -60,7 +60,7 @@ struct AnotherArgument {
 // CHECK-SAME:   )
 // CHECK-NEXT:   [[CANONICALIZED_METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[CANONICALIZED_METADATA_RESPONSE]], 0
 // CHECK-NEXT:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
+// CHECK-SAME:     ptr noalias {{%[0-9]+}},
 // CHECK-SAME:     ptr [[CANONICALIZED_METADATA]]
 // CHECK-SAME:   )
 //      CHECK: }

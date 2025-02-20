@@ -4,7 +4,7 @@ protocol P1 { associatedtype AssocType }
 protocol P2 : P1 { }
 protocol P3 { }
 
-struct X<T : P1, U : P2, V> { 
+struct X<T : P1, U : P2, V> {
   struct Inner<A, B : P3> { }
 
   struct NonGenericInner { }
@@ -14,7 +14,7 @@ extension Int : P1 {
   typealias AssocType = Int
 }
 
-extension Double : P2 { 
+extension Double : P2 {
   typealias AssocType = Double
 }
 
@@ -67,7 +67,7 @@ extension MemberTypeCheckB {
 }
 
 extension MemberTypeCheckB {
-  var t2: Element { return t1 }  
+  var t2: Element { return t1 }
 }
 
 // rdar://problem/19795284

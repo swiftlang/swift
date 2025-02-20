@@ -190,24 +190,24 @@ func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
 // CHECK: define hidden {{.*}}void @"$s8builtins19sizeof_alignof_testyyF"()
 func sizeof_alignof_test() {
   // CHECK: store i64 4, ptr
-  var xs = Builtin.sizeof(Int.self) 
+  var xs = Builtin.sizeof(Int.self)
   // CHECK: store i64 4, ptr
-  var xa = Builtin.alignof(Int.self) 
+  var xa = Builtin.alignof(Int.self)
   // CHECK: store i64 1, ptr
-  var ys = Builtin.sizeof(Bool.self) 
+  var ys = Builtin.sizeof(Bool.self)
   // CHECK: store i64 1, ptr
-  var ya = Builtin.alignof(Bool.self) 
+  var ya = Builtin.alignof(Bool.self)
 
 }
 
 // CHECK: define hidden {{.*}}void @"$s8builtins28sizeof_alignof_metatype_testyyF"()
 func sizeof_alignof_metatype_test() {
   // CHECK: store i64 8, ptr
-  var xs = Builtin.sizeof(Int.Type.self) 
+  var xs = Builtin.sizeof(Int.Type.self)
   // CHECK: store i64 8, ptr
-  var xa = Builtin.alignof(Int.Type.self) 
+  var xa = Builtin.alignof(Int.Type.self)
   // CHECK: store i64 8, ptr
-  var xt = Builtin.strideof(Int.Type.self) 
+  var xt = Builtin.strideof(Int.Type.self)
 }
 
 // CHECK: define hidden {{.*}}void @"$s8builtins27generic_sizeof_alignof_testyyxlF"

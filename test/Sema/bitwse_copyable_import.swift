@@ -74,8 +74,8 @@ func passInts128(_ t: Ints128) {
   take(t.is.0)
   take(t.is.17)
 }
-func passVoidPointers(_ t: VoidPointers) { 
-  take(t) 
+func passVoidPointers(_ t: VoidPointers) {
+  take(t)
   take(t.p10)
 }
 func passIntsTrailing(_ t: IntsTrailing) {

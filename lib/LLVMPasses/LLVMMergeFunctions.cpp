@@ -284,7 +284,7 @@ private:
   };
   using FnTreeType = std::set<EquivalenceClass, FunctionNodeCmp>;
 
-  /// 
+  ///
   struct FunctionEntry {
     FunctionEntry(Function *F, FnTreeType::iterator I) :
         F(F), Next(nullptr), numUnhandledCallees(0), TreeIter(I),

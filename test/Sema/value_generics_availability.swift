@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ValueGenerics 
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ValueGenerics
 
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_ValueGenerics

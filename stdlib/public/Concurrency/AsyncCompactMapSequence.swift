@@ -32,7 +32,7 @@ extension AsyncSequence {
   ///
   ///     let romanNumeralDict: [Int: String] =
   ///         [1: "I", 2: "II", 3: "III", 5: "V"]
-  ///         
+  ///
   ///     let stream = Counter(howHigh: 5)
   ///         .compactMap { romanNumeralDict[$0] }
   ///     for await numeral in stream {
@@ -66,7 +66,7 @@ public struct AsyncCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
 
   @usableFromInline
   init(
-    _ base: Base, 
+    _ base: Base,
     transform: @escaping (Base.Element) async -> ElementOfResult?
   ) {
     self.base = base
@@ -102,7 +102,7 @@ extension AsyncCompactMapSequence: AsyncSequence {
 
     @usableFromInline
     init(
-      _ baseIterator: Base.AsyncIterator, 
+      _ baseIterator: Base.AsyncIterator,
       transform: @escaping (Base.Element) async -> ElementOfResult?
     ) {
       self.baseIterator = baseIterator
@@ -160,13 +160,13 @@ extension AsyncCompactMapSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncCompactMapSequence: @unchecked Sendable 
-  where Base: Sendable, 
-        Base.Element: Sendable, 
+extension AsyncCompactMapSequence: @unchecked Sendable
+  where Base: Sendable,
+        Base.Element: Sendable,
         ElementOfResult: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncCompactMapSequence.Iterator: @unchecked Sendable 
-  where Base.AsyncIterator: Sendable, 
-        Base.Element: Sendable, 
+extension AsyncCompactMapSequence.Iterator: @unchecked Sendable
+  where Base.AsyncIterator: Sendable,
+        Base.Element: Sendable,
         ElementOfResult: Sendable { }

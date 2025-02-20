@@ -69,7 +69,7 @@ class X {
   func f() {}
 }
 
-class Foo<T> : X { 
+class Foo<T> : X {
   func g() { }
 }
 

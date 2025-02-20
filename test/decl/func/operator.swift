@@ -70,7 +70,7 @@ func ++++(lhs: Y, rhs: Y) -> Y {} // okay
 
 func useInt(_ x: Int) {}
 func test() {
-  var x : Int  
+  var x : Int
   let y : Int = 42
   // Produce a diagnostic for using the result of an assignment as a value.
   // rdar://12961094

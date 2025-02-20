@@ -94,7 +94,7 @@ func switchExprBranchInferenceReturn2() -> E {
 }
 
 func ifExprBinding() -> E {
-  let x: E = 
+  let x: E =
     if .random() {
       .e
     } else {

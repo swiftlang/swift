@@ -2189,7 +2189,7 @@ private:
     : BuiltinType(TypeKind::BuiltinFloat, C), Kind(Kind) {}
 public:
 
-  /// getFPKind - Get the 
+  /// getFPKind - Get the
   FPKind getFPKind() const {
     return Kind;
   }
@@ -2716,7 +2716,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getElements());
   }
-  static void Profile(llvm::FoldingSetNodeID &ID, 
+  static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<TupleTypeElt> Elements);
 
   bool containsPackExpansionType() const;
@@ -2926,7 +2926,7 @@ private:
   BoundGenericStructType(StructDecl *theDecl, Type parent,
                          ArrayRef<Type> genericArgs, const ASTContext *context,
                          RecursiveTypeProperties properties)
-    : BoundGenericType(TypeKind::BoundGenericStruct, 
+    : BoundGenericType(TypeKind::BoundGenericStruct,
                        reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
                        genericArgs, context, properties) {}
   friend class BoundGenericType;
@@ -3058,7 +3058,7 @@ enum class MetatypeRepresentation : char {
   /// struct and enum members is completely static.
   Thin,
   /// A thick metatype refers to a complete metatype representation
-  /// that allows introspection and dynamic dispatch. 
+  /// that allows introspection and dynamic dispatch.
   ///
   /// Thick metatypes are used for class and existential metatypes,
   /// which permit dynamic behavior.
@@ -3246,7 +3246,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ModuleType, Type)
 /// };
 /// \endcode
 ///
-/// In this example, \c Self is represented by a 
+/// In this example, \c Self is represented by a
 /// \c DynamicSelfType node whose self type is \c X.
 class DynamicSelfType : public TypeBase {
   Type SelfType;
@@ -6229,7 +6229,7 @@ protected:
   // Syntax sugar types are never canonical.
   DictionaryType(const ASTContext &ctx, Type key, Type value,
                  RecursiveTypeProperties properties)
-    : SyntaxSugarType(TypeKind::Dictionary, ctx, properties), 
+    : SyntaxSugarType(TypeKind::Dictionary, ctx, properties),
       Key(key), Value(value) {}
 
 public:
@@ -7501,7 +7501,7 @@ class ErrorUnionType final
   friend TrailingObjects;
 
   ErrorUnionType(const ASTContext *ctx, ArrayRef<Type> terms,
-                 RecursiveTypeProperties properties) 
+                 RecursiveTypeProperties properties)
         : TypeBase(TypeKind::ErrorUnion, /*Context=*/ctx, properties) {
     Bits.ErrorUnionType.NumTerms = terms.size();
     std::uninitialized_copy(terms.begin(), terms.end(),

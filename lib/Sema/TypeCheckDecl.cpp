@@ -1895,7 +1895,7 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
 /// Bind the given function declaration, which declares an operator, to the
 /// corresponding operator declaration.
 OperatorDecl *
-FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {  
+FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   auto &C = FD->getASTContext();
   auto &diags = C.Diags;
   const auto operatorName = FD->getBaseIdentifier();

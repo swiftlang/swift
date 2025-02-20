@@ -332,7 +332,7 @@ LargeSILTypeMapper::getNewOptionalFunctionType(GenericEnvironment *GenericEnv,
   if (auto objectType = storageType.getOptionalObjectType()) {
     if (auto fnType = objectType.getAs<SILFunctionType>()) {
       if (shouldTransformFunctionType(GenericEnv, fnType, Mod)) {
-        auto newFnType = getNewSILFunctionType(GenericEnv, fnType, Mod);        
+        auto newFnType = getNewSILFunctionType(GenericEnv, fnType, Mod);
         newSILType =
           SILType::getPrimitiveType(newFnType, storageType.getCategory());
         newSILType = SILType::getOptionalType(newSILType);
@@ -3025,7 +3025,7 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
                                    IRGenModule *irgenModule);
 
 /// The entry point to this function transformation.
-void LoadableByAddress::run() {  
+void LoadableByAddress::run() {
   // Set the SIL state before the PassManager has a chance to run
   // verification.
   getModule()->setStage(SILStage::Lowered);

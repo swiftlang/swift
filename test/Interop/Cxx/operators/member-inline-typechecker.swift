@@ -92,8 +92,8 @@ let _ = derivedClassWithOperatorStarAvailable.pointee
 var classWithOperatorStarUnavailable = ClassWithOperatorStarUnavailable()
 let _ = classWithOperatorStarUnavailable.pointee // expected-error {{'pointee' is unavailable in Swift}}
 
-// FIXME: The below test should also fail with 'pointee' is unavailable in Swift error, 
+// FIXME: The below test should also fail with 'pointee' is unavailable in Swift error,
 // but currently pointee is not hidden in derived classes.
 let derivedClassWithOperatorStarUnavailable = DerivedClassWithOperatorStarUnavailable()
-let _ = derivedClassWithOperatorStarUnavailable.pointee  
+let _ = derivedClassWithOperatorStarUnavailable.pointee
 

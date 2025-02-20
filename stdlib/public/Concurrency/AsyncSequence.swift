@@ -376,12 +376,12 @@ extension AsyncSequence {
     by areInIncreasingOrder: (Element, Element) async throws -> Bool
   ) async rethrows -> Element? {
     var it = makeAsyncIterator()
-    guard var result = try await it.next() else { 
-      return nil 
+    guard var result = try await it.next() else {
+      return nil
     }
     while let e = try await it.next() {
-      if try await areInIncreasingOrder(e, result) { 
-        result = e 
+      if try await areInIncreasingOrder(e, result) {
+        result = e
       }
     }
     return result
@@ -431,12 +431,12 @@ extension AsyncSequence {
     by areInIncreasingOrder: (Element, Element) async throws -> Bool
   ) async rethrows -> Element? {
     var it = makeAsyncIterator()
-    guard var result = try await it.next() else { 
-      return nil 
+    guard var result = try await it.next() else {
+      return nil
     }
     while let e = try await it.next() {
-      if try await areInIncreasingOrder(result, e) { 
-        result = e 
+      if try await areInIncreasingOrder(result, e) {
+        result = e
       }
     }
     return result

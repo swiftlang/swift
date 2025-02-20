@@ -25,7 +25,7 @@ func f0<T, U>(_ t: T, _ f: (inout T) -> U) -> U {
 }
 
 struct X2 {
-  func g() -> Float { return 0 }  
+  func g() -> Float { return 0 }
 }
 
 _ = f0(X2(), {$0.g()})
@@ -91,9 +91,9 @@ func test13811882() {
 /// QoI: "Unexpected trailing closure" should have a fixit to insert a `do`
 /// statement
 do {
-  var inSubcall = true 
+  var inSubcall = true
   {  // expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
-  }  
+  }
   inSubcall = false
 
   // These are a problems, but it's not clear what was intended.
@@ -1145,11 +1145,11 @@ struct R_76250381<Result, Failure: Error> {
 }
 
 // https://github.com/apple/swift/issues/55926
-(0..<10).map { x, y in } 
+(0..<10).map { x, y in }
 // expected-error@-1 {{contextual closure type '(Range<Int>.Element) -> ()' (aka '(Int) -> ()') expects 1 argument, but 2 were used in closure body}}
-(0..<10).map { x, y, z in } 
+(0..<10).map { x, y, z in }
 // expected-error@-1 {{contextual closure type '(Range<Int>.Element) -> ()' (aka '(Int) -> ()') expects 1 argument, but 3 were used in closure body}}
-(0..<10).map { x, y, z, w in } 
+(0..<10).map { x, y, z, w in }
 // expected-error@-1 {{contextual closure type '(Range<Int>.Element) -> ()' (aka '(Int) -> ()') expects 1 argument, but 4 were used in closure body}}
 
 // rdar://77022842 - crash due to a missing argument to a ternary operator

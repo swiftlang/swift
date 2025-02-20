@@ -800,7 +800,7 @@ RequirementMatch swift::matchWitness(
 
     // If the number of parameters doesn't match, we're done.
     if (reqParams.size() != witnessParams.size())
-      return RequirementMatch(witness, MatchKind::TypeConflict, 
+      return RequirementMatch(witness, MatchKind::TypeConflict,
                               witnessType);
 
     ParameterList *witnessParamList = getParameterList(witness);
@@ -1264,8 +1264,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
   };
 
   // Finalize the match.
-  auto finalize = [&](bool anyRenaming, 
-                      ArrayRef<OptionalAdjustment> optionalAdjustments) 
+  auto finalize = [&](bool anyRenaming,
+                      ArrayRef<OptionalAdjustment> optionalAdjustments)
                         -> RequirementMatch {
     // Try to solve the system disallowing free type variables, because
     // that would resolve in incorrect substitution matching when witness
@@ -2922,7 +2922,7 @@ static OptionalAdjustmentPosition classifyOptionalityIssues(
 static void addOptionalityFixIts(
     const SmallVectorImpl<OptionalAdjustment> &adjustments,
     const ASTContext &ctx,
-    ValueDecl *witness, 
+    ValueDecl *witness,
     InFlightDiagnostic &diag) {
   for (const auto &adjustment : adjustments) {
     SourceLoc adjustmentLoc = adjustment.getOptionalityLoc(witness);

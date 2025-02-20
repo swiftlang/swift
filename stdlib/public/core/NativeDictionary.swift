@@ -614,7 +614,7 @@ extension _NativeDictionary {
 
   @_alwaysEmitIntoClient
   internal func extractDictionary(
-    using bitset: _UnsafeBitset, 
+    using bitset: _UnsafeBitset,
     count: Int
   ) -> _NativeDictionary<Key, Value> {
     var count = count

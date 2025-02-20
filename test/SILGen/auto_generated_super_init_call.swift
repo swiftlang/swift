@@ -2,7 +2,7 @@
 
 // Test that we emit a call to super.init at the end of the initializer, when none has been previously added.
 
-class Parent { 
+class Parent {
   init() {}
 }
 
@@ -20,7 +20,7 @@ class SomeDerivedClass : Parent {
 // CHECK-NEXT: [[INITCALL1:%[0-9]+]] = function_ref @$s30auto_generated_super_init_call6ParentCACycfc : $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK-NEXT: [[RES1:%[0-9]+]] = apply [[INITCALL1]]([[PARENT]])
 // CHECK-NEXT: [[DOWNCAST:%[0-9]+]] = unchecked_ref_cast [[RES1]] : $Parent to $SomeDerivedClass
-// CHECK-NEXT: store [[DOWNCAST]] to [init] [[SELF]] : $*SomeDerivedClass 
+// CHECK-NEXT: store [[DOWNCAST]] to [init] [[SELF]] : $*SomeDerivedClass
   }
 
   init(x: Int) {
@@ -39,7 +39,7 @@ class SomeDerivedClass : Parent {
     return
 // Check that we are emitting the super.init expr into the epilog block.
 
-// CHECK-LABEL: sil hidden [ossa] @$s30auto_generated_super_init_call16SomeDerivedClassC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
+// CHECK-LABEL: sil hidden [ossa] @$s30auto_generated_super_init_call16SomeDerivedClassC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass
 // CHECK: bb5:
 // SEMANTIC ARC TODO: Another case of needing a mutable load_borrow.
 // CHECK-NEXT: [[SELFLOAD:%[0-9]+]] = load [take] [[SELF:%[0-9]+]] : $*SomeDerivedClass
@@ -65,7 +65,7 @@ class SomeDerivedClass : Parent {
     }
 
     super.init()
-// CHECK-LABEL: sil hidden [ossa] @$s30auto_generated_super_init_call16SomeDerivedClassC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Bool, Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
+// CHECK-LABEL: sil hidden [ossa] @$s30auto_generated_super_init_call16SomeDerivedClassC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Bool, Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass
 // CHECK: function_ref @$s30auto_generated_super_init_call6ParentCACycfc : $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK: return
   }

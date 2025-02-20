@@ -21,8 +21,8 @@ struct S2<T> {}
 extension S2 where T : P {
   typealias A = Never
 }
-extension S2 : P {} 
-// expected-error@-1 {{type 'S2<T>' does not conform to protocol 'P'}} 
+extension S2 : P {}
+// expected-error@-1 {{type 'S2<T>' does not conform to protocol 'P'}}
 // expected-note@-2 {{add stubs for conformance}}
 
 // Here we have a suitable witness
@@ -48,7 +48,7 @@ struct S5<T> {
   typealias A = Never where T : P
 }
 
-extension S5 : P {} 
+extension S5 : P {}
 // expected-error@-1 {{type 'S5<T>' does not conform to protocol 'P'}}
 // expected-note@-2 {{add stubs for conformance}}
 

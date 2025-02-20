@@ -80,7 +80,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
 
   // NS_RETURNS_RETAINED by family (-copy). This is different from Swift's
-  // normal notion of CamelCase, but it's what Clang does, so we should match 
+  // normal notion of CamelCase, but it's what Clang does, so we should match
   // it.
   @objc func copy8() -> Gizmo { return self }
   // CHECK-LABEL: sil private [thunk] [ossa] @$s11objc_thunks6HoozitC5copy8So5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo
@@ -245,7 +245,7 @@ class Hoozit : Gizmo {
     set {}
   }
   // -- getter
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s11objc_thunks6HoozitC10rwPropertySo5GizmoCvgTo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo 
+  // CHECK-LABEL: sil private [thunk] [ossa] @$s11objc_thunks6HoozitC10rwPropertySo5GizmoCvgTo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo
 
   // -- setter
   // CHECK-LABEL: sil private [thunk] [ossa] @$s11objc_thunks6HoozitC10rwPropertySo5GizmoCvsTo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
@@ -470,7 +470,7 @@ extension Hoozit {
   @objc dynamic convenience init(int i: Int) { self.init(bellsOn: i) }
 
   // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks6HoozitC6doubleACSd_tcfC : $@convention(method) (Double, @thick Hoozit.Type) -> @owned Hoozit
-  convenience init(double d: Double) { 
+  convenience init(double d: Double) {
     var x = X()
     self.init(int:Int(d))
     other()

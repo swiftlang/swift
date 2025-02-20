@@ -29,17 +29,17 @@ case (var a, a): // expected-error {{cannot find 'a' in scope}}
 
 protocol P { func p() }
 
-class B : P { 
-  init() {} 
+class B : P {
+  init() {}
   func p() {}
   func b() {}
 }
 class D : B {
-  override init() { super.init() } 
+  override init() { super.init() }
   func d() {}
 }
 class E {
-  init() {} 
+  init() {}
   func e() {}
 }
 

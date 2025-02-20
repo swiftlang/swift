@@ -2631,7 +2631,7 @@ static CanSILFunctionType getSILFunctionType(
         }
 
         SmallBitVector loweredIndices;
-        loweredIndices.resize(parameterMap.size());      
+        loweredIndices.resize(parameterMap.size());
         for (unsigned j = 0; j < parameterMap.size(); ++j) {
           int formalIndex = parameterMap[j];
           if (formalIndex < 0) {

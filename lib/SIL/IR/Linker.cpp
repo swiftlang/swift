@@ -211,7 +211,7 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
         impl->hasValidLinkageForFragileRef(Vtbl->getSerializedKind())) {
       // Deserialize and recursively walk any vtable entries that do not have
       // bodies yet.
-      maybeAddFunctionToWorklist(impl, 
+      maybeAddFunctionToWorklist(impl,
                                  Vtbl->getSerializedKind());
     }
   }

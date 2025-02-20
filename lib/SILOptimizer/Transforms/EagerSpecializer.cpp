@@ -451,13 +451,13 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
 
 // Emits a type check in the current block.
 // Advances the builder to the successful type check's block.
-// 
+//
 // Precondition: Builder's current insertion block is not terminated.
 //
 // Postcondition: Builder's insertion block is a new block that defines the
 // specialized call argument and has not been terminated.
 //
-// The type check is emitted in the current block as: 
+// The type check is emitted in the current block as:
 // metatype $@thick T.Type
 // %a = unchecked_bitwise_cast % to $Builtin.Int64
 // metatype $@thick <Specialized>.Type

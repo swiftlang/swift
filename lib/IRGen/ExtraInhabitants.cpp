@@ -177,7 +177,7 @@ llvm::Value *PointerInfo::getExtraInhabitantIndex(IRGenFunction &IGF,
   auto phi = IGF.Builder.CreatePHI(IGF.IGM.Int32Ty, phiValues.size());
   for (auto &entry : phiValues) {
     phi->addIncoming(entry.second, entry.first);
-  }  
+  }
   return phi;
 }
 

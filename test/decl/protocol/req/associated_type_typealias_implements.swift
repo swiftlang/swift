@@ -25,7 +25,7 @@ struct Y1: R {
   // okay: infers U = XU
 }
 
-struct Y2: R { 
+struct Y2: R {
   // expected-error@-1 {{type 'Y2' does not conform to protocol 'Q'}}
   // expected-note@-2 {{add stubs for conformance}}
   typealias T = XTWithoutP
@@ -34,7 +34,7 @@ struct Y2: R {
   // error: T: P fails
 }
 
-struct Y3: Q { 
+struct Y3: Q {
   // expected-error@-1 {{type 'Y3' does not conform to protocol 'Q'}}
   // expected-note@-2 {{add stubs for conformance}}
   typealias T = XT

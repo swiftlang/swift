@@ -247,7 +247,7 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple,
     // Record this match.
     sources[i] = matched;
     consumed[matched] = true;
-  }  
+  }
 
   // Resolve any unmatched elements.
   unsigned fromNext = 0, fromLast = fromElts.size();
@@ -1940,7 +1940,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
         // We should only perform name validation if both elements have a label,
         // because unlabeled tuple elements can be converted to labeled ones
         // e.g.
-        // 
+        //
         // let tup: (Any, Any) = (1, 1)
         // _ = tup as! (a: Int, Int)
         if ((!fromElt.getName().empty() && !toElt.getName().empty()) &&

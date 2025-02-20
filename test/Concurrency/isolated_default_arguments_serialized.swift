@@ -11,7 +11,7 @@
 
 import SerializedDefaultArguments
 
-@MainActor 
+@MainActor
 func mainActorCaller() {
   useMainActorDefault()
   useNonisolatedDefault()

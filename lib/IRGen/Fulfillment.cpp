@@ -493,7 +493,7 @@ bool FulfillmentMap::addFulfillment(GenericRequirement key,
 
     // Consider cost only if the fulfillments are equivalent in state.
     // TODO: this is potentially suboptimal, but it generally won't matter.
-    if (metadataState == existingState && 
+    if (metadataState == existingState &&
         path.cost() >= it->second.Path.cost()) {
       return false;
     }

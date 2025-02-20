@@ -4,7 +4,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/out)
 // RUN: split-file %s %t
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -swift-version 5.6 -batch-code-completion -source-filename %t/test.swift -filecheck %raw-FileCheck -completion-output-dir %t/out -import-objc-header %t/ObjC.h -enable-objc-interop 
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -swift-version 5.6 -batch-code-completion -source-filename %t/test.swift -filecheck %raw-FileCheck -completion-output-dir %t/out -import-objc-header %t/ObjC.h -enable-objc-interop
 
 
 //--- ObjC.h

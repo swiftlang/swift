@@ -1429,7 +1429,7 @@ struct NestedCallsWithoutClosingParen {
     let b = 2
     _ = [a: foo(#^IN_DICTIONARY_LITERAL?check=NESTED_CALL_WITHOUT_TYPE_RELATION^#, b: 1]
       // NESTED_CALL_WITHOUT_TYPE_RELATION-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#arg: Int#}, {#arg2: Int#}[')'][#Int#];
-  } 
+  }
 
   func testInArrayLiteral() {
     _ = [foo(#^IN_ARRAY_LITERAL?check=NESTED_CALL_WITHOUT_TYPE_RELATION^#, 1]

@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded %s -O -wmo -sil-verify-all -module-name=test -emit-ir | %FileCheck %s
 
 // Also do an end-to-end test to check all components, including IRGen.
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -parse-as-library -enable-experimental-feature Embedded -O -wmo -module-name=test %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 

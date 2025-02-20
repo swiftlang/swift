@@ -4,13 +4,13 @@ func useInt(_ x: Int) {}
 func useDouble(_ x: Double) {}
 
 class B {
-  init() {} 
+  init() {}
 }
 class D1 : B {
-  override init() { super.init() } 
+  override init() { super.init() }
 }
 class D2 : B {
-  override init() { super.init() } 
+  override init() { super.init() }
 }
 
 func useB(_ x: B) {}

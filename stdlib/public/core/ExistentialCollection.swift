@@ -1876,7 +1876,7 @@ extension AnyCollection: Collection {
   public typealias Indices = DefaultIndices<AnyCollection>
   public typealias Iterator = AnyIterator<Element>
   public typealias Index = AnyIndex
-  public typealias SubSequence = AnyCollection<Element> 
+  public typealias SubSequence = AnyCollection<Element>
 
   /// Creates a type-erased collection that wraps the given collection.
   ///
@@ -2099,7 +2099,7 @@ extension AnyBidirectionalCollection: BidirectionalCollection {
   public typealias Indices = DefaultIndices<AnyBidirectionalCollection>
   public typealias Iterator = AnyIterator<Element>
   public typealias Index = AnyIndex
-  public typealias SubSequence = AnyBidirectionalCollection<Element> 
+  public typealias SubSequence = AnyBidirectionalCollection<Element>
 
   /// Creates a type-erased collection that wraps the given collection.
   ///
@@ -2330,7 +2330,7 @@ extension AnyRandomAccessCollection: RandomAccessCollection {
   public typealias Indices = DefaultIndices<AnyRandomAccessCollection>
   public typealias Iterator = AnyIterator<Element>
   public typealias Index = AnyIndex
-  public typealias SubSequence = AnyRandomAccessCollection<Element> 
+  public typealias SubSequence = AnyRandomAccessCollection<Element>
 
   /// Creates a type-erased collection that wraps the given collection.
   ///

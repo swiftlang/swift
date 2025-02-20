@@ -629,7 +629,7 @@ nonThrowableDefaultRethrows() // expected-error {{call can throw but is not mark
 func throwableDefaultRethrows(_ f: () throws -> () = { throw SomeError.Badness }) rethrows {
   try f()
 }
-// This should always emit a diagnostic because we can statically know that default argument can throw. 
+// This should always emit a diagnostic because we can statically know that default argument can throw.
 throwableDefaultRethrows()  // expected-error {{call can throw but is not marked with 'try'}}
                             // expected-note@-1 {{call is to 'rethrows' function, but a defaulted argument function can throw}}
 

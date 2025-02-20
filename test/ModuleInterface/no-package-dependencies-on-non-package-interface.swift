@@ -19,7 +19,7 @@
 
 
 // Test 1: Build a textual interface client which imports Bar and is in Bar's package but not being built from a package interface, therefore it must not import Bar's package-only dependencies
-// RUN: %target-swift-frontend -compile-module-from-interface -explicit-interface-module-build %t/Client.swiftinterface -o %t/Modules/Client.swiftmodule -module-name Client -I %t/Modules/ -package-name BarTest 
+// RUN: %target-swift-frontend -compile-module-from-interface -explicit-interface-module-build %t/Client.swiftinterface -o %t/Modules/Client.swiftmodule -module-name Client -I %t/Modules/ -package-name BarTest
 
 // Test 2: Build a textual interface client which imports Bar and is in Bar's package and is being built from a package interface, therefore it must import Bar's package-only dependencies
 // RUN: not %target-swift-frontend -compile-module-from-interface -explicit-interface-module-build %t/Client.package.swiftinterface -o %t/Modules/Client.package.swiftmodule -module-name Client -I %t/Modules/ -package-name BarTest &> %t/error.txt

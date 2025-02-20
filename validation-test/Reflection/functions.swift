@@ -426,7 +426,7 @@ class CapturingClass {
   @_optimize(none)
   func arity1Capture2() -> (Int) -> () {
    let x: C? = C()
-   let closure = { (i: Int) in 
+   let closure = { (i: Int) in
      print(self)
      print(x)
    }

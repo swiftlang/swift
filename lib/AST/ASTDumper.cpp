@@ -3988,7 +3988,7 @@ public:
     if (auto captureInfo = E->getCachedCaptureInfo()) {
       printCaptureInfoField(captureInfo, Label::optional("captures"));
     }
-    // Printing a function type doesn't indicate whether it's escaping because it doesn't 
+    // Printing a function type doesn't indicate whether it's escaping because it doesn't
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
     if (auto Ty = GetTypeOfExpr(E)) {
       if (auto fType = Ty->getAs<AnyFunctionType>()) {

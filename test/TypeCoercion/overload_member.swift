@@ -178,7 +178,7 @@ extension A {
 
 var clams : X
 
-struct WeirdIvarLookupBehavior { 
+struct WeirdIvarLookupBehavior {
   var clams : Y
 
   func f() {

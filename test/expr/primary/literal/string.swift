@@ -22,7 +22,7 @@ func verify<T>(
   with: T.Type) {
 }
 func verify<T>(
-  unicodeScalarLiteral value: CustomUnicodeScalar<T>, 
+  unicodeScalarLiteral value: CustomUnicodeScalar<T>,
   with: T.Type) {
 }
 

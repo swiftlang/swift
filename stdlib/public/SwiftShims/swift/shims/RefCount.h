@@ -219,7 +219,7 @@ struct RefCountBitsInt<RefCountNotInline, 4> {
 template <>
 struct RefCountBitsInt<RefCountIsInline, 4> {
   typedef uint32_t Type;
-  typedef int32_t SignedType;  
+  typedef int32_t SignedType;
 };
 
 
@@ -364,7 +364,7 @@ class RefCountBitsT {
             (((BitsType(val) << offsets::name##Shift) & offsets::name##Mask)))
 
 # define getField(name) getFieldIn(bits, Offsets, name)
-# define setField(name, val) setFieldIn(bits, Offsets, name, val)  
+# define setField(name, val) setFieldIn(bits, Offsets, name, val)
 # define copyFieldFrom(src, name)                                       \
     setFieldIn(bits, Offsets, name,                                     \
                getFieldIn(src.bits, decltype(src)::Offsets, name))
@@ -983,7 +983,7 @@ class RefCounts {
   /// Return true if the object can be freed directly right now.
   /// (transition DEINITING -> DEAD)
   /// This is used in swift_deallocObject().
-  /// Can be freed now means:  
+  /// Can be freed now means:
   ///   no side table
   ///   unowned reference count is 1
   /// The object is assumed to be deiniting with no strong references already.
@@ -1101,8 +1101,8 @@ class RefCounts {
   public:  // FIXME: access control hack
 
   // Fast path of atomic strong decrement.
-  // 
-  // Deinit is optionally handled directly instead of always deferring to 
+  //
+  // Deinit is optionally handled directly instead of always deferring to
   // the caller because the compiler can optimize this arrangement better.
   template <PerformDeinit performDeinit>
   SWIFT_ALWAYS_INLINE
@@ -1242,7 +1242,7 @@ class RefCounts {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable())
       return bits.getSideTable()->getUnownedCount();
-    else 
+    else
       return bits.getUnownedRefCount();
   }
 
@@ -1343,7 +1343,7 @@ class HeapObjectSideTableEntry {
 
   public:
   HeapObjectSideTableEntry(HeapObject *newObject)
-    : object(newObject), 
+    : object(newObject),
 #if __arm__ || __powerpc__ // https://github.com/apple/swift/issues/48416
    refCounts(SideTableRefCounts::Initialized)
 #else
@@ -1528,7 +1528,7 @@ SWIFT_ALWAYS_INLINE inline bool
 RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
 
   // We can get away without atomicity here.
-  // The caller claims that there are no other threads with strong references 
+  // The caller claims that there are no other threads with strong references
   // to this object.
   // We can non-atomically check that there are no outstanding unowned or
   // weak references, and if nobody else has a strong reference then
@@ -1557,7 +1557,7 @@ RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
 }
 
 // Out-of-line version of non-atomic strong decrement.
-// This version needs to be atomic because of the 
+// This version needs to be atomic because of the
 // threat of concurrent read of a weak reference.
 template <>
 template <PerformDeinit performDeinit>

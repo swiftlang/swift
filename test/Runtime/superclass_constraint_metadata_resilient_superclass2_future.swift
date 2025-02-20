@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-library -enable-library-evolution -module-name Framework -module-link-name Framework %S/Inputs/public_struct_with_generic_arg_swift_class_constrained.swift -o %t/%target-library-name(Framework) -emit-module-path %t/Framework.swiftmodule -target %module-target-future
 // RUN: %target-codesign %t/libFramework.dylib
-// RUN: %target-build-swift -emit-library -enable-library-evolution -module-name Framework2 -module-link-name Framework2 %S/Inputs/open_subclass_of_Framework.Superclass.swift -o %t/%target-library-name(Framework2) -emit-module-path %t/Framework2.swiftmodule -target %module-target-future -I %t -L %t 
+// RUN: %target-build-swift -emit-library -enable-library-evolution -module-name Framework2 -module-link-name Framework2 %S/Inputs/open_subclass_of_Framework.Superclass.swift -o %t/%target-library-name(Framework2) -emit-module-path %t/Framework2.swiftmodule -target %module-target-future -I %t -L %t
 // RUN: %target-codesign %t/libFramework2.dylib
 
 // RUN: %target-build-swift %s %S/Inputs/print_subclass/main.swift -module-name main -o %t/main -I %t -L %t -target %module-target-future

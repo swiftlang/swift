@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -primary-file %s -O -module-name=test -emit-ir | %FileCheck %s
 
 // Also do an end-to-end test.
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT

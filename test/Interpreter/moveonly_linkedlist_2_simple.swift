@@ -20,9 +20,9 @@
 // CHECK: bye end
 @main struct App { static func main() {
   let l: List<Int> = .more(
-    2, 
+    2,
     Box(
-      .more(3, 
+      .more(3,
         Box(
           .end
         )

@@ -4,7 +4,7 @@ protocol P {
   associatedtype SomeType
 }
 
-protocol P2 { 
+protocol P2 {
   func wonka()
 }
 
@@ -16,7 +16,7 @@ extension Double : P {
   typealias SomeType = Double
 }
 
-func f0(_ x: Int, 
+func f0(_ x: Int,
         _ y: Float) { }
 
 func f1(_: @escaping (Int, Float) -> Int) { }
@@ -43,7 +43,7 @@ var d : Double
 // Tuple size mismatch.
 f1(
    f4 // expected-error {{cannot convert value of type '(Int) -> Int' to expected argument type '(Int, Float) -> Int'}}
-   ) 
+   )
 
 // Tuple element unused.
 f0(i, i, // expected-error@:7 {{cannot convert value of type 'Int' to expected argument type 'Float'}}
@@ -127,7 +127,7 @@ protocol Shoes {
 
 // Here the opaque value has type (metatype_type (archetype_type ... ))
 func f(_ x: Shoes, asType t: Shoes.Type) {
-  return t.select(x) 
+  return t.select(x)
   // expected-error@-1 {{unexpected non-void return value in void function}}
   // expected-note@-2 {{did you mean to add a return type?}}
 }
@@ -185,7 +185,7 @@ func perform<T>() {}  // expected-error {{generic parameter 'T' is not used in f
 
 // <rdar://problem/17080659> Error Message QOI - wrong return type in an overload
 func recArea(_ h: Int, w : Int) {
-  return h * w  
+  return h * w
   // expected-error@-1 {{unexpected non-void return value in void function}}
   // expected-note@-2 {{did you mean to add a return type?}}
 }
@@ -361,7 +361,7 @@ protocol Proto {}
 func f<T: Proto>(x: [T]) {}
 func f(x: Int...) {}
 f(x: [1,2,3])
-// TODO(diagnostics): Diagnose both the missing conformance and the disallowed array splat to cover both overloads. 
+// TODO(diagnostics): Diagnose both the missing conformance and the disallowed array splat to cover both overloads.
 // expected-error@-2 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
 // expected-note@-3 {{remove brackets to pass array elements directly}}
 
@@ -674,7 +674,7 @@ func segfault23433271(_ a : UnsafeMutableRawPointer) {
 // <rdar://problem/23272739> Poor diagnostic due to contextual constraint
 func r23272739(_ contentType: String) {
   let actualAcceptableContentTypes: Set<String> = []
-  return actualAcceptableContentTypes.contains(contentType)  
+  return actualAcceptableContentTypes.contains(contentType)
   // expected-error@-1 {{unexpected non-void return value in void function}}
   // expected-note@-2 {{did you mean to add a return type?}}
 }
@@ -795,7 +795,7 @@ class Foo23752537 {
 extension Foo23752537 {
   func isEquivalent(other: Foo23752537) {
     // TODO: <rdar://problem/27391581> QoI: Nonsensical "binary operator '&&' cannot be applied to two 'Bool' operands"
-    // expected-error@+1 {{unexpected non-void return value in void function}} 
+    // expected-error@+1 {{unexpected non-void return value in void function}}
     return (self.title != other.title && self.message != other.message) // expected-note {{did you mean to add a return type?}}
   }
 }
@@ -809,7 +809,7 @@ func rdar27391581(_ a : Int, b : Int) -> Int {
 // <rdar://problem/22276040> QoI: not great error message with "withUnsafePointer" sametype constraints
 func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
 func read<T : BinaryInteger>() -> T? {
-  var buffer : T 
+  var buffer : T
   let n = withUnsafeMutablePointer(to: &buffer) { (p) in
     read2(UnsafePointer(p), maxLength: MemoryLayout<T>.size) // expected-error {{cannot convert value of type 'UnsafePointer<T>' to expected argument type 'UnsafeMutableRawPointer'}}
   }
@@ -822,7 +822,7 @@ func f23213302() {
 
 // <rdar://problem/24202058> QoI: Return of call to overloaded function in void-return context
 func rdar24202058(a : Int) {
-  return a <= 480 
+  return a <= 480
   // expected-error@-1 {{unexpected non-void return value in void function}}
   // expected-note@-2 {{did you mean to add a return type?}}
 }
@@ -1067,7 +1067,7 @@ class L_32934129<T : Comparable> {
 
   func length() -> Int {
     func inner(_ list: L_32934129<T>?, _ count: Int) {
-    guard let list = list else { return count } 
+    guard let list = list else { return count }
       // expected-error@-1 {{unexpected non-void return value in void function}}
       // expected-note@-2 {{did you mean to add a return type?}}
       return inner(list.next, count + 1)
@@ -1199,13 +1199,13 @@ takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expe
 // Void function returns non-void result fix-it
 
 func voidFunc() {
-  return 1 
+  return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
   // expected-note@-2 {{did you mean to add a return type?}}{{-1:16-16= -> <#Return Type#>}}
 }
 
 func voidFuncWithArgs(arg1: Int) {
-  return 1 
+  return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
   // expected-note@-2 {{did you mean to add a return type?}}{{-1:33-33= -> <#Return Type#>}}
 }
@@ -1468,7 +1468,7 @@ func testUnwrapFixIts(x: Int?) throws {
   foo(y: x) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
   // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{11-11= ?? <#default value#>}}
   // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{11-11=!}}
-  foo(y: x ?? 0) 
+  foo(y: x ?? 0)
 
   let _ = x < 2 // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
   // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{12-12= ?? <#default value#>}}

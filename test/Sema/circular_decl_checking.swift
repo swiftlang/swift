@@ -35,7 +35,7 @@ class HasProp { // expected-note {{'HasProp' declared here}}
 
 protocol SomeProtocol {}
 protocol ReferenceSomeProtocol {
-  var SomeProtocol: SomeProtocol { get } 
+  var SomeProtocol: SomeProtocol { get }
 }
 
 func TopLevelFunc(x: TopLevelFunc) -> TopLevelFunc { return x } // expected-error 2 {{cannot find type 'TopLevelFunc' in scope}}'

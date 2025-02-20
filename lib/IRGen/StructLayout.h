@@ -406,7 +406,7 @@ class StructLayout {
   /// alignment are exact.
   bool IsFixedLayout;
 
-  /// Whether this layout 
+  /// Whether this layout
   bool IsLoadable;
 
   IsTriviallyDestroyable_t IsKnownTriviallyDestroyable;

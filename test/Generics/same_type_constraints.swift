@@ -80,7 +80,7 @@ public struct GeneratorOf<T> : IteratorProtocol, Sequence {
 
 // rdar://problem/19009056
 public struct LazySequenceOf<S : Sequence, A> : Sequence where S.Iterator.Element == A {
-  public func makeIterator() -> GeneratorOf<A> { 
+  public func makeIterator() -> GeneratorOf<A> {
     return GeneratorOf<A>({ return nil })
   }
   public subscript(i : A) -> A { return i }

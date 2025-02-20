@@ -18,6 +18,6 @@ actor MyActor {
   // CHECK: } // end sil function '$s4test7MyActorC19passSelfIntoClosureyyYaF'
   func passSelfIntoClosure() async {
     let closure = { useValue(self.ns) }
-    await transferToMain(closure) 
+    await transferToMain(closure)
   }
 }

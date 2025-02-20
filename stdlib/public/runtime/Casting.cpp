@@ -379,7 +379,7 @@ swift::swift_getFunctionFullNameFromMangledName(
 
 /// Report a dynamic cast failure.
 // This is noinline to preserve this frame in stack traces.
-// We want "dynamicCastFailure" to appear in crash logs even we crash 
+// We want "dynamicCastFailure" to appear in crash logs even we crash
 // during the diagnostic because some Metadata is invalid.
 SWIFT_NORETURN SWIFT_NOINLINE void
 swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
@@ -387,9 +387,9 @@ swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
                                 const char *message) {
   swift::fatalError(/* flags = */ 0,
                     "Could not cast value of type '%s' (%p) to '%s' (%p)%s%s\n",
-                    sourceName, sourceType, 
-                    targetName, targetType, 
-                    message ? ": " : ".", 
+                    sourceName, sourceType,
+                    targetName, targetType,
+                    message ? ": " : ".",
                     message ? message : "");
 }
 
@@ -438,7 +438,7 @@ swift::swift_dynamicCastFailure(const Metadata *sourceType,
   std::string sourceName = nameForMetadata(sourceType);
   std::string targetName = nameForMetadata(targetType);
 
-  swift_dynamicCastFailure(sourceType, sourceName.c_str(), 
+  swift_dynamicCastFailure(sourceType, sourceName.c_str(),
                            targetType, targetName.c_str(), message);
 }
 
@@ -1623,7 +1623,7 @@ _bridgeNonVerbatimFromObjectiveCConditional(
   // Check whether we can downcast the source value to the Objective-C
   // type.
   auto sourceValueAsObjectiveCType =
-    const_cast<void*>(swift_dynamicCastUnknownClass(sourceValue, 
+    const_cast<void*>(swift_dynamicCastUnknownClass(sourceValue,
                                                     objectiveCType));
   if (!sourceValueAsObjectiveCType)
     return fail();

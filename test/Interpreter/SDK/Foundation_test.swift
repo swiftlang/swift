@@ -182,7 +182,7 @@ FoundationTestSuite.test("RangeConversion") {
   expectNil(Range(NSRange(location: 0, length: 100), in: s))
 
   let empty = ""
-  expectNil(Range(NSRange(location: 1, length: 0), in: empty))  
+  expectNil(Range(NSRange(location: 1, length: 0), in: empty))
   expectNil(Range(NSRange(location: 0, length: 1), in: empty))
   expectNotNil(Range(NSRange(location: 0, length: 0), in: empty))
 

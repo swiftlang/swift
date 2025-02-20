@@ -12,7 +12,7 @@ enum Optionable<T> {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Optionable<(A) -> A>,
 // CHECK: switch_enum [[ARG]] : $Optionable<(A) -> A>, case #Optionable.Summn!enumelt: [[DEST:bb[0-9]+]]
 //
-// CHECK: [[DEST]]([[ARG:%.*]] : 
+// CHECK: [[DEST]]([[ARG:%.*]] :
 // CHECK:   [[ORIG:%.*]] = copy_value [[ARG]]
 // CHECK:   [[CONV:%.*]] = convert_function [[ORIG]]
 // CHECK:   [[REABSTRACT:%.*]] = function_ref @$s{{.*}}TR :

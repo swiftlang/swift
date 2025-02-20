@@ -491,7 +491,7 @@ func testInferredFromWrapper(x: InferredFromPropertyWrapper) { // expected-note{
   _ = x.test() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'test()' in a synchronous nonisolated context}}
 }
 
-@propertyWrapper 
+@propertyWrapper
 struct SimplePropertyWrapper {
   var wrappedValue: Int { .zero }
   var projectedValue: Int { .max }
@@ -499,7 +499,7 @@ struct SimplePropertyWrapper {
 
 @MainActor
 class WrappedContainsNonisolatedAttr {
-  @SimplePropertyWrapper nonisolated var value 
+  @SimplePropertyWrapper nonisolated var value
   // expected-error@-1 {{'nonisolated' is not supported on properties with property wrappers}}
   // expected-note@-2 {{property declared here}}
 

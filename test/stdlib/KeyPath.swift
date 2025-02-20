@@ -83,7 +83,7 @@ final class ComputedA {
 
 struct ComputedB {
   var readOnly: ComputedA { fatalError() }
-  var mutating: ComputedA { 
+  var mutating: ComputedA {
     get { fatalError() }
     set { fatalError() }
   }

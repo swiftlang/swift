@@ -108,6 +108,6 @@ var DarwinIoctlConstants = TestSuite("DarwinIoctlConstants")
 
 DarwinIoctlConstants.test("tty ioctl constants availability") {
   let aConstant = TIOCGWINSZ
-} 
+}
 
 runAllTests()

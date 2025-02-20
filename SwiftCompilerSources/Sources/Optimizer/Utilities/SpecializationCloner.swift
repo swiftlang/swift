@@ -14,7 +14,7 @@ import OptimizerBridging
 import SIL
 
 /// Utility cloner type that can be used by optimizations that generate new functions or specialized versions of
-/// existing functions. 
+/// existing functions.
 struct SpecializationCloner {
   private let bridged: BridgedSpecializationCloner
   let context: FunctionPassContext

@@ -25,7 +25,7 @@ namespace swift {
 /// TypeMemberVisitor - This is a convenience adapter of DeclVisitor
 /// which filters out a few common declaration kinds that are never
 /// members of nominal types.
-template<typename ImplClass, typename RetTy = void> 
+template<typename ImplClass, typename RetTy = void>
 class TypeMemberVisitor : public DeclVisitor<ImplClass, RetTy> {
 protected:
   ImplClass &asImpl() { return static_cast<ImplClass&>(*this); }

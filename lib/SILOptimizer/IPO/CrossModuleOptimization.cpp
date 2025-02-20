@@ -341,7 +341,7 @@ static bool isSerializeCandidate(SILFunction *F, SILOptions options) {
   return linkage == SILLinkage::Public;
 }
 
-bool CrossModuleOptimization::isReferenceSerializeCandidate(SILFunction *F, 
+bool CrossModuleOptimization::isReferenceSerializeCandidate(SILFunction *F,
                                                             SILOptions options) {
   if (isPackageCMOEnabled(F->getModule().getSwiftModule())) {
     if (isSerializedWithRightKind(F->getModule(), F))
@@ -998,7 +998,7 @@ void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function
 /// Make a nominal type, including its context, usable from inline.
 void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
   if (decl->getEffectiveAccess() >= AccessLevel::Package)
-    return;  
+    return;
 
   // This function should not be called in Package CMO mode.
   assert(!isPackageCMOEnabled(M.getSwiftModule()));

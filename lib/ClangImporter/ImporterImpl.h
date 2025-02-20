@@ -424,7 +424,7 @@ struct ImportDiagnosticHasher {
 };
 
 /// Implementation of the Clang importer.
-class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
+class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   : public LazyMemberLoader,
     public LazyConformanceLoader
 {

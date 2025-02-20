@@ -173,7 +173,7 @@ func stringToPointer(_ s: String) {
   // CHECK: destroy_value [[OWNER]]
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion14inoutToPointeryyF 
+// CHECK-LABEL: sil hidden [ossa] @$s18pointer_conversion14inoutToPointeryyF
 func inoutToPointer() {
   var int = 0
   // CHECK: [[INT:%.*]] = alloc_box ${ var Int }

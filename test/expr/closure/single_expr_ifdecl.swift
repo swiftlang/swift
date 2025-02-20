@@ -8,14 +8,14 @@ func simple() {
   takeIntToInt({
     #if true
     $0 + 1
-    #else 
+    #else
     $0 + 2
     #endif
   })
   takeIntIntToInt({
     #if true
     $0 + $1 + 1
-    #else 
+    #else
     $0 + $1 + 2
     #endif
   })

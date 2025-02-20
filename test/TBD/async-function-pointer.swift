@@ -6,7 +6,7 @@
 @_silgen_name("bar")
 public func foo() async {}
 
-// CHECK: @"$s4test1CC1f33_295642D23064661A21CD592AD781409CLLyyYaFTu" = global %swift.async_func_pointer 
+// CHECK: @"$s4test1CC1f33_295642D23064661A21CD592AD781409CLLyyYaFTu" = global %swift.async_func_pointer
 
 open class C {
   private func f() async { }

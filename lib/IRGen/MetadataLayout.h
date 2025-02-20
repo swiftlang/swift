@@ -432,7 +432,7 @@ llvm::Value *emitClassFieldOffset(IRGenFunction &IGF,
                                   VarDecl *field,
                                   llvm::Value *metadata);
 
-/// Given a class metadata pointer, emit the address of its superclass field.  
+/// Given a class metadata pointer, emit the address of its superclass field.
 Address emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
                                                   llvm::Value *metadata);
 

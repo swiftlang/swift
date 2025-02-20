@@ -96,7 +96,7 @@ func test_global_actor_sendable_and_sending_closures() {
   // CHECK-LABEL: sil private [ossa] @$s6Client47test_global_actor_sendable_and_sending_closuresyyFyyYbcfU_ : $@convention(thin) @Sendable () -> ()
   // CHECK-NOT: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
   // CHECK: } // end sil function '$s6Client47test_global_actor_sendable_and_sending_closuresyyFyyYbcfU_'
-  computeSendable {   
+  computeSendable {
   }
 
   // CHECK-LABEL: sil private [ossa] @$s6Client47test_global_actor_sendable_and_sending_closuresyyFyycfU0_ : $@convention(thin) () -> ()

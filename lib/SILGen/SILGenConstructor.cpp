@@ -868,7 +868,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
                                  AC.getIdentifier("$return_value"),
-                                 element->getDeclContext());  
+                                 element->getDeclContext());
     VD->setSpecifier(ParamSpecifier::InOut);
     VD->setInterfaceType(enumIfaceTy);
     auto resultSlot =

@@ -40,7 +40,7 @@ func callClassMethod() -> NonNilTest? {
   if foo == nil {
     print("nil")
   }
-  return foo  
+  return foo
 }
 
 // OPT-LABEL: sil shared @$s21objc_nonnull_lie_hack18callInstanceMethodSo10NonNilTestCSgAD3obj_tFTf4g_n
@@ -67,7 +67,7 @@ func loadProperty(obj: NonNilTest) -> NonNilTest? {
   if foo == nil {
     print("nil")
   }
-  return foo  
+  return foo
 }
 
 // OPT-LABEL: sil shared @$s21objc_nonnull_lie_hack19loadUnownedPropertySo10NonNilTestCSgAD3obj_tFTf4g_n
@@ -80,5 +80,5 @@ func loadUnownedProperty(obj: NonNilTest) -> NonNilTest? {
   if foo == nil {
     print("nil")
   }
-  return foo  
+  return foo
 }

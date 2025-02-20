@@ -1966,7 +1966,7 @@ const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
   return Types.getCompleteTypeInfo(T);
 }
 
-/// 
+///
 const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
   return *getTypeEntry(T);
 }

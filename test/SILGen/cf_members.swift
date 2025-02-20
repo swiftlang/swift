@@ -161,7 +161,7 @@ public func foo(_ x: Double) {
   // CHECK: [[FN:%.*]] = function_ref @IAMStruct1StaticMethod
   // CHECK: apply [[FN]]()
   var y = Struct1.staticMethod()
-  // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32 
+  // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32
   // CHECK: [[I2:%.*]] = thin_to_thick_function [[THUNK]]
   // CHECK: [[MOVED_I2:%.*]] = move_value [lexical] [var_decl] [[I2]]
   // CHECK: [[BORROWED_I2:%.*]] = begin_borrow [[MOVED_I2]]
@@ -256,7 +256,7 @@ public func foo(_ x: Double) {
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[SELF]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32 
+// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32
 // CHECK:       bb0:
 // CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1StaticMethod
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]()

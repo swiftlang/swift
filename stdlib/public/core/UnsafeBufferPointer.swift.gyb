@@ -86,7 +86,7 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
   }
 
 % if Mutable:
-  /// Creates a mutable typed buffer pointer referencing the same memory as the 
+  /// Creates a mutable typed buffer pointer referencing the same memory as the
   /// given immutable buffer pointer.
   ///
   /// - Parameter other: The immutable buffer pointer to convert.
@@ -97,7 +97,7 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
     count = other.count
   }
 % else:
-  /// Creates an immutable typed buffer pointer referencing the same memory as the 
+  /// Creates an immutable typed buffer pointer referencing the same memory as the
   /// given mutable buffer pointer.
   ///
   /// - Parameter other: The mutable buffer pointer to convert.
@@ -1322,7 +1322,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// different than the number of instances of `Element` referenced by the
   /// original buffer. The number of instances of `T` will be calculated
   /// at runtime.
-  /// 
+  ///
   /// Any instance of `T` within the re-bound region may be initialized or
   /// uninitialized. Every instance of `Pointee` overlapping with a given
   /// instance of `T` should have the same initialization state (i.e.

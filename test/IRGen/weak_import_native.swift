@@ -119,7 +119,7 @@ func testClass() {
 // CHECK-DAG: @"$s25weak_import_native_helper1CCACycfCTq" = extern_weak global %swift.method_descriptor
 class Sub : C {
   deinit {
-    // This is correctly a strong symbol reference; the class is not declared 
+    // This is correctly a strong symbol reference; the class is not declared
     // weak.
     // CHECK-DAG: declare swiftcc {{.+}} @"$s25weak_import_native_helper1CCfd"
   }

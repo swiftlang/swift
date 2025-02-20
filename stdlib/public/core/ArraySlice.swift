@@ -954,7 +954,7 @@ extension ArraySlice: RangeReplaceableCollection {
     let oldCount = self.count
     let startNewElements = _buffer.firstElementAddress + oldCount
     let buf = UnsafeMutableBufferPointer(
-                start: startNewElements, 
+                start: startNewElements,
                 count: self.capacity - oldCount)
 
     let (remainder,writtenUpTo) = buf.initialize(from: newElements)
@@ -1300,7 +1300,7 @@ extension ArraySlice {
     // a precondition and Array never lies about its count.
     guard var p = buffer.baseAddress
       else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
-    _precondition(self.count <= buffer.count, 
+    _precondition(self.count <= buffer.count,
       "Insufficient space allocated to copy array contents")
 
     if let s = _baseAddressIfContiguous {

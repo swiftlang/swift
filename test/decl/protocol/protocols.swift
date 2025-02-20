@@ -36,7 +36,7 @@ protocol Test2 {
 
 func test1() {
   var v1: Test
-  var s: String 
+  var s: String
 
   v1.setTitle(s)
   v1.creator = "Me"                   // expected-error {{cannot assign to property: 'creator' is a get-only property}}
@@ -71,22 +71,22 @@ extension X2 : CustomStringConvertible {
 
 // Explicit conformance checks (unsuccessful)
 
-struct NotPrintableS : Any, CustomStringConvertible {} 
+struct NotPrintableS : Any, CustomStringConvertible {}
 // expected-error@-1 {{type 'NotPrintableS' does not conform to protocol 'CustomStringConvertible'}}
 // expected-note@-2 {{add stubs for conformance}}
 
-class NotPrintableC : CustomStringConvertible, Any {} 
+class NotPrintableC : CustomStringConvertible, Any {}
 // expected-error@-1 {{type 'NotPrintableC' does not conform to protocol 'CustomStringConvertible'}}
 // expected-note@-2 {{add stubs for conformance}}
 
-enum NotPrintableO : Any, CustomStringConvertible {} 
+enum NotPrintableO : Any, CustomStringConvertible {}
 // expected-error@-1 {{type 'NotPrintableO' does not conform to protocol 'CustomStringConvertible'}}
 // expected-note@-2 {{add stubs for conformance}}
 
-struct NotFormattedPrintable : FormattedPrintable { 
+struct NotFormattedPrintable : FormattedPrintable {
   // expected-error@-1 {{type 'NotFormattedPrintable' does not conform to protocol 'CustomStringConvertible'}}
   // expected-note@-2 {{add stubs for conformance}}
-  func print(format: TestFormat) {} 
+  func print(format: TestFormat) {}
 }
 
 // Protocol compositions in inheritance clauses
@@ -149,9 +149,9 @@ struct IsSimpleAssoc : SimpleAssoc {
   struct Associated {}
 }
 
-struct IsNotSimpleAssoc : SimpleAssoc {} 
-// expected-error@-1 {{type 'IsNotSimpleAssoc' does not conform to protocol 'SimpleAssoc'}} 
-// expected-note@-2 {{add stubs for conformance}} 
+struct IsNotSimpleAssoc : SimpleAssoc {}
+// expected-error@-1 {{type 'IsNotSimpleAssoc' does not conform to protocol 'SimpleAssoc'}}
+// expected-note@-2 {{add stubs for conformance}}
 
 protocol StreamWithAssoc {
   associatedtype Element
@@ -169,7 +169,7 @@ struct AWordStreamType : StreamWithAssoc {
   func get() -> Int {}
 }
 
-struct NotAStreamType : StreamWithAssoc { 
+struct NotAStreamType : StreamWithAssoc {
   // expected-error@-1 {{type 'NotAStreamType' does not conform to protocol 'StreamWithAssoc'}}
   // expected-note@-2 {{add stubs for conformance}}
   typealias Element = Float
@@ -209,7 +209,7 @@ extension IntIterator : SequenceViaStream {
   typealias SequenceStreamTypeType = IntIterator
 }
 
-struct NotSequence : SequenceViaStream { 
+struct NotSequence : SequenceViaStream {
   // expected-error@-1 {{type 'NotSequence' does not conform to protocol 'SequenceViaStream'}}
   // expected-note@-2 {{add stubs for conformance}}
   typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'NotSequence.SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
@@ -255,13 +255,13 @@ struct HasIntMax : IntMaxable {
   func intmax(first: Int, rest: Int...) -> Int {}
 }
 
-struct NotIntMax1 : IntMaxable  { 
+struct NotIntMax1 : IntMaxable  {
   // expected-error@-1 {{type 'NotIntMax1' does not conform to protocol 'IntMaxable'}}
   // expected-note@-2 {{add stubs for conformance}}
   func intmax(first: Int, rest: [Int]) -> Int {} // expected-note{{candidate has non-matching type '(Int, [Int]) -> Int'}}
 }
 
-struct NotIntMax2 : IntMaxable { 
+struct NotIntMax2 : IntMaxable {
   // expected-error@-1 {{type 'NotIntMax2' does not conform to protocol 'IntMaxable'}}
   // expected-note@-2 {{add stubs for conformance}}
   func intmax(first: Int, rest: Int) -> Int {} // expected-note{{candidate has non-matching type '(Int, Int) -> Int'}}
@@ -278,7 +278,7 @@ struct HasIsEqual : IsEqualComparable {
   func isEqual(other: HasIsEqual) -> Bool {}
 }
 
-struct WrongIsEqual : IsEqualComparable { 
+struct WrongIsEqual : IsEqualComparable {
   // expected-error@-1 {{type 'WrongIsEqual' does not conform to protocol 'IsEqualComparable'}}
   // expected-note@-2 {{add stubs for conformance}}
   func isEqual(other: Int) -> Bool {}  // expected-note{{candidate has non-matching type '(Int) -> Bool'}}
@@ -296,7 +296,7 @@ protocol InstanceP {
 struct StaticS1 : StaticP {
   static func f() {}
 }
-struct StaticS2 : InstanceP { 
+struct StaticS2 : InstanceP {
   // expected-error@-1 {{type 'StaticS2' does not conform to protocol 'InstanceP'}}
   // expected-note@-2 {{add stubs for conformance}}
   static func f() {} // expected-note{{candidate operates on a type, not an instance as required}}
@@ -405,7 +405,7 @@ protocol NonObjCProtocol : class { //expected-note{{protocol 'NonObjCProtocol' d
   func bar()
 }
 
-class DoesntConformToObjCProtocol : ObjCProtocol { 
+class DoesntConformToObjCProtocol : ObjCProtocol {
   // expected-error@-1 {{type 'DoesntConformToObjCProtocol' does not conform to protocol 'ObjCProtocol'}}
   // expected-note@-2 {{add stubs for conformance}}
 }
@@ -425,7 +425,7 @@ protocol P2 {
 
 struct X3<T : P1> where T.Assoc : P2 {}
 
-struct X4 : P1 { 
+struct X4 : P1 {
   // expected-error@-1 {{type 'X4' does not conform to protocol 'P1'}}
   // expected-note@-2 {{add stubs for conformance}}
   func getX1() -> X3<X4> { return X3() }
@@ -464,7 +464,7 @@ func g<T : C2>(_ x : T) {
   x as P2 // expected-error{{cannot convert value of type 'T' to type 'any P2' in coercion}}
 }
 
-class C3 : P1 {} 
+class C3 : P1 {}
 // expected-error@-1 {{type 'C3' does not conform to protocol 'P1'}}
 // expected-note@-2 {{add stubs for conformance}}
 func h<T : C3>(_ x : T) {
@@ -486,7 +486,7 @@ protocol P4 {
   associatedtype T // expected-note {{protocol requires nested type 'T'}}
 }
 
-class C4 : P4 { 
+class C4 : P4 {
   // expected-error@-1 {{type 'C4' does not conform to protocol 'P4'}}
   // expected-note@-2 {{add stubs for conformance}}
   associatedtype T = Int  // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}} {{3-17=typealias}}

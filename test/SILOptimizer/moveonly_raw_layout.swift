@@ -50,7 +50,7 @@ public func useLock() {
     // CHECK: [[L:%.*]] = alloc_stack
     // CHECK-NOT: destroy_addr [[L]] :
     // CHECK: [[F:%.*]] = function_ref @[[INIT]]
-    // CHECK: apply [[F]]([[L]], 
+    // CHECK: apply [[F]]([[L]],
     var l = Lock()
     // CHECK-NOT: destroy_addr [[L]] :
     // CHECK: [[L_BORROW:%.*]] = begin_access [read] [static] [[L]] :
@@ -62,7 +62,7 @@ public func useLock() {
     // CHECK: [[L2:%.*]] = alloc_stack
     // CHECK-NOT: destroy_addr [[L2]] :
     // CHECK: [[F:%.*]] = function_ref @[[INIT]]
-    // CHECK: apply [[F]]([[L2]], 
+    // CHECK: apply [[F]]([[L2]],
     // CHECK: [[L_INOUT:%.*]] = begin_access [modify] [static] [[L]] :
     // CHECK: destroy_addr [[L]] :
     // CHECK: copy_addr [take] [[L2]] to [init] [[L_INOUT]]

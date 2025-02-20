@@ -29,5 +29,5 @@ public struct MyStruct<T>: MyProtocol {
 
 // "type metadata instantiation cache for main.MyStruct"
 // CHECK-CACHE: @"$s4main8MyStructVMI" = internal global [{{.*}} x ptr] zeroinitializer
-// CHECK-CACHE: @"$s4main8MyStructVMn" = {{.*}} @"$s4main8MyStructVMI" {{.*}} 
+// CHECK-CACHE: @"$s4main8MyStructVMn" = {{.*}} @"$s4main8MyStructVMI" {{.*}}
 // CHECK-NOCACHE-NOT: @"$s4main8MyStructVMI"

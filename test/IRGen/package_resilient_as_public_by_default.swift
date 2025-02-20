@@ -25,11 +25,11 @@
 // CHECK: @"$s18package_resilience28PkgClassWithPublicPropertiesC5colors5Int32VvpWvd" = hidden global
 // CHECK: @"$s18package_resilience24PkgWithPackagePropertiesC1p16resilient_struct5PointVvpWvd" = hidden global
 // CHECK: @"$s18package_resilience24PkgWithPackagePropertiesC1s16resilient_struct4SizeVvpWvd" = hidden global
-// CHECK: @"$s18package_resilience24PkgWithPackagePropertiesC5colors5Int32VvpWvd" = hidden global 
+// CHECK: @"$s18package_resilience24PkgWithPackagePropertiesC5colors5Int32VvpWvd" = hidden global
 // CHECK: @"$s18package_resilience32PublicClassWithEnumIndirectCasesC1s14resilient_enum0C10FunnyShapeOvpWvd" = hidden global
-// CHECK: @"$s18package_resilience32PublicClassWithEnumIndirectCasesC5colors5Int32VvpWvd" = hidden global 
+// CHECK: @"$s18package_resilience32PublicClassWithEnumIndirectCasesC5colors5Int32VvpWvd" = hidden global
 // CHECK: @"$s18package_resilience29PkgClassWithEnumIndirectCasesC1s14resilient_enum10FunnyShapeOvpWvd" = hidden global
-// CHECK: @"$s18package_resilience29PkgClassWithEnumIndirectCasesC5colors5Int32VvpWvd" = hidden global 
+// CHECK: @"$s18package_resilience29PkgClassWithEnumIndirectCasesC5colors5Int32VvpWvd" = hidden global
 
 // CHECK: @"$s18package_resilience33PublicClassWithEmptyThenResilientC9resilient0I7_struct0cH3IntVvpWvd" = hidden global
 // CHECK: @"$s18package_resilience33PublicClassWithResilientThenEmptyC9resilient0I7_struct0cF3IntVvpWvd" = hidden global
@@ -40,15 +40,15 @@
 // CHECK: @"$s18package_resilience33PublicClassWithFrozenPbPropertiesC1s16resilient_struct0fC4SizeVvpWvd" = hidden constant
 // CHECK: @"$s18package_resilience33PublicClassWithFrozenPbPropertiesC5colors5Int32VvpWvd" = hidden constant
 
-// CHECK: @"$s18package_resilience17PublicClassParentC1sAA0C12StructSimpleVvpWvd" = hidden constant 
-// CHECK: @"$s18package_resilience16PublicClassChildC5fields5Int32VvpWvd" = hidden constant 
-// CHECK: @"$s18package_resilience24PublicClassConcreteChildC1xSivpWvd" = hidden constant 
-// CHECK: @"$s18package_resilience14PkgClassParentC1sAA0C12StructSimpleVvpWvd" = hidden constant 
-// CHECK: @"$s18package_resilience13PkgClassChildC5fields5Int32VvpWvd" = hidden constant 
-// CHECK: @"$s18package_resilience21PkgClassConcreteChildC1xSivpWvd" = hidden constant 
+// CHECK: @"$s18package_resilience17PublicClassParentC1sAA0C12StructSimpleVvpWvd" = hidden constant
+// CHECK: @"$s18package_resilience16PublicClassChildC5fields5Int32VvpWvd" = hidden constant
+// CHECK: @"$s18package_resilience24PublicClassConcreteChildC1xSivpWvd" = hidden constant
+// CHECK: @"$s18package_resilience14PkgClassParentC1sAA0C12StructSimpleVvpWvd" = hidden constant
+// CHECK: @"$s18package_resilience13PkgClassChildC5fields5Int32VvpWvd" = hidden constant
+// CHECK: @"$s18package_resilience21PkgClassConcreteChildC1xSivpWvd" = hidden constant
 
-// CHECK: @"$s18package_resilience33PublicClassWithEmptyThenResilientC5emptyAA0cF0VvpWvd" = hidden constant 
-// CHECK: @"$s18package_resilience33PublicClassWithResilientThenEmptyC5emptyAA0cH0VvpWvd" = hidden constant 
+// CHECK: @"$s18package_resilience33PublicClassWithEmptyThenResilientC5emptyAA0cF0VvpWvd" = hidden constant
+// CHECK: @"$s18package_resilience33PublicClassWithResilientThenEmptyC5emptyAA0cH0VvpWvd" = hidden constant
 // CHECK: @"$s18package_resilience30PkgClassWithEmptyThenResilientC5emptyAA0c6StructF0VvpWvd" = hidden constant
 // CHECK: @"$s18package_resilience30PkgClassWithResilientThenEmptyC5emptyAA0c6StructH0VvpWvd" = hidden constant
 

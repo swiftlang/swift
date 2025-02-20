@@ -24,7 +24,7 @@ func bridgedStatus<T>(_: T.Type) -> String {
   if !bridged && verbatim {
     return "IS NOT BRIDGED BUT IS VERBATIM?!"
   }
-  return bridged ? 
+  return bridged ?
     verbatim ? "is bridged verbatim" : "is custom-bridged"
     : "is unbridged"
 }

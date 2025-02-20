@@ -40,7 +40,7 @@ extension VolatileMappedRegister where Pointee == UInt8 {
   ///
   /// Do not use for inter-thread synchronization.
   @_transparent
-  public func load() -> Pointee { 
+  public func load() -> Pointee {
     UInt8(Builtin.atomicload_monotonic_volatile_Int8(_rawPointer))
   }
 

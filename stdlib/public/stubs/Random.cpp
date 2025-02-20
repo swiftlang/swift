@@ -111,7 +111,7 @@ void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 #endif
 
     if (actual_nbytes == -1) {
-      static const int fd = 
+      static const int fd =
         WHILE_EINTR(open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0));
 
       if (fd != -1) {

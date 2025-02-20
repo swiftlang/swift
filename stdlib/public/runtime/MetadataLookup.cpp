@@ -768,7 +768,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 
         // Declarations synthesized by the Clang importer get a small tag
         // string in addition to their name.
-        if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){          
+        if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){
           if (!getIdentity().isRelatedEntity(
                                         nameNode->getFirstChild()->getText()))
             return false;
@@ -1032,11 +1032,11 @@ _findContextDescriptor(Demangle::NodePointer node,
       return Value->getDescription();
   }
 
-  // Check type metadata records		   
+  // Check type metadata records
   // Scan any newly loaded images for context descriptors, then try the context
   foundContext = _searchTypeMetadataRecords(T, node);
 
-  // Check protocol conformances table. Note that this has no support for		
+  // Check protocol conformances table. Note that this has no support for
   // resolving generic types yet.
   if (!foundContext)
     foundContext = _searchConformancesByMangledTypeName(node);
@@ -1829,7 +1829,7 @@ public:
         .getType();
   }
 
-  Mangle::ManglingFlavor getManglingFlavor() { 
+  Mangle::ManglingFlavor getManglingFlavor() {
     return Mangle::ManglingFlavor::Default;
   }
   Demangle::NodeFactory &getNodeFactory() { return demangler; }

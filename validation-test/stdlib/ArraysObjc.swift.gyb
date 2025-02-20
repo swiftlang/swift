@@ -136,13 +136,13 @@ func getBridgedNonverbatimArrayAndNSMutableArray()
   return (Swift._forceBridgeFromObjectiveC(nsa, Array.self), nsa)
 }
 
-func getBridgedVerbatimEquatableArray(_ a: Array<Int>) 
+func getBridgedVerbatimEquatableArray(_ a: Array<Int>)
     -> Array<TestObjCEquatableValueTy> {
   let nsa = getAsEquatableNSArray(a)
   return convertNSArrayToArray(nsa)
 }
 
-func getBridgedNonverbatimEquatableArray(_ a: Array<Int>) 
+func getBridgedNonverbatimEquatableArray(_ a: Array<Int>)
     -> Array<TestBridgedEquatableValueTy> {
   let nsa = getAsEquatableNSArray(a)
   return Swift._forceBridgeFromObjectiveC(nsa, Array.self)
@@ -161,7 +161,7 @@ func getHugeBridgedVerbatimArray() -> Array<AnyObject> {
   return convertNSArrayToArray(nsa)
 }
 
-func getHugeBridgedNonverbatimArray() 
+func getHugeBridgedNonverbatimArray()
     -> Array<TestBridgedValueTy> {
   let nsa = getHugeBridgedVerbatimArrayHelper()
   return Swift._forceBridgeFromObjectiveC(nsa, Array.self)
