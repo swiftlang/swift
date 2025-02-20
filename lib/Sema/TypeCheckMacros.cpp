@@ -25,6 +25,7 @@
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
 #include "swift/AST/MacroDefinition.h"
