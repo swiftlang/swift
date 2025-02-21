@@ -140,3 +140,4 @@ func testFnKeyPathSubscript() {
   test1[#^FN_KEYPATH_SUBSCRIPT^#]
   // FN_KEYPATH_SUBSCRIPT: Pattern/None/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<() -> (), Value>#}[']'][#Value#]; name=keyPath:
 }
+// UNSUPPORTED: OS=windows-msvc

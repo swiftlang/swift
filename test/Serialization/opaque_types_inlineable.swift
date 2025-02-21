@@ -27,3 +27,4 @@ public struct K : P {
 public struct Q : P {
   public init() {}
 }
+// UNSUPPORTED: OS=windows-msvc

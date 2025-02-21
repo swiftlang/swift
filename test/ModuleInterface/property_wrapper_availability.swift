@@ -65,3 +65,4 @@ public struct UnavailableHasWrappers {
   // CHECK-NEXT:    }
   @UnavailableWrapper public var x: Int
 }
+// UNSUPPORTED: OS=windows-msvc

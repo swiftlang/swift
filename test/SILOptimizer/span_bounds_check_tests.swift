@@ -297,3 +297,4 @@ public func span_binary_search_spl(_ v: Span<Int>, _ elem: Int) -> Int? {
   return nil;
 }
 
+// UNSUPPORTED: OS=windows-msvc

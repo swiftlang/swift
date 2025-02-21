@@ -66,3 +66,4 @@ class rdar28583595 : NSObject {
     // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

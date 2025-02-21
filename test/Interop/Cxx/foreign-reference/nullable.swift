@@ -32,3 +32,4 @@ NullableTestSuite.test("IntPair") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

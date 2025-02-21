@@ -19,3 +19,4 @@ struct Test2: TestProtocol { // expected-warning{{conformance of 'C2' to 'Sendab
   // expected-note@-1{{in associated type 'Self.Value' (inferred as 'C2')}}
   typealias Value = C2
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -91,3 +91,4 @@ func useSwiftOriginatedFunctions() {
   swiftOriginatedFunctionDeprecatedOnIOS()
   swiftOriginatedFunctionPotentiallyUnavailableOnIOS()
 }
+// UNSUPPORTED: OS=windows-msvc

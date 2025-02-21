@@ -9,3 +9,4 @@ func foo(_ b: BarForwardDeclaredClass, _ s: SomeItemSet) -> Int32 {
   let _ = s.theSimpleOldNameNotToRename
   return barGlobalVariable
 }
+// UNSUPPORTED: OS=windows-msvc

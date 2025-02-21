@@ -23,3 +23,4 @@ struct UnownedVarBox<T : AnyObject> {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

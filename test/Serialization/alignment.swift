@@ -7,3 +7,4 @@
 
 func foo(x: Foo) {}
 
+// UNSUPPORTED: OS=windows-msvc

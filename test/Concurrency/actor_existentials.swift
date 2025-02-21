@@ -79,3 +79,4 @@ func good() async {
     // expected-note@+1 {{consider declaring an isolated method on 'Proto' to perform the mutation}}
     await aIndirect.i = 777
 }
+// UNSUPPORTED: OS=windows-msvc

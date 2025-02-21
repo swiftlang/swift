@@ -35,3 +35,4 @@ func test(borrowing foo: borrowing Foo) {
         nibble(x)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

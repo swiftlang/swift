@@ -22,3 +22,4 @@ macro invalidMacro()
 // expected-error@-2 {{macro 'invalidMacro()' must declare its applicable roles via '@freestanding' or @attached'}}
 
 #invalidMacro() // expected-error {{no macro named 'invalidMacro'}}
+// UNSUPPORTED: OS=windows-msvc

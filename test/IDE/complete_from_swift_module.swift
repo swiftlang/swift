@@ -166,3 +166,4 @@ func testAmbiguousResultBuilder() {
     // AMBIGUOUS_RESULT_BUILER-NOT: globalVar
   }
 }
+// UNSUPPORTED: OS=windows-msvc

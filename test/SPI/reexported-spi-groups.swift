@@ -186,3 +186,4 @@ public func client() {
     exportedSpiFunc() // expected-error {{cannot find 'exportedSpiFunc' in scope}}
     exporterSpiFunc() // expected-error {{cannot find 'exporterSpiFunc' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

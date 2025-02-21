@@ -5,3 +5,4 @@ public func testSwiftFunc() {}
 
 
 // CHECK: _$s{{.*}}testSwiftFunc{{.*}}
+// UNSUPPORTED: OS=windows-msvc

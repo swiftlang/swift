@@ -17,3 +17,4 @@ func test(peoples: [Int]) {
     MavigationLink(destination: PeopleDetail(peopleId: people))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

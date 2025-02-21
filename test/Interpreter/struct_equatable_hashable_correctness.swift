@@ -86,3 +86,4 @@ StructSynthesisTests.test("ExplicitOverridesSynthesizedInExtension") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

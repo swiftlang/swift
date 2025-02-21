@@ -11,3 +11,4 @@ class CameraViewController
     cameraController.checkDeviceAuthorizationStatusAndConfigureDevice()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

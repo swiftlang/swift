@@ -25,3 +25,4 @@
 #endif
 
 import SomeModule
+// UNSUPPORTED: OS=windows-msvc

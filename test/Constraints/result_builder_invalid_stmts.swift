@@ -60,3 +60,4 @@ func qux(_ x: String) -> Int {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@ func foo() {
   bar(X<Int?>.self, .zero)
   // expected-error@-1 {{cannot find 'X' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

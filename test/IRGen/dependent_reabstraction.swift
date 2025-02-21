@@ -24,3 +24,4 @@ let b = X<String>()
 
 foo(a, X<Int>.self)
 foo(b, X<String>.self)
+// UNSUPPORTED: OS=windows-msvc

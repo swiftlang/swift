@@ -9,3 +9,4 @@ import arm64
 // RUN: %validate-json %t/deps.json | %FileCheck %s
 
 // CHECK-NOT: arm64e-apple-macos11.0
+// UNSUPPORTED: OS=windows-msvc

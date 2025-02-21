@@ -378,3 +378,4 @@ func testBuiltinGlobalStringTablePointerError(s: String) -> UnsafePointer<CChar>
 func testBuiltinGlobalStringTablePointerNoError(s: String) -> UnsafePointer<CChar> {
   return _getGlobalStringTablePointer(s)
 }
+// UNSUPPORTED: OS=windows-msvc

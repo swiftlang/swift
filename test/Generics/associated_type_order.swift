@@ -15,3 +15,4 @@ struct G<T : P1 & P2> where T.A == T.B {
   func foo(_: T.A) {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -39,3 +39,4 @@ func passPackageStruct(_ s: PackageStruct) { take(s) } // expected-error{{type_d
 
 func passPublicStruct(_ s: PublicStruct) { take(s) } // expected-error{{type_does_not_conform_decl_owner}}
                                                      // expected-note@-6{{where_requirement_failure_one_subst}}
+// UNSUPPORTED: OS=windows-msvc

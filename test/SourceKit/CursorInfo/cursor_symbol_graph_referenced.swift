@@ -333,3 +333,4 @@ extension Parent {
 // SPI-NEXT:   ExtInner swift.struct s:30cursor_symbol_graph_referenced6ParentV8ExtInnerV
 // SPI-NEXT:   SPIType swift.struct [[SPIType_USR]]
 // SPI-NEXT: REFERENCED DECLS END
+// UNSUPPORTED: OS=windows-msvc

@@ -149,3 +149,4 @@ struct ImplUnsafeAddressors : P {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

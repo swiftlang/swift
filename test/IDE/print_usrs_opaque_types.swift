@@ -74,3 +74,4 @@ extension TooGenericTooContext where T == Int {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

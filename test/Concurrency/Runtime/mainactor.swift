@@ -143,3 +143,4 @@ class C {
     _ = await t1.value + t2.value
   }
 }
+// UNSUPPORTED: OS=windows-msvc

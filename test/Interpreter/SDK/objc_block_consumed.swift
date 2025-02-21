@@ -20,3 +20,4 @@ ObjCBlockConsumedTestSuite.test("Test") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

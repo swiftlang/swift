@@ -24,3 +24,4 @@ struct Strucc {
   var y: String
 }
 
+// UNSUPPORTED: OS=windows-msvc

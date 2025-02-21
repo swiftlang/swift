@@ -172,3 +172,4 @@ let fixitTry3 : () try -> Int // expected-error{{expected throwing specifier; di
 func fixitAwait0() await { } // expected-error{{expected async specifier; did you mean 'async'?}}{{20-25=async}}
 func fixitAwait1() await -> Int { } // expected-error{{expected async specifier; did you mean 'async'?}}{{20-25=async}}
 func fixitAwait2() throws await -> Int { } // expected-error{{expected async specifier; did you mean 'async'?}}{{27-32=async}}
+// UNSUPPORTED: OS=windows-msvc

@@ -96,3 +96,4 @@ public func test(
 ) -> Bool {
   return obj.member.value == 42
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -2,3 +2,4 @@
 
 // CHECK-KEEP-OBJC-DAG: -migrate-keep-objc-visibility
 // CHECK-KEEP-OBJC-DAG: -emit-remap-file-path {{.*}}.remap
+// UNSUPPORTED: OS=windows-msvc

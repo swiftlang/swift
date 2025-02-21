@@ -236,3 +236,4 @@ func testNotWeaklyLinked() {
 
 // We should not generate a #_hasSymbol query helper for Swift.Int.
 // CHECK-NOT: sSiTwS
+// UNSUPPORTED: OS=windows-msvc

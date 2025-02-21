@@ -106,3 +106,4 @@ func test() {
 // xCHECK:        key.modulename: "FooHelper"
 // xCHECK-NEXT:   key.sourcetext: "FooHelperUnnamedEnumeratorA2"
 // xCHECK-NEXT: },
+// UNSUPPORTED: OS=windows-msvc

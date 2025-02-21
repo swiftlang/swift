@@ -50,3 +50,4 @@ func test_taskGroup_isEmpty() async {
     await test_taskGroup_isEmpty()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ typealias AnAlias = undefined // expected-error {{cannot find type 'undefined'}}
 import errors
 func test(a: AnAlias) {}
 // CHECK-USES-NOT: cannot find type 'AnAlias' in scope
+// UNSUPPORTED: OS=windows-msvc

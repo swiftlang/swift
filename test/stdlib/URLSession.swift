@@ -59,3 +59,4 @@ private func testTaskMetrics(_ metrics: URLSessionTaskMetrics) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

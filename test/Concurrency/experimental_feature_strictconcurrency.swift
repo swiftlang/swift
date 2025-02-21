@@ -36,3 +36,4 @@ func iterate(stream: AsyncStream<Int>) async {
     print(x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

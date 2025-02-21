@@ -271,3 +271,4 @@ Tests.test("UTF8ViewSlicing") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

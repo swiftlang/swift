@@ -15,3 +15,4 @@ protocol AnnotatedEnqueuer {
 // expected-error@+2 {{type 'A<T>' does not conform to protocol 'AnnotatedEnqueuer'}}
 // expected-note@+1 {{add stubs for conformance}}
 extension A : AnnotatedEnqueuer {}
+// UNSUPPORTED: OS=windows-msvc

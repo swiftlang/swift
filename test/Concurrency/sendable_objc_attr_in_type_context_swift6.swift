@@ -152,3 +152,4 @@ class TestConformanceWithoutStripping : InnerSendableTypes {
   func test(withCallback name: String, handler: @escaping @MainActor ([String : any Sendable], (any Error)?) -> Void) { // Ok
   }
 }
+// UNSUPPORTED: OS=windows-msvc

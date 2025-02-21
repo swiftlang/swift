@@ -25,3 +25,4 @@ final class NoneExecutor: SerialExecutor {
     UnownedSerialExecutor(ordinary: self)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

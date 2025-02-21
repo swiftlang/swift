@@ -8,3 +8,4 @@
 // CHECK-LLDB-NOT: debug_pubnames
 
 // REQUIRES: OS=macosx
+// UNSUPPORTED: OS=windows-msvc

@@ -46,3 +46,4 @@ func testMatch() {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

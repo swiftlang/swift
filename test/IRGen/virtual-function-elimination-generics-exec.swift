@@ -38,3 +38,4 @@ o.foo()
 // NM:     $s4main14MyDerivedClassC3fooyyF
 // NM-NOT: $s4main7MyClassC3baryyF
 // NM:     $s4main7MyClassC3fooyyF
+// UNSUPPORTED: OS=windows-msvc

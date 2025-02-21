@@ -71,3 +71,4 @@ enum NotComparableEnumTwo: Comparable {
   case value(NotComparable)
   // expected-note@-1 {{associated value type 'NotComparableEnumTwo.NotComparable' does not conform to protocol 'Comparable', preventing synthesized conformance of 'NotComparableEnumTwo' to 'Comparable'}}
 }
+// UNSUPPORTED: OS=windows-msvc

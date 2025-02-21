@@ -22,3 +22,4 @@ func testCanImportVersion() {
   let badBinaryModuleVersionTooHigh = 1
 #endif
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -140,3 +140,4 @@ func check_existential_metatype(with x: (any ~Copyable.Type)?) {
 }
 check_existential_metatype(with: NC.self)
 // CHECK: passed type = NC
+// UNSUPPORTED: OS=windows-msvc

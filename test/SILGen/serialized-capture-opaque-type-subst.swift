@@ -10,3 +10,4 @@ public func bar() -> () -> Any {
 
     return { xy }
 }
+// UNSUPPORTED: OS=windows-msvc

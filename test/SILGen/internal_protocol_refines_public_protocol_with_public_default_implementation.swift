@@ -13,3 +13,4 @@ extension B {
 
 public struct S: B {
 }
+// UNSUPPORTED: OS=windows-msvc

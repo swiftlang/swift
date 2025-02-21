@@ -8,3 +8,4 @@ public func test() {
   var x = CannotBeInstantianted<IntWrapper>(CChar(0), CChar(0))
   x.incValue() // This is just to make sure "x" isn't removed.
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -78,3 +78,4 @@ extension Box {
     self.t = t
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ public struct server {
         let server = MoveOnly() // CHECK: ==> I am in the deinit!
     }
 }
+// UNSUPPORTED: OS=windows-msvc

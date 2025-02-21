@@ -3,3 +3,4 @@
 // UNSUPPORTED: OS=windows-msvc
 // CHECK: swift-frontend
 
+// UNSUPPORTED: OS=windows-msvc

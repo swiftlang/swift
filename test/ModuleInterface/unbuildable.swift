@@ -34,3 +34,4 @@ import UnbuildableFuture
 
 // CURRENT-VERIFY: UnbuildableCurrent.swiftinterface:{{.*:.*}}: error: failed to verify module interface of 'UnbuildableCurrent' due to the errors above; the textual interface may be broken by project issues or a compiler bug
 // FUTURE-VERIFY: UnbuildableFuture.swiftinterface:{{.*:.*}}: error: failed to verify module interface of 'UnbuildableFuture' due to the errors above; the textual interface may be broken by project issues, differences between compilers (the producer 'NeoTokyoSwift 2000.42' and this compiler '{{.*Swift version.*}}') or a compiler bug
+// UNSUPPORTED: OS=windows-msvc

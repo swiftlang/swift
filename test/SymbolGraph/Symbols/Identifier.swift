@@ -7,3 +7,4 @@ public struct MyStruct {}
 
 // CHECK: "precise": "s:10Identifier8MyStructV",
 // CHECK-NEXT: "interfaceLanguage": "swift"
+// UNSUPPORTED: OS=windows-msvc

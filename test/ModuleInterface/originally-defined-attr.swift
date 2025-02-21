@@ -49,3 +49,4 @@ public struct SimpleThingInAlphabeticalOrderForMacros2 {}
 @_originallyDefinedIn(module: "another", OSX 13.13)
 @usableFromInline
 internal struct SimpleThingInAlphabeticalOrderForMacros3_UsableFromInline {}
+// UNSUPPORTED: OS=windows-msvc

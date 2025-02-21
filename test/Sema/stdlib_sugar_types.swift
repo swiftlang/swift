@@ -17,3 +17,4 @@ enum Optional<Wrapped> {
 struct Array<Element> {}
 
 struct Dictionary<Key, Value> {}
+// UNSUPPORTED: OS=windows-msvc

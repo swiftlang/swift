@@ -62,3 +62,4 @@ public actor MyActor {
     print(local())
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -61,3 +61,4 @@ func runFibonacci(_ n: Int) async {
     await runFibonacci(15)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

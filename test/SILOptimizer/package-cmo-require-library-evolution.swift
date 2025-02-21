@@ -31,3 +31,4 @@ public struct S {
     return 1
   }
 }
+// UNSUPPORTED: OS=windows-msvc

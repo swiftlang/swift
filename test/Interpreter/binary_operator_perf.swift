@@ -217,3 +217,4 @@ let components = D(year:1776, month:7, day:4)
 let date = String(components.year) + "-" + String(components.month) + "-" + String(components.day)
 print(date)
 // CHECK: 1776-7-4
+// UNSUPPORTED: OS=windows-msvc

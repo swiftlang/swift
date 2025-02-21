@@ -4,3 +4,4 @@
 struct BasicAppApp {
   static func main() {}
 }
+// UNSUPPORTED: OS=windows-msvc

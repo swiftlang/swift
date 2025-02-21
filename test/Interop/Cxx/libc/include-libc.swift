@@ -19,3 +19,4 @@ LibcTests.test("abs") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

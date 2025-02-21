@@ -128,3 +128,4 @@ public class AlsoHasThrowingInit : HasThrowingInit {
     try! self.init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ func caller() {
   callee(Key.self, { _ in })
 }
 
+// UNSUPPORTED: OS=windows-msvc

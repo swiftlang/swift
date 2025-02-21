@@ -71,3 +71,4 @@ public struct FakeMapSequence<T> : AsyncIteratorProtocol {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

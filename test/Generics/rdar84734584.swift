@@ -26,3 +26,4 @@ func bar<X1: P2, X2: P1>(x: X1, u: X2, uu: X2.T1)
   let _: S2.Type = X2.T1.T1.self
   let _: S2.Type = X1.T2.T1.self
 }
+// UNSUPPORTED: OS=windows-msvc

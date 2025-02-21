@@ -31,3 +31,4 @@ let c = C()
 // CHECK-NEXT: [{{.*}}] __builtin_log_scope_entry
 // CHECK-NEXT: [{{.*}}] __builtin_log_scope_exit
 // CHECK-NEXT: [{{.*}}] __builtin_log[c='main.C']
+// UNSUPPORTED: OS=windows-msvc

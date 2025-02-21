@@ -29,3 +29,4 @@
 
 // RUN: %FileCheck %s  -check-prefix=CHECK-REBUILD-NO-LOCK < %t/result-no-lock.txt
 // CHECK-REBUILD-NO-LOCK: rebuilding module 'Foo' from interface
+// UNSUPPORTED: OS=windows-msvc

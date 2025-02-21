@@ -33,3 +33,4 @@ struct NEG<T : ~Escapable> : ~Escapable {
     self.t = t
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ var _: Int = nil
 
 // 'nil' can initialize the specified type, if its generic parameters are bound
 var _: Array? = nil // expected-error {{generic parameter 'Element' could not be inferred}}
+// UNSUPPORTED: OS=windows-msvc

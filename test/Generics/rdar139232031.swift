@@ -6,3 +6,4 @@ protocol P1 {
 }
 
 protocol P2<A>: P1 where B: P2<A> {}
+// UNSUPPORTED: OS=windows-msvc

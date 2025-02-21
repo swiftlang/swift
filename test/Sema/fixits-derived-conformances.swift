@@ -19,3 +19,4 @@ extension Enum: @retroactive CaseIterable { }
 // expected-error@-1 {{extension outside of file declaring enum 'Enum' prevents automatic synthesis of 'allCases' for protocol 'CaseIterable'}}
 // expected-note@-2 {{add stubs for conformance}}{{44-44=\n    public static var allCases: [Enum]\n}}
 
+// UNSUPPORTED: OS=windows-msvc

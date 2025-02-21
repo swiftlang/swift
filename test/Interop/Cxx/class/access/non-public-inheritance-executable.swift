@@ -118,3 +118,4 @@ extension PrivPrivBase {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

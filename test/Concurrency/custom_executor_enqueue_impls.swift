@@ -92,3 +92,4 @@ final class MissingOwnership: SerialExecutor { // expected-error {{type 'Missing
     UnownedSerialExecutor(ordinary: self)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

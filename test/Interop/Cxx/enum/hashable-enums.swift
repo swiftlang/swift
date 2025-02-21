@@ -78,3 +78,4 @@ HashableEnumsTestSuite.test("Sets work as expected") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

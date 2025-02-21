@@ -27,3 +27,4 @@
 //--- main.swift
 print((any Test & Sendable).self)
 // CHECK: Test
+// UNSUPPORTED: OS=windows-msvc

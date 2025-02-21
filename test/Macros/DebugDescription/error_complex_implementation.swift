@@ -13,3 +13,4 @@ struct MyStruct {
     flag ? "yes" : "no"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

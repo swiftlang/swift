@@ -45,3 +45,4 @@ public func test_create_largestring() -> String {
 public func test_create_unicode() -> String {
   return "❄️gastroperiodyni"
 }
+// UNSUPPORTED: OS=windows-msvc

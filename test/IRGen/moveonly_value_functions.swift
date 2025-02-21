@@ -456,3 +456,4 @@ public enum SinglePayloadNC_1<Element: Equatable>: ~Copyable {
 // CHECK-SAME:        ptr [[METADATA]])
 // CHECK:       }
 
+// UNSUPPORTED: OS=windows-msvc

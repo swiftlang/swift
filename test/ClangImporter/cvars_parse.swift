@@ -12,3 +12,4 @@ func testPointers() {
   let mp = globalPointer
   mp.abcde() // expected-error {{value of type 'UnsafeMutableRawPointer?' has no member 'abcde'}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ struct S<T: P, U: P<T.A>> {
   func f<V>(_: V) where V == T.A {}
   // expected-error@-1 {{'A' was defined in extension of protocol 'P' and cannot be referenced from a 'where' clause}}
 }
+// UNSUPPORTED: OS=windows-msvc

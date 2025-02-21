@@ -20,3 +20,4 @@ func takeError<E: Error>(_ error: E) { }
 func passError(error: any Error) {
   takeError(error)  // okay
 }
+// UNSUPPORTED: OS=windows-msvc

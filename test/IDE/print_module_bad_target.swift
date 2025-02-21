@@ -5,3 +5,4 @@
 // RUN: not %target-swift-ide-test -source-filename %s -print-module -module-to-print Dummy -I %t
 
 // REQUIRES: OS=macosx
+// UNSUPPORTED: OS=windows-msvc

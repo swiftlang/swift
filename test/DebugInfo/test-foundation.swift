@@ -84,3 +84,4 @@ func useOptions(_ opt: URL.BookmarkCreationOptions)
 // LOC-CHECK: ![[L2]] =
 // LOC-CHECK: ![[L3]] =
 // LOC-CHECK: ![[L4]] =
+// UNSUPPORTED: OS=windows-msvc

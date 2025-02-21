@@ -17,3 +17,4 @@ struct S {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

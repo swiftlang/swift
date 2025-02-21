@@ -65,3 +65,4 @@ let conformingInner: Any = Outer.Inner<String>()
 let nonconformingInner: Any = Outer.Inner<Int>()
 precondition(conformingInner is P)
 precondition(!(nonconformingInner is P))
+// UNSUPPORTED: OS=windows-msvc

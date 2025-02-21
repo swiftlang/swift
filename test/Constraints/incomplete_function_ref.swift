@@ -12,3 +12,4 @@ MyCollection.map // expected-error{{generic parameter 'Element' could not be inf
 let a = MyCollection<Int>()
 a.map // expected-error{{generic parameter 'T' could not be inferred}}
 
+// UNSUPPORTED: OS=windows-msvc

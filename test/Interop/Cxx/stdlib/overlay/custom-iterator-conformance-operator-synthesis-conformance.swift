@@ -30,3 +30,4 @@ public func testPlusEqualOrMinus() -> Bool {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

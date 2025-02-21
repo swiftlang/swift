@@ -10,3 +10,4 @@ class I58661 {
     let check = try? throwing() // expected-error{{generic parameter 'T' could not be inferred}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

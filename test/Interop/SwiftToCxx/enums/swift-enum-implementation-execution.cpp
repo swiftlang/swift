@@ -87,3 +87,4 @@ int main() {
 // CHECK: self
     return  0;
 }
+// UNSUPPORTED: OS=windows-msvc

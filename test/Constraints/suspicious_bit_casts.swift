@@ -255,3 +255,4 @@ func castBetweenIntAndPointer(p: UnsafePointer<Int>,
   // expected-warning@+1{{'unsafeBitCast' from 'UInt64' to 'UnsafeRawPointer' can be replaced with 'bitPattern:' initializer}}{{7-21=UnsafeRawPointer(bitPattern: UInt(}}{{24-52=))}}
   _ = unsafeBitCast(uuu, to: UnsafeRawPointer.self)
 }
+// UNSUPPORTED: OS=windows-msvc

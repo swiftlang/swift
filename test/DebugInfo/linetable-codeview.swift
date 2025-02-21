@@ -94,3 +94,4 @@ func foo() {
 // CHECK-DAG: ![[DEFAULTCLEANUP]] = !DILocation(line: 27, scope:
 // CHECK-DAG: ![[ARRAY]] = !DILocation(line: 31, scope:
 // CHECK-DAG: ![[ARRAY_ALLOC]] = !DILocation(line: 31, scope:
+// UNSUPPORTED: OS=windows-msvc

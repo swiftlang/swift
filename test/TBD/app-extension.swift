@@ -14,3 +14,4 @@
 
 // MACABI: "target": "{{.*}}-macos"
 // MACABI: "target": "{{.*}}-maccatalyst"
+// UNSUPPORTED: OS=windows-msvc

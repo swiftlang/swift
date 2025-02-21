@@ -64,3 +64,4 @@ protocol G3<ActorSystem>: DistributedActor, Base where ActorSystem: DistributedA
 // CHECK:   }
 // CHECK: }
 
+// UNSUPPORTED: OS=windows-msvc

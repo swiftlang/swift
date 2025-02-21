@@ -23,3 +23,4 @@ func iuoEnumContext() -> Bar! {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

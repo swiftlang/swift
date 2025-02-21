@@ -20,3 +20,4 @@ public class SPIClass: NSObject {
   @objc public func publicMember() {}
   // CHECK-NEXT: init
 } // CHECK-NEXT: @end
+// UNSUPPORTED: OS=windows-msvc

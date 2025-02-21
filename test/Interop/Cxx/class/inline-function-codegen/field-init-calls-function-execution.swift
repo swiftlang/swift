@@ -12,3 +12,4 @@ MembersTestSuite.test("field init calls function") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

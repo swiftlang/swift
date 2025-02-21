@@ -39,3 +39,4 @@ public class _InnerType: BaseType, SomeProtocol {
 }
 
 public typealias OuterType = _InnerType
+// UNSUPPORTED: OS=windows-msvc

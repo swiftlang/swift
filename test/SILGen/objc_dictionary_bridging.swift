@@ -94,3 +94,4 @@ import gizmo
 }
 
 func ==(x: Foo, y: Foo) -> Bool { }
+// UNSUPPORTED: OS=windows-msvc

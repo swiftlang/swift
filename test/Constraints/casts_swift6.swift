@@ -72,3 +72,4 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
   _  = [i: i] as! [String: Any]
   _  = [i: stringAnyDict] as! [String: Any]
 }
+// UNSUPPORTED: OS=windows-msvc

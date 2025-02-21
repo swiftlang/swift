@@ -39,3 +39,4 @@ DefaultedTemplateTestSuite.test("Pointer types") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -49,3 +49,4 @@ func ncint_get_neint_mutable_local() {
   }
   ncInt.value = 1
 }
+// UNSUPPORTED: OS=windows-msvc

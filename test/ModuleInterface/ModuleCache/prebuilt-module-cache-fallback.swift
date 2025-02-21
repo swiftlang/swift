@@ -43,3 +43,4 @@ let _: X = Lib.testValue
 // FROM-INTERFACE: [[@LINE-1]]:16: error: cannot convert value of type 'FromInterface' to specified type 'X'
 // FROM-PREBUILT-LONG: [[@LINE-2]]:16: error: cannot convert value of type 'FromPrebuiltLong' to specified type 'X'
 // FROM-PREBUILT-SHORT: [[@LINE-3]]:16: error: cannot convert value of type 'FromPrebuiltShort' to specified type 'X'
+// UNSUPPORTED: OS=windows-msvc

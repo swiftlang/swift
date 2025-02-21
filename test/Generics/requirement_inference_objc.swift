@@ -21,3 +21,4 @@ class X13<S: P14> {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

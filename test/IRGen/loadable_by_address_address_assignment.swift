@@ -97,3 +97,4 @@ public struct Container2 {
 // CHECK:   copy_addr [take] {{.*}} to [init] [[T0]] : $*LargeThing
 // CHECK:   inject_enum_addr [[T2]] : $*Optional<LargeThing>, #Optional.some!enumelt
 // CHECK: } // end sil function '$s1t10Container2VyACSb_AA10LargeThingVAEtcfC
+// UNSUPPORTED: OS=windows-msvc

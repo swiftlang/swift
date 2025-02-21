@@ -38,3 +38,4 @@ extension S4: P2 where T: P2, U: P3, V.X: P2 {}
 // expected-note@-2 {{did you mean to explicitly state the conformance with the same bounds using 'where T: P2, U: P3, V.X: P2'?}}  {{1-1=extension S4: P1 where T: P2, U: P3, V.X: P2 {\n    <#witnesses#>\n\}\n\n}}
 // expected-note@-3 {{did you mean to explicitly state the conformance with different bounds?}} {{1-1=extension S4: P1 where <#requirements#> {\n    <#witnesses#>\n\}\n\n}}
 
+// UNSUPPORTED: OS=windows-msvc

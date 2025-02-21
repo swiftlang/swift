@@ -7,3 +7,4 @@ let nonBreakingSpace2 = 3 // expected-warning {{non-breaking space (U+00A0) use
 func foo() {
     _ = 42 // expected-warning {{non-breaking space (U+00A0) used instead of regular space}} {{1-9=    }}
 }
+// UNSUPPORTED: OS=windows-msvc

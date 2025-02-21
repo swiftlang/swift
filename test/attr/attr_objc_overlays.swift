@@ -16,3 +16,4 @@ class Test {
   @objc func boolean(b: ObjCBool) {} // no-warning
   @objc func booleanRef(ref: UnsafeMutablePointer<ObjCBool>) {} // no-warning
 }
+// UNSUPPORTED: OS=windows-msvc

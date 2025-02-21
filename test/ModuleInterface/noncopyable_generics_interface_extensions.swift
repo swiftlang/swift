@@ -29,3 +29,4 @@ extension bug.Maybe {
 }
 #endif
 
+// UNSUPPORTED: OS=windows-msvc

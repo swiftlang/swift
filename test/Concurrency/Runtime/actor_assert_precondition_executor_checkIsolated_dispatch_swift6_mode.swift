@@ -147,3 +147,4 @@ actor Other {
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

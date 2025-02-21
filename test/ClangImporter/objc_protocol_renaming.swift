@@ -20,3 +20,4 @@ import ImplementProtoRenaming
 class MyGraphViewSubclass : MyGraphView {
 	@objc func doSomethingToGraphView(_ view: GraphView) { } // expected-error{{method 'doSomethingToGraphView' with Objective-C selector 'doSomethingToGraphView:' conflicts with method 'doSomething(to:)' from superclass 'MyGraphView' with the same Objective-C selector}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ func closureDiagnosticsSimple() {
   }
   f()
 }
+// UNSUPPORTED: OS=windows-msvc

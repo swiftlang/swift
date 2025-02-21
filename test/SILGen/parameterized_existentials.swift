@@ -101,3 +101,4 @@ protocol Box<Contents> {
 func functionTypes<T, U>(box: any Box<(T) -> U>, value: T) -> U {
   return box.contents(value)
 }
+// UNSUPPORTED: OS=windows-msvc

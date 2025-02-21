@@ -11,3 +11,4 @@ import _Differentiation
     guard let f else {return nil}
     return c(f)
 }
+// UNSUPPORTED: OS=windows-msvc

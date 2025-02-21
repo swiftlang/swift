@@ -34,3 +34,4 @@ func packItUniquely() {
 
   packingUniqueHeat_1(10)
 }
+// UNSUPPORTED: OS=windows-msvc

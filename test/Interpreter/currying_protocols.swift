@@ -115,3 +115,4 @@ olympicGames(Archimedes())
 
 // CHECK: Archimedes don't do that
 // CHECK: -287
+// UNSUPPORTED: OS=windows-msvc

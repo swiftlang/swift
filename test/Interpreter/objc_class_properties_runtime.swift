@@ -84,3 +84,4 @@ ClassProperties.test("runtime")
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

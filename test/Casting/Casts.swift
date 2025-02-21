@@ -1093,3 +1093,4 @@ CastsTests.test("type(of:) should look through __SwiftValue")
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

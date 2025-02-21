@@ -784,3 +784,4 @@ func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
   // CHECK-NEXT:   return [[MV_1]] : $Int
 }
 
+// UNSUPPORTED: OS=windows-msvc

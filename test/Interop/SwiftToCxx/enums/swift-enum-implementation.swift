@@ -300,3 +300,4 @@ public struct S {
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void E::printSelf() const {
 // CHECK-NEXT:     Enums::_impl::$s5Enums1EO9printSelfyyF(Enums::_impl::swift_interop_passDirect_Enums[[ENUMENCODING]](_getOpaquePointer()));
 // CHECK-NEXT:   }
+// UNSUPPORTED: OS=windows-msvc

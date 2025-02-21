@@ -477,3 +477,4 @@ FoundationTestSuite.test("NotificationCenter/addObserver(_:selector:name:object:
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

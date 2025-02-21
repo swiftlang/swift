@@ -61,3 +61,4 @@ func callInit() {
 
 // CHECK-LABEL: sil_vtable Gizmo {
 // CHECK-NOT:     #Gadget.init!allocator
+// UNSUPPORTED: OS=windows-msvc

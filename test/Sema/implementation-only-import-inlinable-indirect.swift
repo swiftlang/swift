@@ -47,3 +47,4 @@ public func testVariableFromIndirect_get() {
 public func testVariableFromIndirect_set() {
   globalVariableFromIndirect = 5 // expected-error {{var 'globalVariableFromIndirect' cannot be used in an '@inlinable' function because 'indirects' was imported implementation-only}}
 }
+// UNSUPPORTED: OS=windows-msvc

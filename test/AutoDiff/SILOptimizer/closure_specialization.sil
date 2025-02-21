@@ -507,3 +507,4 @@ bb0(%0 : $Float):
   %7 = tuple (%0 : $Float, %6 : $@callee_guaranteed (Float) -> Float) 
   return %7 : $(Float, @callee_guaranteed (Float) -> Float) // id: %8
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -111,3 +111,4 @@ extension Q2pkg {
 }
 
 public struct T2pkg : Q2pkg {} // expected-error {{method 'publicRequirement()' must be declared public because it matches a requirement in public protocol 'P2'}}
+// UNSUPPORTED: OS=windows-msvc

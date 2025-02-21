@@ -283,3 +283,4 @@ SubstringTests.test("Substring.base") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

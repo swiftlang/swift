@@ -238,3 +238,4 @@ protocol CP2 : class { }
 
   init() { }
 }
+// UNSUPPORTED: OS=windows-msvc

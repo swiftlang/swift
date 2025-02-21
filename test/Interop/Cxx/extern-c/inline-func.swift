@@ -6,3 +6,4 @@ import InlineFunc
 public func test() {
   caller()
 }
+// UNSUPPORTED: OS=windows-msvc

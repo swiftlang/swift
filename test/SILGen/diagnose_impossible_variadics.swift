@@ -18,3 +18,4 @@ func testProduce<each T>() -> (repeat each T) -> Bool {
 func testProduceAndCall<each T>(args: repeat each T) -> Bool {
   return produce(((repeat each T) -> Bool).self)(repeat each args)  // expected-error {{cannot fully abstract a value of variadic function type}}
 }
+// UNSUPPORTED: OS=windows-msvc

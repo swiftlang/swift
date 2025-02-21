@@ -26,3 +26,4 @@ public func testNonTrivial() {
     let x = NS.LocalCount.create()
     let t = (x, x, x)
 }
+// UNSUPPORTED: OS=windows-msvc

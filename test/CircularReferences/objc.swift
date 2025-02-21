@@ -23,3 +23,4 @@ class C: B {
     return super[i]
   }
 }
+// UNSUPPORTED: OS=windows-msvc

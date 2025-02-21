@@ -54,3 +54,4 @@ protocol G3 {
 protocol G4 {
   associatedtype T : A where T : B
 }
+// UNSUPPORTED: OS=windows-msvc

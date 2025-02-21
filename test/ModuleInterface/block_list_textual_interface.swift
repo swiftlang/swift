@@ -33,3 +33,4 @@ public func bazFunc() { barFunc() }
 // RUN: %target-swift-frontend -typecheck %s -D BAZ -I %t.sdk -blocklist-file %t/blocklist.yml -module-cache-path %t/modulecache -Rmodule-interface-rebuild &> %t/notes.txt
 // RUN: %FileCheck -check-prefix CHECK-NOTES --input-file %t/notes.txt %s
 // CHECK-NOTES: Foo.swiftmodule' was ignored because the module name is blocklisted
+// UNSUPPORTED: OS=windows-msvc

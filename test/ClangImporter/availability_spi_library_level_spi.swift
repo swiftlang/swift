@@ -33,3 +33,4 @@ public let f: SPIInterface2 = .init()
 public func inlinableUnavailableUsingSPI() {
   SharedInterface.foo()
 }
+// UNSUPPORTED: OS=windows-msvc

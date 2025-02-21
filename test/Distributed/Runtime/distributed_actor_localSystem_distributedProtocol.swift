@@ -68,3 +68,4 @@ func test_distributedVariable<DA: WorkerProtocol>(actor: DA) async throws -> Str
     print("v2 = \(v2)") // CHECK: v2 = implemented variable
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ func bas(_: @convention(c) (@_addressable String) -> Void) {} // expected-error{
 struct Foo {
     @_addressableSelf func doesHaveSelf() {}
 }
+// UNSUPPORTED: OS=windows-msvc

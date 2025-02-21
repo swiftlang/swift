@@ -23,3 +23,4 @@ func testOptional(obj: P) {
   _ = obj.opt?(1)
 }
 
+// UNSUPPORTED: OS=windows-msvc

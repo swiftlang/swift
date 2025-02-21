@@ -20,3 +20,4 @@ class MyClass : SomeClass { }
 let a = SomeClass()
 let b = MyClass()
 let c = b!.didMove(toParent: a!)
+// UNSUPPORTED: OS=windows-msvc

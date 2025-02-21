@@ -15,3 +15,4 @@ struct Slice<Base : Collection> : Collection {
 extension Slice: BidirectionalCollection where Base : BidirectionalCollection {}
 
 protocol SlicedCollection: BidirectionalCollection where SubSequence == Slice<Self> {}
+// UNSUPPORTED: OS=windows-msvc

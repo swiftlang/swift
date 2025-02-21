@@ -138,3 +138,4 @@ private struct PrivatePrivateFileprivateStruct: Private {
     fileprivate let privateVarGet: Int = 0
     fileprivate var privateVarGetSet: Int = 0
 }
+// UNSUPPORTED: OS=windows-msvc

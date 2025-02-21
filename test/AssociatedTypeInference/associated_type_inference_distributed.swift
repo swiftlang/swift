@@ -19,3 +19,4 @@ struct FakeActorSystem: DistributedActorSystem {
 }
 
 print(Worker<FakeActorSystem>.SerializationRequirement.self)
+// UNSUPPORTED: OS=windows-msvc

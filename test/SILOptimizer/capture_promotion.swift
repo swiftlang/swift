@@ -32,3 +32,4 @@ func test_capture_promotion() -> () -> Int {
 
 // CHECK: sil private [_semantics "sil.optimizer.delete_if_unused"] @$s17capture_promotion05test_a1_B0SiycyFSiycfU_ : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Foo }, @guaranteed { var Baz }) -> Int {
 
+// UNSUPPORTED: OS=windows-msvc

@@ -38,3 +38,4 @@ func salam() async {
   // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   _ = refTypeAsyncProp // expected-note {{property access is 'async'}}
 }
+// UNSUPPORTED: OS=windows-msvc

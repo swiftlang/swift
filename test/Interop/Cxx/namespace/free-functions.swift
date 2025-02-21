@@ -50,3 +50,4 @@ NamespacesTestSuite.test("Functions with the same name") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

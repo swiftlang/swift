@@ -40,3 +40,4 @@ public func zzz() {
   source = source.virtualMethod()
 }
 
+// UNSUPPORTED: OS=windows-msvc

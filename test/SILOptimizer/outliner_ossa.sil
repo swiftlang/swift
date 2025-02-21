@@ -350,3 +350,4 @@ bb0(%0: @owned $MyObject):
   return %51 : $Optional<NSData>
 }
 
+// UNSUPPORTED: OS=windows-msvc

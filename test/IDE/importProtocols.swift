@@ -14,3 +14,4 @@
 
 import ImportedProtocols
 func noop(_ p: ImportedProtocolSub) {}
+// UNSUPPORTED: OS=windows-msvc

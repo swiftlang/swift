@@ -13,3 +13,4 @@ public func createAWrapper() {
 }
 
 // CHECK: struct 'MagicWrapper' cannot be used in an '@inlinable' function because 'Helper' was imported implementation-only
+// UNSUPPORTED: OS=windows-msvc

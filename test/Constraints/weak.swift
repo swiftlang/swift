@@ -8,3 +8,4 @@ func overload(x: Float) -> C? {}
 // optionality. We will emit diagnostics if that is not the case.
 weak var v = overload(x: 1)
 weak var w = overload(x: 1.0)
+// UNSUPPORTED: OS=windows-msvc

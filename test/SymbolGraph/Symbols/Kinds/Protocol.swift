@@ -8,3 +8,4 @@
 // CHECK: pathComponents
 // CHECK-NEXT: "P"
 public protocol P {}
+// UNSUPPORTED: OS=windows-msvc

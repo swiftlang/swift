@@ -137,3 +137,4 @@ let _ = await withThrowingTaskGroup { group in
   return 1
 }
 
+// UNSUPPORTED: OS=windows-msvc

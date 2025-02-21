@@ -10,3 +10,4 @@ struct Foo {
     false
   }()
 }
+// UNSUPPORTED: OS=windows-msvc

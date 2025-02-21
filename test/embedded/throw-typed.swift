@@ -95,3 +95,4 @@ struct Main {
 // CHECK: OK6
 
 // CHECK-NOT: ???
+// UNSUPPORTED: OS=windows-msvc

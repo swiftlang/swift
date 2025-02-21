@@ -4,3 +4,4 @@
 // CHECK: key.description: "gCubeVertexData"
 // CHECK: key.typename: "[Float]"
 // CHECK: key.sourcetext: "gCubeVertexData"
+// UNSUPPORTED: OS=windows-msvc

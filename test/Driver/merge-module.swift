@@ -97,3 +97,4 @@
 // MERGE_1: -emit-module-doc-path {{"?}}/tmp{{(/|\\\\)}}modules.swiftdoc{{"?}}
 // MERGE_1: -module-name merge
 // MERGE_1: -o /tmp/modules
+// UNSUPPORTED: OS=windows-msvc

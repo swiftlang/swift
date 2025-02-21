@@ -20,3 +20,4 @@ func testA(a: A) async {
 }
 
 extension NonStrictStruct: @unchecked Sendable { }
+// UNSUPPORTED: OS=windows-msvc

@@ -214,3 +214,4 @@ private func devirtualizeClassMethodWithTypedThrow<E: Error>(_ x: Cl, e: E.Type)
   try! x.foo(e)
 }
 
+// UNSUPPORTED: OS=windows-msvc

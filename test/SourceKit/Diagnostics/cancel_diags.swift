@@ -7,3 +7,4 @@ func foo(x: Invalid1, y: Invalid2) {
 }
 
 // CHECK: error response (Request Cancelled)
+// UNSUPPORTED: OS=windows-msvc

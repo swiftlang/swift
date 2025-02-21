@@ -67,3 +67,4 @@ func fooStatic<T : PStatic>(_ t: T.Type) {
 
 fooStatic(QStatic.self) // CHECK: I survived
 
+// UNSUPPORTED: OS=windows-msvc

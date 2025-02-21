@@ -34,3 +34,4 @@ class C: P {
   var opaqueStoredProperty: some P = Self()
   // expected-error@-1 {{covariant 'Self' type cannot be referenced from a stored property initializer}}
 }
+// UNSUPPORTED: OS=windows-msvc

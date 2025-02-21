@@ -13,3 +13,4 @@ let _: (CGFloat) -> Void = foo
 // expected-error@-1 {{cannot convert value of type '(Double) -> ()' to specified type '(CGFloat) -> Void'}}
 let _: () -> CGFloat = bar
 // expected-error@-1 {{cannot convert value of type '() -> Double' to specified type '() -> CGFloat'}}
+// UNSUPPORTED: OS=windows-msvc

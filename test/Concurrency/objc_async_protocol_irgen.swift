@@ -21,3 +21,4 @@ let anyObject: AnyObject = (MyAsyncProtocol.self as AnyObject) // or something l
 // CHECK-isDarwin-SAME: [1 x %struct._objc_method]
 // CHECK-isDarwin-SAME: @OBJC_METH_VAR_NAME_
 // CHECK-isDarwin-SAME: align [[ALIGNMENT]]
+// UNSUPPORTED: OS=windows-msvc

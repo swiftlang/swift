@@ -10,3 +10,4 @@ for val in values {
 // CHECK-DAG: !DILocalVariable(name: "val", scope: ![[SCOPE2:[0-9]+]]
 // CHECK-DAG: ![[SCOPE2]] ={{.*}}Block({{.*}}line: [[@LINE-2]]
 }
+// UNSUPPORTED: OS=windows-msvc

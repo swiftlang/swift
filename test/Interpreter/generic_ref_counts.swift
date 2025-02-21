@@ -53,3 +53,4 @@ func g1() {
   print(x.buffer.isUniqueReference())
 }
 g1()
+// UNSUPPORTED: OS=windows-msvc

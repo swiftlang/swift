@@ -14,3 +14,4 @@ class Foo {
   // expected-note@+1 2{{in expansion of macro 'HangingMacro' on property 'result' here}}
   @HangingMacro var result: Int // This comment makes it hang.
 }
+// UNSUPPORTED: OS=windows-msvc

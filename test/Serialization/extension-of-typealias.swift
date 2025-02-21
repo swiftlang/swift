@@ -45,3 +45,4 @@ func test(x: Int) {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

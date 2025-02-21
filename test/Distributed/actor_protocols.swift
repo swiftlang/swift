@@ -105,3 +105,4 @@ struct S3: AnyActor { // expected-warning {{'AnyActor' is deprecated: Use 'any A
 enum E3: AnyActor { // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
   // expected-error@-1{{only protocols can inherit from 'AnyObject'}}
 }
+// UNSUPPORTED: OS=windows-msvc

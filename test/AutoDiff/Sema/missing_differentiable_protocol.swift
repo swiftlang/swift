@@ -7,3 +7,4 @@ let _: @differentiable(reverse) (Float) -> Float
 
 // expected-error @+1 2 {{'@differentiable' attribute used without importing module '_Differentiation'}}
 func hasDifferentiableFunctionArg<T>(_ f: @differentiable(reverse) (T) -> T) {}
+// UNSUPPORTED: OS=windows-msvc

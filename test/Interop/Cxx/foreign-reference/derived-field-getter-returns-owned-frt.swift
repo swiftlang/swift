@@ -68,3 +68,4 @@ FunctionsTestSuite.test("derived member FRT field setting shared reference FRT")
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

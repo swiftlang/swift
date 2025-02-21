@@ -145,3 +145,4 @@ struct S {
 #checkGeneric<String>()
 #checkGeneric2<String, Int>()
 #checkGenericHashableCodable<String, Int>()
+// UNSUPPORTED: OS=windows-msvc

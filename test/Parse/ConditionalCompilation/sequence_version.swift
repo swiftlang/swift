@@ -47,3 +47,4 @@ undefinedIf() // expected-error {{cannot find 'undefinedIf' in scope}}
 // There should be no error here.
 foo bar baz
 #endif
+// UNSUPPORTED: OS=windows-msvc

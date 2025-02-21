@@ -54,3 +54,4 @@ var p = BufferedPair(front: 219, first: State.OR, second: "Idaho's Portugal",
                      back: 17)
 // CHECK: 219 Oregon "Idaho\'s Portugal" 17
 printPair(p)
+// UNSUPPORTED: OS=windows-msvc

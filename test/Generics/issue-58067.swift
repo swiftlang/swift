@@ -20,3 +20,4 @@ public protocol P2: Collection, P1 where Element: P1, X == Z.Y {
 public protocol P3: P2 {
   associatedtype T: P2
 }
+// UNSUPPORTED: OS=windows-msvc

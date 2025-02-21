@@ -56,3 +56,4 @@
 #if canImport(Foo)
 import Foo
 #endif
+// UNSUPPORTED: OS=windows-msvc

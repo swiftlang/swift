@@ -39,3 +39,4 @@ struct HasDeprecatedMembers {
   @available(*, deprecated)
   var testDeprecatedReferencingDeprecated3: () = DummyType() - DummyType() // no-warning
 }
+// UNSUPPORTED: OS=windows-msvc

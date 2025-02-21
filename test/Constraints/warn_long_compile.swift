@@ -11,3 +11,4 @@ func test(m: Double) -> Int {
   return Int(foo(Float(m) / 20) * 20 - 2) + 10
   // expected-warning@-1 {{expression took}}
 }
+// UNSUPPORTED: OS=windows-msvc

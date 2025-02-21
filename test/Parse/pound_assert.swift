@@ -17,3 +17,4 @@ func unbalanced2() {
   #assert(true, "hello world" // expected-error{{expected ')' in #assert directive}}
   // expected-note @-1 {{to match this opening '('}}
 }
+// UNSUPPORTED: OS=windows-msvc

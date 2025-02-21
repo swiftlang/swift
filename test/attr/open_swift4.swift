@@ -9,3 +9,4 @@ final public class NonOpenClass {
   open func test() {} // expected-warning {{members of 'final' classes are implicitly 'final'; use 'public' instead of 'open'}} {{3-7=public}}
   open static func test() {} // expected-warning {{static declarations are implicitly 'final'; use 'public' instead of 'open'}} {{3-7=public}}
 }
+// UNSUPPORTED: OS=windows-msvc

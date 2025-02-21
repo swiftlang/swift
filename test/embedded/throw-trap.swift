@@ -40,3 +40,4 @@ public func catching1() {
 // CHECK-TRAPS-IR-NEXT:   unreachable
 // CHECK-TRAPS-IR-NEXT: }
 // CHECK-TRAPS-IR:      define {{.*}}@"$e4main9catching1yyF"{{.*}}{
+// UNSUPPORTED: OS=windows-msvc

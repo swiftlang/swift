@@ -30,3 +30,4 @@ func testCrossReferences(_ derived: Derived) {
   testProtocolWrapper(ProtoConformer())
   _ = testStruct(Point2D(x: 2,y: 3))
 }
+// UNSUPPORTED: OS=windows-msvc

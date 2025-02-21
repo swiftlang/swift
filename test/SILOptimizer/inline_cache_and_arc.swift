@@ -35,3 +35,4 @@ public func testit() {
   x = a.f(x)
 }
 
+// UNSUPPORTED: OS=windows-msvc

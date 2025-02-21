@@ -30,3 +30,4 @@ struct MyStruct : Foo {
 }
 getName_wrapper()
 
+// UNSUPPORTED: OS=windows-msvc

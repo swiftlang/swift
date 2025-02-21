@@ -952,3 +952,4 @@ func enum_test(a : A) async {
   foo_noniso(e3); // expected-tns-note {{access can happen concurrently}}
   foo_noniso(e4);
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ func foo2 () {
 // CHECK-DIAG: <empty name translation info; internal diagnostic: "Unable to resolve ObjC declaration name.">
 // CHECK1: init(float2:)
 // CHECK2: init(float2:second2:)
+// UNSUPPORTED: OS=windows-msvc

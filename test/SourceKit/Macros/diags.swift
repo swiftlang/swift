@@ -32,3 +32,4 @@ struct S {}
 
 // RUN: %sourcekitd-test -req=diags %s -- -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser %s | %sed_clean > %t.response
 // RUN: %diff -u %s.response %t.response
+// UNSUPPORTED: OS=windows-msvc

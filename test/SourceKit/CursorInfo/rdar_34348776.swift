@@ -13,3 +13,4 @@ public typealias Aliased = Alias
 // CHECK-NEXT: AliasTest{{$}}
 // CHECK-NEXT: <Declaration>public typealias Aliased = <Type usr="s:9AliasTest0A0a">Alias</Type></Declaration>
 // CHECK-NEXT: <decl.typealias><syntaxtype.keyword>public</syntaxtype.keyword> <syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>Aliased</decl.name> = <ref.typealias usr="s:9AliasTest0A0a">Alias</ref.typealias></decl.typealias>
+// UNSUPPORTED: OS=windows-msvc

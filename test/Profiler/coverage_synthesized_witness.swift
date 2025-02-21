@@ -9,3 +9,4 @@ protocol P {
 struct S<T> : P {
   subscript(x: T) -> Int { return 0 }
 }
+// UNSUPPORTED: OS=windows-msvc

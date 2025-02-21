@@ -35,3 +35,4 @@ class C {}
 
 var c = C()
 var d = c
+// UNSUPPORTED: OS=windows-msvc

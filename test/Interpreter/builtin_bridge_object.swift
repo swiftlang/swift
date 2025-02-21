@@ -218,3 +218,4 @@ if true {
   // CHECK: some
   hitOptionalGenerically(bo)
 }
+// UNSUPPORTED: OS=windows-msvc

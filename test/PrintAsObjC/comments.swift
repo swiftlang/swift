@@ -9,3 +9,4 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: no_asan
+// UNSUPPORTED: OS=windows-msvc

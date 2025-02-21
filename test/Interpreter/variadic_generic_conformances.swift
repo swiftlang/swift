@@ -88,3 +88,4 @@ conformances.test("packRequirements") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

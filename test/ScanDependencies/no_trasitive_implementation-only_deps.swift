@@ -16,3 +16,4 @@
 import Foo
 
 // CHECK-NOT: "swift": "E"
+// UNSUPPORTED: OS=windows-msvc

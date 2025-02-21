@@ -33,3 +33,4 @@ bb1:
 
 // CHECK-LABEL: sil @nada
 sil @nada : $@convention(c) (Builtin.Int32) -> Never
+// UNSUPPORTED: OS=windows-msvc

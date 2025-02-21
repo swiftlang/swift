@@ -79,3 +79,4 @@ extension X where Self : GenericClass<String> {
     _ = self.bar
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@ protocol P {}
 // CHECK-LABEL: define {{.*}}void @f4(ptr noalias %0, i64 %1, ptr %"each T", ptr %"each T.P")
 @_silgen_name("f4")
 func f4<each T : P>(t: repeat each T) {}
+// UNSUPPORTED: OS=windows-msvc

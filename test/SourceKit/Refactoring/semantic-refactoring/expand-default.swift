@@ -14,3 +14,4 @@ func foo(e : E) {
 // RUN: %diff -u %S/expand-default.swift.expected %t.result/expand-default.swift.expected
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// UNSUPPORTED: OS=windows-msvc

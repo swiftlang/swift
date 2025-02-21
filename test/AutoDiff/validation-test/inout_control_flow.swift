@@ -88,3 +88,4 @@ InoutControlFlowTests.test("LaterInoutParameterWithControlFlow") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

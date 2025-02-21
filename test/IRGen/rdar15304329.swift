@@ -20,3 +20,4 @@ class Bar : NSObject {
     super.init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

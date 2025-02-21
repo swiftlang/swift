@@ -133,3 +133,4 @@ import Original
 }
 
 public func takesGeneric<T: ProtoAlias>(_ t: T) {}
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ extension OuterClass.Inner {
     return OuterClass.Inner()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

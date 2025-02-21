@@ -564,3 +564,4 @@ class Subclass: BaseClass {
     // CHECK-NEXT:   RelChild,RelAcc | instance-property/Swift | x | s:14swift_ide_test8SubclassC1xSivp
   }
 }
+// UNSUPPORTED: OS=windows-msvc

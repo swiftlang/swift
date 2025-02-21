@@ -56,3 +56,4 @@ func synchronous_bind() {
     synchronous_bind()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

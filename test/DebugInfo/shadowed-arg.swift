@@ -20,3 +20,4 @@ public func f(i: Int) {
 // SIL: sil_scope [[S3:[0-9]+]] { {{.*}} parent [[S1]] }
 // SIL: debug_value %0 : $Int, let, name "i", argno 1,{{.*}}, scope [[S1]]
 // SIL: debug_value {{.*}} : $Array<Int>, let, name "i", {{.*}}, scope [[S3]]
+// UNSUPPORTED: OS=windows-msvc

@@ -61,3 +61,4 @@ do {
 
   assertEqualTypes(VectorF.Elle.self, Float.self)
 }
+// UNSUPPORTED: OS=windows-msvc

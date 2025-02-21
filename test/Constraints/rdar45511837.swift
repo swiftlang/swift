@@ -23,3 +23,4 @@ class Foo<Bar: NSObject> {
     // expected-error@-2 {{'nil' is not compatible with expected argument type 'String'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

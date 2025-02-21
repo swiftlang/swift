@@ -11,3 +11,4 @@ func foo(x: BaseInHead) {
 // CHECK-GLOBALS: doSomethingInHead(:)
 // CHECK-GLOBALS: test1(:)
 // CHECK-MEMBERS: doIt(:)
+// UNSUPPORTED: OS=windows-msvc

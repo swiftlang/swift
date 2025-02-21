@@ -65,3 +65,4 @@ public func isEqual<T:Equatable>(_ l: T, _ r: T) -> Bool {
 }
 
 f()
+// UNSUPPORTED: OS=windows-msvc

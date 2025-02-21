@@ -16,3 +16,4 @@ print("Hi from Swift!")
 
 // SECTION: .swift1_autolink_entries
 // NOSECTION-NOT: .swift1_autolink_entries
+// UNSUPPORTED: OS=windows-msvc

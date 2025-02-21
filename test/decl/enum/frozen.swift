@@ -13,3 +13,4 @@ internal enum Outer {
 @frozen enum DeprecationWarning {} // expected-warning {{@frozen has no effect on non-public enums}} {{1-9=}}
 
 @_frozen public enum UnderscoredFrozen {}
+// UNSUPPORTED: OS=windows-msvc

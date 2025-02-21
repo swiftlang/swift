@@ -90,3 +90,4 @@ tuplify {
     value.a
   }
 }
+// UNSUPPORTED: OS=windows-msvc

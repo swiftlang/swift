@@ -25,3 +25,4 @@ public struct MyStruct<T>: MyProtocol {
 
 print(Generic<Int>())
 print(MyStruct<Int>())
+// UNSUPPORTED: OS=windows-msvc

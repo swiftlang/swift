@@ -20,3 +20,4 @@ func test(x: (X & B)?, y: C?) {
   f(x, y)
   Optional.f(x, y)
 }
+// UNSUPPORTED: OS=windows-msvc

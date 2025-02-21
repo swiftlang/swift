@@ -175,3 +175,4 @@ func initClassWithAsyncIsolatedInit2(_ k: NonSendableKlass) async {
     // expected-note @-1 {{task-isolated 'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

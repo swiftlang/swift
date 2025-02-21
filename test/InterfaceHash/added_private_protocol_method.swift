@@ -44,3 +44,4 @@ private protocol P {
 // CHECK-DIFFERENT-TYPE-FINGERPRINT-DAG: -potentialMember interface      4main1P{{[^ ]+}} '' true
 // CHECK-DIFFERENT-TYPE-FINGERPRINT-DAG: +potentialMember implementation 4main1P{{[^ ]+}} '' true
 // CHECK-DIFFERENT-TYPE-FINGERPRINT-DAG: +potentialMember interface      4main1P{{[^ ]+}} '' true
+// UNSUPPORTED: OS=windows-msvc

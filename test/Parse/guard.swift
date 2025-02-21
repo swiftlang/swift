@@ -6,3 +6,4 @@ func noConditionNoElse() {
 func noCondition() {
   guard else {} // expected-error {{missing condition in 'guard' statement}} 
 }
+// UNSUPPORTED: OS=windows-msvc

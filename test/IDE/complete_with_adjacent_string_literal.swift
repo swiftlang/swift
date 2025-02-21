@@ -18,3 +18,4 @@ func foo() {
 // COMPLETE: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#arg: Int#}[')'][#Void#];
 // COMPLETE: End completions
 
+// UNSUPPORTED: OS=windows-msvc

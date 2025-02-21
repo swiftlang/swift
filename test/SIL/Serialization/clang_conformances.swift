@@ -12,3 +12,4 @@ import clang_conformances
 public func main() {
   inlineMe()
 }
+// UNSUPPORTED: OS=windows-msvc

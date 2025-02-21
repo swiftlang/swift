@@ -21,3 +21,4 @@ d++ // expected-error {{cannot find operator '++' in scope; did you mean '+= 1'?
 ++d // expected-error {{cannot find operator '++' in scope; did you mean '+= 1'?}}
 d-- // expected-error {{cannot find operator '--' in scope; did you mean '-= 1'?}}
 --d // expected-error {{cannot find operator '--' in scope; did you mean '-= 1'?}}
+// UNSUPPORTED: OS=windows-msvc

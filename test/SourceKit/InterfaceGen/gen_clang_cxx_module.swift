@@ -42,3 +42,4 @@ using ClassType = ns::CxxClass;
 // CHECK: public typealias ClassType = ns.CxxClass
 
 // NOLOAD: Could not load module: CxxModule
+// UNSUPPORTED: OS=windows-msvc

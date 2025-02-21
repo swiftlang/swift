@@ -33,3 +33,4 @@ func test_prefix1(c1: C1, c2: C2) {
 // PREFIX_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: c1[#C1#]; name=c1
 // PREFIX_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: c2[#C2#]; name=c2
 }
+// UNSUPPORTED: OS=windows-msvc

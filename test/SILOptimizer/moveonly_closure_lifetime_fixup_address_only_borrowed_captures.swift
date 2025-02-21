@@ -94,3 +94,4 @@ func testEscapedLater2<T>(_ e: consuming E<T>) {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -33,3 +33,4 @@ s.commonName = 5
 // CHECK-NEXT: CommonName.h:2:3: note: built-in type 'Complex' not supported
 // CHECK-NEXT:   int _Complex commonName;
 // CHECK-NEXT:   ^
+// UNSUPPORTED: OS=windows-msvc

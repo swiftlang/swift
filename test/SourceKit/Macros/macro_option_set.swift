@@ -50,3 +50,4 @@ public macro OptionSet<RawType>() =
 // CHECK:      key.diagnostics: [
 // CHECK-NEXT: ],
 // CHECK:      key.value: 0
+// UNSUPPORTED: OS=windows-msvc

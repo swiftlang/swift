@@ -50,3 +50,4 @@ unsupported_return_type()
 // CHECK-NEXT: experimental_clang_importer_diagnostics_bridging_header.h:{{[0-9]+}}:1: note: built-in type 'Complex' not supported
 // CHECK-NEXT:      _Complex int unsupported_return_type();
 // CHECK-NEXT: {{^}}^
+// UNSUPPORTED: OS=windows-msvc

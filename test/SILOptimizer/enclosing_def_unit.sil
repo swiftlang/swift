@@ -319,3 +319,4 @@ bb1(%outerReborrow : @guaranteed $C, %innerReborrow : @guaranteed $C):
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

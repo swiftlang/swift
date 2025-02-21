@@ -38,3 +38,4 @@
 // CHECK:   typealias Iterator = CxxIterator<HasInheritedTemplatedConstRACIteratorOutOfLineOps<CInt>>
 // CHECK:   typealias RawIterator = InheritedTemplatedConstRACIteratorOutOfLineOps<CInt>
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

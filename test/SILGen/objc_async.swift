@@ -330,3 +330,4 @@ extension OptionalMemberLookups {
 func checkHotdogs(_ v: some HotdogCompetitor, _ timeLimit: NSObject) async throws -> String? {
     return try await v.pileOfHotdogsToEat(withLimit: timeLimit)
 }
+// UNSUPPORTED: OS=windows-msvc

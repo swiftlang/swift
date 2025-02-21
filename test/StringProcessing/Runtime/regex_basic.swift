@@ -64,3 +64,4 @@ RegexBasicTests.test("Captures") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

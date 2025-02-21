@@ -70,3 +70,4 @@ public func test() -> Builtin.AnyObject {
   return x
 }
 
+// UNSUPPORTED: OS=windows-msvc

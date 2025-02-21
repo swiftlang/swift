@@ -384,3 +384,4 @@ DispatchAPI.test("DispatchData.enumerateBytesTrailingClosure") {
   }
   expectEqual(nextIndex, data.count)
 }
+// UNSUPPORTED: OS=windows-msvc

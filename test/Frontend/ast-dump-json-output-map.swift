@@ -31,3 +31,4 @@
 // MAIN-AST-SAME: "decl_usr":"s:4main1ayyF"
 // MAIN-AST-SAME: "_kind":"call_expr"
 // MAIN-AST-SAME: "decl_usr":"s:4main1byyF"
+// UNSUPPORTED: OS=windows-msvc

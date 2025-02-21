@@ -306,3 +306,4 @@ extension NSURL {
     return prop as? T
   }
 }
+// UNSUPPORTED: OS=windows-msvc

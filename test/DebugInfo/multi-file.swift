@@ -6,3 +6,4 @@
 // CHECK: ![[FILE]] = !DIFile(filename: "{{.*}}multi-file.swift"
 // CHECK-OTHER: !DICompileUnit(language: DW_LANG_Swift, file: ![[FILE:[0-9]+]]
 // CHECK-OTHER: ![[FILE]] = !DIFile(filename: "{{.*}}empty.swift"
+// UNSUPPORTED: OS=windows-msvc

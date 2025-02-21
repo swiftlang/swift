@@ -1168,3 +1168,4 @@ print("test30=\(test30())")
 print("test32=\(test32())")
 
 print("test33=\(test33())")
+// UNSUPPORTED: OS=windows-msvc

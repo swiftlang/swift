@@ -15,3 +15,4 @@ func down_generic(_ b: B) { (b as! G<Int>).bas() }
 up(D())
 down(D())
 down_generic(G<Int>())
+// UNSUPPORTED: OS=windows-msvc

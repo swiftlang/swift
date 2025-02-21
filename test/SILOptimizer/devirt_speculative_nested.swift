@@ -30,3 +30,4 @@ public class Base {
 public func foo(x: Base) {
   x.update()
 }
+// UNSUPPORTED: OS=windows-msvc

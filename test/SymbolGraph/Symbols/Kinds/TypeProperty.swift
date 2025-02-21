@@ -11,3 +11,4 @@ public struct S {
   // CHECK-NEXT: "y"
   public static let y = 2
 }
+// UNSUPPORTED: OS=windows-msvc

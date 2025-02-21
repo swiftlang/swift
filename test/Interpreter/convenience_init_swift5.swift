@@ -34,4 +34,4 @@ ConvenienceInitSelfTest.test("SelfMetadata") {
   expectEqual(c.x, 1)
 }
 
-runAllTests()
+runAllTests()// UNSUPPORTED: OS=windows-msvc

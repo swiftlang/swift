@@ -26,3 +26,4 @@ var dict1 = Dictionary<String, Int>()
 
 var res : Int? = myDictionaryBridge(dict1, false)
 
+// UNSUPPORTED: OS=windows-msvc

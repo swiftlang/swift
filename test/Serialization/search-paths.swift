@@ -49,3 +49,4 @@ numeric(42) // expected-error {{cannot find 'numeric' in scope}}
 // CHECK-NOT: /Frameworks'
 // CHECK-NOT: /SystemFrameworks'
 // CHECK: </INPUT_BLOCK>
+// UNSUPPORTED: OS=windows-msvc

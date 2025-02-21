@@ -110,3 +110,4 @@ struct V {
   // CHECK-NEXT:  [[@LINE-5]]:47 -> [[@LINE-5]]:60 : 2
   // CHECK-NEXT:  }
 }
+// UNSUPPORTED: OS=windows-msvc

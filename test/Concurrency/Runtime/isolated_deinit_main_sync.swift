@@ -27,3 +27,4 @@ func main() {
 // CHECK: DEINIT
 // CHECK: isDead = true
 main()
+// UNSUPPORTED: OS=windows-msvc

@@ -65,3 +65,4 @@ extension NIODefaultSerialEventLoopExecutor: SerialExecutor {
   }
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

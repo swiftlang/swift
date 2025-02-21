@@ -26,3 +26,4 @@
 // CHECK-STRING:   typealias string =  std{{(.__cxx11)?}}.basic_string<CChar, std{{(.__cxx11)?}}.char_traits<CChar>, std{{(.__cxx11)?}}.allocator<CChar>>
 // CHECK-STRING:   typealias wstring =  std{{(.__cxx11)?}}.basic_string<CWideChar, std{{(.__cxx11)?}}.char_traits<CWideChar>, std{{(.__cxx11)?}}.allocator<CWideChar>>
 // CHECK-STD: }
+// UNSUPPORTED: OS=windows-msvc

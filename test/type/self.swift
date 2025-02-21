@@ -380,4 +380,4 @@ struct NonGeneric {
 protocol P {
   func foo() -> Self<Int>
   // expected-error@-1 {{cannot specialize non-generic type 'Self'}}
-}
+}// UNSUPPORTED: OS=windows-msvc

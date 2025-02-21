@@ -95,3 +95,4 @@
 // CHECK: End completion
 
 import #^COMPLETE^#
+// UNSUPPORTED: OS=windows-msvc

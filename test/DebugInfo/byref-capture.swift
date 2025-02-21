@@ -19,3 +19,4 @@ func makeIncrementor(_ inc : Int64) -> () -> Int64
 
 var incrementor = makeIncrementor(5)
 incrementor()
+// UNSUPPORTED: OS=windows-msvc

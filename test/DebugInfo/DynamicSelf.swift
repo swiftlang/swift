@@ -22,3 +22,4 @@ extension C {
 }
 
 let MoreDesignPatterns = C.Factory
+// UNSUPPORTED: OS=windows-msvc

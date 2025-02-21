@@ -30,3 +30,4 @@ guard IntKey(stringValue: "zero") == .zero else { fatalError() }
 guard IntKey(stringValue: "one") == nil else { fatalError() }
 guard IntKey(intValue: 0) == .zero else { fatalError() }
 guard IntKey(intValue: 1) == nil else { fatalError() }
+// UNSUPPORTED: OS=windows-msvc

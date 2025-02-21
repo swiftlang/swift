@@ -6,3 +6,4 @@
 // RUN: %target-swift-ide-test -repl-code-completion -source-filename=%s
 
 let bar: NotARealType = 0; ba
+// UNSUPPORTED: OS=windows-msvc

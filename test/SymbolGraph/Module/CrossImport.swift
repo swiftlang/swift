@@ -45,3 +45,4 @@ extension B {
 
 // CHECK-B-DAG: s:1BAAV4_A_BE14untransmogrify1AAEVyF
 // CHECK-B-DAG: s:e:s:1BAAV4_A_BE14untransmogrify1AAEVyF
+// UNSUPPORTED: OS=windows-msvc

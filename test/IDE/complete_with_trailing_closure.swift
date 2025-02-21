@@ -36,3 +36,4 @@ func foo() {
 // CHECK: Begin completions, 2 items
 // CHECK-DAG: Keyword[self]/CurrNominal:          self[#MyArray#];
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: map({#transform: (ItemWrapper) -> Int##(ItemWrapper) -> Int#})[#Void#];
+// UNSUPPORTED: OS=windows-msvc

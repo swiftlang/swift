@@ -10,3 +10,4 @@
 
 public func testKeywordArgument(register: Int) {
 }
+// UNSUPPORTED: OS=windows-msvc

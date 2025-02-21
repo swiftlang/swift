@@ -37,3 +37,4 @@
 // SCUDO_UBSAN: argument '-sanitize=scudo' is not allowed with '-sanitize=undefined'
 // SCUDO_LIBRARY_LINUX: bin{{/|\\\\}}clang
 // SCUDO_LIBRARY_LINUX-NOT: -fsanitize=scudo
+// UNSUPPORTED: OS=windows-msvc

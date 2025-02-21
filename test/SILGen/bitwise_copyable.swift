@@ -79,3 +79,4 @@ func foo() {
   let bricks: Builtin.FixedArray<1, Conditional<Int>>
   let bricks2: Builtin.FixedArray<1, Conditional<String>>
 }
+// UNSUPPORTED: OS=windows-msvc

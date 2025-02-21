@@ -15,3 +15,4 @@ func dontMove(cheese: StringCheese) -> StringCheese {
   return cheese
 }
 
+// UNSUPPORTED: OS=windows-msvc

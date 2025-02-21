@@ -12,3 +12,4 @@ func foo(_ x: Double) {}
 foo(.#^FOO^#)
 // FOO-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Convertible]: init()[#CGFloat#]; name=init()
 // FOO-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Convertible]: init()[#Double#]; name=init()
+// UNSUPPORTED: OS=windows-msvc

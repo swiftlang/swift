@@ -8,3 +8,4 @@ class RV {
 		NSPrefixWordBreak2.breakBarBas.rawValue = 0 // expected-error{{cannot assign to property: 'rawValue' is immutable}}
 	}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@
 // RUN: echo '"%/t/main.swift": { swiftmodulesummary: "%/t/foo.swiftmodulesummary" }' > %/t/filemap.yaml
 // RUN: %target-swift-frontend -emit-sib -supplementary-output-file-map %/t/filemap.yaml %/t/main.swift
 // RUN: test -f %t/foo.swiftmodulesummary
+// UNSUPPORTED: OS=windows-msvc

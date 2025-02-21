@@ -79,3 +79,4 @@ sil_witness_table hidden DifferentiableConformance: DifferentiableRequirement mo
 // CHECK-SAME:   ptr @"AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_jvp_SU",
 // CHECK-SAME:   ptr @"AD__$s41witness_table_differentiable_requirements25DifferentiableConformanceVAA0E11RequirementA2aDP1fyS2fFTW_vjp_SU"
 // CHECK-SAME: ]
+// UNSUPPORTED: OS=windows-msvc

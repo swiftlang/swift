@@ -23,3 +23,4 @@ takesSendable(DerivedPrivatelyFromHasPrivatePointerField.self) // expected-error
 takesSendable(DerivedProtectedFromHasPublicPointerField.self) // expected-error {{type 'DerivedProtectedFromHasPublicPointerField' does not conform to the 'Sendable' protocol}}
 takesSendable(DerivedProtectedFromHasPublicNonSendableField.self) // expected-error {{type 'DerivedProtectedFromHasPublicNonSendableField' does not conform to the 'Sendable' protocol}}
 takesSendable(DerivedProtectedFromHasPrivatePointerField.self) // expected-error {{type 'DerivedProtectedFromHasPrivatePointerField' does not conform to the 'Sendable' protocol}}
+// UNSUPPORTED: OS=windows-msvc

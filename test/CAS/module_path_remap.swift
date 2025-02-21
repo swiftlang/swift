@@ -32,3 +32,4 @@
 // CLANG-CMD: /^src/test/ScanDependencies/Inputs/CHeaders/module.modulemap
 
 
+// UNSUPPORTED: OS=windows-msvc

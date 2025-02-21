@@ -17,3 +17,4 @@ extension ProtocolTestingBase: Equatable {
 typealias SpecialObject = SubProtoImpl
 extension SpecialObject: SomeSwiftProto {
 }
+// UNSUPPORTED: OS=windows-msvc

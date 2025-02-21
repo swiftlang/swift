@@ -26,3 +26,4 @@ public func f<A>(_ xs: [Continuation<A>]) -> (() -> A?) {
    }
 }
 
+// UNSUPPORTED: OS=windows-msvc

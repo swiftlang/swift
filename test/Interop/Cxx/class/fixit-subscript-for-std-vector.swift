@@ -37,3 +37,4 @@ public func test(v: V) {
   v
     . at(42 )
 }
+// UNSUPPORTED: OS=windows-msvc

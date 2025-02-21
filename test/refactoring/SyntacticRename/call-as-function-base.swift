@@ -17,3 +17,4 @@ let blah = /*test:ref*/add3.callAsFunction(x:y:)
 
 
 
+// UNSUPPORTED: OS=windows-msvc

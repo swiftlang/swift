@@ -13,3 +13,4 @@ struct Wrapper<T> {
 
 func f() { }
 f()
+// UNSUPPORTED: OS=windows-msvc

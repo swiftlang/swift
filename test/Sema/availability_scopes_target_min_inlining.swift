@@ -18,3 +18,4 @@
 // CHECK-watchos-NEXT: {{^}}  (decl_implicit version=6 decl=foo()
 
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

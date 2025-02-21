@@ -63,3 +63,4 @@ bb0(%0 : $Int64, %1 : $Int64):
   // CHECK-MEM2REG-SAME: type $MyStruct, expr op_fragment:#MyStruct.y
   return %0 : $Int64, loc "sroa.swift":11:5, scope 2
 } // end sil function 'foo'
+// UNSUPPORTED: OS=windows-msvc

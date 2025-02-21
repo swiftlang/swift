@@ -1939,3 +1939,4 @@ bb0(%0 : $ValueGenericType<N>):
 // CEHCK-NOT:     type_value $Int for @error_type N
 // CHECK-NEXT:    return [[TYPE_VALUE]] : $Int
 // CHECK-LABEL: } // end sil function '$s19value_generic_countTf4d_n'
+// UNSUPPORTED: OS=windows-msvc

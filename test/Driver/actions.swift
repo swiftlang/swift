@@ -202,3 +202,4 @@
 // WHOLE-MODULE-ELF: 4: swift-autolink-extract, {3}, autolink
 // WHOLE-MODULE-ELF: 5: link, {3, 4}, image
 // WHOLE-MODULE-MACHO: 4: link, {3}, image
+// UNSUPPORTED: OS=windows-msvc

@@ -358,3 +358,4 @@ protocol issue52883_P: issue52883_C {
 extension issue52883_P {
   func foo() {}
 }
+// UNSUPPORTED: OS=windows-msvc

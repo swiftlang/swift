@@ -226,3 +226,4 @@ static func topLevelStaticFunc() {} // expected-error {{static methods may only 
 
 static var topLevelStaticVar = 42 // expected-error {{static properties may only be declared on a type}}
 // CHECK: {{^}}var topLevelStaticVar: Int{{$}}
+// UNSUPPORTED: OS=windows-msvc

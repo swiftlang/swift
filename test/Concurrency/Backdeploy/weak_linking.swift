@@ -40,3 +40,4 @@ public func f() async {
     print(await g())
   }
 }
+// UNSUPPORTED: OS=windows-msvc

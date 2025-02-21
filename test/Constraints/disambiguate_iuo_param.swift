@@ -9,3 +9,4 @@
 // CHECK: load {{.*}}, {{.*}}@"\01L_selector(isEqualToObject:)"
 let c = Obj()
 _ = c.isEqual(to: c)
+// UNSUPPORTED: OS=windows-msvc

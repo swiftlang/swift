@@ -9,3 +9,4 @@ protocol P {
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=G
 // CHECK-NEXT: <Value where Value : P, Value.[P]T : CaseIterable, Value.[P]T.[CaseIterable]AllCases : RandomAccessCollection>
 extension G where Value: P, Value.T: CaseIterable, Value.T.AllCases: RandomAccessCollection {}
+// UNSUPPORTED: OS=windows-msvc

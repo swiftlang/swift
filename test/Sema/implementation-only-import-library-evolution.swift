@@ -103,3 +103,4 @@ public class FrozenPublicClassStoredProperties {
   private static var staticIsOkay: BadStruct? // okay
   @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 }
+// UNSUPPORTED: OS=windows-msvc

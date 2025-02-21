@@ -30,3 +30,4 @@ func bar() {
   // CHECK-TYPE-DAG: Decl[Class]/OtherModule[__ObjC]:    SameName[#SameName#]{{; name=.+$}}
   // CHECK-TYPE-DAG: Decl[Protocol]/OtherModule[__ObjC]: SameNameProtocol[#SameNameProtocol#]{{; name=.+$}}
 }
+// UNSUPPORTED: OS=windows-msvc

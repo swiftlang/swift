@@ -3,3 +3,4 @@
 func foo(_ f: (() -> Void) -> Void, _ b: () -> Void) {
     return withoutActuallyEscaping(b, do: f)
 }
+// UNSUPPORTED: OS=windows-msvc

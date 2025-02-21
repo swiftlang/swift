@@ -57,3 +57,4 @@ extension SymbolFromB: P {
 // FILES-NOT: B@A.symbols.json
 // FILES-NOT: A.symbols.json
 // FILES-NOT: B.symbols.json
+// UNSUPPORTED: OS=windows-msvc

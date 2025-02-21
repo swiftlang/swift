@@ -78,3 +78,4 @@ internal func fn(_: OverlayLibraryTy) {}
 public import DeclaringLibrary // expected-warning {{public import of 'DeclaringLibrary' was not used in public declarations or inlinable code}}
 public import BystandingLibrary // expected-warning {{public import of 'BystandingLibrary' was not used in public declarations or inlinable code}}
 public import SomeUnrelatedModule // expected-warning {{public import of 'SomeUnrelatedModule' was not used in public declarations or inlinable code}}
+// UNSUPPORTED: OS=windows-msvc

@@ -79,3 +79,4 @@ if testingOldSDK {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

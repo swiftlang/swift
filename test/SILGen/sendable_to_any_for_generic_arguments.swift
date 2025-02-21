@@ -282,3 +282,4 @@ func test_inout_uses() {
   @preconcurrency var arr: [any Sendable] = []
   test(&arr)
 }
+// UNSUPPORTED: OS=windows-msvc

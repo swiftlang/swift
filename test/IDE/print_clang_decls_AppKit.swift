@@ -45,3 +45,4 @@
 // APPKIT:   static let NSViewFocusDidChange: NSNotification.Name
 // APPKIT: }
 
+// UNSUPPORTED: OS=windows-msvc

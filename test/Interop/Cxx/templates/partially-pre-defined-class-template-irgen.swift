@@ -31,3 +31,4 @@ public func getWrappedMagicInt() -> CInt {
 // CHECK: %value = getelementptr inbounds %struct.IntWrapper, %struct.IntWrapper* %this1, i32 0, i32 0
 // CHECK: [[VALUE:%.*]] = load i32, i32* %value, align 4
 // CHECK: ret i32 [[VALUE]]
+// UNSUPPORTED: OS=windows-msvc

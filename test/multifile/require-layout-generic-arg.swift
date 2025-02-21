@@ -21,3 +21,4 @@ public func requestType<T>(_ c: Sub<T>) {
 // FILE2:   [[T:%.*]] = load ptr, ptr %1
 // FILE2:   [[CLASSMETADATA:%.*]] = call ptr @swift_allocateGenericClassMetadata
 
+// UNSUPPORTED: OS=windows-msvc

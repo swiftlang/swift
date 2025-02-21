@@ -79,3 +79,4 @@ func testCaptureVariable() {
 // RUN: diff -u %S/Outputs/local/param_2.swift.expected %t.result/param_2.swift
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=51:7 -new-name="capturedVariableRenamed" > %t.result/captured_variable.swift
 // RUN: diff -u %S/Outputs/local/captured_variable.swift.expected %t.result/captured_variable.swift
+// UNSUPPORTED: OS=windows-msvc

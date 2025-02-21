@@ -820,3 +820,4 @@ sil [ossa] @simplest_begin_apply_yield_once_2 : $@convention(thin) () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

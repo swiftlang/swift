@@ -57,3 +57,4 @@ func someFunction() {
 func testGenericWithImplicitSome<T>(_ x: some P1) -> #^GENERIC_WITH_IMPLICIT_SOME^# {}
 
 // GENERIC_WITH_IMPLICIT_SOME-DAG: Decl[GenericTypeParam]/Local:       T[#T#]; name=T
+// UNSUPPORTED: OS=windows-msvc

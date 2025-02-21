@@ -4,3 +4,4 @@
 
 // CHECK: warning: '-Ounchecked' is not memory-safe
 // CHECK: warning: '-disable-access-control' is not memory-safe
+// UNSUPPORTED: OS=windows-msvc

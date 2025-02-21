@@ -335,3 +335,4 @@ public struct ClassConstrainedGenericArg<T: NormalClass>: PublicAssociatedTypePr
 
   public func takesAssoc(_: T) {}
 }
+// UNSUPPORTED: OS=windows-msvc

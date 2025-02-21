@@ -20,3 +20,4 @@
 // Test header interface printing from a clang module.
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -source-filename %s -print-header -header-to-print %S/Inputs/print_clang_header/header-to-print.h -enable-objc-interop -disable-objc-attr-requires-foundation-module --cc-args %target-cc-options -isysroot %clang-importer-sdk-path -fsyntax-only %t.framework.m -F %t -ivfsoverlay %t.yaml > %t.module.txt
 // RUN: diff -u %S/Inputs/print_clang_header/header-to-print.h.module.printed.txt %t.module.txt
+// UNSUPPORTED: OS=windows-msvc

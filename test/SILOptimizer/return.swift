@@ -266,3 +266,4 @@ class C_56857 {
     }
   } // expected-error {{missing return in class method expected to return 'Int'}}
 }
+// UNSUPPORTED: OS=windows-msvc

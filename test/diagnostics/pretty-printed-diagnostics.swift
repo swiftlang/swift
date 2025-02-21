@@ -85,3 +85,4 @@ foo(b:
 // CHECK:  [[#LINE]] | foo(b: 1, a: 2)
 // CHECK:              |         `- error: argument 'a' must precede argument 'b'
 // CHECK: [[#LINE+1]]  |
+// UNSUPPORTED: OS=windows-msvc

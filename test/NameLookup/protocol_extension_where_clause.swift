@@ -39,4 +39,4 @@ public protocol P4: P3 where A == B {}
 
 extension P4 {
   public typealias B = String
-}
+}// UNSUPPORTED: OS=windows-msvc

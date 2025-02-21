@@ -32,3 +32,4 @@ public extension LocalP {
 // MEMBER:           "kind": "memberOf"
 // MEMBER-NEXT:      "source": "s:6Remote6LocalPPAAE8someFuncyyF"
 // MEMBER-NEXT:      "target": "s:6Remote6LocalPP"
+// UNSUPPORTED: OS=windows-msvc

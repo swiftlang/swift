@@ -88,3 +88,4 @@
 // OUTPUT_IMPLICIT_EXPLICIT: -emit-module-doc-path {{"?}}SOURCE_DIR/test/Driver/Inputs{{\\\\|/}}not_main.swiftdoc
 // OUTPUT_IMPLICIT_EXPLICIT-SAME: -o {{"?}}SOURCE_DIR/test/Driver/Inputs{{\\\\|/}}not_main.swiftmodule
 // OUTPUT_IMPLICIT_EXPLICIT: -o {{"?}}SOURCE_DIR/test/Driver/Inputs{{\\\\|/}}not_main
+// UNSUPPORTED: OS=windows-msvc

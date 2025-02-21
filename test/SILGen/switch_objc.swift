@@ -52,3 +52,4 @@ func checkObjCEnumUnhandledCaseDiagnosticEmission(x: ObjCEnum) {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -267,3 +267,4 @@ do {
     typealias A = Array<Bool>
   }
 }
+// UNSUPPORTED: OS=windows-msvc

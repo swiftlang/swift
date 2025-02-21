@@ -74,3 +74,4 @@ public func bar<T: P>(genericValue: T) {
 // CHECK-DAG: ![[OPAQUE_ARRAY_SECOND_TYPE:[0-9]+]] = !DICompositeType({{.*}} name: "$s30opaque_result_type_debug_other3barSayQr_QR_SgtGyFQOyQo0_D"
 // CHECK-DAG: ![[LET_OPAQUE_ARRAY_SECOND_TYPE:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[OPAQUE_ARRAY_SECOND_TYPE]])
 // CHECK-DAG: {{![0-9]+}} = !DILocalVariable(name: "opaqueArraySecond",{{.*}} type: ![[LET_OPAQUE_ARRAY_SECOND_TYPE]])
+// UNSUPPORTED: OS=windows-msvc

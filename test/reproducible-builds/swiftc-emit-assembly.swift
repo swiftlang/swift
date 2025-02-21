@@ -3,3 +3,4 @@
 // RUN: %target-build-swift -O -g -module-name foo -emit-assembly %s > %t/run-2.S
 // RUN: diff -u %t/run-1.S %t/run-2.S
 print("foo")
+// UNSUPPORTED: OS=windows-msvc

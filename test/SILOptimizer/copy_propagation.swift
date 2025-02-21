@@ -28,3 +28,4 @@ func test_hoist_over_non_barrier() {
   non_barrier()
 }
 
+// UNSUPPORTED: OS=windows-msvc

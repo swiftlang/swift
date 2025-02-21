@@ -27,3 +27,4 @@ internal func internalFunc() -> Int { 42 }
   // CHECK-LABEL : sil{{.*}}@$sSo13Rdar114874429C19objc_implementationE4propSivpfi :
   // NEGATIVE-NOT: sil{{.*}} [serialized] {{.*}}@$sSo13Rdar114874429C19objc_implementationE4propSivpfi :
 }
+// UNSUPPORTED: OS=windows-msvc

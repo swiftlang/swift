@@ -144,3 +144,4 @@ typealias MyBlockWithNoescapeParam = (() -> ()) -> Int
 }
 
 // CHECK-NEXT: @end
+// UNSUPPORTED: OS=windows-msvc

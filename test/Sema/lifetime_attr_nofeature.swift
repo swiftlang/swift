@@ -8,3 +8,4 @@ struct NE : ~Escapable {
 func derive(_ ne: NE) -> NE { // expected-error{{returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'}}
   ne
 }
+// UNSUPPORTED: OS=windows-msvc

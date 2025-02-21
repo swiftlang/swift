@@ -17,3 +17,4 @@ public class MyClass<T> {
 }
 
 // CHECK: define {{.*}}@main(
+// UNSUPPORTED: OS=windows-msvc

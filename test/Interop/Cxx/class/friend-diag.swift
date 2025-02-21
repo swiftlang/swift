@@ -27,3 +27,4 @@ import FriendClass
 func test() {
   var v: D // expected-error {{cannot find type 'D' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

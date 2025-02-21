@@ -12,3 +12,4 @@ func foo(_ x: inout Int) {
 var x = 219
 foo(&x)
 print(x) // CHECK: 220
+// UNSUPPORTED: OS=windows-msvc

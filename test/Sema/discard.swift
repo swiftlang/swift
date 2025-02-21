@@ -194,3 +194,4 @@ struct Court: ~Copyable {
 
   deinit { print("deinit of \(self.x)") }
 }
+// UNSUPPORTED: OS=windows-msvc

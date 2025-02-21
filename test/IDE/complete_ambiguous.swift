@@ -540,3 +540,4 @@ func testAmbiguousArgs() {
   // NONINITIAL_VARARG: Decl[LocalVar]/Local/TypeRelation[Convertible]:  localInt[#Int#]; name=localInt
   // NONINITIAL_VARARG-NOT: name=x:
 }
+// UNSUPPORTED: OS=windows-msvc

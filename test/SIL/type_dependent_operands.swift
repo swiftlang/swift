@@ -58,3 +58,4 @@ final class X {
   required init() { }
 }
 
+// UNSUPPORTED: OS=windows-msvc

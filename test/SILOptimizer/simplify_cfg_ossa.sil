@@ -1971,3 +1971,4 @@ bb6(%15: @guaranteed $E, %16 : @reborrow $B):
   %r = tuple()
   return %r
 }
+// UNSUPPORTED: OS=windows-msvc

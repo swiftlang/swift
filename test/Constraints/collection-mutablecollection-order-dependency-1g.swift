@@ -19,3 +19,4 @@ extension Butz: MutableCollection {
     }
     public func index(after i: Flubz) -> Flubz { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

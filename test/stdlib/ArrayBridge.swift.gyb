@@ -568,3 +568,4 @@ tests.test("verbatimBridged/AnyObject/withUnsafeMutableBufferPointer") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -85,3 +85,4 @@ func bridgeFromNewtype(string: MyString) -> String {
 // CHECK-RAW: apply [[FROM_NS]]([[OPTNS]], [[META]])
   return string as NSString as String
 }
+// UNSUPPORTED: OS=windows-msvc

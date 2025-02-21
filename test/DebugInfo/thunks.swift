@@ -27,3 +27,4 @@ let i = foo.foo(-, x: y)
 // SIL-CHECK: sil shared {{.*}}@$ss5Int64VABIyByd_A2BIegyd_TR
 // SIL-CHECK-NOT: return
 // SIL-CHECK: apply {{.*}}auto_gen
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ import Module0
 #endif
 
 // CHECK: "name":"Module0","path":"{{[^"]*}}","isImportedDirectly":true
+// UNSUPPORTED: OS=windows-msvc

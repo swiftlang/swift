@@ -20,3 +20,4 @@ func foo() async {
     nonescapingCapture { await x }// expected-error{{not supported}}
     escapingCapture { await x }// expected-error{{not supported}}
 }
+// UNSUPPORTED: OS=windows-msvc

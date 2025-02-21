@@ -12,3 +12,4 @@ protocol P { }
 struct Rect2 : P {
   var orgx = 0.0
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@ public struct Fooz {
     var str = ""
     var dec = Decimal()
 }
+// UNSUPPORTED: OS=windows-msvc

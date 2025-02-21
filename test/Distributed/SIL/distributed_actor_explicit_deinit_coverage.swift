@@ -35,3 +35,4 @@ distributed actor MyDistActor {
     let _ = .random() ? 0 : 1
   }
 }
+// UNSUPPORTED: OS=windows-msvc

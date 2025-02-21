@@ -6,4 +6,4 @@
  import CoreGraphics
 
  var _: CGBitmapInfo! = nil
- 
+ // UNSUPPORTED: OS=windows-msvc

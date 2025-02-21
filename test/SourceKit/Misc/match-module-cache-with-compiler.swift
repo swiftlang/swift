@@ -25,3 +25,4 @@
 // RUN: find %t/mcp -name "mymod-*.pcm" | count 1
 
 import mymod
+// UNSUPPORTED: OS=windows-msvc

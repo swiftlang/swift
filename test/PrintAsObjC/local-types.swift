@@ -108,3 +108,4 @@ typealias ZForwardAlias = ZForwardAliasClass
 @objc protocol ZForwardProtocol6 {}
 @objc protocol ZForwardProtocol7 {}
 @objc protocol ZForwardProtocol8 {}
+// UNSUPPORTED: OS=windows-msvc

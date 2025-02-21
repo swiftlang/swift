@@ -9,3 +9,4 @@
 
 /// The flag is rejected in Swift 6.
 // CHECK-6: flag '-experimental-spi-imports' is unsupported
+// UNSUPPORTED: OS=windows-msvc

@@ -162,3 +162,4 @@ actor CharlieTheCustomExecutorActor {
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

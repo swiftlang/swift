@@ -48,3 +48,4 @@ distributed actor Worker<ActorSystem> where ActorSystem: DistributedActorSystem<
 
   }
 }
+// UNSUPPORTED: OS=windows-msvc

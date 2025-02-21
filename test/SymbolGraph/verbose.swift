@@ -19,3 +19,4 @@
 // DRIVER-NOT: Found {{[[:digit:]]}} symbols and {{[[:digit:]]}} relationships.
 
 public func someFunc() {}
+// UNSUPPORTED: OS=windows-msvc

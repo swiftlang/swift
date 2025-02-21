@@ -12,3 +12,4 @@ import APINotesFrameworkTest
 // CHECK-TOP-ALIAS-5: struct VeryImportantCStruct {
 // CHECK-NESTED-ALIAS-4: typealias InnerInSwift5 = Outer.Inner
 // CHECK-NESTED-ALIAS-5: struct Inner {
+// UNSUPPORTED: OS=windows-msvc

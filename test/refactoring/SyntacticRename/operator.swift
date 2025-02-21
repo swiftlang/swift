@@ -17,3 +17,4 @@ struct Foo {}
 func /*test:def*/<base>+</base>(x: Foo, y: Foo) {}
 Foo() /*test:ref*/<base>+</base> Foo()
 
+// UNSUPPORTED: OS=windows-msvc

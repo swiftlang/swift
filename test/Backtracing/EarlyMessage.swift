@@ -44,3 +44,4 @@ struct EarlyMessage {
 // swift-backtrace).
 
 // CHECK: *** Signal {{[0-9]+}}: Backtracing from 0x{{[0-9a-f]+}}... done ***
+// UNSUPPORTED: OS=windows-msvc

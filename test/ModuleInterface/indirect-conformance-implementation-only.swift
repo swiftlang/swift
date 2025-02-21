@@ -18,3 +18,4 @@ public struct _s : _p {}
 protocol p : _p {}
 public struct s : p {}
 public func test(s1 : s) {}
+// UNSUPPORTED: OS=windows-msvc

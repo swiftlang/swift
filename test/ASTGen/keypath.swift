@@ -245,3 +245,4 @@ func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
   let _ = \C<Int>.[noHashableConstraint: anything] // expected-error{{subscript index of type 'X' in a key path must be Hashable}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

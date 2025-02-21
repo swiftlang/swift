@@ -55,3 +55,4 @@ enum EE: ~Copyable {
   // expected-error@+1 {{deinitializers are not yet supported on noncopyable enums}}
   @FirstActor isolated deinit {} // expected-error 2 {{only classes and actors can have isolated deinit}}
 }
+// UNSUPPORTED: OS=windows-msvc

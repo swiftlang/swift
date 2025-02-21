@@ -131,3 +131,4 @@ print("target removed")
 // CHECK-NEXT: swiftValue 42, objcValue three
 // CHECK-NEXT: swiftValue 42, objcValue four
 // CHECK-NEXT: target removed
+// UNSUPPORTED: OS=windows-msvc

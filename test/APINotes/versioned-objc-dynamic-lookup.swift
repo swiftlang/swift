@@ -33,3 +33,4 @@ func testRenamedClassMembers(obj: AnyObject) {
   _ = obj.finalInstanceProperty
   // CHECK-DIAGS-5-NOT: swift:[[@LINE-1]]:{{[0-9]+}}:
 }
+// UNSUPPORTED: OS=windows-msvc

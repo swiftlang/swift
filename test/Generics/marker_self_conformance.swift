@@ -22,3 +22,4 @@ protocol P2 where Self: C {}
 
 typealias A4 = G<any P1>
 typealias A5 = G<any P2>
+// UNSUPPORTED: OS=windows-msvc

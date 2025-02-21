@@ -235,3 +235,4 @@ func useRenamedAPIs(actionable: SCNActionable, action: SCNAction, data: Data,
   program.handleBinding(ofBufferNamed: "str", frequency: bufferFrequency,
                         handler: bufferBindingBlock)
 }
+// UNSUPPORTED: OS=windows-msvc

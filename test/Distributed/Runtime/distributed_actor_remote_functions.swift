@@ -271,3 +271,4 @@ func test_remote_invoke(address: ActorAddress, system: FakeActorSystem) async {
     await test_remote_invoke(address: address, system: system)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

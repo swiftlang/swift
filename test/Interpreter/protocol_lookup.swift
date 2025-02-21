@@ -153,3 +153,4 @@ print(StaticBar.mightHaveFoo())
 
 // CHECK: StaticWibble.foo
 print(StaticWibble.mightHaveFoo())
+// UNSUPPORTED: OS=windows-msvc

@@ -74,3 +74,4 @@ extension Outer.Middle.Inner {
     Outer.MiddleExtension.privateDeclaration() // expected-error {{'privateDeclaration' is inaccessible due to 'private' protection level}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

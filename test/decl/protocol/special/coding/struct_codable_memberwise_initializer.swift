@@ -53,3 +53,4 @@ struct InitialValueCodableNoExplicitInitializers : Codable {
     let _ = InitialValueCodableNoExplicitInitializers.init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

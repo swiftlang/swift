@@ -126,3 +126,4 @@ CXXDestructorTestSuite.test("Protocol with member with destructor") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

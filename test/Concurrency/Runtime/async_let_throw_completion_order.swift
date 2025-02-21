@@ -30,3 +30,4 @@ func zim(y: Bar, x: Foo, z: Baz) { print("hooray") }
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

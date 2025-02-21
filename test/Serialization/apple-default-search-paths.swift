@@ -24,3 +24,4 @@ TestFramework2.foo()
 dummyError()
 
 #endif // FRAMEWORK
+// UNSUPPORTED: OS=windows-msvc

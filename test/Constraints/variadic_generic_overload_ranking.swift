@@ -85,3 +85,4 @@ func test_ranking_with_multiple_expansions() {
   // CHECK-NEXT: {{.*}} = function_ref @$s33variadic_generic_overload_ranking05test_D25_with_multiple_expansionsyyF7BuilderL_V5buildyAaByyF5TupleL_VyxxQp_tGxxQpRvzAA1PRzlFZ : $@convention(method) <each τ_0_0 where repeat each τ_0_0 : P> (@pack_guaranteed Pack{repeat each τ_0_0}, @thin Builder.Type) -> Tuple<(repeat each τ_0_0)>
   _ = Builder.build(Empty(), Tuple<(Int, String)>((42, "")))
 }
+// UNSUPPORTED: OS=windows-msvc

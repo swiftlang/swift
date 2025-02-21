@@ -45,3 +45,4 @@ func testAssignment(_ d: CGFloat) -> Double {
   let d2: Double = switch Bool.random() { case true: d case false: 0.0 }
   return .random() ? d1 : d2
 }
+// UNSUPPORTED: OS=windows-msvc

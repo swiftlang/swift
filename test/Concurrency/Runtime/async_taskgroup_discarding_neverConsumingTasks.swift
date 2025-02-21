@@ -91,3 +91,4 @@ func test_discardingTaskGroup_neverConsume(sleepBeforeGroupWaitAll: Duration) as
     await test_discardingTaskGroup_neverConsume(sleepBeforeGroupWaitAll: .milliseconds(500))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

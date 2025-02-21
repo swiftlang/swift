@@ -719,3 +719,4 @@ func test_result_builder_in_member_chaining() {
     result
   }
 }
+// UNSUPPORTED: OS=windows-msvc

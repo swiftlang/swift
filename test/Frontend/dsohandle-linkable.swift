@@ -16,3 +16,4 @@ tests.test("#dsohandle usable") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

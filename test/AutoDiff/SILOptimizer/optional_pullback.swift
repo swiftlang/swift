@@ -46,3 +46,4 @@ func f(x: Double) -> Double {
 }
 
 print(valueWithGradient(at: 0.0, of: f))
+// UNSUPPORTED: OS=windows-msvc

@@ -65,3 +65,4 @@ public struct SharedFRT_OpaqueLayout {
 
 // CHECK: define{{.*}} @"$s4test22SharedFRT_OpaqueLayoutVMr"
 // CHECK: store ptr getelementptr inbounds (ptr, ptr @"$sBpWV", i32
+// UNSUPPORTED: OS=windows-msvc

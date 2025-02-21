@@ -120,3 +120,4 @@ bb0(%0 : $UnsafePointer<Int64>):
   %19 = tuple ()
   return %19
 }
+// UNSUPPORTED: OS=windows-msvc

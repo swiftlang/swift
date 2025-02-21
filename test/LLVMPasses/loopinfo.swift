@@ -22,3 +22,4 @@ public func iterate2(ubp: UnsafeBufferPointer<Int>) -> Int {
 
 
 
+// UNSUPPORTED: OS=windows-msvc

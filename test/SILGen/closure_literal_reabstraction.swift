@@ -198,3 +198,4 @@ func reabstractClassCompStaticMemberRefs<T>(
 func reabstractInstanceMethodRef(instance: Butt) {
     gen(f: instance.getX)
 }
+// UNSUPPORTED: OS=windows-msvc

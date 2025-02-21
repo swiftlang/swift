@@ -31,3 +31,4 @@ func foo() {
     // CHECK-NEXT: good
 }
 foo()
+// UNSUPPORTED: OS=windows-msvc

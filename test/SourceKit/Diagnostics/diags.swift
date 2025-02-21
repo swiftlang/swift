@@ -47,3 +47,4 @@ func foo(y: String) {
 // ... but we shouldn't rebuild an AST
 // CHECK: 1 {{.*}} source.statistic.num-ast-builds
 // CHECK: 1 {{.*}} source.statistic.num-ast-cache-hits
+// UNSUPPORTED: OS=windows-msvc

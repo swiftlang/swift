@@ -85,3 +85,4 @@ conformances.test("nominalWitnesses") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

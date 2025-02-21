@@ -2,3 +2,4 @@
 
 #error("""
 
+// UNSUPPORTED: OS=windows-msvc

@@ -45,3 +45,4 @@ public class Test {
     state = .start
   }
 }
+// UNSUPPORTED: OS=windows-msvc

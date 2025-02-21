@@ -3,3 +3,4 @@
 import ForwardDeclaredInNamespace
 
 public func test(c: Space.C) { c.test() }
+// UNSUPPORTED: OS=windows-msvc

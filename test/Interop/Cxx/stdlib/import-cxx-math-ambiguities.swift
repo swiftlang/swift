@@ -20,3 +20,4 @@ func test() -> Float {
   return m
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

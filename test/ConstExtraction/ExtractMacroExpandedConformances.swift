@@ -26,3 +26,4 @@ struct MyStruct {
 // CHECK-DAG:      "Swift.BitwiseCopyable",
 // CHECK-DAG:      "ExtractMacroExpandedConformances.MyProto"
 // CHECK-NOT:      "ExtractMacroExpandedConformances.MyExtraProto"
+// UNSUPPORTED: OS=windows-msvc

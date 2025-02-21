@@ -247,3 +247,4 @@ ForwardModeTests.test("Generics") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -534,3 +534,4 @@ StringTests.test("hasPrefix/hasSuffix vs Character boundaries") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

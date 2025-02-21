@@ -19,3 +19,4 @@ class ExplicitSubclass : SynthesizedSuperclass {
     try super.encode(to: encoder)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

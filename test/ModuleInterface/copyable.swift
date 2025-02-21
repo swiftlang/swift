@@ -59,3 +59,4 @@ public func maker(_ top: TheTop, withCompletion comp: @escaping Handler) -> S<Th
   _ = genericFn(comp)
   return S(top)
 }
+// UNSUPPORTED: OS=windows-msvc

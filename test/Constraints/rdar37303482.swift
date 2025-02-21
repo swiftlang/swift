@@ -18,3 +18,4 @@ func foo<T: P>(_: [(String, (T) -> () -> Void)]) -> E { fatalError() }
 var arr = [E]()
 arr.append(foo([("a", A.foo)]))
 arr.append(foo([("b", B.foo)]))
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ func test_unavailable_app_extension() {
   _ = SomeCrazyAppExtensionForbiddenAPI() // expected-error {{unavailable}}
 // CHECK: error: 'SomeCrazyAppExtensionForbiddenAPI()' is unavailable in application extensions for {{[a-z]+}}OS: Not available in App Extensions
 }
+// UNSUPPORTED: OS=windows-msvc

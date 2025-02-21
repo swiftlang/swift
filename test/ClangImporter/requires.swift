@@ -7,3 +7,4 @@ import Requires.NotSwift
 // CHECK-NOT: error
 // CHECK: error: no such module 'Requires.NotSwift'
 // CHECK-NOT: error
+// UNSUPPORTED: OS=windows-msvc

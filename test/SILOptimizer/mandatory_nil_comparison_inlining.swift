@@ -36,3 +36,4 @@ func array_func_lhs_non_nil(x: [Int]?) -> Bool {
   return nil != x
 }
 
+// UNSUPPORTED: OS=windows-msvc

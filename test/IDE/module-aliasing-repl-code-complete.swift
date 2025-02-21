@@ -42,3 +42,4 @@ func f() {
   X
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ enum C<let N: Int> {} // expected-error {{values in generic types are only avail
                       // expected-note@-1 {{add @available attribute to enclosing generic enum}}
 
 func something<let N: Int>(_: A<N>) {} // OK, because A can't reference value generics.
+// UNSUPPORTED: OS=windows-msvc

@@ -32,3 +32,4 @@ protocol Swappable3 {
     where Swapped.A == B,
           Swapped.Swapped == Self
 }
+// UNSUPPORTED: OS=windows-msvc

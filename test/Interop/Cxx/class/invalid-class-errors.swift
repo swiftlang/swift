@@ -42,3 +42,4 @@ public func test(x: B) { }
 // CHECK: ^
 // CHECK: SWIFT_SHARED_REFERENCE(<#retain#>, <#release#>)
 public func test(x: Namespace.Nested) { }
+// UNSUPPORTED: OS=windows-msvc

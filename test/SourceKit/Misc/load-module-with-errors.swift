@@ -136,3 +136,4 @@ func testInvalidTopLevelCompletion() {
 // RUN: %sourcekitd-test -req=cursor -pos=13:7 %s -- -Xfrontend -experimental-allow-module-with-compiler-errors -I %t -target %target-triple %s | not %FileCheck %s -check-prefix=CHECK-MEMBER
 // CHECK-MEMBER: source.lang.swift.ref.var.instance
 // CHECK-MEMBER: memberB
+// UNSUPPORTED: OS=windows-msvc

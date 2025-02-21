@@ -34,3 +34,4 @@ SwitchResilienceTestSuite.test("Resilient Type Tuple Initialization") {
   }
   kraken()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@ class SubCities: Cities {
 func boo(_ a: ToplevelType) {
   a.trailing {  print($0!) }
 }
+// UNSUPPORTED: OS=windows-msvc

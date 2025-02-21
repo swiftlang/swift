@@ -26,3 +26,4 @@ struct ThrowAddrOnlyStruct<T : Patatino> {
     try! self.init(throwsOptionalToThrows: throwsOptionalToOptional)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

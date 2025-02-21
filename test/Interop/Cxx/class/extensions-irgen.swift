@@ -11,3 +11,4 @@ Outer.Space.Foo().foo()
 // CHECK: call swiftcc void @"$sSo5OuterO5SpaceO3FooV4mainE3fooyyF"
 
 // CHECK: define hidden swiftcc void @"$sSo5OuterO5SpaceO3FooV4mainE3fooyyF"
+// UNSUPPORTED: OS=windows-msvc

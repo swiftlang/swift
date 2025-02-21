@@ -34,3 +34,4 @@ class C {
   @Wrapper // expected-error{{generic struct 'Wrapper' requires that 'Int' conform to 'P'}}
   var value = C.i
 }
+// UNSUPPORTED: OS=windows-msvc

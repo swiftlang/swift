@@ -44,3 +44,4 @@ actor Container {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@
 
 struct MyStruct {
   func foo() {}
+// UNSUPPORTED: OS=windows-msvc

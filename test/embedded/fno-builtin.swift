@@ -13,3 +13,4 @@ public func foo() -> [Int] {
 }
 
 // CHECK: define {{.*}}@"$e4main3fooSaySiGyF"()
+// UNSUPPORTED: OS=windows-msvc

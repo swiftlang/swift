@@ -16,3 +16,4 @@ bb0:
   // CHECK-NEXT: ret ptr [[SEL]]
   return %0 : $Builtin.RawPointer
 }
+// UNSUPPORTED: OS=windows-msvc

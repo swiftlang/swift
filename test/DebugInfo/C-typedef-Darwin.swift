@@ -19,3 +19,4 @@ use(blah)
 // all in flux allow all three of those modules.
 // Darwin.C.stddef|_Builtin_stddef.size_t|Darwin.POSIX._types._size_t
 // CHECK: ![[DARWIN_MODULE]] = !DIModule({{.*}}, name: "{{stddef|size_t|_size_t}}"
+// UNSUPPORTED: OS=windows-msvc

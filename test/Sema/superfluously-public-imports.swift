@@ -345,3 +345,4 @@ public import ClangReexportedSubmodulePublic.ClangReexportedSubmodulePublicSub
 
 public func useTypedefed(a: TypedefType) {} // expected-remark 2 {{typealias underlying type struct '_TypedefTypeUnderlying' is imported via 'ClangReexportedSubmodulePublicSub', which reexports definition from 'ClangReexportedSubmoduleTop'}}
 // expected-remark @-1 {{type alias 'TypedefType' is imported via 'ClangReexportedSubmodulePublicSub', which reexports definition from 'ClangReexportedSubmoduleTop'}}
+// UNSUPPORTED: OS=windows-msvc

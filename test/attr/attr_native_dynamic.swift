@@ -295,3 +295,4 @@ class SubKlass : Klass {
    return 23
   }
 }
+// UNSUPPORTED: OS=windows-msvc

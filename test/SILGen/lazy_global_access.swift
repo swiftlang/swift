@@ -35,3 +35,4 @@ func useGlobalBar() -> Bar {
 private var globalBar = Bar() {
   willSet {}
 }
+// UNSUPPORTED: OS=windows-msvc

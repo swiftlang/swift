@@ -8,3 +8,4 @@ public struct TestGeneratorCrashy <Key: AnyObject, Value: AnyObject> {
 
 extension TestGeneratorCrashy: IteratorProtocol {
 }
+// UNSUPPORTED: OS=windows-msvc

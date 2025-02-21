@@ -27,3 +27,4 @@ import Foo
 // Step 4: Ensure that round-trip serialization does not affect result
 // RUN: %target-swift-frontend -scan-dependencies -test-dependency-scan-cache-serialization %s -o %t/deps.json -I %t/binaryModuleOnly -emit-dependencies -emit-dependencies-path %t/deps.d -sdk %t -prebuilt-module-cache-path %t/ResourceDir/%target-sdk-name/prebuilt-modules
 // RUN: %validate-json %t/deps.json | %FileCheck %s -check-prefix=BINARY_MODULE_ONLY
+// UNSUPPORTED: OS=windows-msvc

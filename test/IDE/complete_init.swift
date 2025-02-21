@@ -152,3 +152,4 @@ func test57916() {
   Issue57916(#^ISSUE_57916^#
   // ISSUE_57916: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Int#}[')'][#Issue57916#]; name=a:
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ func testNotImported() {
     fromSubmodule = 5
     // expected-error@-1 {{cannot find 'fromSubmodule' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

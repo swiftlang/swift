@@ -18,3 +18,4 @@ public func foo() {
 // CHECK: entry:
 // CHECK:   %0 = call {{.*}}@returnsACFBridgedType()
 // CHECK:   %1 = {{.*}}call ptr @llvm.objc.retainAutoreleasedReturnValue(ptr %0)
+// UNSUPPORTED: OS=windows-msvc

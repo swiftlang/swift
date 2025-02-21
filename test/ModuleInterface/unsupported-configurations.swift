@@ -31,3 +31,4 @@
 
 // NEGATIVE-NOT: warning:
 // NEGATIVE-NOT: error:
+// UNSUPPORTED: OS=windows-msvc

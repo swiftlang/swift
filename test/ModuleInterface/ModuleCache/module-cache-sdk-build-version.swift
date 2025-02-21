@@ -69,3 +69,4 @@ import Lib // expected-remark {{rebuilding module 'Lib' from interface}}
 //--- Client_NoRebuild.swift
 import Lib
 
+// UNSUPPORTED: OS=windows-msvc

@@ -67,3 +67,4 @@ func test(thing: Any) {
     let _ = thing as? @#^CAST?check=TYPEATTR^#
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -634,3 +634,4 @@ bb(%class : $SwiftClass):
   return %result : $@callee_guaranteed @async () -> @out Int
 }
 
+// UNSUPPORTED: OS=windows-msvc

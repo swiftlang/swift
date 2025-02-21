@@ -79,3 +79,4 @@ _ = OpenClassChild.init(from:)
 _ = OpenClassChild.encode(to:)
 
 _ = OpenClass.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

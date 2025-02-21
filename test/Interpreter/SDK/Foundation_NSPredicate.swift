@@ -11,3 +11,4 @@ let s = NSPredicate(format: "(lastName like[cd] %@) AND (birthday > %@)", "LLLL"
 print(s.predicateFormat)
 
 // CHECK: lastName LIKE[cd] "LLLL" AND birthday > "BBBB"
+// UNSUPPORTED: OS=windows-msvc

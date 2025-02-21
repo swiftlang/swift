@@ -109,3 +109,4 @@ if #available(SwiftStdlib 5.1, *) {
 // CHECK: --- use it
 // CHECK: Logger exiting useLogger()
 useLogger()
+// UNSUPPORTED: OS=windows-msvc

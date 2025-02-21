@@ -312,3 +312,4 @@ class Node {
 class RootNode: Node {
   override var rootNode: RootNode { return self }
 }
+// UNSUPPORTED: OS=windows-msvc

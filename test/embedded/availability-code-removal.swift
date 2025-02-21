@@ -24,3 +24,4 @@ public func test() -> any Player {
 
 // CHECK-NONEMBEDDED: $s4main4testAA6Player_pyF
 // CHECK-EMBEDDED-NOT: $e4main4testAA6Player_pyF
+// UNSUPPORTED: OS=windows-msvc

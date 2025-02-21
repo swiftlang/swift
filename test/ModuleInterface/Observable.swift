@@ -24,3 +24,4 @@ public func requiresObservable<T: Observable>(_: T) { }
 @inlinable func useObservable(sc: SomeClass) {
   requiresObservable(sc)
 }
+// UNSUPPORTED: OS=windows-msvc

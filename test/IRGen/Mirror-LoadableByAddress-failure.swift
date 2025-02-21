@@ -21,3 +21,4 @@ class B : Y {
       ancestorRepresentation: .customized({ super.customMirror }))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

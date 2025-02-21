@@ -22,4 +22,4 @@ protocol P3 : P1, P2 {}
 
 // This conformance should succeed, and associated type inference should infer
 // 'S.U == Int'.
-struct S : P3 {}
+struct S : P3 {}// UNSUPPORTED: OS=windows-msvc

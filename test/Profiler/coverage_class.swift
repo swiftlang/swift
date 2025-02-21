@@ -52,3 +52,4 @@ struct S2 {
   // CHECK-NEXT: [[@LINE+1]]:17 -> [[@LINE+1]]:27 : 0
   var m1: Int = g1 ? 0 : 1
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -59,3 +59,4 @@ func useShortIntroduced() {
     // expected-error@-1{{'shortFormIntroducedIn13_0()' is only available in macOS 13.0 or newer}}
     // expected-note@-2{{add 'if #available' version check}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -77,3 +77,4 @@ final class GenericUnableToHaveAssocObjectsSubClass2<T> : GenericAbleToHaveAssoc
 
 class GenericUnableToHaveAssocObjectsSubClass3<T> : GenericAbleToHaveAssocObjectsParentClass2<T> {
 }
+// UNSUPPORTED: OS=windows-msvc

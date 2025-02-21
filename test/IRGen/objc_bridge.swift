@@ -213,3 +213,4 @@ func ==(lhs: Bas, rhs: Bas) -> Bool { return true }
 class OptionalBlockProperty: NSObject {
   @objc var x: (([AnyObject]) -> [AnyObject])?
 }
+// UNSUPPORTED: OS=windows-msvc

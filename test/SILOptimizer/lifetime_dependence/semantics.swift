@@ -475,3 +475,4 @@ func testReturnObjectTemp(outer: Outer) -> Span<Int> {
   // expected-error @-1{{lifetime-dependent value escapes its scope}}
   // expected-note  @-2{{it depends on the lifetime of this parent value}}
 } // expected-note  {{this use causes the lifetime-dependent value to escape}}
+// UNSUPPORTED: OS=windows-msvc

@@ -23,3 +23,4 @@ extension X2 {
 }
 
 public func ==(lhs: X.Y, rhs: X.Y) -> Bool { return true }
+// UNSUPPORTED: OS=windows-msvc

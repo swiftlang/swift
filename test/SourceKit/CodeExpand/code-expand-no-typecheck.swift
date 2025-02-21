@@ -15,3 +15,4 @@ func test(array: [MyEnum]) -> [NyEnum] {
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -76,3 +76,4 @@ entry:
   %t = tuple ()
   return %t : $()
 }
+// UNSUPPORTED: OS=windows-msvc

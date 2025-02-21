@@ -14,3 +14,4 @@ public macro myLogMacro(fault: String) = #externalMacro(module: "CompilerPlugin"
 
 // CHECK: // Unavailable in C++: Swift macro 'myLogMacro(error:)'
 // CHECK: // Unavailable in C++: Swift macro 'myLogMacro(fault:)'
+// UNSUPPORTED: OS=windows-msvc

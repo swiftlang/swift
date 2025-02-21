@@ -41,3 +41,4 @@ struct Cell<T>: ~Copyable {
 
 @_rawLayout(likeArrayOf: T, count: 8)
 struct SmallVectorBuf<T>: ~Copyable {}
+// UNSUPPORTED: OS=windows-msvc

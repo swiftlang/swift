@@ -36,3 +36,4 @@ protocol Z6 {
   associatedtype T : Z6 where T.T.T.T.T.T == Self
 }
 
+// UNSUPPORTED: OS=windows-msvc

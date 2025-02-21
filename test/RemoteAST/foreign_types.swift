@@ -41,3 +41,4 @@ printType(WrapperByAttribute.self)
 // CHECK: found type: WrapperByAttribute{{$}}
 
 stopRemoteAST()
+// UNSUPPORTED: OS=windows-msvc

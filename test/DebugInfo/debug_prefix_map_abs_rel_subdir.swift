@@ -11,3 +11,4 @@ public func f() {}
 // CHECK-NOT: debug_prefix_map_abs_rel_subdir.swift
 // CHECK: !DIFile(filename: "debug_prefix_map_abs_rel_subdir.swift", directory: ".{{/|\\\\}}SubdirectoryWithAVeryUniqueName")
 // CHECK-NOT: debug_prefix_map_abs_rel_subdir.swift
+// UNSUPPORTED: OS=windows-msvc

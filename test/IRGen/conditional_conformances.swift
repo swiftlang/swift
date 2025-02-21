@@ -10,3 +10,4 @@
 
 // Too many pointer-sized integers in the IR
 // REQUIRES: PTRSIZE=64
+// UNSUPPORTED: OS=windows-msvc

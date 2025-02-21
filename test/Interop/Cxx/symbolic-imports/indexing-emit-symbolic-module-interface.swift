@@ -162,3 +162,4 @@ import CxxModule
 // CHECK-NEXT: typealias MyType = ns.TemplateRecord
 // CHECK-EMPTY:
 // CHECK-NEXT: typealias MyType2 = TransitiveStruct
+// UNSUPPORTED: OS=windows-msvc

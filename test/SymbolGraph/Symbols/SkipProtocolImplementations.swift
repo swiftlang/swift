@@ -86,3 +86,4 @@ public protocol _HiddenProtocol {
 public struct HiddenStruct: _HiddenProtocol {
     public struct T {}
 }
+// UNSUPPORTED: OS=windows-msvc

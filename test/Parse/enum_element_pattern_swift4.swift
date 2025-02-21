@@ -66,3 +66,4 @@ do {
                            // expected-note@-1 {{remove associated values to make the pattern match}} {{12-25=}} 
   let _: () = payload
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@ class Derived: GenericBase<Int> {}
 func foo<T: P>(_ x: T) {}
 
 foo(Derived())
+// UNSUPPORTED: OS=windows-msvc

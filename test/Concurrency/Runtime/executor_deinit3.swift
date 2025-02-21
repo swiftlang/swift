@@ -85,3 +85,4 @@ static func main() async {
         sleep(5)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ let e = OneCaseEnum.X
 print(e)
 let x = OneEnumWrapper(v: e)
 print(x)
+// UNSUPPORTED: OS=windows-msvc

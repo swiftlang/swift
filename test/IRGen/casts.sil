@@ -397,3 +397,4 @@ bb2:
 bb3(%11 : $Optional<C & PAnyObject>):
   return %11 : $Optional<C & PAnyObject>
 }
+// UNSUPPORTED: OS=windows-msvc

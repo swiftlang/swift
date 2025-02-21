@@ -69,3 +69,4 @@ struct S {
   __consuming func releasenoneConsumeSelf() {}
 
 }
+// UNSUPPORTED: OS=windows-msvc

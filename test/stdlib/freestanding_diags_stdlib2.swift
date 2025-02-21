@@ -16,3 +16,4 @@ actor Custom { // expected-error{{not permitted within task-to-thread concurrenc
     return simple.unownedExecutor
   }
 }
+// UNSUPPORTED: OS=windows-msvc

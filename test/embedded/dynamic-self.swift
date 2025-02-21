@@ -19,3 +19,4 @@ struct Main {
 }
 
 // CHECK: define {{.*}}@main(
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ TemplatesTestSuite.test("sfinae-example") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

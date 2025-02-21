@@ -4,3 +4,4 @@
 // Make sure we don't emit a coverage map for an empty main file with no
 // top-level code.
 // CHECK-NOT: sil_coverage_map
+// UNSUPPORTED: OS=windows-msvc

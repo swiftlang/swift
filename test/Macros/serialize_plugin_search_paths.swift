@@ -20,3 +20,4 @@
 // CHECK:     -load-plugin-executable {{.*}}mock-plugin#TestPlugin
 // CHECK-SYSV:-plugin-path {{.*}}plugins
 // CHECK-SYSV:-plugin-path {{.*}}plugins
+// UNSUPPORTED: OS=windows-msvc

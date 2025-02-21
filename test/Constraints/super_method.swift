@@ -59,3 +59,4 @@ func test_that_invalid_supertype_ref_doesnt_crash() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -2,3 +2,4 @@
 
 // CHECK-WASM: swift{{.*}} -frontend -c -primary-file {{.*}} -target wasm32-unknown-wasi -disable-objc-interop
 // CHECK-WASM: clang{{.*}} -target wasm32-unknown-wasi {{.*}}static-executable-args.lnk{{.*}}-v {{.*}}-o
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ unowned var globalC1 = C() // expected-warning {{instance will be immediately de
 // expected-note@-1 {{a strong reference is required to prevent the instance from being deallocated}}
 // expected-note@-2 {{'globalC1' declared here}}
 
+// UNSUPPORTED: OS=windows-msvc

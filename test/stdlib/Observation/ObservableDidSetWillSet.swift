@@ -40,3 +40,4 @@ m.state = .running
 // CHECK: new state=complete
 // CHECK: old state=running
 m.state = .complete
+// UNSUPPORTED: OS=windows-msvc

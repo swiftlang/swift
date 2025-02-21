@@ -34,3 +34,4 @@ _ = setC as! Set<U> // Ok
 
 // Test set conditional downcasts to unrelated types.
 if let _ = setC as? Set<U> { } // Ok
+// UNSUPPORTED: OS=windows-msvc

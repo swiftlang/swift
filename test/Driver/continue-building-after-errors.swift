@@ -17,3 +17,4 @@ struct Bar {
     self.baz = self.baz
   }
 }
+// UNSUPPORTED: OS=windows-msvc

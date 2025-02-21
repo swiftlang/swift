@@ -4,3 +4,4 @@
 
 // CHECK: -plugin-path {{[^ ]+}}/lib/swift/host/plugins
 // CHECK-SAME: -plugin-path {{[^ ]+}}/local/lib/swift/host/plugins
+// UNSUPPORTED: OS=windows-msvc

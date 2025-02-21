@@ -7,3 +7,4 @@ withUnsafeTemporaryAllocation(of: Int.self, capacity: .max) { buffer in
     blackHole(buffer.baseAddress)
 }
 // CHECK: error: allocation byte count too large
+// UNSUPPORTED: OS=windows-msvc

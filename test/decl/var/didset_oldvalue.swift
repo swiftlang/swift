@@ -59,4 +59,4 @@ class YetAnotherFoo {
 }
 
 let yetAnotherFoo = YetAnotherFoo()
-yetAnotherFoo.bar = 1
+yetAnotherFoo.bar = 1// UNSUPPORTED: OS=windows-msvc

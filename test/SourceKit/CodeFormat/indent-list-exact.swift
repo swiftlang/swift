@@ -187,3 +187,4 @@ class Foo2 {
 
 //                        "    foo2(1,"
 // CHECK: key.sourcetext: "         "
+// UNSUPPORTED: OS=windows-msvc

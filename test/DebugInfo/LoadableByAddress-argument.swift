@@ -13,3 +13,4 @@ public struct Large {
 
 // CHECK: !DILocalVariable(name: "largeArg", arg: 1
 public func f(_ largeArg : Large) {}
+// UNSUPPORTED: OS=windows-msvc

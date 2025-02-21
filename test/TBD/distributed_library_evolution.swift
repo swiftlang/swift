@@ -65,3 +65,4 @@ public distributed actor SomeDistributedActor: GreeterProtocol {
 // IR unmangledName = $s4test20SomeDistributedActorC5hello4nameS2S_tFTE
 // thunk, method reference + async function pointer
 // IR unmangledName = $s4test20SomeDistributedActorC5hello4nameS2S_tFTETu
+// UNSUPPORTED: OS=windows-msvc

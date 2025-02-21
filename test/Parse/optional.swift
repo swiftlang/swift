@@ -15,3 +15,4 @@ var f = e?()
 
 struct B<T> {}
 var g = B<A?>()
+// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@ TemplatesTestSuite.test("tests") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

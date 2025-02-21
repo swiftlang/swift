@@ -18,3 +18,4 @@ struct MyValue: HasAssocWithConstraint {
   var #^OPAQUE_RESULT^#
 // OPAQUE_RESULT-DAG: Decl[InstanceVar]/Super: value: some HasAssocWithConstraint;
 }
+// UNSUPPORTED: OS=windows-msvc

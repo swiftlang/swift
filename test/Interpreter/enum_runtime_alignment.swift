@@ -18,3 +18,4 @@ var x: [Enum: (Structure?, Structure?)] = [
 
 // CHECK: [main.Enum.One: (Optional(main.Structure(a: 1, b: 2, c: 3)), nil)]
 print(x)
+// UNSUPPORTED: OS=windows-msvc

@@ -40,3 +40,4 @@ MetadataPrintingTests.test("global actor functions") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

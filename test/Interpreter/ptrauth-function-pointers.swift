@@ -32,3 +32,4 @@ PtrAuthFunctionPointersTestSuite.test("PointerAreSigned") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

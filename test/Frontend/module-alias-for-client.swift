@@ -72,3 +72,4 @@ public func rubLib() {
 public func runLog() {
   _ = XLogging.setup()
 }
+// UNSUPPORTED: OS=windows-msvc

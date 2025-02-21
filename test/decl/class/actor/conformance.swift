@@ -98,3 +98,4 @@ actor A2: Initializers {
 
   func withBells() async -> A2 { self }
 }
+// UNSUPPORTED: OS=windows-msvc

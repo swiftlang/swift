@@ -118,3 +118,4 @@ captures.test("Leaks") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -69,3 +69,4 @@ actor Bad {
   @objc nonisolated lazy var invalid = 0
   // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
 }
+// UNSUPPORTED: OS=windows-msvc

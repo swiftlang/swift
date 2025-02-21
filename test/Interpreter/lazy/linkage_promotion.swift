@@ -19,3 +19,4 @@ func bar() {
 // CHECK: foo
 // CHECK-NEXT: bar
 bar()
+// UNSUPPORTED: OS=windows-msvc

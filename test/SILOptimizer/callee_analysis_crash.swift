@@ -39,3 +39,4 @@ public func testit<T: P>(_ t: T) {
   b.foo()
 }
 
+// UNSUPPORTED: OS=windows-msvc

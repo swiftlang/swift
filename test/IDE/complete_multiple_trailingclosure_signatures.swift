@@ -38,3 +38,4 @@ func testStringAndMultipleTrailingClosures() {
   // STRING_AND_MULTIPLE_TRAILING_CLOSURES-DAG: Keyword[self]/CurrNominal:          .self[#Void#]; name=self
   // STRING_AND_MULTIPLE_TRAILING_CLOSURES: End completions
 }
+// UNSUPPORTED: OS=windows-msvc

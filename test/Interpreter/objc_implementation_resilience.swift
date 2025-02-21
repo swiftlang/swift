@@ -13,3 +13,4 @@
     ImplClass.runTests()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

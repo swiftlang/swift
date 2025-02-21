@@ -8,3 +8,4 @@ import #^CLANG_IMPORT1^#
 // CLANG_IMPORT1-DAG:	Decl[Module]/None:                 FooHelper[#Module#]; name=FooHelper
 // CLANG_IMPORT1-DAG:	Decl[Module]/None:                       Bar[#Module#]; name=Bar
 // CLANG_IMPORT1-NOT:	SwiftShims
+// UNSUPPORTED: OS=windows-msvc

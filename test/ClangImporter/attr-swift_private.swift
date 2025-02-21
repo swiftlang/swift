@@ -135,3 +135,4 @@ func testRawNames() {
 // CHECK: @"\01L_selector(initWithTwoArgs:other:)"
 // CHECK-LABEL: define linkonce_odr hidden {{.+}} @"$sSo3BarC2__ABSgs5Int32V_tcfcTO"
 // CHECK: @"\01L_selector(init:)"
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ bb0(%0 : $Int):
   %4 = tuple ()
   return %4 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -192,3 +192,4 @@ import SubE
 // CHECK-MAKE-DEPS-SAME: Bridging.h
 // CHECK-MAKE-DEPS-SAME: BridgingOther.h
 // CHECK-MAKE-DEPS-SAME: module.modulemap
+// UNSUPPORTED: OS=windows-msvc

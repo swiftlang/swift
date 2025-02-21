@@ -47,3 +47,4 @@ do {
   var block = blockWithNullable()
   checkTypeImpl(&block, Optional<my_block_t>.self)
 }
+// UNSUPPORTED: OS=windows-msvc

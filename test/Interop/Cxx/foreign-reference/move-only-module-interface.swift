@@ -30,3 +30,4 @@
 // CHECK:   class func create() -> BadCopyCtor
 // CHECK: }
 // CHECK-NOT: func moveIntoResult(_ x: BadCopyCtor) -> BadCopyCtor
+// UNSUPPORTED: OS=windows-msvc

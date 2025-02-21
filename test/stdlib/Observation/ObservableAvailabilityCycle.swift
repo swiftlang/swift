@@ -17,3 +17,4 @@ extension ObservableClass {
     case used
   }
 }
+// UNSUPPORTED: OS=windows-msvc

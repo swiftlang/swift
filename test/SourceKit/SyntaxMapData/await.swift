@@ -5,3 +5,4 @@ func foo() async {}
 func test() async {
   await foo()
 }
+// UNSUPPORTED: OS=windows-msvc

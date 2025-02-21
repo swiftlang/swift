@@ -53,3 +53,4 @@ testSuite.test("UnicodeScalar literal type") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

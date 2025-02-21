@@ -68,3 +68,4 @@ extension ExpressibleByStringLiteral
 public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32)
 }
+// UNSUPPORTED: OS=windows-msvc

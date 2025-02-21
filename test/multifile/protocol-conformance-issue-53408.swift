@@ -7,3 +7,4 @@
 
 func reproducer() -> Float { return Struct().func1(1.0) }
 
+// UNSUPPORTED: OS=windows-msvc

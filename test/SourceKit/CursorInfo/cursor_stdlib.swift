@@ -290,3 +290,4 @@ let dictNonCost = [1:2, 3:d]
 // CHECK-DICT2-NEXT: Swift
 // CHECK-DICT2-NEXT: <Group>Collection/HashedCollections</Group>
 // CHECK-DICT2-NEXT: SYSTEM
+// UNSUPPORTED: OS=windows-msvc

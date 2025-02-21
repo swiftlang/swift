@@ -18,3 +18,4 @@ d -= int4(0) // expected-error{{'-=' is unavailable: integer vector types do not
 d *= int4(0) // expected-error{{'*=' is unavailable: integer vector types do not support checked arithmetic; use the wrapping operator '&*=' instead}}
 d *= 0 // expected-error{{'*=' is unavailable: integer vector types do not support checked arithmetic; use the wrapping operator '&*=' instead}}
 
+// UNSUPPORTED: OS=windows-msvc

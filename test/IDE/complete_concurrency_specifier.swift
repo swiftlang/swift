@@ -46,3 +46,4 @@ _ = { arg #^CLOSURE2_WITHARROW?check=SPECIFIER^# -> Void in }
 _ = { arg async #^CLOSURE2_WITHASYNCARROW?check=SPECIFIER_WITHASYNC^# -> Void in }
 _ = { arg throws #^CLOSURE2_WITHTHROWSARROW?check=SPECIFIER_WITHTHROWS^# -> Void in }
 _ = { arg async throws #^CLOSURE2_WITHASYNCTHROWSARROW?check=SPECIFIER_WITHASYNCTHROWS^# -> Void in }
+// UNSUPPORTED: OS=windows-msvc

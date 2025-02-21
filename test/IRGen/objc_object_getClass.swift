@@ -20,3 +20,4 @@ func test(_ o: ObjCSubclass) {
 
 // CHECK-DAG: declare ptr @object_getClass(ptr{{.*}})
 // CHECK-DAG: call ptr @object_getClass(ptr %{{.*}})
+// UNSUPPORTED: OS=windows-msvc

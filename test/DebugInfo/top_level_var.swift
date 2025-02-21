@@ -11,3 +11,4 @@ markUsed(a)
 // CHECK: ![[MAIN:.*]] = distinct !DISubprogram(name: "main",
 // CHECK-SAME:                                  line: 1
 // CHECK-SAME:                                  DISPFlagDefinition
+// UNSUPPORTED: OS=windows-msvc

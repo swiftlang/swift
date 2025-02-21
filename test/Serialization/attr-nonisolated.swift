@@ -33,3 +33,4 @@ actor UnsafeCounter {
     set {  }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

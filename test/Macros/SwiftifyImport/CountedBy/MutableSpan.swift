@@ -14,3 +14,4 @@ func myFunc(_ ptr: UnsafeMutablePointer<CInt>, _ len: CInt) {
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
+// UNSUPPORTED: OS=windows-msvc

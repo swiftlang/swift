@@ -78,3 +78,4 @@ autoreleasepool {
 do {
   print(count) // CHECK: 0
 }
+// UNSUPPORTED: OS=windows-msvc

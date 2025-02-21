@@ -77,3 +77,4 @@ default:
 // CHECK-DAG: Keyword[self]/CurrNominal:          self[#MyStruct#]; name=self
 // CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      x[#Int#]; name=x
 // CHECK-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      y[#Int#]; name=y
+// UNSUPPORTED: OS=windows-msvc

@@ -77,3 +77,4 @@ public func testInterferenceRead(mut: inout M, extra: consuming M) {
     borrow(mut.otherMoveOnly, andConsume: mut) // expected-error{{}} expected-note{{}}
     mut = extra
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -52,3 +52,4 @@ func testGeneric() {
   // CHECK: apply [[INIT]]({{%.+}}, [[TYPE]])
   _ = NonGenericSub()
 } // CHECK: end sil function '$s4main11testGenericyyF'
+// UNSUPPORTED: OS=windows-msvc

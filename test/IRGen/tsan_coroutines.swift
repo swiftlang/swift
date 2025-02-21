@@ -29,3 +29,4 @@ extension Foobar {
         return things.values[position.myIndex]
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -70,3 +70,4 @@
 // CHECK:   func pointer() -> UnsafeMutableRawPointer!
 // CHECK:   func selfContained() -> SelfContained
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@ import NSStreamDelegate
 func foo<T: NSStreamDelegate>(_ delegate: T, stream: NSStream) {
   delegate.stream!(stream, handle: NSStreamEvent.openCompleted)
 }
+// UNSUPPORTED: OS=windows-msvc

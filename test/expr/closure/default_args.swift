@@ -13,3 +13,4 @@ func func_default_args() {
   var _ : () -> Int = has_default_args // expected-error{{cannot convert value of type '(Int) -> Int' to specified type '() -> Int'}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

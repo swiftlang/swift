@@ -298,3 +298,4 @@ func notExt(_ c: inout MyClass) {
     // let _ = MyClass.publEnumOpen.Value1
     // let _ = MyClass.privEnumOpen.Value1
 }
+// UNSUPPORTED: OS=windows-msvc

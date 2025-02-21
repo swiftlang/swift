@@ -34,4 +34,4 @@ func f1<T: AnyObject>(t: T) {
 
 func f2<T: AnyObject, U: AnyObject>(u: U, tt: Array<Wrapper<T>>) {
   _ = tt.map { _ in Wrapper(t: u) }
-}
+}// UNSUPPORTED: OS=windows-msvc

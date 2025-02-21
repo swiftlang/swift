@@ -108,3 +108,4 @@ func main() {
     // CHECK-NEXT: deinit <moon>
 }
 main()
+// UNSUPPORTED: OS=windows-msvc

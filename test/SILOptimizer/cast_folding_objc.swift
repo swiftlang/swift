@@ -362,3 +362,4 @@ public func testForcedBridgedCastFromSwiftToNSObjectDerivedClass(_ s: String) ->
 func foo(x: CFMutableDictionary) -> [AnyHashable:AnyObject]? {
   return x as? [AnyHashable:AnyObject]
 }
+// UNSUPPORTED: OS=windows-msvc

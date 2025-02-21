@@ -38,3 +38,4 @@ extension Object {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

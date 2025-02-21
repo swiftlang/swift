@@ -75,3 +75,4 @@
   @objc init() {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

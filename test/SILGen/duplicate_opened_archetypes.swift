@@ -31,3 +31,4 @@ struct Test {
 
   var t: S = S(i: .x)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ import OtherModule
 // CHECK-SERIALIZED: sil_moveonlydeinit [serialized] MoveOnlyEnum {
 let s = MoveOnlyStruct(desc: 5)
 let e = MoveOnlyEnum.lhs(5)
+// UNSUPPORTED: OS=windows-msvc

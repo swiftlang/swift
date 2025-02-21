@@ -93,3 +93,4 @@ takes_short5(short5_value)   // expected-error{{cannot find 'takes_short5' in sc
 takes_ushort6(ushort6_value) // expected-error{{cannot find 'takes_ushort6' in scope}}
 takes_int128(int128_value)   // expected-error{{cannot find 'takes_int128' in scope}}
 takes_uint20(uint20_value)   // expected-error{{cannot find 'takes_uint20' in scope}}
+// UNSUPPORTED: OS=windows-msvc

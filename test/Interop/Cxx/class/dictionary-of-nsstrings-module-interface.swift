@@ -2,4 +2,4 @@
 
 // REQUIRES: objc_interop
 
-// CHECK: func takesDictionaryOfStrings(_ a: [String : String])
+// CHECK: func takesDictionaryOfStrings(_ a: [String : String])// UNSUPPORTED: OS=windows-msvc

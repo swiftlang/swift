@@ -53,3 +53,4 @@ using stubType = Generics::_impl::swift_interop_passStub_Generics_void_ptr_0_4_v
 
 // verify that we're using direct stub type in the test.
 static_assert(sizeof(stubType) == sizeof(void *) * 2);
+// UNSUPPORTED: OS=windows-msvc

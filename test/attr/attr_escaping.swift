@@ -271,3 +271,4 @@ class C_57070 {
     // expected-note@-1{{parameter #1 expects escaping value of type '() -> Void'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

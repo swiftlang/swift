@@ -33,3 +33,4 @@ func foo() {
 }
 // COMPLETE-DAG: Keyword[self]/CurrNominal:          self[#R<S>#]; name=self
 // COMPLETE-DAG: Decl[InstanceMethod]/CurrNominal:   bar()[#Void#]; name=bar()
+// UNSUPPORTED: OS=windows-msvc

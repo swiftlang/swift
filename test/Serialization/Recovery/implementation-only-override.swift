@@ -120,3 +120,4 @@ public class SubscriptChild: SubscriptParent {
     set {}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

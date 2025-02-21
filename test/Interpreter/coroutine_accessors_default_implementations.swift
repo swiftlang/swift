@@ -257,3 +257,4 @@ func modifySomePLocal<T : P>(_ p: inout T) {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

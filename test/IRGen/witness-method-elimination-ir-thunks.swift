@@ -43,3 +43,4 @@ extension MyLibraryProtocol {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

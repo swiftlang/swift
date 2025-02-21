@@ -46,3 +46,4 @@ typealias T3 = P1_1 & P1
 extension T3 { // Ideally, we should emit a warning here but the current implementation doesn't do that.
     func t3() {}
 }
+// UNSUPPORTED: OS=windows-msvc

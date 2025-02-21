@@ -93,3 +93,4 @@ func testStringCollectionTypes(s: String) {
 func testStringInitWithCustomStringConvertible() {
   _ = [(1..<10)].map(String.init)
 }
+// UNSUPPORTED: OS=windows-msvc

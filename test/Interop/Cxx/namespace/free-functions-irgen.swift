@@ -35,3 +35,4 @@ public func sameNames() {
   FunctionsNS4.sameNameInSibling()
 }
 
+// UNSUPPORTED: OS=windows-msvc

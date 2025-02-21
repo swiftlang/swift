@@ -120,3 +120,4 @@ pthread_join(t3, nil)
 // CHECK-DAG: Boule
 // CHECK-DAG: Batard
 myString.withLock { print($0) }
+// UNSUPPORTED: OS=windows-msvc

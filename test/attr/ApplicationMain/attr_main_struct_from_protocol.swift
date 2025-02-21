@@ -17,3 +17,4 @@ struct EntryPoint : Runnable {
   func run() {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

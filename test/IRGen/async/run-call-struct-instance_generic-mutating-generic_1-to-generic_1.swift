@@ -32,3 +32,4 @@ func theMutatingCaller<T, U>(_ g: inout G<T>, _ u: U) async -> U {
     print(i)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

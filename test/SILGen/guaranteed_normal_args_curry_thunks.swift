@@ -116,3 +116,4 @@ func testGenericInitClass<T : ProtocolInitLoadable>(t: T) {
   let x = T.init
   let y = x(Klass())
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -216,3 +216,4 @@ func testTryOnThen() throws -> Int {
 func testReturnTryThen(_ then: Int) -> Int {
   return try then // expected-warning {{no calls to throwing functions occur within 'try' expression}}
 }
+// UNSUPPORTED: OS=windows-msvc

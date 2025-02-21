@@ -438,3 +438,4 @@ func testGlobalActorAutoclosure(_ x: HasMainActorFns) {
   takesMainActorFn(HasMainActorFns.instanceFn(x))
   takesMainActorFn(x.instanceFn)
 }
+// UNSUPPORTED: OS=windows-msvc

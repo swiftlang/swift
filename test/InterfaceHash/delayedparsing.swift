@@ -20,3 +20,4 @@ class C {
   func foo() {}
   func bar() {}
 }
+// UNSUPPORTED: OS=windows-msvc

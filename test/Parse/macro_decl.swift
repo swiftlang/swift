@@ -54,3 +54,4 @@ struct S {
   #class
   # struct Inner {} // expected-error {{expected a macro identifier for a pound literal declaration}} expected-error {{consecutive declarations on a line}}
 }
+// UNSUPPORTED: OS=windows-msvc

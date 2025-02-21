@@ -72,3 +72,4 @@ public struct SomeValue {
     self.b = b
   }
 }
+// UNSUPPORTED: OS=windows-msvc

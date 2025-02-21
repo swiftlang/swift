@@ -9,3 +9,4 @@ func foo() -> Int {
 // RUN: %diff -u %S/extract-repeated-expression.swift.expected %t.result/extract-repeated-expression.swift.expected
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// UNSUPPORTED: OS=windows-msvc

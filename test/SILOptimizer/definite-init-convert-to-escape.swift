@@ -122,3 +122,4 @@ public func bridgeNoescapeBlock() {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

@@ -59,3 +59,4 @@ package func testKeyPath<T: PkgProto>(_ array: [T]) -> KeyPath<T, String> {
 // CHECK: sil_witness_table package [serialized_for_package] Foo: PkgProto module Lib {
 // CHECK:  method #PkgProto.pkgVar!getter: <Self where Self : PkgProto> (Self) -> () -> String : @$s3Lib3FooVAA8PkgProtoA2aDP6pkgVarSSvgTW
 
+// UNSUPPORTED: OS=windows-msvc

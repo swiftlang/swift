@@ -47,3 +47,4 @@ class BarSubclass: Bar {
         set(value) {}
     }
 }
+// UNSUPPORTED: OS=windows-msvc

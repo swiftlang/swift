@@ -4,3 +4,4 @@
 // RUN: %target-swift-frontend -emit-sil -sil-debug-serialization -I %t %S/class.swift | %FileCheck %s -check-prefix=SIL
 
 // SIL-LABEL: sil public_external [transparent] [canonical] @$sSi1poiyS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int
+// UNSUPPORTED: OS=windows-msvc

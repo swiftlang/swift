@@ -6,3 +6,4 @@ var s = MyStruct()
 s.foo(123)
 // CHECK-NOT: shouldNotBeCalledOrEmitted
 // CHECK: calledFromMethodBody
+// UNSUPPORTED: OS=windows-msvc

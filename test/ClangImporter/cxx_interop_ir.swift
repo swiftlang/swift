@@ -62,3 +62,4 @@ func basicMethodsStatic() -> Int32 {
 func basicMethods(a: UnsafeMutablePointer<Methods2>) -> Int32 {
   return a.pointee.SimpleMethod(4)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -49,3 +49,4 @@
 // RUN: not %swiftc_driver -driver-print-jobs -module-name ARCHIVER  %s -emit-executable -static 2>&1 | %FileCheck -check-prefix ERROR %s
 
 // ERROR: error: -static may not be used with -emit-executable
+// UNSUPPORTED: OS=windows-msvc

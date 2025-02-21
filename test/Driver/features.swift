@@ -16,3 +16,4 @@
 // CHECK-SAME: -enable-experimental-feature ParserValidation
 // CHECK-SAME: -disable-upcoming-feature MemberImportVisibility
 // CHECK-SAME: -disable-experimental-feature ParserValidation
+// UNSUPPORTED: OS=windows-msvc

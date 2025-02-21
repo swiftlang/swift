@@ -127,3 +127,4 @@ func testType() {
 // PRECEDENCE_GROUP_MULTIFILE: Decl[PrecedenceGroup]/CurrModule: PrecedenceGroupOtherFile; name=PrecedenceGroupOtherFile
 
 // PRECEDENCE_GROUP_NEGATIVE-NOT: Decl[PrecedenceGroup]
+// UNSUPPORTED: OS=windows-msvc

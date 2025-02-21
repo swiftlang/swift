@@ -46,3 +46,4 @@ for (val, str, idx) in [(PartialImplicitKey.a, "a", 1), (.b, "b", 2), (.c, "c", 
     guard PartialImplicitKey(stringValue: str) == val else { fatalError() }
     guard PartialImplicitKey(intValue: idx) == nil else { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

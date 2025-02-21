@@ -93,3 +93,4 @@ func test() {
 // FILE2-NOT: Unit |{{.*}}ClangModuleB
 // FILE2-NOT: Record
 // FILE2: DEPEND END
+// UNSUPPORTED: OS=windows-msvc

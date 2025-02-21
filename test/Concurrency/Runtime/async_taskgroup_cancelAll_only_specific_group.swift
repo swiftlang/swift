@@ -85,3 +85,4 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
     await test_taskGroup_cancelAll_onlySpecificGroup()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

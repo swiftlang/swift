@@ -4,3 +4,4 @@
 
 import Foundation
 class C {}
+// UNSUPPORTED: OS=windows-msvc

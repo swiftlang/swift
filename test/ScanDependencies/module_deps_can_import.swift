@@ -71,3 +71,4 @@ void notused(void);
 //--- include/Version.swiftinterface
 // swift-interface-format-version: 1.0
 // swift-module-flags: -module-name Version -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -user-module-version 100.1
+// UNSUPPORTED: OS=windows-msvc

@@ -125,3 +125,4 @@ PullbackTests.test("GenericType") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

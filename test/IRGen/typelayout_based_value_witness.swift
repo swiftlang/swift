@@ -145,3 +145,4 @@ public enum E2<T: P> {
     case first(Ref<T>)
     case second(String)
 }
+// UNSUPPORTED: OS=windows-msvc

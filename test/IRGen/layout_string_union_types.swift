@@ -5,3 +5,4 @@
 struct UnionWrapper {
     let x: TestUnion
 }
+// UNSUPPORTED: OS=windows-msvc

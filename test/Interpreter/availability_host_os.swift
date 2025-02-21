@@ -17,3 +17,4 @@ print(yosemite()) // CHECK-NEXT: {{^10$}}
 print(todosSantos()) // expected-error {{'todosSantos()' is only available in macOS 99.99 or newer}}
 // expected-note@-1 {{add 'if #available' version check}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

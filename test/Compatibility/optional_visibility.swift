@@ -11,3 +11,4 @@ class Conforms : Opt {
 func g(x: Conforms) {
   _ = x.f(callback: {}) // expected-error {{'f' is inaccessible due to 'private' protection level}}
 }
+// UNSUPPORTED: OS=windows-msvc

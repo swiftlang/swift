@@ -46,3 +46,4 @@ extension /*invoke here:*/Bar {}
 
 // RUN: %refactor --actions -source-filename %s -pos=45:27 | %FileCheck %s -check-prefix=CHECK4
 // CHECK4: Action begins
+// UNSUPPORTED: OS=windows-msvc

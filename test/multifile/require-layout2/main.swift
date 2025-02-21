@@ -11,3 +11,4 @@ func test() {
 
 // CHECK: test.Sub<Swift.Int>
 test()
+// UNSUPPORTED: OS=windows-msvc

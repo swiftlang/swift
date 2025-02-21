@@ -7,3 +7,4 @@
 
 // REQUIRES: swift_interpreter
 // UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=windows-msvc

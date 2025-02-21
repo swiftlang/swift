@@ -428,3 +428,4 @@ func opaqueReplacement() -> Int {
 dynamic func orig() -> Int {
   return 1
 }
+// UNSUPPORTED: OS=windows-msvc

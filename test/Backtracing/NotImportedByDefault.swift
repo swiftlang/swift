@@ -9,3 +9,4 @@
 let backtrace = try! Backtrace.capture()
 
 // CHECK: error: cannot find 'Backtrace' in scope
+// UNSUPPORTED: OS=windows-msvc

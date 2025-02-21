@@ -44,3 +44,4 @@ public func usesNestedTypeProtocol(_ x: Parent.`Type`.`Protocol`) {}
 
 // CHECK: public func usesNestedProtocol(_ x: MyModule.Parent.`Protocol`)
 public func usesNestedProtocol(_ x: Parent.`Protocol`) {}
+// UNSUPPORTED: OS=windows-msvc

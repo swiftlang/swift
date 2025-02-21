@@ -16,3 +16,4 @@ protocol HasReturn42 {
 
 // sil [clang ConformsToProtocol.return42] @[[FN_NAME]] : $@convention(c) (@inout ConformsToProtocol) -> Int32
 extension ConformsToProtocol : HasReturn42 {}
+// UNSUPPORTED: OS=windows-msvc

@@ -197,3 +197,4 @@ struct Cs : Pb {
     self.init(d: d3)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@
 // CHECK-NEXT:   }
 // CHECK-NEXT:   typealias di = NS1.Decl<CInt>
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

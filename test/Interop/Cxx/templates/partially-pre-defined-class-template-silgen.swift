@@ -19,3 +19,4 @@ public func getWrappedMagicInt() -> CInt {
 // CHECK: MagicWrapper<IntWrapper>::getValuePlusArg
 
 // CHECK: sil [clang MagicWrapper<IntWrapper>.getValuePlusArg] @{{_ZNK12MagicWrapperI10IntWrapperE15getValuePlusArgEi|\?getValuePlusArg@\?\$MagicWrapper@UIntWrapper@@@@QEBAHH@Z}} : $@convention(cxx_method) (Int32, @in_guaranteed MagicWrapper<IntWrapper>) -> Int32
+// UNSUPPORTED: OS=windows-msvc

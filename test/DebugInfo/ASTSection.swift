@@ -31,3 +31,4 @@ func objCUser(_ obj: ObjCClass) {}
 
 // LINETABLE-CHECK-NOT: ASTSection
 
+// UNSUPPORTED: OS=windows-msvc

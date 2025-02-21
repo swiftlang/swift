@@ -13,3 +13,4 @@ public func f<Success>(_ value: Success) async throws -> Success {
     throw error;
   }
 }
+// UNSUPPORTED: OS=windows-msvc

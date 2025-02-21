@@ -65,3 +65,4 @@ public func printBreak(_ x: Int) {
 // CHECK-NEXT:  abort();
 // CHECK-NEXT: }
 // CHECK-NEXT: private:
+// UNSUPPORTED: OS=windows-msvc

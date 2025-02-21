@@ -64,3 +64,4 @@ import B
 
 public func foo() -> A.SomeType { fatalError() }
 #endif // Empty
+// UNSUPPORTED: OS=windows-msvc

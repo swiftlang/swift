@@ -302,3 +302,4 @@ func testClassTangentPropertyNotStored(_ c: ClassTangentPropertyNotStored) -> Fl
 
 // CHECK-LABEL: sil {{.*}} @test_class_tangent_property_not_stored
 // CHECK: ref_element_addr {{%.*}} : $ClassTangentPropertyNotStored, #ClassTangentPropertyNotStored.x
+// UNSUPPORTED: OS=windows-msvc

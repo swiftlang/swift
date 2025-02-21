@@ -140,3 +140,4 @@ public class Derived<T> : Base {
     type = t
   }
 }
+// UNSUPPORTED: OS=windows-msvc

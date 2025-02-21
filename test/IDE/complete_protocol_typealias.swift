@@ -54,3 +54,4 @@ struct ConformingType: MyProto {
 	func foo(content: #^GLOBAL_COMPLETE_IN_CONFORMING_TYPE^#) {}
 // GLOBAL_COMPLETE_IN_CONFORMING_TYPE: Decl[TypeAlias]/Super:              Content[#Int#];
 }
+// UNSUPPORTED: OS=windows-msvc

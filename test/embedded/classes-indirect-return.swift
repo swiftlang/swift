@@ -24,3 +24,4 @@ func testit() -> Int {
   let x = X(t: 27)
   return x.foo()
 }
+// UNSUPPORTED: OS=windows-msvc

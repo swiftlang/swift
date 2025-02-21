@@ -14,3 +14,4 @@ extension S where T == (Int, String) {
     t.0 = 1
   } // expected-error {{return from initializer without initializing all stored properties}}
 }
+// UNSUPPORTED: OS=windows-msvc

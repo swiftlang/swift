@@ -11,3 +11,4 @@ public func testOptIntArray() -> [Int]? {
 }
 
 // CHECK: SWIFT_INLINE_THUNK swift::Optional<swift::Array<swift::Int>> testOptIntArray()
+// UNSUPPORTED: OS=windows-msvc

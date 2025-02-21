@@ -117,3 +117,4 @@ func barFunc() {
     return
   } ()
 }
+// UNSUPPORTED: OS=windows-msvc

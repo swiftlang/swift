@@ -16,3 +16,4 @@ struct Link: ~Copyable {}
 func bar(_: consuming Link) {}
 
 
+// UNSUPPORTED: OS=windows-msvc

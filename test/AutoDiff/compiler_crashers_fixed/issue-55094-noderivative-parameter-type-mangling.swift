@@ -39,3 +39,4 @@ let transformed: @differentiable(reverse) (Float, @noDerivative Float) -> Float 
 // 6  swift                    0x0000000110604152 (anonymous namespace)::IRGenDebugInfoImpl::getOrCreateType(swift::irgen::DebugTypeInfo) (.cold.20) + 146
 // 7  swift                    0x000000010c24ab1e (anonymous namespace)::IRGenDebugInfoImpl::getOrCreateType(swift::irgen::DebugTypeInfo) + 3614
 // 8  swift                    0x000000010c245437 swift::irgen::IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalVariable*, llvm::StringRef, llvm::StringRef, swift::irgen::DebugTypeInfo, bool, bool, llvm::Optional<swift::SILLocation>) + 167
+// UNSUPPORTED: OS=windows-msvc

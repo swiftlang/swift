@@ -71,3 +71,4 @@ func testTaskDetached() async {
     await k.doSomething()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

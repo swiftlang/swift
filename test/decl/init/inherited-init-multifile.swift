@@ -8,3 +8,4 @@ func make<Result: B>(ofClass cls: Result.Type) -> Result {
 func make(ofClass cls: (C & P).Type) -> C {
     return cls.init(1)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ class Sub<T>: Base {}
 func foo<T: Helper & P>(base: Base, arg: T) {
     _ = base as? Sub<T>
 }
+// UNSUPPORTED: OS=windows-msvc

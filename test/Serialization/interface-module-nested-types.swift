@@ -35,3 +35,4 @@ import NestModule
 func tweet<Location: Nest>(from place: Location) where Location.Egg == Int {
   _ = place.robin()
 }
+// UNSUPPORTED: OS=windows-msvc

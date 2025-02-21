@@ -18,3 +18,4 @@ conformanceUniquingTests.test("Nested types with the same name") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

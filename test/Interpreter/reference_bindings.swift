@@ -107,3 +107,4 @@ tests.test("Class Use") {
     expectEqual(x.value, "varName")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

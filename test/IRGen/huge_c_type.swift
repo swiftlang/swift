@@ -8,3 +8,4 @@
 public func doIt(a: Thing3) {
   print(a)
 }
+// UNSUPPORTED: OS=windows-msvc

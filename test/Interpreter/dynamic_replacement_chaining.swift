@@ -74,3 +74,4 @@ DynamicallyReplaceable.test("DynamicallyReplaceable") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

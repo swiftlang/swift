@@ -246,3 +246,4 @@ struct S {
   @ValidPairwiseBuilder1 var i12: Int { 1 }
   @UnavailablePairwiseBuilder var i13: Int { 1; 1; 1 } // expected-error {{result builder 'UnavailablePairwiseBuilder' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
 }
+// UNSUPPORTED: OS=windows-msvc

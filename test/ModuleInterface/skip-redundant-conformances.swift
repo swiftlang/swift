@@ -23,3 +23,4 @@ public class D: C {}
 
 // CHECK: extension Foo.C : Foo.ProtocolA {}
 // CHECK-NOT: extension Foo.D : Foo.ProtocolA {}
+// UNSUPPORTED: OS=windows-msvc

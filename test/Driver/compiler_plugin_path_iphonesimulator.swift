@@ -22,3 +22,4 @@
 
 // CHECK-SAME: -plugin-path
 // CHECK-SAME: {{(/|\\\\)}}local{{(/|\\\\)}}lib{{(/|\\\\)}}swift{{(/|\\\\)}}host{{(/|\\\\)}}plugins
+// UNSUPPORTED: OS=windows-msvc

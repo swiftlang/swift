@@ -763,3 +763,4 @@ extension C.Inner {
     case value
   }
 }
+// UNSUPPORTED: OS=windows-msvc

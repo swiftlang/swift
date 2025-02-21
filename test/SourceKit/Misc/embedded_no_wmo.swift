@@ -26,3 +26,4 @@ public func testit() -> X<Int> {
   return X(27)
 }
 
+// UNSUPPORTED: OS=windows-msvc

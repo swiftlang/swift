@@ -47,3 +47,4 @@ public func returnsVariadicAlias() -> VariadicAlias<Int, String, Float> {}
 
 // CHECK: public func returnsVariadicAlias<each T>() -> PackExpansionType.VariadicAlias<repeat each T>
 public func returnsVariadicAlias<each T>() -> VariadicAlias<repeat each T> {}
+// UNSUPPORTED: OS=windows-msvc

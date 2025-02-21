@@ -17,3 +17,4 @@ func useLibrarySym() {
 // CHECK-DAG: !llvm.linker.options = !{
 // CHECK-DAG: !{{[0-9]+}} = !{!{{"-lempty"|"/DEFAULTLIB:empty.lib"}}}
 // CHECK-DAG: !{{[0-9]+}} = !{!"-framework", !"LinkFramework"}
+// UNSUPPORTED: OS=windows-msvc

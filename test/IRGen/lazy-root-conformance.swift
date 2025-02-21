@@ -23,3 +23,4 @@ extension E : Q {
 // CHECK-DIRECT: @"$s1A1EO1B1QADWP" ={{( dllexport)?}}{{( protected)?}} constant [2 x ptr] [ptr @"$s1A1EO1B1QADMc", ptr @"$s1A1EOAA1PAAWP"]
 // CHECK-INDIRECT: @"$s1A1EO1B1QADWP" ={{( dllexport)?}}{{( protected)?}} constant [2 x ptr] [ptr @"$s1A1EO1B1QADMc", ptr null]
 
+// UNSUPPORTED: OS=windows-msvc

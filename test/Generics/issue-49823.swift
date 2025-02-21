@@ -13,3 +13,4 @@ extension Sequence where Iterator.Element: AnyObject {
     return contains { $0 === object }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

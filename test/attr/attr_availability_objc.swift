@@ -159,3 +159,4 @@ class ClassWithBadWitness : ProtocolWithRenamedRequirement {
   @objc func old(foo: Int) {} // expected-error{{'old(foo:)' has been renamed to 'new(bar:)'}}
   @objc func new(bar: Int) {}
 }
+// UNSUPPORTED: OS=windows-msvc

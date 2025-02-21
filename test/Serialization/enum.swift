@@ -39,3 +39,4 @@ let meal = Breakfast<Basic>.Bacon
 let n = meal.rawValue
 
 do { throw meal } catch {}
+// UNSUPPORTED: OS=windows-msvc

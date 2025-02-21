@@ -235,3 +235,4 @@ func r19558785() {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -55,3 +55,4 @@ extension C0: InternalProto {
 }
 extension C0: PublicProto {
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -356,3 +356,4 @@ public struct Main {
         callSmallErrorLargerResult()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

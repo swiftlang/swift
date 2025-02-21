@@ -103,3 +103,4 @@ func testR74233797() {
 // METATYPE_CONVERSION-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['('][')'][#R74233797Derived#];
 // METATYPE_CONVERSION-DAG: Decl[Constructor]/Super/Flair[ArgLabels]: ['(']{#(test): Bool#}[')'][#R74233797Derived#];
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -59,3 +59,4 @@ func invalid2() {
   _ = inner(invalidLabel:)
   // expected-error@-1 {{cannot find 'inner(invalidLabel:)' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

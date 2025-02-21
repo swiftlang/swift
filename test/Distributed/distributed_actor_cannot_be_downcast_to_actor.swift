@@ -26,3 +26,4 @@ func h(ma: MA) async {
     // would result in a hard crash (as there is no local actor to safely call the function on).
     await g(a: ma) // expected-error{{global function 'g(a:)' requires that 'MA' conform to 'Actor'}}
 }
+// UNSUPPORTED: OS=windows-msvc

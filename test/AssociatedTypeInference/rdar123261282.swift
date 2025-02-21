@@ -18,3 +18,4 @@ struct CustomCollection<T>: RandomAccessCollection {
     func index(after i: Int) -> Int { fatalError() }
     subscript(index: Int) -> T { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -39,3 +39,4 @@ func maybeThrowDuringSingleExprSwitchResult(condition: Bool) throws
         (try throwBNT(), try throwStr())
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@ func testImportMacTypes() {
   var _ : ctypes.Float80 = 0.0
 }
 
+// UNSUPPORTED: OS=windows-msvc

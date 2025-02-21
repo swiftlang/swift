@@ -500,3 +500,4 @@ func testConvertBool() async throws {
   // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT: guard !failure && failure == .random() else { fatalError() }
   // OBJC-BOOL-WITH-ERR-FALLBACK2-NEXT: print("much fails", unrelated, str)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -56,3 +56,4 @@ struct XQ3 : Q3 {
 // CHECK:  associated_conformance (Assoc: P2): XP: P2 module witnesses_canonical
 // CHECK:  associated_type Assoc: XP
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

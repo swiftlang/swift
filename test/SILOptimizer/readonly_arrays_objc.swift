@@ -33,3 +33,4 @@ func testit() {
 }
 
 testit()
+// UNSUPPORTED: OS=windows-msvc

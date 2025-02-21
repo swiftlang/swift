@@ -20,3 +20,4 @@ func foo1() {
 // CHECK-DIAG: <empty name translation info; internal diagnostic: "Unable to resolve ObjC declaration name.">
 // CHECK2: enableThird
 // CHECK3: inEnableThird
+// UNSUPPORTED: OS=windows-msvc

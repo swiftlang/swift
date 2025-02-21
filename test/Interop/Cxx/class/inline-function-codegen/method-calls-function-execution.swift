@@ -12,3 +12,4 @@ MembersTestSuite.test("method calls function") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

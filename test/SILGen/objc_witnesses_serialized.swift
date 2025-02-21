@@ -33,3 +33,4 @@ func takesTopLevel(_ value: TopLevel) {
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$sSo8TopLevelVSYSCSY8rawValuexSg03RawD0Qz_tcfCTW :
 // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$sSo8TopLevelVSYSCSY8rawValue03RawD0QzvgTW :
+// UNSUPPORTED: OS=windows-msvc

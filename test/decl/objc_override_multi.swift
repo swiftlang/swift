@@ -12,3 +12,4 @@ class SubSub1 : Sub1 {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

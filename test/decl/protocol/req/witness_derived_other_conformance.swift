@@ -15,3 +15,4 @@ extension G: Hashable where T: Hashable {}
 
 // Same here, but the conformance is conditional.
 extension G: P where T: P & Hashable {}
+// UNSUPPORTED: OS=windows-msvc

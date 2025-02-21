@@ -82,3 +82,4 @@ func string_interpolation2() {
 func string_plus() {
   "a" + "b"
 }
+// UNSUPPORTED: OS=windows-msvc

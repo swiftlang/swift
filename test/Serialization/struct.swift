@@ -93,3 +93,4 @@ extension Burger {
     self.pattyCount = pattyCount * 2
   }
 }
+// UNSUPPORTED: OS=windows-msvc

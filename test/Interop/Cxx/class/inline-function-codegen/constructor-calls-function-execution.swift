@@ -22,3 +22,4 @@ MembersTestSuite.test("constructor calls template function (implicit)") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

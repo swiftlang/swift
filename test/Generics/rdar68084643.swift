@@ -39,3 +39,4 @@ protocol Boom {
   associatedtype E: Sequence
   associatedtype F: Sequence where E.Element == F.Element
 }
+// UNSUPPORTED: OS=windows-msvc

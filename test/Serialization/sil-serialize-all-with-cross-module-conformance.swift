@@ -42,3 +42,4 @@ func main() {
 let _ = invalid_configuration()
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

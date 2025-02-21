@@ -13,3 +13,4 @@ struct Bar { // expected-note*{{consider making struct 'Bar' conform to the 'Sen
 
   func x() -> Int { 42 }
 }
+// UNSUPPORTED: OS=windows-msvc

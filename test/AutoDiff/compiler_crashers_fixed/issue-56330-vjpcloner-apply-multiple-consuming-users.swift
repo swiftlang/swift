@@ -29,3 +29,4 @@ struct S<T: P> {
 // Consuming Users:
 //   destroy_value %5 : $@differentiable(reverse) @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Float for <τ_0_0.Assoc, τ_0_0.Assoc> // id: %19
 //   %6 = convert_function %5 : $@differentiable(reverse) @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> Float for <τ_0_0.Assoc, τ_0_0.Assoc> to $@differentiable(reverse) @callee_guaranteed (@in_guaranteed τ_0_0.Assoc, @in_guaranteed τ_0_0.Assoc) -> Float // user: %7
+// UNSUPPORTED: OS=windows-msvc

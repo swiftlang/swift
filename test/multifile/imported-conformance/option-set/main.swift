@@ -12,3 +12,4 @@ import library
 public func rreplace(rgx: NSRegularExpression, in: String, with: String, x: NSRange) -> String {
   return replace(rgx: rgx, in: `in`, with: with, x: x)
 }
+// UNSUPPORTED: OS=windows-msvc

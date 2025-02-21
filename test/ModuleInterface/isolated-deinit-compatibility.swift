@@ -151,3 +151,4 @@ public actor SyncActorNonisolatedPublic {
 #if !EMIT_IFACE
 open actor OpenActor {} // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

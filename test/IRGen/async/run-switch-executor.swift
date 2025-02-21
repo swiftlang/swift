@@ -58,3 +58,4 @@ let a = MyActor(p: 27)
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

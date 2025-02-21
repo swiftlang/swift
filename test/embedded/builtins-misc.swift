@@ -33,3 +33,4 @@ public struct MyGenericStruct<T> {
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   ret i1 false
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

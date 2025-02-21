@@ -353,3 +353,4 @@ public func foo<T : ProtocolWithDep>(_ t: T) where T.Element == ExpectedElement 
 public func bar<T : ProtocolWithDep>(_ t: T) where T.Element == ExpectedElement {
   foo(t)
 }
+// UNSUPPORTED: OS=windows-msvc

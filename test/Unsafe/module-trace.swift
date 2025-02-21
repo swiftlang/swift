@@ -19,3 +19,4 @@ import safe_swift_decls
 // Dependencies
 // TRACE: "safe_swift_decls"{{.*}}"strictMemorySafety":true
 // TRACE: "unsafe_swift_decls"{{.*}}"strictMemorySafety":false
+// UNSUPPORTED: OS=windows-msvc

@@ -453,3 +453,4 @@ class Foo {
   // MEMBER-FUNC-ON-NESTED-OTHER-OBJECT-AS-COMPLETION-HANDLER-NEXT: foo.foo.myFooPrint(result)
 
 }
+// UNSUPPORTED: OS=windows-msvc

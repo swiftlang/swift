@@ -28,3 +28,4 @@ import Library
 import Renamed
 
 _ = HasRename(old: 0)
+// UNSUPPORTED: OS=windows-msvc

@@ -61,3 +61,4 @@ print(#line, genericAnyIs(type: PS.self, to: PObjC.self, expected: false)) // CH
 print(#line, genericAnyIs(type: PE.self, to: PObjC.self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, genericAnyIs(type: PC.self, to: PObjC.self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, genericAnyIs(type: PCSub.self, to: PObjC.self, expected: false)) // CHECK: [[@LINE]] false
+// UNSUPPORTED: OS=windows-msvc

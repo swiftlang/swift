@@ -22,3 +22,4 @@ func test(first: First) async throws {
   try await first.owned(.init())
   try await first.shared(.init())
 }
+// UNSUPPORTED: OS=windows-msvc

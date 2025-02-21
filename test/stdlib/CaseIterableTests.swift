@@ -28,3 +28,4 @@ CaseIterableTests.test("MainActor Isolated Enums") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

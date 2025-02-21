@@ -119,3 +119,4 @@ class ObservingAccessorTest : NSObject {
     didSet {}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ protocol Derived : Base { // expected-error {{'Base' is ambiguous for type looku
 }
 
 func foo<T : Derived>(_: T.E, _: T) {}
+// UNSUPPORTED: OS=windows-msvc

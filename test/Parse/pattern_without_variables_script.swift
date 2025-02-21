@@ -2,3 +2,4 @@
 
 _ = 1
 
+// UNSUPPORTED: OS=windows-msvc

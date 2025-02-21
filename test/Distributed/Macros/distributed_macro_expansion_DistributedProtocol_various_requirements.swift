@@ -149,3 +149,4 @@ public protocol MyActorWithSystemRequirement: DistributedActor where ActorSystem
 public protocol MyActorWithSystemRequirementImpl: MyActorWithSystemRequirement {
   distributed func example()
 }
+// UNSUPPORTED: OS=windows-msvc

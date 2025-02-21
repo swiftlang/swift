@@ -6,3 +6,4 @@
 // Make sure we don't import non-copyable types because we will have no way to
 // represent and copy/move these in swift with correct semantics.
 // CHECK-NOT: DeletedCopyConstructor
+// UNSUPPORTED: OS=windows-msvc

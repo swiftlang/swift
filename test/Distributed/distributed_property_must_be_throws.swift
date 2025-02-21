@@ -35,3 +35,4 @@ func testSyncFunc(da: MyDistributedActor) throws {
   // expected-note@-3{{did you mean to handle error as optional value?}}
   // expected-note@-4{{did you mean to disable error propagation?}}
 }
+// UNSUPPORTED: OS=windows-msvc

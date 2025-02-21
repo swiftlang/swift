@@ -7,3 +7,4 @@ func > (lhs: C, rhs: C) -> Bool {
   return false
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

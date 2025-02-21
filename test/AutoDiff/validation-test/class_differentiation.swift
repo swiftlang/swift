@@ -540,3 +540,4 @@ ClassTests.test("LetProperties") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

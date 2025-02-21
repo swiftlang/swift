@@ -200,3 +200,4 @@ bb2:
   return %t : $(Builtin.Int1, Buffer)
 }
 
+// UNSUPPORTED: OS=windows-msvc

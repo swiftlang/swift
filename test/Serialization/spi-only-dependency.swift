@@ -45,3 +45,4 @@ import Lib
 
 
 // VISIBLE-DEP-NOT-NOT: loaded module 'SPIDependency'
+// UNSUPPORTED: OS=windows-msvc

@@ -139,3 +139,4 @@ func cond() -> Bool {
   return true
 }
 
+// UNSUPPORTED: OS=windows-msvc

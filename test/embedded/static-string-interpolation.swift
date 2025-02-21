@@ -56,3 +56,4 @@ struct Main {
 // CHECK: appendLiteral
 // CHECK: 3
 // CHECK: 2
+// UNSUPPORTED: OS=windows-msvc

@@ -127,3 +127,4 @@ public class DynamicMembers {
   @usableFromInline @objc dynamic func foo() {}
   @usableFromInline @objc dynamic var bar: Int = 0
 }
+// UNSUPPORTED: OS=windows-msvc

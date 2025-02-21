@@ -6,3 +6,4 @@
 // CHECK-NEXT: }
 @_show_in_interface
 public protocol _UnderscoredProtocol {}
+// UNSUPPORTED: OS=windows-msvc

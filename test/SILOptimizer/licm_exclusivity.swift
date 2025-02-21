@@ -83,3 +83,4 @@ public class ClassWithArrs {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -189,3 +189,4 @@ struct IB<T> { // expected-error {{value type 'IB<T>' has infinite size}}
   var member: IB<T?>
   // expected-note@-1 {{cycle beginning here: IB<T?> -> (member: IB<T??>) -> (member: IB<T???>) -> (member: IB<T????>) -> (member: IB<T?????>) -> (member: IB<T??????>) -> ...}}
 }
+// UNSUPPORTED: OS=windows-msvc

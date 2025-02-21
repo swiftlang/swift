@@ -4,3 +4,4 @@ import CxxStdlib
 import StdString
 
 let _ = HasMethodThatReturnsString().getString()
+// UNSUPPORTED: OS=windows-msvc

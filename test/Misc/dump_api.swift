@@ -63,3 +63,4 @@ public class FooIteratorBox<
   var base: Base
 }
 
+// UNSUPPORTED: OS=windows-msvc

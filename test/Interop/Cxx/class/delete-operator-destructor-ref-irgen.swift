@@ -71,3 +71,4 @@ public func test() {
 // Make sure we reach destructor accessible from `delete` statement.
 
 // CHECK: define linkonce_odr{{( dso_local)?}} void @{{_Z22emittedIntoSwiftObjectv|"\?emittedIntoSwiftObject@@YAXXZ"}}
+// UNSUPPORTED: OS=windows-msvc

@@ -108,3 +108,4 @@ public func useMain() -> APIProtocol? { return nil }
 public func useImplicit() -> _Klass { return _Klass() }
 
 public func useMain() -> APIProtocol? { return nil }
+// UNSUPPORTED: OS=windows-msvc

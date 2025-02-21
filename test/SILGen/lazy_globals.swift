@@ -79,3 +79,4 @@ var computed: Int {
 
 var initialized: Int = 57
 
+// UNSUPPORTED: OS=windows-msvc

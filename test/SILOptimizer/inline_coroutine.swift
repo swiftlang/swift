@@ -33,3 +33,4 @@ func testit(x: Int64, box: inout Foo) {
   box.value.i ^= x
 }
 
+// UNSUPPORTED: OS=windows-msvc

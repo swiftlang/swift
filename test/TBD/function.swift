@@ -39,3 +39,4 @@ public func replacementForPublicDynamic() {}
 
 @_silgen_name("silgen_internalNoArgs") internal func internalNoArgsSilgenNameDecl()
 @_silgen_name("silgen_internalSomeArgs") internal func internalSomeArgsSilgenNameDecl(_: Int, x: Int)
+// UNSUPPORTED: OS=windows-msvc

@@ -94,3 +94,4 @@ public func invokeMethod(on holder: SubButtHolder) {
 // CHECK-V4-LABEL: define internal swiftcc %swift.metadata_response @"$s4main03SubB10ButtHolderCMr"(ptr %0, ptr %1, ptr %2)
 // CHECK-V4-STABLE-ABI-TRUE:    call swiftcc %swift.metadata_response @swift_updateClassMetadata2(
 // CHECK-V4-STABLE-ABI-FALSE:   call swiftcc %swift.metadata_response @swift_initClassMetadata2(
+// UNSUPPORTED: OS=windows-msvc

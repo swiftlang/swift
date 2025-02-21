@@ -7,3 +7,4 @@ func introducedInAppExtension11_0() { }
 func useAppExtension() {
   introducedInAppExtension11_0() // no-warning
 }
+// UNSUPPORTED: OS=windows-msvc

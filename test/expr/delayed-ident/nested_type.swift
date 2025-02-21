@@ -44,3 +44,4 @@ let _: P = .Impl1.init()
 let _: P = .Impl2.init()
 let _: ConcreteP = .Impl1.init()
 let _: ConcreteP = .Impl2.init()
+// UNSUPPORTED: OS=windows-msvc

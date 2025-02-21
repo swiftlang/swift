@@ -11,3 +11,4 @@ arr.withUnsafeBufferPointer { ubpointer in
     let _ = ConstSpanOfInt(ubpointer.baseAddress!, ubpointer.count) 
     // expected-warning@-1 {{'init(_:_:)' is deprecated: use 'init(_:)' instead.}}
 }
+// UNSUPPORTED: OS=windows-msvc

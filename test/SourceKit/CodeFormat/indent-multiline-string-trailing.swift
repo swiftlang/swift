@@ -21,3 +21,4 @@ this is line1
   this is line2
 
 
+// UNSUPPORTED: OS=windows-msvc

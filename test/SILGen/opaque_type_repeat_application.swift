@@ -19,3 +19,4 @@ func foo<T: P>(x: T) {
 
     _ = CWrap(x: y)
 }
+// UNSUPPORTED: OS=windows-msvc

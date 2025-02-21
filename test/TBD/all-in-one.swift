@@ -19,3 +19,4 @@
 // RUN: %llvm-readtapi --compare %t/incremental_Onone.tbd %t/incremental_O.tbd
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=windows-msvc

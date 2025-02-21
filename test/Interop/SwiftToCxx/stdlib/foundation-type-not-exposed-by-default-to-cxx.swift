@@ -13,3 +13,4 @@ public enum UseFoundationEnum {
 }
 
 // CHECK: class UseFoundationEnum { } SWIFT_UNAVAILABLE_MSG("Swift enum 'UseFoundationEnum' cannot be represented in C++");
+// UNSUPPORTED: OS=windows-msvc

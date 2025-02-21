@@ -8,3 +8,4 @@ enum EnumWithExcludedElement : Codable {
         case x
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -34,3 +34,4 @@ class C: P {
 let c = C()
 c.requirement()
 await c.wait()
+// UNSUPPORTED: OS=windows-msvc

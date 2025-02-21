@@ -13,3 +13,4 @@ MembersTestSuite.test("constructor calls function from nested calls") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

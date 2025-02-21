@@ -26,3 +26,4 @@ import SubEWrapper
 // Ensure the cross-import overlay is not detected with -disable-cross-import-overlays
 // CHECK-NOT:   "swift": "_cross_import_E"
 
+// UNSUPPORTED: OS=windows-msvc

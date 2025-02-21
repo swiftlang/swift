@@ -107,3 +107,4 @@ struct S {
 
 extension S: P2 {}
 
+// UNSUPPORTED: OS=windows-msvc

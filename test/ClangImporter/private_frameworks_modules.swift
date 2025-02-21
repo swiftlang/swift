@@ -17,3 +17,4 @@ let _: Bool = PSGlobal // expected-error {{type 'Int32' cannot be used as a bool
 let _: Bool = PSPrivateGlobal // expected-error {{type 'Int32' cannot be used as a boolean}}
 let _: Bool = PPGlobal // expected-error {{type 'Int32' cannot be used as a boolean}}
 let _: Bool = PPPrivateGlobal // expected-error {{type 'Int32' cannot be used as a boolean}}
+// UNSUPPORTED: OS=windows-msvc

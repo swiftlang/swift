@@ -49,3 +49,4 @@ protocol P4Bad {
   associatedtype V where V == T.U
   associatedtype X where X == U.X
 }
+// UNSUPPORTED: OS=windows-msvc

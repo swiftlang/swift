@@ -674,3 +674,4 @@ bb0(%0 : $@thin Trivial.Type):
   %13 = tuple ()
   return %13 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

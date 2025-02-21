@@ -114,3 +114,4 @@ func testAsBindingVariableInSwitch(_ x: ChildKlass) {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

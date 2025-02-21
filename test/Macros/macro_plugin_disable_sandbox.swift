@@ -82,3 +82,4 @@ func test() {
   let _: String = #stringify(42).1
   let _: String = #testString
 }
+// UNSUPPORTED: OS=windows-msvc

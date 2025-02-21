@@ -7,3 +7,4 @@
 public func concrete() {
   generic(Inner())
 }
+// UNSUPPORTED: OS=windows-msvc

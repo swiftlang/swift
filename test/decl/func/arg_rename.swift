@@ -74,3 +74,4 @@ func +++(lhs lhs: Int, // expected-error{{operator cannot have keyword arguments
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

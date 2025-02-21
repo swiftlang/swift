@@ -6,3 +6,4 @@
 // RUN: %swiftc_driver -enable-batch-mode        -disable-batch-mode   %S/../Inputs/empty.swift -### 2>&1 >/dev/null | %FileCheck -allow-empty %s
 //
 // CHECK-NOT: remark: using batch mode
+// UNSUPPORTED: OS=windows-msvc

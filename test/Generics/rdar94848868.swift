@@ -24,3 +24,4 @@ struct MyCollection: MyCollectionProtocol {
 
     public func makeIterator() -> MyCollectionIterator<Self> { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

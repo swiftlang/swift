@@ -16,3 +16,4 @@ public func differentCDeclName(x: CInt, y: CInt) -> CInt { return x + y }
 // CHECK: SWIFT_INLINE_THUNK int differentCDeclName(int x, int y) noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: return CdeclFunctions::_impl::cfuncPassTwo(x, y);
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

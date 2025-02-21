@@ -79,3 +79,4 @@
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   public func __operatorStar() -> Int32
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

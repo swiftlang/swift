@@ -9,3 +9,4 @@ func testObjCMethods() {
     _ = Bridge.objCMethodReturningNonCxxFrtAnannotated()
     _ = Bridge.objCMethodReturningFRTUnannotated()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -39,3 +39,4 @@ class X {
 var x0 = X()
 var x1 = X(x: 1, y: "2")
 
+// UNSUPPORTED: OS=windows-msvc

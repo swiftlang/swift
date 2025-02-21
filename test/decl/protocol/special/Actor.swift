@@ -83,3 +83,4 @@ func testConformance() {
   acceptActor(A6.self)
   acceptActor(A7.self)
 }
+// UNSUPPORTED: OS=windows-msvc

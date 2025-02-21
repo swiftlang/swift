@@ -228,3 +228,4 @@ package var cannotBePackage = makeAValue()
 
 public var cannotBePublicPkg = makeAValuePkg()
 // expected-error@-1 {{variable cannot be declared public because its type 'GenericAlias<ActuallyPackage>' (aka 'PublicGeneric<ActuallyPackage>') uses a package type}}
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ public distributed actor DA {
 // CHECK: "kind": "keyword"
 // CHECK-NEXT: "spelling": "distributed actor"
 
+// UNSUPPORTED: OS=windows-msvc

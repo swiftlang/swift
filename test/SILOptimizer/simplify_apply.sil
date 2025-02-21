@@ -46,3 +46,4 @@ sil_vtable Bar {
   #Bar.foo: @bar_foo
 }
 
+// UNSUPPORTED: OS=windows-msvc

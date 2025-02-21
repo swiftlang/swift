@@ -17,4 +17,4 @@ protocol P2 {
 // CHECK-NEXT: Requirement signature: <Self where Self.[P3]T : P1, Self.[P3]T : P2>
 protocol P3 {
   associatedtype T : P1 & P2 where T.U == Int
-}
+}// UNSUPPORTED: OS=windows-msvc

@@ -49,3 +49,4 @@ extension ObjCClass {
 
 @_cdecl("CImplFunc") @_objcImplementation func CImplFunc() {}
 // NEGATIVE-NOT: CImplFunc(
+// UNSUPPORTED: OS=windows-msvc

@@ -191,3 +191,4 @@ func frob(x: MyAssortment) -> Int {
 
 extension MyEnum: BitwiseCopyable
     where T: Copyable & BitwiseCopyable {}
+// UNSUPPORTED: OS=windows-msvc

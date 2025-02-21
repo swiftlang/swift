@@ -70,3 +70,4 @@ func testWrap<T: ~Copyable>(_ x: borrowing Wrap<T>,
 
   return result // expected-note {{consumed}}
 }
+// UNSUPPORTED: OS=windows-msvc

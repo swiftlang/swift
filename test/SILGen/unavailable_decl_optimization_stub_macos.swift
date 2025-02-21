@@ -62,3 +62,4 @@ public func unavailableOniOSFunc() {}
 // CHECK:           } // end sil function '$s4Test20obsoletedOnMacOS10_9yyF'
 @available(macOS, obsoleted: 10.9)
 public func obsoletedOnMacOS10_9() {}
+// UNSUPPORTED: OS=windows-msvc

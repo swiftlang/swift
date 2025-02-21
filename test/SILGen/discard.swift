@@ -196,3 +196,4 @@ enum Ticket: ~Copyable {
 
 enum E: Error { case err }
 class Ptr { var whatever: Int = 0 }
+// UNSUPPORTED: OS=windows-msvc

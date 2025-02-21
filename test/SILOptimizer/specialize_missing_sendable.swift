@@ -13,3 +13,4 @@ public func caller() -> Class<any P> {
   // CHECK: return
   return Class<any P>()
 }
+// UNSUPPORTED: OS=windows-msvc

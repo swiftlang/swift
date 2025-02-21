@@ -111,3 +111,4 @@ DarwinIoctlConstants.test("tty ioctl constants availability") {
 } 
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

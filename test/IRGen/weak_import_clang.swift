@@ -35,3 +35,4 @@ func wrapWeakFunction() {
   // CHECK-10_51: declare void @future_function_should_be_weak()
   future_function_should_be_weak()
 }
+// UNSUPPORTED: OS=windows-msvc

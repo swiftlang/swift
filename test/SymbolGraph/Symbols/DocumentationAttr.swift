@@ -45,3 +45,4 @@ public enum PublicEnum {
     case _ShouldntAppear
     @_documentation(visibility: public) case _ShouldAppear
 }
+// UNSUPPORTED: OS=windows-msvc

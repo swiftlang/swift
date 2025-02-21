@@ -19,3 +19,4 @@ import UseModuleA
 public func callFortyTwo() -> CInt {
   return getFortyTwo()
 }
+// UNSUPPORTED: OS=windows-msvc

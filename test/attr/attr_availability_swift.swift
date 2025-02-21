@@ -53,3 +53,4 @@ extension TestStruct {}
 @available(macOS 10.11, *)
 @available(swift 400) // FIXME: This has no effect and should be complained about.
 extension TestStruct {}
+// UNSUPPORTED: OS=windows-msvc

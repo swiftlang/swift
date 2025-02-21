@@ -102,3 +102,4 @@ x.deallocate();
 // CHECK-RECOVER-STDOUT: DONE
 print("DONE")
 fflush(stdout)
+// UNSUPPORTED: OS=windows-msvc

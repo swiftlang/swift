@@ -6,3 +6,4 @@ import Foo
 // RUN: %sourcekitd-test -req=complete.open -pos=2:1 -req-opts=hidelowpriority=0 %s -- %s -Xcc -F -Xcc libIDE-mock-sdk -working-directory %S/../Inputs | %FileCheck %s
 
 // CHECK: fooFunc
+// UNSUPPORTED: OS=windows-msvc

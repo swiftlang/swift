@@ -22,3 +22,4 @@ func main() {
     reqCopy1(DataType())
     reqCopy2(DataType())
 }
+// UNSUPPORTED: OS=windows-msvc

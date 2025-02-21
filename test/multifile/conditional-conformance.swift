@@ -7,3 +7,4 @@
 extension Catch22: Comparable where Value: Comparable {
   public static func <(lhs: Catch22, rhs: Catch22) -> Bool { true }
 }
+// UNSUPPORTED: OS=windows-msvc

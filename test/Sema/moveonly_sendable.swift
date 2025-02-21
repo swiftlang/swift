@@ -156,3 +156,4 @@ struct PaperAirplaneFile: ~Copyable {
 }
 
 extension PaperAirplaneFile: Sendable {}
+// UNSUPPORTED: OS=windows-msvc

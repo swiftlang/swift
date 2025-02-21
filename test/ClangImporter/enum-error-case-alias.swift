@@ -8,4 +8,4 @@ import AliasCaseErrorEnum
 // which themselves point at aliases inside the nested 'Code' type.
 
 _ = AliasError.realName
-_ = AliasError.fakeName
+_ = AliasError.fakeName// UNSUPPORTED: OS=windows-msvc

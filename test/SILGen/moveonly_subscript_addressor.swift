@@ -19,3 +19,4 @@ func load(b: UnsafeMutableBufferPointer<Foo>) -> Int {
     // CHECK: end_access [[BEGIN]]
     return b[1].load()
 }
+// UNSUPPORTED: OS=windows-msvc

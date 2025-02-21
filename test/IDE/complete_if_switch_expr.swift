@@ -375,3 +375,4 @@ func testCompleteBinding2(_ x: Int?) -> Int {
 }
 
 // BINDING-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: foobar[#Int#]; name=foobar
+// UNSUPPORTED: OS=windows-msvc

@@ -42,3 +42,4 @@ public func f<Scalar: Differentiable>(
 // }
 // Conformance access paths: {
 // }
+// UNSUPPORTED: OS=windows-msvc

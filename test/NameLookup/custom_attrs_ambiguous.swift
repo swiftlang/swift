@@ -15,3 +15,4 @@ struct Test {
   // expected-error@-1 {{'Builder' is ambiguous for type lookup in this context}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

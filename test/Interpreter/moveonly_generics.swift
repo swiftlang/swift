@@ -118,3 +118,4 @@ func testMaybe() {
     case .none: eagerAssert(false)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

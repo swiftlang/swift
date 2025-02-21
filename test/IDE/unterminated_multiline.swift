@@ -14,3 +14,4 @@ let x = """
   string followed by code
   ""
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

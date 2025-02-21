@@ -762,3 +762,4 @@ struct Runner {
         await runAllTestsAsync()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

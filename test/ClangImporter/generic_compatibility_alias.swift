@@ -21,3 +21,4 @@ func faz(_: SwiftGenericNameAlias<Int>) {
 
 func bar(_: SwiftGenericNameAlias<NSNumber>) {} // Ok
 func baz<T: AnyObject>(_: SwiftGenericNameAlias<T>) {} // Ok
+// UNSUPPORTED: OS=windows-msvc

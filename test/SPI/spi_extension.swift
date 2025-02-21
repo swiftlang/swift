@@ -29,3 +29,4 @@ public class Klass {}
 extension Klass: SPIProto {
   func bar() {}
 }
+// UNSUPPORTED: OS=windows-msvc

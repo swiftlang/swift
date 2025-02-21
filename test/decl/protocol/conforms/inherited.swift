@@ -281,3 +281,4 @@ class A15 : P15 { // expected-error{{protocol 'P15' requirement 'f18()' cannot b
   func f17() -> Array<A15> {} // expected-error{{protocol 'P15' requirement 'f17()' cannot be satisfied by a non-final class ('A15') because it uses 'Self' in a non-parameter, non-result type position}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

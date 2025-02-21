@@ -15,3 +15,4 @@ public func valueWithPullback<T, R>(
 ) -> (value: R, pullback: (T.TangentVector) -> R.TangentVector) {
   fatalError()
 }
+// UNSUPPORTED: OS=windows-msvc

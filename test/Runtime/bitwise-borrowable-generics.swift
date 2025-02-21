@@ -42,3 +42,4 @@ test(NC<Any>.self)
 test(Test<Int>.self)
 // CHECK-NEXT: false
 test(Test<Any>.self)
+// UNSUPPORTED: OS=windows-msvc

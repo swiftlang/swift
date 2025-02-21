@@ -35,3 +35,4 @@ public func test(_ dict: NSDictionary) {
 // OPT:   call {{.*}}@objc_msgSend
 // OPT:   notail call ptr @llvm.objc.retainAutoreleasedReturnValue
 // OPT:   ret void
+// UNSUPPORTED: OS=windows-msvc

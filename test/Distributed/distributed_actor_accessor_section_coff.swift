@@ -148,3 +148,4 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTEHF"
 // CHECK-SAME: @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTEHF"
 // CHECK-SAME: ], section "llvm.metadata"
+// UNSUPPORTED: OS=windows-msvc

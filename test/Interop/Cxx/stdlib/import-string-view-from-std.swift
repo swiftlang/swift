@@ -20,3 +20,4 @@ module CxxModule {
 import CxxModule
 
 // CHECK: {{std|std_string_view}}-{{.*}}.pcm
+// UNSUPPORTED: OS=windows-msvc

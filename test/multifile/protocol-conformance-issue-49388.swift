@@ -10,3 +10,4 @@
 enum _PositionRelation: Int {
   case before = 0
 }
+// UNSUPPORTED: OS=windows-msvc

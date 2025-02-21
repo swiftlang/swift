@@ -12,3 +12,4 @@ func foo(x: Int) {
 // CHECK-NEXT: 3:10 - 1
 // CHECK-NEXT: 5:9 - 1
 // CHECK-NEXT: END RANGES
+// UNSUPPORTED: OS=windows-msvc

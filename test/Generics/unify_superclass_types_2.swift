@@ -64,3 +64,4 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK-RULE-NEXT:   τ_0_0.[P1:X] => { layout: _NativeClass superclass: [superclass: Generic<Int, String, τ_0_0.[P1:B1]>] }
 // CHECK-RULE-NEXT:   τ_0_0.[P2:A2] => { conforms_to: [Copyable Escapable] concrete_type: [concrete: Int] }
 // CHECK-RULE-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

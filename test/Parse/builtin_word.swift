@@ -50,3 +50,4 @@ i16 = Builtin.zext_Word_Int16(word) // expected-error{{}}
 i32 = Builtin.zext_Word_Int32(word) // expected-error{{}}
 i64 = Builtin.zext_Word_Int64(word) // expected-error{{}}
 i128 = Builtin.zext_Word_Int128(word)
+// UNSUPPORTED: OS=windows-msvc

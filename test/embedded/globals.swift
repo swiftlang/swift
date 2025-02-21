@@ -116,3 +116,4 @@ extension MyPublicEnum {
 // CHECK:        @"$es12MyPublicEnumO23static_mypublicstruct_2s0aB6StructVvpZ" = {{.*}}zeroinitializer
 // CHECK-NOT:    static_my_publicstruct_3
 // CHECK:        @"$es12MyPublicEnumO23static_mypublicstruct_4s0aB6StructVvpZ" = {{.*}}zeroinitializer
+// UNSUPPORTED: OS=windows-msvc

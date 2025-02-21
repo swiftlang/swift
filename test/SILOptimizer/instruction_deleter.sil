@@ -57,3 +57,4 @@ sil [ossa] @doDeleteLoadTake : $() -> () {
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

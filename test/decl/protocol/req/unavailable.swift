@@ -116,3 +116,4 @@ protocol UnavailableAssoc {
   @available(swift, obsoleted: 99)
   associatedtype A5
 }
+// UNSUPPORTED: OS=windows-msvc

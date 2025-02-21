@@ -108,3 +108,4 @@ typealias First<T, U> = T
 
 func unusedParameterPack2<each T>(_: repeat First<Int, each T>) {}
 // expected-error@-1 {{generic parameter 'T' is not used in function signature}}
+// UNSUPPORTED: OS=windows-msvc

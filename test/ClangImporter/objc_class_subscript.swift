@@ -30,3 +30,4 @@ func testClassMethods() {
   _ = NoClassSubscript.object(forKeyedSubscript: "foo")
   NoClassSubscript.setObject("", forKeyedSubscript: "foo")
 }
+// UNSUPPORTED: OS=windows-msvc

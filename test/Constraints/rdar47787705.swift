@@ -12,3 +12,4 @@ func make<T: P & C>(type: T.Type) -> T {
   // CHECK: [[INIT:.*]] = witness_method $T, #P.init
   return T.init(value: 0)
 }
+// UNSUPPORTED: OS=windows-msvc

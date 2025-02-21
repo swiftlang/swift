@@ -121,3 +121,4 @@ public final class ExposedClass {
 
 // CHECK-NOT: NonExposedStruct
 
+// UNSUPPORTED: OS=windows-msvc

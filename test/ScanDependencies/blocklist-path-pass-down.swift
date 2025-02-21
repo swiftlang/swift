@@ -21,3 +21,4 @@ import E
 
 // CHECK: "-blocklist-file"
 // CHECK-NEXT: {{.*}}blocklist.yml"
+// UNSUPPORTED: OS=windows-msvc

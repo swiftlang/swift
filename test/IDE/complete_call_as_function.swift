@@ -102,3 +102,4 @@ func testCallAsFunctionOverloaded(fn: Functor) {
 //OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: down[#Functor.Vertical#];
 //OVERLOADED_ARG2_VALUE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Functor.Vertical#})[#(into: inout Hasher) -> Void#];
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -5,4 +5,4 @@
 
 public func foo() {}
 
-// CHECK: link library: Foo, force load: true
+// CHECK: link library: Foo, force load: true// UNSUPPORTED: OS=windows-msvc

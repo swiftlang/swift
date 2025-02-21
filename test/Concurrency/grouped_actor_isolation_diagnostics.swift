@@ -135,3 +135,4 @@ func testPreconcurrencyGrouped() {  // expected-warning {{calls to '@MainActor'-
   let _ = InferMainActorPreconcurrency().predatesConcurrency(n:4)
   // expected-note@-1 {{call to main actor-isolated instance method 'predatesConcurrency(n:)' in a synchronous nonisolated context}}
 }
+// UNSUPPORTED: OS=windows-msvc

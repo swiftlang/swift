@@ -191,3 +191,4 @@ sil [ossa] @nonending_then_nonending_is_nonending : $@convention(thin) () -> () 
   return %retval : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

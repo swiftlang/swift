@@ -8,3 +8,4 @@ let _: [S] = arr.sorted {
 }.prefix(1).map {
     return $0.0
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -73,3 +73,4 @@ entry(%a : $T):
   %0 = unconditional_checked_cast %a : $T to ClassProto
   return %0 : $ClassProto
 }
+// UNSUPPORTED: OS=windows-msvc

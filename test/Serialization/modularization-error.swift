@@ -70,3 +70,4 @@ extension MyType : Proto {}
 
 @available(SwiftStdlib 5.1, *)
 public func foo() -> some Proto { return MyType() }
+// UNSUPPORTED: OS=windows-msvc

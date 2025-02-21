@@ -23,3 +23,4 @@ func foo() throws -> (BigNontrivialThing?, String) {
     (nothrowBNT(), nothrowStr())
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ class IBActionWrapperTy {
   // CHECK-tvos: attr_ibaction_ios.swift:[[@LINE-3]]:18: error: @IBAction methods must have at most 2 arguments
   // CHECK-watchos: attr_ibaction_ios.swift:[[@LINE-4]]:18: error: @IBAction methods must have at most 2 arguments
   // CHECK-xros: attr_ibaction_ios.swift:[[@LINE-5]]:18: error: @IBAction methods must have at most 2 arguments
+// UNSUPPORTED: OS=windows-msvc

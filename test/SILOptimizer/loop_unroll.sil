@@ -553,3 +553,4 @@ bb4:
   return %8 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

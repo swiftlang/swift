@@ -19,3 +19,4 @@
     Task.runInline {}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

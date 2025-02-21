@@ -4,3 +4,4 @@
 @available(macOS 10.12
 @available(macOS 10.13
 func foo() {} {code}
+// UNSUPPORTED: OS=windows-msvc

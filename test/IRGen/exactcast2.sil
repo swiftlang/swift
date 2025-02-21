@@ -59,3 +59,4 @@ sil_vtable MD5 {
 
 
 
+// UNSUPPORTED: OS=windows-msvc

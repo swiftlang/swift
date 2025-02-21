@@ -46,3 +46,4 @@ func gen<T:NSFastEnumeration>(_ t:T) {
 }
 
 gen(userTypedObj)
+// UNSUPPORTED: OS=windows-msvc

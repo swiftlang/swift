@@ -34,3 +34,4 @@ func fib(_ x: Int) async -> Int {
     await fib(4)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

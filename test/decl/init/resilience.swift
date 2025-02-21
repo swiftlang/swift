@@ -57,3 +57,4 @@ extension Gadget {
     self.init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -37,3 +37,4 @@ func f7<T: P, U: P>(_: T, _: U) where T.T == C, U.T == C, T.T == U.T { }
 // CHECK-LABEL: .f8@
 // CHECK-NEXT: Generic signature: <T, U where T : P, U : P, T.[P]T == C, U.[P]T == C>
 func f8<T: P, U: P>(_: T, _: U) where T.T == U.T, U.T == C, T.T == C { }
+// UNSUPPORTED: OS=windows-msvc

@@ -127,3 +127,4 @@ func printArray(_ a: [Int]) {
   print("]")
 }
 
+// UNSUPPORTED: OS=windows-msvc

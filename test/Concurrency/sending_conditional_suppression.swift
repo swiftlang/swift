@@ -239,3 +239,4 @@ public var publicGlobal: (sending NonSendableKlass) -> () = { x in fatalError() 
 // CHECK-NEXT: #endif
 @usableFromInline
 internal var usableFromInlineGlobal: (sending NonSendableKlass) -> () = { x in fatalError() }
+// UNSUPPORTED: OS=windows-msvc

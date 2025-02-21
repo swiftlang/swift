@@ -9,3 +9,4 @@
 // RUN: %target-swift-frontend -typecheck -I %S/Inputs/custom-modules -import-objc-header %S/Inputs/no-fake-source-buffer-excerpts.h %s 2>%t/errors
 // RUN: od -a < %t/errors | %FileCheck %s
 // CHECK-NOT: nul nul nul nul
+// UNSUPPORTED: OS=windows-msvc

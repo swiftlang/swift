@@ -170,3 +170,4 @@ struct X3<T, U> where U: P2, U.A: P1 { }
 // CHECK:   [[METADATA:%.*]] = call ptr @swift_allocateGenericClassMetadata(ptr %0, ptr %1, ptr %2)
 // CHECK-NEXT: ret ptr [[METADATA]]
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@
 // RUN: %llvm-readtapi --compare %t/typecheck.tbd %t/emit-ir.tbd
 
 // Top-level code (i.e. implicit `main`) should be handled
+// UNSUPPORTED: OS=windows-msvc

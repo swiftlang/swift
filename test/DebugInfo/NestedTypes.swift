@@ -16,3 +16,4 @@ public let e : Enum = .WithClass(C())
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "WithStruct",
 // CHECK-SAME:           size: 128)
 
+// UNSUPPORTED: OS=windows-msvc

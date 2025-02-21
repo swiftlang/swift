@@ -163,3 +163,4 @@ print(P.self)
 // CHECK-JIT: ret void
 // CHECK-JIT-NEXT: {{^}$}}
 
+// UNSUPPORTED: OS=windows-msvc

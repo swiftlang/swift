@@ -22,3 +22,4 @@ bb1(%2 : @guaranteed $Builtin.NativeObject):
   return %4 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

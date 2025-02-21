@@ -86,3 +86,4 @@ bb0:
   return %17 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

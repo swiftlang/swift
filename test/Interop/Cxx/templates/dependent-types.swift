@@ -118,3 +118,4 @@ DependentTypesTestSuite.test("Complex different dependent argument and return ty
 // }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

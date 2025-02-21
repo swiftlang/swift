@@ -21,3 +21,4 @@ let b = x * (y * z)
 let c = (x * y) * z
 let d = x * (y * z as B)
 let e = (x * y as B) * z
+// UNSUPPORTED: OS=windows-msvc

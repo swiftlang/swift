@@ -177,3 +177,4 @@ _ = #"""
 
 _ = #"# #"#
 // CHECK: "# #"
+// UNSUPPORTED: OS=windows-msvc

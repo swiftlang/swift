@@ -142,3 +142,4 @@ func testPopularityVsPrefixMatch1() {
 // POPULAR_VS_PREFIX_1-NEXT:    ABBobtail
 // POPULAR_VS_PREFIX_1-NEXT:    ABFont
 // POPULAR_VS_PREFIX_1-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

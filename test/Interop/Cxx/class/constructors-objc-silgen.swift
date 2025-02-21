@@ -9,3 +9,4 @@ import ConstructorsObjC
 // CHECK: [[FUNC:%[0-9]+]] = function_ref @_ZN27ConstructorWithNSArrayParamC1EP7NSArray : $@convention(c) (Optional<NSArray>) -> @out ConstructorWithNSArrayParam
 // CHECK: %{{[0-9]+}} = apply [[FUNC]]([[VAR]], [[OPT_ARRAY]]) : $@convention(c) (Optional<NSArray>) -> @out ConstructorWithNSArrayParam
 let _ = ConstructorWithNSArrayParam([])
+// UNSUPPORTED: OS=windows-msvc

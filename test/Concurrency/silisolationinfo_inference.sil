@@ -876,3 +876,4 @@ bb2(%10 : @owned $any Error):
   dealloc_stack %2 : $*T
   throw %10 : $any Error
 }
+// UNSUPPORTED: OS=windows-msvc

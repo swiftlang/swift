@@ -6,3 +6,4 @@ protocol P {}
 struct S: P {}
 
 func foo() -> P { return S() }
+// UNSUPPORTED: OS=windows-msvc

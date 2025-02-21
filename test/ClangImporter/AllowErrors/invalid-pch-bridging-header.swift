@@ -53,3 +53,4 @@ func use(s: SomeTy, s2: InnerTy) {}
 // MISSING_HMAP-NOT: cannot find type 'SomeTy' in scope
 // MISSING_HMAP: cannot find type 'InnerTy' in scope
 // MISSING_HMAP-NOT: cannot find type 'SomeTy' in scope
+// UNSUPPORTED: OS=windows-msvc

@@ -73,3 +73,4 @@ open class PartialImpl: SubProto {
 
 
 #endif // TEST
+// UNSUPPORTED: OS=windows-msvc

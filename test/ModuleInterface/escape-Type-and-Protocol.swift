@@ -73,3 +73,4 @@ public enum UncoolEnum {
   case `Type`, `Protocol`
 // CHECK: }
 }
+// UNSUPPORTED: OS=windows-msvc

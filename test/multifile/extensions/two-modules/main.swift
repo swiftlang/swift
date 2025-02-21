@@ -18,3 +18,4 @@ extension Point {
     self.z = 0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@ class Cl{
   var L : CALayer = {
     let layer = CALayer()
     layer.transform = #^TOK1^#
+// UNSUPPORTED: OS=windows-msvc

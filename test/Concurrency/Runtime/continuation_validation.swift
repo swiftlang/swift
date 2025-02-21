@@ -95,3 +95,4 @@ func test_isolation_withCheckedThrowingContinuation() async {
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

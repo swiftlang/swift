@@ -302,3 +302,4 @@ sil [ossa] @test_0_000_100 : $@convention(thin) () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

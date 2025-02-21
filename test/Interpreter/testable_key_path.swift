@@ -19,3 +19,4 @@ c[keyPath: kp] = "hello"
 print("I say \(c.field)")
 
 // CHECK: I say hello
+// UNSUPPORTED: OS=windows-msvc

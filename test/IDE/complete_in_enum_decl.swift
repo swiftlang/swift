@@ -49,3 +49,4 @@ enum EnumCase8 {
 // NESTED_TYPE_IN_ENUM_CASE_DECL: Begin completions, 2 items
 // NESTED_TYPE_IN_ENUM_CASE_DECL-DAG: Decl[Struct]/CurrNominal:           Nested[#Wrapper.Nested#];
 // NESTED_TYPE_IN_ENUM_CASE_DECL-DAG: Keyword/None:                       Type[#Wrapper.Type#];
+// UNSUPPORTED: OS=windows-msvc

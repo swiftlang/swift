@@ -13,3 +13,4 @@ public class MyClass {
         otherParam: S
     ) {}
 }
+// UNSUPPORTED: OS=windows-msvc

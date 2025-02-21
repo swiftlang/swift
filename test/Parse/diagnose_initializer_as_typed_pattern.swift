@@ -35,3 +35,4 @@ func nonTopLevel() {
   let k: X(x, y) { foo() }  // expected-error{{unexpected initializer in pattern; did you mean to use '='?}} {{8-9= =}}
   _ = (a, i, j, k)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@ extension SubProto {
 }
 
 _ = Impl().foo()
+// UNSUPPORTED: OS=windows-msvc

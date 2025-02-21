@@ -41,3 +41,4 @@ import Module
 // FIXME: show [-Wincomplete-umbrella]
 
 // CHECK-NO-WARN-NOT: warning about something
+// UNSUPPORTED: OS=windows-msvc

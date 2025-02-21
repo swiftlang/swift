@@ -20,3 +20,4 @@ struct G: S {
 
   func makeI() -> I {}
 }
+// UNSUPPORTED: OS=windows-msvc

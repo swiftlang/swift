@@ -30,3 +30,4 @@ dynamic func run() async {
     await run()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

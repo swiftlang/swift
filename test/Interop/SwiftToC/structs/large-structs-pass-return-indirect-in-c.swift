@@ -30,3 +30,4 @@ public func printStructSeveralI64(_ x: StructSeveralI64) {
 // CHECK: SWIFT_EXTERN void $s7Structs21printStructSeveralI64yyAA0cdE0VF(const void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL;
 
 // CHECK: SWIFT_EXTERN void $s7Structs25returnNewStructSeveralI641iAA0deF0Vs5Int64V_tF(SWIFT_INDIRECT_RESULT void * _Nonnull, int64_t i) SWIFT_NOEXCEPT SWIFT_CALL;
+// UNSUPPORTED: OS=windows-msvc

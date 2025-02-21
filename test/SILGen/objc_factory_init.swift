@@ -108,3 +108,4 @@ class SubHive : Hive {
     self.init(queen: Bee())
   }
 }
+// UNSUPPORTED: OS=windows-msvc

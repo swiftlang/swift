@@ -6,3 +6,4 @@
 protocol P {
   associatedtype T : P where T.T.T.T.T.T.T.T.T.T.T.T.T.T.T.T.T.T.T.T.T.T.T.T.T.T == Self
 }
+// UNSUPPORTED: OS=windows-msvc

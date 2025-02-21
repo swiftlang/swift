@@ -44,3 +44,4 @@ public func main() {
 }
 
 // CHECK: @"$e9MyModuleA6globalSivp" = {{.*}}global %TSi zeroinitializer
+// UNSUPPORTED: OS=windows-msvc

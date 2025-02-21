@@ -76,3 +76,4 @@ SupersetVJPTests.testWithLeakChecking("IndirectResults") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

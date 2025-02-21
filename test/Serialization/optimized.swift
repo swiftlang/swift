@@ -7,3 +7,4 @@
 class Rdar17567391 {
   let data: [Int] = []
 }
+// UNSUPPORTED: OS=windows-msvc

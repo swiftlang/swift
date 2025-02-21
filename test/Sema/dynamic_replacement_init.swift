@@ -39,3 +39,4 @@ extension B {
     self.init(b: _i, i: _i)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

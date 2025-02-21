@@ -53,3 +53,4 @@ let w = x - y
 let f = FunctionVoidToFRTStruct()
 let frt = f()
 // CHECK-NOT: warning: 'operator()' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE
+// UNSUPPORTED: OS=windows-msvc

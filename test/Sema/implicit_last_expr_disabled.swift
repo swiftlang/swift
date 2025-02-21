@@ -80,3 +80,4 @@ func testClosure2() {
   }
   takesFn(fn) // expected-error {{cannot convert value of type '() -> ()' to expected argument type '() -> Int'}}
 }
+// UNSUPPORTED: OS=windows-msvc

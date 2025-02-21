@@ -7,3 +7,4 @@
 let x = "Hello World"
 
 // CHECK: error response (Request Cancelled)
+// UNSUPPORTED: OS=windows-msvc

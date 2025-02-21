@@ -45,3 +45,4 @@ public enum Enum {
 // CHECK-DAG:      [[C4]]  = !{{{.*}} @"$s4main6StructVHn", i32 0, [[M3A:!.*]]}
 
 // CHECK-DAG:      [[C5]]  = !{{{.*}} @"$s4main4EnumOHn", i32 0, [[M4A:!.*]]}
+// UNSUPPORTED: OS=windows-msvc

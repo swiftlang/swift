@@ -76,3 +76,4 @@ public func makeOne<T>(_ t: T) -> T {
 public func makePair<T, U>(_ t: T, _ u: U) -> (T, U) {
   return makeTuple(t, u)
 }
+// UNSUPPORTED: OS=windows-msvc

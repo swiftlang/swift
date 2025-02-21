@@ -24,3 +24,4 @@ if #available(SwiftStdlib 5.5, *) {
 
 // CHECK: done
 print("done")
+// UNSUPPORTED: OS=windows-msvc

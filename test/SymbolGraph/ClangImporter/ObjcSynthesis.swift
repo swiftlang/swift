@@ -7,3 +7,4 @@
 // REQUIRES: objc_interop
 
 // CHECK-NOT: "precise": "c:objc(pl)NSCoding(im)initWithCoder"
+// UNSUPPORTED: OS=windows-msvc

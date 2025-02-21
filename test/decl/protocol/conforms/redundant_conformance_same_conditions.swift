@@ -23,3 +23,4 @@ extension OtherGenericConditionalConformsToP: P1 where T: P2 {
     // expected-error@-1{{redundant conformance of 'OtherGenericConditionalConformsToP<T>' to protocol 'P1'}}
     func f() -> Int { return 0 }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -111,3 +111,4 @@ var nsa3: NSArray = a3._bridgeToObjectiveC()
 for x in nsa3 {
   print(x)
 }
+// UNSUPPORTED: OS=windows-msvc

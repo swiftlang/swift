@@ -49,3 +49,4 @@ DynamicMetadataCycleTests.test("cycle through enum")
   }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

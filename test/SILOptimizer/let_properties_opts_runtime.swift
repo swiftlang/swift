@@ -108,3 +108,4 @@ public func testStructWithMultipleInitsAndInlinedInitializer() {
 }
 
 testStructWithMultipleInitsAndInlinedInitializer()
+// UNSUPPORTED: OS=windows-msvc

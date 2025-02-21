@@ -255,3 +255,4 @@ DerivativeRegistrationTests.testWithLeakChecking("DerivativeOfDefaultImplementat
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

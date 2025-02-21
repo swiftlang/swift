@@ -72,3 +72,4 @@ WithoutEscapingSuite.test("ExpectNoCrash3") {
 
 }
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

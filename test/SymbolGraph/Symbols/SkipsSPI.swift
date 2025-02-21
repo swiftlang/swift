@@ -64,3 +64,4 @@ extension StructShouldAppear {
   // tagged as SPI, so everything inside it should be considered SPI as well.
   public func functionInSPIExtensionShouldntAppear() {}
 }
+// UNSUPPORTED: OS=windows-msvc

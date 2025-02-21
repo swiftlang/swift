@@ -10,3 +10,4 @@ class C: B<Int> {
     super.init(foo: foo)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

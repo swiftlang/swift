@@ -93,3 +93,4 @@ public func foo(a: exportedClangType) {}
 import Exporter
 
 public func foo(a: exportedClangType) {}
+// UNSUPPORTED: OS=windows-msvc

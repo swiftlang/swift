@@ -14,3 +14,4 @@ import CompletionHandlerGlobals
 
 // CHECK: class Computer
 // CHECK: @_alwaysEmitIntoClient public final func multiply(_ x: Double, by y: Double) async -> Double
+// UNSUPPORTED: OS=windows-msvc

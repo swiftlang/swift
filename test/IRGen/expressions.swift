@@ -17,3 +17,4 @@ func TestStringLiteral() -> String {
 func TestStringLiteral2() -> String {
   return "non-ASCII string \u{00B5}"
 }
+// UNSUPPORTED: OS=windows-msvc

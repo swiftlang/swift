@@ -57,3 +57,4 @@ import DirectMixedDependency
 // CHECK-DAG: remark: loaded module 'SwiftNonResilientDependency'; source: '{{.*}}SwiftNonResilientDependency.swiftmodule', loaded: '{{.*}}SwiftNonResilientDependency.swiftmodule'
 // CHECK-DAG: remark: loaded module 'IndirectMixedDependency' (overlay for a clang dependency); source: '{{.*}}IndirectMixedDependency.swiftinterface', loaded: '{{.*}}IndirectMixedDependency-{{.*}}.swiftmodule'
 // CHECK-DAG: remark: loaded module 'DirectMixedDependency'; source: '{{.*}}module.modulemap', loaded: '{{.*}}DirectMixedDependency-{{.*}}.pcm'
+// UNSUPPORTED: OS=windows-msvc

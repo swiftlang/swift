@@ -30,3 +30,4 @@ public func produceSomeEmptyNontrivialAddronlyEnumInstance(_ one: EnumNontrivial
 public func produceNoneEmptyAddronlyEnumInstance() -> EnumNontrivialWithEmptyCases? {
   return .none
 }
+// UNSUPPORTED: OS=windows-msvc

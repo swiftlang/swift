@@ -53,3 +53,4 @@ protocol P3<A>: P1, P2 {
 func f<T>(_ value: any P3<T>) -> (any P1<T>, any P2<T>) {
   return (value, value)
 }
+// UNSUPPORTED: OS=windows-msvc

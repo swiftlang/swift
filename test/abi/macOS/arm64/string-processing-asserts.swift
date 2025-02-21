@@ -39,3 +39,4 @@
 // of this file. This file is dedicated for assert only symbols.
 
 // _StringProcessing Symbols
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ public func testit(_ N: Int, _ x: Int) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

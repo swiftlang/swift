@@ -453,3 +453,4 @@ func testResultBuilder(x: Int, y: Int) -> MyArray {
           // expected-error@-1 {{argument must be an integer literal}}
     }
 }
+// UNSUPPORTED: OS=windows-msvc

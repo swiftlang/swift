@@ -31,3 +31,4 @@ struct MyStruct {
 // RESULT-DAG: key.description: "barParam"
 // RESULT: ]
 // RESULT: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

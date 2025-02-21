@@ -11,3 +11,4 @@
 // CHECK-SYSTEM-NOT: non-void function does not return a value
 import FWModule
 import Module
+// UNSUPPORTED: OS=windows-msvc

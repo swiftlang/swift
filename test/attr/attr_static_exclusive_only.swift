@@ -101,3 +101,4 @@ extension U {
     B()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

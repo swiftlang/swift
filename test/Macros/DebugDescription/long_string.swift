@@ -19,3 +19,4 @@ struct MyStruct: CustomDebugStringConvertible {
 // CHECK:     /* version */ 1 as UInt8,
 // CHECK:     /* record size */ 192 as UInt8, 2 as UInt8,
 // CHECK: 8-bit integer. See https://en.wikipedia.org/wiki/LEB128" */ 175 as UInt8, 2 as UInt8, 65 as UInt8,
+// UNSUPPORTED: OS=windows-msvc

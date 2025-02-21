@@ -44,3 +44,4 @@ public func caller(_ b: Bool) async -> Int {
   minusOne()
   return 1
 }
+// UNSUPPORTED: OS=windows-msvc

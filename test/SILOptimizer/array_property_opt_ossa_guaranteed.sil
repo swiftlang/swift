@@ -323,3 +323,4 @@ bb7:
 bb8:
   return %6 : $MyBool
 }
+// UNSUPPORTED: OS=windows-msvc

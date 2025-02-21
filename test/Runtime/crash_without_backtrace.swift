@@ -25,3 +25,4 @@ func foo() -> Int {
 }
 
 foo()
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ func useDefaultInits() {
   _ = DefaultedStruct(y: false)
 }
 
+// UNSUPPORTED: OS=windows-msvc

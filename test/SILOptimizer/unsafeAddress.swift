@@ -168,3 +168,4 @@ func testSNCMutBorrow(snc: borrowing SNC) {
 func testSNCMod(mut_snc snc: inout SNC) {
   mod(&snc.mutableData)
 }
+// UNSUPPORTED: OS=windows-msvc

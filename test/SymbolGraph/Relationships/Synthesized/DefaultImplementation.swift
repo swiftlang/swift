@@ -44,3 +44,4 @@ extension Outer {
 }
 
 // CHECK-NOT: {{.*baz}}::SYNTHESIZED::
+// UNSUPPORTED: OS=windows-msvc

@@ -229,3 +229,4 @@ class Subclass: Base<Item> {
     didSet {}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -422,3 +422,4 @@ func testHashableGenerics(
 func testGenericsWithTypedefBlocks(hba: HasBlockArray) {
   let _: Int = hba.blockArray() // expected-error{{type '[@convention(block) () -> Void]'}}
 }
+// UNSUPPORTED: OS=windows-msvc

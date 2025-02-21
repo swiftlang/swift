@@ -222,3 +222,4 @@ func I59843_f() {
   I59843_B.contextDiff(a: "a", b: "b") // expected-warning{{'contextDiff(a:b:)' was deprecated in macOS 51: replaced by 'I59843_A.contextDiff(with:and:)' [DeprecatedDeclaration]}}
   // expected-note@-1{{use 'I59843_A.contextDiff(with:and:)' instead}} {{3-23=I59843_A.contextDiff}} {{24-25=with}} {{32-33=and}}
 }
+// UNSUPPORTED: OS=windows-msvc

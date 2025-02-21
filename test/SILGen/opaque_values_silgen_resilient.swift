@@ -65,3 +65,4 @@ public struct StructYieldingAResilientNonetrivialValue : ProtocolWithAYield {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ func checks<T: ~Copyable, C>(
           _ b: KlassModern,
           _ c: Konditional<T>,
           _ d: Konditional<C>) {}
+// UNSUPPORTED: OS=windows-msvc

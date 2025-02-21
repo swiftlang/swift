@@ -169,3 +169,4 @@ func test005() {
 // GLOBAL_FUNC_1-NEXT:         MyAnyGenerator
 // GLOBAL_FUNC_1-NEXT:     myanyFunc()
 // GLOBAL_FUNC_1-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

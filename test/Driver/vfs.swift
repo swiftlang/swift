@@ -23,3 +23,4 @@
 // RUN: echo '{"version": 0,"roots":[{"type":"directory","name":"%/t","contents":[{"type":"file","name":"vfsname.swift", "external-contents":"main.swift"}]}]}' > %t.yaml
 // RUN: not %swiftc_driver -vfsoverlay %t.yaml vfsname.swift -v 2>&1 | %FileCheck --check-prefix=CHECK-ERROR %s
 // CHECK-ERROR: {{^}}main.swift:1:1: error:
+// UNSUPPORTED: OS=windows-msvc

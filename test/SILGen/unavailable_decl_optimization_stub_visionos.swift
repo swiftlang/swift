@@ -87,3 +87,4 @@ public struct UnavailableOnVisionOS {
     return S()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

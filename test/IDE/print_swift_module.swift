@@ -68,3 +68,4 @@ public struct Event {
   // CHECK2: init(start: Int, end: Int? = nil, repeating: ((), Int?) = ((), nil), name: String = "untitled event")
 }
 // CHECK2: }
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ import MyCxxModule
 }
 
 // CHECK: @property (nonatomic) X * _Nullable x;
+// UNSUPPORTED: OS=windows-msvc

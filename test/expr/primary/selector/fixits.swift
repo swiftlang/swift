@@ -83,3 +83,4 @@ func testSelectorConstruction() {
   // Note: from Foundation
   _ = Selector("initWithArray:") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{7-33=#selector(NSSet.init(array:))}}
 }
+// UNSUPPORTED: OS=windows-msvc

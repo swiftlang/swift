@@ -42,3 +42,4 @@ open class d {
 // CHECK-DAG-NO-OPT: define dllexport swiftcc ptr @"$s9dllexport1dCACycfc"(ptr %0)
 // CHECK-DAG-OPT: define dllexport swiftcc void @"$s9dllexport1dCfD"(ptr %0)
 
+// UNSUPPORTED: OS=windows-msvc

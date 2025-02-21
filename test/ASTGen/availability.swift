@@ -60,3 +60,4 @@ func testPoundIf() {
     // pass
   }
 }
+// UNSUPPORTED: OS=windows-msvc

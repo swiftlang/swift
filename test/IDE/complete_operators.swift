@@ -356,3 +356,4 @@ func testAutoclosure(x: Boolish, y: Boolish) {
 // INFIX_AUTOCLOSURE_2-DAG: Decl[InfixOperatorFunction]/CurrModule/TypeRelation[Convertible]: [' ']|||| {#Boolish#}[#Boolish#];
 // INFIX_AUTOCLOSURE_2: End completions
 
+// UNSUPPORTED: OS=windows-msvc

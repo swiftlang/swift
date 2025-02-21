@@ -47,3 +47,4 @@ func rundown<T: Q>(value: T, count: Int) {
 DispatchQueue.concurrentPerform(iterations: 5) { n in
   rundown(value: B<A<()>>(), count: 1000)
 }
+// UNSUPPORTED: OS=windows-msvc

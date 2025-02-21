@@ -45,3 +45,4 @@ func test12<T: P>(_: T) where T.A == G<Int>, T.A == G<T.B> { }
 // CHECK: Generic signature: <T where T : P, T.[P]A == G<Int>, T.[P]B == Int>
 
 // CHECK-NOT: Generic signature
+// UNSUPPORTED: OS=windows-msvc

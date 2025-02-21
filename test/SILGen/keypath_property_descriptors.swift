@@ -168,3 +168,4 @@ extension Array where Element == Foo {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -167,3 +167,4 @@ func validateNonisolatedOnClassMeansCallerIsolationInheritingOnFuncDecl(
   await c.nonisolatedMethod() // expected-disabled-error {{sending 'c' risks causing data races}}
   // expected-disabled-note @-1 {{sending main actor-isolated 'c' to nonisolated instance method 'nonisolatedMethod()' risks causing data races between nonisolated and main actor-isolated uses}}
 }
+// UNSUPPORTED: OS=windows-msvc

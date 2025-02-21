@@ -7,3 +7,4 @@
 }
 
 // CHECK-NOT: sil_default_witness_table ObjCProtocol
+// UNSUPPORTED: OS=windows-msvc

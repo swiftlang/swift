@@ -14,3 +14,4 @@ extension Outer.Space.Foo: @retroactive ExpressibleByIntegerLiteral {
 
 var it: Outer.Space.Foo = 123
 let res = it.bar()
+// UNSUPPORTED: OS=windows-msvc

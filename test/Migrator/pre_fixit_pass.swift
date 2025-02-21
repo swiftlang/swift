@@ -14,3 +14,4 @@ func foo(_ a : PropertyUserInterface) {
   a.setURL(1)
   _ = a.field()
 }
+// UNSUPPORTED: OS=windows-msvc

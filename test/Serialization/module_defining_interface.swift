@@ -25,3 +25,4 @@
 // swift-interface-format-version: 1.0
 // swift-module-flags: -module-name Foo
 public func foo()
+// UNSUPPORTED: OS=windows-msvc

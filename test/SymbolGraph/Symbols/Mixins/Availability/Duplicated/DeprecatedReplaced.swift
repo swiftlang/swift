@@ -36,3 +36,4 @@ public func noLongerDeprecated() {}
 // NOTDEPRECATED-NEXT:     }
 // NOTDEPRECATED-NEXT:   }
 // NOTDEPRECATED-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

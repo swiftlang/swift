@@ -10,3 +10,4 @@ func square(_ n: Int) -> Int {
 
 // CHECK: !DIFile(filename: "/var/empty/debug_prefix_map.swift"
 // CHECK: !DIModule(scope: null, name: "Globals", {{.*}}includePath: "/var/empty{{(/|\\\\)}}Globals.swiftmodule"
+// UNSUPPORTED: OS=windows-msvc

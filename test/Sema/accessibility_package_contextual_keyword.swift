@@ -64,3 +64,4 @@ let packages: [MyColor] = [MyColor.red, MyColor.blue].compactMap { package in
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

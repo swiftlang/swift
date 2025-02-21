@@ -6,3 +6,4 @@
 // CHECK:   mutating func test(_: {{UInt|UInt32}})
 // CHECK: }
 // CHECK: typealias Surveyor = Lander<CChar>
+// UNSUPPORTED: OS=windows-msvc

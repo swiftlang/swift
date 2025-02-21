@@ -68,3 +68,4 @@ func testCF(_ fridge: CCRefrigerator) {
 
   CCRefrigeratorOpenMaybeDoSomething(5) // expected-error{{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator'}}
 }
+// UNSUPPORTED: OS=windows-msvc

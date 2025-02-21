@@ -17,3 +17,4 @@ func aFunction<T : AProtocol>(_ x: T) {
 }
 
 aFunction(AClass())
+// UNSUPPORTED: OS=windows-msvc

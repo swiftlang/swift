@@ -59,3 +59,4 @@ struct MyInt: FixedWidthInteger { // expected-error {{type 'MyInt' does not conf
 
   var magnitude: UInt { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

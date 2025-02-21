@@ -19,3 +19,4 @@ enum Never {}
 
 Builtin.unreachable()
 Builtin.int_trap()
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ sil @patatino : $@convention(thin) () -> () {
   %45 = tuple ()
   return %45 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

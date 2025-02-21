@@ -49,3 +49,4 @@ UInt16(sssmall_i8)
 UInt16(szero_i8)
 UInt32(sssmall_u8)
 UInt32(szero_u8)
+// UNSUPPORTED: OS=windows-msvc

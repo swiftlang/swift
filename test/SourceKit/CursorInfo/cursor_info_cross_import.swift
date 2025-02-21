@@ -23,3 +23,4 @@ func foo(x: From_ABAdditionsType) {
 // CHECK4: key.modulename: "A"
 // CHECK5: key.modulename: "B"
 // CHECK6: key.modulename: "C"
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ fileprivate struct X {
 public func force_metadata() -> Any.Type {
   return X.Y.self
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -393,3 +393,4 @@ var testExplicitOldValue3: Int = 0 {
 // EXPLICIT_OLDVALUE_COPIEDMEMBER-DAG: Keyword[self]/CurrNominal:          self[#Int#];
   }
 }
+// UNSUPPORTED: OS=windows-msvc

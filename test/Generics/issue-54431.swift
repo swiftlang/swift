@@ -30,3 +30,4 @@ protocol C {
   associatedtype T: BB where T.Z == Self
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -37,3 +37,4 @@ public func test(x: MyClass) {
   // CHECK: call swiftcc void @"$e4main7MyClassC3baryyF"
 
 }
+// UNSUPPORTED: OS=windows-msvc

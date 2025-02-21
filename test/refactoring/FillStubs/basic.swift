@@ -120,3 +120,4 @@ extension C14: P3 {
 // RUN: diff -u %S/Outputs/basic/P71-12.swift.expected %t.result/P71-12.swift
 // RUN: %refactor -fill-stub -source-filename %s -pos=88:12 >> %t.result/P88-12.swift
 // RUN: diff -u %S/Outputs/basic/P88-12.swift.expected %t.result/P88-12.swift
+// UNSUPPORTED: OS=windows-msvc

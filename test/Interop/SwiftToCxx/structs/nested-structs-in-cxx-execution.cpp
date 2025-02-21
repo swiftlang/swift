@@ -22,3 +22,4 @@ int main() {
   auto xx = makeAudioFileType();
   AudioFileType::SubType yy = xx.getCAF();
 }
+// UNSUPPORTED: OS=windows-msvc

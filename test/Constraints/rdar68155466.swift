@@ -28,3 +28,4 @@ func data() -> [A] {
 _ = Loop(data(), id: \.uniqueID) { $0 } // expected-error {{key path cannot refer to instance method 'uniqueID()'}}
 // FIXME: the diagnostics below ideally should have been emitted (rdar://106241733)
 // error@-1 {{type '() -> Int' cannot conform to 'Hashable'}} note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
+// UNSUPPORTED: OS=windows-msvc

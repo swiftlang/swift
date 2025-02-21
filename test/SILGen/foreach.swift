@@ -642,3 +642,4 @@ func injectForEachElementIntoOptional(_ xs: [Int]) {
 func injectForEachElementIntoOptional<T>(_ xs: [T]) {
   for x : T? in xs {}
 }
+// UNSUPPORTED: OS=windows-msvc

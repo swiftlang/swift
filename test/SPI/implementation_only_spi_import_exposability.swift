@@ -54,3 +54,4 @@ public struct LocalSPIStruct : IOIProtocol, SPIProtocol { // expected-warning {{
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

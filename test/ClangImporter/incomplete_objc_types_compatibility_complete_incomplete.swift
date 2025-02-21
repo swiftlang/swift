@@ -61,3 +61,4 @@ takeACompleteInterface(incompleteInterface)
 takeACompleteInterface(interfacePropertyCopy)
 takeACompleteProtocol(incompleteProtocol)
 takeACompleteProtocol(protocolPropertyCopy)
+// UNSUPPORTED: OS=windows-msvc

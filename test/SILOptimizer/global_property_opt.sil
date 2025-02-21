@@ -557,3 +557,4 @@ sil @_provide_struct : $@convention(thin) () -> @owned DepStruct
 
 sil @provide_tuple : $@convention(thin) () -> @owned (Array<X>, Builtin.Int64)
 
+// UNSUPPORTED: OS=windows-msvc

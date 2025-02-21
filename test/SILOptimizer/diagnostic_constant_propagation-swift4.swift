@@ -6,3 +6,4 @@
 func testArithmeticOverflowSwift4() {
   var _ = Int8(126) + (1 + 1) // expected-error {{arithmetic operation '126 + 2' (on type 'Int8') results in an overflow}}
 }
+// UNSUPPORTED: OS=windows-msvc

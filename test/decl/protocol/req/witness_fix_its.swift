@@ -49,3 +49,4 @@ protocol RenameableProtocol {
 extension Linux: RenameableProtocol {} 
 // expected-error@-1 {{type 'Linux' does not conform to protocol 'RenameableProtocol'}}
 // expected-note@-2 {{add stubs for conformance}}
+// UNSUPPORTED: OS=windows-msvc

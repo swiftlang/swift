@@ -19,3 +19,4 @@ public func good<T>(_ BAD_PARAM_NAME: T) -> T {
   func BAD_LOCAL_FUNC() {}
   return BAD_PARAM_NAME
 }
+// UNSUPPORTED: OS=windows-msvc

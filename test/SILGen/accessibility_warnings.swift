@@ -247,3 +247,4 @@ private class PrivateClass {
   // CHECK-DAG: sil private{{( \[.+\])*}} [ossa] @$s22accessibility_warnings12PrivateClass33_5D2F2E026754A901C0FF90C404896D02LLCADycfc
 }
 
+// UNSUPPORTED: OS=windows-msvc

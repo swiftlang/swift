@@ -103,3 +103,4 @@ struct UnavailableType {
 class UnavailableClass {
   deinit {}
 }
+// UNSUPPORTED: OS=windows-msvc

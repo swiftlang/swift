@@ -4,3 +4,4 @@
 // STATS: Statistics Collected
 // Only print statistics once
 // STATS-NOT: Statistics Collected
+// UNSUPPORTED: OS=windows-msvc

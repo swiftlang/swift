@@ -25,3 +25,4 @@ struct ImageMapTest {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

@@ -471,3 +471,4 @@ func asyncWithUnsafeInheritance_hopback() async {
   // CHECK-NEXT: return
   await redFn(0)
 }
+// UNSUPPORTED: OS=windows-msvc

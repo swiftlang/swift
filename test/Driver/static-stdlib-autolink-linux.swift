@@ -28,3 +28,4 @@ struct Main {
     await asyncFunc()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

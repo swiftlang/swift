@@ -140,3 +140,4 @@ func canImportVersionedString() {
   let underlyingMinorSmaller = 1
 #endif
 }
+// UNSUPPORTED: OS=windows-msvc

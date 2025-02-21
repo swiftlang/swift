@@ -81,3 +81,4 @@ struct Runner {
     sleep(1)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

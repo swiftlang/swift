@@ -25,3 +25,4 @@ public struct S2 {
 public class C1 {
   var mirror: Mirror?
 }
+// UNSUPPORTED: OS=windows-msvc

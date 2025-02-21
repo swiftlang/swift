@@ -55,3 +55,4 @@ struct Test {
 // RUN: diff -u %S/Outputs/basic_ranges/top_level.swift.expected %t/top_level.swift
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=26:12 > %t/SP1.swift
 // RUN: diff -u %S/Outputs/basic_ranges/SP1.swift.expected %t/SP1.swift
+// UNSUPPORTED: OS=windows-msvc

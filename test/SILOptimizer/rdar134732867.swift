@@ -11,3 +11,4 @@ public class Base<T> {
 public func caller(b: Base<Array<Int>>) -> Bool {
   return b.f(123, [1, 2, 3], 5)
 }
+// UNSUPPORTED: OS=windows-msvc

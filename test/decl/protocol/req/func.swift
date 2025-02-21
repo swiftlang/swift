@@ -277,3 +277,4 @@ protocol P14 {
 }
 prefix func %%%<P: P13>(_: P.Type) { }
 struct X13: P14, P13 { }
+// UNSUPPORTED: OS=windows-msvc

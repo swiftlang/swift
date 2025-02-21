@@ -12,3 +12,4 @@ class EvilMain {
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: 'NSApplicationMain' attribute can only apply to one class in a module
+// UNSUPPORTED: OS=windows-msvc

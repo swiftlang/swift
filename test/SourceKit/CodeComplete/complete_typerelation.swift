@@ -111,3 +111,4 @@ func testUnknown() {
 // UNKNOWNCONTEXT:       key.typename: "Bool",
 // UNKNOWNCONTEXT:       key.typerelation: source.codecompletion.typerelation.unknown,
 // UNKNOWNCONTEXT-LABEL: }
+// UNSUPPORTED: OS=windows-msvc

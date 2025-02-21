@@ -9,4 +9,4 @@
 // https://github.com/apple/swift/issues/54868
 
 let object = MyClass()
-object.property = "value"
+object.property = "value"// UNSUPPORTED: OS=windows-msvc

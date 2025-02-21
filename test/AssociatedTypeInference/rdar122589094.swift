@@ -32,3 +32,4 @@ struct S2: P2 {
     fatalError()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

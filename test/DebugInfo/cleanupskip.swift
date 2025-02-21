@@ -14,3 +14,4 @@ public class AClass : NSObject {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

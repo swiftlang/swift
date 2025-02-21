@@ -33,4 +33,4 @@ extension Foo {
 // CHECK-NEXT:  }
 // CHECK-EMPTY:
 // Before the fix, we had the static method's thunk here.
-// CHECK-NEXT:    swift::Int getHashValue() const
+// CHECK-NEXT:    swift::Int getHashValue() const// UNSUPPORTED: OS=windows-msvc

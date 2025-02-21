@@ -120,3 +120,4 @@ var zzz = "zzz"
 // There should be no error here.
 var zzz = zzz
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -130,3 +130,4 @@ public struct MineOwnIterator<Element>: AsyncSequence, AsyncIteratorProtocol {
   @_implements(AsyncSequence, Failure)
   public typealias __AsyncSequence_Failure = Never
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -23,3 +23,4 @@
 // CHECK-NOTES: note: textual interface for Test is blocklisted as broken; interface verification errors are downgraded to warnings
 
 public func foo() {}
+// UNSUPPORTED: OS=windows-msvc

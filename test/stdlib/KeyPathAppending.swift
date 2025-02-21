@@ -127,3 +127,4 @@ func partialAppends<T, U, V>(partial: PartialKeyPath<T>,
   expect(&n, is: Optional<PartialKeyPath<U>>.self)
    */
 }
+// UNSUPPORTED: OS=windows-msvc

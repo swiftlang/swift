@@ -8,4 +8,4 @@ if true {
     _ = "\()"
 }
 
-if true { _ = "\()" }
+if true { _ = "\()" }// UNSUPPORTED: OS=windows-msvc

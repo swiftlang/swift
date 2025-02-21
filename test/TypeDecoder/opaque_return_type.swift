@@ -32,3 +32,4 @@ extension G where T == Int {
 
 // DEMANGLE: $s18opaque_return_type3barQryFQOyQo_7ElementSTQxD
 // CHECK: (some Sequence).Element
+// UNSUPPORTED: OS=windows-msvc

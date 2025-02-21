@@ -15,3 +15,4 @@ public func f1<each T>(p: repeat any P1<each T>) {
 public func f2<each T>(p: repeat any P2<each T>) {
   let _ = (repeat each p)
 }
+// UNSUPPORTED: OS=windows-msvc

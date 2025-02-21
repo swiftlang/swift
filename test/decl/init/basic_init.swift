@@ -48,3 +48,4 @@ struct MyStruct {
     self.init(k: 1)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -82,3 +82,4 @@ modules:
   - name: _B_A
 //--- sdk/SDKSettings.json
 {}
+// UNSUPPORTED: OS=windows-msvc

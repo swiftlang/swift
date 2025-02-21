@@ -57,3 +57,4 @@ public func testDispatchThunkMyOverride(d: MyDerived, o: Object) {
 public func testDispatchThunkCast(d: Derived) {
   _ = d.returnsSuperclass()
 }
+// UNSUPPORTED: OS=windows-msvc

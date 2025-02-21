@@ -276,3 +276,4 @@ extension AvailableLaterOnMacCatalyst { // expected-note 2 {{enclosing scope req
   }
 
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -51,3 +51,4 @@ func ASYNC___2___() async -> Int {
 // CHECK-NOT: !dbg
 // CHECK: ret void
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

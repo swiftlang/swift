@@ -3,3 +3,4 @@
 
 // CHECK: main
 func main() {}
+// UNSUPPORTED: OS=windows-msvc

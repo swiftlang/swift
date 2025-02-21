@@ -308,3 +308,4 @@ extension StructDynamicMembers {
   @_dynamicReplacement(for: dynamicStaticMethod())
   public static func staticMethodReplacement() {}
 }
+// UNSUPPORTED: OS=windows-msvc

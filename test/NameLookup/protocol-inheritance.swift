@@ -3,3 +3,4 @@
 func kitty<Purrs>(cat: Meow<Purrs>) {
   cat.pet()
 }
+// UNSUPPORTED: OS=windows-msvc

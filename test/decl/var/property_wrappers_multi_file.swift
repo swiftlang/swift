@@ -8,3 +8,4 @@ final class Subclass: BaseClass {
     $value = 42
   }
 }
+// UNSUPPORTED: OS=windows-msvc

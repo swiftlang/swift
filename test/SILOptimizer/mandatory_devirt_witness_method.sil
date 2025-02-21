@@ -57,3 +57,4 @@ sil_witness_table private S: P module test {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

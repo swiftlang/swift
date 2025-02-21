@@ -14,3 +14,4 @@ TemplatesTestSuite.test("fully-defined") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

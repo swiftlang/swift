@@ -63,3 +63,4 @@ let generic3 = Foo.Generic<Bar.Generic2<Foo.Generic<Bar.Two>>>(t: generic2)
 
 // DEMANGLE-TYPE: $s3Bar7GenericCyAA8Generic2CyACyAA3TwoCGGGD
 // CHECK-TYPE: Foo.Generic<Bar.Generic2<Foo.Generic<Bar.Two>>>
+// UNSUPPORTED: OS=windows-msvc

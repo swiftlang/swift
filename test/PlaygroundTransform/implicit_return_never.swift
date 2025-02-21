@@ -21,3 +21,4 @@ func f() -> Int {
 }
 
 f()
+// UNSUPPORTED: OS=windows-msvc

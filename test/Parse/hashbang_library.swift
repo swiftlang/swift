@@ -4,3 +4,4 @@ class Foo {}
 // when compiling in library mode.
 // RUN: %target-typecheck-verify-swift -parse-as-library
 
+// UNSUPPORTED: OS=windows-msvc

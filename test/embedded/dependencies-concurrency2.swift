@@ -71,3 +71,4 @@ struct Main {
     await t.value
   }
 }
+// UNSUPPORTED: OS=windows-msvc

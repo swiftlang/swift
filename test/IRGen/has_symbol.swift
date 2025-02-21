@@ -258,3 +258,4 @@ public func testMetatypes() {
 // CHECK:   [[V1:%.*]] = icmp ne ptr @"$s17has_symbol_helper7GenericVMa", null
 // CHECK:   [[RES:%.*]] = and i1 [[V0]], [[V1]]
 // CHECK:   ret i1 [[RES]]
+// UNSUPPORTED: OS=windows-msvc

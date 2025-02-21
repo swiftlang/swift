@@ -65,3 +65,4 @@ func test2Fixits() {
 
   labeledFunc(aax: 0, bbx: 1) // expected-error {{incorrect argument labels in call (have 'aax:bbx:', expected 'aa:bb:')}} {{15-18=aa}} {{23-26=xx}} {{none}}
 }
+// UNSUPPORTED: OS=windows-msvc

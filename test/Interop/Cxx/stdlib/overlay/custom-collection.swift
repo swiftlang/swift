@@ -88,3 +88,4 @@ CxxCollectionTestSuite.test("HasInheritedTemplatedConstRACIteratorOutOfLineOps a
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

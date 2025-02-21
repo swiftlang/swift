@@ -3,3 +3,4 @@
 // RUN: %sourcekitd-test -req=doc-info -module cake -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import -I %t.mod > %t.response
 // RUN: %diff -u %s.response %t.response
 
+// UNSUPPORTED: OS=windows-msvc

@@ -43,3 +43,4 @@
 // RUN: not %swiftc_driver -driver-print-actions -typecheck %t/empty.o 2>&1 | %FileCheck -check-prefix=ERROR %s
 // RUN: not %swiftc_driver -driver-print-actions -typecheck %t/empty.h 2>&1 | %FileCheck -check-prefix=ERROR %s
 // RUN: %swiftc_driver -driver-print-actions %t/empty.swift 2>&1 | %FileCheck -check-prefix=COMPILE %s
+// UNSUPPORTED: OS=windows-msvc

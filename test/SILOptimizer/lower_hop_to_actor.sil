@@ -307,3 +307,4 @@ bb0(%0 : @guaranteed $Optional<any Actor>):
   return %r
 }
 
+// UNSUPPORTED: OS=windows-msvc

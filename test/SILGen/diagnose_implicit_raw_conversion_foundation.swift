@@ -34,3 +34,4 @@ func test_explicit(darg: Data) {
         write_uchar($0.baseAddress!)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

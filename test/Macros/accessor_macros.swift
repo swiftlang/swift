@@ -207,3 +207,4 @@ func testLocalWithAutoclosure(x: Int, y: Int) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

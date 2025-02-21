@@ -22,3 +22,4 @@
 
 // SHOW: func coverage
 // REPORT: coverage_relative_path.swift
+// UNSUPPORTED: OS=windows-msvc

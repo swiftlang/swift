@@ -11,3 +11,4 @@
 
 private extension String {
   private extension String
+// UNSUPPORTED: OS=windows-msvc

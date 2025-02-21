@@ -22,3 +22,4 @@ class NonThrowingInitClass: ThrowingInitSuperclass {
 class RethrowingInitClass: ThrowingInitSuperclass {
   init(throwingArgument: () throws -> Void) rethrows { } // expected-error {{missing call to superclass's initializer; 'super.init' is a throwing initializer and requires either an explicit call or that this initializer is also marked as 'throws'}}
 }
+// UNSUPPORTED: OS=windows-msvc

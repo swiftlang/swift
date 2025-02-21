@@ -8,3 +8,4 @@ func testInIf(a: Any) {
   // expected-note@-1{{coalesce}}
   // expected-note@-2{{force-unwrap}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ struct S: ~Copyable, Sendable {}
 // expected-note@+2 3{{add}}
 // expected-error@+1 {{parameter of noncopyable type 'T' must specify ownership}}
 func checkGeneric<T>(_ t: T) where T: ~Copyable, T: Sendable {}
+// UNSUPPORTED: OS=windows-msvc

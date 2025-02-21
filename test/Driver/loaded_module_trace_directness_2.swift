@@ -183,3 +183,4 @@ public class MemoryMapEntry {
 // TESTMEMORY-NOT: MemoryKit
 // TESTMEMORY-DAG: {"name":"CoreMemory","path":"{{[^"]*}}CoreMemory.swiftmodule","isImportedDirectly":true,
 // TESTMEMORY: ]
+// UNSUPPORTED: OS=windows-msvc

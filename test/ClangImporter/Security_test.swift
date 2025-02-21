@@ -29,3 +29,4 @@ func testAuthorizationIsNotCF() {
   _ = AuthorizationCreate(&auth)
   _ = AuthorizationFree(auth)
 }
+// UNSUPPORTED: OS=windows-msvc

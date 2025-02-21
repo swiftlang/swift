@@ -16,3 +16,4 @@ func bar() -> String {
   // CHECK-DIRECTIVE: [[# @LINE-1]]:10-[[# @LINE-1]]:10
 }
 #sourceLocation()
+// UNSUPPORTED: OS=windows-msvc

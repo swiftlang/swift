@@ -135,3 +135,4 @@ extension ExtendedInternal {
 
 // SAFETY-PRIVATE: Serialization safety, unsafe: 'privateMemberToInternal()'
 // SAFETY-PRIVATE: Serialization safety, unsafe: 'fileprivateMemberToInternal()'
+// UNSUPPORTED: OS=windows-msvc

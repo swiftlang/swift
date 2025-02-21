@@ -42,3 +42,4 @@ struct B: Differentiable {
     }
 
 }
+// UNSUPPORTED: OS=windows-msvc

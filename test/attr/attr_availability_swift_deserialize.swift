@@ -13,3 +13,4 @@ let _ = fiveOnly()
 // FOUR: 'fourOnly()' is unavailable
 // FOUR: 'fourOnly()' was obsoleted in Swift 5.0
 let _ = fourOnly()
+// UNSUPPORTED: OS=windows-msvc

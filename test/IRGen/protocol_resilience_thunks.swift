@@ -99,3 +99,4 @@ public protocol MyResilientProtocol {
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: [[RESULT:%.*]] = call swiftcc { ptr, ptr } [[WITNESS]](ptr noalias dereferenceable({{16|32}}) %0, ptr swiftself %1, ptr %2, ptr %3)
 // CHECK-NEXT: ret { ptr, ptr } [[RESULT]]
+// UNSUPPORTED: OS=windows-msvc

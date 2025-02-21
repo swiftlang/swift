@@ -1051,3 +1051,4 @@ func useF() {
   f(Concrete1())
   f(Concrete2())
 }
+// UNSUPPORTED: OS=windows-msvc

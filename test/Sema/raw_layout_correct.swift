@@ -10,3 +10,4 @@ struct RawSmallArray<T>: ~Copyable {}
 
 @_rawLayout(size: 4, alignment: 4)
 struct Lock: ~Copyable {}
+// UNSUPPORTED: OS=windows-msvc

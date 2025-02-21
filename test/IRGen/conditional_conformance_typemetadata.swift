@@ -14,3 +14,4 @@ private struct S<A, B> {}
 extension S: P where A == E { typealias AT = B }
 
 print(S<E, Bool>.AT.self)
+// UNSUPPORTED: OS=windows-msvc

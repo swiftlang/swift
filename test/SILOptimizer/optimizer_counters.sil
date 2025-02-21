@@ -100,3 +100,4 @@ sil @another_simple_func : $@convention(thin) () -> Builtin.Int64 {
 // CHECK-SIL-STATS-ONLY-FUNCTIONS-NOT: function_history, inst,{{.*}}, another_simple_func
 
 
+// UNSUPPORTED: OS=windows-msvc

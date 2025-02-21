@@ -24,3 +24,4 @@ func test() {
 }
 
 // CHECK: std-{{.*}}.pcm
+// UNSUPPORTED: OS=windows-msvc

@@ -37,3 +37,4 @@ import MyModuleC
 a()
 b()
 c()
+// UNSUPPORTED: OS=windows-msvc

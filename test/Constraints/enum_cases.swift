@@ -197,3 +197,4 @@ func isSouth(c : CompassPoint) -> Bool {
   return c == .South // expected-error {{binary operator '==' cannot be applied to two 'CompassPoint' operands}}
   // expected-note@-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
 }
+// UNSUPPORTED: OS=windows-msvc

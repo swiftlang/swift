@@ -63,3 +63,4 @@ struct IVarTest {
   @_semantics("localLet2")
   let localLetWithSemantics : Int = 5
 }
+// UNSUPPORTED: OS=windows-msvc

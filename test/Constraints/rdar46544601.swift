@@ -29,3 +29,4 @@ func crash(_ p: P, payload: [UInt8]) throws {
     p.bar(root: parentID, from: p).and(result: args1)
   }.whenFailure { _ in }
 }
+// UNSUPPORTED: OS=windows-msvc

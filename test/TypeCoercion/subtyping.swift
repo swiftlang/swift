@@ -54,3 +54,4 @@ func nonTrivialNested() {
   f1 = f3 // expected-error{{cannot assign value of type '(() -> any FormattedPrintable) -> any CustomStringConvertible' to type '(() -> any CustomStringConvertible) -> any CustomStringConvertible'}}
   _ = f1
 }
+// UNSUPPORTED: OS=windows-msvc

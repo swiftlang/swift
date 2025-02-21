@@ -579,3 +579,4 @@ do {
     func doubleCheckKind(@Binding a: Value.Kind, @Binding b: Value.Kind) {}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

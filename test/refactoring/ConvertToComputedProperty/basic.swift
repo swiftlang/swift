@@ -45,3 +45,4 @@ class C {
 
 // RUN: %refactor -convert-to-computed-property -source-filename %s -pos=14:3 -end-pos=14:17 > %t.result/L14-3.swift
 // RUN: diff -u %S/Outputs/basic/L14-3.swift.expected %t.result/L14-3.swift
+// UNSUPPORTED: OS=windows-msvc

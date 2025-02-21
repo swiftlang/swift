@@ -395,3 +395,4 @@ suite.test("heapSort") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

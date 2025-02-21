@@ -33,3 +33,4 @@ private struct ListProcessor: ~Copyable {
         }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

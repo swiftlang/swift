@@ -33,3 +33,4 @@ func variadic() {
   takesVariadicIntInt({_ = $0; takesIntArray($1)})
   takesVariadicIntInt({_ = $0; let _: [Int] = $1})
 }
+// UNSUPPORTED: OS=windows-msvc

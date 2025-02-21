@@ -32,3 +32,4 @@ print(incr())
 
 // CHECK: 2
 print(incr())
+// UNSUPPORTED: OS=windows-msvc

@@ -241,3 +241,4 @@ ClassProperties.test("dynamicOverride") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

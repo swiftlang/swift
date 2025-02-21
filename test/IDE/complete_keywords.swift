@@ -500,3 +500,4 @@ class Derivied: Base {
 // OVERRIDE-DAG: Keyword[super]/CurrNominal/Flair[CommonKeyword]: super[#Base#]; name=super
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ _ = #/x/#
 
 @available(SwiftStdlib 5.7, *)
 func foo(_ x: Regex<Substring>) {}
+// UNSUPPORTED: OS=windows-msvc

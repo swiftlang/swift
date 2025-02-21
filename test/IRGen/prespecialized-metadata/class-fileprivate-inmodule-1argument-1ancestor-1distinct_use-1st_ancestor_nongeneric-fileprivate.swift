@@ -109,3 +109,4 @@ doit()
 
 //              CHECK: define internal swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]LLCMa"
 
+// UNSUPPORTED: OS=windows-msvc

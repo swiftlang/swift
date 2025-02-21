@@ -5,3 +5,4 @@
 func test(_ a: [Int], _ f: ((Int) -> Bool)?) {
   _ = a.filter(f!)
 }
+// UNSUPPORTED: OS=windows-msvc

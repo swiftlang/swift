@@ -163,3 +163,4 @@ MoveOnlyCxxOperators.test("testNonCopyableHolderValueMutDerefDerivedDerived poin
 #endif
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

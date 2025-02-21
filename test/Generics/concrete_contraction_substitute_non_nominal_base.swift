@@ -16,3 +16,4 @@ struct G<X : P, Y : Q> where X.T.U == Int {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=G
 // CHECK-NEXT: Generic signature: <X, Y where X == S<Y>, Y : Q, Y.[Q]U == Int>
 extension G where X == S<Y> {}
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@
 
 //--- extended.swift
 #/\(/#
+// UNSUPPORTED: OS=windows-msvc

@@ -591,3 +591,4 @@ public actor MyActorIsolatedParameterMerge {
 class ClassWithIsolatedAsyncInitializer {
     init(isolation: isolated (any Actor)? = #isolation) async {}
 }
+// UNSUPPORTED: OS=windows-msvc

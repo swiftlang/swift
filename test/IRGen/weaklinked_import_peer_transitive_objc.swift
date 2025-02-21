@@ -18,3 +18,4 @@ import Foundation
 
 // CHECK-DAG: @"OBJC_CLASS_$_NSNotification" = external global %objc_class
 _ = NSNotification()
+// UNSUPPORTED: OS=windows-msvc

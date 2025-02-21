@@ -33,3 +33,4 @@ foo.tellMe()
 
 
 print("Hello")
+// UNSUPPORTED: OS=windows-msvc

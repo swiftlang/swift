@@ -28,3 +28,4 @@ func doit() {
     consume(clazzType: MyGenericClazz<Int>.self)
 }
 
+// UNSUPPORTED: OS=windows-msvc

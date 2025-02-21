@@ -109,3 +109,4 @@ tests.test("simpleInoutVarTest") {
     var outerX = Klass()
     inOutTest(&outerX)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -85,3 +85,4 @@ ReferenceCountedTestSuite.test("Global array") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

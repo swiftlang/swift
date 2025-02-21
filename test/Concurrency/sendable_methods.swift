@@ -331,4 +331,4 @@ do {
 
     static func ff() {}
   }
-}
+}// UNSUPPORTED: OS=windows-msvc

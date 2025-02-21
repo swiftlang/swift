@@ -20,3 +20,4 @@ func goo<T>(_ f: Foo<T>) {
 protocol Bar {
 	var count: Int {get set}
 }
+// UNSUPPORTED: OS=windows-msvc

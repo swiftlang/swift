@@ -59,3 +59,4 @@ distributed actor GreeterImpl: GreeterDefinedSystemProtocol {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

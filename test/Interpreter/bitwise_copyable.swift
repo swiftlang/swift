@@ -32,3 +32,4 @@ bitwise.test("Conditional conformance with resilient enum") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

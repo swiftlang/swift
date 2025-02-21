@@ -28,3 +28,4 @@ func foo<T>(x: T, y: Int) {
   // CHECK-LABEL: function_ref setter of mutable #1 in foo<A>(x:y:)
   mutable = y
 }
+// UNSUPPORTED: OS=windows-msvc

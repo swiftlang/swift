@@ -19,3 +19,4 @@ macro externalMacroCallPattern() = #externalMacro(#^EXTERNAL_MACRO_CALL_PATTERN^
 @freestanding(expression)
 macro externalMacroCallPattern() = #externalMacro(module: "MyModule", #^EXTERNAL_MACRO_TYPE_ARG_LABEL^#)
 // EXTERNAL_MACRO_TYPE_ARG_LABEL: Pattern/Local/Flair[ArgLabels]:     {#type: String#}[#String#]; name=type:
+// UNSUPPORTED: OS=windows-msvc

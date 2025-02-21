@@ -52,3 +52,4 @@ public enum SingletonEnum {
 // CHECK: define internal void @"$s14enum_singleton13SingletonEnumOwui"
 // CHECK:   ret void
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

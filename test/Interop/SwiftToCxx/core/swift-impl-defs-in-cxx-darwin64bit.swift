@@ -73,3 +73,4 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace swift
 
+// UNSUPPORTED: OS=windows-msvc

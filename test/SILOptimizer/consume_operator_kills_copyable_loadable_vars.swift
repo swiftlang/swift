@@ -772,3 +772,4 @@ func inoutAndUseTest(_ x: Klass) {
     useValueAndInOut(&y, consume y) // expected-note {{used here}}
                                   // expected-note @-1 {{consumed here}}
 }
+// UNSUPPORTED: OS=windows-msvc

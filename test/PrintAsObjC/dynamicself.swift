@@ -35,3 +35,4 @@ import Foundation
   // CHECK: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 }
 // CHECK: @end
+// UNSUPPORTED: OS=windows-msvc

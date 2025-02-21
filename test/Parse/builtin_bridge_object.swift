@@ -10,3 +10,4 @@ var c: C
 let bo = Builtin.castToBridgeObject(c, word)
 c = Builtin.castReferenceFromBridgeObject(bo)
 word = Builtin.castBitPatternFromBridgeObject(bo)
+// UNSUPPORTED: OS=windows-msvc

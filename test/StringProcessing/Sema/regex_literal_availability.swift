@@ -13,3 +13,4 @@ if #available(SwiftStdlib 5.7, *) {
   _ = /x/
   _ = #/x/#
 }
+// UNSUPPORTED: OS=windows-msvc

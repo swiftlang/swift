@@ -72,3 +72,4 @@ public func unmovableClient() {
 
 entityClient()
 unmovableClient()
+// UNSUPPORTED: OS=windows-msvc

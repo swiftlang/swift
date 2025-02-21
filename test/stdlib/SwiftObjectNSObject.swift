@@ -278,3 +278,4 @@ if #available(OSX 10.12, iOS 10.0, *) {
   fakeEquatableWarning(E1(i:1))
   fakeEquatableWarning(E2(i:1))
 }
+// UNSUPPORTED: OS=windows-msvc

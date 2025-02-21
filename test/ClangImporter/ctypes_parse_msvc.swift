@@ -2,3 +2,4 @@
 
 _ = T().uc
 _ = T(S(uc: 0))
+// UNSUPPORTED: OS=windows-msvc

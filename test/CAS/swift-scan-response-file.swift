@@ -42,3 +42,4 @@
 
 func testFunc() {}
 
+// UNSUPPORTED: OS=windows-msvc

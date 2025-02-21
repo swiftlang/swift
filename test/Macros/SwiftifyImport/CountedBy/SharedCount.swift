@@ -18,3 +18,4 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ ptr2: UnsafePointer<CInt>, _ len: CInt
 // CHECK-NEXT:     }
 // CHECK-NEXT:     return myFunc(ptr.baseAddress!, ptr2.baseAddress!, len)
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

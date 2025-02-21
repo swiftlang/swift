@@ -5,3 +5,4 @@
 // RUN: %swift_driver_plain --driver-mode=swiftc -O -target aarch64-unknown-linux-android21 -c %s -I %t
 // UNSUPPORTED: VENDOR=apple
 
+// UNSUPPORTED: OS=windows-msvc

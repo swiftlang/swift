@@ -14,3 +14,4 @@ struct S2 {
   @_implements(NeedsF0) // expected-error {{expected ',' in '_implements' attribute}}
   func f() { }
 }
+// UNSUPPORTED: OS=windows-msvc

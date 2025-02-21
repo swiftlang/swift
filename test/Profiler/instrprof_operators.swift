@@ -19,3 +19,4 @@ func operators(a : Bool, b : Bool) {
 // CHECK: implicit closure
 // CHECK: increment_profiler_counter 0, "{{.*}}:$s19instrprof_operators0B01a1bySb_SbtFSbyKXEfu0_", num_counters 1, hash
 // CHECK-NOT: increment_profiler_counter
+// UNSUPPORTED: OS=windows-msvc

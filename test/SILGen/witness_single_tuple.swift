@@ -8,3 +8,4 @@ protocol Runcible {
 struct Foo: Runcible {
   func runce(x: Int = 0) {}
 }
+// UNSUPPORTED: OS=windows-msvc

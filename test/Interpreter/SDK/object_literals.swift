@@ -34,3 +34,4 @@ LiteralsTestSuite.test("color") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

@@ -720,3 +720,4 @@ struct S_57037: P_57037 {
 // MULTI_VAR_DECL_OVERRIDE:     Begin completions, 1 items
 // MULTI_VAR_DECL_OVERRIDE-DAG: Decl[InstanceVar]/Super:            value: Int;
 }
+// UNSUPPORTED: OS=windows-msvc

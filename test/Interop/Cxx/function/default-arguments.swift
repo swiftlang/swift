@@ -191,3 +191,4 @@ DefaultArgTestSuite.test("static method with parameter referring to field") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

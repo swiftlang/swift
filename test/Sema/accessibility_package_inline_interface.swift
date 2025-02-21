@@ -143,3 +143,4 @@ package func packageFunc() {
   InternalKlassForInline().bar1()
   print(a, b)
 }
+// UNSUPPORTED: OS=windows-msvc

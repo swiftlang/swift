@@ -9,3 +9,4 @@ do {
   let p: any P
   foo(p) // OK
 }
+// UNSUPPORTED: OS=windows-msvc

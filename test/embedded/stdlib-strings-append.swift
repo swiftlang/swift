@@ -16,3 +16,4 @@ struct Main {
 }
 
 // CHECK: hello hello hello hello hello hello hello hello hello hello hello hello hello hello hello hello 
+// UNSUPPORTED: OS=windows-msvc

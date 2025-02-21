@@ -10,3 +10,4 @@ import VerySmallObjCFramework
 
 // CHECK: 42
 print(globalValue)
+// UNSUPPORTED: OS=windows-msvc

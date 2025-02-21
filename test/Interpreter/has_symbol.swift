@@ -42,3 +42,4 @@ if #_hasSymbol(theAnswer) {
 } else {
   print("No answer")
 }
+// UNSUPPORTED: OS=windows-msvc

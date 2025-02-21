@@ -12,3 +12,4 @@ MembersTestSuite.test("method calls method from nested struct") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

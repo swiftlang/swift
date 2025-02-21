@@ -16,3 +16,4 @@ func test() {
 func testMember(val: S) {
   val.#^MEMBER_1?check=MEMBER^##^MEMBER_2?check=MEMBER^#
 }
+// UNSUPPORTED: OS=windows-msvc

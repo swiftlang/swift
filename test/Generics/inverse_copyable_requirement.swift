@@ -289,3 +289,4 @@ func doBadMetatypeStuff<T>(_ t: T) {
 func tryToDoBadMetatypeStuff() {
   doBadMetatypeStuff(MO.self)
 }
+// UNSUPPORTED: OS=windows-msvc

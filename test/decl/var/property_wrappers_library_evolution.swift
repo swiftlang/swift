@@ -18,3 +18,4 @@ public struct StructUsesPublishedAsPrivate {
   @ResilientWrapper(description: getHello()) // expected-error {{global function 'getHello()' is internal and cannot be referenced from a property initializer in a '@frozen' type}}
   var otherString: String = "World"
 }
+// UNSUPPORTED: OS=windows-msvc

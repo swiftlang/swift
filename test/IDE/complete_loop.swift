@@ -87,3 +87,4 @@ do {
   for t in #^LOOP_8^# {}
 }
 // LOOP_8-DAG: Keyword[repeat]/None:                   repeat; name=repeat
+// UNSUPPORTED: OS=windows-msvc

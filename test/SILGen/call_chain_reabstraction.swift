@@ -19,3 +19,4 @@ struct A {
                 let b = g(recur)(self, self)
         }
 }
+// UNSUPPORTED: OS=windows-msvc

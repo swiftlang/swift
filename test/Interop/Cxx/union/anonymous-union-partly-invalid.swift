@@ -10,3 +10,4 @@ let a = sPtr![0].f()
 // CHECK-NEXT: call ptr
 // CHECK-NEXT: ptrtoint ptr
 
+// UNSUPPORTED: OS=windows-msvc

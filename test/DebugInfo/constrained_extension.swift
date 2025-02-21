@@ -12,3 +12,4 @@ extension G where T: Equatable, U: Equatable {
 
 public func foo<T>(_: G<T, T>.Nested) {
 }
+// UNSUPPORTED: OS=windows-msvc

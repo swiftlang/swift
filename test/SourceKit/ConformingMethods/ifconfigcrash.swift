@@ -8,3 +8,4 @@ func test() {}
 
 // RUN: %sourcekitd-test -req=conformingmethods -pos=3:6 -repeat-request=2 %s -- %s
   
+// UNSUPPORTED: OS=windows-msvc

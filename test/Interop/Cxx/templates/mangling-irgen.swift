@@ -18,3 +18,4 @@ public func returnInstantiation() -> WrappedMagicInt {
 // Don't forget to update manglings.txt when changing s4main19returnInstantiationSo34__CxxTemplateInst12MagicWrapperIiEVyF
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main19returnInstantiationSo0024MagicWrapperCInt_npAIefbVyF"()
 
+// UNSUPPORTED: OS=windows-msvc

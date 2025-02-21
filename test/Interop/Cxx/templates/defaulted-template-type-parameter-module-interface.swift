@@ -24,3 +24,4 @@
 // CHECK: func defaultedTemplatePointerTypeParam<T>(_ t: UnsafeMutablePointer<T>)
 // We don't support references to dependent types (rdar://89034440).
 // CHECK-NOT: defaultedTemplatePointerReferenceTypeParam
+// UNSUPPORTED: OS=windows-msvc

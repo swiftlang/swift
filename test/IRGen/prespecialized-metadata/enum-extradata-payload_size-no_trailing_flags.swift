@@ -86,3 +86,4 @@ public enum Either<T> {
   case second(Second)
 }
 
+// UNSUPPORTED: OS=windows-msvc

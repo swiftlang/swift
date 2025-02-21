@@ -28,3 +28,4 @@
   // Implicitly synthesized `override init()`:
   // CHECK: constructor/Swift | init() | c:@CM@ObjcImpl@@objc(cs)ObjCClass(im)init | Def
 }
+// UNSUPPORTED: OS=windows-msvc

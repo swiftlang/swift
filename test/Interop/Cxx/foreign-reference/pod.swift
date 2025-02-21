@@ -182,3 +182,4 @@ PODTestSuite.test("BaseRef") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

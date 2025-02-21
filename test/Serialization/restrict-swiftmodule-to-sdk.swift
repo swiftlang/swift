@@ -54,3 +54,4 @@ public func foo() {}
 // BEGIN Client.swift
 import Lib
 foo()
+// UNSUPPORTED: OS=windows-msvc

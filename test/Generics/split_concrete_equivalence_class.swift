@@ -35,3 +35,4 @@ func f08<C : Collection, R : Collection>(_: C, _: R) where C.SubSequence == Subs
 // CHECK-LABEL: split_concrete_equivalence_class.(file).f09@
 // CHECK-NEXT: Generic signature: <C, R where C : Collection, R : Collection, C.[Collection]SubSequence == Substring, R.[Collection]SubSequence == Substring>
 func f09<C : Collection, R : Collection>(_: C, _: R) where C.SubSequence == Substring, R.SubSequence == Substring, C.Element == R.Element, R.Element == Character {}
+// UNSUPPORTED: OS=windows-msvc

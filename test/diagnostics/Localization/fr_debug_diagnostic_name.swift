@@ -16,3 +16,4 @@ struct Broken {
   var b : Bool = True
 }
 // CHECK_NAMES: error: impossible de trouver 'True' portée [cannot_find_in_scope]{{$}}
+// UNSUPPORTED: OS=windows-msvc

@@ -61,3 +61,4 @@ func testAsFunc(_ someA: A) -> Int {
   let fn: (A) -> Int = \A.b.c.d // expected-error {{key path cannot refer to noncopyable type 'B'}}
   return fn(someA)
 }
+// UNSUPPORTED: OS=windows-msvc

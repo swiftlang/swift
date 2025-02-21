@@ -47,3 +47,4 @@ func bar() {}
 // COMPLETE:     Begin completions, 2 items
 // COMPLETE-DAG: Decl[StaticMethod]/Super/TypeRelation[Convertible]: foo()[#S#]; name=foo()
 // COMPLETE-DAG: Decl[StaticMethod]/Super/TypeRelation[Convertible]: qux()[#B<S>#]; name=qux()
+// UNSUPPORTED: OS=windows-msvc

@@ -37,3 +37,4 @@ public func testFunction() -> String {
 // CHECK-NOT: namespace swift {
 
 // INTERFACE-NOT: enum swift
+// UNSUPPORTED: OS=windows-msvc

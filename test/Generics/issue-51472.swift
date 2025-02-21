@@ -56,3 +56,4 @@ public struct Message {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

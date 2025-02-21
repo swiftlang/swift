@@ -8,3 +8,4 @@ func foo(x: String) {
 // CHECK-NEXT: 3:13 - 6
 // CHECK-NEXT: 4:10 - 6
 // CHECK-NEXT: END RANGES
+// UNSUPPORTED: OS=windows-msvc

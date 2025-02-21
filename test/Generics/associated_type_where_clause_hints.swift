@@ -69,3 +69,4 @@ protocol P3b: P3a where A: P0 {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

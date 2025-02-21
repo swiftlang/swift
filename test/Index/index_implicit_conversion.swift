@@ -9,3 +9,4 @@ public struct S {
 let s = S { }
 // CHECK: [[@LINE-1]]:9 | struct/Swift | S | s:14swift_ide_test1SV | Ref,RelCont
 // CHECK: [[@LINE-2]]:9 | constructor/Swift | init(_:) | s:14swift_ide_test1SVyACyyccfc | Ref,Call,RelCont
+// UNSUPPORTED: OS=windows-msvc

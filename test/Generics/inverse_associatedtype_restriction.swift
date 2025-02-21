@@ -39,3 +39,4 @@ protocol Q {
 protocol R where Self.A: ~Copyable { // expected-error {{cannot suppress 'Copyable' requirement of an associated type}}
   associatedtype A
 }
+// UNSUPPORTED: OS=windows-msvc

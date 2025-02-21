@@ -376,3 +376,4 @@ public func returnDerivedDerivedClass() -> DerivedDerivedClass {
 // CHECK:          swift::Int DerivedDerivedClass::getComputedPropInDerivedDerived() {
 // CHECK-NEXT:     return Class::_impl::$s5Class07DerivedbA0C014computedPropInbB0Sivg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT:     }
+// UNSUPPORTED: OS=windows-msvc

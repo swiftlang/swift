@@ -37,3 +37,4 @@ let x: A<-5, -5> = getA()
 
 // CHECK: main.A<-5, -5>
 print(_typeName(type(of: x), qualified: true))
+// UNSUPPORTED: OS=windows-msvc

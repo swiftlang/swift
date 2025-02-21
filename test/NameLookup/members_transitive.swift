@@ -101,3 +101,4 @@ func testDerivedMethodAccess() {
   DerivedClassInC().methodInB() // expected-member-visibility-error{{instance method 'methodInB()' is not available due to missing import of defining module 'members_B'}}
   DerivedFromClassInC().methodInB()
 }
+// UNSUPPORTED: OS=windows-msvc

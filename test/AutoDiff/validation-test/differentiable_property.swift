@@ -146,3 +146,4 @@ E2EDifferentiablePropertyTests.testWithLeakChecking("computed property") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

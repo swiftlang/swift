@@ -18,3 +18,4 @@ public func bar() {
   // SWIFT_PRE_52: @"$s39access_type_metadata_by_mangled_name_513fooQryFQOyQo_1AAA1PPQxMa"(
   useMetadata(foo().a)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@ func useWrappers(hd: HasWrappers) {
 
   mutableHD._x = SomeWrapper(wrappedValue: 42) // expected-error{{'_x' is inaccessible due to 'private' protection level}}
 }
+// UNSUPPORTED: OS=windows-msvc

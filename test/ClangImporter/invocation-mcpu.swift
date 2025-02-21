@@ -5,3 +5,4 @@
 
 // RUN: %swift %s -typecheck -parse-stdlib -dump-clang-diagnostics -target arm64-apple-ios13.0 2>&1 | %FileCheck -check-prefix=CHECK-APPLE-A7 %s
 // CHECK-APPLE-A7: '-mcpu=apple-a7'
+// UNSUPPORTED: OS=windows-msvc

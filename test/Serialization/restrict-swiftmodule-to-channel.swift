@@ -97,3 +97,4 @@ foo()
 // RUN:   %target-swift-frontend -typecheck %t/ChannelClient.swift \
 // RUN:   -swift-version 5 -I %t/build -parse-stdlib -module-cache-path %t/cache \
 // RUN:   -verify -verify-ignore-unknown -verify-additional-prefix reject-
+// UNSUPPORTED: OS=windows-msvc

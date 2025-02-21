@@ -57,3 +57,4 @@ unsupported_return_type()
 // CHECK-NEXT: cfuncs.h:{{[0-9]+}}:1: note: built-in type 'Complex' not supported
 // CHECK-NEXT:      _Complex int unsupported_return_type();
 // CHECK-NEXT: {{^}}^
+// UNSUPPORTED: OS=windows-msvc

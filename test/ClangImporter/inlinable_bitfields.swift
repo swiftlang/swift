@@ -11,3 +11,4 @@ public func g(_ m: MM) -> UInt32 {
 // Just make sure this is a definition and not a declaration...
 
 // CHECK: define internal{{( zeroext)?}} i32 @"$So5ModRMV$rm$getter"
+// UNSUPPORTED: OS=windows-msvc

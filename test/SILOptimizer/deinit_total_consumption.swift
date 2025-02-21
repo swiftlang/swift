@@ -102,3 +102,4 @@ struct T5: ~Copyable {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

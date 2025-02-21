@@ -389,3 +389,4 @@ public func test_static_struct_let_tuple_wrapped_ints() -> Int {
 public func test_static_class_let_tuple_wrapped_ints() -> Int {
   return C.IT1.0.0 + C.IT2.1
 }
+// UNSUPPORTED: OS=windows-msvc

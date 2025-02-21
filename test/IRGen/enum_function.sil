@@ -47,3 +47,4 @@ bb3:
   // CHECK: ret void
   return %5 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

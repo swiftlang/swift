@@ -21,3 +21,4 @@ import Foundation
 func indexedSubscripting(b b: B, idx: Int, a: A) {
   var a2 = b[idx] as! A
 }
+// UNSUPPORTED: OS=windows-msvc

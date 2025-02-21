@@ -51,3 +51,4 @@ extension Hello: MySequence, MyIteratorProtocol {
     return nil
   }
 }
+// UNSUPPORTED: OS=windows-msvc

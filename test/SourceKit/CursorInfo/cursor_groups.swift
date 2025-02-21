@@ -83,3 +83,4 @@ func test(f: FooStruct) {
   // CHECK-BARINTEXT: s:3Foo0A5ProtoP3BarSi1TRtzrlE9barIntExtyyF
   // CHECK-BARINTEXT-NOT: <Group>TestGroup</Group>
 }
+// UNSUPPORTED: OS=windows-msvc

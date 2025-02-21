@@ -6,3 +6,4 @@ public func foo() {}
 
 // CHECK: '-fmodules-validate-once-per-build-session'
 // CHECK: '-fbuild-session-file=
+// UNSUPPORTED: OS=windows-msvc

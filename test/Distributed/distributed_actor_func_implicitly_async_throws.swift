@@ -96,3 +96,4 @@ func test_outside(distributed: D) async throws {
   _ = distributed.actorSystem // ok
 }
 
+// UNSUPPORTED: OS=windows-msvc

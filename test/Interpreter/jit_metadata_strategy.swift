@@ -42,3 +42,4 @@ class ClassNeedingUpdate {
 blackHole(FixedSizeClass())
 blackHole(ClassWithGenericSuperclass())
 blackHole(ClassNeedingUpdate())
+// UNSUPPORTED: OS=windows-msvc

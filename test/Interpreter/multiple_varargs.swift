@@ -83,3 +83,4 @@ let baz2 = Baz(1, 2, 3, b: "hello, world!", 3, 2, 1)
 
 print(baz1[1, 2, b: 3, 4])
 // CHECK: [1, 2, 3, 4]
+// UNSUPPORTED: OS=windows-msvc

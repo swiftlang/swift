@@ -17,3 +17,4 @@ let _ = foo(x: 100)
 //CHECK: {{.*br.*}} loc "{{.*}}def_source_loc.swift":7:5
 //CHECK: {{.*struct \$UInt64.*}} loc "{{.*}}def_source_loc.swift":7:12
 //CHECK: {{.*return.*}} loc "{{.*}}def_source_loc.swift":8:2
+// UNSUPPORTED: OS=windows-msvc

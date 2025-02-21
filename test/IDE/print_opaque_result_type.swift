@@ -10,3 +10,4 @@ public func foo() -> some Base & Proto {
   class Derived: Base, Proto {}
   return Derived()
 }
+// UNSUPPORTED: OS=windows-msvc

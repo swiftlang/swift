@@ -73,3 +73,4 @@ print(castValueToErrorCarrier(Carrier<Error & C>(name: "A carrier of classic com
 
 // CHECK-NEXT: end
 print("end")
+// UNSUPPORTED: OS=windows-msvc

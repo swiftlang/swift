@@ -18,3 +18,4 @@ struct TestNoErrorsAboutThrows {
     _ = columns.compactMap(Column.init) // Ok
   }
 }
+// UNSUPPORTED: OS=windows-msvc

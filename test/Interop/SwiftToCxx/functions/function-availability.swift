@@ -35,3 +35,4 @@ public func alwaysUnavailableMessage() {}
 // CHECK: SWIFT_INLINE_THUNK void singlePlatAvailability() noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_AVAILABILITY(macos,introduced=11)
 @available(macOS 11, *)
 public func singlePlatAvailability() {}
+// UNSUPPORTED: OS=windows-msvc

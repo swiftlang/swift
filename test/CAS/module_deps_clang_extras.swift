@@ -47,3 +47,4 @@ void dummy(void);
   "roots": []
 }
 
+// UNSUPPORTED: OS=windows-msvc

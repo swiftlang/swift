@@ -5,3 +5,4 @@
 
 let foo = CFunctionReturningAForwardDeclaredInterface()
 CFunctionTakingAForwardDeclaredInterface(foo)
+// UNSUPPORTED: OS=windows-msvc

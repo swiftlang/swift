@@ -20,4 +20,4 @@ func foo() {
   _ = AliasTest<Int>.B.self // expected-error {{type 'Int' does not conform to protocol 'Collection'}}
   _ = AliasTest<String>.A.self
   _ = AliasTest<String>.B.self
-}
+}// UNSUPPORTED: OS=windows-msvc

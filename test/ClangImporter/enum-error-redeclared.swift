@@ -15,3 +15,4 @@ _ = SomeError.Code.self
 
 _ = Redeclared.SomeError.self
 _ = Base.SomeError.self
+// UNSUPPORTED: OS=windows-msvc

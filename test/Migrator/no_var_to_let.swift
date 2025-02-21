@@ -13,3 +13,4 @@
 for var i in 0..<10 {
   _ = i + 1
 }
+// UNSUPPORTED: OS=windows-msvc

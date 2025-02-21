@@ -66,3 +66,4 @@ public class TestObject {
         case invalid
     }
 }
+// UNSUPPORTED: OS=windows-msvc

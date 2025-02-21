@@ -26,3 +26,4 @@
 // CHECK-MAC: D $ld$previous$/System/Previous/macOS/ToasterKit.dylib$$1$10.8$10.15$_$s10ToasterKit7VehicleVN$
 
 // CHECK-NOT: $_$s10ToasterKit7VehicleV32originallyDefinedInCurrentModuleyyF
+// UNSUPPORTED: OS=windows-msvc

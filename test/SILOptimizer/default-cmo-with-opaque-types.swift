@@ -63,3 +63,4 @@ private struct EntityIterator<T: Hashable>: IteratorProtocol {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

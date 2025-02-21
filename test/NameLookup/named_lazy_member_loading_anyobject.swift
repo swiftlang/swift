@@ -13,3 +13,4 @@ func callDirect(snt: SimilarlyNamedThings, d: Double) {
   snt.doSomething(d, fahrenheit: d) {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@
 import NamedLazyMembers
 
 func fn(_: SimpleDoer.Mode) {}
+// UNSUPPORTED: OS=windows-msvc

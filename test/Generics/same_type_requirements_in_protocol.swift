@@ -66,3 +66,4 @@ protocol S2 {
   associatedtype X : S1
   associatedtype Y: S2 where Y.X == X
 }
+// UNSUPPORTED: OS=windows-msvc

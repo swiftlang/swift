@@ -145,3 +145,4 @@ class ObjCTest {
 // HEADER-NO-PRIVATE:     case TETwo
 // HEADER-NO-PRIVATE:   }
 // HEADER-NO-PRIVATE: }
+// UNSUPPORTED: OS=windows-msvc

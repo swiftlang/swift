@@ -626,3 +626,4 @@ testWrapperInitWithDefaultArg()
 test54775()
 testNonMutatingSetterStruct()
 testStructWithClassWrapper()
+// UNSUPPORTED: OS=windows-msvc

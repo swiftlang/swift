@@ -7,3 +7,4 @@
 public func test(a: A) {
   a.foo()
 }
+// UNSUPPORTED: OS=windows-msvc

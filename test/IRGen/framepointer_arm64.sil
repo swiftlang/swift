@@ -69,3 +69,4 @@ entry(%i : $Int32):
 // CHECKASM-ALL: _leaf_function_no_frame_pointer
 // CHECKASM-ALL: ldp
 // CHECKASM-ALL: ret
+// UNSUPPORTED: OS=windows-msvc

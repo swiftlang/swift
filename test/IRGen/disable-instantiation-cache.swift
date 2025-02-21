@@ -31,3 +31,4 @@ public struct MyStruct<T>: MyProtocol {
 // CHECK-CACHE: @"$s4main8MyStructVMI" = internal global [{{.*}} x ptr] zeroinitializer
 // CHECK-CACHE: @"$s4main8MyStructVMn" = {{.*}} @"$s4main8MyStructVMI" {{.*}} 
 // CHECK-NOCACHE-NOT: @"$s4main8MyStructVMI"
+// UNSUPPORTED: OS=windows-msvc

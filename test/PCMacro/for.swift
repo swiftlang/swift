@@ -68,3 +68,4 @@ for i in 0..<3 {
 // check the file is finished
 // CHECK-NEXT: [57:1-57:2] pc before
 // CHECK-NEXT: [57:1-57:2] pc after
+// UNSUPPORTED: OS=windows-msvc

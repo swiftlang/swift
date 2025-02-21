@@ -118,3 +118,4 @@ func backdeployMacExplicit() {
   if #available(iOS 54.7.2, macOS 10.14.5, *) {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

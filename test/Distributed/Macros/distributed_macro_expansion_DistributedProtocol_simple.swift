@@ -45,3 +45,4 @@ public protocol GetSet: DistributedActor, Sendable
 
   var asyncGetSet: String { get async throws }
 }
+// UNSUPPORTED: OS=windows-msvc

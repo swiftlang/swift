@@ -124,3 +124,4 @@ import ForeignModule
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target aarch64--linux-android 2>&1 | %FileCheck -DNORM=aarch64--linux-android %s
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target amd64-ibm-linux40.04 2>&1 | %FileCheck -DNORM=amd64-ibm-linux40.04 %s
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target i986-snapple-haiku 2>&1 | %FileCheck -DNORM=i986-snapple-haiku %s
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@
 func foo() -> Int { return 0 }
 
 // CHECK-BC-NOT: UnknownCode
+// UNSUPPORTED: OS=windows-msvc

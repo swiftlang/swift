@@ -25,3 +25,4 @@ public var v: UnsafeMutablePointer<S1_t>? = nil
 
 // CHECK:  !DICompositeType(tag: DW_TAG_structure_type, {{.*}} identifier: "$eSpySo4S1_taGD"
 // CHECK:  !DICompositeType(tag: DW_TAG_structure_type, {{.*}} identifier: "$eSpySo2S2VGD"
+// UNSUPPORTED: OS=windows-msvc

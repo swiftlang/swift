@@ -13,3 +13,4 @@ class C {
 }
 
 // CHECK: true
+// UNSUPPORTED: OS=windows-msvc

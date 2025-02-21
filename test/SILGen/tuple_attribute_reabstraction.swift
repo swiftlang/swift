@@ -22,3 +22,4 @@ public func f() {
 // even though its materializable:
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSaySiGIegg_AAytIegnr_TR : $@convention(thin) (@in_guaranteed Array<Int>, @guaranteed @callee_guaranteed (@guaranteed Array<Int>) -> ()) -> @out ()
+// UNSUPPORTED: OS=windows-msvc

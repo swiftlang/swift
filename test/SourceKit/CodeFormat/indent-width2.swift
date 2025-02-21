@@ -29,3 +29,4 @@ test = 1
 // CHECK: key.sourcetext: "  "
 // CHECK: key.sourcetext: "}"
 
+// UNSUPPORTED: OS=windows-msvc

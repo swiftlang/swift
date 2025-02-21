@@ -40,3 +40,4 @@ protocol Queue: ~Copyable { associatedtype Job: ~Copyable }
 struct Scheduler<Q: Queue>: ~Copyable {}
 extension Scheduler: Copyable where Q.Job: Copyable {}
 // expected-error@-1 {{conditional conformance to suppressible protocol 'Copyable' cannot depend on 'Q.Job: Copyable'}}
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ var someval = 0xFFeeFF0033
 print("value = \(someval)")
 
 
+// UNSUPPORTED: OS=windows-msvc

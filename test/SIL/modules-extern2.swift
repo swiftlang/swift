@@ -24,3 +24,4 @@ func some_forward_declared_api()
 
 some_forward_declared_api()
 publicFuncInAModule()
+// UNSUPPORTED: OS=windows-msvc

@@ -63,3 +63,4 @@ test7()
 // CHECK: test7
 // CHECK-NEXT: 0
 // CHECK-NEXT: foo
+// UNSUPPORTED: OS=windows-msvc

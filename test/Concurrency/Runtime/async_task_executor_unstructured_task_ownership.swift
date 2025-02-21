@@ -93,3 +93,4 @@ nonisolated func nonisolatedFunc(expectedQueue queue: DispatchQueue) async {
     // CHECK: Done
   }
 }
+// UNSUPPORTED: OS=windows-msvc

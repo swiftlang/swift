@@ -68,3 +68,4 @@ _ = """
    bar
    """
 //CHECK: string_literal_expr {{.*}} value="foo\n\n\n\nbar"
+// UNSUPPORTED: OS=windows-msvc

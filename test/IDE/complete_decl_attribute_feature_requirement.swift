@@ -125,3 +125,4 @@ func dummy2() {}
 // KEYWORD_LAST_ENABLED-DAG:  Keyword/None:              abi[#Declaration Attribute#]; name=abi
 // KEYWORD_LAST_DISABLED-NOT: Keyword/None:              abi[#Declaration Attribute#]; name=abi
 // KEYWORD_LAST:              End completions
+// UNSUPPORTED: OS=windows-msvc

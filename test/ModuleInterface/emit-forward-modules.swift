@@ -24,3 +24,4 @@ import Foo
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Foo.swiftmodule/%target-swiftinterface-name -o %t/Foo-from-interface.swiftmodule -module-name Foo -candidate-module-file %t/Foo.swiftmodule/%target-swiftmodule-name
 
 // RUN: not %{python} %S/ModuleCache/Inputs/check-is-forwarding-module.py %t/Foo-from-interface.swiftmodule
+// UNSUPPORTED: OS=windows-msvc

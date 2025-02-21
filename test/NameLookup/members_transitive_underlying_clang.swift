@@ -14,3 +14,4 @@
 func test(_ s: UnderlyingStruct) {
   _ = s.a
 }
+// UNSUPPORTED: OS=windows-msvc

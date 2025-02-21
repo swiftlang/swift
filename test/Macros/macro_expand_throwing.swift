@@ -30,3 +30,4 @@ func testThrownErrors() {
   #myError("experimental features ahead") // expected-error{{experimental features ahead}}
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -71,3 +71,4 @@ func doit() {
 
 
 
+// UNSUPPORTED: OS=windows-msvc

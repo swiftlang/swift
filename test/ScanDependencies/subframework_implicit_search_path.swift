@@ -21,3 +21,4 @@ import SubE
 // CHECK: "mainModuleName": "deps"
 // CHECK: "swift": "E"
 // CHECK: "swift": "SubE"
+// UNSUPPORTED: OS=windows-msvc

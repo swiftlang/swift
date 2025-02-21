@@ -110,3 +110,4 @@ extension GenericSample1: SampleProtocol1 where T: SampleProtocol1 {}
 // expected-note@-2 {{add '@retroactive' to silence this warning}}
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ public func copy<T>(_ a: AnotherType<T>) -> AnotherType<T> {
   let copy = a
   return copy
 }
+// UNSUPPORTED: OS=windows-msvc

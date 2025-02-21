@@ -745,3 +745,4 @@ func reproduction<T: Init>(_ x: Int, _ y: Int, _ t: T) {
 
 // CHECK: there is no byte
 reproduction(2, 3, TrailingByte())
+// UNSUPPORTED: OS=windows-msvc

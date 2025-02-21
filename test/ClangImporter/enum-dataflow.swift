@@ -18,3 +18,4 @@ switch aliasOriginal { // expected-error {{switch must be exhaustive}}
 case .bySameValue:
   break
 }
+// UNSUPPORTED: OS=windows-msvc

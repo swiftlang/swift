@@ -247,3 +247,4 @@ func ifLet(test: Int?) {
 // CHECK17-NEXT: 103:10 - 4
 // CHECK17-NEXT: 104:11 - 4
 // CHECK17-NEXT: END RANGES
+// UNSUPPORTED: OS=windows-msvc

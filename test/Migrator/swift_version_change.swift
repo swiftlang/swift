@@ -3,3 +3,4 @@
 // RUN: %target-swift-frontend -typecheck -update-code -primary-file %s -emit-migrated-file-path %t/dummy.result -swift-version 5 %api_diff_data_dir
 
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

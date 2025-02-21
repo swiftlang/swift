@@ -18,3 +18,4 @@ class B : A {
     return "ok"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

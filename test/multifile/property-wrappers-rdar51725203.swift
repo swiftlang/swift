@@ -7,3 +7,4 @@ func test(sm: StructModel, cm: ClassModel) {
   _ = sm._bar // expected-error{{'_bar' is inaccessible due to 'private' protection level}}
   _ = cm._bar // expected-error{{'_bar' is inaccessible due to 'private' protection level}}
 }
+// UNSUPPORTED: OS=windows-msvc

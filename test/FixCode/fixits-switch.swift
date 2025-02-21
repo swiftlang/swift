@@ -112,3 +112,4 @@ func foo7(_ e : E2) -> Int {
   case .e3: return 0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

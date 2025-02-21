@@ -14,3 +14,4 @@
 // REQUIRES: objc_interop
 
 import SomeKitCore
+// UNSUPPORTED: OS=windows-msvc

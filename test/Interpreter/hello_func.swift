@@ -7,3 +7,4 @@ func hello() {
 }
 
 hello()
+// UNSUPPORTED: OS=windows-msvc

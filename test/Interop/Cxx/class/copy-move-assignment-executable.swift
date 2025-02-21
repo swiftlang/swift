@@ -56,3 +56,4 @@ CxxCopyMoveAssignTestSuite.test("NonTrivialCopyAndCopyMoveAssign") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -262,3 +262,4 @@ extension Greeting where SerializationRequirement == Codable {
 func isolated_generic_ok<T: DistributedActor>(_ t: isolated T) {}
 
 func isolated_existential_ok(_ t: isolated any DistributedActor) {}
+// UNSUPPORTED: OS=windows-msvc

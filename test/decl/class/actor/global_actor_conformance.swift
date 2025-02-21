@@ -73,3 +73,4 @@ extension OnMain {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

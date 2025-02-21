@@ -102,3 +102,4 @@ class ProvidesNewConvenienceInit: HasRequiredConvenienceInit {
 class ProvidesNewDesignatedInit: HasRequiredConvenienceInit {
   required init(conveniently: Int) { super.init() }
 }
+// UNSUPPORTED: OS=windows-msvc

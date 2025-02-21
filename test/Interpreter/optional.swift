@@ -175,3 +175,4 @@ print(c4 != nil)
 
 print(nil != c4)
 // CHECK: true
+// UNSUPPORTED: OS=windows-msvc

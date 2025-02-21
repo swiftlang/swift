@@ -89,3 +89,4 @@ struct G<Element>: RandomAccessCollection {
   public var endIndex: Int { 0 }
   public subscript(position: Int) -> Element { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

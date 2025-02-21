@@ -126,3 +126,4 @@ func objc_enum_method_calls(_ x: ObjCEnumMethods) {
 
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind memory(none) }
 
+// UNSUPPORTED: OS=windows-msvc

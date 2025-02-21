@@ -8,3 +8,4 @@
 // CHECK: pathComponents
 // CHECK-NEXT: "E"
 public enum E {}
+// UNSUPPORTED: OS=windows-msvc

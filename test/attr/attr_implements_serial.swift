@@ -33,3 +33,4 @@ public func client() {
   precondition(comparedAsFauxtsCount == 3)
   // CHECK: compared as Fauxts
 }
+// UNSUPPORTED: OS=windows-msvc

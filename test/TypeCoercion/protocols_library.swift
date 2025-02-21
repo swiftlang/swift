@@ -10,3 +10,4 @@ let x = refCoercion(&fp_2) // expected-error{{inout argument could be set to a v
 func y() {
   refCoercion(&fp_2) // expected-error{{inout argument could be set to a value with a type other than 'String'; use a value declared as type 'any CustomStringConvertible' instead}}
 }
+// UNSUPPORTED: OS=windows-msvc

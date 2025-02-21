@@ -29,3 +29,4 @@ func unsafePointerInitEphemeralConversions() {
   // expected-note@-1 {{implicit argument conversion from 'C?' to 'UnsafeMutablePointer<C?>' produces a pointer valid only for the duration of the call to 'init(_:)'}}
   // expected-note@-2 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

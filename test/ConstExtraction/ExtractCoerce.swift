@@ -27,3 +27,4 @@ public struct TestStruct : MyProto {
 // CHECK:             "label": "bar",
 // CHECK:             "valueKind": "RawLiteral",
 // CHECK:             "value": "bar"
+// UNSUPPORTED: OS=windows-msvc

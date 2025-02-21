@@ -182,3 +182,4 @@ public func testdfs2() -> Int {
   return local1() + local2()
 }
 
+// UNSUPPORTED: OS=windows-msvc

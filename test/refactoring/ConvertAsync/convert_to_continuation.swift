@@ -707,3 +707,4 @@ func testDispatch(_ completionHandler: @escaping (Int) -> Void) {
 // DISPATCH-NEXT:     }
 // DISPATCH-NEXT:   }
 // DISPATCH-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

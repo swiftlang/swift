@@ -29,3 +29,4 @@
 // CHECK-NEXT: "name":
 // CHECK-NEXT: "printedName":
 // CHECK: "kind": "Function"
+// UNSUPPORTED: OS=windows-msvc

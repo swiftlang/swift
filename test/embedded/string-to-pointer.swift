@@ -16,3 +16,4 @@ func foo(_ string: UnsafePointer<CChar>?) {
 
 foo("hello")
 // CHECK: hello
+// UNSUPPORTED: OS=windows-msvc

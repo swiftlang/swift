@@ -71,3 +71,4 @@ import MostlyPrivate2_Private
 extension SecretClass {
   private func somethingThatShouldNotBeIncluded() {}
 }
+// UNSUPPORTED: OS=windows-msvc

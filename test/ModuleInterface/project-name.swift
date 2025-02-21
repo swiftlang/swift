@@ -21,3 +21,4 @@
 // CHECK-NONPUBLIC-SAME: -project-name ProjectName
 
 public func foo() {}
+// UNSUPPORTED: OS=windows-msvc

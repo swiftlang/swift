@@ -26,4 +26,4 @@ public struct HasDistributedActors {
   func test() async throws {
     try await check.test()
   }
-}
+}// UNSUPPORTED: OS=windows-msvc

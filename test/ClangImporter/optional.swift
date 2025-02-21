@@ -81,3 +81,4 @@ class TestWeak : NSObject {
   weak var b : WeakObject? = nil
 }
 class WeakObject : NSObject {}
+// UNSUPPORTED: OS=windows-msvc

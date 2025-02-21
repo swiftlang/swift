@@ -43,3 +43,4 @@ class SomeSub : UnavailableDefaultInitSub { }
 // Handle default initializers.
 let udi1 = UnavailableDefaultInit()
 let udis1 = UnavailableDefaultInitSub()
+// UNSUPPORTED: OS=windows-msvc

@@ -118,3 +118,4 @@ func test_gradient_array_loop() {
 // CHECK: [[VJP_RESULT:%.*]] = apply [[VJP_FN_REF]]
 // CHECK-LABEL: } // end sil function 'test_gradient_array_loop' 
 
+// UNSUPPORTED: OS=windows-msvc

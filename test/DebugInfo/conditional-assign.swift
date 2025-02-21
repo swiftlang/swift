@@ -28,3 +28,4 @@ public class M {
         value = i
     }
 }
+// UNSUPPORTED: OS=windows-msvc

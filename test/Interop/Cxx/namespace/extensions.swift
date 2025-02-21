@@ -41,3 +41,4 @@ NamespacesTestSuite.test("Nested namespace") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

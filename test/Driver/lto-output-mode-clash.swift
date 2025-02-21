@@ -9,3 +9,4 @@
 // CHECK-DAG: -emit-bc
 // CHECK-DAG: -lto=llvm-full
 // CHECK-DAG: -o [[BITCODEFILE:.*\.bc]]
+// UNSUPPORTED: OS=windows-msvc

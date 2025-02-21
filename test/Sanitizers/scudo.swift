@@ -9,3 +9,4 @@ allocated.deallocate()
 allocated.deallocate()
 
 // CHECK: {{ERROR: invalid chunk state|\*\*\* GWP-ASan detected a memory error \*\*\*}}
+// UNSUPPORTED: OS=windows-msvc

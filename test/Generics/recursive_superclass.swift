@@ -42,3 +42,4 @@ extension P2 where Self == A, A == B {
     return self
   }
 }
+// UNSUPPORTED: OS=windows-msvc

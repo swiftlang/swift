@@ -124,3 +124,4 @@ MOCK_PLUGIN([
     "response": {"expandFreestandingMacroResult": {"expandedSource": "\"load-plugin-executable\"", "diagnostics": []}}
   }
 ])
+// UNSUPPORTED: OS=windows-msvc

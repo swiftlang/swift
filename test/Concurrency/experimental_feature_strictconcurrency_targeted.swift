@@ -24,3 +24,4 @@ func testConcurrency(c: C) async {
   acceptsSendable(c) // expected-warning{{type 'C' does not conform to the 'Sendable' protocol}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

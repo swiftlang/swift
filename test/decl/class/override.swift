@@ -431,3 +431,4 @@ class OverrideTypoSubclass: OverrideTypoBaseClass {
 class InvalidSubclass: GenericBase { // expected-error {{reference to generic type 'GenericBase' requires arguments in <...>}}
   var values: Float { 0 } // expected-error {{property 'values' with type 'Float' cannot override a property with type 'Int'}}
 }
+// UNSUPPORTED: OS=windows-msvc

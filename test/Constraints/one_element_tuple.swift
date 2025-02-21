@@ -27,3 +27,4 @@ func packSubstitution() -> Int {
   let s = S<Int>(t: 1)
   return s.t
 }
+// UNSUPPORTED: OS=windows-msvc

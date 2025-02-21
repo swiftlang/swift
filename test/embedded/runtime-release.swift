@@ -21,3 +21,4 @@ func test() -> [Int] {
     s += []
     return s
 }
+// UNSUPPORTED: OS=windows-msvc

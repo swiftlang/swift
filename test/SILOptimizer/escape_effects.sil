@@ -384,3 +384,4 @@ bb0(%0 : $*Str):
   return %1 : $Y
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@
 
 // FILES-NOT: DocAttrExportedImport@A.symbols.json
 
+// UNSUPPORTED: OS=windows-msvc

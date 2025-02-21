@@ -83,3 +83,4 @@ func enumNotSupported<Element>(x: Element) -> Element where Element: Differentia
 func enumOptional<Element>(x: Element) -> Element? where Element: Differentiable {
     return x
 }
+// UNSUPPORTED: OS=windows-msvc

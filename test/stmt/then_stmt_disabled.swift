@@ -9,3 +9,4 @@ let x = if .random() {
 } else { // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
   1
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ public actor MyActor3: MyActorProto {
 // NOTE: Since missing 'public' is super common, code completion automatically add it.
 // CONFORM_ACTORPROTO_WITHINTRO-DAG: Decl[InstanceMethod]/Super/Erase[5]: <name>nonIsolatedFunc</name>(); typename=; name=nonIsolatedFunc(); sourcetext=public nonisolated func nonIsolatedFunc() {\n<#code#>\n}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -299,3 +299,4 @@ func test_other_platform_unavailable() -> some P {
 // CHECK: universal:
 // CHECK-NEXT:   ret ptr @"$s43opaque_result_with_conditional_availability1DVAA1PAAWP"
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

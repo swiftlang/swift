@@ -143,3 +143,4 @@ struct S: P {
   func f31(_: Int) {}
   func f32(_: Int) {}
 }
+// UNSUPPORTED: OS=windows-msvc

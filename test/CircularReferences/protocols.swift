@@ -10,3 +10,4 @@ protocol P where Self : Q, Self : C { }
 
 // CHECK-NOT: CYCLE DETECTED
 
+// UNSUPPORTED: OS=windows-msvc

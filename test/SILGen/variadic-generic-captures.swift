@@ -34,3 +34,4 @@ func formEscapingClosure<each T>(x: repeat each T) -> () -> () {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

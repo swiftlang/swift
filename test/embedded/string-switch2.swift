@@ -35,3 +35,4 @@ e = MyEnum.case2
 print(e.rawValue)
 // CHECK: case1
 // CHECK: case2
+// UNSUPPORTED: OS=windows-msvc

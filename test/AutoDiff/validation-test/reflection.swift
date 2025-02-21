@@ -15,3 +15,4 @@ import _Differentiation
 // CHECK: aFunction: @differentiable(reverse) (Swift.Float) -> Swift.Float
 // CHECK: (function differentiable=reverse
 
+// UNSUPPORTED: OS=windows-msvc

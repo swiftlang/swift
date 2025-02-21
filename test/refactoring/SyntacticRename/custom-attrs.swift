@@ -66,3 +66,4 @@ struct Bar {
 // RUN: diff -u %S/Outputs/custom-attrs/Foo.swift.expected %t.ranges/custom-attrs-Foo.swift
 // RUN: diff -u %S/Outputs/custom-attrs/wrapped.swift.expected %t.ranges/custom-attrs-wrapped.swift
 // RUN: diff -u %S/Outputs/custom-attrs/Other.swift.expected %t.ranges/custom-attrs-Other.swift
+// UNSUPPORTED: OS=windows-msvc

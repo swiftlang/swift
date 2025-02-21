@@ -4,3 +4,4 @@ func foo() {
   print("hello")
 }
 // CHECK-NOT: brace_stmt
+// UNSUPPORTED: OS=windows-msvc

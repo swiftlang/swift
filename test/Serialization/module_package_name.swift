@@ -20,3 +20,4 @@
 
 //--- File.swift
 public func log(level: Int) {}
+// UNSUPPORTED: OS=windows-msvc

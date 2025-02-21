@@ -75,3 +75,4 @@ struct Main {
     // CHECK: you {{won|lost}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

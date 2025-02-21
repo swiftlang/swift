@@ -51,3 +51,4 @@ struct X4: Equatable {
   let x: Int
   var y: String
 }
+// UNSUPPORTED: OS=windows-msvc

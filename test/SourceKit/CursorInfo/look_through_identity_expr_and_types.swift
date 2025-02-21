@@ -24,3 +24,4 @@ func lookThorughInout() {
 // CHECK: s:Sa
 // CHECK: RECEIVERS END
 
+// UNSUPPORTED: OS=windows-msvc

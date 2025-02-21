@@ -97,3 +97,4 @@ public final class DoableWithAsyncAndMultipleCompletionHandlerCandidates2: Doabl
   // Matches async requirement
   public func doIt() async {}
 }
+// UNSUPPORTED: OS=windows-msvc

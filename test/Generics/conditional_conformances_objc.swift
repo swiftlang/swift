@@ -40,3 +40,4 @@ extension X: ObjCProtocol where T: Foo {}
 // expected-error@-1{{type 'X<T>' cannot conditionally conform to @objc protocol 'ObjCProtocol' because Objective-C does not support conditional conformances}}
 extension X: AtObjCProtocol where T: Foo {}
 // expected-error@-1{{type 'X<T>' cannot conditionally conform to @objc protocol 'AtObjCProtocol' because Objective-C does not support conditional conformances}}
+// UNSUPPORTED: OS=windows-msvc

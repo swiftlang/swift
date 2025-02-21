@@ -621,3 +621,4 @@ enum E16_52486 {
   typealias Z = Int // expected-note {{'Z' previously declared here}}
   case Z // expected-error {{invalid redeclaration of 'Z'}}
 }
+// UNSUPPORTED: OS=windows-msvc

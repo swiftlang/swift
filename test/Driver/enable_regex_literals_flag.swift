@@ -8,3 +8,4 @@
 public func foo() -> Int {
     return 42
 }
+// UNSUPPORTED: OS=windows-msvc

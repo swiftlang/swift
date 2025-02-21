@@ -23,3 +23,4 @@ let northSouth = char.map {
       ? 1.0
       : $0 == "S" ? -1 : nil // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

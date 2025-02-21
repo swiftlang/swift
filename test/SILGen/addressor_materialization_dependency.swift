@@ -72,3 +72,4 @@ func test2() {
     // CHECK: end_borrow [[BASE]]
     copyableLoadable()[0].test()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ struct UInt128 {
 }
 
 //CHECK: ![[NEW_VALUE]] = !DILocalVariable(name: "newValue", arg: 1
+// UNSUPPORTED: OS=windows-msvc

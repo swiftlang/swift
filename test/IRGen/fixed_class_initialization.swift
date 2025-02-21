@@ -15,3 +15,4 @@ public func foof() -> Any.Type {
 // CHECK-LABEL: define {{.*}} %swift.metadata_response @"$s4main1CCMa"
 // HAS_OPT_SELF:  call {{.*}} @objc_opt_self
 // NO_OPT_SELF:  call {{.*}} @swift_getInitializedObjCClass
+// UNSUPPORTED: OS=windows-msvc

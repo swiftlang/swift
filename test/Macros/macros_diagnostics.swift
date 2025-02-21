@@ -234,3 +234,4 @@ func someGlobalNext(
 ) async throws {
   fatalError()
 }
+// UNSUPPORTED: OS=windows-msvc

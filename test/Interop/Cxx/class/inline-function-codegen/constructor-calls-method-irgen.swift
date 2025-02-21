@@ -7,3 +7,4 @@ public func getIncrementorValue() -> CInt {
 }
 
 // CHECK: define {{.*}}i32 @{{_ZN11Incrementor9incrementEi|"\?increment@Incrementor@@QEAAHH@Z"}}(ptr {{.*}}, i32 {{.*}})
+// UNSUPPORTED: OS=windows-msvc

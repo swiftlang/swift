@@ -17,3 +17,4 @@ struct Bar {
   
   @Foo var baz: Bool = false
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -31,3 +31,4 @@ enum namespace {
 extension Copyable { // expected-error {{cannot extend protocol 'Copyable'}}
   func hello() {}
 }
+// UNSUPPORTED: OS=windows-msvc

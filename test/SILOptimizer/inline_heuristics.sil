@@ -597,3 +597,4 @@ bb0(%0 : $Float, %1 : @closureCapture $Builtin.FPIEEE32, %2 : @closureCapture $B
   %69 = tuple (%62 : $Float, %67 : $Float)        // user: %70
   return %69 : $(Float, Float)                    // id: %70
 }
+// UNSUPPORTED: OS=windows-msvc

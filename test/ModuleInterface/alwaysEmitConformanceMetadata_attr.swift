@@ -16,3 +16,4 @@ public protocol TestP {
 
 
 // CHECK: @_alwaysEmitConformanceMetadata public protocol TestP
+// UNSUPPORTED: OS=windows-msvc

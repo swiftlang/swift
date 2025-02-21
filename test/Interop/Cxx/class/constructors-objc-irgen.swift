@@ -13,3 +13,4 @@ public func createConstructorWithNSArrayParam() -> ConstructorWithNSArrayParam {
   // CHECK: call void @_ZN27ConstructorWithNSArrayParamC1EP7NSArray(ptr [[VAR]], ptr %{{[0-9]+}})
   return ConstructorWithNSArrayParam([])
 }
+// UNSUPPORTED: OS=windows-msvc

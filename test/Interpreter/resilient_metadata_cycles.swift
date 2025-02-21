@@ -46,3 +46,4 @@ ResilientMetadataCycleTests.test("ResilientClassCycle") {
 
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

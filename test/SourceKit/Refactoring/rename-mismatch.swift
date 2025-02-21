@@ -56,3 +56,4 @@ _ = Sss()
     ]
   }
 ]
+// UNSUPPORTED: OS=windows-msvc

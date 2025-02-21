@@ -22,3 +22,4 @@ struct S1 {
 // RUN: %sourcekitd-test -req=cursor -pos=6:29 %s -- %s | %FileCheck %s
 // RUN: %sourcekitd-test -req=cursor -pos=6:31 %s -- %s | %FileCheck %s
 // CHECK: <empty cursor info; internal diagnostic: "Unable to resolve cursor info.">
+// UNSUPPORTED: OS=windows-msvc

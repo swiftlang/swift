@@ -8,3 +8,4 @@ class ImageSet {
     /*here:*/StandImageSet()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

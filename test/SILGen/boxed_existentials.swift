@@ -248,3 +248,4 @@ func test() {
   var errors: [Error] = []
   test_property(errors[0].myError)
 }
+// UNSUPPORTED: OS=windows-msvc

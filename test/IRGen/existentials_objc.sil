@@ -222,3 +222,4 @@ bb0(%0 : $TestC):
 sil_vtable TestC { }
 
 sil_vtable NSObject { }
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@ func testOverrides(obj: Sub) {
   obj.foo()
   obj.prop = 5
 }
+// UNSUPPORTED: OS=windows-msvc

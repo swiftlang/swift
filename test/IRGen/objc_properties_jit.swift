@@ -25,3 +25,4 @@ extension NSString {
 // CHECK:         call ptr @class_replaceMethod(ptr [[NSOBJECT]], ptr [[GET_INSTANCE_PROP]]
 // CHECK:         [[SET_INSTANCE_PROP:%.*]] = call ptr @sel_registerName({{.*}}(setInstanceProp:)
 // CHECK:         call ptr @class_replaceMethod(ptr [[NSOBJECT]], ptr [[SET_INSTANCE_PROP]]
+// UNSUPPORTED: OS=windows-msvc

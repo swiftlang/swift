@@ -158,3 +158,4 @@ bb0(%0 : @guaranteed $Container):
   %18 = tuple ()
   return %18 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

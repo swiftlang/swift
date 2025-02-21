@@ -14,3 +14,4 @@ func foo() {
     print(s, terminator: "")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

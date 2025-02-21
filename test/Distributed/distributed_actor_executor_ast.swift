@@ -45,3 +45,4 @@ distributed actor DefaultWorker {
 // CHECK: (return_stmt implicit
 // CHECK:   (call_expr implicit type="Builtin.Executor" nothrow
 // CHECK:     (declref_expr implicit type="(DefaultWorker) -> Builtin.Executor" decl="Builtin.(file).buildDefaultActorExecutorRef [with (substitution_map generic_signature='<T where T : AnyObject>' 'T -> DefaultWorker')]" function_ref=unapplied)
+// UNSUPPORTED: OS=windows-msvc

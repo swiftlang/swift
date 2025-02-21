@@ -18,3 +18,4 @@ extension Doggo {
     print("Doggo value: \(floofer)")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

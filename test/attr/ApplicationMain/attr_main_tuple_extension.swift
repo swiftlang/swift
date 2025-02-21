@@ -9,3 +9,4 @@ extension Int.Type { // expected-error {{cannot extend a metatype 'Int.Type'}}
 
 
 
+// UNSUPPORTED: OS=windows-msvc

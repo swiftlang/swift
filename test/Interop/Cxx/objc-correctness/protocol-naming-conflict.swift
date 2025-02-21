@@ -10,3 +10,4 @@ import ProtocolNamingConflict
 // CHECK-IDE-TEST: class Foo : FooProtocol
 class Thing: FooProtocol {
 }
+// UNSUPPORTED: OS=windows-msvc

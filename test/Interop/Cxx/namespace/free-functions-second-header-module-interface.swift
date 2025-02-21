@@ -4,3 +4,4 @@
 // CHECK: enum FunctionsNS1 {
 // cHECK:   static func definedInDefs() -> UnsafePointer<CChar>!
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

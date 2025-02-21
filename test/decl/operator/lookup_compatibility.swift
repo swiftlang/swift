@@ -120,3 +120,4 @@ func testBuiltinPrecedenceGroupOverriding() {
   var x = 0
   x = 0 as Int // expected-error {{cannot convert value of type '()' to type 'Int' in coercion}}
 }
+// UNSUPPORTED: OS=windows-msvc

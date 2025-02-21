@@ -189,3 +189,4 @@ sil @generic_with_forwarded_conformance_3 : $<each T : PA where repeat (each T).
 sil @generic_with_forwarded_conformance_3_callee : $<each T : PA where repeat (each T).A : Q> () -> () {
 }
 
+// UNSUPPORTED: OS=windows-msvc

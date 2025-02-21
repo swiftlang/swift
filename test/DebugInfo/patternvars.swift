@@ -52,3 +52,4 @@ public func mangle(s: [UnicodeScalar]) -> [UnicodeScalar] {
 // CHECK-NOT:   #dbg_value
 // CHECK-NOT:   call void asm sideeffect "", "r"
 
+// UNSUPPORTED: OS=windows-msvc

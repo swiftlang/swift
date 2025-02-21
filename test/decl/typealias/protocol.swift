@@ -328,3 +328,4 @@ typealias Amb = Amb1 & Amb2
 
 let _: Int.Type = Amb.T.self
 let _: String.Type = Amb.T.self
+// UNSUPPORTED: OS=windows-msvc

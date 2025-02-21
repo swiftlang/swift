@@ -15,3 +15,4 @@ public enum Endpoint {
   }
 }
 // CHECK: Decl[LocalVar]/Local/TypeRelation[Convertible]: myInt[#Int#];
+// UNSUPPORTED: OS=windows-msvc

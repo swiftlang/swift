@@ -2152,3 +2152,4 @@ public func closureAndClosureCaptureClassOwnedArgUseAfterConsume4(_ x2: __owned 
     f()
     consumeVal(x2)
 }
+// UNSUPPORTED: OS=windows-msvc

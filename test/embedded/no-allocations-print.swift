@@ -12,3 +12,4 @@
 print("Hello Embedded Swift!")
 print(42)
 print(false)
+// UNSUPPORTED: OS=windows-msvc

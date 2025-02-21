@@ -11,3 +11,4 @@ open class ClassLevel1: MyProtocol {
 open class ClassLevel2: ClassLevel1 {
     public override init () {}
 }
+// UNSUPPORTED: OS=windows-msvc

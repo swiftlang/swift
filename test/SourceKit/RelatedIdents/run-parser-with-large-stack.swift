@@ -301,3 +301,4 @@ if true {
 if true {
 if true {
 if true {
+// UNSUPPORTED: OS=windows-msvc

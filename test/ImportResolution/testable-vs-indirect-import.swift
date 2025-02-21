@@ -10,3 +10,4 @@ import TestableVersusIndirectImporter
 
 t1()
 t2()
+// UNSUPPORTED: OS=windows-msvc

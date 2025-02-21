@@ -62,3 +62,4 @@ public func reproduce(_ e: Something) {
 // CHECK:     [[USE_REF:%.*]] = function_ref @$s3Lib3useyySiyXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> ()
 // CHECK:     [[RESULT:%.*]] = apply [[USE_REF]]([[MARKED]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Int) -> ()
 
+// UNSUPPORTED: OS=windows-msvc

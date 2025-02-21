@@ -395,3 +395,4 @@ bb2:
   unreachable
 }
 
+// UNSUPPORTED: OS=windows-msvc

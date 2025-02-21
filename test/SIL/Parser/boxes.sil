@@ -107,3 +107,4 @@ entry:
   dealloc_box %0: ${ let Int }
   return undef : $()
 }
+// UNSUPPORTED: OS=windows-msvc

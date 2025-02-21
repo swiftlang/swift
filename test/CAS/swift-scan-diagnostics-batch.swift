@@ -59,3 +59,4 @@
 #warning("This is also a warning")
 //--- c.swift
 #warning("This is another warning")
+// UNSUPPORTED: OS=windows-msvc

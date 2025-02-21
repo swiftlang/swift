@@ -51,3 +51,4 @@ struct R {
 struct Q {
     [;
 }
+// UNSUPPORTED: OS=windows-msvc

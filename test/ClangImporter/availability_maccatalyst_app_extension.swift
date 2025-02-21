@@ -36,3 +36,4 @@ func test_ios_app_extension() {
   availableOnIOSButDeprecatedOniOSAppExtension() // expected-warning {{'availableOnIOSButDeprecatedOniOSAppExtension()' was deprecated in application extensions for Mac Catalyst 13.1}}
   availableOnIOSAppExtensionButDeprecatedOnmacCatalystAppExtension() // expected-warning {{'availableOnIOSAppExtensionButDeprecatedOnmacCatalystAppExtension()' was deprecated in application extensions for Mac Catalyst 9.0}}
 }
+// UNSUPPORTED: OS=windows-msvc

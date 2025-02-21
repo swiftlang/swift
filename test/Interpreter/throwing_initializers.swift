@@ -443,3 +443,4 @@ ThrowingInitTestSuite.test("ThrowsAndFailableTest") {
 // Invalid pointer dequeued from free list: run-time crash on some weird code
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

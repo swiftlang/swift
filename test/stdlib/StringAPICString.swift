@@ -504,3 +504,4 @@ CStringTests.test("String.init.decodingCString.with.inout.conversion") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

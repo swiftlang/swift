@@ -110,3 +110,4 @@ let osName: String = {
   return "Unknown"
 #endif
 }()
+// UNSUPPORTED: OS=windows-msvc

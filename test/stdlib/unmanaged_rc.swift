@@ -38,3 +38,4 @@ public func useUnmanaged(_ u: Unmanaged<KlassContainer>) {
         myPrint($0.k)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

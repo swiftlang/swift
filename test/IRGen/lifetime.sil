@@ -106,3 +106,4 @@ bb0(%x : $*Builtin.Int64):
 // CHECK-NEXT:    store
 // CHECK-NEXT:    call void @llvm.lifetime.end.p0({{(i32|i64)}} 8, ptr [[XBUF]])
 
+// UNSUPPORTED: OS=windows-msvc

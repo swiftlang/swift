@@ -17,3 +17,4 @@ struct S2<A>: P2 {
 }
 
 let x: Int.Type = S2<Int>.A.self
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ entry(%0 : $NSError):
   return %1 : $Error
 }
 
+// UNSUPPORTED: OS=windows-msvc

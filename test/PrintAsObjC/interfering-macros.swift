@@ -17,3 +17,4 @@ import Foundation
   public var str: String = ""
   public var strongProp: Any?
 }
+// UNSUPPORTED: OS=windows-msvc

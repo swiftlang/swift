@@ -29,3 +29,4 @@ class Impl : Problem {}
       assert(r == 1)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

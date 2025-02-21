@@ -118,3 +118,4 @@ func test_unavailability_condition() -> some P {
 
   return Z()
 }
+// UNSUPPORTED: OS=windows-msvc

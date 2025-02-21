@@ -12,3 +12,4 @@ _ = DispatchQueue.GlobalQueuePriority.low // no-warning
 _ = DispatchQueue.GlobalQueuePriority.background // no-warning
 
 _ = DispatchQueue.global(priority:DispatchQueue.GlobalQueuePriority.background)  // no-warning
+// UNSUPPORTED: OS=windows-msvc

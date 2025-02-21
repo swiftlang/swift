@@ -17,3 +17,4 @@ import Swift
 
 var c = Container<Int>()
 c.doSomething()
+// UNSUPPORTED: OS=windows-msvc

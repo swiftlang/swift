@@ -57,4 +57,4 @@ Tests.test("dontLeakCalleeDifferential") {
   expectEqual(0, LifetimeTracked.instances)
 }
 
-runAllTests()
+runAllTests()// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@
 
 // RUN: %sourcekitd-test -req=interface-gen %S/Inputs/Foo3.swift -- %S/Inputs/Foo3.swift | %FileCheck -check-prefix=CHECK3 %s
 // CHECK3: public class C {
+// UNSUPPORTED: OS=windows-msvc

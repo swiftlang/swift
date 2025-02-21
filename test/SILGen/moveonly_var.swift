@@ -63,3 +63,4 @@ public func useVarKlassErrorSimple() {
     let _ = k5
 }
 */
+// UNSUPPORTED: OS=windows-msvc

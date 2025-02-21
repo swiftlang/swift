@@ -8,3 +8,4 @@ _ = constantB
 #if !NO_ERROR
 _ = constantA // expected-error{{cannot find 'constantA' in scope}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

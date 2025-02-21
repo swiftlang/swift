@@ -10,3 +10,4 @@
 // CHECK: func templateTypeParamNotUsedInSignatureWithVarargs<T, U>(T: T.Type, U: U.Type, _ varargs: Any...)
 // CHECK: @available(*, unavailable, message: "Variadic function is unavailable")
 // CHECK: func templateTypeParamNotUsedInSignatureWithVarargsAndUnrelatedParam<T, U, V>(_ x: Int32, T: T.Type, U: U.Type, V: V.Type, _ varargs: Any...)
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@
 // CHECK-DAG: "metadata": "this is a longer string"
 @_documentation(metadata: "this is a longer string") public class OtherClass {}
 
+// UNSUPPORTED: OS=windows-msvc

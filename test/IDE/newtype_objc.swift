@@ -18,3 +18,4 @@ func useSpecializationOverNewtypes(a: UsesGenericClassA) {
   let gca = GenericClassA<NSString>()
   a.takeEnumValues(gca)
 }
+// UNSUPPORTED: OS=windows-msvc

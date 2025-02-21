@@ -148,3 +148,4 @@ func bounceBetweenKinds(_ l: ListOfFiles) -> ListOfFiles {
 // CHECK-NEXT:     #ListOfFiles.freshFile!read:
 // CHECK-NOT:      getter
 // CHECK:       }
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@
 
 // CHECK: let SpaceShipNotification: String
 // CHECK: let CExternNotification: String
+// UNSUPPORTED: OS=windows-msvc

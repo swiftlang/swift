@@ -145,3 +145,4 @@ func test(system: FakeActorSystem) async {
     await test(system: FakeActorSystem())
   }
 }
+// UNSUPPORTED: OS=windows-msvc

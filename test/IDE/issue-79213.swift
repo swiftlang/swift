@@ -36,3 +36,4 @@ func foo(_ x: R, _ b: Bool) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

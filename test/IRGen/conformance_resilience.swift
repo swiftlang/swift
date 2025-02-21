@@ -26,3 +26,4 @@ public func getConformance(_ w: ConcreteWrapper) {
   // CHECK: ret void
   useConformance(w)
 }
+// UNSUPPORTED: OS=windows-msvc

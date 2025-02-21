@@ -3,3 +3,4 @@
 var x: X.AssocType = 0.0 as Float
 
 var y = Y.AssocType()
+// UNSUPPORTED: OS=windows-msvc

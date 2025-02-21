@@ -30,3 +30,4 @@ struct S {
 // CHECK2: RELATED BEGIN
 // CHECK2: <RelatedName usr="s:5MyMod1SV3foo1xySi_tF">foo(x: Int)</RelatedName>
 // CHECK2: RELATED END
+// UNSUPPORTED: OS=windows-msvc

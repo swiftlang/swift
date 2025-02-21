@@ -17,3 +17,4 @@ private extension String {}
 
 
 // EOF
+// UNSUPPORTED: OS=windows-msvc

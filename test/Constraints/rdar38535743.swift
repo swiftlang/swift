@@ -12,3 +12,4 @@ class C {
 func foo<T: NSObject>(value: T) where T: P {
   _ = C(values: [value]) // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

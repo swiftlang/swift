@@ -23,3 +23,4 @@ public typealias PublicAlias = Int
 
   _ = PublicAlias.self
 }
+// UNSUPPORTED: OS=windows-msvc

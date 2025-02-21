@@ -41,3 +41,4 @@ class TestClass6 {
   @objc func testMethod() {} // expected-error {{@objc attribute used without importing module 'Foundation'}}
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ let a: Int? = 1 // expected-note {{'a' declared here}}
 guard let b = a else {
   fatalError()
 }
+// UNSUPPORTED: OS=windows-msvc

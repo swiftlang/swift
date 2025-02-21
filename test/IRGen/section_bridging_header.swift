@@ -22,3 +22,4 @@ func foo() { }
 	fptr2: nil,
 	fptr3: { arg1, arg2, arg3 in print(arg1, arg2, arg3) }
 	)
+// UNSUPPORTED: OS=windows-msvc

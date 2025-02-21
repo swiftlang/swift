@@ -29,3 +29,4 @@ func callee(p: any P) -> any P {
 func caller(p: any P) -> any P {
   return callee(p: p)
 }
+// UNSUPPORTED: OS=windows-msvc

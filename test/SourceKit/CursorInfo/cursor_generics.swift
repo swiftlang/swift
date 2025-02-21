@@ -69,3 +69,4 @@ public protocol Proto<Assoc> {
 // CHECK_ASSOC_COMMON-NEXT: source.refactoring.kind.rename.global
 // CHECK_ASSOC_COMMON-NEXT: Global Rename
 // CHECK_ASSOC_COMMON-NEXT: ACTIONS END
+// UNSUPPORTED: OS=windows-msvc

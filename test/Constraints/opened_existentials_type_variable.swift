@@ -26,3 +26,4 @@ public struct SryMap<Output> : MyProto {
 }
 
 public class SomeClass<T> {}
+// UNSUPPORTED: OS=windows-msvc

@@ -42,3 +42,4 @@ class C4 {}
 // expected-note@-2{{replace with 'targetEnvironment(simulator)'}}{{7-31=targetEnvironment(simulator)}}
 class C5 {}
 #endif
+// UNSUPPORTED: OS=windows-msvc

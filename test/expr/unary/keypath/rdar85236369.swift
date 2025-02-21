@@ -26,3 +26,4 @@ struct S {
 // CHECK: (parsed_root
 // CHECK-NOT: (parsed_path
 _ = \S.x
+// UNSUPPORTED: OS=windows-msvc

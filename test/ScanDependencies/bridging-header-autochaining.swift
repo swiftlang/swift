@@ -243,3 +243,4 @@ module B {
   header "b.h"
   export *
 }
+// UNSUPPORTED: OS=windows-msvc

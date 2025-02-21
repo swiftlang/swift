@@ -16,3 +16,4 @@
 // LINUX-lib-flag-space-DAG: -lboo
 // LINUX-lib-flag-space-DAG: -Xlinker -undefined
 // LINUX-lib-flag-space: -o main
+// UNSUPPORTED: OS=windows-msvc

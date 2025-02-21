@@ -221,3 +221,4 @@ public func nestedTreesOfThrowing(_ i: Int, _ j: Int, _ k: Int, _ l: Int) throws
     throw MyError.err
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ public func ifelseexpr() -> Int64 {
   return x.x // CHECK: ![[RELEASE]] = !DILocation(line: [[@LINE]], column: 3
 }
 
+// UNSUPPORTED: OS=windows-msvc

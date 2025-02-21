@@ -4,3 +4,4 @@
 // CHECK: remark: SWIFTC_MAXIMUM_DETERMINISM overriding -j
 // CHECK: remark: SWIFTC_MAXIMUM_DETERMINISM overriding -num-threads
 print(1)
+// UNSUPPORTED: OS=windows-msvc

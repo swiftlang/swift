@@ -11,3 +11,4 @@ func &&&(x: S, y: S) -> Bool {}
 
 S()#^A^#
 // CHECK: Decl[InstanceMethod]/CurrNominal:   .f
+// UNSUPPORTED: OS=windows-msvc

@@ -242,3 +242,4 @@ inferredConformancesGeneric(diff) // okay!
 
 func inferredConformancesGenericResult<T, U>() -> @differentiable(reverse) (Linear<T>) -> Linear<U> {}
 func inferredConformancesGenericResultLinear<T, U>() -> @differentiable(_linear) (Linear<T>) -> Linear<U> {}
+// UNSUPPORTED: OS=windows-msvc

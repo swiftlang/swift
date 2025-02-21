@@ -363,3 +363,4 @@ sil_moveonlydeinit TrivialMoveOnlyEnum {
 sil_moveonlydeinit NonTrivialMoveOnlyEnum {
   @$s4main22NonTrivialMoveOnlyEnumOfD
 }
+// UNSUPPORTED: OS=windows-msvc

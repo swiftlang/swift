@@ -21,3 +21,4 @@ public func brokenPlatforms() {}
 
 @available(_triggerParsingMacros)
 public func brokenPlatforms() {}
+// UNSUPPORTED: OS=windows-msvc

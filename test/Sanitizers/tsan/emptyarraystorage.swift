@@ -57,3 +57,4 @@ for _ in 1...5 {
 print("Done!")
 
 // CHECK: Done!
+// UNSUPPORTED: OS=windows-msvc

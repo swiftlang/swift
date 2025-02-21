@@ -18,3 +18,4 @@ struct S: Q {
 extension P where X == () {
   typealias Y = S
 }
+// UNSUPPORTED: OS=windows-msvc

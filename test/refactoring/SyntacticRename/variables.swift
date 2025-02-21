@@ -52,3 +52,4 @@ struct S {
 // RUN: diff -u %S/Outputs/variables/pattern-b.swift.expected %t.result/variables_pattern-b.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="lazy" -old-name "myVal" -new-name "myNewVal" >> %t.result/variables_lazy.swift
 // RUN: diff -u %S/Outputs/variables/lazy.swift.expected %t.result/variables_lazy.swift
+// UNSUPPORTED: OS=windows-msvc

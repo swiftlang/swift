@@ -18,3 +18,4 @@ public func f(_ e : macro_enum) -> Int32 {
     return e.rawValue
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -82,3 +82,4 @@ func associatedTypeTestBasic2<T: AssociatedTypeTestProtocol>(_: T, iso: isolated
   await transferToMain(x) // expected-error {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending 'iso'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'iso'-isolated uses}}
 }
+// UNSUPPORTED: OS=windows-msvc

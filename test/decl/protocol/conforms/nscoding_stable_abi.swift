@@ -6,3 +6,4 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_stable_abi
+// UNSUPPORTED: OS=windows-msvc

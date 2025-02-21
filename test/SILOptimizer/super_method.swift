@@ -97,3 +97,4 @@ class ConcreteGrandchild : ConcreteChild {
     super.method()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

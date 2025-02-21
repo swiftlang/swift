@@ -11,3 +11,4 @@ precedencegroup SomePrecedence {
 }
 
 infix operator <>: SomePrecedence
+// UNSUPPORTED: OS=windows-msvc

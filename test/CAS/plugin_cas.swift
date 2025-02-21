@@ -177,3 +177,4 @@ import SubE
 // CHECK-NEXT: SwiftShims-{{.*}}[[SHIMS_CONTEXT]].pcm
 // CHECK-NO-SEARCH-PATHS-NOT: "-prebuilt-module-cache-path"
 
+// UNSUPPORTED: OS=windows-msvc

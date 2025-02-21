@@ -23,3 +23,4 @@ public class MyClass {
 }
 
 // CHECK: class MyClass
+// UNSUPPORTED: OS=windows-msvc

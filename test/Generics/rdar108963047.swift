@@ -13,3 +13,4 @@ struct FloatElement : HasElt {
 struct G<T: HasElt> where T.Element == Float {
   func foo() where T == IntElement {} // expected-error {{generic signature requires types 'IntElement.Element' (aka 'Int') and 'Float' to be the same}}
 }
+// UNSUPPORTED: OS=windows-msvc

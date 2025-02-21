@@ -25,3 +25,4 @@
 // RUN: rm 😂-file-02.dia
 // RUN: rm 😂-file-02.o
 // RUN: rm 😂-file-02.swift
+// UNSUPPORTED: OS=windows-msvc

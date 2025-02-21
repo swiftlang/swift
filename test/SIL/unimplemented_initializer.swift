@@ -13,3 +13,4 @@ class DesignatedStubs : Gizmo {
 
 // CHECK-RELEASE-NOT: unimplemented_initializer.swift",
 
+// UNSUPPORTED: OS=windows-msvc

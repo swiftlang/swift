@@ -11,3 +11,4 @@ public struct Foo {}
 // CHECK: #else
 // CHECK: {{^}}public struct Foo {
 // CHECK: #endif
+// UNSUPPORTED: OS=windows-msvc

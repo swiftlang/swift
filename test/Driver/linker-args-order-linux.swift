@@ -7,3 +7,4 @@ print("hello world!")
 // CHECK: {{.*}}/swift-frontend -frontend -c -primary-file {{.*}}/linker-args-order-linux.swift
 // CHECK: {{.*}}/swift-autolink-extract{{.*}}
 // CHECK: {{.*}}swiftrt.o /{{.*}}/linker-args-order-linux-{{[a-z0-9]+}}.o -Xlinker --start-group @/{{.*}}/linker-args-order-linux-{{[a-z0-9]+}}.autolink -Xlinker --end-group {{.*}} @{{.*}}/static-stdlib-args.lnk {{.*}} -Xlinker --no-allow-multiple-definition
+// UNSUPPORTED: OS=windows-msvc

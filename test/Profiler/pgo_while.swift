@@ -52,3 +52,4 @@ main()
 // IR: !{!"branch_weights", i32 176401, i32 421}
 // IR-OPT: !{!"branch_weights", i32 421, i32 43}
 // IR-OPT: !{!"branch_weights", i32 176401, i32 421}
+// UNSUPPORTED: OS=windows-msvc

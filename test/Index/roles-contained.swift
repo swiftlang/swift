@@ -354,3 +354,4 @@ var computedVoidProperty: () { () }
 
 func voidFunc() -> () { () }
 // CHECK: [[@LINE-1]]:6 | function/Swift | voidFunc() | {{.*}} | Def | rel: 0
+// UNSUPPORTED: OS=windows-msvc

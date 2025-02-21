@@ -18,3 +18,4 @@ public func toast() {}
 
 // CHECK-HAS-NOT-NOT: $ld$hide$os10.15$_$s10ToasterKit5toastyyF
 // CHECK-HAS-NOT-NOT: $ld$hide$os10.7$_$s10ToasterKit5toastyyF
+// UNSUPPORTED: OS=windows-msvc

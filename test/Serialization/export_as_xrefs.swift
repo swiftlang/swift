@@ -17,3 +17,4 @@ import A
 let a = foo()
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -95,3 +95,4 @@ let _ = Z2.a.intValue
 let _ = X2(intValue: 0)
 let _ = Y2(intValue: 0)
 let _ = Z2(intValue: 0)
+// UNSUPPORTED: OS=windows-msvc

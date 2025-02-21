@@ -17,3 +17,4 @@ enum Foo: FooLiteral { // expected-error {{raw type 'FooLiteral' is not expressi
   case bar2 = #imageLiteral(resourceName: "hello.png")
   case bar3 = #fileLiteral(resourceName: "what.txt")
 }
+// UNSUPPORTED: OS=windows-msvc

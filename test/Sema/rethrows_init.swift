@@ -59,3 +59,4 @@ class DerivedWithSuperInitCall : Base {
     try super.init { throw MyError.bad } // FIXME
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ do {
 // CHECK: @callee_guaranteed (Int, @guaranteed Class, @owned Class, @in_guaranteed Any, @inout Int) -> (Int, @owned Class, @out Any)
 // CHECK: @callee_guaranteed () -> @error Error
 // CHECK: @callee_guaranteed (@in Int) -> @owned Int
+// UNSUPPORTED: OS=windows-msvc

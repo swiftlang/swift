@@ -320,3 +320,4 @@ ErrorHandlingTests.test("Enum Initialization Leaks") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

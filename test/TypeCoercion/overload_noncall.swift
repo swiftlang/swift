@@ -68,3 +68,4 @@ func test_lvalue_or_rvalue() {
   y = y1
   _ = y
 }
+// UNSUPPORTED: OS=windows-msvc

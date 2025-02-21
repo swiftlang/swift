@@ -24,3 +24,4 @@ public struct UsesResilientSmallStruct {
 public func createUsesResilientSmallStruct() -> UsesResilientSmallStruct {
     UsesResilientSmallStruct(x: 97, y: createLargeStruct(45).firstSmallStruct)
 }
+// UNSUPPORTED: OS=windows-msvc

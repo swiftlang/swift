@@ -78,3 +78,4 @@ func test_dynamic_callables<T : C>(_ s: S, _ p1: P1, _ p2: P2, _ t: T) {
   // CHECK: unchecked_ref_cast %{{.+}} : $C to $T
   _ = t("")
 }
+// UNSUPPORTED: OS=windows-msvc

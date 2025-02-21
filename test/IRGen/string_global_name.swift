@@ -24,3 +24,4 @@ func strings() {
 }
 
 @inline(never) func blackHole(_: String) {}
+// UNSUPPORTED: OS=windows-msvc

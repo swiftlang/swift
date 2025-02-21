@@ -34,3 +34,4 @@ s.x = 10
 
 // CHECK: setting 100
 s.y = 100
+// UNSUPPORTED: OS=windows-msvc

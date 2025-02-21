@@ -161,3 +161,4 @@ class Cat : FakeNSObject {
     self.init(n: 0, after: after)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

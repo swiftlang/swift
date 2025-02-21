@@ -55,3 +55,4 @@ struct Main {
 // CHECK: count: 2
 // CHECK: mysection[0]: 42
 // CHECK: mysection[1]: 46
+// UNSUPPORTED: OS=windows-msvc

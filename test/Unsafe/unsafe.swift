@@ -191,3 +191,4 @@ class ClassWithUnsafeStorage {
   var int: Int = 0
   var array: [UnsafeSuper]? = nil // expected-note{{property 'array' involves unsafe type 'UnsafeSuper'}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -44,3 +44,4 @@ func testApple() {
   // CHECK-objc: [[@LINE-1]]:16: error: cannot convert value of type '({{.+}}) -> Int'{{( [(]aka .+[)])?}} to specified type 'Int'
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

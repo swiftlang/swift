@@ -29,3 +29,4 @@ public struct M: SomeProtocol {
   static let defaultValue = HiddenStruct()
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

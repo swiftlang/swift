@@ -9,3 +9,4 @@ public extension AnyIterator {
       return AnySequence([])
     }
 }
+// UNSUPPORTED: OS=windows-msvc

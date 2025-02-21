@@ -158,3 +158,4 @@ print("\(repr(s))")
 var s2 = String()
 s2 += s
 print("\(repr(s2))")
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ func useSendable(ns: NSString) {
   // Note: warning below is suppressed due to @preconcurrency
   acceptSendable(ns)
 }
+// UNSUPPORTED: OS=windows-msvc

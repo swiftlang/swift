@@ -80,3 +80,4 @@ public class SubSub: Sub {
   _ = Sub()
   _ = SubSub()
 }
+// UNSUPPORTED: OS=windows-msvc

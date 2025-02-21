@@ -19,3 +19,4 @@
 import App
 
 _ = app_function(2)
+// UNSUPPORTED: OS=windows-msvc

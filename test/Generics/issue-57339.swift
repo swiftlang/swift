@@ -9,3 +9,4 @@ protocol P { associatedtype A: Q where A.B == Self }
 // CHECK-LABEL: .Q@
 // CHECK-NEXT: Requirement signature: <Self where Self : CaseIterable, Self == Self.[Q]B.[P]A, Self.[Q]B : P>
 protocol Q: CaseIterable { associatedtype B: P where B.A == Self }
+// UNSUPPORTED: OS=windows-msvc

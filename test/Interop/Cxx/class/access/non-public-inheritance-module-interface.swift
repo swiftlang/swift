@@ -117,3 +117,4 @@
 // CHECK-NEXT:   @available(*, unavailable, message: "{{.*}}private{{.*}}")
 // CHECK-NEXT:   private func priv() -> Int32
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

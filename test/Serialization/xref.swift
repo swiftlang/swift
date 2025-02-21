@@ -19,3 +19,4 @@ numericArray([42])
 
 func incr<T: ExtraIncrementable>(_ x: T) {}
 incr(SpecialInt())
+// UNSUPPORTED: OS=windows-msvc

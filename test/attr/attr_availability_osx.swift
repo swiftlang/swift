@@ -219,3 +219,4 @@ extension UnavailableStruct { } // no-error
 @available(macOS, unavailable)
 extension UnavailableStruct { } // no-error
 #endif
+// UNSUPPORTED: OS=windows-msvc

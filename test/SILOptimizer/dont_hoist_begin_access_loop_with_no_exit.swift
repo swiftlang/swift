@@ -8,3 +8,4 @@ var i = 0
 while true {
   i += 1
 }
+// UNSUPPORTED: OS=windows-msvc

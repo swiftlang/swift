@@ -65,3 +65,4 @@ UsingBaseTestSuite.test("OperatorBasePrivateInheritance") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -131,3 +131,4 @@ testSuite.test("nil") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

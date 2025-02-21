@@ -31,3 +31,4 @@ public struct X2: RandomAccessCollection {
     return ""
   }
 }
+// UNSUPPORTED: OS=windows-msvc

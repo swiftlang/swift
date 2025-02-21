@@ -139,3 +139,4 @@ sil_vtable SubConcrete {}
 sil_vtable Derived {}
 sil_vtable SubDerived {}
 sil_vtable MoreDerived {}
+// UNSUPPORTED: OS=windows-msvc

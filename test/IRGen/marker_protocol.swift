@@ -97,3 +97,4 @@ let v2 = C.self
 func testProtocolComposition() {
   print(v1 == v2)
 }
+// UNSUPPORTED: OS=windows-msvc

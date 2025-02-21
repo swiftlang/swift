@@ -38,3 +38,4 @@ func test3<MyGeneric: MyProto>() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

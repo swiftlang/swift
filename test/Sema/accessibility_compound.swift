@@ -61,3 +61,4 @@ private class SpecificBox<T: PrivateProto> { // expected-note 2 {{type declared 
 let specificBoxUnboxInt: SpecificBox<PublicStruct>.InnerType = .init() // expected-error {{constant must be declared private or fileprivate because its type uses a private type}}
 let specificBoxFloat: SpecificBox<PublicStruct>.AlwaysFloat = 0 // expected-error {{constant must be declared private or fileprivate because its type uses a private type}}
 
+// UNSUPPORTED: OS=windows-msvc

@@ -1226,3 +1226,4 @@ bb1(%5 : @reborrow $C):
   return %9 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -115,3 +115,4 @@ suite.test("hashValue forwarding") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

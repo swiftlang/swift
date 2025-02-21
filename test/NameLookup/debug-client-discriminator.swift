@@ -41,3 +41,4 @@ let processedString = process("abc")
 // CHECK-INT: let processedStringQualified: String
 // CHECK-STRING: let processedStringQualified: String
 let processedStringQualified = MyStruct.process("abc")
+// UNSUPPORTED: OS=windows-msvc

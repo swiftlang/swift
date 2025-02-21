@@ -244,3 +244,4 @@ func testREPLPrintable() {
 
 // Bool coercion
 if true as Bool {}
+// UNSUPPORTED: OS=windows-msvc

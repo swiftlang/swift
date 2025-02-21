@@ -6,3 +6,4 @@ public struct MyStruct: MyProto {}
 // RUN: %target-swift-synthesize-interface -module-name swift_mod -I %t -o - -target %target-triple | %FileCheck %s
 
 // CHECK: public struct MyStruct : swift_mod.MyProto
+// UNSUPPORTED: OS=windows-msvc

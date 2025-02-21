@@ -12,3 +12,4 @@
 // RUN: not %target-swift-frontend -compile-module-from-interface -module-name Foo %t/inputs/Foo.swiftinterface -o %t/outputs/Foo.swiftmodule
 
 // RUN: %target-swift-frontend -compile-module-from-interface -module-name Foo %t/inputs/Foo.swiftinterface -o %t/outputs/Foo.swiftmodule -backup-module-interface-path %t/alternative-inputs
+// UNSUPPORTED: OS=windows-msvc

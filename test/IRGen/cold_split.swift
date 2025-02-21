@@ -40,3 +40,4 @@ public func numberWithLogging(_ b: Bool) -> Int {
         return 1337
     }
 }
+// UNSUPPORTED: OS=windows-msvc

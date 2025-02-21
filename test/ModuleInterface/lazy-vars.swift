@@ -39,3 +39,4 @@ public struct HasLazyVars {
   public lazy var foo: Int = 0
   private lazy var bar: Int = 0
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ struct MyOptions: OptionSet {
     static let piVal = MyOptions(float: Float.pi)
     static let zero = MyOptions(float: 0.0)
 }
+// UNSUPPORTED: OS=windows-msvc

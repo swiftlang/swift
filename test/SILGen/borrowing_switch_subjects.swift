@@ -77,3 +77,4 @@ func borrowParam(x: borrowing Outer) {
         use(y)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

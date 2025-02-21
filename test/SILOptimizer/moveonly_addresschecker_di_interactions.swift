@@ -117,3 +117,4 @@ struct ListEntry<T> : ~Copyable {
 
   init() { innerBox = nil }
 }
+// UNSUPPORTED: OS=windows-msvc

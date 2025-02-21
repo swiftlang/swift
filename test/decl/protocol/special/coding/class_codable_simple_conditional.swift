@@ -38,3 +38,4 @@ let _ = Conditional<Nonconforming>.encode(to:) // expected-error {{referencing i
 // The synthesized CodingKeys type should not be accessible from outside the
 // struct.
 let _ = Conditional<Int>.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

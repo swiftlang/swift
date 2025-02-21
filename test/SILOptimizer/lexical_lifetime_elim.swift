@@ -50,3 +50,4 @@ public func testLexical() -> AnyObject {
   // Without lexical lifetimes, the lifetime of 'a' ends in between the two calls:
   return takeGuaranteed(takeGuaranteed(a))
 }
+// UNSUPPORTED: OS=windows-msvc

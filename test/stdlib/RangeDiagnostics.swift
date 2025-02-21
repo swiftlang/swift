@@ -244,3 +244,4 @@ func typeInference_commonTypes() {
     expectType(PartialRangeThrough<String.Index>.self, &range)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

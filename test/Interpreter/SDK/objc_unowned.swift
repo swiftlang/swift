@@ -12,3 +12,4 @@ unowned let y = x
 
 print(y) // CHECK:      <NSObject: [[ID:.*]]>
 print(x) // CHECK-NEXT: <NSObject: [[ID]]>
+// UNSUPPORTED: OS=windows-msvc

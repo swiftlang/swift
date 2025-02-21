@@ -24,3 +24,4 @@ func testFunc() {}
 // CHECK:     }
 
 // CHECK: ]
+// UNSUPPORTED: OS=windows-msvc

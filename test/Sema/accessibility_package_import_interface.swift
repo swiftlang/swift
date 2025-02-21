@@ -142,3 +142,4 @@ import LibPass
 public func clientFunc() {
   libFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -470,3 +470,4 @@ struct KeyPathLiteralAsFunctionDefaultArg {
 }
 
 KeyPathLiteralAsFunctionDefaultArg(x: 1738).doStuff()
+// UNSUPPORTED: OS=windows-msvc

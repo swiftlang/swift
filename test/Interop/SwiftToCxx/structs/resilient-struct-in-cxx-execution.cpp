@@ -67,3 +67,4 @@ int main() {
 // CHECK-NEXT: destroy RefCountedClass 0
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

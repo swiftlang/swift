@@ -92,3 +92,4 @@ do {
 // CHECK-DECL: objc_classes.(file).OurObjCProtocol
 // CHECK-DECL: Foundation.(file).NSCache@{{.*}}NSCache.h:{{[0-9]+}}:{{[0-9]+}}
 // CHECK-DECL: Foundation.(file).PropertyListSerialization extension.WriteOptions@{{.*}}NSPropertyList.h:{{[0-9]+}}:{{[0-9]+}}
+// UNSUPPORTED: OS=windows-msvc

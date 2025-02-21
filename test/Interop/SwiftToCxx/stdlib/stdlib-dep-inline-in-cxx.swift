@@ -24,3 +24,4 @@ public func testIntArray() -> [Int] {
 
 // CHECK: namespace swift SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("swift") {
 // CHECK: class SWIFT_SYMBOL("{{.*}}") String final {
+// UNSUPPORTED: OS=windows-msvc

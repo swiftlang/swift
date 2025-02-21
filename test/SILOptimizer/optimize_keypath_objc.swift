@@ -28,3 +28,4 @@ func noKVCString() -> String? {
     // CHECK:      [[RESULT:%.*]] = enum $Optional<String>, #Optional.none
     return (\Foo.noKVCString)._kvcKeyPathString
 }
+// UNSUPPORTED: OS=windows-msvc

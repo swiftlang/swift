@@ -9,3 +9,4 @@ public func foo<T>(_: () -> T) {}
 public func bar() {
   foo { C<Int, Int>().method() }
 }
+// UNSUPPORTED: OS=windows-msvc

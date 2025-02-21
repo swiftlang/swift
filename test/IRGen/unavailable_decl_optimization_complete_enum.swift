@@ -62,3 +62,4 @@ public enum UnavailableEnum {
 
 // CHECK-NO-STRIP: s4Test15UnavailableEnumOMa
 // CHECK-STRIP-NOT: s4Test15UnavailableEnumOMa
+// UNSUPPORTED: OS=windows-msvc

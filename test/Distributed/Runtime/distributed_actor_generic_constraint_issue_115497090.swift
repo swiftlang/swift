@@ -58,3 +58,4 @@ typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
     print("OK")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

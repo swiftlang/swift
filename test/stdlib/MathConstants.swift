@@ -20,3 +20,4 @@ _ = M_PI_4 // expected-warning {{is deprecated: Please use 'Double.pi / 4' or '.
 
 _ = M_SQRT2 // expected-warning {{is deprecated: Please use '2.squareRoot()'. [DeprecatedDeclaration]}}
 _ = M_SQRT1_2 // expected-warning {{is deprecated: Please use '0.5.squareRoot()'. [DeprecatedDeclaration]}}
+// UNSUPPORTED: OS=windows-msvc

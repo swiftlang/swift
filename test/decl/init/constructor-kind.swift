@@ -79,3 +79,4 @@ struct SomeStruct {
     self.init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

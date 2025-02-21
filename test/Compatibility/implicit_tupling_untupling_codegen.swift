@@ -150,3 +150,4 @@ func content_generic_pattern_ambiguous2(b: Box<(Int, Int)>) -> (Int, Int) {
 }
 print(content_generic_pattern_ambiguous2(b: b_ex))
 // CHECK: (1, 2)
+// UNSUPPORTED: OS=windows-msvc

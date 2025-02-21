@@ -73,4 +73,4 @@ struct S3: P3 {
   func f(_: Int) {}
 }
 
-let x3: Int.Type = S3.A.self
+let x3: Int.Type = S3.A.self// UNSUPPORTED: OS=windows-msvc

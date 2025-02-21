@@ -44,3 +44,4 @@ func test5() {
     static func == (lhs: C, rhs: C) -> Bool { true }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

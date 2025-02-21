@@ -64,3 +64,4 @@
 // FILE_C-NOT: sil_witness_table hidden Thing: Hashable module main
 
 struct Thing { var value: Int }
+// UNSUPPORTED: OS=windows-msvc

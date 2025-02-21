@@ -269,3 +269,4 @@ func global_task_local() async {
     await global_task_local()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

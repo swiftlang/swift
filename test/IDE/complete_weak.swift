@@ -40,3 +40,4 @@ class CompleteWeak {
 // UNOWNED_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#Void#]{{; name=.+$}}
 
 }
+// UNSUPPORTED: OS=windows-msvc

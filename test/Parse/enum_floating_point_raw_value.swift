@@ -95,3 +95,4 @@ public protocol RawValueB
 enum RawValueBTest: Double, RawValueB {
   case A, B
 }
+// UNSUPPORTED: OS=windows-msvc

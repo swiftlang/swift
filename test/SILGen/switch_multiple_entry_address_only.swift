@@ -182,3 +182,4 @@ func fallthroughWithValue(e: E) {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

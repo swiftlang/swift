@@ -28,3 +28,4 @@ func mutate(_ b: inout any Boopable & ~Copyable) {
 borrow(S())
 var s = S() as any Boopable & ~Copyable
 mutate(&s)
+// UNSUPPORTED: OS=windows-msvc

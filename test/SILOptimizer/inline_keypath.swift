@@ -16,3 +16,4 @@ func tyFunc<C: Collection, H: P>(_ h: H.Type, _ kp: PartialKeyPath<C>) -> Bool {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

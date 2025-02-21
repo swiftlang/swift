@@ -25,3 +25,4 @@ EnumError.test("default codes") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -65,3 +65,4 @@ public extension SomeObjCClass {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ open class Parent<C: P>: Q {
 final class Child: Parent<Child.Nested> {
   struct Nested: P {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -99,3 +99,4 @@ func test_cancel_while_withTaskCancellationHandler_onlyOnce() async {
     await test_cancel_while_withTaskCancellationHandler_onlyOnce()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

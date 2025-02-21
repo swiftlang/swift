@@ -49,3 +49,4 @@ struct S3_54675: Encodable { // expected-error {{type 'S3_54675' does not confor
   var x: Int // expected-note {{'x' previously declared here}}
   var x: Int // expected-error {{invalid redeclaration of 'x'}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -59,3 +59,4 @@ actor class MyActor2 { }
 
 @objc actor class MyObjCActor2: NSObject {}
 // expected-error@-1 {{keyword 'class' cannot be used as an identifier here}}
+// UNSUPPORTED: OS=windows-msvc

@@ -403,3 +403,4 @@ extension MyActor {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

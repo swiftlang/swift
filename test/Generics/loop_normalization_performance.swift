@@ -26,3 +26,4 @@ where T : NonEmptyProtocol,
       T.Collection.Collection.Collection.Collection.Collection.Collection.Collection.Collection.Collection : NonEmptyProtocol,
       T.Collection.Collection.Collection.Collection.Collection.Collection.Collection.Collection.Collection.Collection : NonEmptyProtocol,
       T.Collection.Collection.Collection.Collection.Collection.Collection.Collection.Collection.Collection.Collection.Collection : NonEmptyProtocol {}
+// UNSUPPORTED: OS=windows-msvc

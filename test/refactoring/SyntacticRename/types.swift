@@ -82,3 +82,4 @@ var _ = /*enum-WithValue*/WithValue . /*case-one*/one
 // RUN: diff -u %S/Outputs/types/enum-WithValue.swift.expected %t.result/types_enum-WithValue.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="case-one" -old-name "one" > %t.result/types_case-one.swift
 // RUN: diff -u %S/Outputs/types/case-one.swift.expected %t.result/types_case-one.swift
+// UNSUPPORTED: OS=windows-msvc

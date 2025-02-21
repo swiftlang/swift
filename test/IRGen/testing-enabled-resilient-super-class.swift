@@ -29,3 +29,4 @@ public func testCase() {
 }
 
 testCase()
+// UNSUPPORTED: OS=windows-msvc

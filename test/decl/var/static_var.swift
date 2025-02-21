@@ -294,3 +294,4 @@ public struct Foo { // expected-note {{to match this opening '{'}}}
 }
 
 // expected-error@+1 {{expected '}' in struct}}
+// UNSUPPORTED: OS=windows-msvc

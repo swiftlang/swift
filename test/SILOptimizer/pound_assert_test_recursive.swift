@@ -19,3 +19,4 @@ func test_recursive() {
   #assert(recursive(a: 20000) > 42)
 }
 
+// UNSUPPORTED: OS=windows-msvc

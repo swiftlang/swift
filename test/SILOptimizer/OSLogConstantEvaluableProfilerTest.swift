@@ -9,3 +9,4 @@
 // RUN: %FileCheck %S/Inputs/OSLogConstantEvaluable.swift < %t/error-output
 //
 // REQUIRES: VENDOR=apple
+// UNSUPPORTED: OS=windows-msvc

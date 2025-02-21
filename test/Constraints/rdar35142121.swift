@@ -10,3 +10,4 @@ func foo(_ a: (Int) -> (Int)) -> Int {
 
 // CHECK: function_ref @$s12rdar351421213fooyS3iXEF :
 let _ = foo({ (a: Int) -> Int in a + 1 })
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ func makeAnAlertView() -> UIAlertView {
                      delegate: nil,
                      cancelButtonTitle: "Abort")
 }
+// UNSUPPORTED: OS=windows-msvc

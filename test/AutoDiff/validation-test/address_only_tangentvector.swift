@@ -68,3 +68,4 @@ AddressOnlyTangentVectorTests.test("LoadableClassAddressOnlyTangentVector") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

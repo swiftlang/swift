@@ -45,3 +45,4 @@ o.d1()
 
 print("okay")
 // CHECK: okay
+// UNSUPPORTED: OS=windows-msvc

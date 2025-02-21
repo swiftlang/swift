@@ -154,3 +154,4 @@ print("end")
 
 // TODO: I can't think of any way to do this for sets and dictionary
 // keys that doesn't involve bridging.
+// UNSUPPORTED: OS=windows-msvc

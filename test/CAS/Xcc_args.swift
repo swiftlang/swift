@@ -65,3 +65,4 @@ module _Macro {
   "use-external-names": true,
   "roots": []
 }
+// UNSUPPORTED: OS=windows-msvc

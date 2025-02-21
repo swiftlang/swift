@@ -55,3 +55,4 @@ entry(%0 : @guaranteed $C):
   %mark = mark_dependence [unresolved] %call : $NEObject on %zero : $Builtin.Int1
   return %mark // expected-note {{this use causes the lifetime-dependent value to escape}}
 }
+// UNSUPPORTED: OS=windows-msvc

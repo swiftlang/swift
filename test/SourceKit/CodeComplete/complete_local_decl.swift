@@ -28,3 +28,4 @@ func test2() {
 // above checks too.
 // RUN: %sourcekitd-test -req=complete -pos=%(line):1 %s -- %s | %FileCheck %s --check-prefix NON_LOCAL
 // NON_LOCAL: key.associated_usrs: "s:{{.*}}test2{{.*}}"
+// UNSUPPORTED: OS=windows-msvc

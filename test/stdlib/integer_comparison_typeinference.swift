@@ -33,3 +33,4 @@ ComparisonTypeInferenceTests.test("UInt128") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

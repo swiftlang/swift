@@ -31,3 +31,4 @@ import Test
 func test() {
     let _ = TrivialABIRecord() // expected-error{{'TrivialABIRecord' is unavailable: C++ classes with `trivial_abi` Clang attribute are not yet available in Swift}}
 }
+// UNSUPPORTED: OS=windows-msvc

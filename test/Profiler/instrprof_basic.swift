@@ -49,3 +49,4 @@ func exceptions() {
 
   // CHECK-NOT: increment_profiler_counter
 }
+// UNSUPPORTED: OS=windows-msvc

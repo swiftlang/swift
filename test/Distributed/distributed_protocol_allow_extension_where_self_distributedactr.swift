@@ -14,3 +14,4 @@ extension GamePlayer where Self: DistributedActor, ActorSystem == LocalTestingDi
 distributed actor FishPlayer: GamePlayer {
   typealias ActorSystem = LocalTestingDistributedActorSystem
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -74,3 +74,4 @@ func test(l: LocalStruct, m: ModStruct) {
   // RUN: %sourcekitd-test -req=cursor -pos=%(line+1):5 %t/test.swift -- -I %t/mods -target %target-triple %t/test.swift | %FileCheck %s --check-prefix=MOD_CURSOR
   m.newFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

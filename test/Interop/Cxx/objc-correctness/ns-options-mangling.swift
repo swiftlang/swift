@@ -9,3 +9,4 @@
 import NSOptionsMangling
 protocol Fooable { }
 extension UIControl.State: Fooable {}
+// UNSUPPORTED: OS=windows-msvc

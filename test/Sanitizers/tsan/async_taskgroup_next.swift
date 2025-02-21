@@ -60,3 +60,4 @@ func test_sum_nextOnCompletedOrPending() async {
     await test_sum_nextOnCompletedOrPending()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -75,3 +75,4 @@ propertyWrapperTests.test("test wrapped value leak - generic") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

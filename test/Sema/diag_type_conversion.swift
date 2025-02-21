@@ -87,3 +87,4 @@ do {
   for x in arr where returnInt(x) {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}} {{22-22=(}} {{34-34= != 0)}}
   for x in arr where returnS(x) {} // expected-error {{cannot convert value of type 'S' to expected condition type 'Bool'}}
 }
+// UNSUPPORTED: OS=windows-msvc

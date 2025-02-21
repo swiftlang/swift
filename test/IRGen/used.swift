@@ -31,3 +31,4 @@
 // IR-SAME: ptr @"$s4used2g1Si_Sitvp"
 // IR-SAME: ptr @"$s4used2g2Sbvp"
 // IR-SAME: ptr @"$s4used3fooyyF"
+// UNSUPPORTED: OS=windows-msvc

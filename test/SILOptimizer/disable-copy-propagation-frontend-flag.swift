@@ -101,3 +101,4 @@
 // CHECK-CPON-DHON: destroy-addr-hoisting
 
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

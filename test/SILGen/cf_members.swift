@@ -301,3 +301,4 @@ public func importGlobalVarsAsProperties()
   // CHECK: global_addr @kCCPowerSupplyDefaultPower
   return (CCPowerSupply.defaultPower, CCPowerSupply.AC, CCPowerSupply.DC)
 }
+// UNSUPPORTED: OS=windows-msvc

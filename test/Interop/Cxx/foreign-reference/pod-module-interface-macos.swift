@@ -7,3 +7,4 @@
 
 // CHECK: @available(macOS 13.3.0, *)
 // CHECK-NEXT: class MultipleAttrs {
+// UNSUPPORTED: OS=windows-msvc

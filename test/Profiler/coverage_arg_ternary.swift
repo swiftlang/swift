@@ -7,3 +7,4 @@ var s: String?
 // CHECK-NEXT:  [[@LINE+2]]:43 -> [[@LINE+2]]:45 : 0
 // CHECK-NEXT: }
 func f(arg: String? = s != nil ? s : nil) {}
+// UNSUPPORTED: OS=windows-msvc

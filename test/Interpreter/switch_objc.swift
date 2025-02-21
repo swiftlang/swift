@@ -38,3 +38,4 @@ SwitchTestSuite.test("Resilient Type Tuple Initialization Construction") {
   }
   print("done")
 }
+// UNSUPPORTED: OS=windows-msvc

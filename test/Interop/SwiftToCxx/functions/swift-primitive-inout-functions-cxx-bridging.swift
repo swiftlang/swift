@@ -49,3 +49,4 @@ public func inoutTypeWithNullability(_ x: inout UnsafeRawPointer) {
 public func inoutUnsafeGenericPointer(_ x: inout UnsafePointer<Int32>) {
     x += 1
 }
+// UNSUPPORTED: OS=windows-msvc

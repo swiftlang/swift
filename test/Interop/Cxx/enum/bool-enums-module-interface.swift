@@ -38,3 +38,4 @@
 // CHECK-NEXT:      typealias RawValue = Bool
 // CHECK-NEXT:    }
 // CHECK-NEXT:  }
+// UNSUPPORTED: OS=windows-msvc

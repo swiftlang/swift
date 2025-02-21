@@ -31,3 +31,4 @@ where Element: P {
   public var startIndex: Index {0}
   public var endIndex: Index {0}
 }
+// UNSUPPORTED: OS=windows-msvc

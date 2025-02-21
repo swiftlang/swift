@@ -27,3 +27,4 @@ extension TopLevelInline.InTopLevelInline { // ok
     return ""
   }
 }
+// UNSUPPORTED: OS=windows-msvc

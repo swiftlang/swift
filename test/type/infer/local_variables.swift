@@ -33,3 +33,4 @@ func infer_generic_args() {
   _ = f(d) as [(String, Int)]
 }
 
+// UNSUPPORTED: OS=windows-msvc

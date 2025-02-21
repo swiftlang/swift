@@ -23,4 +23,4 @@
 // RUN: %target-swift-frontend -c %s -g -cas-backend -cas-emit-casid-file -cas-backend-mode=casid -cas-path %t/cas -o %t/test.id
 // RUN: not cat %t/test.id.casid
 
-func testFunc() {}
+func testFunc() {}// UNSUPPORTED: OS=windows-msvc

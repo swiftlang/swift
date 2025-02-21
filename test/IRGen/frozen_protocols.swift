@@ -49,3 +49,4 @@ public struct ConformsToFrozenProtocol : FrozenProtocol {
 // allows for a protocol to be retroactively declared as @_fixed_layout
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16frozen_protocols14FrozenProtocolP14protocolMethodyyFTj"(
 
+// UNSUPPORTED: OS=windows-msvc

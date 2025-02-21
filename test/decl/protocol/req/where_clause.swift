@@ -30,3 +30,4 @@ protocol InvalidWhereClause2 {
   associatedtype T where Self: AlsoBad
   // expected-error@-1 {{constraint with subject type of 'Self' is not supported; consider adding requirement to protocol inheritance clause instead}}
 }
+// UNSUPPORTED: OS=windows-msvc

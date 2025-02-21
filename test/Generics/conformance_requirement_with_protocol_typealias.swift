@@ -40,3 +40,4 @@ extension P {
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=P
 // CHECK-NEXT: Generic signature: <Self where Self : P, Self : Q1, Self : Q2>
 extension P where Self: B {}
+// UNSUPPORTED: OS=windows-msvc

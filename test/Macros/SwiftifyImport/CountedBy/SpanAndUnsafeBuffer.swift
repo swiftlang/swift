@@ -13,3 +13,4 @@ func myFunc(_ ptr1: UnsafePointer<CInt>, _ len1: CInt, _ ptr2: UnsafePointer<CIn
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -38,3 +38,4 @@ public func f(_ k: @convention(c, cType: "size_t (*)(void)") () -> Int) {
 f(ctypes.returns_size_t) // OK: check that importing preserves Clang type
 
 // CHECK: sil @$s3tmp1fyySiyXzC9_ZTSPFmvEF
+// UNSUPPORTED: OS=windows-msvc

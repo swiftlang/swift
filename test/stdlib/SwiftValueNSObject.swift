@@ -165,3 +165,4 @@ if #available(OSX 10.12, iOS 10.0, *) {
   fputs("d ##This is D's description##\n", stderr)
   fputs("S ##__SwiftValue##\n", stderr)
 }
+// UNSUPPORTED: OS=windows-msvc

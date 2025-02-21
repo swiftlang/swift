@@ -64,3 +64,4 @@
 // CHECK-REALLY-EMPTY: error: could not find module 'Swift' for target '{{.*}}'; found: garbage-garbage-garbage, at: {{.*}}/Swift.swiftmodule
 
 let x: Int = 1
+// UNSUPPORTED: OS=windows-msvc

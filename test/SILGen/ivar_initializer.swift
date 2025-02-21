@@ -24,3 +24,4 @@ public class OtherDerived : OtherMiddle {
 // CHECK-LABEL: sil hidden [ossa] @$s16ivar_initializer9MyDerivedCfeTo : $@convention(objc_method) (@owned MyDerived) -> @owned MyDerived {
 
 // CHECK-LABEL: sil hidden [ossa] @$s16ivar_initializer12OtherDerivedCfeTo : $@convention(objc_method) (@owned OtherDerived) -> @owned OtherDerived {
+// UNSUPPORTED: OS=windows-msvc

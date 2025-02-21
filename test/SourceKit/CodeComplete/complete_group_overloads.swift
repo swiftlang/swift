@@ -112,3 +112,4 @@ func test007() {
 // BAR_INIT_2-NEXT:   Bar()
 // BAR_INIT_2-NEXT:   Bar(x: A)
 // BAR_INIT_2-NEXT:   Bar(x: B)
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ struct G<each T> {}
 
 // Type aliases are OK
 typealias A<each T> = (repeat each T)
+// UNSUPPORTED: OS=windows-msvc

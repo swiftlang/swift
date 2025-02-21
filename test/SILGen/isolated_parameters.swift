@@ -65,3 +65,4 @@ public func testOptionalIsolatedExistential(_ a: isolated (any Actor)?) async {
   // CHECK: hop_to_executor [[ACTOR_BORROW]] : $Optional<any Actor>
   // CHECK: return
 }
+// UNSUPPORTED: OS=windows-msvc

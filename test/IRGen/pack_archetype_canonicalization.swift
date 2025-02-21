@@ -10,3 +10,4 @@ public struct GG<each T> {
     fatalError()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

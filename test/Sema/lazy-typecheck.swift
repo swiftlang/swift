@@ -5,3 +5,4 @@
 // should be emitted for this semantically invalid code.
 
 var x: DoesNotExist
+// UNSUPPORTED: OS=windows-msvc

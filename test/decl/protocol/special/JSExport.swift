@@ -19,3 +19,4 @@ import Foundation
 @objc protocol Sub3 : Sub2 { }
 
 protocol ReexportJSExport : RootJSExport, JSExport { }
+// UNSUPPORTED: OS=windows-msvc

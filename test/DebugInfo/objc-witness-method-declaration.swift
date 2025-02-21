@@ -15,3 +15,4 @@ class SomeClass {
 
     @objc func foo() {}
 }
+// UNSUPPORTED: OS=windows-msvc

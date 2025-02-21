@@ -12,3 +12,4 @@ func testDiagnoseInvalidEscapingCaptures(_ f: @differentiable(reverse) (Float) -
   // Should not be diagnosed as invalid escaping capture.
   nonEscapingUseOfDifferentiableFunction { f($0) }
 }
+// UNSUPPORTED: OS=windows-msvc

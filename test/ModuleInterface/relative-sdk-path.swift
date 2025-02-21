@@ -13,3 +13,4 @@ import OtherModule
 func fn(_: Int) {
     let _ = OtherStruct()
 }
+// UNSUPPORTED: OS=windows-msvc

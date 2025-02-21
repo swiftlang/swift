@@ -25,3 +25,4 @@
 // CHECK-NOT: work-dir: REMAPPED_OUT_DIR
 
 // CHECK-NOT: file1.o-[[UNIT_HASH]]
+// UNSUPPORTED: OS=windows-msvc

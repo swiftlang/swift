@@ -27,3 +27,4 @@ actor Bar {
     ns.foo() // expected-note {{access can happen concurrently}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -490,3 +490,4 @@ func testGlobalInitializer() {
 // GLOBAL_WITHINIT-DAG: Decl[TypeAlias]/OtherModule[Swift]/IsSystem: AnyObject[#Builtin.AnyObject#]; name=AnyObject
 // GLOBAL_WITHINIT-NOT: name=AnyObject(
 }
+// UNSUPPORTED: OS=windows-msvc

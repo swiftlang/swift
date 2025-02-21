@@ -24,3 +24,4 @@ func f3<T: P2>(_: T) where T.A == () -> () {}
 // CHECK-LABEL: typed_throws.(file).f4@
 // CHECK-NEXT: Generic signature: <T where T : P2, T.[P2]E == any Error>
 func f4<T: P2>(_: T) where T.A == () throws -> () {}
+// UNSUPPORTED: OS=windows-msvc

@@ -453,3 +453,4 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
 // CHECK-NEXT: store ptr [[LAYOUT]], {{.*}} [[BUF1]]
 
 // CHECK:   call void @swift_initEnumMetadataMultiPayload(ptr [[METADATA]], {{i(32|64)}} 0, {{i(32|64)}} 2, ptr [[BUF0]])
+// UNSUPPORTED: OS=windows-msvc

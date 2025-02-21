@@ -14,3 +14,4 @@ public func baseline() {}
 // CHECK: func test(_: IndirectlyImportedStruct)
 // CHECK-RECOVERY-NOT: IndirectlyImportedStruct
 public func test(_: IndirectlyImportedStruct) {}
+// UNSUPPORTED: OS=windows-msvc

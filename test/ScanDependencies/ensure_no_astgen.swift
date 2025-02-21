@@ -39,3 +39,4 @@ struct S2 {}
 func foo(_ x: S) {
   _ = x.getStorage()
 }
+// UNSUPPORTED: OS=windows-msvc

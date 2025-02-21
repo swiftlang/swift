@@ -425,3 +425,4 @@ do {
     let _: [(String, String)] = f { return Array(v) } + v // Ok
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -98,3 +98,4 @@ private class PrivateClass {
 // SOURCE-LOC: comments-hidden.swift:43:10: Constructor/PublicClass.init
 // SOURCE-LOC: comments-hidden.swift:45:10: Subscript/PublicClass.subscript
 // SOURCE-LOC: comments-hidden.swift:52:15: Func/-=
+// UNSUPPORTED: OS=windows-msvc

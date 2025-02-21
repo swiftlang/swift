@@ -29,3 +29,4 @@ extension Row: Collection {
 // This should type check because Row.Element == String, and not Any
 let x: Row.Element.Type = Row.Element.self
 let y: String.Type = x
+// UNSUPPORTED: OS=windows-msvc

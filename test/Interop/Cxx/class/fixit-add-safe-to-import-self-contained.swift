@@ -41,3 +41,4 @@ public func test(x: X) {
   // CHECK: SWIFT_SELF_CONTAINED
   x.other()
 }
+// UNSUPPORTED: OS=windows-msvc

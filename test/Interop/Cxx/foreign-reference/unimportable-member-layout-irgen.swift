@@ -34,3 +34,4 @@ public func test(y: UnimportableMemberValue) -> CInt {
   return y.y
 }
 
+// UNSUPPORTED: OS=windows-msvc

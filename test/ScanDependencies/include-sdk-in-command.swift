@@ -9,3 +9,4 @@ func foo() { print(1) }
 
 // CHECK: "-sdk",
 // CHECK-NEXT: mysecretsdk.sdk
+// UNSUPPORTED: OS=windows-msvc

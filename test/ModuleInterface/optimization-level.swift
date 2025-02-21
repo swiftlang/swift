@@ -14,3 +14,4 @@
 // UNOPT-NOT: AccessMarkerElimination
 public func f() {}
 
+// UNSUPPORTED: OS=windows-msvc

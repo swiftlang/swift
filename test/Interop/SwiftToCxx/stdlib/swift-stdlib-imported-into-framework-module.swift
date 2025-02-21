@@ -81,3 +81,4 @@ void testUseSwiftStdlibAPIsFromTwoFrameworksImportedViaModules() {
     auto swiftString2 = Second::testSwiftFuncTwo();
     auto c2 = swiftString.getCount();
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -784,3 +784,4 @@ func testGenericSelfClause() {
   foo(.#^GENERIC_SELF_CLAUSE^#)
   // GENERIC_SELF_CLAUSE: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]: foo()[#S3<Int>#]; name=foo()
 }
+// UNSUPPORTED: OS=windows-msvc

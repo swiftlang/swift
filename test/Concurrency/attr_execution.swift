@@ -15,3 +15,4 @@ func concurrentTest() async {}
 // CHECK: sil hidden [ossa] @$s14attr_execution10callerTestyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
 @execution(caller)
 func callerTest() async {}
+// UNSUPPORTED: OS=windows-msvc

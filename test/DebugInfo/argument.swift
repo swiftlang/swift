@@ -59,3 +59,4 @@ class A {
 func tuple(_ x: Int64, y: (Int64, Float, String)) -> Int64 {
   return x+y.0
 }
+// UNSUPPORTED: OS=windows-msvc

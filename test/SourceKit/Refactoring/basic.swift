@@ -276,3 +276,4 @@ func hasCallToAsyncAlternative(c: ConvertAsync) {
 
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_swift_parser
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ extension LazyCat : PurrExtractor {}
 
 // Dummy statement
 _ = ()
+// UNSUPPORTED: OS=windows-msvc

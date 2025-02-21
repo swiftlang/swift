@@ -119,3 +119,4 @@ public struct MyStruct {
   func log<T: AppleLogging.Loggable>(_ arg: T) {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ module TypedefStructUnderscore {
 typedef struct _MyStruct {
     int myField;
 } MyStruct;
+// UNSUPPORTED: OS=windows-msvc

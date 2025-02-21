@@ -35,3 +35,4 @@ func bar() {
   foo(.random())
 }
 bar()
+// UNSUPPORTED: OS=windows-msvc

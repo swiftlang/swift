@@ -37,3 +37,4 @@ bar()
 // IP:      #0 0x{{[0-9a-f]+}} in main.foo() -> ()+0x
 // IP-NEXT: #1 0x{{[0-9a-f]+}} in main.bar() -> ()+0x
 // IP-NEXT: #2 0x{{[0-9a-f]+}} in main+0x
+// UNSUPPORTED: OS=windows-msvc

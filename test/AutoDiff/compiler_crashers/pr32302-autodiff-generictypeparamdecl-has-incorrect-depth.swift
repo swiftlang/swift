@@ -56,3 +56,4 @@ extension Differentiable {
 // #21 0x00000000004b2c72 main /work/software/swift-stocktoolchain/swift/tools/driver/driver.cpp:20:3
 // #22 0x00007ffbfbb170b3 __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x270b3)
 // #23 0x00000000004b2b7e _start (/work/software/swift-stocktoolchain/build/ds/swift-linux-x86_64/bin/swift-frontend+0x4b2b7e)
+// UNSUPPORTED: OS=windows-msvc

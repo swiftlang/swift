@@ -281,3 +281,4 @@ entry(%0 : @owned $C, %1 : @owned $C):
   %void = tuple()
   return %void : $()
 }
+// UNSUPPORTED: OS=windows-msvc

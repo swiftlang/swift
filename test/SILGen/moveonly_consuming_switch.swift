@@ -32,3 +32,4 @@ func maybeMaybeVoid2Optional<Wrapped: ~Copyable>(_ o2: consuming MaybeMaybeVoid<
     return .some(wrapped)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

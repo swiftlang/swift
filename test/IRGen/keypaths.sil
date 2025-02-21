@@ -605,3 +605,4 @@ sil @s_hash : $@convention(keypath_accessor_hash) <A: Hashable, B: Hashable> (@i
 
 sil @v_get : $@convention(keypath_accessor_getter) <A: Hashable, B: Hashable> (@in_guaranteed B, @in_guaranteed Int) -> @out A
 sil @v_set : $@convention(keypath_accessor_setter) <A: Hashable, B: Hashable> (@in_guaranteed A, @in_guaranteed B, @in_guaranteed Int) -> ()
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@
 // RUN: echo '#include "header3.h"' > %t.m
 // RUN: %sourcekitd-test -req=interface-gen -header %S/Inputs/header3.h -swift-version=5 -- -fsyntax-only %t.m -I %S/Inputs > %t.header3.response
 // RUN: %diff -u %s.header3.response %t.header3.response
+// UNSUPPORTED: OS=windows-msvc

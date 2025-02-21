@@ -47,3 +47,4 @@ func testing(obj: C) {
 // CHECK_1-NEXT:    - Name: returnsConcreteTarget2()
 // CHECK_1-NEXT:      TypeName: ConcreteTarget2
 // CHECK_1-NEXT: -----END CONFORMING METHOD LIST-----
+// UNSUPPORTED: OS=windows-msvc

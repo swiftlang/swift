@@ -52,3 +52,4 @@ private class PrivateOuter {
 // OTHER-FILE-NOT: fromMainFile
 // OTHER-FILE: fromOtherFile
 // OTHER-FILE-NOT: fromMainFile
+// UNSUPPORTED: OS=windows-msvc

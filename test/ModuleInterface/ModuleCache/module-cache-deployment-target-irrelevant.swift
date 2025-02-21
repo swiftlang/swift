@@ -30,3 +30,4 @@
 // RUN: if [ ! $NUM_OTHER_MODULES -eq 1 ]; then echo "Should only be 1 OtherModule, found $NUM_OTHER_MODULES"; exit 1; fi
 import LeafModule
 import OtherModule
+// UNSUPPORTED: OS=windows-msvc

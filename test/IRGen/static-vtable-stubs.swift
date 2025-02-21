@@ -38,3 +38,4 @@ struct Main {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

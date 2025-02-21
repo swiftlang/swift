@@ -32,3 +32,4 @@ let protocolPropertyCopy = incompleteTypeConsumer.propertyUsingAForwardDeclaredP
 incompleteTypeConsumer.propertyUsingAForwardDeclaredProtocol1 = incompleteProtocol
 _ = CFunctionReturningAForwardDeclaredProtocol1()
 CFunctionTakingAForwardDeclaredProtocol1(incompleteProtocol)
+// UNSUPPORTED: OS=windows-msvc

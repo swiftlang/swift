@@ -48,3 +48,4 @@ S21.`init`(0)
 _ = S22(0)
 _ = S22.init(0)
 _ = S22.`init`(0) // expected-error {{type 'S22' has no member 'init'}}
+// UNSUPPORTED: OS=windows-msvc

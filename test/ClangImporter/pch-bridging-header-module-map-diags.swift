@@ -11,3 +11,4 @@
 // RUN: %target-swift-frontend -F %S/Inputs/ModuleMapWarning -import-objc-header %S/Inputs/ModuleMapWarning/bridging-pch.h -pch-output-dir %t/pch -typecheck %s
 
 
+// UNSUPPORTED: OS=windows-msvc

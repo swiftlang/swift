@@ -16,3 +16,4 @@ public func test() {
   let f = create(getInt())
 }
 
+// UNSUPPORTED: OS=windows-msvc

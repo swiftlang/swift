@@ -65,3 +65,4 @@ package enum TestRawTypePackage: IntLike {
 
 package protocol TestRefinedProtoPackage: BadProto {
 }
+// UNSUPPORTED: OS=windows-msvc

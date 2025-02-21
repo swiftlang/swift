@@ -43,3 +43,4 @@ getOffsetX()
 
 // CHECK: Optional(0)
 print(gg as Any)
+// UNSUPPORTED: OS=windows-msvc

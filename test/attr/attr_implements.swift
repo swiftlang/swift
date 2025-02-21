@@ -107,3 +107,4 @@ struct XWithAssoc: PWithAssoc {
   @_implements(PWithAssoc, A)
   typealias __P_A = Int
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -113,3 +113,4 @@ entry(%b : $Error):
   // CHECK: ret { ptr, ptr } [[RET2]]
   return %m : $@thick Error.Type
 }
+// UNSUPPORTED: OS=windows-msvc

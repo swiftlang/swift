@@ -59,4 +59,4 @@ extension Slice {
     let rebased = UnsafeBufferPointer<Element>(rebased: self)
     return try rebased.withMemoryRebound(to: T.self, body)
   }
-}
+}// UNSUPPORTED: OS=windows-msvc

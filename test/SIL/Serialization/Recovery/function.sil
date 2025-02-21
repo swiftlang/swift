@@ -24,3 +24,4 @@ sil @missingResult : $@convention(thin) () -> (SoonToBeMissing) {
 entry:
   unreachable
 }
+// UNSUPPORTED: OS=windows-msvc

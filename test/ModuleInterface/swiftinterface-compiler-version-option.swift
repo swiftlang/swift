@@ -46,3 +46,4 @@
 public struct S {
     public var test: Int = 42
 }
+// UNSUPPORTED: OS=windows-msvc

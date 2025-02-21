@@ -32,3 +32,4 @@ public class MOHaver {
     self.mo = MO()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

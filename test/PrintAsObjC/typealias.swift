@@ -24,4 +24,4 @@ public typealias PassesThroughGeneric = GenericHelper<Int>.TheType
   @objc public var actuallyGeneric: ActuallyGeneric<Int> = 0
   // CHECK: @property (nonatomic) NSInteger passesThroughGeneric;
   @objc public var passesThroughGeneric: PassesThroughGeneric = 0
-} // CHECK: @end
+} // CHECK: @end// UNSUPPORTED: OS=windows-msvc

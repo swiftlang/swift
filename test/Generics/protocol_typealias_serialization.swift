@@ -11,3 +11,4 @@ func useP1<T : P1>(_: T) where T.X == Int {}
 // CHECK-LABEL: .useP2@
 // CHECK-NEXT: <T where T : P2, T.[P2]Z == Int>
 func useP2<T : P2>(_: T) where T.C == Array<Int> {}
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ func testProtocolMembers(_ p: ObjCProtocol) {
   if #_hasSymbol(p.protocolMemberProperty) {} // expected-error {{'#_hasSymbol' cannot be used with Objective-C property 'protocolMemberProperty'; use respondsToSelector() instead}}
   if #_hasSymbol(p.protocolMemberMethod) {} // expected-error {{'#_hasSymbol' cannot be used with Objective-C method 'protocolMemberMethod'; use respondsToSelector() instead}}
 }
+// UNSUPPORTED: OS=windows-msvc

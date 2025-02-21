@@ -11,3 +11,4 @@ import gizmo
 // CHECK-NOT: sil_witness_table shared NSFungingMask: RawRepresentable module gizmo
 // CHECK-NOT: sil_witness_table hidden NSRuncingOptions: Bub module objc_enum
 
+// UNSUPPORTED: OS=windows-msvc

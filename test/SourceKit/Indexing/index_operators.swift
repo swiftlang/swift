@@ -21,3 +21,4 @@ struct StructB {
         return lhs
     }
 }
+// UNSUPPORTED: OS=windows-msvc

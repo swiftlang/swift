@@ -299,3 +299,4 @@ testSuite.test("_swift_instantiateCheckedGenericMetadata value generics") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

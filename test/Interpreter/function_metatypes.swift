@@ -53,3 +53,4 @@ var xy = (0, 0)
 gio(&xy)
 print(xy)
 // CHECK: (8080, 9090)
+// UNSUPPORTED: OS=windows-msvc

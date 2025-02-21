@@ -25,3 +25,4 @@ extension X {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

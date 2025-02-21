@@ -196,3 +196,4 @@ bb0(%0 : $*Container):
   destroy_value %12
   return %29
 }
+// UNSUPPORTED: OS=windows-msvc

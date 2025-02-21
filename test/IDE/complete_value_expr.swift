@@ -1860,3 +1860,4 @@ func testRdar90136020() {
 // RDAR90136020: Decl[Struct]/OtherModule[Swift]/IsSystem/TypeRelation[Convertible]: Int64[#Int64#]; name=Int64
 // RDAR90136020-NOT: name=Int64{{$}}
 }
+// UNSUPPORTED: OS=windows-msvc

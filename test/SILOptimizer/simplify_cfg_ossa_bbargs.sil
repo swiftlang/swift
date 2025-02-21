@@ -315,3 +315,4 @@ bb2:
   return %t : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

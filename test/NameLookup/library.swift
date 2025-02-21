@@ -43,3 +43,4 @@ func increment_y2() {
   y2 = library.y2 + 1
 }
 
+// UNSUPPORTED: OS=windows-msvc

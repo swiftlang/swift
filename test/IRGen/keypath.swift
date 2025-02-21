@@ -18,3 +18,4 @@ class TheTest {
     _ = SubclassOfResilientBase(0)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -34,3 +34,4 @@ public func foobar(i: Int) {
 // and break the expectations that each trap point is unique.
 // CHECK-NOT: @"$es17_assertionFailure__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF"
 // CHECK-NOT: @"$ss17_assertionFailure__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF"
+// UNSUPPORTED: OS=windows-msvc

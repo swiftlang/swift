@@ -50,3 +50,4 @@ func test() {
 // EXPLICIT_GLOBAL_VAR-DAG: Decl[LocalVar]/Local: globalValue[#String?#][' async']; name=globalValue{{$}}
 
 }
+// UNSUPPORTED: OS=windows-msvc

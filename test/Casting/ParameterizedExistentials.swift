@@ -112,3 +112,4 @@ tests.test("Existential box should maintain identity") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

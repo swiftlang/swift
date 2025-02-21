@@ -35,3 +35,4 @@ public func testUsableFromInline() {
 
 testUsableFromInline()
 // CHECK: 3
+// UNSUPPORTED: OS=windows-msvc

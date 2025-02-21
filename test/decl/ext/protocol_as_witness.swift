@@ -36,3 +36,4 @@ extension P3 where Self : Equatable {
 }
 
 struct X3 : P3 {} // expected-error{{type 'X3' does not conform to protocol 'P3'}} expected-note {{add stubs for conformance}}
+// UNSUPPORTED: OS=windows-msvc

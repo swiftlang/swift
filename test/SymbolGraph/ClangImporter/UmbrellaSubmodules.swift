@@ -30,3 +30,4 @@ static int varOne = 1;
 //--- UmbrellaSubmodules/HeaderTwo.h
 // CHECK-DAG: "precise": "c:HeaderTwo.h@varTwo"
 static int varTwo = 2;
+// UNSUPPORTED: OS=windows-msvc

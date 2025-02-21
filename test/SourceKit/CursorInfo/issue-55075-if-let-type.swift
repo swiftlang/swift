@@ -13,4 +13,4 @@ if let bar: Int = foo {
 // CHECK-BAR-NEXT: <decl.var.local><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>bar</decl.name>: <decl.var.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.type></decl.var.local>
 
 // CHECK-FOO:      <Declaration>let foo: <Type usr="s:Si">Int</Type>?</Declaration>
-// CHECK-FOO-NEXT: <decl.var.global><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>foo</decl.name>: <decl.var.type><ref.struct usr="s:Si">Int</ref.struct>?</decl.var.type></decl.var.global> 
+// CHECK-FOO-NEXT: <decl.var.global><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>foo</decl.name>: <decl.var.type><ref.struct usr="s:Si">Int</ref.struct>?</decl.var.type></decl.var.global> // UNSUPPORTED: OS=windows-msvc

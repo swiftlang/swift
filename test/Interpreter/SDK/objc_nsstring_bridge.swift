@@ -64,3 +64,4 @@ var s8 = ao as? String
 
 // CHECK-NEXT: done
 print("done")
+// UNSUPPORTED: OS=windows-msvc

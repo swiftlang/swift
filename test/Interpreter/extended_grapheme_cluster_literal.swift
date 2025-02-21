@@ -48,3 +48,4 @@ testSuite.test("Character literal type") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -169,3 +169,4 @@ protocol SwiftProto {}
 @objc protocol ObjCProto {}
 extension CCRefrigerator: ObjCProto {} // expected-error {{Core Foundation class 'CCRefrigerator' cannot conform to @objc protocol 'ObjCProto' because Core Foundation types are not classes in Objective-C}}
 extension CCRefrigerator: SwiftProto {}
+// UNSUPPORTED: OS=windows-msvc

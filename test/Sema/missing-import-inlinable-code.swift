@@ -109,3 +109,4 @@ extension ImportedType {
     public func localModuleMethod() {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

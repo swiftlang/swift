@@ -20,3 +20,4 @@ func bar() {}
 } // expected-error{{extraneous '}' at top level}} {{1-3=}}
 } // expected-error{{extraneous '}' at top level}} {{1-3=}}
 
+// UNSUPPORTED: OS=windows-msvc

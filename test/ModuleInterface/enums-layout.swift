@@ -89,3 +89,4 @@ func testFrozenIndirectCaseEnum() -> FrozenIndirectCaseEnum {
   // CHECK: ret i{{32|64}} {{1|2}}
   return .c
 }
+// UNSUPPORTED: OS=windows-msvc

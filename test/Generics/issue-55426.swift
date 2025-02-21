@@ -24,3 +24,4 @@ extension Vector where
 
   func column(_ index: Index) -> Element { Element { self[$0][index] } }
 }
+// UNSUPPORTED: OS=windows-msvc

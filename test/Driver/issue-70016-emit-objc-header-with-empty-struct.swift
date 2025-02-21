@@ -2,3 +2,4 @@
 
 public struct Struct {}
 public func foo(_ x: Struct) {}
+// UNSUPPORTED: OS=windows-msvc

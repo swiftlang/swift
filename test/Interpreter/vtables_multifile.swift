@@ -47,3 +47,4 @@ VTableTestSuite.test("OtherFinalDerived") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

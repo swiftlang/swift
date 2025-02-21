@@ -21,3 +21,4 @@ public func use() {
     print(OldModuleType.property)
 }
 // CHECK-NOT: @{{.*}}8property{{.*}}vau :
+// UNSUPPORTED: OS=windows-msvc

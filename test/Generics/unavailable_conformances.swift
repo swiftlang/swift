@@ -50,3 +50,4 @@ extension Foo.Bar: Equatable {
 extension Foo.Bar: Hashable {
     func hash(into hasher: inout Hasher) {}
 }
+// UNSUPPORTED: OS=windows-msvc

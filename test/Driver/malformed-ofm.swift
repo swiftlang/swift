@@ -12,3 +12,4 @@
 {
   "/path/to/some/file.swift": {
     "dependencies": "
+// UNSUPPORTED: OS=windows-msvc

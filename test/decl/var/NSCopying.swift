@@ -36,3 +36,4 @@ class CopyingClassTest {
   init() {}
   
 }
+// UNSUPPORTED: OS=windows-msvc

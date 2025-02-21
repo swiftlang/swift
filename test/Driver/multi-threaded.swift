@@ -90,3 +90,4 @@
 
 func libraryFunction() {}
 
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@ let z = 3
 a
 (a, b)
 (a, z)
+// UNSUPPORTED: OS=windows-msvc

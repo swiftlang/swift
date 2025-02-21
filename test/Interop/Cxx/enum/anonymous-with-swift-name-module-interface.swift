@@ -108,3 +108,4 @@
 // CHECK: }
 // CHECK: @available(swift, obsoleted: 3, renamed: "GlobalNewName")
 // CHECK: typealias GlobalOldName = GlobalNewName
+// UNSUPPORTED: OS=windows-msvc

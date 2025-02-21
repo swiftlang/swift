@@ -21,3 +21,4 @@ func diffEscapingFunc(fn: @escaping @differentiable(reverse) (Float) -> Float) -
 
 // CHECK-LABEL: sil hidden [ossa] @$s8mangling18linearEscapingFunc2fnS2fYjlcS2fYjlc_tF : 
 func linearEscapingFunc(fn: @escaping @differentiable(_linear) (Float) -> Float) -> @differentiable(_linear) (Float) -> Float { fn }
+// UNSUPPORTED: OS=windows-msvc

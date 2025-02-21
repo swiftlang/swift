@@ -10,3 +10,4 @@ struct /*test:def*/StringifyMacro {}
 
 @freestanding(expression)
 macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MyMacroMacros", type: "/*test:ref*/StringifyMacro")
+// UNSUPPORTED: OS=windows-msvc

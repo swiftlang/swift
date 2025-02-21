@@ -40,3 +40,4 @@ UsesSubmodule.useSomethingFromSubmodule()
 // CHECK-WITH-DISABLED-DAG: !{!"-framework", !"Barrel"}
 // CHECK-WITH-DISABLED-DAG: !{!"-framework", !"Indirect"}
 // NEGATIVE-WITH-DISABLED-NOT: !"LinkFramework"
+// UNSUPPORTED: OS=windows-msvc

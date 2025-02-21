@@ -33,3 +33,4 @@ print("OK!")
 // CHECK: global is nil
 // CHECK: end of deinit
 // CHECK: OK!
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ class MyTestCase : XCTestCase {
   func testSomeAsync() async {}
   // CHECK: [[@LINE-1]]:8 | instance-method(test,swift_async)/Swift | testSomeAsync() |
 }
+// UNSUPPORTED: OS=windows-msvc

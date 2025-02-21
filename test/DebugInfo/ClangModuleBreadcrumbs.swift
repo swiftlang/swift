@@ -30,3 +30,4 @@ let _ = someFunc(0)
 // REMAP: !DICompileUnit(language: DW_LANG_{{ObjC|C99|C11}},{{.*}} producer: "{{.*}}Swift{{.*}}PREFIX{{/|\\\\}}{{.*}}{{/|\\\\}}OtherClangModule{{.*}}dwoId:
 
 // REMAP: !DICompileUnit(language: DW_LANG_{{ObjC|C99|C11}},{{.*}} producer: "{{.*}}clang{{.*}}PREFIX{{/|\\\\}}{{.*}}{{/|\\\\}}ClangModule{{.*}}dwoId:
+// UNSUPPORTED: OS=windows-msvc

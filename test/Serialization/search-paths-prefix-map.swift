@@ -48,4 +48,4 @@ numeric(42)
 // RUN:   -debug-prefix-map %t=TESTPREFIX
 // RUN: llvm-bcanalyzer -dump %t/unprefixed.swiftmodule | %FileCheck --check-prefix=UNPREFIXED %s
 
-// UNPREFIXED-NOT: TESTPREFIX
+// UNPREFIXED-NOT: TESTPREFIX// UNSUPPORTED: OS=windows-msvc

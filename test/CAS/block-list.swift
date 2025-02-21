@@ -75,3 +75,4 @@ ShouldUseLayoutStringValueWitnesses:
 PlaceHolder:
     ModuleName:
         - A
+// UNSUPPORTED: OS=windows-msvc

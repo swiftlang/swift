@@ -34,3 +34,4 @@ public distributed actor MyActorGenericsOnType<Act: ClusterSingleton> {
     fatalError("mock impl")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@ protocol P {
                       UnsafeMutableRawPointer?) -> CInt
 }
 
+// UNSUPPORTED: OS=windows-msvc

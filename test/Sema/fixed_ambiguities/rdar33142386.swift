@@ -4,3 +4,4 @@
 let x: String = "ultimate question"
 // CHECK: function_ref @$sSmsE6filteryxSb7ElementQzKXEKF
 _ = x.filter({ $0 == " " }).count < 3
+// UNSUPPORTED: OS=windows-msvc

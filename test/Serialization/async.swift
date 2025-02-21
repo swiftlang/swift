@@ -21,3 +21,4 @@ func testSerializedAsyncLet() async {
 func testSerializedAsyncLetTyped() async {
   await doSerializedAsyncLetTyped()
 }
+// UNSUPPORTED: OS=windows-msvc

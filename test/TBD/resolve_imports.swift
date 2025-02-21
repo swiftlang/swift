@@ -39,3 +39,4 @@ public struct S: PrivateProto {}
 // CHECK-NEXT: T _$s15resolve_imports1SVSQAAMc
 // CHECK-NEXT: T _$s15resolve_imports1SVSQAASQ2eeoiySbx_xtFZTW
 // CHECK-NEXT: T _main
+// UNSUPPORTED: OS=windows-msvc

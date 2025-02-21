@@ -11,3 +11,4 @@ if let val = yieldValue() {
 // CHECK-DAG: !DILocalVariable(name: "val", scope: ![[SCOPE2:[0-9]+]]
 // CHECK-DAG: ![[SCOPE2]] = distinct !DILexicalBlock(scope: ![[MAIN2:[0-9]+]]
 }
+// UNSUPPORTED: OS=windows-msvc

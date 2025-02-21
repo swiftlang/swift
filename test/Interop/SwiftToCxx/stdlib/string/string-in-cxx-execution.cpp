@@ -48,3 +48,4 @@ int main() {
 // CHECK: '''HELLO WORLD!TEST'''
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

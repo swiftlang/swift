@@ -99,3 +99,4 @@ final class Custom {
 // CHECK-NEXT: Simple.unownedExecutor
 // CHECK-NEXT: simple.count == 0
 // CHECK-NEXT: end
+// UNSUPPORTED: OS=windows-msvc

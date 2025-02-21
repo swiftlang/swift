@@ -46,3 +46,4 @@ public struct D<I: Equatable, D> {
     set {fatalError()}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

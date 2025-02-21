@@ -19,3 +19,4 @@
 // RUN: %FileCheck %s < %t/result.txt
 
 // CHECK: Foo: Func P.f() has mangled name changing from '(extension in Foo):Foo.P.f< where A.A == Swift.Int>() -> ()' to '(extension in Foo):Foo.P< where A.A == Swift.Int>.f() -> ()'
+// UNSUPPORTED: OS=windows-msvc

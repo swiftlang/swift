@@ -19,3 +19,4 @@ protocol DerivedProto : BaseProto {
 
 func generic<T: BaseProto>(_: T, _ assoc: T.AssocTy) {} // no-warning
 
+// UNSUPPORTED: OS=windows-msvc

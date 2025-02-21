@@ -467,3 +467,4 @@ dynamic func toBeReplaced(arg: Int) {}
 
 @_dynamicReplacement(for: toBeReplaced(arg:))
 func toReplaceWith(arg: Int) {}
+// UNSUPPORTED: OS=windows-msvc

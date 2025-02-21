@@ -65,3 +65,4 @@ func foo() {
 // CHECK: key.sourcetext: "        ("
 // CHECK: key.sourcetext: "        )"
 // CHECK: key.sourcetext: "    )"
+// UNSUPPORTED: OS=windows-msvc

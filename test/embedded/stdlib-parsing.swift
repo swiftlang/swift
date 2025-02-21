@@ -17,3 +17,4 @@ struct Main {
     // CHECK: 4096
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -316,3 +316,4 @@ var a2 : P1= 17 as! P1
 class TestOptionalMethodFixit {
   func test() {}
 }
+// UNSUPPORTED: OS=windows-msvc

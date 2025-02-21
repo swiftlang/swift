@@ -23,3 +23,4 @@ class D {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

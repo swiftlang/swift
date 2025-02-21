@@ -8,3 +8,4 @@
 // CHECK: pathComponents
 // CHECK-NEXT: "S"
 public struct S {}
+// UNSUPPORTED: OS=windows-msvc

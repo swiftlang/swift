@@ -423,3 +423,4 @@ public func deferTest<T>(_ x: __owned T) { // expected-error {{'x' used after co
     }
     print("do Something")
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -19,4 +19,4 @@ public func catastrophicFunction() {}
 // CHECK: @available(*, unavailable, message: "\n    First line.\n    Another line!")
 // CHECK: public func catastrophicFunction2()
 @available(*, unavailable, message: "\n    First line.\n    Another line!")
-public func catastrophicFunction2() {}
+public func catastrophicFunction2() {}// UNSUPPORTED: OS=windows-msvc

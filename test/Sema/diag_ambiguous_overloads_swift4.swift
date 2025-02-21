@@ -9,3 +9,4 @@ class C_49843 {
 // expected-error@-1 {{contextual closure type '(String, (any Error)?) -> Void' expects 2 arguments, but 1 was used in closure body}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

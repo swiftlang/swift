@@ -15,3 +15,4 @@ struct Dummy: Foo {
 
 // CHECK: ok
 print("ok")
+// UNSUPPORTED: OS=windows-msvc

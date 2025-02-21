@@ -2,3 +2,4 @@
 
 @backDeployed(before: SwiftStdlib 5.7)
 public func foo() {}
+// UNSUPPORTED: OS=windows-msvc

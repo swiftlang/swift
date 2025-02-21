@@ -33,3 +33,4 @@ public class RecordConfig {
 public func makeRecordConfig() -> RecordConfig {
     return RecordConfig()
 }
+// UNSUPPORTED: OS=windows-msvc

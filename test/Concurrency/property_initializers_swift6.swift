@@ -20,3 +20,4 @@ class C {
 }
 
 var x: Int = globalActorFn() // expected-error {{call to global actor 'GlobalActor'-isolated global function 'globalActorFn()' in a synchronous main actor-isolated context}}
+// UNSUPPORTED: OS=windows-msvc

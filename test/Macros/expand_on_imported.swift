@@ -28,3 +28,4 @@ func testAll(x: Double, y: Double, computer: SlowComputer) async {
 
 // CHECK: define{{.*}}@"$sSC12async_divideyS2d_SdtYaF"
 // CHECK: define{{.*}}@"$sSo12SlowComputerV6divideyS2d_SdtYaF"
+// UNSUPPORTED: OS=windows-msvc

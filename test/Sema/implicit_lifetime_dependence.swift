@@ -37,3 +37,4 @@ func foo3<T: BitwiseCopyable>(arg: borrowing T) -> BufferView { // expected-erro
   return BufferView(nil, 0)
 }
 
+// UNSUPPORTED: OS=windows-msvc

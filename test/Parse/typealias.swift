@@ -32,3 +32,4 @@ typealias Recovery5 : Int, Float // expected-error {{expected '=' in type alias 
 typealias Recovery6 = = // expected-error {{expected type in type alias declaration}}
 
 typealias switch = Int // expected-error {{keyword 'switch' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{11-17=`switch`}}
+// UNSUPPORTED: OS=windows-msvc

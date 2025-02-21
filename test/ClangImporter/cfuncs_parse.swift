@@ -197,3 +197,4 @@ func test_ambiguous() {
   exit(5) // expected-error {{ambiguous use of 'exit'}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -305,3 +305,4 @@ public protocol ExpressibleByArrayLiteral {
 
 public protocol Equatable {
 }
+// UNSUPPORTED: OS=windows-msvc

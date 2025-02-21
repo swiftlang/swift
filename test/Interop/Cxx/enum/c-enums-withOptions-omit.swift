@@ -73,3 +73,4 @@ import CenumsWithOptionsOmit
 // CHECK-NEXT: class func scrollToRowAtIndexPath(_ indexPath: NSIndexPath!, atScrollPosition scrollPosition: UITableViewScrollPosition)
 // CHECK-NEXT: @available(swift, obsoleted: 3, renamed: "scrollToRow(at:at:)")
 // CHECK-NEXT: func scrollToRowAtIndexPath(_ indexPath: NSIndexPath!, atScrollPosition scrollPosition: UITableViewScrollPosition)
+// UNSUPPORTED: OS=windows-msvc

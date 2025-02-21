@@ -107,3 +107,4 @@ let _cassini: FlightKit.Mission = (origin: "Earth", destination: "Saturn")
 // SHIPUI-DAG: {"name":"CoreMission","path":"{{[^"]*}}CoreMission.swiftmodule","isImportedDirectly":true,
 // SHIPUI: ]
 #endif
+// UNSUPPORTED: OS=windows-msvc

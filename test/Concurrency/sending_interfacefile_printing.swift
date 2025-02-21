@@ -49,3 +49,4 @@ public func test2(_ x: sending NonSendableKlass) {}
 // CHECK-REPR-NEXT: @_Concurrency.MainActor public var closure: () -> NonSendableKlass
 // CHECK-REPR-NEXT: #endif
 @MainActor public var closure: () -> sending NonSendableKlass = { NonSendableKlass() }
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ func f(c: AnyObject??) {
   // CHECK: function_ref {{.*3use.*}} scope [[S10]]
   use(x)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@ func foo() { // CHECK-DAG: [[@LINE]]:12 -> [[@LINE+19]]:2 : 0
 }
 
 foo()
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ import Cocoa
 func rdar14759044(obj: NSObject) -> Bool {
   return obj.responds(to: "abc") // no-warning
 }
+// UNSUPPORTED: OS=windows-msvc

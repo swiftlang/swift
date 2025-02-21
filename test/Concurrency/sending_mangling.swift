@@ -130,3 +130,4 @@ func reabstractionThunkTest() {
     NonSendableKlass(),
     reabstractionThunkTest_takeSendingReturnSending)
 }
+// UNSUPPORTED: OS=windows-msvc

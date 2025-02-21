@@ -24,3 +24,4 @@ let interfacePropertyCopy = consumer.propertyUsingAForwardDeclaredNoRootTypeProt
 consumer.propertyUsingAForwardDeclaredNoRootTypeProtocol = incompleteNoRootTypeProtocol
 _ = CFunctionReturningAForwardDeclaredNoRootTypeProtocol()
 CFunctionTakingAForwardDeclaredNoRootTypeProtocol(incompleteNoRootTypeProtocol)
+// UNSUPPORTED: OS=windows-msvc

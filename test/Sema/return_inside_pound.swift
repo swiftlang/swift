@@ -13,3 +13,4 @@ func f2() {
     return // no-error
   #endif
 }
+// UNSUPPORTED: OS=windows-msvc

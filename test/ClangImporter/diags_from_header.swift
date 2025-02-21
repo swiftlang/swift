@@ -15,3 +15,4 @@
 // CHECK-WARN: diags_from_header.h:{{.*}}:2: warning: "here is some warning about something"
 // CHECK-NO-WARN-NOT: warning about something
 // CHECK: diags_from_header.h:{{.*}}:2: error: "but this one is an error"
+// UNSUPPORTED: OS=windows-msvc

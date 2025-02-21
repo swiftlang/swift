@@ -7,3 +7,4 @@
 // CHECK: struct HasEmptySpecializationAndStaticDateMember<CChar> {
 // CHECK:   static let value: Bool
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

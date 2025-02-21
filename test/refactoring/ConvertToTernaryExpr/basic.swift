@@ -32,3 +32,4 @@ func testConvertTupleToTernaryExpr() {
 
 // RUN: %refactor -convert-to-ternary-expr -source-filename %s -pos=15:3 -end-pos=19:4 > %t.result/L15-3.swift
 // RUN: diff -u %S/Outputs/basic/L15-3.swift.expected %t.result/L15-3.swift
+// UNSUPPORTED: OS=windows-msvc

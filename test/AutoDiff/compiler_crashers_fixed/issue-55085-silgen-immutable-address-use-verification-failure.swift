@@ -69,3 +69,4 @@ func loadableOriginal<T: AdditiveArithmetic>(_ loadable: LoadableOriginal<T>) ->
 // #12 0x0000000000f3fba4 swift::autodiff::VJPEmitter::run()
 // #13 0x0000000000eb1669 (anonymous namespace)::DifferentiationTransformer::canonicalizeDifferentiabilityWitness(swift::SILFunction*, swift::SILDifferentiabilityWitness*, swift::autodiff::DifferentiationInvoker, swift::SerializedKind_t)
 // #14 0x0000000000eaea5e (anonymous namespace)::Differentiation::run()
+// UNSUPPORTED: OS=windows-msvc

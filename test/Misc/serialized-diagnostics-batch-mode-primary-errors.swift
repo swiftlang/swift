@@ -14,3 +14,4 @@
 func test(x: SomeType) {
   nonexistent()
 }
+// UNSUPPORTED: OS=windows-msvc

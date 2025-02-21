@@ -25,3 +25,4 @@ func test(_ url: CFURL, ident: CSIdentity) {
   _ = KCGetKeychainManagerVersion(&vers) as OSStatus// expected-error{{cannot find 'KCGetKeychainManagerVersion' in scope}}
   _ = CoreServices.KCGetKeychainManagerVersion(&vers) as OSStatus// okay
 }
+// UNSUPPORTED: OS=windows-msvc

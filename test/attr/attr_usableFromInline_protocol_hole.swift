@@ -21,3 +21,4 @@ func test(_ obj: UFIImpl) {
   obj.ufiExtensionMethod() // expected-error {{inaccessible}}
   obj.internalExtensionMethod() // expected-error {{inaccessible}}
 }
+// UNSUPPORTED: OS=windows-msvc

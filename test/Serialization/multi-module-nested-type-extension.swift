@@ -17,3 +17,4 @@ import other
 extension X {
   func takesB(_: B) {}
 }
+// UNSUPPORTED: OS=windows-msvc

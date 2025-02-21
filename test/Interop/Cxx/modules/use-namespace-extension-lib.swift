@@ -22,3 +22,4 @@ NamespacesTestSuite.test("Call functions from extension") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

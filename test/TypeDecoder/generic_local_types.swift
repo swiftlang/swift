@@ -191,3 +191,4 @@ class Generic<T> {
 // CHECK-DECL: generic_local_types.(file).Generic.init().Alias14
 // CHECK-DECL: generic_local_types.(file).Generic.deinit.Alias15
 // CHECK-DECL: generic_local_types.(file).Generic.method(_:).nested().Alias
+// UNSUPPORTED: OS=windows-msvc

@@ -106,3 +106,4 @@ func testLocalTransposeRegistration() {
   @transpose(of: +)
   func transpose(_ x: Float) -> (Float, Float)
 }
+// UNSUPPORTED: OS=windows-msvc

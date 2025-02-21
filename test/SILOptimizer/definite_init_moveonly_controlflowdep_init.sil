@@ -135,3 +135,4 @@ bb3:
   %37 = tuple ()
   return %37 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

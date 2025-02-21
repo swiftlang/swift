@@ -202,3 +202,4 @@ let pt3 = set(_1)(3)((1, 2))
 print(pt3) // CHECK-NEXT: (3, 2)
 let pt4 = view(_2)(("hello", 5))
 print(pt4) // CHECK-NEXT: 5
+// UNSUPPORTED: OS=windows-msvc

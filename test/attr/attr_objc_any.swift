@@ -19,3 +19,4 @@ class Foo: NSObject {
 
   @objc func throwingMethod(x: Any) throws -> Any? { return x } // expected-error{{throwing method cannot be marked @objc because it returns a value of optional type 'Any?'; 'nil' indicates failure to Objective-C}}
 }
+// UNSUPPORTED: OS=windows-msvc

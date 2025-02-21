@@ -26,3 +26,4 @@ public func foo() {
 
 // CHECK:       [[P3:%.*]] = load ptr, ptr @"$e4main9callback3ySb_SbtcSgvp"
 // CHECK:       call swiftcc void [[P3:%.*]](i1 true, i1 true, ptr swiftself {{.*}}) [ "ptrauth"(i32 0, i64 25424) ]
+// UNSUPPORTED: OS=windows-msvc

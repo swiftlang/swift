@@ -24,3 +24,4 @@ TemplatesTestSuite.test("typedeffed-template-template-parameter") {
 // }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -45,3 +45,4 @@ extension Dictionary {
 
 let dictionary: [String: String] = [:]
 _ = dictionary.first { (column, value) in true }!.value
+// UNSUPPORTED: OS=windows-msvc

@@ -71,3 +71,4 @@ import Swift
 
 @freestanding(expression) macro stringifyPackage<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroTwo", type: "StringifyMacro")
 @freestanding(expression) package macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroTwo", type: "StringifyMacro")
+// UNSUPPORTED: OS=windows-msvc

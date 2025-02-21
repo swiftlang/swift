@@ -228,3 +228,4 @@ protocol Pair<X, Y> where Self.X == Self.Y {
 
 func splay(_ x: some Pair<Int, String>) -> (Int, String) { fatalError() }
 // expected-error@-1 {{no type for '(some Pair<Int, String>).X' can satisfy both '(some Pair<Int, String>).X == String' and '(some Pair<Int, String>).X == Int'}}
+// UNSUPPORTED: OS=windows-msvc

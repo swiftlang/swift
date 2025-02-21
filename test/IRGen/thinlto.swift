@@ -33,3 +33,4 @@ func main() -> Int {
 
 // CHECK: Hello!
 // CHECK: fooFromModule
+// UNSUPPORTED: OS=windows-msvc

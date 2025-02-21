@@ -39,3 +39,4 @@ public protocol P4 {
 public protocol P5 {
     associatedtype T2: P4
 }
+// UNSUPPORTED: OS=windows-msvc

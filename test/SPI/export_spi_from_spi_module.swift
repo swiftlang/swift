@@ -42,3 +42,4 @@ public func inlinable(_ e: PublicEnum) {
   var spiTypeInFrozen = SPIStruct()
   private var spiTypeInFrozen1: SPIClass
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -88,3 +88,4 @@ extension MP {
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

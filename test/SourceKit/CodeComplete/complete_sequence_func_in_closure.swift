@@ -62,3 +62,4 @@ struct MyStruct {
 // RESULT_SCRIPT-LABEL: key.results: [
 // RESULT_SCRIPT: key.description: "value"
 // RESULT_SCRIPT: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

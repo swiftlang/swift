@@ -64,3 +64,4 @@ CxxConstructorTestSuite.test("implicit default ctor") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

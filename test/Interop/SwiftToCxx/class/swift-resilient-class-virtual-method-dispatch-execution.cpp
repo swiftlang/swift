@@ -11,3 +11,4 @@
 // REQUIRES: executable_test
 
 #include "swift-class-virtual-method-dispatch-execution.cpp"
+// UNSUPPORTED: OS=windows-msvc

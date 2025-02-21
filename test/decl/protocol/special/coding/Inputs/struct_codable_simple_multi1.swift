@@ -30,3 +30,4 @@ struct A: Codable {
   static let propertyName = CodingKeys.property.stringValue
 }
 
+// UNSUPPORTED: OS=windows-msvc

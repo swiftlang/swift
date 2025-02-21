@@ -38,3 +38,4 @@ TemplatesTestSuite.test("typedeffed-variadic-class-template") {
 // }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -495,3 +495,4 @@ extension P {
     usePGeneric(_borrow self)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

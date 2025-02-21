@@ -39,3 +39,4 @@ public func bar<Pub: Publisher>(_: Pub) -> some Publisher {
   Map<Pub, Pub.Output>()
 }
 
+// UNSUPPORTED: OS=windows-msvc

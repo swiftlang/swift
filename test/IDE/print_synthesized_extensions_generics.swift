@@ -85,3 +85,4 @@ extension G : P2 {}
 // CHECK:      extension P2 where Self.T.T : print_synthesized_extensions_generics.A {
 // CHECK-NEXT:   func blah()
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

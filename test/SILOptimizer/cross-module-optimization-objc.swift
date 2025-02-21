@@ -34,3 +34,4 @@ func testClass() {
 
 testClass()
 
+// UNSUPPORTED: OS=windows-msvc

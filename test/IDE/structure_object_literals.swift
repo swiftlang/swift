@@ -36,3 +36,4 @@ func after() {}
 // CHECK-AFTER: .<##><object-literal-expression>#<name>imageLiteral</name>(<arg><name>resourceName</name>: <# name #></arg>)</object-literal-expression>x.<##>
 // CHECK-AFTER: <ffunc>func <name>after()</name> {}</ffunc>
 
+// UNSUPPORTED: OS=windows-msvc

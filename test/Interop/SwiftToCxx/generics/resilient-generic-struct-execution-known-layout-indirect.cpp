@@ -11,3 +11,4 @@
 // REQUIRES: executable_test
 
 #include "generic-struct-execution-known-layout-indirect.cpp"
+// UNSUPPORTED: OS=windows-msvc

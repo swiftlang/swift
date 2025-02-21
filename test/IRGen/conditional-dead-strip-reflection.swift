@@ -29,3 +29,4 @@ public enum Enum {
 // CHECK: main.Class
 // CHECK: main.Struct
 // CHECK: main.Enum
+// UNSUPPORTED: OS=windows-msvc

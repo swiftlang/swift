@@ -26,3 +26,4 @@
 // RUN:   2>&1 | %FileCheck %s
 
 // CHECK: 'offset' + 'length' is out of range
+// UNSUPPORTED: OS=windows-msvc

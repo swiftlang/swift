@@ -50,3 +50,4 @@ foo(1)
 // CHECK-NEXT: [16:10-16:11] __builtin_log[='false']
 // CHECK-NEXT: [20:1-20:17] __builtin_log[='[true, false, false]']
 // CHECK-NEXT: [20:1-20:17] pc after
+// UNSUPPORTED: OS=windows-msvc

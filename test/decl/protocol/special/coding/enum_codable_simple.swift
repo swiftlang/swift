@@ -57,3 +57,4 @@ enum EmptyCodableEnum2: Decodable {} // expected-error{{cannot automatically syn
 enum EmptyCodableEnum: Codable {}
 // expected-error@-1{{cannot automatically synthesize 'Encodable' conformance for empty enum 'EmptyCodableEnum'}}
 // expected-error@-2{{cannot automatically synthesize 'Decodable' conformance for empty enum 'EmptyCodableEnum'}}
+// UNSUPPORTED: OS=windows-msvc

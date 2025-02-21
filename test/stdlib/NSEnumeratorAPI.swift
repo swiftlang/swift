@@ -28,3 +28,4 @@ NSEnumeratorAPI.test("keyEnumerator") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

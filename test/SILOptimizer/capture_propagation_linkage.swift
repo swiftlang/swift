@@ -21,3 +21,4 @@ func createInstance() -> MyClass? {
     return MyClass()
 }
 
+// UNSUPPORTED: OS=windows-msvc

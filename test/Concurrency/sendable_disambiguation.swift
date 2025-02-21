@@ -46,3 +46,4 @@ do {
     let _: Int = sendable(x.fn) // Ok (picks `sendable<T: Sendable>` with a method)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

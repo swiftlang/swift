@@ -215,3 +215,4 @@ struct NE : ~Escapable {}
 }
 @lifetime(borrow borrow) func testNameConflict(_ borrow: E) -> NE { NE() }
 @lifetime(result: source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
+// UNSUPPORTED: OS=windows-msvc

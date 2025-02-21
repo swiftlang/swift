@@ -12,3 +12,4 @@ var qux: Regex<Substring> { / x}/ }
 // RUN: -req=complete -pos=5:28 %s -- -enable-bare-slash-regex %s
 
 // REQUIRES: swift_swift_parser
+// UNSUPPORTED: OS=windows-msvc

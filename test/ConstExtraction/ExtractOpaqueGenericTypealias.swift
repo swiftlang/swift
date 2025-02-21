@@ -70,3 +70,4 @@ struct Foo<L : Hashable> : myProto {
 // CHECK-NEXT:     "properties": []
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

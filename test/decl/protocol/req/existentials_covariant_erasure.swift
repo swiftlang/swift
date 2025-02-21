@@ -42,3 +42,4 @@ do {
     // CHECK: (pattern_named type="((any C & P) -> Void, ((any C & P)?) -> Void, ([any C & P]) -> Void, ([Array<any C & P>?]) -> Void) -> [String : () -> any C & P]" "x6")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

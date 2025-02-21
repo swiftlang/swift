@@ -6,3 +6,4 @@
 // CHECK: macCatalyst
 @available(macOS 12.0, iOS 15.0, macCatalyst 15.0, *)
 public struct Foo {}
+// UNSUPPORTED: OS=windows-msvc

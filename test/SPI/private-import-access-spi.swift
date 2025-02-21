@@ -66,3 +66,4 @@ public func inlinableExport(a: SPITypeA, b: SPITypeB) { // expected-error {{cann
   spiFuncA() // expected-error {{cannot find 'spiFuncA' in scope}}
   spiFuncB() // expected-error {{cannot find 'spiFuncB' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

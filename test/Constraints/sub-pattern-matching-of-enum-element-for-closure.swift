@@ -16,3 +16,4 @@ func test(type: TestType) -> String {
     
     return str
 }
+// UNSUPPORTED: OS=windows-msvc

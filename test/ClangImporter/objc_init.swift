@@ -221,3 +221,4 @@ func testNoConvenienceInitInheritance() {
   _ = NoConvenienceInitInheritanceBase(y: 42)
   _ = NoConvenienceInitInheritance(y: 42) // expected-error {{argument passed to call that takes no arguments}}
 }
+// UNSUPPORTED: OS=windows-msvc

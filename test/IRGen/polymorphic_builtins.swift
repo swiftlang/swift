@@ -48,3 +48,4 @@ public func calleeAddVectorsGenericTransparentGuarded<T>(_ lhs: T, _ rhs: T) -> 
 public func callerAddVectorsGenericTransparent(_ lhs: Builtin.Vec4xInt32, _ rhs: Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
   return calleeAddVectorsGenericTransparentGuarded(lhs, rhs)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -34,3 +34,4 @@ func mayReassign(span: inout Span<Int>, to: ContiguousArray<Int>) {
   span = to.span
 }
 
+// UNSUPPORTED: OS=windows-msvc

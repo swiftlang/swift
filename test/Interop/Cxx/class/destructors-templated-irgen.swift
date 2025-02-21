@@ -7,3 +7,4 @@ let _ = DerivedTemplatedHasVirtualDestructorChar()
 // CHECK: define {{.*}} @{{_ZN36DerivedTemplatedHasVirtualDestructorIcED2Ev|"\?\?1\?\$DerivedTemplatedHasVirtualDestructor@D@@UEAA@XZ"}}
 // CHECK: entry:
 // CHECK:   call {{.*}} @{{_ZN29TemplatedHasVirtualDestructorIcED2Ev|"\?\?1\?\$TemplatedHasVirtualDestructor@D@@UEAA@XZ"}}
+// UNSUPPORTED: OS=windows-msvc

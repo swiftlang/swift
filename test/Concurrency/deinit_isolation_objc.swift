@@ -544,3 +544,4 @@ func isolatedFunc() {}  // expected-note 15{{calls to global function 'isolatedF
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

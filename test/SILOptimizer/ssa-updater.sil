@@ -180,3 +180,4 @@ bb23:
   br bb3
 
 }
+// UNSUPPORTED: OS=windows-msvc

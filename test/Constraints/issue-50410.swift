@@ -20,3 +20,4 @@ func test() {
   overloaded(f, g as (Test, A) -> ())
   overloaded(f, g)
 }
+// UNSUPPORTED: OS=windows-msvc

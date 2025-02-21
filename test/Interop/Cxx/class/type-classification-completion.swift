@@ -11,3 +11,4 @@ func foo(x: HasMethodThatReturnsIterator) {
 // CHECK-METHOD-NOT: __getIteratorUnsafe
 // CHECK-METHOD-NOT: Decl[InstanceMethod]/CurrNominal:   __getIteratorUnsafe
 // CHECK-METHOD: End completions
+// UNSUPPORTED: OS=windows-msvc

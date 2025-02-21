@@ -72,3 +72,4 @@ class 23class {
   // expected-error@-1 {{function name can only start with a letter or underscore, not a number}}
   // expected-error@-2 {{'m' is not a valid digit in integer literal}}
 }
+// UNSUPPORTED: OS=windows-msvc

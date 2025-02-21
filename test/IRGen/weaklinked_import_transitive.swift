@@ -18,3 +18,4 @@ import weaklinked_import_helper
 
 // CHECK-DAG: declare swiftcc {{.+}} @"$s24weaklinked_import_helper2fnyyF"()
 fn()
+// UNSUPPORTED: OS=windows-msvc

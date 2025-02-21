@@ -16,3 +16,4 @@ renamed(17)
 // CHECK: call void @exit(i32 17)
 exit(17)
 
+// UNSUPPORTED: OS=windows-msvc

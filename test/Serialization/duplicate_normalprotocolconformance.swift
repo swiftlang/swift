@@ -6,3 +6,4 @@ import Swift
 
 var s = S()
 
+// UNSUPPORTED: OS=windows-msvc

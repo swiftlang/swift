@@ -43,3 +43,4 @@ func testSendableBuiltinConformances(
   acceptSendable(nsw) // TODO: @_nonSendable should beat an explicit conformance, or at least conflict with it
   acceptSendable(nsl)
 }
+// UNSUPPORTED: OS=windows-msvc

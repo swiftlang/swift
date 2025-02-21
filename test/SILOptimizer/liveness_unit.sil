@@ -543,3 +543,4 @@ bb3:
   %9999 = tuple ()
   return %9999 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

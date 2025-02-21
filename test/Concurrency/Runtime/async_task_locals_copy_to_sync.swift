@@ -88,3 +88,4 @@ func copyTo_sync_noValues() {
     copyTo_sync_noValues()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

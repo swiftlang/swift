@@ -27,3 +27,4 @@ public func dontCrash() {
 }
 
 dontCrash()
+// UNSUPPORTED: OS=windows-msvc

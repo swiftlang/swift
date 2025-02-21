@@ -15,3 +15,4 @@ public func test_no_optionals_used<T>(_ items: [T]) {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

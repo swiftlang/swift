@@ -18,3 +18,4 @@
 // CHECK: passes:          [ "use-prespecialized", "function-stack-protection", "late-onone-simplification",
 // CHECK-NEXT:               "cleanup-debug-steps", "sil-debuginfo-gen" ]
 // CHECK: ...
+// UNSUPPORTED: OS=windows-msvc

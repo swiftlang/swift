@@ -367,3 +367,4 @@ extension PublicDynamicMembers {
   @_dynamicReplacement(for: dynamicClassMethod())
   public class func classMethodReplacement() {}
 }
+// UNSUPPORTED: OS=windows-msvc

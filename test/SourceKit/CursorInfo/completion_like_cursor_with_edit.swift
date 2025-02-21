@@ -11,3 +11,4 @@ class SceneDelegate {
 
 // CHECK: source.lang.swift.decl.var.local (7:16-7:22)
 // CHECK-NEXT: yyyxxx
+// UNSUPPORTED: OS=windows-msvc

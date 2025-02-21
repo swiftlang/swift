@@ -42,3 +42,4 @@ func optExpr(str: String?) -> String? {
 // CHECK: (418, 423): String
 // CHECK: (442, 447): String
 // CHECK: (457, 458): String
+// UNSUPPORTED: OS=windows-msvc

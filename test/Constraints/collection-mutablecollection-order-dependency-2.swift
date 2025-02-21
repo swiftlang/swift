@@ -20,3 +20,4 @@ extension Butz: Collection {
     }
     public func index(after i: Int) -> Int { return 0 }
 }
+// UNSUPPORTED: OS=windows-msvc

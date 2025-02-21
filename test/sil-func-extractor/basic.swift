@@ -98,3 +98,4 @@ public class Vehicle {
 func foo() -> Int {
   return 7
 }
+// UNSUPPORTED: OS=windows-msvc

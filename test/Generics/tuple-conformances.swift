@@ -124,3 +124,4 @@ extension Tuple: Comparable where repeat each Element: Comparable {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

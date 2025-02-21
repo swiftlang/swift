@@ -80,3 +80,4 @@ enum SE3<T : ExpressibleByIntegerLiteral> : T where T: InstanceGettable {
 }
 
 enum SE4<T : ExpressibleByIntegerLiteral & Equatable> : T { case X }
+// UNSUPPORTED: OS=windows-msvc

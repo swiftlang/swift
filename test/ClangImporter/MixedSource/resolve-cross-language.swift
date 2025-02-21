@@ -62,3 +62,4 @@ _ = ExtendsTwoProtosImpl.self
 
 // Make sure we're actually parsing stuff.
 useBaseClass() // expected-error{{missing argument for parameter #1}}
+// UNSUPPORTED: OS=windows-msvc

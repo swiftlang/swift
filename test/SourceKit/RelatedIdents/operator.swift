@@ -17,3 +17,4 @@ Foo() + Foo()
 // CHECK: [[# @LINE - 6 ]]:7 - 1 - source.syntacticrename.call
 // CHECK: END RANGES
 // CHECK: NAME: +(_:_:)
+// UNSUPPORTED: OS=windows-msvc

@@ -45,3 +45,4 @@ let g: String = #keyPath(MyClass.Inner.otherProp.someDictKey.myProp)
 // CHECK: [[@LINE-2]]:34 | {{.*}} | Inner
 // CHECK: [[@LINE-3]]:40 | {{.*}} | otherProp
 // CHECK: [[@LINE-4]]:62 | {{.*}} | myProp
+// UNSUPPORTED: OS=windows-msvc

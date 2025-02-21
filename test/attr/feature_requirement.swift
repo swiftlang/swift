@@ -14,3 +14,4 @@ func fn() {}  // expected-disabled-error@-1 {{'abi' attribute is only valid when
 #else
   #error("doesn't have @abi")  // expected-disabled-error {{doesn't have @abi}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

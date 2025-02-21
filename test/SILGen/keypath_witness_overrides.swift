@@ -24,3 +24,4 @@ where OS.Index: Hashable {
 
 // CHECK-LABEL: sil shared [thunk] [ossa] @$s18protocol_overrides10AddsSetterPy7ElementQz5IndexQzcipAA09OverridesD0RzSHAGRQlxxTk
 // CHECK-LABEL: witness_method $OS, #AddsSetter.subscript!setter
+// UNSUPPORTED: OS=windows-msvc

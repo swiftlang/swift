@@ -92,3 +92,4 @@ bb0(%0 : $*AnyObject):
   dealloc_stack %1
   return %7
 }
+// UNSUPPORTED: OS=windows-msvc

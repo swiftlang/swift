@@ -7,3 +7,4 @@ class MyClass {}
 
 @_inheritsConvenienceInitializers // no-error
 class MyOtherClass {}
+// UNSUPPORTED: OS=windows-msvc

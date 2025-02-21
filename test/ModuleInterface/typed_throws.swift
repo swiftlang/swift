@@ -17,3 +17,4 @@ public struct HasThrowingInit {
   // CHECK: public init() throws(Test.MyError)
   public init() throws(MyError) { }
 }
+// UNSUPPORTED: OS=windows-msvc

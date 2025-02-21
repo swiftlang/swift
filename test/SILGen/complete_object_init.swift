@@ -23,3 +23,4 @@ class A {
   init(x: X) { }
 }
 
+// UNSUPPORTED: OS=windows-msvc

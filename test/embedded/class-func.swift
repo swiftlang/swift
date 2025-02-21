@@ -28,3 +28,4 @@ class MySubclass: MyClass {
 
 // CHECK: MyClass.foo
 // CHECK: MySubclass.foo
+// UNSUPPORTED: OS=windows-msvc

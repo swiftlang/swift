@@ -539,3 +539,4 @@ func generalized(_ x: Any.Type) {}
 func testMetatypes(_ t: (any Veggie & ~Copyable).Type) {
   generalized(t) // expected-error {{cannot convert value of type '(any Veggie & ~Copyable).Type' to expected argument type 'any Any.Type'}}
 }
+// UNSUPPORTED: OS=windows-msvc

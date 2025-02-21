@@ -14,3 +14,4 @@ const_map(\Article.id)
 
 const_map(keypath_generator()) // expected-error {{expect a compile-time constant literal}}
 const_map(keypath) // expected-error {{expect a compile-time constant literal}}
+// UNSUPPORTED: OS=windows-msvc

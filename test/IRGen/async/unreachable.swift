@@ -12,3 +12,4 @@ func bar() async -> Never {
   await foo()
   fatalError()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@ func testMe<T: Q>(_ t: T) {
 func doIt() {
   testMe(X())
 }
+// UNSUPPORTED: OS=windows-msvc

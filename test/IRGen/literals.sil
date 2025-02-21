@@ -25,3 +25,4 @@ bb0:
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @utf8_literal_with_nul() {{.*}} {
 // CHECK:   ret ptr [[U8_1]]
 
+// UNSUPPORTED: OS=windows-msvc

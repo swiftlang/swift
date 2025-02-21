@@ -17,3 +17,4 @@ public func chopVegetables() async throws -> [String] {
   // CHECK: ![[V]] = !DILocalVariable(name: "veggies"
   return veggies.map { "chopped \($0)" }
 }
+// UNSUPPORTED: OS=windows-msvc

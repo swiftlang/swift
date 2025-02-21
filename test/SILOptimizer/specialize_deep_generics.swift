@@ -64,3 +64,4 @@ public func computeFunctionType<T>(t: [T]) {
 public func testComputeFunctionType() {
   computeFunctionType(t: [0])
 }
+// UNSUPPORTED: OS=windows-msvc

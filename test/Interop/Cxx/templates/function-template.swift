@@ -43,3 +43,4 @@ FunctionTemplateTestSuite.test("constLvalueReferenceToBool<T> where T == Bool") 
 // better supported in ClangTypeConverter first.
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

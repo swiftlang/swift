@@ -39,3 +39,4 @@ func test() {
   """)
 struct HasMembers {
 }
+// UNSUPPORTED: OS=windows-msvc

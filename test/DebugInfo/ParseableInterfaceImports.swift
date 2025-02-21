@@ -21,3 +21,4 @@ import basic
 func markUsed<T>(_ t: T) {}
 markUsed(basic.foo(1, 2))
 
+// UNSUPPORTED: OS=windows-msvc

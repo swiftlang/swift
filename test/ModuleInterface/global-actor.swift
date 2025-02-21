@@ -54,3 +54,4 @@ public class NoActorClass {
 
 // CHECK: extension Test.GlobalActor : _Concurrency.GlobalActor {}
 // CHECK: extension Test.ClassBoundToGlobalActor : Swift.Sendable {}
+// UNSUPPORTED: OS=windows-msvc

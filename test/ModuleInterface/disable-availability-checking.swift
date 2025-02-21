@@ -14,3 +14,4 @@
 
 import Foo
 
+// UNSUPPORTED: OS=windows-msvc

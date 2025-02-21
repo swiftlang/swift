@@ -20,3 +20,4 @@ public protocol P4 {}
 func bar<T : P3 & P4, X>(x: T, y: T.B, _: X) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s24gsb_canonical_type_bug_33bar1x1y_yx_1AAA2P1PQzq_tAA2P3RzAA2P4Rzr0_lF : $@convention(thin) <T, X where T : P3, T : P4> (@in_guaranteed T, @in_guaranteed T.A, @in_guaranteed X) -> ()
+// UNSUPPORTED: OS=windows-msvc

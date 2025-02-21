@@ -44,3 +44,4 @@ module A {
 
 //--- test.swift
 import A
+// UNSUPPORTED: OS=windows-msvc

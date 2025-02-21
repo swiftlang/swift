@@ -44,3 +44,4 @@ public func main() {
 // CHECK: define {{.*}}void @"$e8MyModule8ConcreteVACycfC"{{.*}} {
 // CHECK: define {{.*}}void @"$e8MyModule5start1pyx_tAA6PlayerRzlFAA8ConcreteV_Tg5"{{.*}} {
 // CHECK: define {{.*}}void @"$e8MyModule8ConcreteV4playyyF"{{.*}} {
+// UNSUPPORTED: OS=windows-msvc

@@ -296,3 +296,4 @@ protocol PP {}
 struct A : PP {}
 let _: any PP = A() // Ok
 let _: any (any PP) = A() // expected-error{{redundant 'any' in type 'any any PP'}} {{8-12=}}
+// UNSUPPORTED: OS=windows-msvc

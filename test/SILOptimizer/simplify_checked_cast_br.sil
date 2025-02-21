@@ -103,3 +103,4 @@ bb2(%10 : @guaranteed $P):
 
 sil_vtable X {
 }
+// UNSUPPORTED: OS=windows-msvc

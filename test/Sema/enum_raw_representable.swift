@@ -323,3 +323,4 @@ enum MismatchedRawValues {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

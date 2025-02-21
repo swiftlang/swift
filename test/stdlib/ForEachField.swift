@@ -498,3 +498,4 @@ if #available(SwiftStdlib 5.2, *) {
 } else {
   runNoTests()
 }
+// UNSUPPORTED: OS=windows-msvc

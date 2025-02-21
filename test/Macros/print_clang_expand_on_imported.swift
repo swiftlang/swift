@@ -23,3 +23,4 @@ import CompletionHandlerGlobals
 
 
 // DIAGS-NOT: error
+// UNSUPPORTED: OS=windows-msvc

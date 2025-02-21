@@ -85,3 +85,4 @@ struct AsyncIteratorWithOnlyNextIsolation: AsyncIteratorProtocol {
 struct AsyncIteratorWithOnlyNext: AsyncIteratorProtocol {
   public mutating func next() throws(MyError) -> Int? { 0 }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ class Bar<T> {
     Inner.init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

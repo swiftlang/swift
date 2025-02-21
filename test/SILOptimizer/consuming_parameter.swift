@@ -90,3 +90,4 @@ extension C {
     p.pointee = self
   }
 }
+// UNSUPPORTED: OS=windows-msvc

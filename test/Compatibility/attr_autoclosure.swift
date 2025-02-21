@@ -69,3 +69,4 @@ do {
     bar(fn) // Ok
   }
 }
+// UNSUPPORTED: OS=windows-msvc

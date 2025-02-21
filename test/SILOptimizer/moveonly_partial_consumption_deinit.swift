@@ -59,3 +59,4 @@ func swapUr(_ u0: inout Ur, _ u1: inout Ur) {
   u0 = u1
   u1 = tmp
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -57,3 +57,4 @@ func nsEnums() {
 // CHECK-ENS1-NEXT: Decl[StaticVar]/CurrNominal:        two[#EnumNS1.AnEnum#]; name=two
 // CHECK-ENS1-NEXT: Decl[StaticVar]/CurrNominal:        three[#EnumNS1.AnEnum#]; name=three
 // CHECK-ENS1-NEXT: End completions
+// UNSUPPORTED: OS=windows-msvc

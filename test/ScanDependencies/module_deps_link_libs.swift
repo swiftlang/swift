@@ -26,3 +26,4 @@ import SubE
 // CHECK-NEXT:          "isStatic": false,
 // CHECK-NEXT:          "isFramework": false,
 // CHECK-NEXT:          "shouldForceLoad": true
+// UNSUPPORTED: OS=windows-msvc

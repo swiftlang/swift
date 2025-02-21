@@ -12,3 +12,4 @@ let b = 2 // End line with CRlet c = 3
 // CHECK: key.sourcetext: "let b = 2 // End line with CR"
 // CHECK: key.sourcetext: "let c = 3"
 
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@
 // CHECK: pathComponents
 // CHECK-NEXT: "C"
 public class C {}
+// UNSUPPORTED: OS=windows-msvc

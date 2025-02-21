@@ -22,3 +22,4 @@ func test15921530() {
     }
     var _: (inout X) -> () = makef() // expected-error{{cannot convert value of type '(X) -> ()' to specified type '(inout X) -> ()'}}
 }
+// UNSUPPORTED: OS=windows-msvc

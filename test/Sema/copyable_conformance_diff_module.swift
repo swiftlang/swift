@@ -30,3 +30,4 @@ import GardenKit
 
 // expected-error@+1 {{conformance to 'Copyable' must occur in the same source file as generic struct 'Garden'}}
 extension Garden: @retroactive Copyable where Plant: Copyable {}
+// UNSUPPORTED: OS=windows-msvc

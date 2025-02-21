@@ -71,3 +71,4 @@
 // OPTPCH: swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend
 // OPTPCH-SAME: -O{{ }}
 // OPTPCH-SAME: -emit-pch
+// UNSUPPORTED: OS=windows-msvc

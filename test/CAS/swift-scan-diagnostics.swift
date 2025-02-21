@@ -61,3 +61,4 @@
 
 
 #warning("This is a warning")
+// UNSUPPORTED: OS=windows-msvc

@@ -232,3 +232,4 @@ public func mutateRef() {
 // CHECK-CC: declare void @takeMyABINewTypeNonNullNS(ptr noundef)
 // CHECK-CC: declare void @takeMyABIOldTypeNonNullNS(ptr noundef)
 
+// UNSUPPORTED: OS=windows-msvc

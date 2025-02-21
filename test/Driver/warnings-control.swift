@@ -28,3 +28,4 @@ func bar() {
 // WERR:    error: cannot find 'xyz' in scope
 // NOWARN:  error: cannot find 'xyz' in scope
 }
+// UNSUPPORTED: OS=windows-msvc

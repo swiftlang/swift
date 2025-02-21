@@ -114,3 +114,4 @@ do {
   // expected-note@-2 {{force-unwrap the value to avoid this warning}}
   // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
 }
+// UNSUPPORTED: OS=windows-msvc

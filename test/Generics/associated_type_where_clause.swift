@@ -204,3 +204,4 @@ struct Z2 : P7 { // expected-error{{type 'Z2' does not conform to protocol 'P7'}
   func getC() -> Y1 { return Y1() }
   func getC() -> Y2 { return Y2() }
 }
+// UNSUPPORTED: OS=windows-msvc

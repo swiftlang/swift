@@ -20,3 +20,4 @@
 import Foo
 // CHECK: error: no such module 'Foo'
 
+// UNSUPPORTED: OS=windows-msvc

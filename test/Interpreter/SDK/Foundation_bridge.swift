@@ -175,3 +175,4 @@ print("getNonnull: \(getNonnull())")
 // CHECK: final
 print("final")
 
+// UNSUPPORTED: OS=windows-msvc

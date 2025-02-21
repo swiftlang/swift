@@ -24,3 +24,4 @@ import SubE
 // CHECK-DAG:  "_SwiftConcurrencyShims"
 // CHECK-DAG:  "_StringProcessing"
 // CHECK: ]
+// UNSUPPORTED: OS=windows-msvc

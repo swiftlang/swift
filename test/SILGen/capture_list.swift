@@ -47,3 +47,4 @@ class Foo {
         }))
     }
 }
+// UNSUPPORTED: OS=windows-msvc

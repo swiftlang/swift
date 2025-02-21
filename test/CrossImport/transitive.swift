@@ -25,3 +25,4 @@ fromAlwaysImportedOverlay() // no-error
 
 // We should *not* have loaded _NeverImportedOverlay
 fromNeverImportedOverlay() // expected-error {{cannot find 'fromNeverImportedOverlay' in scope}}
+// UNSUPPORTED: OS=windows-msvc

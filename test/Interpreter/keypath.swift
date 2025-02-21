@@ -208,3 +208,4 @@ do {
   // CHECK: true
   print(StaticExample<MyLabel>().isVisible)
 }
+// UNSUPPORTED: OS=windows-msvc

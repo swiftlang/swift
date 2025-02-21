@@ -13,3 +13,4 @@ var x = 10
 // RUN: %sourcekitd-test -req=interface-gen -module Mixed -- -I %t.overlays -F %S/../Inputs/libIDE-mock-sdk -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck -check-prefix=CHECK1 %s
 
 // CHECK1: PureSwiftClass
+// UNSUPPORTED: OS=windows-msvc

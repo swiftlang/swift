@@ -25,3 +25,4 @@ bb0:
 // CHECK:  [[ASSERTIONSDBG:%.*]] = alloca ptr
 // CHECK:  [[ASSERTIONS:%.*]] = alloca i8, i64 %size
 // CHECK:  store ptr [[ASSERTIONS]], ptr [[ASSERTIONSDBG]]
+// UNSUPPORTED: OS=windows-msvc

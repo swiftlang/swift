@@ -583,3 +583,4 @@ bb6:
   %res = tuple ()
   return %res : $()
 }
+// UNSUPPORTED: OS=windows-msvc

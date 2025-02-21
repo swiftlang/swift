@@ -23,3 +23,4 @@ func testStaticInit() {
   // CHECK-NOT: class_method
   // CHECK: return
 }
+// UNSUPPORTED: OS=windows-msvc

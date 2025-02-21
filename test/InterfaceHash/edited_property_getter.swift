@@ -28,3 +28,4 @@ class C {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

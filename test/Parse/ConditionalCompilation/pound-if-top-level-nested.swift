@@ -5,3 +5,4 @@
 
 // expected-error@+2{{expected #else or #endif at end of conditional compilation block}}
 // expected-error@+1{{expected #else or #endif at end of conditional compilation block}}
+// UNSUPPORTED: OS=windows-msvc

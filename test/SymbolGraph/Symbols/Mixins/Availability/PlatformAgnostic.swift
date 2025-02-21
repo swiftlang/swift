@@ -17,3 +17,4 @@ public struct FuturePackage {}
 // CHECK-SO: SwiftObsolete
 @available(swift, obsoleted: 1.0)
 public struct SwiftObsolete {}
+// UNSUPPORTED: OS=windows-msvc

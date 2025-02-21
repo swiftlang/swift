@@ -63,3 +63,4 @@ extension Foo: NativeIntProperty {}
 
 // CHECK-LABEL: sil shared [serialized] [ossa] @$sSo3FooC11intPropertys5Int32VvM
 
+// UNSUPPORTED: OS=windows-msvc

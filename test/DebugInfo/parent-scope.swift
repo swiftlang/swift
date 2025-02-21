@@ -28,3 +28,4 @@ public struct Concrete {
 }
 
 public func getConcrete() -> Concrete? { return nil; }
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@
 import FooSwiftModuleOverlay
 
 #^TOP_LEVEL_1^#
+// UNSUPPORTED: OS=windows-msvc

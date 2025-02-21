@@ -58,3 +58,4 @@
   Value().foo()
   unrelated()
 #endif
+// UNSUPPORTED: OS=windows-msvc

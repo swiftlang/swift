@@ -170,3 +170,4 @@ public func testPrespecializedUse() {
 }
 // dynamic library with wasm is not supported yet
 // UNSUPPORTED: CPU=wasm32
+// UNSUPPORTED: OS=windows-msvc

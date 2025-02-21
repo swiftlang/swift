@@ -84,3 +84,4 @@ assert(assocIsolated(MyStruct.self) == ActorIsolatedFn.self)
 
 // NEW-NOT: call swiftcc %swift.metadata_response @"$sSS4main7MyActorCYicMa"(i64 0)
 // NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$sSS4main7MyActorCYicMD")
+// UNSUPPORTED: OS=windows-msvc

@@ -74,3 +74,4 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
 
 // CHECK: ThreadSanitizer: {{(Swift access|data)}} race
 // CHECK: Location is global 'globalCounterValue'
+// UNSUPPORTED: OS=windows-msvc

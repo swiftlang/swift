@@ -52,3 +52,4 @@ dummy {
   // expected-warning@-2 {{variable 'attributedVar' was never used; consider replacing with '_' or removing it}}
   ()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -36,3 +36,4 @@ func testMe() {
 // CHECK-NEXT: }
 // CHECK: public struct X<CInt> {
 // CHECK: public typealias XofInt = X<CInt>
+// UNSUPPORTED: OS=windows-msvc

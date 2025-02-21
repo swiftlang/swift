@@ -32,3 +32,4 @@ func baz(_ x: (Int, Int) -> Int, _ y: (Int, Int) -> Int) {}
 baz(/, /)
 baz(/^, /)
 baz(^^/, /)
+// UNSUPPORTED: OS=windows-msvc

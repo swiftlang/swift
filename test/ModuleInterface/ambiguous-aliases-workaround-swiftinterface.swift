@@ -55,3 +55,4 @@ public func builtinUser(_ a: Builtin.Int32) {}
 public func builtinInlinableUser() {
     var a: Builtin.Int32
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -4,3 +4,4 @@
 // RUN: %target-build-swift -whole-module-optimization %S/Inputs/library.swift %S/main.swift
 
 extension NuclearMeltdown : Error {}
+// UNSUPPORTED: OS=windows-msvc

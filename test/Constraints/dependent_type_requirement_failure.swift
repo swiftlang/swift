@@ -22,3 +22,4 @@ func bar(_ arr: [Person]) {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

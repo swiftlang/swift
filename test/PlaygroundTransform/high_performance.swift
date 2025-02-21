@@ -51,3 +51,4 @@ for i in 0..<3 {
 }
 // CHECK-NEXT: [{{.*}}] __builtin_log[c='true']
 // CHECK-NEXT: [{{.*}}] __builtin_log[='0']
+// UNSUPPORTED: OS=windows-msvc

@@ -186,3 +186,4 @@ bb0:
  return %10 : $MyInt
 }
 
+// UNSUPPORTED: OS=windows-msvc

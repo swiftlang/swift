@@ -12,3 +12,4 @@ public func f() {
   var protocolObject = NSProtocolFromString("HelperTool")!
 }
 
+// UNSUPPORTED: OS=windows-msvc

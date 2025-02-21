@@ -6,3 +6,4 @@
 // RUN: %FileCheck %s --input-file %t/FactoryInit.symbols.json
 
 // CHECK-NOT: not inherited
+// UNSUPPORTED: OS=windows-msvc

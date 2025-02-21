@@ -4,3 +4,4 @@
 
 import swift // CHECK: error: {{cannot load module 'Swift' as 'swift'|no such module 'swift'}}
 import NEW_MODULE // CHECK: error: {{cannot load module 'new_module' as 'NEW_MODULE'|no such module 'NEW_MODULE'}}
+// UNSUPPORTED: OS=windows-msvc

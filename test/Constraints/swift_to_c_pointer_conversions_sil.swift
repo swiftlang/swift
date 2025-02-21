@@ -34,3 +34,4 @@ func test_overloaded_ref_is_not_ambiguous() {
   // CHECK-NEXT: apply
   const_opt_char_ptr_func(overloaded_mutable_func()) // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -47,3 +47,4 @@ public func g<DA: DistributedActor>(_ t: isolated DA) -> any Actor {
 }
 
 // CHECK: OK: hello
+// UNSUPPORTED: OS=windows-msvc

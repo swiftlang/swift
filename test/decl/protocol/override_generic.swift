@@ -44,3 +44,4 @@ struct S : Derived {
 // CHECK-NEXT: method #Base.foo2: <Self where Self : Base><T where T : P> (Self) -> (T, T.T) -> () : @$s16override_generic1SVAA4BaseA2aDP4foo2yyqd___1TQyd__tAA1PRd__lFTW
 // CHECK-NEXT: method #Base.foo3: <Self where Self : Base><T where T : P> (Self) -> (T, T.T) -> () : @$s16override_generic1SVAA4BaseA2aDP4foo3yyqd___1TQyd__tAA1PRd__lFTW
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

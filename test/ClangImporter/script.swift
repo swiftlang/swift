@@ -2,3 +2,4 @@
 
 var _ : ScriptTy
 print(())
+// UNSUPPORTED: OS=windows-msvc

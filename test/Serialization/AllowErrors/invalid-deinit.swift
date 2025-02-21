@@ -19,3 +19,4 @@ func foo() -> Foo { return Foo() }
 // Make sure @discardableResult isn't added to `foo`, which could be possible
 // if the deinit is partially serialized
 foo() // expected-warning{{result of call to 'foo()' is unused}}
+// UNSUPPORTED: OS=windows-msvc

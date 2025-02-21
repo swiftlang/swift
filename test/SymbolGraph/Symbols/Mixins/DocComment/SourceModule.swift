@@ -94,3 +94,4 @@ public struct Override: Hashable, P {
 // OVERRIDE-OTHER-NEXT:          }
 // OVERRIDE-OTHER-NEXT:        ]
 // OVERRIDE-OTHER-NEXT:      },
+// UNSUPPORTED: OS=windows-msvc

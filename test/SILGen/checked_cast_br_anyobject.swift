@@ -42,3 +42,4 @@ public func getValue(_ obj: UnsafeMutablePointer<BridgedSwiftObject>) -> AnyObje
         fatalError("unknown type")
     }
 }
+// UNSUPPORTED: OS=windows-msvc

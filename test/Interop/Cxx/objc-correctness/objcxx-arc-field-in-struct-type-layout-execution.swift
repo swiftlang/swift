@@ -62,3 +62,4 @@ testReferenceStructToClassWithNonTrivialLogDestructorIvar()
 // CHECK-NEXT: bar
 // CHECK-NEXT: baz
 // CHECK-NEXT: ~NonTrivialLogDestructor 21
+// UNSUPPORTED: OS=windows-msvc

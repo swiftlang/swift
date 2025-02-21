@@ -43,3 +43,4 @@ func testSwiftName() {
   jumpTo(x: 0, y: 0, z: 0)
   jumpTo(0, 0, 0) // expected-error{{missing argument labels 'x:y:z:' in call}}
 }
+// UNSUPPORTED: OS=windows-msvc

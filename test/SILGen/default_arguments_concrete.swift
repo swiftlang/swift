@@ -14,4 +14,4 @@ func testConcreteDefaultArguments() {
   calleeWithTupleOfLoadable()
   calleeWithTupleOfAddressOnly()
   calleeWithTupleOfMixed()
-}
+}// UNSUPPORTED: OS=windows-msvc

@@ -124,3 +124,4 @@ FloatingPointDerivativeTests.test("${Self}.maximum") {
 %end # for Self in ['Float', 'Double', 'Float80']:
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

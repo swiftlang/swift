@@ -478,3 +478,4 @@ entry(%arg : $ContainsTuple):
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

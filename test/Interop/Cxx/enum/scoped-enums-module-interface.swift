@@ -85,3 +85,4 @@
 // CHECK:   case y
 // CHECK:   case z
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

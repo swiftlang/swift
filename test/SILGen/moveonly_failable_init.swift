@@ -27,3 +27,4 @@ struct MyType: ~Copyable {
 func test() -> MyType? {
   return MyType(handle: MoveWithDeinit())
 }
+// UNSUPPORTED: OS=windows-msvc

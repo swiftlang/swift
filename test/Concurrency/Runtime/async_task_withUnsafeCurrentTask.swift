@@ -39,3 +39,4 @@ func test_withUnsafeCurrentTask() async {
     await test_withUnsafeCurrentTask()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

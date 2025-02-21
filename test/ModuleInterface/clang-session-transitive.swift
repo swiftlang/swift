@@ -43,3 +43,4 @@ import TestModule
  // CHECK:                 "-validate-clang-modules-once",
  // CHECK-NEXT:            "-clang-build-session-file",
  // CHECK-NEXT:            "{{.*}}Build.session"
+// UNSUPPORTED: OS=windows-msvc

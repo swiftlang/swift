@@ -6,3 +6,4 @@ import other
 
 let t = Foo.self
 let n = t.Nested()
+// UNSUPPORTED: OS=windows-msvc

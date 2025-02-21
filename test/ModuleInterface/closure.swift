@@ -11,3 +11,4 @@ public let MyClosureVar: (Int) -> Int = { $0 }
 
 // CHECK: public let MyOtherClosureVar: (_ x: Swift.Int) -> Swift.Int
 public let MyOtherClosureVar: (_ x: Int) -> Int = { x in x }
+// UNSUPPORTED: OS=windows-msvc

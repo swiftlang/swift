@@ -15,3 +15,4 @@ func test(other: Container) {
   _ = Container(objects: other)
   // expected-error@-1 {{cannot convert value of type 'Container' to expected argument type '[Obj]'}}
 }
+// UNSUPPORTED: OS=windows-msvc

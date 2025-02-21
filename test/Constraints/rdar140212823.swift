@@ -27,3 +27,4 @@ let _ = (S.staticMethod)
 let _ = (type(of: S()).staticMethod)
 
 let _: (Int, Int) -> Int = (+)
+// UNSUPPORTED: OS=windows-msvc

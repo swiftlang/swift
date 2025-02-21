@@ -19,3 +19,4 @@ struct S1<T>: ExpressibleByIntegerLiteral { // expected-note{{'S1' has been expl
 typealias IntegerLiteralType = S1<Int>
 
 let a = 0 // expected-error{{'S1' is unavailable}}
+// UNSUPPORTED: OS=windows-msvc

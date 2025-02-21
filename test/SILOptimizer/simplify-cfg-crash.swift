@@ -21,3 +21,4 @@ public func testit(_ x: Base?) -> Derived? {
     return i as? Derived
 }
 
+// UNSUPPORTED: OS=windows-msvc

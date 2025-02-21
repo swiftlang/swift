@@ -82,3 +82,4 @@ func testCommonTypeDynamicSelf(ds: DynamicSelf, ids: InheritsDynamicSelf) {
   _ = ids.foo(0)
 }
 
+// UNSUPPORTED: OS=windows-msvc

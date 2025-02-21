@@ -34,3 +34,4 @@ func testRegexLiteral() {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

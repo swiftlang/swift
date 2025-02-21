@@ -31,3 +31,4 @@ distributed actor MyDistActor {
 // CHECK: br bb5([[ACTOR_INSTANCE]] : $MyDistActor)
 }
 
+// UNSUPPORTED: OS=windows-msvc

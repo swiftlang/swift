@@ -184,3 +184,4 @@ public struct DeprecatedAnnotations: MyProto {}
 // CHECK-NEXT:  }
 // CHECK-NEXT:]
 
+// UNSUPPORTED: OS=windows-msvc

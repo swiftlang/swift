@@ -17,3 +17,4 @@ public class ClosureMaker {
 
 // CHECK: define {{.*}} @"$s4main12ClosureMakerC03getB0SiycyFSiycfU_"
 // CHECK: #dbg_declare(ptr %{{.*}} !DIExpression(DW_OP_deref)
+// UNSUPPORTED: OS=windows-msvc

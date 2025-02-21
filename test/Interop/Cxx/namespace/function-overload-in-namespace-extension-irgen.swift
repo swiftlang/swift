@@ -28,3 +28,4 @@ public func doTest() {
   ExtendedInSwift.test(0, 0)
   ExtendedInSwift.test()
 }
+// UNSUPPORTED: OS=windows-msvc

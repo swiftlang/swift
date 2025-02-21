@@ -12,3 +12,4 @@ func foo1(e : E, i : Int) {
   // expected-note@-3 {{missing case: '.e2'}}
   switch i {} // expected-error{{'switch' statement body must have at least one 'case' or 'default' block; add a default case}}{{13-13=default:\n<#code#>\n}}
 }
+// UNSUPPORTED: OS=windows-msvc

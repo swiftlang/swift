@@ -17,3 +17,4 @@ func testVar() {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

@@ -300,3 +300,4 @@ public func usePrespecializedEntryPointsAvailability() {
 // NONE: sil @$s30pre_specialized_module_layouts16publicInlineableyyxlFSd_Ts5 : $@convention(thin) (Double) -> () {
 @_specialize(exported: true, target: publicInlineable(_:), where T == Double)
 public func specializeTarget<T>(_ t: T) {}
+// UNSUPPORTED: OS=windows-msvc

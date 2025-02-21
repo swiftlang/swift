@@ -131,3 +131,4 @@ extension FixedWidthInteger {
     accepts_int(shift) // Ok
   }
 }
+// UNSUPPORTED: OS=windows-msvc

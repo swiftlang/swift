@@ -29,3 +29,4 @@ public func refToUnderlying(_ a: MyModule.UnderlyingType) {}
 
 @_exported import Mod___MyModule
 public func refToUnderlying(_ a: Mod___MyModule.UnderlyingType) {}
+// UNSUPPORTED: OS=windows-msvc

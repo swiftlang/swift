@@ -19,3 +19,4 @@ public extension S1 {
 // CHECK1:  extension <loc><ref:Struct>S1</ref></loc> {
 // CHECK1: <decl:Extension>@available(iOS 13, *)
 // CHECK1: extension <loc><ref:Struct>S1</ref></loc> {
+// UNSUPPORTED: OS=windows-msvc

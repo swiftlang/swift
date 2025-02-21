@@ -18,3 +18,4 @@ func foo(_ x: some P) {
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()
 // CHECK-NEXT: } // end sil function '$s26opaque_parameter_roundtrip3fooyyxAA1PRzlF'
+// UNSUPPORTED: OS=windows-msvc

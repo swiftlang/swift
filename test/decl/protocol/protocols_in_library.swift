@@ -13,3 +13,4 @@ protocol Proto {
 protocol Proto2 {
   func f() // expected-note {{protocol requires function 'f()' with type '() -> ()'}}
 }
+// UNSUPPORTED: OS=windows-msvc

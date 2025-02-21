@@ -18,3 +18,4 @@ foo()
 
 // The C++ function:
 // CHECK: define{{( dso_local)?}} void @{{_Z21funcReturnsLargeClassv|"\?funcReturnsLargeClass@@YA\?AULargeClass@@XZ"}}({{%struct.LargeClass\*|ptr}}{{.*}} sret(%struct.LargeClass){{( align .*)?}} %{{.*}})
+// UNSUPPORTED: OS=windows-msvc

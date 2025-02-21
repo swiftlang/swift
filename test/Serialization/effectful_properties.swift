@@ -83,3 +83,4 @@ protocol P {
 
    subscript(_ p : String) -> Int { get async throws }
 }
+// UNSUPPORTED: OS=windows-msvc

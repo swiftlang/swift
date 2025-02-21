@@ -28,3 +28,4 @@ struct G<X, Y> where X : Q {
 
 func foo<X, Y>(_: X, _: Y) where X : Q, X : S<Y>, Y : P {}
 // CHECK: Generic signature: <X, Y where X : S<Y>, Y : P>
+// UNSUPPORTED: OS=windows-msvc

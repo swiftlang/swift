@@ -281,3 +281,4 @@ distributed actor TacoWorker: DistributedTacoMaker {} // implemented in extensio
 extension DistributedTacoMaker where SerializationRequirement == Codable {
   distributed func makeGreatTacos(with: Salsa) {}
 }
+// UNSUPPORTED: OS=windows-msvc

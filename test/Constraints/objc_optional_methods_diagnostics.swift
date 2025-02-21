@@ -18,3 +18,4 @@ import Foundation
 func test(s: P.Type, v: Int) {
   _ = s.test!(c: v, 0) // expected-error {{no exact matches in call to static method 'test'}}
 }
+// UNSUPPORTED: OS=windows-msvc

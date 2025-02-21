@@ -50,3 +50,4 @@ func testInheritanceFromComposition(_ object: CompositionSubObject, _ specific: 
   let _: SomeSpecificSubclass = specific
   let _: NSCopying = specific
 }
+// UNSUPPORTED: OS=windows-msvc

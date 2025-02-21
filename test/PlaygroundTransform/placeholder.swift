@@ -39,3 +39,4 @@ if CommandLine.arguments.last == "--crash" {
   print("the value is \(f(crash: false))")
   // CHECK: the value is 42
 }
+// UNSUPPORTED: OS=windows-msvc

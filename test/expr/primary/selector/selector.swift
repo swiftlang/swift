@@ -172,3 +172,4 @@ extension SomeProtocol {
 func test() -> Selector {
   #selector(OverloadedFuncAndProperty.f)
 }
+// UNSUPPORTED: OS=windows-msvc

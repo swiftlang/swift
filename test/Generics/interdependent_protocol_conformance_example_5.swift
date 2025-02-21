@@ -73,3 +73,4 @@ func testMultiPoint<T : MultiPoint>(_: T) {
 func testCoordinateSystem<T : CoordinateSystem>(_: T) {
   sameType(T.P.C.self, T.self)
 }
+// UNSUPPORTED: OS=windows-msvc

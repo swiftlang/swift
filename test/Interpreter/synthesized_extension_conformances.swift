@@ -297,3 +297,4 @@ for (name, test) in caseIterable {
 }
 runAllTests()
 #endif
+// UNSUPPORTED: OS=windows-msvc

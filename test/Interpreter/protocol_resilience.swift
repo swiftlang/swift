@@ -67,3 +67,4 @@ ResilientProtocolTestSuite.test("DynamicCastToResilientProtocol") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

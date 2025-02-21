@@ -97,3 +97,4 @@ class TestMainActorIsolated {
     u.#^IN_GLOBALACTOR_ASYNC_UNSAFE?check=UNSAFE_OK^#
   }
 }
+// UNSUPPORTED: OS=windows-msvc

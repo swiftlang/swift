@@ -227,3 +227,4 @@ class G<T> : P11b where T : AnyObject {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

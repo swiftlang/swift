@@ -34,3 +34,4 @@ let _ = IntKey.a.stringValue
 let _ = IntKey(stringValue: "a")
 let _ = IntKey.a.intValue
 let _ = IntKey(intValue: 3)
+// UNSUPPORTED: OS=windows-msvc

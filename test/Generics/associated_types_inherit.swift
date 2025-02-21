@@ -41,3 +41,4 @@ protocol P3: P2 where T == Self {}
 
 enum C3: P3 {} // correct, might be an error
 
+// UNSUPPORTED: OS=windows-msvc

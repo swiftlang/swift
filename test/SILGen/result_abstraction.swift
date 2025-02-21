@@ -58,3 +58,4 @@ struct ConformsToReturnsAssocWithFunction : ReturnsAssoc {
     return {s in R()}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

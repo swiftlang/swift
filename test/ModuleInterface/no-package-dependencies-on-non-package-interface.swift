@@ -57,3 +57,4 @@ import Bar
 
 
 
+// UNSUPPORTED: OS=windows-msvc

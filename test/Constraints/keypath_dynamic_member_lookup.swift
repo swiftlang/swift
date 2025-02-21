@@ -558,3 +558,4 @@ struct S_54150 {
     // CHECK-NEXT: apply %{{.*}}<S_54150, T>({{.*}})
   }
 }
+// UNSUPPORTED: OS=windows-msvc

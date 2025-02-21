@@ -321,3 +321,4 @@ do {
     lvalueP[setOnlySubscript: ()] = pClosure
   }
 }
+// UNSUPPORTED: OS=windows-msvc

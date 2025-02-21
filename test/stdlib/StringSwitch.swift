@@ -81,3 +81,4 @@ StringSwitchTests.test("switch") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

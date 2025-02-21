@@ -15,3 +15,4 @@ class OptionalButUnavailableImpl : OptionalButUnavailable {
   // Note the argument label that causes this not to match the requirement.
   func doTheThing(object: Any) {} // no-warning
 }
+// UNSUPPORTED: OS=windows-msvc

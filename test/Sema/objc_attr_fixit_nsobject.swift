@@ -15,3 +15,4 @@ protocol NonObjCProto {}
 // expected-note@-1 {{inherit from 'NSObject' to silence this error}} {{26-26=NSObject, }}
 
 @objc class NoNote: NonObjCBase {} // expected-error {{only classes that inherit from NSObject can be declared @objc}} {{1-7=}}
+// UNSUPPORTED: OS=windows-msvc

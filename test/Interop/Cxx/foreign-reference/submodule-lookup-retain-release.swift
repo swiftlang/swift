@@ -36,3 +36,4 @@ void releaseFn(RefCounted *);
 import Test
 
 let x = RefCounted.create()
+// UNSUPPORTED: OS=windows-msvc

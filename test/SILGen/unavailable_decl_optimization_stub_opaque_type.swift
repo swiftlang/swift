@@ -13,3 +13,4 @@ extension S: P {}
 public func unavailableOpaqueReturnFunc() -> some P {
   return S()
 }
+// UNSUPPORTED: OS=windows-msvc

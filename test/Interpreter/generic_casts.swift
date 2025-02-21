@@ -403,3 +403,4 @@ func swiftOptimizesThisFunctionIncorrectly() -> Bool {
 let result = swiftOptimizesThisFunctionIncorrectly()
 print(#line, "Bridge cast result: \(result)") // CHECK-NEXT-objc: Bridge cast result: true
 #endif
+// UNSUPPORTED: OS=windows-msvc

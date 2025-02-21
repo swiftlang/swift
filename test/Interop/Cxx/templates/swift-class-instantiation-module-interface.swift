@@ -6,3 +6,4 @@
 // CHECK: import ClassTemplateForSwiftModule
 // CHECK: func makeWrappedMagicNumber() -> MagicWrapper<IntWrapper>
 // CHECK: func readWrappedMagicNumber(_ i: inout MagicWrapper<IntWrapper>) -> CInt
+// UNSUPPORTED: OS=windows-msvc

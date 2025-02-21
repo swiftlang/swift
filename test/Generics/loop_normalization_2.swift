@@ -26,3 +26,4 @@ protocol Q1 {
 protocol Q2 {
   associatedtype T where T : P2, T == S2
 }
+// UNSUPPORTED: OS=windows-msvc

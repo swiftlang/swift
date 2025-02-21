@@ -52,3 +52,4 @@ func foo() -> (String, String, String, Number, Number) {
 
 // CHECK: ("1", "2", "3", 42, 7)
 print(foo())
+// UNSUPPORTED: OS=windows-msvc

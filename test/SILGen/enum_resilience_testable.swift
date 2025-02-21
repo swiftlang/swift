@@ -55,3 +55,4 @@ func resilientSwitch(_ m: Medium) {
   case .Postcard: ()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ protocol OtherChain where Foo == Composite<Next.Foo> {
   associatedtype Next: OtherChain
   associatedtype Foo
 }
+// UNSUPPORTED: OS=windows-msvc

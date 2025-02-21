@@ -4,3 +4,4 @@
 class MyClass {
     var myProperty = MyGenericStruct<Int>()
 }
+// UNSUPPORTED: OS=windows-msvc

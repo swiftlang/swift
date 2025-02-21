@@ -76,3 +76,4 @@ suite.test("exchange.noncopyable") {
   _ = consume a
   expectEqual(Counted.instances, 0)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -66,3 +66,4 @@ public func test3(_ arr: Array<Int>, index: Int) -> Int {
   return arr[index] + arr[index]
 }
 
+// UNSUPPORTED: OS=windows-msvc

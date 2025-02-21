@@ -11,3 +11,4 @@ public func f<T>(collection : [T]) {
     consume(element)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

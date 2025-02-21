@@ -18,4 +18,4 @@ struct G<T : P> {}
 // None of these should produce a warning about an unavailable conformance.
 func usesConformance(_: G<HasUnavailableConformance>) {}
 func usesConformance(_: G<HasConditionallyAvailableConformance>) {}
-func usesConformance(_: G<HasAlwaysAvailableConformance>) {}
+func usesConformance(_: G<HasAlwaysAvailableConformance>) {}// UNSUPPORTED: OS=windows-msvc

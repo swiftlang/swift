@@ -41,3 +41,4 @@ struct S: P { // expected-note {{add @available attribute to enclosing struct}}
   typealias A = @isolated(any) () -> () // expected-error {{runtime support for @isolated(any) function types is only available in}}
   // expected-note @-1 {{add @available attribute to enclosing type alias}}
 }
+// UNSUPPORTED: OS=windows-msvc

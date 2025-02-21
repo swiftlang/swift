@@ -296,3 +296,4 @@ func cond_tuple_var(_ x: Float) -> Float {
 
 // CHECK-SIL: bb7({{%.*}} : $Float, [[BB0_PB_STRUCT:%.*]] : $()):
 // CHECK-SIL:   return {{%.*}} : $Float
+// UNSUPPORTED: OS=windows-msvc

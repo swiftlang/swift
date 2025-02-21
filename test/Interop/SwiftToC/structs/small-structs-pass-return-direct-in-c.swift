@@ -133,3 +133,4 @@ public func getStructDoubleAndFloat_y(_ x: StructDoubleAndFloat) -> Float { retu
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_EXTERN struct swift_interop_returnStub_Structs_[[StructU16AndPointer]] $s7Structs28returnNewStructU16AndPointeryAA0defG0VSvF(void * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL;
+// UNSUPPORTED: OS=windows-msvc

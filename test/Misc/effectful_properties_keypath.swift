@@ -40,3 +40,4 @@ asFunction(\Vertex.parent.marked) // expected-error {{cannot form key path to pr
 // expected-error@+1 {{cannot form key path to property with 'throws' or 'async'}}
 let _ = #keyPath(Vertex.parent)
 
+// UNSUPPORTED: OS=windows-msvc

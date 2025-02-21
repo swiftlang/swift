@@ -18,3 +18,4 @@
 
 // Step 3: we should be able to load if we don't prefer cake.swiftinterface
 // RUN: %api-digester -dump-sdk -print-module -module cake -I %t.mod -sdk %clang-importer-sdk-path -module-cache-path %t.module-cache -o %t.json -abi -abort-on-module-fail
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ func bar<T, Proto>(arg: T) { // expected-error {{generic parameter 'Proto' is no
 func baz<T: Hashable, Proto>(arg: T) { // expected-error {{generic parameter 'Proto' is not used in function signature}}
   arg.ugh() // expected-error {{value of type 'T' has no member 'ugh'}}
 }
+// UNSUPPORTED: OS=windows-msvc

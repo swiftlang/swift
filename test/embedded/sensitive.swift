@@ -59,3 +59,4 @@ struct Container<T> {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

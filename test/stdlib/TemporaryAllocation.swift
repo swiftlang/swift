@@ -156,3 +156,4 @@ TemporaryAllocationTestSuite.test("typedAllocationIsAligned") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -34,3 +34,4 @@ macro FreestandingDeclarationMacro
 // NAMES_ARGUMENT-DAG: Keyword/None:                       suffixed({#(name)#}); name=suffixed()
 // NAMES_ARGUMENT-DAG: Keyword/None:                       arbitrary; name=arbitrary
 
+// UNSUPPORTED: OS=windows-msvc

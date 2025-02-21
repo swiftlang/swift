@@ -7,3 +7,4 @@
 protocol Sub : Base {
   var foo: String { get set }
 }
+// UNSUPPORTED: OS=windows-msvc

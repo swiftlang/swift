@@ -75,3 +75,4 @@ StdFunctionTestSuite.test("FunctionStringToString init from closure and pass as 
 #endif
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -86,3 +86,4 @@ public func funcSkippable() {
 // TRC-FULL:  (if_then version=10.14
 // TRC-FULL-NOT-NOT:  (condition_following_availability version=10.14
 // TRC-FULL-NOT-NOT:  (if_then version=10.14
+// UNSUPPORTED: OS=windows-msvc

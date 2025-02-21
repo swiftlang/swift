@@ -90,3 +90,4 @@ actor QueueActor {
     print("DONE")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

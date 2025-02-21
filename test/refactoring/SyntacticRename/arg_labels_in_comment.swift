@@ -14,3 +14,4 @@ func /*foo:def*/foo(baz: Int) {}
 /// `/*foo:unknown*/<base>foo</base>(<sel index=0>baz</sel>:)` does very importants stuff
 func /*foo:def*/<base>foo</base>(<arglabel index=0>baz</arglabel><param index=0></param>: Int) {}
 
+// UNSUPPORTED: OS=windows-msvc

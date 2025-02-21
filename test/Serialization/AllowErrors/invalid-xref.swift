@@ -42,3 +42,4 @@ public class SomeClass {
     self.member = member
   }
 }
+// UNSUPPORTED: OS=windows-msvc

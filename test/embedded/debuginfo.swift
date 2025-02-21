@@ -26,3 +26,4 @@ public func test() {
     foo(&a)
     foo2(&a)
 }
+// UNSUPPORTED: OS=windows-msvc

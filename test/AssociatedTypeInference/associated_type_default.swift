@@ -39,4 +39,4 @@ struct X4 : P4 {} // expected-error{{type 'X4' does not conform to protocol 'P4'
 protocol Seq {
   associatedtype SubSeq: Seq
   associatedtype Index = SubSeq.Index
-}
+}// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ func createKeyPathImported() -> String {
   // CHECK: string_literal utf8 "originalName"
   return #keyPath(Gizmo.renamedProp)
 } // CHECK: } // end sil function '$s12objc_keypath21createKeyPathImportedSSyF'
+// UNSUPPORTED: OS=windows-msvc

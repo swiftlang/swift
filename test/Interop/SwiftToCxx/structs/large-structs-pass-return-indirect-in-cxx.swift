@@ -53,3 +53,4 @@ public func inoutStructSeveralI64(_ s: inout StructSeveralI64) {
 // CHECK-NEXT:    Structs::_impl::$s7Structs25returnNewStructSeveralI641iAA0deF0Vs5Int64V_tF(result, i);
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

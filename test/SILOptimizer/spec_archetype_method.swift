@@ -43,3 +43,4 @@ func interesting_code_here() {
   generic_call(x: x)
   useFoo(x: x)
 }
+// UNSUPPORTED: OS=windows-msvc

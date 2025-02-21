@@ -24,3 +24,4 @@ public func foo() {}
 //--- Client.swift
 import Lib
 foo()
+// UNSUPPORTED: OS=windows-msvc

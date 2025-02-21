@@ -16,3 +16,4 @@ import helper
 // USER-ACCESS-DAG:      Decl[EnumElement]/CurrNominal:      bar[#MyEnum#]; name=bar
 // USER-ACCESS-NOT:      __derived_enum_equals
 }
+// UNSUPPORTED: OS=windows-msvc

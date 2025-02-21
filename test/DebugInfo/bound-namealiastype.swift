@@ -16,3 +16,4 @@ func dispatch_queue_create() -> dispatch_queue_t! {
 // CHECK: ![[TY]] = !DICompositeType(
 // CHECK-SAME:             name: "$s4main16dispatch_queue_taSgD"
 public var queue = dispatch_queue_create()
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@ struct NonisolatedStruct {
     await x.asyncMethod()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

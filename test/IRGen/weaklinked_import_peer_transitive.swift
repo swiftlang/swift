@@ -19,3 +19,4 @@
 fn()
 // CHECK-DAG: declare extern_weak void @clang_fn()
 clang_fn()
+// UNSUPPORTED: OS=windows-msvc

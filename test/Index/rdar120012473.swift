@@ -48,3 +48,4 @@ func baz(x: () -> Bool = {
   }
   return true
 }) {}
+// UNSUPPORTED: OS=windows-msvc

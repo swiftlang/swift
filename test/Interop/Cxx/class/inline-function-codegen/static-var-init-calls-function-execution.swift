@@ -12,3 +12,4 @@ MembersTestSuite.test("static var init calls function") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

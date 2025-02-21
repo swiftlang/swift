@@ -26,3 +26,4 @@ let d = DerivedOutOfOrder.getInstance()
 let _ = d.baseField
 let _ = d.derivedField
 let _ = d.leafField
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@ import People
 class MyFrank : Frank {
   override func frank() {}
 }
+// UNSUPPORTED: OS=windows-msvc

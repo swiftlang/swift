@@ -8,3 +8,4 @@ func clamp(_ value: Double, _ lowerBound: Double, _ upperBound: Double) -> Doubl
     // No error expected
     return Struct.max(min(value, upperBound), lowerBound)
 }
+// UNSUPPORTED: OS=windows-msvc

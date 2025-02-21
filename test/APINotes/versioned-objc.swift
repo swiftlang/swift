@@ -175,3 +175,4 @@ extension PrintingInterference {
 }
 
 let unrelatedDiagnostic: Int = nil
+// UNSUPPORTED: OS=windows-msvc

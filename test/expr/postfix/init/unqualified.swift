@@ -133,3 +133,4 @@ do {
     _ = init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

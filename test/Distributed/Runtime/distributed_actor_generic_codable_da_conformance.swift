@@ -167,3 +167,4 @@ distributed actor CodableIDDA<ActorSystem>
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

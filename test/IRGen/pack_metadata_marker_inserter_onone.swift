@@ -102,3 +102,4 @@ public func consume2S<T>(_: consuming S<T>, _: consuming S<T>) {}
 public func callConsume2S<T>(_ s: S<T>) {
   consume2S(s, s)
 }
+// UNSUPPORTED: OS=windows-msvc

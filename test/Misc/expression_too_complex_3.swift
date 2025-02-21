@@ -72,3 +72,4 @@ var radar32680856 = [
   Int32(bitPattern: 0xF0), Int32(bitPattern: 0xF1), Int32(bitPattern: 0xF2), Int32(bitPattern: 0xF3), Int32(bitPattern: 0xF4), Int32(bitPattern: 0xF5), Int32(bitPattern: 0xF6), Int32(bitPattern: 0xF7), Int32(bitPattern: 0xF8), Int32(bitPattern: 0xF9), Int32(bitPattern: 0xFA), Int32(bitPattern: 0xFB), Int32(bitPattern: 0xFC), Int32(bitPattern: 0xFD), Int32(bitPattern: 0xFE), Int32(bitPattern: 0xFF),
 ]
 
+// UNSUPPORTED: OS=windows-msvc

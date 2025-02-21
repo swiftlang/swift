@@ -50,3 +50,4 @@ fileprivate class ToplevelClass7 {}
 @available(OSX 13.10, *)
 @_originallyDefinedIn(module: "foo", OSX 13.13, iOS 7.0) // expected-warning {{'@_originallyDefinedIn' does not have any effect on internal declarations}}
 internal class ToplevelClass8 {}
+// UNSUPPORTED: OS=windows-msvc

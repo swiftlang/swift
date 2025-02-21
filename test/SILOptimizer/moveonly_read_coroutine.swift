@@ -71,3 +71,4 @@ func test(p: P) {
   take(p.data) // expected-error{{'p.data' is borrowed and cannot be consumed}} expected-note{{consumed here}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

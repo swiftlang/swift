@@ -36,3 +36,4 @@ struct User3: Codable {
 
 // RUN: %refactor -add-explicit-codable-implementation -source-filename %s -pos=30:8 > %t.result/has_decodable.swift
 // RUN: diff -u %S/Outputs/existing/has_decodable.swift.expected %t.result/has_decodable.swift
+// UNSUPPORTED: OS=windows-msvc

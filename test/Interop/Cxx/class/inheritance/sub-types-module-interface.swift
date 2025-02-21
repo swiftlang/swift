@@ -47,3 +47,4 @@
 // CHECK-NEXT:   typealias Parent = Base.Parent.Type
 // CHECK-NEXT:   typealias Union = Base.Union.Type
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

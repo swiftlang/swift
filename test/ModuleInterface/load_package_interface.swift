@@ -83,3 +83,4 @@ import Bar
 func foo() {
   print(PubKlass().pubVar, PkgKlass().pkgVar)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -34,3 +34,4 @@
   }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

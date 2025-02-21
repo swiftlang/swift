@@ -169,3 +169,4 @@ protocol MissingAccessorsLet {
 enum Bar15: MissingAccessorsLet { // OK
   case bar
 }
+// UNSUPPORTED: OS=windows-msvc

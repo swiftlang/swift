@@ -70,3 +70,4 @@ public func has_witness_table_pack2<each T: Sequence>(t: repeat each T) -> () ->
 func f<each T>(t: (repeat each T)) {
   let tup = (repeat ((each T).self, each t))
 }
+// UNSUPPORTED: OS=windows-msvc

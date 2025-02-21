@@ -44,3 +44,4 @@ public func inlineThis(_ char: Character) {
 
 // CHECK: define{{.*}}@"$s4test7ContextC8SomeEnumOSQAASQ2eeoiySbx_xtFZTW"({{.*}}){{.*}} {
 // CHECK-NEXT: entry:
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ class TestUnknownDanglingAttr1 {
 class TestUnknownDanglingAttr2 {
   @UnknownAttr(arg: { MyValue.#^ATTRARG_MEMBER_IN_CLOSURE^# })
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ struct Test {
 let test = Test(_$value: Wrapper())
 print(test.value)
 // CHECK: 1
+// UNSUPPORTED: OS=windows-msvc

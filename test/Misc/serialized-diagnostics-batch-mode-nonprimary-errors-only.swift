@@ -20,3 +20,4 @@
 
 func test(x: SomeType) {
 }
+// UNSUPPORTED: OS=windows-msvc

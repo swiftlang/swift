@@ -99,3 +99,4 @@ struct C {
   // CHECK: (pattern_named "propertyC6"
   // CHECK-NEXT: (type_attributed attrs="@differentiable(reverse) @convention(c) "
 }
+// UNSUPPORTED: OS=windows-msvc

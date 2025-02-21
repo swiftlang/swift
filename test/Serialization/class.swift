@@ -86,3 +86,4 @@ HasNoOptionalReqs()
 OptionalImplementer().unrelated()
 
 extension def_class.ComputedProperty { }
+// UNSUPPORTED: OS=windows-msvc

@@ -56,3 +56,4 @@ expectEqual(MemoryLayout<SinglePayloadTrivial>.size, 1)
 expectEqual(MemoryLayout<MultiPayloadTrivial>.size, 2)
 expectEqual(MemoryLayout<MultiPayloadGeneric<UInt8, UInt8>>.size, 2)
 expectEqual(MemoryLayout<MultiPayloadGeneric<UInt32, UInt32>>.size, 5)
+// UNSUPPORTED: OS=windows-msvc

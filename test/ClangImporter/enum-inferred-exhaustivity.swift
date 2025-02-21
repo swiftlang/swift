@@ -17,3 +17,4 @@ func test(_ value: EnumWithSpecialAttributes) {
   case .loneCase: break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

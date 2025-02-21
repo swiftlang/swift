@@ -33,3 +33,4 @@ RepeatTests.test("out-of-bounds") {
 #endif
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

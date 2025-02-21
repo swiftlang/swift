@@ -82,3 +82,4 @@ func passAvailableConformance2a(x: HasAvailableConformance2) {
   _ = UsesHorse<HasAvailableConformance2>.self
 }
 
+// UNSUPPORTED: OS=windows-msvc

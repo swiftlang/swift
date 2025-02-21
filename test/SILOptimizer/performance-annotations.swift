@@ -605,3 +605,4 @@ extension G where T == Int {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

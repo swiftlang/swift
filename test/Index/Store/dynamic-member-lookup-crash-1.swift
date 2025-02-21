@@ -16,3 +16,4 @@ extension Foo {
     fatalError()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

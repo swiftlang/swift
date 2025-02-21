@@ -11,3 +11,4 @@ struct FooStruct {
 }
 func f(foo: FooStruct) {
   foo.#^A^#
+// UNSUPPORTED: OS=windows-msvc

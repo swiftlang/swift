@@ -16,3 +16,4 @@ private struct PrivateType {}
 
   init() {}
 }
+// UNSUPPORTED: OS=windows-msvc

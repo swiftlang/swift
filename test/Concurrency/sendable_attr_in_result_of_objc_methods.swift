@@ -39,3 +39,4 @@ func test(test: Test) {
     _ = result3 // Ok
   }
 }
+// UNSUPPORTED: OS=windows-msvc

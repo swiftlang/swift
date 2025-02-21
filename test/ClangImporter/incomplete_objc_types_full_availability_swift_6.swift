@@ -39,3 +39,4 @@ let protocolTestClassInstance = ProtocolTestClass()
 interfaceTestClassInstance.doSomethingForwardDeclaredInterfacesCan()
 interfaceTestInstance.doSomethingForwardDeclaredInterfacesCan()
 protocolTestClassInstance.doSomethingForwardDeclaredProtocolsCan()
+// UNSUPPORTED: OS=windows-msvc

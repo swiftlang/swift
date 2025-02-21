@@ -26,3 +26,4 @@ extension MyObjcClass {
   // CHECK: s:So11MyObjcClassC18SwiftAttrExtensionE8someFuncyyF
   public func someFunc() {}
 }
+// UNSUPPORTED: OS=windows-msvc

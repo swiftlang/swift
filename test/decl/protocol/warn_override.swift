@@ -30,3 +30,4 @@ protocol P2: P0 {
   @_nonoverride
   var prop: A { get }
 }
+// UNSUPPORTED: OS=windows-msvc

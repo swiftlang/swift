@@ -8,3 +8,4 @@ protocol SubProto : BaseProto {}
 
 protocol DoubleSubProto : IntermediateProto {}
 // CHECK: @"$s24objc_protocol_multi_file14DoubleSubProtoMp" = hidden constant
+// UNSUPPORTED: OS=windows-msvc

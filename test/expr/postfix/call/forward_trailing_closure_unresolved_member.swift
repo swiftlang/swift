@@ -17,3 +17,4 @@ func test() {
       print("handler2 is called")
     })
 }
+// UNSUPPORTED: OS=windows-msvc

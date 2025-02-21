@@ -88,3 +88,4 @@ actor MyActor {
 // CHECK-NEXT: isSameExclusiveExecutionContext: consider 'one' and 'two' executors as equal context
 // CHECK-NEXT: MyActor: [one] on same context as [two]
 // CHECK-NEXT: end
+// UNSUPPORTED: OS=windows-msvc

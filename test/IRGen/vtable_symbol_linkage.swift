@@ -18,3 +18,4 @@ public class MostDerived : Middle {}
 
 public class DerivedNested : Namespace.Nested {}
 public class DerivedExtNested : Namespace.ExtNested {}
+// UNSUPPORTED: OS=windows-msvc

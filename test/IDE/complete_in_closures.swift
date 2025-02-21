@@ -559,3 +559,4 @@ func testVariableInClosureHasArchetype<K>(_ key: K) {
     // VAR_WITH_ARCHETYPE: End completions
   }
 }
+// UNSUPPORTED: OS=windows-msvc

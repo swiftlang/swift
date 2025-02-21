@@ -713,3 +713,4 @@ func testNSUIntegerNewtype() {
   let _: Int = NSUIntegerSystemNewType(4).rawValue
   let _: NSUIntegerSystemNewType = NSUIntegerSystemNewType.constant
 }
+// UNSUPPORTED: OS=windows-msvc

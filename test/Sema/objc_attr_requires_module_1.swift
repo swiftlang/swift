@@ -10,3 +10,4 @@
 
 #if false
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@ func test(value: Value) {
 // CHECK1-NEXT: 7:1 - inactive
 // CHECK1-NEXT: 9:1 - active
 // CHECK1-NEXT: END IF CONFIGS
+// UNSUPPORTED: OS=windows-msvc

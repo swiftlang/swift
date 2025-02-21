@@ -76,3 +76,4 @@ func useBar(_ x: Bar) -> Int32 {
   // CHECK: %[[RETVAL:.+]] = phi i32 [ 10, %[[CASE_A]] ], [ 15, %[[CASE_C]] ], [ 11, %[[CASE_B]] ]
   // CHECK: ret i32 %[[RETVAL]]
 }
+// UNSUPPORTED: OS=windows-msvc

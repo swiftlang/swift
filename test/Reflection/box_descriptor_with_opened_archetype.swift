@@ -15,4 +15,4 @@ extension P {
   var open: some P {
     S<Self>()
   }
-}
+}// UNSUPPORTED: OS=windows-msvc

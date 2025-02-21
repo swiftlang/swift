@@ -11,3 +11,4 @@ public class C {
 @inlinable public func g(_ x: C) {
   x.f()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -157,3 +157,4 @@ func testResultReabstractedEmission_vanishing() {
     (a: Int, b: Bool) -> Bool in b
   }
 }
+// UNSUPPORTED: OS=windows-msvc

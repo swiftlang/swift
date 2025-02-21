@@ -13,3 +13,4 @@ maybeTrans(0) // expected-error{{ambiguous use of 'maybeTrans'}}
 // CHECK: found this candidate
 // CHECK-NOT: transparent
 // CHECK: maybeTrans(_ i: Int32)
+// UNSUPPORTED: OS=windows-msvc

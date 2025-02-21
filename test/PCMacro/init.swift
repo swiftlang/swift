@@ -41,3 +41,4 @@ var b = B()
 // CHECK-NEXT: [11:3-11:24] pc after
 // CHECK-NEXT: [18:5-18:15] pc after
 // CHECK-NEXT: [25:1-25:12] pc after
+// UNSUPPORTED: OS=windows-msvc

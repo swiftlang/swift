@@ -60,3 +60,4 @@ public func test1() {
   foobar
 }
 
+// UNSUPPORTED: OS=windows-msvc

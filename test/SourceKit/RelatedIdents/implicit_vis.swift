@@ -23,3 +23,4 @@ class B {
 // CHECK1: 3:10 - 1
 // CHECK1: 4:10 - 1
 // CHECK1: END RANGES
+// UNSUPPORTED: OS=windows-msvc

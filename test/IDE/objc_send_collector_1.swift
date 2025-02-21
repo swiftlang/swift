@@ -47,3 +47,4 @@ public func testProperties(_ x: FooClassBase, _ y: FooProtocolBase) {
 // CHECK-DAG: "swift-compiler-version":
 
 // CHECK-BLOCKED-NOT: "FooClassBase"
+// UNSUPPORTED: OS=windows-msvc

@@ -46,3 +46,4 @@ if #available(SwiftStdlib 5.1, *) {
   let s = PublicStruct()
   let r = s.foo()
 }
+// UNSUPPORTED: OS=windows-msvc

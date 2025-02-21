@@ -37,3 +37,4 @@ import Lib
 public func test() -> Test {
   .value // Ok (no sendability errors)
 }
+// UNSUPPORTED: OS=windows-msvc

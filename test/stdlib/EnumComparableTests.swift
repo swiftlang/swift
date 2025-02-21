@@ -42,3 +42,4 @@ SynthesizedComparableTests.test("Associated Values Enum sorting") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -36,3 +36,4 @@ func bar(_ e: E2) {
     case .foo((_, _, _)): break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

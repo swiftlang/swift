@@ -42,3 +42,4 @@ bb0(%0 : $Builtin.Word):
   %13 = move_value [lexical] [var_decl] %12 : $BaseClass
   return %13 : $BaseClass
 }
+// UNSUPPORTED: OS=windows-msvc

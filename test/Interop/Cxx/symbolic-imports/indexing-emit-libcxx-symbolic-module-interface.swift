@@ -41,3 +41,4 @@ import CxxModule
 // FILES: std-{{.*}}.pcm.symbolicswiftinterface
 
 // CHECK: // Swift interface for system module 'std'
+// UNSUPPORTED: OS=windows-msvc

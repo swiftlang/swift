@@ -6,3 +6,4 @@ func foo() {}
 
 // WITHOUT-PREFIX-MAP: sysroot: "{{.*}}SOME_SDK
 // WITH-PREFIX-MAP: sysroot: "foo
+// UNSUPPORTED: OS=windows-msvc

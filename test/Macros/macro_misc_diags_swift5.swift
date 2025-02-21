@@ -42,3 +42,4 @@ class rdar138997009_Class {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

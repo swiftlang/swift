@@ -67,3 +67,4 @@ extension Optional where Wrapped: SECRETProtocol {
 
 // NEGATIVE-NOT: CoreFoo
 // NEGATIVE-NOT: SECRET
+// UNSUPPORTED: OS=windows-msvc

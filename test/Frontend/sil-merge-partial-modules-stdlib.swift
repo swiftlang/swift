@@ -7,3 +7,4 @@
 public func makeMirror(object x: Any) -> Mirror {
   return Mirror(reflecting: x)
 }
+// UNSUPPORTED: OS=windows-msvc

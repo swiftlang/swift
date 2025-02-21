@@ -37,3 +37,4 @@ import A
 func callA() {
   funcA()
 }
+// UNSUPPORTED: OS=windows-msvc

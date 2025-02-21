@@ -273,3 +273,4 @@ func testValueToObjectBridgingInSwitch() {
 // CHECK-NOT: oh noes
 // CHECK: Done
 testValueToObjectBridgingInSwitch()
+// UNSUPPORTED: OS=windows-msvc

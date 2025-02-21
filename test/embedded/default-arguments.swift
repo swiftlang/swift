@@ -18,3 +18,4 @@ public func testit(_ x: Int = foo(27)) -> Int {
 public func callit() -> Int {
   testit()
 }
+// UNSUPPORTED: OS=windows-msvc

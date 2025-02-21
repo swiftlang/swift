@@ -193,3 +193,4 @@ struct WeirdIvarLookupBehavior {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

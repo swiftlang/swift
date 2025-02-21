@@ -39,3 +39,4 @@ public enum Box: Hashable { case boom }
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

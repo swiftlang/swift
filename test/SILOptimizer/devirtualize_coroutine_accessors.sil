@@ -48,3 +48,4 @@ sil_vtable Base {
 sil_vtable Derived {
   #Base.x!read2: @Derived_x_read2 [override]
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ protocol Q: P where T == G<U> {}
 protocol R: Q where U == Int {}
 
 struct X: R {}
+// UNSUPPORTED: OS=windows-msvc

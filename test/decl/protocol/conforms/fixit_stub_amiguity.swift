@@ -30,3 +30,4 @@ extension Outer: P {} // fixit `func foo(_ : Inner)` picks up `Outer.Inner` by a
 The ASTPrinter doesn't currently have enough context to declare this situation ambiguous.
 
 */
+// UNSUPPORTED: OS=windows-msvc

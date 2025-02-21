@@ -21,3 +21,4 @@ struct Foo {
 // CHECK: is-debug: 1
 // CHECK: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
 // CHECK: Record | user | SOURCE_DIR{{/|\\}}test{{/|\\}}SourceKit{{/|\\}}Indexing{{/|\\}}indexstore_multifile.swift | indexstore_multifile.swift-{{.*}}
+// UNSUPPORTED: OS=windows-msvc

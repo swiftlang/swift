@@ -133,3 +133,4 @@ func testNeverTransferInexactMatchExplicit(_ x: (PreCUncheckedExplicitlyNonSenda
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

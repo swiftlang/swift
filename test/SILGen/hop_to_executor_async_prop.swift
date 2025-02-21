@@ -690,3 +690,4 @@ class Polar {
 func accessStaticIsolated() async -> Int {
   return await Polar.temperature
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@
 // CHECK:   mutating func nonConst() -> Int32
 // CHECK:   var a: Int32
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

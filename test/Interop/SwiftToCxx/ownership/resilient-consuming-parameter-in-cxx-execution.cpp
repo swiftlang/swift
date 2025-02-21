@@ -9,3 +9,4 @@
 // RUN: %target-run %t/swift-consume-execution-evo | %FileCheck %S/consuming-parameter-in-cxx-execution.cpp
 
 // REQUIRES: executable_test
+// UNSUPPORTED: OS=windows-msvc

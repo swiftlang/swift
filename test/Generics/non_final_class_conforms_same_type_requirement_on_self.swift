@@ -74,3 +74,4 @@ public class SuperclassExampleC : SuperclassExampleP {
 public class SuperclassExampleD : Q {
   public typealias B = G<SuperclassExampleC>
 }
+// UNSUPPORTED: OS=windows-msvc

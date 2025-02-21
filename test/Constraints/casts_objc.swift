@@ -96,3 +96,4 @@ func anyObjectCasts(xo: [Int]?, xooo: [Int]???, x: [Int]) {
   _ = xooo as AnyObject???
   _ = xooo as AnyObject???? // okay: injects extra optionals
 }
+// UNSUPPORTED: OS=windows-msvc

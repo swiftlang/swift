@@ -20,3 +20,4 @@ class Goo {
   static func main() async throws {} // expected-error{{not permitted within task-to-thread concurrency model}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

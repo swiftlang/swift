@@ -31,3 +31,4 @@ doit()
 // CHECK:  age: 10
 // CHECK:  end
 // CHECK: DEINIT
+// UNSUPPORTED: OS=windows-msvc

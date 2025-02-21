@@ -81,3 +81,4 @@ public class SelfCasts {
 
   public required init() {}
 }
+// UNSUPPORTED: OS=windows-msvc

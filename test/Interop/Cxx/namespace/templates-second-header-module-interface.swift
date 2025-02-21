@@ -9,3 +9,4 @@
 // CHECK: }
 
 // CHECK: typealias BasicClassTemplateDefinedInDefsChar = TemplatesNS1.BasicClassTemplateDefinedInDefs<CChar>
+// UNSUPPORTED: OS=windows-msvc

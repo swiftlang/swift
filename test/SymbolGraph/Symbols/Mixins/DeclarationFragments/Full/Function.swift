@@ -109,3 +109,4 @@ public func foo<S>(f: @escaping () -> (), ext int: Int = 2, s: S) where S: Seque
 // CHECK-NEXT:          "preciseIdentifier": "s:ST"
 // CHECK-NEXT:        }
 // CHECK-NEXT:      ],
+// UNSUPPORTED: OS=windows-msvc

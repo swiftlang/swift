@@ -43,3 +43,4 @@ int main() {
 // CHECK-NEXT: -6, -100, -54, 220, -293274, -1540
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

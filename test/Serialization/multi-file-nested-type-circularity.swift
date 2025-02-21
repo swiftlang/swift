@@ -19,3 +19,4 @@ extension Outer {
 
   public func useTypes(_: Outer.Callback?) {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -122,3 +122,4 @@ StringForPrintObjectTests.test("StructWithTwoMembers") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

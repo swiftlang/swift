@@ -154,3 +154,4 @@ func withAtSILGenName_Wasm()
 @_cdecl("another_c_name")
 @_silgen_name("another_sil_name")
 func withAtSILGenName_CDecl_C()
+// UNSUPPORTED: OS=windows-msvc

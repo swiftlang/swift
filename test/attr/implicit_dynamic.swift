@@ -55,3 +55,4 @@ public struct NotImplicitDynamic {
 @_silgen_name("foobar")
 public func noImplicitDynamicFunc() {
 }
+// UNSUPPORTED: OS=windows-msvc

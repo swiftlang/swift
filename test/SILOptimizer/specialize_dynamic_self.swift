@@ -28,3 +28,4 @@ class C<T> : P {
 func usesCInt(c: C<Int>) {
   _ = c.returnsSelf()
 }
+// UNSUPPORTED: OS=windows-msvc

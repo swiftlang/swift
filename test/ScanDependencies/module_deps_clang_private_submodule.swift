@@ -7,3 +7,4 @@
 // CHECK-NOT: "clang": "Y_Private"
 import X.Private
 import Y.Private
+// UNSUPPORTED: OS=windows-msvc

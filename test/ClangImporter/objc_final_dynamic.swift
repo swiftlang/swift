@@ -15,3 +15,4 @@ final class MyClass : NSObject { }
 extension MyClass {
   public static var otherStaticIntProperty: Int = 17
 }
+// UNSUPPORTED: OS=windows-msvc

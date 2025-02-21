@@ -9,3 +9,4 @@ struct S<T> where T: ~Copyable {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

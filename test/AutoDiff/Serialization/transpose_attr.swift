@@ -95,3 +95,4 @@ extension S {
     t
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ public func callFortySomething() -> CInt {
 }
 
 // CHECK: 'getFortySomething' has different definitions in different modules
+// UNSUPPORTED: OS=windows-msvc

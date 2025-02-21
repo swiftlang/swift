@@ -117,3 +117,4 @@ open class TestThing2 {}
 
 @available(SwiftStdlib 5.1, *)
 open class TestSubThing2 : TestThing2 {}
+// UNSUPPORTED: OS=windows-msvc

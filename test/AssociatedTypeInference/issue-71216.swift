@@ -16,3 +16,4 @@ struct GenericBad<A>: RequiresIntFunction {
     true
   }
 }
+// UNSUPPORTED: OS=windows-msvc

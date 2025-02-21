@@ -39,3 +39,4 @@
 // CHECK-STRING:   }
 // CHECK-STRING: }
 // CHECK-STRING-NOT: enum std
+// UNSUPPORTED: OS=windows-msvc

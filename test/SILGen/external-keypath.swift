@@ -74,3 +74,4 @@ func testProtocolRequirement<T: ExternalProto>(_: T.Type) {
   // CHECK-NOT: external #ExternalProto.protoReqt
   _ = \T.protoReqt
 }
+// UNSUPPORTED: OS=windows-msvc

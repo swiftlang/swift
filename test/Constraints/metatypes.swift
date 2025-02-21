@@ -29,3 +29,4 @@ let _: A?.Type = B.self // expected-error {{cannot convert value of type 'B.Type
 let _: A?.Type = id(B.self) // expected-error {{cannot convert value of type 'B.Type' to specified type 'A?.Type'}}
 let _: S?.Type = id(S.self) // expected-error {{cannot convert value of type 'S.Type' to specified type 'S?.Type'}}
 
+// UNSUPPORTED: OS=windows-msvc

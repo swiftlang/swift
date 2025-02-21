@@ -14,3 +14,4 @@
 public func foo() {
     print("hello")
 }
+// UNSUPPORTED: OS=windows-msvc

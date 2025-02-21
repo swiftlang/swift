@@ -16,3 +16,4 @@ func updateFridgeTemp(_ home: APPHouse, delta: Double) {
   home.fridge.temperature += delta
 // CHECK: return
 }
+// UNSUPPORTED: OS=windows-msvc

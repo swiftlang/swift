@@ -98,3 +98,4 @@ struct CrashAsync {
 // FRIENDLY-NEXT:     38|   }
 // FRIENDLY-NEXT:     39| }
 
+// UNSUPPORTED: OS=windows-msvc

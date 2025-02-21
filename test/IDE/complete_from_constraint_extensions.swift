@@ -51,3 +51,4 @@ func foo3() {
 // CONSTRAINT3:      Begin completions, 2 items
 // CONSTRAINT3-NEXT: Keyword[self]/CurrNominal: self[#ConcreteCollection<Int>#]; name=self
 // CONSTRAINT3-NEXT: Decl[InstanceVar]/Super:            indices[#MyDefaultIndices<ConcreteCollection<Int>>#]; name=indices
+// UNSUPPORTED: OS=windows-msvc

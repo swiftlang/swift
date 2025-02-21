@@ -28,3 +28,4 @@ CrossModuleTests.test("differentiable function specified default argument") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

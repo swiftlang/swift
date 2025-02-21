@@ -25,3 +25,4 @@ import UsesSubmodule
 // CHECK-NOT: !{!"-framework", !"HasSubmodule"}
 // CHECK-NOT: !{!"-framework", !"Barrel"}
 // CHECK-NOT: !{!"-framework", !"Indirect"}
+// UNSUPPORTED: OS=windows-msvc

@@ -31,3 +31,4 @@ public struct publicTestEntity : TestEntity {}
 // CHECK-DAG: 21PreservedConformances17privateTestEntity5${{[0-9a-f]+}}LLV0c6NesteddE0V (PreservedConformances.(privateTestEntity in ${{[0-9a-f]+}}).privateNestedTestEntity) : PreservedConformanceProtocols.TestEntity
 // CHECK-DAG: 21PreservedConformances18internalTestEntityV (PreservedConformances.internalTestEntity) : PreservedConformanceProtocols.TestEntity
 // CHECK-DAG: 21PreservedConformances18internalTestEntityV0c6NesteddE0V (PreservedConformances.internalTestEntity.internalNestedTestEntity) : PreservedConformanceProtocols.TestEntity
+// UNSUPPORTED: OS=windows-msvc

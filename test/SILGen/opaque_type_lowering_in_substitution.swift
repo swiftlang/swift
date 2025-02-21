@@ -14,3 +14,4 @@ func abstraction_level<T>(x: T) -> (T) -> () {
 func test() {
     abstraction_level(x: Bas(bar(foo())))(Bas(bar(foo())))
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ func test() {
 // Ensure that we don't report the call pattern for `bar` as `Convertible`
 // COMPLETE-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#withString: String#}[')'][#String#]; name=withString:
 // COMPLETE-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#withInt: Int#}[')'][#Int#]; name=withInt:
+// UNSUPPORTED: OS=windows-msvc

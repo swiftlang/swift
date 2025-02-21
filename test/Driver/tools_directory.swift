@@ -34,3 +34,4 @@
 // LDSUB: -o [[OBJECTFILE:.*]]
 // LDSUB: {{[^ ]+(\\\\|/)}}Inputs{{/|\\\\}}fake-toolchain{{(\\\\|/)ld"?}} [[OBJECTFILE]]
 // LDSUB: -o tools_directory
+// UNSUPPORTED: OS=windows-msvc

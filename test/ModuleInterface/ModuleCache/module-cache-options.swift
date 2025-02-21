@@ -37,3 +37,4 @@ public func TestFunc() {
     OtherFunc()
     a()
 }
+// UNSUPPORTED: OS=windows-msvc

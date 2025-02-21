@@ -15,3 +15,4 @@ testStruct(nil)
 
 // CHECK: define {{.*}} @"$So7cstructV$member$setter"
 // CHECK: define {{.*}} @"$So7cstructV$member$getter"
+// UNSUPPORTED: OS=windows-msvc

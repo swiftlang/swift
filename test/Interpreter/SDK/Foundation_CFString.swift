@@ -29,3 +29,4 @@ print(cfstrAsStr)
 // CHECK-NEXT: Created as String
 let cfstr2: CFString = str as NSString
 print(cfstr2)
+// UNSUPPORTED: OS=windows-msvc

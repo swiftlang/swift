@@ -15,3 +15,4 @@ import library
 class CustomCounter : MyCounter {
   override var value: Int32 { didSet { } }
 }
+// UNSUPPORTED: OS=windows-msvc

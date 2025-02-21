@@ -5,3 +5,4 @@
 
 // RUN: ls %t/Foo.swiftmodule
 // RUN: ls %t/Foo.swiftsemanticinfo
+// UNSUPPORTED: OS=windows-msvc

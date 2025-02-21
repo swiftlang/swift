@@ -5,3 +5,4 @@ class UserCollection {
     Self.staticMember
   }
 }
+// UNSUPPORTED: OS=windows-msvc

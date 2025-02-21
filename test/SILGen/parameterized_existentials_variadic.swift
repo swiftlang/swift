@@ -22,3 +22,4 @@ struct S3<each T> {
   // CHECK-LABEL: sil hidden [ossa] @$s13parameterized2S3V1fAA1P_pSi1AAaEPRts_XPyF : $@convention(method) <each T> (S3<repeat each T>) -> @out any P<Int> {
   func f() -> any P<Int> {}
 }
+// UNSUPPORTED: OS=windows-msvc

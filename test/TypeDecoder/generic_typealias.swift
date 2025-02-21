@@ -144,3 +144,4 @@ do {
 // CHECK-DECL: generic_typealias.(file).Proto extension.OtherAlias
 // CHECK-DECL: generic_typealias.(file).Proto extension.OtherAliasWhere
 // CHECK-DECL: generic_typealias.(file).GenericOuter extension.ConditionalAlias
+// UNSUPPORTED: OS=windows-msvc

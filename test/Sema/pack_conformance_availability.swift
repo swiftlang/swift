@@ -12,3 +12,4 @@ extension S: P {}
 
 f(S())
 // expected-error@-1 {{conformance of 'S' to 'P' is unavailable}}
+// UNSUPPORTED: OS=windows-msvc

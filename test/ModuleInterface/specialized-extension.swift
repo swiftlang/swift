@@ -40,3 +40,4 @@ public typealias StringDict<T> = [String: T]
 
 // CHECK: extension Swift.Dictionary where Key == Swift.String, Value == Swift.Int
 extension StringDict<Int> { public static func mark() {} }
+// UNSUPPORTED: OS=windows-msvc

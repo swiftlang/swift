@@ -78,3 +78,4 @@ extension FooIntBarFloatDoubleInner {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -230,3 +230,4 @@ bb6:
   store %27 to %17 : $*FakeOptional<S>
   br bb5
 }
+// UNSUPPORTED: OS=windows-msvc

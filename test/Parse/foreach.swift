@@ -38,3 +38,4 @@ func for_each(r: Range<Int>, iir: IntRange<Int>) { // expected-note {{'r' declar
             // expected-error @-4 {{expected Sequence expression for for-each loop}}
   for i in r sum = sum + i; // expected-error{{expected '{' to start the body of for-each loop}}
 }
+// UNSUPPORTED: OS=windows-msvc

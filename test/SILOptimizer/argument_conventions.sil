@@ -31,3 +31,4 @@ entry(%result : $*T, %instance : @guaranteed $C):
 //    specify_test "argument_conventions"
 //    unreachable
 // }
+// UNSUPPORTED: OS=windows-msvc

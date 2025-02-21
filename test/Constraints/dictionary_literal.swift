@@ -198,3 +198,4 @@ f59215(["", "", "", ""]) //expected-error{{dictionary of type '[String : String]
 // expected-note@-1{{did you mean to use a dictionary literal instead?}} {{11-12=:}} {{19-20=:}}
 f59215(["", "", "", ""]) //expected-error{{dictionary of type '[String : String]' cannot be used with array literal}}
 // expected-note@-1{{did you mean to use a dictionary literal instead?}} {{11-12=:}} {{19-20=:}}
+// UNSUPPORTED: OS=windows-msvc

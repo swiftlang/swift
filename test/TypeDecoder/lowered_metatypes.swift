@@ -21,3 +21,4 @@ protocol Proto {}
 
 // CHECK: @thick any Proto.Type
 // CHECK: @objc_metatype any Proto.Type
+// UNSUPPORTED: OS=windows-msvc

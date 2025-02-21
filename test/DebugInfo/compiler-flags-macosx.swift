@@ -10,3 +10,4 @@
 // CHECK-VAR-SET-SAME:                 flags: "
 // CHECK-VAR-SET-NOT:                  "
 // CHECK-VAR-SET-SAME:                 -resource-dir 
+// UNSUPPORTED: OS=windows-msvc

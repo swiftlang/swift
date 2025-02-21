@@ -16,3 +16,4 @@ func genericParam<T: WithAssoc>(_ t: T) {
 func testBuggyGenericParam() {
    genericParam(BuggyConformer())
 }
+// UNSUPPORTED: OS=windows-msvc

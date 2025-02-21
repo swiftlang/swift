@@ -15,3 +15,4 @@ class ProblematicObjC {
     get throws { throw E.NotAvailable }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

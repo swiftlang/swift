@@ -29,3 +29,4 @@ func takesSendable<T: Sendable>(_: T) {}
 
 takesSendable(One<Int>(t: 3))
 takesSendable(Both<Int>(t: 3))
+// UNSUPPORTED: OS=windows-msvc

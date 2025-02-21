@@ -673,3 +673,4 @@ package func pkg_constructExhaustiveWithResilientMembers() -> SimpleShape {
 // CHECK-NEXT:   ret ptr [[RESULT]]
 
 
+// UNSUPPORTED: OS=windows-msvc

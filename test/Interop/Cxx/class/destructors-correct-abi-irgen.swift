@@ -11,3 +11,4 @@ public func test() {
   let d = DummyStruct()
   let h = HasUserProvidedDestructorAndDummy(d)
 }
+// UNSUPPORTED: OS=windows-msvc

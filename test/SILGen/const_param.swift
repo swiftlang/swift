@@ -13,3 +13,4 @@ func bar(a: _const String) {}
 // RUN: %swift-demangle s1A3bar1aySSYt_tF | %FileCheck %s -check-prefix=CHECK-BAR
 
 // CHECK-BAR: A.bar(a: _const Swift.String) -> ()
+// UNSUPPORTED: OS=windows-msvc

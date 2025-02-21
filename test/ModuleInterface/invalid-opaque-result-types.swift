@@ -21,3 +21,4 @@
 // CHECK: unable to resolve type for _opaqueReturnTypeOf attribute
 // CHECK: failed to build module 'InvalidOpaqueResultType' for importation
 import InvalidOpaqueResultType
+// UNSUPPORTED: OS=windows-msvc

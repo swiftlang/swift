@@ -16,3 +16,4 @@ class InferMainActor: P {
 // CHECK-FUNC-NEXT: test()
 // CHECK-FUNC: <Declaration>@<Type usr="s:ScM">MainActor</Type> func test()</Declaration>
 // CHECK-FUNC: <decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@<ref.class usr="s:ScM">MainActor</ref.class></syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>test</decl.name>()</decl.function.method.instance>
+// UNSUPPORTED: OS=windows-msvc

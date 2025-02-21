@@ -131,3 +131,4 @@ bb5(%40 : @owned $Error):
   throw %40 : $Error
 }
 
+// UNSUPPORTED: OS=windows-msvc

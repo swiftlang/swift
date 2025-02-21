@@ -3,3 +3,4 @@
 // make sure trailing semicolons are valid syntax in toplevel library code.
 var x = 4;
 
+// UNSUPPORTED: OS=windows-msvc

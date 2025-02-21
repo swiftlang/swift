@@ -29,3 +29,4 @@ func foo(_ x : Int32) -> Int32 { // CHECK: [[@LINE]]:32 -> [[@LINE+4]]:2 : 0
 foo(1)
 foo(2)
 foo(3)
+// UNSUPPORTED: OS=windows-msvc

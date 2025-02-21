@@ -46,3 +46,4 @@ class CodableDefaultConstructed : Codable {
     let _ = CodableDefaultConstructed.encode(to:)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -63,3 +63,4 @@ func useStructWithUnnamedUnion(_ u: UnnamedUnion) {
   u.u.i = 100
   u.u.f = 1.0
 }
+// UNSUPPORTED: OS=windows-msvc

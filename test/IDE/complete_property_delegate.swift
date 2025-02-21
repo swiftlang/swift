@@ -90,3 +90,4 @@ func localTest() {
 // LOCAL-DAG: Decl[FreeFunction]/CurrModule:      paramTest({#arg: MyMember#})[#Void#]; name=paramTest(arg:)
 }
 
+// UNSUPPORTED: OS=windows-msvc

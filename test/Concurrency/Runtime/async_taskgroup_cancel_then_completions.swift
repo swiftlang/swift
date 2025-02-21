@@ -79,3 +79,4 @@ func test_taskGroup_cancel_then_completions() async {
     await test_taskGroup_cancel_then_completions()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

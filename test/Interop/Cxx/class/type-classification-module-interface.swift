@@ -49,3 +49,4 @@
 // CHECK: }
 
 // CHECK: struct StructCopyableMovableAnnotatedNonCopyable
+// UNSUPPORTED: OS=windows-msvc

@@ -47,3 +47,4 @@ final class NSQueueTaskExecutor: NSData, TaskExecutor, @unchecked Sendable {
     assert(num == 12)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

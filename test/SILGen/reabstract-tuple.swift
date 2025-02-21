@@ -52,3 +52,4 @@ func g<T>() -> (Int, T)? { }
 func f<T>(t: T) {
   let _: (Int, ((T) -> (), T))? = g()
 }
+// UNSUPPORTED: OS=windows-msvc

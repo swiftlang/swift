@@ -46,3 +46,4 @@
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -g %t/a.o %t/b.o %t/a.swiftmodule %t/b.swiftmodule -o main 2>&1 | %FileCheck %s -check-prefix=DEBUG-LINK-ONLY
 // DEBUG-LINK-ONLY-NOT: "swift"
 // DEBUG-LINK-ONLY: # "x86_64-apple-macosx10.9" - "ld{{(.exe)?}}", inputs: ["{{.*}}/a.o", "{{.*}}/b.o", "{{.*}}/a.swiftmodule", "{{.*}}/b.swiftmodule"], output: {image: "main"}
+// UNSUPPORTED: OS=windows-msvc

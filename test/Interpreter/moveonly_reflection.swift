@@ -55,3 +55,4 @@ func test() {
   printFields(Dangerous("spots"))       // CHECK: field Optional("spots")
 #endif
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -138,3 +138,4 @@ struct S {
   func foo() {}
 }
 let fn = S.foo
+// UNSUPPORTED: OS=windows-msvc

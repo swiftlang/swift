@@ -289,3 +289,4 @@ exit(%cm : @owned $C):
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

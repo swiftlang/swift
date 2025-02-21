@@ -33,3 +33,4 @@ func main() {
     // CHECK-NEXT: disposing 55
 }
 main()
+// UNSUPPORTED: OS=windows-msvc

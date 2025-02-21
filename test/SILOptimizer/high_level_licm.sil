@@ -68,3 +68,4 @@ bb3:
   %r1 = tuple ()
   return %r1 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

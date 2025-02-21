@@ -147,3 +147,4 @@ if #available(SwiftStdlib 5.9, *) {
     expectEqual("\(r)", "[]U+24")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

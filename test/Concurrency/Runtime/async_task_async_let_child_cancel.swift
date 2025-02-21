@@ -75,3 +75,4 @@ func test() async {
     await test()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

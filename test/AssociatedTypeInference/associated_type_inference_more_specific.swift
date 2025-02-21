@@ -29,3 +29,4 @@ let y: String = forceP(S2())
 struct S2: R {
   func f() -> String {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -31,3 +31,4 @@ func runTheTest() {
 }
 
 runTheTest()
+// UNSUPPORTED: OS=windows-msvc

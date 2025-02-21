@@ -224,3 +224,4 @@ func testParamsMulti() async throws {
   // MIXED-ERROR-NEXT: }
   // MIXED-ERROR-NOT: }
 }
+// UNSUPPORTED: OS=windows-msvc

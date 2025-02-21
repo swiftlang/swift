@@ -12,3 +12,4 @@ func usesAssocTypeOfPrivateResultType() {
   let iterator = doSomething()
   let _ = iterator.next()
 }
+// UNSUPPORTED: OS=windows-msvc

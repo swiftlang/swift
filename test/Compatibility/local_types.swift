@@ -5,3 +5,4 @@ func foo() {
   _ = Visitor()
   struct Visitor { }
 }
+// UNSUPPORTED: OS=windows-msvc

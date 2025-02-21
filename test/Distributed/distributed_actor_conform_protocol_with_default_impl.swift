@@ -41,3 +41,4 @@ extension Device {
   distributed func fetch2() async -> String? { "" }
   distributed func fetch5() async -> String? { "" }
 }
+// UNSUPPORTED: OS=windows-msvc

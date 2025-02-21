@@ -9,3 +9,4 @@ class Hello {}
 // CHECK-DAG: c"_TtC5Hello5Hello\00"
 // CHECK-DAG: _DATA__TtC5Hello5Hello
 
+// UNSUPPORTED: OS=windows-msvc

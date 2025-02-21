@@ -251,3 +251,4 @@ let _ = UnknownOptionsThanksToAPINotesFirst
 
 // CHECK-IR: $s4enum12testMangling2e12e22e3ySo9EnumByTagV_So0gH7TypedefaSo0gH4BothVtF
 func testMangling(e1: EnumByTag, e2: EnumByTypedef, e3: EnumByBoth) {}
+// UNSUPPORTED: OS=windows-msvc

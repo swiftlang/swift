@@ -37,3 +37,4 @@ import _Concurrency
         // CHECK: All done!
     }
 }
+// UNSUPPORTED: OS=windows-msvc

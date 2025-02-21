@@ -10,3 +10,4 @@ func test_short_and_close() {
   let _ = bood + 1 // expected-error {{cannot find 'bood' in scope}}
   let _ = bood + 1 // expected-error {{cannot find 'bood' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

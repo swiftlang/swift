@@ -79,3 +79,4 @@ public enum Object : ObjectProtocol {
 // CHECK-LIB: copy_addr %1 to [init] %3 : $*EntityIdentifier
 // CHECK-LIB: apply %{{.*}}(%0, [[TEMP]], %{{.*}}) : $@convention(method) (@in EntityIdentifier, @thin Object.Type) -> @out Object
 // CHECK-LIB-LABEL: } // end sil function '$s21protocol_enum_witness6ObjectOAA0D8ProtocolA2aDP15entityReferenceyxAA16EntityIdentifierVFZTW'
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ func testFuncWithOpaqueResult() -> some Taggable {
 var testGetterWithOpaqueResult: some Taggable {
   "This is also an amazing tag"
 }
+// UNSUPPORTED: OS=windows-msvc

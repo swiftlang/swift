@@ -38,3 +38,4 @@ func test() {
   // CHECK-HELPER-DAG: serialized-diagnostics-batch-mode-helper.swift:{{[0-9]+}}:3: error: cannot find 'nonexistent' in scope
   // CHECK-STDERR-DAG: serialized-diagnostics-batch-mode-helper.swift:{{[0-9]+}}:3: error: cannot find 'nonexistent' in scope
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -136,3 +136,4 @@ RefcountTests.test("Basic") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

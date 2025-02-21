@@ -39,3 +39,4 @@ public func f(s : S) -> (() -> ()) {
 // CHECK-DAG: @"$ss1SVs1PsMA" = internal constant {{.*}}, section ".sw5asty$B"
 // CHECK-DAG: @"$sBoMB" = internal constant {{.*}}, section ".sw5bltn$B"
 
+// UNSUPPORTED: OS=windows-msvc

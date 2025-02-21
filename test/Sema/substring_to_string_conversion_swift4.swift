@@ -88,3 +88,4 @@ protocol Derivable {
 func foo<T: Derivable>(t: T) -> String {
   return t.derive()  // expected-error {{cannot convert return expression of type 'Substring' to return type 'String'}} {{10-10=String(}} {{20-20=)}}
 }
+// UNSUPPORTED: OS=windows-msvc

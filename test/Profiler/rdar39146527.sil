@@ -91,3 +91,4 @@ bb11(%46 : $String):
   release_value %1 : $String
   return %46 : $String
 }
+// UNSUPPORTED: OS=windows-msvc

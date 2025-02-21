@@ -14,3 +14,4 @@ public func useFloat16() {
 }
 
 // CHECK-LABEL: @"$ss7Float16VN" = extern_weak global %swift.type
+// UNSUPPORTED: OS=windows-msvc

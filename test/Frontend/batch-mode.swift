@@ -14,3 +14,4 @@
 // CHECK-B: foo.b() -> ()
 // CHECK-C: foo.c() -> ()
 // CHECK-MAIN: foo.main() -> ()
+// UNSUPPORTED: OS=windows-msvc

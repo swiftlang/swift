@@ -338,3 +338,4 @@ func testSwiftObjCAndWeakObjC() {
 }
 
 testSwiftObjCAndWeakObjC()
+// UNSUPPORTED: OS=windows-msvc

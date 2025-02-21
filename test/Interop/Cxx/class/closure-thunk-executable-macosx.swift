@@ -17,3 +17,4 @@ ClosureTestSuite.test("ConvertToBlockARCWeak") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

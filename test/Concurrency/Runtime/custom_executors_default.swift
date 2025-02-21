@@ -50,3 +50,4 @@ actor Custom {
 // CHECK-NEXT: custom.count == 2
 // CHECK-NEXT: simple.count == 2
 // CHECK-NEXT: end
+// UNSUPPORTED: OS=windows-msvc

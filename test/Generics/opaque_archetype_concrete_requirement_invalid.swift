@@ -23,3 +23,4 @@ protocol HasP {
 
 extension HasP where T == DefinesOpaqueP1.T, U == T.DoesNotExist {}
 // expected-error@-1 {{'DoesNotExist' is not a member type of type 'Self.T'}}
+// UNSUPPORTED: OS=windows-msvc

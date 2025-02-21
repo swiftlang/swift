@@ -12,3 +12,4 @@ do {
     EmptyStruct() as EmptyStruct
   }
 }
+// UNSUPPORTED: OS=windows-msvc

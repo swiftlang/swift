@@ -41,3 +41,4 @@ func test_detach_cancel_taskGroup() async {
     await test_detach_cancel_taskGroup()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

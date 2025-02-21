@@ -82,3 +82,4 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer):
   %8 = tuple ()
   return %8 : $()
 } // end sil function 'forward'
+// UNSUPPORTED: OS=windows-msvc

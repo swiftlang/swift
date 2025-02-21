@@ -2,3 +2,4 @@
 
 // expected-error@+1{{@extractConstantsFromMembers requires '-enable-experimental-feature ExtractConstantsFromMembers'}}
 @extractConstantsFromMembers protocol MyProto {}
+// UNSUPPORTED: OS=windows-msvc

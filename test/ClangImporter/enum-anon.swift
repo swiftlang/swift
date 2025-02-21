@@ -21,3 +21,4 @@ func testDiags() {
   // expected-error@-1 {{type 'Struct' has no member 'NestedConstant2'}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

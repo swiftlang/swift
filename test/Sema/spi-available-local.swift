@@ -14,3 +14,4 @@ public class MacOSDerived: MacOSSPIClass {} // expected-error {{cannot use class
 
 @available(macOS 10.10, iOS 8.0, *)
 public class iOSDerived: iOSSPIClass {}
+// UNSUPPORTED: OS=windows-msvc

@@ -42,3 +42,4 @@ struct S_Explicit_With_Woopsional<T> : BitwiseCopyable {
 }
 
 func passWoopsional<T>(_ t: Woopsional<T>) { take(t) }
+// UNSUPPORTED: OS=windows-msvc

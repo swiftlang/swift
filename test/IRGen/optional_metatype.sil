@@ -65,3 +65,4 @@ cont:
   return undef : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

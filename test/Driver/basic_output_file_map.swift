@@ -11,3 +11,4 @@
 // BINDINGS: # "x86_64-apple-macosx10.9" - "swift{{(c|c-legacy-driver|-frontend)?(\.exe)?}}", inputs: ["{{.*}}/Inputs/main.swift"], output: {object: "/build/main.o"}
 // BINDINGS: # "x86_64-apple-macosx10.9" - "swift{{(c|c-legacy-driver|-frontend)?(\.exe)?}}", inputs: ["{{.*}}/Inputs/lib.swift"], output: {object: "/build/lib.o"}
 // BINDINGS: # "x86_64-apple-macosx10.9" - "ld{{(\.exe)?}}", inputs: ["/build/basic_output_file_map.o", "/build/main.o", "/build/lib.o"], output: {image: "/build/basic_output_file_map.out"}
+// UNSUPPORTED: OS=windows-msvc

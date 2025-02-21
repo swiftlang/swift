@@ -34,3 +34,4 @@ struct DummyComposition: P {
     layer.foo(input)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

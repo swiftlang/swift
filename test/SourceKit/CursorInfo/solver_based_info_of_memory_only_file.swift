@@ -14,3 +14,4 @@ func test() {
 // CHECK: () -> Int
 // CHECK-LABEL: SECONDARY SYMBOLS BEGIN
 // CHECK: () -> String
+// UNSUPPORTED: OS=windows-msvc

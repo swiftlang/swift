@@ -23,3 +23,4 @@ extension Array : Comparable where Element : Comparable {
     return false
   }
 }
+// UNSUPPORTED: OS=windows-msvc

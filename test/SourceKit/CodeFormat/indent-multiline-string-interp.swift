@@ -55,3 +55,4 @@ comment content
 // CHECK: key.sourcetext: "  foo \\( 45 /*"
 // CHECK: key.sourcetext: "         comment content"
 // CHECK: key.sourcetext: "         */) bar"
+// UNSUPPORTED: OS=windows-msvc

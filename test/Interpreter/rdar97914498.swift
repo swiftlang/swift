@@ -30,3 +30,4 @@ struct Resource<Payload> {
 }
 
 crash()
+// UNSUPPORTED: OS=windows-msvc

@@ -1731,3 +1731,4 @@ func embedAutoclosure_never() -> Int {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

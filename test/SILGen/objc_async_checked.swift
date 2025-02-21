@@ -370,3 +370,4 @@ extension OptionalMemberLookups {
     await self.generateMaybe!()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

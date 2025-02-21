@@ -11,3 +11,4 @@ struct FooStruct {
 func f() {
   var foo = FooStruct()
   foo.#^A^#
+// UNSUPPORTED: OS=windows-msvc

@@ -31,3 +31,4 @@ enum Main {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

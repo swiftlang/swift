@@ -18,3 +18,4 @@ public class Foo {
     _ = dynamicFunc() // expected-error {{instance method 'dynamicFunc()' is internal and cannot be referenced from an '@inlinable' function}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

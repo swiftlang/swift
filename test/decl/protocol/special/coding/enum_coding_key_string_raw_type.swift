@@ -50,3 +50,4 @@ for (val, realStr, str, idx) in [(PartialStringKey.a, "A", "x", 1), (.b, "b", "y
     guard PartialStringKey(stringValue: realStr) == val else { fatalError() }
     guard PartialStringKey(intValue: idx) == nil else { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

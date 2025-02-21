@@ -106,3 +106,4 @@ public enum Optional<Wrapped> {
 public func xx(x: inout Z, y: Z) {
     x[{ let _ = y }] = y
 }
+// UNSUPPORTED: OS=windows-msvc

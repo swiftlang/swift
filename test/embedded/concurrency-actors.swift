@@ -71,3 +71,4 @@ actor Number {
         }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

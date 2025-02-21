@@ -20,3 +20,4 @@
 // CHECK-DAG: "precise":"s:1B9StructOneV"
 
 // FILES-NOT: ExportedImport@A.symbols.json
+// UNSUPPORTED: OS=windows-msvc

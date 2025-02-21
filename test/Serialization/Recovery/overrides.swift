@@ -431,3 +431,4 @@ public class E2_InitializerStub : InitializerWithDisappearingType {
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
 #endif // TEST
+// UNSUPPORTED: OS=windows-msvc

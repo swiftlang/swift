@@ -4,3 +4,4 @@
 // RUN: %FileCheck %s < %t
 
 // CHECK-NOT: Unknown
+// UNSUPPORTED: OS=windows-msvc

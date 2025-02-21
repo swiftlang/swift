@@ -114,3 +114,4 @@ extension TopLevelStruct {
   @backDeployed(before: visionOS 2) // expected-error {{'@backDeployed' has no effect because 'methodInUnavailableExtension()' is unavailable on visionOS}}
   public func methodInUnavailableExtension() {}
 }
+// UNSUPPORTED: OS=windows-msvc

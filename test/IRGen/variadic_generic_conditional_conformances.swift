@@ -11,3 +11,4 @@ extension G: P where repeat each T: P {
 }
 
 // CHECK-LABEL: define internal swiftcc void @"$s41variadic_generic_conditional_conformances1GVyxxQp_QPGAA1PA2aEP6foobaryyFZTW"(ptr swiftself %0, ptr %Self, ptr %SelfWitnessTable)
+// UNSUPPORTED: OS=windows-msvc

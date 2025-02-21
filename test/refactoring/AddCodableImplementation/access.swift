@@ -20,3 +20,4 @@ open class OpenC: Codable {
 
 // RUN: %refactor -add-explicit-codable-implementation -source-filename %s -pos=17:12 > %t.result/open.swift
 // RUN: diff -u %S/Outputs/access/open.swift.expected %t.result/open.swift
+// UNSUPPORTED: OS=windows-msvc

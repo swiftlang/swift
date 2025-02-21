@@ -24,3 +24,4 @@ public struct PublicStruct {}
 package extension PublicStruct { // expected-error {{the package access level requires a package name; set it with the compiler flag -package-name}}
   func implicitlyPackage() {}
 }
+// UNSUPPORTED: OS=windows-msvc

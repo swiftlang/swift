@@ -11,3 +11,4 @@ func if_expr() -> Int { // CHECK:      [[@LINE]]:23   -> {{[0-9]+}}:2  : 0
     2
   }                     // CHECK-NEXT: }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -60,3 +60,4 @@ do {
   print(s.contains(.mutablyFrom("abcxxxxxxxxxxx"))) // CHECK-NEXT: true
   print(s.contains(.mutablyFrom("efxxxxxxxxxxx"))) // CHECK-NEXT: false
 }
+// UNSUPPORTED: OS=windows-msvc

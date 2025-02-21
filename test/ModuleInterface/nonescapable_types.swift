@@ -66,3 +66,4 @@ public func derive<T : ~Escapable>(_ y: Y<T>) -> Y<T> {
 public func derive<T : ~Escapable>(_ x: X<T>) -> X<T> {
   x
 }
+// UNSUPPORTED: OS=windows-msvc

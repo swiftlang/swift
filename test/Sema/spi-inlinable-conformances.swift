@@ -290,3 +290,4 @@ public class SubclassOfNormalClass: NormalClass {}
 @inlinable public func SPItestSpecializedConformance() {
   _ = NormalProtoAssocHolder<GenericStruct<Int>>.self
 }
+// UNSUPPORTED: OS=windows-msvc

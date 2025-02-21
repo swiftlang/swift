@@ -20,3 +20,4 @@ class A {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

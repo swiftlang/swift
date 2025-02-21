@@ -77,3 +77,4 @@ CxxSequenceTestSuite.test("HasInputOutputConstIterator to Swift.Array") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -50,3 +50,4 @@ sil [lexical_lifetimes] [ossa] @force_lexical_function : $@convention(thin) () -
   %retval = tuple()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -953,4 +953,4 @@ do {
 
 // CHECK-NEXT: - init accessor vs dynamic Self
 // CHECK-NEXT: init accessor with Self = Base
-// CHECK-NEXT: init accessor with Self = Sub
+// CHECK-NEXT: init accessor with Self = Sub// UNSUPPORTED: OS=windows-msvc

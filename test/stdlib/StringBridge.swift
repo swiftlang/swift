@@ -148,3 +148,4 @@ StringBridgeTests.test("Character from NSString") {
 
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

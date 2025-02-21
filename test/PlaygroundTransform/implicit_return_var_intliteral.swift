@@ -18,3 +18,4 @@ foo
 // CHECK-NEXT: {{.*}} __builtin_log[='2019']
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 // CHECK-NEXT: {{.*}} __builtin_log[='2019']
+// UNSUPPORTED: OS=windows-msvc

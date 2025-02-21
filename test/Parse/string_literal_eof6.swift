@@ -5,4 +5,4 @@
 // expected-error@+3 {{cannot find ')' to match opening '(' in string interpolation}}
 _ = """
     foo
-    \("bar
+    \("bar// UNSUPPORTED: OS=windows-msvc

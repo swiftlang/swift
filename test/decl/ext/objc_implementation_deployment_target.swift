@@ -18,3 +18,4 @@
   // expected-warning@-1 {{'@implementation' of an Objective-C class requires a minimum deployment target of at least macOS 10.14.4; this will become an error after adopting '@implementation'}}
   // expected-warning@-2 {{'@_objcImplementation' is deprecated; use '@implementation' instead}}
 }
+// UNSUPPORTED: OS=windows-msvc

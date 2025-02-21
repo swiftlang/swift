@@ -487,3 +487,4 @@ class ProbeImplicit_DeallocIsolatedFromExtension: DeallocIsolatedFromExtension {
 class ProbeGlobal_DeallocIsolatedFromExtension: DeallocIsolatedFromExtension {
     @AnotherActor deinit {} // ok, base is not isolated
 }
+// UNSUPPORTED: OS=windows-msvc

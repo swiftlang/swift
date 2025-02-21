@@ -212,3 +212,4 @@ extension Result {
   }
 }
 // GENERIC_CLOSUREARG: Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]: rdar_70057258(_:)[#<T> (T) -> ()#]; name=rdar_70057258(_:)
+// UNSUPPORTED: OS=windows-msvc

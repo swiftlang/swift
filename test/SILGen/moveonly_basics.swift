@@ -35,3 +35,4 @@ func expectWrapper(_ a : consuming NormalType) {}
 // CHECK-LABEL: sil hidden [ossa] @$s4test13expectWrapperyyAA10NormalTypeVnF : $@convention(thin) (NormalType) -> () {
 // CHECK:         bb0({{.*}} : @noImplicitCopy @_eagerMove $NormalType):
 // CHECK:           alloc_box ${ var @moveOnly NormalType }, var
+// UNSUPPORTED: OS=windows-msvc

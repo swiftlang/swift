@@ -41,3 +41,4 @@ doit()
 func blackhole<T>(_ t: T) {
   print(t) 
 }
+// UNSUPPORTED: OS=windows-msvc

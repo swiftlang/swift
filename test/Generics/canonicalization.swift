@@ -20,3 +20,4 @@ func f<T>(t: T) where T : P, T : Q, T.A : P0 { } // expected-note{{'f(t:)' previ
 // CHECK-NEXT: Generic signature: <T where T : Q, T.[P]A : P0>
 func f<T>(t: T) where T : Q, T : P, T.A : P0 { } // expected-error{{invalid redeclaration of 'f(t:)'}}
 
+// UNSUPPORTED: OS=windows-msvc

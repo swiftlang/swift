@@ -29,3 +29,4 @@ public class AccessorTest {
 // FILE2-LABEL: define internal ptr @"$s4test3SubCMi"(ptr %0, ptr %1, ptr %2)
 // FILE2:   [[T:%.*]] = load ptr, ptr %1
 // FILE2:   [[CLASSMETADATA:%.*]] = call ptr @swift_allocateGenericClassMetadata
+// UNSUPPORTED: OS=windows-msvc

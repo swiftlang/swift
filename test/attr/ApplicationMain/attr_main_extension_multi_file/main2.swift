@@ -9,3 +9,4 @@ class Main {
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: 'main' attribute can only apply to one class in a module
+// UNSUPPORTED: OS=windows-msvc

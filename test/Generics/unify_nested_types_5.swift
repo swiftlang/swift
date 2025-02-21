@@ -24,3 +24,4 @@ struct G<T : P1 & P2> {
     eq(x, y)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

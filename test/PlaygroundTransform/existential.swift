@@ -31,3 +31,4 @@ foo()
 // CHECK-NEXT: [{{.*}}] __builtin_log[opt='Optional(32883296)']
 // CHECK-NEXT: [{{.*}}] __builtin_log[='32883296']
 // CHECK-NEXT: [{{.*}}] __builtin_log_scope_exit
+// UNSUPPORTED: OS=windows-msvc

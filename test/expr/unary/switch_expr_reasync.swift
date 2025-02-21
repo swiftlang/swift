@@ -30,3 +30,4 @@ func reasyncSwitch4(_ fn: () async -> Int) reasync -> Int {
   }
   return 0
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -70,3 +70,4 @@ enum Color {
 // At the top level
 var i, j : Int i = j j = i // expected-error{{consecutive statements}} {{15-15=;}} expected-error{{consecutive statements}} {{21-21=;}}
 
+// UNSUPPORTED: OS=windows-msvc

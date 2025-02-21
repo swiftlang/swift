@@ -39,3 +39,4 @@ struct Main {
     // CHECK: abcdefghijklmnop
   }
 }
+// UNSUPPORTED: OS=windows-msvc

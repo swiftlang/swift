@@ -118,3 +118,4 @@ func local() {
   anotherVar = "hello!"
   _ = anotherVar
 }
+// UNSUPPORTED: OS=windows-msvc

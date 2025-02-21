@@ -1567,3 +1567,4 @@ bb2:
 bb3(%11 : $Builtin.Int1):
   return %11 : $Builtin.Int1
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -216,3 +216,4 @@ struct ProtocolWithAssociatedTypeImpl: ProtocolWithAssociatedType {
         let localVariableShouldntBeIndexed = 0
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ xprint("xprint \(42) \("my string")")
 // CHECK: xprint %lld %s
 // CHECK: 42
 // CHECK: my string
+// UNSUPPORTED: OS=windows-msvc

@@ -23,3 +23,4 @@ func test(value: Bool) {
 module Lib [system] {
   export *
 }
+// UNSUPPORTED: OS=windows-msvc

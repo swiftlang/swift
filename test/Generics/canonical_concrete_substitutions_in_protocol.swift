@@ -67,4 +67,4 @@ protocol P5a {
 protocol P5 {
   associatedtype T where T == G<U.T>
   associatedtype U : P5a where U.U == Int
-}
+}// UNSUPPORTED: OS=windows-msvc

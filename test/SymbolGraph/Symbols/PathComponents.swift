@@ -42,3 +42,4 @@ public extension String {
 // EXTENSION_EBS-NEXT:  "pathComponents": [
 // EXTENSION_EBS-NEXT:   "String"
 // EXTENSION_EBS-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

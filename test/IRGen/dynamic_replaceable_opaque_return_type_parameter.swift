@@ -11,3 +11,4 @@
 extension Container {
   @_dynamicReplacement(for: update(arg:)) private func __update(arg: Assoc) {}
 }
+// UNSUPPORTED: OS=windows-msvc

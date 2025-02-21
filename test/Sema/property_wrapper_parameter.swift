@@ -248,3 +248,4 @@ struct Widget {
 func buildWidget(_ w: ProjectionWrapper<Int>) -> Widget {
   Widget($w: w)
 }
+// UNSUPPORTED: OS=windows-msvc

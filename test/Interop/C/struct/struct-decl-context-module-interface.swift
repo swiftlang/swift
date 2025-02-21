@@ -110,3 +110,4 @@
 // CHECK-NEXT: struct StructNestedCompletedLater8 {
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

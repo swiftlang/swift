@@ -79,3 +79,4 @@ print("Inlinable.x = \(inlinable.x)")
 let transparent = Transparent(x: -1)
 print("Transparent.x = \(transparent.x)")
 // CHECK: Transparent.x = -1
+// UNSUPPORTED: OS=windows-msvc

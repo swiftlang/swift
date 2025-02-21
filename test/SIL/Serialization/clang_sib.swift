@@ -10,3 +10,4 @@ func test() {
   // Use a factory initializer.
   _ = Hive(queen: Bee())
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -38,3 +38,4 @@ newPartialImport.d = 5
 // CHECK-NEXT: ctypes.h:{{[0-9]+}}:3: note: built-in type 'Complex' not supported
 // CHECK-NEXT:   int _Complex d;
 // CHECK-NEXT:   ^
+// UNSUPPORTED: OS=windows-msvc

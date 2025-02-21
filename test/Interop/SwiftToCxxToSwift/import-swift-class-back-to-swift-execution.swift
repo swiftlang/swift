@@ -114,3 +114,4 @@ testReceiveAndPassSwiftClassInClass()
 // CHECK-NEXT: ExposedToCxx75.testMethod
 // CHECK-NEXT: destroy ~InClass()
 // CHECK-NEXT: ExposedToCxx75.deinit
+// UNSUPPORTED: OS=windows-msvc

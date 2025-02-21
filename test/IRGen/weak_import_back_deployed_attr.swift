@@ -20,3 +20,4 @@ import Library
 // CHECK-OLD: declare extern_weak {{.*}} void @"$s7Library16backDeployedFuncyyF"()
 // CHECK-NEW: declare {{.*}} void @"$s7Library16backDeployedFuncyyF"()
 backDeployedFunc()
+// UNSUPPORTED: OS=windows-msvc

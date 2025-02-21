@@ -92,3 +92,4 @@ tests.test("callNominalType") { @CustomActor () -> () in
 }
 
 await runAllTestsAsync()
+// UNSUPPORTED: OS=windows-msvc

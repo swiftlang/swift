@@ -3,3 +3,4 @@
 // REQUIRES: autolink-extract
 
 // CHECK: <unknown>:0: error: this mode requires at least one input file
+// UNSUPPORTED: OS=windows-msvc

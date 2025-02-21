@@ -23,4 +23,4 @@ blackHole(weakVar, unownedVar, unmanagedVar)
 
 // CHECK: @sil_weak Optional<Class>
 // CHECK: @sil_unowned Class
-// CHECK: @sil_unmanaged Class
+// CHECK: @sil_unmanaged Class// UNSUPPORTED: OS=windows-msvc

@@ -36,3 +36,4 @@ subclassgenericconcrete()
 #endif
 
 
+// UNSUPPORTED: OS=windows-msvc

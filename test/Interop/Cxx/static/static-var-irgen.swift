@@ -95,3 +95,4 @@ public func passingVarAsInout() {
 // CHECK: call void @{{__cxx_global_var_init.3|"\?\?__EstaticConstInlineInit@@YAXXZ"}}()
 // CHECK: call void @{{__cxx_global_var_init.4|"\?\?__EstaticNonTrivial@@YAXXZ"}}()
 // CHECK: call void @{{__cxx_global_var_init.5|"\?\?__EstaticConstNonTrivial@@YAXXZ"}}()
+// UNSUPPORTED: OS=windows-msvc

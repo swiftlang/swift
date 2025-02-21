@@ -29,3 +29,4 @@ public struct Addable : Proto {
 public func inc(_ i: inout Addable) {
   i = sum(i, Addable(1))
 }
+// UNSUPPORTED: OS=windows-msvc

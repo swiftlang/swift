@@ -38,3 +38,4 @@ import A_Private.BP.CP
 #if canImport(A_Private.BP.CP.Z)
 #error("should not can import A_Private.BP.CP.Z")
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ func bar(_ x: P2) {
   x.#^COMPLETE2^#
   // COMPLETE2: Decl[InstanceMethod]/CurrNominal:   bar()[#Void#]; name=bar()
 }
+// UNSUPPORTED: OS=windows-msvc

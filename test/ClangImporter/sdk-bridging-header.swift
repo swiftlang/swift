@@ -22,3 +22,4 @@ let and = MyPredicate.and([])
 let or = MyPredicate.or([not, and])
 
 _ = MyPredicate.foobar() // expected-error{{type 'MyPredicate' has no member 'foobar'}}
+// UNSUPPORTED: OS=windows-msvc

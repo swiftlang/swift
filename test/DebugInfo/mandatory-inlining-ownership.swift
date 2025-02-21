@@ -22,3 +22,4 @@ func bar() {
 
 @_transparent
 func foo(_ logObject: OSLog) { }
+// UNSUPPORTED: OS=windows-msvc

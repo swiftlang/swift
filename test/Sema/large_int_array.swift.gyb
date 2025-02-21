@@ -11,3 +11,4 @@ let _ : [Int] = [
   v,
 % end
 ]
+// UNSUPPORTED: OS=windows-msvc

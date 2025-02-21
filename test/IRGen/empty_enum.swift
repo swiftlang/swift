@@ -4,3 +4,4 @@
 //   CHECK-SAME: {{@"\$sytWV(.ptrauth)?"|ptr @"\$s10empty_enum6JamaisOWV"}}
 
 enum Jamais {}
+// UNSUPPORTED: OS=windows-msvc

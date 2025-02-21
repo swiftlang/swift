@@ -22,3 +22,4 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
 
   _ = slowServer.allOperations
 }
+// UNSUPPORTED: OS=windows-msvc

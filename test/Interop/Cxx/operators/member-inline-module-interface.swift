@@ -313,3 +313,4 @@
 // CHECK: struct HasStaticOperatorCallWithUnimportableCxxType {
 // CHECK-NEXT:  init()
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

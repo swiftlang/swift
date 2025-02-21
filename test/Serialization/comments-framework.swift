@@ -29,3 +29,4 @@ public class first_decl_class_1 {
 // CHECK: comments-framework.swift:20:15: Func/first_decl_class_1.decl_func_2 RawComment=[/**\n   * decl_func_3 Aaa.\n   */]
 // CHECK: comments-framework.swift:24:15: Func/first_decl_class_1.decl_func_3 RawComment=[/// decl_func_3 Aaa.\n/** Bbb. */]
 
+// UNSUPPORTED: OS=windows-msvc

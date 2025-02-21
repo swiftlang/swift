@@ -190,3 +190,4 @@ class TestTypesWithoutName2 {
 }
 
 // NO_COMPLETION-NOT: Begin completions
+// UNSUPPORTED: OS=windows-msvc

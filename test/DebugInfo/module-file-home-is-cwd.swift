@@ -14,3 +14,4 @@ let _ = someFunc(0)
 
 // Ensure compilation directory is set to the debug compilation directory.
 // CHECK: !DIFile(filename: "ClangModule", directory: "/CWD")
+// UNSUPPORTED: OS=windows-msvc

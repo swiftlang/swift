@@ -40,3 +40,4 @@ extension ClassFive: ProtoFour {}
 
 // ClassFive conforms to ProtoFour
 // CHECK-DAG: {"kind":"conformsTo","source":"s:24ProtocolClassInheritance0B4FiveC","target":"s:24ProtocolClassInheritance9ProtoFourP"}
+// UNSUPPORTED: OS=windows-msvc

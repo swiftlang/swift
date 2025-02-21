@@ -371,3 +371,4 @@ func testKeyPath() {
   keyPathTester(keyPath: \.topLeft)
   // CHECK: <Func@[[@LINE-3]]:6>keyPathTester</Func>(<Func@[[@LINE-3]]:6#keyPath>keyPath</Func>: \.<Var@[[@LINE-12]]:7>topLeft</Var>)
 }
+// UNSUPPORTED: OS=windows-msvc

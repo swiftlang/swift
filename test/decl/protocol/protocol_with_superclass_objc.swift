@@ -14,3 +14,4 @@ typealias Composition = OtherProtocol & Base
 
 @objc protocol Protocol3 : OtherProtocol & Base {}
 // expected-error@-1 {{inheritance from class-constrained protocol composition type 'Base & OtherProtocol'}}
+// UNSUPPORTED: OS=windows-msvc

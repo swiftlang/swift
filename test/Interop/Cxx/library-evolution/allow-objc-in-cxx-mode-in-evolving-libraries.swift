@@ -89,3 +89,4 @@ public func publicFuncPublicBody() {
 // expected-error@+1 {{cannot use struct 'CxxStruct' here; C++ types from imported module 'ObjCxxModule' do not support library evolution}}
 public func usesCxxStruct(_ x: CxxStruct) {
 }
+// UNSUPPORTED: OS=windows-msvc

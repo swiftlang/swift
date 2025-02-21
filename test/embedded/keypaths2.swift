@@ -41,3 +41,4 @@ _ = test_read(x: &box)
 test_write(x: &box)
 print(box.b)
 // CHECK: 42
+// UNSUPPORTED: OS=windows-msvc

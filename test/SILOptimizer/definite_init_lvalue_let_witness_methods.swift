@@ -60,3 +60,4 @@ testObject3 = TestStruct(foo: 42)
 func mutateThis(mutatee: inout Int) {
     mutatee = 666
 }
+// UNSUPPORTED: OS=windows-msvc

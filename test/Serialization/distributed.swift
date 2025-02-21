@@ -13,3 +13,4 @@ import def_distributed
 func testDoSomethingDistributed(system: LocalTestingDistributedActorSystem) {
   let _: DA = DA(actorSystem: system)
 }
+// UNSUPPORTED: OS=windows-msvc

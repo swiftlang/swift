@@ -68,3 +68,4 @@ suite.test("comparable") {
 } // if #available(SwiftStdlib 6.2, *)
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

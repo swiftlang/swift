@@ -60,3 +60,4 @@ actor NotInitializableActor {
   // expected-note@+1{{stored property 'b' without initial value prevents synthesized initializers}}
   var b: Float
 }
+// UNSUPPORTED: OS=windows-msvc

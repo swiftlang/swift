@@ -58,3 +58,4 @@ func foo(a: consuming Int, b: borrowing Int, c: _const Int) {}
 // CHECK-NEXT:   key.offset: 55,
 // CHECK-NEXT:   key.length: 3
 // CHECK-NEXT: },
+// UNSUPPORTED: OS=windows-msvc

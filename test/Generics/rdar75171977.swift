@@ -15,3 +15,4 @@ public extension P2 where B.A == A {
 public class C<B: P2>: P2 {
     public typealias A = B.A
 }
+// UNSUPPORTED: OS=windows-msvc

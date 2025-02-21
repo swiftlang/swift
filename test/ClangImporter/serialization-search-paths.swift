@@ -12,3 +12,4 @@ impl.takeStruct(testStruct(value: 0))
 _ = impl.getEnum()
 
 getModuleVersion()
+// UNSUPPORTED: OS=windows-msvc

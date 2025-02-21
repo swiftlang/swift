@@ -133,3 +133,4 @@ func checkInitExistentialThunk() -> P? {
   cls.crash(setup: { (arg:  P) -> () in  })
   return nil
 }
+// UNSUPPORTED: OS=windows-msvc

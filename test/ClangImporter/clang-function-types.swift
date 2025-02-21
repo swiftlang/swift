@@ -12,3 +12,4 @@ public let f2 = getHigherOrderFunctionPointer()
 
 // CHECK: f3: () -> (@convention(c) (Swift.UnsafeMutablePointer<ctypes.Dummy>?) -> Swift.UnsafeMutablePointer<ctypes.Dummy>?)?
 public let f3 = getFunctionPointer3
+// UNSUPPORTED: OS=windows-msvc

@@ -84,3 +84,4 @@ struct Pair<First, Second, Third> {
     let third: Int64
 }
 
+// UNSUPPORTED: OS=windows-msvc

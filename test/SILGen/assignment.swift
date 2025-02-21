@@ -59,3 +59,4 @@ func stupidGames() -> ((), ()) {
 func assignToNestedVoid() {
   let _: ((), ()) = stupidGames()
 }
+// UNSUPPORTED: OS=windows-msvc

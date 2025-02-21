@@ -19,3 +19,4 @@ public func existingClient2<T>(arg: T.Type) -> Alias<T>? { nil }
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Sendable>
 @preconcurrency
 public func preconcurrencyClient<T>(arg: T.Type) -> ExistingType<T>? { nil }
+// UNSUPPORTED: OS=windows-msvc

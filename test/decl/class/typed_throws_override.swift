@@ -56,3 +56,4 @@ class Sub: Super {
     get throws(SubError) { 5 } // okay to make type more specific
   }
 }
+// UNSUPPORTED: OS=windows-msvc

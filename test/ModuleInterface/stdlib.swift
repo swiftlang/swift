@@ -10,3 +10,4 @@
 @inlinable public func test() {
   Builtin.sizeof(Builtin.Int8.self)
 }
+// UNSUPPORTED: OS=windows-msvc

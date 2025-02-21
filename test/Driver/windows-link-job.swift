@@ -9,3 +9,4 @@
 // UNSUPPORTED: swift_swift_parser
 
 // CHECK: {{^}}clang
+// UNSUPPORTED: OS=windows-msvc

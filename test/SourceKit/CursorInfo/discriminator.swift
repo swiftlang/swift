@@ -44,3 +44,4 @@ func testReuseAST(bytes: Int) {
   // REUSE_AST: source.lang.swift.decl.var.local (41:7-41:12)
   // REUSE_AST: s:13discriminator12testReuseAST5bytesySi_tFACL0_Sivp
 }
+// UNSUPPORTED: OS=windows-msvc

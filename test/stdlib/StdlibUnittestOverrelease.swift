@@ -12,3 +12,4 @@ Suite.test("doesntfail").xfail(.never).code { }
 autoreleasepool {
     runAllTests()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -23,3 +23,4 @@ extension Frozen {
     discard self // expected-error {{can only 'discard' from the same module defining type 'Frozen'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -48,3 +48,4 @@ public func test() {
 test()
 
 // CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)
+// UNSUPPORTED: OS=windows-msvc

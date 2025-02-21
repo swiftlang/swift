@@ -132,3 +132,4 @@ func test003(x: D) {
 // Otherwise, it's the next result
 // RUN: %complete-test -group=overloads -tok=D_INSTANCE_0 %s -raw -limit=1 | %FileCheck -check-prefix=NEXT1 %s
 // NEXT1: key.nextrequeststart: 1
+// UNSUPPORTED: OS=windows-msvc

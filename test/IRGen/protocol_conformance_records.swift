@@ -174,3 +174,4 @@ extension Dependent : Associate {
 // CHECK-LABEL: @"$s28protocol_conformance_records8ConcreteVAA20AssociateConformanceAAHc" = private constant
 // CHECK-LABEL: @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlHc" = private constant
 // CHECK-LABEL: @"$sSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsHc" = private constant
+// UNSUPPORTED: OS=windows-msvc

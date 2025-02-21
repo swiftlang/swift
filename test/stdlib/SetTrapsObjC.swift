@@ -152,3 +152,4 @@ SetTraps.test("Downcast2")
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

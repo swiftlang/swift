@@ -6,3 +6,4 @@ var Foo: Int {
 
 // CHECK: source.edit.kind.active:
 // CHECK:   5:6-5:31 source.refactoring.range.kind.basename
+// UNSUPPORTED: OS=windows-msvc

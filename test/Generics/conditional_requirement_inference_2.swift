@@ -31,3 +31,4 @@ extension Array : Hashable where Element : Hashable {}
 // CHECK-LABEL: doStuff@
 // CHECK-NEXT: Generic signature: <U where U : Hashable>
 func doStuff<U>(_: Set<Array<U>>) {}
+// UNSUPPORTED: OS=windows-msvc

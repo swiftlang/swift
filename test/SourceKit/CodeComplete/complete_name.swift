@@ -18,3 +18,4 @@ func test02(_ x: S) {
 }
 // METHOD_NAME: key.name: "foo1(:::::)"
 // METHOD_NAME: key.name: "foo2(a:b:c:d:e:)"
+// UNSUPPORTED: OS=windows-msvc

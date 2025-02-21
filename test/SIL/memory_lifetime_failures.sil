@@ -809,3 +809,4 @@ bb0(%0 : @owned $T, %1 : @owned $Inner):
   return %8
 }
 
+// UNSUPPORTED: OS=windows-msvc

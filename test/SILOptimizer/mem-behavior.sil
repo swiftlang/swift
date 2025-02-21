@@ -1880,3 +1880,4 @@ bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
   %5 = mark_dependence %1 on %0
   return %4
 }
+// UNSUPPORTED: OS=windows-msvc

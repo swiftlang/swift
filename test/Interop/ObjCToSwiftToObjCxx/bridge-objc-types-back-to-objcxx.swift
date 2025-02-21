@@ -125,3 +125,4 @@ public func retObjCProtocolNullable() -> ObjCProtocol? {
 // CHECK-NEXT:   UseObjCTy::_impl::$s9UseObjCTy04takeB17CProtocolNullableyySo0bE0_pSgF(x);
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
+// UNSUPPORTED: OS=windows-msvc

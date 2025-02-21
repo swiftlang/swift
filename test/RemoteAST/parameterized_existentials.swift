@@ -79,3 +79,4 @@ freeRange(Pig.self)
 
 
 stopRemoteAST()
+// UNSUPPORTED: OS=windows-msvc

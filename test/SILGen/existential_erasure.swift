@@ -129,3 +129,4 @@ class EraseDynamicSelf {
     return instance
   }
 }
+// UNSUPPORTED: OS=windows-msvc

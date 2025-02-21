@@ -8,3 +8,4 @@
 final public class MyBuffer: ManagedBuffer<Int, UInt8> {
 }
 
+// UNSUPPORTED: OS=windows-msvc

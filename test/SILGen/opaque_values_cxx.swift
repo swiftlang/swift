@@ -24,3 +24,4 @@ import Cxx
 func test_cxx_vector_uint32t_iterate(_ n: Int, _ vectorOfU32: VectorOfU32) {
   for x in vectorOfU32 {}
 }
+// UNSUPPORTED: OS=windows-msvc

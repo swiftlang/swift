@@ -38,3 +38,4 @@ func testClosures() {
   // expected-error@-1{{cannot convert value of type '() throws -> ()'}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

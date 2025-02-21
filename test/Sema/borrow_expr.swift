@@ -85,3 +85,4 @@ func testVarClassAccessField() {
     t = Klass()
     let _ = _borrow t.k // expected-error {{'borrow' can only be applied to a local binding ('let', 'var', or parameter)}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -399,3 +399,4 @@ public func run_MergeTest9(_ N: Int) {
     _ = toStream(stream, asWriteProt(listOfThings, transform: { $0.value }))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ StaticMemberFuncTestSuite.test("call-static-member-func") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

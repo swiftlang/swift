@@ -36,3 +36,4 @@ func Foo1() {
 // CHECK: key.sourcetext: "    let a = 2"
 // CHECK: key.sourcetext: "    }()"
 // CHECK: key.sourcetext: "    })"
+// UNSUPPORTED: OS=windows-msvc

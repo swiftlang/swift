@@ -31,3 +31,4 @@ public func bar() -> Int {
     return 2
   }
 }
+// UNSUPPORTED: OS=windows-msvc

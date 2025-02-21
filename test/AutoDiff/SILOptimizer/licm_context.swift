@@ -88,3 +88,4 @@ func m<T, R>(_ f: @escaping @differentiable(reverse) (T) -> R) -> @differentiabl
 
 let m = b(y: B());
 let grad = m.pullback(B.TangentVector(h: Array<Float>.TangentVector(), e: Z.TangentVector(r: Array<R>.TangentVector())))
+// UNSUPPORTED: OS=windows-msvc

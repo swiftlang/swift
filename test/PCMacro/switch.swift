@@ -85,3 +85,4 @@ s(.some(3))
 // CHECK-NEXT: [20:7-20:20] pc before
 // CHECK-NEXT: [20:7-20:20] pc after
 // CHECK-NEXT: [27:1-27:12] pc after
+// UNSUPPORTED: OS=windows-msvc

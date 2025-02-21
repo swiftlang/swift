@@ -17,3 +17,4 @@ fileprivate let bar: Bar = {
   // CHECK-NEXT: RELATED END
   return bar
 }()
+// UNSUPPORTED: OS=windows-msvc

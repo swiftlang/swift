@@ -48,3 +48,4 @@ func test() {
     .title(__findValue("someKey", fallback: "<unknown>"))
     .background(ambiguitySource()) // expected-error {{ambiguous use of 'ambiguitySource()'}}
 }
+// UNSUPPORTED: OS=windows-msvc

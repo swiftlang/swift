@@ -32,3 +32,4 @@ protocol A {}
 // CHECK: error: struct 'B' referenced in protocol conformance 'SwiftTest.B' is not a protocol
 
 func test(_ inv: CInv, _ invMod: CModInv, _ x: CX, _ a: CA, _ b: CB) {}
+// UNSUPPORTED: OS=windows-msvc

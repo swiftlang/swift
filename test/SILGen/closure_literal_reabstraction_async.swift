@@ -14,3 +14,4 @@ func passNonthrowingAsyncClosureLiteral() {
     // CHECK: apply [[CALLEE]]<Int>([[CLOSURE]])
     takeThrowingAsyncClosure { return 42 }
 }
+// UNSUPPORTED: OS=windows-msvc

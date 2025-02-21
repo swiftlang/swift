@@ -9,3 +9,4 @@
 
 import Link
 _ = Link.APIFromLinkFramework
+// UNSUPPORTED: OS=windows-msvc

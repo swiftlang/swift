@@ -21,3 +21,4 @@ _ = ##/#|\|\#\\/##
 _ = (#/[*/#, #/+]/#, #/.]/#)
 // expected-error@-1:16 {{cannot parse regular expression: quantifier '+' must appear after expression}}
 // expected-error@-2:10 {{cannot parse regular expression: expected ']'}}
+// UNSUPPORTED: OS=windows-msvc

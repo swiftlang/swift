@@ -19,3 +19,4 @@ sil_vtable B {}
 // CHECK: [[PTR:%.*]] = inttoptr i64 [[SIGNED]] to ptr
 // CHECK: [[METADATA:%.*]] = call ptr @swift_allocateGenericClassMetadata(ptr [[PTR]], ptr %1, ptr %2)
 // CHECK: ret ptr [[METADATA]]
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ protocol ExpressibleByFloatLiteral {
   associatedtype FloatLiteralType : _ExpressibleByBuiltinFloatLiteral
   static func convertFromFloatLiteral(value: FloatLiteralType) -> Self
 }
+// UNSUPPORTED: OS=windows-msvc

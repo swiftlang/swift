@@ -85,3 +85,4 @@ func testBridgedIsAnyObject(_ arr: [AnyObject], arrOpt: [AnyObject]?,
   return false
 }
 
+// UNSUPPORTED: OS=windows-msvc

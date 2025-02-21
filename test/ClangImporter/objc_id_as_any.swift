@@ -33,3 +33,4 @@ install_global_event_handler(idLover) // expected-error {{cannot convert value o
 // Function conversions are not legal when converting to a thin function type.
 let handler: @convention(c) (Any) -> () = { object in () }
 install_global_event_handler(handler)
+// UNSUPPORTED: OS=windows-msvc

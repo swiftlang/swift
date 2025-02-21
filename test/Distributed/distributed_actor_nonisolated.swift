@@ -63,3 +63,4 @@ func invalidIsolatedCall<DA: DistributedActor> (
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

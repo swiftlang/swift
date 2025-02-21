@@ -20,3 +20,4 @@
 // CHECK:   func __getUnsafeUnsafe() -> Unsafe
 // CHECK:   mutating func __getUnsafeMutatingUnsafe() -> Unsafe
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

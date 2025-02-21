@@ -19,3 +19,4 @@ import Test
 
 // CHECK: error: invalid value 'swift-5.8' in '-cxx-interoperability-mode=swift-5.8'
 // CHECK: note: valid arguments to '-cxx-interoperability-mode=' are 'off', 'default'
+// UNSUPPORTED: OS=windows-msvc

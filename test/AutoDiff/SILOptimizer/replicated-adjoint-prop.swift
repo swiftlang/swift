@@ -35,3 +35,4 @@ func wrapper(input: Float, multiplier: Float) -> Float {
 
 let grad = gradient(at: 2.0, 3.0, of: wrapper)
 print("Grad: \(grad)")
+// UNSUPPORTED: OS=windows-msvc

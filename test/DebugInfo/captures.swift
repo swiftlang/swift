@@ -24,3 +24,4 @@ public final class C<V: View, V1: View>: UIView {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

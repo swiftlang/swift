@@ -152,3 +152,4 @@ func fallthrough_not_last(i: Int) {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

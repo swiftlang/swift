@@ -22,3 +22,4 @@ func f() {
   genericP2.funcInClass()
   genericP2.funcInBaseProtocol()
 }
+// UNSUPPORTED: OS=windows-msvc

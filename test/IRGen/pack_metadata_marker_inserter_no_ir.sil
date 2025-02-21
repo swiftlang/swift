@@ -21,3 +21,4 @@ entry:
   throw %retval : $GVT<repeat each T>
 }
 
+// UNSUPPORTED: OS=windows-msvc

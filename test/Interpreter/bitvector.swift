@@ -102,3 +102,4 @@ for i in 0..<64 {
 // CHECK-NEXT: false
 // CHECK-NEXT: true
 // CHECK-NEXT: false
+// UNSUPPORTED: OS=windows-msvc

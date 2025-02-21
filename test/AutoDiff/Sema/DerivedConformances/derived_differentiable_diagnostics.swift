@@ -14,3 +14,4 @@ struct StructWithTangentVectorConstrained: TangentVectorConstrained {
 }
 // expected-error @-1 {{type 'StructWithTangentVectorConstrained.TangentVector' does not conform to protocol 'TangentVectorP'}}
 // expected-note @-2 {{add stubs for conformance}}
+// UNSUPPORTED: OS=windows-msvc

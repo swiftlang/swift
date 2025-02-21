@@ -134,3 +134,4 @@ public func testRenames(transform: CGAffineTransform, context: CGContext,
 // CHECK:   ret void
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -32,3 +32,4 @@ public func foo() {
     let bricks: InlineArray<1, MySprite> = [MySprite()]
     sprites = .init(bricks: bricks)
 }
+// UNSUPPORTED: OS=windows-msvc

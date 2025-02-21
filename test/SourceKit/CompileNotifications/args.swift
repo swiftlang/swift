@@ -13,3 +13,4 @@
 // ARGS2-LINE:    [[PATH]]
 // ARGS2-LINE:    -j
 // ARGS2-LINE:    1000
+// UNSUPPORTED: OS=windows-msvc

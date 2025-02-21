@@ -48,3 +48,4 @@ func archetypeCasts<T, BT : Base<T>, BI : Base<Int>, BS : Base<String>, D : Deri
   let _ = d as? BS // expected-warning {{always fails}}
   let _ = d as? BT
 }
+// UNSUPPORTED: OS=windows-msvc

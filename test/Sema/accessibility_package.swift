@@ -113,3 +113,4 @@ func clientFunc() {
   lib.pkgFunc() // expected-error {{'pkgFunc' is inaccessible due to 'package' protection level}}
   lib.publicFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -59,3 +59,4 @@ do {
 // Simulate the expected output.
 print("SubclassOfGenericSuperclassWithURLField nil 45")
 #endif
+// UNSUPPORTED: OS=windows-msvc

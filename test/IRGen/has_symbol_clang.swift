@@ -14,3 +14,4 @@ public func testClangDecls() {
 // CHECK: define linkonce_odr hidden i1 @"$sSo9clangFuncyys5Int32VFTwS"() #1{{( comdat)?}} {
 // CHECK:   [[RES:%.*]] = icmp ne ptr @clangFunc, null
 // CHECK:   ret i1 [[RES]]
+// UNSUPPORTED: OS=windows-msvc

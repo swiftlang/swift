@@ -64,3 +64,4 @@ import B
 
 //--- C.swift
 @_spi(Testing) public func c() {}
+// UNSUPPORTED: OS=windows-msvc

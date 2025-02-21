@@ -27,3 +27,4 @@ public typealias PublicAlias = Int
   typealias LocalAlias = InternalAlias // expected-warning {{type alias 'InternalAlias' is internal and should not be referenced from an '@inlinable' function}}
   typealias GenericAlias<T> = (T, InternalAlias) // expected-warning {{type alias 'InternalAlias' is internal and should not be referenced from an '@inlinable' function}}
 }
+// UNSUPPORTED: OS=windows-msvc

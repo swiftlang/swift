@@ -40,3 +40,4 @@ public func someAsyncFunction() async {
 // ALWAYS-ARM64: s31swift_async_extended_frame_info17someAsyncFunctionyyYaFTY0
 // ALWAYS-ARM64-NOT: swift_async_extendedFramePointerFlags
 // ALWAYS-ARM64: #0x1000000000000000
+// UNSUPPORTED: OS=windows-msvc

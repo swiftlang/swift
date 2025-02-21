@@ -11,3 +11,4 @@ import UIKit
 // expected-deprecated-note@-2 {{use @main instead}} {{1-19=@main}}
 class MyNonDelegate {
 }
+// UNSUPPORTED: OS=windows-msvc

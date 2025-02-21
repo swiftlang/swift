@@ -13,3 +13,4 @@
 // CHECK: <unknown>:0: error: experimental feature 'ParserValidation' cannot be enabled in production compiler
 
 import Swift
+// UNSUPPORTED: OS=windows-msvc

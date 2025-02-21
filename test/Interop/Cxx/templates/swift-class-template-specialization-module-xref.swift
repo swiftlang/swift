@@ -76,3 +76,4 @@ public func testFunction() -> [Int] {
 }
 
 // CHECK: func testFunction() -> [Int]
+// UNSUPPORTED: OS=windows-msvc

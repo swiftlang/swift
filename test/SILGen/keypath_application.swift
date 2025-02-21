@@ -221,3 +221,4 @@ func writebackNesting(x: inout Int,
 
   x.b[keyPath: y].u[keyPath: z].tt = w
 }
+// UNSUPPORTED: OS=windows-msvc

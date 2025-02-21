@@ -12,3 +12,4 @@ entry(%0 : $*@sil_unowned C, %1 : $C):
 }
 
 sil_vtable C {}
+// UNSUPPORTED: OS=windows-msvc

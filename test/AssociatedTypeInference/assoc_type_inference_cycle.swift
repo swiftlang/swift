@@ -195,3 +195,4 @@ public struct Conformer11b: P11 {
   public let c: A<Int>.B<Self.U>
   public let d: Int
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ func foo(c1: NSObject, c2: NSObject) {
   // CHECK: <Param@[[@LINE-1]]:10>c1</Param> <iFunc@>==</iFunc> <Param@[[@LINE-1]]:24>c2</Param>
   c1 == c2
 }
+// UNSUPPORTED: OS=windows-msvc

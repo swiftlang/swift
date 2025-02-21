@@ -41,3 +41,4 @@ printRollCall(TomServo())
 // CHECK: Croooow!
 // CHECK: (That's one O!)
 printRollCallWithSnark(Crow())
+// UNSUPPORTED: OS=windows-msvc

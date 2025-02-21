@@ -27,3 +27,4 @@
 
 //--- main.swift
 public func test() {}
+// UNSUPPORTED: OS=windows-msvc

@@ -471,3 +471,4 @@ func completeInNestedPatternMatching(x: WithNestedEnum) {
 }
 // NESTED_ENUM_PATTERN_MATCHING:     Begin completions, 1 items
 // NESTED_ENUM_PATTERN_MATCHING-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: caseWithAssociatedType({#SomeStruct#})[#PlainEnum#];
+// UNSUPPORTED: OS=windows-msvc

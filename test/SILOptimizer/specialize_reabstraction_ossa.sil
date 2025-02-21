@@ -264,3 +264,4 @@ bb0:
 // CHECK-NEXT:    throw_addr
 // CHECK:       } // end sil function '$s14indirect_error4main14NonLoadableErrV_TG5'
 
+// UNSUPPORTED: OS=windows-msvc

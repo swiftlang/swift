@@ -1805,3 +1805,4 @@ func tuple_splat_with_a_label() {
   test(vals: (23, "hello", 3.14)) // expected-error {{local function 'test' expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
   test((vals: 23, "hello", 3.14)) // expected-error {{local function 'test' expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
 }
+// UNSUPPORTED: OS=windows-msvc

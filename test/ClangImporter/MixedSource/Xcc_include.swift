@@ -21,3 +21,4 @@ func test() {
   _ = Base()
 #endif
 }
+// UNSUPPORTED: OS=windows-msvc

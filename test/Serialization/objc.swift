@@ -36,3 +36,4 @@ func testNativeClass(obj obj: NonObjCClass) {
   _ = obj[42]
 }
 
+// UNSUPPORTED: OS=windows-msvc

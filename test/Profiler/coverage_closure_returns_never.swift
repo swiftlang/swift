@@ -15,3 +15,4 @@ func closure_with_fatal_error(_ arr: [Never]) {
     _ in fatalError()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

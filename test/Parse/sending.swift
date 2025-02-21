@@ -32,3 +32,4 @@ func testArgWithConsumingWrongOrderType(_ x: (sending consuming String, sending 
 
 func testBorrowSending(_ x: borrowing sending String) {}
 // expected-error @-1 {{'sending' cannot be used together with 'borrowing'}}
+// UNSUPPORTED: OS=windows-msvc

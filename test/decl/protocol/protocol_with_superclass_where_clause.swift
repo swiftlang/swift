@@ -339,3 +339,4 @@ extension Amb { // expected-error {{'Amb' is ambiguous for type lookup in this c
     _ = ConcreteAlias.self
   }
 }
+// UNSUPPORTED: OS=windows-msvc

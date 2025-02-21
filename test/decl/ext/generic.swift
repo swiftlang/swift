@@ -230,3 +230,4 @@ extension (NewGeneric) {
     return NewGeneric()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

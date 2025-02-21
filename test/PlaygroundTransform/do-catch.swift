@@ -48,3 +48,4 @@ try? doSomething()
 // CHECK-NEXT: [{{.*}}] __builtin_log[='5']
 // CHECK-NEXT: [{{.*}}] __builtin_log_scope_exit
 // CHECK-NEXT: [{{.*}}] __builtin_log[='Optional(5)']
+// UNSUPPORTED: OS=windows-msvc

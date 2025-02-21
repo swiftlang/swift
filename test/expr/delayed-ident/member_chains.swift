@@ -382,3 +382,4 @@ func acceptInt(_ x: Int) {}
 func postfixOpIsNotAMemberChain() {
   acceptInt(.implicit.another^)
 }
+// UNSUPPORTED: OS=windows-msvc

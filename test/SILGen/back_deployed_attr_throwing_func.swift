@@ -58,3 +58,4 @@ func caller() throws {
   // CHECK: {{%.*}} = function_ref @$s11back_deploy12throwingFuncyyKFTwb : $@convention(thin) () -> @error any Error
   try throwingFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

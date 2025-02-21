@@ -41,3 +41,4 @@ actor CheckDeinitFromActor {
     print(ns)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

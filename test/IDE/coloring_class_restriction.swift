@@ -6,3 +6,4 @@
 
 // CHECK: <kw>protocol</kw> P : <type>class</type>
 protocol P : class
+// UNSUPPORTED: OS=windows-msvc

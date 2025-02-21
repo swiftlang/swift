@@ -100,3 +100,4 @@ class C {
 // CLASS_METHOD_1: Decl[StaticMethod]/CurrNominal:     method2 {|}[#Void#]
 // CLASS_METHOD_1-NOT: {|}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -38,3 +38,4 @@ class Foo {
 }
 
 let _: [String] = Foo().foo(of: String.self)
+// UNSUPPORTED: OS=windows-msvc

@@ -182,3 +182,4 @@ public enum FrozenEnum {
   @_spi(S) // expected-error {{enum case 'spiCaseWithPayload' cannot be declared '@_spi' in a '@frozen' enum}}
   case spiCaseWithPayload(_: Int)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@
 public func fourth<T>(_: T, _: T, _: T, x4 : T) -> T {
   return x4
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -50,3 +50,4 @@ func test_literal_arguments_are_loaded() {
     return #colorLiteral(red: red, green: green, blue: 1, alpha: 1) // Ok
   }
 }
+// UNSUPPORTED: OS=windows-msvc

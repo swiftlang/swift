@@ -149,3 +149,4 @@ public func doSomethingElse(with param: some OtherProtocol & SomeProtocol) {}
 // MULTI-NEXT:          "spelling": ")"
 // MULTI-NEXT:        }
 // MULTI-NEXT:      ],
+// UNSUPPORTED: OS=windows-msvc

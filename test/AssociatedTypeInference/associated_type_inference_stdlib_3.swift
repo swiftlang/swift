@@ -9,3 +9,4 @@ struct FooIterator<T: Sequence>: IteratorProtocol {
 struct FooSequence<Element>: Sequence {
   func makeIterator() -> FooIterator<Self> { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@
 
 import LeafModule
 import OtherModule
+// UNSUPPORTED: OS=windows-msvc

@@ -59,3 +59,4 @@ func bar() {
 // SCOPED-NEGATIVE-NOT: [_ABAdditions]
 // SCOPED-NEGATIVE-NOT: [__ABAdditionsDAdditions]
 
+// UNSUPPORTED: OS=windows-msvc

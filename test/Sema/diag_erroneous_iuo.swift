@@ -418,3 +418,4 @@ func conditionalDowncastToObject(b: B?) -> D {
   // expected-swift4-warning@-3:17 {{using '!' here is deprecated; this is an error in the Swift 5 language mode}}{{none}}
   // expected-swift5-error@-4:17 {{using '!' is not allowed here}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -48,3 +48,4 @@ func bar(arg: Bar) {
 // RUN:   -req=complete -pos=17:1 %s -async -- %s == \
 // RUN:   -req=complete -pos=12:11 %s -async -- %s == \
 // RUN:   -req=complete -pos=15:11 %s -async -- %s
+// UNSUPPORTED: OS=windows-msvc

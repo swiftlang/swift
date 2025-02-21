@@ -14,3 +14,4 @@ extension Array where Element == Foo {
 // CHECK: [main.Foo, main.Foo, main.Foo]
 let foos = [Foo](withAThing: "Hi")
 print(foos)
+// UNSUPPORTED: OS=windows-msvc

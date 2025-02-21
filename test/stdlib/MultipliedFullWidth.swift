@@ -126,3 +126,4 @@ tests.test("Random Values") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

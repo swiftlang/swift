@@ -4,3 +4,4 @@ extension NonExistentSymbolName {
         ""
     }
 }
+// UNSUPPORTED: OS=windows-msvc

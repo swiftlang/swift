@@ -6,3 +6,4 @@
 //
 // CHECK: error: unable to load output file map '{{.*}}/something-which-should-not-exist.json': {{[Nn]}}o such file or directory
 // CHECK-NOT: Assertion failed
+// UNSUPPORTED: OS=windows-msvc

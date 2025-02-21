@@ -972,3 +972,4 @@ bb1(%9 : $()):
 bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
+// UNSUPPORTED: OS=windows-msvc

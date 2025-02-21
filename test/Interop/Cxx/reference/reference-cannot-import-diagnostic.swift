@@ -28,3 +28,4 @@ public func test() {
   // CHECK: note: function 'notStdMove' unavailable (cannot import)
   // CHECK: note: C++ functions with rvalue reference parameters are unavailable in Swift
 }
+// UNSUPPORTED: OS=windows-msvc

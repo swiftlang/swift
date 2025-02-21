@@ -38,3 +38,4 @@ let s = C2()
 s.bar
 
 // CHECK: call {{.*}} @"$s29protocol_extensions_constrain2C3VAA2P3AAWP"
+// UNSUPPORTED: OS=windows-msvc

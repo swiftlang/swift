@@ -8,3 +8,4 @@ import Darwin
 func getAnyValue<T>(_ opt: T?) -> T { return opt! }
 
 qsort(getAnyValue(nil), 0, 0, getAnyValue(nil))
+// UNSUPPORTED: OS=windows-msvc

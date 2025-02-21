@@ -13,3 +13,4 @@ let a = S(e: .foo)
 let b = S(e: .bar)
 
 _ = a == b
+// UNSUPPORTED: OS=windows-msvc

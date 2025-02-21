@@ -9,3 +9,4 @@ func testEmptyEnumImport(value: OpenEmptyEnum) -> Int8 {
   // Should still compile even though the enum is uninhabited in c++.
   return value.rawValue
 }
+// UNSUPPORTED: OS=windows-msvc

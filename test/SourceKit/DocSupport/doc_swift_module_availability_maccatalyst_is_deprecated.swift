@@ -85,3 +85,4 @@ public func isAlwaysDeprecated_iOS() {}
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   key.is_deprecated: 1
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

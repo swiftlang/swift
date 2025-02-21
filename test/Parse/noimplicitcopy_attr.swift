@@ -29,3 +29,4 @@ func getKlass() -> Builtin.NativeObject {
 @_noImplicitCopy let g2: Builtin.NativeObject = getKlass()
 
 
+// UNSUPPORTED: OS=windows-msvc

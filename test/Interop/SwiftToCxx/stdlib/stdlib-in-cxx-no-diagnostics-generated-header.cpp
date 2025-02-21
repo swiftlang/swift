@@ -26,3 +26,4 @@ int main() {
   auto _ = swift::String::init();
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

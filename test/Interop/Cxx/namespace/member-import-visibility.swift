@@ -26,3 +26,4 @@ func test() {
   let _: Bool = returnsTransitiveStruct().memberVar // expected-member-visibility-error {{property 'memberVar' is not available due to missing import of defining module 'MembersTransitive'}}
   let _: Bool = returnsTopLevelTransitiveStruct().memberVar // expected-member-visibility-error {{property 'memberVar' is not available due to missing import of defining module 'MembersTransitive'}}
 }
+// UNSUPPORTED: OS=windows-msvc

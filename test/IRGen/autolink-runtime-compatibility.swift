@@ -80,3 +80,4 @@ public func foo() {}
 // FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility50"
 // FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibilityDynamicReplacements"
 // FORCE-LOAD-55-NOT: @"_swift_FORCE_LOAD_$_swiftCompatibility51"
+// UNSUPPORTED: OS=windows-msvc

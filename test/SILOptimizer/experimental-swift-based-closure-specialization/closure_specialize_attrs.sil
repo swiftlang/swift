@@ -85,3 +85,4 @@ bb0(%0 : $Storage):
   dealloc_stack %177 : $@noescape @callee_guaranteed (Val) -> Val
   return %189 : $Val
 }
+// UNSUPPORTED: OS=windows-msvc

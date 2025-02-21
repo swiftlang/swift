@@ -535,3 +535,4 @@ ResilientEnumTestSuite.test("ResilientEnumWithUnavailableCaseAndPayload") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

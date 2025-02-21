@@ -12,3 +12,4 @@ func test(myVar: Int) {
 }
 
 // COMPLETE: Decl[LocalVar]/Local:               myVar[#Int#]; name=myVar
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@ import FooBar
 // CHECK-NEXT:   |        |- note: a dependency of Swift module 'P': '{{.*}}{{/|\\}}P.swiftinterface'
 // CHECK-NEXT:   |        `- note: a dependency of main module 'deps'
 // CHECK-NEXT: 4 | public func funcZ() { }
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ public typealias LocalAlias = Bool
 public typealias ClassAlias = MyClass<LocalAlias, Bool>
 public func use(cls: ClassAlias?) {}
 
+// UNSUPPORTED: OS=windows-msvc

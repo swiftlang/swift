@@ -14,3 +14,4 @@ public class Test : NSObject {
   @objc public func thank(_ queue: DispatchQueue) {}
   // CHECK-NEXT: init
 } // CHECK-NEXT: @end
+// UNSUPPORTED: OS=windows-msvc

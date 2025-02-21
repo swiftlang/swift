@@ -3,3 +3,4 @@
 
 // REQUIRES: objc_interop
 
+// UNSUPPORTED: OS=windows-msvc

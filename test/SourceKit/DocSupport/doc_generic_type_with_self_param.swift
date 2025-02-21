@@ -27,3 +27,4 @@ public extension Proto {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

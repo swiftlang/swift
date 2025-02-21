@@ -15,3 +15,4 @@ import def_objc_xref
 
 // Trigger deserialization of the MyObjectFactorySub initializer.
 let sub = MyObjectFactorySub()
+// UNSUPPORTED: OS=windows-msvc

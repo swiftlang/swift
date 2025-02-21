@@ -132,3 +132,4 @@ flags:           [ not_app_extension_safe ]
 install-name:    '/System/Library/Frameworks/Simple.framework/Versions/A/Simple'
 current-version: 1000
 ...
+// UNSUPPORTED: OS=windows-msvc

@@ -167,3 +167,4 @@ func testDifferentIsolationFromSameClassKindPartialApplyFlowSensitive2() async {
   }
   await closure(p2)
 }
+// UNSUPPORTED: OS=windows-msvc

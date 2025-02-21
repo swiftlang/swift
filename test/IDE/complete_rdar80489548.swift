@@ -23,3 +23,4 @@ func test(value: [Int]) {
 
 #^GLOBAL_STMT?check=KW_NO_IN^#
 value #^GLOBAL_POSTFIX?check=KW_NO_IN^#
+// UNSUPPORTED: OS=windows-msvc

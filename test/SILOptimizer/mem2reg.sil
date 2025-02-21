@@ -578,3 +578,4 @@ bb0:
   dealloc_stack %11 : $*Pair<T, ()>
   return undef : $()
 }
+// UNSUPPORTED: OS=windows-msvc

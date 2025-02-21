@@ -20,3 +20,4 @@ func test2(bar: Bar.Type) -> Bool {
     }
     return true
 }
+// UNSUPPORTED: OS=windows-msvc

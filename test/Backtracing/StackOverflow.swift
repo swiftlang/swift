@@ -221,3 +221,4 @@ struct StackOverflow {
 // SKIP-FRIENDLY-NEXT:     22│     recurse(1)
 // SKIP-FRIENDLY-NEXT:       │     ▲
 // SKIP-FRIENDLY-NEXT:     23│   }
+// UNSUPPORTED: OS=windows-msvc

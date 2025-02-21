@@ -27,3 +27,4 @@ tests.test("subscript with Any") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

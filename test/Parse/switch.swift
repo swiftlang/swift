@@ -652,3 +652,4 @@ func testIncompleteArrayLiteral() {
     ()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -696,3 +696,4 @@ func butt() -> Butt<Any>
 func foo() throws -> Any {
   return try butt().foo()
 }
+// UNSUPPORTED: OS=windows-msvc

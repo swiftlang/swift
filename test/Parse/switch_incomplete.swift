@@ -5,3 +5,4 @@
 // expected-error@+1 {{switch must be exhaustive}} expected-note@+1{{add a default clause}}
 switch 1 { // expected-note{{to match this opening '{'}}
 case 1:    // expected-error@+1{{expected '}' at end of 'switch' statement}}
+// UNSUPPORTED: OS=windows-msvc

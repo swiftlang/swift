@@ -77,3 +77,4 @@ func testStaticButNotInline() -> CInt {
 // CHECK-DAG: attributes [[ALWAYS_INLINE]] = { alwaysinline nounwind optsize ssp
 // CHECK-DAG: attributes [[INNER_ZERO_ATTR]] = { inlinehint nounwind optsize ssp
 // CHECK-DAG: attributes [[GET_INT_ATTR]] = {
+// UNSUPPORTED: OS=windows-msvc

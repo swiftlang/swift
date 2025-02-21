@@ -50,3 +50,4 @@ public func anything() {}
 //--- profile.txt
 bar:100:100
  1: 2001
+// UNSUPPORTED: OS=windows-msvc

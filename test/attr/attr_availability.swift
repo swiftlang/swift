@@ -1307,3 +1307,4 @@ struct UnavailableSubscripts {
     _ = x[to: 3] // expected-warning {{'subscript(to:)' is deprecated: renamed to 'subscriptTo(_:)' [DeprecatedDeclaration]}} // expected-note {{use 'subscriptTo(_:)' instead}} {{10-11=.subscriptTo(}} {{16-17=)}} {{11-15=}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

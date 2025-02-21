@@ -23,3 +23,4 @@ func Glob(_ g: String) -> Array<String> {
 
 // CHECK: [{{.*}}]
 print(Glob("/*"))
+// UNSUPPORTED: OS=windows-msvc

@@ -2,3 +2,4 @@
 
 // ENABLE: swift
 // ENABLE: -enable-experimental-cxx-interop
+// UNSUPPORTED: OS=windows-msvc

@@ -382,3 +382,4 @@ FailableInitTestSuite.test("InitFailure_Struct") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

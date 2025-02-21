@@ -12,3 +12,4 @@
 // CHECK: DISubprogram(name: "Foo"{{.*}} unit: ![[CLANG_CU]]
 
 Foo()
+// UNSUPPORTED: OS=windows-msvc

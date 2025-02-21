@@ -29,3 +29,4 @@ let _ = #customFileID
   ]
 }
 
+// UNSUPPORTED: OS=windows-msvc

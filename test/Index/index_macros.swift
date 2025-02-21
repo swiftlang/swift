@@ -292,3 +292,4 @@ public struct SomePeerMemberMacro: PeerMacro {
     ]
   }
 }
+// UNSUPPORTED: OS=windows-msvc

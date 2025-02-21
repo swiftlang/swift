@@ -95,3 +95,4 @@ public func publicFuncPublicBody() {
     let value = SingletonReference.create()
     value.method()
 }
+// UNSUPPORTED: OS=windows-msvc

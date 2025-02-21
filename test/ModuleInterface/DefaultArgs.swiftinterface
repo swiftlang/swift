@@ -23,3 +23,4 @@ class SomeClass {
   // CHECK: integer_literal $Builtin.IntLiteral, 5
   // CHECK: end sil function '$s11DefaultArgs9SomeClassC1aACSi_tcfcfA_'
 }
+// UNSUPPORTED: OS=windows-msvc

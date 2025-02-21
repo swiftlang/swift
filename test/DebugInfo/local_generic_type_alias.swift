@@ -9,3 +9,4 @@ public func f<T>(t: T) {
   var y: G2<Int> = t
   var z: G3<Int> = (t, 123)
 }
+// UNSUPPORTED: OS=windows-msvc

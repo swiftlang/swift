@@ -34,3 +34,4 @@ extension MyBridgedObject {
 extension MyPrivateObject {
   @objc func implementedInSwift() {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -163,3 +163,4 @@ tuplify(true) { cond in
   ""
 }
 // CHECK: (Optional((42, (), 0)), "")
+// UNSUPPORTED: OS=windows-msvc

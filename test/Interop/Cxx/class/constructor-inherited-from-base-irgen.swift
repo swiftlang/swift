@@ -48,3 +48,4 @@ public func test() {
 // Make sure we reach clang declarations accessible from base constructors:
 
 // CHECK: define linkonce_odr{{( dso_local)?}} void @{{_Z22emittedIntoSwiftObjectv|"\?emittedIntoSwiftObject@@YAXXZ"}}
+// UNSUPPORTED: OS=windows-msvc

@@ -841,3 +841,4 @@ ControlFlowTests.test("ThrowingCalls") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

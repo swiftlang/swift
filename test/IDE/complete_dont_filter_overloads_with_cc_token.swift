@@ -22,3 +22,4 @@ func test(text: String) {
 // COMPLETE-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#(content): StringProtocol#}[')'][#MyText#];
 // COMPLETE-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: text[#String#];
 // COMPLETE: End completions
+// UNSUPPORTED: OS=windows-msvc

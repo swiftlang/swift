@@ -29,3 +29,4 @@ public func testIndirectReturnNoReturn() {
 public func testVoidReturnNoReturn() {
   voidNoReturn()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ public class Bar : Foo {}
 // CHECK-NEXT: #else
 // CHECK: #import <header-symlink.h>
 // CHECK: #endif
+// UNSUPPORTED: OS=windows-msvc

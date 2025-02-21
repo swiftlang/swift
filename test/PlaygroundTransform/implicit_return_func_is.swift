@@ -27,3 +27,4 @@ iss(57, anInstanceOf: String.self)
 // CHECK-NEXT: {{.*}} __builtin_log[='false']
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 // CHECK-NEXT: {{.*}} __builtin_log[='false']
+// UNSUPPORTED: OS=windows-msvc

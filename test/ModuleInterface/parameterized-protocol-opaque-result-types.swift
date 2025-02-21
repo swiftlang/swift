@@ -36,3 +36,4 @@ public func returnsQT<T>(_: T) -> some Q<T> { return S<T>() }
 
 // CHECK-LABEL: public func returnsQArrayT<T>(_: T) -> some ParameterizedProtocols.Q<Swift.Array<T>>
 public func returnsQArrayT<T>(_: T) -> some Q<Array<T>> { return S<Array<T>>() }
+// UNSUPPORTED: OS=windows-msvc

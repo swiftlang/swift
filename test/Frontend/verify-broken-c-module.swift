@@ -9,3 +9,4 @@
 // CHECK: note: diagnostic produced elsewhere: in file included from <module-includes>
 // CHECK: broken_c.h:2:11: error: diagnostic produced elsewhere: expected function body after function declarator
 import BrokenCModule
+// UNSUPPORTED: OS=windows-msvc

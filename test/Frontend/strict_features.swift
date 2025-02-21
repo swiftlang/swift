@@ -16,3 +16,4 @@
 // CHECK-UNKNOWN-EXPERIMENTAL: warning: 'UnknownFeature' is not a recognized experimental feature
 // CHECK-NOT-EXPERIMENTAL-ENABLE: warning: 'ConciseMagicFile' is not an experimental feature, use -enable-upcoming-feature instead
 // CHECK-NOT-EXPERIMENTAL-DISABLE: warning: 'ConciseMagicFile' is not an experimental feature, use -disable-upcoming-feature instead
+// UNSUPPORTED: OS=windows-msvc

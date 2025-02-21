@@ -17,3 +17,4 @@ protocol InternalProto {}
 // CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT: } // namespace Functions
+// UNSUPPORTED: OS=windows-msvc

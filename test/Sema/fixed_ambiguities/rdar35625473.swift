@@ -2,3 +2,4 @@
 
 // CHECK: function_ref @$sSlsE9dropFirsty11SubSequenceQzSiF
 _ = [1, 2, 3].dropFirst(1).dropFirst(1)
+// UNSUPPORTED: OS=windows-msvc

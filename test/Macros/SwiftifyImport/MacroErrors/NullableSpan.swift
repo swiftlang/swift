@@ -7,3 +7,4 @@
 @_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)))
 func nullableSpan(_ ptr: UnsafePointer<CInt>?, _ len: CInt) {
 }
+// UNSUPPORTED: OS=windows-msvc

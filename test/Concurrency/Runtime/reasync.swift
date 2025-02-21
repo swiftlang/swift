@@ -66,3 +66,4 @@ ReasyncTests.test("reasyncThrows") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

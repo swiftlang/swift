@@ -175,3 +175,4 @@ entry(%0 : $<τ_0_0> { var τ_0_0 } <T>):
   %t = apply %f<T>(%p) : $@convention(thin) <T> (@in T) -> ()
   return undef : $()
 }
+// UNSUPPORTED: OS=windows-msvc

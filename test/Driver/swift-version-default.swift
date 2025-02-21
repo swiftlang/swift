@@ -47,3 +47,4 @@ aoeu
 #else
 htn // expected-error {{cannot find 'htn' in scope}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

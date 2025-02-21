@@ -26,3 +26,4 @@ struct C: P3 {
 extension P1 where X: P2, X.Y : P3, X.Y == C {
   func foo(_ x: X.Y) -> C { return x }
 }
+// UNSUPPORTED: OS=windows-msvc

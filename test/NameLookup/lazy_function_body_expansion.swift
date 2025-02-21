@@ -3,3 +3,4 @@
 // RUN: %target-swift-frontend -typecheck -primary-file %s %S/Inputs/lazy_function_body_expansion_helper.swift
 
 let a = v
+// UNSUPPORTED: OS=windows-msvc

@@ -80,3 +80,4 @@ import Lib
 public func rubLib() {
   Lib.start()
 }
+// UNSUPPORTED: OS=windows-msvc

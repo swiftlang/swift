@@ -4,3 +4,4 @@
 
 // Link against stable ABI
 // CHECK: libclang_rt.asan_abi{{.*}}.a
+// UNSUPPORTED: OS=windows-msvc

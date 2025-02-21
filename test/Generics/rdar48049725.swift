@@ -14,3 +14,4 @@ func test<T: P5>(value: T) {
   // CHECK: call swiftcc void @"$s12rdar480497253FooV1fyyxAA2P5RzlFZ"
   Foo.f(value)
 }
+// UNSUPPORTED: OS=windows-msvc

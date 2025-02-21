@@ -80,3 +80,4 @@ func testPrivateOverridden() {
   let obj = getPrivateClass()
   obj.bar()
 }
+// UNSUPPORTED: OS=windows-msvc

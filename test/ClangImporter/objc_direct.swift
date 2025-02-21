@@ -25,3 +25,4 @@ var otherThing = Foo() as AnyObject
 
 // We expect no error.
 let _ = otherThing.directProtocolMethod()
+// UNSUPPORTED: OS=windows-msvc

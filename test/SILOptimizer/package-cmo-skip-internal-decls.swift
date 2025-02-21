@@ -339,3 +339,4 @@ public func useClassKeypath<T>(_ t: T) -> Int {
 // CHECK-NEXT:   #PubKlassWithInternalMember.pubVar!getter: (PubKlassWithInternalMember) -> () -> Int : @$s3Lib26PubKlassWithInternalMemberC6pubVarSivg  // PubKlassWithInternalMember.pubVar.getter
 // CHECK-NEXT:   #PubKlassWithInternalMember.pkgVar!getter: (PubKlassWithInternalMember) -> () -> Int : @$s3Lib26PubKlassWithInternalMemberC6pkgVarSivg  // PubKlassWithInternalMember.pkgVar.getter
 // CHECK-NEXT:   #PubKlassWithInternalMember.deinit!deallocator: @$s3Lib26PubKlassWithInternalMemberCfD  // PubKlassWithInternalMember.__deallocating_deinit
+// UNSUPPORTED: OS=windows-msvc

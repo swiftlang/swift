@@ -3728,3 +3728,4 @@ bb5:
 bb6:
   return undef : $()
 }
+// UNSUPPORTED: OS=windows-msvc

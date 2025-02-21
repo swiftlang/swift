@@ -24,3 +24,4 @@ func test() {
 // RUN: diff -u %S/Outputs/enum/second.swift.expected %t.result/second_def.swift
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=9:15 -new-name 'secondary' > %t.result/second_ref.swift
 // RUN: diff -u %S/Outputs/enum/second.swift.expected %t.result/second_ref.swift
+// UNSUPPORTED: OS=windows-msvc

@@ -31,3 +31,4 @@ none:
 }
 
 sil_vtable AClass {}
+// UNSUPPORTED: OS=windows-msvc

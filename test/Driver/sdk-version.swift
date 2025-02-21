@@ -6,3 +6,4 @@
 // MACOS_10_15: -target-sdk-version 10.15
 // MACOS_10_15_4: -target-sdk-version 10.15.4
 // MACOS_UNVERSIONED-NOT: -target-sdk-version
+// UNSUPPORTED: OS=windows-msvc

@@ -84,3 +84,4 @@ extension DummyClass {
   @backDeployed(before: macOS 12.0)
   @nonobjc public final var finalNonObjCProperty: [Int] { [1] }
 }
+// UNSUPPORTED: OS=windows-msvc

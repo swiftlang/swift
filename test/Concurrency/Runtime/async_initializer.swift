@@ -174,3 +174,4 @@ struct PrecariousStruct {
     print("done")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

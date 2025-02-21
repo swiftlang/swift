@@ -22,3 +22,4 @@
 @testable import Testable_ClangModule // no-error
 
 _ = clangGlobal
+// UNSUPPORTED: OS=windows-msvc

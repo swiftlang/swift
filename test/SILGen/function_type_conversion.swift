@@ -79,3 +79,4 @@ func concreteDirectTakesFunction(
   // thunking and conversion to the substituted form
   return genericTakesFunction(f)
 }
+// UNSUPPORTED: OS=windows-msvc

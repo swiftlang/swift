@@ -15,3 +15,4 @@
 public var x = INVALID_DECL
 // CHECK-NOT: INVALID_DECL
 
+// UNSUPPORTED: OS=windows-msvc

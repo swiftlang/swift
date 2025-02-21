@@ -33,3 +33,4 @@ do {
     // expected-warning@-1 {{use of protocol 'P2' as a type must be written 'any P2'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

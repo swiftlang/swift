@@ -7,3 +7,4 @@ import SWIFT
 
 print("hi")
 SWIFT.print("hi")
+// UNSUPPORTED: OS=windows-msvc

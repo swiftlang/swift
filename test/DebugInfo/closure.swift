@@ -19,3 +19,4 @@ for i in 0..<10 { a[i] = Int64(i) }
 // CHECK: !DILocalVariable(name: "$1", arg: 2{{.*}} line: [[@LINE+1]],
 var sum:Int64 = foldl1(a, { $0 + $1 })
 markUsed(sum)
+// UNSUPPORTED: OS=windows-msvc

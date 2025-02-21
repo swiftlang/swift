@@ -50,3 +50,4 @@ exit:
   return %retval : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

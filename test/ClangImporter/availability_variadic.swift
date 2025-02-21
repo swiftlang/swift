@@ -19,3 +19,4 @@ func test_unavailable_because_variadic() {
   print(variadicFunc2(2, 3, 4, 5, 6)) // no-error
   print(variadicFunc2(2, [3], [4], 5, 6)) // no-error
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ public struct Wrapper {
 // CHECK-NEXT: }
 
 // CHECK-TESTING-LABEL: sil_global [let] @$s28globalopt_resilience_testing7WrapperV14usefulConstantACvpZ : $Wrapper{{$}}
+// UNSUPPORTED: OS=windows-msvc

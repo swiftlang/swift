@@ -170,3 +170,4 @@ actor ActorTests {
     let _ = otherInstanceOfMyClass#^IN_ACTOR_OTHER_NODOT?check=IN_SYNC_FUNC_NODOT^#
   }
 }
+// UNSUPPORTED: OS=windows-msvc

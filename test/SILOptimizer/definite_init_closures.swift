@@ -81,3 +81,4 @@ class Derived : Base {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

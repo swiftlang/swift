@@ -19,3 +19,4 @@ extension { // expected-error {{expected type name in extension declaration}}
     associatedtype A
   }
 }
+// UNSUPPORTED: OS=windows-msvc

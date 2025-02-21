@@ -31,3 +31,4 @@ nonisolated func mainActorAssumeIsolated() -> NonSendableKlass {
     NonSendableKlass()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

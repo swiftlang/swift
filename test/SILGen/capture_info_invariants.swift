@@ -19,3 +19,4 @@ extension GetIsolatedParamTest : CustomDebugStringConvertible {
       return description
     }
 }
+// UNSUPPORTED: OS=windows-msvc

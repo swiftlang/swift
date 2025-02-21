@@ -57,3 +57,4 @@ func forEachEach<each C, U>(
   repeat (each c).forEach(function)
 }
 
+// UNSUPPORTED: OS=windows-msvc

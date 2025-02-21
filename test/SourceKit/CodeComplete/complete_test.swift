@@ -48,3 +48,4 @@ struct ForDiff {
 func diff(x: ForDiff) {
   x.#^DIFF^#
 }
+// UNSUPPORTED: OS=windows-msvc

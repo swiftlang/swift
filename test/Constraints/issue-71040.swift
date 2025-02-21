@@ -24,3 +24,4 @@ func bar() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

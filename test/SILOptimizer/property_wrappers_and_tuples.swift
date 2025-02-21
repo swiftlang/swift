@@ -73,3 +73,4 @@ test()
 
 // CHECK: num instances of X: 0
 print("num instances of X: \(X.numInstances)")
+// UNSUPPORTED: OS=windows-msvc

@@ -67,3 +67,4 @@ qux.f()
 
 // CHECK: !DISubprogram(name: "baz.get"
 // CHECK: !DISubprogram(name: "baz2.get"
+// UNSUPPORTED: OS=windows-msvc

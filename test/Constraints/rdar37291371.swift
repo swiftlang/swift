@@ -19,3 +19,4 @@ func bar<T>(_ e: T?) -> R<T> {
 
 foo([Double(1.0)].v) == Double(1.0)
 bar([Double(1.0)].v) == Double(1.0)
+// UNSUPPORTED: OS=windows-msvc

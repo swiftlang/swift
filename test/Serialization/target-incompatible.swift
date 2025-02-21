@@ -34,3 +34,4 @@ import mips
 import solaris
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -86,3 +86,4 @@ tests.test("throwing startOnMainActor") {
 }
 
 await runAllTestsAsync()
+// UNSUPPORTED: OS=windows-msvc

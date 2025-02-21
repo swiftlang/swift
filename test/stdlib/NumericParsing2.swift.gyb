@@ -56,3 +56,4 @@ tests.test("${Self}/Overflow/Underflow") {
 % end
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

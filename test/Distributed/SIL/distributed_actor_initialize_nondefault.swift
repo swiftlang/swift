@@ -26,3 +26,4 @@ distributed actor MyDistActor {
 // CHECK: [[ACTOR_INSTANCE:%[0-9]+]] = builtin "initializeNonDefaultDistributedActor"(%1 : $MyDistActor) : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

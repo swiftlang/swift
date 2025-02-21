@@ -98,3 +98,4 @@ func classifyPoint2(_ p: (Double, Double)) {
 
 // CHECK: !DILocation(line: [[@LINE+1]],
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -78,3 +78,4 @@ bb0(%0 : $Class):
   strong_release %0 : $Class
   return %2 : $G
 }
+// UNSUPPORTED: OS=windows-msvc

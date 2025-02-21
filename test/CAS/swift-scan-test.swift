@@ -41,3 +41,4 @@
 // CHECK-QUERY-NEXT: cached-diagnostics: llvmcas://
 
 func testFunc() {}
+// UNSUPPORTED: OS=windows-msvc

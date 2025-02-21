@@ -110,3 +110,4 @@ public class MyClass {
 
 // COMMON: }{{$}}
 }
+// UNSUPPORTED: OS=windows-msvc

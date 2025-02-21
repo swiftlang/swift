@@ -29,3 +29,4 @@ let _ = SimpleStruct.encode(to:)
 // The synthesized CodingKeys type should not be accessible from outside the
 // struct.
 let _ = SimpleStruct.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

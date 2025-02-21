@@ -26,3 +26,4 @@ public func consume<T>(_ t: T) {
   withExtendedLifetime(t) { t in
   }
 }
+// UNSUPPORTED: OS=windows-msvc

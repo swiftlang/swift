@@ -28,3 +28,4 @@ import Library
 // swift-interface-format-version: 1.0
 // swift-module-flags: -module-name Library -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -user-module-version 1.0
 public func foo() {}
+// UNSUPPORTED: OS=windows-msvc

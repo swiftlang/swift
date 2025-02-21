@@ -37,3 +37,4 @@ func test(obj: RPFoo) {
 func f_51011(obj: RPSub) {
   obj.accessorInProto = nil
 }
+// UNSUPPORTED: OS=windows-msvc

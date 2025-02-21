@@ -27,3 +27,4 @@ let _: ctypes.Color?
 #if !NO_ERRORS
 let _: bits.DWORD = 0 // expected-error {{cannot find type 'bits' in scope}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

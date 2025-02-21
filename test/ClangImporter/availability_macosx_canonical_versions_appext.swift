@@ -11,3 +11,4 @@ FunctionIntroducedIn10_16AppExt()
 FunctionIntroducedIn11_0AppExt()
 // expected-error@-1 {{'FunctionIntroducedIn11_0AppExt()' is only available in application extensions for macOS 11.0 or newer}}
 // expected-note@-2 {{add 'if #available' version check}}
+// UNSUPPORTED: OS=windows-msvc

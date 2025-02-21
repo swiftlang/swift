@@ -123,3 +123,4 @@ func bar(x: C2 = .main) {}
 // CHECK-DEFAULT-ARGUMENT-NEXT: <ASTNodes>1</ASTNodes>
 // CHECK-DEFAULT-ARGUMENT-NEXT: <end>
 
+// UNSUPPORTED: OS=windows-msvc

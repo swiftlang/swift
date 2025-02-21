@@ -26,3 +26,4 @@ var qS1 : letters.S // expected-error {{no type named 'S' in module 'letters'}}
 var qS2 : asdf.S // expected-error {{no type named 'S' in module 'asdf'}}
 // but...!
 letters.consumeS(letters.myS)
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ public struct Unavailable {}
 
 @available(*, unavailable)
 public func usesUnavailable(_ u: Unavailable) {}
+// UNSUPPORTED: OS=windows-msvc

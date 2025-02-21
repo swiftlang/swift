@@ -18,3 +18,4 @@ public func caller(_ x: Int) -> Int {
 	return to_be_inlined(x)
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -71,3 +71,4 @@ class C {
 // CHECK9: note: forbidden typecheck occurred: FORBID2_global
 var FORBID2_global = 0
 #endif
+// UNSUPPORTED: OS=windows-msvc

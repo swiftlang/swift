@@ -190,3 +190,4 @@ public struct WrapOverloadedInits {
 // CHECK-NEXT:   _impl::swift_interop_returnDirect_Init_[[PTRENC]](result, Init::_impl::$s4Init28StructWithRefCountStoredPropV1xACSi_tcfC(x));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

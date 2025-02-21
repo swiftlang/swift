@@ -11,3 +11,4 @@ public func build<F: Factory>(f: F) -> any Reducer<WindowData> {
 }
 
 build(f: MyFactory())
+// UNSUPPORTED: OS=windows-msvc

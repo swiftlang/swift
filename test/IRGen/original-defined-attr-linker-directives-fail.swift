@@ -28,3 +28,4 @@ public struct Entity {
 // CHECK-SYMBOLS-LOW-TARGET: $ld$previous$/System/OriginalModule.dylib$$1$1.0$10.10$_$s14OriginalModule6EntityV06removeC0yyACF$
 
 // CHECK-ERROR: cannot open previous install name map
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ func test() -> Bool {
 }
 
 let _ = test()
+// UNSUPPORTED: OS=windows-msvc

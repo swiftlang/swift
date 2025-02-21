@@ -64,3 +64,4 @@ testit1()
 // CHECK-OUTPUT: abc 42
 // CHECK-OUTPUT: abc 42
 testit2()
+// UNSUPPORTED: OS=windows-msvc

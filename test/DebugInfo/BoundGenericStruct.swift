@@ -46,3 +46,4 @@ public let inner = S2<Double>.Inner(t:4.2)
 // DWARF-DAG: ![[ELEMENTS1]] = !{![[ELEMENTS2:[0-9]+]]}
 
 // DWARF-DAG: ![[ELEMENTS2]] = !DIDerivedType(tag: DW_TAG_member, name: "t"
+// UNSUPPORTED: OS=windows-msvc

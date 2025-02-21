@@ -65,3 +65,4 @@ public func testCaptureGlobal() {
 // CHECK-arm64e-SYSV-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
 // CHECK-arm64e-WIN-DAG: attributes [[CLANG_FUNC_ATTR]] = { noinline nounwind {{.*}}"frame-pointer"="all"{{.*}}
 // CHECK-arm64e-WIN-DAG: attributes [[SWIFT_FUNC_ATTR]] = { {{.*}}"frame-pointer"="all" {{.*}}"target-cpu"
+// UNSUPPORTED: OS=windows-msvc

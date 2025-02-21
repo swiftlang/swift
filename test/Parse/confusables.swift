@@ -26,3 +26,4 @@ print("A"); print("B")
 // expected-error@-1 2{{consecutive statements on a line must be separated by ';'}}
 // expected-error@-2 {{cannot find ';' in scope}}
 // expected-note@-3 {{identifier ';' (Greek Question Mark) looks similar to ';' (Semicolon); did you mean ';' (Semicolon)?}} {{11-13=;}}
+// UNSUPPORTED: OS=windows-msvc

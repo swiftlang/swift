@@ -219,3 +219,4 @@ func testCaseAddressOnlyNoAllocBoxToStackable<T : MyProt & Sendable>(i : T) {
                            // xpected-note @-8 {{capturing use}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

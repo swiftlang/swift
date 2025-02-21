@@ -12,3 +12,4 @@ func g(_ x: UInt32, _ y: Int) -> Bool { x < y }
 // CHECK: %2 = zext i32 %0 to i64
 // CHECK-NEXT: %3 = icmp slt i64 %2, %1
 // CHECK-NEXT: ret i1 %3
+// UNSUPPORTED: OS=windows-msvc

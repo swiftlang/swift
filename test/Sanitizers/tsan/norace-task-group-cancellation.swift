@@ -45,3 +45,4 @@ final class Thing: Sendable {
 final class OtherThing: Sendable {
   func cancel() {}
 }
+// UNSUPPORTED: OS=windows-msvc

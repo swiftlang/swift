@@ -191,3 +191,4 @@ public class Class1 {
     return nil
   }
 }
+// UNSUPPORTED: OS=windows-msvc

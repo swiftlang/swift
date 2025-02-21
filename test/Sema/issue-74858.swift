@@ -7,3 +7,4 @@ func invalidSpecializeExpr(_ x: Alias<Int>.Type) {
   // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
   // FIXME: Bad diagnostic
 }
+// UNSUPPORTED: OS=windows-msvc

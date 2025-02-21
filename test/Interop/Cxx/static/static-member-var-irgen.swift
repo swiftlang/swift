@@ -54,3 +54,4 @@ public func readDefinedOutOfLineConstMember() -> CInt {
 // CHECK: define {{(protected |dllexport )?}}swiftcc i32 @"$s4main31readDefinedOutOfLineConstMembers5Int32VyF"() #0
 // CHECK: [[VALUE:%.*]] = load i32, ptr @{{_ZN21WithConstStaticMember16definedOutOfLineE|"\?definedOutOfLine@WithConstStaticMember@@2HB"}}, align 4
 // CHECK: ret i32 [[VALUE]]
+// UNSUPPORTED: OS=windows-msvc

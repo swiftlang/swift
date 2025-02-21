@@ -4,3 +4,4 @@
 // RUN: %target-swift-ide-test -print-module-metadata -module-to-print Foo -I %t -source-filename %s | %FileCheck %s
 
 // CHECK: link library: Bar
+// UNSUPPORTED: OS=windows-msvc

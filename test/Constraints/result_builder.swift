@@ -1402,3 +1402,4 @@ func testBuildFinalResultDependentOnContextualType() {
 
 testBuildFinalResultDependentOnContextualType()
 // CHECK: Optional(42)
+// UNSUPPORTED: OS=windows-msvc

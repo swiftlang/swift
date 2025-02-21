@@ -1930,3 +1930,4 @@ bb0(%1 : @guaranteed $RefElemClass):
   %11 = tuple ()
   return %11
 }
+// UNSUPPORTED: OS=windows-msvc

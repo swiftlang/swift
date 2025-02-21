@@ -7,3 +7,4 @@
 @_private(sourceFile: "nonexistent_file.swift") import empty // no-error
 
 @_private(sourceFile: "none") func foo() {} // expected-error {{@_private may only be used on 'import' declarations}} {{1-31=}}
+// UNSUPPORTED: OS=windows-msvc

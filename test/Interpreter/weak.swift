@@ -131,3 +131,4 @@ func testStaticObject() {
 }
 
 testStaticObject()
+// UNSUPPORTED: OS=windows-msvc

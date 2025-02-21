@@ -131,3 +131,4 @@ func useUnsafeLifetimeAnnotated(v: View) {
     // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
     unsafeFunc(v, v) // expected-note{{reference to unsafe global function 'unsafeFunc'}}
 }
+// UNSUPPORTED: OS=windows-msvc

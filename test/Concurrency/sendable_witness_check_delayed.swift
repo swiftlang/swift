@@ -19,3 +19,4 @@ struct S : P {
   func f(_: @Sendable () -> ()) -> Int { return 0 }
   // expected-warning@-1 {{sendability of function types in instance method 'f' does not match requirement in protocol 'P'}}
 }
+// UNSUPPORTED: OS=windows-msvc

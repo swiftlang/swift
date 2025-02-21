@@ -27,3 +27,4 @@ class AA: NSView {
 
 let a = A()
 print(a.accessibilityLabel() as Any, terminator: "")
+// UNSUPPORTED: OS=windows-msvc

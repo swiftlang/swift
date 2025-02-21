@@ -41,3 +41,4 @@ func argAndParamNames() -> Int {
   _ = f1(1, 2)
   return f1(1, 2)
 }
+// UNSUPPORTED: OS=windows-msvc

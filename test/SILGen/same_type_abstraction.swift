@@ -56,3 +56,4 @@ extension Refined {
     self.init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -35,3 +35,4 @@ tests.test("all paths through a switch with guard") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

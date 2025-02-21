@@ -21,3 +21,4 @@ func caller<each T>(_ t: repeat each T) {
 // CHECK: [[ADDR:%.*]] = init_existential_addr %0 : $*Any, $τ_1_0
 // CHECK: copy_addr %1 to [init] [[ADDR]] : $*τ_1_0
 // CHECK: return
+// UNSUPPORTED: OS=windows-msvc

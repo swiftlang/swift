@@ -5,3 +5,4 @@
 import ID
 
 let v = getHasIdMember()
+// UNSUPPORTED: OS=windows-msvc

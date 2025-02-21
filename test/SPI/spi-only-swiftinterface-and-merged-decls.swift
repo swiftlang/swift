@@ -41,3 +41,4 @@ import B
 @_spi(_)
 public func foo(_ a: MovingType) {}
 // CHECK: A.MovingType
+// UNSUPPORTED: OS=windows-msvc

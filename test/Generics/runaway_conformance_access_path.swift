@@ -19,3 +19,4 @@ public struct FutureHolder<T : FutureProtocol> {
     takesFuture(T.self)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

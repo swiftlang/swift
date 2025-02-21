@@ -42,3 +42,4 @@ func takesEnumInB(_ e: EnumInB) {}
 @_spiOnly @_weakLinked import members_C
 
 func takesEnumInC(_ e: EnumInC) {}
+// UNSUPPORTED: OS=windows-msvc

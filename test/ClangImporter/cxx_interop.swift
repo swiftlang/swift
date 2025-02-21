@@ -15,3 +15,4 @@ func namespaceLookup() -> UnsafeMutablePointer<ns.T> {
   var tmp: UnsafeMutablePointer<ns.T> = ns.doMakeT()!
   return tmp
 }
+// UNSUPPORTED: OS=windows-msvc

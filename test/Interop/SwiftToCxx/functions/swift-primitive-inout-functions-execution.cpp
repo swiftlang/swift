@@ -57,3 +57,4 @@ int main() {
         assert(*p == 2);
     }
 }
+// UNSUPPORTED: OS=windows-msvc

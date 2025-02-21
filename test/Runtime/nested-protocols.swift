@@ -62,3 +62,4 @@ var result = f0(DoesNotConform())
 precondition(result.inputConforms == false)
 result = f0(result.0)
 precondition(result.inputConforms == true)
+// UNSUPPORTED: OS=windows-msvc

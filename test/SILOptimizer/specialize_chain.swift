@@ -48,3 +48,4 @@ func exp1() {
 //CHECK: function_ref @$s16specialize_chain3YYYV{{[_0-9a-zA-Z]*}}fCSi_Tt1g5
 //CHECK: function_ref @$s16specialize_chain3YYYV4AAA9{{[_0-9a-zA-Z]*}}FSi_Tg5
 //CHECK: return
+// UNSUPPORTED: OS=windows-msvc

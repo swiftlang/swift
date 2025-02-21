@@ -20,3 +20,4 @@
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics16inoutGenericPairyyAA0cD0Vyxq_Gz_xtr0_lF(void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // inoutGenericPair(_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics16makeConcretePairyAA07GenericD0Vys6UInt16VAFGAF_AFtF(SWIFT_INDIRECT_RESULT void * _Nonnull, uint16_t x, uint16_t y) SWIFT_NOEXCEPT SWIFT_CALL; // makeConcretePair(_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics15makeGenericPairyAA0cD0Vyxq_Gx_q_tr0_lF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // makeGenericPair(_:_:)
+// UNSUPPORTED: OS=windows-msvc

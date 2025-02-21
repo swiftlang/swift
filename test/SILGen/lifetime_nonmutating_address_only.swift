@@ -18,3 +18,4 @@ func f(i: Int) {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

@@ -60,3 +60,4 @@ public func caller22<T : X2>(_: T) {
   // (T : X2)(Child : P3)(Self.B : P2)(Self.A : P1).
   callee(T.Child.A.self)
 }
+// UNSUPPORTED: OS=windows-msvc

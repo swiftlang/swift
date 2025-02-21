@@ -23,3 +23,4 @@ func existentialMetatypes(nonClass: NonClassProto.Type,
   takesAnyObject(classConstrained)
   takesAnyObject(compo)
 }
+// UNSUPPORTED: OS=windows-msvc

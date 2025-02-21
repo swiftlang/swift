@@ -13,3 +13,4 @@ public class D: C {
 // Make sure we don't report the override of the private member in the base class.
 //CHECK:      instance-method/Swift | foo() | s:3Mod1DC3fooyyF | Def,Dyn,RelChild | rel: 1
 //CHECK-NEXT: RelChild | class/Swift | D | s:3Mod1DC
+// UNSUPPORTED: OS=windows-msvc

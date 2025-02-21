@@ -19,3 +19,4 @@ func mismatches() {
 
 // RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
 func missingBody(complete: @escaping (Int?, Error?) -> Void)
+// UNSUPPORTED: OS=windows-msvc

@@ -3,3 +3,4 @@
 import ExternIntX
 
 x += 1
+// UNSUPPORTED: OS=windows-msvc

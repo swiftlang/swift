@@ -163,3 +163,4 @@ func test() {
 // CHECK-AFTER-NEXT:   },
 // CHECK-AFTER-NEXT:   "uri": "file://{{.*}}cursor_info_multi_module.swift"
 // CHECK-AFTER-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

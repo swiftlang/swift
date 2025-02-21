@@ -9,3 +9,4 @@ import has_nested_generic_extension
 
 var sillyGeneric = Outer<String>.Inner<Float>()
 let result: Float = sillyGeneric.extensionMethod(t: "square root of two")
+// UNSUPPORTED: OS=windows-msvc

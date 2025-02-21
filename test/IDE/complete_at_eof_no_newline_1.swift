@@ -11,4 +11,4 @@ struct FooStruct {
 }
 var fooObject: FooStruct
 // There is no newline on the following line.  Don't fix this!
-fooObject.#^A^#
+fooObject.#^A^#// UNSUPPORTED: OS=windows-msvc

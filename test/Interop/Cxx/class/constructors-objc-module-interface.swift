@@ -10,3 +10,4 @@
 // CHECK-NEXT:   @available(*, deprecated, message
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

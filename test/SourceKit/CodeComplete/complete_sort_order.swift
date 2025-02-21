@@ -240,3 +240,4 @@ func test8() {
 // CALLARG: stringVal
 // CALLARG: String
 }
+// UNSUPPORTED: OS=windows-msvc

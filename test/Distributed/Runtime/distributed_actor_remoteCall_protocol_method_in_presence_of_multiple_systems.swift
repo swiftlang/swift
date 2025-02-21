@@ -83,3 +83,4 @@ distributed actor Feeder: FeederProtocol {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

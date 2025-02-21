@@ -78,3 +78,4 @@ class MyMagnetism : CCMagnetismModel {
     return super.borrowRefrigerator()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

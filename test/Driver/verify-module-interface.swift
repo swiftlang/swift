@@ -10,3 +10,4 @@
 
 // CHECK_EVOLUTION: -typecheck-module-from-interface
 // CHECK_NO_EVOLUTION-NOT: -typecheck-module-from-interface
+// UNSUPPORTED: OS=windows-msvc

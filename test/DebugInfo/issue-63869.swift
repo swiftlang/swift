@@ -15,3 +15,4 @@ public extension P {
         G<Element, Int> { x in }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

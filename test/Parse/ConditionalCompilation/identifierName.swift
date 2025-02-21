@@ -99,3 +99,4 @@ let BAR = { () -> Void in
 #endif
 }
 
+// UNSUPPORTED: OS=windows-msvc

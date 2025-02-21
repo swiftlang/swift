@@ -39,3 +39,4 @@ let s = Sub() as AnyObject as! Hello
 
 s.hello()
 
+// UNSUPPORTED: OS=windows-msvc

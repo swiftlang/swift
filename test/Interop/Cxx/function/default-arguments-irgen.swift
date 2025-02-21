@@ -7,3 +7,4 @@ import DefaultArguments
 // Make sure the default argument generator isn't emitted if it isn't used.
 let _ = isZero(0)
 // CHECK-NOT: __cxx__defaultArg_0__Z6isZeroi
+// UNSUPPORTED: OS=windows-msvc

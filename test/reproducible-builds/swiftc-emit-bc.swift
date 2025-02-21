@@ -8,3 +8,4 @@
 // RUN: mv %t/run.bc %t/run-2.bc
 // RUN: cmp %t/run-1.bc %t/run-2.bc
 print("foo")
+// UNSUPPORTED: OS=windows-msvc

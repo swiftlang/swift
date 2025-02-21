@@ -149,3 +149,4 @@ func testClosures(_ g: Gen) {
     return g.IG.#^RETURN_TR3_CLOSURE^#
   }
 }
+// UNSUPPORTED: OS=windows-msvc

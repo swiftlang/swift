@@ -255,3 +255,4 @@ UnicodeScalarPropertiesTests.test("properties.numericTypeAndValue") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

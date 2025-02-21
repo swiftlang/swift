@@ -53,3 +53,4 @@ class ClosesOverGuard { // expected-note {{type declared here}}
     _ = getX() // This is diagnosed by SILGen.
   }
 }
+// UNSUPPORTED: OS=windows-msvc

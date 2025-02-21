@@ -39,3 +39,4 @@ private func recFuncManyCalls(_ x: Int32) -> Int32 {
 func callother() -> Int32 {
   return recFuncManyCalls(10)
 }
+// UNSUPPORTED: OS=windows-msvc

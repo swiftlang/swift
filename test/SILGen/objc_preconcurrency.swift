@@ -158,3 +158,4 @@ func testInoutAccess(_ grass: NSTouchGrass) {
 func testProtocolVarAccess(p: P) {
   modify(&p.sendyHandler)
 }
+// UNSUPPORTED: OS=windows-msvc

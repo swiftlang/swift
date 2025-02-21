@@ -49,3 +49,4 @@ public func bar() {
 }
 
 // YAML-FILTERED-NOT: sil-inliner
+// UNSUPPORTED: OS=windows-msvc

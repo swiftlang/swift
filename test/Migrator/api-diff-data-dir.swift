@@ -13,3 +13,4 @@ func foo(_ b: BarForwardDeclaredClass) {
   // SWIFT3:  barGlobalFuncNewSwift3OverlayName(newlabel: 2)
   // SWIFT4:  barGlobalFuncNewSwift4OverlayName(newlabel: 2)
 }
+// UNSUPPORTED: OS=windows-msvc

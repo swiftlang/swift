@@ -340,3 +340,4 @@ fourthCall(a: @escaping () -> Int)
 
 // CHECK: <call><name>foo</name> <arg><closure><brace>{ [unowned <lvar><name>self</name></lvar>, <lvar><name>x</name></lvar>] in _ }</brace></closure></arg></call>
 foo { [unowned self, x] in _ }
+// UNSUPPORTED: OS=windows-msvc

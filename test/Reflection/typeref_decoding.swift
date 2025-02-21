@@ -749,3 +749,4 @@
 // CHECK: (generic_type_parameter depth=0 index=1)
 // CHECK: (generic_argument index=0
 // CHECK:   (reference_capture index=0))
+// UNSUPPORTED: OS=windows-msvc

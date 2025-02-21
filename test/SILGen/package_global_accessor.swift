@@ -52,3 +52,4 @@ public struct S {
 // static S.x.getter
 // CHECK-NONRES: sil [transparent] [serialized] [ossa] @$s3Lib1SV1xSSvgZ : $@convention(method) (@thin S.Type) -> @owned String {
 // CHECK: sil [ossa] @$s3Lib1SV1xSSvgZ : $@convention(method) (@thin S.Type) -> @owned String {
+// UNSUPPORTED: OS=windows-msvc

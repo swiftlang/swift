@@ -1353,3 +1353,4 @@ bb0(%0 : $*InlineArray<N, Int>, %1 : $Int):
   return %14
 }
 
+// UNSUPPORTED: OS=windows-msvc

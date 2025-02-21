@@ -122,3 +122,4 @@
 // MACOS_10_15_4_REVERSE_ZIPPERED: -platform_version mac-catalyst 13.1.0 13.4.0
 // MACOS_10_15_4_REVERSE_ZIPPERED: -platform_version macos 10.14.0 10.15.4
 
+// UNSUPPORTED: OS=windows-msvc

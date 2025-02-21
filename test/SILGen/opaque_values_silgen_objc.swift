@@ -21,3 +21,4 @@ struct UnownedBox<T : AnyObject> {
   unowned var value: T
 }
 
+// UNSUPPORTED: OS=windows-msvc

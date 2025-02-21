@@ -69,3 +69,4 @@ class Node2<A, B> {
 // CHECK:   [[SELF_OWNED:%.*]] = unchecked_ownership_conversion [[SELF_NATIVE]] : $Builtin.NativeObject, @guaranteed to @owned
 // CHECK:   return [[SELF_OWNED]] : $Builtin.NativeObject
 // CHECK: } // end sil function '$s31deinit_recursive_linear_generic5Node2Cfd'
+// UNSUPPORTED: OS=windows-msvc

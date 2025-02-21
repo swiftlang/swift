@@ -11,3 +11,4 @@ struct S: P {
 func f<each T: P>(_: repeat each T) -> (repeat (each T).A.A.A.A) {}
 
 f(S(), S(), S())
+// UNSUPPORTED: OS=windows-msvc

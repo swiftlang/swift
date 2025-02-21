@@ -26,3 +26,4 @@ public struct S: P {
     return self
   }
 }
+// UNSUPPORTED: OS=windows-msvc

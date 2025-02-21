@@ -181,3 +181,4 @@ public struct MainUser {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

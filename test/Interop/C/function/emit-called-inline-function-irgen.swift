@@ -21,3 +21,4 @@ import EmitCalledInlineFunction
 calledFromSwift()
 
 let _ = varUsedFromSwift
+// UNSUPPORTED: OS=windows-msvc

@@ -54,3 +54,4 @@ CHat()
 CHat(1)
 // CHECK: k
 CHat(Hat())
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: #undef SWIFT_SYMBOL
+// UNSUPPORTED: OS=windows-msvc

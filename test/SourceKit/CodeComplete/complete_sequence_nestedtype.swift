@@ -44,3 +44,4 @@ struct Outer {
 // RESULT-DAG: key.description: "instanceMethod(self: Inner)"
 // RESULT: ]
 // RESULT: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

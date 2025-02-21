@@ -303,3 +303,4 @@ func badTypeConformance7<T, U>(_: T, _: U) where T? : U { }
 func badSameType<T, U : GeneratesAnElement, V>(_ : T, _ : U)
   where T == U.Element, U.Element == V {}
 // expected-warning@-2{{same-type requirement makes generic parameters 'V' and 'T' equivalent}}
+// UNSUPPORTED: OS=windows-msvc

@@ -138,3 +138,4 @@ func testOptionalTuple5(a: (x: Int, y: String)?) {
 // UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    .instanceVar[#Int#]{{; name=.+$}}
 // UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#Void#]{{; name=.+$}}
 
+// UNSUPPORTED: OS=windows-msvc

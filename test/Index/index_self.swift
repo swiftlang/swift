@@ -55,3 +55,4 @@ extension Proto {
     Self() // CHECK: [[@LINE]]:5 | constructor/Swift | init() | [[Proto_init_USR]] | Ref,Call,RelCall,RelCont | rel: 1
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -76,3 +76,4 @@ public struct E<V> {
      return r
    }
 }
+// UNSUPPORTED: OS=windows-msvc

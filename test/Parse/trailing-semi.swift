@@ -42,3 +42,4 @@ protocol P {
   func b ();
   static func c ();
 }
+// UNSUPPORTED: OS=windows-msvc

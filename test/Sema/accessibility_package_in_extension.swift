@@ -33,3 +33,4 @@ extension Proto {
     return first == second
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ extension String: CustomDebugStringConvertible {
 // RUN: %FileCheck %s --input-file %t/Extension@Swift.symbols.json
 
 // CHECK: This should be captured
+// UNSUPPORTED: OS=windows-msvc

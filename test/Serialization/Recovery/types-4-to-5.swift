@@ -95,3 +95,4 @@ public protocol Proto {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

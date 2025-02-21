@@ -131,3 +131,4 @@ func test010() {
 // ALL_UNDERSCORES: _quux
 // ALL_UNDERSCORES: _InternalStruct
 // ALL_UNDERSCORES: _internalTopLevelFunc()
+// UNSUPPORTED: OS=windows-msvc

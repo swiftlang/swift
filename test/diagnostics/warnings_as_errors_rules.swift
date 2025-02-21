@@ -43,3 +43,4 @@ foo()
 // CHECK-WAE-WW-GROUP: warning: 'bar()' is deprecated: renamed to 'bar2'
 // CHECK-WAE-WW-GROUP-NOT: error: 'bar()' is deprecated: renamed to 'bar2'
 bar()
+// UNSUPPORTED: OS=windows-msvc

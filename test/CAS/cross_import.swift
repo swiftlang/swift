@@ -96,3 +96,4 @@ func test () {
 version: 1
 modules:
   - name: _B_A
+// UNSUPPORTED: OS=windows-msvc

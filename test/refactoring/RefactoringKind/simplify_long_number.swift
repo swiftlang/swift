@@ -24,3 +24,4 @@ func foo() {
 
 // CHECK-NONE: Action begins
 // CHECK-NONE-NEXT: Action ends
+// UNSUPPORTED: OS=windows-msvc

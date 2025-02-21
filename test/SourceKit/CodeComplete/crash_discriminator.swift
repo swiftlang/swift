@@ -6,3 +6,4 @@ func foo(array: [Int]) {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

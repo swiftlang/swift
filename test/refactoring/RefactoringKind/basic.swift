@@ -510,3 +510,4 @@ extension TestAddEquatableStructConforming: Equatable {
 // CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED: Action begins
 // CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED-NOT: Add Equatable Conformance
 // CHECK-ADD-EQUATABLE-CONFORMANCE-NOT-INCLUDED: Action ends
+// UNSUPPORTED: OS=windows-msvc

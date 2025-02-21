@@ -19,3 +19,4 @@ func test(e: NSRuncingMode) -> Bool {
   // CHECK: witness_method $NSRuncingMode, #Equatable."=="
   return compareImportedEnumToSelf(e)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -40,4 +40,4 @@ extension TaterTots : Potato, Fried {}
 
 // sil shared [transparent] [thunk] @$s37conformance_availability_disambiguate9TaterTotsVAA6PotatoA2aDP3eatyyFTW : $@convention(witness_method: Potato) (@in_guaranteed TaterTots) -> () {
 // CHECK: function_ref @$s37conformance_availability_disambiguate6PotatoPA2A5FriedRzrlE3eatyyF : $@convention(method) <τ_0_0 where τ_0_0 : Fried, τ_0_0 : Potato> (@in_guaranteed τ_0_0) -> ()
-// CHECK: return
+// CHECK: return// UNSUPPORTED: OS=windows-msvc

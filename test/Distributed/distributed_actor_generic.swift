@@ -21,3 +21,4 @@ distributed actor GreeterX<A: Message> {
     return "\(value) \(bs)"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

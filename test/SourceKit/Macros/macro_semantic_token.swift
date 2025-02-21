@@ -29,3 +29,4 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 // PRIMARY_FILE: key.kind: source.lang.swift.ref.macro
 // There should be no other references
 // PRIMARY_FILE-NOT: key.kind
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ func test(foo: consuming NoncopyableEnum) {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

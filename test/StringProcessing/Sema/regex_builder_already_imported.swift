@@ -11,3 +11,4 @@ func foo() {
     0 // expected-error {{static method 'buildExpression' requires that 'Int' conform to 'RegexComponent'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

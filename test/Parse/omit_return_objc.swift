@@ -55,3 +55,4 @@ func ff_implicitClassMetatypeToAnyObjectExpr_ifdecl() -> AnyObject {
     SomeClass.self
     #endif
 }
+// UNSUPPORTED: OS=windows-msvc

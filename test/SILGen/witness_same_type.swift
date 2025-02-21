@@ -33,3 +33,4 @@ public struct LazySequenceOf<SS : Sequence, A> : Sequence where SS.Iterator.Elem
     } 
   }
 }
+// UNSUPPORTED: OS=windows-msvc

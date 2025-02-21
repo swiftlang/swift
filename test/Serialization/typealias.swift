@@ -57,3 +57,4 @@ let x: GG<Int> = 0
 let x2: GInt = 1
 
 public typealias TestUnbound = UnboundAlias
+// UNSUPPORTED: OS=windows-msvc

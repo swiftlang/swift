@@ -33,3 +33,4 @@
 // CHECK:   typealias Pointee = Int32
 // CHECK:   typealias Distance = Int32
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

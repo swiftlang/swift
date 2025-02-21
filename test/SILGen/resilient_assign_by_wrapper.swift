@@ -101,3 +101,4 @@ extension ObjectifiedSetter where T == SomeObject {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

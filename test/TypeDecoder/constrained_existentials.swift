@@ -57,3 +57,4 @@ do {
 //   blackHole_noncopyable(consume e0)
 //   blackHole_noncopyable(consume e1)
 }
+// UNSUPPORTED: OS=windows-msvc

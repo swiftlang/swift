@@ -23,3 +23,4 @@ extension A {
 func lldb_expr(a: A) {
   a.lldb_wrapped_expr()
 }
+// UNSUPPORTED: OS=windows-msvc

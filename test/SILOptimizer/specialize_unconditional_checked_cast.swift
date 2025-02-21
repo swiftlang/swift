@@ -393,3 +393,4 @@ public func callGenericDownCast(_ c: C?) -> D {
   return genericDownCast(c, D.self)
 }
 
+// UNSUPPORTED: OS=windows-msvc

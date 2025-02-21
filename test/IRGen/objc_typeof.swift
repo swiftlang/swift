@@ -34,3 +34,4 @@ public func typeOfUnknown(_ x: AnyObject) -> AnyObject.Type {
   // CHECK: ret ptr [[ISA]]
   return type(of: x)
 }
+// UNSUPPORTED: OS=windows-msvc

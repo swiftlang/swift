@@ -450,3 +450,4 @@ struct HasIntInit {
 func compare_solutions_with_bindings(x: UInt8, y: UInt8) -> HasIntInit {
   return .init(Int(x / numericCast(y)))
 }
+// UNSUPPORTED: OS=windows-msvc

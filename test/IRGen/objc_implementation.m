@@ -35,3 +35,4 @@ void implFunc(int param) {
 void implFuncCName(int param) {
   printf("implFuncCName");
 }
+// UNSUPPORTED: OS=windows-msvc

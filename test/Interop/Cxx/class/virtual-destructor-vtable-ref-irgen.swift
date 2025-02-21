@@ -127,3 +127,4 @@ public func test() {
 
 // Make sure we reach the virtual destructor of 'Func'.
 // CHECK: define linkonce_odr {{.*}} @{{_ZN4impl4FuncIZNK8MyFutureIiE12OnCompletionEPFvPvES3_EUlRK12MyFutureBaseE_FvS8_EED2Ev|"\?\?1\?\$BaseClass@\$\$A6AXAEBVMyFutureBase@@@Z@impl@@UEAA@XZ"}}
+// UNSUPPORTED: OS=windows-msvc

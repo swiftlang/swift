@@ -25,3 +25,4 @@ struct Outer<T : P> {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

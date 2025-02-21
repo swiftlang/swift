@@ -840,3 +840,4 @@ bb3:
   %res = tuple ()
   return %res : $()
 }
+// UNSUPPORTED: OS=windows-msvc

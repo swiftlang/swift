@@ -65,3 +65,4 @@ func test(value: MyObj) {
 // COMPLETE-NOT: name=addAttributes()
 }
 
+// UNSUPPORTED: OS=windows-msvc

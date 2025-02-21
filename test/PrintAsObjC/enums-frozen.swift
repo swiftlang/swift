@@ -21,3 +21,4 @@ import Foundation
   case no
   case fileNotFound
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -184,3 +184,4 @@ bb0(%0 : $((Float, Float), Float)):
   return %2 : $Float
 }
 // CHECK-LABEL: sil private [ossa] @function_with_tuple_extract_3TJpSpSr : $@convention(thin) (Float) -> ((Float, Float), Float) {
+// UNSUPPORTED: OS=windows-msvc

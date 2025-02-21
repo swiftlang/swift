@@ -11,3 +11,4 @@ public enum E {
   // CHECK-NEXT: "oneCase"
   case oneCase
 }
+// UNSUPPORTED: OS=windows-msvc

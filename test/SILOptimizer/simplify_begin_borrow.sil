@@ -480,3 +480,4 @@ bb1(%7 : @reborrow $@callee_guaranteed () -> ()):
   return %r
 }
 
+// UNSUPPORTED: OS=windows-msvc

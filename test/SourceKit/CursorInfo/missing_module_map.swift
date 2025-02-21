@@ -7,3 +7,4 @@ let x: String = "abc"
 // CHECK: source.lang.swift.ref.struct ()
 // CHECK: String
 // CHECK: s:SS
+// UNSUPPORTED: OS=windows-msvc

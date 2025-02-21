@@ -59,3 +59,4 @@ protocol FPExponentDigit: FP {
   associatedtype Nine:  FPExponentDigit
 }
 
+// UNSUPPORTED: OS=windows-msvc

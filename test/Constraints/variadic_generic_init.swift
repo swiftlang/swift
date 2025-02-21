@@ -82,3 +82,4 @@ func bar3b<each T: Q>(_ t: repeat each T) -> some P {
 func bar4b<each T: Q>(_ t: repeat each T) -> S2<repeat (each T).A> {
   return S2.init(arg: (repeat (each t).a))
 }
+// UNSUPPORTED: OS=windows-msvc

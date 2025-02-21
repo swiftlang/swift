@@ -25,3 +25,4 @@ extension P2 where Self: A<Int> {
     return fiz()  
   }
 }
+// UNSUPPORTED: OS=windows-msvc

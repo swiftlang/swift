@@ -47,3 +47,4 @@ defer {
 #if VAR
 x = 5
 #endif
+// UNSUPPORTED: OS=windows-msvc

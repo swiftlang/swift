@@ -9,3 +9,4 @@ public func test() {
   someFunc(5)
 }
 // CHECK: end sil function '$s1B4testyyF'
+// UNSUPPORTED: OS=windows-msvc

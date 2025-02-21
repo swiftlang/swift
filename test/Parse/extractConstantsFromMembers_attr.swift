@@ -4,3 +4,4 @@
 
 @extractConstantsFromMembers
 protocol MyProto {}
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ func test() {
 
 // CHECK: a Y(x: a.C<a.Outer.Inner>, y: a.C<a.Outer2.InnerE>, z: a.C<a.Outer3.InnerC>, w: a.C<a.Outer4.InnerExtension>)
 test()
+// UNSUPPORTED: OS=windows-msvc

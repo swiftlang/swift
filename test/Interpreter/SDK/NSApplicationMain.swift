@@ -5,3 +5,4 @@
 
 import AppKit
 NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)
+// UNSUPPORTED: OS=windows-msvc

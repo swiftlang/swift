@@ -106,3 +106,4 @@ extension PC {
     self = type(of: self).init(0)
   } */
 }
+// UNSUPPORTED: OS=windows-msvc

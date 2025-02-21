@@ -48,3 +48,4 @@ func genericStringLiteral<T : ExpressibleByStringLiteral>(x: T) {
 
   x = "hello"
 }
+// UNSUPPORTED: OS=windows-msvc

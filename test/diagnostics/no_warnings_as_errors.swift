@@ -10,3 +10,4 @@
 func b() {
   let c = 2
 }
+// UNSUPPORTED: OS=windows-msvc

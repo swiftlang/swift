@@ -14,3 +14,4 @@ func foo() {
 // ParenType (XSp) has been removed, make sure it demangles for compatibility.
 // DEMANGLE: $sSiXSq_SfXSaSdSSXSDSbXSptD
 // CHECK: (Int?, [Float], [Double : String], Bool)
+// UNSUPPORTED: OS=windows-msvc

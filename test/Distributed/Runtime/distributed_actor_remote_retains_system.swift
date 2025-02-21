@@ -157,3 +157,4 @@ func test_remote() async {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

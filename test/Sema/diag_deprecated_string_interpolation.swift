@@ -19,3 +19,4 @@ This is a multiline literal with a deprecated interpolation:
 \(deprecated: 42)
 """
 // expected-warning@-2:2 {{'appendInterpolation(deprecated:)' is deprecated [DeprecatedDeclaration]}}
+// UNSUPPORTED: OS=windows-msvc

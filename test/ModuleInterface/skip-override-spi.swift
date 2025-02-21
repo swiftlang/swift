@@ -13,3 +13,4 @@ public class HideyHole {
 public class StashyCache: HideyHole {
   // CHECK: public init()
 }
+// UNSUPPORTED: OS=windows-msvc

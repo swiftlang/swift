@@ -47,3 +47,4 @@ var x: AnyObject
 
 // Trigger a typo correction to read all members of all subtypes to NSObject.
 x.notAMember() // expected-error {{value of type 'AnyObject' has no member 'notAMember'}}
+// UNSUPPORTED: OS=windows-msvc

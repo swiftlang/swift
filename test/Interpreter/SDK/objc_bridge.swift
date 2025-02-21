@@ -57,3 +57,4 @@ autoreleasepool {
 
 // CHECK: DONE
 print("DONE")
+// UNSUPPORTED: OS=windows-msvc

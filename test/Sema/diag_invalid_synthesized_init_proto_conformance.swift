@@ -19,3 +19,4 @@ class D : B {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

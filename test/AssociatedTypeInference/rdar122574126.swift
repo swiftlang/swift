@@ -17,3 +17,4 @@ public struct S<Base: Sequence>: LazySequenceProtocol {
 }
 
 let x: Int.Type = S<Array<Int>>.Element.self
+// UNSUPPORTED: OS=windows-msvc

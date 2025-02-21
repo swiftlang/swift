@@ -46,3 +46,4 @@ public protocol ProtocolTypealias {
 
 // CHECK: public func dependentExistential<T>(value: (T) -> any main.P) where T : main.ProtocolTypealias
 public func dependentExistential<T: ProtocolTypealias>(value: (T) -> T.A) {}
+// UNSUPPORTED: OS=windows-msvc

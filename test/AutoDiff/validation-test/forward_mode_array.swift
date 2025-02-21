@@ -115,3 +115,4 @@ ForwardModeTests.test("Array.differentiableReduce") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

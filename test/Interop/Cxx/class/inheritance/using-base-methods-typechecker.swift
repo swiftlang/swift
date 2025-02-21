@@ -36,3 +36,4 @@ let _ = PrivUserPubl().omitUsingPubl() // expected-error {{'omitUsingPubl' is in
 let _ = PrivUserPubl().publUsingProt()
 let _ = PrivUserPubl().protUsingProt() // expected-error {{'protUsingProt' is inaccessible due to 'private' protection level}}
 let _ = PrivUserPubl().omitUsingProt() // expected-error {{'omitUsingProt' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

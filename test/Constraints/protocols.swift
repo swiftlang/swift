@@ -577,3 +577,4 @@ do {
 
   isFooableError(overloaded()) // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

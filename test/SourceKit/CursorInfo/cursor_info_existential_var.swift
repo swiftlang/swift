@@ -11,3 +11,4 @@ func foo(error: MyError) {
 // CHECK-NEXT: s:27cursor_info_existential_var7MyErrorP5myVarSSvp
 // CHECK-NEXT: source.lang.swift
 // CHECK-NEXT: String
+// UNSUPPORTED: OS=windows-msvc

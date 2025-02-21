@@ -115,3 +115,4 @@ infix operator *<*< : F, Proto
 
 // expected-error@+2 {{expected precedence group name after ':' in operator declaration}}
 postfix operator ++: // expected-error {{only infix operators may declare a precedence}} {{20-21=}}
+// UNSUPPORTED: OS=windows-msvc

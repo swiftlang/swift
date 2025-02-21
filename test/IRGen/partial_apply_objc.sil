@@ -259,3 +259,4 @@ entry(%c : $Gizmo):
 // CHECK-NOT: release
 // CHECK:   ret void
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

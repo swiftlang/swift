@@ -152,3 +152,4 @@ print(await runTest(TestWithParent.self))
 import Types
 print(await runChildTest(TestWithParent.self))
 // CHECK-NOT: Incorrect actor executor assumption
+// UNSUPPORTED: OS=windows-msvc

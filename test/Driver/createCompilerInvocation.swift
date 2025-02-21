@@ -40,3 +40,4 @@
 // NOOUTPUT_ARGS-DAG: -typecheck
 // NOOUTPUT_ARGS-DAG: -module-name
 // NOOUTPUT_ARGS: Frontend Arguments END
+// UNSUPPORTED: OS=windows-msvc

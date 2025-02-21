@@ -57,3 +57,4 @@ func castExpr(x: Any) {
     // CHECK: [[@LINE+1]]:15 | struct/Swift | S1 | [[S1_USR]] | Ref
     _ = x as? S1
 }
+// UNSUPPORTED: OS=windows-msvc

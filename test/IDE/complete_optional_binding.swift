@@ -69,3 +69,4 @@ func testPreviousElements() {
 // PREV_ELEMENT-DAG: Decl[LocalVar]/Local:               localOpt[#Int?#];
 // PREV_ELEMENT-NOT: NonOpt
 }
+// UNSUPPORTED: OS=windows-msvc

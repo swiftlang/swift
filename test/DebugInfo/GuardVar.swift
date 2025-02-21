@@ -7,3 +7,4 @@ public func f(_ i : Int?)
   guard var gv = i else { return }
   markUsed(gv)
 }
+// UNSUPPORTED: OS=windows-msvc

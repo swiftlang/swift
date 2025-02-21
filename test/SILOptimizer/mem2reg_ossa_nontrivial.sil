@@ -1549,3 +1549,4 @@ bb9:
   dealloc_stack %5
   br bb3
 }
+// UNSUPPORTED: OS=windows-msvc

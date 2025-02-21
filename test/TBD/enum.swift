@@ -68,3 +68,4 @@ public enum PublicEnumDefaultArgument {
 internal enum InternalEnumDefaultArgument {
   case first(_: Int = 123)
 }
+// UNSUPPORTED: OS=windows-msvc

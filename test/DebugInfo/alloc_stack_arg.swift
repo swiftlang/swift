@@ -8,3 +8,4 @@ public func snd<T, U>(_ t : (T, U)) -> U {
 // CHECK-NOT: !DILocalVariable(name: "t"
 // CHECK: !DILocalVariable(name: "t", arg: 1
 // CHECK-NOT: !DILocalVariable(name: "t"
+// UNSUPPORTED: OS=windows-msvc

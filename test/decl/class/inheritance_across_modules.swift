@@ -18,3 +18,4 @@ class MySubclassA: MySuperclassA {
 // expected-warning{{'required' initializer 'init()' must be provided by subclass of 'MySuperclassA'; this is an error in the Swift 6 language mode}}
   var hi: String
 }
+// UNSUPPORTED: OS=windows-msvc

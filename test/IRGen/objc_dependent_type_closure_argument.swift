@@ -11,3 +11,4 @@ public class SwiftClass<S: SwiftProtocol> {
     objcClass.bar(block: { _ in })
   }
 }
+// UNSUPPORTED: OS=windows-msvc

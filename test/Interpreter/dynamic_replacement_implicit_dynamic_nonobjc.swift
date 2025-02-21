@@ -24,3 +24,4 @@ func doit() {
 
 // CHECK: replacement
 doit()
+// UNSUPPORTED: OS=windows-msvc

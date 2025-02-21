@@ -10,3 +10,4 @@
 
 
 // CHECK: source.lang.swift.decl.class
+// UNSUPPORTED: OS=windows-msvc

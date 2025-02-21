@@ -16,3 +16,4 @@
 
 // BASE-NOT: "s:1A10SomeStructV1BE05InnerB0V06NestedB0V"
 // EXT-DAG: "s:1A10SomeStructV1BE05InnerB0V06NestedB0V"
+// UNSUPPORTED: OS=windows-msvc

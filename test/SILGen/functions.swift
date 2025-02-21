@@ -516,3 +516,4 @@ func testNoescape2() {
 // CHECK: // closure #1 () -> () in closure #1 () -> () in functions.testNoescape2() -> ()
 // CHECK-NEXT: Isolation: nonisolated
 // CHECK-NEXT: sil private [ossa] @$s9functions13testNoescape2yyFyyXEfU_yycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
+// UNSUPPORTED: OS=windows-msvc

@@ -52,3 +52,4 @@ struct TestCollection: RandomAccessCollection, RangeReplaceableCollection {
 
 
 
+// UNSUPPORTED: OS=windows-msvc

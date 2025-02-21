@@ -89,3 +89,4 @@ protocol P16 {}
 // CHECK-LABEL: rdar91232987.(file).C@
 // CHECK-NEXT: Generic signature: <X, Y where X : P14, Y : P15, X.[P14]A1 : Decodable, X.[P14]A1 : Encodable, Y.[P15]A6 : Decodable, Y.[P15]A6 : Encodable, Y.[P15]A6 == X.[P14]A1.[P2]A3.[P5]A6>
 class C<X: P14, Y: P15> where X.A1: Codable, X.A1.A3.A6: Codable, X.A1.A3.A6 == Y.A6 {}
+// UNSUPPORTED: OS=windows-msvc

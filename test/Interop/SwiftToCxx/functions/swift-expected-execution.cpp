@@ -130,3 +130,4 @@ int main() {
 // CHECK-NEXT: Test get T's Value
 // CHECK-NEXT: testIntValue has a value
 // CHECK-NEXT: testIntError doesn't have a value
+// UNSUPPORTED: OS=windows-msvc

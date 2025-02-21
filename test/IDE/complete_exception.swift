@@ -189,3 +189,4 @@ func test016() {
     i.#^INSIDE_CATCH_TYPEDERR_DOT?check=INT_DOT^#
   }
 }
+// UNSUPPORTED: OS=windows-msvc

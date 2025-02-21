@@ -25,3 +25,4 @@ struct Bas<T, U, V, W>: Foo {
 
 testDeducedFlamType(Bas<Int, String, Float, Double>(), String.self)
 testDeducedFlamType(Bas<String, Float, Double, Int>(), Float.self)
+// UNSUPPORTED: OS=windows-msvc

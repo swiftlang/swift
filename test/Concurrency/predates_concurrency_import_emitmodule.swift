@@ -29,3 +29,4 @@ func test(
   acceptSendable(oma)
   acceptSendable(ssc)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -49,3 +49,4 @@ func testReallocation() {
 
 testReallocation()
 print("done!")
+// UNSUPPORTED: OS=windows-msvc

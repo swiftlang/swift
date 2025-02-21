@@ -24,3 +24,4 @@ public var x: Int {
 // TSAN: attributes [[COROUTINE_ATTRS]] =
 // TSAN-SAME: sanitize_thread
 // TSAN-SAME: }
+// UNSUPPORTED: OS=windows-msvc

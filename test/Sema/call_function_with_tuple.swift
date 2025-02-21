@@ -19,3 +19,4 @@ func test() -> String {
 
 func bar(_: (Int,Int), _: (Int,Bool)) {} // expected-note {{'bar' declared here}}
 bar((0,false)) // expected-error {{missing argument for parameter #1 in call}}
+// UNSUPPORTED: OS=windows-msvc

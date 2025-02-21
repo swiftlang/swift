@@ -324,3 +324,4 @@ func makeContentsPairs<each First: Container, each Second: Container>(
 ) -> (repeat Pair<(each First).Contents, (each Second).Contents>) {
   return (repeat Pair((each first).contents, (each second).contents))
 }
+// UNSUPPORTED: OS=windows-msvc

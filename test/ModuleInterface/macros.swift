@@ -76,3 +76,4 @@ public struct TestStruct {
   // CHECK: var _foo
   // CHECK-NOT: var _foo
 }
+// UNSUPPORTED: OS=windows-msvc

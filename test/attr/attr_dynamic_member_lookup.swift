@@ -840,3 +840,4 @@ struct WithSendable {
     get { false }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

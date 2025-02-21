@@ -71,3 +71,4 @@ func foo() {
 // CHECK-DAG: key.description: "localSwiftFunc()"
 // CHECK: ]
 // CHECK: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

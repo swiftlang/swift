@@ -46,3 +46,4 @@ public struct B {
 
 // CHECK: SWIFT_INLINE_THUNK B A::returnsB() const {
 // CHECK: SWIFT_INLINE_THUNK A B::returnsA() const {
+// UNSUPPORTED: OS=windows-msvc

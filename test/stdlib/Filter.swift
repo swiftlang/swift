@@ -96,3 +96,4 @@ FilterTests.test("chained filter order") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

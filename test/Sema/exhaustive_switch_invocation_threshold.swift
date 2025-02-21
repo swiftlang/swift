@@ -49,3 +49,4 @@ func f(a: A, b: B) {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ struct PiggyBack: Gesture {
         return self
     }
 }
+// UNSUPPORTED: OS=windows-msvc

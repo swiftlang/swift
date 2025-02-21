@@ -8,3 +8,4 @@ import Swift
 
 var x = X()
 whatShouldIDo(x)
+// UNSUPPORTED: OS=windows-msvc

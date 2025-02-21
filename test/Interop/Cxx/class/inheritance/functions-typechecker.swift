@@ -20,3 +20,4 @@ Derived().sameMethodDifferentSignature()
 
 // FIXME: we should import this (https://github.com/apple/swift/issues/69745):
 Derived().rvalueThisInBase() // expected-error {{value of type 'Derived' has no member 'rvalueThisInBase'}}
+// UNSUPPORTED: OS=windows-msvc

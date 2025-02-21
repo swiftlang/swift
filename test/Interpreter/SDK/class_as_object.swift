@@ -24,3 +24,4 @@ print(NSObject.conforms(to: NSCopying.self))
 // CHECK-NEXT: false
 print(NSString.conforms(to: NSCopying.self))
 // CHECK-NEXT: true
+// UNSUPPORTED: OS=windows-msvc

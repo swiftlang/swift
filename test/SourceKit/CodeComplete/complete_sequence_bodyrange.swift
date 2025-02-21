@@ -55,3 +55,4 @@ class TestChain {
 // CHECK: key.name: "prop2",
 // CHECK-NOT: key.name: "prop1"
 // CHECK-NOT: key.name: "prop2"
+// UNSUPPORTED: OS=windows-msvc

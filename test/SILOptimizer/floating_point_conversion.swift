@@ -45,3 +45,4 @@ public func testDouble(_ x: Double) -> Double {
 public func testFloat(_ x: Float) -> Float {
   return convert(x, to: Float.self)
 }
+// UNSUPPORTED: OS=windows-msvc

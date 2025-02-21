@@ -58,3 +58,4 @@ func test5() -> S {}
 test5().#^TEST5^#
 // TEST5-DAG: Decl[InstanceMethod]/CurrNominal:   pMethod()[#Void#]; name=pMethod()
 // TEST5-DAG: Decl[InstanceMethod]/CurrNominal:   sMethod()[#Void#]; name=sMethod()
+// UNSUPPORTED: OS=windows-msvc

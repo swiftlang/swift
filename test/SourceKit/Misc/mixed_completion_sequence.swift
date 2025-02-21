@@ -39,3 +39,4 @@ func testing(obj: C) {
 // RUN:   -req=typecontextinfo -pos=32:33 %s -- %s -module-name MyModule == \
 // RUN:   -req=complete -pos=29:14 %s -- %s -module-name MyModule > %t.response
 // RUN: %diff -u %s.response %t.response
+// UNSUPPORTED: OS=windows-msvc

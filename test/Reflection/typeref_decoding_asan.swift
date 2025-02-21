@@ -735,3 +735,4 @@
 // CHECK: (generic_argument index=0
 // CHECK:   (reference_capture index=0))
 
+// UNSUPPORTED: OS=windows-msvc

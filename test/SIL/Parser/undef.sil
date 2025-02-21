@@ -359,3 +359,4 @@ bb2(%2 : $Error):
 bb3:
   return undef : $()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ public class Class: NSObject {
   @available(*, unavailable)
   @objc public func foo() {}
 }
+// UNSUPPORTED: OS=windows-msvc

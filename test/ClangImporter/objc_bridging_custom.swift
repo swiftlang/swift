@@ -232,3 +232,4 @@ func testExplicitConversion(objc: APPManufacturerInfo<NSString>,
   // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{17-19=as!}}
 
 }
+// UNSUPPORTED: OS=windows-msvc

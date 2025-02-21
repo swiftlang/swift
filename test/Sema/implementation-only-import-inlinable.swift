@@ -106,3 +106,4 @@ public func testExtensionSubscript_get(s: inout StructFromIndirect) {
 public func testExtensionSubscript_set(s: inout StructFromIndirect) {
   s[extensionSubscript: 0] = 5 // expected-error {{cannot be used in an '@inlinable' function because 'directs' was imported implementation-only}}
 }
+// UNSUPPORTED: OS=windows-msvc

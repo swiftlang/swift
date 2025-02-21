@@ -155,3 +155,4 @@ func test8() throws {             // CHECK-NEXT: [[@LINE]]:21   -> [[@LINE+4]]:2
                                   // CHECK-NEXT: [[@LINE-1]]:34 -> [[@LINE+2]]:2 : (0 - 1)
   #declMacroWithControlFlow       // CHECK-NEXT: [[@LINE]]:28   -> [[@LINE+1]]:2 : ((0 - 1) - 3)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ func flatMapOnCollectionOfStrings<
 >(xs: C, f: (C.Element) -> String?) {
   _ = xs.flatMap(f) // expected-warning {{'flatMap' is deprecated: Please use compactMap(_:) for the case where closure returns an optional value [DeprecatedDeclaration]}} expected-note {{compactMap}}
 }
+// UNSUPPORTED: OS=windows-msvc

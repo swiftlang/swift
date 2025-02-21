@@ -98,3 +98,4 @@ func foo() {
   do { if .random() {} }
   do { if .random() {} }
 }
+// UNSUPPORTED: OS=windows-msvc

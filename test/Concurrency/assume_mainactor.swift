@@ -217,3 +217,4 @@ actor MyActor2 {
   // NonIsolated and not if print was inferred to be main actor.
   print("123")
 }
+// UNSUPPORTED: OS=windows-msvc

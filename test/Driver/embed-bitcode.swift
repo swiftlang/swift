@@ -134,3 +134,4 @@
 // RUN: %target-swiftc_driver -embed-bitcode-marker -emit-assembly %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
 // WARN-EMBED-BITCODE-MARKER: warning: ignoring -embed-bitcode-marker since no object file is being generated
 // WARN-EMBED-BITCODE-MARKER-NOT: -embed-bitcode-marker
+// UNSUPPORTED: OS=windows-msvc

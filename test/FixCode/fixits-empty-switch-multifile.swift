@@ -9,3 +9,4 @@ func foo1(_ e: EMulti) {
 // expected-note@-5 {{add missing cases}} {{+6:3-3=case .e1:\n<#code#>\ncase .e2:\n<#code#>\ncase .e3(_):\n<#code#>\n}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

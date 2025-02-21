@@ -124,3 +124,4 @@ func poundEndIfSameLine(
   #else
   return 1#endif
 }                            // CHECK: [[@LINE]]{{[ ]*\|[ ]*[0-9]+}}
+// UNSUPPORTED: OS=windows-msvc

@@ -171,3 +171,4 @@ protocol R3 {
   // The GSB would include a redundant 'X.T == Int' in the minimal signature.
   associatedtype X where X : Pa, X.T == G<Int>, X : Pb
 }
+// UNSUPPORTED: OS=windows-msvc

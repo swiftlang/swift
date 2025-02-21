@@ -251,3 +251,4 @@ bb0(%0 : $EmptyClass, %1 : $Builtin.Word):
   return %l : $Int32
 }
 
+// UNSUPPORTED: OS=windows-msvc

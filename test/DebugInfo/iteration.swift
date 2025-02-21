@@ -35,3 +35,4 @@ count()
 //
 // DWARF-CHECK:  DW_TAG_variable
 // DWARF-CHECK:  DW_AT_name ("i")
+// UNSUPPORTED: OS=windows-msvc

@@ -57,3 +57,4 @@ sil @$generic_indices_equals : $@convention(keypath_accessor_equals) <T where T 
 bb0(%0 : $*(_: T), %1 : $*(_: T)):
   unreachable
 }
+// UNSUPPORTED: OS=windows-msvc

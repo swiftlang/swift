@@ -12,3 +12,4 @@
 // CHECK-EXEC: 3: link, {1, 2}, image
 // CHECK-EXEC: 4: generate-dSYM, {3}, dSYM
 
+// UNSUPPORTED: OS=windows-msvc

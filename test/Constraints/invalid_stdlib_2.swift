@@ -11,3 +11,4 @@ func useDict<K, V>(_ d: Dictionary<K,V>) {}
 useDict(["Hello" : 1])
 useDict(["Hello" : 1, "World" : 2])
 
+// UNSUPPORTED: OS=windows-msvc

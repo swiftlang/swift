@@ -10,3 +10,4 @@ func ModifyStruct(inDrill : Drill) -> Int32 {
   D.x += 3
   return D.x
 }
+// UNSUPPORTED: OS=windows-msvc

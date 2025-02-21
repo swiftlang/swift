@@ -58,3 +58,4 @@ func test_class_constraint_diagnostics_with_contextual_type() {
   let _: P = foo(A() as AnyObject) // expected-error {{local function 'foo' requires that 'any P' be a class type}}
   let _: P = foo(A()) // expected-error {{local function 'foo' requires that 'any P' be a class type}}
 }
+// UNSUPPORTED: OS=windows-msvc

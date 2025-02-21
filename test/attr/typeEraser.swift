@@ -176,3 +176,4 @@ public struct AnyE5_SPI: E5 {
 @_spi(SPI2) @_spi(SPI1)
 @_typeEraser(AnyE5_SPI) // same SPI groups, okay
 public protocol E5 {}
+// UNSUPPORTED: OS=windows-msvc

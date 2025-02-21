@@ -22,3 +22,4 @@ extension AnotherSendableStruct: @retroactive @unchecked Sendable {}
 // expected-warning@-1 {{conformance of 'AnotherSendableStruct' to protocol 'Sendable' was already stated in the type's module 'SendableConformances'}}
 
 typealias CheckAnotherSendableStruct = RequireSendable<AnotherSendableStruct>
+// UNSUPPORTED: OS=windows-msvc

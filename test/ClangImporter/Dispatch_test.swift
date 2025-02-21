@@ -37,3 +37,4 @@ func test_dispatch2(_ object: DispatchObject) {
   dispatch_release(object) // expected-error {{'dispatch_release' is unavailable in Swift}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

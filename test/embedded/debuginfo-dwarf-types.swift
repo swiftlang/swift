@@ -22,3 +22,4 @@ public func foo(_ t: MyType) {}
 // CHECK-G: !DIDerivedType(tag: DW_TAG_member, name: "y"
 
 // CHECK-GNONE-NOT: !DICompositeType(tag: DW_TAG_structure_type, name: "MyType"
+// UNSUPPORTED: OS=windows-msvc

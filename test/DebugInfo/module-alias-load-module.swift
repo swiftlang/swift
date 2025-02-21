@@ -14,3 +14,4 @@
 
 import Cat
 public func meow() -> Cat.Klass? { return nil }
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@ import A
 @_exported import C
 @_implementationOnly import D
 @_implementationOnly import E
+// UNSUPPORTED: OS=windows-msvc

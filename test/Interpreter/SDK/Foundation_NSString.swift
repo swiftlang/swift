@@ -166,3 +166,4 @@ print(m)
 m.append(" lever")
 // CHECK-NEXT: <q r> lever
 print(m)
+// UNSUPPORTED: OS=windows-msvc

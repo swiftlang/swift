@@ -35,3 +35,4 @@ public struct FA<T> {
   var ump: UnsafeMutablePointer<T>
 }
 
+// UNSUPPORTED: OS=windows-msvc

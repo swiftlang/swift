@@ -789,4 +789,4 @@ if a > 1 {
 if a > 1 {
 
 // This used to stack overflow because syntactic parsing was performed on a background queue with reduced stack size.
-// RUN: %sourcekitd-test -req=syntax-map %s -- %s
+// RUN: %sourcekitd-test -req=syntax-map %s -- %s// UNSUPPORTED: OS=windows-msvc

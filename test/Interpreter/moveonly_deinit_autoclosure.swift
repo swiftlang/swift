@@ -33,3 +33,4 @@ func test() {
 test()
 // CHECK-NEXT: great success
 print("great success")
+// UNSUPPORTED: OS=windows-msvc

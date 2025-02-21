@@ -33,3 +33,4 @@
 import Swifty
 
 usesCStruct(nil)
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ macro anonymousTypes(public: Bool, _: () -> String) = #externalMacro(module: "Ma
 // CHECK-IR-NOT: $s9MacroUser{{.*}}fMX{{.*}}_33{{.*}}14anonymousTypesfMf0_4namefMu_
 // CHECK-IR: $s9MacroUser{{.*}}fMX{{.*}}_33{{.*}}14anonymousTypesfMf_4namefMu_
 // CHECK-IR-NOT: $s9MacroUser{{.*}}fMX{{.*}}_33{{.*}}14anonymousTypesfMf0_4namefMu_
+// UNSUPPORTED: OS=windows-msvc

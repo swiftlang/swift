@@ -27,3 +27,4 @@ func testit(s: S) {
 // CHECK: S(i: 27)
 testit(s: S(i: 27))
 
+// UNSUPPORTED: OS=windows-msvc

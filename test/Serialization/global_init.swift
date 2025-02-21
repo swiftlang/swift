@@ -30,3 +30,4 @@ var MyVar = 3
 func getGlobals() -> Int {
   return MyVar + MyConst
 }
+// UNSUPPORTED: OS=windows-msvc

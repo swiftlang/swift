@@ -16,3 +16,4 @@ if #available(iOS 9.0, *) {}
 #sourceLocation(file: "here.swift", line:100)
 #sourceLocation()
 #endif
+// UNSUPPORTED: OS=windows-msvc

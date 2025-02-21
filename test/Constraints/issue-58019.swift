@@ -29,3 +29,4 @@ extension MyProto {
 struct SryMap<Output> : MyProto {
   typealias Failure = MyError
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@
 // RUN: env TMP=%t TMPDIR=%t %target-swift-frontend %s -I %t/xyz -g -emit-ir -debug-info-store-invocation -o - | %FileCheck --check-prefix CHECK-TEMP %s
 // CHECK-TEMP: !DICompileUnit({{.*}} flags: "{{.*}} -I {{(\\22)?}}<temporary-file>
 
+// UNSUPPORTED: OS=windows-msvc

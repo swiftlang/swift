@@ -8,3 +8,4 @@
 @MyBuilder func test(action: () -> #^COMPLETE^#Void) {}
 
 // COMPLETE: Decl[TypeAlias]/OtherModule[Swift]/IsSystem: Void[#Void#]; name=Void
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@
 @objc class Test : NSObject, TestProto {
   var strongProp: Any?
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -218,3 +218,4 @@ internal import LibV
 // CHECK-7-MUL-PRV: public import LibX
 // CHECK-7-MUL-PRV: @_exported public import LibY
 // CHECK-7-MUL-PRV: public import PublicLib
+// UNSUPPORTED: OS=windows-msvc

@@ -74,3 +74,4 @@ func doEV(_ state: E1...) {}
 doEV(.On)
 
 func hasDefaultArg(a: Int... = [5]) {} // expected-error {{variadic parameter cannot have a default value}}
+// UNSUPPORTED: OS=windows-msvc

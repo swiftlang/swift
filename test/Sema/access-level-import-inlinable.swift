@@ -274,3 +274,4 @@ public struct GenericType<T, U> {}
   internal static var staticProp: InternalImportType?
   private var computed: PrivateImportType? { return nil }
 }
+// UNSUPPORTED: OS=windows-msvc

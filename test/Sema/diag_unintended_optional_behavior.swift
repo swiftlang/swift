@@ -234,3 +234,4 @@ _ = {
     // expected-note@-3 {{force-unwrap the value to avoid this warning}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

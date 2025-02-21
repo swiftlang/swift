@@ -27,3 +27,4 @@ public func f(x: String?) throws {
     return
   }
 }
+// UNSUPPORTED: OS=windows-msvc

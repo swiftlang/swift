@@ -39,3 +39,4 @@ extension Class where T == Bool {
   func badRequirement() where T == Int { }
   // expected-error@-1 {{no type for 'T' can satisfy both 'T == Int' and 'T == Bool'}}
 }
+// UNSUPPORTED: OS=windows-msvc

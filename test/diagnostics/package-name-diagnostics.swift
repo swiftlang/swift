@@ -45,3 +45,4 @@
 // RUN: %target-swift-frontend %s -typecheck -verify -package-name "a\nde-f.g ~!@#$%^&<>?/|:"
 
 package func log() {}
+// UNSUPPORTED: OS=windows-msvc

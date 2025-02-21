@@ -10,3 +10,4 @@ class Outer2: Outer2.Inner {
 // CHECK-NEXT:         `--InheritedDeclsReferencedRequest({{.*}})
 // CHECK-NEXT:             `--QualifiedLookupRequest({{.*}})
 // CHECK-NEXT:                 `--[0;32mSuperclassDeclRequest({{.*}})[0;31m (cyclic dependency)[0m
+// UNSUPPORTED: OS=windows-msvc

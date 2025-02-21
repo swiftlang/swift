@@ -64,3 +64,4 @@ public enum EnumWithAssociatedValues {
   @available(macOS 51, *)
   case introducedAtDeploymentWithAssoc(Int)
 }
+// UNSUPPORTED: OS=windows-msvc

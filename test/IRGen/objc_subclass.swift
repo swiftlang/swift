@@ -324,3 +324,4 @@ class SwiftGizmo2 : Gizmo {
   deinit { }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -316,3 +316,4 @@ var a2 : protocol<P1>= 17
 class TestOptionalMethodFixit {
   optional func test() {}
 }
+// UNSUPPORTED: OS=windows-msvc

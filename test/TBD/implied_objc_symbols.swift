@@ -33,3 +33,4 @@ public struct Empty {}
 // A generic one does not, however the obj-c metaclass should still be exported.
 public class NotCAPI<T> : AnotherCAPI {}
 public class NotCAPIBase : NotCAPI<Empty> {}
+// UNSUPPORTED: OS=windows-msvc

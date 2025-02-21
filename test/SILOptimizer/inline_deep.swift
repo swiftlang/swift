@@ -23,3 +23,4 @@ public func top() -> Int32 {
   return S().l9(709)
   // CHECK: return [[STRUCT]]
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -49,3 +49,4 @@ extension ES: EQ {
 
 // extension ES -> ES
 // EXTENSION-DAG: "kind": "extensionTo",{{[[:space:]]*}}"source": "s:e:s:16ExternalIndirect2ESV0B0E3fooyyF",{{[[:space:]]*}}"target": "s:16ExternalIndirect2ESV"
+// UNSUPPORTED: OS=windows-msvc

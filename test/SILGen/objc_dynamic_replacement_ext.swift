@@ -87,3 +87,4 @@ extension Generic {
 extension MyGeneric {
     @_dynamicReplacement(for: doIt()) func __replacement__doIt() {}
 }
+// UNSUPPORTED: OS=windows-msvc

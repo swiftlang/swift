@@ -57,4 +57,4 @@ class COther : POther {}
 
 // CHECK-LABEL: .foo7@
 // CHECK-NEXT: Generic signature: <T where T : POther>
-func foo7<T>(_: T) where T : COther, T : POther {}
+func foo7<T>(_: T) where T : COther, T : POther {}// UNSUPPORTED: OS=windows-msvc

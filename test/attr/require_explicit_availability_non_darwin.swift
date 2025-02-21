@@ -20,3 +20,4 @@ public func noAvailabilityFunc() { }
 
 @available(SwiftStdlib 5.9, *)
 public func stdlib5_9AvailabilityFunc() { }
+// UNSUPPORTED: OS=windows-msvc

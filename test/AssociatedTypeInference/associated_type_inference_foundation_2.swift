@@ -42,3 +42,4 @@ extension CustomCollection: ContiguousBytes where Element == UInt8 { }
 extension CustomCollection: DataProtocol where Element == UInt8 {
     public var regions: CollectionOfOne<CustomCollection<UInt8>> { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

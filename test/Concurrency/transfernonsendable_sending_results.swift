@@ -315,3 +315,4 @@ extension MyActor {
     return value
   }
 }
+// UNSUPPORTED: OS=windows-msvc

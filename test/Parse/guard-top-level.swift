@@ -7,3 +7,4 @@ guard let b = a else {
 func foo() {} // to interrupt the TopLevelCodeDecl
 
 let c = b
+// UNSUPPORTED: OS=windows-msvc

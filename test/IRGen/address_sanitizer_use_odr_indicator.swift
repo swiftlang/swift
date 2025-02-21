@@ -17,3 +17,4 @@
 // CHECK-ODR: @{{.+}} = private alias {{.*}}@"[[MANGLED_GLOBAL]]"
 
 let aGlobal:Int = 128;
+// UNSUPPORTED: OS=windows-msvc

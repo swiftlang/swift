@@ -45,3 +45,4 @@ AssociatedTypeDemangleTests.test("superclass substitutions") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

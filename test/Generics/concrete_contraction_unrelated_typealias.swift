@@ -65,3 +65,4 @@ protocol DelegateProxyType {
   associatedtype Parent : AnyObject
   associatedtype Delegate
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -51,3 +51,4 @@ incompleteTypeConsumer2.propertyUsingAForwardDeclaredProtocol2 = incompleteProto
 
 CFunctionTakingAForwardDeclaredProtocol1(incompleteProtocol2)
 CFunctionTakingAForwardDeclaredProtocol2(incompleteProtocol1)
+// UNSUPPORTED: OS=windows-msvc

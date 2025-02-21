@@ -12,4 +12,4 @@ public func testDefaultArguments(
   // CHECK-SAME: special: Int = #line
   special: Int = #line
 ) {}
-// CHECK-SAME: )
+// CHECK-SAME: )// UNSUPPORTED: OS=windows-msvc

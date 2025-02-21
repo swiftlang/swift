@@ -29,3 +29,4 @@ import Lib
 
 showsUpInBothPlaces()
 onlyInTheCompiledModule()
+// UNSUPPORTED: OS=windows-msvc

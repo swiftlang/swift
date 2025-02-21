@@ -504,3 +504,4 @@ func archetypeDowncasts<S,
   // CHECK:      return
   // CHECK-NEXT: }
 }
+// UNSUPPORTED: OS=windows-msvc

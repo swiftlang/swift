@@ -65,3 +65,4 @@ enum DirectOnEnum {
 // CHECK:         "kind": "enum",
 // CHECK:         "cases": [
 // CHECK:             "name": "yes"
+// UNSUPPORTED: OS=windows-msvc

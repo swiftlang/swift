@@ -63,3 +63,4 @@ func bv_borrow_var(p: UnsafeRawPointer, i: Int) {
 func bv_pointer_convert(p: UnsafePointer<Int>) -> BV {
   BV(p, 0)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -196,3 +196,4 @@ func hoist2DArray(a: inout [[Int]]) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -56,3 +56,4 @@
 // TOOLCHAIN-RPATH: bin/ld{{"? }}
 // TOOLCHAIN-RPATH-SAME: -rpath garbage/[[PLATFORM]]{{ }}
 // TOOLCHAIN-RPATH-SAME: -o {{[^ ]+}}
+// UNSUPPORTED: OS=windows-msvc

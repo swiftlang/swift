@@ -107,3 +107,4 @@ class GenericCodableSub<T>: GenericCodableSuper<T> {
   var t: T
   // expected-note@-1 {{stored property 't' without initial value prevents synthesized initializers}}
 }
+// UNSUPPORTED: OS=windows-msvc

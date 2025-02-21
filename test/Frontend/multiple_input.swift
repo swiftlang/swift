@@ -4,3 +4,4 @@
 // RUN: not %target-swift-frontend -typecheck -parse-as-library %S/Inputs/multiple_input/main.swift %S/Inputs/multiple_input/lib.swift %s 2>&1 | %FileCheck %s
 // CHECK: main.swift:
 // CHECK: expressions are not allowed at the top level
+// UNSUPPORTED: OS=windows-msvc

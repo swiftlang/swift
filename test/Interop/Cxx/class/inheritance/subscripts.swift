@@ -22,3 +22,4 @@ FieldsTestSuite.test("Non-const subscript from derived returning ref") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

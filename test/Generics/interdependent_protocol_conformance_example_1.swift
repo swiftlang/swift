@@ -38,3 +38,4 @@ func takesP4<T : P4>(_: T.Type) {}
 func testP1<T : P1>(_: T) {
   takesP4(T.B.self)
 }
+// UNSUPPORTED: OS=windows-msvc

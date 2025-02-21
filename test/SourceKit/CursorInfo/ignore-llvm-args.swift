@@ -4,3 +4,4 @@ _ = ""
 // RUN: %sourcekitd-test -req=cursor -offset=0 %s -- -Xllvm -aarch64-use-tbi %s | %FileCheck %s
 
 // CHECK: <empty cursor info; internal diagnostic: "Resolved to incomplete expression or statement.">
+// UNSUPPORTED: OS=windows-msvc

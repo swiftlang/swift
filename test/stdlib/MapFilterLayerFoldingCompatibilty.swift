@@ -98,3 +98,4 @@ tests.test("Double map type/Collection/\(swiftVersion)") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

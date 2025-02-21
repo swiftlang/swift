@@ -95,3 +95,4 @@ bb0(%0 : @owned $C?):
 // armv7k-NEXT: [[T3:%.*]] = ptrtoint ptr [[T2]] to i32
 // armv7k-NEXT: ret i32 [[T3]]
 
+// UNSUPPORTED: OS=windows-msvc

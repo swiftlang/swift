@@ -68,3 +68,4 @@ public func bar(t: T2) -> MyClass<T2> {
 // CHECK-IR-DAG: define {{.*}}void @"$e4main7MyClassCfDAA2T2V_Tg5"(ptr swiftself %0)
 // CHECK-IR-DAG: define {{.*}}ptr @"$e4main3foo1tAA7MyClassCyAA2T1VGAG_tF"()
 // CHECK-IR-DAG: define {{.*}}ptr @"$e4main3bar1tAA7MyClassCyAA2T2VGAG_tF"(i1 %0)
+// UNSUPPORTED: OS=windows-msvc

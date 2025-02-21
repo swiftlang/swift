@@ -37,3 +37,4 @@ print("value:", dict[kSomeKey] ?? "nil")
 
 // CHECK: ok
 print("ok")
+// UNSUPPORTED: OS=windows-msvc

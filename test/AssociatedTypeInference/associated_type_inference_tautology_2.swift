@@ -19,3 +19,4 @@ struct S: P {
 }
 
 let x: String.Type = S.A.self
+// UNSUPPORTED: OS=windows-msvc

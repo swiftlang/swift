@@ -14,3 +14,4 @@ verifyIsSigned(LL_TO_ULL)
 verifyIsUnsigned(LL_TO_ULL)
 #endif
 
+// UNSUPPORTED: OS=windows-msvc

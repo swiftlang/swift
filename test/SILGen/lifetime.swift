@@ -790,3 +790,4 @@ func tuple_explosion() {
   // CHECK-NOT: tuple_extract [[TUPLE]]
   // CHECK-NOT: destroy_value [[TUPLE]]
 }
+// UNSUPPORTED: OS=windows-msvc

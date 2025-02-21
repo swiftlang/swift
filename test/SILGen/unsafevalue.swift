@@ -135,3 +135,4 @@ public struct UnsafeValue<Element: AnyObject> {
   @inlinable
   public var strongRef: Element { _value }
 }
+// UNSUPPORTED: OS=windows-msvc

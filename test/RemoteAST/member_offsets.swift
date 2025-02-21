@@ -82,4 +82,4 @@ printTypeMemberOffset(B<Float>.self, "e")
 printTypeMemberOffset(B<Float>.self, "f")
 // CHECK-NEXT: type has no member named 'f'
 
-stopRemoteAST()
+stopRemoteAST()// UNSUPPORTED: OS=windows-msvc

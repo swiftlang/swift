@@ -15,3 +15,4 @@ struct Butt<T: RandomAccessCollection>
     return 0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

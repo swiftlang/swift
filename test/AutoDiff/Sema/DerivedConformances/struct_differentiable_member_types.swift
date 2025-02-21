@@ -18,3 +18,4 @@ struct Struct: Differentiable {
 
 extension Struct.TangentVector: Protocol {}
 // expected-error@-1 {{non-nominal type 'Struct.TangentVector' cannot be extended}}
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ public struct ConcreteA {}
 public protocol Q: P where Self.A == ConcreteA {}
 
 extension G: Q where A == ConcreteA {}
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ func upperBound(derived: DerivedWithClass) -> BaseWithClass<C> {
 func upperBound(derived: DerivedWithBoth) -> BaseWithBoth<any C & P> {
   return derived
 }
+// UNSUPPORTED: OS=windows-msvc

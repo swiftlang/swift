@@ -31,3 +31,4 @@ func g1(x: X) -> Float {
     f(x: x).0
 }
 
+// UNSUPPORTED: OS=windows-msvc

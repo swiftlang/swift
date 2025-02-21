@@ -3,3 +3,4 @@
 // https://github.com/apple/swift/issues/47534
 
 // Intentionally empty.
+// UNSUPPORTED: OS=windows-msvc

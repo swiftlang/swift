@@ -173,3 +173,4 @@ bb0(%0 : $Optional<CP>):
   %2 = unchecked_ref_cast %0 : $Optional<CP> to $Optional<AnyObject>
   return %2 : $Optional<AnyObject>
 }
+// UNSUPPORTED: OS=windows-msvc

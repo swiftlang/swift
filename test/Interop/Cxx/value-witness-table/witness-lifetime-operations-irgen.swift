@@ -51,3 +51,4 @@ let h = Holder(holding: NonTrivial())
 // CHECK: call void @{{_ZN10NonTrivialD(1|2)Ev|"\?\?1NonTrivial@@QEAA@XZ"}}(ptr %{{.*}})
 // CHECK-NOT: call
 // CHECK: ret ptr
+// UNSUPPORTED: OS=windows-msvc

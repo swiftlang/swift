@@ -38,3 +38,4 @@ public struct Struct {
 
 // CHECK_INCLUDE_SPI: Func foo() has been removed
 // CHECK_EXCLUDE_SPI-NOT: foo()
+// UNSUPPORTED: OS=windows-msvc

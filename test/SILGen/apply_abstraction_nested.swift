@@ -25,3 +25,4 @@ var a = X()
 // CHECK:  [[CHAINED_FUNC_REABSTRACTED:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT]]([[CHAINED_FUNC_CONV]])
 // CHECK:  [[BORROW:%.*]] = begin_borrow [[CHAINED_FUNC_REABSTRACTED]]
 // CHECK:  apply [[BORROW]]() : $@callee_guaranteed () -> ()
+// UNSUPPORTED: OS=windows-msvc

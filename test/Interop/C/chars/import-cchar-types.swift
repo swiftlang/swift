@@ -5,3 +5,4 @@
 // CHECK: var a_wchar: wchar_t
 
 // CHECK-CXX: var small_char: UInt8
+// UNSUPPORTED: OS=windows-msvc

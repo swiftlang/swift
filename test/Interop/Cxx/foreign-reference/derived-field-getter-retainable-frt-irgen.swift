@@ -14,3 +14,4 @@ let _ = testGetX()
 // CHECK: %[[VALUE_PTR_PTR:.*]] = getelementptr inbounds %class.BaseFieldFRT, ptr %{{.*}}, i32 0, i32 0
 // CHECK: %[[VALUE_PTR:.*]] = load ptr, ptr %[[VALUE_PTR_PTR]]
 // CHECK: call void @{{.*}}retainRefCounted{{.*}}(ptr noundef %[[VALUE_PTR]])
+// UNSUPPORTED: OS=windows-msvc

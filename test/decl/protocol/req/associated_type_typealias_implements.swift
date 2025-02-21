@@ -70,3 +70,4 @@ func testImplements() {
   _ = RequireSame<A1_T<BothA1_and_A2>, Int>(same: true)
   _ = RequireSame<A2_T<BothA1_and_A2>, String>(same: true)
 }
+// UNSUPPORTED: OS=windows-msvc

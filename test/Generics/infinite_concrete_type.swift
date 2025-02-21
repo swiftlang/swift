@@ -19,3 +19,4 @@ func useP2<T : P2>(_: T) {
   _ = T.A.self
   _ = T.B.self
 }
+// UNSUPPORTED: OS=windows-msvc

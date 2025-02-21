@@ -55,3 +55,4 @@ func someFunc() {
   publicLog(1)
   packageLog(2)
 }
+// UNSUPPORTED: OS=windows-msvc

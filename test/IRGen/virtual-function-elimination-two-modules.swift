@@ -77,3 +77,4 @@ func main() -> Int32 {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

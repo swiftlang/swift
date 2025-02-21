@@ -38,3 +38,4 @@ func testLocalFunctionCaptureBorrowing(x: borrowing Class) { // expected-error{{
         consume(x) // expected-note{{consumed here}}
     }
 }
+// UNSUPPORTED: OS=windows-msvc

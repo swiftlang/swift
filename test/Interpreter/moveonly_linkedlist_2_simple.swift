@@ -116,3 +116,4 @@ struct MyLittlePointer<Pointee : ~Copyable> : Copyable {
     return Builtin.take(_rawValue)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

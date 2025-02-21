@@ -21,3 +21,4 @@ public class C {}
 // CHECK: public class C {
 // CHECK: deinit
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

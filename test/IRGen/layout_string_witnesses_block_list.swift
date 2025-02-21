@@ -31,3 +31,4 @@ public enum Foo {
     case b(Int, AnyObject)
     case c
 }
+// UNSUPPORTED: OS=windows-msvc

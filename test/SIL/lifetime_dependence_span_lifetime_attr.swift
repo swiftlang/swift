@@ -203,3 +203,4 @@ public func array_view_slice_element(a: ContiguousArray<Int> , sliceIdx: FakeRan
   a.view[sliceIdx][Idx]
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -69,3 +69,4 @@
 // PREBUILTMODULE-NOT: Module.swiftmodule
 
 import Module2
+// UNSUPPORTED: OS=windows-msvc

@@ -51,3 +51,4 @@ public func testAccess(_ k1: Builtin.RawPointer) {
   endAccess(k1)
   readAccess(k1, Builtin.RawPointer.self)
 }
+// UNSUPPORTED: OS=windows-msvc

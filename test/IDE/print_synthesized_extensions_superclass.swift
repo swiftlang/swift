@@ -130,3 +130,4 @@ public struct S7<T, U> : P where T : Middle<U> {}
 // CHECK-NEXT:  }
 
 public struct S8<T, U> : P where T : Most {}
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ struct SomeTy {
 //--- use.swift
 import m
 func use(s: SomeTy) {}
+// UNSUPPORTED: OS=windows-msvc

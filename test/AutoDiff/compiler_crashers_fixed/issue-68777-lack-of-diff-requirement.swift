@@ -28,3 +28,4 @@ import _Differentiation;
 
 public struct D<T>: Differentiable {}
 extension D {@differentiable(reverse, wrt: self) mutating func m(r: @differentiable(reverse) (T?) -> T?) {}}
+// UNSUPPORTED: OS=windows-msvc

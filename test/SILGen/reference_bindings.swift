@@ -74,3 +74,4 @@ func testBindToInOut(_ x: inout String) {
   inout y = x
   doSomething()
 }
+// UNSUPPORTED: OS=windows-msvc

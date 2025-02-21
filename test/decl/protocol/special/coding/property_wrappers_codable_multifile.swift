@@ -3,3 +3,4 @@
 func test(_ value: Foo = Foo()) {
   let _: Codable = value
 }
+// UNSUPPORTED: OS=windows-msvc

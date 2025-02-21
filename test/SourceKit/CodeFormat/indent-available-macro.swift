@@ -7,3 +7,4 @@ UIView()
 // RUN: %FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "    UIView()"
+// UNSUPPORTED: OS=windows-msvc

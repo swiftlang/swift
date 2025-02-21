@@ -33,3 +33,4 @@ tests.test("Double reverse type/Collection/\(swiftVersion)") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

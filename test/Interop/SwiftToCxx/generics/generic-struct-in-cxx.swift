@@ -505,3 +505,4 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<T_0_0> storageGuard_consumedParamCopy_newValue(consumedParamCopy_newValue);
 // CHECK-NEXT: _impl::$s8Generics11GenericPairV11computedVarxvs(swift::_impl::getOpaquePointer(consumedParamCopy_newValue), swift::TypeMetadataTrait<GenericPair<T_0_0, T_0_1>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

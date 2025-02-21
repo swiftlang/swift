@@ -128,3 +128,4 @@ doit()
 //        CHECK-apple:   [[COMPLETE_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response [[RESPONSE]], [[INT]] 0, 1
 //        CHECK-apple:   ret %swift.metadata_response [[COMPLETE_RESPONSE]]
 //              CHECK: }
+// UNSUPPORTED: OS=windows-msvc

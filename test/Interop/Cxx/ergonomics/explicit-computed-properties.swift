@@ -24,3 +24,4 @@ struct Record {
 // CHECK:   var x: Int32 { mutating get }
 // CHECK:   mutating func getX() -> Int32
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

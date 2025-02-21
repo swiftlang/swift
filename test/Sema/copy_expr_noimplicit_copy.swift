@@ -11,3 +11,4 @@ func testNoImplicitCopyWorks() {
   let _ = copy x
   consumeKlass(x)
 }
+// UNSUPPORTED: OS=windows-msvc

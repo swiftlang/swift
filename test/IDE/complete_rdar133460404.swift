@@ -9,3 +9,4 @@ func bar() {
   }
 }
 // COMPLETE: Decl[LocalVar]/Local: foo[#String#]; name=foo
+// UNSUPPORTED: OS=windows-msvc

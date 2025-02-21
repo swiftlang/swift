@@ -33,3 +33,4 @@ func useClassExistential() {
   g?.baseProp = 1
   // CHECK: ret void
 }
+// UNSUPPORTED: OS=windows-msvc

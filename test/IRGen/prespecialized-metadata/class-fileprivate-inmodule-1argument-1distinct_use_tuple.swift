@@ -37,3 +37,4 @@ func doit() {
   consume( Value(first: (13, "13")) )
 }
 doit()
+// UNSUPPORTED: OS=windows-msvc

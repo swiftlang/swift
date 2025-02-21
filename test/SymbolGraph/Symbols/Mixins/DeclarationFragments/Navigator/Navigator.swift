@@ -91,3 +91,4 @@ public struct MyStruct<S> { public var x: S
 // BAR-NEXT:            "spelling": ")"
 // BAR-NEXT:          }
 // BAR-NEXT:      ]
+// UNSUPPORTED: OS=windows-msvc

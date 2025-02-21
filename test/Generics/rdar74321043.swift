@@ -391,3 +391,4 @@ protocol P90: Codable {
 protocol P91: P86, P23 {
 }
 
+// UNSUPPORTED: OS=windows-msvc

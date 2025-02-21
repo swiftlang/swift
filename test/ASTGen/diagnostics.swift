@@ -28,3 +28,4 @@ func dummy() {}
 
 @_silgen_name("whatever", extra)  // expected-error@:27 {{unexpected arguments in '_silgen_name' attribute}}
 func _whatever()
+// UNSUPPORTED: OS=windows-msvc

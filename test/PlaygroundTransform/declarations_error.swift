@@ -7,3 +7,4 @@
 import Nonexistent_Module
 // CHECK-NOT: error
 import Another_Nonexistent_Module
+// UNSUPPORTED: OS=windows-msvc

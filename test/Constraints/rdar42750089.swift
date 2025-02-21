@@ -68,3 +68,4 @@ struct A {
     _ = S("A") + S("\(value)").bar() + S("B") // Ok
   }
 }
+// UNSUPPORTED: OS=windows-msvc

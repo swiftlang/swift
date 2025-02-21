@@ -49,3 +49,4 @@ public class Base {
   }
 }
 public class Derived: Base {}
+// UNSUPPORTED: OS=windows-msvc

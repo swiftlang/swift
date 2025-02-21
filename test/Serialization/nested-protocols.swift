@@ -12,3 +12,4 @@ public func usesNested(_ x: some Outer.Inner) {}
 // CHECK-NEXT: Isolation: unspecified
 // CHECK-NEXT: sil @$s4main21usesNestedInExtensionyyx20nestedprotocolsource5OuterV05InnerdE0RzlF :
 public func usesNestedInExtension(_ x: some Outer.InnerInExtension) {}
+// UNSUPPORTED: OS=windows-msvc

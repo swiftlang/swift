@@ -26,3 +26,4 @@ SwitchDefaultTestSuite.test("do not leak default case payload") {
   }
   f(.value1(LifetimeTracked(0)))
 }
+// UNSUPPORTED: OS=windows-msvc

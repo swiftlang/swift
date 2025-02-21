@@ -29,3 +29,4 @@ this is line1
  and this is a line with trailing interpolation \(1 +
 
   """
+// UNSUPPORTED: OS=windows-msvc

@@ -54,3 +54,4 @@ func testBigArrays2d(_ maxSize: UnsafeMutablePointer<IntTuple4096>?, _ maxSizePl
 
 public func testFieldWithSwiftName(o : Rdar86069786) {
 }
+// UNSUPPORTED: OS=windows-msvc

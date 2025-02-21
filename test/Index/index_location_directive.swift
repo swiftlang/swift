@@ -8,3 +8,4 @@
 func testFunc() {}
 // CHECK: [[@LINE-1]]:6 | function/Swift | testFunc() | s:14swift_ide_test0C4FuncyyF | Def | rel: 0
 #sourceLocation()
+// UNSUPPORTED: OS=windows-msvc

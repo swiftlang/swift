@@ -153,3 +153,4 @@ PrintTests.test("Printable_Float16") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

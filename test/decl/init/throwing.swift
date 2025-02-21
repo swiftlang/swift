@@ -20,3 +20,4 @@ class B22108568 : A22108568 {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

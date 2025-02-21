@@ -209,3 +209,4 @@ func pack_test1<each T>(args: repeat each T) {
 func pack_test2<each T>(args: repeat each T, i: Int, s: String) {
   receive_simple(i, repeat each args, s)
 }
+// UNSUPPORTED: OS=windows-msvc

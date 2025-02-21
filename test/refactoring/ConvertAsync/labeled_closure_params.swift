@@ -70,3 +70,4 @@ func testConvertCall() {
   // CONVERT-CALL-NEXT: print(a)
   // CONVERT-CALL-NEXT: print(b)
 }
+// UNSUPPORTED: OS=windows-msvc

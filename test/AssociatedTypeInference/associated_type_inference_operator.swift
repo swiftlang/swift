@@ -10,3 +10,4 @@ protocol P1 {
 class C1<A>: P1 {
   static func =*= (x: C1, y: Box<A>) {}
 }
+// UNSUPPORTED: OS=windows-msvc

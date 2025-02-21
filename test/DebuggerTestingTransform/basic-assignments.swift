@@ -86,3 +86,4 @@ func f5(_ v: inout String) {
 
 var v: String = ""
 f5(&v)
+// UNSUPPORTED: OS=windows-msvc

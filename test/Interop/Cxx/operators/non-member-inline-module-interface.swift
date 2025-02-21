@@ -19,3 +19,4 @@
 
 // CHECK:      func && (lhs: LoadableBoolWrapper, rhs: LoadableBoolWrapper) -> LoadableBoolWrapper
 // CHECK-NEXT: func || (lhs: LoadableBoolWrapper, rhs: LoadableBoolWrapper) -> LoadableBoolWrapper
+// UNSUPPORTED: OS=windows-msvc

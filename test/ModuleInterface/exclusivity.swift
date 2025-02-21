@@ -41,3 +41,4 @@ public class Class {
   @exclusivity(unchecked)
   public static var uncheckedStaticVar: Int = 27
 }
+// UNSUPPORTED: OS=windows-msvc

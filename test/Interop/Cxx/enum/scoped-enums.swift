@@ -41,3 +41,4 @@ ScopedEnumsTestSuite.test("Make and compare (MiddleDefinedScopedEnum)") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

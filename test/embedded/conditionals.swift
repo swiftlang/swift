@@ -12,3 +12,4 @@ public func regular() { }
 
 // CHECK:    define {{.*}}void @"$s12conditionals7regularyyF"()
 // EMBEDDED: define {{.*}}void @"$e12conditionals8embeddedyyF"()
+// UNSUPPORTED: OS=windows-msvc

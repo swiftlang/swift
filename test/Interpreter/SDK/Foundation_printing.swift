@@ -51,3 +51,4 @@ FoundationPrinting.test("NSArrayDescription") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

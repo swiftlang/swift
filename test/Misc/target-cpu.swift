@@ -43,3 +43,4 @@
 // RUN: not %swiftc -typecheck -target x86_64-unknown-windows-msvc -target-cpu haswell -Xcc -### %s 2>&1 | %FileCheck -check-prefix X86_64 %s
 // X86_64: "-target-cpu" "haswell"
 // X86_64: "-tune-cpu" "haswell"
+// UNSUPPORTED: OS=windows-msvc

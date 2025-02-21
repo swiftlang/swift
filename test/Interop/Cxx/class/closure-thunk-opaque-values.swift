@@ -12,3 +12,4 @@ import Closure
 public func testARCWeakFunctionPointer2() -> (ARCWeak) -> () {
   return getFnPtr2()
 }
+// UNSUPPORTED: OS=windows-msvc

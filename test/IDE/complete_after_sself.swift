@@ -79,3 +79,4 @@ extension MyProto {
 // CHECK-MyProto-DAG: Decl[InstanceMethod]/CurrNominal:   instanceMethod({#(self): MyProto#})[#() -> Void#];
 // CHECK-MyProto-DAG: Decl[StaticMethod]/CurrNominal:     staticMethod()[#Void#];
 }
+// UNSUPPORTED: OS=windows-msvc

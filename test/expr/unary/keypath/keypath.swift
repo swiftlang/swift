@@ -1338,3 +1338,4 @@ func testKeyPathInout() {
   takesInoutOpt(\.count)
   takesInoutOpt(\String.count)
 }
+// UNSUPPORTED: OS=windows-msvc

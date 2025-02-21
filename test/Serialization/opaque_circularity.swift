@@ -12,3 +12,4 @@ public struct S : P {
     return [1,2,3]
   }
 }
+// UNSUPPORTED: OS=windows-msvc

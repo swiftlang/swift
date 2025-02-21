@@ -8,3 +8,4 @@ import TestModule
 _ = TestStruct()
 
 // CHECK: {{-lcoreTestModuleKitUtilsTool|/DEFAULTLIB:coreTestModuleKitUtilsTool.lib}}
+// UNSUPPORTED: OS=windows-msvc

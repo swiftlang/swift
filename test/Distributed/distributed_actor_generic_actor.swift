@@ -26,3 +26,4 @@ distributed actor Worker<Work: Sendable & Codable> {
     [other]
   }
 }
+// UNSUPPORTED: OS=windows-msvc

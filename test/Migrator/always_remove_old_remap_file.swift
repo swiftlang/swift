@@ -12,3 +12,4 @@
 // RUN: not ls %t/always_remove_old_remap_file.remap
 
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

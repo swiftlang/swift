@@ -33,3 +33,4 @@ CxxSequenceTestSuite.test("SimpleEmptySequence as Swift.Sequence") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

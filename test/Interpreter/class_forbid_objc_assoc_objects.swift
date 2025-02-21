@@ -237,3 +237,4 @@ if #available(SwiftStdlib 5.0, *) {
     objc_setAssociatedObject(x, "myKey", "myValue", .OBJC_ASSOCIATION_RETAIN)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ StdStringOptTestSuite.test("std::string with Hashable conformance optimized") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

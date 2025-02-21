@@ -365,3 +365,4 @@ bb2(%6 : @guaranteed $X):
   %23 = tuple ()
   return %23 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

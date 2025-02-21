@@ -41,3 +41,4 @@ public struct S4 {
   public let gg: G4<Int>
   public let ggg: G4<Int, Float>
 }
+// UNSUPPORTED: OS=windows-msvc

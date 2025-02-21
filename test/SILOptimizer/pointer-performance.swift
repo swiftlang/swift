@@ -15,3 +15,4 @@ public struct S {
 public func testit(_ p: UnsafePointer<S>) -> UnsafePointer<Int>? {
   return p.pointer(to: \.b)
 }
+// UNSUPPORTED: OS=windows-msvc

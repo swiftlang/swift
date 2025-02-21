@@ -40,3 +40,4 @@ distributed actor DA2 {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

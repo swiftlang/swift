@@ -104,3 +104,4 @@ public func createSmallStruct(x: Float) -> SmallStruct {
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void SmallStruct::invert() {
 // CHECK-NEXT:   Methods::_impl::$s7Methods11SmallStructV6invertyyF(_getOpaquePointer());
 // CHECK-NEXT:   }
+// UNSUPPORTED: OS=windows-msvc

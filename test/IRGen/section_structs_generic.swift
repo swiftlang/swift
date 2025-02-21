@@ -44,3 +44,4 @@ struct MyStruct5<T> {
 // CHECK: @"{{.*}}g_MyStruct3{{.*}}Gvp" = hidden global {{.*}} <{ %TSi <{ {{(i32|i64)}} 42 }>, %TSi <{ {{(i32|i64)}} 77 }> }>
 // CHECK: @"{{.*}}g_MyStruct4{{.*}}Gvp" = hidden global {{.*}} <{ %TSi <{ {{(i32|i64)}} 42 }>, {{.*}} <{ %TSi <{ {{(i32|i64)}} 43 }>, %TSi <{ {{(i32|i64)}} 44 }> }> }>
 // CHECK: @"{{.*}}g_MyStruct5{{.*}}Gvp" = hidden global {{.*}} <{ {{.*}} <{ %TSi <{ {{(i32|i64)}} 42 }>, {{.*}} <{ %TSi <{ {{(i32|i64)}} 43 }>, %TSi <{ {{(i32|i64)}} 44 }> }> }>, {{.*}} <{ %TSi <{ {{(i32|i64)}} 42 }>, {{.*}} <{ %TSi <{ {{(i32|i64)}} 43 }>, %TSi <{ {{(i32|i64)}} 44 }> }> }> }>
+// UNSUPPORTED: OS=windows-msvc

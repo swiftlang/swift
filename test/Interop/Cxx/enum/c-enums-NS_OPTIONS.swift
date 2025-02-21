@@ -36,3 +36,4 @@ import CenumsNSOptions
 // CHECK-NEXT:   class func setBar(_ bar: Bar)
 // CHECK-NEXT:   func setBar(_ bar: Bar)
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

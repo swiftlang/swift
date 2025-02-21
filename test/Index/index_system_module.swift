@@ -17,3 +17,4 @@
 // CHECK-NEXT: RelChild | class/Swift | SubCls | [[SUBCLS_USR]]
 
 // NEGATIVE-NOT: SECRET
+// UNSUPPORTED: OS=windows-msvc

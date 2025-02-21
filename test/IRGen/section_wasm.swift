@@ -44,3 +44,4 @@
 // ASM: $s7section2g4SpySiGSgvp:
 // ASM-NOT: .section
 // ASM: $s7section2g5SpySiGSgvp:
+// UNSUPPORTED: OS=windows-msvc

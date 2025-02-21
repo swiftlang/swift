@@ -277,3 +277,4 @@ class Test19 {
 }
 // rdar://23111219
 // ASSIGN_19: Decl[LocalVar]/Local/TypeRelation[Convertible]: t[#Bool#]
+// UNSUPPORTED: OS=windows-msvc

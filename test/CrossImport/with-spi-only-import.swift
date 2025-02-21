@@ -84,3 +84,4 @@ import DeclaringLibrary
 // NEGATIVE-NOT: import _OverlayLibrary
 // PRIVATE-DAG: import BystandingLibrary
 // PRIVATE-DAG: import _OverlayLibrary
+// UNSUPPORTED: OS=windows-msvc

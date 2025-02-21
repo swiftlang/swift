@@ -16,3 +16,4 @@
 // CHECK-wasm-DAG: -lempty
 
 import empty
+// UNSUPPORTED: OS=windows-msvc

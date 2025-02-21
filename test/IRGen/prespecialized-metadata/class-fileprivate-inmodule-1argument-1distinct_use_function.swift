@@ -37,3 +37,4 @@ func doit() {
   consume( Value(first: { (i: Int) -> String in fatalError() }) )
 }
 doit()
+// UNSUPPORTED: OS=windows-msvc

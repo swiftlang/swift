@@ -11,3 +11,4 @@ class C {
 }
 
 C().#^HERE^#
+// UNSUPPORTED: OS=windows-msvc

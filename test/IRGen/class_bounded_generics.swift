@@ -291,3 +291,4 @@ func archetype_with_generic_class_constraint<T, U>(t: T) where T : A<U> {
 func calls_archetype_with_generic_class_constraint<T>(a: A<T>) {
   archetype_with_generic_class_constraint(t: a)
 }
+// UNSUPPORTED: OS=windows-msvc

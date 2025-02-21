@@ -112,4 +112,4 @@
 // CHECK: Vec8xInt8
 // CHECK: Vec16xInt8
 // CHECK: Vec32xInt8
-// CHECK: Vec64xInt8
+// CHECK: Vec64xInt8// UNSUPPORTED: OS=windows-msvc

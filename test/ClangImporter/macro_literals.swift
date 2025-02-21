@@ -183,3 +183,4 @@ func testLogicalComparisons() {
   // CHECK-NEXT: %15 = struct $Bool (%14 : $Builtin.Int1), loc {{.*}}
   _ = L_OR_FALSE_B
 }
+// UNSUPPORTED: OS=windows-msvc

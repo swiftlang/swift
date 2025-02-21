@@ -25,3 +25,4 @@ public func bar() {
 
   // YAML: sil-assembly-vision-remark-gen
 }
+// UNSUPPORTED: OS=windows-msvc

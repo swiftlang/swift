@@ -32,3 +32,4 @@ extension MyAsset {
     try await loadTracks(withStringEnum: stringEnum)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

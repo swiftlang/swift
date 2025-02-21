@@ -124,3 +124,4 @@
 // CHECK:       #endif
 
 // CHECK-NOT: @
+// UNSUPPORTED: OS=windows-msvc

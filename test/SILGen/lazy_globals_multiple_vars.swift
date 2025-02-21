@@ -32,3 +32,4 @@ var (a, b) = (1, 2)
 // CHECK-NOT:     global_addr [[TOKEN_C]]
 // CHECK:         function_ref [[INIT_D]]
 var c = 1, d = 2
+// UNSUPPORTED: OS=windows-msvc

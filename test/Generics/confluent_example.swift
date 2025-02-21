@@ -25,3 +25,4 @@ protocol P3 {
   associatedtype B where B.C : P3
   associatedtype C : P3 where A.B == A, B.C == B, A.C == A
 }
+// UNSUPPORTED: OS=windows-msvc

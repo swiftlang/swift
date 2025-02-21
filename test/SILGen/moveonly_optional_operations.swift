@@ -170,3 +170,4 @@ func consumingSwitchSubject2(nc: consuming NC?,
       break
     }
 }
+// UNSUPPORTED: OS=windows-msvc

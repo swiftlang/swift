@@ -48,3 +48,4 @@ bb0(%0 : $@differentiable(reverse) (Float, @noDerivative Float) -> (Float, @noDe
 // CHECK: bb0(%0 : $@differentiable(reverse) (Float, @noDerivative Float) -> (Float, @noDerivative Float)):
 // CHECK:   return %0 : $@differentiable(reverse) (Float, @noDerivative Float) -> (Float, @noDerivative Float)
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

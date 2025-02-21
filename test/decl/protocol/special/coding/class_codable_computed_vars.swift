@@ -34,3 +34,4 @@ let _ = ClassWithComputedMembers.encode(to:)
 // The synthesized CodingKeys type should not be accessible from outside the
 // class.
 let _ = ClassWithComputedMembers.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

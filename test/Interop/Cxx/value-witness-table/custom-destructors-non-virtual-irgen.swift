@@ -41,3 +41,4 @@ public func testHasDefaultedDestructor() {
 // CHECK-LABEL: define {{.*}}void @"$sSo33HasUserProvidedDestructorAndDummyVwxx"
 // CHECK: call {{.*}}@{{_ZN33HasUserProvidedDestructorAndDummyD(1|2)Ev|"\?\?1HasUserProvidedDestructorAndDummy@@QEAA@XZ"}}(ptr
 // CHECK: ret
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ public struct A {
     Builtin.unreachable()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -108,3 +108,4 @@ from__ABAdditionsCAdditions()
 // UNITS-NEGATIVE-NOT: Record | {{.*}} | __ABAdditionsCAdditions
 // UNITS-NEGATIVE-NOT: Record | system | Swift
 
+// UNSUPPORTED: OS=windows-msvc

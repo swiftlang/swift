@@ -12,3 +12,4 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt) -> CInt {
 // CHECK-NEXT:         return myFunc(_ptrPtr.baseAddress!, CInt(exactly: ptr.count)!)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

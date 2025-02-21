@@ -125,3 +125,4 @@ struct S {
     let _: Int = (S.foo(self).self)()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

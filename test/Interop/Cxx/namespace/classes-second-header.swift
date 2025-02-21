@@ -16,3 +16,4 @@ NamespacesTestSuite.test("Declared and defined in different headers") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

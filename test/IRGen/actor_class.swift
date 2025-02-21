@@ -69,3 +69,4 @@ public actor Exchanger<T> {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[INT]], ptr {{.*}}, [[INT]] [[#CLASS_METADATA_HEADER+2]]
 // CHECK-NEXT:    [[OFFSET:%.*]] = load [[INT]], ptr [[T0]], align
 // CHECK-NEXT:    getelementptr inbounds i8, ptr %1, [[INT]] [[OFFSET]]
+// UNSUPPORTED: OS=windows-msvc

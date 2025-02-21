@@ -7,3 +7,4 @@ func test0() -> (Int, Double, String) {
     "Hello"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

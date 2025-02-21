@@ -45,3 +45,4 @@ var privateFlagEnumVar: PublicPrivate.PrivateFlagEnum // expected-error {{'Priva
 // print(PublicPrivate.PrivateAnonymousEnumValue1)
 print(PublicPrivate.PrivateOpenEnum.value1) // expected-error {{'PrivateOpenEnum' is inaccessible due to 'private' protection level}}
 print(PublicPrivate.PrivateClosedEnum.value1) // expected-error {{'PrivateClosedEnum' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

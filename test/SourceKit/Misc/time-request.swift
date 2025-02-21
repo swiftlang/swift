@@ -2,3 +2,4 @@
 // RUN: %sourcekitd-test -time-request -json-request-path %S/Inputs/version_request.json 2>&1 | %FileCheck %s
 // CHECK-DAG: key.version_major
 // CHECK-DAG: request time: {{.*}} ms
+// UNSUPPORTED: OS=windows-msvc

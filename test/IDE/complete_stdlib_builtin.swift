@@ -16,3 +16,4 @@ func testBuiltinRawPointer1(a: UnsafeMutablePointer<UInt8>) {
 func testBuiltinRawPointer2(a: UnsafeMutablePointer<UInt8>) {
   a.value.#^BUILTIN_2^#
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@
 
 // CHECK-MISSING: 'NoSuchModule'
 // CHECK-MISSING-SUBMODULE: 'Swift.NoSuchSubModule'
+// UNSUPPORTED: OS=windows-msvc

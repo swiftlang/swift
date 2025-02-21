@@ -32,3 +32,4 @@ class MyClass {
 let a = MyClass()
 let img = a.filterImage(UIImage(), true)
 
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ func testHive() {
   _ = hiveIUO as Hive?
   let _: Hive = Hive()
 }
+// UNSUPPORTED: OS=windows-msvc

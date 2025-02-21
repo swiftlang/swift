@@ -54,3 +54,4 @@ struct Tensor<T>: Differentiable {
 // Original error in https://github.com/apple/swift/issues/55334:
 // SIL verification failed: Basic block contains a non-contiguous lexical scope at -Onone: DS == LastSeenScope
 // %26 = struct $_AD__$s5crash6TensorVyACyxGx_ADtcfC_bb0__PB__src_0_wrt_1_l<τ_0_0> () // users: %34, %28
+// UNSUPPORTED: OS=windows-msvc

@@ -62,3 +62,4 @@ public class B: NSObject {}
 // CHECK-DAG:  - (void)member;
 // CHECK-DAG:  @end
 #ObjCFreestandingClass
+// UNSUPPORTED: OS=windows-msvc

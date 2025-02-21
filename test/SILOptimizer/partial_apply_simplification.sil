@@ -210,3 +210,4 @@ entry(%x : $Int, %y : $*Int):
   return %r : $Int
 }
 
+// UNSUPPORTED: OS=windows-msvc

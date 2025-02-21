@@ -61,3 +61,4 @@ int main() {
 // CHECK-NEXT: '''start++end++cxx'''
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -48,3 +48,4 @@ public func toMerge() {
 //CHECK-DAG: 16LocalTypesMerged7toMergeyyF16SingleFuncStructL_V
 //CHECK-DAG: 16LocalTypesMerged10singleFuncyyF06SingleE6StructL_V
 //CHECK-DAG: 16LocalTypesMerged13singlePatternSivg06SingleE6StructL_V
+// UNSUPPORTED: OS=windows-msvc

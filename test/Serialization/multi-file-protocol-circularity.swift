@@ -6,3 +6,4 @@
 
 // RUN: %target-swift-frontend -parse-as-library -emit-module -module-name Multi %t/a.swiftmodule %t/b.swiftmodule %t/c.swiftmodule -o %t
 
+// UNSUPPORTED: OS=windows-msvc

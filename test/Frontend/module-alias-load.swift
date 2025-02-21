@@ -36,3 +36,4 @@ public func bar() {}
 
 // BEGIN FileFoo.swift
 import Cat
+// UNSUPPORTED: OS=windows-msvc

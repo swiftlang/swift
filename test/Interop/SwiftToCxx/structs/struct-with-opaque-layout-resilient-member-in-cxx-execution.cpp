@@ -26,3 +26,4 @@ int main() {
 // CHECK: UsesResilientSmallStruct(97,FirstSmallStruct(x: 65)
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

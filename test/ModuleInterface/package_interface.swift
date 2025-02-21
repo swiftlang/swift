@@ -298,3 +298,4 @@ private func priv(x: Int, y: String) { print("priv func") }
 // CHECK: extension Bar.PubEnum : Swift.Hashable {}
 // CHECK: extension Bar.FrozenPub : Swift.Sendable {}
 
+// UNSUPPORTED: OS=windows-msvc

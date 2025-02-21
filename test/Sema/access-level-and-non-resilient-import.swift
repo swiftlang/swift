@@ -63,3 +63,4 @@ package import PackageLib
 internal import InternalLib
 fileprivate import FileprivateLib
 private import PrivateLib
+// UNSUPPORTED: OS=windows-msvc

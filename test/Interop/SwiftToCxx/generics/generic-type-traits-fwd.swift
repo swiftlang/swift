@@ -48,3 +48,4 @@ public struct LaterGeneric<T> {
 // CHECK: class SWIFT_SYMBOL("s:8Generics16ComesFirstStructV") ComesFirstStruct final {
 // CHECK: LaterGeneric<ComesFirstStruct> returnsLaterOpt() const SWIFT_SYMBOL("s:8Generics16ComesFirstStructV15returnsLaterOptAA0F7GenericVyACGyF");
 // CHECK: class SWIFT_SYMBOL("s:8Generics12LaterGenericV") LaterGeneric final {
+// UNSUPPORTED: OS=windows-msvc

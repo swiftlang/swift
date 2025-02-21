@@ -16,3 +16,4 @@ extension PP {
 }
 
 extension Never : PP {}
+// UNSUPPORTED: OS=windows-msvc

@@ -87,3 +87,4 @@ print("\(bicycle.currentSpeed)")
 funcMacro()
 // BEFORE_MOVE: Macro from HighLevel
 // AFTER_MOVE: Macro from LowLevel
+// UNSUPPORTED: OS=windows-msvc

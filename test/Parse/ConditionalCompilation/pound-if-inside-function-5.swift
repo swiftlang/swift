@@ -14,3 +14,4 @@ struct S {
   }
   func baz() {}
 }
+// UNSUPPORTED: OS=windows-msvc

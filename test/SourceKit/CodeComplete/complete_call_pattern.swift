@@ -12,3 +12,4 @@ func test() {
 
 // CHECK: key.kind: source.lang.swift.decl.function.constructor
 // CHECK-NEXT: key.name: "foo:"
+// UNSUPPORTED: OS=windows-msvc

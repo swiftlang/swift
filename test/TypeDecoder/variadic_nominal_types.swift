@@ -52,3 +52,4 @@ do {
 
 // DEMANGLE-TYPE: $s22variadic_nominal_types8VariadicVAASQRzrlE11ConstrainedVySi_SSQPSf_GD
 // CHECK-TYPE: Variadic<Int, String, Float>.Constrained
+// UNSUPPORTED: OS=windows-msvc

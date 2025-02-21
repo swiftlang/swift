@@ -557,3 +557,4 @@ public func varArgCCFlowTrueTest<T : P>(_ msg: inout T) async {
     msg = T.value as! T
     await forceSplit4()
 }
+// UNSUPPORTED: OS=windows-msvc

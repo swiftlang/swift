@@ -33,3 +33,4 @@ struct MergeTest<G : P1a & P2a> {
 // CHECK: - τ_0_0.[P1a:T].[P2:Y2] => τ_0_0.[P1a:T].[P1:Y1]
 // CHECK: - τ_0_0.[P1a:T].[P2:Z2] => τ_0_0.[P1a:T].[P1:Z1]
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

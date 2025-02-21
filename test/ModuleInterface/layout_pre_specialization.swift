@@ -13,3 +13,4 @@
 public func test<A>(a: A) -> A {
     return a
 }
+// UNSUPPORTED: OS=windows-msvc

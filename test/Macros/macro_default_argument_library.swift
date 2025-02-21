@@ -18,3 +18,4 @@ public macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(
 public func foo(param: (String, String) = #stringify(#fileID)) {
     print(param)
 }
+// UNSUPPORTED: OS=windows-msvc

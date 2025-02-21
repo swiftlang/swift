@@ -31,3 +31,4 @@ public protocol Validator {
 public protocol ValidationSuite: Validator {
     associatedtype InputType: Validatable
 }
+// UNSUPPORTED: OS=windows-msvc

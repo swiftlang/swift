@@ -15,3 +15,4 @@ func outer(_ a: Int64) -> Int64 {
 
      return inner(42)
 }
+// UNSUPPORTED: OS=windows-msvc

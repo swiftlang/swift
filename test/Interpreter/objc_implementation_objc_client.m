@@ -256,3 +256,4 @@ int main() {
 
 @end
 #endif
+// UNSUPPORTED: OS=windows-msvc

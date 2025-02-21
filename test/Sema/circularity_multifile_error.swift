@@ -9,3 +9,4 @@ struct A {
 struct B {
   var a : External
 }
+// UNSUPPORTED: OS=windows-msvc

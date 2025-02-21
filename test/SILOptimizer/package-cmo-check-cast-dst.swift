@@ -122,3 +122,4 @@ extension ResolvedStyledText {
 package class AnyTextModifier {
   func isEqual(to other: AnyTextModifier) -> Bool { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

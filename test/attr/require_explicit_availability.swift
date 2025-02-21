@@ -21,3 +21,4 @@ public func noAvailabilityFunc() { } // expected-warning {{public declarations s
 @available(tvOS, introduced: 9)
 @available(visionOS, introduced: 1)
 public func hasAvailability() { }
+// UNSUPPORTED: OS=windows-msvc

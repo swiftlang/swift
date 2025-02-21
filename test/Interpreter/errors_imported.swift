@@ -53,3 +53,4 @@ ErrorHandlingTests.test("blockFailure") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

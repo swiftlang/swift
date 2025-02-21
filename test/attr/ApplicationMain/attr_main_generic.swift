@@ -5,3 +5,4 @@ class MyBase<T> {
   static func main() {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

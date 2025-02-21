@@ -36,3 +36,4 @@ protocol Protocol1 : class {
 class Implementation : Protocol1 {
   func foo(_ x: Float) -> Float { return 2*x }
 }
+// UNSUPPORTED: OS=windows-msvc

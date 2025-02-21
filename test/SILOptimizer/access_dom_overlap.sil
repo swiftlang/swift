@@ -521,3 +521,4 @@ bb0(%0 : $*Int64):
   %z = tuple ()
   return %z : $()
 }
+// UNSUPPORTED: OS=windows-msvc

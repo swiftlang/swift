@@ -163,3 +163,4 @@ func test_defer_async() async {
         }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

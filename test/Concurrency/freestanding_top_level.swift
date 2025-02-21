@@ -9,3 +9,4 @@ var global = 10
 
 // No warning because we're in the same module.
 print(global)
+// UNSUPPORTED: OS=windows-msvc

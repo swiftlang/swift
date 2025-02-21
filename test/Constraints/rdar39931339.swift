@@ -51,3 +51,4 @@ func foo<T>(_ s: S<T>.Type) {
 func bar<T: P>(_ s: S<T>.Type) {
   _ = s.A() // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

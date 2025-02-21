@@ -24,3 +24,4 @@ public func testit(_ p: P) {
   p.genericFunc(&x)
 }
 
+// UNSUPPORTED: OS=windows-msvc

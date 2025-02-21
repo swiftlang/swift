@@ -12,3 +12,4 @@ let _ = MyTime.add(
 let _ = MyTime.add(
   this: MyTime.z,
   that: MyTime.z)
+// UNSUPPORTED: OS=windows-msvc

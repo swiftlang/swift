@@ -225,3 +225,4 @@ ImplClass.runTests()
 // CHECK-LABEL: *** SwiftSubclass end ***
 // CHECK: SwiftSubclass It's better to burn out than to fade away.
 #endif
+// UNSUPPORTED: OS=windows-msvc

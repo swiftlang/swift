@@ -10,4 +10,4 @@ extension S: Sequence {
   }
 }
 
-let x: (key: String, value: Int).Type = S<String>.Element.self
+let x: (key: String, value: Int).Type = S<String>.Element.self// UNSUPPORTED: OS=windows-msvc

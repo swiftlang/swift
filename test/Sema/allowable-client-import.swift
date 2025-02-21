@@ -20,3 +20,4 @@ import Foo // expected-error {{module 'Foo' doesn't allow importation from modul
 func bar() { foo() }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

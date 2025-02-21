@@ -23,3 +23,4 @@ public func callsPublicRequirement(s: S) {
 
   // CHECK: return
 }
+// UNSUPPORTED: OS=windows-msvc

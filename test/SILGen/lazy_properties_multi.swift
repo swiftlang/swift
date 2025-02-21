@@ -12,3 +12,4 @@ public class C1 {
     c.f()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

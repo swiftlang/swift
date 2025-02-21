@@ -22,3 +22,4 @@ func printDSOHandle(dso: UnsafeRawPointer = #dsohandle) -> UnsafeRawPointer {
 }
 
 _ = printDSOHandle()
+// UNSUPPORTED: OS=windows-msvc

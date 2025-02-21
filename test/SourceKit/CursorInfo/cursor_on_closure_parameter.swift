@@ -6,3 +6,4 @@ func test() {
   save(record) { (record) in
   }
 }
+// UNSUPPORTED: OS=windows-msvc

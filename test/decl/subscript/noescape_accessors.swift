@@ -122,3 +122,4 @@ func testSubscripts_escapingIndex(nonescaping: () -> (),
   s[escapingIndex: nonescaping] = 0 // expected-error {{passing non-escaping parameter}}
   s[escapingIndex: escaping] = 0
 }
+// UNSUPPORTED: OS=windows-msvc

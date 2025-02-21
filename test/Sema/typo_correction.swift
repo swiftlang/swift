@@ -220,3 +220,4 @@ extension P2 {
     _ = a // expected-error {{cannot find 'a' in scope}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

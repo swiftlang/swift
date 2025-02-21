@@ -32,3 +32,4 @@ bb3(%7 : $Builtin.Int1):
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

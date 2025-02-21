@@ -261,3 +261,4 @@ bb0(%native : @guaranteed $String):
 // CHECK:         destroy_value [[OPT_BRIDGED_2]]
 // CHECK:         destroy_value [[OPT_BRIDGED_1]]
 // CHECK-LABEL: } // end sil function '$s4main2TyC5take3yySSSg_A2EtFZToTembgbgbgnn_'
+// UNSUPPORTED: OS=windows-msvc

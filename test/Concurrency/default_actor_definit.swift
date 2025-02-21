@@ -67,3 +67,4 @@ actor C {
 // CHECK-NOT:     builtin "initializeDefaultActor"
 // CHECK-NOT:     builtin "destroyDefaultActor"
 // CHECK-LABEL: end sil function '$s21default_actor_definit1CC2yyACSgSi_tcfC'
+// UNSUPPORTED: OS=windows-msvc

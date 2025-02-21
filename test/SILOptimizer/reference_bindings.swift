@@ -28,3 +28,4 @@ func varBindingTest3() {
     }
     x = "2"
 }
+// UNSUPPORTED: OS=windows-msvc

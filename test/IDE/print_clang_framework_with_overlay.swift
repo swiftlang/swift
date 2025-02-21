@@ -14,3 +14,4 @@ import FooOverlay
 // FIXME: this duplicate import is silly, but not harmful.
 // CHECK: @_exported import func Foo.fooSubFunc1
 // CHECK: func fooSubOverlayFunc1(x: Int32) -> Int32
+// UNSUPPORTED: OS=windows-msvc

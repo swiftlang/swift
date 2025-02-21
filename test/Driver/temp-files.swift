@@ -59,3 +59,4 @@
 
 // SAVE-TEMPS-macho-NOT: .autolink
 // SAVE-TEMPS-elf: temp-files-{{.+}}.autolink
+// UNSUPPORTED: OS=windows-msvc

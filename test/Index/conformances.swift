@@ -175,3 +175,4 @@ func returnOpaqueResultType() -> some BaseConfFromBase & P1 & WithAssocType {} /
 // CHECK-NEXT:   RelCont | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF
 // CHECK: [[@LINE-5]]:63 | protocol/Swift | WithAssocType | s:14swift_ide_test13WithAssocTypeP | Ref,RelCont | rel: 1
 // CHECK-NEXT:   RelCont | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF
+// UNSUPPORTED: OS=windows-msvc

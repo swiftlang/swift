@@ -228,3 +228,4 @@ public class SomeImpl : DeclarationOnlyUser {
         print("hello")
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -41,3 +41,4 @@ public func sub(_ x: Int, _ y: Int) -> Int {
 
 // CHECK: 6
 print(add(1, 2, 3))
+// UNSUPPORTED: OS=windows-msvc

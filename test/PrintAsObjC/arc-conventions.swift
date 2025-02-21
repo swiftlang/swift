@@ -26,3 +26,4 @@ public class Test: NSObject {
     print("deinitialized \(self)")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

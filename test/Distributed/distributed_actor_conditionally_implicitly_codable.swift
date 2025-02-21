@@ -114,3 +114,4 @@ public struct FakeIdIsNotCodableActorSystem: DistributedActorSystem, CustomStrin
     "\(Self.self)()"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

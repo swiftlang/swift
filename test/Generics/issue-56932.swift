@@ -30,3 +30,4 @@ extension Double : ScalarMultiplicative {}
 extension Double : ScalarProtocol {
   public typealias Scalar = Self
 }
+// UNSUPPORTED: OS=windows-msvc

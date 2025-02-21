@@ -6,3 +6,4 @@ protocol Derived<A, B> where C == any Derived<Never, B> {
 
   associatedtype C
 }
+// UNSUPPORTED: OS=windows-msvc

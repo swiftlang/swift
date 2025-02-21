@@ -38,3 +38,4 @@ struct MyStruct3: CustomDebugStringConvertible {
 // CHECK:     /* record size */ 21 as UInt8,
 // CHECK:     /* "main.MyStruct3" */ 15 as UInt8, 109 as UInt8, 97 as UInt8, 105 as UInt8, 110 as UInt8, 46 as UInt8, 77 as UInt8, 121 as UInt8, 83 as UInt8, 116 as UInt8, 114 as UInt8, 117 as UInt8, 99 as UInt8, 116 as UInt8, 51 as UInt8, 0 as UInt8,
 // CHECK:     /* "two" */ 4 as UInt8, 116 as UInt8, 119 as UInt8, 111 as UInt8, 0 as UInt8
+// UNSUPPORTED: OS=windows-msvc

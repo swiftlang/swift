@@ -51,3 +51,4 @@ entry(%fn : $@callee_guaranteed @isolated(any) () -> ()):
 // CHECK-NEXT: [[T0:%.*]] = insertvalue { [[INT]], [[INT]] } undef, [[INT]] [[ISO_REF]], 0
 // CHECK-NEXT: [[T1:%.*]] = insertvalue { [[INT]], [[INT]] } [[T0]], [[INT]] [[ISO_WT]], 1
 // CHECK-NEXT: ret { [[INT]], [[INT]] } [[T1]]
+// UNSUPPORTED: OS=windows-msvc

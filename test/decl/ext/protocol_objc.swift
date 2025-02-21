@@ -22,3 +22,4 @@ func testOP1(_ oc1: OC1, ao: AnyObject) {
   // Extension of @objc protocol does not have @objc members.
   ao.extOP1a!() // expected-error{{value of type 'AnyObject' has no member 'extOP1a'; did you mean 'reqOP1a'?}}
 }
+// UNSUPPORTED: OS=windows-msvc

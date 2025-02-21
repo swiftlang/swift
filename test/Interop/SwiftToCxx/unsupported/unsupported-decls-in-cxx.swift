@@ -68,3 +68,4 @@ public distributed actor DistributedActorClass {
     @_expose(Cxx) // ok
     public struct NestedStruct {}
 }
+// UNSUPPORTED: OS=windows-msvc

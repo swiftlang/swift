@@ -167,3 +167,4 @@ extension GCLU: ExpressibleByExtendedGraphemeClusterLiteral {
 }
 let _: GCLU = .init(extendedGraphemeClusterLiteral: "🇧🇷") // expected-error{{'init(extendedGraphemeClusterLiteral:)' is only available in macOS 100 or newer}} expected-note{{add 'if #available' version check}}
 let _: GCLU = "🇧🇷" // expected-error{{'init(extendedGraphemeClusterLiteral:)' is only available in macOS 100 or newer}} expected-note{{add 'if #available' version check}}
+// UNSUPPORTED: OS=windows-msvc

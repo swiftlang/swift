@@ -43,3 +43,4 @@ struct Timing {
 // two decimal places.
 
 // CHECK: Backtrace took {{[0-9]+}}.{{[0-9][0-9]}}s
+// UNSUPPORTED: OS=windows-msvc

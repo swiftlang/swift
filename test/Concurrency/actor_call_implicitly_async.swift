@@ -588,3 +588,4 @@ final class IsolatedOperator: @preconcurrency Equatable {
     return foo == self
   }
 }
+// UNSUPPORTED: OS=windows-msvc

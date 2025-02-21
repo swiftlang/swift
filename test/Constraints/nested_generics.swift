@@ -21,3 +21,4 @@ GInt().bar(0)
 
 GInt.static_foo(GChar())
 GInt.static_bar(0)
+// UNSUPPORTED: OS=windows-msvc

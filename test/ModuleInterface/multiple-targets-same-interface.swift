@@ -26,3 +26,4 @@
 
 // 5. Make sure there are only 3 .swiftmodules in the cache path (because iOS was reused)
 // RUN: ls %t/MCP/*.swiftmodule | count 3
+// UNSUPPORTED: OS=windows-msvc

@@ -203,3 +203,4 @@ struct UfiHidStruct {
     return arg > 0 ? arg : 11
   }
 }
+// UNSUPPORTED: OS=windows-msvc

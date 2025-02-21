@@ -34,3 +34,4 @@ public func conditionalAvailableSetterContext() {
 }
 
 // FIXME: Check additional unavailability conditions
+// UNSUPPORTED: OS=windows-msvc

@@ -130,3 +130,4 @@ struct DistributedTargetInvocationResultHandler {
   func onReturnVoid() async throws {}
   func onThrow<Err: Error>(error: Err) async throws {}
 }
+// UNSUPPORTED: OS=windows-msvc

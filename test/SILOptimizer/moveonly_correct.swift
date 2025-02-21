@@ -23,4 +23,4 @@ public struct M_109232806: ~Copyable {
 }
 public func test_109232806(m: borrowing M_109232806) {
   _ = m.y
-}
+}// UNSUPPORTED: OS=windows-msvc

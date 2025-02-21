@@ -11,3 +11,4 @@ struct EntryPoint {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

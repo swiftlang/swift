@@ -11,3 +11,4 @@ func bar(a: Int, b: Int = 0, c: Int) {}
 
 // CHECK: function_ref @$s12rdar362268743bar1a1cySi_SitF : $@convention(thin) (Int, Int) -> ()
 bar(a: 0, c: 42)
+// UNSUPPORTED: OS=windows-msvc

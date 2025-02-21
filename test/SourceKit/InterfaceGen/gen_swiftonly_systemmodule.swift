@@ -36,3 +36,4 @@ public class _SecretClass {
   public var publicVarInSeretClass: Int = 0
 }
 public class PublicClass {}
+// UNSUPPORTED: OS=windows-msvc

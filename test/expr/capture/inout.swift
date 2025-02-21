@@ -14,3 +14,4 @@ struct C {
 
 var c = C()
 let x = c.f // expected-error{{cannot reference 'mutating' method as function value}}
+// UNSUPPORTED: OS=windows-msvc

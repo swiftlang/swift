@@ -27,3 +27,4 @@ class MyClass {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

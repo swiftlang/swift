@@ -5,3 +5,4 @@ struct FileDescriptor: ~#^COMPLETE^# {}
 // COMPLETE:     Begin completions, 2 items
 // COMPLETE-DAG: Decl[Protocol]/OtherModule[Swift]/IsSystem: Copyable[#Copyable#]; name=Copyable
 // COMPLETE-DAG: Decl[Protocol]/OtherModule[Swift]/IsSystem: Escapable[#Escapable#]; name=Escapable
+// UNSUPPORTED: OS=windows-msvc

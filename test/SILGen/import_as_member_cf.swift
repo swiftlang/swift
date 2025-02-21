@@ -9,3 +9,4 @@ public func readSemiModularPowerSupply() -> CCPowerSupply {
   return CCPowerSupply.semiModular
 }
 
+// UNSUPPORTED: OS=windows-msvc

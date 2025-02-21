@@ -73,3 +73,4 @@ print(keyPath5FromLibB == keyPath3FromLibC)
 print(keyPath6FromLibB == keyPath5FromLibC)
 // Check: false
 print(keyPath6FromLibB == keyPath6FromLibC)
+// UNSUPPORTED: OS=windows-msvc

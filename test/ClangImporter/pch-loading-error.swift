@@ -14,3 +14,4 @@
 public func mytest(x: Int32) -> Int32 {
   return c_func(x)
 }
+// UNSUPPORTED: OS=windows-msvc

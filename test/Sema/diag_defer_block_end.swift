@@ -24,3 +24,4 @@ defer { // No note
     print("end of program.")
 }
 
+// UNSUPPORTED: OS=windows-msvc

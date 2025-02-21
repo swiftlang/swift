@@ -1876,3 +1876,4 @@ bb0(%0 : $*GS<B>, %1 : $*GS<B>):
   return %10 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

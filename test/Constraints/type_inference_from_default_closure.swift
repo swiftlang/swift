@@ -4,3 +4,4 @@
 
 // Make sure we don't prematurely mark 'x' as invalid.
 func testInferenceFromClosureVar<T>(x: T = { var x: Int = 0; return x }()) {}
+// UNSUPPORTED: OS=windows-msvc

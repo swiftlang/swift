@@ -59,3 +59,4 @@ class X<XT> : Q {
     return No<XT>()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

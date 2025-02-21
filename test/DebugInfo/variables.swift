@@ -118,3 +118,4 @@ func myprint(_ value: TriValue) {
 myprint(unknown)
 
 // CHECK-DAG: !DIFile(filename: "{{.*}}variables.swift"
+// UNSUPPORTED: OS=windows-msvc

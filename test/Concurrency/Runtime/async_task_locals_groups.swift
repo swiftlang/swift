@@ -114,3 +114,4 @@ func taskInsideGroup() async {
     await taskInsideGroup()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -87,3 +87,4 @@ distributed actor A: P {
   // expected-error@-1{{actor-isolated distributed instance method 'foo()' cannot be used to satisfy nonisolated requirement from protocol 'P'}}
 }
 // ---
+// UNSUPPORTED: OS=windows-msvc

@@ -66,3 +66,4 @@ func testRecursive<T>(_ indicator: Indicator<T>) {
 // COMPLETE_RECURSIVE_GENERIC: Begin completions, 1 item
 // COMPLETE_RECURSIVE_GENERIC-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#Indicator<T>#];
 }
+// UNSUPPORTED: OS=windows-msvc

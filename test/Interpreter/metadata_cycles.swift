@@ -129,3 +129,4 @@ MetadataCycleTests.test("rdar://19320857") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

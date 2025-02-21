@@ -5,3 +5,4 @@ import Swift
 func addressOnlyCopy<T>(t: T) -> T {
     copy t
 }
+// UNSUPPORTED: OS=windows-msvc

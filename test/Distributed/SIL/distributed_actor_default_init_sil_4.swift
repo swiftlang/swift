@@ -49,3 +49,4 @@ distributed actor MyDistActor {
   // CHECK: } // end sil function '$s14default_deinit11MyDistActorC24system_async_fail_throws4condACSg015FakeDistributedE7Systems0kE6SystemV_SbtYaKcfc'
 
 }
+// UNSUPPORTED: OS=windows-msvc

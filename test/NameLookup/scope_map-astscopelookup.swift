@@ -478,3 +478,4 @@ func HasLabeledDo() {
 
 // CHECK-SEARCHES-NOT:  ***Complete scope map***
 
+// UNSUPPORTED: OS=windows-msvc

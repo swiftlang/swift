@@ -6,3 +6,4 @@ let test = 1
 // CHECK: key.sourcetext: "        let test = 1"
     }
 #sourceLocation()
+// UNSUPPORTED: OS=windows-msvc

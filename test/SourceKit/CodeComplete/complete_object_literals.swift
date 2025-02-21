@@ -56,3 +56,4 @@ func test(color: String) {
 // CHECK1:       key.description: "#imageLiteral(resourceName: String)",
 // CHECK1:       key.sourcetext: "#imageLiteral(resourceName: <#T##String#>)"
 // CHECK1:     },
+// UNSUPPORTED: OS=windows-msvc

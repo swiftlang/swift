@@ -91,3 +91,4 @@ public struct M: ~Copyable {
     set { }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

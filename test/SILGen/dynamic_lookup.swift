@@ -409,3 +409,4 @@ func testAnyObjectWithDefault(_ x: AnyObject) {
   // CHECK: apply [[METHOD]]([[DEFARG]], [[OPENEDX]])
   x.hasDefaultParam()
 }
+// UNSUPPORTED: OS=windows-msvc

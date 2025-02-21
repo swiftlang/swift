@@ -80,3 +80,4 @@ struct Generic<Element> {
 // RUN:   | tee %t.response
 
 // RUN: diff -u %s.expected %t.response
+// UNSUPPORTED: OS=windows-msvc

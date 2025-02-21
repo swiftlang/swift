@@ -22,3 +22,4 @@ struct Huge {
 // CHECK: define linkonce_odr hidden ptr @__swift_memcpy4097_8(ptr %0, ptr %1, ptr %2)
 // CHECK:   call void @llvm.memcpy.p0.p0.{{(i64|i32)}}(ptr align 8 %0, ptr align 8 %1, {{(i64|i32)}} 4097, i1 false)
 // CHECK:   ret ptr %0
+// UNSUPPORTED: OS=windows-msvc

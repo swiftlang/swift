@@ -36,3 +36,4 @@
 
 // RUN: %api-digester -diagnose-sdk -baseline-dir %t.baseline -module Foo -I %t.mod2 -module-cache-path %t.module-cache %clang-importer-sdk-nosource -abi -serialize-diagnostics-path %t/serialized-diag.dia -breakage-allowlist-path %t/complete-allowlist.txt
 // RUN: ls %t/serialized-diag.dia
+// UNSUPPORTED: OS=windows-msvc

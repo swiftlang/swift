@@ -76,3 +76,4 @@ struct Profiler { void* ptr; };
 
 //--- header_deps_of_binary.swift
 import FooClient
+// UNSUPPORTED: OS=windows-msvc

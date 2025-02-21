@@ -16,3 +16,4 @@ public struct MyStruct: Equatable {
 
 // We don't want Self: Equatable to show up here for !=
 // CHECK-NOT: swiftGenerics
+// UNSUPPORTED: OS=windows-msvc

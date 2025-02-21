@@ -140,3 +140,4 @@ func makeGenericMetatypes() {
 
 // CHECK-DAG: attributes [[NOUNWIND_READONLY]] = { nounwind memory(read) }
 // CHECK-DAG: attributes [[NOUNWIND_OPT]] = { noinline nounwind "
+// UNSUPPORTED: OS=windows-msvc

@@ -226,3 +226,4 @@ func testCallsWithinClosures(formatOpt: OSLogIntegerFormatting) {
     _osLogTestHelper("Maximum integer value: \(Int.max, privacy: .public)")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

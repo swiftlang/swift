@@ -163,3 +163,4 @@ struct User {
         "mario"
     }
 }
+// UNSUPPORTED: OS=windows-msvc

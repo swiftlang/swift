@@ -25,3 +25,4 @@ extension DictionaryIndex {
 extension CountableRange where Element == Int {
   func getLowerBoundAsInt() -> Int { return lowerBound }
 }
+// UNSUPPORTED: OS=windows-msvc

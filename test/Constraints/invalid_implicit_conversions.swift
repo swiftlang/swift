@@ -36,3 +36,4 @@ func test(
   takesAutoclosure(ptrU8, s) // expected-error {{cannot perform pointer conversion of value of type 'String' to autoclosure result type 'UnsafePointer<UInt8>'}}
   takesAutoclosure(ptrVoid, s) // expected-error {{cannot perform pointer conversion of value of type 'String' to autoclosure result type 'UnsafePointer<Void>'}}
 }
+// UNSUPPORTED: OS=windows-msvc

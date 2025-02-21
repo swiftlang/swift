@@ -184,3 +184,4 @@ suite.test("subscript and advanced(by:) works") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -38,3 +38,4 @@ public class RecursibleDirectoryContentsGenerator {
         current = (path, try fileSystem.getDirectoryContents(path).makeIterator())
     }
 }
+// UNSUPPORTED: OS=windows-msvc

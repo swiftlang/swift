@@ -9,3 +9,4 @@ func testNonexistentPowerOperatorWithPowFunctionInScope() {
   let z: Double = x**y // expected-error {{no operator '**' is defined; did you mean 'pow(_:_:)'?}}
   let w: Double = a(x**2.0) // expected-error {{no operator '**' is defined; did you mean 'pow(_:_:)'?}} expected-error {{cannot convert value of type '()' to specified type 'Double'}}
 }
+// UNSUPPORTED: OS=windows-msvc

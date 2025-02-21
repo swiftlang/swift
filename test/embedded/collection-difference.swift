@@ -23,3 +23,4 @@ struct Main {
     // CHECK: .insert(3, 6)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ struct MyStruct {
 // IN-INSTANCE-METHOD: source.lang.swift.ref.function.free
 // IN-INSTANCE-METHOD-NEXT: bar
 // IN-INSTANCE-METHOD: DID REUSE AST CONTEXT: 1
+// UNSUPPORTED: OS=windows-msvc

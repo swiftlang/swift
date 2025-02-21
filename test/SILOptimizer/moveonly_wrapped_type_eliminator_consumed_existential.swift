@@ -7,3 +7,4 @@ protocol Foo {
 func identity(_ a: consuming any Foo) -> String {
     return a.foo
 }
+// UNSUPPORTED: OS=windows-msvc

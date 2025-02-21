@@ -89,3 +89,4 @@ protocol P6 {
 protocol P7 {
   associatedtype A2: P6 where A2.A1 == Self
 }
+// UNSUPPORTED: OS=windows-msvc

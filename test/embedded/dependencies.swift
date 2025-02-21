@@ -71,3 +71,4 @@ struct Main {
     // CHECK: MySubClass.foo
   }
 }
+// UNSUPPORTED: OS=windows-msvc

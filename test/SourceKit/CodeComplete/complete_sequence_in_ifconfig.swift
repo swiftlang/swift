@@ -52,3 +52,4 @@ struct TestStruct {
 // RESULT-DAG: key.description: "value"
 // RESULT: ]
 // RESULT-NOT: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

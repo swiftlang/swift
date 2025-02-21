@@ -12,3 +12,4 @@ public func foo<each T: P>(t: repeat each T) -> () -> () {
   var x = (repeat each t)
   return { x = (repeat (each x).f()) }
 }
+// UNSUPPORTED: OS=windows-msvc

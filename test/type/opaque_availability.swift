@@ -54,3 +54,4 @@ extension Outer {
   }
 
 }
+// UNSUPPORTED: OS=windows-msvc

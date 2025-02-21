@@ -10,3 +10,4 @@ extension EntryPoint {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

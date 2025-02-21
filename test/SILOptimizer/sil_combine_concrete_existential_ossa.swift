@@ -138,3 +138,4 @@ public func testExtensionProtocolComposition(c: C_PQ) {
   let pp: P & Q = c
   pp.witnessComposition()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -217,3 +217,4 @@ class SubclassOfFrameworkClassConformingToLaterAnnotatedFrameworkProtocol : Fram
     set(newValue) { }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

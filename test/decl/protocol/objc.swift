@@ -271,3 +271,4 @@ struct MyStruct {}
 
 @objc protocol InvalidProtocol where Self: MyStruct {}
 // expected-error@-1 {{type 'Self' constrained to non-protocol, non-class type 'MyStruct'}}
+// UNSUPPORTED: OS=windows-msvc

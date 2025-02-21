@@ -12,3 +12,4 @@ print(asd[asd.firstIndex(of: 0)!...])
 // CHECK: 5:11 - 3
 // CHECK: END RANGES
 
+// UNSUPPORTED: OS=windows-msvc

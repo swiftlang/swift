@@ -25,3 +25,4 @@ class B : A {
 
 // Make sure the OBJC_METHODS table is present.
 // CHECK: OBJC_METHODS
+// UNSUPPORTED: OS=windows-msvc

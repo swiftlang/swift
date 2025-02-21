@@ -67,3 +67,4 @@ do {
   }
   clos(NC())
 }
+// UNSUPPORTED: OS=windows-msvc

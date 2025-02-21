@@ -9,3 +9,4 @@ struct Concrete: Player {}
 public func test() -> any Player {
   Concrete() // expected-error {{cannot use a value of protocol type 'any Player' in embedded Swift}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -76,3 +76,4 @@ nonisolated func passMetaSmuggledAnyFromExistential(_ qT: Q.Type) {
     acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to code in the current task}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

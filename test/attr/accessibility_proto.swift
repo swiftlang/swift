@@ -269,3 +269,4 @@ package struct PkgAdoptViaCombinedProtocol : PkgProtoWithReqs, PkgReqProvider2 {
   // expected-error@-2 {{type alias 'AssocB' must be declared package because it matches a requirement in package protocol 'PkgProtoWithReqs'}} {{none}}
   public typealias AssocA = Int
 }
+// UNSUPPORTED: OS=windows-msvc

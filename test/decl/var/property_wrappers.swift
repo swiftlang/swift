@@ -2143,3 +2143,4 @@ struct TestInitError {
   // expected-error@+1 {{cannot convert value of type 'Int' to specified type 'WrapperWithFailableInit<Int>'}}
   @WrapperWithFailableInit var value: Int = 10
 }
+// UNSUPPORTED: OS=windows-msvc

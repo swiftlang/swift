@@ -12,3 +12,4 @@ public enum TestError : Error {
 // CHECK-NEXT: T _$s4test9TestErrorOMn
 // CHECK-NEXT: D _$s4test9TestErrorON
 // CHECK-NEXT: T _$s4test9TestErrorOs0C0AAMc
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@ final class VarInit {
     return "Hello"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

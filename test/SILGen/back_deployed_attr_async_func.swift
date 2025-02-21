@@ -56,3 +56,4 @@ func caller() async {
   await asyncFunc()
 }
 
+// UNSUPPORTED: OS=windows-msvc

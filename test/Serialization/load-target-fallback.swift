@@ -26,3 +26,4 @@ import TargetModule
 import ArchModule
 
 // RUN: %target-swift-frontend %s -typecheck -I %t -F %t
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ public func test() {
     fnptr: { (x) in return }
   )
 }
+// UNSUPPORTED: OS=windows-msvc

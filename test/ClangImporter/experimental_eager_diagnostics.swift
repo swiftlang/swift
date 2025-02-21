@@ -242,3 +242,4 @@ import macros
 // CHECK:      macros.h:{{[0-9]+}}:9: note: macro 'UNSUPPORTED_5' unavailable: structure not supported
 // CHECK-NEXT:      #define UNSUPPORTED_5 1 + 1 + 1
 // CHECK-NEXT: {{^}}        ^
+// UNSUPPORTED: OS=windows-msvc

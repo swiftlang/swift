@@ -16,3 +16,4 @@ struct S {
         throw Err.or
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -23,3 +23,4 @@ func foo2() {
     print(a)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

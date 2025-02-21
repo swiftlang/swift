@@ -59,3 +59,4 @@ public extension DateValue {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

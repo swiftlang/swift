@@ -42,3 +42,4 @@ bb3:
 
 // CHECK:   call ptr @__swift_project_boxed_opaque_existential_1
 // CHECK:   ret void
+// UNSUPPORTED: OS=windows-msvc

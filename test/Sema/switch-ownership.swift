@@ -56,3 +56,4 @@ func test(value: A) {
         break
     }
 }
+// UNSUPPORTED: OS=windows-msvc

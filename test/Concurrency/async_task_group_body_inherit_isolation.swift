@@ -25,3 +25,4 @@ actor A {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

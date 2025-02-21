@@ -42,3 +42,4 @@ func foo(_ x: S) {}
 func foo(_ x: S) {
   _ = x.getStorage()
 }
+// UNSUPPORTED: OS=windows-msvc

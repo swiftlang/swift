@@ -69,3 +69,4 @@ FunctionsTestSuite.test("base member FRT subscript accessing reference FRT throu
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

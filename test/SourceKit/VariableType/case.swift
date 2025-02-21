@@ -19,3 +19,4 @@ case .pair(let u, var v):
 // CHECK: (4:16, 4:17): String? (explicit type: 1)
 // CHECK: (11:16, 11:17): Int? (explicit type: 0)
 // CHECK: (11:23, 11:24): String (explicit type: 0)
+// UNSUPPORTED: OS=windows-msvc

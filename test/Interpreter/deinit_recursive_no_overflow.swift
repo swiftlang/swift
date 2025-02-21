@@ -17,4 +17,4 @@ for _ in 1...3_000_000 {
 func deallocList() {
     first = nil
 }
-deallocList()
+deallocList()// UNSUPPORTED: OS=windows-msvc

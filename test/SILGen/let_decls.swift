@@ -518,3 +518,4 @@ func test_unassigned_let_constant() {
 // CHECK-NEXT:  destroy_addr [[MUI]] : $*String
 // CHECK-NEXT:  dealloc_stack [[S]] : $*String
 
+// UNSUPPORTED: OS=windows-msvc

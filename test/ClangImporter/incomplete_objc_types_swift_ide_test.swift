@@ -33,3 +33,4 @@
 // CHECK: func CFunctionTakingAForwardDeclaredInterface1(_ param: ForwardDeclaredInterface!)
 // CHECK: func CFunctionReturningAForwardDeclaredProtocol1() -> (any ForwardDeclaredProtocol & NSObjectProtocol)!
 // CHECK: func CFunctionTakingAForwardDeclaredProtocol1(_ param: (any ForwardDeclaredProtocol)!)
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ func funcB() {
 
 @_semantics("array.mutate_unknown")
 func funcC(i: Int) {}
+// UNSUPPORTED: OS=windows-msvc

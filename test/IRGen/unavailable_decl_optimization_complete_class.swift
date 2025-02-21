@@ -57,3 +57,4 @@ public class UnavailableClass<T> {
 
 // CHECK-NO-STRIP: s4Test16UnavailableClassCMa
 // CHECK-STRIP-NOT: s4Test16UnavailableClassCMa
+// UNSUPPORTED: OS=windows-msvc

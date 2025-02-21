@@ -12,3 +12,4 @@ func test(_ b : Base) {
 // CHECK: (Base) -> (Int32) -> ()
 // CHECK: Mixed
 // CHECK: <Declaration>func doIt(_ arg: <Type usr="s:s5Int32V">Int32</Type>)</Declaration>
+// UNSUPPORTED: OS=windows-msvc

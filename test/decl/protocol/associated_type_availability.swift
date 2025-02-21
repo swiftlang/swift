@@ -92,3 +92,4 @@ protocol P3 {
   @available(macOS, obsoleted: 99)
   associatedtype A2
 }
+// UNSUPPORTED: OS=windows-msvc

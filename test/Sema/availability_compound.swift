@@ -26,3 +26,4 @@ public let c2: Pair<PublicStruct.Obsolete, ObsoleteAlias.Inner>? // expected-err
 // expected-error@-2 {{constant cannot be declared public because its type uses an internal type}}
 
 public let d: ObsoleteAlias? // expected-error {{'ObsoleteAlias' has been renamed to 'PublicStruct'}}
+// UNSUPPORTED: OS=windows-msvc

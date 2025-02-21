@@ -6,3 +6,4 @@
 
 // CHECK: {{^/foo/:[^:]+/lib/swift/linux$}}
 // CHECK_LAX: {{^/foo/:[^:]+/lib/swift/linux}}
+// UNSUPPORTED: OS=windows-msvc

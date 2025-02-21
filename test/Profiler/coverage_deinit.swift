@@ -22,3 +22,4 @@ public class Foo {
 // CHECK-NEXT: [[@LINE-8]]:8 -> [[@LINE-8]]:17 : 0
 // CHECK-NEXT: [[@LINE-9]]:18 -> [[@LINE-7]]:6 : 1
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

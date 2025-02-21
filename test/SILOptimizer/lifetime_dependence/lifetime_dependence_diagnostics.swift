@@ -109,3 +109,4 @@ func neint_throws(ncInt: borrowing NCInt) throws -> NEInt {
 func neint_try(ncInt: borrowing NCInt) throws -> NEInt {
   try neint_throws(ncInt: ncInt)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ struct A<I: E>: P {
   typealias V = I
   func f<N: R>(_: N) where N.G == Self {}
 }
+// UNSUPPORTED: OS=windows-msvc

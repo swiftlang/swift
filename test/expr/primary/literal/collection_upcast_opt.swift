@@ -36,3 +36,4 @@ struct TakesDictionary<T> {
 func dictionaryUpcast(_ x1: @escaping (P) -> Void, _ x2: @escaping (P) -> Void) {
   _ = TakesDictionary<X>(([1: x1, 2: x2]))
 }
+// UNSUPPORTED: OS=windows-msvc

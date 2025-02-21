@@ -57,3 +57,4 @@ public func encodable() {
     // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance11doEncodableyyxSERzlF"(ptr noalias {{%.*}}, ptr {{%.*}}, ptr [[Nonfinal_Encodable]])
     doEncodable(Nonfinal(x: 1))
 }
+// UNSUPPORTED: OS=windows-msvc

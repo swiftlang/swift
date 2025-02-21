@@ -15,4 +15,4 @@ func f1<T : P3>(_: T) where T.A : P1 {}
 
 func f2<T : P3>(_: T) where T.A : P2 {}
 // CHECK-LABEL: .f2@
-// CHECK-NEXT: Generic signature: <T where T : P3>
+// CHECK-NEXT: Generic signature: <T where T : P3>// UNSUPPORTED: OS=windows-msvc

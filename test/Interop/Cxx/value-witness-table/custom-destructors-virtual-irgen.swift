@@ -14,3 +14,4 @@ public func testHasVirtualBaseWithVirtualDestructor(
 ) {
   _ = HasBaseWithVirtualDestructor(ptr)
 }
+// UNSUPPORTED: OS=windows-msvc

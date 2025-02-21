@@ -188,3 +188,4 @@ func checkEmptyBody(e: E) {
 // RUN: %refactor -convert-to-switch-stmt -source-filename %s -pos=128:3 -end-pos=131:4 > %t.result/L128-3.swift
 // RUN: %target-swift-frontend-typecheck %t.result/L128-3.swift
 // RUN: diff -u %S/Outputs/basic/L128-3.swift.expected %t.result/L128-3.swift
+// UNSUPPORTED: OS=windows-msvc

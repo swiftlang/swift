@@ -9,3 +9,4 @@ func test(name: String?) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

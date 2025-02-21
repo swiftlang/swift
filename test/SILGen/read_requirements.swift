@@ -1628,3 +1628,4 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-NEXT:    method #P3.ur!read2:
 // CHECK-SAME:      : @$s17read_requirements2P3P2urAA1UVvy
 // CHECK-NEXT:  }
+// UNSUPPORTED: OS=windows-msvc

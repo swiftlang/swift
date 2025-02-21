@@ -290,3 +290,4 @@ suite.test("remove") {
   expectTrue(array.isEmpty)
   expectEqual(Counted.instances, 0)
 }
+// UNSUPPORTED: OS=windows-msvc

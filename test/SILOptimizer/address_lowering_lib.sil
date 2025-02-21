@@ -60,3 +60,4 @@ bb0(%value : @owned $Optional<T>):
   %retval = struct $WeakBox<T> (%weak_value : $@sil_weak Optional<T>)
   return %retval : $WeakBox<T>
 }
+// UNSUPPORTED: OS=windows-msvc

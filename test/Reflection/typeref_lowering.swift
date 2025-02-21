@@ -1280,3 +1280,4 @@ $1_SiBV
 // CHECK-32-NEXT:   (integer value=2)
 // CHECK-32-NEXT:   (struct Swift.Int))
 // CHECK-32-NEXT: (array size=8 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1)
+// UNSUPPORTED: OS=windows-msvc

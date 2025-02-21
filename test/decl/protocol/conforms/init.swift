@@ -87,3 +87,4 @@ class Middle : Base {
 }
 
 class Derived : Middle {}
+// UNSUPPORTED: OS=windows-msvc

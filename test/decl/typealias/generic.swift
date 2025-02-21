@@ -465,3 +465,4 @@ func testSugar(_ gx: GX<Int>, _ gy: GX<Int>.GY<Double>, gz: GX<Int>.GY<Double>.E
   let i2: Int = gy  // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>' (aka 'Array<Double>') to specified type 'Int'}}
   let i3: Int = gz // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>.Element' (aka 'Double') to specified type 'Int'}}
 }
+// UNSUPPORTED: OS=windows-msvc

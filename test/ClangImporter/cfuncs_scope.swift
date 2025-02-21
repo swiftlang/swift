@@ -13,3 +13,4 @@ func testLocalVsFileScope() {
   aFunctionInBase() // just make sure it's imported
   // CHECK-NOT: :[[@LINE-1]]:{{[0-9]+}}:
 }
+// UNSUPPORTED: OS=windows-msvc

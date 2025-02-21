@@ -114,3 +114,4 @@ TrapOnExecutionTestSuite.test("ClassWithNoThrowingConstructor") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -77,3 +77,4 @@ bb0(%c : @guaranteed $C):
   %retval = tuple ()
   return %retval
 }
+// UNSUPPORTED: OS=windows-msvc

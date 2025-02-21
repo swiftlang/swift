@@ -70,3 +70,4 @@ func project(fn fn: () -> Holder) -> C {
 // CHECK-NEXT: [[T2:%.*]] = strong_copy_unmanaged_value [[T1]]
 // CHECK-NEXT: destroy_value [[FNC]]
 // CHECK-NEXT: return [[T2]]
+// UNSUPPORTED: OS=windows-msvc

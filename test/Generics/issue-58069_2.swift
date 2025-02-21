@@ -37,3 +37,4 @@ public protocol MinMaxType {}
 public protocol _RealmSchemaDiscoverable {}
 
 public protocol RealmOptionalType: _ObjcBridgeable {}
+// UNSUPPORTED: OS=windows-msvc

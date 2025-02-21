@@ -23,3 +23,4 @@ class TestC2 {
     @_alwaysEmitConformanceMetadata  // expected-error {{@_alwaysEmitConformanceMetadata may only be used on 'protocol' declarations}}
     var foo: Int = 11
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -114,3 +114,4 @@ public enum PublicReferenceEnum {
   @available(macOS 50, *)
   case x(NewStruct)
 }
+// UNSUPPORTED: OS=windows-msvc

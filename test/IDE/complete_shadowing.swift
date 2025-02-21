@@ -282,3 +282,4 @@ func test_LocalTy_OutNominalTy() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

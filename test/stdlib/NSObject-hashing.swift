@@ -15,3 +15,4 @@ class Foo: NSObject {
     // expected-error@-1 {{'NSObject.hash(into:)' is not overridable; did you mean to override 'NSObject.hash'?}} {{12-16=var}} {{21-48=: Int}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

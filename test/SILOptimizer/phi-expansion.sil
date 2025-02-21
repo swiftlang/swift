@@ -113,3 +113,4 @@ bb2:
   return %3 : $Int
 }
 
+// UNSUPPORTED: OS=windows-msvc

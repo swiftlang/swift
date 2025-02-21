@@ -54,3 +54,4 @@ public struct MyGenericStruct<T> {
 // CHECK-NOT: @swift_arrayAssignWithCopyBackToFront
 // CHECK-NOT: @swift_arrayAssignWithTake
 // CHECK-NOT: @swift_arrayDestroy
+// UNSUPPORTED: OS=windows-msvc

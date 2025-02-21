@@ -507,3 +507,4 @@ public func test() {
 
 // GXX: __gxx_personality_v0
 // GXX-NOT: _swift_exceptionPersonality
+// UNSUPPORTED: OS=windows-msvc

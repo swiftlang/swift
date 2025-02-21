@@ -71,3 +71,4 @@ struct Main {
     // CHECK: 777
   }
 }
+// UNSUPPORTED: OS=windows-msvc

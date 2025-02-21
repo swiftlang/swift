@@ -140,3 +140,4 @@ public func withoutActuallyEscapingCFunction(function: (@convention(c) () -> Voi
     print(pointer)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -113,3 +113,4 @@ func testC4<let T: Int>(with c: C<T, T>) {
 }
 
 struct D<let N: Int & P> {} // expected-error {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
+// UNSUPPORTED: OS=windows-msvc

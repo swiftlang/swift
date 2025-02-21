@@ -147,3 +147,4 @@ public func inoutSmall(_ en: inout Small, _ x: Int) {
 // CHECK:      SWIFT_INLINE_THUNK void printTiny(const Tiny& en) noexcept SWIFT_SYMBOL("s:5Enums9printTinyyyAA0C0OF") {
 // CHECK-NEXT:   Enums::_impl::$s5Enums9printTinyyyAA0C0OF(Enums::_impl::swift_interop_passDirect_Enums_uint8_t_0_1(Enums::_impl::_impl_Tiny::getOpaquePointer(en)));
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

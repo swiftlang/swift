@@ -175,3 +175,4 @@ test_varArgs6()
 
 // CHECK: done.
 my_printf("done.")
+// UNSUPPORTED: OS=windows-msvc

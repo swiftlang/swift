@@ -894,3 +894,4 @@ sil_witness_table hidden Int64: ThrowingP module eager_specialize_throwing_funct
 sil_default_witness_table hidden ThrowingP {
   no_default
 }
+// UNSUPPORTED: OS=windows-msvc

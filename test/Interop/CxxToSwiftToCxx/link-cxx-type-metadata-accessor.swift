@@ -57,3 +57,4 @@ int main() {
 #endif
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

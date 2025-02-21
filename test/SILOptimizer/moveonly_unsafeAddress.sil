@@ -55,3 +55,4 @@ bb0(%0 : $*SNC):
   %18 = tuple ()
   return %18 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

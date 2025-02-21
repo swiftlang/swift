@@ -12,3 +12,4 @@ public func f<T>(_: T.Type) {}
 public func g<T>(_: T.Type) { f((any P<T>).self) }
 
 // CHECK-LABEL: declare extern_weak ptr @swift_getExtendedExistentialTypeMetadata(ptr, ptr)
+// UNSUPPORTED: OS=windows-msvc

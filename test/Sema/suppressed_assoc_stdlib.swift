@@ -3,3 +3,4 @@
 public protocol Hello {
   associatedtype Req: ~Copyable
 }
+// UNSUPPORTED: OS=windows-msvc

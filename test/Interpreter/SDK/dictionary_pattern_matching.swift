@@ -155,3 +155,4 @@ dump(statisticFromPlist(invalidCountryPlist1))
 dump(statisticFromPlist(invalidCountryPlist2))
 // CHECK-LABEL: nil
 dump(statisticFromPlist(invalidKindPlist))
+// UNSUPPORTED: OS=windows-msvc

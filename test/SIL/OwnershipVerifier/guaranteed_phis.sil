@@ -359,3 +359,4 @@ bb3(%14 : @reborrow $Klass, %15 : @reborrow $Klass):
   %20 = tuple ()
   return %20
 }
+// UNSUPPORTED: OS=windows-msvc

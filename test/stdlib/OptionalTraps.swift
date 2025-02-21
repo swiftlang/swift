@@ -100,3 +100,4 @@ OptionalTraps.test("UnwrapNone/Message/Implicit")
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

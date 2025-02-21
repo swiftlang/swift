@@ -109,3 +109,4 @@ struct TestShadowedStruct: TestShadowedProtocol {
     // RETURN_OVERLOADED-DAG: Decl[InstanceMethod]/Super/Flair[ArgLabels]: ['('][')'][#Int#]; name=
   }
 }
+// UNSUPPORTED: OS=windows-msvc

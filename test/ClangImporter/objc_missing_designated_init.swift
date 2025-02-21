@@ -103,3 +103,4 @@ func testSubclasses() {
   _ = DesignatedInitializerInAnotherModuleSubclass(category: 0) // expected-error {{no exact matches in call to initializer}}
   _ = DesignatedInitializerInAnotherModuleSubclass(fromOtherModule: 0) // okay
 }
+// UNSUPPORTED: OS=windows-msvc

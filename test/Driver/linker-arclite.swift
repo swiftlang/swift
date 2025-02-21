@@ -13,3 +13,4 @@
 // NO_ARCLITE-NOT: arclite
 // NO_ARCLITE-NOT: CoreFoundation
 // NO_ARCLITE: -o {{[^ ]+}}
+// UNSUPPORTED: OS=windows-msvc

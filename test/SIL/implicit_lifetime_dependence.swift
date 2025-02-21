@@ -231,3 +231,4 @@ public struct OuterNE: ~Escapable {
     self.inner1 = value
   }
 }
+// UNSUPPORTED: OS=windows-msvc

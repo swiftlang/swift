@@ -38,3 +38,4 @@ public struct Array<T> {
 public func userOfSemanticsAnnotatedFunc(_ a: Array<Int>) -> Int {
   return a._getCapacity()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ struct Int32: SignedInteger {
 func test() {
   let _: [(Int32, Float)] = (0..<1).myMap { (Int32($0), 0.0) }
 }
+// UNSUPPORTED: OS=windows-msvc

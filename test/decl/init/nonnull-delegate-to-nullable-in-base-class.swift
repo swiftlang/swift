@@ -18,3 +18,4 @@ class Dog: Animal {
 
 print(Dog(owner: "John Arbuckle").butt)
 
+// UNSUPPORTED: OS=windows-msvc

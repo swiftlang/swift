@@ -14,3 +14,4 @@
 // FIXME: Re-run the test with -experimental-skip-non-inlinable-function-bodies
 
 // REQUIRES: VENDOR=apple
+// UNSUPPORTED: OS=windows-msvc

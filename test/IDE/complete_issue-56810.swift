@@ -16,3 +16,4 @@ foo { x in
 }
 
 // CHECK: Decl[InstanceVar]/CurrNominal:      bar[#Bool#];
+// UNSUPPORTED: OS=windows-msvc

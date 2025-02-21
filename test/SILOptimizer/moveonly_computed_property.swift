@@ -20,3 +20,4 @@ final class Wrapper {
 
   init() { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

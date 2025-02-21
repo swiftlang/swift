@@ -17,3 +17,4 @@ public func bar() {
 // CHECK-NEXT:        "{{.*}}ScanDependencies/unicode_filename.swift",
 // CHECK-NEXT:        "{{.*}}ScanDependencies/Inputs/unicode_filёnamё.swift"
 // CHECK-NEXT:      ],
+// UNSUPPORTED: OS=windows-msvc

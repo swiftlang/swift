@@ -16,3 +16,4 @@ sil @patatino : $@convention(thin) () -> Never {
 bb0:
   br bb0
 }
+// UNSUPPORTED: OS=windows-msvc

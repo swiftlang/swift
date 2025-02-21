@@ -12,3 +12,4 @@ var self1 = self1
 struct Broken {
   var b : Bool = True // expected-error{{cannot find 'True' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

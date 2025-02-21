@@ -40,3 +40,4 @@ import ResilientDep
 
 //--- NonResilientClient.swift
 import NonResilientDep
+// UNSUPPORTED: OS=windows-msvc

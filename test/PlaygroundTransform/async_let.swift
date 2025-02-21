@@ -48,3 +48,4 @@ print(await fac4)
 
 //             print(await fac4)
 // CHECK-NEXT: [26:{{[[:digit:]]+}}-26:{{[[:digit:]]+}}] __builtin_postPrint
+// UNSUPPORTED: OS=windows-msvc

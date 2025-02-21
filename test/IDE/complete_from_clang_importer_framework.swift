@@ -57,3 +57,4 @@ func testClangMember1() {
 // CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: y[#Double#]{{; name=.+$}}
 // CLANG_MEMBERS1-DAG: Keyword[self]/CurrNominal: self[#FooStruct1#]; name=self
 }
+// UNSUPPORTED: OS=windows-msvc

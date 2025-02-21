@@ -76,3 +76,4 @@ public struct TestBuildPartialBlock4 { // Ok
   public static func buildPartialBlock(first: Int) -> Int { first }
   public static func buildPartialBlock(accumulated: Int, next: Int) -> Int { accumulated + next }
 }
+// UNSUPPORTED: OS=windows-msvc

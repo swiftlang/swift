@@ -76,3 +76,4 @@ struct Wrapper {
     shadowedByMember4() // expected-warning {{found the member decl}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

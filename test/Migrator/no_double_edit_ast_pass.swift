@@ -13,3 +13,4 @@ class Derived : WillOverrideWithTypeChange {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

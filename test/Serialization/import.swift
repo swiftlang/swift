@@ -12,3 +12,4 @@ public func test() {
 }
 
 internal func hidden() {}
+// UNSUPPORTED: OS=windows-msvc

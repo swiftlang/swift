@@ -10,3 +10,4 @@ extension {
   // CHECK: :[[@LINE+1]]:8: error: operator '==' declared in extension must be 'static'
   func ==(lhs: Any, rhs: Any) -> Bool {}
 }
+// UNSUPPORTED: OS=windows-msvc

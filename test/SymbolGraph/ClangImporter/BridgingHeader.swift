@@ -13,3 +13,4 @@
 // CHECK-NOT: __builtin_ms_va_list
 // CHECK-NOT: __builtin_va_list
 
+// UNSUPPORTED: OS=windows-msvc

@@ -36,3 +36,4 @@ extension Redecl {
   @objc(methodWithXref)
   func methodWithXref_alias() { }
 }
+// UNSUPPORTED: OS=windows-msvc

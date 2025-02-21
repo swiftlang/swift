@@ -57,3 +57,4 @@ public func drink() -> Mild? {
   return brew()
 }
 
+// UNSUPPORTED: OS=windows-msvc

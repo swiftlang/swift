@@ -43,3 +43,4 @@ suite.test("storeIfNil") {
 } // if #available(SwiftStdlib 6.0)
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

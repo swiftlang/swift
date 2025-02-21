@@ -18,3 +18,4 @@ class TestHeapStorage<T> : HeapStorage<CountAndCapacity,T> {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

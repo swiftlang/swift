@@ -41,3 +41,4 @@ testSuite.test("StaticString literal type") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

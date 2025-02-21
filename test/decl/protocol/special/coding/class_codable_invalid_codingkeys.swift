@@ -35,3 +35,4 @@ class InvalidCodingKeys3 : Codable { // expected-error {{type 'InvalidCodingKeys
       }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

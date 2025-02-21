@@ -19,3 +19,4 @@ public protocol BinaryInteger: Numeric {}
 public protocol SignedInteger: BinaryInteger, SignedNumeric {}
 
 struct S<X> where X : RandomAccessCollection, X.Index : SignedInteger {}
+// UNSUPPORTED: OS=windows-msvc

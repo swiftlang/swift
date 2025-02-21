@@ -33,3 +33,4 @@
 // TWENTYPOINTTHREEHUNDREDCOMPAT: warning: truncating compatibility version '20.300' in TBD file to fit in 32-bit space used by old mach-o format
 // TWENTYPOINTTHREEHUNDREDCOMPAT: compatibility_versions
 // TWENTYPOINTTHREEHUNDREDCOMPAT: "version": "20.255"
+// UNSUPPORTED: OS=windows-msvc

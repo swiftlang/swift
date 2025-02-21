@@ -24,3 +24,4 @@ public func callReturnPointer() {
   let b: UnsafeMutablePointer<CInt>? = returnPointer(4) // call unsafe interop
 }
 
+// UNSUPPORTED: OS=windows-msvc

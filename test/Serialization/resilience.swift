@@ -30,3 +30,4 @@
 // NEGATIVE-NOT: UnknownCode
 
 public func flip() {}
+// UNSUPPORTED: OS=windows-msvc

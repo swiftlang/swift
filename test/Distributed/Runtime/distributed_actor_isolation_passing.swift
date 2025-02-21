@@ -58,3 +58,4 @@ func pass(isolatedToActor: isolated (any Actor) = #isolation) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

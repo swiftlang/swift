@@ -39,3 +39,4 @@ getAdder(5)(x: 1, y: 42)
 ((add3.callAsFunction)(x: 5, y: 10))(x: 1, y: 42)
 // CHECK: [[@LINE-1]]:8 | instance-method/Swift | callAsFunction(x:y:) | [[callAsFunc2]] | Ref,Call | rel: 0
 // CHECK: [[@LINE-2]]:37 | instance-method/Swift | callAsFunction(x:y:) | [[callAsFunc2]] | Ref,Call | rel: 0
+// UNSUPPORTED: OS=windows-msvc

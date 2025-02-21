@@ -56,3 +56,4 @@ func test() {}
 
 //--- B.swift
 func b() {}
+// UNSUPPORTED: OS=windows-msvc

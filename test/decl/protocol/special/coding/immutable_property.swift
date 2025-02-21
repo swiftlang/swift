@@ -26,3 +26,4 @@ struct Foo : Codable {
   // expected-note@-2 {{set the initial value via the initializer or explicitly define a CodingKeys enum including a 'x5' case to silence this warning}}
   // expected-note@-3 {{make the property mutable instead}}{{11-14=var}}
 }
+// UNSUPPORTED: OS=windows-msvc

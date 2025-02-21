@@ -17,3 +17,4 @@ open class Visitor {
     private func visitExprImpl() {
     }
 }
+// UNSUPPORTED: OS=windows-msvc

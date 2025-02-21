@@ -113,3 +113,4 @@ func prec_equal(_ x: Bool, _ y: Bool, _ z: Bool) -> Bool {
   return x +== y ? y +== z : x +== y ? y +== z : x +== y
 }
 
+// UNSUPPORTED: OS=windows-msvc

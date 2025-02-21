@@ -34,3 +34,4 @@ let point = Point(x: 1, y: 2)
 // CHECK:     var_decl {{.*}} "point"{{.*}} interface_type="Point"
 // SWIFTONLY-NOT: var_decl {{.*}} "point"
 
+// UNSUPPORTED: OS=windows-msvc

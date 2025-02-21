@@ -57,3 +57,4 @@ class NSSomething : NSObject {
   // expected-error@-2 {{class 'NSSomething' has no initializers}}
   var x: Int // expected-error{{stored property 'x' requires an initial value}}
 }
+// UNSUPPORTED: OS=windows-msvc

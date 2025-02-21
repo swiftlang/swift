@@ -35,3 +35,4 @@ public struct S {
 // CHECK-NOT: "spelling": "postfix"
 // CHECK-NOT: "spelling": "infix"
 
+// UNSUPPORTED: OS=windows-msvc

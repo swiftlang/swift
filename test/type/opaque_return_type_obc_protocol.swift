@@ -14,3 +14,4 @@ extension NSIndexSet: MyProtocol {}
 public func toSomeMyProtocol() -> some MyProtocol { 
     return NSIndexSet(index: 7)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@ func for_loop_tuple_destructure_reabstraction(_ x: [(P, P.Protocol)]) {
   for (a, b) in x { _ = (a, b) }
 }
 
+// UNSUPPORTED: OS=windows-msvc

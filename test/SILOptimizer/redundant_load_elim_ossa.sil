@@ -1703,3 +1703,4 @@ bb0(%0 : $*ExistentialIntPair, %1 : $*ExistentialIntPair):
   return %4
 }
 
+// UNSUPPORTED: OS=windows-msvc

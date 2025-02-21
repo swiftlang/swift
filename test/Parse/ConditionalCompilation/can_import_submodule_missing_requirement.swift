@@ -20,3 +20,4 @@
 #if canImport(A_Private.BP.CPMissingRequirement)
 #error("should not can import A_Private.BP.CPMissingRequirement")
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ func foo(
 
 // RUN: not %sourcekitd-test -req=complete -vfs-name nope %s -pass-as-sourcetext -dont-print-request -pos=9:27 2>&1 | %FileCheck %s -check-prefix=NONEXISTENT_VFS_ERROR
 // NONEXISTENT_VFS_ERROR: error response (Request Failed): unknown virtual filesystem 'nope'
+// UNSUPPORTED: OS=windows-msvc

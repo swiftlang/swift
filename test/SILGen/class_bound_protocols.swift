@@ -209,3 +209,4 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   x.nonMutatingCounter = y
   takesInOut(&x.nonMutatingCounter)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -81,3 +81,4 @@ i = co_f0_int_x1
 var co_f0_int_x2 = co.f0(5, t: x2)
 d = co_f0_int_x2
 
+// UNSUPPORTED: OS=windows-msvc

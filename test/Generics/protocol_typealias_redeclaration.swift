@@ -6,3 +6,4 @@ protocol P {
   typealias T = Int
   associatedtype T
 }
+// UNSUPPORTED: OS=windows-msvc

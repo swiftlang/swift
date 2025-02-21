@@ -112,3 +112,4 @@ public struct StructWithImplicitlyNonSendable {
 // form.
 
 // SYNTHESIZED: extension Test.C2 : Swift.Sendable {}
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@ import keypath_objc_protocol_extension_other
 public func foo(array: [any P]) {
   _ = array.filter(\.value)
 }
+// UNSUPPORTED: OS=windows-msvc

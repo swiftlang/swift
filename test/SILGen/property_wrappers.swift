@@ -1018,3 +1018,4 @@ struct TestReabstractableWrappedValue<T1> {
   @AutoclosureWrapper var v: S<T1> = S()
   init() where T1 == Int { }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -105,3 +105,4 @@ public func makeQueryResult() -> QueryResult<UInt32> { .init(glyphIDs: []) }
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif // __cpp_concepts
 // CHECK-NEXT: class unsupportedGenericStruct { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'unsupportedGenericStruct' can not yet be represented in C++");
+// UNSUPPORTED: OS=windows-msvc

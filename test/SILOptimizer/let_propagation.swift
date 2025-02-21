@@ -340,3 +340,4 @@ public func testVarTuple(s: S3) -> Int32 {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

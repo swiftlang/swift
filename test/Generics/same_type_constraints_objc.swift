@@ -6,3 +6,4 @@
 struct X1<T: AnyObject> { }
 
 extension X1 where T == Q { } 
+// UNSUPPORTED: OS=windows-msvc

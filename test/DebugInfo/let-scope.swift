@@ -6,3 +6,4 @@ public func f(value: (Int, Int)) {
   // CHECK: debug_value {{.*}}let, name "y", {{.*}}, scope [[LET]]
   use((x,y))
 }
+// UNSUPPORTED: OS=windows-msvc

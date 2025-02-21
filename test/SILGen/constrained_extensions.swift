@@ -259,3 +259,4 @@ extension S: HasX where T == Int {
 // CHECK: begin_apply [[WITNESS_FN]](%0) : $@yield_once @convention(method) (@inout S<Int>) -> @yields @inout Int
 // CHECK: yield
 // CHECK: unwind
+// UNSUPPORTED: OS=windows-msvc

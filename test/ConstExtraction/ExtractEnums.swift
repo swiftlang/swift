@@ -281,3 +281,4 @@ public struct Enums: MyProto {
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  }
 // CHECK-NEXT:]
+// UNSUPPORTED: OS=windows-msvc

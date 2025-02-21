@@ -229,3 +229,4 @@ func foo15() -> Int {   // CHECK-NEXT: [[@LINE]]:21   -> [[@LINE+19]]:2 : 0
   }                     // CHECK-NEXT: [[@LINE]]:4    -> [[@LINE+1]]:11 : (((1 + 3) + 5) - 4)
   return x
 }                       // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

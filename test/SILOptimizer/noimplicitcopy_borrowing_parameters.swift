@@ -570,3 +570,4 @@ struct TrivialSelfTest {
 }
 
 func consumeTrivialSelfTest(_ x: consuming TrivialSelfTest) {}
+// UNSUPPORTED: OS=windows-msvc

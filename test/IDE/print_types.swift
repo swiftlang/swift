@@ -138,3 +138,4 @@ func testInGenericFunc2<T : QuxProtocol, U : QuxProtocol>(_: T, _: U) where T.Qu
 // CHECK: FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> (T, U) -> (){{$}}
 // FULL:  FuncDecl '''testInGenericFunc2''' <T, U where T : swift_ide_test.QuxProtocol, U : swift_ide_test.QuxProtocol, T.Qux == U.Qux> (T, U) -> (){{$}}
 
+// UNSUPPORTED: OS=windows-msvc

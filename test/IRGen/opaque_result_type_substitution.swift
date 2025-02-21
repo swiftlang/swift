@@ -31,3 +31,4 @@ public func usePair<T, V>(_ t: T, _ v: V) {
 // CHECK:  [[PAIR_OPAQUE:%.*]] = call swiftcc %swift.metadata_response @"$s31opaque_result_type_substitution4PairVMa"({{.*}}, ptr [[MD]], ptr [[MD]])
 // CHECK:  [[MD2:%.*]] = extractvalue %swift.metadata_response [[PAIR_OPAQUE]], 0
 // CHECK:  call ptr @"$s31opaque_result_type_substitution4PairVyACyxq_GADGr0_lWOh"({{.*}}, ptr {{.*}}, ptr [[MD2]])
+// UNSUPPORTED: OS=windows-msvc

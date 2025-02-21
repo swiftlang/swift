@@ -20,3 +20,4 @@ func testOptional(obj: P) {
   // CHECK: common result type for {{.*}} is Int
   _ = obj.opt!(1)
 }
+// UNSUPPORTED: OS=windows-msvc

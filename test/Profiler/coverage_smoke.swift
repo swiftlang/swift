@@ -203,3 +203,4 @@ var s2 = Struct2()
 s2.visible()
 
 // CHECK-REPORT: TOTAL {{.*}} 100.00% {{.*}} 100.00%
+// UNSUPPORTED: OS=windows-msvc

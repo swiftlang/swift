@@ -27,3 +27,4 @@ func func1(
 // CHECK: ]
 
 // DESCRIPTION-NOT: key.description: "fn{{[0-9]*}}: {
+// UNSUPPORTED: OS=windows-msvc

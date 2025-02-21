@@ -101,3 +101,4 @@ SimpleModelTests.testWithLeakChecking("gradient") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -370,3 +370,4 @@ func testSendableKeyPath(_ x: HasSendableKeyPath<Point>) {
   // SENDABLE_KEYPATH_POINT-DAG: Decl[InstanceVar]/CurrNominal: x[#HasSendableKeyPath<Int>#]; name=x
   // SENDABLE_KEYPATH_POINT-DAG: Decl[InstanceVar]/CurrNominal: y[#HasSendableKeyPath<Int>#]; name=y
 }
+// UNSUPPORTED: OS=windows-msvc

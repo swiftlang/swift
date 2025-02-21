@@ -194,3 +194,4 @@ protocol ProtocolHasConsumingRequirement {
 struct ProtocolHasConsumingRequirementAdopter: ProtocolHasConsumingRequirement { // expected-error {{type 'ProtocolHasConsumingRequirementAdopter' does not conform to protocol 'ProtocolHasConsumingRequirement'}} expected-note {{add stubs for conformance}} {{81-81=\n    func foo() {\n        <#code#>\n    \}\n}}
 
 }
+// UNSUPPORTED: OS=windows-msvc

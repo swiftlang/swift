@@ -22,3 +22,4 @@
 }
 
 let s = Smashed.sharedSmashed
+// UNSUPPORTED: OS=windows-msvc

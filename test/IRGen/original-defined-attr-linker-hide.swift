@@ -25,3 +25,4 @@ public struct OldEntity {
 // CHECK-DIFFMAJOR: $ld$hide$os10.8$_$s14OriginalModule9OldEntityVN
 // CHECK-DIFFMAJOR: $ld$hide$os10.9$_$s14OriginalModule9OldEntityVN
 // CHECK-DIFFMAJOR-NOT: $ld$hide$os10.10$_$s14OriginalModule9OldEntityVN
+// UNSUPPORTED: OS=windows-msvc

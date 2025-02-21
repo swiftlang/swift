@@ -38,3 +38,4 @@ extension TestActor {
     self.init(designated: x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

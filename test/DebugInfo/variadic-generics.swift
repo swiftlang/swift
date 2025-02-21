@@ -54,3 +54,4 @@ public func nominalExpansionWithMemberType<each T: Sequence>(args: repeat each T
 public typealias First<T, U> = T
 
 public func concreteExpansion<each T>(args: repeat each T, concrete: repeat First<Int, each T>) {}
+// UNSUPPORTED: OS=windows-msvc

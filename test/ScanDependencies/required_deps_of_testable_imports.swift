@@ -19,3 +19,4 @@
 // resolves the required dependencies contained within.
 //
 // CHECK: "swift": "A"
+// UNSUPPORTED: OS=windows-msvc

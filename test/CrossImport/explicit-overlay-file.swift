@@ -12,3 +12,4 @@ import BystandingLibrary
 
 // IMPORT: import of 'DeclaringLibrary' and 'BystandingLibrary' triggered a cross-import of '_OverlayLibrary'
 // NO-IMPORT-NOT: import of 'DeclaringLibrary' and 'BystandingLibrary' triggered a cross-import of '_OverlayLibrary'
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ import Library
 // Compiler thinks that the module is empty in all cases.
 // CHECK: :[[@LINE+1]]:1: error: module 'Library' has no member named 'foo'
 Library.foo()
+// UNSUPPORTED: OS=windows-msvc

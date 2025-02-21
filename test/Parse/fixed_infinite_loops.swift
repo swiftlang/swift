@@ -8,3 +8,4 @@ func test2() {
   @unknown // expected-error {{expected statement}}
   return
 }
+// UNSUPPORTED: OS=windows-msvc

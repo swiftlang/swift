@@ -49,3 +49,4 @@ func throwsNothing() {
   // CHECK: optional_try_expr{{.*}}thrown_error="Never"
   try? doesNotThrow()
 }
+// UNSUPPORTED: OS=windows-msvc

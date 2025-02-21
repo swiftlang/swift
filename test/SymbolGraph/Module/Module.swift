@@ -25,3 +25,4 @@ public struct S {
 // CHECK-ios-NEXT:       minor
 // CHECK-tvos-NEXT:      minor
 // CHECK-watchos-NEXT:   minor
+// UNSUPPORTED: OS=windows-msvc

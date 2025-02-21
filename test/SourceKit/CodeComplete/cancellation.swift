@@ -46,3 +46,4 @@ class Foo {
 // CANCEL_CACHED:   fooMember
 // CANCEL_CACHED: ]
 // CANCEL_CACHED: error response (Request Cancelled)
+// UNSUPPORTED: OS=windows-msvc

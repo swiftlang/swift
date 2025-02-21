@@ -40,3 +40,4 @@ _ = NSArray.Inner1()
 _ = NSArray.Inner2()
 
 
+// UNSUPPORTED: OS=windows-msvc

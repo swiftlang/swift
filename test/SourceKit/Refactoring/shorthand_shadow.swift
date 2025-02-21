@@ -39,3 +39,4 @@ func renameBuiltinMacroWithoutHash() {
 // REQUIRES: swift_swift_parser
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
+// UNSUPPORTED: OS=windows-msvc

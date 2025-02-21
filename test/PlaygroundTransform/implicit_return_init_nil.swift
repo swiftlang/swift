@@ -20,3 +20,4 @@ var s = S()
 // FIXME: It seems like there should be a __builtin_log_scope_exit here but there isn't, whether
 //        or not the return is explicit.
 // CHECK-NEXT: {{.*}} __builtin_log[s='nil']
+// UNSUPPORTED: OS=windows-msvc

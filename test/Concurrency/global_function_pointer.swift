@@ -45,3 +45,4 @@ public var gfptr = callAsync
 // CHECK-EXEC-NEXT: Hello World!
 // CHECK-EXEC-NEXT: 43
 
+// UNSUPPORTED: OS=windows-msvc

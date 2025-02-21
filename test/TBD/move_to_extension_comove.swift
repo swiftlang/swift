@@ -47,3 +47,4 @@ extension Date {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

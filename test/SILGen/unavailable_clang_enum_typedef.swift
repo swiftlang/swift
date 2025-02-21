@@ -21,3 +21,4 @@ let _ = MyOptionsTypedef(rawValue: 1)
 // CHECK-LABEL: sil shared [transparent] [serialized]{{.*}} @$sSo9MyOptionsa8rawValueABs5Int32V_tcfC : $@convention(method) (Int32, @thin MyOptions.Type) -> MyOptions {
 // CHECK-NOT:     _diagnoseUnavailableCodeReached
 // CHECK:       } // end sil function '$sSo9MyOptionsa8rawValueABs5Int32V_tcfC'
+// UNSUPPORTED: OS=windows-msvc

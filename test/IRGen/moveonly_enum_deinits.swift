@@ -75,3 +75,4 @@ public enum List: ~Copyable {
 
 @_silgen_name("something")
 func something<T : ~Copyable>(_ t: borrowing T)
+// UNSUPPORTED: OS=windows-msvc

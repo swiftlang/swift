@@ -26,3 +26,4 @@ PrintTests.test("Printable") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

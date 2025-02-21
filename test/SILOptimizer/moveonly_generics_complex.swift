@@ -63,3 +63,4 @@ func _withUnprotectedUnsafeTemporaryAllocation<T: ~Copyable, R: ~Copyable>(
   case .failure(let error): return try _rethrowsViaClosure { throw error }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

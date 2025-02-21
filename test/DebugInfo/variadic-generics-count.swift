@@ -52,3 +52,4 @@ public func f6<each T>(s: S<repeat each T>) {
 // CHECK-DAG: [[COUNT3_1_VAR]] = !DILocalVariable(name: "$pack_count_0",{{.*}} flags: DIFlagArtificial)
 // CHECK-DAG: [[COUNT4_1_VAR]] = !DILocalVariable(name: "$pack_count_0",{{.*}} flags: DIFlagArtificial)
 // CHECK-DAG: [[COUNT6_1_VAR]] = !DILocalVariable(name: "$pack_count_0",{{.*}} flags: DIFlagArtificial)
+// UNSUPPORTED: OS=windows-msvc

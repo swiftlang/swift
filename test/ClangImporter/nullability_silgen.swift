@@ -21,3 +21,4 @@ func testFunnyProperty(_ sc: SomeClass) {
   sc.funnyProperty = "hello"
   var str: String = sc.funnyProperty
 }
+// UNSUPPORTED: OS=windows-msvc

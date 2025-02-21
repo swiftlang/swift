@@ -299,3 +299,4 @@ void funcUnderDirective(void);
 // CHECK-DIRECTIVE-FUNC:  "location": {
 // CHECK-DIRECTIVE-FUNC:    "uri": "file://{{.*}}other.h"
 // CHECK-DIRECTIVE-FUNC:  }
+// UNSUPPORTED: OS=windows-msvc

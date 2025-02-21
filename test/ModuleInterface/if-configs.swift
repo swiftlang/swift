@@ -179,3 +179,4 @@ public func hasIfCompilerCheck(_ x: () -> Bool = {
 #endif
   }) {
 }
+// UNSUPPORTED: OS=windows-msvc

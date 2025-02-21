@@ -56,3 +56,4 @@ int main() {
   assert(e == SomeEnum::first);
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

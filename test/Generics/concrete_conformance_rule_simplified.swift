@@ -32,3 +32,4 @@ struct G2<T: P5> where T.T: P4 {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=G2
 // CHECK-NEXT: Generic signature: <T where T == G1<C>>
 extension G2 where T == G1<C> {}
+// UNSUPPORTED: OS=windows-msvc

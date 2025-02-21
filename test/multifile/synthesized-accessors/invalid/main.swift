@@ -9,3 +9,4 @@ public protocol P {
 public struct HasAccessors : P {
   public var x: Int = 123
 }
+// UNSUPPORTED: OS=windows-msvc

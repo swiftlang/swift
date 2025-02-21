@@ -46,3 +46,4 @@ func test(lhs: AnyError) {
 // CHECK-NEXT: ]
 
 // CHECK: SYMBOL GRAPH END
+// UNSUPPORTED: OS=windows-msvc

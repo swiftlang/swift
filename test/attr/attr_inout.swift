@@ -11,3 +11,4 @@ enum inout_carrier {
 }
 
 func deprecated(inout x: Int) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}
+// UNSUPPORTED: OS=windows-msvc

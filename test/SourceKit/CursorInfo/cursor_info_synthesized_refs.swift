@@ -16,3 +16,4 @@ func test() {
 
 // RUN: %sourcekitd-test -req=cursor -pos=10:15 %s -- %s | %FileCheck -check-prefix=CHECK2 %s
 // CHECK2: <Declaration>let $0: <Type usr="s:Si">Int</Type></Declaration>
+// UNSUPPORTED: OS=windows-msvc

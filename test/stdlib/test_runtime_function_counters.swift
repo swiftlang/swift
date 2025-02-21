@@ -279,3 +279,4 @@ testMeasureRuntimeFunctionCountersDiffs()
 
 /// Test that you can provide custom handlers for runtime functions counters updates.
 testFunctionRuntimeCountersUpdateHandler()
+// UNSUPPORTED: OS=windows-msvc

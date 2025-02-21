@@ -35,3 +35,4 @@ func bar<T>(_ T: T.Type) {}
 // CHECK-NEXT:   key.diagnostics: [
 // CHECK-NEXT:   ]
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

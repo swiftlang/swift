@@ -34,3 +34,4 @@ func test_use_of_buffer_init() throws {
       try $0.test()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

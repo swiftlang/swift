@@ -51,3 +51,4 @@ public class Class {
 // CHECK-SAME:   ptr {{.*}}@swift_deletedMethodError{{(.ptrauth)?}}
 
 // CHECK-SAME: }>
+// UNSUPPORTED: OS=windows-msvc

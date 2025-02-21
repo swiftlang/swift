@@ -77,3 +77,4 @@ withUnsafeTemporaryAllocation(of: Void.self, capacity: 2) { buffer in
 // CHECK: [[VOID_PTR:%[0-9]+]] = ptrtoint ptr [[VOID_PTR_RAW]] to [[WORD]]
 // CHECK: call swiftcc void @blackHole([[WORD]] [[VOID_PTR]])
 
+// UNSUPPORTED: OS=windows-msvc

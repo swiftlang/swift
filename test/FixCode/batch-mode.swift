@@ -22,3 +22,4 @@ func fooMain(_ e: E1) {
   switch e {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

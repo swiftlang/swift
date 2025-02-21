@@ -24,3 +24,4 @@
 // CHECK-DAG: 16ConformanceCheck2S4V (ConformanceCheck.S4) : ConformanceCheck.P1, ConformanceCheck.P2
 // CHECK-DAG: 16ConformanceCheck2C1C (ConformanceCheck.C1) : ConformanceCheck.ClassBoundP
 // CHECK-DAG: 16ConformanceCheck3fooV (ConformanceCheck.foo) : ConformanceCheck.MyProto
+// UNSUPPORTED: OS=windows-msvc

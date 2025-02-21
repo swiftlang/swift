@@ -33,3 +33,4 @@ public func main() {
 // CHECK-NEXT:    call swiftcc void @"$e4main5start1pyx_tAA6PlayerRzlFAA8ConcreteV_Tg5"()
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
+// UNSUPPORTED: OS=windows-msvc

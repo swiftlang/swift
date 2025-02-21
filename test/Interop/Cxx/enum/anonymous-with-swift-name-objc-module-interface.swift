@@ -16,3 +16,4 @@
 // CHECK:   @available(swift, obsoleted: 3, renamed: "makeOtherColor(with:withOptions:)")
 // CHECK:   func makeOtherColorWithInt(_ x: Int32, withOptions opts: CFColorMask)
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

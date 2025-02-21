@@ -29,3 +29,4 @@ extension Never: P {
     public func makeA() -> Never { fatalError() }
     public var b: Never { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

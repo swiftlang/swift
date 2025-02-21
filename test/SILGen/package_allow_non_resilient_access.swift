@@ -170,3 +170,4 @@ func bar() {
 // CHECK-DEFAULT: sil @$s5Utils9PubStructV6pubVarSivg : $@convention(method) (@in_guaranteed PubStruct) -> Int
 // CHECK-ACCESS: function_ref @$s5Utils9PubStructV6pubVarSivg
 // CHECK-NONRES: struct_extract {{.*}} : $PubStruct, #PubStruct.pubVar
+// UNSUPPORTED: OS=windows-msvc

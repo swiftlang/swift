@@ -56,3 +56,4 @@ func allNamedOther(buf ptr: UnsafePointer<CInt>, count len: CInt) {
 // CHECK-NEXT:     return allNamedOther(buf: ptr.baseAddress!, count: CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
 
+// UNSUPPORTED: OS=windows-msvc

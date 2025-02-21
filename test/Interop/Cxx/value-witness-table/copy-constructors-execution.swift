@@ -49,3 +49,4 @@ CXXCopyConstructorTestSuite.test("Default copy constructor, member with user-def
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

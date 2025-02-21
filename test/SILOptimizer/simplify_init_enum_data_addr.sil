@@ -95,3 +95,4 @@ bb0(%0 : $*F, %1 : $Builtin.RawPointer):
   %6 = tuple ()
   return %6 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

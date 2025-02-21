@@ -10,3 +10,4 @@ public func foo() {
       bytes.map(\.description).joined(separator: ".") // expected-error {{cannot use key path in embedded Swift}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

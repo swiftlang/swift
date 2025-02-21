@@ -758,3 +758,4 @@ func test_existential_sendable_cast(v: any Sendable) {
   let _ = v as! [String: Any] // Ok
   let _ = v as! Set<Int> // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

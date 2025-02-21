@@ -139,3 +139,4 @@ doit()
 //      CHECK: }
 
 
+// UNSUPPORTED: OS=windows-msvc

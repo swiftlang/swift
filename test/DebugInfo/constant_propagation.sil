@@ -55,3 +55,4 @@ bb0(%0 : $Int64, %1 : $Int64):
   (%5, %6) = destructure_tuple %3 : $(low: Int64, high: Int64), loc "file.swift":15:5, scope 2
   return %5 : $Int64, loc "file.swift":15:5, scope 2
 } // end sil function 'bar'
+// UNSUPPORTED: OS=windows-msvc

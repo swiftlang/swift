@@ -17,3 +17,4 @@ extension G: ExpressibleByIntegerLiteral where A == Int {}
 public func f() -> G<Int> {
   return 123
 }
+// UNSUPPORTED: OS=windows-msvc

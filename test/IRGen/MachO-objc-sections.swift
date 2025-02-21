@@ -26,3 +26,4 @@ class D {
 // CHECK-MACHO: @objc_categories = {{.*}}, section "__DATA,__objc_catlist,regular,no_dead_strip"
 // CHECK-MACHO: @objc_non_lazy_classes = {{.*}}, section "__DATA,__objc_nlclslist,regular,no_dead_strip"
 
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@ _ = HasUserProvidedDestructor()
 _ = HasEmptyDestructorAndMemberWithUserDefinedConstructor()
 _ = HasNonTrivialImplicitDestructor()
 _ = HasNonTrivialDefaultedDestructor()
+// UNSUPPORTED: OS=windows-msvc

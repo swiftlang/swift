@@ -14,3 +14,4 @@ import Preconcurrency
 public enum SendableEnum: Sendable {
   case caseWithNonSendablePayload(_ ns: NotSendable)
 }
+// UNSUPPORTED: OS=windows-msvc

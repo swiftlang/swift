@@ -25,3 +25,4 @@ extension Q {
 // CHECK-NOT: requirementOf
 // CHECK-NOT: defaultImplementationOf 
 
+// UNSUPPORTED: OS=windows-msvc

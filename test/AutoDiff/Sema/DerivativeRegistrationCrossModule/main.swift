@@ -16,3 +16,4 @@ func foo(_ s: Struct) {
   _ = Struct()
   _ = s.method(1)
 }
+// UNSUPPORTED: OS=windows-msvc

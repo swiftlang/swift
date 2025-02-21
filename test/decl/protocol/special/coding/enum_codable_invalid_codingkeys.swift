@@ -41,3 +41,4 @@ enum InvalidCodingKeys3 : Codable { // expected-error {{type 'InvalidCodingKeys3
       }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

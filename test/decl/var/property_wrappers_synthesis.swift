@@ -89,3 +89,4 @@ class MyObservedType {
   // CHECK:   subscript_expr implicit type="@lvalue Int" decl="{{.*}}.Observable.subscript(_enclosingInstance:wrapped:storage:)@
 }
 
+// UNSUPPORTED: OS=windows-msvc

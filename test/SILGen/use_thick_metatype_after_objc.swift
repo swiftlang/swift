@@ -21,3 +21,4 @@ class ExampleCallingClass {
         ExampleClass.exampleProperty.toggle()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

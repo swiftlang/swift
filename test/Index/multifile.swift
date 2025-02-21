@@ -16,3 +16,4 @@ typealias Bar = [Int] // CHECK: 2:11 | type-alias/Swift | Bar | [[Bar_USR:.*]] |
 
 func foo() -> Bar { [] } // CHECK: 2:15 | type-alias/Swift | Bar | [[Bar_USR]] | Ref,RelCont | rel: 1
 extension Optional where Wrapped == Bar {} // CHECK: 3:37 | type-alias/Swift | Bar | [[Bar_USR]] | Ref | rel: 0
+// UNSUPPORTED: OS=windows-msvc

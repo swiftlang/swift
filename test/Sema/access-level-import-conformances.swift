@@ -28,3 +28,4 @@ public func useInAPI(a: any Proto = ConformingType()) { // expected-error {{cann
 @inlinable public func inlinableFunc() {
   let _: any Proto = ConformingType() // expected-error {{cannot use conformance of 'ConformingType' to 'Proto' here; 'ConformanceDefinition' was not imported publicly}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -254,3 +254,4 @@ func test_implicit_cgfloat_conversion() {
   allow_optional_promotion_double(cgf) // Ok -> CGFloat -> Double -> Double??
   allow_optional_promotion_cgfloat(d) // Ok -> Double -> CGFloat -> CFloat??
 }
+// UNSUPPORTED: OS=windows-msvc

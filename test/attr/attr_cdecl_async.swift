@@ -5,3 +5,4 @@
 @_cdecl("async") // expected-error{{@_cdecl global function cannot be asynchronous}}
 func asynchronous() async { }
 
+// UNSUPPORTED: OS=windows-msvc

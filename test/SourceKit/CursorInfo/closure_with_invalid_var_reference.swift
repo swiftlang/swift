@@ -10,3 +10,4 @@ func test(array: [String]) {
 }
 
 // CHECK: <Declaration>let refToElement: <Type usr="s:SS">String</Type></Declaration>
+// UNSUPPORTED: OS=windows-msvc

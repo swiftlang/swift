@@ -39,3 +39,4 @@
 // of this file. This file is dedicated for assert only symbols.
 
 // _Builtin_float Symbols
+// UNSUPPORTED: OS=windows-msvc

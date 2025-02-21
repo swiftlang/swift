@@ -324,3 +324,4 @@ sil_moveonlydeinit S3 {
 sil_moveonlydeinit S4 {
   @s4_deinit
 }
+// UNSUPPORTED: OS=windows-msvc

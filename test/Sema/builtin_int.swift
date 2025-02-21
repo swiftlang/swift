@@ -19,3 +19,4 @@ func c<T>(x: Builtin.Int<T>) {} // expected-error{{}}
 func d<let N: Int>(x: Builtin.Int<N>) -> Builtin.Int<N> { // expected-error 2 {{}}
     return x
 }
+// UNSUPPORTED: OS=windows-msvc

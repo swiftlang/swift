@@ -150,3 +150,4 @@ sil @set_computed_generic_subscript : $@convention(keypath_accessor_setter) <T: 
 
 sil @get_reabstracted : $@convention(keypath_accessor_getter) <T> (@in_guaranteed ExternalReabstractions<T>) -> @out @callee_guaranteed @substituted <U> () -> @out U for <()>
 sil @set_reabstracted : $@convention(keypath_accessor_setter) <T> (@in_guaranteed @callee_guaranteed @substituted <U> () -> @out U for <()>, @inout ExternalReabstractions<T>) -> ()
+// UNSUPPORTED: OS=windows-msvc

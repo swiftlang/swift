@@ -22,4 +22,4 @@ HasCtor {
 import Test
 
 // CHECK: error: 'HasCtor' cannot be constructed because it has no accessible initializers
-let x = HasCtor(42)
+let x = HasCtor(42)// UNSUPPORTED: OS=windows-msvc

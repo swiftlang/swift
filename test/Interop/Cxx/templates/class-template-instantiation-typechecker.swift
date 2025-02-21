@@ -26,3 +26,4 @@ public func clangErrorReportedOnInstantiation() {
   z.memberWrongType()
   z.argWrongType(IntWrapper())
 }
+// UNSUPPORTED: OS=windows-msvc

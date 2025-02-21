@@ -56,3 +56,4 @@ class WithDesignatedInit : WithDesignatedInit {
 
   init(x: Int) {}
 }
+// UNSUPPORTED: OS=windows-msvc

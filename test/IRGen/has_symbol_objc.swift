@@ -13,3 +13,4 @@ public func testClassTypes() {
 // CHECK: define linkonce_odr hidden i1 @"$sSo9ObjCClassCTwS"()
 // CHECK:   [[RES:%.*]] = icmp ne ptr @"OBJC_CLASS_$_ObjCClass", null
 // CHECK:   ret i1 [[RES]]
+// UNSUPPORTED: OS=windows-msvc

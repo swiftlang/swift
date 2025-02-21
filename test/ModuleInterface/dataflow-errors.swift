@@ -9,4 +9,4 @@ public struct BadInit {
   public init() {
     return // without initializing 'x'
   }
-}
+}// UNSUPPORTED: OS=windows-msvc

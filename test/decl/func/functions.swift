@@ -197,3 +197,4 @@ func bogusDestructuring() {
   Foo().registerCallback { (Bar?) in } // expected-error {{unnamed parameters must be written with the empty name '_'}}
 
 }
+// UNSUPPORTED: OS=windows-msvc

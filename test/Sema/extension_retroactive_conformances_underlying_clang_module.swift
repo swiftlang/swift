@@ -47,3 +47,4 @@ extension OtherLibraryClass: UnderlyingLibraryProtocol {}
 extension OtherLibraryClass: LibraryProtocol {}
 extension OtherLibraryClass: OtherLibraryProtocol {} // expected-warning {{extension declares a conformance of imported type 'OtherLibraryClass' to imported protocol 'OtherLibraryProtocol'}}
 // expected-note @-1 {{add '@retroactive' to silence this warning}} {{30-50=@retroactive OtherLibraryProtocol}}
+// UNSUPPORTED: OS=windows-msvc

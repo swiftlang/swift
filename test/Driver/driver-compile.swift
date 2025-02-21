@@ -126,3 +126,4 @@
 // UPDATE-CODE: {{DISTINCTIVE-PATH|distinctive-path}}{{/|\\\\}}usr{{/|\\\\}}bin{{/|\\\\}}swift{{c?(\.exe)?}}
 // UPDATE-CODE: -frontend -c
 // UPDATE-CODE: -emit-remap-file-path {{.+}}.remap
+// UNSUPPORTED: OS=windows-msvc

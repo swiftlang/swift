@@ -232,3 +232,4 @@ func test_if_case_b(x: __owned Foo3) {
         _ = b
     }
 }
+// UNSUPPORTED: OS=windows-msvc

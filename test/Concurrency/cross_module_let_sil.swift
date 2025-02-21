@@ -45,3 +45,4 @@ func check3(_ actor: OtherModuleActor) async -> Int {
 func check4(_ actor: OtherModuleActor?) async -> SomeSendableClass? {
   return await actor?.d
 }
+// UNSUPPORTED: OS=windows-msvc

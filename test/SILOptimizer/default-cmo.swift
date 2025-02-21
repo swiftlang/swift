@@ -103,3 +103,4 @@ public func getModuleKlassMemberTBD() -> Int {
   return ModuleTBD.moduleKlassMember()
 }
 
+// UNSUPPORTED: OS=windows-msvc

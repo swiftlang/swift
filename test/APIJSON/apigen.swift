@@ -440,3 +440,4 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT: ],
 // CHECK-NEXT: "categories": [],
 // CHECK-NEXT: "version": "1.0"
+// UNSUPPORTED: OS=windows-msvc

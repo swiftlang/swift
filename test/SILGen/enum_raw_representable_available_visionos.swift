@@ -17,3 +17,4 @@ public enum Metasyntactics: String, RawRepresentable {
     @available(visionOS 1.1, *)
     case bar
 }
+// UNSUPPORTED: OS=windows-msvc

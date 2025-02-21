@@ -48,3 +48,4 @@ s[13]
 // CHECK-NEXT: {{.*}} __builtin_log[='Optional(33)']
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 // CHECK-NEXT: {{.*}} __builtin_log[='Optional(33)']
+// UNSUPPORTED: OS=windows-msvc

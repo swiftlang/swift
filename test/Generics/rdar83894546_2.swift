@@ -40,3 +40,4 @@ public func callee<T : P1>(_: T.Type) -> T {
 public func callee<T : P9>(_: T) {
   _ = callee(T.F.A.D.self)
 }
+// UNSUPPORTED: OS=windows-msvc

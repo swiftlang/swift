@@ -8,3 +8,4 @@ public func f(_ input: Int) -> Int {
 // CHECK-SAME: scope: ![[FILE:[0-9]+]]
 // CHECK-SAME: file: ![[FILE]]
 // CHECK-NOT: "Swift runtime failure: arithmetic overflow"
+// UNSUPPORTED: OS=windows-msvc

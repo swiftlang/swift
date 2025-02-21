@@ -110,3 +110,4 @@ func testPrivate() {
   String.#^CLANG_QUAL_STRING^#
 // CLANG_QUAL_STRING: name=someMethod()
 }
+// UNSUPPORTED: OS=windows-msvc

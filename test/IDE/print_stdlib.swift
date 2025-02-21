@@ -78,3 +78,4 @@
 /// deserialization safety enabled.
 // RUN: %target-swift-ide-test -print-module-groups -module-to-print=Swift -source-filename %s -print-interface -enable-deserialization-safety > %t-group.txt
 // RUN: %FileCheck -check-prefix=CHECK-GROUPS1 %s < %t-group.txt
+// UNSUPPORTED: OS=windows-msvc

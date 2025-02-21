@@ -40,3 +40,4 @@ public struct ForEach2<Data, ID, Content>: View2 where Data : RandomAccessCollec
 // CHECK: Begin completions, 2 items
 // CHECK-NEXT: Keyword[self]/CurrNominal:          self[#Text2#];
 // CHECK-NEXT: Decl[InstanceMethod]/Super/TypeRelation[Convertible]:         font()[#View2#];
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@
 // CHECK: error: compile command failed due to signal
 
 print("Hello, World")
+// UNSUPPORTED: OS=windows-msvc

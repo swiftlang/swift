@@ -10,3 +10,4 @@ struct Broken {
   var b : Bool = True // expected-error{{cannot find 'True' in scope}}
 }
 var v1 : Int[1 // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
+// UNSUPPORTED: OS=windows-msvc

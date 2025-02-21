@@ -160,3 +160,4 @@ class ThrowingChild : ThrowingParent {
 class FailingThrowingChild : FailingThrowingParent {
   override init?() throws {}
 }
+// UNSUPPORTED: OS=windows-msvc

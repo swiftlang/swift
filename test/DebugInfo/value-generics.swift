@@ -26,3 +26,4 @@ func concreteBA(_: Builtin.FixedArray<4, Int>) {}
 // CHECK-DAG: ![[ELEMENT_PARAM]] = !DITemplateTypeParameter(type: ![[ELEMENT_TYPE:.*]])
 // CHECK-DAG: ![[ELEMENT_TYPE]] = !DICompositeType({{.*}}identifier: "$sSiD"
 func concreteV(_: Slab<2, Int>) {}
+// UNSUPPORTED: OS=windows-msvc

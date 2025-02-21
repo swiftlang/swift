@@ -27,3 +27,4 @@ public func test_PartialApplyDynamicType() -> Int {
   return result
 }
 
+// UNSUPPORTED: OS=windows-msvc

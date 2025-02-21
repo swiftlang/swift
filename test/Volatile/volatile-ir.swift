@@ -55,3 +55,4 @@ public func test_uint64() -> UInt64 {
 // CHECK:   [[RET:%.*]] = load atomic volatile i64, ptr {{.*}} monotonic, align 8
 // CHECK:   ret i64 [[RET]]
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

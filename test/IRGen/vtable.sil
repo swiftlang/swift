@@ -45,3 +45,4 @@ sil @$s6vtable1CCfD : $@convention(method) (@owned C) -> ()
 sil_vtable C {
   #C.init!allocator: @$s6vtable1CCACycACmcfC
 }
+// UNSUPPORTED: OS=windows-msvc

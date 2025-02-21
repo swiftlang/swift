@@ -38,3 +38,4 @@ import BrokenClangModule
 
 _ = BrokenClangModule.x
 // CHECK: broken-modules.swift:[[@LINE-1]]:5: error: cannot find 'BrokenClangModule' in scope
+// UNSUPPORTED: OS=windows-msvc

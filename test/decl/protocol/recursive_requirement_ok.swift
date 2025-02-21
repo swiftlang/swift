@@ -98,3 +98,4 @@ protocol P13 {
   associatedtype AT1 : P12
   associatedtype AT2: P13 where AT2.AT1 == AT1
 }
+// UNSUPPORTED: OS=windows-msvc

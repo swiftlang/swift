@@ -6,3 +6,4 @@
 
 // VERIFY-DEBUG-INFO: dsymutil{{(\.exe)?}}{{"?}} verify-debug-info -o verify-debug-info.dSYM
 // VERIFY-DEBUG-INFO: dwarfdump --verify --debug-info --eh-frame --quiet verify-debug-info.dSYM
+// UNSUPPORTED: OS=windows-msvc

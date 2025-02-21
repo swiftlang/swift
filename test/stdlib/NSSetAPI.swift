@@ -122,3 +122,4 @@ NSIndexSetAPI.test("Sequence") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

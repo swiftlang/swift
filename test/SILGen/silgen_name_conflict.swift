@@ -21,3 +21,4 @@ public func foo() {
     my_other_extern_func1()
     my_other_extern_func2(x: 42) // expected-error {{function type mismatch, declared as '@convention(c) () -> ()' but used as '@convention(c) (Int) -> ()'}}
 }
+// UNSUPPORTED: OS=windows-msvc

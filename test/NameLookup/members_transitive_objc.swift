@@ -56,3 +56,4 @@ extension ObjectInBridgingHeader {
     overridesCategoryMethodOnNSObject()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

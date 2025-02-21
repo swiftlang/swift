@@ -134,3 +134,4 @@ func testBadOverrides(obj: FoolishErrorSub) throws {
   let _: CInt = try base.badZeroResult()
   try base.badNonzeroResult() as Void
 }
+// UNSUPPORTED: OS=windows-msvc

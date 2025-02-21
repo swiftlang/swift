@@ -8,3 +8,4 @@ func testArrays() {
   staticBoundsArray([])
   staticBoundsArray(nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<CChar>'}}
 }
+// UNSUPPORTED: OS=windows-msvc

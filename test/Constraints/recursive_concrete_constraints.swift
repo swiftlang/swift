@@ -32,3 +32,4 @@ struct S<A: Collection> : Collection where A.Index == Int {
   var base: A
   var baseRange: Range<A.Index>
 }
+// UNSUPPORTED: OS=windows-msvc

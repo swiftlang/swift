@@ -14,3 +14,4 @@ public func foo(_ f: (Void) -> ()) {}
 // CHECK-REMAP: "text": "("
 
 // CHECK-ACTIONS: -Xllvm -aarch64-use-tbi
+// UNSUPPORTED: OS=windows-msvc

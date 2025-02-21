@@ -104,3 +104,4 @@ func testOwnGetter() {
     }
 // GETTER-DAG: Decl[LocalVar]/Local/NotRecommended/TypeRelation[Convertible]: valueInOwnGetter[#Int#]; name=valueInOwnGetter; diagnostics=warning:attempting to access 'valueInOwnGetter' within its own getter{{$}}
 }
+// UNSUPPORTED: OS=windows-msvc

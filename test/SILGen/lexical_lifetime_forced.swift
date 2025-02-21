@@ -5,3 +5,4 @@
 @_silgen_name("funky")
 @_lexicalLifetimes func funky() {}
 
+// UNSUPPORTED: OS=windows-msvc

@@ -1386,3 +1386,4 @@ bb0(%0 : $*B, %1 : $*B):
   return %3
 }
 
+// UNSUPPORTED: OS=windows-msvc

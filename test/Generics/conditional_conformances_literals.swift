@@ -136,3 +136,4 @@ func combined() {
     // expected-error@-1 {{generic struct 'Dictionary' requires that 'Fails' conform to 'Conforms'}}
     // expected-error@-2 {{type 'any Conforms' cannot conform to 'Conforms'}} expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }
+// UNSUPPORTED: OS=windows-msvc

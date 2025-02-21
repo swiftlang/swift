@@ -105,3 +105,4 @@ struct Main {
     try await resolved.testFunc(arg: arg)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

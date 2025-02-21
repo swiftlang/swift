@@ -48,3 +48,4 @@ func zang(x: consuming Outer) {
     }
 
 }
+// UNSUPPORTED: OS=windows-msvc

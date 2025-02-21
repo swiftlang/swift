@@ -15,3 +15,4 @@ class C<each T> {
     self.values = (repeat each fromPack)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

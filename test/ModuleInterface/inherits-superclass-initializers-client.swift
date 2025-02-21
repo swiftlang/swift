@@ -41,3 +41,4 @@ test()
 // CHECK: secret init from Base
 
 // CHECK-NOT: public init
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ func foo() {
   } catch _ as NSError {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

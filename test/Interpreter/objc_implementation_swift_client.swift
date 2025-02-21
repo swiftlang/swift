@@ -185,3 +185,4 @@ do {
 // CHECK: SwiftClientSubclass.otherProperty = 9
 // CHECK-LABEL: *** SwiftClientSubclass end ***
 // CHECK: SwiftClientSubclass It's better to burn out than to fade away.
+// UNSUPPORTED: OS=windows-msvc

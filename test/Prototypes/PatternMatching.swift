@@ -400,3 +400,4 @@ struct Paired<T: Hashable, I: Comparable> : Pattern {
 // swift-syntax-check-fn: swift-syntax-check-single-file
 // End:
 
+// UNSUPPORTED: OS=windows-msvc

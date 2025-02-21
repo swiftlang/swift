@@ -13,3 +13,4 @@
 // CHECK:   var b: Int32
 // CHECK: }
 // CHECK: func mutateIt(_ x: IntPair!)
+// UNSUPPORTED: OS=windows-msvc

@@ -55,3 +55,4 @@ public struct UnavailableOniOS {
 // CHECK:           } // end sil function '$s4Test37unavailableOnMacCatalystExtensionFuncyyF'
 @available(macCatalystApplicationExtension, unavailable)
 public func unavailableOnMacCatalystExtensionFunc() {}
+// UNSUPPORTED: OS=windows-msvc

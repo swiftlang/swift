@@ -93,3 +93,4 @@ func passIntsTrailing3(_ t: IntsTrailing3) {
 func passE(_ e: E) {
   take(e)
 }
+// UNSUPPORTED: OS=windows-msvc

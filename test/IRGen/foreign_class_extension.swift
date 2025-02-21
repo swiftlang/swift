@@ -15,3 +15,4 @@ extension CGImage {
   var bar: Int { return 0 }
   subscript(x: Int) -> Int { return x }
 }
+// UNSUPPORTED: OS=windows-msvc

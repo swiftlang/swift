@@ -18,3 +18,4 @@
 // CHECK: Import successful!
 
 // LINETABLE-CHECK-NOT: ASTSection
+// UNSUPPORTED: OS=windows-msvc

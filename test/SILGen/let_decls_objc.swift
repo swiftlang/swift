@@ -10,3 +10,4 @@ import Foundation
 class C : NSObject {
   let x : Int = 100
 }
+// UNSUPPORTED: OS=windows-msvc

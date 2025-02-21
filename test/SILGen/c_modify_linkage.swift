@@ -19,3 +19,4 @@ extension NSReferencePoint: Pointable {}
 // CHECK-LABEL: sil shared [serialized] [ossa] @$sSo16NSReferencePointC1xSfvM
 
 // CHECK-LABEL: sil shared [serialized] [ossa] @$sSo16NSReferencePointC1ySfvM
+// UNSUPPORTED: OS=windows-msvc

@@ -4,3 +4,4 @@ func bar() {
   badMagicLiteral()
   let _: Int = badGenericMagicLiteral()
 }
+// UNSUPPORTED: OS=windows-msvc

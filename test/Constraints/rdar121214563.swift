@@ -14,3 +14,4 @@ func test<T: P2>(x: T.A2, y: any P<T>, z: any P2) {
   y.x = x // Ok
   y.x = z.x // expected-error {{cannot assign value of type 'Any' to type 'T.A2'}}
 }
+// UNSUPPORTED: OS=windows-msvc

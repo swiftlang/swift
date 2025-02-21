@@ -8,3 +8,4 @@ class CallerXYImpl: CallerX, CallerY {
 class CallerXDerivedY: CallerBaseY, CallerX {
   override func use(_ x: Int, error callback: @escaping () -> ()) throws { } // expected-error {{incompatible error argument conventions}}
 }
+// UNSUPPORTED: OS=windows-msvc

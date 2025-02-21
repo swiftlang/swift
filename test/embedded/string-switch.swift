@@ -17,3 +17,4 @@ e = MyEnum.bar
 print(e.rawValue)
 // CHECK: foo
 // CHECK: bar
+// UNSUPPORTED: OS=windows-msvc

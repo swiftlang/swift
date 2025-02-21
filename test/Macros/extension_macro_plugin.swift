@@ -54,3 +54,4 @@ struct Outer {
 // CHECK: {"expandMacroResult":{"diagnostics":[],"expandedSource":"extension Outer.Nested: P where Element: P {\n  static func requirement() {\n    Element.requirement()\n  }\n}"}}
 
 requiresP(Outer.Nested<Wrapped>.self)
+// UNSUPPORTED: OS=windows-msvc

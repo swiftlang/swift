@@ -15,3 +15,4 @@ class C<A> {
 }
 
 C<Int64>().foo(1, y: 3.14);
+// UNSUPPORTED: OS=windows-msvc

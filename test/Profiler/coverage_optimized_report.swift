@@ -28,3 +28,4 @@ func baz() {
 }
 
 baz()
+// UNSUPPORTED: OS=windows-msvc

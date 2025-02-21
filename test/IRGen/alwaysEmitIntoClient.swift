@@ -30,3 +30,4 @@
 public func referencesFunction() {
   referencedFunction()
 }
+// UNSUPPORTED: OS=windows-msvc

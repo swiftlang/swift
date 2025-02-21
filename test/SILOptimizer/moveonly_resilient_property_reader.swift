@@ -13,3 +13,4 @@ public struct Resilient: ~Copyable {
     public var pubPropNC: ResilientMemberNC = ResilientMemberNC()
 }
 
+// UNSUPPORTED: OS=windows-msvc

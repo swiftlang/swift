@@ -53,3 +53,4 @@ import F
 // CHECK-DAG:             "-swift-module-file=SwiftOnoneSupport={{.*}}{{/|\\}}SwiftOnoneSupport-{{.*}}.swiftmodule"
 // CHECK-DAG:             "-fmodule-file=F={{.*}}{{/|\\}}F-{{.*}}.pcm"
 // CHECK-DAG:             "-fmodule-file=SwiftShims={{.*}}{{/|\\}}SwiftShims-{{.*}}.pcm"
+// UNSUPPORTED: OS=windows-msvc

@@ -62,3 +62,4 @@
 // CHECK-NEXT:   struct HasSpecialization<> {
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

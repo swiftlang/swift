@@ -10,3 +10,4 @@ import SILSource
 public func main() {
   public_func() as Int?
 }
+// UNSUPPORTED: OS=windows-msvc

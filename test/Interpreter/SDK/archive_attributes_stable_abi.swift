@@ -10,3 +10,4 @@
 // REQUIRES: objc_interop
 // REQUIRES: swift_stable_abi
 // REQUIRES: CPU=i386 || CPU=x86_64
+// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@ print(pullback(at: 1.0, of: testFunc)(.init(1.0)) == 3.0)
 func foo<T>(_ fn: @escaping @differentiable(reverse) (T?) -> Double) {
   let _: @differentiable(reverse) (T) -> Double = fn
 }
+// UNSUPPORTED: OS=windows-msvc

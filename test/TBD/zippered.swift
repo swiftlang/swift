@@ -62,3 +62,4 @@ public func foo() -> Bool {
   },
   "tapi_tbd_version": 5
 }
+// UNSUPPORTED: OS=windows-msvc

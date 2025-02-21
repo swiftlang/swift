@@ -18,3 +18,4 @@ extension CGPoint: MyPoint {}
 
 // Dummy statement
 _ = ()
+// UNSUPPORTED: OS=windows-msvc

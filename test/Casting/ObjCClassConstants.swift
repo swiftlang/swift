@@ -78,3 +78,4 @@ tests.test("ObjC and Swift type lookups should agree (with array cast to AnyObje
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

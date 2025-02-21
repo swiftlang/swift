@@ -8,3 +8,4 @@ struct Foo {
   init(x: Int) {}
   init(y: Int) {}
 }
+// UNSUPPORTED: OS=windows-msvc

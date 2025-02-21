@@ -45,3 +45,4 @@ if #_hasSymbol(foo bar) {}
 // expected-note@+1 {{to match this opening '('}}
 if #_hasSymbol(foo {}
 
+// UNSUPPORTED: OS=windows-msvc

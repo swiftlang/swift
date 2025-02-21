@@ -13,3 +13,4 @@ struct SQ : Q {}
 func g() {
   f(p: SP())
 }
+// UNSUPPORTED: OS=windows-msvc

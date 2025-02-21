@@ -12,3 +12,4 @@ struct StaticInstanceNameDisambiguation : Codable {
   static let version: Float = 0.42
   let version: Int = 42
 }
+// UNSUPPORTED: OS=windows-msvc

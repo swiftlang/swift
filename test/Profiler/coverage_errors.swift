@@ -923,3 +923,4 @@ struct TestType7 {
   // CHECK-NEXT:  [[@LINE-3]]:29 -> [[@LINE-3]]:33 : (0 - 1)
   // CHECK-NEXT:  }
 }
+// UNSUPPORTED: OS=windows-msvc

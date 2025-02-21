@@ -21,3 +21,4 @@ NSLog(
   "%@ is the loneliest number that you'll ever %@", 
   NSNumber(value: 1), "do"
 )
+// UNSUPPORTED: OS=windows-msvc

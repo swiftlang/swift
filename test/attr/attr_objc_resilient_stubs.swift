@@ -40,3 +40,4 @@ extension FixedLayoutNSObjectOutsideParent {
 extension AnotherFixedLayoutNSObjectSubclass {
   @objc public func categoryTwoMethod() {}
 }
+// UNSUPPORTED: OS=windows-msvc

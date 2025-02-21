@@ -12,3 +12,4 @@
 // CHECK:     children:        
 // CHECK: ...
 
+// UNSUPPORTED: OS=windows-msvc

@@ -38,3 +38,4 @@ func test() {
   _ = AnonymousEnumConstant // expected-error {{'AnonymousEnumConstant' has been renamed to 'BoxForConstants.anonymousEnumConstant'}}
   _ = BoxForConstants.anonymousEnumConstant // okay
 }
+// UNSUPPORTED: OS=windows-msvc

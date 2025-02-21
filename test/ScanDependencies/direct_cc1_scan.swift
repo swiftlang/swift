@@ -31,3 +31,4 @@ func a() {}
 //--- test.swift
 import A
 func test() {}
+// UNSUPPORTED: OS=windows-msvc

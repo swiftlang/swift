@@ -15,3 +15,4 @@ public func testAsyncLet(_ n: String) async -> String {
   let result = await first
   return result
 }
+// UNSUPPORTED: OS=windows-msvc

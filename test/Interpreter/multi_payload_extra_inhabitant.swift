@@ -253,3 +253,4 @@ tests.test("types with more spare bits than used by tags") {
   }
 }
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

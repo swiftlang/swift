@@ -19,3 +19,4 @@ import bar
 
 // FLAG-PROVIDED: $s3bar3BarCMa
 // FLAG-PROVIDED: $s3foo3FooCMa
+// UNSUPPORTED: OS=windows-msvc

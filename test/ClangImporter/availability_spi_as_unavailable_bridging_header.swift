@@ -12,3 +12,4 @@ public let d: SPIInterface2 // expected-error{{cannot use class 'SPIInterface2' 
 public func inlinableUsingSPI() { // expected-warning{{public declarations should have an availability attribute with an introduction version}}
   SharedInterface.foo() // expected-error{{class method 'foo()' cannot be used in an '@inlinable' function because it is an SPI imported from '__ObjC'}}
 }
+// UNSUPPORTED: OS=windows-msvc

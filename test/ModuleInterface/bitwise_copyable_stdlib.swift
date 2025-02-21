@@ -19,3 +19,4 @@
 public protocol BitwiseCopyable {}
 public typealias _BitwiseCopyable = BitwiseCopyable
 
+// UNSUPPORTED: OS=windows-msvc

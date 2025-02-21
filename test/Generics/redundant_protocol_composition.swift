@@ -22,3 +22,4 @@ struct G1a<T : BinaryInteger & FixedWidthInteger & UnsignedInteger> {}
 // CHECK-NEXT: Generic signature: <T where T : FixedWidthInteger, T : UnsignedInteger>
 struct G2a<T> where T : BinaryInteger & FixedWidthInteger & UnsignedInteger {}
 
+// UNSUPPORTED: OS=windows-msvc

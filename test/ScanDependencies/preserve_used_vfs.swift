@@ -72,3 +72,4 @@ import F
 // CHECK-NEXT: "-Xcc",
 // CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay.yaml",
 // CHECK: ],
+// UNSUPPORTED: OS=windows-msvc

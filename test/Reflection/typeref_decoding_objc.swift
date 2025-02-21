@@ -86,3 +86,4 @@
 // CHECK-NEXT: (protocol_composition
 // CHECK-NEXT:   (objective_c_protocol name=NSCoding))
 // CHECK-NEXT: - Metadata sources:
+// UNSUPPORTED: OS=windows-msvc

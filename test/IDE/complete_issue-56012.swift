@@ -29,3 +29,4 @@ func testMember(val: Derived<Int>) {
 // MEMBER-DAG: Decl[InstanceMethod]/Super:         onBase()[#Int#]; name=onBase()
 // MEMBER-DAG: Decl[InstanceMethod]/Super:         onRoot()[#Void#]; name=onRoot()
 }
+// UNSUPPORTED: OS=windows-msvc

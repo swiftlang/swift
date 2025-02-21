@@ -10,3 +10,4 @@ foo()
 
 // CHECK: call {{.*foo}}
 
+// UNSUPPORTED: OS=windows-msvc

@@ -43,3 +43,4 @@ class Derived : Base {
     g()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

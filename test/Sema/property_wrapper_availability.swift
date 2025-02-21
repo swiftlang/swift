@@ -186,3 +186,4 @@ func unavailableOnMacOSFunc(
   @WrappedValueUnavailableOnMacOS var unavailableWrappedValueLocal = S()
   @WrappedValueAvailable51 var wrappedValueAavailable51 = S() // expected-error {{'wrappedValue' is only available in macOS 51 or newer}}
 }
+// UNSUPPORTED: OS=windows-msvc

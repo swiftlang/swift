@@ -40,3 +40,4 @@ struct ConformsToUnsafeRequirement: HasUnsafeRequirement {
 class SubclassWithUnsafeMethod: SuperclassWithUnsafeMethod {
   @unsafe override func implicitlyUnsafe(_: PointerType) { }
 }
+// UNSUPPORTED: OS=windows-msvc

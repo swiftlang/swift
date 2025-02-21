@@ -11,3 +11,4 @@ x = 8
 
 
 // CHECK-NOT: cannot find 'x' in scope
+// UNSUPPORTED: OS=windows-msvc

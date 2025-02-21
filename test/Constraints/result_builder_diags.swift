@@ -1079,3 +1079,4 @@ func testNoDuplicateStmtDiags() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

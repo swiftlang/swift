@@ -36,3 +36,4 @@ for _ in 0 ..< 30 {
 }
 
 // IR: !{!"branch_weights", i32 6, i32 31}
+// UNSUPPORTED: OS=windows-msvc

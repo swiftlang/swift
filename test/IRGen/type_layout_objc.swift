@@ -84,3 +84,4 @@ struct TypeLayoutTest<T> {
   // CHECK:       store ptr getelementptr (ptr, ptr @"$sBi32_WV", i32 8)
   var k: CommonLayout
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ extension S {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

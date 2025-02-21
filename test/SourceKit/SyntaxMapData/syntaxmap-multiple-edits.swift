@@ -274,3 +274,4 @@
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],
 
+// UNSUPPORTED: OS=windows-msvc

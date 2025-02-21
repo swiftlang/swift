@@ -48,3 +48,4 @@ public struct HasMethods {
 // CHECK: // Unavailable in C++: Swift global function 'unsupportedAEIC()'.
 // CHECK-EMPTY:
 // CHECK-NEXT: // Unavailable in C++: Swift global function 'unsupportedThrows()'.
+// UNSUPPORTED: OS=windows-msvc

@@ -50,3 +50,4 @@ func doit() async throws {
 }
 
 try await doit()
+// UNSUPPORTED: OS=windows-msvc

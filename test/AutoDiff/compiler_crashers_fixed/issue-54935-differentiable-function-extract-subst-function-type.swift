@@ -21,3 +21,4 @@ func bar() {
   let pb = pullback(at: 10, of: f)
   _ = pb(1)
 }
+// UNSUPPORTED: OS=windows-msvc

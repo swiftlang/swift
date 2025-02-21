@@ -174,4 +174,4 @@ protocol Comprehensive {
     protocol Nested {
       func foo()
     }
-  }
+  }// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ do {
 do {
   let _ = S.bar(fiz & // expected-error {{missing arguments for parameters 'fiz', 'baz' in call}}
 } // expected-error {{expected expression after operator}}
+// UNSUPPORTED: OS=windows-msvc

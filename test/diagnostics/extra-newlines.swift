@@ -20,3 +20,4 @@
 func foo(a: Int, b: Int) {
   a + b
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -57,3 +57,4 @@ distributed actor Worker {
     print("OK") // CHECK: OK
   }
 }
+// UNSUPPORTED: OS=windows-msvc

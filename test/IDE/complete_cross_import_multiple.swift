@@ -43,3 +43,4 @@ import #^IMPORT^#
 // IMPORT-NEGATIVE-NOT: _ABAdditions
 // IMPORT-NEGATIVE-NOT: __ABAdditionsDAdditions
 
+// UNSUPPORTED: OS=windows-msvc

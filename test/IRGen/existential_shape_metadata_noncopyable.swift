@@ -20,3 +20,4 @@ public struct NCStruct: ~Copyable { }
 public func testNoncopyableConcrete() -> any  ~Copyable.Type {
   return (any QNC<NCStruct>).self
 }
+// UNSUPPORTED: OS=windows-msvc

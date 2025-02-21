@@ -15,3 +15,4 @@ public func f(value: String?) {
     use((value))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

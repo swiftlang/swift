@@ -8,3 +8,4 @@
 protocol MyProto {
   func action()
 }
+// UNSUPPORTED: OS=windows-msvc

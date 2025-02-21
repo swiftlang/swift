@@ -75,3 +75,4 @@ import ObjectiveC
 
 }
 // CHECK-NEXT: @end
+// UNSUPPORTED: OS=windows-msvc

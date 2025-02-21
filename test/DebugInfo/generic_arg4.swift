@@ -14,3 +14,4 @@ public func foo<T>(_ arg: [Q<T>]) {
 // CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,
 // CHECK-SAME:                        line: [[@LINE-2]], type: ![[DITY:.*]])
 }
+// UNSUPPORTED: OS=windows-msvc

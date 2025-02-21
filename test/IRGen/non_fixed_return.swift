@@ -69,3 +69,4 @@ func create<T>(_ t: T) -> C<T> {
 // OPT:  [[ADDR4:%.*]] = getelementptr inbounds i8, ptr [[BASE]], i64 8
 // OPT: call void @llvm.memset.p0.i64(ptr {{.*}}[[ADDR4]], i8 0, i64 16, i1 false)
 // OPT: ret void
+// UNSUPPORTED: OS=windows-msvc

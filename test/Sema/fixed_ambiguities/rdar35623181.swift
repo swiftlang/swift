@@ -6,3 +6,4 @@ extension Sequence where Element == String {
     return lazy.map({ $0 }).joined(separator: ",")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

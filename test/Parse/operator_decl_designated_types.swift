@@ -86,3 +86,4 @@ postfix operator ^^*%% : MediumPrecedence, Class
 
 infix operator <*<>*> : AdditionPrecedence,
 // expected-warning@-1 {{designated types are no longer used by the compiler}} {{43-44=}}
+// UNSUPPORTED: OS=windows-msvc

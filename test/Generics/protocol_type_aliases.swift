@@ -109,3 +109,4 @@ protocol P7a : P7 {
 }
 
 func testP7A<T : P7a>(_: T, a: T.A) -> Int { return a }
+// UNSUPPORTED: OS=windows-msvc

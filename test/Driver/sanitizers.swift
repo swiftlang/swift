@@ -110,3 +110,4 @@
 
 // BADARG: unsupported argument 'unknown' to option '-sanitize='
 // INCOMPATIBLESANITIZERS: argument '-sanitize=address' is not allowed with '-sanitize=thread'
+// UNSUPPORTED: OS=windows-msvc

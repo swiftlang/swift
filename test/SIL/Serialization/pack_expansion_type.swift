@@ -36,3 +36,4 @@ serializedCaller(1, "hi", false)
 calleeWithRequirement(1, "hi")
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

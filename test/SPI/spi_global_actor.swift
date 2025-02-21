@@ -18,3 +18,4 @@ public struct PublicStruct {}
 @_spi(Foo)
 @SPIGA
 public struct SPIStruct {}
+// UNSUPPORTED: OS=windows-msvc

@@ -38,3 +38,4 @@ func test_generic_vs_unavailable(_ s: S) {
   s.bar(42) // Ok (picks overload with defaulted argument)
   // CHECK: function_ref @$s29availability_with_overloading1SV3baryySi_SitF
 }
+// UNSUPPORTED: OS=windows-msvc

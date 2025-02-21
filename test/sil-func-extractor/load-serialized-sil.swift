@@ -58,3 +58,4 @@ public struct X {
     unknown()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

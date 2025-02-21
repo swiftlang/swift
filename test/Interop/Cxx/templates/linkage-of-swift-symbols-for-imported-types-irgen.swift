@@ -26,3 +26,4 @@ public func getMagicNumberForLinkageComparison() -> Any {
 
 // CHECK: $sSo0031MagicWrapperMagicNumber_IJFJhAbVMB" = linkonce_odr hidden constant
 // CHECK: $sSo0031MagicWrapperMagicNumber_IJFJhAbVMF" = linkonce_odr hidden constant
+// UNSUPPORTED: OS=windows-msvc

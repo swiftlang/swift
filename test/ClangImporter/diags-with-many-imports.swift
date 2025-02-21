@@ -109,3 +109,4 @@ obsoleted()
 // CHECK: [[@LINE-1]]:1: error:
 // CHECK: explicitly marked unavailable here
 // CHECK: void obsoleted() __attribute__((unavailable));
+// UNSUPPORTED: OS=windows-msvc

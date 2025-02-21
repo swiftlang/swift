@@ -58,3 +58,4 @@ func test6(x: Int, y: inout DiffableStruct, z: Float) -> (Float, Float) { return
 // CHECK:   jvp: @$s31inout_differentiability_witness5test61x1y1zSf_SftSi_AA14DiffableStructVzSftFTJfUSSpSSSr : $@convention(thin) (Int, @inout DiffableStruct, Float) -> (Float, Float, @owned @callee_guaranteed (@inout DiffableStruct.TangentVector, Float) -> (Float, Float))
 // CHECK:   vjp: @$s31inout_differentiability_witness5test61x1y1zSf_SftSi_AA14DiffableStructVzSftFTJrUSSpSSSr : $@convention(thin) (Int, @inout DiffableStruct, Float) -> (Float, Float, @owned @callee_guaranteed (Float, Float, @inout DiffableStruct.TangentVector) -> Float)
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

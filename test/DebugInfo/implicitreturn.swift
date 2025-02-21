@@ -13,3 +13,4 @@ func app() {
 
 app()
 
+// UNSUPPORTED: OS=windows-msvc

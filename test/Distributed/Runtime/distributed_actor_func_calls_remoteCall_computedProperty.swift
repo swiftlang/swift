@@ -44,3 +44,4 @@ func test() async throws {
     try! await test()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

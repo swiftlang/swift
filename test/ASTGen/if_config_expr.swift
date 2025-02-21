@@ -128,3 +128,4 @@ func ifconfigExprInExpr(baseExpr: MyStruct) {
 #endif
   )
 }
+// UNSUPPORTED: OS=windows-msvc

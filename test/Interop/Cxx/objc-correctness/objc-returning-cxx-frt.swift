@@ -14,3 +14,4 @@ func testObjCMethods() {
     var frt3 = Bridge.objCMethodReturningFRTOwned()
     // CHECK: objc_method {{.*}} #Bridge.objCMethodReturningFRTOwned!foreign : (Bridge.Type) -> () -> CxxRefType, $@convention(objc_method) (@objc_metatype Bridge.Type) -> @owned CxxRefType
  }
+// UNSUPPORTED: OS=windows-msvc

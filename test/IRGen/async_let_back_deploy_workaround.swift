@@ -35,3 +35,4 @@ public func bar(x: Int, y: Int) async -> Int {
     async let z = bar_work()
     return await z
 }
+// UNSUPPORTED: OS=windows-msvc

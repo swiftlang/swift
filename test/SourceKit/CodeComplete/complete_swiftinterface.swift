@@ -25,3 +25,4 @@ print(x.#^MEMBER^#)
 // CHECK: Decl[InstanceVar]/CurrNominal:      y[#Double#]; name=y
 // CHECK: Decl[InstanceVar]/CurrNominal:      magnitudeSquared[#Double#]; name=magnitudeSquared
 // CHECK: Decl[InstanceVar]/CurrNominal:      magnitude[#Double#]; name=magnitude
+// UNSUPPORTED: OS=windows-msvc

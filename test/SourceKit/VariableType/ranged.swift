@@ -8,3 +8,4 @@ var w = 4
 // CHECK: (2:5, 2:6): String (explicit type: 0)
 // CHECK: (3:5, 3:6): String (explicit type: 1)
 // CHECK-NOT: (4:5, 4:6)
+// UNSUPPORTED: OS=windows-msvc

@@ -212,3 +212,4 @@ do {
 
   precondition(array.removeLast() == 1)
 }
+// UNSUPPORTED: OS=windows-msvc

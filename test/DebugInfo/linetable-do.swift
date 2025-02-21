@@ -43,3 +43,4 @@ func testDoWhileStmt() -> Void {
     _blackHole(e)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

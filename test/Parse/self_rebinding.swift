@@ -132,3 +132,4 @@ enum EnumCaseNamedSelf {
 struct TestImplicitSelfUse : Codable {
   let `self`: Int // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

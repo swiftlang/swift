@@ -7,3 +7,4 @@
 
 // CHECK: warning:
 // CHECK-NOT: error:
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ import Test
 func test(_ val: SecondRecordWithXUsesFirst) {
   let _ = val.x
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -122,3 +122,4 @@ func sequenceOfNormalTrys(_ b1: Bool,
 }
 
 // CHECK-IR: [[PREFER_FALSE]] = !{!"branch_weights", i32 1, i32 2000}
+// UNSUPPORTED: OS=windows-msvc

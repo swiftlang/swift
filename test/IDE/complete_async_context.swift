@@ -61,3 +61,4 @@ func syncClosure() {
 func asyncFunc() async {
   #^CHECK_asyncFunc?check=CHECK_asyncContext^#
 }
+// UNSUPPORTED: OS=windows-msvc

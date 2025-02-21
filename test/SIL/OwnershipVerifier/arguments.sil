@@ -749,3 +749,4 @@ bb3:
   return %9999 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

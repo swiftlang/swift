@@ -374,3 +374,4 @@ private enum ProtGenEnumWithSize<T: Prot> {
 
 // CHECK-LABEL: define linkonce_odr hidden ptr @"$s15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLOyxGAA0C0RzlWOh"(ptr
 // CHECK:   ret ptr %0
+// UNSUPPORTED: OS=windows-msvc

@@ -104,3 +104,4 @@ testKVCStrings.test("identification by selector") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

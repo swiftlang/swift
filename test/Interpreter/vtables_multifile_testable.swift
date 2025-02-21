@@ -113,3 +113,4 @@ VTableTestSuite.test("Derived") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

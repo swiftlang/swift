@@ -54,3 +54,4 @@ struct Witness: Either {
     typealias Left = Maybe<RegularStruct>
     typealias Right = Maybe<NC>
 }
+// UNSUPPORTED: OS=windows-msvc

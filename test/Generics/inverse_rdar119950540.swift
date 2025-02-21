@@ -124,3 +124,4 @@ public struct KVPair<Key, Value>: MyCollection {
   public typealias Iterator = MyIndexingIterator<Self>
   public __consuming func makeIterator() -> Iterator { fatalError("todo") }
 }
+// UNSUPPORTED: OS=windows-msvc

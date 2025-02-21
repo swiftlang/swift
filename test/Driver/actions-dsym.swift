@@ -114,3 +114,4 @@
 // WHOLE-MODULE: 3: compile, {0, 1, 2}, object
 // WHOLE-MODULE: 4: link, {3}, image
 // WHOLE-MODULE: 5: generate-dSYM, {4}, dSYM
+// UNSUPPORTED: OS=windows-msvc

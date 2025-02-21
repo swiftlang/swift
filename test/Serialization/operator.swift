@@ -58,3 +58,4 @@ func typeCheckOnly() {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

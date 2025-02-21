@@ -35,3 +35,4 @@ doit()
 // CHECK-LABEL: define hidden swiftcc void @"$s4main4doityyF"()
 //       CHECK:   call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s4main5Value{{[A-Za-z_0-9]+}}LLCySiGMD")
 //       CHECK: }
+// UNSUPPORTED: OS=windows-msvc

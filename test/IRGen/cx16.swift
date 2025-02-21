@@ -10,3 +10,4 @@ public func test() {
 
 // We expect double-wide atomic intrinsics to always be available on x86_64.
 // CHECK: "target-features"="{{.*}}+cx16,
+// UNSUPPORTED: OS=windows-msvc

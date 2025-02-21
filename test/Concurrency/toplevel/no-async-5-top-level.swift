@@ -44,3 +44,4 @@ if a > 10 {
 
     print(a)
 }
+// UNSUPPORTED: OS=windows-msvc

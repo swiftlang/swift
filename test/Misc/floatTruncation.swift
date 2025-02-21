@@ -8,3 +8,4 @@ let x = Builtin.fptoui_FPIEEE32_Int8(f._value)
 // CHECK-NOT: (dummy CHECK line to avoid FileCheck complaints)
 // CHECK-s390x: clfebr %r{{[0-9]+}}, {{[0-7]+}}, %f{{[0-9]+}}, {{[0-9]+}}
 
+// UNSUPPORTED: OS=windows-msvc

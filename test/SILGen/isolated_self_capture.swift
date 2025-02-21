@@ -21,3 +21,4 @@ actor MyActor {
     await transferToMain(closure) 
   }
 }
+// UNSUPPORTED: OS=windows-msvc

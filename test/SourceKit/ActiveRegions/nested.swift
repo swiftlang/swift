@@ -45,3 +45,4 @@ class Fallback {
 // CHECK4-NEXT: 9:1 - active
 // CHECK4-NEXT: 13:1 - inactive
 // CHECK4-NEXT: END IF CONFIGS
+// UNSUPPORTED: OS=windows-msvc

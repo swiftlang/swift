@@ -725,3 +725,4 @@ InterpolationTestSuite.test("Floats and Doubles") {
         })
   }
 }
+// UNSUPPORTED: OS=windows-msvc

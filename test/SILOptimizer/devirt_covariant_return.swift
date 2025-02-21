@@ -350,3 +350,4 @@ public class H: F {
     return nil
   }
 }
+// UNSUPPORTED: OS=windows-msvc

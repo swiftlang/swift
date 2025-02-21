@@ -3,3 +3,4 @@
 import NoCXXStdlib
 
 let _ = my_sum(12, 15)
+// UNSUPPORTED: OS=windows-msvc

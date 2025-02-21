@@ -46,3 +46,4 @@ public final actor ActorWithField {
 public func takeActorWithIntField(_ x: ActorWithField) {
     print("takeActorWithIntField")
 }
+// UNSUPPORTED: OS=windows-msvc

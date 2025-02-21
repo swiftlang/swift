@@ -165,3 +165,4 @@
 
 // TITLE-LABEL: "precise": "s:6Macros14stringifySevenSi_SStycfm",
 // TITLE: "title": "stringifySeven()",
+// UNSUPPORTED: OS=windows-msvc

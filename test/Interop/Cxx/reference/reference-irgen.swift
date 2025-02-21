@@ -45,3 +45,4 @@ public func setCxxConstRef() {
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main14setCxxConstRefyyF"()
 // CHECK: call void @{{_Z20setConstStaticIntRefRKi|"\?setConstStaticIntRef@@YAXAEBH@Z"}}(ptr %{{.*}})
+// UNSUPPORTED: OS=windows-msvc

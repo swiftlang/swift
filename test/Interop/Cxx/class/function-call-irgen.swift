@@ -37,3 +37,4 @@ public func testNonTrivialFunctionPointer() {
   let f = getFnPtr()
   f(NonTrivial())
 }
+// UNSUPPORTED: OS=windows-msvc

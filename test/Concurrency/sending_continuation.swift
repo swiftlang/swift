@@ -247,3 +247,4 @@ public actor WithCheckedThrowingContinuationErrorAvoidance {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

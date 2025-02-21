@@ -121,3 +121,4 @@ OuterStruct<Int>.InnerStruct<String>(u: "two").printAllThree(t: 1, v: [3])
 
 // CHECK: override 1 two [3]
 SubClass<String, Int>(u: "two").printAllThree(t: 1, v: [3])
+// UNSUPPORTED: OS=windows-msvc

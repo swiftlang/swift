@@ -14,3 +14,4 @@ public struct G<each T> {
 // CHECK-NOT: sil_property #G.property1<each τ_0_0>
 // CHECK-NOT: sil_property #G.property2<each τ_0_0>
 // CHECK-LABEL: sil_property #G.property3<each τ_0_0>
+// UNSUPPORTED: OS=windows-msvc

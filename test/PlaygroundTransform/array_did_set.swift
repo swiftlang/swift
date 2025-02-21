@@ -33,3 +33,4 @@ s.a.append(300)
 // CHECK-NEXT: [{{.*}}] __builtin_postPrint
 // CHECK-NEXT: [{{.*}}] __builtin_log_scope_exit
 // CHECK-NEXT: [{{.*}}] __builtin_log[a='[3, 2, 300]']
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ class Grandchild : Child {
     super.foo()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

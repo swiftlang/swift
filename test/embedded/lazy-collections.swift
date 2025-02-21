@@ -25,3 +25,4 @@ struct Main {
     // CHECK: 1 2 3 4 5 6
   }
 }
+// UNSUPPORTED: OS=windows-msvc

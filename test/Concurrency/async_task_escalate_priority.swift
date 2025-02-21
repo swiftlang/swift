@@ -226,3 +226,4 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
     await top_level.value
   }
 }
+// UNSUPPORTED: OS=windows-msvc

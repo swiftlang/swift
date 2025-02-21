@@ -45,3 +45,4 @@ extension S: Sendable where T: Sendable {
 
 @available(SwiftStdlib 5.1, *)
 @MainActor @Sendable func globalActorFuncAsync() async { }
+// UNSUPPORTED: OS=windows-msvc

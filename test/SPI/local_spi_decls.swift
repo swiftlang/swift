@@ -132,3 +132,4 @@ public func inlinableSPI() {
 @_spi(S) func internalFunc() {} // expected-error {{internal global function cannot be declared '@_spi' because only public and open declarations can be '@_spi'}}
 
 @_spi(S) package func packageFunc() {} // expected-error {{package global function cannot be declared '@_spi' because only public and open declarations can be '@_spi'}}
+// UNSUPPORTED: OS=windows-msvc

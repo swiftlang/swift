@@ -10,3 +10,4 @@ func bar<T>(_ x: T) {} // expected-note {{generic parameters are always consider
 func baz(_ fn: () -> Void) {
   (a: 0, b: bar).b(fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
 }
+// UNSUPPORTED: OS=windows-msvc

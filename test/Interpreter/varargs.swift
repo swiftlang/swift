@@ -16,3 +16,4 @@ vf(a as NSArray)
 // CHECK: OK
 vf(s as NSString)
 // CHECK: OK
+// UNSUPPORTED: OS=windows-msvc

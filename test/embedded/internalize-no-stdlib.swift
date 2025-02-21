@@ -32,3 +32,4 @@ public func main() {
 
 // CHECK-MACHO-NOT: @llvm.compiler.used
 // CHECK-MACHO-NOT: @llvm.used
+// UNSUPPORTED: OS=windows-msvc

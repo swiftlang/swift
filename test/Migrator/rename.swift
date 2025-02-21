@@ -24,3 +24,4 @@ func foo(_ b: BarForwardDeclaredClass) {
 func foo1(_ b: BarForwardDeclaredClass) {
   b.barInstanceFunc2(0,toRemove:1,toRemove1:2,toRemove2:3)
 }
+// UNSUPPORTED: OS=windows-msvc

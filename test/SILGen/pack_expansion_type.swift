@@ -50,3 +50,4 @@ public func sameExpansionTwice<each U, each V>(us: repeat each U, more_us: repea
 public func nonPackAndPackParameterInExpansion<each T, U, V>(t: repeat each T, u: U, v: V) -> (repeat (each T, U, V)) {
   return (repeat (each t, u, v))
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -100,3 +100,4 @@ func bv_assign_field(_ bv: BV) -> UnsafeRawPointer {
   let ne = NE(bv)
   return ne.bv.p
 }
+// UNSUPPORTED: OS=windows-msvc

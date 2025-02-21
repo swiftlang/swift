@@ -12,3 +12,4 @@ func foo() {
 #sourceLocation(file: "bar.swift", line: 100)
   } while x < 10
 }
+// UNSUPPORTED: OS=windows-msvc

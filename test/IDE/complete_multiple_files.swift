@@ -57,3 +57,4 @@ var _: Void = {
 // VAR_INITIALIZED_BY_CALLING_CLOSURE:     Begin completions, 2 items
 // VAR_INITIALIZED_BY_CALLING_CLOSURE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: bar[#Foo#];
 // VAR_INITIALIZED_BY_CALLING_CLOSURE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Foo#})[#(into: inout Hasher) -> Void#];
+// UNSUPPORTED: OS=windows-msvc

@@ -41,3 +41,4 @@ import VersionedFMWK
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 }
 // CHECK-NEXT: @end
+// UNSUPPORTED: OS=windows-msvc

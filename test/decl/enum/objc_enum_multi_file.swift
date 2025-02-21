@@ -52,3 +52,4 @@ enum TheEnum: Invalid { // should never be hit
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

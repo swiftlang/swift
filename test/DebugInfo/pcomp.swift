@@ -34,3 +34,4 @@ func main() {
   markUsed("\(p.f())")
 }
 
+// UNSUPPORTED: OS=windows-msvc

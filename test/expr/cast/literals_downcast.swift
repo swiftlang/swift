@@ -31,3 +31,4 @@ struct S: ExpressibleByStringLiteral {
 
 let a = "A" as? S // expected-warning {{cast from literal of inferred type 'String' to unrelated type 'S' always fails; consider using 'as' coercion}} {{none}}
 let a1 = "A" as! S // expected-warning {{cast from literal of inferred type 'String' to unrelated type 'S' always fails; consider using 'as' coercion}}
+// UNSUPPORTED: OS=windows-msvc

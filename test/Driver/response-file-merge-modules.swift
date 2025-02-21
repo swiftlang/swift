@@ -10,3 +10,4 @@
 // MERGE: -emit-module-doc-path {{"?}}[[PARTIAL_MODULE_B:[^ ]+]].swiftdoc
 // MERGE: bin{{/|\\\\}}swift{{c?}}
 // MERGE: @{{[^ ]*}}arguments-{{[0-9a-zA-Z]+}}.resp{{"?}} # -frontend -merge-modules -emit-module {{"?}}[[PARTIAL_MODULE_A]].swiftmodule{{"?}} {{"?}}[[PARTIAL_MODULE_B]].swiftmodule
+// UNSUPPORTED: OS=windows-msvc

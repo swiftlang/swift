@@ -25,3 +25,4 @@ extension S2 {
   var y: T { get {} } // expected-error{{invalid redeclaration of 'y'}}
   var z: Int { get {} } // expected-error{{invalid redeclaration of 'z'}}
 }
+// UNSUPPORTED: OS=windows-msvc

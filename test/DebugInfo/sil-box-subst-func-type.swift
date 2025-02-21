@@ -6,4 +6,4 @@ func f<T>(_ g: @escaping (() -> T) -> T) -> (() -> T) {
     return h!
 }
 
-// CHECK-LABEL: !DICompositeType(tag: DW_TAG_structure_type, name: "$sxIegr_Sgz_x_lXXD",
+// CHECK-LABEL: !DICompositeType(tag: DW_TAG_structure_type, name: "$sxIegr_Sgz_x_lXXD",// UNSUPPORTED: OS=windows-msvc

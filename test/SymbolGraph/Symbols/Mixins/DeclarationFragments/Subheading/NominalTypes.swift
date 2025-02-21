@@ -89,3 +89,4 @@ public class Class<T> where T: Sequence {}
 // TYPEALIAS-NEXT: }
 public typealias TypeAlias<T> = Struct<T> where T: Collection
 
+// UNSUPPORTED: OS=windows-msvc

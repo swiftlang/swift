@@ -16,3 +16,4 @@ public class Renamed<T> {}
 // CHECK: class SWIFT_SYMBOL("s:6Expose6TestMeC") Renamed
 
 // CHECK: // Unavailable in C++: Swift generic class 'Renamed'.
+// UNSUPPORTED: OS=windows-msvc

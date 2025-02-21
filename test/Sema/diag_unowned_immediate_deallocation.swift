@@ -494,3 +494,4 @@ func testDontDiagnoseThroughImmediatelyEvaluatedClosure() {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

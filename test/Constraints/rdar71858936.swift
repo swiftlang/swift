@@ -26,3 +26,4 @@ class S {
     return binding.wrappedValue
   }
 }
+// UNSUPPORTED: OS=windows-msvc

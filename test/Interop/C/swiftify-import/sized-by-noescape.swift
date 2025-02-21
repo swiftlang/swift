@@ -17,3 +17,4 @@ import SizedByNoEscapeClang
 // CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int{{.*}}, _ p1: RawSpan, _ p2: RawSpan)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_  p: RawSpan)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func swiftAttr(_  p: RawSpan)
+// UNSUPPORTED: OS=windows-msvc

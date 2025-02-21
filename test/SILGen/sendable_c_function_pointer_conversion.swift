@@ -21,3 +21,4 @@ public func eventHandler(
 }
 
 func update(pointer: UnsafeMutableRawPointer!) -> Int32 { 0 }
+// UNSUPPORTED: OS=windows-msvc

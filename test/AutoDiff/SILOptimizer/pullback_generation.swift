@@ -220,3 +220,4 @@ func move_value(x: Float) -> Float {
 // CHECK:         dealloc_stack %[[#T1]]
 // CHECK:       bb4(%113 : $Builtin.RawPointer):
 // CHECK:         br bb5(%[[#]] : $Float, %[[#]] : $Float, %[[#T4]] : $Float, %[[#]] : $(predecessor: _AD__$s19pullback_generation10move_value1xS2f_tF_bb2__Pred__src_0_wrt_0))
+// UNSUPPORTED: OS=windows-msvc

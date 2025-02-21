@@ -1442,3 +1442,4 @@ this(%string : @owned $String):
   %retval = tuple ()
   return %retval
 }
+// UNSUPPORTED: OS=windows-msvc

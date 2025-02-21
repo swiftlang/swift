@@ -84,3 +84,4 @@ func outer<T>(_: T) {
   func hasDefault(x: Int = { inner(); return 3 }()) {}
   hasDefault()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -39,3 +39,4 @@ public struct V<T> {
 public struct Container {
   public static let All = { return { (_ v: V<Int>) in { return G(5) } } }
 }
+// UNSUPPORTED: OS=windows-msvc

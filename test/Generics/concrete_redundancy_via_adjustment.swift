@@ -12,3 +12,4 @@ protocol P1 {
 protocol P2 {
   associatedtype T : P1 where T.X == G<T.Y>
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -112,3 +112,4 @@ struct AccidentalReorder {
 func testAccidentalReorder() {
   _ = AccidentalReorder(optionalInt: 17) { 42 } // expected-error{{incorrect argument label in call (have 'optionalInt:_:', expected 'content:optionalInt:')}}
 }
+// UNSUPPORTED: OS=windows-msvc

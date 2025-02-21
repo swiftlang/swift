@@ -21,3 +21,4 @@ func testSignedIntegers() {
 %end
 %end
 }
+// UNSUPPORTED: OS=windows-msvc

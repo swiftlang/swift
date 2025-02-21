@@ -45,3 +45,4 @@ func test<C: Class>(_ c: C, _ x: Float) {
 // CHECK-LABEL: sil_differentiability_witness private [reverse] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Class> @$s8mangling4testyyx_SftAA5ClassCRbzlFSfx_SftcfU_ : $@convention(thin) <C where C : Class> (@guaranteed C, Float) -> Float {
 // CHECK:  jvp: @$s8mangling4testyyx_SftAA5ClassCRbzlFSfx_SftcfU_ADRbzlTJfSSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Class> (@guaranteed τ_0_0, Float) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (@guaranteed τ_0_0, Float) -> Float for <τ_0_0.TangentVector>)
 // CHECK:  vjp: @$s8mangling4testyyx_SftAA5ClassCRbzlFSfx_SftcfU_ADRbzlTJrSSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Class> (@guaranteed τ_0_0, Float) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (Float) -> (τ_0_0, Float) for <τ_0_0.TangentVector>)
+// UNSUPPORTED: OS=windows-msvc

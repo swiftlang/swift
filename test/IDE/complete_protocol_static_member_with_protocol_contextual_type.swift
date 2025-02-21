@@ -29,3 +29,4 @@ func testOnMyOtherProto() {
 func testOpaqueMyProto() -> some MyProto {
    return .#^IN_OPAQUE_PROTOCOL_POS?check=ON_MY_PROTO^#
 }
+// UNSUPPORTED: OS=windows-msvc

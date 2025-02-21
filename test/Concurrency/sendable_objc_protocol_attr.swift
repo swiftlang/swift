@@ -102,3 +102,4 @@ do {
   testSendable(KRefined()) // Ok
   testSendable(KUncheckedRefined()) // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

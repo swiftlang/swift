@@ -45,3 +45,4 @@ struct TestShadowedQualified {
 }
 
 _ = TestShadowedQualified().value
+// UNSUPPORTED: OS=windows-msvc

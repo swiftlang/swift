@@ -19,3 +19,4 @@ struct Foo<T: Tubb>: P {
 // CHECK: [[BUTT_CONFORMANCE_ADDR:%.*]] = getelementptr {{.*}} [[TUBB_CONFORMANCE]], i32 1
 // CHECK: [[BUTT_CONFORMANCE:%.*]] = load {{.*}} [[BUTT_CONFORMANCE_ADDR]]
 // CHECK: ret {{.*}} [[BUTT_CONFORMANCE]]
+// UNSUPPORTED: OS=windows-msvc

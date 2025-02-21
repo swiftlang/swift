@@ -51,3 +51,4 @@ extension Foo.E {
   func e(x: Foo.E) {}
 // CHECK: func e(x: Foo.E)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -45,3 +45,4 @@ public func test() -> Int64 {
 
 // CHECK-LABEL: sil [clang M<Int64>.getValue] @{{_ZNK1MIxE8getValueEv|\?getValue@\?\$M@_J@@QEBA_JXZ}} : $@convention(cxx_method) (@in_guaranteed M<Int64>) -> Int64
 // CHECK-LABEL: sil [serialized] [clang dependantReturnTypeInferred]  @{{_Z27dependantReturnTypeInferredIxE1MIT_ES1_|\?\?\$dependantReturnTypeInferred@_J@@YA\?AU\?\$M@_J@@_J@Z}} : $@convention(c) (Int64) -> M<Int64>
+// UNSUPPORTED: OS=windows-msvc

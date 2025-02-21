@@ -66,3 +66,4 @@ public extension P {
     /// Extension override!
     func someFunc() {}
 }
+// UNSUPPORTED: OS=windows-msvc

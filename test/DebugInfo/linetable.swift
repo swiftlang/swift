@@ -54,3 +54,4 @@ func main(_ x: Int64) -> Void
 // ASM-CHECK: .loc [[FILEID]] {{0|34}} {{[0-9]+}} prologue_end
 
 main(30)
+// UNSUPPORTED: OS=windows-msvc

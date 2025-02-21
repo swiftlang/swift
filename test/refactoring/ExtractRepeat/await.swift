@@ -15,3 +15,4 @@ func testExtract() async -> Int {
 // RUN: diff -u %S/Outputs/await/one.swift.expected %t.result/one.swift
 // RUN: %refactor -extract-repeat -source-filename %s -pos=7:11 -end-pos=7:26 >> %t.result/two.swift
 // RUN: diff -u %S/Outputs/await/two.swift.expected %t.result/two.swift
+// UNSUPPORTED: OS=windows-msvc

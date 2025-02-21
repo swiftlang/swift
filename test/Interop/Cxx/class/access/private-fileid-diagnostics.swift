@@ -57,3 +57,4 @@ import CxxModule
 
 // This file is referenced in the MultipleAnnotations test case.
 // We don't need to create it here but we may as well do so.
+// UNSUPPORTED: OS=windows-msvc

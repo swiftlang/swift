@@ -12,3 +12,4 @@
 public func passThroughCLong(_ x: CLong) -> CLong { return x }
 
 public func passThroughCUnsignedLong(_ x: CUnsignedLong) -> CUnsignedLong { return x }
+// UNSUPPORTED: OS=windows-msvc

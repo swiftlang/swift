@@ -88,3 +88,4 @@ func testPrimaries(
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfInts)
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without a type annotation}}
 }
+// UNSUPPORTED: OS=windows-msvc

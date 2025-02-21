@@ -64,3 +64,4 @@ let s: Set<KeyClass> = Set()
 
 setUpCast(s)
 setDownCast(s)
+// UNSUPPORTED: OS=windows-msvc

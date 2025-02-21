@@ -140,3 +140,4 @@ struct GenericTypeWithYields<T> {
   }
   */
 }
+// UNSUPPORTED: OS=windows-msvc

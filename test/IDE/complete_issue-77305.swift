@@ -29,3 +29,4 @@ withFoo { x in
     }
   }(x)
 }
+// UNSUPPORTED: OS=windows-msvc

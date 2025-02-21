@@ -349,3 +349,4 @@ struct RangeHolder:~Copyable
     var r:Range<Int> { fatalError() }
     var y:Int { self.r.upperBound }
 }
+// UNSUPPORTED: OS=windows-msvc

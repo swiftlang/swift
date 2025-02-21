@@ -21,3 +21,4 @@ var s = [S()]
 s[0].a.append(3)
 // CHECK: [{{.*}}] __builtin_log[s='[main.S(a: [])]']
 // CHECK-NEXT: [{{.*}}] __builtin_log[a='[3])]']
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ extension S1 {
   struct k {} // expected-error{{invalid redeclaration of 'k'}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ func ASYNC___2___() async -> Int {
   x = 12
   return x
 }
+// UNSUPPORTED: OS=windows-msvc

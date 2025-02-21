@@ -488,3 +488,4 @@ extension Optional where Wrapped == Optional<Bool> {
     try? self.init(SpecFailableAndThrows: ())
   }
 }
+// UNSUPPORTED: OS=windows-msvc

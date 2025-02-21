@@ -16,3 +16,4 @@ public func foo(_ param: Int) {
 public func bar(_ param: Int) {
 #sourceLocation()
 }
+// UNSUPPORTED: OS=windows-msvc

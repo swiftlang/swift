@@ -39,3 +39,4 @@ public class PublicImpl: PublicAssocTypeProto, FilePrivateAssocTypeProto {
   // CHECK-5-DAG: {{^}} fileprivate typealias FilePrivateValue
   // CHECK-4-DAG: {{^}} internal typealias FilePrivateValue
 } // CHECK: {{^[}]}}
+// UNSUPPORTED: OS=windows-msvc

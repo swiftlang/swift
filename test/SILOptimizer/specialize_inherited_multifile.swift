@@ -17,3 +17,4 @@
 public func takesConcreteHasAssocType(c: ConcreteHasAssocType) {
   takesHasAssocType(t: c)
 }
+// UNSUPPORTED: OS=windows-msvc

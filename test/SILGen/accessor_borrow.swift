@@ -20,3 +20,4 @@ struct NEContainer: ~Copyable {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

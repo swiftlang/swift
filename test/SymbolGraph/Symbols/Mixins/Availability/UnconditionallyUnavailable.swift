@@ -14,3 +14,4 @@ public struct UnconditionallyUnavailable {}
 // CHECK-NEXT:     "isUnconditionallyUnavailable": true
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

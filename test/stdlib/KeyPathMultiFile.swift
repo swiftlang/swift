@@ -16,3 +16,4 @@ keyPathMultiFile.test("identity across multiple files") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

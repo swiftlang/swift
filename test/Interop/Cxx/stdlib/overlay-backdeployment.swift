@@ -5,3 +5,4 @@
 import Cxx
 
 public func takesCxxType(_ s: some CxxSequence) {}
+// UNSUPPORTED: OS=windows-msvc

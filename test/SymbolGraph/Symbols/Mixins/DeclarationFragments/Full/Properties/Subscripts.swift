@@ -95,3 +95,4 @@ public struct S {
 // SUBHEADING-NEXT:     "preciseIdentifier": "s:Si"
 // SUBHEADING-NEXT:   }
 // SUBHEADING-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

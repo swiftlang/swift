@@ -35,3 +35,4 @@ public func testDevirt(a: A<Int>) -> Int32 {
   return a.doSomething()
 }
 
+// UNSUPPORTED: OS=windows-msvc

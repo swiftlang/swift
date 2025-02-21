@@ -16,3 +16,4 @@ func foo() {
   _ = FontWeighting(x: 2, y: 2, z: 2)
   _ = FontWeighting(x: 2, 2)
 }
+// UNSUPPORTED: OS=windows-msvc

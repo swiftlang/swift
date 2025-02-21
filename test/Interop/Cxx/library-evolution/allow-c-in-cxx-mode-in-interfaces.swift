@@ -49,3 +49,4 @@ let _ = getMyCStruct().y
 let _ = getMyCStruct().anotherInstanceOfSelf
 let _ = getMyCEnum()
 let _ = getMyCFixedEnum()
+// UNSUPPORTED: OS=windows-msvc

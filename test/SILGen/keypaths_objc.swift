@@ -157,3 +157,4 @@ func dynamicMemberLookupMixedKeypaths(foo: DynamicClass<Foo>) {
   // CHECK: keypath $KeyPath<NonObjC, NSObject>, (root
   _ = foo.bar.foo.nonobjc.y 
 }
+// UNSUPPORTED: OS=windows-msvc

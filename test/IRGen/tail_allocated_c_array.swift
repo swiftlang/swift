@@ -4,3 +4,4 @@
 // CHECK: @keypath = private global <{{.*}}i32 0, i32 -2147483644, i32 25165828 }>
 
 _ = MemoryLayout<foo>.offset(of: \foo.tailallocatedarray)!
+// UNSUPPORTED: OS=windows-msvc

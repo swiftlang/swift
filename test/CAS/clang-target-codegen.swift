@@ -49,3 +49,4 @@ public func foo()
 
 //--- test.swift
 import Foo
+// UNSUPPORTED: OS=windows-msvc

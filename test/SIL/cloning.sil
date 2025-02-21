@@ -306,3 +306,4 @@ bb0(%0 : $@thick any Any.Type):
   %retval = apply %getSize<@opened("00000000-0000-0000-0000-000000000000", Any) Self>(%ty) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
   return %retval : $Builtin.Word
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -88,3 +88,4 @@ func tryKeypaths() {
     _ = \Door.[0] // expected-error{{cannot form key path to actor-isolated subscript 'subscript(_:)'}}
     _ = \Door.["hello"] // expected-warning {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in the Swift 6 language mode}}
 }
+// UNSUPPORTED: OS=windows-msvc

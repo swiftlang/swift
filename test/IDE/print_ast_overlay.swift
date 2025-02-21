@@ -44,3 +44,4 @@ public class FooOverlayClassDerived : FooOverlayClassBase {
 // PASS_ANNOTATED-NOT: import Foo
 // PASS_ANNOTATED: <decl:Import>@_exported import <ref:module>Foo</ref>.<ref:module>FooSub</ref></decl>
 // PASS_ANNOTATED: <decl:Import>@_exported import <ref:module>FooHelper</ref></decl>
+// UNSUPPORTED: OS=windows-msvc

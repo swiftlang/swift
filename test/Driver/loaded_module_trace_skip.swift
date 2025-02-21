@@ -3,3 +3,4 @@
 
 import IllformedModule
 // CHECK: unexpected error produced: malformed compiled module
+// UNSUPPORTED: OS=windows-msvc

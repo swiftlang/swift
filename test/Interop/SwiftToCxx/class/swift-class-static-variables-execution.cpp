@@ -20,4 +20,4 @@ using namespace Class;
 int main() {
     auto x = FileUtilities::getShared();
     assert(x.getField() == 42);
-}
+}// UNSUPPORTED: OS=windows-msvc

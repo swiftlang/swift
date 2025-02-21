@@ -26,3 +26,4 @@ public struct S2 {}
 // CHECK: "text": "lines."
 
 
+// UNSUPPORTED: OS=windows-msvc

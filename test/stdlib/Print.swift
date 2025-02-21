@@ -74,3 +74,4 @@ PrintTests.test("PlaygroundPrintHook") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ public class SubClass<T> {
 import MyModule
 
 var dummy: [SubClass<Int>] = []
+// UNSUPPORTED: OS=windows-msvc

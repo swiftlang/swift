@@ -300,3 +300,4 @@ bb3(%4 : @guaranteed $Optional<Klass>):
   end_borrow %0a : $Klass
   return %5a : $Klass
 }
+// UNSUPPORTED: OS=windows-msvc

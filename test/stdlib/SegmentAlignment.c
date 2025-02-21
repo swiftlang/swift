@@ -47,3 +47,4 @@ void Test(void)
     // CHECK-DAG: libswiftCore.dylib
     // CHECK: Flawless victory
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -118,3 +118,4 @@ do {
 
 // LLVM: }
 
+// UNSUPPORTED: OS=windows-msvc

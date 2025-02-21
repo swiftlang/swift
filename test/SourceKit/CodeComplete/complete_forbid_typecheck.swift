@@ -9,3 +9,4 @@
 // RUN: %sourcekitd-test -req=complete -pos=5:20 %S/Inputs/forbid_typecheck_primary.swift -- -Xfrontend -debug-forbid-typecheck-prefix -Xfrontend NOTYPECHECK %S/Inputs/forbid_typecheck_2.swift %S/Inputs/forbid_typecheck_primary.swift | %FileCheck %s -check-prefix=MEMBER
 
 // MEMBER: key.name: "member"
+// UNSUPPORTED: OS=windows-msvc

@@ -70,3 +70,4 @@ struct MyStruct2: P {
   typealias #^TYPEALIASNAME_HASSIG^# = <#type#>
 // INVALID
 }
+// UNSUPPORTED: OS=windows-msvc

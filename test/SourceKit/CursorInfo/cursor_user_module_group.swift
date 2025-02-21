@@ -7,3 +7,4 @@ import MyModule
 _ = fooSwiftFunc()
 
 // CHECK: <Group>GroupA</Group>
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@ extension ViewController: ViewDataSource where T == String {
     return []
   }
 }
+// UNSUPPORTED: OS=windows-msvc

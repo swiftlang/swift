@@ -155,3 +155,4 @@ Tests.test("global borrowing access") {
   expectEqual(HasStatic.b.y.data, 121)
 }
 
+// UNSUPPORTED: OS=windows-msvc

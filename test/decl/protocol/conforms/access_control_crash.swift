@@ -5,3 +5,4 @@ public struct Horse : OptionSet {
   typealias Element = Horse // this was not public...
   public static let horse = Horse()
 }
+// UNSUPPORTED: OS=windows-msvc

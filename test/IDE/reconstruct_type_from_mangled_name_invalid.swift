@@ -22,3 +22,4 @@ struct SP: P {
   typealias TT = Self.T
 // CHECK: typealias TT = <<error type>>	for 'TT' usr=s:14swift_ide_test2SPV2TTa
 }
+// UNSUPPORTED: OS=windows-msvc

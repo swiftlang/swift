@@ -699,3 +699,4 @@ func nestedType2() -> Int {
     1
   }
 }
+// UNSUPPORTED: OS=windows-msvc

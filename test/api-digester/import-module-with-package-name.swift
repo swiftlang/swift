@@ -103,3 +103,4 @@ public func clientFuncInlinable() {
   libFunc()
   print(x)
 }
+// UNSUPPORTED: OS=windows-msvc

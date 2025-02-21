@@ -25,3 +25,4 @@
 // CHECK-SINGLE-FILE-SECOND: @"_swift_FORCE_LOAD_$_TEST"
 // CHECK-SINGLE-FILE-SECOND-NOT: source_filename
 
+// UNSUPPORTED: OS=windows-msvc

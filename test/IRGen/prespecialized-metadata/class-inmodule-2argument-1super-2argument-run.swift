@@ -85,3 +85,4 @@ func doit() {
     consume(derived: MyWeakMutableInstanceMethodBox<Double, Float>())
 }
 
+// UNSUPPORTED: OS=windows-msvc

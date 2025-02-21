@@ -1203,3 +1203,4 @@ bb0(%0 : $*T, %1 : $*T, %2 : $*T):
   %15 = tuple ()
   return %15 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

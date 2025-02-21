@@ -18,3 +18,4 @@ public func returnInstantiation() -> WrappedMagicInt {
 
 // CHECK: // returnInstantiation()
 // CHECK: sil @$s4main19returnInstantiationSo0024MagicWrapperCInt_npAIefbVyF : $@convention(thin) () -> MagicWrapper<CInt>
+// UNSUPPORTED: OS=windows-msvc

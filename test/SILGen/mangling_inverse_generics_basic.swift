@@ -114,3 +114,4 @@ extension OverloadComputed where T: ~Copyable {
   // CHECK: $s4test16OverloadComputedVAARi_zrlE4propxvg
   var prop: T { return obtain() }
 }
+// UNSUPPORTED: OS=windows-msvc

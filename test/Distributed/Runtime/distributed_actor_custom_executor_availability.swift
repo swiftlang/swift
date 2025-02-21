@@ -46,3 +46,4 @@ import Distributed
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

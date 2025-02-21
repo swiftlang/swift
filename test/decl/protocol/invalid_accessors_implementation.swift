@@ -46,4 +46,4 @@ protocol Protocol10 {
 // No error in extension
 extension Protocol10 {
   var a: Int { return 0 }
-}
+}// UNSUPPORTED: OS=windows-msvc

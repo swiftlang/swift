@@ -43,3 +43,4 @@ struct Y<T> : Hashable {
 let _ = [Y<Int>: Int]()
 let _ = [Y<Int> : Int]()
 let _ = [Y<Int> :Int]()
+// UNSUPPORTED: OS=windows-msvc

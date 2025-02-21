@@ -13,3 +13,4 @@ import Module
 struct Foo: View {}
 
 // CHECK: <Declaration>@_typeEraser(<Type usr="s:6Module7AnyViewV">AnyView</Type>) protocol View</Declaration>
+// UNSUPPORTED: OS=windows-msvc

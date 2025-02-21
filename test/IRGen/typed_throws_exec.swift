@@ -28,3 +28,4 @@ public func catching() {
 catching()
 print("Works!")
 // CHECK: Works!
+// UNSUPPORTED: OS=windows-msvc

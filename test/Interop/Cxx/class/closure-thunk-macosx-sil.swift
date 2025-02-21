@@ -35,3 +35,4 @@ import Closure
 public func testClosureToBlockARCWeak() {
   cfuncARCWeak({ARCWeak in})
 }
+// UNSUPPORTED: OS=windows-msvc

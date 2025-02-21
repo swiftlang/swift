@@ -114,3 +114,4 @@ class Bar: Foo {
 
 let x: Bar = 1.0
 x.identify() // CHECK-LABEL: Bar
+// UNSUPPORTED: OS=windows-msvc

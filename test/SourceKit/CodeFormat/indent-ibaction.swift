@@ -11,3 +11,4 @@
 // RUN: %FileCheck --strict-whitespace %s <%t.segueaction.response
 
 // CHECK: key.sourcetext: "    var xyz : Int"
+// UNSUPPORTED: OS=windows-msvc

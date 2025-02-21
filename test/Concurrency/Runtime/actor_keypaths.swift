@@ -91,3 +91,4 @@ erasePages(book, badPages: enumeratePageKeys(from: 0, to: 100))
 guard bookHasChanged(book, currentGetter: \Page.numWords, initialGetter: \Page.initialNumWords) else {
     fatalError("book should be wiped!")
 }
+// UNSUPPORTED: OS=windows-msvc

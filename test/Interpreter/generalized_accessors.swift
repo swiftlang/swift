@@ -49,3 +49,4 @@ x += 10
 print("4: current value of x is \(x).")
 // CHECK-NEXT: 5: end.
 print("5: end.")
+// UNSUPPORTED: OS=windows-msvc

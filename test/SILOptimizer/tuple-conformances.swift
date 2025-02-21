@@ -62,3 +62,4 @@ public func caller() {
 
 // CHECK: [[FN:%.*]] = function_ref @$sBT4mainRvzAA1PRzlE14protocolMethodyyFZ : $@convention(method) <each τ_0_0 where repeat each τ_0_0 : P> (@thin (repeat each τ_0_0).Type) -> ()
 // CHECK: apply [[FN]]<Pack{Int}>({{.*}}) : $@convention(method) <each τ_0_0 where repeat each τ_0_0 : P> (@thin (repeat each τ_0_0).Type) -> ()
+// UNSUPPORTED: OS=windows-msvc

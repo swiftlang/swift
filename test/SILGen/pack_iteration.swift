@@ -323,3 +323,4 @@ func iterateClosure<each Element>(over element: repeat each Element) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

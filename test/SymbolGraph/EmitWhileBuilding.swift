@@ -46,3 +46,4 @@ func bar() {}
 // CHECK: "precise":"s:17EmitWhileBuilding3fooyyF"
 // PUB-NOT: "precise":"s:17EmitWhileBuilding3baryyF"
 // PRIV: "precise":"s:17EmitWhileBuilding3baryyF"
+// UNSUPPORTED: OS=windows-msvc

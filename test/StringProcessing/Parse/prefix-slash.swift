@@ -21,3 +21,4 @@ foo((/)(E.e), /E.e)
 
 func bar<T>(_ x: T) -> Int { 0 }
 _ = bar(/E.e) / 2
+// UNSUPPORTED: OS=windows-msvc

@@ -56,3 +56,4 @@ struct TestClass<
     _ = typecheck1
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -1057,3 +1057,4 @@ extension AsyncSequence where Element: Equatable {
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

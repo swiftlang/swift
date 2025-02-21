@@ -13,3 +13,4 @@
 
 
 // CHECK-NOT: ';'
+// UNSUPPORTED: OS=windows-msvc

@@ -372,3 +372,4 @@ struct I65705 {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -69,3 +69,4 @@ class DesignatedInitsInheritObjCAttrSub: InitsInheritObjCAttrBase {
   // CHECK: {{^}} init(unrelated: Int)
   init(unrelated: Int) { super.init() }
 } // CHECK: {{^[}]$}}
+// UNSUPPORTED: OS=windows-msvc

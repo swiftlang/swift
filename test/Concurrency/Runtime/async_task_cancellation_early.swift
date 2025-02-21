@@ -38,3 +38,4 @@ func test_detach_cancel_child_early() async {
     await test_detach_cancel_child_early()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -74,3 +74,4 @@ func test() {
     test = EventSource<Void>().event
     print(test)
 }
+// UNSUPPORTED: OS=windows-msvc

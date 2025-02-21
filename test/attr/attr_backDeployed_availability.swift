@@ -83,3 +83,4 @@ extension TopLevelStruct {
     get { 0 }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

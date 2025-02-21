@@ -20,3 +20,4 @@ fileprivate func setStorage(to newValue: String) {
 }
 
 setStorageTo("hi")
+// UNSUPPORTED: OS=windows-msvc

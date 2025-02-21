@@ -35,3 +35,4 @@
 // CHECK:   (parameters
 // CHECK:     isolated
 // CHECK:     (class TypesToReflect.SomeActor))
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ func return10() -> UInt32 {
 // CHECK: attributes [[CLANG_ATTRS]] = {
 // CHECK-NOT: noinline
 // CHECK-SAME: }
+// UNSUPPORTED: OS=windows-msvc

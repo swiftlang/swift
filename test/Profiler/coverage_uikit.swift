@@ -13,3 +13,4 @@ class ViewController: UIViewController {
     super.viewDidLoad()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

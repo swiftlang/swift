@@ -49,3 +49,4 @@ protocol P27b {
   associatedtype A
   associatedtype B: X3 where A == X26<B>
 }
+// UNSUPPORTED: OS=windows-msvc

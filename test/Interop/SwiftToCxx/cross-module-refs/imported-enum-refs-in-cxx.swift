@@ -35,3 +35,4 @@ public func inoutLargeEnum(_ s: inout LargeEnum) {
 // CHECK-NEXT:   _impl::$s9UsesEnums0aB9LargeEnumV1x0B00cD0Ovg(result, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

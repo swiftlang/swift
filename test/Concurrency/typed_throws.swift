@@ -21,3 +21,4 @@ func testAsyncFor<S: AsyncSequence>(seq: S) async throws(MyError)
   for try await _ in seq {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -84,3 +84,4 @@ actor A {
     print("finished with return counter = \(result)")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

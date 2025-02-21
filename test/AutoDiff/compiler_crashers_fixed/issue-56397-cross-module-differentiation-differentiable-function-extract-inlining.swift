@@ -33,3 +33,4 @@ public func foo(
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -84,3 +84,4 @@ final class ClassBoom: Error {
     print("done") // CHECK: done
   }
 }
+// UNSUPPORTED: OS=windows-msvc

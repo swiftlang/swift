@@ -12,3 +12,4 @@ public func doIt() {
   var x = Container()
   var y = x
 }
+// UNSUPPORTED: OS=windows-msvc

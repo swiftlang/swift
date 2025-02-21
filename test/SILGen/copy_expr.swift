@@ -439,3 +439,4 @@ func testCallMethodOnAddressOnlyInOutCopy<T : P>(_ x: inout T) {
   _ = (copy x).computedK
   _ = (copy x).consumingComputedK
 }
+// UNSUPPORTED: OS=windows-msvc

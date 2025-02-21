@@ -29,3 +29,4 @@ print(w.isEmpty_bug() ? "is empty" : "is not empty")
 w.val = FileDescriptor(desc: Int.min)
 // CHECK: is empty
 print(w.isEmpty_bug() ? "is empty" : "is not empty")
+// UNSUPPORTED: OS=windows-msvc

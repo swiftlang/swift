@@ -102,3 +102,4 @@ entry(%x : $Huge, %y : $Huge):
   %z = apply %a(%x) : $@convention(thick) @callee_owned (Huge) -> Huge
   return %z : $Huge
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ extension StructA.Testclass {
 
 testit()
 
+// UNSUPPORTED: OS=windows-msvc

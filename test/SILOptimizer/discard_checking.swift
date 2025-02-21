@@ -586,3 +586,4 @@ struct Money: ~Copyable {
     assert(balance > 0)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

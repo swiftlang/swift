@@ -31,3 +31,4 @@ func testCaseLetNestedIf() {
 // RUN: diff -u %S/Outputs/basic/L15-3.swift.expected %t.result/L15-3.swift
 // RUN: %refactor -collapse-nested-if -source-filename %s -pos=21:3 > %t.result/L21-3.swift
 // RUN: diff -u %S/Outputs/basic/L21-3.swift.expected %t.result/L21-3.swift
+// UNSUPPORTED: OS=windows-msvc

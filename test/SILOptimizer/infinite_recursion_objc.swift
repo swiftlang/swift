@@ -25,3 +25,4 @@ func insideAvailability() {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -60,3 +60,4 @@
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>urlWithQueryString()</Name><USR>s:14swift_ide_test18urlWithQueryStringyyF</USR><Declaration>func urlWithQueryString()</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract><Discussion><Para>Test <Link href="http://apple.com?a=1&amp;b=1&amp;c=abc">a link</Link></Para></Discussion></CommentParts></Function>]
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>imageWithAmpersandsInTitleAndAlt()</Name><USR>s:14swift_ide_test32imageWithAmpersandsInTitleAndAltyyF</USR><Declaration>func imageWithAmpersandsInTitleAndAlt()</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract><Discussion><Para><rawHTML><![CDATA[<img src="http://apple.com" title="&&&" alt="&&&"/>]]></rawHTML></Para></Discussion></CommentParts></Function>]
+// UNSUPPORTED: OS=windows-msvc

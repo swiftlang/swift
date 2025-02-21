@@ -44,3 +44,4 @@ actor EscapeLocked {
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

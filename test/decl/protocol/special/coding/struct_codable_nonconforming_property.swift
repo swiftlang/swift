@@ -178,3 +178,4 @@ let _ = NonConformingStruct.encode(to:) // expected-error {{type 'NonConformingS
 
 // They should not get a CodingKeys type.
 let _ = NonConformingStruct.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

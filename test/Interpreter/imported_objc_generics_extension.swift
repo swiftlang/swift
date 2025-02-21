@@ -29,3 +29,4 @@ ImportedObjCGenericExtension.test("ExtensionFromSwift") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

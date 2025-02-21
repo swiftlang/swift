@@ -64,3 +64,4 @@ import TestedLib
 // CHECK: remark: loaded module 'HiddenDep'
 
 let _ = dependsOnHiddenType() // expected-error {{cannot find 'dependsOnHiddenType' in scope}}
+// UNSUPPORTED: OS=windows-msvc

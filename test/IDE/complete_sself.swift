@@ -146,3 +146,4 @@ class CCC {
         }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

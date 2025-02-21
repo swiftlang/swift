@@ -182,3 +182,4 @@ int main() {
 // CHECK-NEXT: EndOfTest
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@
 // XFAIL: freestanding
 
 // RUN: %{python} %utils/check_freestanding_dependencies.py --vendor %target-vendor --library %test-resource-dir/freestanding/libswiftCore.a --nm-path %llvm-nm
+// UNSUPPORTED: OS=windows-msvc

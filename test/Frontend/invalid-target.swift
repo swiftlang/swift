@@ -3,3 +3,4 @@
 
 // CHECKARCH: <unknown>:0: error: unsupported target architecture: '6502'
 // CHECKOS: <unknown>:0: error: unsupported target OS: 'eyeOS'
+// UNSUPPORTED: OS=windows-msvc

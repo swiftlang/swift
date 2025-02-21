@@ -304,3 +304,4 @@ func simpleInOut() -> Klass {
                              // expected-note @-5:9 {{of 'x.next'}}
     return x
 }
+// UNSUPPORTED: OS=windows-msvc

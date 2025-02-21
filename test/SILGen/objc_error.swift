@@ -174,3 +174,4 @@ class Gizmoid : NSObject {
   // CHECK-LABEL: sil private [thunk] [ossa] @$s10objc_error7GizmoidC3fooACyt_tKcfcTo : $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @owned Gizmoid) -> @owned Optional<Gizmoid>
   @objc init(foo: ()) throws {}
 }
+// UNSUPPORTED: OS=windows-msvc

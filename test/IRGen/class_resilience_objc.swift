@@ -146,3 +146,4 @@ public class AnotherClassWithResilientThenEmpty : ResilientNSObjectOutsideParent
     self.resilient = resilient
   }
 }
+// UNSUPPORTED: OS=windows-msvc

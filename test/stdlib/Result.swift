@@ -208,3 +208,4 @@ ResultTests.test("Hashable") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

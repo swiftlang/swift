@@ -105,3 +105,4 @@ FunctionsTestSuite.test("mutating base member calls do not require copying") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

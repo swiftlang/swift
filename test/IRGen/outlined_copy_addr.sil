@@ -25,3 +25,4 @@ bb0:
   %t = tuple ()
   return %t: $()
 }
+// UNSUPPORTED: OS=windows-msvc

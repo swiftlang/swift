@@ -7,3 +7,4 @@
 // Standalone stdlib builds use downloadable toolchains from swift.org, which are codesigned in a way that doesn't let
 // the interpreter process (swift-frontend) dynamically load locally-built modules (libswiftCore).
 // REQUIRES: swift_tools_extra
+// UNSUPPORTED: OS=windows-msvc

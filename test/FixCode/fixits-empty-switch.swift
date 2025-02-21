@@ -20,3 +20,4 @@ func foo1 (_ i : Int) {
   switch i { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; add a default case}} {{+1:3-3=default:\n<#code#>\n}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

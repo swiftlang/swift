@@ -5,3 +5,4 @@
 
 publicHasDefaultArgument()
 internalHasDefaultArgument()
+// UNSUPPORTED: OS=windows-msvc

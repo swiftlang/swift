@@ -3788,3 +3788,4 @@ protocol PAsync {
     // CHECK: }
     func i5(_ b: Bool) async throws(ThreeWords) -> (Int, Int, Int, Int, Int)
 }
+// UNSUPPORTED: OS=windows-msvc

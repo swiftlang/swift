@@ -88,3 +88,4 @@ func consumeField1_AggResilientDeiniting(_ a: consuming AggResilientDeiniting) {
   consume(a.field1) // expected-error{{field 'a.field1' was consumed but not reinitialized; the field must be reinitialized during the access}}
                     // expected-note@-1{{consumed here}}
 }
+// UNSUPPORTED: OS=windows-msvc

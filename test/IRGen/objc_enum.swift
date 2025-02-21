@@ -28,3 +28,4 @@ public func objc_enum_switch(_ x: ExportedToObjC) -> Int {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ extension S1: P2 {
     public func f<T: Q2>(_: T) -> S2 {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

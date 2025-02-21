@@ -105,3 +105,4 @@ extension HasNonMutatingSetter {
     foo = x
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ protocol ConditionalP {
 // The conditional requirement ConditionalC: Sendable is satisfied
 // by an unavailable conformance. But we still allow it in this case.
 extension ConditionalP where Value == ConditionalG<ConditionalC> {}
+// UNSUPPORTED: OS=windows-msvc

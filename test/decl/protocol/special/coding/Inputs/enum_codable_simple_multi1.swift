@@ -25,3 +25,4 @@ enum SimpleEnum : Codable {
     let _ = SimpleEnum.BCodingKeys.z
   }
 }
+// UNSUPPORTED: OS=windows-msvc

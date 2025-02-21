@@ -54,3 +54,4 @@ func testAlwaysEmitIntoClient() {
   // CHECK-DAG: declare extern_weak void @always_available_function()
   aeicFuncCallingAlwaysAvailableFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

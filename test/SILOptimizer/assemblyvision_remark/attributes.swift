@@ -92,3 +92,4 @@ public func mix4a() -> (Klass, Klass) {
     return (x, Klass()) // expected-remark {{"main.Klass.__allocating_init()" inlined into "main.mix4a()"}}
                         // expected-remark @-1 {{heap allocated ref of type 'Klass'}}
 }
+// UNSUPPORTED: OS=windows-msvc

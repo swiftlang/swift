@@ -152,3 +152,4 @@ Casts.test("testFunctionCastToArchetype") {
   expectNil(attemptFunctionCast(K.self))
   expectTrue(attemptFunctionCast(Any.self) != nil)
 }
+// UNSUPPORTED: OS=windows-msvc

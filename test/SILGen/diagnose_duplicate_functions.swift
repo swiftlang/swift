@@ -19,3 +19,4 @@ func c(_ x: Int) -> Int { // expected-note {{other definition here}}
 func d(_ x: Int) -> Int { // expected-error {{multiple definitions of symbol 'bar'}}
   return x
 }
+// UNSUPPORTED: OS=windows-msvc

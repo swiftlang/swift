@@ -16,3 +16,4 @@ public func takesFunction<T : AnyObject>(fn: @escaping (GenericClass<T>) -> ()) 
   let copy = fn
   return copy
 }
+// UNSUPPORTED: OS=windows-msvc

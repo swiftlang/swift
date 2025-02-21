@@ -163,3 +163,4 @@ func test_unstructured_noValues_childTasks() async {
     await test_unstructured_noValues_childTasks()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

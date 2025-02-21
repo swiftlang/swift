@@ -8,3 +8,4 @@ subscriptWithLabel[label: b].paramWithLabel(label: 0)
 
 // RUN: %sourcekitd-test -req=structure %s > %t.response
 // RUN: %diff -u %s.response %t.response
+// UNSUPPORTED: OS=windows-msvc

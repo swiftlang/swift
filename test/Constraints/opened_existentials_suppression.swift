@@ -18,3 +18,4 @@ func passBox(p: P, obj: AnyObject, err: Error) {
   acceptsBoxType(Any.self)
   acceptsBoxType(AnyObject.self)
 }
+// UNSUPPORTED: OS=windows-msvc

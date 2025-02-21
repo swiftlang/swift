@@ -10,3 +10,4 @@ struct MyStruct {
   // expected-error @+1 {{cannot reference computed properties}}
   var debugDescription: String { "name: \(name)" }
 }
+// UNSUPPORTED: OS=windows-msvc

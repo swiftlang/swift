@@ -205,3 +205,4 @@ class EscapeKeywordsInDottedPaths {
   // CHECK: #EscapeKeywordsInDottedPaths.`switch`!getter
   var `switch`: String = ""
 }
+// UNSUPPORTED: OS=windows-msvc

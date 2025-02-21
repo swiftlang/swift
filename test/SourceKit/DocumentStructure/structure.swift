@@ -12,3 +12,4 @@
 
 // RUN: %sourcekitd-test -req=structure -text-input %S/Inputs/main.swift | %sed_clean > %t.empty.response
 // RUN: %diff -u %s.empty.response %t.empty.response
+// UNSUPPORTED: OS=windows-msvc

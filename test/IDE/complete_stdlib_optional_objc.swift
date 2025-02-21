@@ -78,3 +78,4 @@ func testAnyObject8(a: AnyObject) {
 
 // OPT_NO_DOT_OBJCCLASS-DAG: Decl[InstanceVar]/CurrNominal:    ?.instanceVar[#Int#]{{; name=.+$}}
 // OPT_NO_DOT_OBJCCLASS-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#ObjcClass#]{{; name=.+$}}
+// UNSUPPORTED: OS=windows-msvc

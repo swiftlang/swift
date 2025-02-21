@@ -10,3 +10,4 @@ actor Charlie {
         []
     }
 }
+// UNSUPPORTED: OS=windows-msvc

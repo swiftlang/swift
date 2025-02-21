@@ -50,3 +50,4 @@
   let notAllowed = VoidedWarranty(inconvenient: ()) // expected-error{{argument passed to call that takes no arguments}}
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

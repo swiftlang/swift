@@ -11,3 +11,4 @@ import Foundation
 
 // CHECK: {{^}}ABCDEF{{$}}
 print(("ABC" as NSString).appending("DEF"))
+// UNSUPPORTED: OS=windows-msvc

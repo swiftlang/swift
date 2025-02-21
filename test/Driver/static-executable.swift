@@ -13,3 +13,4 @@ print("hello world!")
 // RUN: %llvm-readelf -program-headers %t/static-executable | %FileCheck %s --check-prefix=ELF
 // CHECK: hello world!
 // ELF-NOT: INTERP
+// UNSUPPORTED: OS=windows-msvc

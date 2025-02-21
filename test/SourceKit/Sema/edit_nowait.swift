@@ -40,3 +40,4 @@
 // ANNOTATION-NEXT:     key.is_system: 1
 // ANNOTATION-NEXT:   }
 // ANNOTATION-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

@@ -37,3 +37,4 @@ struct Test {
     self.name = name
   }
 }
+// UNSUPPORTED: OS=windows-msvc

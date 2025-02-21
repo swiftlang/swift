@@ -88,3 +88,4 @@ struct ShellTask {
 let delegate = Delegate(shellTasks: [])
 _ = delegate.shellTasks[safe: 0]?.commandLine.compactMap({ $0.asString.hasPrefix("") ? $0 : nil }).count ?? 0
 // expected-error@-1 {{value of type 'String' has no member 'asString'}}
+// UNSUPPORTED: OS=windows-msvc

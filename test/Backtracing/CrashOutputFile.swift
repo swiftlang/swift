@@ -59,3 +59,4 @@ struct CrashOutputFile {
 // CHECK: Images ({{[0-9]+}} omitted):
 
 // CHECK: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{([0-9a-f]+|<no build ID>)}}{{ +}}CrashOutputFile{{ +}}{{.*}}/CrashOutputFile
+// UNSUPPORTED: OS=windows-msvc

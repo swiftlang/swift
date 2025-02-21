@@ -41,3 +41,4 @@ func foo() {
 // CHECK-NEXT:            "-frontend",
 // CHECK-NEXT:            "-compile-module-from-interface",
 // CHECK:            "-application-extension",
+// UNSUPPORTED: OS=windows-msvc

@@ -46,3 +46,4 @@ func testWibble() {
   doWibble(3.14) // expected-error{{argument type 'Double' does not conform to expected type 'CanWibble'}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@
 
 // CHECK: "triple": "{{.*}}-apple-macosx{{[0-9][0-9]}}
 // CHECK: "unversionedTriple": "{{.*}}-apple-macosx"
+// UNSUPPORTED: OS=windows-msvc

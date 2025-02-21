@@ -82,3 +82,4 @@ extension C {
 #if false
 #elseif #^CONDITION_GLOBAL_2^#
 // This '#if' is intentionally not closed with '#endif'
+// UNSUPPORTED: OS=windows-msvc

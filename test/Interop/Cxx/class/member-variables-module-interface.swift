@@ -5,3 +5,4 @@
 // CHECK-NEXT:   init(const_member: Int32)
 // CHECK-NEXT:   var const_member: Int32 { get }
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

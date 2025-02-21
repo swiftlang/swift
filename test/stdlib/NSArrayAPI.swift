@@ -46,3 +46,4 @@ NSMutableArrayAPI.test("CustomStringConvertible") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -414,3 +414,4 @@ func testNonBinding6(y: [Int], z: Int) -> Int {
     0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

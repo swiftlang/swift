@@ -141,3 +141,4 @@ import InternalDep
 //--- TestableClientOfNonPublic_FileB.swift
 @testable import InternalDep // expected-error {{missing required module 'HiddenDep'}}
 import FileprivateDep
+// UNSUPPORTED: OS=windows-msvc

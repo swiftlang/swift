@@ -30,3 +30,4 @@ extension DefaultStringInterpolation {
     appendInterpolation("0x" + String(UInt(bitPattern: value), radix: 16))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

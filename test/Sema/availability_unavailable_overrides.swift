@@ -257,3 +257,4 @@ func testImplicitSuperInit() {
     // expected-note@-2 {{call to unavailable initializer 'init()' from superclass 'Base' occurs implicitly at the end of this initializer}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

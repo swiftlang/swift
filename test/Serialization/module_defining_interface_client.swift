@@ -45,3 +45,4 @@ modules:
 import Foo
 import Bar
 public func baz() { foo_bar() }
+// UNSUPPORTED: OS=windows-msvc

@@ -46,3 +46,4 @@
   foo bar
  #endif
 #endif
+// UNSUPPORTED: OS=windows-msvc

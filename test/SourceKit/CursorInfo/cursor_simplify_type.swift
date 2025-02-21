@@ -33,3 +33,4 @@ func test() {
 }
 
 // CHECK: <Declaration>func stage3() -&gt; <Type usr="s:4test13MyGenerictypeV">MyGenerictype</Type>&lt;<Type usr="s:4test24HasTypeAccessInTypealiasV">HasTypeAccessInTypealias</Type>&lt;<Type usr="s:4test13MyGenerictypeV">MyGenerictype</Type>&lt;<Type usr="s:Si">Int</Type>&gt;&gt;.<Type usr="s:4test24HasTypeAccessInTypealiasV6Outputa">Output</Type>&gt;</Declaration>
+// UNSUPPORTED: OS=windows-msvc

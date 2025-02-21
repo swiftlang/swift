@@ -23,3 +23,4 @@ var applyGet: Int {
 enum `switch` {}
 
 typealias `Self` = Int
+// UNSUPPORTED: OS=windows-msvc

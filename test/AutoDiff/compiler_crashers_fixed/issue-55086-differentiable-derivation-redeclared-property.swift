@@ -27,3 +27,4 @@ struct WrappedProperties: Differentiable {
   // expected-error@-1 {{invalid redeclaration of 'int'}}
   // expected-error@-2 {{invalid redeclaration of synthesized property '_int'}}
 }
+// UNSUPPORTED: OS=windows-msvc

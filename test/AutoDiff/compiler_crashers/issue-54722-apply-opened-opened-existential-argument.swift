@@ -58,3 +58,4 @@ public func abs<T: DifferentiableTensorView>(_ x: T) -> T where T.Element: Numer
 // #14 0x0000000000f17925 swift::autodiff::LinearMapInfo::generateDifferentiationDataStructures(swift::autodiff::ADContext&, swift::SILFunction*) (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0xf17925)
 // #15 0x0000000000f2615f swift::autodiff::VJPEmitter::VJPEmitter(swift::autodiff::ADContext&, swift::SILFunction*, swift::SILDifferentiabilityWitness*, swift::SILFunction*, swift::autodiff::DifferentiationInvoker) (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0xf2615f)
 // #16 0x0000000000e7efff (anonymous namespace)::DifferentiationTransformer::canonicalizeDifferentiabilityWitness(swift::SILFunction*, swift::SILDifferentiabilityWitness*, swift::autodiff::DifferentiationInvoker, swift::SerializedKind_t) (build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swift+0xe7efff)
+// UNSUPPORTED: OS=windows-msvc

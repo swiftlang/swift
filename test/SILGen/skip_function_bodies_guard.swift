@@ -8,3 +8,4 @@ let x = m
 public func f(_: Int = m, _: String = "") {}
 
 f()
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ import UsesSubmodule
 
 // No linker options produced
 // CHECK: !llvm.linker.options = !{}
+// UNSUPPORTED: OS=windows-msvc

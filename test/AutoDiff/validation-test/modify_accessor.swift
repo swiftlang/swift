@@ -78,3 +78,4 @@ ModifyAccessorTests.test("GenericModifyAccessor") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

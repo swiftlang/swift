@@ -38,3 +38,4 @@ do {
   print("end")
 }
 
+// UNSUPPORTED: OS=windows-msvc

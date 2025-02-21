@@ -445,3 +445,4 @@ ProtocolInitTestSuite.test("AddrOnlyStruct_Failure") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

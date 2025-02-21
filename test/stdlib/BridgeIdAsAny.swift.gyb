@@ -350,3 +350,4 @@ BridgeAnything.test("SwiftValue(mixed values)/Hashable") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

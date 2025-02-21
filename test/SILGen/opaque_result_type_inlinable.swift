@@ -9,3 +9,4 @@
 @inlinable public func caller() -> some Any {
   return callee()
 }
+// UNSUPPORTED: OS=windows-msvc

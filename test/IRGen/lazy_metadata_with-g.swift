@@ -51,3 +51,4 @@ struct Teststruct2 : P {
 
   func foo() -> Int { return 27 }
 }
+// UNSUPPORTED: OS=windows-msvc

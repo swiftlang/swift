@@ -711,3 +711,4 @@ print("SimpleClass obj count: \(SimpleClass.numObjs)")
 print("GenClass obj count: \(numGenClassObjs)")
 
 
+// UNSUPPORTED: OS=windows-msvc

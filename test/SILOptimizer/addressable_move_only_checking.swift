@@ -28,3 +28,4 @@ func test(node: borrowing Node) -> NodeRef {
     return NodeRef(node: node)
 }
 
+// UNSUPPORTED: OS=windows-msvc

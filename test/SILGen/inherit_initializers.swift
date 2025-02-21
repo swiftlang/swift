@@ -127,3 +127,4 @@ class Twice<X, Y> {
 class Pair<T, U> : Twice<T, U> {}
 
 class Once<T> : Twice<T, T> {}
+// UNSUPPORTED: OS=windows-msvc

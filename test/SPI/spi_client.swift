@@ -68,3 +68,4 @@ public func inlinable2() -> SPIClass {
   _ = SPIClass()
   _ = [SPIClass]()
 }
+// UNSUPPORTED: OS=windows-msvc

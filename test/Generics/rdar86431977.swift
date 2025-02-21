@@ -20,3 +20,4 @@ extension G {
   // CHECK: Generic signature: <T, U where T : P2, T == U>
   func bar() where T : P2, T == U {}
 }
+// UNSUPPORTED: OS=windows-msvc

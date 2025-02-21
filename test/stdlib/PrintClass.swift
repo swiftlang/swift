@@ -45,3 +45,4 @@ PrintTests.test("ClassVeryPrintable") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

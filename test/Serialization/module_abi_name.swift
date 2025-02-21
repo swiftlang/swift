@@ -10,3 +10,4 @@ func callFunction() {
 }
 
 // CHECK: sil @$s7Goodbye8functionyyF : $@convention(thin) () -> ()
+// UNSUPPORTED: OS=windows-msvc

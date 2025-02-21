@@ -10,3 +10,4 @@ public func f() -> MyAtomicBool {
 public func g(_ b: MyAtomicBool) {
   let _ = b
 }
+// UNSUPPORTED: OS=windows-msvc

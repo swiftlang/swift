@@ -33,3 +33,4 @@ struct OtherTestStruct {
 // CHECK-NOT: UnknownCode
 
 // CHECK-PRINT-DAG: macro macroWithBuilderArgs(@Builder _: () -> Void)
+// UNSUPPORTED: OS=windows-msvc

@@ -4,3 +4,4 @@
 // RUN: %llvm-dwarfdump %t/Macro.pcm | %FileCheck %s
 
 // CHECK: DW_AT_comp_dir	("/compdir")
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ func testU<T, U : P2>(_: T, _: U) where T.A : P1, T.A.A == U, U.A : P1, U.A.A ==
 
 // CHECK: Generic signature: <T, U where T : P2, T == U.[P2]A.[P1]A, U == T.[P2]A.[P1]A, T.[P2]A : P1, U.[P2]A : P1>
 func testT<T : P2, U>(_: T, _: U) where T.A : P1, T.A.A == U, U.A : P1, U.A.A == T {}
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@ public func subtractWrappers() {
   let wrapperB = MagicWrapper()
   let _ = wrapperA - wrapperB
 }
+// UNSUPPORTED: OS=windows-msvc

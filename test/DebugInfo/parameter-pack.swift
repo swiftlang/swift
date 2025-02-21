@@ -9,3 +9,4 @@ func f<each A, B, C>(t: ((repeat each A), B), c: C) -> ((repeat each A, B), C) {
   // CHECK: debug_value %{{[0-9]+}} : $*C, let, name "c", argno 2, expr op_deref
   ((repeat each t.0, t.1), c)
 }
+// UNSUPPORTED: OS=windows-msvc

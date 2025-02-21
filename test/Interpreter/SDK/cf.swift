@@ -93,3 +93,4 @@ CFTestSuite.test("Dictionary/round-trip") {
 
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ func square2(n: Int) -> Int {
 
 // CHECK: attributes [[ATTR1]] = { {{.*}}noinline optnone{{.*}} }
 // CHECK: attributes [[ATTR2]] = { {{.*}}optsize{{.*}} }
+// UNSUPPORTED: OS=windows-msvc

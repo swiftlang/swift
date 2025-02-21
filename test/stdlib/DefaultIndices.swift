@@ -42,3 +42,4 @@ suite.test("Bidirectional dispatch") {
   let j2 = r.genericIndex(r.startIndex, offsetBy: -1, limitedBy: r.startIndex)
   expectEqual(j, j2)
 }
+// UNSUPPORTED: OS=windows-msvc

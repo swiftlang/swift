@@ -2,4 +2,4 @@
 // REQUIRES: concurrency
 
 
-protocol P : Actor { } // expected-error{{cannot find type 'Actor' in scope}}
+protocol P : Actor { } // expected-error{{cannot find type 'Actor' in scope}}// UNSUPPORTED: OS=windows-msvc

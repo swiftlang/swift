@@ -18,3 +18,4 @@ struct Bar {
   @Invalid2 var badWrapper2: Bool = false // expected-error {{unknown attribute 'Invalid2'}}
   @Invalid3 var badWrapper3: Bool = false // expected-error {{unknown attribute 'Invalid3'}}
 }
+// UNSUPPORTED: OS=windows-msvc

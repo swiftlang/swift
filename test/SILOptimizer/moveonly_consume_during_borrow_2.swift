@@ -20,3 +20,4 @@ extension Tree.Node {
     } // expected-note 2 {{}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

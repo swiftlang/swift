@@ -93,3 +93,4 @@ ShouldUseBinaryModule:
   ModuleName:
     - Swift_UseSwiftinterfaceByDefault
     - BlocklistedModule
+// UNSUPPORTED: OS=windows-msvc

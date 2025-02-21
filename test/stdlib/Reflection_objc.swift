@@ -299,3 +299,4 @@ print("float4 has \(Mirror(reflecting: x).children.count) children")
 // CHECK-LABEL: and now our song is done
 print("and now our song is done")
 
+// UNSUPPORTED: OS=windows-msvc

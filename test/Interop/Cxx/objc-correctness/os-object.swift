@@ -6,3 +6,4 @@ import OSObject
 extension my_object_t {
   func dummy() {}
 }
+// UNSUPPORTED: OS=windows-msvc

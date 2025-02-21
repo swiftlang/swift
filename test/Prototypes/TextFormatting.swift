@@ -278,3 +278,4 @@ print(0x1EADBEEF.format(radix:16).delimited)
 
 print((0xDEADBEEF as UInt).format(radix:16).delimited)
 // CHECK-NEXT: DEADBEEF
+// UNSUPPORTED: OS=windows-msvc

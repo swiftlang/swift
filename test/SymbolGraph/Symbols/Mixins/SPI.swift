@@ -59,3 +59,4 @@ extension String: P {}
 // SPI_EXT_Swift-DAG: "spi": true
 // SPI_EXT_Swift-DAG: "precise": "s:4SPIP1PP3SPIE3fooyyF::SYNTHESIZED::s:SS"
 // SPI_EXT_Swift-DAG: "spi": true
+// UNSUPPORTED: OS=windows-msvc

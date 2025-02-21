@@ -265,3 +265,4 @@ func bogusProtocolConstraint2(_ : some MyFormattedPrintable<String>) {}
 // expected-error@-1 {{protocol 'MyFormattedPrintable' does not have primary associated types that can be constrained}}{{60-68=}}
 func bogusProtocolConstraint3(_ : MyFormattedPrintable<String>) {}
 // expected-error@-1 {{protocol 'MyFormattedPrintable' does not have primary associated types that can be constrained}}{{55-63=}}
+// UNSUPPORTED: OS=windows-msvc

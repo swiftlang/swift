@@ -7,3 +7,4 @@ enum E
 // cf. https://github.com/apple/swift/issues/64309
 
 // RUN: %sourcekitd-test -req=cursor -pos=2:6 %s -- %s
+// UNSUPPORTED: OS=windows-msvc

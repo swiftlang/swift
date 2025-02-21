@@ -50,3 +50,4 @@ func foo() {
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "exit-status": 1
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ public func add(_ lhs: LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> Loadabl
 // CHECK: apply [[COUNTER]](%0, %1) : $@convention(c) (LoadableIntWrapper, LoadableIntWrapper) -> LoadableIntWrapper
 
 // CHECK: sil [clang "+"] [[NAME]] : $@convention(c) (LoadableIntWrapper, LoadableIntWrapper) -> LoadableIntWrapper
+// UNSUPPORTED: OS=windows-msvc

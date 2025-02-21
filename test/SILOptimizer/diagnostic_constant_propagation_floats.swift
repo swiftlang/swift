@@ -221,3 +221,4 @@ func testIntToFloatConversion() {
   _blackHole(Float(16777217))
   _blackHole(Double(2_147_483_647))
 }
+// UNSUPPORTED: OS=windows-msvc

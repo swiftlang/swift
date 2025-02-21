@@ -23,3 +23,4 @@ public class UnsupportedClass: NSObject {
 
     let x: Int
 }
+// UNSUPPORTED: OS=windows-msvc

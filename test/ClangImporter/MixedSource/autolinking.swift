@@ -11,3 +11,4 @@ public let y = Test()
 // CHECK-NOT: !{!"-framework", !"AutolinkingTest"}
 // CHECK: !{!{{"-lswiftCore"|"/DEFAULTLIB:swiftCore.lib"}}}
 // CHECK-NOT: !{!"-framework", !"AutolinkingTest"}
+// UNSUPPORTED: OS=windows-msvc

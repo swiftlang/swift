@@ -18,3 +18,4 @@ struct TestStruct {
 #endif
 }
 
+// UNSUPPORTED: OS=windows-msvc

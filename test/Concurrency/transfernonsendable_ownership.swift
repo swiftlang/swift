@@ -121,3 +121,4 @@ actor ActorTestCase {
     // expected-note @-1 {{sending 'self'-isolated 'self.k' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

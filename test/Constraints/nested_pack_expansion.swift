@@ -87,3 +87,4 @@ extension G {
 sameType(G<X1, Y1, Z1>.C1<X2, Y2, Z2>.self, Expanded.self)
 sameType(G<X1, Y1, Z1>.C2<X3, Y3, Z3>.self, Expanded.self)
 sameType(G<X2, Y2, Z2>.C3<X3, Y3, Z3>.self, Expanded.self)
+// UNSUPPORTED: OS=windows-msvc

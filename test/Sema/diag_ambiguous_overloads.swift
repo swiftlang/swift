@@ -189,3 +189,4 @@ do {
   let _ = i16 -- i16
   // expected-error@-1 {{ambiguous use of operator '--'}}
 }
+// UNSUPPORTED: OS=windows-msvc

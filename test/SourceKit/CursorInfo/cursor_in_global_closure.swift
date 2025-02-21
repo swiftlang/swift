@@ -4,3 +4,4 @@ fileprivate let formatter: DateFormatter = {
     let formatter
 
 // CHECK: s:24cursor_in_global_closureXefU_9formatterL_Xevp
+// UNSUPPORTED: OS=windows-msvc

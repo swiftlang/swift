@@ -168,3 +168,4 @@ extension P {
   subscript<T>(dynamicMember keyPath: KeyPath<Bar, T>) -> Int { 0 }
   subscript<T>(dynamicMember keyPath: KeyPath<P, T>) -> Int { 0 }
 }
+// UNSUPPORTED: OS=windows-msvc

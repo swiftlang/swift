@@ -252,3 +252,4 @@ internal protocol InternalProtocol: SPIProtocol {}
 public struct PublicStruct2: InternalProtocol {}
 // CHECK-PRIVATE: @_spi(S) extension {{.*}}PublicStruct2 : {{.*}}.SPIProtocol
 // CHECK-PUBLIC-NOT: SPIProtocol
+// UNSUPPORTED: OS=windows-msvc

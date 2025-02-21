@@ -21,3 +21,4 @@ public struct S: Q {
   public init() { }
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

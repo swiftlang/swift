@@ -36,3 +36,4 @@ public func brokenPlatforms() {}
 
 // CHECK: duplicate definition of availability macro '_duplicateVersion' for version '1.0'
 // CHECK-NEXT: _duplicateVersion
+// UNSUPPORTED: OS=windows-msvc

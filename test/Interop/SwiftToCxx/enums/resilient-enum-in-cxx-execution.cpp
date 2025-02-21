@@ -62,3 +62,4 @@ int main() {
 // NEW_CASE: Foo::unknownDefault
 // OLD_CASE: Foo::a
 // CHECK-NEXT: Foo::a
+// UNSUPPORTED: OS=windows-msvc

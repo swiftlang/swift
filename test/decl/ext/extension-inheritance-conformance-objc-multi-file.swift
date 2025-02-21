@@ -17,3 +17,4 @@ let x = Object().bar()
 let y = Responder().bar()
 let z = View().bar()
 
+// UNSUPPORTED: OS=windows-msvc

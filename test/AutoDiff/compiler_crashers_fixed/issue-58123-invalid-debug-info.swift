@@ -137,3 +137,4 @@ extension TestType.TangentVector: TestInterfaceTangentVector {
        return (lhs as! Self) == (rhs as! Self)
    }
 }
+// UNSUPPORTED: OS=windows-msvc

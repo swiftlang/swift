@@ -2,3 +2,4 @@
 
 // CHECK: {{.*}}swift{{c|c-legacy-driver|-frontend}}{{(.exe)?"?}} -frontend -c
 // CHECK: {{.*}}clang{{(.exe)?"?}} -fuse-ld=gold
+// UNSUPPORTED: OS=windows-msvc

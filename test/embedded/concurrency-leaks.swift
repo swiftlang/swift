@@ -45,3 +45,4 @@ struct Main {
     // CHECK: done
   }
 }
+// UNSUPPORTED: OS=windows-msvc

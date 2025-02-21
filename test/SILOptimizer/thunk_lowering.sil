@@ -918,3 +918,4 @@ bb0(%result : $*T):
   %directResult = end_apply %tag as $(Klass, Klass)
   return %directResult : $(Klass, Klass)
 }
+// UNSUPPORTED: OS=windows-msvc

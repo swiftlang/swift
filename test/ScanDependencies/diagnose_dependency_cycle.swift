@@ -8,3 +8,4 @@
 // CHECK: module dependency cycle: 'CycleOne.swiftinterface -> CycleTwo.swiftinterface -> CycleThree.swiftinterface -> CycleOne.swiftinterface'
 
 import CycleOne
+// UNSUPPORTED: OS=windows-msvc

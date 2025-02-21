@@ -113,3 +113,4 @@ _ = MONEY
 #if ERROR
 _ = someRandomUndefinedName
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -40,3 +40,4 @@ import SomeExternalModule
 // CHECK-DAG: "swift": "_StringProcessing"
 // CHECK-DAG: "clang": "_SwiftConcurrencyShims"
 // CHECK: ],
+// UNSUPPORTED: OS=windows-msvc

@@ -586,3 +586,4 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT:   [[RESULT:%.*]] = call ptr @swift_lookUpClassMethod(ptr %0, ptr %1, ptr @"$s16class_resilience21ResilientGenericChildCMn{{(\.ptrauth.*)?}}")
 // CHECK-NEXT:   ret ptr [[RESULT]]
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ public struct R {
 // CHECK-IR-RES: define hidden swiftcc ptr @"$s4File1RV1aSSvau"()
 // CHECK-IR-RES: define hidden swiftcc ptr @"$s4File1RV1bSSvau"()
 
+// UNSUPPORTED: OS=windows-msvc

@@ -37,3 +37,4 @@ module C { header "C.h" }
 
 //--- a.swift
 import B
+// UNSUPPORTED: OS=windows-msvc

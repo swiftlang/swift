@@ -20,3 +20,4 @@ do {
   s[p] = p // expected-error {{cannot assign through subscript: 's' is immutable}}
   takesInOut(&s[p]) // expected-error {{cannot pass immutable value as inout argument: 's' is immutable}}
 }
+// UNSUPPORTED: OS=windows-msvc

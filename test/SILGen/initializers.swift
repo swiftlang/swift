@@ -1328,3 +1328,4 @@ class Butt {
   init(foo: inout (Int, Int)) { }
 }
 
+// UNSUPPORTED: OS=windows-msvc

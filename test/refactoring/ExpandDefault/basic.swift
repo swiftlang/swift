@@ -20,3 +20,4 @@ func foo(e: E) -> Int {
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -expand-default -source-filename %s -pos=15:8 >> %t.result/L15.swift
 // RUN: diff -u %S/Outputs/basic/L15.swift.expected %t.result/L15.swift
+// UNSUPPORTED: OS=windows-msvc

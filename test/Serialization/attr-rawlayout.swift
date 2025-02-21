@@ -18,3 +18,4 @@ struct B_Cell<T>: ~Copyable {}
 // MODULE-CHECK: @_rawLayout(likeArrayOf: T, count: 8) struct C_SmallVector
 @_rawLayout(likeArrayOf: T, count: 8)
 struct C_SmallVector<T>: ~Copyable {}
+// UNSUPPORTED: OS=windows-msvc

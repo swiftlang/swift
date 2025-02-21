@@ -7,3 +7,4 @@ extension MyView {
     return nil#^CC^#
   }
 }
+// UNSUPPORTED: OS=windows-msvc

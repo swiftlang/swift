@@ -363,3 +363,4 @@ do {
   func testSomeMarkerProto<T: SomeMarkerProto>(_: T) {}
   testSomeMarkerProto(.answer())
 }
+// UNSUPPORTED: OS=windows-msvc

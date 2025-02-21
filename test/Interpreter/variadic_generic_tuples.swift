@@ -87,3 +87,4 @@ tuples.test("labels") {
 
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

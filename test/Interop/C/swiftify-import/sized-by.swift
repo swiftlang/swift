@@ -19,3 +19,4 @@ import SizedByClang
 // CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_  p: UnsafeMutableRawBufferPointer)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func swiftAttr(_  p: UnsafeMutableRawBufferPointer)
 
+// UNSUPPORTED: OS=windows-msvc

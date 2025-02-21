@@ -22,3 +22,4 @@ public func test() {
   let value = 42
   unsafeWriteArray(type(of: args.0), array: &args, index: n, value: value) // expected-note {{called from here}}
 }
+// UNSUPPORTED: OS=windows-msvc

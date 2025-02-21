@@ -40,3 +40,4 @@
 // SANCOV_WITHOUT_XSAN: option '-sanitize-coverage=' requires a sanitizer to be enabled. Use -sanitize= to enable a sanitizer
 // SANCOV_BAD_ARG: unsupported argument 'unknown' to option '-sanitize-coverage='
 // SANCOV_MISSING_ARG: error: option '-sanitize-coverage=' is missing a required argument ("func", "bb", "edge")
+// UNSUPPORTED: OS=windows-msvc

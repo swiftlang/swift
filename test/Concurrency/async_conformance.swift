@@ -44,3 +44,4 @@ protocol Backer {
 class Investor: Backer {  // expected-error {{type 'Investor' does not conform to protocol 'Backer'}} expected-note {{add stubs for conformance}}
     func back(stonk: String) async {}  // expected-note {{candidate is 'async', but protocol requirement is not}}
 }
+// UNSUPPORTED: OS=windows-msvc

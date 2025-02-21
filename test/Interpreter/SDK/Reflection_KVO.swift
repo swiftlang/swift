@@ -45,3 +45,4 @@ value.amount += 1
 dump(value)
 
 
+// UNSUPPORTED: OS=windows-msvc

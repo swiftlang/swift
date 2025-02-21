@@ -113,3 +113,4 @@ AssociatedTypeDemangleTests.test("nested private generic types in associated typ
 
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

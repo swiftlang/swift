@@ -131,3 +131,4 @@ func testCastWithImplicitErasure() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

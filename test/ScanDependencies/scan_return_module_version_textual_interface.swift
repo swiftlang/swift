@@ -28,3 +28,4 @@ import TextualFoo
 
 // CHECK:  "userModuleVersion": "12.3.4"
 // CHECK:  "userModuleVersion": "42.3.3.0"
+// UNSUPPORTED: OS=windows-msvc

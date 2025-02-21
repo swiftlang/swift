@@ -72,3 +72,4 @@ func empty(arbitrary: String = "") {
 func ineligible(function: String = #function) {
   callee(arbitrary: function)
 }
+// UNSUPPORTED: OS=windows-msvc

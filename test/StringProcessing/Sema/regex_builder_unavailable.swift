@@ -27,3 +27,4 @@ let _ = Regex { // expected-error {{'Regex' is only available in macOS 13.0 or n
   /def/ // expected-error {{'Regex' is only available in macOS 13.0 or newer}}
   // expected-note@-1 {{add 'if #available' version check}}
 }
+// UNSUPPORTED: OS=windows-msvc

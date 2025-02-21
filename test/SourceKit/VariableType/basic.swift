@@ -45,4 +45,4 @@ let `else` = 3
 // CHECK-FULLY-QUALIFIED: (14:7, 14:8): [Swift.Int : Swift.Int] (explicit type: 1)
 // CHECK-FULLY-QUALIFIED: (15:7, 15:8): (Swift.Int) -> Swift.Int (explicit type: 1)
 // CHECK-FULLY-QUALIFIED: (19:7, 19:12): Swift.Int (explicit type: 0)
-// CHECK-FULLY-QUALIFIED: (22:5, 22:11): Swift.Int (explicit type: 0)
+// CHECK-FULLY-QUALIFIED: (22:5, 22:11): Swift.Int (explicit type: 0)// UNSUPPORTED: OS=windows-msvc

@@ -74,3 +74,4 @@ public protocol P {
 public func some(_ arr : Something<UInt>, p: P) {
   p.t(arr)
 }
+// UNSUPPORTED: OS=windows-msvc

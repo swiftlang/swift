@@ -6,3 +6,4 @@
 // MISSING_VFS_OVERLAYS-NEXT: <unknown>:0: error: cannot open file '{{.*}}{{/|\\}}final-missing-overlay.yaml' ({{[Nn]}}o such file or directory)
 
 // INVALID_VFS_OVERLAY: <unknown>:0: error: invalid virtual overlay file '{{.*}}{{/|\\}}invalid-overlay.yaml'
+// UNSUPPORTED: OS=windows-msvc

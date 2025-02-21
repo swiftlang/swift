@@ -10,3 +10,4 @@ void test(void * _Nonnull p) {
   // Prohibited to construct class reference directly from opaque pointer.
   Class::ClassWithIntField x(p);
 }
+// UNSUPPORTED: OS=windows-msvc

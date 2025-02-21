@@ -206,3 +206,4 @@ class SecondClass {
     // CHECK:   return [[RESULT]] : $Optional<SecondClass>
   }
 }
+// UNSUPPORTED: OS=windows-msvc

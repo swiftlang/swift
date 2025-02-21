@@ -162,3 +162,4 @@ func testUnreachablePlatformAvailableGuard() {
 
   doThing() // no-warning
 }
+// UNSUPPORTED: OS=windows-msvc

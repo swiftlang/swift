@@ -235,3 +235,4 @@ class NSObjectInitOverride: NSObject {
 
 // CHECK-LABEL: sil private [thunk] [ossa] @$s27preconcurrency_conformances20NSObjectInitOverrideCACycfcTo : $@convention(objc_method) (@owned NSObjectInitOverride) -> @owned NSObjectInitOverride
 // CHECK-NOT: [[PRECONDITION:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+// UNSUPPORTED: OS=windows-msvc

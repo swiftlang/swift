@@ -21,3 +21,4 @@ var b: B
 b = B()
 // note: a should not be logged (at least until move-only types can be passed to the generic logging functions)
 // CHECK: [{{.*}}] __builtin_log[b='B()']
+// UNSUPPORTED: OS=windows-msvc

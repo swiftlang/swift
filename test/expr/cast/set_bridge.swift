@@ -106,3 +106,4 @@ func testConditionalDowncastBridge() {
 
 
 
+// UNSUPPORTED: OS=windows-msvc

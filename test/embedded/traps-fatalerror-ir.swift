@@ -27,3 +27,4 @@ public func test() {
 // CHECK-NOMESSAGE-NEXT:   tail call void @llvm.trap()
 // CHECK-NOMESSAGE-NEXT:   unreachable
 // CHECK-NOMESSAGE-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

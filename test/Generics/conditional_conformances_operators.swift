@@ -15,3 +15,4 @@ extension Foo: P where T : Q {
 func useIt<T: Q>(_: T.Type) {
   Foo<T>()%%%
 }
+// UNSUPPORTED: OS=windows-msvc

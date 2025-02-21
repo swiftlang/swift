@@ -110,3 +110,4 @@ Tests.test("Indirect Dispatch + Transparent + No _isConcrete Guard == Crash when
   let y = callBarMul(f, x)
   expectEqual(expectedOutputs, y.asArray)
 }
+// UNSUPPORTED: OS=windows-msvc

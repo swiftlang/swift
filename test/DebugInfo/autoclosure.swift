@@ -29,3 +29,4 @@ func call_me(_ input: Int64) -> Void {
 }
 
 call_me(5)
+// UNSUPPORTED: OS=windows-msvc

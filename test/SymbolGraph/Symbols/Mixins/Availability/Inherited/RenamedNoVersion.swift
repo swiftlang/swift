@@ -14,3 +14,4 @@ public struct S {
 // so we will not expect to see an empty availability mix-in with
 // just the `renamed` field, even though there is a domain listed.
 // CHECK-NOT: "availability":
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ indirect enum Bar<T> {
 indirect struct Bas { // expected-error{{cannot be applied}} {{1-10=}}
   indirect var x: Int // expected-error{{cannot be applied}} {{3-12=}}
 }
+// UNSUPPORTED: OS=windows-msvc

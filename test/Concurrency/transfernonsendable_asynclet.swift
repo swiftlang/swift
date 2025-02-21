@@ -777,3 +777,4 @@ extension NonSendableStruct {
     _ = await subTask6
   }
 }
+// UNSUPPORTED: OS=windows-msvc

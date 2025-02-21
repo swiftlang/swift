@@ -20,3 +20,4 @@
 // RUN: not diff -r -u %t/idx/*/records %t/idx-orig/*/records
 // RUN: ls %t/idx/*/records/* | grep "theinput.swift" | count 2
 // Changed!  Wrote a new record.
+// UNSUPPORTED: OS=windows-msvc

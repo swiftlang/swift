@@ -30,3 +30,4 @@ extension CustomCollection: DataProtocol where Element == UInt8 {
         fatalError()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

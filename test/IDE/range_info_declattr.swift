@@ -117,3 +117,4 @@ class Derived : ObjCBase {
 // CHECK10-NEXT:     set { }</Content>
 // CHECK10-NEXT: <ASTNodes>0</ASTNodes>
 // CHECK10-NEXT: <end>
+// UNSUPPORTED: OS=windows-msvc

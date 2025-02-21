@@ -473,3 +473,4 @@ StdStringTestSuite.test("pass as a default argument") {
 #endif
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

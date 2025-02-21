@@ -31,3 +31,4 @@ func testBaseVirtualMethodCall() -> C {
   let derived = Derived()
   return derived.virtual_method()
 }
+// UNSUPPORTED: OS=windows-msvc

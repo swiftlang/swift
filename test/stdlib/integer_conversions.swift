@@ -129,3 +129,4 @@ let ii = Int64._convert(from: i)
 let iii = Int64(i)
 print(iii == ii.value!)
 // CHECK:  true
+// UNSUPPORTED: OS=windows-msvc

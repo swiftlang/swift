@@ -16,3 +16,4 @@ public class C<T>
 // CHECK: ![[PTRTY]] = !DIDerivedType(tag: DW_TAG_pointer_type, name: "$sBpD", baseType: null, size: {{64|32}}, flags: DIFlagArtificial | DIFlagObjectPointer)
 // CHECK: ![[LOC]] = !DILocation(line: 0,
 
+// UNSUPPORTED: OS=windows-msvc

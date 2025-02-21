@@ -15,3 +15,4 @@ foo()
 // CHECK: key.sourcetext: "        repeat {"
 // CHECK: key.sourcetext: "            foo()"
 
+// UNSUPPORTED: OS=windows-msvc

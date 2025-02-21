@@ -16,3 +16,4 @@ a += b
 // CHECK: [{{.*}}] __builtin_log[a='a']
 // CHECK-NEXT: [{{.*}}] __builtin_log[b='b']
 // CHECK-NEXT: [{{.*}}] __builtin_log[a='ab']
+// UNSUPPORTED: OS=windows-msvc

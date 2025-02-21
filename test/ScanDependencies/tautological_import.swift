@@ -8,3 +8,4 @@
 import TautologicalModule // expected-warning {{file 'tautological_import.swift' is part of module 'TautologicalModule'; ignoring import}}
 
 // CHECK: "mainModuleName": "TautologicalModule"
+// UNSUPPORTED: OS=windows-msvc

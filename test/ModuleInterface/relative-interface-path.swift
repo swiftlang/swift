@@ -9,3 +9,4 @@
 // RUN:   relative_path/A.swiftmodule/arm64-apple-macos.swiftinterface -o out/A.swiftmodule -I out
 
 // REQUIRES: OS=macosx
+// UNSUPPORTED: OS=windows-msvc

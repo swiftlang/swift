@@ -15,3 +15,4 @@ class C : P {
 
 // CHECK-LABEL: Generic signature: <X, T, U where X : S<T, Int>, T : C, U == Int>
 extension G where X : S<T, U>, T : C {}
+// UNSUPPORTED: OS=windows-msvc

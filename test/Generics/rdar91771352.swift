@@ -26,3 +26,4 @@ public protocol P1 {
 public protocol P2 {
   associatedtype B: P1
 }
+// UNSUPPORTED: OS=windows-msvc

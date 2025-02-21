@@ -37,3 +37,4 @@ struct Test {
     return data.config(DataModifier(data)) // Ok (Value is not considered an opaque type)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

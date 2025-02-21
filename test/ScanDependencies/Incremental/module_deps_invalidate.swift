@@ -80,3 +80,4 @@ public func foo() {}
 
 //--- Client.swift
 import A
+// UNSUPPORTED: OS=windows-msvc

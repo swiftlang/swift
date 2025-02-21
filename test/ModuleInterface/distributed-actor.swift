@@ -100,3 +100,4 @@ func main() {
   let dag: DAG<LocalTestingDistributedActorSystem>? = nil
   _ = dag
 }
+// UNSUPPORTED: OS=windows-msvc

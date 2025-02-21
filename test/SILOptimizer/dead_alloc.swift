@@ -57,3 +57,4 @@ public func deadClassInstance() {
 public func deadManagedBuffer() -> () {
   _ = ManagedBuffer<Void, Void>.create(minimumCapacity: 1, makingHeaderWith: { _ in () })
 }
+// UNSUPPORTED: OS=windows-msvc

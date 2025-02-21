@@ -6,3 +6,4 @@
 // CHECK: "LastOption"
 // CHECK: "SupportedFeatures"
 // CHECK: "LastFeature"
+// UNSUPPORTED: OS=windows-msvc

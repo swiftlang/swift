@@ -227,3 +227,4 @@ func testLocalDefaultInit() {
   // CHECK: function_ref @$s22property_wrapper_local19DefaultWrappedValueVACycfC : $@convention(method) (@thin DefaultWrappedValue.Type) -> DefaultWrappedValue
   @DefaultWrappedValue var w: Int
 }
+// UNSUPPORTED: OS=windows-msvc

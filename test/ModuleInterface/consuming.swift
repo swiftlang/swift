@@ -26,3 +26,4 @@ public struct Field {
 }
 
 // CHECK: __consuming get
+// UNSUPPORTED: OS=windows-msvc

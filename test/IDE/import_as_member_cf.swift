@@ -31,3 +31,4 @@ let powerSupply = CCPowerSupply(watts: 500.0)
 let refrigerator = CCRefrigerator(powerSupply: powerSupply)
 refrigerator.open();
 refrigerator.powerSupply = powerSupply
+// UNSUPPORTED: OS=windows-msvc

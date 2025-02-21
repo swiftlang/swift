@@ -27,3 +27,4 @@ public struct MyStruct<S: Sequence> {
 // CHECK-NEXT:     "rhsPrecise": "s:Si"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

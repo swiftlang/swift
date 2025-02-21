@@ -7,3 +7,4 @@ withUnsafeTemporaryAllocation(byteCount: 1, alignment: -1) { buffer in
     blackHole(buffer.baseAddress)
 }
 // CHECK: error: alignment value must be greater than zero
+// UNSUPPORTED: OS=windows-msvc

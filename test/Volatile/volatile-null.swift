@@ -17,3 +17,4 @@ public func test_volatilepointer() {
 // CHECK:   store atomic volatile i8 42, ptr null monotonic, align {{.*}}
 // CHECK:   ret void
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

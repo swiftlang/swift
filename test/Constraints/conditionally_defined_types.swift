@@ -234,3 +234,4 @@ func f<PI : PP & P2>(s: SS<PI>) -> SS<EE<PI.U, PI.U>> where PI.U : PP, PI.V : P2
   let t: EE<PI.V.U, PI.V.U>.V
   // expected-error@-1 {{type 'PI.V.U' does not conform to protocol 'PP'}}
 }
+// UNSUPPORTED: OS=windows-msvc

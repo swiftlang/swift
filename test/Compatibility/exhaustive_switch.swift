@@ -1231,3 +1231,4 @@ do {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

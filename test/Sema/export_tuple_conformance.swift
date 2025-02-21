@@ -5,3 +5,4 @@ public struct G<T: Sendable> {}
 public func makeG() -> G<Void> {}
 
 // No spurious warning about use of conformance from Builtin module
+// UNSUPPORTED: OS=windows-msvc

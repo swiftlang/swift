@@ -21,3 +21,4 @@ public protocol Derived: Base {
   @differentiable(reverse)
   func callAsFunction(_ input: Input) -> Output
 }
+// UNSUPPORTED: OS=windows-msvc

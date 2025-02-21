@@ -2,3 +2,4 @@
 
 // CHECK: func invokeWith42ConstRef(_ fn: ((Int32) -> Void)!)
 // CHECK: func invokeWith42Ref(_ fn: ((UnsafeMutablePointer<Int32>) -> Void)!)
+// UNSUPPORTED: OS=windows-msvc

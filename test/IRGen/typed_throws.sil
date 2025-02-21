@@ -516,3 +516,4 @@ bb1(%12 : $Int):
 bb2(%19 : $Never):
   unreachable
 }
+// UNSUPPORTED: OS=windows-msvc

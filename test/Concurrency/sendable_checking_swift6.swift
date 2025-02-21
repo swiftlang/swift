@@ -14,3 +14,4 @@ func checkOpaqueType() -> some Sendable {
   UnavailableSendable()
   // expected-error@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable}}
 }
+// UNSUPPORTED: OS=windows-msvc

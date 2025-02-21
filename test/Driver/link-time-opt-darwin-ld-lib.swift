@@ -39,3 +39,4 @@
 // CHECK-SIMPLE-LTO-LIB-macosx: ld
 // CHECK-SIMPLE-LTO-LIB-macosx-DAG: -lto_library /foo/libLTO.dylib
 // CHECK-SIMPLE-LTO-LIB-macosx-DAG: [[OBJECTFILE]]
+// UNSUPPORTED: OS=windows-msvc

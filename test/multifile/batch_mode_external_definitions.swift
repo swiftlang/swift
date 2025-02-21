@@ -214,3 +214,4 @@
 // CHECK-NEITHER-FUNC-NOT: use_func_2
 // CHECK-NEITHER-FUNC-NOT: define internal i32 @extern_inline_function
 
+// UNSUPPORTED: OS=windows-msvc

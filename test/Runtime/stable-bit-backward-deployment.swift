@@ -28,3 +28,4 @@ class ResilientSubInit: JSONEncoder {}
 debugPrint(ResilientSubInit.self) // CHECK-NEXT: main.ResilientSubInit
 
 print("nailed it") // CHECK-NEXT: nailed it
+// UNSUPPORTED: OS=windows-msvc

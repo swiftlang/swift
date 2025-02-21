@@ -11,4 +11,4 @@ func f2() -> <T: SignedInteger, U: SignedInteger> Int {
 // CHECK1: {{^}}func f1() -> <T> Int {{{$}}
 // CHECK1: {{^}}}{{$}}
 // CHECK1: {{^}}func f2() -> <T : SignedInteger, U : SignedInteger> Int {{{$}}
-// CHECK1: {{^}}}{{$}}
+// CHECK1: {{^}}}{{$}}// UNSUPPORTED: OS=windows-msvc

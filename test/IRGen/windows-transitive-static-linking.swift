@@ -21,3 +21,4 @@ public func g() -> Int { f() + 1 }
 //--- library.swift
 import `static`
 public func h() -> Int { g() + 1 }
+// UNSUPPORTED: OS=windows-msvc

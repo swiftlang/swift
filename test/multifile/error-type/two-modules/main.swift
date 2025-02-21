@@ -11,3 +11,4 @@ extension NuclearMeltdown : Error {}
 
 // Dummy statement
 _ = ()
+// UNSUPPORTED: OS=windows-msvc

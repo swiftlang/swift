@@ -221,3 +221,4 @@ func trivialStructContinueBreak(_ xx: AsyncLazySequence<[Int]>) async {
 
   funcEnd()
 }
+// UNSUPPORTED: OS=windows-msvc

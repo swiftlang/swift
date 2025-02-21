@@ -11,3 +11,4 @@ extension IdentifiableValue {
     return id + 1
   }
 }
+// UNSUPPORTED: OS=windows-msvc

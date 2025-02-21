@@ -79,3 +79,4 @@ extension MyObject {
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: 'nsstringProperty2' previously declared here
+// UNSUPPORTED: OS=windows-msvc

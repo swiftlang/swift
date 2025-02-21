@@ -479,3 +479,4 @@ func testSendableOptionalInference(nc: NotConcurrent) {
   }
   _ = fn
 }
+// UNSUPPORTED: OS=windows-msvc

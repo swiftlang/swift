@@ -19,3 +19,4 @@ import PlaygroundSupport
 var a = true
 // CHECK: [1:2] [8:1-8:13] pc before
 // CHECK-NEXT: [1:2] [8:1-8:13] pc after
+// UNSUPPORTED: OS=windows-msvc

@@ -455,3 +455,4 @@ let zz:Int32 = getName_wrapper()
 let _ = find_wrapper()
 return x + y + z + Int(zz)
 }
+// UNSUPPORTED: OS=windows-msvc

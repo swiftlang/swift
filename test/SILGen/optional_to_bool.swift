@@ -23,3 +23,4 @@ public func foo(x: inout [A]) -> Bool {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

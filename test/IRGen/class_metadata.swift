@@ -189,3 +189,4 @@ class E {}
 // CHECK-LABEL: @"$s14class_metadata1FCMn" =
 // CHECK-SAME: @"symbolic _____yq_G 14class_metadata1CC"
 class F<T, U> : C<U> { }
+// UNSUPPORTED: OS=windows-msvc

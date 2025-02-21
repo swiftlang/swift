@@ -245,3 +245,4 @@ public protocol ReadableField {
   @_borrowed
   var field: Int { get }
 }
+// UNSUPPORTED: OS=windows-msvc

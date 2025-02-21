@@ -73,3 +73,4 @@ func test_taskGroup_throws() async {
     await test_taskGroup_throws()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

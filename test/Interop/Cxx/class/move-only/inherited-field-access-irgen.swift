@@ -24,3 +24,4 @@ testSetX(2)
 // CHECK: define {{.*}}linkonce_odr{{.*}} ptr @{{(.*)(31NonCopyableHolderDerivedDerived33__synthesizedBaseSetterAccessor_x|__synthesizedBaseSetterAccessor_x@NonCopyableHolderDerivedDerived)(.*)}}
 // CHECK: %[[VPTRS:.*]] = getelementptr inbounds %struct.NonCopyableHolder
 // CHECK: ret ptr %[[VPTRS]]
+// UNSUPPORTED: OS=windows-msvc

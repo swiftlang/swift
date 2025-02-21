@@ -41,3 +41,4 @@ public func publicClient() -> LibStruct { fatalError() }
 
 public func publicClient() -> LibStruct { fatalError() } // expected-error {{cannot use struct 'LibStruct' here; 'Lib' was imported for SPI only}}
 @_spi(X) public func spiClient() -> LibStruct { fatalError() }
+// UNSUPPORTED: OS=windows-msvc

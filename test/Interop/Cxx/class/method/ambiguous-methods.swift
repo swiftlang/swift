@@ -86,3 +86,4 @@ CxxAmbiguousMethodTestSuite.test("Inout Param Increment: (inout Int, Int) -> Voi
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

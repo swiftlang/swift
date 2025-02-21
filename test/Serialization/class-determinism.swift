@@ -15,3 +15,4 @@
 // RUN: cmp %t/orig-mtime.txt %t.3
 
 // We shouldn't re-emit the module if it hasn't changed.
+// UNSUPPORTED: OS=windows-msvc

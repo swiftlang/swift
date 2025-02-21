@@ -21,3 +21,4 @@ struct Main {
     // CHECK: true
   }
 }
+// UNSUPPORTED: OS=windows-msvc

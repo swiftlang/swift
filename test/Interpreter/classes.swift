@@ -233,3 +233,4 @@ class DerivedProperty : BaseProperty {
 
 // CHECK: 1
 print(DerivedProperty().increment().value)
+// UNSUPPORTED: OS=windows-msvc

@@ -56,3 +56,4 @@ func test_detach_throw() async {
     await test_detach_throw()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

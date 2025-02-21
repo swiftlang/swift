@@ -878,3 +878,4 @@ struct Outer {
 extension Outer.Inner<Never> { // expected-note {{in extension of 'Outer.Inner<Never>'}}
   @someAttr
 } // expected-error {{expected declaration}}
+// UNSUPPORTED: OS=windows-msvc

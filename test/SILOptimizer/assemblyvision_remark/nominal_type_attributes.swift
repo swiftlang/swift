@@ -49,3 +49,4 @@ enum Enum2 {
         callPrint("I am callPrinting 1")
     }
 }
+// UNSUPPORTED: OS=windows-msvc

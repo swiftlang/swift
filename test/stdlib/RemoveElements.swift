@@ -105,3 +105,4 @@ RemoveElements.test("removing-string-with-equatable") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ func test() {
         consumeMoveIntPair(x)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

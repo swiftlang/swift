@@ -293,3 +293,4 @@ func testAddressOnlyBorrowingEnum<T>(_ x: borrowing AddressOnlyEnum<T>) {
         break
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ struct BadStruct {
   @available(iOS 13, *)
   var unavailableOnCatalyst: Int
 }
+// UNSUPPORTED: OS=windows-msvc

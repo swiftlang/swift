@@ -8,3 +8,4 @@ enum EmptyEnum : CodingKey {}
 // Cannot check accessors since there are no instances of EmptyEnum to test on.
 guard EmptyEnum(stringValue: "") == nil else { fatalError() }
 guard EmptyEnum(intValue: 0) == nil else { fatalError() }
+// UNSUPPORTED: OS=windows-msvc

@@ -185,3 +185,4 @@ public class Concrete : Derived<Int> {
 // -- ClassLayoutFlags is 256 / 0x100, HasStaticVTable
 // CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata2(ptr %0, [[INT]] 256, {{.*}})
 // CHECK: ret %swift.metadata_response
+// UNSUPPORTED: OS=windows-msvc

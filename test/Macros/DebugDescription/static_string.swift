@@ -36,3 +36,4 @@ class MyEnum: CustomDebugStringConvertible {
 // CHECK:     /* "main.MyEnum" */ 12 as UInt8, 109 as UInt8, 97 as UInt8, 105 as UInt8, 110 as UInt8, 46 as UInt8, 77 as UInt8, 121 as UInt8, 69 as UInt8, 110 as UInt8, 117 as UInt8, 109 as UInt8, 0 as UInt8,
 // CHECK:     /* "thirty" */ 7 as UInt8, 116 as UInt8, 104 as UInt8, 105 as UInt8, 114 as UInt8, 116 as UInt8, 121 as UInt8, 0 as UInt8
 // CHECK: )
+// UNSUPPORTED: OS=windows-msvc

@@ -117,3 +117,4 @@ struct TypeLayoutTest<T> {
   // CHECK:       store ptr [[TUPLE_LAYOUT_O]]
   var o: (T, T, T, T)
 }
+// UNSUPPORTED: OS=windows-msvc

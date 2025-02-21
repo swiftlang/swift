@@ -170,3 +170,4 @@ public import PublicSwift
 // expected-warning @-1 {{public import of 'PublicSwift' was not used in public declarations or inlinable code}}{{1-8=}}
 public import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}{{1-8=}}
 // expected-warning @-1 {{public import of 'PrivateSwift' was not used in public declarations or inlinable code}}{{1-8=}}
+// UNSUPPORTED: OS=windows-msvc

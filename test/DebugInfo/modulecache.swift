@@ -21,3 +21,4 @@ import ClangModule
 // 3. Test that swift-ide-check will not share swiftc's module cache.
 
 // RUN: %swift-ide-test_plain -print-usrs -target %target-triple -module-cache-path %t  -I %S/Inputs -source-filename %s
+// UNSUPPORTED: OS=windows-msvc

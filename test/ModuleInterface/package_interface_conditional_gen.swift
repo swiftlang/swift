@@ -36,3 +36,4 @@ package struct PkgStruct {
 public struct PubStruct {
 
 }
+// UNSUPPORTED: OS=windows-msvc

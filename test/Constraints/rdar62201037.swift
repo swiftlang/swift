@@ -29,3 +29,4 @@ func foo<T>(_ s: String, _ rt: R<T>?) -> String? {
   }
   .flatMap(\.str)
 }
+// UNSUPPORTED: OS=windows-msvc

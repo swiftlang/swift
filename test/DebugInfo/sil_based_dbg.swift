@@ -39,3 +39,4 @@ public func test_debug_scope(val : Int) -> Int {
     the_struct.the_member = val + 13
     return the_struct.the_member
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -9,4 +9,4 @@ public func takesAnInt(_: Int? = nil) {}
 // CHECK: return
 public func callsTakesAnInt() {
   takesAnInt()
-}
+}// UNSUPPORTED: OS=windows-msvc

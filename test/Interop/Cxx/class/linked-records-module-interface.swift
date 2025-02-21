@@ -52,3 +52,4 @@
 // CHECK:   }
 // CHECK:   var cc: G.__Unnamed_class_cc
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ private struct PrivateConformer: Hashable {
   // CHECK-DAG: fileprivate var hashValue: Int { get }
   // CHECK-DAG: @_implements(Equatable, ==(_:_:)) fileprivate static func __derived_struct_equals
 }
+// UNSUPPORTED: OS=windows-msvc

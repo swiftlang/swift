@@ -65,3 +65,4 @@ distributed actor MyDistActor {
 // CHECK:  } // end sil function '$s14default_deinit11MyDistActorCACyKcfc'
 
 }
+// UNSUPPORTED: OS=windows-msvc

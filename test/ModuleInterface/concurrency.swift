@@ -94,3 +94,4 @@ func callFn() async {
 // RUN: %target-swift-emit-module-interface(%t/LibraryPreserveTypesAsWritten.swiftinterface) %s -enable-experimental-concurrency -DLIBRARY -module-name LibraryPreserveTypesAsWritten -module-interface-preserve-types-as-written
 // RUN: %target-swift-typecheck-module-from-interface(%t/LibraryPreserveTypesAsWritten.swiftinterface) -enable-experimental-concurrency
 // RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK-ASWRITTEN %s < %t/LibraryPreserveTypesAsWritten.swiftinterface
+// UNSUPPORTED: OS=windows-msvc

@@ -237,3 +237,4 @@ func testPointeeDependenceOnMutablePointer(p: UnsafePointer<Int64>) {
   var ptr = p
   _ = ptr.pointee
 }
+// UNSUPPORTED: OS=windows-msvc

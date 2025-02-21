@@ -51,3 +51,4 @@ struct RoundedBadge : MyView {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

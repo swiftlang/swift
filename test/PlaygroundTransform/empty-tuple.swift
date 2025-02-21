@@ -14,3 +14,4 @@ func foo() { }
 foo()
 1+2
 // CHECK: {{.*}} __builtin_log[='3']
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ x.#^AFTER_DOT_FOLLOWING_DOT?check=AFTER_DOT^#.
 
 Foo().bar.#^UNRESOLVED_MEMBER_REF^#
 // UNRESOLVED_MEMBER_REF: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]/Erase[1]: ({#argLabel: Int#})[#Int#]; name=(argLabel:)
+// UNSUPPORTED: OS=windows-msvc

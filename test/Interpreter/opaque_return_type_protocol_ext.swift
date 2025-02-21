@@ -108,3 +108,4 @@ if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
   print("nope, still too old")
   print("too damn old")
 }
+// UNSUPPORTED: OS=windows-msvc

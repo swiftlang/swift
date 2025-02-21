@@ -38,3 +38,4 @@ struct Pack<each T> {
     Builtin.packLength((repeat each T).self)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

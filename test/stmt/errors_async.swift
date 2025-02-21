@@ -13,3 +13,4 @@ func shouldThrow() async {
     continuation.resume(throwing: MyError.bad)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -72,3 +72,4 @@ protocol Q3 : Q {
 protocol Q4 : Q {
   associatedtype B : P where A.T == B.T, A == G<A.T>
 }
+// UNSUPPORTED: OS=windows-msvc

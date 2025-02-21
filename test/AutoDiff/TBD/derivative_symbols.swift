@@ -154,3 +154,4 @@ public final class Class: Differentiable {
   //   fatalError()
   // }
 }
+// UNSUPPORTED: OS=windows-msvc

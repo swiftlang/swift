@@ -154,3 +154,4 @@ func test_taskGroup_contains() async {
     await test_taskGroup_contains()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

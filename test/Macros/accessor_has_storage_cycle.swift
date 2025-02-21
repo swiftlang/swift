@@ -19,3 +19,4 @@ struct Content {
   //expected-error@-1 2{{could not be found for macro}}
   // expected-warning@-2{{result of operator '==' is unused}}
 }
+// UNSUPPORTED: OS=windows-msvc

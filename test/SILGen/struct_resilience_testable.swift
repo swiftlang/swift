@@ -12,3 +12,4 @@
 public func takesResilientStructWithInternalField(_ s: ResilientWithInternalField) -> Int {
   return s.x
 }
+// UNSUPPORTED: OS=windows-msvc

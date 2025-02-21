@@ -18,3 +18,4 @@ func test_dynamic_replacement_for2() {
 func test_dynamic_replacement_for3() {
 // expected-error@-1 {{expected ')' after function name for @_dynamicReplacement}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -88,3 +88,4 @@ func asyncFunc() async {
 // CHECK-SIL-NEXT:  [[DRAIN_FN:%.*]] = function_ref @swift_task_asyncMainDrainQueue : $@convention(thin) () -> Never
 // CHECK-SIL-NEXT:  apply [[DRAIN_FN]]() : $@convention(thin) () -> Never
 // CHECK-SIL-NEXT:  unreachable
+// UNSUPPORTED: OS=windows-msvc

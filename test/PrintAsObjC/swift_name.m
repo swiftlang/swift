@@ -25,3 +25,4 @@ SWIFT_PROTOCOL(aaa) // CHECK-NEXT: __attribute__((objc_runtime_name(aaa)))
 SWIFT_PROTOCOL_NAMED(bbb) // CHECK-NEXT: __attribute__((swift_name(bbb)))
 @protocol BBB // CHECK-NEXT: @protocol
 @end
+// UNSUPPORTED: OS=windows-msvc

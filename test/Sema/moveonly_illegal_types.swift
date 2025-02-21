@@ -79,3 +79,4 @@ func illegalTypes<T>(_ t: T) {
 func illegalInExpr() {
 
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ from_ABAdditions()
 // CHECK: [[@LINE-1]]:1 | function{{/|\\}}Swift | from_ABAdditions() | {{.*}} | Ref,Call | rel: 0
 from__ABAdditionsCAdditions()
 // CHECK: [[@LINE-1]]:1 | function{{/|\\}}Swift | from__ABAdditionsCAdditions() | {{.*}} | Ref,Call | rel: 0
+// UNSUPPORTED: OS=windows-msvc

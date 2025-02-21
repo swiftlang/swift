@@ -20,3 +20,4 @@ public func captureRange(_ r: NSRange?) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -5,3 +5,4 @@ func test() {
 
 // CHECK: source.lang.swift.ref.module ()
 // CHECK-NEXT: Swift
+// UNSUPPORTED: OS=windows-msvc

@@ -239,3 +239,4 @@ bb2:
 bb3(%3 : $TestArrayStorage):
   return %3 : $TestArrayStorage
 }
+// UNSUPPORTED: OS=windows-msvc

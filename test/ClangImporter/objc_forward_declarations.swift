@@ -9,3 +9,4 @@
 import ForwardDeclarationsHelper
 
 public class Innocuous: Confusing {}
+// UNSUPPORTED: OS=windows-msvc

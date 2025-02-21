@@ -22,3 +22,4 @@ func mentionSubclassConformsToPrivateProto(
   ssc: SubclassSubclassConformsToPrivateProto) {
   useP(ssc)
 }
+// UNSUPPORTED: OS=windows-msvc

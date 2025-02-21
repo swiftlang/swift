@@ -915,3 +915,4 @@ private struct PrivateGenericUsesFileprivate<A: FileprivateImportProto> {}
 private struct PrivateGenericUsesPrivate<A: PrivateImportProto> {}
 
 public struct PublicGenericUsesProtocolComposition<A: FileprivateImportProto & InternalImportProto> {} // expected-error {{generic struct cannot be declared public because its generic parameter uses a fileprivate type}}
+// UNSUPPORTED: OS=windows-msvc

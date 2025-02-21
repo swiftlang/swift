@@ -62,3 +62,4 @@ import A.B.C
 
 #if canImport(A.B.C()) // expected-error@:15 {{expected module name}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

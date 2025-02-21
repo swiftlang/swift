@@ -26,3 +26,4 @@ enum IsRecursiveBad1Integral : Bool, Equatable, Hashable {
 enum IsRecursiveBad2 : Int, Equatable, Hashable {
   case recursive = false // expected-error{{cannot convert value of type 'Bool' to raw type 'Int'}}
 }
+// UNSUPPORTED: OS=windows-msvc

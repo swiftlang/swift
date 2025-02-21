@@ -6,3 +6,4 @@
 public protocol ExternalP {}
 
 public struct ExternalConformer: ExternalP {}
+// UNSUPPORTED: OS=windows-msvc

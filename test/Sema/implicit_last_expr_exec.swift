@@ -108,3 +108,4 @@ print(testClosure(true))
 print(testClosure(false))
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ public struct Struct {
 // CHECK: SWIFT_INLINE_THUNK swift::Int Struct::getGetterOnly() const SWIFT_AVAILABILITY(macos,introduced=11) {
 
 // CHECK: SWIFT_INLINE_THUNK swift::Int Struct::getStaticUnavailableProp() SWIFT_UNAVAILABLE_MSG("stuff happened") {
+// UNSUPPORTED: OS=windows-msvc

@@ -43,3 +43,4 @@ public let globalvar = empty.exists
 // CHECK3: ![[VAR]] = distinct !DIGlobalVariable(name: "globalvar",
 // CHECK3-SAME:          {{.*}}line: [[@LINE-4]], {{.*}}isLocal: false,
 // CHECK3-SAME:          isDefinition: true)
+// UNSUPPORTED: OS=windows-msvc

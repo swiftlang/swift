@@ -18,3 +18,4 @@ let _ = objWMutableProperty.duplicateAnnotations()
 let objWithoutMutableProperty = NoMutableProperty(a: 42) // expected-note {{change 'let' to 'var' to make it mutable}}
 let _ = objWithoutMutableProperty.isConst()
 let _ = objWithoutMutableProperty.nonConst() // expected-error {{cannot use mutating member on immutable value: 'objWithoutMutableProperty' is a 'let' constant}}
+// UNSUPPORTED: OS=windows-msvc

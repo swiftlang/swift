@@ -16,3 +16,4 @@ var b = 2
 // CHECK: ![[INT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int"
 // CHECK-SAME:                        identifier: "$sSiD"
 
+// UNSUPPORTED: OS=windows-msvc

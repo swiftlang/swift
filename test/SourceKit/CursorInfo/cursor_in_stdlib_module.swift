@@ -10,3 +10,4 @@ func test() {
 // CHECK-NEXT: <T where T : Comparable> (T, T) -> T
 // CHECK-NEXT: $syxx_xtcSLRzluD
 // CHECK-NEXT: Swift
+// UNSUPPORTED: OS=windows-msvc

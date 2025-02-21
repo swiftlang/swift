@@ -13,3 +13,4 @@ func use<T: DefaultInitializable>(_: T) {}
 func test(x: SpecialInt) {
   use(x)
 }
+// UNSUPPORTED: OS=windows-msvc

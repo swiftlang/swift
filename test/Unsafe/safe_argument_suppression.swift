@@ -51,3 +51,4 @@ class NotSafeSubclass: NotSafe {
   okayFunc(ns)
   _ = ns[ns]
 }
+// UNSUPPORTED: OS=windows-msvc

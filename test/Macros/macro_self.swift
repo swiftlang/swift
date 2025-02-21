@@ -25,3 +25,4 @@ func testCapitalSelfAsAttachedMacro() {
   @Self // expected-error {{expected expression}}
   struct Foo {}
 }
+// UNSUPPORTED: OS=windows-msvc

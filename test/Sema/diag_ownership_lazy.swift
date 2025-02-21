@@ -16,3 +16,4 @@ class LazyReferenceClass {
   // expected-note@-3 {{'unownedValue' declared here}}
   // expected-note@-4 {{a strong reference is required to prevent the instance from being deallocated}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@
 // RUN: not diff %t/path1 %t/path2
 
 func test() {}
+// UNSUPPORTED: OS=windows-msvc

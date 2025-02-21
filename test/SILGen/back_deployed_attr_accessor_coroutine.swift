@@ -75,3 +75,4 @@ func caller(_ s: TopLevelStruct) {
   // CHECK: {{%.*}} = function_ref @$s11back_deploy14TopLevelStructV8propertyACvrTwb : $@yield_once @convention(method) (TopLevelStruct) -> @yields TopLevelStruct
   _ = s.property
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -387,3 +387,4 @@ extension ReducedError where T == MyError {
     throw MyError.fail
   }
 }
+// UNSUPPORTED: OS=windows-msvc

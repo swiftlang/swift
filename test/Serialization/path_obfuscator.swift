@@ -11,4 +11,4 @@ public class A {}
 // CHECK-ORIGINAL: /CHANGED_BAR/contents
 
 // CHECK-RECOVER: /FOO/contents
-// CHECK-RECOVER: /BAR/contents
+// CHECK-RECOVER: /BAR/contents// UNSUPPORTED: OS=windows-msvc

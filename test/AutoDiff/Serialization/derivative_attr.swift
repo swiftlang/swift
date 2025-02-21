@@ -161,3 +161,4 @@ extension S {
     fatalError()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

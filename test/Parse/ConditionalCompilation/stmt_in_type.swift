@@ -11,3 +11,4 @@ struct S1 { // expected-note {{in declaration of 'S1'}}
   foo(); // expected-error {{expected 'func' keyword in instance method declaration}}
 #endif
 }
+// UNSUPPORTED: OS=windows-msvc

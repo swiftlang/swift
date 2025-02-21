@@ -54,3 +54,4 @@ public protocol P {
   var books: Int { get async }
   subscript(_ x: Int) -> Int { get throws }
 }
+// UNSUPPORTED: OS=windows-msvc

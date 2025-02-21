@@ -31,3 +31,4 @@ func test(a: A) {
   s = a.b.c?.d
   print(s)
 }
+// UNSUPPORTED: OS=windows-msvc

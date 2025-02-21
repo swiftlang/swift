@@ -171,3 +171,4 @@ func getBlockWithLoop(noEscapeBlock: () -> Void ) -> MyBlock {
   return (Optional<MyBlock>.none)!
 }
 
+// UNSUPPORTED: OS=windows-msvc

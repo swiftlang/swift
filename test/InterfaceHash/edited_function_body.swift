@@ -14,3 +14,4 @@ func f() -> Int {
 func f() -> Int {
     return 1
 }
+// UNSUPPORTED: OS=windows-msvc

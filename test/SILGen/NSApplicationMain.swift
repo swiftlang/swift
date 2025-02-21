@@ -24,3 +24,4 @@ func bar() {
   NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

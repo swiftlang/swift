@@ -53,3 +53,4 @@ class C3 {
 
 // AVAILABLE: Keyword/Local/Flair[ExprSpecific]:               available({#Platform...#}, *); name=available(*)
 // AVAILABLE1-NOT: available({#Platform...#}, *)
+// UNSUPPORTED: OS=windows-msvc

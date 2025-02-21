@@ -25,3 +25,4 @@ extension List {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

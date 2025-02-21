@@ -49,3 +49,4 @@ func foo(
 // INNER_CMODULE: key.name: "StructDefinedInCModule"
 // INNER_CMODULE: key.name: "StructDefinedInCModule."
 // INNER_CMODULE: key.name: "StructDefinedInCModule("
+// UNSUPPORTED: OS=windows-msvc

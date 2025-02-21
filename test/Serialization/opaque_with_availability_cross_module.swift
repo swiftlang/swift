@@ -58,3 +58,4 @@ unavailableTest.hello()
 let inactiveTest = LimitedAvailOpaque.testInactiveAvailableQuery()
 inactiveTest.hello()
 // CHECK: Hello from Empty
+// UNSUPPORTED: OS=windows-msvc

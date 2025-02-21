@@ -32,3 +32,4 @@ d4.f()
 
 // CHECK-NOT: _ZN6UnusedIiE3fooEv
 // CHECK-NOT: "\?foo@\?\$Unused@H@@UEAAXXZ"
+// UNSUPPORTED: OS=windows-msvc

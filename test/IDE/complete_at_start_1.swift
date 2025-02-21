@@ -15,3 +15,4 @@
 
 // This function just adds more non-comment tokens to ensure that the file is not empty.
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

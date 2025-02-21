@@ -19,3 +19,4 @@
 
 // CHECK-DIAG: bad-bridging-header.h:1:10: error: 'this-header-does-not-exist.h' file not found
 // CHECK-DIAG: failed to emit precompiled header
+// UNSUPPORTED: OS=windows-msvc

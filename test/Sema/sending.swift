@@ -23,3 +23,4 @@ func test_repeated_sending_mixed(_ x: sending consuming sending inout Int) {}
 // Just until we get the results setup.
 func test_sending_result_in_tuple() -> (sending Int, Int) {}
 // expected-error @-1 {{'sending' cannot be applied to tuple elements}}
+// UNSUPPORTED: OS=windows-msvc

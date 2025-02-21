@@ -80,3 +80,4 @@ distributed actor Philosopher {
 //    }
 //  }
 }
+// UNSUPPORTED: OS=windows-msvc

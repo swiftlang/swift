@@ -449,3 +449,4 @@ bb0(%0 : $Unmanaged<C>):
   return %8
 }
 
+// UNSUPPORTED: OS=windows-msvc

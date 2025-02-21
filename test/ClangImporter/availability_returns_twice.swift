@@ -26,3 +26,4 @@ func test_unavailable_returns_twice_function() {
   _ = setjmp(&x) // expected-error {{'setjmp' is unavailable: Functions that may return more than one time (annotated with the 'returns_twice' attribute) are unavailable in Swift}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

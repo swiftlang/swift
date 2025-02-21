@@ -1282,3 +1282,4 @@ if #available(SwiftStdlib 6.1, *) {
   }
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

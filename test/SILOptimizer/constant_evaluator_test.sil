@@ -1555,3 +1555,4 @@ bb0:
   return %0 : $(Builtin.Int64)
 } // CHECK: Returns int: 25
 
+// UNSUPPORTED: OS=windows-msvc

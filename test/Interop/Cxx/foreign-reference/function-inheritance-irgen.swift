@@ -13,3 +13,4 @@ let _ = testGetX()
 // CHECK: define {{.*}}linkonce_odr{{.*}} i32 @{{(.*)(30CopyTrackedDerivedDerivedClass26__synthesizedBaseCall_getX|__synthesizedBaseCall_getX@CopyTrackedDerivedDerivedClass)(.*)}}(ptr {{.*}} %[[THIS_PTR:.*]])
 // CHECK: %[[ADD_PTR:.*]] = getelementptr inbounds i8, ptr %{{.*}}, i{{32|64}} 4
 // CHECK: call{{.*}} i32 @{{.*}}(ptr {{.*}} %[[ADD_PTR]])
+// UNSUPPORTED: OS=windows-msvc

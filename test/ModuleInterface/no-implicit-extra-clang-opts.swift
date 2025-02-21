@@ -28,3 +28,4 @@ import SIMod
 // CHECK-NOT: remark: rebuilding module 'SIMod' from interface
 // CHECK-NOT: note: cached module is out of date
 // CHECK-NOT: note: dependency is out of date
+// UNSUPPORTED: OS=windows-msvc

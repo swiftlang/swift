@@ -207,3 +207,4 @@ do {
 // CHECK: ((@escaping () -> ()) -> ()).Type
 // CHECK: Array<@convention(c) () -> ()>.Type
 // CHECK: Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>.Type
+// UNSUPPORTED: OS=windows-msvc

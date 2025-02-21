@@ -7,3 +7,4 @@
 extension X {
   func foo() { }
 }
+// UNSUPPORTED: OS=windows-msvc

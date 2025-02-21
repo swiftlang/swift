@@ -24,3 +24,4 @@ public struct S {}
 
 // CHECK: "message": "Everyone makes mistakes"
 // CHECK: "renamed": "S2"
+// UNSUPPORTED: OS=windows-msvc

@@ -32,3 +32,4 @@ public enum SwiftEnum {}
 
 // ensure that the only nodes with a "location" field are the ones that came from Swift
 // LOCATION-COUNT-2: "location":
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ public func runTest(_ l : large_thing) {
   let r = pass_and_return(l, l)
   print(r)
 }
+// UNSUPPORTED: OS=windows-msvc

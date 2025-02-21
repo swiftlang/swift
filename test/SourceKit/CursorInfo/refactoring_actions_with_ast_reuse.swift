@@ -18,3 +18,4 @@ func outer() {
 // CHECK-DAG: source.refactoring.kind.convert.func-to-async
 // CHECK-DAG: Convert Function to Async
 // CHECK: ACTIONS END
+// UNSUPPORTED: OS=windows-msvc

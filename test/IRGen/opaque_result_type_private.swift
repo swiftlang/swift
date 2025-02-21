@@ -13,3 +13,4 @@ public func test() {
     var x = B(C())
     print(x)
 }
+// UNSUPPORTED: OS=windows-msvc

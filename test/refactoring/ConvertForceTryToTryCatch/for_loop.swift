@@ -7,3 +7,4 @@ for num in try! throwingFunc() {
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -convert-to-do-catch -source-filename %s -pos=4:14 > %t.result/L5.swift
 // RUN: diff -u %S/Outputs/for_loop/L5.swift.expected %t.result/L5.swift
+// UNSUPPORTED: OS=windows-msvc

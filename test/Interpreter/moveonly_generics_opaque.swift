@@ -27,3 +27,4 @@ do {
   let markedVal = makeWrapper(wrapping: String.self)
   markedVal.announce() // CHECK: ConcreteWrapper<Hello<String>> is Marked
 }
+// UNSUPPORTED: OS=windows-msvc

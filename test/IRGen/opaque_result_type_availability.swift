@@ -20,3 +20,4 @@ public func main() {
 
 // MAYBE-AVAILABLE: declare{{.*}} extern_weak {{.*}} @swift_getOpaqueTypeConformance
 // ALWAYS-AVAILABLE-NOT: declare{{.*}} extern_weak {{.*}} @swift_getOpaqueTypeConformance
+// UNSUPPORTED: OS=windows-msvc

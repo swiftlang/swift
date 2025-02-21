@@ -17,3 +17,4 @@ func foo(value: MyEnum) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

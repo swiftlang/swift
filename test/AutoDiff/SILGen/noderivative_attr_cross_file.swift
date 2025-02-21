@@ -8,3 +8,4 @@ func bar(_ x: Float) -> Float {
 }
 
 // CHECK: sil hidden [_semantics "autodiff.nonvarying"] [ossa] @float_to_int_noderivative : $@convention(thin) (Float) -> Int
+// UNSUPPORTED: OS=windows-msvc

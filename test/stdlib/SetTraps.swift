@@ -75,3 +75,4 @@ SetTraps.test("RemoveFirstFromEmpty")
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

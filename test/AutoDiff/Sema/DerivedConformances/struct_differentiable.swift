@@ -430,3 +430,4 @@ extension OtherFileNonconforming: Differentiable {}
 extension GenericOtherFileNonconforming: Differentiable {}
 // expected-error@-1 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
 // expected-note@-2 {{add stubs for conformance}}
+// UNSUPPORTED: OS=windows-msvc

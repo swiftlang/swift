@@ -120,3 +120,4 @@ struct TestStaticVar {
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

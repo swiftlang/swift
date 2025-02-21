@@ -21,3 +21,4 @@ undefinedElse() // expected-error {{cannot find 'undefinedElse' in scope}}
 // expected-error @+1 {{invalid conditional compilation expression}}
 #if false || true && try! Swift
 #endif
+// UNSUPPORTED: OS=windows-msvc

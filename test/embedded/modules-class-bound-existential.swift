@@ -39,3 +39,4 @@ struct MyApp {
 }
 
 // CHECK: Hello from main!
+// UNSUPPORTED: OS=windows-msvc

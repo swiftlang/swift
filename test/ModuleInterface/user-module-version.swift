@@ -18,3 +18,4 @@
 // INTERFACE-FLAG: -user-module-version 113.33.44.55
 
 // USER-MODULE-PRINT: user module version: 113.33.44.55
+// UNSUPPORTED: OS=windows-msvc

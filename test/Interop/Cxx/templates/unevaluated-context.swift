@@ -13,3 +13,4 @@ UnevaluatedTestSuite.test("declval") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

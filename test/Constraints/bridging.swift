@@ -409,3 +409,4 @@ do {
     _ = e is NSError // expected-warning{{checking a value with optional type '(any Error)?' against type 'NSError' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

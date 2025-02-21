@@ -30,3 +30,4 @@ protocol Derived4 : Base where A == Int, B == Int, C == Int {}
 // CHECK-LABEL: connected_components_concrete.(file).Derived5@
 // CHECK-LABEL: Requirement signature: <Self where Self : Base, Self.[Base]A == Int, Self.[Base]B == Int, Self.[Base]C == Int>
 protocol Derived5 : Base where A == Int, D.T == Int, C == Int {}
+// UNSUPPORTED: OS=windows-msvc

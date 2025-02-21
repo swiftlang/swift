@@ -13,3 +13,4 @@ extension FakeRoundtripActorSystemDistributedActor {
     return "Echo: \(name)"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

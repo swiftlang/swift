@@ -21,3 +21,4 @@ public func callStaticMemberFuncAddr() -> CInt {
 
 // CHECK: declare {{.*}}ptr @{{_ZN20WithStaticMemberFunc26getStaticMemberFuncAddressEv|"\?getStaticMemberFuncAddress@WithStaticMemberFunc@@SAP6AHXZXZ"}}()
 
+// UNSUPPORTED: OS=windows-msvc

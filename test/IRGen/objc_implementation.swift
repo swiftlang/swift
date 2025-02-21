@@ -397,3 +397,4 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 
 // NEGATIVE-NOT: Category2
 // NEGATIVE-NOT: NoImplClass
+// UNSUPPORTED: OS=windows-msvc

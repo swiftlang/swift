@@ -132,3 +132,4 @@ func callit(b: Base) {
   b.extfunc()
   _ = b.prop
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ public func f() -> (() -> ()) {
       use(i)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

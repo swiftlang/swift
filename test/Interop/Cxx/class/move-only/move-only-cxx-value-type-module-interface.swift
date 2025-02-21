@@ -2,3 +2,4 @@
 
 // CHECK: func getNonCopyablePtr() -> UnsafeMutablePointer<NonCopyable>
 // CHECK: func getNonCopyableDerivedPtr() -> UnsafeMutablePointer<NonCopyableDerived>
+// UNSUPPORTED: OS=windows-msvc

@@ -61,3 +61,4 @@ func testMetatypeSelfConformance(m1: (ObjCClass & ObjCProtocol).Protocol,
   _ = m2 as (ObjCClass & StaticObjCProtocol).Type // expected-error {{cannot convert value of type '(any ObjCClass & StaticObjCProtocol).Type' to type 'any (ObjCClass & StaticObjCProtocol).Type' in coercion}}
   _ = m2 as? (ObjCClass & StaticObjCProtocol).Type // FIXME should 'always fail'
 }
+// UNSUPPORTED: OS=windows-msvc

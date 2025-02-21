@@ -56,3 +56,4 @@ do {
   assertExactType(of: kp_subscriptForce_name,
                   is: ReferenceWritableKeyPath<SwiftProtocol, String>.self)
 }
+// UNSUPPORTED: OS=windows-msvc

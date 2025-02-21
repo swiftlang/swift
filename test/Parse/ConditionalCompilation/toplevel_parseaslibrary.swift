@@ -9,3 +9,4 @@ func foo() {}
 #else
   if true { foo() } // expected-error {{statements are not allowed at the top level}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

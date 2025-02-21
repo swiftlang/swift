@@ -41,3 +41,4 @@ func test_Equatable() {
   testEquatable(array[1])
 }
 test_Equatable()
+// UNSUPPORTED: OS=windows-msvc

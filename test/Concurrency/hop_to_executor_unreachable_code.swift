@@ -19,3 +19,4 @@ func testit() async {
     await bye()
 }
 
+// UNSUPPORTED: OS=windows-msvc

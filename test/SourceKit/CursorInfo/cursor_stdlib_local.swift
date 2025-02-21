@@ -40,3 +40,4 @@ func test(_ x: E) {
 
 // RUN: %sourcekitd-test -req=cursor -pos=10:16 %t/Client.swift -- -I %t/modules -target %target-triple %t/Client.swift | %FileCheck %s -check-prefix=CHECK1
 // RUN: %sourcekitd-test -req=cursor -pos=11:12 %t/Client.swift -- -I %t/modules -target %target-triple %t/Client.swift | %FileCheck %s -check-prefix=CHECK2
+// UNSUPPORTED: OS=windows-msvc

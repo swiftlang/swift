@@ -113,3 +113,4 @@ public struct PreformattedTest {
 // PREFORMATTED-NEXT: {{^}}_ = 2
 // PREFORMATTED-NEXT: {{^}}}
 // PREFORMATTED-NEXT: {{^}}"
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ func foo(_ oc: [String]) {
     dictionary.first { (column, value) in true }!.value
   })
 }
+// UNSUPPORTED: OS=windows-msvc

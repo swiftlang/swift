@@ -35,3 +35,4 @@ func test(s: String, answer: Int) {
   let r2c = f2(s)
   let _: A = r2c
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -34,3 +34,4 @@ func test(_ c: C) {
   mod(&c.data)
   mod(&c.data)
 }
+// UNSUPPORTED: OS=windows-msvc

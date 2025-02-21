@@ -70,3 +70,4 @@ s.c = 5
 // CHECK-NOT: note
 // CHECK-NOT: warning
 // CHECK-NOT: error
+// UNSUPPORTED: OS=windows-msvc

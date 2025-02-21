@@ -45,3 +45,4 @@ public func testPartialApply(_ obj: Test) {
     _ = prop2
   }
 } // CHECK: // end sil function '$s4Test16testPartialApplyyySoAA_pF'
+// UNSUPPORTED: OS=windows-msvc

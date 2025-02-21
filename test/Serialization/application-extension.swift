@@ -8,3 +8,4 @@
 // CHECK-LABEL: <OPTIONS_BLOCK
 // CHECK:      <XCC abbrevid={{[0-9]+}}/> blob data = '-fapplication-extension'
 // CHECK: </OPTIONS_BLOCK>
+// UNSUPPORTED: OS=windows-msvc

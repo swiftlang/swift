@@ -136,3 +136,4 @@
 // SEED2: Added to TaskQueue: {compile: {{.*}} <= {{file-[0-3][2-9].swift .*}}}
 // SEED2: Added to TaskQueue: {compile: {{.*}} <= {{.*}}}
 // SEED2: Added to TaskQueue: {compile: {{.*}} <= {{.*}}}
+// UNSUPPORTED: OS=windows-msvc

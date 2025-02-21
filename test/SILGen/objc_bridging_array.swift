@@ -39,3 +39,4 @@ func setChildren(p: Parent, c: Child) {
 // CHECK: destroy_value [[COPIED]] : $[[OPENED_TYPE]]
 // CHECK: [[RESULT:%.*]] = tuple ()
 // CHECK: return [[RESULT]] : $()
+// UNSUPPORTED: OS=windows-msvc

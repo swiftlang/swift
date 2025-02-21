@@ -94,3 +94,4 @@ public protocol CycleB {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

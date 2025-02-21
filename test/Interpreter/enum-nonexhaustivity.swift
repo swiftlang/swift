@@ -401,3 +401,4 @@ EnumTestSuite.test("TrapOnUnexpected/NestedSwiftExhaustive")
 #endif
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

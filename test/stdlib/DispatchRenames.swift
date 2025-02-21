@@ -17,3 +17,4 @@ _ = dispatch_source_create(OpaquePointer(bitPattern: ~0)!, 0, 0, nil) // expecte
 _ = dispatch_get_main_queue() // expected-FIXME-error {{'dispatch_get_main_queue()' has been replaced by property 'DispatchQueue.main'}}
 #endif
 _ = DispatchQueue.main
+// UNSUPPORTED: OS=windows-msvc

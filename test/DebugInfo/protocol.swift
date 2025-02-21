@@ -35,3 +35,4 @@ public func main() -> Int64 {
 // CHECK-SAME:             DIFlagArtificial
 
 // CHECK: ![[LOC]] = !DILocalVariable(name: "loc2d",{{.*}} line: [[@LINE-10]]
+// UNSUPPORTED: OS=windows-msvc

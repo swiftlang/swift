@@ -17,3 +17,4 @@ public struct CKThingWrapper: RawRepresentable {
   // Note that this is CoreKit.CKThing, not ExportAsCoreKit.CKThing
   // CHECK: public typealias RawValue = CoreKit.CKThing
 } // CHECK: {{^}$}}
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@
 // CHECK: ClangModule.Foo
 import ClangModule
 let foo = Foo()
+// UNSUPPORTED: OS=windows-msvc

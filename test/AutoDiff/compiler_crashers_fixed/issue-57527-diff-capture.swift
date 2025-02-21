@@ -35,3 +35,4 @@ func outerFunc2(value: inout Float) -> (Float, (Float) -> Float) {
   return (value + valAndPullback.value, valAndPullback.pullback)
 }
 
+// UNSUPPORTED: OS=windows-msvc

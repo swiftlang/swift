@@ -8,3 +8,4 @@
 // CHECK: pathComponents
 // CHECK-NEXT: "foo()"
 public func foo() {}
+// UNSUPPORTED: OS=windows-msvc

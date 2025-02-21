@@ -9,3 +9,4 @@ func f(_ k: WritableKeyPath<A, Int>) {}
 func g() {
   f(\A.foo)
 }
+// UNSUPPORTED: OS=windows-msvc

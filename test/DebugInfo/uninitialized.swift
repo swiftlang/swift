@@ -25,3 +25,4 @@ public func g() {
   // OPT-NOT: @llvm.memset
   // OPT: ret
 }
+// UNSUPPORTED: OS=windows-msvc

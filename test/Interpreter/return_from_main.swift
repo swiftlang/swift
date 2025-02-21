@@ -6,3 +6,4 @@
 // CHECK: Error raised at top level: return_from_main.MyError.Foo
 enum MyError : Error { case Foo }
 throw MyError.Foo
+// UNSUPPORTED: OS=windows-msvc

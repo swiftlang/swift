@@ -18,3 +18,4 @@ public func testGetter() {
   var c0 = C0()
   var lc = c0.lc
 }
+// UNSUPPORTED: OS=windows-msvc

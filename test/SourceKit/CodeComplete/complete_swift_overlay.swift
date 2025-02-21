@@ -42,3 +42,4 @@ struct B {
     }
   ]
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ public func foo() {}
 // NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibility52"}
 // NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibility53"}
 // NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibilityDynamicReplacements"}
+// UNSUPPORTED: OS=windows-msvc

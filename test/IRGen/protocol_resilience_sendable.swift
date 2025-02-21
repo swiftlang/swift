@@ -58,3 +58,4 @@ func passNonResilientSendableBase() {
   // CHECK-USAGE: call swiftcc void @"$s28protocol_resilience_sendable30acceptNonResilientSendableBaseyyxm014non_resilient_A00efgH0RzlF"(ptr @"$s22non_resilient_protocol30ConformsToNonResilientSendableVN", ptr @"$s22non_resilient_protocol30ConformsToNonResilientSendableVN", ptr @"$s22non_resilient_protocol30ConformsToNonResilientSendableVAA0fgH4BaseAAWP")
   acceptNonResilientSendableBase(ConformsToNonResilientSendable.self)
 }
+// UNSUPPORTED: OS=windows-msvc

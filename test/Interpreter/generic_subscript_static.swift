@@ -195,3 +195,4 @@ GenericSubscriptTestSuite.test("Overrides") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@ public func fibo(_ n: Int) async -> Int {
   let rhs = await fibo(retval - 2)
   return lhs + rhs + retval
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -45,3 +45,4 @@ public distributed actor MyActorInt {
     self.actorSystem = actorSystem
   }
 }
+// UNSUPPORTED: OS=windows-msvc

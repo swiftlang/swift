@@ -59,3 +59,4 @@ public let managedBuf = ManagedBuffer<Void, UInt8>.create(minimumCapacity: 0, ma
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -146,3 +146,4 @@ extension String: @retroactive _ObjectiveCBridgeable {
 
   init() { }
 }
+// UNSUPPORTED: OS=windows-msvc

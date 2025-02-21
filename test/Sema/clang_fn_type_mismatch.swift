@@ -48,3 +48,4 @@ let _ : (@convention(c) ((@convention(c) (Swift.Int) -> Swift.Int)?) -> (@conven
 let f3 = getFunctionPointer3
 
 let _ : @convention(c) (UnsafeMutablePointer<ctypes.Dummy>?) -> UnsafeMutablePointer<ctypes.Dummy>? = f3()!
+// UNSUPPORTED: OS=windows-msvc

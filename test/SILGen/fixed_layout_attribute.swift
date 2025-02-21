@@ -70,3 +70,4 @@ public func usesStaticProperty() {
 public func usesStaticPropertyInlinable() {
   _ = HasStaticProperty.staticProperty
 }
+// UNSUPPORTED: OS=windows-msvc

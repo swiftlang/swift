@@ -31,3 +31,4 @@ extension MyProto {
 
 public func bar<T: MyBinaryInteger>(_ value: @autoclosure () -> T) {
 }
+// UNSUPPORTED: OS=windows-msvc

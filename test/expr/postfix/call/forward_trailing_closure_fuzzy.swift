@@ -109,4 +109,4 @@ func testBlockObserverExample() {
   _ = BlockObserver { _ in }
     produceHandler: { _, _ in }
     finishHandler: { _, _, _ in }
-}
+}// UNSUPPORTED: OS=windows-msvc

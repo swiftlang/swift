@@ -12,3 +12,4 @@ protocol Item: (DefaultItem) {}
 func test(item: Item) {
   _ = item.isEnabled
 }
+// UNSUPPORTED: OS=windows-msvc

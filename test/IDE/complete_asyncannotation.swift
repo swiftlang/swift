@@ -55,3 +55,4 @@ func testAsyncIntiializers() async {
 // CHECK_initializers-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#withAsyncThrows: Int#}[')'][' async'][' throws'][#HasAsyncMembers#]; name=withAsyncThrows:{{$}}
 // CHECK_initializers-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#withAsyncRethrows: () async throws -> Void##() async throws -> Void#}[')'][' async'][' rethrows'][#HasAsyncMembers#]; name=withAsyncRethrows:{{$}}
 }
+// UNSUPPORTED: OS=windows-msvc

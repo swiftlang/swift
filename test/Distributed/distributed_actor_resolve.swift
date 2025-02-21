@@ -16,3 +16,4 @@ distributed actor Capybara { }
 func test(id: FakeActorSystem.ActorID, system: FakeActorSystem) async throws {
   let _: Capybara = try Capybara.resolve(id: id, using: system)
 }
+// UNSUPPORTED: OS=windows-msvc

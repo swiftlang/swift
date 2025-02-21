@@ -15,3 +15,4 @@ struct S: P1 {
 }
 
 let x: (any NSObject & P2).Type = S.A.self
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@ internal typealias InternalAlias = Int // expected-note 2 {{type alias 'Internal
   typealias LocalAlias = InternalAlias // expected-error {{type alias 'InternalAlias' is internal and cannot be referenced from an '@inlinable' function}}
   typealias GenericAlias<T> = (T, InternalAlias) // expected-error {{type alias 'InternalAlias' is internal and cannot be referenced from an '@inlinable' function}}
 }
+// UNSUPPORTED: OS=windows-msvc

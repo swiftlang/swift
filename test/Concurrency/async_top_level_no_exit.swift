@@ -7,3 +7,4 @@ func foo() async {
 }
 
 await foo()
+// UNSUPPORTED: OS=windows-msvc

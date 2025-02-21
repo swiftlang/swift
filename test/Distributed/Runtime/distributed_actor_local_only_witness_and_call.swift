@@ -70,3 +70,4 @@ distributed actor Worker: LifecycleWatch {
     print("OK") // CHECK: OK
   }
 }
+// UNSUPPORTED: OS=windows-msvc

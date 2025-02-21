@@ -16,3 +16,4 @@ func foo(_ error: any Error) {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

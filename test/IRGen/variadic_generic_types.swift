@@ -37,3 +37,4 @@ struct VariadicOptionalTuple<each V> {
 }
 
 func useVOT(_: VariadicOptionalTuple<String>) {}
+// UNSUPPORTED: OS=windows-msvc

@@ -20,4 +20,4 @@ import _Concurrency
 
 final class FakeExecutor: SerialExecutor {
   func enqueue(_ job: UnownedJob) {}
-}
+}// UNSUPPORTED: OS=windows-msvc

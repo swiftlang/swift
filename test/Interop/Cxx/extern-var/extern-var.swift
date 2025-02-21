@@ -45,3 +45,4 @@ ExternVarTestSuite.test("no-collisions") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

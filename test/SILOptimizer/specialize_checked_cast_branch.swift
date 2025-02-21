@@ -340,3 +340,4 @@ _ = ExistentialToArchetypeCast(o: o, t: b)
 // CHECK-NOT: checked_cast_br %
 // CHECK: } // end sil function '$s30specialize_checked_cast_branch26ExistentialToArchetypeCast1o1txyXl_xtlFyXl_Tt1g5'
 _ = ExistentialToArchetypeCast(o: o, t: o)
+// UNSUPPORTED: OS=windows-msvc

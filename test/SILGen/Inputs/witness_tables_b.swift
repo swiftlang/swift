@@ -6,3 +6,4 @@
 public struct OtherModuleStruct {}
 public class OtherModuleClass {}
 
+// UNSUPPORTED: OS=windows-msvc

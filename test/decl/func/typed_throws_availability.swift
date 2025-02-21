@@ -20,3 +20,4 @@ func good() -> Any.Type {
   typealias Fn = () throws(any Error) -> ()
   return Fn.self
 }
+// UNSUPPORTED: OS=windows-msvc

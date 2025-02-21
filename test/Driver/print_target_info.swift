@@ -122,3 +122,4 @@
 // CHECK-PTR-SIZE-64:   "pointerWidthInBits": 64,
 // CHECK-PTR-SIZE-64:   "pointerWidthInBytes": 8,
 // CHECK-PTR-SIZE-64: }
+// UNSUPPORTED: OS=windows-msvc

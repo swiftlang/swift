@@ -52,3 +52,4 @@ struct FileDescriptor: ~Copyable {
 
 // FIXME: warning for 'class'
 protocol ClassOnly: class {}
+// UNSUPPORTED: OS=windows-msvc

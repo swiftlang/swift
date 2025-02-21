@@ -112,3 +112,4 @@ import Dispatch
     print("Cancelled!")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

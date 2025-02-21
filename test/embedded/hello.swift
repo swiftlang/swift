@@ -8,3 +8,4 @@
 print("Hello, Embedded Swift!")
 
 // CHECK: Hello, Embedded Swift!
+// UNSUPPORTED: OS=windows-msvc

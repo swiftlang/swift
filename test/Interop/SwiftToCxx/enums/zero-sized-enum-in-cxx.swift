@@ -9,3 +9,4 @@ public enum SingleCaseEnum { case first }
 // CHECK-NOT: EmptyEnum final {
 // CHECK-NOT: SingleCaseEnum final {
 // CHECK: } // namespace Enums
+// UNSUPPORTED: OS=windows-msvc

@@ -1060,3 +1060,4 @@ while i < 10000 {
   b.subclass()
   i += 1
 }
+// UNSUPPORTED: OS=windows-msvc

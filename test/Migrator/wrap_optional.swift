@@ -52,3 +52,4 @@ class MyExtraCitiesWithMoreAliases : ExtraCities {
   func blibli(x: (OptString, String) -> String?) {}
   func currimundi(x: OptGeneric<(Int, (Int, Int))>) {}
 }
+// UNSUPPORTED: OS=windows-msvc

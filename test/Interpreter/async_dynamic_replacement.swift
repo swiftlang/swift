@@ -24,3 +24,4 @@ internal func _replacement_number() async -> Int {
     print(value)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

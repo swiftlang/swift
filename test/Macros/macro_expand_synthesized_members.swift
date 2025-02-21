@@ -175,3 +175,4 @@ func testWitnessStub() {
   let stub: any MacroExpansionRequirements = __MacroExpansionRequirements()
   _ = stub.hello(name: "Caplin")
 }
+// UNSUPPORTED: OS=windows-msvc

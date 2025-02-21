@@ -1226,3 +1226,4 @@ bb0:
   destroy_value %box : ${ var Builtin.Int32 }
   return %value : $Builtin.Int32
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -88,3 +88,4 @@ class Sub : Super {
 }
 
 func get() throws -> Int { 0 }
+// UNSUPPORTED: OS=windows-msvc

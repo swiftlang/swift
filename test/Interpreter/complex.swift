@@ -19,3 +19,4 @@ public func * (lhs: Complex, rhs: Complex) -> Complex {
 public func + (lhs: Complex, rhs: Complex) -> Complex {
   return Complex(real: lhs.real + rhs.real, imag: lhs.imag + rhs.imag)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -124,3 +124,4 @@ import Dart
 
 //--- bridging_header_dep_module_map.swift
 import FooClient
+// UNSUPPORTED: OS=windows-msvc

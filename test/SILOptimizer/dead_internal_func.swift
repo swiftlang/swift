@@ -11,3 +11,4 @@ public func caller_func() {
 	testfunc()
 }
 
+// UNSUPPORTED: OS=windows-msvc

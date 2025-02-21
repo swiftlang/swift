@@ -13,3 +13,4 @@ class Foo : NSManagedObject {
     self.init(entity: type(of: self).entity(), insertInto: context)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

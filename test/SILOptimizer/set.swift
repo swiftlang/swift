@@ -30,3 +30,4 @@ public func createNonEmptySet() -> Set<Int> {
     return [1, 2, 3]
 }
 
+// UNSUPPORTED: OS=windows-msvc

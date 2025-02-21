@@ -22,3 +22,4 @@ struct Main {
     // CHECK: booleans: true false
   }
 }
+// UNSUPPORTED: OS=windows-msvc

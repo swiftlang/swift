@@ -24,3 +24,4 @@ import SubEWrapper
 // CHECK: ]
 
 
+// UNSUPPORTED: OS=windows-msvc

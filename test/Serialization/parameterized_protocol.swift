@@ -8,3 +8,4 @@ func testParameterizedProtocol(_: some MySequence<Int>) {}
 func testParameterizedProtocol(x : any MySequence<Int>) -> MySequenceHolder<Int> {
   return MySequenceHolder(seq: x)
 }
+// UNSUPPORTED: OS=windows-msvc

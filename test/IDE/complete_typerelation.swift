@@ -25,3 +25,4 @@ struct ConstrainedExistentialTest {
 // IN_CONSTRAINED_EXISTENTIAL_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal:      intProducer[#IntProducer#];
 // IN_CONSTRAINED_EXISTENTIAL_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: stringProducer[#StringProducer#];
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -23,3 +23,4 @@
 #sourceLocation()
 
 // CHECK: anything.swift:1:10: warning: this is a warning
+// UNSUPPORTED: OS=windows-msvc

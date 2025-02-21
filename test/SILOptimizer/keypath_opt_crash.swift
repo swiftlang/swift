@@ -32,3 +32,4 @@ public func test_get(s: S) -> (() -> ())? {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

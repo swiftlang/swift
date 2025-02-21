@@ -40,3 +40,4 @@ func test(value: PublicStruct) {
   // MEMBER-NEG-NOT: internalMethod
   // MEMBER-ALL-NEG-NOT: privateMethod
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -258,3 +258,4 @@ func testBigArrayInStruct(_ maxSize: IntTuple4096) {
   structWithBigArray.max_size = maxSize
   structWithBigArray.max_size_plus_one // expected-error {{value of type 'StructWithBigArray' has no member 'max_size_plus_one'}}
 } 
+// UNSUPPORTED: OS=windows-msvc

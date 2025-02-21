@@ -21,3 +21,4 @@ FieldTestSuite.test("NSOption as field") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

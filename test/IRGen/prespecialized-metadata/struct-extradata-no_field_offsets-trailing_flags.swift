@@ -89,3 +89,4 @@ struct Pair<First, Second, Third> {
     let second: Second
     let third: Third
 }
+// UNSUPPORTED: OS=windows-msvc

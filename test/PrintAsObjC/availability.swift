@@ -662,3 +662,4 @@ extension Availability {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

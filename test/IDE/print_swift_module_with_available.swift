@@ -19,3 +19,4 @@ public extension C1 {
 
 // CHECK1: @available(macOS 10.12, *)
 // CHECK1-NEXT: extension C1 {
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ final class D: NSObject, Sendable {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

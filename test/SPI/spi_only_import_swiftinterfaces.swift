@@ -88,3 +88,4 @@ extension IOIPublicStruct {
 @_spiOnly import ConstantSPIOnly
 @_spiOnly import InconsistentPublic
 @_spiOnly import InconsistentIOI
+// UNSUPPORTED: OS=windows-msvc

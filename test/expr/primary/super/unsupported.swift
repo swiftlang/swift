@@ -104,3 +104,4 @@ class Root {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

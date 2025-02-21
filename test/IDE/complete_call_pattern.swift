@@ -90,3 +90,4 @@ struct AmbiguousInResultBuilder {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

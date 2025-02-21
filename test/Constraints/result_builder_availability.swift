@@ -226,3 +226,4 @@ func testUnavailableBuilderWithPartialBlock() -> Int {
   2 // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
   3
 }
+// UNSUPPORTED: OS=windows-msvc

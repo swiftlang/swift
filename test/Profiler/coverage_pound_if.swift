@@ -152,3 +152,4 @@ func poundIf10() -> Int {
 // CHECK-NEXT:    [[@LINE-7]]:3 -> [[@LINE-7]]:11 : skipped
 // CHECK-NEXT:    [[@LINE-6]]:3 -> [[@LINE-5]]:17 : skipped
 // CHECK-NEXT:  }
+// UNSUPPORTED: OS=windows-msvc

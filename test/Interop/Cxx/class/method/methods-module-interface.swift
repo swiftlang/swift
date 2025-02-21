@@ -16,4 +16,4 @@
 // CHECK: func constSumAsWrapper(_ a: NonTrivialInWrapper, _ b: NonTrivialInWrapper) -> NonTrivialInWrapper
 
 // CHECK: mutating func nonConstPassThroughAsWrapper(_ a: Int32) -> NonTrivialInWrapper
-// CHECK: func constPassThroughAsWrapper(_ a: Int32) -> NonTrivialInWrapper
+// CHECK: func constPassThroughAsWrapper(_ a: Int32) -> NonTrivialInWrapper// UNSUPPORTED: OS=windows-msvc

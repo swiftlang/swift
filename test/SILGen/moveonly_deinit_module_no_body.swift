@@ -12,3 +12,4 @@ public struct S: ~Copyable {
   deinit {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

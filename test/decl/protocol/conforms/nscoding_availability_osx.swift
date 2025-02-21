@@ -20,3 +20,4 @@ class OuterCodingJ {
   // CHECK-NOT: class_decl{{.*}}"NestedJ"{{.*}}@_staticInitializeObjCMetadata
   class NestedJ : CodingI { }
 }
+// UNSUPPORTED: OS=windows-msvc

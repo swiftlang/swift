@@ -18,3 +18,4 @@ public struct Foo: MyProto {
 // CHECK-NEXT:      {
 // CHECK-NEXT:       	"label": "name",
 // CHECK-NEXT:	        "type": "Swift.Optional<Swift.String>",
+// UNSUPPORTED: OS=windows-msvc

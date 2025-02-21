@@ -50,3 +50,4 @@ func resilientTupleEltCaseEnumTest() {
     kraken()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

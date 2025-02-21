@@ -11,3 +11,4 @@ enum E : Int {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

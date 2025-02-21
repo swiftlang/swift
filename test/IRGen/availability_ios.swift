@@ -62,3 +62,4 @@ public func multipleAvailabilityChecks() {
     print("test three")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ if let componentsJoinedByString = a.componentsJoined {
 // CHECK: foo, bar, bas
 // CHECK: foo • bar • bas
 
+// UNSUPPORTED: OS=windows-msvc

@@ -49,3 +49,4 @@ funcSPI() // expected-error {{cannot find 'funcSPI' in scope}}
 
 funcPublic()
 funcSPI() // expected-error {{cannot find 'funcSPI' in scope}}
+// UNSUPPORTED: OS=windows-msvc

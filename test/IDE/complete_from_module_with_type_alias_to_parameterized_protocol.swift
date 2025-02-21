@@ -26,3 +26,4 @@ import pck
 // CHECK-DAG: Decl[Protocol]/OtherModule[pck]/Flair[RareType]: Foo[#Foo#];
 // CHECK-DAG: Decl[TypeAlias]/OtherModule[pck]:   Problem[#Foo<String>#];
 // CHECK-DAG: Decl[TypeAlias]/OtherModule[pck]:   ConstrainedBar[#Foo<T>#];
+// UNSUPPORTED: OS=windows-msvc

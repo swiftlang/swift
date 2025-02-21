@@ -66,3 +66,4 @@ func g() {
     _ = 1/ + 1/
     _ = 1 + 2/
 }
+// UNSUPPORTED: OS=windows-msvc

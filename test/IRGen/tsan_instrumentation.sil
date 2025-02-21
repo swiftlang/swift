@@ -29,3 +29,4 @@ bb0:
   return %2 : $()
 // CHECK:   ret void
 }
+// UNSUPPORTED: OS=windows-msvc

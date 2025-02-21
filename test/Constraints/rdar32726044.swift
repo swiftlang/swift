@@ -16,3 +16,4 @@ func rdar32726044() -> Float {
   let _: Float = Float(42) + 0 // Ok
   return f
 }
+// UNSUPPORTED: OS=windows-msvc

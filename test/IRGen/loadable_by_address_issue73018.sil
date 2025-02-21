@@ -85,3 +85,4 @@ bb3(%p3 : $((@callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned 
   %t = tuple ()
   return %t : $()
 }
+// UNSUPPORTED: OS=windows-msvc

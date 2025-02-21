@@ -42,3 +42,4 @@ bb1(%result : $()):
 bb2(%83 : @owned $any Error):
   unreachable , scope 2
 }
+// UNSUPPORTED: OS=windows-msvc

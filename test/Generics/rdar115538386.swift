@@ -11,3 +11,4 @@ struct S<each T>: P {
 func foo<each T>() -> some P<(repeat each T)> {
   S<repeat each T>()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -106,3 +106,4 @@ func useLowercasedEnumCase(x: NSRuncingMode) {
     case .Quince: return // expected-error {{'Quince' has been renamed to 'quince'}} {{11-17=quince}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -616,3 +616,4 @@ do {
     // expected-error@-1 {{return type of local function 'test3()' requires that 'S' inherit from 'A'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

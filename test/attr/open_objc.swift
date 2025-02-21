@@ -71,3 +71,4 @@ open extension InvalidOpenExtensionObjcClass {  // expected-error {{extensions c
   var F: Int { 3 } // Insert open
   private var G: Int { 3 } // Okay
 }
+// UNSUPPORTED: OS=windows-msvc

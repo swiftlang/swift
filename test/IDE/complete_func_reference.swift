@@ -201,3 +201,4 @@ do {
 // VOID_INT_INT-DAG: Decl{{.*}}:      voidToInt()[#Int#];
 // VOID_INT_INT-DAG: Decl{{.*}}:      anyToInt({#a: Any#})[#Int#];
 // VOID_INT_INT-DAG: Decl{{.*}}:      intToInt({#a: Int#})[#Int#];
+// UNSUPPORTED: OS=windows-msvc

@@ -527,3 +527,4 @@
 // symbols are handled properly.
 
 // REQUIRES: OS=linux-gnu
+// UNSUPPORTED: OS=windows-msvc

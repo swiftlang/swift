@@ -10,3 +10,4 @@
 
 import empty // CHECK-NOT: empty
 import ThisOneReallyDoesNotExist // CHECK: [[@LINE]]:{{[0-9]+}}: error: no such module 'ThisOneReallyDoesNotExist'
+// UNSUPPORTED: OS=windows-msvc

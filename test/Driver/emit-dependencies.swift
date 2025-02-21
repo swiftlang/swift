@@ -3,3 +3,4 @@
 
 // CHECK-OFF-NOT: -track-system-dependencies
 // CHECK-ON: -track-system-dependencies
+// UNSUPPORTED: OS=windows-msvc

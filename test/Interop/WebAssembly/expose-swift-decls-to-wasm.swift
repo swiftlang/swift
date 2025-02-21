@@ -52,3 +52,4 @@ public func exposed7WithCDecl_WithDifferentName() {
 // CHECK: attributes [[EA5]] = {{{.*}} "wasm-export-name"="$s6Expose17exposed5ReturnInts5Int32VyF" {{.*}}}
 // CHECK: attributes [[EA6]] = {{{.*}} "wasm-export-name"="exposed6WithCDecl" {{.*}}}
 // CHECK: attributes [[EA7]] = {{{.*}} "wasm-export-name"="exposed7WithCDecl:WithDifferentName" {{.*}}}
+// UNSUPPORTED: OS=windows-msvc

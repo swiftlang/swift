@@ -42,3 +42,4 @@ func sayWithClosure(_ action: () async -> ()) async {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

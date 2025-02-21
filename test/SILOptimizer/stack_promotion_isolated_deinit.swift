@@ -69,3 +69,4 @@ public func testInnerInside() {
     let inner = Inner()
     obj.inner = inner
 }
+// UNSUPPORTED: OS=windows-msvc

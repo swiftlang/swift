@@ -40,3 +40,4 @@ import NotSoSecret2 // expected-error {{'NotSoSecret2' inconsistently imported w
 
 @_weakLinked import ActuallySecret // no-error
 import ActuallyOkay // no-error
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@ extension P {
 // CHECK-NEXT:    public static func blah3<T>(_: Self) where Self : Test.Foo<T>
 // CHECK-NEXT:    public static func blah4<T>(_: Test.Foo<T>.Nested) where Self : Test.Foo<T>
 // CHECK-NEXT:  }
+// UNSUPPORTED: OS=windows-msvc

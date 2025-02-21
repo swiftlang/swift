@@ -7,3 +7,4 @@
 // REQUIRES: concurrency
 
 @preconcurrency import OtherActors
+// UNSUPPORTED: OS=windows-msvc

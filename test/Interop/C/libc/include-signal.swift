@@ -31,3 +31,4 @@
 // REQUIRES: OS=linux-gnu || OS=linux-android
 
 import IncludeSignal
+// UNSUPPORTED: OS=windows-msvc

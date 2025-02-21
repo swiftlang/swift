@@ -229,3 +229,4 @@ protocol optErrorProtocol {
 @objc protocol optionalInitProto {
   @objc optional init() // expected-error{{'optional' cannot be applied to an initializer}}
 }
+// UNSUPPORTED: OS=windows-msvc

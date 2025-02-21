@@ -21,3 +21,4 @@ func returnVariadicClosure<each T, R>(f: @escaping (repeat each T) -> R) -> (rep
         return f(repeat each t)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

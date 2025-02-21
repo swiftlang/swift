@@ -62,3 +62,4 @@ class MyDerived : BaseClass<Int> {
     return await super.wait()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

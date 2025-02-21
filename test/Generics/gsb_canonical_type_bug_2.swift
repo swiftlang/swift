@@ -21,3 +21,4 @@ extension P2 {
 }
 
 // CHECK-LABEL:     sil hidden [ossa] @$s24gsb_canonical_type_bug_22P2PAAE3fooyyqd___1AQztAA2P1Rd__AA2P3Rd__1BAaHPQyd__Rsd__AeaGPQyd__AFRSlF : $@convention(method) <Self where Self : P2><T where T : P1, T : P3, T == T.B, Self.A == T.A> (@in_guaranteed T, @in_guaranteed Self.A, @in_guaranteed Self) -> ()
+// UNSUPPORTED: OS=windows-msvc

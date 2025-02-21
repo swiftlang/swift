@@ -67,3 +67,4 @@ func testMainActorMethod(eff : EffProps) async {
   // CHECK: } // end sil function '${{.*}}19testMainActorMethod
   let _ = await eff.regularMainDog()
 }
+// UNSUPPORTED: OS=windows-msvc

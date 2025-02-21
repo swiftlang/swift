@@ -13,3 +13,4 @@ import Foundation
 
 TestingBool().shouldBeTrueObjCBool(true)
 TestingBool().shouldBeTrueCBool(true)
+// UNSUPPORTED: OS=windows-msvc

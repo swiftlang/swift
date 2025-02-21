@@ -56,3 +56,4 @@ public func copyBar(bar: Bar) -> Bar {
   let copy = bar
   return copy
 }
+// UNSUPPORTED: OS=windows-msvc

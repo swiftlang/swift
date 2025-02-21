@@ -11,3 +11,4 @@ public struct S {
   // CHECK-NEXT: "foo()"
   public func foo() {}
 }
+// UNSUPPORTED: OS=windows-msvc

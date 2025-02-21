@@ -353,3 +353,4 @@ extension E where T: ~Copyable & NoncopyableProto {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

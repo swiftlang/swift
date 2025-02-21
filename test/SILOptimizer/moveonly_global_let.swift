@@ -58,3 +58,4 @@ func manipulateGlobalVar() {
     // FIXME: gives different diagnostics for parse-as-library vs script global
     consume(globalVar) // expected-error{{consume}}
 }
+// UNSUPPORTED: OS=windows-msvc

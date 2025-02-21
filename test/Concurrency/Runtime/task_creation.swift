@@ -45,3 +45,4 @@ enum SomeError: Error {
     assert(result == 32)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

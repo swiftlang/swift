@@ -16,3 +16,4 @@ open class Bar {
 	// CHECK-NEXT: }
 	@IBOutlet public private(set) weak var foo: MyType!
 }
+// UNSUPPORTED: OS=windows-msvc

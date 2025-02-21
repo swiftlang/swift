@@ -4,3 +4,4 @@
 // A failed import due to a missing -sdk frontend argument produces a
 // diagnostic with an invalid sourceloc.
 import CoreGraphics
+// UNSUPPORTED: OS=windows-msvc

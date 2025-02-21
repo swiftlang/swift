@@ -12,3 +12,4 @@ public struct Yoda<
 
 // RUN: %target-swift-ide-test -print-swift-file-interface -print-original-source -source-filename %s > %t.out
 // RUN: diff -u %s.result %t.out
+// UNSUPPORTED: OS=windows-msvc

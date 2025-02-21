@@ -14,3 +14,4 @@ func qux() {}
 #endif
 
 // CHECK1-NOT: #if
+// UNSUPPORTED: OS=windows-msvc

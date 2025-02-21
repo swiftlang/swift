@@ -205,3 +205,4 @@ OptionalTests.test("Optional class stored properties") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

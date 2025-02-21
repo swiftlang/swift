@@ -157,3 +157,4 @@ protocol SubtypingP2: SubtypingP0 {
   // CHECK-SAME: designated
   init?()
 }
+// UNSUPPORTED: OS=windows-msvc

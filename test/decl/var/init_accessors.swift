@@ -706,3 +706,4 @@ extension Test2ForExtension {
     set { _x = newValue }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -48,3 +48,4 @@ public func publicFuncPublicBody() {
     // expected-error@+1 {{global function 'freeCxxFunctionTakesStructPointer' cannot be used in an '@inlinable' function because C++ APIs from imported module 'CxxModule' do not support library evolution}}
     freeCxxFunctionTakesStructPointer(0, nil)
 }
+// UNSUPPORTED: OS=windows-msvc

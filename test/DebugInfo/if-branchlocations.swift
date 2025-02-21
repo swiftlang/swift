@@ -38,3 +38,4 @@ class AppDelegate {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

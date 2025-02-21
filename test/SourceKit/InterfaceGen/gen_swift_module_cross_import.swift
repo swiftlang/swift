@@ -23,3 +23,4 @@
 // RUN: %target-swift-frontend -emit-module-path %t.mod/_OtherCAdditions.swiftmodule -emit-module-doc-path %t.mod/_OtherCAdditions.swiftdoc -module-cache-path %t.mod/mcp -I %S/../Inputs/CrossImport %S/../Inputs/CrossImport/_OtherCAdditions.swift -parse-as-library -enable-cross-import-overlays -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import
 // RUN: %sourcekitd-test -req=interface-gen -module Other -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  -target %target-triple -I %S/../Inputs/CrossImport -I %t.mod/ -module-cache-path %t.mod/mcp > %t.response
 // RUN: %diff -u %s.Other.response %t.response
+// UNSUPPORTED: OS=windows-msvc

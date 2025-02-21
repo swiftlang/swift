@@ -2524,3 +2524,4 @@ func implicitMember() -> VerticalDirection {
       .unknown
     #endif
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@
 @_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .countedBy(pointer: .param(1), count: "dummy"))
 func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt, _ dummy: CInt) {
 }
+// UNSUPPORTED: OS=windows-msvc

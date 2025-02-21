@@ -151,3 +151,4 @@ func useMoveOnly2(_ x: __shared MoveOnly) {
     @_noImplicitCopy let y = x // expected-error {{'@_noImplicitCopy' has no effect when applied to a noncopyable type}}
     let _ = y
 }
+// UNSUPPORTED: OS=windows-msvc

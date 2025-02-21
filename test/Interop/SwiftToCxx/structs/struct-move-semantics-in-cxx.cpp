@@ -49,3 +49,4 @@ int main() {
 }
 
 // CHECK: C++ does not support moving a Swift value yet
+// UNSUPPORTED: OS=windows-msvc

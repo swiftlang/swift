@@ -53,3 +53,4 @@ CXXDestructorTestSuite.test("Type with virtual defaulted destructor") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

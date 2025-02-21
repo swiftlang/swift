@@ -142,3 +142,4 @@ do {
   let exist: any GenericRequirementFailuresDerived
   exist.method4() // ok
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@
 // CHECK-STRING:   typealias wstring = std.basic_string<CWideChar, std.char_traits<CWideChar>, std.allocator<CWideChar>>
 // CHECK-STRING: }
 
+// UNSUPPORTED: OS=windows-msvc

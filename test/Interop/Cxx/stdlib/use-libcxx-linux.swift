@@ -51,3 +51,4 @@ LibcxxLinuxTestSuite.test("std::vector<std::string>") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

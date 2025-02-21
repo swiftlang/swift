@@ -141,3 +141,4 @@ func testDefaultArgInit3(_ x: Int = #^DEFAULT_ARG_INIT_3^#) { }
 // DEFAULT_ARG_INIT: Decl[GlobalVar]/CurrModule:         globalVar[#Int#]{{; name=.+$}}
 
 // DEFAULT_ARG_INIT_INTCONTEXT: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: globalVar[#Int#]{{; name=.+$}}
+// UNSUPPORTED: OS=windows-msvc

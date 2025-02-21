@@ -24,3 +24,4 @@ macro stringify<T>(_ value: T) -> Stringified<T> = #externalMacro(
 // expected-error@+1{{macro 'stringify' is internal and cannot be referenced from a default argument value}}
 public func publicUseInternal(fail: Stringified<Int> = #stringify(0)) {}
 func internalUseInternal(okay: Stringified<Int> = #stringify(0)) {}
+// UNSUPPORTED: OS=windows-msvc

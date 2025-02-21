@@ -17,3 +17,4 @@ extension BestProtocol {
     return _bestValue(GoodStruct.self, x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

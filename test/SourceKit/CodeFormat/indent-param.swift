@@ -21,3 +21,4 @@ class C {
 // CHECK: key.sourcetext: ") -> PathShape {"
 // CHECK: key.sourcetext: "    ) {}"
 // CHECK: key.sourcetext: "    ) -> Int { get {} }"
+// UNSUPPORTED: OS=windows-msvc

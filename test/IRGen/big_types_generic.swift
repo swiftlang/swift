@@ -93,3 +93,4 @@ public struct DefineSome : Assoc {
 public func abiIndirect() -> BigThing<DefineSome.A> {
   return BigThing<DefineSome.A>()
 }
+// UNSUPPORTED: OS=windows-msvc

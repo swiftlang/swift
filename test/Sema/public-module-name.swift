@@ -118,3 +118,4 @@ internal import Lib // expected-note {{global function 'coreFunc()' imported as 
 public func foo() {
     coreFunc() // expected-error {{global function 'coreFunc()' is internal and cannot be referenced from an '@inlinable' function}}
 }
+// UNSUPPORTED: OS=windows-msvc

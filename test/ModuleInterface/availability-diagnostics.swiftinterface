@@ -12,3 +12,4 @@ public struct S {
   @available(macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
   public func moreAvailable()
 }
+// UNSUPPORTED: OS=windows-msvc

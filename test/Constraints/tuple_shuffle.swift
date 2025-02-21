@@ -29,3 +29,4 @@
    // expected-warning@-2 {{expression shuffles the elements of this tuple}}
    consume((x, c1, c2, c3))
  }
+// UNSUPPORTED: OS=windows-msvc

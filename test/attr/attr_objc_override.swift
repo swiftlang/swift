@@ -37,3 +37,4 @@ class B : A {
 extension B {
   override func bar() { } // expected-error{{non-@objc instance method 'bar()' declared in 'A' cannot be overridden from extension}}
 }
+// UNSUPPORTED: OS=windows-msvc

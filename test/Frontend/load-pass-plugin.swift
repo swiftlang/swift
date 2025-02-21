@@ -16,3 +16,4 @@
 // REQUIRES: executable_test
 
 func empty() {}
+// UNSUPPORTED: OS=windows-msvc

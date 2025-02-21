@@ -23,3 +23,4 @@ class Foo2 {
 // CHECK: key.sourcetext: "        return 1"
 // CHECK: key.sourcetext: "    }"
 // CHECK: key.sourcetext: "}"
+// UNSUPPORTED: OS=windows-msvc

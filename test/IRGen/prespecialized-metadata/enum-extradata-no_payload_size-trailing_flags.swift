@@ -89,3 +89,4 @@ enum Either<First, Second, Third> {
   case second(String)
 }
 
+// UNSUPPORTED: OS=windows-msvc

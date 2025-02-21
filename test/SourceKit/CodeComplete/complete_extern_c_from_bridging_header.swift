@@ -22,3 +22,4 @@ extern "C" {
 // CHECK-DAG: func_from_bridging_header
 // CHECK-DAG: extern_c_func_from_bridging_header
 // CHECK-DAG: nested_extern_c_func_from_bridging_header
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@
 // RUN: rm -rf %t/lazy-skip-non-inlinable/*.swiftmodule
 // RUN: %target-swift-frontend -package-name ClientPackage -typecheck -verify %S/../Inputs/lazy_typecheck_client.swift -I %t/lazy-skip-non-inlinable
 // RUN: diff -u %t/baseline/lazy_typecheck.swiftinterface %t/lazy-skip-non-inlinable/lazy_typecheck.swiftinterface
+// UNSUPPORTED: OS=windows-msvc

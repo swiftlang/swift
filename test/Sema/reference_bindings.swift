@@ -67,3 +67,4 @@ func neverWrittenMutatedDiagnostics() {
         let _ = x2
     }
 }
+// UNSUPPORTED: OS=windows-msvc

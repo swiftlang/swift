@@ -23,3 +23,4 @@ func callsTakesP<T : P>(_ t: T) {
 func callsTakesPWithP(_ p: P) {
   callsTakesP(p)
 }
+// UNSUPPORTED: OS=windows-msvc

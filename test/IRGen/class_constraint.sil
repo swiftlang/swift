@@ -24,3 +24,4 @@ bb0(%0 : $T):
 }
 // CHECK: define {{.*}}void @foo(ptr %0, ptr %T)
 // CHECK: store ptr @"$s16class_constraint1ACAA1PAAWP",
+// UNSUPPORTED: OS=windows-msvc

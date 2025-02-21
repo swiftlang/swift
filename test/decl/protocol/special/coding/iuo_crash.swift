@@ -8,3 +8,4 @@ struct X: Codable {  // expected-error 2{{type 'X' does not conform to protocol}
   // expected-note @-1{{does not conform to}}
   // expected-note @-2{{does not conform to}}
 }
+// UNSUPPORTED: OS=windows-msvc

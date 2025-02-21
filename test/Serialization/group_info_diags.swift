@@ -17,3 +17,4 @@ internal class InternalClass {}
 // CORRUPTED: error: cannot parse group info file at path
 // EXCLUDED-NOT: InternalClass
 // INCLUDED: PublicProtocol
+// UNSUPPORTED: OS=windows-msvc

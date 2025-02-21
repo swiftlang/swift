@@ -17,3 +17,4 @@ RepeatedCallsTests.testWithLeakChecking("Repeat") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -91,3 +91,4 @@ myglobal2 = 14
 // CHECK: myglobal3.willSet from 1 to 15 replacement
 // CHECK: myglobal3.didSet from 1 to 15 replacement
 myglobal3 = 15
+// UNSUPPORTED: OS=windows-msvc

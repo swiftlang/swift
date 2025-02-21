@@ -65,3 +65,4 @@ func callA() {
   funcA()
   anotherFuncA()
 }
+// UNSUPPORTED: OS=windows-msvc

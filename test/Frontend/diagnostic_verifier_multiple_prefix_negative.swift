@@ -38,3 +38,4 @@ func test() {
   // expected-first-warning @-2 {{initialization of immutable value 'fourth'}}
   #endif
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ import Swift
 final public class Foo {
   @objc deinit
 }
+// UNSUPPORTED: OS=windows-msvc

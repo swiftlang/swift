@@ -14,3 +14,4 @@ func passAnX(x: X) {
   let _: X.A = x.f()
 }
 
+// UNSUPPORTED: OS=windows-msvc

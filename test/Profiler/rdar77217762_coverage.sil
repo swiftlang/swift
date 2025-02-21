@@ -59,3 +59,4 @@ bb3:
 sil_coverage_map "main.swift" "$foo" "$foo" 0 {
   10:6 -> 10:11 : 0
 }
+// UNSUPPORTED: OS=windows-msvc

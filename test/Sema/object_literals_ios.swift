@@ -30,3 +30,4 @@ struct Path: _ExpressibleByFileReferenceLiteral {
 let p1: Path = #fileLiteral(resourceName: "what.txt")
 let p2 = #fileLiteral(resourceName: "what.txt") // expected-error{{could not infer type of file reference literal}}
 // expected-note@-1{{import Foundation to use 'URL' as the default file reference literal type}}
+// UNSUPPORTED: OS=windows-msvc

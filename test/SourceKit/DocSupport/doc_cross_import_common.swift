@@ -11,4 +11,4 @@
 // RUN: %diff -u %s.ClangFramework.response %t.response
 
 // RUN: %sourcekitd-test -req=doc-info -module OverlaidClangFramework -- -target %target-triple -I %t/include -I %t/lib/swift -F %t/Frameworks -module-cache-path %t/mcp > %t.response
-// RUN: %diff -u %s.OverlaidClangFramework.response %t.response
+// RUN: %diff -u %s.OverlaidClangFramework.response %t.response// UNSUPPORTED: OS=windows-msvc

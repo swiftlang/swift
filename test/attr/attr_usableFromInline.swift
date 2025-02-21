@@ -352,3 +352,4 @@ public struct IncorrectInitUse {
     self.x = x
   }
 }
+// UNSUPPORTED: OS=windows-msvc

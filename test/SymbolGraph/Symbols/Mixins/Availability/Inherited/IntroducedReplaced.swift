@@ -71,3 +71,4 @@ public struct Outer {
     public func equal() {}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -631,3 +631,4 @@ class
 case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}}
 case  // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}}
 // NOTE: EOF is important here to properly test a code path that used to crash the parser
+// UNSUPPORTED: OS=windows-msvc

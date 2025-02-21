@@ -22,3 +22,4 @@ struct Example {
     p.count
   }
 }
+// UNSUPPORTED: OS=windows-msvc

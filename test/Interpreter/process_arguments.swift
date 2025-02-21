@@ -38,3 +38,4 @@ print("End unsafeArgv")
 // CHECK-THREE-NEXT: c
 // CHECK-THREE-NEXT: (null)
 // CHECK-THREE-NEXT: End unsafeArgv
+// UNSUPPORTED: OS=windows-msvc

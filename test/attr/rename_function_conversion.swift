@@ -14,3 +14,4 @@ func asyncStuff() async throws {
     try await foo.request(at: 11) // expected-warning{{'request(at:)' is deprecated: renamed to 'request(at:completion:)'}}
     //expected-note@-1{{use 'request(at:completion:)' instead}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@ public func onMacOS10_11() {}
 @available(_iOS8Aligned, *)
 public func onMacOS10_10() {}
 // CHECK-NOT: key.line
+// UNSUPPORTED: OS=windows-msvc

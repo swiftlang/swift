@@ -88,3 +88,4 @@ actor MyActor: WithSpecifiedExecutor {
 // CHECK-NEXT: MyActor: on executor NaiveQueueExecutor(CustomQueue)
 // CHECK-NEXT: NaiveQueueExecutor(CustomQueue): after run
 // CHECK-NEXT: end
+// UNSUPPORTED: OS=windows-msvc

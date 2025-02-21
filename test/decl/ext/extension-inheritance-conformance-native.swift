@@ -18,3 +18,4 @@ _ = Object().bar()
 _ = Responder().bar()
 _ = View().bar()
 
+// UNSUPPORTED: OS=windows-msvc

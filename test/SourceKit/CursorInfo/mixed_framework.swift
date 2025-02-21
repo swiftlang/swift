@@ -7,3 +7,4 @@ public class MySwiftType {
         x.foo()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

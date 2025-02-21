@@ -45,3 +45,4 @@ module A {
   header "a.h"
   export *
 }
+// UNSUPPORTED: OS=windows-msvc

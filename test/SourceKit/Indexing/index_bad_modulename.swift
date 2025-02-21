@@ -10,3 +10,4 @@ let v: NSObject?
 
 // REQUIRES: objc_interop
 // REQUIRES: rdar95219987
+// UNSUPPORTED: OS=windows-msvc

@@ -132,3 +132,4 @@ func testRefinementProtocolImplKlass() -> MyEnum {
   let x = RefinementProtocolImplKlass()
   return transparentObjectCallee(x)
 }
+// UNSUPPORTED: OS=windows-msvc

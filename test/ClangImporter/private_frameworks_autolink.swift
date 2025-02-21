@@ -14,3 +14,4 @@
 
 import SomeKitCore
 import SomeKit
+// UNSUPPORTED: OS=windows-msvc

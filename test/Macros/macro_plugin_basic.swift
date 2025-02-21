@@ -76,3 +76,4 @@ MOCK_PLUGIN([
                    ]}}
   }
 ])
+// UNSUPPORTED: OS=windows-msvc

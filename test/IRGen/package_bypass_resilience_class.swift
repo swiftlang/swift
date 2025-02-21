@@ -252,3 +252,4 @@ class InternalKlass {
 // CHECK-TBD-COMMON-DAG: s4Core3PubCfD
 // CHECK-TBD-COMMON-DAG: s4Core3PubCMu
 // CHECK-TBD-COMMON-DAG: s4Core3PubCMo
+// UNSUPPORTED: OS=windows-msvc

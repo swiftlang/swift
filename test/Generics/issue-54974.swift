@@ -29,3 +29,4 @@ extension Dictionary where Value: AnyPropertyProtocol {
         return self[key] as? P
     }
 }
+// UNSUPPORTED: OS=windows-msvc

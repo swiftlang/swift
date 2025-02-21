@@ -12,3 +12,4 @@ import Module_Private.Sub4
 }
 
 extension Module: @retroactive ModuleProto {} // no-error
+// UNSUPPORTED: OS=windows-msvc

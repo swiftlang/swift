@@ -223,3 +223,4 @@ class InheritConformance: ConformInExtension {
 func testInheritedMainActorConformance() {
   InheritConformance().f() // okay; this is not main actor isolated
 }
+// UNSUPPORTED: OS=windows-msvc

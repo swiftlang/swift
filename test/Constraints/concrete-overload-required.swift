@@ -44,3 +44,4 @@ extension Int : P {}
 extension String : P {}
 
 let _ = 1 +++ "hi" +++ 3 *** 4 +++ 5
+// UNSUPPORTED: OS=windows-msvc

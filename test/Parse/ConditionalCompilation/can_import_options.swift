@@ -143,3 +143,4 @@ func canImportUnderlyingVersion() {
   let version = 1 // expected-warning {{initialization of immutable value 'version' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 }
+// UNSUPPORTED: OS=windows-msvc

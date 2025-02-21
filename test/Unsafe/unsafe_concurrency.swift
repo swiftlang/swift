@@ -45,3 +45,4 @@ final class MyExecutor: SerialExecutor {
   func enqueue(_ job: consuming ExecutorJob) { fatalError("boom") }
   @unsafe func asUnownedSerialExecutor() -> UnownedSerialExecutor { fatalError("boom") }
 }
+// UNSUPPORTED: OS=windows-msvc

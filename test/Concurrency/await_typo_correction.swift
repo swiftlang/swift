@@ -34,3 +34,4 @@ func varNamedAsync(async: Bool) async {
   if async { }
   let _ = async
 }
+// UNSUPPORTED: OS=windows-msvc

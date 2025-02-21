@@ -21,3 +21,4 @@ public func test2(fn: @isolated(any) @Sendable () -> ()) {}
 // CHECK-NEXT: #endif
 @_allowFeatureSuppression(IsolatedAny)
 public func test3(fn: @isolated(any) @Sendable () -> ()) {}
+// UNSUPPORTED: OS=windows-msvc

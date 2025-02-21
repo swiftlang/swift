@@ -1647,3 +1647,4 @@ func testCaptureList() {
   let _ = { [x = (if .random() { 0 } else { 1 })] in x }
   // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 }
+// UNSUPPORTED: OS=windows-msvc

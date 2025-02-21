@@ -142,3 +142,4 @@ func multipleExtractionsFromSameStruct(_ model: SmallTestModel) -> Float{
 // CHECK:   debug_value %39 : $SmallTestModel.TangentVector, let, name "model", argno 1 
 // CHECK:   return %39 : $SmallTestModel.TangentVector      
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

@@ -63,3 +63,4 @@ public enum Bob {
   case bar(p: Int)
   public init(foo: String = super /*comment*/) // expected-error {{default value inheritance via 'super' can only be used when overriding a designated initializer}}
 }
+// UNSUPPORTED: OS=windows-msvc

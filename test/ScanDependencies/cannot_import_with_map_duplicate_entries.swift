@@ -75,3 +75,4 @@ public func foo() {}
 	"clangModuleMapPath": "SWIFTLIBDIR/swift/shims/module.modulemap",
 	"clangModulePath": "INPUTDIR/inputs/SwiftShims.pcm"
 }]
+// UNSUPPORTED: OS=windows-msvc

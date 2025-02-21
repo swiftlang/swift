@@ -21,3 +21,4 @@ struct What {
     let _ = _move(t)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

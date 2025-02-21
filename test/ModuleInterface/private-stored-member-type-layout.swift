@@ -50,3 +50,4 @@ public func makeUser() {
   myClass.publicEndVar = 4
   myClass.publicVar = myClass.publicEndVar
 }
+// UNSUPPORTED: OS=windows-msvc

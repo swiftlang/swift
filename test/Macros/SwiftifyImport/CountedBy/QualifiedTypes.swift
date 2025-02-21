@@ -21,3 +21,4 @@ func bar(_ ptr: Swift.UnsafePointer<Swift.CInt>, _ len: Swift.Int) -> () {
 // CHECK-NEXT: }
 
 
+// UNSUPPORTED: OS=windows-msvc

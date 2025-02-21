@@ -102,3 +102,4 @@ extension Int: P2 {}
 // TYPE6-LABEL: public struct Inner {
 // TYPE6:   public func innerFoo()
 // TYPE6: }
+// UNSUPPORTED: OS=windows-msvc

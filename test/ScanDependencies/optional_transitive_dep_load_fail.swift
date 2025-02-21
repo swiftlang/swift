@@ -47,3 +47,4 @@
 
 // Step 4: Ensure the resulting object file exists
 // RUN: ls %t/optional_transitive_dep_load_fail.o > /dev/null
+// UNSUPPORTED: OS=windows-msvc

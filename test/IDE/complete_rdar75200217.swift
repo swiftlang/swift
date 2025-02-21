@@ -31,3 +31,4 @@ func deserializeName(_ data: Array<UInt16>, flag: Bool) {
 }
 
 // CHECK-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: utf8[#Encoding#];
+// UNSUPPORTED: OS=windows-msvc

@@ -88,3 +88,4 @@ do {
   let _: UInt8 = result1 // Ok
   let _: [UInt8] = result2 // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

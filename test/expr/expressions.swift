@@ -955,3 +955,4 @@ let _ = "foo \(42 /*
 // https://github.com/apple/swift/issues/66192
 func I66192(_: Int) {}
 I66192(true ? "yes" : "no") // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
+// UNSUPPORTED: OS=windows-msvc

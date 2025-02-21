@@ -17,3 +17,4 @@ public extension P {
 
 // CHECK-DAG: ![[SELFMETA]] = !DILocalVariable(name: "$\CF\84_0_0", {{.*}}type: ![[SELFTY:[0-9]+]], flags: DIFlagArtificial)
 // CHECK-DAG: ![[SELFTY]] = !DIDerivedType(tag: DW_TAG_typedef, name: "Self"
+// UNSUPPORTED: OS=windows-msvc

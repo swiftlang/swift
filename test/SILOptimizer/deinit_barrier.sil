@@ -154,3 +154,4 @@ bb0(%42 : $Builtin.RawPointer, %9 : $Builtin.RawPointer):
   return %68 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

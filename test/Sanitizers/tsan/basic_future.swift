@@ -87,3 +87,4 @@ func testSimple(
     print("Done")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

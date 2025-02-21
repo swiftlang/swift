@@ -18,3 +18,4 @@ public struct EmptyViewGraphNodeChildren<ParentView: ChildlessView>: ViewGraphNo
 // expected-note@-1 3{{through reference here}}
 // expected-error@-2 {{type 'EmptyViewGraphNodeChildren<ParentView>' does not conform to protocol 'ViewGraphNodeChildren'}}
 // expected-note@-3 {{add stubs for conformance}}
+// UNSUPPORTED: OS=windows-msvc

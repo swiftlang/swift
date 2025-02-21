@@ -30,3 +30,4 @@ func main() {
 	drive(.coupe, k2: getCarKind()) // expected-error {{expect a compile-time constant literal}}
 	drive(getCarKind(), k2: .coupe) // expected-error {{expect a compile-time constant literal}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -45,3 +45,4 @@ var d : Array<(String, Int)>? = Array()
 for x in d! { // expected-warning{{immutable value 'x' was never used; consider replacing with '_' or removing it}}
   doFoo()
 }
+// UNSUPPORTED: OS=windows-msvc

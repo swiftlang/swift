@@ -42,3 +42,4 @@ this is line1
 // CHECK: key.sourcetext: "                                        2)"
 // CHECK: key.sourcetext: "    \"\"\""
 // CHECK: key.sourcetext: "\"\"\""
+// UNSUPPORTED: OS=windows-msvc

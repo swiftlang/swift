@@ -54,3 +54,4 @@ let metatype : Any.Type = Any.self
 printDynamicTypeAndAddressForExistential(metatype as Any.Type)
 
 stopRemoteAST()
+// UNSUPPORTED: OS=windows-msvc

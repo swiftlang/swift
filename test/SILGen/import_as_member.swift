@@ -70,3 +70,4 @@ public func useSpecialInit() -> Struct1 {
   return Struct1(specialLabel:())
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -23,3 +23,4 @@ public class S {
     return x
   }
 }
+// UNSUPPORTED: OS=windows-msvc

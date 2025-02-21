@@ -25,3 +25,4 @@ extension TheColor {
     case black
   }
 }
+// UNSUPPORTED: OS=windows-msvc

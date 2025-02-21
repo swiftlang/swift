@@ -15,3 +15,4 @@ class AClass {
 
   @objc dynamic var allowedProperty : Int { return 1}
 }
+// UNSUPPORTED: OS=windows-msvc

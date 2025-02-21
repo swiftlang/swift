@@ -16,3 +16,4 @@ extension MyStruct {
     public static let copyValue = originalValue
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@ public func testGenClass() -> P {
   return GenClass<Int>() // expected-error {{an existential type cannot contain a generic method 'foo(t:)' in embedded Swift}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -404,3 +404,4 @@ extension CoffeeDelegate  {
         return await self.icedMochaServiceGenerateMocha!(NSObject())
     }
 }
+// UNSUPPORTED: OS=windows-msvc

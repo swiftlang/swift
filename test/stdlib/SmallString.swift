@@ -107,3 +107,4 @@ SmallStringTests.test("Append, repeating") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

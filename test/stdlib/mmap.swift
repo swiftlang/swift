@@ -23,3 +23,4 @@ MMapTests.test("MAP_FAILED") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

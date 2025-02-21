@@ -18,3 +18,4 @@ func foo() {
   a = 2
 }
 #sourceLocation() // reset
+// UNSUPPORTED: OS=windows-msvc

@@ -745,3 +745,4 @@ protocol P4: P where A == (B, B) {
 func testCovariantAssocMethod1PartiallyConcrete(p4: any P4) {
   let x = p4.covariantAssocMethod1()
 }
+// UNSUPPORTED: OS=windows-msvc

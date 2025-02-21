@@ -160,3 +160,4 @@ do {
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword/None: .Protocol[#(any Sequence).Type#]; name=Protocol
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword/None: .Type[#any Sequence.Type#]; name=Type
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -82,3 +82,4 @@ func loadUnownedProperty(obj: NonNilTest) -> NonNilTest? {
   }
   return foo  
 }
+// UNSUPPORTED: OS=windows-msvc

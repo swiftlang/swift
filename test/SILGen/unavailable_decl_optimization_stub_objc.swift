@@ -56,3 +56,4 @@ func foo() {}
     foo()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

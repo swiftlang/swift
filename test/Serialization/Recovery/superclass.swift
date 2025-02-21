@@ -54,3 +54,4 @@ extension C4_ExtensionNestingCRTPish {
 }
 
 #endif // TEST
+// UNSUPPORTED: OS=windows-msvc

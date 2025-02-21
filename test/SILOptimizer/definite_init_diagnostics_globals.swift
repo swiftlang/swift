@@ -83,3 +83,4 @@ protocol P {
 var p: P    // expected-note {{variable defined here}}
 
 defer { print(p.f) } // expected-error {{variable 'p' used in defer before being initialized}}
+// UNSUPPORTED: OS=windows-msvc

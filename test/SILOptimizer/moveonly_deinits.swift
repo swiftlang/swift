@@ -47,3 +47,4 @@ enum MoveOnlyEnum: ~Copyable {
         // expected-note @-1 {{consumed again here}}
     } // expected-note {{used here}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ func concurrentWithCaptures(i: Int) -> Int {
 
   return i
 }
+// UNSUPPORTED: OS=windows-msvc

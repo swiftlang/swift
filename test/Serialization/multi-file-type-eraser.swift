@@ -18,3 +18,4 @@ public struct AnyWindows : Vista {
   public var dlls: Never { fatalError() }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ public func float2(_ _vector: Builtin.Vec2xFPIEEE32, _ index: UInt) {
   let elt = Builtin.extractelement_Vec2xFPIEEE32_Int32(_vector,
     Int32(index)._value)
 }
+// UNSUPPORTED: OS=windows-msvc

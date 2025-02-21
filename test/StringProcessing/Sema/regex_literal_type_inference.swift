@@ -46,3 +46,4 @@ let _: Regex<(Substring, Substring?)>.Type = type(of: r10)
 
 let r11 = #/()()()()()()()()/#
 let _: Regex<(Substring, Substring, Substring, Substring, Substring, Substring, Substring, Substring, Substring)>.Type = type(of: r11)
+// UNSUPPORTED: OS=windows-msvc

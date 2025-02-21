@@ -150,3 +150,4 @@ struct Indentation {
 // CHECK-NEXT: Struct/Indentation RawComment=none
 // CHECK-NEXT: Func/Indentation.briefBlockWithASCIIArt1 {{.*}} BriefComment=[Aaa.]
 
+// UNSUPPORTED: OS=windows-msvc

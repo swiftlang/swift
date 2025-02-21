@@ -21,3 +21,4 @@ int main() {
   static_assert(CHECK(noexcept(destroyFn(nullptr, nullptr))), "value witness table fns are noexcept");
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

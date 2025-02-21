@@ -136,3 +136,4 @@ package struct PkgGenericStruct<T> {
   package func nonGenericWhereClause() where T : PrivateProtocol {}
   // expected-error@-1 {{instance method cannot be declared package because its generic requirement uses a private type}}
 }
+// UNSUPPORTED: OS=windows-msvc

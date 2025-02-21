@@ -17,3 +17,4 @@ class Kitty {
   // CHECK:         [[ACCESS:%.+]] = begin_access {{.*}} [[REF]] : $*Int
   // CHECK:         assign {{.*}} to [[ACCESS]] : $*Int
 }
+// UNSUPPORTED: OS=windows-msvc

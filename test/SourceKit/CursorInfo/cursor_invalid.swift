@@ -79,3 +79,4 @@ enum Outer2 {
 // RUN: %sourcekitd-test -req=cursor -pos=32:8 %s -- %s | %FileCheck -check-prefix=INVALID_ENUM2 %s
 // INVALID_ENUM2: source.lang.swift.decl.enumelement (32:8-32:14)
 // INVALID_ENUM2: Inner2(x:)
+// UNSUPPORTED: OS=windows-msvc

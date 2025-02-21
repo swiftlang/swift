@@ -17,3 +17,4 @@
 // CHECK-NEXT: };
 // CHECK-NEXT: // Swift type metadata request type.
 // CHECK-NEXT: typedef uint64_t MetadataRequestTy;
+// UNSUPPORTED: OS=windows-msvc

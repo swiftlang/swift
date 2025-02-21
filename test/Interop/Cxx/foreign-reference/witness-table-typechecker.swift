@@ -12,3 +12,4 @@ extension CxxLinkedList : ListNode { }
 
 let existential: any ListNode = makeLinkedList()
 let cast: CxxLinkedList? = existential as? CxxLinkedList
+// UNSUPPORTED: OS=windows-msvc

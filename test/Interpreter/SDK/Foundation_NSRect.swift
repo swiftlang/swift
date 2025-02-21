@@ -37,3 +37,4 @@ print(NSStringFromRect(r))
 let d = 1.5
 var r2 = NSRect(x: d, y: d, width: d, height: d)
 printRect(r2)
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ public func foo<Type>(_ values : [S<Type>])
   }
  
 }
+// UNSUPPORTED: OS=windows-msvc

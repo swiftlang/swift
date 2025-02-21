@@ -16,3 +16,4 @@ import Serialized
 
 // CHECK: ("MacroUser/macro_default_argument_serialized.swift", "#fileID")
 print(foo())
+// UNSUPPORTED: OS=windows-msvc

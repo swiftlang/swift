@@ -45,3 +45,4 @@ module B {
 
 //--- include/B.h
 void b(void);
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@
 // RUN: not %sourcekitd-test -repeat-request=0 -req=version 2>&1 | %FileCheck %s -check-prefix=ERROR
 // RUN: not %sourcekitd-test -repeat-request="asdf" -req=version 2>&1 | %FileCheck %s -check-prefix=ERROR
 // ERROR: error:
+// UNSUPPORTED: OS=windows-msvc

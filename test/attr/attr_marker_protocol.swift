@@ -71,3 +71,4 @@ extension Array: P10 where Element: P10, Element: P8 { }
 
 @objc @_marker protocol P11 {}
 // expected-error@-1 {{only classes (and their extensions), non-marker protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+// UNSUPPORTED: OS=windows-msvc

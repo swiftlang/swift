@@ -78,3 +78,4 @@ bb0(%0 : $Int, %u : $UnsafeThing):
   %v = tuple ()
   return %v : $()
 }
+// UNSUPPORTED: OS=windows-msvc

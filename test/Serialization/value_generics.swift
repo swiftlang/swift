@@ -21,3 +21,4 @@ extension Vector where Count == 2 {
 
 // CHECK: func something<let N : Int>(_: borrowing Vector<Int, N>)
 func something<let N: Int>(_: borrowing Vector<Int, N>) {}
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@ public func getValueFromMethod() -> CInt {
 }
 
 // CHECK: define {{.*}}i32 @{{_Z9incrementi|"\?increment@@YAHH@Z"}}(i32 {{.*}})
+// UNSUPPORTED: OS=windows-msvc

@@ -42,3 +42,4 @@ incompleteNoRootTypeProtocol.doSomethingForwardDeclaredProtocolsCan()
 // CHECK: @protocol NoRootTypeProtocol;
 // CHECK: ^
 
+// UNSUPPORTED: OS=windows-msvc

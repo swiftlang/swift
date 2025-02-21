@@ -5,3 +5,4 @@ func testOperator() {
 
   _ = x
 }
+// UNSUPPORTED: OS=windows-msvc

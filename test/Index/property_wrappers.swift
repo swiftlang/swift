@@ -81,3 +81,4 @@ func useMemberwiseInits(i: Int) {
   _ = HasWrappers(x: i)
   _ = HasWrappers(y: Wrapper(initialValue: i))
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ func fooThrowing<T: P>(_: T) throws(HomeworkError) {}
 func openMaybeThrow(existential: P) throws(HomeworkError) {
   try _openExistential(existential, do: fooThrowing)
 }
+// UNSUPPORTED: OS=windows-msvc

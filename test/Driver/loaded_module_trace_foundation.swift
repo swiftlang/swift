@@ -41,3 +41,4 @@
 // CHECK: ]
 
 import Foundation
+// UNSUPPORTED: OS=windows-msvc

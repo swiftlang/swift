@@ -4,3 +4,4 @@
 func foo() {
     if #available(macOS 10.15, *) {}
 }
+// UNSUPPORTED: OS=windows-msvc

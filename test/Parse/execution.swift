@@ -42,3 +42,4 @@ do {
   // expected-error@-1 {{cannot use '@execution' on non-async function type}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

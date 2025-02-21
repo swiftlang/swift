@@ -35,3 +35,4 @@ var b = {
 }() {
   didSet { print("didSet") }
 }
+// UNSUPPORTED: OS=windows-msvc

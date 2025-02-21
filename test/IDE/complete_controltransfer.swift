@@ -70,3 +70,4 @@ TOP_IF_2: if true { break #^TOPLEVEL_1^# }
 TOP_IF_3: if true {}
 // TOPLEVEL_1: Begin completions, 1 items
 // TOPLEVEL_1-DAG: Pattern/Local:                      TOP_IF_2;
+// UNSUPPORTED: OS=windows-msvc

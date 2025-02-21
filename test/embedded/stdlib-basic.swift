@@ -53,3 +53,4 @@ public func checks(n: Int) {
 // CHECK: define {{.*}}{ {{i32|i64}}, i8 } @"$e4main8optionalSiSgyF"()
 // CHECK: define {{.*}}{ {{i32|i64}}, {{i32|i64}}, i8 } @"$e4main12staticstrings12StaticStringVyF"()
 // CHECK: define {{.*}}void @"$e4main6checks1nySi_tF"({{i32|i64}} %0)
+// UNSUPPORTED: OS=windows-msvc

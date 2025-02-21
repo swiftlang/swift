@@ -169,3 +169,4 @@ fileprivate func convertFromOptionalSimpleAttributeArray(_ input: [SimpleAttribu
 fileprivate func convertFromNewAttribute(_ input: NewAttribute) -> String {
 	return input.rawValue
 }
+// UNSUPPORTED: OS=windows-msvc

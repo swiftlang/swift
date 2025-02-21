@@ -14,3 +14,4 @@ struct S: P {
   // for the `P.req()` requirement.
   public func req() {}
 }
+// UNSUPPORTED: OS=windows-msvc

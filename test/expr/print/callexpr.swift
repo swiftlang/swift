@@ -13,3 +13,4 @@ class Constants { static var myConst = 0 }
 func test(foo: Int) { }
 // CHECK-LABEL: test(foo: Constants.myConst)
 test(foo: Constants.myConst)
+// UNSUPPORTED: OS=windows-msvc

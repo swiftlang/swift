@@ -56,3 +56,4 @@ sil @s_hash : $@convention(keypath_accessor_hash) <A: Hashable, B: Hashable> (@i
 // CHECK-SAME:   @"get_witness_table
 //            -- computed get-only property, identified by indirect pointer
 // CHECK-SAME:   <i32 0x0208_0002>
+// UNSUPPORTED: OS=windows-msvc

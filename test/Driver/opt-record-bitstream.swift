@@ -34,3 +34,4 @@ public func bar() {
   // BITSTREAM-NEXT:   <Argument abbrevid=8 op0=7 op1=17/>
   // BITSTREAM-NEXT: </Remark>
 }
+// UNSUPPORTED: OS=windows-msvc

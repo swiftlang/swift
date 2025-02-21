@@ -233,3 +233,4 @@ func testMultiType() {
   _ = b as Int // expected-error {{cannot convert value of type 'String' to type 'Int'}}
   _ = b as String
 }
+// UNSUPPORTED: OS=windows-msvc

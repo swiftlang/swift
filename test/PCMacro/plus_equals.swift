@@ -24,3 +24,4 @@ a += b
 // CHECK-NEXT: [11:1-11:12] pc after
 // CHECK-NEXT: [12:1-12:7] pc before
 // CHECK-NEXT: [12:1-12:7] pc after
+// UNSUPPORTED: OS=windows-msvc

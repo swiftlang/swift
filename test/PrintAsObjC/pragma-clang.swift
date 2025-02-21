@@ -21,3 +21,4 @@
 }
 // CHECK: #pragma clang diagnostic pop
 // CHECK-NOT: clang diagnostic
+// UNSUPPORTED: OS=windows-msvc

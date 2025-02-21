@@ -90,3 +90,4 @@ print(bar.foo.x.0)
 print(bar.foo.x.1)
 print(bar.foo.x.2)
 
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@
 
 // CHECK:   @_extern(wasm, module: "m", name: "f") public func wasmImportedFunc()
 @_extern(wasm, module: "m", name: "f") public func wasmImportedFunc()
+// UNSUPPORTED: OS=windows-msvc

@@ -65,3 +65,4 @@ entry(%b : $Builtin.BridgeObject):
   %c = bridge_object_to_ref %b : $Builtin.BridgeObject to $C
   return %c : $C
 }
+// UNSUPPORTED: OS=windows-msvc

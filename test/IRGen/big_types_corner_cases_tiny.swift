@@ -9,3 +9,4 @@
 // CHECK: call swiftcc void {{.*}}(ptr noalias nocapture sret({{.*}}) [[ALLOC]]
 let model = ClassWithLoadableStructWithBiggerString().f()
 
+// UNSUPPORTED: OS=windows-msvc

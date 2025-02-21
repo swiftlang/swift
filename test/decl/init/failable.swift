@@ -385,3 +385,4 @@ struct InitiateFailureS {
     return nil // ok
   }
 }
+// UNSUPPORTED: OS=windows-msvc

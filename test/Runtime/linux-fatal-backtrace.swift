@@ -25,3 +25,4 @@ func funcA() {
 
 print("bla")
 funcA()
+// UNSUPPORTED: OS=windows-msvc

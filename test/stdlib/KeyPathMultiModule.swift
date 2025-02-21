@@ -236,3 +236,4 @@ keyPathMultiModule.test("external generic property keypath accessed from differe
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

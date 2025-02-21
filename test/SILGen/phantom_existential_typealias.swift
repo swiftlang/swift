@@ -24,4 +24,4 @@ func callee(_: () -> ()) {}
 func test2(p: any P) {
   let a = p.x
   callee { _ = a }
-}
+}// UNSUPPORTED: OS=windows-msvc

@@ -39,3 +39,4 @@ func foo() {}
 // CACHE-MISS-NOT: remark: replay output file
 // CACHE-HIT: remark: replay output file
 // CACHE-HIT-NOT: remark: cache miss for input
+// UNSUPPORTED: OS=windows-msvc

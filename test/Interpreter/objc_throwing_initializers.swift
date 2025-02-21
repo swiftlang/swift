@@ -623,3 +623,4 @@ ThrowingInitTestSuite.test("ConvenienceInitFailure_Dynamic") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

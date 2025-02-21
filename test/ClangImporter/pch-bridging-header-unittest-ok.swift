@@ -20,3 +20,4 @@ func test_all() {
   let _ = app_function(AppFunc())
 #endif
 }
+// UNSUPPORTED: OS=windows-msvc

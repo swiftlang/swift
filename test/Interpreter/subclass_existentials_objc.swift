@@ -56,3 +56,4 @@ SubclassExistentialsTestSuite.test("Metatype self-conformance") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

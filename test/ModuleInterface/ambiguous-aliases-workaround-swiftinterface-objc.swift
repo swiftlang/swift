@@ -17,3 +17,4 @@ public class C: NSObject {
     context: UnsafeMutableRawPointer?
   ){}
 }
+// UNSUPPORTED: OS=windows-msvc

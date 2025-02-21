@@ -38,3 +38,4 @@
 // MULTIPLE-OBJECTS-INLINE: ; ModuleID =
 // MULTIPLE-OBJECTS-INLINE: @__covrec_{{[a-zA-Z0-9]+}} =
 // MULTIPLE-OBJECTS-INLINE: llvm_coverage_mapping =
+// UNSUPPORTED: OS=windows-msvc

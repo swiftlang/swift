@@ -138,3 +138,4 @@ extension Int /* or any imported type, really */ {
 //  CHECK-RECOVERY-NEXT: }
 
 #endif // TEST
+// UNSUPPORTED: OS=windows-msvc

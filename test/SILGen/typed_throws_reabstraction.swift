@@ -37,3 +37,4 @@ func test1() throws { // OK
     try gorble()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

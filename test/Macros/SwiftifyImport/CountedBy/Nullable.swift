@@ -10,3 +10,4 @@ func myFunc(_ ptr: UnsafePointer<CInt>?, _ len: CInt) {
 // CHECK-NEXT: func myFunc(_ ptr: UnsafeBufferPointer<CInt>?) {
 // CHECK-NEXT:     return myFunc(ptr?.baseAddress, CInt(exactly: ptr?.count ?? 0)!)
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

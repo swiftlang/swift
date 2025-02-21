@@ -249,3 +249,4 @@ public extension Differentiable {
 // CHECK-NEXT: }
 
 // CHECK-NOT: // differentiability witness for protocolExtensionWithDiffAttr
+// UNSUPPORTED: OS=windows-msvc

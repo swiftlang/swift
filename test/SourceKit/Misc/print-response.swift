@@ -3,3 +3,4 @@
 // RUN: %sourcekitd-test -req=version -dont-print-response | %FileCheck %s -allow-empty
 // RUN: %sourcekitd-test -json-request-path %S/Inputs/version_request.json -dont-print-response | %FileCheck %s -allow-empty
 // CHECK-NOT: key.version_major
+// UNSUPPORTED: OS=windows-msvc

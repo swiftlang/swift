@@ -713,3 +713,4 @@ class Butter {
 
   static var e: Int = getGlobal7()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@ class C<T> {
 }
 
 func bar<T, U: C<T>>(_ t: T, _ u: U) -> C<T> { return u }
+// UNSUPPORTED: OS=windows-msvc

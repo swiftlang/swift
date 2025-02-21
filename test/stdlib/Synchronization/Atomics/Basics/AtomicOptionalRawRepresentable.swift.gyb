@@ -11,3 +11,4 @@
   ]
 }%
 ${expand("Tests.gyb-template", line_directive='', types=types)}
+// UNSUPPORTED: OS=windows-msvc

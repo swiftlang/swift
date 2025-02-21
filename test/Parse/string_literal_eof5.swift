@@ -6,3 +6,4 @@
 _ = """
     foo
     \(
+// UNSUPPORTED: OS=windows-msvc

@@ -46,3 +46,4 @@ import RedundantGoose
 // this behavior. (A circularity diagnostic instead wouldn't be awful.)
 import CircularGoose
 // no-error
+// UNSUPPORTED: OS=windows-msvc

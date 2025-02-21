@@ -59,3 +59,4 @@ func testFactoryMethodWithKeywordArgument() {
   let prot = NSCoding.self
   _ = NSXPCInterface(with: prot) // not "protocol:"
 }
+// UNSUPPORTED: OS=windows-msvc

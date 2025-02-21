@@ -13,3 +13,4 @@ class Derived : Base {
   required init?(coder: NSCoder) {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

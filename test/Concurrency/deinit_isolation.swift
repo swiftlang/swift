@@ -553,3 +553,4 @@ public class PublicIsolatedOnPrivateActor {
     @PrivateActor deinit {}
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ fileprivate func convertToNewAttribute(_ input: String) -> NewAttribute {
 fileprivate func convertFromNewAttribute(_ input: NewAttribute) -> String {
  return ""
 }
+// UNSUPPORTED: OS=windows-msvc

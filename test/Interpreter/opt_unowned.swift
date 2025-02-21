@@ -96,3 +96,4 @@ func testProtocol() {
 }
 
 testProtocol()
+// UNSUPPORTED: OS=windows-msvc

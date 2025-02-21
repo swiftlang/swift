@@ -24,3 +24,4 @@ func foo() {
 // CHECK-NEXT:    "text": ") ?? <#default value#>"
 // CHECK:  }
 // CHECK:]
+// UNSUPPORTED: OS=windows-msvc

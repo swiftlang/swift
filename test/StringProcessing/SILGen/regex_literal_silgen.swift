@@ -12,3 +12,4 @@ var s = #/abc/#
 
 // CHECK: [[REGEX_INIT:%[0-9]+]] = function_ref @$s17_StringProcessing5RegexV06_regexA07versionACyxGSS_SitcfC : $@convention(method) <τ_0_0> (@owned String, Int, @thin Regex<τ_0_0>.Type) -> @out Regex<τ_0_0>
 // CHECK: apply [[REGEX_INIT]]<{{.+}}>({{%.+}}, [[REGEX_STR]], [[VERSION_INT]], {{%.+}}) : $@convention(method) <τ_0_0> (@owned String, Int, @thin Regex<τ_0_0>.Type) -> @out Regex<τ_0_0>
+// UNSUPPORTED: OS=windows-msvc

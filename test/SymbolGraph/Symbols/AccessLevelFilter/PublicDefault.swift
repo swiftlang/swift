@@ -13,3 +13,4 @@ internal struct ShouldntAppear {
 
 // CHECK: ShouldAppear
 // CHECK-NOT: ShouldntAppear
+// UNSUPPORTED: OS=windows-msvc

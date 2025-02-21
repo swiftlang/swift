@@ -6,3 +6,4 @@
 // CHECK-NEXT:   static var myStatic: Int32
 // CHECK-NEXT:   var myInstance: Int32
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

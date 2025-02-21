@@ -32,3 +32,4 @@ if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
   print("a.(unknown context at $0).(unknown context at $0).MyClass1")
   print("a.Outer.(unknown context at $0).(unknown context at $0).MyClass2")
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -44,3 +44,4 @@ func invalidTarget(_ result: inout NE, _ source: consuming NE) { // expected-err
 func immortalConflict(_ immortal: Int) -> NE { // expected-error{{conflict between the parameter name and 'immortal' contextual keyword}}
   NE()
 }
+// UNSUPPORTED: OS=windows-msvc

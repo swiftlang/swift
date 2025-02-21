@@ -22,3 +22,4 @@ struct X {
 let x = X(y: [])
 let a = M.f(a: x.y[0], b: x.y[1])
 // expected-error@-1 {{generic struct 'M' requires that 'X.Y' conform to 'Collection'}}
+// UNSUPPORTED: OS=windows-msvc

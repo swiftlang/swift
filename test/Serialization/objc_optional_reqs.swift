@@ -15,3 +15,4 @@
 import def_objc_conforming
 
 func test(x: Foo) { _ = x.badness }
+// UNSUPPORTED: OS=windows-msvc

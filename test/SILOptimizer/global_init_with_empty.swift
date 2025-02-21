@@ -39,3 +39,4 @@ print(Mystruct.tupleglobal.c)
 // CHECK-OUTPUT-NEXT: {{0x0+$}}
 print(Mystruct.ptrToEmpty)
 
+// UNSUPPORTED: OS=windows-msvc

@@ -51,3 +51,4 @@ entry(%p : $*T, %i: $Builtin.Word):
   %q = index_addr %p : $*T, %i : $Builtin.Word
   return undef : $()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -37,3 +37,4 @@ public class DerivedClass: BaseClass {
   // CHECK-NEXT: override internal func doSomethingUsableFromInline()
   @usableFromInline override func doSomethingUsableFromInline() { super.doSomethingUsableFromInline() }
 }
+// UNSUPPORTED: OS=windows-msvc

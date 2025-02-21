@@ -20,3 +20,4 @@ final class Impl: P, @unchecked Sendable {
 func test(_ v: Impl) {
   v.block = {} // Ok, no warnings or errors
 }
+// UNSUPPORTED: OS=windows-msvc

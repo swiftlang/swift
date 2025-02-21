@@ -54,3 +54,4 @@ func DoubleYum(_ x: SIMD2<Float>) -> SIMD2<Int32> {
   fptosiWithFreeze(SIMD2<Float>(repeating: 0x1.0p32))
   // CHECK-NOT: poison
 }
+// UNSUPPORTED: OS=windows-msvc

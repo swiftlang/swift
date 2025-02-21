@@ -42,3 +42,4 @@ func asyncFun() async {
 }
 
 await asyncFun()
+// UNSUPPORTED: OS=windows-msvc

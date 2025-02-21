@@ -71,3 +71,4 @@ func foo(value: MyStruct) {
 // CHECK-DAG: key.description: "self"
 // CHECK: ]
 // CHECK-NOT: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

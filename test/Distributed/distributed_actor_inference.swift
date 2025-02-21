@@ -67,3 +67,4 @@ distributed actor BadValuesDistributedActor_7 {
   distributed static func staticNope() async throws -> Int { 13 } // expected-error{{'distributed' method cannot be 'static'}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

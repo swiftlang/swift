@@ -62,3 +62,4 @@ extension GenericStruct where T: SomeProto {
   // CHECK-RECOVERY-NEGATIVE-NOT: someOperation
   func someOperation() {}
 }
+// UNSUPPORTED: OS=windows-msvc

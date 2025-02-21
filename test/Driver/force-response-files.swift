@@ -8,3 +8,4 @@
 // RUN: %swiftc_driver -enable-batch-mode -driver-force-response-files -typecheck %S/../Inputs/empty.swift -### 2>&1 | %FileCheck %s -check-prefix=BATCH
 // BATCH: @
 // BATCH: .resp
+// UNSUPPORTED: OS=windows-msvc

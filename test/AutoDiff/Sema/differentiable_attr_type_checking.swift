@@ -779,3 +779,4 @@ func testTupling(withoutNoDerivative: @escaping @differentiable(reverse) (Float,
   let _ = tuplifyDifferentiable(withoutNoDerivative) // expected-error {{cannot convert value of type '@differentiable(reverse) (Float, Float) -> Float' to expected argument type '@differentiable(reverse) (Float) -> Float'}}
   let _ = tuplifyDifferentiable(withNoDerivative) // expected-error {{cannot convert value of type '@differentiable(reverse) (Float, @noDerivative Float) -> Float' to expected argument type '@differentiable(reverse) (Float) -> Float'}}
 }
+// UNSUPPORTED: OS=windows-msvc

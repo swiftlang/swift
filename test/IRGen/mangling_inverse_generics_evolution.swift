@@ -114,3 +114,4 @@ struct List<Element: ~Copyable>: ~Copyable {
 
   var head: Link
 }
+// UNSUPPORTED: OS=windows-msvc

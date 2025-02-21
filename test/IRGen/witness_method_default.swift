@@ -20,3 +20,4 @@ public func callAbs<T: SIMDScalarStub>(s: T) -> T {
   // CHECK: call swiftcc void [[ABS]]
  return s.abs()
 }
+// UNSUPPORTED: OS=windows-msvc

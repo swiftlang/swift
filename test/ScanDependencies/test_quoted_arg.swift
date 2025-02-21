@@ -17,3 +17,4 @@ import Foo
 
 // CHECK:      "-package-name"
 // CHECK-NEXT: "\"ManyFoos\""
+// UNSUPPORTED: OS=windows-msvc

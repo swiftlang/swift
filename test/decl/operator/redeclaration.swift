@@ -29,3 +29,4 @@ prefix operator %%% // expected-error {{operator redeclared}}
 precedencegroup P2 {}
 infix operator *** : P2 // expected-note {{previous operator declaration here}}
 infix operator *** // expected-error {{operator redeclared}}
+// UNSUPPORTED: OS=windows-msvc

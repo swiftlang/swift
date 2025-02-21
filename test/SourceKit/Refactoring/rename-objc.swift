@@ -16,3 +16,4 @@ func foo1() {
 // CHECK1-NEXT: cannot rename a Clang symbol from its Swift reference
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// UNSUPPORTED: OS=windows-msvc

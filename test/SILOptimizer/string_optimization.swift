@@ -184,3 +184,4 @@ if testObjcClassName(qualified: true) != "NSObject" {
 
 #endif
 
+// UNSUPPORTED: OS=windows-msvc

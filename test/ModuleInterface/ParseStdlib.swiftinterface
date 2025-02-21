@@ -10,3 +10,4 @@
 
 // CHECK: func test(_: Builtin.Int42)
 public func test(_: Builtin.Int42) {}
+// UNSUPPORTED: OS=windows-msvc

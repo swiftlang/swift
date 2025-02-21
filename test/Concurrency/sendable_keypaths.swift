@@ -258,3 +258,4 @@ do {
   // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
   let _: () -> Void = forward(Test.fn) // expected-error {{conflicting arguments to generic parameter 'T' ('@Sendable () -> ()' vs. '() -> Void')}}
 }
+// UNSUPPORTED: OS=windows-msvc

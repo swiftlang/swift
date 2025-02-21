@@ -61,3 +61,4 @@ enum StarWars {
     case Ep1, Ep2; case Ep3;
 };
 
+// UNSUPPORTED: OS=windows-msvc

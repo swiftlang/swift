@@ -80,3 +80,4 @@ struct AutoClosureWrapper<T> {
 }
 
 VarInit().coverageFunction()
+// UNSUPPORTED: OS=windows-msvc

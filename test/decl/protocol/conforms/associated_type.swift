@@ -168,3 +168,4 @@ protocol P6b: P6a where B == GenClass<X> {
   associatedtype C: GenClass<Self> = GenClass<Self>
 }
 struct S6<A: GenClass<Never>>: P6b {}
+// UNSUPPORTED: OS=windows-msvc

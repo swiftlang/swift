@@ -21,3 +21,4 @@ public func use_an_array() -> Int {
 public func use_unsafepointer_allocate() -> UnsafeMutablePointer<UInt8> {
 	return UnsafeMutablePointer<UInt8>.allocate(capacity: 10) // expected-error {{cannot use allocating operation in -no-allocations mode}}
 }
+// UNSUPPORTED: OS=windows-msvc

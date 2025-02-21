@@ -14,3 +14,4 @@ class A {
     // CHECK2: source.lang.swift.ref.var.instance
   }
 }
+// UNSUPPORTED: OS=windows-msvc

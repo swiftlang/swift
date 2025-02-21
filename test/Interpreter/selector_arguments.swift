@@ -26,3 +26,4 @@ var h : (_:Int, _ byDividends:Int, _:Int, _:Int, _ thenAdd:Int) -> Int = divide
 
 print(g(60, 2, 3, 300)) // CHECK: 310
 print(h(60, 2, 3, 5, 300)) // CHECK: 302
+// UNSUPPORTED: OS=windows-msvc

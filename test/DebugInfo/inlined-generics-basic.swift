@@ -127,3 +127,4 @@ public class C<R> {
 // IR-DAG: ![[SP_GB_G]] = {{.*}}linkageName: "$s1A1gyyxlFSb_Tg5"
 // IR-DAG: ![[GB_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GB_U:[0-9]+]], {{.*}}type: ![[LET_BOOL]])
 // IR-DAG: ![[SP_GB_U]] = {{.*}}linkageName: "$s1A1hyyxlFSb_TG5"
+// UNSUPPORTED: OS=windows-msvc

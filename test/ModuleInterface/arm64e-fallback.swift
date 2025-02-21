@@ -41,3 +41,4 @@ public let x: Bool = tvOSNotPtrAuth
 #endif
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

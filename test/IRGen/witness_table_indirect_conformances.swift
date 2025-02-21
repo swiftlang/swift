@@ -44,3 +44,4 @@ struct W: P3 {
 // CHECK-SAME:    ([[INT]] %0)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret %swift.metadata_response { ptr {{.*}} @"$s35witness_table_indirect_conformances1ZVMf", i32 0, i32 2), [[INT]] 0 }
+// UNSUPPORTED: OS=windows-msvc

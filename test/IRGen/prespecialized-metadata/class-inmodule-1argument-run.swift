@@ -74,3 +74,4 @@ public func doit() {
   // CHECK: [[FLOAT_METADATA_METATYPE_ADDRESS]] MyGenericClazz<Float>
   consume(clazzType: MyGenericClazz<Float>.self)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ func implicitReturn() -> Int {
     fatalError()
 }
 
+// UNSUPPORTED: OS=windows-msvc

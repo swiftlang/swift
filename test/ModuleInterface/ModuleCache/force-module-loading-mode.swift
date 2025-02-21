@@ -75,3 +75,4 @@ struct X {}
 let _: X = Lib.testValue
 // FROM-INTERFACE: [[@LINE-1]]:16: error: cannot convert value of type 'FromInterface' to specified type 'X'
 // FROM-SERIALIZED: [[@LINE-2]]:16: error: cannot convert value of type 'FromSerialized' to specified type 'X'
+// UNSUPPORTED: OS=windows-msvc

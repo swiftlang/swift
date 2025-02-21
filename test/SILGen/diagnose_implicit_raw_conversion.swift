@@ -220,3 +220,4 @@ func test_accepted<I: FixedWidthInteger, BC: BitwiseCopyable>(intArg: I, bcArg: 
     read_uchar(&simd)
     write_uchar(&simd)
 }
+// UNSUPPORTED: OS=windows-msvc

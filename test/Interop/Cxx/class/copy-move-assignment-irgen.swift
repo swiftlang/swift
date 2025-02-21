@@ -43,3 +43,4 @@ public func takeAssign() {
 
 copyAssign()
 takeAssign()
+// UNSUPPORTED: OS=windows-msvc

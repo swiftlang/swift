@@ -68,3 +68,4 @@ extension Delegate {
 extension Delegate {
   @objc public func makeRequest(fromSwift: Request, completionHandler: (() -> Void)?) {}
 }
+// UNSUPPORTED: OS=windows-msvc

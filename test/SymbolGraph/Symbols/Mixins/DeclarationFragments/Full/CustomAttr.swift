@@ -61,3 +61,4 @@ public func wrapped(@SomeWrapper arg: Int) {}
 // CHECK-NEXT:    "spelling": ")"
 // CHECK-NEXT:  }
 // CHECK-NEXT:]
+// UNSUPPORTED: OS=windows-msvc

@@ -43,3 +43,4 @@ public protocol P {
 // CHECK: !DILocalVariable(name: "$_2", {{.+}} line: 8
 // CHECK: !DILocalVariable(name: "$_3", {{.+}} line: 8
 
+// UNSUPPORTED: OS=windows-msvc

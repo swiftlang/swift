@@ -18,3 +18,4 @@ func foo() {}
 // CHECK-ABS: !DIFile(filename: "{{[a-zA-Z]:\\\\.*\\\\}}file_compilation_dir_windows.swift", directory: "Z:\\path\\to")
 // CHECK-REL: !DIFile(filename: "file_compilation_dir_windows.swift", directory: "Z:\\path\\to")
 // CHECK-REL-CWD: !DIFile(filename: "file_compilation_dir_windows.swift", directory: ".")
+// UNSUPPORTED: OS=windows-msvc

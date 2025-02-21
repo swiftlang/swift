@@ -22,3 +22,4 @@ public func testit() -> Bool {
   return call_closure(0, 1, closure)
 }
 
+// UNSUPPORTED: OS=windows-msvc

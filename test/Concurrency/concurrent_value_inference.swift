@@ -141,3 +141,4 @@ func testCV(
   // Thin and C function types are Sendable.
   acceptCV(hf)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@
 func MyFunction() async throws {
     class MyClass {}
 }
+// UNSUPPORTED: OS=windows-msvc

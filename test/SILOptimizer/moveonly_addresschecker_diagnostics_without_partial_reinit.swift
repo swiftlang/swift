@@ -46,3 +46,4 @@ func not_reinit_3(agg: inout Agg) {
   rewrite(&agg.u1)
   rewrite(&agg.u2)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -46,3 +46,4 @@ func foo() {
 // CHECK: internal func internalAmbiguity() {}
 // CHECK: note: found this candidate in module 'B'
 }
+// UNSUPPORTED: OS=windows-msvc

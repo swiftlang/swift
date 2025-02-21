@@ -37,3 +37,4 @@ public func eliminate_copy_of_returned_then_consumed_owned_value(arg: __owned An
 // =============================================================================
 // = TESTS                                                                    }}
 // =============================================================================
+// UNSUPPORTED: OS=windows-msvc

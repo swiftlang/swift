@@ -20,3 +20,4 @@ class Base {
     return cast(x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

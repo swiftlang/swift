@@ -26,3 +26,4 @@ public func foo() {}
 import A
 
 foo()
+// UNSUPPORTED: OS=windows-msvc

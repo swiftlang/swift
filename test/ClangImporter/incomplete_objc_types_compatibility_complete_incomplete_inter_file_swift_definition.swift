@@ -39,3 +39,4 @@ class Main {
         // CHECK-NEXT: ^
     }
 }
+// UNSUPPORTED: OS=windows-msvc

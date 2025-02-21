@@ -38,3 +38,4 @@ for (var number : Int8 = start; number < count; number+=1) { // expected-error {
 for (var m : Int8 = start; m < count; m+=1) { // expected-error {{C-style for statement was removed in Swift 3}} {{none}}
   m += 3
 }
+// UNSUPPORTED: OS=windows-msvc

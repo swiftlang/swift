@@ -33,3 +33,4 @@ class Extant {
 
 // Only valid on platforms where @objc is valid.
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=windows-msvc

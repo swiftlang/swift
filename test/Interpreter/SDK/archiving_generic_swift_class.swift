@@ -213,3 +213,4 @@ if CommandLine.arguments.count < 2 {
   fatalError("invalid commandline argument")
 }
 
+// UNSUPPORTED: OS=windows-msvc

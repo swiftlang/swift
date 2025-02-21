@@ -24,3 +24,4 @@ import CoreFoundation
 
 // Make sure the transitive dependency on os_object is present
 // CHECK:       "clang": "os_object"
+// UNSUPPORTED: OS=windows-msvc

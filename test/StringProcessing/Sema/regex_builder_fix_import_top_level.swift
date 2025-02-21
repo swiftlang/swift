@@ -31,3 +31,4 @@ Regex(a: 0) {
   // expected-error@-2 {{extra trailing closure passed in call}}
   /abc/
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -112,3 +112,4 @@ public func testNonGeneric() {
         s.foo()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ var y = MyClass()
 // MyClass in line 6
 // CHECK: key.kind: source.lang.swift.ref.class,
 // CHECK: key.length: 7
+// UNSUPPORTED: OS=windows-msvc

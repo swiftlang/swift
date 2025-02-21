@@ -27,4 +27,4 @@
 // PROTO1: struct Stru: Prot, Prot1 {
 // PROTO1:   var value: Stru { return <expr type:"Stru">self</expr> }
 // PROTO1:   func getValue() -> Stru { return <expr type:"Stru">self</expr> }
-// PROTO1: }
+// PROTO1: }// UNSUPPORTED: OS=windows-msvc

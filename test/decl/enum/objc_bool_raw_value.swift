@@ -10,3 +10,4 @@ extension Bool: @retroactive ExpressibleByIntegerLiteral {
 @objc enum IsDefinitelyRecursive : Bool, Equatable, Hashable { // expected-error{{'@objc' enum raw type 'Bool' is not an integer type}}
   case recursive=false
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ func foo() -> Int {
   // CHECK-NEXT: {{^}}  0
   // CHECK-NEXT: }
 }
+// UNSUPPORTED: OS=windows-msvc

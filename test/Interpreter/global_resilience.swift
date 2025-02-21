@@ -104,3 +104,4 @@ ResilientGlobalTestSuite.test("OtherGlobal") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

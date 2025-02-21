@@ -19,3 +19,4 @@ public class Subclass1: HasUnavailableInit {
   // CHECK-NEXT: @objc override dynamic public init()
   // CHECK-NEXT: @objc deinit
 } // CHECK-NEXT:{{^}$}}
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ private class B : NSObject {}
 #if PUBLIC_EXTRA
 public class C : NSObject {}
 #endif
+// UNSUPPORTED: OS=windows-msvc

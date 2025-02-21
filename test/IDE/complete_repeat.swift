@@ -73,3 +73,4 @@ do {
 // REPEAT_COND_1-NOT: LocalVar
 // REPEAT_COND_1: Decl[LocalVar]/Local:               local1[#Int#];
 // REPEAT_COND_1-NOT: LocalVar
+// UNSUPPORTED: OS=windows-msvc

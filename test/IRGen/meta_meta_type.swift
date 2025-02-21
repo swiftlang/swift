@@ -40,3 +40,4 @@ debugPrint(tt)
 
 // CHECK: a.Mystruct.Type.Type
 debugPrint(tt2)
+// UNSUPPORTED: OS=windows-msvc

@@ -151,3 +151,4 @@ func forEachLoop(us: UnsafeSequence) {
 
   for _ in unsafe us { }
 }
+// UNSUPPORTED: OS=windows-msvc

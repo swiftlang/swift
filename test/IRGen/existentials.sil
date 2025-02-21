@@ -136,3 +136,4 @@ entry(%arg : $*any Constrained<Int>):
 // OPT: store
 // OPT:  call
 // OPT: ret
+// UNSUPPORTED: OS=windows-msvc

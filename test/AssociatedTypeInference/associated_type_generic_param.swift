@@ -7,3 +7,4 @@ protocol P {
 struct S<A>: P {}
 
 let x: String.Type = S<String>.A.self
+// UNSUPPORTED: OS=windows-msvc

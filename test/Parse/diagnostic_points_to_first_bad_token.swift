@@ -14,3 +14,4 @@ typealias TestDiagPointsToBadToken = =
 // CHECK-NEXT: {{^}}typealias TestDiagPointsToBadToken = ={{$}}
 // CHECK-NEXT: {{^}}                                     ^{{$}}
 
+// UNSUPPORTED: OS=windows-msvc

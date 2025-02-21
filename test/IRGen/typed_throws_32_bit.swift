@@ -25,3 +25,4 @@ public func bar(f: () throws(MyError) -> Int64) -> Int64 {
         return error.x.x
     }
 }
+// UNSUPPORTED: OS=windows-msvc

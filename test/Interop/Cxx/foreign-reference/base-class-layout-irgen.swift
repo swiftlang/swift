@@ -9,3 +9,4 @@ import MemberLayout
 public func test(y: IntBase) -> CInt {
   return y.i
 }
+// UNSUPPORTED: OS=windows-msvc

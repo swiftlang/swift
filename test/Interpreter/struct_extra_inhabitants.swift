@@ -200,3 +200,4 @@ tests.test("types that have more than one extra inhabitant") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

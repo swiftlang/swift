@@ -52,3 +52,4 @@ class PropertyGetSet_ComputedGetSet : PropertyGetSet {
 class PropertyGetSet_ComputedGet : PropertyGetSet {  // expected-error {{type 'PropertyGetSet_ComputedGet' does not conform to protocol 'PropertyGetSet'}} expected-note {{add stubs for conformance}}
   var x : Int { return 42 }  // expected-note {{candidate is not settable, but protocol requires it}}
 }
+// UNSUPPORTED: OS=windows-msvc

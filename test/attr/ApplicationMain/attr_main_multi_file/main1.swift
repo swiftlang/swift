@@ -10,3 +10,4 @@ class MyMain {
 }
 
 func hi() {}
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ public func test() {
   var y = CannotBeInstantianted<IntWrapper>(IntWrapper())
   y.callsMethodWithError()
 }
+// UNSUPPORTED: OS=windows-msvc

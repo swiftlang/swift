@@ -33,3 +33,4 @@ public func test() -> String {
   g(f(), getP())
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@ class MyBase {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

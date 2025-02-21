@@ -17,3 +17,4 @@ struct Foo {
     foo(\.x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

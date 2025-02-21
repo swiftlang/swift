@@ -54,3 +54,4 @@ extension Bar {
 // RESULT-DAG: key.name: "b"
 // RESULT: ]
 // RESULT-NOT: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

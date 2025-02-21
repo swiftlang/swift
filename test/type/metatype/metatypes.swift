@@ -18,3 +18,4 @@ var test1 = Test1a.self
 test1 = Test1b.self
 var x = Test1b()
 test1 = type(of: x)
+// UNSUPPORTED: OS=windows-msvc

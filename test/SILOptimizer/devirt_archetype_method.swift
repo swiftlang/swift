@@ -51,3 +51,4 @@ func main() {
   aMethod(x)
 }
 
+// UNSUPPORTED: OS=windows-msvc

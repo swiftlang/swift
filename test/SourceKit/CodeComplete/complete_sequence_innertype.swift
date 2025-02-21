@@ -8,3 +8,4 @@ func test() {
 
 // CHECK: key.results: [
 // CHECK:   description: "Int",
+// UNSUPPORTED: OS=windows-msvc

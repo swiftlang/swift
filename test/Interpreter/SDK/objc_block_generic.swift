@@ -15,3 +15,4 @@ autoreleasepool {
   // CHECK: 219
   print(gg!(219))
 }
+// UNSUPPORTED: OS=windows-msvc

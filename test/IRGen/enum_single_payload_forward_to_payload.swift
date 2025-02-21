@@ -57,3 +57,4 @@ public struct NontrivialJunkFields {
 public func nontrivialJunkFields(_: __owned NontrivialJunkFields?) {}
 // CHECK-LABEL: define{{.*}}20nontrivialJunkFields
 // CHECK:     20NontrivialJunkFieldsVSgW{{Os|Oe}}"
+// UNSUPPORTED: OS=windows-msvc

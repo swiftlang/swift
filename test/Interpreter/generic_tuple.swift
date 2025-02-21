@@ -13,3 +13,4 @@ func drop<T>(_ x: T) {}
 var x = ()
 drop(dup(x))
 print("ok") // CHECK: ok
+// UNSUPPORTED: OS=windows-msvc

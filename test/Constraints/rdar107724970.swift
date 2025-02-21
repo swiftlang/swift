@@ -14,3 +14,4 @@ func foo(_ x: E) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

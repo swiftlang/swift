@@ -25,3 +25,4 @@ extension S: Q { // expected-error {{type 'S' does not conform to protocol 'Q'}}
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

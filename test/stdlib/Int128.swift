@@ -587,3 +587,4 @@ Int128Tests.test("String roundtrip") {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

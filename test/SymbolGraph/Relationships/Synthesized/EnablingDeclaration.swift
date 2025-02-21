@@ -23,3 +23,4 @@ extension NoPImpl: P {
 }
 
 // SYNTH: {{"NoPImpl",[[:space:]]*"extraFunc\(\)"}}
+// UNSUPPORTED: OS=windows-msvc

@@ -69,3 +69,4 @@ if #available(visionOS 2.2, *) {
 
 @available(visionOS 1.50.4, *)
 public func foo() { }
+// UNSUPPORTED: OS=windows-msvc

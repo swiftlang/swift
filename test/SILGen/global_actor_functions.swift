@@ -22,3 +22,4 @@ class Sub: Super {
     super.f()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

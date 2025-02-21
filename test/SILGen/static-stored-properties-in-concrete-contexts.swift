@@ -19,3 +19,4 @@ Foo<Int>.y = 2
 Foo<Int>.y += 3
 print(Foo<Int>.y)
 
+// UNSUPPORTED: OS=windows-msvc

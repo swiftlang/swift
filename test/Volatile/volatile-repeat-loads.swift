@@ -24,3 +24,4 @@ public func test_volatilepointer() -> UInt8 {
 // CHECK:   [[RET:%.*]] = load atomic volatile i8, ptr {{.*}} monotonic, align 1
 // CHECK:   ret i8 [[RET]]
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

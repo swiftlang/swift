@@ -12,3 +12,4 @@ import CompleteSwiftTypes
 import ObjCLibraryForwardDeclaringCompleteSwiftTypes
 
 let placeholderInstanceForNativeObjCInterfaceShadowedProtocol = returnANativeObjCClassShadowedProtocol()
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ extension Test {
     return lhs.baseAddress.load(as: UInt8.self) == rhs.baseAddress.load(as: UInt8.self)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -543,3 +543,4 @@ bb0:
   return %4
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -76,3 +76,4 @@ func doit() {
   assert(!isStaticallySpecializedGenericMetadata(dynamicMetadata))
   assert(!isCanonicalStaticallySpecializedGenericMetadata(dynamicMetadata))
 }
+// UNSUPPORTED: OS=windows-msvc

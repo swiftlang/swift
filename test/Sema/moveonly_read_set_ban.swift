@@ -62,3 +62,4 @@ public enum E {
         set { fatalError() }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

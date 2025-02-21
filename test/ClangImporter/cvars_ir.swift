@@ -10,3 +10,4 @@ import cvars
 func getPI() -> Float {
   return PI
 }
+// UNSUPPORTED: OS=windows-msvc

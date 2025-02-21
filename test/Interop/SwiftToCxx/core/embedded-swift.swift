@@ -11,3 +11,4 @@ public func id(_ x: Int) -> Int {
 }
 
 // CHECK-NOT: TypeMetadataTrait<bool>
+// UNSUPPORTED: OS=windows-msvc

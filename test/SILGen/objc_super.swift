@@ -44,3 +44,4 @@ class NonObjCSuperInit : Wotsit {
     super.init(nope: NotInObjC<Int>())
   }
 }
+// UNSUPPORTED: OS=windows-msvc

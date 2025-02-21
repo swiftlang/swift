@@ -19,3 +19,4 @@ public class TricksyClass: NSObject {
 
 extension TricksyClass.Color {
 }
+// UNSUPPORTED: OS=windows-msvc

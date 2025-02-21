@@ -5,3 +5,4 @@
 // Too many pointer-sized integers in the IR
 // REQUIRES: PTRSIZE=64
 // REQUIRES: OS=macosx
+// UNSUPPORTED: OS=windows-msvc

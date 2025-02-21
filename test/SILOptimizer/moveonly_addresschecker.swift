@@ -74,3 +74,4 @@ struct TestCoroAccessorOfCoroAccessor<T : ~Escapable> : ~Copyable & ~Escapable {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

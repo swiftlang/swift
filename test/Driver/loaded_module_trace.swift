@@ -40,3 +40,4 @@
 import Module2
 
 @freestanding(expression) macro echo<T>(_: T) -> T = #externalMacro(module: "Plugin", type: "EchoMacro")
+// UNSUPPORTED: OS=windows-msvc

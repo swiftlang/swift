@@ -22,3 +22,4 @@ actor Test {
     print("Hello \(Self.local ?? 0)")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

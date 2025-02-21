@@ -89,3 +89,4 @@ class Derived : Base {
     return 1
   }
 }
+// UNSUPPORTED: OS=windows-msvc

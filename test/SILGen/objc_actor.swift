@@ -32,3 +32,4 @@ public actor MyClass1: NSObject {
 
 // CHECK: alloc_ref $MyClass3
 // CHECK-NOT: alloc_ref [objc] $MyClass3
+// UNSUPPORTED: OS=windows-msvc

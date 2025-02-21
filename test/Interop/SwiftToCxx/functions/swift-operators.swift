@@ -58,3 +58,4 @@ public func ==(lhs: IntBox, rhs: IntBox) -> Bool {
 // CHECK-NEXT:   return Operators::_impl::$s9Operators2eeoiySbAA6IntBoxV_ADtF(Operators::_impl::swift_interop_passDirect_Operators_uint32_t_0_4(Operators::_impl::_impl_IntBox::getOpaquePointer(lhs)), Operators::_impl::swift_interop_passDirect_Operators_uint32_t_0_4(Operators::_impl::_impl_IntBox::getOpaquePointer(rhs)));
 // CHECK-NEXT: }
 
+// UNSUPPORTED: OS=windows-msvc

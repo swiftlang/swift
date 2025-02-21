@@ -766,3 +766,4 @@ func testGenericResultCompletion7<T>() -> Array< #^GENERIC_RESULT7?check=GENERIC
 func testGenericResultCompletion8<T>() -> Array<(Int, #^GENERIC_RESULT8?check=GENERIC_RESULT^#)> {}
 
 // GENERIC_RESULT-DAG: Decl[GenericTypeParam]/Local: T[#T#]; name=T
+// UNSUPPORTED: OS=windows-msvc

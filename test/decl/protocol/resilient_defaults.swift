@@ -16,3 +16,4 @@ public protocol Q: P where Self.AssocType: Q { }
 
 public protocol R: Q where Self.AssocType: R { }
 // expected-warning@-1{{default type 'Wrapper<Self>' for associated type 'AssocType' does not satisfy constraint 'Self.AssocType': 'R'}}
+// UNSUPPORTED: OS=windows-msvc

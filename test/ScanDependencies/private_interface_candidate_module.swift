@@ -25,3 +25,4 @@ import E
 // Ensure the adjacent binary module is a candidate
 // CHECK: "compiledModuleCandidates": [
 // CHECK-NEXT: {{.*}}{{/|\\}}E.framework{{/|\\}}Modules{{/|\\}}E.swiftmodule{{/|\\}}{{.*}}.swiftmodule
+// UNSUPPORTED: OS=windows-msvc

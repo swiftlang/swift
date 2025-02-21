@@ -10,3 +10,4 @@ var x: Int {
 
 // CHECK-DAG: source.lang.swift.ref.function.free (1:6-1:19)
 // CHECK-DAG: source.lang.swift.ref.function.free (2:6-2:22)
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ public struct PublicStruct {
 }
 
 // CHECK-NOT: "accessLevel": "private" 
+// UNSUPPORTED: OS=windows-msvc

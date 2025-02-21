@@ -143,3 +143,4 @@ CastTrapsTestSuite.test("Unexpected Obj-C null")
 #endif
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

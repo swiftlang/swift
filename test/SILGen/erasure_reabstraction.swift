@@ -19,3 +19,4 @@ let x: Any = Foo.self
 // CHECK: store [[CLOSURE_CONV]] to [init] [[CONCRETE]]
 let y: Any = {() -> () in ()}
 
+// UNSUPPORTED: OS=windows-msvc

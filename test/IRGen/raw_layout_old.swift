@@ -61,3 +61,4 @@ struct SmallVectorBuf<T>: ~Copyable {}
 // CHECK-NEXT: {{%.*}} = insertvalue %swift.type_layout undef, {{i64|i32}} [[OUR_STRIDE]], 0
 // CHECK-NEXT: {{%.*}} = insertvalue %swift.type_layout {{%.*}}, {{i64|i32}} [[OUR_STRIDE]], 1
 // CHECK: call void @swift_initStructMetadata(ptr %"SmallVectorBuf<T>", {{i64|i32}} 0, {{i64|i32}} 1, ptr {{%.*}}, ptr {{%.*}})
+// UNSUPPORTED: OS=windows-msvc

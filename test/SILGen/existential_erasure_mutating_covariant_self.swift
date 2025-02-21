@@ -71,3 +71,4 @@ func foo(x: inout MutatingWithCovariantReturn, y: inout ClassConstrainedRefineme
 
   _ = z.covariantClosureArgAndReturn({ _ in 0 })
 }
+// UNSUPPORTED: OS=windows-msvc

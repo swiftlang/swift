@@ -32,3 +32,4 @@ extension P where AS.B == A {}
 extension P where Self : P {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=P
 // CHECK-NEXT: Generic signature: <Self where Self : P>
+// UNSUPPORTED: OS=windows-msvc

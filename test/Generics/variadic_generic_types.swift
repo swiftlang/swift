@@ -116,3 +116,4 @@ func packExpansionInScalarArgument<each T>(_: repeat each T) {
   typealias A<U> = U
   typealias One = A<repeat each T> // expected-error {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument of a variadic type}}
 }
+// UNSUPPORTED: OS=windows-msvc

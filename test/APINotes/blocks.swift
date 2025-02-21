@@ -14,3 +14,4 @@ class MyView: UIView {
       completion: nil);
   }
 }
+// UNSUPPORTED: OS=windows-msvc

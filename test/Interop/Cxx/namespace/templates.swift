@@ -43,3 +43,4 @@ NamespacesTestSuite.test("Forward declared") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

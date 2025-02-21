@@ -19,3 +19,4 @@ func test() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

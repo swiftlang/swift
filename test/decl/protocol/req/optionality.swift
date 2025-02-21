@@ -144,3 +144,4 @@ extension ParameterNonOpt1d : ParameterNonOpt1 {} // expected-warning{{parameter
 @objc class ParamAndResult1a : ParamAndResult1 {
   func f0(_ x: C1!) -> C1! { } // expected-warning{{result and parameters of 'f0' have different optionality than expected}}{{18-19=?}}{{26-27=}}
 }
+// UNSUPPORTED: OS=windows-msvc

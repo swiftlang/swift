@@ -21,3 +21,4 @@ func _withUnsafeMutablePointer<T, E: Error, Result>(
 
 func bar<T>(_ arg: UnsafeMutablePointer<[T]>) {}
 
+// UNSUPPORTED: OS=windows-msvc

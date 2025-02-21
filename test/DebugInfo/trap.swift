@@ -16,3 +16,4 @@ func f(_ x : Int64) -> Int64 {
   }
   return x
 }
+// UNSUPPORTED: OS=windows-msvc

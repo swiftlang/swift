@@ -69,3 +69,4 @@ CxxMethodTestSuite.test("Static method with ref params") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

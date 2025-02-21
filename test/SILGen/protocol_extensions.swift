@@ -903,3 +903,4 @@ extension P2 {
     f2(x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

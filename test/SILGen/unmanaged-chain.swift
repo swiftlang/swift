@@ -13,3 +13,4 @@ extension Unmanaged {
         x?.toOpaque()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

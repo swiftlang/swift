@@ -11,3 +11,4 @@
 // RUN: llvm-bcanalyzer -dump OtherModule.swiftmodule | %FileCheck %s
 
 // CHECK-NOT: <DEPENDENCY_DIRECTORY abbrevid=11/> blob data = '/
+// UNSUPPORTED: OS=windows-msvc

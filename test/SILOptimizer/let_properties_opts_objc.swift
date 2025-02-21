@@ -27,3 +27,4 @@ public func testObjcInterface(_ x: ObjcInterface) -> Int {
     return constant
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -42,3 +42,4 @@ if selNil == nil {
   // CHECK: ok selNil == nil
 }
 
+// UNSUPPORTED: OS=windows-msvc

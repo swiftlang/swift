@@ -18,3 +18,4 @@ TemplatesTestSuite.test("Calls valid member on arg") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

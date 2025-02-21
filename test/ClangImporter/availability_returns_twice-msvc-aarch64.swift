@@ -15,3 +15,4 @@ func test_unavailable_returns_twice_function() {
 // CHECK-NEXT: setjmp.h:{{[0-9]+}}:{{[0-9]+}}: note: diagnostic produced elsewhere: macro '_JBTYPE' unavailable: structure not supported
 // CHECK-NEXT:   #define _JBTYPE unsigned __int64
 
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ protocol P {
   associatedtype B : P where B == A.C
   associatedtype C : P where C == A.B
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ struct FooStruct3 : InheritsFooable { }
 extension FooStruct3 : InheritsFooable2 {
 	func foo() { }
 }
+// UNSUPPORTED: OS=windows-msvc

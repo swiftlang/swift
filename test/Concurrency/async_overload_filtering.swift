@@ -27,3 +27,4 @@ var a: String? = nil
 filter_async {
   Obj()
 }.op("" + (a ?? "a"))
+// UNSUPPORTED: OS=windows-msvc

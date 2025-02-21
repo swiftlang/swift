@@ -13,3 +13,4 @@ import Swift
 func f(x : UInt8[]) -> UInt8 {
   return x[0]
 }
+// UNSUPPORTED: OS=windows-msvc

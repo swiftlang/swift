@@ -76,3 +76,4 @@ class MyDerived: FooClassDerived {
 // CHECKMISSING1: fooInstanceFunc21(_:withB:)
 // CHECKMISSING2: fooInstanceFunc2(_:withBB:)
 // CHECKMISSING3: fooInstanceFunc2(_:withB:)
+// UNSUPPORTED: OS=windows-msvc

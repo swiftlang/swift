@@ -15,3 +15,4 @@ enum NullableObjCRefcounted {
 // CHECK:   call void @swift_unknownObjectRelease(ptr %0) {{#[0-9]+}}
 // CHECK:   ret void
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

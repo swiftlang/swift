@@ -8,3 +8,4 @@ func generic<T: P>(value: T) {}
 func useGeneric() {
   generic(value: A())
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -76,3 +76,4 @@ package struct PackageContext {
   @_alwaysEmitIntoClient
   package static var v : Int { 1 }
 }
+// UNSUPPORTED: OS=windows-msvc

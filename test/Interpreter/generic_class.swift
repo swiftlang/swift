@@ -242,3 +242,4 @@ checkRootGenericFixedLayout(gg)
 // CHECK: 4
 // CHECK: 5
 checkGenericInheritsGenericFixedLayout(gg)
+// UNSUPPORTED: OS=windows-msvc

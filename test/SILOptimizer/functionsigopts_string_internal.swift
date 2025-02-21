@@ -18,3 +18,4 @@ func setStorageTo(_ newValue: String) {
   setStorage(to: newValue)
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -509,3 +509,4 @@ if #available(SwiftStdlib 5.1, *) {
 }
 #endif
 
+// UNSUPPORTED: OS=windows-msvc

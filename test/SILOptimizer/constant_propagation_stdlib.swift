@@ -95,3 +95,4 @@ public func isConcrete_concrete_caller(_ x: MyInt) -> Builtin.Int1 {
 public func main(x: MyInt) -> (Builtin.Int1, Builtin.Int1, Builtin.Int1) {
   return (isConcrete_true(x), isConcrete_false(x), isConcrete_concrete_caller(x))
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ func testFoo() {
     // CHECK: [[@LINE+1]]:11 | static-method/Swift | __derived_struct_equals(_:_:) | s:14swift_ide_test9CustomFooV23__derived_struct_equalsySbAC_ACtFZ | {{.*}}Ref
     _ = f == CustomFoo(a: 0, b: "b")
 }
+// UNSUPPORTED: OS=windows-msvc

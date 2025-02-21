@@ -65,3 +65,4 @@ struct Foo {}
 
 //--- Client.swift
 import Foo
+// UNSUPPORTED: OS=windows-msvc

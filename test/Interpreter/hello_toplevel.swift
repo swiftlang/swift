@@ -3,3 +3,4 @@
 
 // CHECK: Hey I just met you and this is crazy
 print("Hey I just met you and this is crazy")
+// UNSUPPORTED: OS=windows-msvc

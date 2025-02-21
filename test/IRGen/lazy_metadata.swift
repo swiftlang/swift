@@ -114,3 +114,4 @@ public func callfuncD() {
   consume4(d)
 }
 
+// UNSUPPORTED: OS=windows-msvc

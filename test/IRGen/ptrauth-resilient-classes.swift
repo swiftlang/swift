@@ -20,3 +20,4 @@ public class HasResilientField {
 
 // CHECK-LABEL: @_DATA__TtC4main17HasResilientField = internal constant
 // CHECK-SAME: @"$s4main17HasResilientFieldCMU.ptrauth"
+// UNSUPPORTED: OS=windows-msvc

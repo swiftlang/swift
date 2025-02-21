@@ -7,3 +7,4 @@
 // check that we don't crash.
 // CHECK: void f(const swift::Array<swift::Int>&
 public func f(_: [Int]) { }
+// UNSUPPORTED: OS=windows-msvc

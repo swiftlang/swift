@@ -165,3 +165,4 @@ _ = C.Nested(value: 1)
 // CHECK-NEXT: [[@LINE+2]]:7 | struct/Swift | Nested | [[C_Nested_USR]] | Ref | rel: 0
 // CHECK-NEXT: [[@LINE+1]]:14 | constructor/Swift | init(value:) | [[C_Nested_init_USR]] | Ref,Call | rel: 0
 _ = C.Nested.init(value: 1)
+// UNSUPPORTED: OS=windows-msvc

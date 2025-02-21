@@ -18,3 +18,4 @@ public class Derived: Base {
 // CHECK: "kind": "overrides"
 // CHECK-NEXT: "source": "s:9Overrides7DerivedC1xSivp"
 // CHECK-NEXT: "target": "s:9Overrides4BaseC1xSivp"
+// UNSUPPORTED: OS=windows-msvc

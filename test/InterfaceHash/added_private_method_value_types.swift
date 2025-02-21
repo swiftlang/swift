@@ -82,3 +82,4 @@ enum B {
 // CHECK-DIFFERENT-TYPE-FINGERPRINT-DAG: -potentialMember interface      4main1B{{[^ ]+}} '' true
 // CHECK-DIFFERENT-TYPE-FINGERPRINT-DAG: +potentialMember implementation 4main1B{{[^ ]+}} '' true
 // CHECK-DIFFERENT-TYPE-FINGERPRINT-DAG: +potentialMember interface      4main1B{{[^ ]+}} '' true
+// UNSUPPORTED: OS=windows-msvc

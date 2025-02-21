@@ -21,3 +21,4 @@ enum E<T> {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

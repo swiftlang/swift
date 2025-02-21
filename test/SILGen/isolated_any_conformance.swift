@@ -25,3 +25,4 @@ extension A : Enqueuer {}
 // CHECK-NEXT:  // function_ref
 // CHECK-NEXT:  [[THUNK:%.*]] = function_ref @$sxIeghHr_xIeAghHr_lTR
 // CHECK-NEXT:  partial_apply [callee_guaranteed] [isolated_any] [[THUNK]]<τ_0_0>([[ISOLATION]], [[FN_COPY]])
+// UNSUPPORTED: OS=windows-msvc

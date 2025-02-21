@@ -72,3 +72,4 @@ ObjCRuntimeVisibleTestSuite.test("protocols/downcast")
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

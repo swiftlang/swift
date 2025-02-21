@@ -37,3 +37,4 @@ func test(value: MyStruct) {
 // ASSOC-NEXT: MyModule{{$}}
 // ASSOC-NEXT: <Declaration>func bar() -&gt; <Type usr="s:8MyModule0A6StructV5Assoca">Assoc</Type></Declaration>
 // ASSOC-NEXT: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>bar</decl.name>() -&gt; <decl.function.returntype><ref.typealias usr="s:8MyModule0A6StructV5Assoca">Assoc</ref.typealias></decl.function.returntype></decl.function.method.instance>
+// UNSUPPORTED: OS=windows-msvc

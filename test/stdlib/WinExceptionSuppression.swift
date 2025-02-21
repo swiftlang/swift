@@ -22,3 +22,4 @@ while (GetMessageA(&msg, nil, 0, 0)) {
   TranslateMessage(&msg);
   DispatchMessageA(&msg);
 }
+// UNSUPPORTED: OS=windows-msvc

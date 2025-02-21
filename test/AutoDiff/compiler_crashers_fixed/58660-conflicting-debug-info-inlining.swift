@@ -61,3 +61,4 @@ struct MyModel: Differentiable {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

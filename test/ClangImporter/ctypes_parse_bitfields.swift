@@ -21,3 +21,4 @@ func constructStructWithBitfields(_ x: CUnsignedInt) {
   _ = StructWithBitfields()
   _ = StructWithBitfields(First: x, Second: x, Third: x)
 }
+// UNSUPPORTED: OS=windows-msvc

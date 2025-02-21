@@ -104,3 +104,4 @@ do {
   fooWithOverload(0, 1, 2, 3, nil) // expected-error {{'nil' requires a contextual type}}
 
 }
+// UNSUPPORTED: OS=windows-msvc

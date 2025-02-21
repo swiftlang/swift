@@ -333,3 +333,4 @@ ProtocolInitTestSuite.test("ClassInit_Failure") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

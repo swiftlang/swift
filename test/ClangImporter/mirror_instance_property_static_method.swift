@@ -7,3 +7,4 @@ func mirrorInstancePropertyAsStaticMethod() {
   // Instance properties are mirrored as static _methods_. Make sure this works.
   let _: AnyClass = NSObject.classForCoder()
 }
+// UNSUPPORTED: OS=windows-msvc

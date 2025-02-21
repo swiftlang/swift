@@ -555,3 +555,4 @@ func test_rdar86050684() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

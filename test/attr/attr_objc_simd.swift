@@ -12,3 +12,4 @@ import simd
   @objc func doStuffWithUInt4(x: uint4) -> uint4 { return x }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ public func CFunc() -> Void {}
 // CHECK-DAG: "precise":"s:1CAAV"
 // CHECK-DAG: "precise":"s:1BAAV"
 // CHECK-DAG: "precise":"s:1AAAV"
+// UNSUPPORTED: OS=windows-msvc

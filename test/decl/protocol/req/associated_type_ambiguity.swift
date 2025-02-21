@@ -52,3 +52,4 @@ protocol P4 : P2, P3 {
   func takeT71(_: T)
   func takeT72(_: Self.T)
 }
+// UNSUPPORTED: OS=windows-msvc

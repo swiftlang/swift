@@ -39,3 +39,4 @@ class Foo {}
 func main() {
   _ = Foo()
 }
+// UNSUPPORTED: OS=windows-msvc

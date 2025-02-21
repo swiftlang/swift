@@ -12,3 +12,4 @@ class Foo {
 // CHECK-NEGATIVE-NOT: class Foo
 }
 
+// UNSUPPORTED: OS=windows-msvc

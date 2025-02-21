@@ -54,3 +54,4 @@ if #available(SwiftStdlib 5.3, *) {
   print("Array: false")
   print("Set: false")
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@
 // REQUIRES: OS=macosx
 
 import Foundation
+// UNSUPPORTED: OS=windows-msvc

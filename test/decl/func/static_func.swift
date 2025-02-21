@@ -117,3 +117,4 @@ extension P {
   class func f6() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}} {{3-8=static}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

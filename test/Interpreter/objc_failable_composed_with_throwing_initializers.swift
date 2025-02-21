@@ -676,3 +676,4 @@ FailableComposedWithThrowingInitTestSuite.test("ConvenienceInitFailure_Derived")
   mustFail { AtObjCPolarBear(before: false, during: false, after: true) }
   expectEqual(NSLifetimeTracked.count(), 0)
 }
+// UNSUPPORTED: OS=windows-msvc

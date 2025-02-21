@@ -48,3 +48,4 @@ public func start() {
   it.startLogging()
 }
 
+// UNSUPPORTED: OS=windows-msvc

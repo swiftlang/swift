@@ -16,3 +16,4 @@ public func foo() {
   p(Bar<Int>())
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -98,3 +98,4 @@ sil_vtable Sub {
   #Sub.init!allocator: (Sub.Type) -> (NSString) -> Sub : @$s4main3SubCyACSo8NSStringCcfC
   #Sub.deinit!deallocator: @$s4main3SubCfD
 }
+// UNSUPPORTED: OS=windows-msvc

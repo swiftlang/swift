@@ -88,3 +88,4 @@ extension Array : ApplyRegStruct, RegStructable where Element == PublicStruct {
     mutating func applyTransform() {
     }
 }
+// UNSUPPORTED: OS=windows-msvc

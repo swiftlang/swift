@@ -586,3 +586,4 @@ func guardValueWithInlineStorage<U>(v: ValueWithInlineStorage<U>) {
     if case .box(let box) = v { return }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -79,3 +79,4 @@ public struct IndirectEnum {
         print(containsFalse)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

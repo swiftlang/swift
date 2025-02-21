@@ -56,3 +56,4 @@ func funcTestSendingArg() async {
   // expected-note @-1 {{'x' used after being passed as a 'sending' parameter; Later uses could race}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
+// UNSUPPORTED: OS=windows-msvc

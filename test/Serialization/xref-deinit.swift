@@ -7,3 +7,4 @@
 import ObjCXRef
 
 public class Object: MyObject {}
+// UNSUPPORTED: OS=windows-msvc

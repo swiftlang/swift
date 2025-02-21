@@ -13,3 +13,4 @@ func hasStaticViolation() {
   var l = X()
   takesInout(&l.f, &l.f)
 }
+// UNSUPPORTED: OS=windows-msvc

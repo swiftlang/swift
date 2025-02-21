@@ -42,3 +42,4 @@ bb0(%0 : $*HasMemberWithUserProvidedDestructor, %1 : $Int32, %2 : $@thin HasMemb
   %5 = tuple ()
   return %5 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

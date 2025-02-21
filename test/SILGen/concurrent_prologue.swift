@@ -19,3 +19,4 @@
     let x = await f();
   }
 }
+// UNSUPPORTED: OS=windows-msvc

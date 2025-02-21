@@ -52,3 +52,4 @@ public typealias MyCode = Int
 #endif // ObjC
 
 #endif // CLIENT
+// UNSUPPORTED: OS=windows-msvc

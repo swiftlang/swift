@@ -274,3 +274,4 @@ func check_call_on_downcasted_instance(_ a: A7) -> Bool {
   }
   return a.foo()
 }
+// UNSUPPORTED: OS=windows-msvc

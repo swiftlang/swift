@@ -6,3 +6,4 @@
   static func main() async {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

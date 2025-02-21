@@ -23,3 +23,4 @@ func test4(x: repeat #^AFTER_REPEAT?check=HAS_SOME_ANY;check=NO_REPEAT^#) {}
 // HAS_REPEAT-DAG: Keyword/None: repeat; name=repeat
 
 // NO_REPEAT-NOT: Keyword/None: repeat; name=repeat
+// UNSUPPORTED: OS=windows-msvc

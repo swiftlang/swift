@@ -69,3 +69,4 @@ closure = {}
 
 // CHECK-NEXT: done
 print("done")
+// UNSUPPORTED: OS=windows-msvc

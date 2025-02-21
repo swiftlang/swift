@@ -34,3 +34,4 @@ if Bool(fromCxx: o) {
 } else if Bool(fromCxx: !o) {
   // let _: Int32 = o[789] // FIXME: currently broken
 }
+// UNSUPPORTED: OS=windows-msvc

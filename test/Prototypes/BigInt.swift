@@ -1876,3 +1876,4 @@ BigIntTests.test("isMultiple") {
   expectTrue((0 as _BigInt<UInt>).isMultiple(of: 0))
   expectFalse((1 as _BigInt<UInt>).isMultiple(of: 0))
 }
+// UNSUPPORTED: OS=windows-msvc

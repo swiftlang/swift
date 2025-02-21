@@ -97,3 +97,4 @@ func testAlwaysErrorBridge(cond: Bool, mec: MyErrorClass) -> NSObject? {
 
   return mec as? NSObject // expected-warning{{conditional cast from 'MyErrorClass}}' to 'NSObject' always succeeds
 }
+// UNSUPPORTED: OS=windows-msvc

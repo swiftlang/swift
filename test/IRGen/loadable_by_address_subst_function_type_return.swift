@@ -16,3 +16,4 @@ public struct S2 {
     return 0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

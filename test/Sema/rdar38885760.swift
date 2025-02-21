@@ -8,3 +8,4 @@
 import Swift
 
 Builtin.trigger_fallback_diagnostic()
+// UNSUPPORTED: OS=windows-msvc

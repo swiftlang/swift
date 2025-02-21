@@ -24,3 +24,4 @@ import objc_implementation
   // CHECK-DAG: @objc func goodMethod()
   @objc public func goodMethod() {}
 }
+// UNSUPPORTED: OS=windows-msvc

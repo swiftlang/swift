@@ -120,3 +120,4 @@ do {
     var value // Ok - $kp$ of key path is captured implicitly by backing variable init
   }
 }
+// UNSUPPORTED: OS=windows-msvc

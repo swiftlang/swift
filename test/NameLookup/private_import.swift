@@ -84,3 +84,4 @@ func ambiguousWithTwoNonPrivateImports(_: Coast) {}
 // in a single file, so this behavior is more accidental than anything.
 func ambiguousWithTwoPrivateImports(_: Roast) {}
 // expected-error@-1{{'Roast' is ambiguous for type lookup in this context}}
+// UNSUPPORTED: OS=windows-msvc

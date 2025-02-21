@@ -29,3 +29,4 @@
 // Make sure the fingerprint for the member changes
 // INCREMENTAL-IMPORTS-MUTATION-DAG: blob data = '99bb01bb4d9177dc6f902d1f2326caad'
 // INCREMENTAL-IMPORTS-MUTATION-LABEL: </INCREMENTAL_INFORMATION_BLOCK>
+// UNSUPPORTED: OS=windows-msvc

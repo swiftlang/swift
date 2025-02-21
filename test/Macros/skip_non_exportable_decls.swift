@@ -18,3 +18,4 @@ macro anonymousTypes(public: Bool = false, causeErrors: Bool = false, _: () -> S
 
 // FIXME: Changing 'public: false' to 'public: true' above doesn't seem to
 // have any effect on the generated SIL. Perhaps there is a bug here.
+// UNSUPPORTED: OS=windows-msvc

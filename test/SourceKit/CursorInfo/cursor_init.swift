@@ -29,3 +29,4 @@ func test() {
 // CHECK-BOOL-NEXT: source.lang.swift
 // CHECK-BOOL: -----
 // CHECK-BOOL-NEXT: SECONDARY SYMBOLS END
+// UNSUPPORTED: OS=windows-msvc

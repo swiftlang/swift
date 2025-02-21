@@ -8,3 +8,4 @@ public class MyClass {
   public init()
   @objc deinit
 }
+// UNSUPPORTED: OS=windows-msvc

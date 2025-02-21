@@ -34,3 +34,4 @@ func testReadOnlyKeyPathDiagnostics() {
   t[keyPath: path] = 4 // expected-error {{cannot assign through subscript: 'path' is a read-only key path}}
   t[keyPath: \T.a] = 4 // expected-error {{cannot assign through subscript: key path is read-only}}
 }
+// UNSUPPORTED: OS=windows-msvc

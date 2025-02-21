@@ -395,3 +395,4 @@ public func z(_ arg: FrozenPublicEnum) -> Int {
     return 2 + val
   }
 }
+// UNSUPPORTED: OS=windows-msvc

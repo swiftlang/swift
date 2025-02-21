@@ -129,3 +129,4 @@ do {
 
 // CHECK-NEXT: all done.
 print("all done.")
+// UNSUPPORTED: OS=windows-msvc

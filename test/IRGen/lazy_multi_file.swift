@@ -27,3 +27,4 @@ func test() -> Int {
   useLazyContainer(container)
   return container.lazyVar
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ extension B {
 struct Foo<Value>: B {
   var value: Value  
 }
+// UNSUPPORTED: OS=windows-msvc

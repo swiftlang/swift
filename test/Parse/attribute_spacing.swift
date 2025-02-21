@@ -31,3 +31,4 @@ let closure2 = { @MainActor
 @ 
 MainActor
 func mainActorFunc() {}
+// UNSUPPORTED: OS=windows-msvc

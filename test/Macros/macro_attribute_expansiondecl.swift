@@ -180,3 +180,4 @@ func testS3(value: S3) {
   value.foo() // expected-warning {{result of call to 'foo()' is unused}}
   value.bar() // expected-warning {{result of call to 'bar()' is unused}}
 }
+// UNSUPPORTED: OS=windows-msvc

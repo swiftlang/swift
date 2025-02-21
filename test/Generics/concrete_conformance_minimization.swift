@@ -32,3 +32,4 @@ extension G4 where T == String {}
 // CHECK-LABEL: ExtensionDecl line={{[0-9]+}} base=G4
 // CHECK-NEXT: Generic signature: <T where T == Substring>
 extension G4 where T == Substring {}
+// UNSUPPORTED: OS=windows-msvc

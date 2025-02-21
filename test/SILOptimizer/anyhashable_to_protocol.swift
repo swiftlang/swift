@@ -16,3 +16,4 @@ public func testit(_ x: AnyHashable) -> Bool {
   return (x as? FooProtocol) != nil
 }
 
+// UNSUPPORTED: OS=windows-msvc

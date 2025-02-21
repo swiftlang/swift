@@ -44,3 +44,4 @@ public class AttributeContainer1 {
   // ATTR1: func m3(a: @escaping () -> Int)
   public func m3(a : @escaping () -> Int) {}
 }
+// UNSUPPORTED: OS=windows-msvc

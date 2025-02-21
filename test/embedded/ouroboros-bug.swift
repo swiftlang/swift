@@ -19,3 +19,4 @@ public func test() {}
 test()
 
 // CHECK: define {{.*}}i32 @main
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ import module
 // CHECK-MSVC-ASM: .section .drectve
 // CHECK-MSVC-ASM: .ascii " /DEFAULTLIB:module.lib"
 
+// UNSUPPORTED: OS=windows-msvc

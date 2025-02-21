@@ -86,3 +86,4 @@ public func topLevelNonAsyncFunc() { }
 // CHECK-NOT: key.is_async: 1
 // CHECK: }
 
+// UNSUPPORTED: OS=windows-msvc

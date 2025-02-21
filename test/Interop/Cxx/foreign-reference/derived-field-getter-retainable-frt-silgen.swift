@@ -10,3 +10,4 @@ func testGetX() -> CInt {
 let _ = testGetX()
 
 // CHECK:  function_ref @{{.*}}__synthesizedBaseGetterAccessor_{{.*}} : $@convention(cxx_method) (@in_guaranteed DerivedFieldFRT) -> @owned RefCounted
+// UNSUPPORTED: OS=windows-msvc

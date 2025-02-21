@@ -16,3 +16,4 @@
   func bar() {}
 }
 // CHECK: @_PROTOCOL_INSTANCE_METHODS__TtP4test1P_ = {{.*}} [{ ptr, ptr, ptr } { ptr @"\01L_selector_data(bar)", ptr {{@.*}}, ptr null }]
+// UNSUPPORTED: OS=windows-msvc

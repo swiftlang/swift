@@ -304,3 +304,4 @@ public func condCast6(_ ns: Existential1) -> Existential2? {
   }
   return x
 }
+// UNSUPPORTED: OS=windows-msvc

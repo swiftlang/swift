@@ -318,3 +318,4 @@ extension Collection {
 func keypathToFunctionWithOptional() {
   _ = Array("").prefix(1...4, while: \.isNumber) // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

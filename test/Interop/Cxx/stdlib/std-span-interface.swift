@@ -32,3 +32,4 @@ import CxxStdlib
 // CHECK-NEXT: @_alwaysEmitIntoClient public func funcWithSafeWrapper2(_ s: Span<CInt>) -> Span<CInt>
 // CHECK-NEXT: @lifetime(borrow v)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcWithSafeWrapper3(_ v: borrowing VecOfInt) -> Span<CInt>
+// UNSUPPORTED: OS=windows-msvc

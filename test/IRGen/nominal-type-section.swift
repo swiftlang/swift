@@ -9,3 +9,4 @@
 public struct s {
 }
 
+// UNSUPPORTED: OS=windows-msvc

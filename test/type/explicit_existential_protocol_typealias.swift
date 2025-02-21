@@ -14,3 +14,4 @@ extension P {
   func f2() -> any PAlias2 {}
   func g2<T>(_: T) -> any PAlias2 {}
 }
+// UNSUPPORTED: OS=windows-msvc

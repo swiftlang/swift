@@ -60,3 +60,4 @@ int main() {
 // CHECK-NEXT: breakpoint 5
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

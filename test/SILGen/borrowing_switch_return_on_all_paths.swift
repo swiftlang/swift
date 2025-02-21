@@ -37,3 +37,4 @@ enum Maybe<Element: ~Copyable>: ~Copyable {
     case none
     case some(Element)
 }
+// UNSUPPORTED: OS=windows-msvc

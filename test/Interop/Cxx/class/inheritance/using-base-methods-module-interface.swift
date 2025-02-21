@@ -51,3 +51,4 @@
 // CHECK-NEXT:   private func omitUsingPubl() -> Return
 // CHECK-NEXT:   private func omitUsingProt() -> Return
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

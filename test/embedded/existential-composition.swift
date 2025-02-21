@@ -26,3 +26,4 @@ struct Main {
                                  // expected-note@-4 {{called from here}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

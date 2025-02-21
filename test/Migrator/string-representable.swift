@@ -73,3 +73,4 @@ public class SubContainer: Container {
   public override func add(single: String) {}
   public override func add(singleOptional: String?) {}
 }
+// UNSUPPORTED: OS=windows-msvc

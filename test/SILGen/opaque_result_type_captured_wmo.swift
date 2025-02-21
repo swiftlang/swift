@@ -8,3 +8,4 @@ func foo(s: String?) {
 
   s.map { print("\($0) \(butz)") }
 }
+// UNSUPPORTED: OS=windows-msvc

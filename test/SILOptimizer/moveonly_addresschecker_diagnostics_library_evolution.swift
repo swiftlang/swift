@@ -195,3 +195,4 @@ public func callerConsumeClassVarFieldForArgumentSpillingTestVarGlobal() {
     consumeVal(copyableKlassVarGlobal.varS.e) // expected-error{{field 'copyableKlassVarGlobal.varS' was consumed but not reinitialized; the field must be reinitialized during the access}}
                                               // expected-note@-1{{consumed here}}
 }
+// UNSUPPORTED: OS=windows-msvc

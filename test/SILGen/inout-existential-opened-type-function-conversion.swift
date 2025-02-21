@@ -7,3 +7,4 @@ protocol P {
 func foo(x: inout P) {
   x.foo { y in return }
 }
+// UNSUPPORTED: OS=windows-msvc

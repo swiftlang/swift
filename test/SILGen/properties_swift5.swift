@@ -132,3 +132,4 @@ struct DidSetWillSetTests: ForceAccessors {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

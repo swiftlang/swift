@@ -46,3 +46,4 @@ public func client_func() {
     return 0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

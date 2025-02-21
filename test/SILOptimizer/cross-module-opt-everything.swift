@@ -67,3 +67,4 @@ public func client_func_2() {
   open_existential(S1())
   open_existential(S2())
 }
+// UNSUPPORTED: OS=windows-msvc

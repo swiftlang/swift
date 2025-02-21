@@ -209,3 +209,4 @@ func ineligible(function: String = #function) {
 
   SomeClass().callee(arbitrary: function)
 }
+// UNSUPPORTED: OS=windows-msvc

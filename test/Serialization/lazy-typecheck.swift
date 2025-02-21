@@ -20,3 +20,4 @@
 //     and -experimental-skip-non-exportable-decls can be used by the same client as in (1).
 // RUN: %target-swift-frontend -swift-version 5 %S/../Inputs/lazy_typecheck.swift -module-name lazy_typecheck -enable-library-evolution -parse-as-library -package-name Package -DFLAG -emit-module -emit-module-path %t/lazy-skip-non-inlinable/lazy_typecheck.swiftmodule -debug-forbid-typecheck-prefix NoTypecheck -experimental-lazy-typecheck -experimental-skip-non-inlinable-function-bodies -experimental-skip-non-exportable-decls
 // RUN: %target-swift-frontend -package-name Package -typecheck -verify %S/../Inputs/lazy_typecheck_client.swift -DFLAG -I %t/lazy-skip-non-inlinable
+// UNSUPPORTED: OS=windows-msvc

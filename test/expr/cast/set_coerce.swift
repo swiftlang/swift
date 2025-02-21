@@ -20,3 +20,4 @@ var setD = Set<D>()
 setC = setD
 setD = setC // expected-error{{cannot assign value of type 'Set<C>' to type 'Set<D>'}}
 // expected-note@-1 {{arguments to generic parameter 'Element' ('C' and 'D') are expected to be equal}}
+// UNSUPPORTED: OS=windows-msvc

@@ -85,3 +85,4 @@ func testDeclsNestedInObjCContainers() {
   let _: NameInProtocol = 0
   let _: NameInCategory = 0
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -254,3 +254,4 @@ func testNonEphemeralInitParams(x: OpaquePointer) {
   // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
   // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

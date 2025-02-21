@@ -86,3 +86,4 @@ struct DeferBody {
     // expected-error@-1 {{'No' is unavailable}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

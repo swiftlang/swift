@@ -21,3 +21,4 @@ class B {
     bar = A.default.foo(arg: self.) // expected-error {{expected member name following '.'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

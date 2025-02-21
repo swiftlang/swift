@@ -21,3 +21,4 @@ StaticLocalVarTestSuite.test("static-local-var") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

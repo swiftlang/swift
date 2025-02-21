@@ -87,3 +87,4 @@ public struct GoodStringInterpolationWithBadOnesToo: StringInterpolationProtocol
   func appendInterpolation(default: ()) {}
   public func appendInterpolation(intResult: ()) -> Int {}
 }
+// UNSUPPORTED: OS=windows-msvc

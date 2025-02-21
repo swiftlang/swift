@@ -23,3 +23,4 @@
 // CHECK-TBD: _$s10spi_helper7SPIEnumO0A6MethodyyF
 // CHECK-TBD: _$s10spi_helper8SPIClassC0A6MethodyyF
 // CHECK-TBD: _$s10spi_helper9SPIStructV0A6MethodyyF
+// UNSUPPORTED: OS=windows-msvc

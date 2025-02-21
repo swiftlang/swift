@@ -28,3 +28,4 @@ class MyClass {
 // CHECK:     /* "${var.name}" */ 12 as UInt8, 36 as UInt8, 123 as UInt8, 118 as UInt8, 97 as UInt8, 114 as UInt8, 46 as UInt8, 110 as UInt8, 97 as UInt8, 109 as UInt8, 101 as UInt8, 125 as UInt8, 0 as UInt8
 // CHECK: )
 
+// UNSUPPORTED: OS=windows-msvc

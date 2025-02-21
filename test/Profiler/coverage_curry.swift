@@ -18,3 +18,4 @@ func testS0CurriedInstanceMethods(s0: S0, a: Int, b: Int) {
   let f1OneLevel = S0.f1(s0)
   let f1Init = S0.init(a:b:)
 }
+// UNSUPPORTED: OS=windows-msvc

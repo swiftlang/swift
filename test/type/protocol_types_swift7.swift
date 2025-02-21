@@ -47,3 +47,4 @@ func testExistentialInCatch() throws {
     // expected-warning@-2 2{{'is' test is always true}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

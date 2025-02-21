@@ -31,3 +31,4 @@ class B : A {
 
   @objc(setObject:atIndexedSubscript:) func doSet(_ x: AnyObject, y: Int) { } // expected-error{{method 'doSet(_:y:)' with Objective-C selector 'setObject:atIndexedSubscript:' conflicts with subscript setter from superclass 'A' with the same Objective-C selector}}
 }
+// UNSUPPORTED: OS=windows-msvc

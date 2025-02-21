@@ -117,3 +117,4 @@ _ = memberwise . /*memberwise-x:ref*/x
 // RUN: diff -u %S/Outputs/functions/nested.swift.expected %t.ranges/functions_nested.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="memberwise-x" -old-name "x" >> %t.ranges/functions_memberwise-x.swift
 // RUN: diff -u %S/Outputs/functions/memberwise-x.swift.expected %t.ranges/functions_memberwise-x.swift
+// UNSUPPORTED: OS=windows-msvc

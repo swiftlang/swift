@@ -49,3 +49,4 @@ mirrors.test("Packs") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -68,3 +68,4 @@ func main() {
     print("total \(ResilientCapturesInDeinit.instanceCount())")
 }
 main()
+// UNSUPPORTED: OS=windows-msvc

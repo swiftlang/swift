@@ -27,3 +27,4 @@ entry:
   // CHECK: return [[PA]] : $@callee_guaranteed () -> ()
   return %g : $@callee_guaranteed () -> ()
 }
+// UNSUPPORTED: OS=windows-msvc

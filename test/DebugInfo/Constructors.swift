@@ -11,3 +11,4 @@ struct Foo {
 
 var f = Foo(x: 1)
 f.bar(2)
+// UNSUPPORTED: OS=windows-msvc

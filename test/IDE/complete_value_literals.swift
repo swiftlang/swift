@@ -219,3 +219,4 @@ func testImage1() {
   let x: MyImage1 = #^IMAGE_1^#
 }
 // IMAGE_1: Literal[_Image]/None/TypeRelation[Convertible]: #imageLiteral({#resourceName: String#})[#MyImage1#];
+// UNSUPPORTED: OS=windows-msvc

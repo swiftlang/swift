@@ -14,3 +14,4 @@
 // CHECK: sil [serialized] [canonical] [ossa] @$s5stage21functionToReserializeyyF : $@convention(thin) () -> () {
 @inlinable
 public func functionToReserialize() {}
+// UNSUPPORTED: OS=windows-msvc

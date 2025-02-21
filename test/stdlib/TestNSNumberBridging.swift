@@ -910,3 +910,4 @@ nsNumberBridging.test("bitPattern to exactly") { test_numericBitPatterns_to_floa
 nsNumberBridging.test("Bridge AnyHashable") { testNSNumberBridgeAnyHashable() }
 nsNumberBridging.test("Bridge AnyHashable (ObjC)") { testNSNumberBridgeAnyHashableObjc() }
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

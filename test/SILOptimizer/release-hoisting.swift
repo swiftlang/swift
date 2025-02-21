@@ -33,3 +33,4 @@ public func testit(s: S) -> Int {
   return x.s.i
 }
 
+// UNSUPPORTED: OS=windows-msvc

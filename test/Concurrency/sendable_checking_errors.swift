@@ -18,3 +18,4 @@ func f() async {
 struct S: Sendable {
   var b: Undefined // expected-error{{cannot find type 'Undefined' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -54,3 +54,4 @@ bb0:
 public struct Container<Element> : ~Copyable, ~Escapable where Element : ~Copyable {}
 
 sil [ossa] @parseInoutDep : $@convention(method) <Element where Element : ~Copyable> (@lifetime(copy 0) @inout Container<Element>) -> ()
+// UNSUPPORTED: OS=windows-msvc

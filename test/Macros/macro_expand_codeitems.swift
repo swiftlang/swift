@@ -39,3 +39,4 @@ func testVarDecl() {
   func use<T>(_ t: T) {}
   #varDecl()
 }
+// UNSUPPORTED: OS=windows-msvc

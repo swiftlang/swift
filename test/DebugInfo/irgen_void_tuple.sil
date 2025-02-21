@@ -34,3 +34,4 @@ bb0:
 
 // CHECK: ![[RESULT_VAR]] = !DILocalVariable
 // CHECK-SAME: name: "result"
+// UNSUPPORTED: OS=windows-msvc

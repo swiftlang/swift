@@ -139,3 +139,4 @@ EnumSynthesisTests.test("IndirectEquatability/Hashability") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

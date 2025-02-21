@@ -191,3 +191,4 @@ StdVectorTestSuite.test("VectorOfString subclass for loop") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

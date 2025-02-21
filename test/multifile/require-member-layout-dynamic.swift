@@ -9,3 +9,4 @@ public class Foo: NSObject {
     bar("hello")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

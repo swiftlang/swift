@@ -44,3 +44,4 @@ extension ErrorStruct2 : Error { }
 class ErrorClass2 { }
 
 extension ErrorClass2 : Error { }
+// UNSUPPORTED: OS=windows-msvc

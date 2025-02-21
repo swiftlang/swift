@@ -64,3 +64,4 @@ enum MyEnum {
 // RUN: not %refactor -move-to-extension -source-filename %s -pos=33:1 -end-pos=34:1
 // RUN: not %refactor -move-to-extension -source-filename %s -pos=37:1 -end-pos=37:1
 // RUN: not %refactor -move-to-extension -source-filename %s -pos=37:8 -end-pos=37:16
+// UNSUPPORTED: OS=windows-msvc

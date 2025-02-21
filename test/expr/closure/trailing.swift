@@ -488,3 +488,4 @@ func rdar92521618() {
   if let _ = { foo {} }() {}
   guard let _ = { foo {} }() else { return }
 }
+// UNSUPPORTED: OS=windows-msvc

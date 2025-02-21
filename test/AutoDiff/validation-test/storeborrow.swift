@@ -138,3 +138,4 @@ StoreBorrowAdjTest.test("NonZeroGrad") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

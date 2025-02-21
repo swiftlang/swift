@@ -5,3 +5,4 @@
 func thing() {
     print(1)
 }
+// UNSUPPORTED: OS=windows-msvc

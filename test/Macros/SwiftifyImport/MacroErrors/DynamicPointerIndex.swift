@@ -7,3 +7,4 @@ let pointerIndex = 1
 @_SwiftifyImport(.countedBy(pointer: .param(pointerIndex), count: "len"))
 func myFunc(_ ptr: UnsafePointer<CInt>, _ len: String) {
 }
+// UNSUPPORTED: OS=windows-msvc

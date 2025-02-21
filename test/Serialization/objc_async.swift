@@ -19,3 +19,4 @@ class Derived: Base {
 extension Derived {
 	override func foo(id: Int) async { }
 }
+// UNSUPPORTED: OS=windows-msvc

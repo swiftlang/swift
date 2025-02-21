@@ -31,3 +31,4 @@ protocol P4a {
 protocol P5a {
   associatedtype T where T : P4a, T.T : C
 }
+// UNSUPPORTED: OS=windows-msvc

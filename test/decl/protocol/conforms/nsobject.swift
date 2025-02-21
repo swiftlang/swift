@@ -17,3 +17,4 @@ class D: C, NSObjectProtocol { } // expected-error{{cannot declare conformance t
 class E { }
 
 extension E: NSObjectProtocol { } // expected-error{{cannot declare conformance to 'NSObjectProtocol' in Swift; 'E' should inherit 'NSObject' instead}} expected-note {{add stubs for conformance}}
+// UNSUPPORTED: OS=windows-msvc

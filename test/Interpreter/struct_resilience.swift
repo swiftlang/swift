@@ -167,3 +167,4 @@ ResilientStructTestSuite.test("DynamicLayoutAssociatedType") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

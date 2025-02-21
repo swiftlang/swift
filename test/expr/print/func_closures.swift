@@ -53,3 +53,4 @@ let fn9 = { () -> Int in 0 }
 let fn10 = { () in }
 // CHECK: @_hasInitialValue internal let fn10: () -> () = { () in
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

@@ -32,3 +32,4 @@ import MyModule
 var arr: [any ClassBound] = [factory()]
 arr[0].foo()
 // CHECK: MyGenericClass<String>.foo()
+// UNSUPPORTED: OS=windows-msvc

@@ -35,3 +35,4 @@ public func start() -> XLogging.Logger? {
 
 public func end(_ arg: XLogging.Logger) {
 }
+// UNSUPPORTED: OS=windows-msvc

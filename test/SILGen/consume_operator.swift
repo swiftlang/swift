@@ -72,3 +72,4 @@ func testAddressOnlyVar<T : P>(_ t: T.Type) {
   k = T.value
   let _ = consume k
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ public func useHasPointer(_: HasPointer)
 
 // FIXME: https://github.com/apple/swift/issues/56844
 // UNSUPPORTED: OS=windows-msvc
+// UNSUPPORTED: OS=windows-msvc

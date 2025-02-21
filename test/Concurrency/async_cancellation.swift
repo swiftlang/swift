@@ -56,3 +56,4 @@ func test_cancellation_loop() async -> Int {
   }
   return processed
 }
+// UNSUPPORTED: OS=windows-msvc

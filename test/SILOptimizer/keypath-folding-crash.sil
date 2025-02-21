@@ -52,3 +52,4 @@ bb0(%0 : $*NSObject, %1 : $*ObjClass):
   return %6 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

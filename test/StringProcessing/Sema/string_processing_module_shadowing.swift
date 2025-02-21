@@ -9,3 +9,4 @@ func f(_ t : Regex<Substring>) -> Bool {
 }
 
 func g(_: _StringProcessing.Regex<Substring>) {}
+// UNSUPPORTED: OS=windows-msvc

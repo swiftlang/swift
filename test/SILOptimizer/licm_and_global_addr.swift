@@ -28,3 +28,4 @@ func testit(_ n: Int) {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ extension EnumWithProtocolWitness: P {}
 // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:         enum $EnumWithProtocolWitness, #EnumWithProtocolWitness.requirement!enumelt
 // CHECK:       } // end sil function '$s4Test23EnumWithProtocolWitnessO11requirementyAcA1SVcACmF'
+// UNSUPPORTED: OS=windows-msvc

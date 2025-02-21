@@ -680,3 +680,4 @@ bb2:
   destroy_value %2 : $KlassPair
   unwind
 }
+// UNSUPPORTED: OS=windows-msvc

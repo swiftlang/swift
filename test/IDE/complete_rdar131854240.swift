@@ -26,3 +26,4 @@ import Lib
 #^TOPLEVEL?check=TOPLEVEL;check=TOPLEVEL_NOT^#
 // TOPLEVEL:         Decl[Struct]/OtherModule[Lib]/IsSystem: SomeNonUnderscoredType[#SomeNonUnderscoredType#]
 // TOPLEVEL_NOT-NOT: _SomeUnderscoredType
+// UNSUPPORTED: OS=windows-msvc

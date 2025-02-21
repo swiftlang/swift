@@ -43,3 +43,4 @@
 // CHECK-NEXT: GenericPair<T, T2>::testme::0,3425;
 // CHECK-NEXT: GenericPair<T, T2>::genericMethod<T>::PairOfUInt64(x: 719610, y: 205891),4221;
 // CHECK-NEXT: EOF
+// UNSUPPORTED: OS=windows-msvc

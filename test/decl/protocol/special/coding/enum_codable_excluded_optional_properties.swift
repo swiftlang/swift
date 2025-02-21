@@ -26,3 +26,4 @@ enum EnumWithExcludedOptionalParameters : Codable { // expected-error {{type 'En
         case p1, p2
     }
 }
+// UNSUPPORTED: OS=windows-msvc

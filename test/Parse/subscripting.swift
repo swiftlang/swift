@@ -232,3 +232,4 @@ struct A11 {
 }
 
 } // expected-error{{extraneous '}' at top level}} {{1-3=}}
+// UNSUPPORTED: OS=windows-msvc

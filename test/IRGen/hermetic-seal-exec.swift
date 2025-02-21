@@ -74,3 +74,4 @@
   }
 
 #endif  // CLIENT
+// UNSUPPORTED: OS=windows-msvc

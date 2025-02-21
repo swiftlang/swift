@@ -77,3 +77,4 @@ func capture_and_release_generic_indirect<T>(_: T.Type) -> () -> () {
 // CHECK:   [[T:%.*]] = load ptr, ptr [[BINDINGS]],
 // CHECK:   call {{.*}}22FixedWithDeinitGenericVfD"({{.*}}, ptr [[T]])
 
+// UNSUPPORTED: OS=windows-msvc

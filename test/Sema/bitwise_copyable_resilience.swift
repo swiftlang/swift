@@ -50,3 +50,4 @@ func passWoopsional<T>(_ t: Woopsional<T>) { take(t) } // expected-error    {{ty
                                                        // expected-note@-15 {{where_requirement_failure_one_subst}}
 
 extension Integer : @retroactive BitwiseCopyable {} // expected-error {{bitwise_copyable_outside_module}}
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ public func propagate_roundingmode() -> Int {
 public func round_floating_point(_ x: Float) -> Float {
   return x.rounded()
 }
+// UNSUPPORTED: OS=windows-msvc

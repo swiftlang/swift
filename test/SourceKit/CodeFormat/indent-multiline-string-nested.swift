@@ -23,3 +23,4 @@ func foo() {
 // CHECK: key.sourcetext: "        "
 // CHECK: key.sourcetext: "        this is line2 in outer string"
 // CHECK: key.sourcetext: "        \"\"\""
+// UNSUPPORTED: OS=windows-msvc

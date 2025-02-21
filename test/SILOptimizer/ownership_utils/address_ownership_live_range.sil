@@ -33,3 +33,4 @@ bb0(%0 : @guaranteed $D, %1 : @guaranteed $D):
   %99 = tuple()
   return %99 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

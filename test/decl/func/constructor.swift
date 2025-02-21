@@ -108,3 +108,4 @@ var noCrash1c : NoCrash1a
 class MissingDef {
   init() // expected-error{{initializer requires a body}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ func testRMW(_ b: Bool) -> (Bool, Bool) {
   return x.logicalOr(true, ordering: .relaxed)
 }
 
+// UNSUPPORTED: OS=windows-msvc

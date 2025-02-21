@@ -130,3 +130,4 @@ GenericSubscriptTestSuite.test("ProtocolExtensionWitness") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

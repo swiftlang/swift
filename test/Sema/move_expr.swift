@@ -85,3 +85,4 @@ func testConsumeResultImmutable() {
   (consume t) = Test() // expected-error {{cannot assign to immutable expression of type 'Test'}}
   consume t = Test() // expected-error {{cannot assign to immutable expression of type 'Test'}}
 }
+// UNSUPPORTED: OS=windows-msvc

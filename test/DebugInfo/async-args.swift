@@ -31,3 +31,4 @@ func withGenericArg<T>(_ msg: T) async {
 // CHECK-DAG: ![[TAU_R]] = !DILocalVariable(name: "$\CF\84_0_0",
 // CHECK-DAG: ![[MSG_R]] = !DILocalVariable(name: "msg", arg: 1,
 
+// UNSUPPORTED: OS=windows-msvc

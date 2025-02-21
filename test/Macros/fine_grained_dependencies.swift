@@ -17,3 +17,4 @@ macro Empty<T>(_ x: T) = #externalMacro(module: "MacroDefinition", type: "EmptyD
     }
     _ = S.foo
 }
+// UNSUPPORTED: OS=windows-msvc

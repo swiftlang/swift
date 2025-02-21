@@ -91,3 +91,4 @@ func foo() {
   // <rdar://problem/21900971> tracks improving QoI here.
   allMine.takeAll() // expected-error{{type 'any Mine' cannot conform to 'Mine'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@
 
 @_transparent
 public func transparentPrimitiveFunc(_ x: Int) -> Int { return x * x }
+// UNSUPPORTED: OS=windows-msvc

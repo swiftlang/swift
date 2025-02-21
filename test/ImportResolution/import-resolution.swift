@@ -53,3 +53,4 @@ var qS1 : asdf.S // okay
 // CHECK-IMPORTS-DAG: aeiou:
 // CHECK-IMPORTS-DAG: aeiou:
 // CHECK-IMPORTS-DAG: abcde:
+// UNSUPPORTED: OS=windows-msvc

@@ -89,3 +89,4 @@ public func test_weakly_linked_enum_cases(e: E) -> Int {
       return 3
   }
 }
+// UNSUPPORTED: OS=windows-msvc

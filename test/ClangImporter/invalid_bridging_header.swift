@@ -2,3 +2,4 @@
 
 // CHECK: 1:12: error: cannot find interface declaration for 'UndeclaredError'
 // CHECK: error: failed to import bridging header
+// UNSUPPORTED: OS=windows-msvc

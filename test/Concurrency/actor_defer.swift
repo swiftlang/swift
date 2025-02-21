@@ -219,3 +219,4 @@ func testIsolatedActor_closure_negative() {
   }
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

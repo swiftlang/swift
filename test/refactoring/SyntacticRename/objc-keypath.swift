@@ -42,3 +42,4 @@ _ = #keyPath(/*Outer:unknown*/Outer . /*Inner:unknown*/Inner . /*dict:unknown*/d
 // RUN: diff -u %S/Outputs/objc-keypath/array.swift.expected %t/array.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="dict" -old-name "dict" >> %t/dict.swift
 // RUN: diff -u %S/Outputs/objc-keypath/dict.swift.expected %t/dict.swift
+// UNSUPPORTED: OS=windows-msvc

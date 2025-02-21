@@ -218,3 +218,4 @@ struct FileDescriptor: ~Copyable, Eq, Show {
     old_swap(&self, &other)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

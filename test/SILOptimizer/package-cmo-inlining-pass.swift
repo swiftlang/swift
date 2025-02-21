@@ -51,3 +51,4 @@ package struct PkgStruct {
 // CHECK:   load [trivial] [[FIELD1]] : $*Int
 // CHECK:   [[FIELD2:%.*]] = struct_element_addr [[PKG_ALLOC]] : $*PkgStruct, #PkgStruct.field2
 // CHECK:   load [trivial] [[FIELD2]] : $*Int
+// UNSUPPORTED: OS=windows-msvc

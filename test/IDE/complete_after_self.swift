@@ -280,3 +280,4 @@ struct S1 {
     self.#^STRUCT_FUNC_SELF_DOT_1?check=NO_INIT^#
   }
 }
+// UNSUPPORTED: OS=windows-msvc

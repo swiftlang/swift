@@ -25,3 +25,4 @@ var last:String
         yield &x
     }
 }
+// UNSUPPORTED: OS=windows-msvc

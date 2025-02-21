@@ -15,3 +15,4 @@ func function_with_interesting_stuff() {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

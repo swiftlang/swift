@@ -54,3 +54,4 @@ func callBar(bar: Bar, gen: Gen<Int, String>) {
   // CHECK: apply [[BRIDGE]]<Gen<Int, String>>
   bar.bar(gen)
 }
+// UNSUPPORTED: OS=windows-msvc

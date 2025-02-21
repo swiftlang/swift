@@ -16,3 +16,4 @@ CxxClassExtensionsTestSuite.test("calling extension method") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

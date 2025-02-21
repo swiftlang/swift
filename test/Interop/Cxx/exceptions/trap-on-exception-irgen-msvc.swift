@@ -21,3 +21,4 @@
 // CHECK: call {{.*}}i32 @"?freeFunctionThrows@@YAHH@Z"
 // CHECK: ret i32 %1
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

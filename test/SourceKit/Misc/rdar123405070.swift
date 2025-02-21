@@ -24,3 +24,4 @@ struct Flim {}
 @_rawLayout(likeArrayOf: Qux, count: 5)
 @available(macOS 5.0, *)
 struct Flam {}
+// UNSUPPORTED: OS=windows-msvc

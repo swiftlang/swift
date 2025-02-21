@@ -21,3 +21,4 @@ public func addressableTest(x: borrowing @_addressable NonTrivialInWrapper, y: i
   // CHECK-NEXT: end_access [[ACCESS]]
   m2.nonTrivialTakesRef(&y)
 }
+// UNSUPPORTED: OS=windows-msvc

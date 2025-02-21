@@ -90,3 +90,4 @@ struct S: RandomAccessCollection {
   public subscript(position: Int) -> String { "" }
 }
 
+// UNSUPPORTED: OS=windows-msvc

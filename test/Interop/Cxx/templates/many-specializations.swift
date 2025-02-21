@@ -6,3 +6,4 @@
 // CHECK-NEXT: }
 
 // CHECK-NOT: typealias
+// UNSUPPORTED: OS=windows-msvc

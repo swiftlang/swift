@@ -9,3 +9,4 @@
 // RUN: %target-run %t/swift-stdlib-execution | %FileCheck %S/array-execution.cpp
 
 // REQUIRES: executable_test
+// UNSUPPORTED: OS=windows-msvc

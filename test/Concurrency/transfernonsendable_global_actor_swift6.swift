@@ -85,3 +85,4 @@ var booleanFlag: Bool { false }
   await useValueAsync(erased) // expected-error {{sending 'erased' risks causing data races}}
   // expected-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
+// UNSUPPORTED: OS=windows-msvc

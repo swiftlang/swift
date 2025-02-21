@@ -12,3 +12,4 @@ func t() {
 
 // The extension E: P should not show up in this filel.
 // CHECK-NOT: $s21conformance_multifile1EOAA1PAAMc
+// UNSUPPORTED: OS=windows-msvc

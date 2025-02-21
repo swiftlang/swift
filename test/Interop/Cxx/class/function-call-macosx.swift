@@ -34,3 +34,4 @@ public func testARCWeakFunctionPointer() {
   let f = getFnPtr2()
   f(ARCWeak())
 }
+// UNSUPPORTED: OS=windows-msvc

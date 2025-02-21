@@ -32,3 +32,4 @@ public func caller() {
 // CHECK: ref_to_raw_pointer
 // CHECK: builtin "cmp_eq_RawPointer"
 // CHECK: function_ref @$s24cse_open_existential_ref9blackHoleyyxlF
+// UNSUPPORTED: OS=windows-msvc

@@ -1764,3 +1764,4 @@ sil_vtable GenKlass {
 sil_vtable $GenKlass<Int> {
 }
 
+// UNSUPPORTED: OS=windows-msvc

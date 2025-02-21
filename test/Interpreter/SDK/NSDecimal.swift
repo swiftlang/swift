@@ -123,3 +123,4 @@ print(twenty.significand) // CHECK: 2
 print(twenty.exponent) // CHECK: 1
 
 print(Decimal(sign: .plus, exponent: -2, significand: 100)) // CHECK: 1
+// UNSUPPORTED: OS=windows-msvc

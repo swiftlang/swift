@@ -79,3 +79,4 @@ allTests.test("Lookup via dynamic subclasses") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

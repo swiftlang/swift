@@ -143,3 +143,4 @@ sil_default_witness_table P {
   no_default
 }
 
+// UNSUPPORTED: OS=windows-msvc

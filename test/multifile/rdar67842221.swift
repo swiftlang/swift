@@ -15,3 +15,4 @@
 public func force() {
   _ = closureValue
 }
+// UNSUPPORTED: OS=windows-msvc

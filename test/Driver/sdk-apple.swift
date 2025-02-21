@@ -79,3 +79,4 @@
 
 // SDK-TOO-OLD: error: Swift does not support the SDK '{{.+}}.sdk'{{$}}
 // SDK-OKAY: -sdk {{.*}}/{{[^/ ]+}}sdk
+// UNSUPPORTED: OS=windows-msvc

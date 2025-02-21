@@ -23,3 +23,4 @@ class Foo: NSObject, NSButz {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

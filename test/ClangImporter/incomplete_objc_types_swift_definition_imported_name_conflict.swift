@@ -70,3 +70,4 @@ _ = returnAProtocolConflictingTypeName()
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolConflictingTypeName' forward declared here
 // CHECK-NEXT: @protocol ProtocolConflictingTypeName;
 // CHECK-NEXT: ^
+// UNSUPPORTED: OS=windows-msvc

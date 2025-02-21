@@ -166,3 +166,4 @@ func calltests() {
 
 calltests()
 
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ import HasBuiltinImport
 
 // CHECK: "mainModuleName": "deps"
 
+// UNSUPPORTED: OS=windows-msvc

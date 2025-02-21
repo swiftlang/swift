@@ -30,3 +30,4 @@ ObjCMetatypesTest.test("ProtocolInit") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

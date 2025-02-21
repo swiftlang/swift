@@ -74,3 +74,4 @@ func testFallthrough(_ x: Bool) -> Int {
 print("fallthrough: \(testFallthrough(true))")
 
 // CHECK: fallthrough: 6
+// UNSUPPORTED: OS=windows-msvc

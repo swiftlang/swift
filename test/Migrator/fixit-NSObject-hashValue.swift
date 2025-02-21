@@ -12,3 +12,4 @@ class MyClass: NSObject {
     return 42
   }
 }
+// UNSUPPORTED: OS=windows-msvc

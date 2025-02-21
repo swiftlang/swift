@@ -19,3 +19,4 @@ acceptBridgeableNSError(E2.A)
 
 acceptBridgeableNSError(E3.A)
 // expected-error@-1{{global function 'acceptBridgeableNSError' requires that 'E3' conform to '_ObjectiveCBridgeableError'}}
+// UNSUPPORTED: OS=windows-msvc

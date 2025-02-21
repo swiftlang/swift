@@ -26,3 +26,4 @@ extension CustomError.Code {
     return CustomError.Code(rawValue: -9999)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

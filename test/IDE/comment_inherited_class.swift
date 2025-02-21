@@ -49,3 +49,4 @@ class Derived : Base {
   // CHECK: Var/Derived.varWithDerivedComment {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>varWithDerivedComment</Name><USR>s:14swift_ide_test7DerivedC07varWithD7CommentSbvp</USR><Declaration>override var varWithDerivedComment: Bool { get }</Declaration><CommentParts><Abstract><Para>Base</Para></Abstract><Discussion><Note><Para>This documentation comment was inherited from <codeVoice>Base</codeVoice>.</Para></Note></Discussion></CommentParts></Other>]
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ do {
   // CHECK: call swiftcc void @"$s15raw_layout_fred4FredVACyxGycfC"
   let _ = Fred<Bool>()
 }
+// UNSUPPORTED: OS=windows-msvc

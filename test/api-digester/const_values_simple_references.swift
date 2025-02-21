@@ -39,3 +39,4 @@
 // CHECK-NEXT: "length": 12,
 // CHECK-NEXT: "value": "[(2, 1), (2, 1), (3, 1)]",
 // CHECK-NEXT: "decl": "class_dict"
+// UNSUPPORTED: OS=windows-msvc

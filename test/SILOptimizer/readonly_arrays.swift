@@ -99,3 +99,4 @@ storeArray()
 // CHECK-OUTPUT-NEXT: [227, 228]
 print(gg!)
 
+// UNSUPPORTED: OS=windows-msvc

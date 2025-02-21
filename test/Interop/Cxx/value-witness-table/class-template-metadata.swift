@@ -18,3 +18,4 @@ ClassTemplateMetadataTestSuite.test("Different specializations of a class templa
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

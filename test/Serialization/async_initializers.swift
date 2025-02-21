@@ -38,3 +38,4 @@ enum E {
 struct S {
   init() async {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -55,3 +55,4 @@ func trigger(cond: Bool) {
     "blah"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

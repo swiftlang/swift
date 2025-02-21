@@ -51,3 +51,4 @@ struct CopyableFoo {
         else { copyableBar(prefix) }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

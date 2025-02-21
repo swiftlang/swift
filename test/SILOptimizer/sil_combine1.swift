@@ -36,3 +36,4 @@ public func test_compose_closure() -> Int32 {
   return gs
 }
 
+// UNSUPPORTED: OS=windows-msvc

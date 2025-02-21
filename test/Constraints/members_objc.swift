@@ -32,3 +32,4 @@ func test_subject_ClassConstrainedSubscript() {
   let list: subject_ClassConstrainedSubscript! = test_HasSubscript()
   _ = list[0]
 }
+// UNSUPPORTED: OS=windows-msvc

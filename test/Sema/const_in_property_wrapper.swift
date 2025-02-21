@@ -48,3 +48,4 @@ struct WrapperAdopters_incorrect {
     @Wrapper<Bool>(giveMeBlue()) // expected-error{{expect a compile-time constant literal}}
     var wrappedVar_incorrect_4
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@
 // CHECK-arm64_32: "arch": "arm64_32"
 // CHECK-i386: "arch": "i386"
 // CHECK-x86_64: "arch": "x86_64"
+// UNSUPPORTED: OS=windows-msvc

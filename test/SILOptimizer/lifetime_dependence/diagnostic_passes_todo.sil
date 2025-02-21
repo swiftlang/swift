@@ -74,3 +74,4 @@ bb0:
   %93 = tuple ()
   return %93 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

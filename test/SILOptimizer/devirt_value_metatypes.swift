@@ -61,3 +61,4 @@ public final class E : C {
 public func testE(_ x: E) -> Int {
   return (type(of: x) as C.Type).foo()
 }
+// UNSUPPORTED: OS=windows-msvc

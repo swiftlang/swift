@@ -56,3 +56,4 @@ struct Main {
 // CHECK: foo
 // CHECK-NEXT: 6
 // CHECK-NEXT: bar
+// UNSUPPORTED: OS=windows-msvc

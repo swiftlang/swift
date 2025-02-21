@@ -6,3 +6,4 @@
     foo() // expected-error {{cannot find 'foo' in scope}}
   }
 #endif
+// UNSUPPORTED: OS=windows-msvc

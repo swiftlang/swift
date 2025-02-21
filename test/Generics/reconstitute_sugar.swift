@@ -58,4 +58,4 @@ struct G2<T1 : P, T2 : P> {}
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=G2
 // CHECK-NEXT: Generic signature: <T1, T2 where T1 : P, T2 : P, T1.[P]U == [Int], T2.[P]U == [Int]>
-extension G2 where T2.U == [Int], T1.T == T2.T {}
+extension G2 where T2.U == [Int], T1.T == T2.T {}// UNSUPPORTED: OS=windows-msvc

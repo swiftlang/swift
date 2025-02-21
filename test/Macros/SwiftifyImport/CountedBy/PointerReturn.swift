@@ -20,3 +20,4 @@ func nonEscaping(_ len: CInt) -> UnsafePointer<CInt> {
 // CHECK-NEXT:     return UnsafeBufferPointer<CInt> (start: nonEscaping(len), count: Int(len))
 // CHECK-NEXT: }
 
+// UNSUPPORTED: OS=windows-msvc

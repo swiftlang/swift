@@ -157,3 +157,4 @@ struct ConcreteSendable: AbstractSendable {
   func runnableInBackground() -> () -> Void { fatalError() } // expected-warning {{sendability of function types in instance method 'runnableInBackground()' does not match requirement in protocol 'AbstractSendable'}}
   func runnableInForeground() -> @Sendable () -> Void { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ struct S {
 }
 
 _ = [S() as Sendable]
+// UNSUPPORTED: OS=windows-msvc

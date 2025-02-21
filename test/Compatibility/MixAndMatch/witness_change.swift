@@ -34,3 +34,4 @@ public protocol SomeSwift4Protocol {
 }
 extension SomeObjCClass: SomeSwift4Protocol {}
 
+// UNSUPPORTED: OS=windows-msvc

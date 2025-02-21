@@ -68,3 +68,4 @@ func ao_dep<let N: Int>(a: MyVector<N, Any>)
     return (a, a)
 }
 
+// UNSUPPORTED: OS=windows-msvc

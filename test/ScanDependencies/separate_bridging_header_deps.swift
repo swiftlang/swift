@@ -33,3 +33,4 @@ import E
 // CHECK-NEXT:      "swift": "F"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

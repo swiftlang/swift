@@ -13,3 +13,4 @@ struct S : P {
 
   func f() {}
 }
+// UNSUPPORTED: OS=windows-msvc

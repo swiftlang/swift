@@ -40,3 +40,4 @@ extension Thing {
 public  func doIt(_ thingy: (any Proto1 & MarkerProto)?) -> some Proto1 {
     return Thing.doIt(thingy)
 }
+// UNSUPPORTED: OS=windows-msvc

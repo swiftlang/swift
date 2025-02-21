@@ -11,3 +11,4 @@ struct Outer {
 
 let _: Outer = .Inner.Foo<Outer>.id(.init())
 
+// UNSUPPORTED: OS=windows-msvc

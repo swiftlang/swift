@@ -24,3 +24,4 @@ public func test(x: Ref) {
     // CHECK: note: function uses foreign reference type 'Ref' as a value in a parameter types which breaks 'swift_shared_reference' contract
     takesRef(x)
 }
+// UNSUPPORTED: OS=windows-msvc

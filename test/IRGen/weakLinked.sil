@@ -8,3 +8,4 @@ sil [weak_imported] @f : $@convention(thin) () -> () {
   return %unit : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

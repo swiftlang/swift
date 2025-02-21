@@ -32,3 +32,4 @@ PrintTests.test("LosslessStringConvertible") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

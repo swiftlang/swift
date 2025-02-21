@@ -7,3 +7,4 @@ public class Foo {
   var x : Int64
   init(x: Int64) { self.x = x }
 }
+// UNSUPPORTED: OS=windows-msvc

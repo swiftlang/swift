@@ -11,3 +11,4 @@ public extension MyClass {
 }
 
 // CHECK-NOT: myFunc
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ public struct S {
 }
 
 // RUN: %target-swift-typecheck-module-from-interface(%s) -module-name Test -verify -verify-ignore-unknown -experimental-lazy-typecheck
+// UNSUPPORTED: OS=windows-msvc

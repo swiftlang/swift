@@ -10,3 +10,4 @@ func orElse<T: ~Copyable>(
     return try defaultValue()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

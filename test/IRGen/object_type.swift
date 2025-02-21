@@ -40,3 +40,4 @@ func work() {
 
 // CHECK: okay
 work()
+// UNSUPPORTED: OS=windows-msvc

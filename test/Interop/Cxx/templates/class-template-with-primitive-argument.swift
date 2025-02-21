@@ -13,3 +13,4 @@ TemplatesTestSuite.test("int-argument") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

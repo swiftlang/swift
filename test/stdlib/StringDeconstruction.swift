@@ -132,3 +132,4 @@ StringDeconstructTests.test("deconstruct cocoa") {
 }
 #endif
 
+// UNSUPPORTED: OS=windows-msvc

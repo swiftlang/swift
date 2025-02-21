@@ -21,3 +21,4 @@ struct Container {
 }
 
 // CHECK: <IMPORTED_MODULE abbrevid={{[0-9]+}} op0=2 op1=0{{.*}}/> blob data = 'def_struct'
+// UNSUPPORTED: OS=windows-msvc

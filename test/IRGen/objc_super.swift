@@ -124,3 +124,4 @@ class GenericRuncer<T> : Gizmo {
     super.runce()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

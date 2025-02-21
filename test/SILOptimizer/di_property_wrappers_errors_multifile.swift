@@ -6,3 +6,4 @@
 
 let contentView = ContentView() // expected-error {{missing argument for parameter 'runner' in call}}
 
+// UNSUPPORTED: OS=windows-msvc

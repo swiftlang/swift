@@ -33,3 +33,4 @@ public struct MyStruct {
 // CHECK-LABEL: @"$s32reflection_metadata_isolated_any8MyStructVMF" = internal constant
 // CHECK-PRESENT-SAME: ptr @"symbolic yyYAc"
 // CHECK-SUPPRESSED-SAME: ptr @"get_type_metadata yyYAc.{{[0-9]+}}"
+// UNSUPPORTED: OS=windows-msvc

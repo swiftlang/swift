@@ -44,3 +44,4 @@ for i in 0..<3 {
 }
 // CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[c='true' module: main. file: {{.*/main.swift}}]
 // CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='0' module: main. file: {{.*/main.swift}}]
+// UNSUPPORTED: OS=windows-msvc

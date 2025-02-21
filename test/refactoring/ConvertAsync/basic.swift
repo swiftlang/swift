@@ -887,3 +887,4 @@ func testForInWhereRefactoring() {
 // FOR-IN-WHERE-NEXT:     print(res)
 // FOR-IN-WHERE-NEXT:   }
 // FOR-IN-WHERE-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

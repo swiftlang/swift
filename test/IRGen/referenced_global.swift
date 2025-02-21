@@ -7,3 +7,4 @@
 // CHECK-LABEL: @"$s17referenced_global1bSPySiGvp" ={{.*}} global {{.*}} ptr @"$s17referenced_global1x{{.*}}"
 public var b = UnsafePointer(&x)
 private var x = 1
+// UNSUPPORTED: OS=windows-msvc

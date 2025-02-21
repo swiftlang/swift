@@ -66,3 +66,4 @@ func test_echo(system: FakeActorSystem) async {
     await test_echo(system: FakeActorSystem())
   }
 }
+// UNSUPPORTED: OS=windows-msvc

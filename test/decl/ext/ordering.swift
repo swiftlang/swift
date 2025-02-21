@@ -185,3 +185,4 @@ extension Outer5D.Inner {}
 extension Outer5D {
   class Inner : OtherOuter5D.Super {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -86,3 +86,4 @@ func test_contextual_member_with_unavailable_extension() {
 
   _ = Test(.foo) // Ok `A.foo` since `foo` from `HasUnavailableExtesion` is unavailable
 }
+// UNSUPPORTED: OS=windows-msvc

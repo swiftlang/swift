@@ -18,3 +18,4 @@
 // RUN: env TMP="%t/fake/" TMPDIR="%t/fake/" not %target-build-swift -driver-filelist-threshold=0 %t.o 2>&1 | %FileCheck -check-prefix=CHECK-FILELIST %s
 
 // CHECK-FILELIST: - unable to create temporary file for inputs.LinkFileList
+// UNSUPPORTED: OS=windows-msvc

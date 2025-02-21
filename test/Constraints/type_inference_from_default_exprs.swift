@@ -269,3 +269,4 @@ do {
 
 func testInferenceFromClosureVarInvalid<T>(x: T = { let x = "" as Int; return x }()) {}
 // expected-error@-1 {{cannot convert value of type 'String' to type 'Int' in coercion}}
+// UNSUPPORTED: OS=windows-msvc

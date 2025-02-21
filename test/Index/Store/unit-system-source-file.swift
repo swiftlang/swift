@@ -19,3 +19,4 @@
 // NO-SDK: is-system: 0
 
 func someFunc() {}
+// UNSUPPORTED: OS=windows-msvc

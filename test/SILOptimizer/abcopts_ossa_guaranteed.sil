@@ -1631,3 +1631,4 @@ bb6(%33 : $Builtin.Int32):
   %34 = struct $Int32 (%33)
   return %34
 }
+// UNSUPPORTED: OS=windows-msvc

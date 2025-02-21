@@ -15,3 +15,4 @@
 // CHECK-NEXT:   typealias T = Int32
 // CHECK-NEXT:   typealias U = Base.Struct
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

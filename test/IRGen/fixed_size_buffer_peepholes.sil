@@ -27,3 +27,4 @@ entry(%p : $*P):
   dealloc_stack %0 : $*P
   return undef: $()
 }
+// UNSUPPORTED: OS=windows-msvc

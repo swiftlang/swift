@@ -17,3 +17,4 @@ func myFunc2(_ ptr: UnsafePointer<CInt>, _ len: CInt) {
 // expected-note@+1{{function myFunc3 has no parameters}}
 func myFunc3() {
 }
+// UNSUPPORTED: OS=windows-msvc

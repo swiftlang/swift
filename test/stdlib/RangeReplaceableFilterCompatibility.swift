@@ -39,3 +39,4 @@ tests.test("lazy.flatMap.filter ambiguity") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

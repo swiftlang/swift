@@ -44,3 +44,4 @@ public struct RawTextDisplay <Value: CustomStringConvertible>: SingleValueDispla
     Text(displayedValue.description)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -53,3 +53,4 @@ func testExtensionNestedActorConformance(_ a: S.ExtensionNestedActor) {
   takesExecutor(a.unownedExecutor)
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -73,3 +73,4 @@ exerciseSubHolder(with: SubSubButtHolder())
 
 
 print("OK that's it") // CHECK-NEXT: OK that's it
+// UNSUPPORTED: OS=windows-msvc

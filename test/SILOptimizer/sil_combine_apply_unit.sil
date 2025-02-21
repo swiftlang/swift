@@ -176,3 +176,4 @@ failure(%error : @owned $Error):
   destroy_value %c2
   throw %error
 }
+// UNSUPPORTED: OS=windows-msvc

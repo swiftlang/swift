@@ -9,3 +9,4 @@ public class DefinedElsewhere {}
 // CHECK: DICompositeType(tag: DW_TAG_structure_type, name: "DefinedElsewhere",{{.*}}runtimeLang: DW_LANG_Swift, identifier: "$s11ThirdModule16DefinedElsewhereCD")
 
 let v2 = DefinedElsewhere()
+// UNSUPPORTED: OS=windows-msvc

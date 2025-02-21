@@ -327,3 +327,4 @@ public func memoryLayoutDotOffsetOfWithResilientStruct() -> Int? {
 public struct StructWithResilientInit {
   public init() {}
 }
+// UNSUPPORTED: OS=windows-msvc

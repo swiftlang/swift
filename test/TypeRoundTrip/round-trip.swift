@@ -24,3 +24,4 @@ struct Test {
     try runAllTests()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

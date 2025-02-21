@@ -196,3 +196,4 @@ ImportedObjCGenerics.test("BridgedInitializer") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

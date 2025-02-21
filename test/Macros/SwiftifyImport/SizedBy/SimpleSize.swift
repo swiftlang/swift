@@ -10,3 +10,4 @@ func myFunc(_ ptr: UnsafeRawPointer, _ size: CInt) {
 // CHECK-NEXT: func myFunc(_ ptr: UnsafeRawBufferPointer) {
 // CHECK-NEXT:     return myFunc(ptr.baseAddress!, CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

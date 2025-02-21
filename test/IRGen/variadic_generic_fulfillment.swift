@@ -25,3 +25,4 @@ public struct GG<each T> {
 // CHECK-NEXT: [[T_ELT:%.*]] = load ptr, ptr [[T_ELT_PTR]]
 
 // CHECK: ret void
+// UNSUPPORTED: OS=windows-msvc

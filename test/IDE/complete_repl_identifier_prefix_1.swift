@@ -3,3 +3,4 @@
 // CHECK-DAG: {{^}}true: Bool{{$}}
 
 tru
+// UNSUPPORTED: OS=windows-msvc

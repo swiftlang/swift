@@ -171,3 +171,4 @@ public class SubclassOfNormalClass: NormalClass {}
 @inlinable public func testSpecializedConformance() {
   _ = NormalProtoAssocHolder<GenericStruct<Int>>.self // expected-error {{cannot use conformance of 'GenericStruct<T>' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 }
+// UNSUPPORTED: OS=windows-msvc

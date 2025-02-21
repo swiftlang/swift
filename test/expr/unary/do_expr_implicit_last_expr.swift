@@ -79,3 +79,4 @@ func doCatch1() -> Int {
     0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

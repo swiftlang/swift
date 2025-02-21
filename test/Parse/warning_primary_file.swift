@@ -18,3 +18,4 @@ public func baz(x: Int, y: Int) -> Int {
   return z + y
 }
 
+// UNSUPPORTED: OS=windows-msvc

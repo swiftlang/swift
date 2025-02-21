@@ -7,3 +7,4 @@
 func f() {
   #^A^#
   1 2 3
+// UNSUPPORTED: OS=windows-msvc

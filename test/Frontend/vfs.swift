@@ -29,3 +29,4 @@ import VFSMappedModule
 import YetAnotherVFSMappedModule
 #endif
 #endif
+// UNSUPPORTED: OS=windows-msvc

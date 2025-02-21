@@ -82,3 +82,4 @@ int main() {
 // CHECK-NEXT: ClassWithNonFinalMethods.staticClassMethod;
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

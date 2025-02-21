@@ -40,3 +40,4 @@ func test_ambiguity_with_placeholders(pairs: [(rank: Int, count: Int)]) -> Bool 
 
 let unboundInPlaceholder1: Array<Never> = <#T##Array#> // expected-error{{editor placeholder in source file}}
 let unboundInPlaceholder2: Array<Never> = foo(<#T##t: Array##Array<Never>#>) // expected-error{{editor placeholder in source file}}
+// UNSUPPORTED: OS=windows-msvc

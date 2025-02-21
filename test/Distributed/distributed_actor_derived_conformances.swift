@@ -13,3 +13,4 @@ distributed actor DA: Comparable {}
 // expected-error@-1 {{type 'DA' does not conform to protocol 'Comparable'}}
 // expected-note@-2 {{automatic synthesis of 'Comparable' is not supported for distributed actor declarations}}
 // expected-note@-3 {{add stubs for conformance}}
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@
 // TWO_RECORDS: DEPEND END
 
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

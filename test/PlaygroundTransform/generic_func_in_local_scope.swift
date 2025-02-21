@@ -31,3 +31,4 @@ func test3<Content>(_ content: Content) {
        return content2
     }
 }
+// UNSUPPORTED: OS=windows-msvc

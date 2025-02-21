@@ -571,3 +571,4 @@ struct BadAccessorAvailability<T> {
   }
 
 }
+// UNSUPPORTED: OS=windows-msvc

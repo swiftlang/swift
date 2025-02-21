@@ -26,3 +26,4 @@ final public class Escaper {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

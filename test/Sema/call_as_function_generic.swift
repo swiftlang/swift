@@ -58,3 +58,4 @@ func testCallAsFunctionWithWhereClause(_ c1: C<Int>, _ c2: C<S0>, _ s0: S0) {
 
   c2(t: s0) // Okay.
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@
 // CHECK-NEXT: legacy-driver-propagates-response-file.sh
 // CHECK:      @{{.*}}.resp
 // CHECK-NOT:  -DTEST5_{{.*}}
+// UNSUPPORTED: OS=windows-msvc

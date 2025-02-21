@@ -28,3 +28,4 @@ func call_call_objc_method<T: ObjC>(_ x: T) {
 func call_objc_existential_method(_ x: ObjC) {
   x.method()
 }
+// UNSUPPORTED: OS=windows-msvc

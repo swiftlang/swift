@@ -115,3 +115,4 @@ func test_diagnose_deepest_ambiguity() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

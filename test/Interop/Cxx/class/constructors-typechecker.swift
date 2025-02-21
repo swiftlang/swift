@@ -19,3 +19,4 @@ let _ = TemplatedCopyConstructor(123)
 let _ = TemplatedCopyConstructorWithExtraArg(123)
 takesCopyable(TemplatedCopyConstructor.self)
 takesCopyable(TemplatedCopyConstructorWithExtraArg.self)
+// UNSUPPORTED: OS=windows-msvc

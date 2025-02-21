@@ -13,3 +13,4 @@ func test1() {
   _ = Foo.FooHelperSubEnum1X
 }
 
+// UNSUPPORTED: OS=windows-msvc

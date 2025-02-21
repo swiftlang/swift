@@ -181,3 +181,4 @@ struct Rectangle {
 
   private var computed: PrivateStruct? { return nil }
 }
+// UNSUPPORTED: OS=windows-msvc

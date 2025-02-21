@@ -5,3 +5,4 @@
 // RUN: %target-codesign %t/%target-library-name(module1)
 // RUN: %target-run %t/a.out %t/%target-library-name(module1)
 // REQUIRES: executable_test
+// UNSUPPORTED: OS=windows-msvc

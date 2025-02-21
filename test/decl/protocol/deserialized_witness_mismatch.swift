@@ -15,3 +15,4 @@ protocol HasCurrent {
 extension TimeZone : HasCurrent {}
 // expected-error@-1 {{type 'TimeZone' does not conform to protocol 'HasCurrent'}}
 // expected-note@-2 {{add stubs for conformance}}
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ func useUnderPoundAvailable() {
     introducedOn10_16() // no-error
   }
 }
+// UNSUPPORTED: OS=windows-msvc

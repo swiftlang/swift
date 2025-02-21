@@ -52,3 +52,4 @@ public struct S<T> {
 }
 
 // CHECK: define {{.*}}@main(
+// UNSUPPORTED: OS=windows-msvc

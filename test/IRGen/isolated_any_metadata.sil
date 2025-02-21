@@ -42,3 +42,4 @@ entry:
 // CHECK-COMBO-ACCESSOR-LABEL: define{{.*}} swiftcc %swift.metadata_response @"$ss11NonSendableVyYbYAYTcMa"
 //   18 == 0x12 == IsolatedAny | HasSendingResult
 // CHECK-COMBO-ACCESSOR:         call ptr @swift_getExtendedFunctionTypeMetadata([[INT]] 3288334336, [[INT]] 0, ptr null, ptr null, ptr getelementptr inbounds {{.*}} @"$ss11NonSendableVMf"{{.*}}), ptr null, i32 18, ptr null)
+// UNSUPPORTED: OS=windows-msvc

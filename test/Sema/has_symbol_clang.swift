@@ -30,3 +30,4 @@ func testEnum() {
 func testStruct(_ s: ClangStruct) {
   if #_hasSymbol(s.x) {} // expected-error {{'#_hasSymbol' cannot be used with this declaration}}
 }
+// UNSUPPORTED: OS=windows-msvc

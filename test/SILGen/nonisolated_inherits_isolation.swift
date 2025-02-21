@@ -151,3 +151,4 @@ class MainActorKlass {
     await unspecifiedAsyncUse(n)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

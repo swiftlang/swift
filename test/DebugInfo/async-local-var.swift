@@ -21,3 +21,4 @@ public func makeDinner() async throws -> String {
 // CHECK: ![[LOCAL]] = !DILocalVariable(name: "local"
   return local
 }
+// UNSUPPORTED: OS=windows-msvc

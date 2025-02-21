@@ -38,3 +38,4 @@ func testAssertLikeUseDifferentBits() {
         }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

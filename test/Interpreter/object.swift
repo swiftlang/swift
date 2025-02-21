@@ -18,3 +18,4 @@ test()
 
 // CHECK: good
 // CHECK: also good
+// UNSUPPORTED: OS=windows-msvc

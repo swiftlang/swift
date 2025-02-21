@@ -25,3 +25,4 @@ func testErrorCompositionWithClass(error: Error & C) {
   opensError(error) // okay
   wantsError(error, error) // expected-error {{type 'any C & Error' cannot conform to 'Error'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
 }
+// UNSUPPORTED: OS=windows-msvc

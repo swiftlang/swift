@@ -381,3 +381,4 @@ public distributed actor MyOtherActor {
 // CHECK-INDIRECT-NEXT: [[SELECT:%[0-9]+]] = select i1 true, ptr @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTETu", ptr [[ADDR]]
 // CHECK-INDIRECT-NEXT: [[LOAD:%[0-9]+]] = getelementptr inbounds %swift.async_func_pointer, ptr [[SELECT]], i32 0, i32 1
 // CHECK-INDIRECT-NEXT: {{.*}} = load i32, ptr [[LOAD]]
+// UNSUPPORTED: OS=windows-msvc

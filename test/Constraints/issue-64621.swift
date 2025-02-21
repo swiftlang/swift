@@ -11,3 +11,4 @@ func foo<R>(_: R) -> any Wrapper<R> {}
 func test() {
   foo(0).get()
 }
+// UNSUPPORTED: OS=windows-msvc

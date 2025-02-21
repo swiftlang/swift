@@ -2,3 +2,4 @@
 // RUN: diff %t.importedmodules %S/Inputs/imported_modules/imported_modules_underlying.importedmodules
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=windows-msvc

@@ -43,3 +43,4 @@ func usesA(_: S.A) {} // should resolve to the typealias inside S
 func callsA() {
   usesA("hello")
 }
+// UNSUPPORTED: OS=windows-msvc

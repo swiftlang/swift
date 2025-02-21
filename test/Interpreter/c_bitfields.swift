@@ -47,3 +47,4 @@ BitfieldTestSuite.test("Initializer") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

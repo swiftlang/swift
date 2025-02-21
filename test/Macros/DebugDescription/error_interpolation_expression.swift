@@ -8,3 +8,4 @@ struct MyStruct {
   // expected-error @+1 {{only references to stored properties are allowed}}
   var debugDescription: String { "\(1)" }
 }
+// UNSUPPORTED: OS=windows-msvc

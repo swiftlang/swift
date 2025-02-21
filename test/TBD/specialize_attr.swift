@@ -49,3 +49,4 @@ public class C {
   @_specialize(exported: true, where T == Float)
   private func fooPrivate<T>(_ x : T) -> T { return x }
 }
+// UNSUPPORTED: OS=windows-msvc

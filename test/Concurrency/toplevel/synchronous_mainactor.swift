@@ -29,3 +29,4 @@ func safeAsyncAccess() async {
 }
 
 print(a)
+// UNSUPPORTED: OS=windows-msvc

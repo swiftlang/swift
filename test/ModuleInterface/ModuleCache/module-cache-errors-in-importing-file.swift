@@ -21,3 +21,4 @@ unresolved // expected-error {{cannot find 'unresolved' in scope}}
 import SomeModule
 
 print(SomeFunc())
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ func test(v: API) async {
   v.wait() // expected-error {{instance method 'wait' is unavailable from asynchronous contexts; use complete() instead}}
   v.waitUntilComplete() // expected-warning {{instance method 'waitUntilComplete' is unavailable from asynchronous contexts; use complete() instead}}
 }
+// UNSUPPORTED: OS=windows-msvc

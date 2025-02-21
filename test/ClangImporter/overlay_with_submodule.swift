@@ -8,3 +8,4 @@ func useAnOperator() -> Int {
   x = 1 + 2           // Forces a lookup of precedence groups
   return x
 }
+// UNSUPPORTED: OS=windows-msvc

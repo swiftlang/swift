@@ -28,3 +28,4 @@ func testFunctions() {
 // CHECK-DAG: @"OBJC_CLASS_$_NSNumber" = extern_weak global %objc_class
 // CHECK-DAG: @"OBJC_METACLASS_$_NSNumber" = extern_weak global %objc_class
 class CustomNumber: NSNumber {}
+// UNSUPPORTED: OS=windows-msvc

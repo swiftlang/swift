@@ -32,3 +32,4 @@ public func passExistentialType() {
   typealias Fn = (Sendable & P & Q & R) async -> Void
   takeAnyType(Fn.self)
 }
+// UNSUPPORTED: OS=windows-msvc

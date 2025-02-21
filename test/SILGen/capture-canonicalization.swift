@@ -12,3 +12,4 @@ extension Foo where T == Bar {
     return foo2()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

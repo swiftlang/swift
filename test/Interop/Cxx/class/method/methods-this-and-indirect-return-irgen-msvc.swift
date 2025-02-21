@@ -17,3 +17,4 @@ public func use() -> CInt {
 
 // CHECK-x86_64: define {{.*}} void @"?nonConstPassThroughAsWrapper@HasMethods@@QEAA?AUNonTrivialInWrapper@@H@Z"(ptr {{.*}} %{{.*}}, ptr {{.*}} sret(%struct.NonTrivialInWrapper) {{.*}} %{{.*}}, i32 noundef %{{.*}})
 // CHECK-aarch64: define {{.*}} void @"?nonConstPassThroughAsWrapper@HasMethods@@QEAA?AUNonTrivialInWrapper@@H@Z"(ptr {{.*}} %{{.*}}, ptr {{.*}}inreg {{.*}} sret(%struct.NonTrivialInWrapper) {{.*}} %{{.*}}, i32 noundef %{{.*}})
+// UNSUPPORTED: OS=windows-msvc

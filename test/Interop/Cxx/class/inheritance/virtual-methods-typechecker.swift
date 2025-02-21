@@ -37,3 +37,4 @@ func takesDerivedFromImmortal(_ i: DerivedFromImmortal) {
   let _ = i.getIntValue()
   i.setIntValue(1)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -167,3 +167,4 @@ protocol BadP {
 
   var prop5 : Int { get throws async } // expected-error {{'async' must precede 'throws'}}
 }
+// UNSUPPORTED: OS=windows-msvc

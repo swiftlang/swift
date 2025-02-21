@@ -44,3 +44,4 @@ func selectorTest() {
 func selectorTestFail() {
   _ = #selector(SomeClassWithObjCMembers.notInferredObjC) // expected-error{{argument of '#selector' refers to instance method 'notInferredObjC()' that is not exposed to Objective-C}}
 }
+// UNSUPPORTED: OS=windows-msvc

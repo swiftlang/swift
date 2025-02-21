@@ -49,3 +49,4 @@ public func test(i: Int) {
 // CHECK-NOMESSAGE:   tail call void @llvm.trap()
 // CHECK-NOMESSAGE:   unreachable
 // CHECK-NOMESSAGE: }
+// UNSUPPORTED: OS=windows-msvc

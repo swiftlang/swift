@@ -8,3 +8,4 @@ print("hello world!")
 // RUN: ldd %t/static-stdlib | %FileCheck %s --check-prefix=LDD
 // CHECK: hello world!
 // LDD-NOT: libswiftCore.so 
+// UNSUPPORTED: OS=windows-msvc

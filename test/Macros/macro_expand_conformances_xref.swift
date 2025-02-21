@@ -46,3 +46,4 @@ class OtherRoot {
 @ListConformances
 class OtherP1Root: P1 { }
 
+// UNSUPPORTED: OS=windows-msvc

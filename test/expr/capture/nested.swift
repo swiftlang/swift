@@ -10,3 +10,4 @@ func foo2(_ x: Int) -> (Int) -> (Int) -> Int {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

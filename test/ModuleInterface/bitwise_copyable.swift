@@ -14,3 +14,4 @@ public struct S_Implicit_Noncopyable: ~Copyable {}
 // CHECK-NEXT: public typealias _BitwiseCopyable = Test.BitwiseCopyable
 public protocol BitwiseCopyable {}
 public typealias _BitwiseCopyable = BitwiseCopyable
+// UNSUPPORTED: OS=windows-msvc

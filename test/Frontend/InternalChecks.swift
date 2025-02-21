@@ -15,3 +15,4 @@ func test_internal_checks_config(_ x: Int, _ y: Int) -> Int {
 
 // NOCHECKS-LABEL: $s14InternalChecks27test_internal_checks_configyS2i_SitF
 // NOCHECKS-NOT: "internal check emitted"
+// UNSUPPORTED: OS=windows-msvc

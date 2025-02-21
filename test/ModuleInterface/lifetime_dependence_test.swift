@@ -41,3 +41,4 @@ import lifetime_dependence
 // CHECK: extension lifetime_dependence.Container {
 // CHECK-NEXT: #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
 // CHECK-NEXT:   public var storage: lifetime_dependence.BufferView {
+// UNSUPPORTED: OS=windows-msvc

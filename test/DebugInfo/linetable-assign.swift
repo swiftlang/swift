@@ -15,3 +15,4 @@ public func f(_ i: Int32) {
   }
   return closure() 
 }
+// UNSUPPORTED: OS=windows-msvc

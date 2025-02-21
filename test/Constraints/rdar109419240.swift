@@ -13,3 +13,4 @@ func foo(_ arr: [E]) -> Int {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

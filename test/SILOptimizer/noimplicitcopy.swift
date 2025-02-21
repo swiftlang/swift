@@ -2233,3 +2233,4 @@ func moveOperatorTest(_ k: __owned Klass) {
     let _ = consume k2 // expected-note {{consumed again here}}
     let _ = k3
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -226,3 +226,4 @@ int main() {
 // CHECK-NEXT: TestSmallStruct value=TestSmallStruct(x1: 57)
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

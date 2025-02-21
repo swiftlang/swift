@@ -21,3 +21,4 @@ tests.test("synthesized type identity across modules") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

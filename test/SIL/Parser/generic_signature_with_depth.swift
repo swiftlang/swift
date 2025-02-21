@@ -31,3 +31,4 @@ func test<
  lhs.extend(rhs)
  return lhs
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -45,3 +45,4 @@ extension PublicAdopter {
   // expected-note@-1 {{'foo()' declared here}}
 }
 extension InternalAdopter: UFIProtoWithReqs {} // okay
+// UNSUPPORTED: OS=windows-msvc

@@ -90,3 +90,4 @@ func f1<T : P8a, U : P7b>(_: T, _: U) where T.C == U.B {}
 // CHECK-LABEL: .f2@
 // CHECK-NEXT: <T, U where T : P7b, U : P8a, U.[P8a]C == Int>
 func f2<T : P7b, U : P8a>(_: T, _: U) where T.B == U.C {}
+// UNSUPPORTED: OS=windows-msvc

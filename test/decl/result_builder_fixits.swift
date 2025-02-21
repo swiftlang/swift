@@ -62,3 +62,4 @@ func testDiags() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

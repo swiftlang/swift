@@ -20,3 +20,4 @@ func available() {
   unavailable() // expected-error {{'unavailable()' is unavailable: unavailable in embedded Swift}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

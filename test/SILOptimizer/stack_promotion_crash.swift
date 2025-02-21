@@ -36,3 +36,4 @@ testit()
 // CHECK: ok
 print("ok")
 
+// UNSUPPORTED: OS=windows-msvc

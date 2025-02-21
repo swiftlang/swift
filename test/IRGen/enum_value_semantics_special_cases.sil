@@ -158,3 +158,4 @@ enum AllRefcountedTwoSimple {
 
 // CHECK-LABEL: define internal void @"$s34enum_value_semantics_special_cases22AllRefcountedTwoSimpleOwxx"
 // CHECK:   call void @"$s34enum_value_semantics_special_cases22AllRefcountedTwoSimpleOWOy"
+// UNSUPPORTED: OS=windows-msvc

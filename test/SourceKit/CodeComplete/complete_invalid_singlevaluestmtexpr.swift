@@ -17,3 +17,4 @@ func bar() {
 }
 // Make sure we don't crash when attempting to solve the fallback.
 // RUN: %sourcekitd-test -req=complete -pos=13:15 %s -- %s
+// UNSUPPORTED: OS=windows-msvc

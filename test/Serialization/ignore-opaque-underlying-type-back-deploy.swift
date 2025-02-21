@@ -68,3 +68,4 @@ if #available(SwiftStdlib 5.1, *) {
   let v = EV()
   let _ = v.backdeployedOpaqueFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -80,3 +80,4 @@ public func useLock() {
     // CHECK: destroy_addr [[L]]
     // CHECK: dealloc_stack [[L]]
 }
+// UNSUPPORTED: OS=windows-msvc

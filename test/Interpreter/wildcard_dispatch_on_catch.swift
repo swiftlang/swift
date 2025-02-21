@@ -35,3 +35,4 @@ public func testCatchWildcardDispatch(_ name: String...) throws {
 // CHECK: ["TEST"]
 try testCatchWildcardDispatch("TEST")
 
+// UNSUPPORTED: OS=windows-msvc

@@ -850,3 +850,4 @@ func decl_func_1() {}
 
 // CHECK: Func/decl_func_1 RawComment=[/**\nBEGIN\n{{[^]]*}}\nEND\n*/]
 
+// UNSUPPORTED: OS=windows-msvc

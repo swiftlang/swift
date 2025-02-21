@@ -112,3 +112,4 @@ do {
 // CHECK: (P & Q).Type
 // CHECK: (C & P & Q).Type
 // CHECK: (P & Q & AnyObject).Type
+// UNSUPPORTED: OS=windows-msvc

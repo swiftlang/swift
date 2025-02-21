@@ -15,3 +15,4 @@ func bad() {
   // expected-error@-2{{'async' may only occur before '->'}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

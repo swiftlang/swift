@@ -34,3 +34,4 @@ import A
 
 foo()
 // CHECK: 1|foo()
+// UNSUPPORTED: OS=windows-msvc

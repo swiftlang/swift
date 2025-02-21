@@ -82,3 +82,4 @@ class Sub : Base {
   private func subMethod() {}
 } // CHECK: {{^[}]$}}
 
+// UNSUPPORTED: OS=windows-msvc

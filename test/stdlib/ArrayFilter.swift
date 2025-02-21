@@ -10,3 +10,4 @@ public func foobar(_ xs: [Int]) -> [Int] {
   return xs.filter { _ in false }
 }
 
+// UNSUPPORTED: OS=windows-msvc

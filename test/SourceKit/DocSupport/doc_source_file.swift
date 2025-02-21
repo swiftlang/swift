@@ -5,3 +5,4 @@
 // RUN: %FileCheck %s -check-prefix=MULTI_FILE < %t.error
 
 // MULTI_FILE: unexpected input in compiler arguments
+// UNSUPPORTED: OS=windows-msvc

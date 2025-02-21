@@ -35,3 +35,4 @@
 //                                            -- Your friendly stdlib engineers
 
 // _Builtin_float Symbols
+// UNSUPPORTED: OS=windows-msvc

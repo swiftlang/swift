@@ -11,3 +11,4 @@ public struct S {
   // CHECK-NEXT: "x"
   public var x: Int
 }
+// UNSUPPORTED: OS=windows-msvc

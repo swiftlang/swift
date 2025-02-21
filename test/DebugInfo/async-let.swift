@@ -38,3 +38,4 @@ public actor Bob {
     return x + x
   }
 }
+// UNSUPPORTED: OS=windows-msvc

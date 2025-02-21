@@ -15,3 +15,4 @@ public class Thing {
 }
 
 // CHECK: class SWIFT_AVAILABILITY(visionos,introduced=2) SWIFT_AVAILABILITY(watchos,introduced=11) SWIFT_AVAILABILITY(tvos,introduced=18) SWIFT_AVAILABILITY(ios,introduced=18) SWIFT_AVAILABILITY(macos,introduced=15) SWIFT_SYMBOL("s:18UseSynchronization5ThingC") Thing;
+// UNSUPPORTED: OS=windows-msvc

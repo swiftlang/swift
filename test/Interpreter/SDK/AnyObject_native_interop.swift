@@ -20,3 +20,4 @@ autoreleasepool {
 }
 // CHECK-NEXT: dead
 
+// UNSUPPORTED: OS=windows-msvc

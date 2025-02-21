@@ -30,3 +30,4 @@ extension Optional where Wrapped: Fooable {
     await a.theConstrainedFunction()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

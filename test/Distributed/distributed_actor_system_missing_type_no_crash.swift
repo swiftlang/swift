@@ -18,3 +18,4 @@ distributed actor Fish {
     // What would the fish say, if it could talk?
   }
 }
+// UNSUPPORTED: OS=windows-msvc

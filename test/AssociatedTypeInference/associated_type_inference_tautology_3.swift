@@ -17,3 +17,4 @@ struct S1: P1 {
 }
 
 let x: String.Type = S1.A.self
+// UNSUPPORTED: OS=windows-msvc

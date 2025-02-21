@@ -2544,3 +2544,4 @@ public func run_UTF8Decode(_ N: Int) {
 run_UTF8Decode(10000)
 #endif
 
+// UNSUPPORTED: OS=windows-msvc

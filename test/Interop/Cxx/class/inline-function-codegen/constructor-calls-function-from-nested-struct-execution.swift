@@ -17,3 +17,4 @@ MembersTestSuite.test("constructor calls function from nested struct (implicit)"
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

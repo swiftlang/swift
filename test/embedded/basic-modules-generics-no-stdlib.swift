@@ -61,3 +61,4 @@ public func main() {
 // CHECK: define {{.*}}void @"$e8MyModule11GenericTypeVyACyxGxcfC4Main4BoolV_Tt1g5"()
 // CHECK: define {{.*}}void @"$e8MyModule17protocolBoundFuncyyxAA8ProtocolRzlF4Main4BoolV_Tg5"()
 // CHECK: define {{.*}}void @"$e8MyModule17protocolBoundFuncyyxAA8ProtocolRzlFAA11GenericTypeVy4Main4BoolVG_Tg5"()
+// UNSUPPORTED: OS=windows-msvc

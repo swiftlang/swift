@@ -29,3 +29,4 @@ import Metal
 // CHECK:     {
 // CHECK:       "swiftPlaceholder": "Darwin"
 // CHECK:     },
+// UNSUPPORTED: OS=windows-msvc

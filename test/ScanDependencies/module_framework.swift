@@ -18,3 +18,4 @@ import ScannerTestKit
 // CHECK: ],
 
 // CHECK: "isFramework": true
+// UNSUPPORTED: OS=windows-msvc

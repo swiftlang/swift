@@ -48,3 +48,4 @@ typealias Expanded = ((((X1, X2, X3),
 
 sameType(G<X1, Y1, Z1>.H<X2, Y2, Z2>.C<X3, Y3, Z3>.self, Expanded.self)
 
+// UNSUPPORTED: OS=windows-msvc

@@ -64,3 +64,4 @@ import Foundation
 
 // Used to crash during sorting due to assumptions regarding the Decl kind
 @objc class ErrorClass: NSObject {}
+// UNSUPPORTED: OS=windows-msvc

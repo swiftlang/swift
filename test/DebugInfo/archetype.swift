@@ -24,3 +24,4 @@ func ExistentialTuple<T: RandomAccessIndex>(_ x: T, y: T) -> T.Distance {
 // CHECK: ![[TT]] = !DICompositeType(tag: DW_TAG_structure_type,
 // CHECK-SAME:                       name: "$s8Distance9archetype17RandomAccessIndexPQz_SbtD"
 
+// UNSUPPORTED: OS=windows-msvc

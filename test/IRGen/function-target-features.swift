@@ -21,3 +21,4 @@ func test() {
 // CORE-CPU-AND-FEATURES: "target-cpu"="corei7" "target-features"={{.*}}+avx
 // X86-64-CPU: "target-cpu"="x86-64"
 // AVX-MINUS-FEATURE: "target-features"={{.*}}-avx
+// UNSUPPORTED: OS=windows-msvc

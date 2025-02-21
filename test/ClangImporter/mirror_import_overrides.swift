@@ -16,3 +16,4 @@ func allowClassAndInstance(widget: Widget) {
   _ = widget.classAndInstanceProp
   _ = Widget.classAndInstanceProp
 }
+// UNSUPPORTED: OS=windows-msvc

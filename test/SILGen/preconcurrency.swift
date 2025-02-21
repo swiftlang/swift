@@ -67,3 +67,4 @@ func testPropertyWrapperPreconcurrencyThunk(_ x: HasWrapperAndPreconcurrency) {
   _ = (x.instanceMethod)
   _ = (type(of: x).instanceMethod)
 }
+// UNSUPPORTED: OS=windows-msvc

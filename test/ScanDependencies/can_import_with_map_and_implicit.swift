@@ -19,3 +19,4 @@
 // RUN: %target-swift-frontend -typecheck %s -explicit-swift-module-map-file %t/inputs/map.json -I %t/barinputs
 import Foo
 import Bar
+// UNSUPPORTED: OS=windows-msvc

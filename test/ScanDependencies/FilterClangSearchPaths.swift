@@ -33,3 +33,4 @@ import C
 // CHECK-NOT:        "/tmp/foo"
 // CHECK-NOT:        "-I/tmp/bar"
 // CHECK:          ]
+// UNSUPPORTED: OS=windows-msvc

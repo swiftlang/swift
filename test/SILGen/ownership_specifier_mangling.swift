@@ -88,3 +88,4 @@ class Foo {
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC27legacyModifiersInClosure_cbyySSn_SShtcvM
     var legacyModifiersInClosure_cb: (__owned String, __shared String) -> () = {_,_ in}
 }
+// UNSUPPORTED: OS=windows-msvc

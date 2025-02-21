@@ -73,3 +73,4 @@ func caller(_ s: S) {
   _ = TopLevelStruct(s)
 }
 
+// UNSUPPORTED: OS=windows-msvc

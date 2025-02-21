@@ -25,3 +25,4 @@ func test(action: Action) {
     switch action {
     case let action
 
+// UNSUPPORTED: OS=windows-msvc

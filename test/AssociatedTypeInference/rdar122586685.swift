@@ -13,3 +13,4 @@ extension P {
 }
 
 let x: AnyIterator<String>.Type = S.Iterator.self
+// UNSUPPORTED: OS=windows-msvc

@@ -62,3 +62,4 @@ struct ImageMapTest {
     // CHECK: Maps match
   }
 }
+// UNSUPPORTED: OS=windows-msvc

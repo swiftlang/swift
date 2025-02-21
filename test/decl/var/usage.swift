@@ -571,3 +571,4 @@ func testEnumeratedForLoop(a: [Int]) {
     let _ = c
   }
 }
+// UNSUPPORTED: OS=windows-msvc

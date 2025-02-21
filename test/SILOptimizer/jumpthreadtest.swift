@@ -15,3 +15,4 @@ public func foo(_ p:UInt8) -> UInt64 {
   let q = UInt64(truncatingIfNeeded: p)
   return q
 }
+// UNSUPPORTED: OS=windows-msvc

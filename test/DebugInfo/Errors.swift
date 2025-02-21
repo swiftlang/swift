@@ -44,3 +44,4 @@ public func returnThrowing() -> (() throws -> ()) { return throwError }
 // CHECK: !DISubprogram(name: "takesThrowing",
 // CHECK-NOT:           thrownTypes:
 public func takesThrowing(fn : (() throws -> ())) {}
+// UNSUPPORTED: OS=windows-msvc

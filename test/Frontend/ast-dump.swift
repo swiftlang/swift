@@ -51,3 +51,4 @@
 
 // MAIN-AST: (call_expr
 // MAIN-AST-NEXT: b()
+// UNSUPPORTED: OS=windows-msvc

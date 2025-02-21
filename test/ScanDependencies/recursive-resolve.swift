@@ -72,3 +72,4 @@ module C {
   header "C.h"
   export *
 }
+// UNSUPPORTED: OS=windows-msvc

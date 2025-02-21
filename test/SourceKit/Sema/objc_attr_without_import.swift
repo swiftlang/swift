@@ -9,3 +9,4 @@
 class Cat : Communicate {
   let name = "Felix"
 }
+// UNSUPPORTED: OS=windows-msvc

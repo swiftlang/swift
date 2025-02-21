@@ -14,3 +14,4 @@ class C2 {
   }
   deinit {}
 }
+// UNSUPPORTED: OS=windows-msvc

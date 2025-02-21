@@ -52,3 +52,4 @@ typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
     // CHECK: back = Worker(ActorAddress(address: "<unique-id>"))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

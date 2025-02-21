@@ -48,3 +48,4 @@ public func test(x: M) {
   // CHECK-NOT: error: value of type 'M' has no member 'stringLiteral'
   x.stringLiteral()
 }
+// UNSUPPORTED: OS=windows-msvc

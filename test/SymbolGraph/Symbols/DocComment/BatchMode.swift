@@ -8,3 +8,4 @@
 // CHECK: "range":{"start":{"line":[[# @LINE]],"character":4},"end":{"line":[[# @LINE]],"character":22}}
 /// This is some func.
 public func someFunc() {}
+// UNSUPPORTED: OS=windows-msvc

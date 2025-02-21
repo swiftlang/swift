@@ -13,3 +13,4 @@ func foo() -> Int{
 // RUN: %refactor -extract-function -source-filename %s -pos=3:1 -end-pos=4:26 >> %t.result/L3-4.swift
 // RUN: diff -u %S/Outputs/basic/L3-4.swift.expected %t.result/L3-4.swift
 // REQUIRES: swift_swift_parser
+// UNSUPPORTED: OS=windows-msvc

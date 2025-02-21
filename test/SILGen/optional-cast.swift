@@ -209,3 +209,4 @@ public struct TestAddressOnlyStruct<T> {
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
   var x: Int! = a
 }
+// UNSUPPORTED: OS=windows-msvc

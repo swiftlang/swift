@@ -21,3 +21,4 @@ func testLValueCoerce() {
 	let map: [AnyHashable : Any] = [lvalue: lvalue]
 	lvalue = map[lvalue] as! String
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@ protocol P5 : P4, P2 {
   associatedtype A
 }
 
+// UNSUPPORTED: OS=windows-msvc

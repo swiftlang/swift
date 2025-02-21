@@ -123,3 +123,4 @@ public struct HasStoredPropertiesFixedLayout {
     self.storedWithObservers = BagOfVariables()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

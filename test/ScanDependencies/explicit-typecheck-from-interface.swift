@@ -51,3 +51,4 @@
 
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/Foo.swiftinterface -module-cache-path %t.module-cache \
 // RUN:   -explicit-interface-module-build -explicit-swift-module-map-file %t/inputs/map.json -disable-implicit-swift-modules -verify
+// UNSUPPORTED: OS=windows-msvc

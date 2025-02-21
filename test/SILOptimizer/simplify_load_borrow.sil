@@ -93,3 +93,4 @@ bb0(%0 : $*B):
   %4 = tuple ()
   return %4
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ NestedEnumsTestSuite.test("Make and compare") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

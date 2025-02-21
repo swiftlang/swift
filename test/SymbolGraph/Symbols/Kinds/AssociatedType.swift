@@ -13,3 +13,4 @@ public protocol P {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@
 // CHECK-NEXT:        key.name: "errFirst",
 // CHECK-NEXT:        key.usr: "s:SC11MyErrorCodeLeV8errFirstSoAAVvpZ",
 // CHECK-NEXT:        This is first error.
+// UNSUPPORTED: OS=windows-msvc

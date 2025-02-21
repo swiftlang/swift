@@ -87,3 +87,4 @@
 public func test_func1() {
   print("Hello")
 }
+// UNSUPPORTED: OS=windows-msvc

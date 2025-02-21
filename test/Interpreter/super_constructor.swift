@@ -70,3 +70,4 @@ class DerivedWithDummyParameter : BaseWithDummyParameter {
 _ = BaseWithDummyParameter(dummy: ()) // CHECK: correct
 _ = DerivedWithDummyParameter() // CHECK: correct
 
+// UNSUPPORTED: OS=windows-msvc

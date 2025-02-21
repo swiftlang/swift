@@ -122,3 +122,4 @@ func testNestedArray() -> Int {
    return num
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -94,3 +94,4 @@ func testConditionalConformanceYes(arg: GenericS<Int>) {
 // TestConditionalConformanceYes: LookedupTypeNames: ['Mod.BaseP1', 'Mod.GenericS', 'Swift.BitwiseCopyable', 'Swift.Sendable']
 
 }
+// UNSUPPORTED: OS=windows-msvc

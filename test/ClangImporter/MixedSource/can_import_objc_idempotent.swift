@@ -37,3 +37,4 @@
 let object = NSObject() // expected-error {{cannot find 'NSObject' in scope}}
 let someAPI = Derived() // expected-error {{cannot find 'Derived' in scope}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

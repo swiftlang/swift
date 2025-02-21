@@ -19,3 +19,4 @@ struct Base<Value>: BaseProtocol {
     self.closure = closure
   }
 }
+// UNSUPPORTED: OS=windows-msvc

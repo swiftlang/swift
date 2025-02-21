@@ -59,3 +59,4 @@ entry:
   strong_retain %b : $KeyPath<C, Int>
   unreachable
 }
+// UNSUPPORTED: OS=windows-msvc

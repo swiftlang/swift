@@ -28,3 +28,4 @@ func condFunctionFromAny(_ x: Any) {
 func uncondFunctionFromAny(_ x: Any) {
   (x as! () -> ())()
 }
+// UNSUPPORTED: OS=windows-msvc

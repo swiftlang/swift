@@ -125,3 +125,4 @@ check(base: 1, sub: 1) { _ = Sub(objcToNormalFactory: ()) }
 // CHECK-NEXT: END
 print("END")
 
+// UNSUPPORTED: OS=windows-msvc

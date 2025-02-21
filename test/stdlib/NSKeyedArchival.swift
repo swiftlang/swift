@@ -228,3 +228,4 @@ if #available(OSX 10.11, iOS 9.0, *) {
   runAllTests()
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

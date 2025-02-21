@@ -29,3 +29,4 @@ let _: Foo<Bar> = Foo<Bar> { (a: Bar) -> Void in
       break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

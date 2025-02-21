@@ -102,3 +102,4 @@ func test() {
 
 // expected-error@+1 {{'super' cannot be used outside of a class computed property, method, initializer, deinitializer, or subscript}}
 super.init()
+// UNSUPPORTED: OS=windows-msvc

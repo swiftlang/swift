@@ -77,3 +77,4 @@ for t in threads {
 }
 
 // CHECK: ThreadSanitizer: data race
+// UNSUPPORTED: OS=windows-msvc

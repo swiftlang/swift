@@ -6,3 +6,4 @@ protocol LocalProtocol {}
 extension LocalStruct: @retroactive LocalProtocol {} // expected-error {{'retroactive' attribute does not apply; 'LocalStruct' is declared in this module}}
 
 extension Int: @retroactive LocalProtocol {} // expected-error {{'retroactive' attribute does not apply; 'LocalProtocol' is declared in this module}}
+// UNSUPPORTED: OS=windows-msvc

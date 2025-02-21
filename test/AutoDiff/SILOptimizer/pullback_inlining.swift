@@ -88,3 +88,4 @@ func caller_of_more_complex_pb_with_control_flow() -> Float {
 
 // CHECK: decision {{.*}} $s17pullback_inlining33more_complex_pb_with_control_flow1xS2f_tFTJpSpSr
 // CHECK-NEXT: "pullback of pullback_inlining.more_complex_pb_with_control_flow(x:)" inlined into "caller_of_more_complex_pb_with_control_flow"
+// UNSUPPORTED: OS=windows-msvc

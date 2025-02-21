@@ -15,3 +15,4 @@ import Foo
 
 // RUN: cat %t/deps.json | %FileCheck %s
 // CHECK-NOT: "CxxShim"
+// UNSUPPORTED: OS=windows-msvc

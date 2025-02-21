@@ -56,3 +56,4 @@ public struct IsHasProperties {
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int IsHasProperties::getIsOption() const {
 // CHECK-NEXT: return Properties::_impl::$s10Properties05IsHasA0V8isOptionSivg(_getOpaquePointer());
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

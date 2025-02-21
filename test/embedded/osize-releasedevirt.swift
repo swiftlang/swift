@@ -12,3 +12,4 @@ func bar(_: UnsafePointer<UInt?>) {
 }
 
 // CHECK: define {{.*}}@main(
+// UNSUPPORTED: OS=windows-msvc

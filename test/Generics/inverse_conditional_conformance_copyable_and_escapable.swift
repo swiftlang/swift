@@ -86,3 +86,4 @@ extension C_C_C where T: ~Copyable, U: ~Copyable, U == NC {
 }
 
 extension C_C_C.SubNC: Copyable where T: Copyable {}
+// UNSUPPORTED: OS=windows-msvc

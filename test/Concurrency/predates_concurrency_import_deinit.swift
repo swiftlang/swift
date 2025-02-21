@@ -20,3 +20,4 @@ actor ActorWithDeinit {
     print(ss) // expected-warning{{cannot access property 'ss' with a non-sendable type 'StrictStruct' from nonisolated deinit}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@
 // RUN: diff -u %S/Outputs/clang-module-dump.txt %t.result
 
 // REQUIRES: rdar84050936
+// UNSUPPORTED: OS=windows-msvc

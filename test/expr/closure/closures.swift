@@ -1839,3 +1839,4 @@ extension TestExtensionOnOptionalSelf? {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

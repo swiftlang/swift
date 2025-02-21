@@ -118,3 +118,4 @@ package func first_package_function() {}
 // RUN: llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -enable-swiftsourceinfo -source-filename %s -I %t -swift-version 5 | %FileCheck %s -check-prefix=INTERFACE
+// UNSUPPORTED: OS=windows-msvc

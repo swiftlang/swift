@@ -16,3 +16,4 @@ func testPopFirst() {
   dump(charSubView)
 }
 
+// UNSUPPORTED: OS=windows-msvc

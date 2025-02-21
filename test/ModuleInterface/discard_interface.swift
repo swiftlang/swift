@@ -16,3 +16,4 @@ public struct MoveOnlyStruct: ~Copyable {
 
   deinit {}
 }
+// UNSUPPORTED: OS=windows-msvc

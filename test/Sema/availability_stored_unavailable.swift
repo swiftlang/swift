@@ -76,3 +76,4 @@ enum GoodAvailableEnum {
   @available(macOS, unavailable)
   case unavailableMacOS(UnavailableMacOSStruct)
 }
+// UNSUPPORTED: OS=windows-msvc

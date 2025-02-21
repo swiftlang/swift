@@ -29,4 +29,4 @@ import ObjCModule
 @_noObjCBridging
 func test(i: Interface) {
   i.test()
-}
+}// UNSUPPORTED: OS=windows-msvc

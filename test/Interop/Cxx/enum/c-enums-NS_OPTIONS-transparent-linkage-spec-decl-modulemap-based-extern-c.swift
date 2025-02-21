@@ -8,3 +8,4 @@ import CenumsNSOptionsExternC
 // CHECK-NOT: warning: imported declaration '' could not be mapped to 'UIPrinter.JobTypes'
 // CHECK-NOT: note: please report this issue to the owners of 'CenumsNSOptions'
 
+// UNSUPPORTED: OS=windows-msvc

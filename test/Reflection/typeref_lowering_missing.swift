@@ -21,3 +21,4 @@
 // CHECK: (bound_generic_struct TypeLowering.Bar
 // CHECK:   (struct TypeLowering.BasicStruct))
 // CHECK: Invalid lowering
+// UNSUPPORTED: OS=windows-msvc

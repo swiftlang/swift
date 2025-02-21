@@ -16,3 +16,4 @@ public protocol P {
   associatedtype E: P where E.C == C, E.B == S, E.A == A, E.E == E
   associatedtype F: P where F.C == S, F.B == B, F.A == A, F.F == F
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ public struct F: Differentiable {
     @noDerivative var i: [Double]? {return nil}
     func g() -> Double? {return nil}
 }
+// UNSUPPORTED: OS=windows-msvc

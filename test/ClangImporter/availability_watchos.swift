@@ -17,3 +17,4 @@ func test_unavailable_because_deprecated() {
 func test_swift_unavailable_wins() {
   unavailableWithOS() // expected-error {{'unavailableWithOS()' is unavailable in Swift}}
 }
+// UNSUPPORTED: OS=windows-msvc

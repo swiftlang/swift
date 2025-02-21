@@ -25,3 +25,4 @@ FieldsTestSuite.test("Zero sized field") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

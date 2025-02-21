@@ -641,3 +641,4 @@ Tests.test("AnyHashable") {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

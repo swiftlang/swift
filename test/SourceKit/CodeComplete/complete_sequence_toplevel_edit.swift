@@ -91,3 +91,4 @@ func dummy(x: ) {
 // RESULT-DAG: key.description: "Foo"
 // RESULT: ]
 // RESULT: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

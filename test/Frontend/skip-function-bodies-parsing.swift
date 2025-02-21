@@ -19,3 +19,4 @@ public func bar() {
 public struct S {
   public func qux() {}
 }
+// UNSUPPORTED: OS=windows-msvc

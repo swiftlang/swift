@@ -34,3 +34,4 @@ public func main() {
 // CHECK: @"$e4Main024global_in_client_unused_c1_D0Sivp" = {{.*}}global %TSi zeroinitializer
 // CHECK: @"$e8MyModule022global_in_module_used_d1_E0Sivp" = {{.*}}global %TSi zeroinitializer
 // CHECK: @"$e8MyModule024global_in_module_unused_d1_E0Sivp" = {{.*}}global %TSi zeroinitializer
+// UNSUPPORTED: OS=windows-msvc

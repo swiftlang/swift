@@ -15,3 +15,4 @@ public struct S1 {}
 // CHECK-NEXT:   "character": 16
 // CHECK: "text": "Single line."
 
+// UNSUPPORTED: OS=windows-msvc

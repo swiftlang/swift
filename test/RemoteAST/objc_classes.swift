@@ -52,3 +52,4 @@ printType(Optional<OurObjCProtocol>.self)
 // CHECK: Optional<OurObjCProtocol & AnyObject>
 
 stopRemoteAST()
+// UNSUPPORTED: OS=windows-msvc

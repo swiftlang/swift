@@ -37,3 +37,4 @@ struct Available {
 // CHECK:      $example.get()
 // CHECK:    }
 // CHECK:  }
+// UNSUPPORTED: OS=windows-msvc

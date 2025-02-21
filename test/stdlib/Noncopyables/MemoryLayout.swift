@@ -38,3 +38,4 @@ print("stride(ofValue:): \(actualStride2 == expectedStride)")
 let actualAlignment2 = MemoryLayout.alignment(ofValue: a)
 // CHECK: alignment(ofValue:): true
 print("alignment(ofValue:): \(actualAlignment2 == expectedAlignment)")
+// UNSUPPORTED: OS=windows-msvc

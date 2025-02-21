@@ -50,3 +50,4 @@ public struct IOIStruct {
     return IOIStruct() // expected-error {{struct 'IOIStruct' cannot be used in an '@inlinable' function because 'Lib' was imported implementation-only}}
     // expected-error @-1 {{initializer 'init()' cannot be used in an '@inlinable' function because 'Lib' was imported implementation-only}}
 }
+// UNSUPPORTED: OS=windows-msvc

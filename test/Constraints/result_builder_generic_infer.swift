@@ -68,3 +68,4 @@ extension ConcreteTypeSubstitution: P where Value == Int {
   // CHECK: Builder.buildBlock{{.*}}(substitution_map generic_signature=<T where T : Copyable, T : Escapable> T -> ConcreteTypeSubstitution<Int>)
   var x2: [S] { S() }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -88,3 +88,4 @@ func testDeclsNestedInObjCContainers() {
 
 func testReleaseClassWhoseMembersAreNeverLoaded(
     obj: ClassThatHasAProtocolTypedPropertyButMembersAreNeverLoaded) {}
+// UNSUPPORTED: OS=windows-msvc

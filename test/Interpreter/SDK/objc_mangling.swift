@@ -77,3 +77,4 @@ checkProtocolName(RadicalHeart⺖.self, "MangleTest.RadicalHeart⺖", "_TtP10Man
 checkClassName(RadicalSheep⽺.self, 
   "MangleTest.RadicalSheep⽺", "_TtC10MangleTest15RadicalSheep⽺")
 checkIvarName(RadicalSheep⽺.self, "⽺x")
+// UNSUPPORTED: OS=windows-msvc

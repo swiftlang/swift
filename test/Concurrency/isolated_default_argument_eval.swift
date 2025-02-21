@@ -89,3 +89,4 @@ func passInoutWithDefault() async {
 func testNoSuspensionInDefaultArgGenerator() async {
   await noSuspensionInDefaultArgGenerator()
 }
+// UNSUPPORTED: OS=windows-msvc

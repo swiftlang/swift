@@ -38,3 +38,4 @@ func test() {
 test()
 
 // CHECK: MyClass.foo
+// UNSUPPORTED: OS=windows-msvc

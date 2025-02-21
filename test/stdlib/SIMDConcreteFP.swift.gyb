@@ -86,3 +86,4 @@ ${Scalar}x${n}_TestSuite.test("comparisons") {
 %end
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

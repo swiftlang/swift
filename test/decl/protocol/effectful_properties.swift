@@ -344,3 +344,4 @@ protocol Hackbrett : HammeredDulcimer {
  override var bridges : Int { get } // no effects are OK
  override subscript(_ note : Int) -> Int { get async throws } // expected-error {{cannot override non-async subscript with async subscript}}
 }
+// UNSUPPORTED: OS=windows-msvc

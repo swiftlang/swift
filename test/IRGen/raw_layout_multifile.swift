@@ -60,3 +60,4 @@ public func something3() -> Int32 {
   let x = MyInt(x: Int32Fake())
   return x.x.address.pointee
 }
+// UNSUPPORTED: OS=windows-msvc

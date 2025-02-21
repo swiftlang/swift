@@ -12,3 +12,4 @@ x = x+1
 x = x+1
 class D{}
 #endif
+// UNSUPPORTED: OS=windows-msvc

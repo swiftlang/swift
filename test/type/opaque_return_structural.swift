@@ -125,3 +125,4 @@ struct StructuralMethods {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

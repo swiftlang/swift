@@ -18,3 +18,4 @@
 internal func innerFunc() -> String { "sup" }
 
 public func someFunc() -> String { innerFunc() }
+// UNSUPPORTED: OS=windows-msvc

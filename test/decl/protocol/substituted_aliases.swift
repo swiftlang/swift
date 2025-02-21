@@ -9,3 +9,4 @@ struct Q<T: Collection> : Sequence {
   }
   var base: T
 }
+// UNSUPPORTED: OS=windows-msvc

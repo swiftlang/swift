@@ -19,3 +19,4 @@ public func f(a: UnsafePointer<Int>, b: UnsafePointer<Int>, count: Int) -> Int {
   return c
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -42,3 +42,4 @@ class SubSubB2 : SubB {
 func rdar19941580(foo: Foo) {
   var _: FooProto = foo
 }
+// UNSUPPORTED: OS=windows-msvc

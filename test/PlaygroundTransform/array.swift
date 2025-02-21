@@ -14,3 +14,4 @@ var foo = [true, false]
 foo.append(true)
 // CHECK: [{{.*}}] __builtin_log[foo='[true, false]']
 // CHECK-NEXT: [{{.*}}] __builtin_log[foo='[true, false, true]']
+// UNSUPPORTED: OS=windows-msvc

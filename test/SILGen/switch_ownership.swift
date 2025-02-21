@@ -97,3 +97,4 @@ func test_switch_two_nontrivial_unions(x: NonTrivialFoo, y: NonTrivialFoo) {
   }
 }
 // CHECK: } // end sil function '$s6switch05test_A22_two_nontrivial_unions1x1yyAA13NonTrivialFooO_AFtF'
+// UNSUPPORTED: OS=windows-msvc

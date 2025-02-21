@@ -7,3 +7,4 @@ func address_only_bind<T: P>(x: T?) -> Int {
   let y = x!.method()
   return y
 }
+// UNSUPPORTED: OS=windows-msvc

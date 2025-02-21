@@ -13,3 +13,4 @@ public func b(f: @differentiable(reverse) (Float) -> Float) {}
 
 public func c(f: @differentiable(reverse) (Float, @noDerivative Float) -> Float) {}
 // CHECK: public func c(f: @differentiable(reverse) (Swift.Float, @noDerivative Swift.Float) -> Swift.Float)
+// UNSUPPORTED: OS=windows-msvc

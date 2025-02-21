@@ -60,3 +60,4 @@ class ClassC
 }
 
 let c = ClassC()
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ public func hasOpaqueResult<T : P>(_: T.Type, _: T.Horse) -> some Feed {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

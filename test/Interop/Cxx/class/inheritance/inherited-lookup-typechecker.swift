@@ -84,3 +84,4 @@ func fIIIOne(v: IIIOne) {
     let _ = v.methodII()
     let _ = v.methodIII()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@
 // RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/RandomPath/NonExistentCachePath/Lib-*.swiftmodule
 
 import Lib
+// UNSUPPORTED: OS=windows-msvc

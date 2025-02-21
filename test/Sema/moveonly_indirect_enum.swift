@@ -23,3 +23,4 @@ enum E3: ~Copyable {
     case first
     indirect case second(S) // expected-error {{noncopyable enum 'E3' cannot be marked indirect or have indirect cases yet}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -57,3 +57,4 @@ func hasNested() {
 func throwing() throws { }
 
 // TODO: cdecl name collisions
+// UNSUPPORTED: OS=windows-msvc

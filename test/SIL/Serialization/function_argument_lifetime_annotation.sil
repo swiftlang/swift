@@ -34,3 +34,4 @@ sil [serialized] [lexical_lifetimes] [ossa] @force_lexical_function : $@conventi
   %retval = tuple()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

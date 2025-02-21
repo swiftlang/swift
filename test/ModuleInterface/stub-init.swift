@@ -22,3 +22,4 @@ public class Derived: Base {
 // CHECK-NEXT:    {{(@objc )?}}deinit
 // CHECK-NEXT: }
 
+// UNSUPPORTED: OS=windows-msvc

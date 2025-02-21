@@ -9,3 +9,4 @@ public class MyClass {}
 extension MyClass: Sendable {}
 
 // CHECK-NOT: conformsTo
+// UNSUPPORTED: OS=windows-msvc

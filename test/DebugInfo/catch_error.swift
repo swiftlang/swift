@@ -18,3 +18,4 @@ open class Cache<T> {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

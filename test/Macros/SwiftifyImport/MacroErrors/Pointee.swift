@@ -17,3 +17,4 @@ func myFunc(_ ptr: UnsafeRawPointer, _ count: CInt) {
 func myFunc(_ ptr: OpaquePointer, _ count: CInt) {
 }
 
+// UNSUPPORTED: OS=windows-msvc

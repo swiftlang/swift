@@ -415,3 +415,4 @@ bb2(%8 : @owned $Error):
   unreachable
 }
 
+// UNSUPPORTED: OS=windows-msvc

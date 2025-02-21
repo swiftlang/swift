@@ -58,3 +58,4 @@ func asyncFib(_ n: Int, _ a1: Actor, _ a2: Actor) async -> Int {
     await print(a2.x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

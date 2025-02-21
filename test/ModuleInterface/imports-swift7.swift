@@ -53,3 +53,4 @@ public import NotSoSecret // expected-warning {{'NotSoSecret' inconsistently imp
 // CHECK-7-NEXT: {{^}}public import Swift{{$}}
 // CHECK-7-NEXT: {{^}}@_exported public import resilient{{$}}
 // CHECK-7-NOT: import
+// UNSUPPORTED: OS=windows-msvc

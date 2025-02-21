@@ -15,3 +15,4 @@ foo()
 
 // CHECK: hello
 // CHECK: world
+// UNSUPPORTED: OS=windows-msvc

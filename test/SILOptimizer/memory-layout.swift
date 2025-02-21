@@ -35,3 +35,4 @@ public func getStride() -> Int {
   return MemoryLayout<Int32>.stride
 }
 
+// UNSUPPORTED: OS=windows-msvc

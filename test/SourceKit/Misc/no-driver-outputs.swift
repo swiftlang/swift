@@ -27,3 +27,4 @@
 // RUN: %empty-directory(%t)
 // RUN: env TMPDIR=%t __XPC_TMPDIR=%t %sourcekitd-test -req=sema %s -- %s -emit-module -module-name main -emit-module-path %t/main.swiftmodule -emit-executable -o %t/foo
 // RUN: ls %t/ | count 0
+// UNSUPPORTED: OS=windows-msvc

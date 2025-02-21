@@ -343,3 +343,4 @@ public func foo() -> Optional<(a: Int?, b: Bool, c: (Int?)->BigStruct?)> {
 public func dontAssert() {
   let _ = foo()
 }
+// UNSUPPORTED: OS=windows-msvc

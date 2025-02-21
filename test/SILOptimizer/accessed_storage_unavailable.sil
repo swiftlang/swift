@@ -50,3 +50,4 @@ bb0(%0 : $Builtin.RawPointer):
 sil [noinline] [_semantics "unavailable_code_reached"] @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
 
 sil_property #Unavailable.i ()
+// UNSUPPORTED: OS=windows-msvc

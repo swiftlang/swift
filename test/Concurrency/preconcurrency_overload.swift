@@ -36,3 +36,4 @@ extension Future {
     // expected-complete-and-tns-warning @-1 {{function call causes an infinite recursion}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

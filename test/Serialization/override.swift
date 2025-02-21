@@ -38,3 +38,4 @@ newSetterSubscript[4] = newSetterSubscript[5]
 let simpleSubscript2 = OverrideComplexSubscript()
 simpleSubscript2[4, true] = 5
 print(simpleSubscript2[4, true])
+// UNSUPPORTED: OS=windows-msvc

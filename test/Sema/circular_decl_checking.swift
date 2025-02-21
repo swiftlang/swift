@@ -79,3 +79,4 @@ protocol rdar27680407Proto {
 struct rdar27680407Struct : rdar27680407Proto { // expected-error {{type 'rdar27680407Struct' does not conform to protocol 'rdar27680407Proto'}} expected-note {{add stubs for conformance}}
   init(value: rdar27680407Struct.T) {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ import Test
 
 // CHECK: warning: the '-enable-experimental-cxx-interop' flag is deprecated; please pass '-cxx-interoperability-mode=' instead
 // CHECK: note: Swift will maintain source compatibility for imported APIs based on the selected compatibility mode, so updating the Swift compiler will not change how APIs are imported
+// UNSUPPORTED: OS=windows-msvc

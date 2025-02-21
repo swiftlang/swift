@@ -80,4 +80,4 @@ extension A where T: AnyObject {
 // CHECK: A<C, Int>.ViaAnyObject
 printType(A<C, Int>.ViaAnyObject.self)
 
-stopRemoteAST()
+stopRemoteAST()// UNSUPPORTED: OS=windows-msvc

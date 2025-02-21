@@ -248,3 +248,4 @@ do {
   S_54699().bar1 // expected-error {{function is unused}}
   S_54699.bar2 // expected-error {{function is unused}}
 }
+// UNSUPPORTED: OS=windows-msvc

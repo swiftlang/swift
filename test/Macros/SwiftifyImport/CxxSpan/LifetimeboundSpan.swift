@@ -57,3 +57,4 @@ struct X {
 // CHECK-NEXT: func myFunc5() -> Span<CInt> {
 // CHECK-NEXT:     return _unsafeRemoveLifetime(Span(_unsafeCxxSpan: myFunc5()))
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

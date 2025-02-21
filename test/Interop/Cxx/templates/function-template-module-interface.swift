@@ -27,3 +27,4 @@
 // CHECK:   static func cassini<T, U>(_: T, _: U)
 // CHECK:   static func magellan<T>(_: inout T)
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

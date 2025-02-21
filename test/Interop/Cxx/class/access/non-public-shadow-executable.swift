@@ -20,3 +20,4 @@ Tests.test("Check return values") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

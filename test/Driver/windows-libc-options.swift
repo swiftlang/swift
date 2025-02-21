@@ -23,3 +23,4 @@
 // CHECK-MTd: -autolink-library oldnames -autolink-library libcmtd -Xcc -D_MT
 // CHECK-MTd-NOT: -D_DLL
 
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ func primFn() {
   secFn()
   let _ = ClsSec().member
 }
+// UNSUPPORTED: OS=windows-msvc

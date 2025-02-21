@@ -17,3 +17,4 @@ import static_inline
 public func mytest(x: Int32) -> Int32 {
   return testit(x: x)
 }
+// UNSUPPORTED: OS=windows-msvc

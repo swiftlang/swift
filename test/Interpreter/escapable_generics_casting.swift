@@ -53,3 +53,4 @@ func main(_ noEscapeFunc: () -> Void) {
   _openExistential(fnType, do: doFuncCall)
 }
 
+// UNSUPPORTED: OS=windows-msvc

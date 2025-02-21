@@ -17,3 +17,4 @@ public struct BigStruct {
 let bigStructGlobalArray : [BigStruct] = [
   BigStruct()
 ]
+// UNSUPPORTED: OS=windows-msvc

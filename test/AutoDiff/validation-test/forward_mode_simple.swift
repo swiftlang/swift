@@ -1380,3 +1380,4 @@ ForwardModeTests.test("https://github.com/apple/swift/issues/55967") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

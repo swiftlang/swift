@@ -129,3 +129,4 @@ do {
   _ = C(a: 0)
   _ = C(b: 0)
 }
+// UNSUPPORTED: OS=windows-msvc

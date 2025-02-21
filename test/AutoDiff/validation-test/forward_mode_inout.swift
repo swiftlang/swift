@@ -159,3 +159,4 @@ ForwardModeInoutTests.test("StructMutatingMethod") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

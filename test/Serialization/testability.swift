@@ -66,3 +66,4 @@
   let _: INVALID_TESTING_MODE
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

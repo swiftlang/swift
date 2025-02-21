@@ -44,3 +44,4 @@ func bar() {
   UIApplicationMain(0, nil, nil, nil)
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

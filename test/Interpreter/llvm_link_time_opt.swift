@@ -18,3 +18,4 @@
 // CHECK-NOT: _$s7module120unusedPublicFunctionyyF
 
 import module1
+// UNSUPPORTED: OS=windows-msvc

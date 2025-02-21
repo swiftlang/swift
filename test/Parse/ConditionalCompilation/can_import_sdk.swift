@@ -72,3 +72,4 @@ keepOn {
   print(object)
 }
 
+// UNSUPPORTED: OS=windows-msvc

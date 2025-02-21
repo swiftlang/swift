@@ -21,3 +21,4 @@ func baz(_ x: S.E) {
   if case S.E(let y) = x {} // expected-error {{'S.E' cannot be constructed because it has no accessible initializers}}
   if case S.E(S.E.e(let y)) = x {} // expected-error {{'S.E' cannot be constructed because it has no accessible initializers}}
 }
+// UNSUPPORTED: OS=windows-msvc

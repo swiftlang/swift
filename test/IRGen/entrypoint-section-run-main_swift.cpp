@@ -88,3 +88,4 @@ int main(int argc, char *argv[]) {
   mainFunction(argc, argv);
   return 1;
 }
+// UNSUPPORTED: OS=windows-msvc

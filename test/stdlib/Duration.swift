@@ -266,3 +266,4 @@ if #available(SwiftStdlib 6.0, *) {
     expectEqual(min.attoseconds, .min)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

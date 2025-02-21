@@ -27,3 +27,4 @@ import Foo
 // CHECK-NEXT:          "userModuleVersion":
 // CHECK-NEXT:          "isFramework": true
 // CHECK-NEXT:        }
+// UNSUPPORTED: OS=windows-msvc

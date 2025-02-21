@@ -35,3 +35,4 @@ func bindAroundGroupAddTask() async {
     await bindAroundGroupAddTask()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

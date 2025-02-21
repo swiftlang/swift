@@ -99,3 +99,4 @@ func test(m_p p: inout P) {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

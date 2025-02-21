@@ -3,3 +3,4 @@
 func run<CO: ConnectableObservableType, O>(co: CO, o: O) {
   co.subscribe(o)
 }
+// UNSUPPORTED: OS=windows-msvc

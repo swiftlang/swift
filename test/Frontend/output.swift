@@ -22,3 +22,4 @@
 // SUB: explicit.bc
 // SUB-NEXT: output.bc
 // SUB-NEXT: stdin.bc
+// UNSUPPORTED: OS=windows-msvc

@@ -33,3 +33,4 @@ func referenceUsage<Root, Value>(_ kp: ReferenceWritableKeyPath<Root, Value>, _ 
   copy[keyPath: kp] = value
   return copy
 }
+// UNSUPPORTED: OS=windows-msvc

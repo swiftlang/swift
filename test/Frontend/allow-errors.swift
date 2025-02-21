@@ -16,3 +16,4 @@
 // CHECK-BC-NOT: UnknownCode
 
 public func invalid() -> undefined {} // expected-error {{cannot find type 'undefined'}}
+// UNSUPPORTED: OS=windows-msvc

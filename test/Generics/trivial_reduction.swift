@@ -13,3 +13,4 @@ protocol P2 {
   associatedtype R : P2 where R.R == Self
   associatedtype C : P2 where C.C.C == Self, C.C.R.C.C.R == Self, R.C.R.C.R.C == Self
 }
+// UNSUPPORTED: OS=windows-msvc

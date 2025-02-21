@@ -32,3 +32,4 @@ public func fwdDeclaresWobble(wobbler: NSWobbling) { fatalError() }
 
 @_cdecl("imports_cgpoint")
 public func importsCGPoint(pt: CGPoint) { fatalError() }
+// UNSUPPORTED: OS=windows-msvc

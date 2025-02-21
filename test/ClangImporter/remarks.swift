@@ -4,3 +4,4 @@ import Requires.Swift
 // CHECK-NOT: error
 // CHECK: remark: importing module 'SwiftShims'
 // CHECK: remark: importing module 'Requires'
+// UNSUPPORTED: OS=windows-msvc

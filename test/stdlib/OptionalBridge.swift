@@ -175,3 +175,4 @@ tests.test("NSArray of NSNull") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

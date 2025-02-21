@@ -27,3 +27,4 @@ entry(%a : $Int):
   dealloc_stack %y : $*SomeButt2
   return undef : $()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -87,3 +87,4 @@ func driver() -> () {
 }
 
 driver()
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ import Foo
 // CHECK-FOO: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooRuncingOptions
 // CHECK-FOO: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooRuncingOptions
 // CHECK-FOO: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooRuncingOptions
+// UNSUPPORTED: OS=windows-msvc

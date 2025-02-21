@@ -20,3 +20,4 @@ class C<M> {
         let function: (B<Int>, ReferenceWritableKeyPath<M, Int>) -> Void = a.f // expected-error {{cannot convert value of type '(B<Int>, WritableKeyPath<M, B<Int>.U>) -> ()' to specified type '(B<Int>, ReferenceWritableKeyPath<M, Int>) -> Void'}}
     }
 }
+// UNSUPPORTED: OS=windows-msvc

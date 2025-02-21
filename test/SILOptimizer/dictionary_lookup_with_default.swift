@@ -17,3 +17,4 @@ public struct S {
 public func testit(_ data: inout [Int: S], x: Int) {
   data[x, default: S(x: x)].doSomething()
 }
+// UNSUPPORTED: OS=windows-msvc

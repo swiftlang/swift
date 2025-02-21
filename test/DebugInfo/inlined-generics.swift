@@ -53,3 +53,4 @@ public class C : Q {
 public func updateC(_ c: C) {
   update(c)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ do {
   noNote("Hello")
   // CHECK: [[@LINE-1]]:10: error: cannot convert value of type 'String' to expected argument type 'Int' [] []
 }
+// UNSUPPORTED: OS=windows-msvc

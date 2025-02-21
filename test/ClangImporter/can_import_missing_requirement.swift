@@ -5,3 +5,4 @@ class Unique {}
 #if canImport(MissingRequirement)
   class Unique {} // No diagnostic
 #endif
+// UNSUPPORTED: OS=windows-msvc

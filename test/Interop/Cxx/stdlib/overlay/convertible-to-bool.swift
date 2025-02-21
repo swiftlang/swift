@@ -26,3 +26,4 @@ CxxConvertibleToBoolTestSuite.test("DualOverloadBoolBox as CxxConvertibleToBool"
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

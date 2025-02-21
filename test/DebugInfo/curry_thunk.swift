@@ -6,3 +6,4 @@ public func testCurryThunk() -> [HTTPMethod] {
 
 // CHECK: [[FILE:![0-9]+]] = !DIFile(filename: "{{.*[/\\]}}curry_thunk.swift", directory: "{{.*}}")
 // CHECK: {{![0-9]+}} = !DILocalVariable(name: "rawValue", arg: 1, scope: {{![0-9]+}}, file: {{![0-9]+}}, type: {{![0-9]+}}, flags: DIFlagArtificial)
+// UNSUPPORTED: OS=windows-msvc

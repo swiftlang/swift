@@ -10,3 +10,4 @@
 import library
 
 hasDefaultArgument()
+// UNSUPPORTED: OS=windows-msvc

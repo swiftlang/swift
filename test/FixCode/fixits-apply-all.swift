@@ -24,3 +24,4 @@ func warn_unused_result_removal() -> Int { return 5 }
 @discardableResult func discardableResultOnVoidFunc() {}
 
 @discardableResult func discardableResultOnNeverFunc() -> Never { fatalError() }
+// UNSUPPORTED: OS=windows-msvc

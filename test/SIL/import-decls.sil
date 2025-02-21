@@ -17,3 +17,4 @@ func foo() {}
 // CHECK-NOT: import Builtin
 // CHECK-NOT: import Swift{{$}}
 // CHECK: import TestModule
+// UNSUPPORTED: OS=windows-msvc

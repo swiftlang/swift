@@ -51,3 +51,4 @@ func test5() {
   // CHECK: keypath $KeyPath<Subscript2, String>, (root $Subscript2; gettable_property $String, id @$s17default_arg_other10Subscript2VyS2Scig : $@convention(method) (@guaranteed String, Subscript2) -> @owned String, getter @$s17default_arg_other10Subscript2VyS2ScipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed Subscript2, @in_guaranteed String) -> @out String, indices [%$0 : $String : $String], indices_equals @$sSSTH : $@convention(keypath_accessor_equals) (@in_guaranteed String, @in_guaranteed String) -> Bool, indices_hash @$sSSTh : $@convention(keypath_accessor_hash) (@in_guaranteed String) -> Int, external #Subscript2.subscript) ([[DEF_ARG]])
   _ = \Subscript2.[]
 }
+// UNSUPPORTED: OS=windows-msvc

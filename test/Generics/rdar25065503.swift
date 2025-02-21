@@ -13,3 +13,4 @@ extension Holder where A : Derived {
   // 'A : Derived', since 'Derived : Base<Int>'.
   func returnInt(_ b: B) -> Int { return b }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -62,3 +62,4 @@
 
 //--- Private_Exported.swift
 @_exported private import Lib // expected-error {{'@_exported' is incompatible with 'private'; it can only be applied to public imports}}
+// UNSUPPORTED: OS=windows-msvc

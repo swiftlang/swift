@@ -97,3 +97,4 @@
 
 // TODO: Is this correct?  this correct? rdar://102092136
 // SYNTACTIC: key.notification: source.notification.compile-did-finish
+// UNSUPPORTED: OS=windows-msvc

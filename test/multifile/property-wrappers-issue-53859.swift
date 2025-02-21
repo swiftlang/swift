@@ -10,3 +10,4 @@ class MyOtherType<T: Equatable>: Observed {
     self.x = x
   }
 }
+// UNSUPPORTED: OS=windows-msvc

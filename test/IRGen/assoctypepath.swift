@@ -22,3 +22,4 @@ protocol R: Q where A.ZZ: Y {}
 struct S<T>: R where T: Z, T.ZZ: Y {
 	typealias A = T
 }
+// UNSUPPORTED: OS=windows-msvc

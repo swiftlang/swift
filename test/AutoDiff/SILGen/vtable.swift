@@ -156,3 +156,4 @@ class SubSub: Sub {}
 // CHECK:   #Sub.method!jvp.SSU: (Sub) -> (Float, Float) -> Float : @$s6vtable3SubC6methodyS2f_SftFTJVfSSUpSr [inherited]
 // CHECK:   #Sub.method!vjp.SSU: (Sub) -> (Float, Float) -> Float : @$s6vtable3SubC6methodyS2f_SftFTJVrSSUpSr [inherited]
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

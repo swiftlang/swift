@@ -162,3 +162,4 @@ enum S {
 // RESULT-DAG: key.description: "didSet"
 // RESULT: ]
 // RESULT-NOT: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

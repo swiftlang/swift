@@ -19,3 +19,4 @@ let bar = foo as NSArray
 
 // CHECK: CGColor
 print(bar[0])
+// UNSUPPORTED: OS=windows-msvc

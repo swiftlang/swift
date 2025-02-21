@@ -16,3 +16,4 @@
 // REQUIRES: concurrency
 
 public func asyncFunc(_ x: Double) async -> Double { return 2 * x }
+// UNSUPPORTED: OS=windows-msvc

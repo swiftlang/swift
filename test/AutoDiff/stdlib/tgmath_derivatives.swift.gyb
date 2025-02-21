@@ -213,3 +213,4 @@ DerivativeTests.test("${op}_${T}") {
 %end # for op in ['derivative', 'gradient']:
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

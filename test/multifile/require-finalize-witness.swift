@@ -12,3 +12,4 @@ protocol P {
 
 // CHECK: define {{.*}} @"$s4test1CCAA1PA2aDP3fooyySSFTW"
 extension C: P { }
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ struct X: Codable {
   // checker will reject an init(from:) that doesn't decode a value for it.
   let a: String
 }
+// UNSUPPORTED: OS=windows-msvc

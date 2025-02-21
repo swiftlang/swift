@@ -12,3 +12,4 @@ protocol P { func test() }
 extension Thingy: P {
   @objc func test() {}
 }
+// UNSUPPORTED: OS=windows-msvc

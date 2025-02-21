@@ -61,3 +61,4 @@ func exposeToWasmCxx() {}
 @_expose(wasm)
 @_expose(wasm) // expected-error {{duplicate attribute}}
 func exposeToWasmWasm() {}
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ func runThis() {
 }
 
 runThis()
+// UNSUPPORTED: OS=windows-msvc

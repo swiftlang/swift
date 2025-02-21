@@ -108,3 +108,4 @@ class Person {
 let hello = "Hello"
 #useIdentifier("hello")
 #endif
+// UNSUPPORTED: OS=windows-msvc

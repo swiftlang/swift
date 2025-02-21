@@ -68,3 +68,4 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   return %t : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

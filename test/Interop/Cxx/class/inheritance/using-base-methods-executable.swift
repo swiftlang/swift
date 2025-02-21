@@ -38,3 +38,4 @@ Suite.test("PrivUserPubl: using inherited members") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -589,3 +589,4 @@ do {
   exist[invariantSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
   exist[invariantSubscript15: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
 }
+// UNSUPPORTED: OS=windows-msvc

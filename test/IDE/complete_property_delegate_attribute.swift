@@ -59,3 +59,4 @@ struct TestStruct {
 
   @MyStruct(#^WITHOUT_VAR?check=AFTER_PAREN^#
 }
+// UNSUPPORTED: OS=windows-msvc

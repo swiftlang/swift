@@ -100,3 +100,4 @@ func readwriteRefinementProto(_ x: MyDerivedClass) {
     x.answer = 42
   }
 }
+// UNSUPPORTED: OS=windows-msvc

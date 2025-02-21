@@ -13,3 +13,4 @@ func string_literals(_ s: String, i: Int) -> String {
   return "outer \(s)\(i) close"
 }
 
+// UNSUPPORTED: OS=windows-msvc

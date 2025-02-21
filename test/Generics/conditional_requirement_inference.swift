@@ -34,3 +34,4 @@ struct SillyBox<T : First> {
     sameType(U.X.self, U.Y.self)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

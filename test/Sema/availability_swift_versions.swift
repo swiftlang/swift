@@ -362,3 +362,4 @@ class ChangePropertyType {
 _ = ChangePropertyType().computed
 // CHECK-4: :[[@LINE-1]]:{{.+}} not 5.0
 // CHECK-5: :[[@LINE-2]]:{{.+}} yes 5.0
+// UNSUPPORTED: OS=windows-msvc

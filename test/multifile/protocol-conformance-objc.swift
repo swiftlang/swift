@@ -10,3 +10,4 @@ import Foundation
 
 extension Pony : Horse {}
 
+// UNSUPPORTED: OS=windows-msvc

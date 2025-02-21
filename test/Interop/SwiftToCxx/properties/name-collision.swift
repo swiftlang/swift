@@ -35,3 +35,4 @@ public class C1 {
 // CHECK: SWIFT_INLINE_THUNK swift::Int C1::getFeat() {
 // CHECK: skip emitting accessor method for 'Feat'. 'getFeat' already declared.
 // CHECK-NOT: getFeat()
+// UNSUPPORTED: OS=windows-msvc

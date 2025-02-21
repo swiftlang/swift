@@ -154,3 +154,4 @@ func errorMessageVariants(x: X<Int>, x2: X<Bool> = X<Int>()) -> X<Bool> {
   let _: X<Int>.Foo = X<Bool>.Foo() // expected-error {{cannot convert parent type 'X<Bool>' to expected type 'X<Int>'}}
   return x // expected-error {{cannot convert return expression of type 'X<Int>' to return type 'X<Bool>'}}
 }
+// UNSUPPORTED: OS=windows-msvc

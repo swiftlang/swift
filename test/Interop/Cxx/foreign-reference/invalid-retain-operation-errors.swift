@@ -311,3 +311,4 @@ public func testMultipleRetainRelease(x: MultipleRetainReleaseAttrFRT) {}
 // CHECK: note: function uses foreign reference type 'UnimportedRetainRelease' as a value in the return types which breaks 'swift_shared_reference' contract
 @available(macOS 13.3, *)
 public func test(x: UnimportedRetainRelease) {}
+// UNSUPPORTED: OS=windows-msvc

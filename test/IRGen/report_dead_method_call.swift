@@ -77,3 +77,4 @@ public class PublicBase {
   private func ghiAsync() async {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

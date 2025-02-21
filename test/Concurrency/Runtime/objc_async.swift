@@ -73,3 +73,4 @@ class Buttertion: MutableButt_2Fast2Furious {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

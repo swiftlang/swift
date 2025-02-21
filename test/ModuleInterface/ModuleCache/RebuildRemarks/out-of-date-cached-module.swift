@@ -22,3 +22,4 @@
 import TestModule // expected-remark {{rebuilding module 'TestModule' from interface}}
 // expected-note @-1 {{cached module is out of date}}
 // expected-note @-2 {{dependency is out of date}}
+// UNSUPPORTED: OS=windows-msvc

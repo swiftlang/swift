@@ -70,3 +70,4 @@ struct Command<T: CommandTypes> {
 func createCommandArray() -> Any {
   return [Command<EnumCommand>]()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ struct Err: Error { }
 struct ThrowingMain {
   static func main() async throws(Err) { }
 }
+// UNSUPPORTED: OS=windows-msvc

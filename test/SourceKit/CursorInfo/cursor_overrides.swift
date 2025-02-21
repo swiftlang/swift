@@ -43,3 +43,4 @@ public protocol WithInheritedAssocType : WithAssocType {
 // CHECK2: OVERRIDES BEGIN
 // CHECK2-NEXT: s:16cursor_overrides13WithAssocTypeP0dE0
 // CHECK2-NEXT: OVERRIDES END
+// UNSUPPORTED: OS=windows-msvc

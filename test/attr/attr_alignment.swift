@@ -41,3 +41,4 @@ struct Foo {
   @_alignment(16) var fieldWithAlignment: Int // expected-error{{cannot be applied to this declaration}} {{3-19=}}
   @_alignment(16) func funcWithAlignment() {} // expected-error{{cannot be applied to this declaration}} {{3-19=}}
 }
+// UNSUPPORTED: OS=windows-msvc

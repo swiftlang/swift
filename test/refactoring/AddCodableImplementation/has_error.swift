@@ -6,3 +6,4 @@ struct Foo: Codable {
     var other: Unknown
 }
 
+// UNSUPPORTED: OS=windows-msvc

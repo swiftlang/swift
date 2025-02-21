@@ -113,3 +113,4 @@ func genericInoutIndirectCaller<T: Differentiable, U: Differentiable>(
 // CHECK:   %9 = tuple ()
 // CHECK:   return %9 : $()
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

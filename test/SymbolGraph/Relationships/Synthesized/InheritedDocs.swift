@@ -101,3 +101,4 @@ public struct S: P {
 
     public func superFunc() {}
 }
+// UNSUPPORTED: OS=windows-msvc

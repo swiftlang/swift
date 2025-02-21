@@ -42,3 +42,4 @@ func uses() {
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="body" -is-function-like -old-name "init(first:body:)" >> %t.ranges/property-wrapper-body.swift
 // RUN: diff -u %S/Outputs/property-wrapper-init/init.swift.expected %t.ranges/property-wrapper-init.swift
 // RUN: diff -u %S/Outputs/property-wrapper-init/body.swift.expected %t.ranges/property-wrapper-body.swift
+// UNSUPPORTED: OS=windows-msvc

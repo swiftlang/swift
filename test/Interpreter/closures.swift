@@ -92,3 +92,4 @@ func crash() {
     print("fs: \(fs)")
 }
 crash()
+// UNSUPPORTED: OS=windows-msvc

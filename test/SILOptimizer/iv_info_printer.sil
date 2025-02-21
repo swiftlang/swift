@@ -123,3 +123,4 @@ bb7:
   %27 = tuple ()
   return %27 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

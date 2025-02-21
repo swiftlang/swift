@@ -92,3 +92,4 @@ func bar() async {
 func foo2(
     body: @MainActor @Sendable () throws -> () // expected-error{{annotating a type with a global actor 'MainActor' is not permitted within task-to-thread concurrency model}}
 ) {}
+// UNSUPPORTED: OS=windows-msvc

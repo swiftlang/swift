@@ -152,3 +152,4 @@ Swift.success()
 // RUN: %empty-directory(%t.mcp)
 // RUN: not %target-swift-frontend(mock-sdk: -sdk %t/empty-empty-sdk) -target %target-cpu-apple-macosx10.15 -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=NILLIB-MACOSX
 // NILLIB-MACOSX: unable to load standard library
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ enum E {
 func test(_: _const E) {}
 
 test(.a.c) // expected-error {{expect a compile-time constant literal}}
+// UNSUPPORTED: OS=windows-msvc

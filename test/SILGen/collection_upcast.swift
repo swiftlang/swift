@@ -114,3 +114,4 @@ func testSetUpcastBridged(_ set: Set<BridgedSwift>) {
   // CHECK-NOT: destroy_value [[SET]]
   let anyObjectSet = set as Set<NSObject>
 }
+// UNSUPPORTED: OS=windows-msvc

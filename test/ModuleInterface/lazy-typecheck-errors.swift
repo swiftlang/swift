@@ -5,3 +5,4 @@
 extension DoesNotExist { // expected-error {{cannot find type 'DoesNotExist' in scope}}
   public func method() {}
 }
+// UNSUPPORTED: OS=windows-msvc

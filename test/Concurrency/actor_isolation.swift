@@ -1719,3 +1719,4 @@ class InferIsolationViaOverride: SuperWithIsolatedMethod {
     // expected-error@-1 {{call to main actor-isolated instance method 'isolatedMethod()' in a synchronous nonisolated context}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@
 
 // CHECK: struct ExplicitBoolBox : CxxConvertibleToBool {
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

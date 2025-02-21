@@ -221,3 +221,4 @@ enum UnavailableEnum: Hashable {
   // CHECK-NEXT:   }
 
 }
+// UNSUPPORTED: OS=windows-msvc

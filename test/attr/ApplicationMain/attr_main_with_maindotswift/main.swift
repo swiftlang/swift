@@ -3,3 +3,4 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s %S/file.swift
 
 hi()
+// UNSUPPORTED: OS=windows-msvc

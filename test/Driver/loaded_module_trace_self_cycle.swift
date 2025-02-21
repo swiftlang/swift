@@ -2,3 +2,4 @@
 // RUN: %target-swift-frontend %s -emit-module -o /dev/null -emit-loaded-module-trace-path - -I %S/Inputs/imported_modules/SelfImport
 
 import Outer
+// UNSUPPORTED: OS=windows-msvc

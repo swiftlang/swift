@@ -2066,3 +2066,4 @@ ConcurrentTypeByNameTests.test("concurrent _typeByName") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

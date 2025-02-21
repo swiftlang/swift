@@ -5,3 +5,4 @@ func unavailableModulo(description: String = "<rdar://problem/27855641>") {
   var f: Float = 42.0
   f %= 2 // expected-error {{For floating point numbers use formTruncatingRemainder}}
 }
+// UNSUPPORTED: OS=windows-msvc

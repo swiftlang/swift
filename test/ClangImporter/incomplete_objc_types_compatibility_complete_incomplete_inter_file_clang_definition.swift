@@ -37,3 +37,4 @@ class Main {
         assert(type(of: incompleteForwardDeclaredInterface) == type(of: completeForwardDeclaredInterface))
     }
 }
+// UNSUPPORTED: OS=windows-msvc

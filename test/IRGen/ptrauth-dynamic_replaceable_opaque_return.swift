@@ -56,3 +56,4 @@ struct Pair : P {
 public func _replacement_bar(y x: Int) -> some P {
   return Pair()
 }
+// UNSUPPORTED: OS=windows-msvc

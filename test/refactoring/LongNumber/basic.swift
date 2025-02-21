@@ -14,3 +14,4 @@ func foo() {
 // RUN: diff -u %S/Outputs/PositiveInteger.expected %t.result/PositiveInteger.swift
 // RUN: %refactor -simplify-long-number -source-filename %s -pos=5:7 > %t.result/NegativeInteger.swift
 // RUN: diff -u %S/Outputs/NegativeInteger.expected %t.result/NegativeInteger.swift
+// UNSUPPORTED: OS=windows-msvc

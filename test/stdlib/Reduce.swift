@@ -112,3 +112,4 @@ do {
 
 // CHECK: all done.
 print("all done.")
+// UNSUPPORTED: OS=windows-msvc

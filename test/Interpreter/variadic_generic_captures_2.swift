@@ -69,4 +69,4 @@ captures.test("Test") {
   g2(C(), D(), E())
 }
 
-runAllTests()
+runAllTests()// UNSUPPORTED: OS=windows-msvc

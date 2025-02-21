@@ -12,3 +12,4 @@ func test1(_ a: [String], s: String) {
 func test2(_ s: String, c: Character) {
   _ = s.index(of: c)
 }
+// UNSUPPORTED: OS=windows-msvc

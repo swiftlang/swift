@@ -24,3 +24,4 @@ public macro addMemberWithFixIt() = #externalMacro(module: "MacroDefinition", ty
 
 @addMemberWithFixIt
 struct S {}
+// UNSUPPORTED: OS=windows-msvc

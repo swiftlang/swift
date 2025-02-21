@@ -82,3 +82,4 @@ public func start() {
 // CHECK-RECORD: 6:10 | constructor/Swift | s:12AppleLogging6LoggerVACycfc | Ref,Call,RelCall,RelCont | rel: 1
 // CHECK-RECORD:   RelCall,RelCont | s:12AppleLogging5setupAA6LoggerVSgyF
 
+// UNSUPPORTED: OS=windows-msvc

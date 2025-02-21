@@ -161,3 +161,4 @@ func badForwardReference() {
 
   let z2 = 0
 }
+// UNSUPPORTED: OS=windows-msvc

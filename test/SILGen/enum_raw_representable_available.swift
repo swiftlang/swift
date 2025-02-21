@@ -131,3 +131,4 @@ public enum E: Int {
 // NEGATIVE-NOT: integer_literal $Builtin.Word, 99
 
 // NEGATIVE: end sil function '$s4main1EO8rawValueACSgSi_tcfC'
+// UNSUPPORTED: OS=windows-msvc

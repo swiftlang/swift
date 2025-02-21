@@ -182,3 +182,4 @@ bb0(%0 : @owned $XX):
   return %8 : $()                                 // id: %9
 }
 
+// UNSUPPORTED: OS=windows-msvc

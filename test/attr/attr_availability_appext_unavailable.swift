@@ -17,3 +17,4 @@ func unavailableToExtensions() {} // expected-note {{'unavailableToExtensions()'
 func alwaysAvailable() {
   unavailableToExtensions() // expected-error {{'unavailableToExtensions()' is unavailable in application extensions for}}
 }
+// UNSUPPORTED: OS=windows-msvc

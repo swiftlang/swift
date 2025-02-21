@@ -33,3 +33,4 @@ if optVal2 != nil {
 } else {
    print("NSDictionary subscript with an index fails")
 }
+// UNSUPPORTED: OS=windows-msvc

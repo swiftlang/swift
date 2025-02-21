@@ -236,3 +236,4 @@ _ = """
 // CHECK: "to"
 // CHECK: "Swift"
 // CHECK: "\n!"
+// UNSUPPORTED: OS=windows-msvc

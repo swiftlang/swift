@@ -150,3 +150,4 @@ extension Blah: P, Q, Copyable, R {} // expected-error{{must explicitly state wh
 
 enum Hello<Gesture: ~Copyable>: ~Copyable {}
 extension Hello: Copyable & Edible & P {} // expected-error {{conformance to 'Copyable' must be declared in a separate extension}}
+// UNSUPPORTED: OS=windows-msvc

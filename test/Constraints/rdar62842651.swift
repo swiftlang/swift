@@ -10,3 +10,4 @@ func test<T>(_ type: T.Type) -> T? {
 // CHECK: [[RESULT:%.*]] = function_ref @$s12rdar628426514testyxSgxmlF
 // CHECK-NEXT: apply [[RESULT]]<B>({{.*}})
 let _: A? = test(B.self)
+// UNSUPPORTED: OS=windows-msvc

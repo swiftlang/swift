@@ -22,3 +22,4 @@ public protocol P {
   associatedtype A: ColorPixel
   associatedtype B: ColorPixel where B.Model == A.Model
 }
+// UNSUPPORTED: OS=windows-msvc

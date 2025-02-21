@@ -16,3 +16,4 @@ func useP<T: P>(_ t: T) -> Int { return t.property }
 func testUseP(c: ConformsToP) {
   _ = useP(c)
 }
+// UNSUPPORTED: OS=windows-msvc

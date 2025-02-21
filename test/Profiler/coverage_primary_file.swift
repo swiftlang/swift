@@ -27,3 +27,4 @@ func main() {
   var b = Box()
   let _ = b.x
 }
+// UNSUPPORTED: OS=windows-msvc

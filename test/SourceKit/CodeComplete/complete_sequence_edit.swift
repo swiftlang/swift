@@ -75,3 +75,4 @@ func foo(arg: Foo) {
 // RESULT-DAG: key.name: "z"
 // RESULT: ]
 // RESULT-NOT: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

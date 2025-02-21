@@ -52,3 +52,4 @@ requireConformanceToPublicProtocol("string")
 // CHECK: Deserialized: 'IndirectConformant'
 // CHECK: Deserialized: 'PublicProtocol'
 // CHECK-NOT: Deserialized: 'InternalProtocol'
+// UNSUPPORTED: OS=windows-msvc

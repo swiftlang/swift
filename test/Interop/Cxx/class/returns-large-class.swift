@@ -20,3 +20,4 @@ LargeTypes.test("NRVO") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

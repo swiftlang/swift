@@ -20,3 +20,4 @@ func testThrows() {
   let _: () -> Void = SomeStruct.init
   // expected-error@-1{{invalid conversion from throwing function of type '() throws(MyError) -> SomeStruct'}}
 }
+// UNSUPPORTED: OS=windows-msvc

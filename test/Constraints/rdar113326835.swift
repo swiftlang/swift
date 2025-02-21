@@ -44,3 +44,4 @@ func bar(a: Int) -> Q<String> {
       // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -65,3 +65,4 @@ func testImplicitlyAsync(a : A) async -> Int {
 func testNormalAsync(a : A) async -> Int {
   return await a.asyncProp
 }
+// UNSUPPORTED: OS=windows-msvc

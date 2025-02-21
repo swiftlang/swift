@@ -195,3 +195,4 @@ tests.test("${Self}/Basics") {
 
 % end
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

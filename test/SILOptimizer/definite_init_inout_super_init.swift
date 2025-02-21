@@ -45,3 +45,4 @@ class E : B {
     super.init(x: &x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

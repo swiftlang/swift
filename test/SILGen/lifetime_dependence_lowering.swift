@@ -110,3 +110,4 @@ struct AddressableForDeps {
                 other: AddressableForDeps) -> Foo {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

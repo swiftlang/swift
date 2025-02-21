@@ -21,3 +21,4 @@ func foo() {
   AStack {
     if true {
       Rectangle()
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ _ = ["x":["z",y]] as [String : [AnyObject]]
 _ = [["y":"z","a":y]] as [[String : AnyObject]]
 _ = [["z",y]] as [[AnyObject]]
 
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@
 // CHECK-LABEL: @interface NeverClass
 // CHECK:         - (void)doesNotReturn SWIFT_NORETURN;
 // CHECK:       @end
+// UNSUPPORTED: OS=windows-msvc

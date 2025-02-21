@@ -50,3 +50,4 @@ class AlwaysAvailable { // expected-note {{add @available attribute to enclosing
     // expected-note@-1 {{add 'if #available' version check}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

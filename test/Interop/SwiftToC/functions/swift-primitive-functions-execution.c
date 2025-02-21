@@ -97,3 +97,4 @@ int main() {
   // passThroughUnsafeMutableRawPointer
   VERIFY_PASSTHROUGH_VALUE($s9Functions34passThroughUnsafeMutableRawPointeryS2vF, &x);
 }
+// UNSUPPORTED: OS=windows-msvc

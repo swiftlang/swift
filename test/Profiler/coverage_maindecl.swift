@@ -20,3 +20,4 @@ struct S {
 }
 
 // CHECK-NOT: sil_coverage_map {{.*}} "main"
+// UNSUPPORTED: OS=windows-msvc

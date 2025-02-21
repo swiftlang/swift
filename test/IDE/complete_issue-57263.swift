@@ -28,3 +28,4 @@ func foo() {
     }
     .unknownMethod()
 }
+// UNSUPPORTED: OS=windows-msvc

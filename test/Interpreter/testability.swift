@@ -28,3 +28,4 @@ log(Sub(2) as Any as? Base) // CHECK: {{^}}[[@LINE]]: Optional(sub instance 2){{
 log(Base(1).callPrivate()) // CHECK: {{^}}[[@LINE]]: private 1{{$}}
 log(Sub(2).callPrivate()) // CHECK: {{^}}[[@LINE]]: private 2{{$}}
 log(getPrivateInstance().callPrivate()) // CHECK: {{^}}[[@LINE]]: really private{{$}}
+// UNSUPPORTED: OS=windows-msvc

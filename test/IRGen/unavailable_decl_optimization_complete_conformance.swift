@@ -24,3 +24,4 @@ extension S: P {
   // CHECK-STRIP-NOT: s4Test1SV11requirementyyF
   public func requirement() {}
 }
+// UNSUPPORTED: OS=windows-msvc

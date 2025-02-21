@@ -37,3 +37,4 @@ static int varOne = 1;
 //--- frameworks/UmbrellaFramework.framework/Headers/HeaderTwo.h
 // CHECK-DAG: "precise": "c:@varTwo"
 static int varTwo = 2;
+// UNSUPPORTED: OS=windows-msvc

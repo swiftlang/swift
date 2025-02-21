@@ -15,3 +15,4 @@ extension Foo where Self: Collection, Bar: Collection, Self.SubSequence == Bar.S
     return bar[bounds]
   }
 }
+// UNSUPPORTED: OS=windows-msvc

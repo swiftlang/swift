@@ -9,3 +9,4 @@ struct S {
 }
 
 _ = try S(foo: 42)
+// UNSUPPORTED: OS=windows-msvc

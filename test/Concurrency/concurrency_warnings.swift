@@ -26,3 +26,4 @@ func testWarnings() {
   _ = globalInt // expected-warning{{reference to var 'globalInt' is not concurrency-safe because it involves shared mutable state}}
   globalInt += 1 // expected-warning{{reference to var 'globalInt' is not concurrency-safe because it involves shared mutable state}}
 }
+// UNSUPPORTED: OS=windows-msvc

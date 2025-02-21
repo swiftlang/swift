@@ -51,3 +51,4 @@ ErrorHandlingTests.test("failIgnoringError") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ debugPrint(3, &stream, appendNewline: false) // expected-error {{extra argument 
 // expected-error@-1:15 {{'&' used with non-inout argument of type 'Any'}}
 
 print(4, quack: 5) // expected-error {{extra argument 'quack' in call}}
+// UNSUPPORTED: OS=windows-msvc

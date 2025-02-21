@@ -119,3 +119,4 @@ public struct PubStructForSPI {
     self.pubVarForSPI = arg
   }
 }
+// UNSUPPORTED: OS=windows-msvc

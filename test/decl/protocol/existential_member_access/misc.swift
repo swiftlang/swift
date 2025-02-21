@@ -69,3 +69,4 @@ extension StringProtocol {
     let _ = [target.prefix(idx), target.suffix(idx)] // Ok
   }
 }
+// UNSUPPORTED: OS=windows-msvc

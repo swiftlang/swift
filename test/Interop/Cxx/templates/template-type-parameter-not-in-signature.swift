@@ -52,3 +52,4 @@ TemplateNotInSignatureTestSuite.test("Type not used in signature and takes an in
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

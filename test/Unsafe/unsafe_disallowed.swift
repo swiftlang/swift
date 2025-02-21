@@ -3,3 +3,4 @@
 @unsafe func f() { }
 // expected-error@-1{{attribute requires '-enable-experimental-feature AllowUnsafeAttribute'}}
 
+// UNSUPPORTED: OS=windows-msvc

@@ -1584,3 +1584,4 @@ func testUnownedObjc() {
 
 testUnownedObjc()
 #endif
+// UNSUPPORTED: OS=windows-msvc

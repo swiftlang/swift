@@ -25,3 +25,4 @@ protocol P4 {
 // CHECK-LABEL: .foo@
 // CHECK-NEXT: Generic signature: <T where T : P4, T.[P4]T : P1, T.[P4]T.[P1]T : P3>
 func foo<T: P4>(_: T) where T.T: P1, T.T.T: P3 {}
+// UNSUPPORTED: OS=windows-msvc

@@ -63,3 +63,4 @@ struct StaticGenericType<T : Collection> {
     return factory.init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

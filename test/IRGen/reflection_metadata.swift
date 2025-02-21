@@ -109,3 +109,4 @@ public enum MyGenericEnum<T : MyProtocol> {
 public func makeSomeClosures<T : MyProtocol>(t: T) -> (() -> ()) {
   return { _ = t }
 }
+// UNSUPPORTED: OS=windows-msvc

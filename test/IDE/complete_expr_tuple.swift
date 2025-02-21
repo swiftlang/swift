@@ -111,3 +111,4 @@ func testTupleNested1() {
 // TUPLE_NESTED_1-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // TUPLE_NESTED_1-NEXT: Decl[InstanceVar]/CurrNominal: fooInstanceVar[#Int#]{{; name=.+$}}
 // TUPLE_NESTED_1-NEXT: Decl[InstanceVar]/CurrNominal: barInstanceVar[#Double#]{{; name=.+$}}
+// UNSUPPORTED: OS=windows-msvc

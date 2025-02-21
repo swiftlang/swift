@@ -13,3 +13,4 @@ import NonExistent
 
 // No subsequent diagnostics after fatal errors.
 var x: NonExistent.Something
+// UNSUPPORTED: OS=windows-msvc

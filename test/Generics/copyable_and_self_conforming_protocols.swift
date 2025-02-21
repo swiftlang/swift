@@ -17,3 +17,4 @@ struct Test {
     self.closure(request as! Request<MyResult>)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

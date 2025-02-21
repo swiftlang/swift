@@ -61,3 +61,4 @@ import ClangModuleB
 import SwiftModuleB
 @_implementationOnly import CCryptoBoringSSL
 import ClangModuleB
+// UNSUPPORTED: OS=windows-msvc

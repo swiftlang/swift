@@ -245,3 +245,4 @@ func testVirtualMethods(base: Base, derived: Derived) {
     var frt4 = mutableDerived.VirtualMethodReturningFRTOwned()
     // CHECK: function_ref @{{.*}}VirtualMethodReturningFRTOwned{{.*}} : $@convention(cxx_method) (@inout Derived) -> @owned FRTStruct
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -143,3 +143,4 @@ open extension InvalidOpenExtensionClass {  // expected-error {{extensions canno
   var F: Int { 3 } // Insert public
   private var G: Int { 3 } // Okay
 }
+// UNSUPPORTED: OS=windows-msvc

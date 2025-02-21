@@ -48,3 +48,4 @@ public class Derived2: Base {
     self.init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

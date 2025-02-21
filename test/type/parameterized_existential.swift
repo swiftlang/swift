@@ -103,3 +103,4 @@ func genericIncrement<T: Numeric>(_ n : any Collection<T>) {
     _ = value + 1
   }
 }
+// UNSUPPORTED: OS=windows-msvc

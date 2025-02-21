@@ -36,3 +36,4 @@
 // swift-module-flags: -swift-version 4 -module-name Client
 import Swift
 @_spiOnly import Empty
+// UNSUPPORTED: OS=windows-msvc

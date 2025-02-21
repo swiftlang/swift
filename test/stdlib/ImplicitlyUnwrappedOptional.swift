@@ -72,3 +72,4 @@ ImplicitlyUnwrappedOptionalTests.test("preferOptional") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

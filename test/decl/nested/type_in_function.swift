@@ -145,3 +145,4 @@ class Generic<T> {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

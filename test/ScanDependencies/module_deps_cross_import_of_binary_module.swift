@@ -83,3 +83,4 @@ public func foobar() {}
 version: 1
 modules:
   - name: _Foo_Bar
+// UNSUPPORTED: OS=windows-msvc

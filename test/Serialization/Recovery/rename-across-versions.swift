@@ -36,3 +36,4 @@ public func testReplacementA(_: BeforeReplacedType) {}
 // CHECK-LABEL: func testReplacementA(_: BeforeReplacedType)
 
 // NEGATIVE-RECOVERY-NOT: testReplacement
+// UNSUPPORTED: OS=windows-msvc

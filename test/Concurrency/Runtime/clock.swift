@@ -161,3 +161,4 @@ import StdlibUnittest
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

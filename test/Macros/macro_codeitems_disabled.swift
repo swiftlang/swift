@@ -2,3 +2,4 @@
 
 @freestanding(codeItem)  // expected-error {{codeItem macros are an experimental feature that is not enabled}}
 macro codeItems() // expected-error {{macro 'codeItems()' requires a definition}}
+// UNSUPPORTED: OS=windows-msvc

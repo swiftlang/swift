@@ -60,3 +60,4 @@ testObjCMethodCall()
 // GXX-NEXT: call void @llvm.trap()
 // GXX-NEXT: unreachable
 // GXX-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

@@ -132,3 +132,4 @@ FUNCTION_NAME_TEST()
 // CHECK: init()
 // CHECK: deinit
 
+// UNSUPPORTED: OS=windows-msvc

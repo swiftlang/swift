@@ -16,3 +16,4 @@ internal class ObjCFoo : NSObject {
   var object: AnyObject
   init(o: AnyObject) { object = o }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@ func someFunc() {}
 // match up.
 // RUN: %sourcekitd-test -req=cursor -pos=9:6 %s -- %s | %FileCheck %s
 // CHECK: source.lang.swift.decl.function.method.instance
+// UNSUPPORTED: OS=windows-msvc

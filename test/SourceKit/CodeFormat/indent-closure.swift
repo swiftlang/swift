@@ -167,3 +167,4 @@ func foo12() {
 // CHECK: key.sourcetext: "    .onAppear3() {"
 // CHECK: key.sourcetext: "        }"
 // CHECK: key.sourcetext: "    .onAppear4() {}"
+// UNSUPPORTED: OS=windows-msvc

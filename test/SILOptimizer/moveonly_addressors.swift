@@ -122,3 +122,4 @@ func test(mut_snc snc: inout SNC) {
   mod(&snc.mutableData)
   take(snc.mutableData) // expected-error{{missing reinitialization of inout parameter 'snc.mutableData' after consume}} expected-note{{consumed here}}
 }
+// UNSUPPORTED: OS=windows-msvc

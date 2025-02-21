@@ -196,3 +196,4 @@ func blarp5() {}
 // expected-error@+1:48 {{expected ')' in '_unavailableFromAsync' attribute}}{{48-48=)}}
 @_unavailableFromAsync(message: "blarppy blarp"
 func blarp6() {}
+// UNSUPPORTED: OS=windows-msvc

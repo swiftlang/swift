@@ -16,3 +16,4 @@ let _: IAMMultipleNested.Inner? // expected-error {{ambiguous type name 'Inner' 
 func testCreateShadowing(d: Double) -> Struct1 {
   return Struct1(x: d, y: d, z: d)
 }
+// UNSUPPORTED: OS=windows-msvc

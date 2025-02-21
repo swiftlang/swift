@@ -5,3 +5,4 @@
 import Foundation
 
 @objc class Foo : NSObject, ObjCProtocol { }
+// UNSUPPORTED: OS=windows-msvc

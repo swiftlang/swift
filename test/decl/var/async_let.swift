@@ -42,3 +42,4 @@ func testInterpolation() async {
   async let y = "\(12345)"
   _ = await y
 }
+// UNSUPPORTED: OS=windows-msvc

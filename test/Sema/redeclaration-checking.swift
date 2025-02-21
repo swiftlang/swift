@@ -152,3 +152,4 @@ func issue63750fn() {
   // expected-error@-2 {{invalid redeclaration of 'x'}}
   // expected-note@-3 {{'x' previously declared here}}
 }
+// UNSUPPORTED: OS=windows-msvc

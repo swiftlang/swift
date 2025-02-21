@@ -99,3 +99,4 @@ struct GenericStruct<T: Differentiable>: Differentiable {
       { $0.addressOnly = $1 }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

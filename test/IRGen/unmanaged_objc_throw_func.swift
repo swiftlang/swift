@@ -68,3 +68,4 @@ import Foundation
 // CHECK-NEXT: call void @llvm.objc.release(ptr %{{.+}})
 // CHECK-NEXT: %[[T14:.+]] = inttoptr i{{32|64}} %[[T12]] to ptr
 // CHECK-NEXT: ret ptr %[[T14]]
+// UNSUPPORTED: OS=windows-msvc

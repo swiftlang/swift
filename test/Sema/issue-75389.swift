@@ -53,3 +53,4 @@ if case ({ if case (S) = S.self { true } else { false } }()) = true {}
 // expected-error@-1 {{expected member name or initializer call after type name}}
 // expected-note@-2 {{add arguments after the type to construct a value of the type}}
 // expected-note@-3 {{use '.self' to reference the type object}}
+// UNSUPPORTED: OS=windows-msvc

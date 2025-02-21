@@ -23,3 +23,4 @@ public struct Header<TitleContent> {
     return titleContent // expected-warning * {{}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

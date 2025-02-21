@@ -34,3 +34,4 @@ test()
 
 // CHECK: module_func
 // CHECK: module_generic_func: 42
+// UNSUPPORTED: OS=windows-msvc

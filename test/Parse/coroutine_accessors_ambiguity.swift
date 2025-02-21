@@ -28,3 +28,4 @@ var ir : Int {
     1 // expected-enabled-warning{{integer literal is unused}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

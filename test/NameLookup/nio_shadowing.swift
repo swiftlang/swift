@@ -9,3 +9,4 @@ import NIOFoundationCompat
 func test(data: Data) {
   data.withUnsafeBytes { x in print(x) }
 }
+// UNSUPPORTED: OS=windows-msvc

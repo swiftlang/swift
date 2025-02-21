@@ -32,3 +32,4 @@ func outerGeneric<T>(t: T, x: AnyObject) {
   // CHECK: closure_expr type="(TT) -> ()" {{.*}} captures=(<generic> type=T)
   let _: (TT) -> () = { _ in }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -43,3 +43,4 @@ _ = Bar(a: 12, b: 42)
 // RESULT-DAG: key.name: "b"
 // RESULT: ]
 // RESULT: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

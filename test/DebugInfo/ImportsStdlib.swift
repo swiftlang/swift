@@ -25,3 +25,4 @@
 // DWARF-NEXT: "ImportsStdlib.swift"
 
 // NEGATIVE-DWARF-NOT: DW_AT_name ("Swift")
+// UNSUPPORTED: OS=windows-msvc

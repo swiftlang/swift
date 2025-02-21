@@ -52,3 +52,4 @@ public func getSomeProto2() -> some SomeProto {
 public func getSomeProto3() -> some SomeProto {
     return Thing3()
 }
+// UNSUPPORTED: OS=windows-msvc

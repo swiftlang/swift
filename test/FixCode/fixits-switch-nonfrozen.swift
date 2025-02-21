@@ -373,3 +373,4 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

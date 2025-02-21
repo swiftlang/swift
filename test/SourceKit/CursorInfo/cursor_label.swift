@@ -64,3 +64,4 @@ class C2 {
 
 // CHECK-SUBS: source.lang.swift.decl.function.subscript
 // CHECK-SUBS-NOT: PARENT OFFSET:
+// UNSUPPORTED: OS=windows-msvc

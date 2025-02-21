@@ -27,3 +27,4 @@ class Test : NSObject, ABCErrorProtocol {
   func didFail(_ error: Swift.Error) {}
   func didFailOptional(_ error: Swift.Error?) {}
 }
+// UNSUPPORTED: OS=windows-msvc

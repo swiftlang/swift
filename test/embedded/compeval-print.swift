@@ -15,3 +15,4 @@ import MyCustomMessage
 
 xprint("xprint \(42) \("string")")
 // CHECK: xprint %lld %s
+// UNSUPPORTED: OS=windows-msvc

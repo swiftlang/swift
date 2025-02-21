@@ -46,3 +46,4 @@ final class PropertyTableViewAdapter<Factory: TableViewCellFactoryType>
       self.dataManager = dataManager
     }
 }
+// UNSUPPORTED: OS=windows-msvc

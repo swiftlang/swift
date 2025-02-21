@@ -35,3 +35,4 @@ struct A2: A {
   func bar() throws { }
   func bar() async throws { }
 }
+// UNSUPPORTED: OS=windows-msvc

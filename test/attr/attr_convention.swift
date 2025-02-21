@@ -38,3 +38,4 @@ do {
   func thin2(_ f: @autoclosure @convention(thin) () -> Int) -> Void {} // OK
   thin2(1)
 }
+// UNSUPPORTED: OS=windows-msvc

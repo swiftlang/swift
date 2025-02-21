@@ -93,3 +93,4 @@ var x: FooClassBase
 // RUN: %sourcekitd-test -req=interface-gen -module APINotesTests -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  -swift-version 5 -F %S/Inputs/mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource > %t.apinotes_swift4.response
 // RUN: %diff -u %s.apinotes_swift4.response %t.apinotes_swift4.response
+// UNSUPPORTED: OS=windows-msvc

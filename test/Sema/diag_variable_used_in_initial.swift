@@ -58,3 +58,4 @@ func localContext() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

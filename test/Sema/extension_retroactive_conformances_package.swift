@@ -57,3 +57,4 @@ extension LibraryClass: ExternalLibraryProtocol {}
 
 extension ExternalLibraryClass: @retroactive OtherLibraryProtocol {} // expected-warning {{'retroactive' attribute does not apply; 'OtherLibraryProtocol' is declared in the same package; this is an error in the Swift 6 language mode}}
 extension OtherLibraryClass: @retroactive ExternalLibraryProtocol {} // expected-warning {{'retroactive' attribute does not apply; 'OtherLibraryClass' is declared in the same package; this is an error in the Swift 6 language mode}}
+// UNSUPPORTED: OS=windows-msvc

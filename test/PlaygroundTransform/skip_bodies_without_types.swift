@@ -17,3 +17,4 @@ struct Foo {
 }
 
 // This test will cause the frontend to crash without the fix for skipping playground transformation of functions that have skipped type information. If it doesn't crash, it passes.
+// UNSUPPORTED: OS=windows-msvc

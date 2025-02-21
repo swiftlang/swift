@@ -236,3 +236,4 @@ func testPathClassification() async throws {
   // SILLY-CLASSIFICATION-NEXT:   print("urr")
   // SILLY-CLASSIFICATION-NEXT: }
 }
+// UNSUPPORTED: OS=windows-msvc

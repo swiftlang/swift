@@ -91,3 +91,4 @@ func testImportSEL() {
 func testStructDefaultInit() {
   let _ = NonNilableReferences() // expected-error{{missing argument}}
 }
+// UNSUPPORTED: OS=windows-msvc

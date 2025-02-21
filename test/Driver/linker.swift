@@ -502,3 +502,4 @@
 
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc
+// UNSUPPORTED: OS=windows-msvc

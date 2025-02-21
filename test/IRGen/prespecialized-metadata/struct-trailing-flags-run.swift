@@ -80,3 +80,4 @@ struct PointerInvocation : WithSuccessorInvocation {
 allocateDirtyAndFreeChunk()
 
 _ = Zero.withSuccessor(offsetBy: 10000, invoke: PointerInvocation())
+// UNSUPPORTED: OS=windows-msvc

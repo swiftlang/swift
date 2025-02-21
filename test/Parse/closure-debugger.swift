@@ -4,3 +4,4 @@
 // DEBUG: error: cannot find '$0' in scope
 // NODEBUG: error: anonymous closure argument not contained in a closure
 $0
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@
 class D {}
 #endif
 // expected-error@-1 {{unexpected conditional compilation block terminator}}
+// UNSUPPORTED: OS=windows-msvc

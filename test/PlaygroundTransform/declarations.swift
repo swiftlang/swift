@@ -16,3 +16,4 @@ a + b
 // CHECK: [{{.*}}] __builtin_log[a='2']
 // CHECK-NEXT: [{{.*}}] __builtin_log[b='3']
 // CHECK-NEXT: [{{.*}}] __builtin_log[='5']
+// UNSUPPORTED: OS=windows-msvc

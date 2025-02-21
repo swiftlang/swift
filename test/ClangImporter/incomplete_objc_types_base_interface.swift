@@ -24,3 +24,4 @@ _ = incompleteInterface.perform(#selector(NSObject.debugDescription))
 _ = incompleteInterface.perform(#selector(NSObject.hash))
 _ = incompleteInterface.isEqual(to: incompleteInterface)
 _ = incompleteInterface.isLike("abc")
+// UNSUPPORTED: OS=windows-msvc

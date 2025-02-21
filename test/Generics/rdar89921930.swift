@@ -14,3 +14,4 @@ public protocol Circle {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

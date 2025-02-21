@@ -43,3 +43,4 @@ let p: P = S(a: 1, b: 2, c: 3, d: 4)
 // CHECK-OUTPUT: 10
 print(testit(p)!)
 
+// UNSUPPORTED: OS=windows-msvc

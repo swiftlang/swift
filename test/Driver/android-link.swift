@@ -8,3 +8,4 @@
 // RUN: %swift_driver_plain --driver-mode=swiftc -target x86_64-unknown-linux-androideabi -emit-executable %s -### 2>&1 | %FileCheck %s -check-prefix CHECK-X64
 // CHECK-X64: clang{{(.exe)?"?.*}} --target=x86_64-unknown-linux-android
 
+// UNSUPPORTED: OS=windows-msvc

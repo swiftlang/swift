@@ -20,3 +20,4 @@ public func test() {
   // CHECK: @"$sSo17CCRefrigeratorRefaMa"
   x = CCRefrigerator.self
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ func cannotCompile() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

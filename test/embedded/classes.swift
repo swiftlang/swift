@@ -110,3 +110,4 @@ struct Main {
     print(DynamicSelfClass.ds.x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

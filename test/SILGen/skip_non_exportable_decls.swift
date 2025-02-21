@@ -201,3 +201,4 @@ extension PublicClass {
 // CHECK-NEXT:          }
 
 // CHECK:               sil_property #PublicClass.publicVar
+// UNSUPPORTED: OS=windows-msvc

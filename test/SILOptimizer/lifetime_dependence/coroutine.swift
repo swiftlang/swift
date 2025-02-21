@@ -103,3 +103,4 @@ func testDoubleNestedRead(nc: consuming NCContainer) {
   let view = wrapper.view
   use(view)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ class Foo: NSObject {
 func invokeMethodsWithDefaultArgs(x: Foo) {
   x.bridged()
 }
+// UNSUPPORTED: OS=windows-msvc

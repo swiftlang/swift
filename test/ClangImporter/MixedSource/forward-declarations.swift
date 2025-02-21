@@ -11,3 +11,4 @@ class Sub: Base {
     // CHECK: ret void
   }
 }
+// UNSUPPORTED: OS=windows-msvc

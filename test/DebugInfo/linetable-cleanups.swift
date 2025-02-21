@@ -33,3 +33,4 @@ func main() {
 // CHECK: ![[CLEANUPS]] = !DILocation(line: [[@LINE+1]], column: 1,
 }
 main()
+// UNSUPPORTED: OS=windows-msvc

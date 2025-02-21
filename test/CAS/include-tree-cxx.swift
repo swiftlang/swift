@@ -22,3 +22,4 @@ module MyCXX {
 class A {};
 
 void test(const A& str);
+// UNSUPPORTED: OS=windows-msvc

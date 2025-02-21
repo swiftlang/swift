@@ -52,3 +52,4 @@ func testMessenger(intVal: Int, fltVal: Float) {
 // OVERLOAD_FLT-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: precision({#Int#})[#MsgInterpolation.FloatFormat#];
 // OVERLOAD_FLT-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: hex[#MsgInterpolation.FloatFormat#];
 }
+// UNSUPPORTED: OS=windows-msvc

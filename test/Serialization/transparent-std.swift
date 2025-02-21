@@ -57,3 +57,4 @@ func test_conversion(c: C, t32: Builtin.Int32) {
 // SIL: pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
   destroy_obj(x: d)
 }
+// UNSUPPORTED: OS=windows-msvc

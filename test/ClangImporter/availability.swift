@@ -204,3 +204,4 @@ func testUnavailableRenamedEnum() {
   _ = NSClothingStyle.hipster
   _ = NSClothingStyleOfficeCasual // expected-error{{'NSClothingStyleOfficeCasual' has been renamed to 'NSClothingStyle.semiFormal'}} {{7-34=NSClothingStyle.semiFormal}}
 }
+// UNSUPPORTED: OS=windows-msvc

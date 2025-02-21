@@ -37,3 +37,4 @@ public func testmain() {
 // CHECK-NOT: A.deinit
 // CHECK: B.deinit!deallocator: @[[B]]
 
+// UNSUPPORTED: OS=windows-msvc

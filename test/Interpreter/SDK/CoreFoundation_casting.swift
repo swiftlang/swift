@@ -120,3 +120,4 @@ func testOptionalCFStringToStringAndNSString() {
   print("done")
 }
 testOptionalCFStringToStringAndNSString()
+// UNSUPPORTED: OS=windows-msvc

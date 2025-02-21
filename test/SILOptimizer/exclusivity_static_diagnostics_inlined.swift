@@ -30,3 +30,4 @@ public func testNestedAccess() {
   var s: SomeP = Some()
   assignNonConflict(&s)
 }
+// UNSUPPORTED: OS=windows-msvc

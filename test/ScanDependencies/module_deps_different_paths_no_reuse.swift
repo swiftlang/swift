@@ -46,3 +46,4 @@ import A
 // CHECK-DIFFERENT-NEXT:      "details": {
 // CHECK-DIFFERENT-NEXT:        "swift": {
 // CHECK-DIFFERENT-NEXT:          "moduleInterfacePath": "{{.*}}/SwiftDifferent/A.swiftinterface",
+// UNSUPPORTED: OS=windows-msvc

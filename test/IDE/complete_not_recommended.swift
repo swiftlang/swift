@@ -22,3 +22,4 @@ class B : A {
 // OVERRIDE_1: Decl[InstanceMethod]/Super:         foo() {|};
 // OVERRIDE_1-NOT: Decl[InstanceMethod]
 }
+// UNSUPPORTED: OS=windows-msvc

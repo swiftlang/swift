@@ -34,3 +34,4 @@ extension P {
     _ = T.self // typealiases were not checked in Swift 4.2, but P.T inherits @usableFromInline in Swift 4.2 mode
   }
 }
+// UNSUPPORTED: OS=windows-msvc

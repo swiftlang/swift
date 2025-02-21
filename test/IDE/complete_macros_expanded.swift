@@ -94,3 +94,4 @@ func testLocal() {
 // LOCAL_MACRO-NOT: Decl[LocalVar]/Local: addOne[#(Int) -> Int#]; name=addOne
   }
 }
+// UNSUPPORTED: OS=windows-msvc

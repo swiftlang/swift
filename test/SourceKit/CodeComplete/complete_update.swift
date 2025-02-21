@@ -46,3 +46,4 @@ func test(x: X) {
 // ONE_GROUP: key.kind: source.lang.swift.codecomplete.group,
 // ONE_GROUP-NEXT: key.name: "aaa"
 // ONE_GROUP-NOT: key.name: "aaa"
+// UNSUPPORTED: OS=windows-msvc

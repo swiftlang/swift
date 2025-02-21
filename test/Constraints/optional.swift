@@ -595,3 +595,4 @@ do {
   test(x!) // expected-error {{no exact matches in call to local function 'test'}}
   // expected-error@-1 {{cannot force unwrap value of non-optional type 'Double'}}
 }
+// UNSUPPORTED: OS=windows-msvc

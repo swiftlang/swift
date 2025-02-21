@@ -7,3 +7,4 @@ struct Foo {
     func dynamicallyCall(withArguments args: [Any]) -> () { return }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

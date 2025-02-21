@@ -13,3 +13,4 @@ struct Foo: ~Copyable {
 struct Bar: ~Copyable {
     func foo(_: consuming Foo) {}
 }
+// UNSUPPORTED: OS=windows-msvc

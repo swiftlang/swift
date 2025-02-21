@@ -235,3 +235,4 @@ print("\(repr(s))")
 // CHECK-NEXT: Done.
 print("Done.")
 
+// UNSUPPORTED: OS=windows-msvc

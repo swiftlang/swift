@@ -17,3 +17,4 @@
 
 import SystemLibrary
 import SecretLibrary // expected-error {{no such module 'SecretLibrary'}}
+// UNSUPPORTED: OS=windows-msvc

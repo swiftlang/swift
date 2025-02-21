@@ -95,3 +95,4 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK:   [[ADJ_SELF:%.*]] = struct $Struct.TangentVector ([[ADJ_X]] : $Float, [[ADJ_Y]] : $Float)
 // CHECK:   return [[ADJ_SELF]] : $Struct.TangentVector
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

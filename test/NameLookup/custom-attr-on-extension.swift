@@ -7,3 +7,4 @@ struct Ty{}
 
 @foo extension Ty {} // expected-error {{unknown attribute 'foo'}}
 
+// UNSUPPORTED: OS=windows-msvc

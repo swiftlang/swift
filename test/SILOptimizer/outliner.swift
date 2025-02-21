@@ -269,3 +269,4 @@ public class AnotherTest {
       self.obj.error = NSError(myError: 10)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

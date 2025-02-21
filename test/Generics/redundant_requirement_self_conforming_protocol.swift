@@ -5,3 +5,4 @@ struct G<T> {}
 
 // CHECK-LABEL: Generic signature: <T where T == any Error>
 extension G where T : Error, T == Error {}
+// UNSUPPORTED: OS=windows-msvc

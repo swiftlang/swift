@@ -475,3 +475,4 @@ class NotSendable {}
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

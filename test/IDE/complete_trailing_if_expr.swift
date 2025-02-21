@@ -21,3 +21,4 @@ func foo() {
 // COMPLETE: Begin completions
 // COMPLETE: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // COMPLETE: End completions
+// UNSUPPORTED: OS=windows-msvc

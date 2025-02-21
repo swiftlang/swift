@@ -8,3 +8,4 @@
 // CHECK-SIMPLE: debug-prefix-map old=new
 // CHECK-COMPLEX: debug-prefix-map old=n=ew
 // CHECK-EMPTY: debug-prefix-map old=
+// UNSUPPORTED: OS=windows-msvc

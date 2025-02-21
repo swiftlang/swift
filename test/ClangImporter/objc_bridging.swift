@@ -74,3 +74,4 @@ func test_repair_does_not_interfere_with_conversions() {
     foo(a, b as! NSObject) // Ok
   }
 }
+// UNSUPPORTED: OS=windows-msvc

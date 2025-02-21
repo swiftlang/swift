@@ -17,3 +17,4 @@ var xx = CC()
 #endif
 #endif
 var yy = xx
+// UNSUPPORTED: OS=windows-msvc

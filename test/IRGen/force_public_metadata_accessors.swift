@@ -31,3 +31,4 @@ public func use() -> Int {
 // CHECK-NOT: define
 // CHECK: call {{.*}} %swift.metadata_response @"$s31force_public_metadata_accessors14FixedContainer{{.*}}LLOMa"
 
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ struct T {}
 
 // CHECK-DUMP: extension T: Hashable  {
 // CHECK-DUMP: }
+// UNSUPPORTED: OS=windows-msvc

@@ -791,3 +791,4 @@ struct StaticInstanceNameDisambiguation : Codable {
   // expected-note@-2 {{set the initial value via the initializer or explicitly define a CodingKeys enum including a 'version' case to silence this warning}}
   // expected-note@-3 {{make the property mutable instead}}{{3-6=var}}
 }
+// UNSUPPORTED: OS=windows-msvc

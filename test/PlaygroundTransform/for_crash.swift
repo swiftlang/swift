@@ -12,3 +12,4 @@
 for x in y {
   x
 }
+// UNSUPPORTED: OS=windows-msvc

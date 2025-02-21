@@ -7,3 +7,4 @@
 func call_buggy_builtin() {
   produce_error_in_clang_irgen();
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -36,3 +36,4 @@ checkIntSequence(SimpleArrayWrapperNullableIterators())
 // No UnsafeCxxInputIterator conformance required, since the iterators are actually optional UnsafePointers here.
 // Conformance to CxxSequence is synthesized.
 checkIntSequence(SimpleEmptySequence())
+// UNSUPPORTED: OS=windows-msvc

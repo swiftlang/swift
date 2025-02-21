@@ -34,3 +34,4 @@ struct ContentView: View {
         Button("And Here")
     }
 }
+// UNSUPPORTED: OS=windows-msvc

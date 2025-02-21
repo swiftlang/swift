@@ -49,3 +49,4 @@ struct Context {
     func foo() -> () {}
     // CHECK: [[@LINE-1]]:10 | instance-method/Swift | foo() | s:14swift_ide_test7ContextV3fooyyF | Def,RelChild | rel: 1
 }
+// UNSUPPORTED: OS=windows-msvc

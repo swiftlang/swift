@@ -139,3 +139,4 @@ public func bar() {
   // CHECK-DAG: ![[MEMBER]] = !DIDerivedType(tag: DW_TAG_member, {{.*}}baseType: ![[USED_AS_GENERIC:[0-9]+]])
   // CHECK-DAG: ![[USED_AS_GENERIC]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s9typealias1SVyAA22UsedAsGenericParameteraGD"
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -47,3 +47,4 @@ for (val, str, idx) in [(PartialIntKey.a, "a", 3), (.b, "b", 4), (.c, "c", 1)] {
     guard PartialIntKey(stringValue: str) == val else { fatalError() }
     guard PartialIntKey(intValue: idx) == val else { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

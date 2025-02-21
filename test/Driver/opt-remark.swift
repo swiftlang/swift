@@ -49,3 +49,4 @@ func foo() {
   // REMARK_PASSED-NOT: remark: Not profitable
   small()
 }
+// UNSUPPORTED: OS=windows-msvc

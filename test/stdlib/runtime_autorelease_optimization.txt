@@ -99,3 +99,4 @@
 // CHECK-arm64: mov      x29, x29
 // CHECK-arm64: bl      {{.*}} ; symbol stub for: _objc_retainAutoreleasedReturnValue
 // CHECK-arm64: ret
+// UNSUPPORTED: OS=windows-msvc

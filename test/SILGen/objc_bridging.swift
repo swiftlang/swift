@@ -635,3 +635,4 @@ func castToCFunction(ptr: UnsafeRawPointer) {
   typealias Fn = @convention(c) (AnyObject?) -> Void
   unsafeBitCast(ptr, to: Fn.self)(nil)
 }
+// UNSUPPORTED: OS=windows-msvc

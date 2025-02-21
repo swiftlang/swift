@@ -13,3 +13,4 @@ func boop() {
 // RUN: diff -u %S/Outputs/localEnum/north.swift.expected %t.result/north_def.swift
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=7:19 -new-name east > %t.result/north_ref.swift
 // RUN: diff -u %S/Outputs/localEnum/north.swift.expected %t.result/north_ref.swift
+// UNSUPPORTED: OS=windows-msvc

@@ -52,3 +52,4 @@ public final class CompletelyHollowActorSystem_NotEvenTypes: DistributedActorSys
   // expected-error@-5{{class 'CompletelyHollowActorSystem_NotEvenTypes' is missing witness for protocol requirement 'remoteCall'}}
   // expected-note@-6{{add stubs for conformance}}
 }
+// UNSUPPORTED: OS=windows-msvc

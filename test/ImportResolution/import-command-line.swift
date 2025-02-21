@@ -12,3 +12,4 @@
 
 var a: A? // expected-error {{cannot find type 'A' in scope}}
 var qA: abcde.A? // expected-error {{cannot find type 'abcde' in scope}}
+// UNSUPPORTED: OS=windows-msvc

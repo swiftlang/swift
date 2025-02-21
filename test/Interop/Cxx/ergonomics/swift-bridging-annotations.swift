@@ -159,3 +159,4 @@ private:
 // CHECK: struct UnsafeSendable : @unchecked Sendable {
 
 // CHECKLATEST: struct NonCopyableCopyable
+// UNSUPPORTED: OS=windows-msvc

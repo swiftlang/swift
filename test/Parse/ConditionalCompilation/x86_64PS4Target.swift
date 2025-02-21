@@ -16,3 +16,4 @@ var x = C()
 
 var y = x
 
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ func doit() {
 // CHECK-NEXT: deiniting 1
 // CHECK-NEXT: deiniting 2
 doit()
+// UNSUPPORTED: OS=windows-msvc

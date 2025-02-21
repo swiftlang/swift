@@ -109,3 +109,4 @@ struct BigStructWithNativeObjects {
   @objc init() { }
 }
 
+// UNSUPPORTED: OS=windows-msvc

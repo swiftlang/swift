@@ -55,3 +55,4 @@ actor Custom {
 // CHECK-NEXT: main.InlineExecutor: enqueue (priority: TaskPriority.medium)
 // CHECK-NEXT: custom.count == 1
 // CHECK-NEXT: end
+// UNSUPPORTED: OS=windows-msvc

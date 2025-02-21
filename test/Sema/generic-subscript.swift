@@ -28,3 +28,4 @@ struct S3: P2 {
     return x
   }
 }
+// UNSUPPORTED: OS=windows-msvc

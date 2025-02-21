@@ -30,3 +30,4 @@ struct MultiPayloadObjCExistentialWrapper {
     let x: MultiPayloadObjCExistential
     let y: Int = 0
 }
+// UNSUPPORTED: OS=windows-msvc

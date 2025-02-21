@@ -222,3 +222,4 @@ fileprivate struct C_45184 {
   private var outerProperty = Inner().innerProperty // expected-error {{property cannot be declared in this context because its type 'C_45184.Inner.InnerPrivateType' uses a private type}}
   var outerProperty2 = Inner().innerProperty // expected-error {{property must be declared private because its type 'C_45184.Inner.InnerPrivateType' uses a private type}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -125,3 +125,4 @@ struct Struct: Protocol {
 // CHECK-NEXT:   method #Protocol.subscript!setter.vjp.USUS.<Self where Self : Protocol>: <Self where Self : Protocol> (inout Self) -> (Float, Float, Float) -> () : @AD__$s13witness_table6StructVAA8ProtocolA2aDPyS2f_SftcisTW_vjp_USUS
 // CHECK-NEXT:   method #Protocol.subscript!modify: <Self where Self : Protocol> (inout Self) -> (Float, Float) -> () : @$s13witness_table6StructVAA8ProtocolA2aDPyS2f_SftciMTW
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

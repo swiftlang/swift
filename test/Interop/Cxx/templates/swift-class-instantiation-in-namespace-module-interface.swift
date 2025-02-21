@@ -12,3 +12,4 @@
 // CHECK: func returnShip() -> Space.__CxxTemplateInstN5Space4ShipIbEE
 // CHECK: func returnShipWithEngine() -> Space.__CxxTemplateInstN5Space4ShipIN6Engine8TurbojetEEE
 
+// UNSUPPORTED: OS=windows-msvc

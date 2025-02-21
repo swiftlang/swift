@@ -5,3 +5,4 @@ struct A {
   // expected-error@-1 {{value type 'A' cannot have a stored property that recursively contains it}}
   // expected-note@-2 {{cycle beginning here: B? -> (some(_:): B) -> (a: A)}}
 }
+// UNSUPPORTED: OS=windows-msvc

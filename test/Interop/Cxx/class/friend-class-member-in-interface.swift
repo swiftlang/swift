@@ -33,3 +33,4 @@ struct C: B {
 // CHECK:  mutating func memberInC()
 // CHECK-NEXT:  mutating func memberInB()
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

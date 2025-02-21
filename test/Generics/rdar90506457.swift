@@ -42,3 +42,4 @@ public protocol P5 {
 public protocol P6 {
   associatedtype G: SIMDScalar
 }
+// UNSUPPORTED: OS=windows-msvc

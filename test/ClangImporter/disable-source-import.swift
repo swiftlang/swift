@@ -16,3 +16,4 @@ import ExternIntX
 public let y = x // ERROR: error
 
 // CHECK-NOT: error
+// UNSUPPORTED: OS=windows-msvc

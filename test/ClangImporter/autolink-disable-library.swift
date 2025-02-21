@@ -23,3 +23,4 @@ import UsesSubmodule
 
 // CHECK-NOT: !{!{{"-lStock"|"/DEFAULTLIB:Stock.lib"}}}
 // CHECK-NOT: !{!{{"-lUnderlyingClangLibrary"|"/DEFAULTLIB:UnderlyingClangLibrary.lib"}}}
+// UNSUPPORTED: OS=windows-msvc

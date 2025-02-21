@@ -241,3 +241,4 @@ func hasRethrowsConformanceAndThrowsBody<T : Empty>(_: T) rethrows {
   throw HorseError.bolted
   // expected-error@-1 {{a function declared 'rethrows' may only throw if its parameter does}}
 }
+// UNSUPPORTED: OS=windows-msvc

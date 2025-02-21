@@ -32,3 +32,4 @@ var InternalFoo = foo()
 // CHECK: // global_init_attribute.InternalFoo.unsafeMutableAddressor : Swift.Int
 // CHECK-NEXT: // Isolation:
 // CHECK-NEXT: sil hidden [global_init] [ossa] @$s21global_init_attribute11InternalFooSivau
+// UNSUPPORTED: OS=windows-msvc

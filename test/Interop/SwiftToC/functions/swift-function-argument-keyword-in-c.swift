@@ -5,3 +5,4 @@
 // CHECK: SWIFT_EXTERN void $s9Functions19testKeywordArgument8registerySi_tF(ptrdiff_t register_) SWIFT_NOEXCEPT SWIFT_CALL;
 
 public func testKeywordArgument(register: Int) { }
+// UNSUPPORTED: OS=windows-msvc

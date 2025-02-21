@@ -72,3 +72,4 @@ func testObjC(
   _ = k
 }
 #endif // _ObjC
+// UNSUPPORTED: OS=windows-msvc

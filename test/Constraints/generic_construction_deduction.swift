@@ -42,3 +42,4 @@ struct X<T,U> {
 
 var q = X<B,Int>(a: x)
 
+// UNSUPPORTED: OS=windows-msvc

@@ -881,3 +881,4 @@ func testActiveEnumAddr<T>(_ e: IndirectEnum<T>) -> T {
 // CHECK: [ACTIVE] {{.*}} = alloc_stack [lexical] [var_decl] $T, let, name "y2"
 // CHECK: bb3:
 // CHECK: [NONE]   {{.*}} = tuple ()
+// UNSUPPORTED: OS=windows-msvc

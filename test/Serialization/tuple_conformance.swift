@@ -11,3 +11,4 @@ public func doStuff() {
 // CHECK: [[FN:%.*]] = function_ref @$s3lib5makeGyAA1GVyxGxms8SendableRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Sendable> (@thick τ_0_0.Type) -> G<τ_0_0>
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<()>({{%.*}}) : $@convention(thin) <τ_0_0 where τ_0_0 : Sendable> (@thick τ_0_0.Type) -> G<τ_0_0>
 // CHECK-NEXT: return [[RESULT]] : $G<()>
+// UNSUPPORTED: OS=windows-msvc

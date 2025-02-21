@@ -14,3 +14,4 @@ public func backDeployedFuncOniOSWithoutBody()
 @available(iOS 17.4, *)
 @backDeployed(before: iOS 18.0)
 public var backDeployedVarWithoutBody: Int
+// UNSUPPORTED: OS=windows-msvc

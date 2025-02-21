@@ -53,3 +53,4 @@
 // CHECK-WATCHOS-SAME: {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)clang(/|\\\\)lib(/|\\\\)darwin(/|\\\\)libclang_rt.watchos.a}}
 // CHECK-WATCHOSSIM-SAME: {{[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)clang(/|\\\\)lib(/|\\\\)darwin(/|\\\\)libclang_rt.watchossim.a}}
 // CHECK-SAME: -o {{[^ ]+}}
+// UNSUPPORTED: OS=windows-msvc

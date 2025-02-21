@@ -379,3 +379,4 @@ func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String
 // BODY_EXPAND-NEXT: return try await remoteCall(function: "f", arguments: ["a": a, "b": b])
 // BODY_EXPAND-NEXT: }"
 // BODY_EXPAND-NEXT: source.edit.kind.active:
+// UNSUPPORTED: OS=windows-msvc

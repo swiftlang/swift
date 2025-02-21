@@ -37,3 +37,4 @@ func nameBuiltinNonDefaultDistributedActorStorage(_ b: Builtin.NonDefaultDistrib
 struct MyObjCBool {
   var value: ObjCBool
 }
+// UNSUPPORTED: OS=windows-msvc

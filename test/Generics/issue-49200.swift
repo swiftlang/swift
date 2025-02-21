@@ -9,3 +9,4 @@ protocol D : B {
   // expected-error@-2 {{no type for 'Self.A' can satisfy both 'Self.A : AnyObject' and 'Self.A == Any'}}
   typealias A = AnyObject
 }
+// UNSUPPORTED: OS=windows-msvc

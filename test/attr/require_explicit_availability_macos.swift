@@ -257,3 +257,4 @@ extension Error {
 extension Error { // expected-warning {{public declarations should have an availability attribute with an introduction version}}
   public var publicVar: Bool { return true } // expected-warning {{public declarations should have an availability attribute with an introduction version}}
 }
+// UNSUPPORTED: OS=windows-msvc

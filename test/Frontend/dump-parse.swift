@@ -130,3 +130,4 @@ struct SelfParam {
 // CHECK-NEXT:        (type_unqualified_ident id="Bool" unbound))
 // CHECK-NEXT:    (parameter_list range=[{{.+}}])
 func dumpMemberTypeRepr() -> Array<Bool>.Element { true }
+// UNSUPPORTED: OS=windows-msvc

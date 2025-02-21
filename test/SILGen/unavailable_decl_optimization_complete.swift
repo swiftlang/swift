@@ -237,3 +237,4 @@ public func unavailableFuncWithNestedType() {
 
 // CHECK-NO-STRIP: sil_property #C.unavailableProperty<τ_0_0> ()
 // CHECK-STRIP-NOT: sil_property #C.unavailableProperty<τ_0_0> ()
+// UNSUPPORTED: OS=windows-msvc

@@ -98,3 +98,4 @@ distributed actor MyDistActor {
 
 }
 
+// UNSUPPORTED: OS=windows-msvc

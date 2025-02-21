@@ -14,3 +14,4 @@ print(!opts.intersection(.lastEqual).isEmpty)
 
 // CHECK: {{^}}0 0{{$}}
 print("\(([] as NSBinarySearchingOptions).rawValue) \(NSBinarySearchingOptions(rawValue: 0).rawValue)")
+// UNSUPPORTED: OS=windows-msvc

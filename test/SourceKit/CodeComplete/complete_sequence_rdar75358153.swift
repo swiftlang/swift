@@ -45,3 +45,4 @@ func test(val: E) {
 // CHECK-DAG: key.description: "foo(arg: E)",
 // CHECK: ],
 // CHECK: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

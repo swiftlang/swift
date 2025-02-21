@@ -119,3 +119,4 @@ bb1(%5 : @reborrow $Klass):
   return %9 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

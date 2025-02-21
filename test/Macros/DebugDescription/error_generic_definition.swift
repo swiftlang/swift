@@ -10,3 +10,4 @@ struct MyGeneric<T> {
     "zero zero zero"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

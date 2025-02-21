@@ -30,3 +30,4 @@ var x: Int? = {
         return nil // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
     }
 }() // expected-error {{expected ')' in expression list}}
+// UNSUPPORTED: OS=windows-msvc

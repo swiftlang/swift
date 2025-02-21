@@ -25,3 +25,4 @@ func asyncFunc() async throws {
     try await asyncFunc()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

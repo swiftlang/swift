@@ -202,3 +202,4 @@ struct Foo {
     class NestedClass {}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

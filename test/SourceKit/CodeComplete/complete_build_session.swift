@@ -87,3 +87,4 @@ func test() {
 // CHECK_USER-DAG: key.description: "fooHelperSubFunc(arg: Int32)"
 // CHECK_USER-NOT: fooFunc(
 // CHECK_USER-NOT: fooSubFunc(
+// UNSUPPORTED: OS=windows-msvc

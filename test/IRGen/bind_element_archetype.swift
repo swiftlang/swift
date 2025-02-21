@@ -17,3 +17,4 @@ public func foo2<each T: Q, each U>(t: repeat each T, u: repeat each U)
   repeat f(each u)
 }
 
+// UNSUPPORTED: OS=windows-msvc

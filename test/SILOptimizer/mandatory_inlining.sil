@@ -1539,3 +1539,4 @@ sil_vtable X {
   #X.foo: <E where E : Error> (X) -> (E.Type) throws(E) -> () : @X_foo
 }
 
+// UNSUPPORTED: OS=windows-msvc

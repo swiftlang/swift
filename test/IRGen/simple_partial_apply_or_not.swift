@@ -46,3 +46,4 @@ print(s)
 
 // CHECK-EXEC: Hello!
 // CHECK-EXEC: S(_value: main.State<Swift.Int64>(ref: main.State<Swift.Int64>.(unknown context at {{.*}}).Reference))
+// UNSUPPORTED: OS=windows-msvc

@@ -2,3 +2,4 @@
 
 // REQUIRES: swift_in_compiler
 
+// UNSUPPORTED: OS=windows-msvc

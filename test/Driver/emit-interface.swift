@@ -26,3 +26,4 @@
 // CHECK-FILELIST: swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend
 // CHECK-FILELIST-SAME: -supplementary-output-file-map
 // CHECK-FILELIST-NOT: emit-interface.swift{{ }}
+// UNSUPPORTED: OS=windows-msvc

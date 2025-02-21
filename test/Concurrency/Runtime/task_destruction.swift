@@ -29,3 +29,4 @@ enum Main {
     print("Success!")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

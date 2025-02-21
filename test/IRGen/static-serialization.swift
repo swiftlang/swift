@@ -17,3 +17,4 @@ internal let s = f()
 
 // CHECK-NOT: declare dllimport swiftcc ptr @"$s13StaticLibrary1SCACycfC"(ptr swiftself)
 // CHECK: declare swiftcc ptr @"$s13StaticLibrary1SCACycfC"(ptr swiftself)
+// UNSUPPORTED: OS=windows-msvc

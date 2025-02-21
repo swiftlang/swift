@@ -93,4 +93,4 @@ ImplicitComputedPropertiesTestSuite.test("SnakeCaseUTF8Str") {
     expectEqual(object.utf8String, 32)
 }
 
-runAllTests()
+runAllTests()// UNSUPPORTED: OS=windows-msvc

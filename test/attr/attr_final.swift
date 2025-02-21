@@ -86,3 +86,4 @@ struct Box<T> {
   final class Super3 {}
 }
 class Sub3: Box<Int>.Super3 {} // expected-error{{inheritance from a final class 'Box.Super3'}}
+// UNSUPPORTED: OS=windows-msvc

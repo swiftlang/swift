@@ -16,3 +16,4 @@
 // RUN: echo '{"%/t/main.swift": { const-values: "%/t/main.module.swiftconstvalues" }}' > %/t/filemap.json
 // RUN: %target-swift-frontend -typecheck -const-gather-protocols-file %t/protocols.json -supplementary-output-file-map %/t/filemap.json %/t/main.swift
 // RUN: test -f %t/main.module.swiftconstvalues
+// UNSUPPORTED: OS=windows-msvc

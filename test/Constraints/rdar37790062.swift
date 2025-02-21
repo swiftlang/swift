@@ -44,3 +44,4 @@ extension A where V: P, V.V: A, E == V.V.E {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

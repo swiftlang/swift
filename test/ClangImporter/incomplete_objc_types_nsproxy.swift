@@ -29,3 +29,4 @@ CFunctionTakingAForwardDeclaredNSProxyInterface(incompleteNSProxyInterface)
 _ = incompleteNSProxyInterface.perform(#selector(NSObject.description))
 _ = incompleteNSProxyInterface.perform(#selector(NSObject.debugDescription))
 _ = incompleteNSProxyInterface.perform(#selector(NSObject.hash))
+// UNSUPPORTED: OS=windows-msvc

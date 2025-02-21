@@ -33,3 +33,4 @@ for i in 0..<3 {
 // CHECK-NEXT: [{{.*}}] __builtin_log_scope_entry
 // CHECK-NEXT: [{{.*}}] __builtin_log[='2']
 // CHECK-NEXT: [{{.*}}] __builtin_log_scope_exit
+// UNSUPPORTED: OS=windows-msvc

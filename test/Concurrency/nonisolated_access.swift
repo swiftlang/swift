@@ -46,3 +46,4 @@ actor A {
     sendable.prop = false // okay
   }
 }
+// UNSUPPORTED: OS=windows-msvc

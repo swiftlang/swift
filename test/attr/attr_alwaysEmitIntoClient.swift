@@ -43,3 +43,4 @@ public struct TestInitAccessors {
      self.x = 0 // expected-error {{init acecssor for property 'x' is internal and cannot be referenced from an '@inlinable' function}}
    }
 }
+// UNSUPPORTED: OS=windows-msvc

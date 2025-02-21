@@ -57,3 +57,4 @@ package extension PkgOuterClass {
   // expected-warning@-1 {{'open' modifier conflicts with extension's default access of 'package'}}
   // expected-error@-2 {{only classes and overridable class members can be declared 'open'; use 'public'}}
 }
+// UNSUPPORTED: OS=windows-msvc

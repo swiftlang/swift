@@ -19,3 +19,4 @@ func return_a_number() -> Int64 {
 }
 
 print("The number: \(return_a_number())")
+// UNSUPPORTED: OS=windows-msvc

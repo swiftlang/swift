@@ -21,3 +21,4 @@ import EWrapper
 // CHECK-DAG:   "clang": "_SwiftConcurrencyShims"
 
 // CHECK-NOT:   "swift": "_cross_import_E"
+// UNSUPPORTED: OS=windows-msvc

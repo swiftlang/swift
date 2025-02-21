@@ -36,3 +36,4 @@ test()
 // CHECK: attributes [[EA2]] = {{{.*}} "wasm-import-module"="m0" "wasm-import-name"="import2" {{.*}}}
 // CHECK: attributes [[EA3]] = {{{.*}} "wasm-import-module"="m0" "wasm-import-name"="import3" {{.*}}}
 // CHECK: attributes [[EA4]] = {{{.*}} "wasm-import-module"="m0" "wasm-import-name"="import4" {{.*}}}
+// UNSUPPORTED: OS=windows-msvc

@@ -54,3 +54,4 @@ struct Main {
 
 // CHECK-NOT: ThreadSanitizer: data race
 // CHECK: Done!
+// UNSUPPORTED: OS=windows-msvc

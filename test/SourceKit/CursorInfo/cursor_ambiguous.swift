@@ -46,3 +46,4 @@ struct TestDeduplicateResults {
   // STATIC_FUNC: SECONDARY SYMBOLS BEGIN
   // STATIC_FUNC-NEXT: SECONDARY SYMBOLS END
 }
+// UNSUPPORTED: OS=windows-msvc

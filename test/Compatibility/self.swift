@@ -17,3 +17,4 @@ final class FinalMario : Mario {
         return FinalMario()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

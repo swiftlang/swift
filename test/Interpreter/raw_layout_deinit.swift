@@ -34,3 +34,4 @@ print("-- done")
 // CHECK-NEXT: Foo.bar()
 // CHECK-NEXT: Foo.deinit
 // CHECK-NEXT: -- done
+// UNSUPPORTED: OS=windows-msvc

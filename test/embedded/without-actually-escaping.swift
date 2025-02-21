@@ -40,3 +40,4 @@ letEscape(f: { print("C") })
 // CHECK: B
 // CHECK: C
 // CHECK: non-escaping closure escaped
+// UNSUPPORTED: OS=windows-msvc

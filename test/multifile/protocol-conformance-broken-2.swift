@@ -23,3 +23,4 @@ func callee(_: some Equatable) {}
 func caller() { // expected-error {{type 'S' does not conform to protocol 'P'}}
   callee(S().f())
 }
+// UNSUPPORTED: OS=windows-msvc

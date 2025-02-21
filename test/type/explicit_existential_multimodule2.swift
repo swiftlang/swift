@@ -17,3 +17,4 @@ import M
 func test(_: P) {}
 // expected-warning@-1 {{use of protocol 'P' as a type must be written 'any P'}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

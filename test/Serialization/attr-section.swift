@@ -11,3 +11,4 @@
 // MODULE-CHECK: @_section("SOME_SECT") let Constant: Int
 @_section("SOME_SECT")
 let Constant = 321
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@
 // CHECK: pathComponents
 // CHECK-NEXT: "global"
 public let global = 2
+// UNSUPPORTED: OS=windows-msvc

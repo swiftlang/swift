@@ -304,3 +304,4 @@ bb3:
   unreachable
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -86,3 +86,4 @@ extension FinalTests {
   @objc static func bar() { }
 }
 
+// UNSUPPORTED: OS=windows-msvc

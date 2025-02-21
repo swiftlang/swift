@@ -7,3 +7,4 @@
 func test1() {
   unresolved() // expected-error {{cannot find 'unresolved' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

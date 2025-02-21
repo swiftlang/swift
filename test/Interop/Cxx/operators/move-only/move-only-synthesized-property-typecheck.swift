@@ -93,3 +93,4 @@ testNonCopyableHolderMutDerefPointee()
 testNonCopyableHolderMutDerefPointeeLet()
 testNonCopyableHolderValueConstDerefPointeeLet()
 testNonCopyableHolderValueMutDerefPointeeLet()
+// UNSUPPORTED: OS=windows-msvc

@@ -176,3 +176,4 @@ func unsafeCallerAvoidsNewLoop(clock: some Clock) async throws {
 @_unsafeInheritExecutor
 func _unsafeInheritExecutor_hacky() async { }
 // expected-warning@-1{{@_unsafeInheritExecutor attribute is deprecated; consider an 'isolated' parameter defaulted to '#isolation' instead}}
+// UNSUPPORTED: OS=windows-msvc

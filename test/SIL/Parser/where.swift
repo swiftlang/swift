@@ -7,3 +7,4 @@ protocol P {
     G : IteratorProtocol
   >(next: inout G) -> Int where G.Element == CodeUnit
 }
+// UNSUPPORTED: OS=windows-msvc

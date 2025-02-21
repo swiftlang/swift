@@ -272,3 +272,4 @@ class HasClassVar {
 assert(HasClassVar.x == 0)
 HasClassVar.x += 10
 assert(HasClassVar.x == 10)
+// UNSUPPORTED: OS=windows-msvc

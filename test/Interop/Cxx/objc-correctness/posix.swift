@@ -4,3 +4,4 @@
 import MockPOSIX
 
 let _ = in_addr(s_addr: INADDR_ANY)
+// UNSUPPORTED: OS=windows-msvc

@@ -39,3 +39,4 @@ public class MyObject: NSManagedObject {
   @NSManaged @objc dynamic public private(set) var myVar4: String
 // CHECK: }
 }
+// UNSUPPORTED: OS=windows-msvc

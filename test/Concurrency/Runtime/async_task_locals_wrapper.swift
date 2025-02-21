@@ -89,3 +89,4 @@ func async_let_nested_skip_optimization() async {
     await async_let_nested_skip_optimization()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

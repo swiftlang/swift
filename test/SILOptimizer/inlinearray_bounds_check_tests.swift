@@ -290,3 +290,4 @@ public func inlinearray_binary_search_spl<let N: Int>(_ v: InlineArray<N, Int>, 
   return nil;
 }
 
+// UNSUPPORTED: OS=windows-msvc

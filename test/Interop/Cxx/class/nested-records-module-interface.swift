@@ -93,3 +93,4 @@
 // CHECK:   }
 // CHECK:   static func takesHasNestedForwardDeclaration(_: NestedDeclIsAFirstForwardDeclaration.HasNestedForwardDeclaration)
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

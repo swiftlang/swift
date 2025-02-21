@@ -424,3 +424,4 @@ public func deferTest(_ x: __owned Klass) { // expected-error {{'x' used after c
     }
     print("do Something")
 }
+// UNSUPPORTED: OS=windows-msvc

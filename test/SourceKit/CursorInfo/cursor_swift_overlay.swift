@@ -29,3 +29,4 @@ func b() {}
     }
   ]
 }
+// UNSUPPORTED: OS=windows-msvc

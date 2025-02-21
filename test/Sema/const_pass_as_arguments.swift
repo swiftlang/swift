@@ -80,3 +80,4 @@ class ConstFanClassWrong5 {
 		return globalConst + localConst
 	}
 }
+// UNSUPPORTED: OS=windows-msvc

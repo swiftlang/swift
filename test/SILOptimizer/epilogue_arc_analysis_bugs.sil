@@ -34,3 +34,4 @@ bb5:
  return %res : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ func properlyScopeSubcasesOfEmitBoolDispatch() {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

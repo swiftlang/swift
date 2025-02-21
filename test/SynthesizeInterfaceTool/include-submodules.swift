@@ -37,3 +37,4 @@
 // EXPLICIT-NOT: import TopLevelModule{{.*}}
 // EXPLICIT-NOT: TopLevelModuleStruct
 // EXPLICIT-NOT: ImplicitModuleStruct
+// UNSUPPORTED: OS=windows-msvc

@@ -23,3 +23,4 @@ struct B {
     func takeClosure<T>(_ f: () throws -> T) throws -> T { try f() }
     func takeP(_: some P) throws {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -54,3 +54,4 @@ struct Logic {
 @_compilerInitialized let bestID: String
 
 
+// UNSUPPORTED: OS=windows-msvc

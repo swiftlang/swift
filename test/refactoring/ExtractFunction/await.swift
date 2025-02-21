@@ -17,3 +17,4 @@ func testThrowingClosure() async throws -> Int {
 // RUN: %refactor -extract-function -source-filename %s -pos=8:1 -end-pos=8:60 >> %t.result/consumes_async.swift
 // RUN: diff -u %S/Outputs/await/consumes_async.swift.expected %t.result/consumes_async.swift
 // REQUIRES: swift_swift_parser
+// UNSUPPORTED: OS=windows-msvc

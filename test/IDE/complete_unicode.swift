@@ -23,3 +23,4 @@ func unicode_test_1() {
 // UNICODE_1-DAG: Decl[InstanceMethod]/CurrNominal: カタカナでも()[#Void#]{{; name=.+$}}
 // UNICODE_1-DAG: Decl[InstanceMethod]/CurrNominal: 漢字でも()[#Void#]{{; name=.+$}}
 // UNICODE_1-DAG: Decl[InstanceMethod]/CurrNominal: いいです()[#Void#]{{; name=.+$}}
+// UNSUPPORTED: OS=windows-msvc

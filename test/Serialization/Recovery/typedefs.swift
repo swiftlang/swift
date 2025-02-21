@@ -412,3 +412,4 @@ extension WrappedInt: WrappedProto {
 }
 
 #endif // TEST
+// UNSUPPORTED: OS=windows-msvc

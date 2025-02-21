@@ -58,3 +58,4 @@ class Sub: Base {
   override class var conflict: Int { return 100 }
   override var conflict: Int { return 200 }
 }
+// UNSUPPORTED: OS=windows-msvc

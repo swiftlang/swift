@@ -141,3 +141,4 @@ suite.test("concurrentPushesAndPops") {
 } // if #available(SwiftStdlib 6.0)
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

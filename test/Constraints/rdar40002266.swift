@@ -9,3 +9,4 @@ struct S {
     // expected-error@-1 {{cannot convert value of type 'T' to expected argument type 'Int'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -114,3 +114,4 @@ public func createCrossModuleDerivedDerivedClass() -> CrossModuleDerivedDerivedC
 
 // CHECK:      void CrossModuleDerivedDerivedClass::virtualMethod2InDerived() {
 // CHECK-NEXT: _impl::$s8UseClass018CrossModuleDerivedeB0C016virtualMethod2InE0yyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// UNSUPPORTED: OS=windows-msvc

@@ -92,3 +92,4 @@ public func resetOpt<T>(_ val: inout Optional<T>) {
 // CHECK: SWIFT_INLINE_THUNK void takeSmallStructOpt(const swift::Optional<SmallStruct>& val) noexcept SWIFT_SYMBOL("s:11UseOptional18takeSmallStructOptyyAA0dE0VSgF") {
 // CHECK-NEXT:  UseOptional::_impl::$s11UseOptional18takeSmallStructOptyyAA0dE0VSgF(UseOptional::_impl::swift_interop_passDirect_UseOptional_uint32_t_0_4(swift::_impl::_impl_Optional<SmallStruct>::getOpaquePointer(val)));
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

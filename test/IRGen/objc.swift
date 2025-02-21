@@ -143,3 +143,4 @@ class WeakObjC {
 //     6 and 2 is the current major.minor version. 7 is the Swift ABI version.
 // CHECK:  i32 4, !"Objective-C Garbage Collection", i32 100796160}
 // CHECK:  i32 1, !"Swift Version", i32 7}
+// UNSUPPORTED: OS=windows-msvc

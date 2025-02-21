@@ -33,3 +33,4 @@ bb0(%0: $Builtin.Int64):
   %999 = tuple ()
   return %999 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

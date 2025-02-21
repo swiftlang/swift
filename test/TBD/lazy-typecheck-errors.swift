@@ -12,3 +12,4 @@ public struct S: P {
 extension DoesNotExist {
   public func method() {}
 }
+// UNSUPPORTED: OS=windows-msvc

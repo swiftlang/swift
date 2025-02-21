@@ -336,3 +336,4 @@ class Derived<Foo> : Base {
 
 // CHECK-LABEL: sil_vtable Derived {
 // CHECK:         #Base.returnsOptional: (Base) -> () -> Int? : @$s13vtable_thunks7DerivedC15returnsOptionalSiyFAA4BaseCADSiSgyFTV [override]
+// UNSUPPORTED: OS=windows-msvc

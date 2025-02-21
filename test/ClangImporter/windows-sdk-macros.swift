@@ -12,3 +12,4 @@
 // CHECK-ARM: -D_ARM_
 // CHECK-ARM64: -D_ARM64_
 
+// UNSUPPORTED: OS=windows-msvc

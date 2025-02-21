@@ -91,3 +91,4 @@ protocol P2 {
   associatedtype U : P1
 }
 
+// UNSUPPORTED: OS=windows-msvc

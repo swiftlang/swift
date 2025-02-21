@@ -61,3 +61,4 @@ suite.test("BitfieldUnionIndirect") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

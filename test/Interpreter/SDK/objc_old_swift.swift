@@ -84,3 +84,4 @@ tests.test("array")
 // FIXME: add coverage of more Swift runtime entrypoints
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ public func f() {
 // CHECK: !DISubprogram(name: "deinit"
 // CHECK: !DISubprogram(name: "init"
 // CHECK: !DISubprogram(name: "subscript
+// UNSUPPORTED: OS=windows-msvc

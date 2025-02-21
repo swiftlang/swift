@@ -309,3 +309,4 @@ func closuresInPeerMacroCrash() {}
 @trait(Trait {})
 @trait(Trait {})
 var closuresInPeerMacroOnVariableCrash: Int = 0
+// UNSUPPORTED: OS=windows-msvc

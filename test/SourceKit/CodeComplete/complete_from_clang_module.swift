@@ -15,3 +15,4 @@ import Foo
 // CHECK-NEXT:       key.sourcetext: "fooIntVar"
 // CHECK-NEXT:     },
 
+// UNSUPPORTED: OS=windows-msvc

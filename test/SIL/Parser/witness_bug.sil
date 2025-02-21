@@ -12,3 +12,4 @@ bb0:
 sil_witness_table public_external Int: Comparable module Swift {
   base_protocol Equatable: Int: Equatable module Swift
 }
+// UNSUPPORTED: OS=windows-msvc

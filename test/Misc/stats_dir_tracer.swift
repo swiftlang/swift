@@ -24,3 +24,4 @@ extension Bar : Proto {
     return x + y
   }
 }
+// UNSUPPORTED: OS=windows-msvc

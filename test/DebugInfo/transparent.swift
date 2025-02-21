@@ -26,3 +26,4 @@ use(z)
 // CHECK-SAME:                             file: ![[FILE]]
 // CHECK-NOT: line:
 // CHECK: ![[ZERO]] = !DILocation(line: 0,
+// UNSUPPORTED: OS=windows-msvc

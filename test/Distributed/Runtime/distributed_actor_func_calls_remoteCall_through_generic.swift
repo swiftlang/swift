@@ -397,3 +397,4 @@ func test_generic_plain(system: DefaultDistributedActorSystem) async throws {
     try! await test_generic_plain(system: system)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

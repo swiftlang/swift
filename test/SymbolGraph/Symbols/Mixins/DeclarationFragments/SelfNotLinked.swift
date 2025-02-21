@@ -48,3 +48,4 @@ extension Sequence where Self : Collection {
 // CHECK-NEXT:        }
 // CHECK-NEXT:      ],
 // CHECK-NEXT:      "accessLevel": "public"
+// UNSUPPORTED: OS=windows-msvc

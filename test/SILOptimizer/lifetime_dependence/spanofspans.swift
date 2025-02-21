@@ -74,3 +74,4 @@ func withFatlifetimes() {
   useSpan(firstSpan)
   // end borrow vec
 }
+// UNSUPPORTED: OS=windows-msvc

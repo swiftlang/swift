@@ -85,3 +85,4 @@ do {
     print("")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

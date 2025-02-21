@@ -88,3 +88,4 @@ public func start() -> XLogging.Loggable? {
 
 public func end(_ arg: XLogging.Logger) {
 }
+// UNSUPPORTED: OS=windows-msvc

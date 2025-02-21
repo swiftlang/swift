@@ -8,3 +8,4 @@ extension S {
 
 // CHECK: @"$ss1SV1jytvpMV" = dllexport alias { i32 }, ptr @"$ss1SV1iytvpMV"
 
+// UNSUPPORTED: OS=windows-msvc

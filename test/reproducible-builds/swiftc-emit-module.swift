@@ -4,3 +4,4 @@
 // RUN: cmp %t/run-1.module %t/run-2.module
 // RUN: cmp %t/run-1.swiftdoc %t/run-2.swiftdoc
 print("foo")
+// UNSUPPORTED: OS=windows-msvc

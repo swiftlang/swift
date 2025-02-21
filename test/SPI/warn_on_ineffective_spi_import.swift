@@ -17,3 +17,4 @@
 // RUN: %target-typecheck-verify-swift -I %t
 
 @_spi(SPIHelper) import SPIHelper // expected-warning {{'@_spi' import of 'SPIHelper' will not include any SPI symbols; 'SPIHelper' was built from the public interface at}}
+// UNSUPPORTED: OS=windows-msvc

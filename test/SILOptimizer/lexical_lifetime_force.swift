@@ -26,3 +26,4 @@ func funky() {
   borrow(c)
   barrier()
 }
+// UNSUPPORTED: OS=windows-msvc

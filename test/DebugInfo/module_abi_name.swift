@@ -5,3 +5,4 @@ class SomeClass {}
 
 let v1 = SomeClass()
 
+// UNSUPPORTED: OS=windows-msvc

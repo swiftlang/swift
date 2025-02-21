@@ -14,3 +14,4 @@ func mainActorAsyncDiscardable() async -> Int { 0 }
 func consumesMainActorAsyncDiscardable() async {
   await mainActorAsyncDiscardable() // ok
 }
+// UNSUPPORTED: OS=windows-msvc

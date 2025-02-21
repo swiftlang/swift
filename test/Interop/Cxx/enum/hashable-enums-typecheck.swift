@@ -19,3 +19,4 @@ let _: Set = [kFour, kTwo, 0]       // construct a set that mixes untyped enums 
 
 let _ = [Pet.goat: "baa", Pet.dogcow: "moo"]                        // dictionaries are fine too
 let _: [AnyHashable: String] = [Pet.goat: "baa", kFour: "meow"]     // even heterogeneous ones
+// UNSUPPORTED: OS=windows-msvc

@@ -4,3 +4,4 @@
 class Test {
   init() async { }
 }
+// UNSUPPORTED: OS=windows-msvc

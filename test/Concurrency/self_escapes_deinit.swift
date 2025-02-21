@@ -35,3 +35,4 @@ class C2 {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

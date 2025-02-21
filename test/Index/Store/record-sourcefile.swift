@@ -152,3 +152,4 @@ class MyTestCase: XCTestCase {
 
 // CHECK: [[@LINE+1]]:11 | class/Swift | s:4file2C2C | Ref | rel: 0
 extension C2 {}
+// UNSUPPORTED: OS=windows-msvc

@@ -63,3 +63,4 @@ class A_Priv<T> {
 class B_Override<U> : A_Priv<[U]> {
   init(_ foo: [U]) { fatalError() } // Ok, because effectively overrides init from parent which is invisible
 }
+// UNSUPPORTED: OS=windows-msvc

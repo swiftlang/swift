@@ -19,3 +19,4 @@ import E
 // CHECK: "commandLine": [
 // CHECK: "-enable-ossa-modules"
 // CHECK: ]
+// UNSUPPORTED: OS=windows-msvc

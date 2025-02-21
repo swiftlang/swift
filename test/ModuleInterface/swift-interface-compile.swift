@@ -12,3 +12,4 @@ import `dynamic`
 
 // CHECK-STATIC: IS_STATIC
 // CHECK-DYNAMIC-NOT: IS_STATIC
+// UNSUPPORTED: OS=windows-msvc

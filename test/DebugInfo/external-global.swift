@@ -5,3 +5,4 @@ import Globals
 // No debug info should be emitted for an externally defined global variable.
 // CHECK-NOT: !DIGlobalVariable({{.*}}global
 global = 23
+// UNSUPPORTED: OS=windows-msvc

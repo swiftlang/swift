@@ -5,3 +5,4 @@ func keyPathToImportedMember() {
   // CHECK: keypath $KeyPath<Butt, Int32>, (root $Butt; gettable_property $Int32,  id @ButtSize
   _ = \Butt.size
 }
+// UNSUPPORTED: OS=windows-msvc

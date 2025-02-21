@@ -128,3 +128,4 @@ if #available(SwiftStdlib 5.1, *) {
   let v = EV()
   let _ = v.opaqueReferencingPrivate()
 }
+// UNSUPPORTED: OS=windows-msvc

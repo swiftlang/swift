@@ -46,3 +46,4 @@ numeric(42)
 // EXPLICIT: -DDUMMY
 
 // SWIFT6: error: missing required modules: 'has_alias', 'struct_with_operators'
+// UNSUPPORTED: OS=windows-msvc

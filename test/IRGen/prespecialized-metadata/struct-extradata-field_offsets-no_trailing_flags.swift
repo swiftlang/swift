@@ -83,3 +83,4 @@ struct Pair<First, Second, Third> {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

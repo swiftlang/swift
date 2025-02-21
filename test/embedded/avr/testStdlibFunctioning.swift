@@ -11,3 +11,4 @@ let i: Int = 1
 #endif
 
 var j = i
+// UNSUPPORTED: OS=windows-msvc

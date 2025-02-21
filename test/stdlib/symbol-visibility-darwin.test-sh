@@ -20,3 +20,4 @@
 
 // REQUIRES: VENDOR=apple
 // UNSUPPORTED: freestanding
+// UNSUPPORTED: OS=windows-msvc

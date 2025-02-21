@@ -19,3 +19,4 @@ import Foo
 
 //--- Foo.swift
 public func foo() {}
+// UNSUPPORTED: OS=windows-msvc

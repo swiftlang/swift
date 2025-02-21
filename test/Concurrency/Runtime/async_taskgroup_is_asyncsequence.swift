@@ -97,3 +97,4 @@ func test_asyncSequence_labelledTuples() async {
     // CHECK: result: 65
   }
 }
+// UNSUPPORTED: OS=windows-msvc

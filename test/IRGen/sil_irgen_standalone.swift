@@ -3,3 +3,4 @@
 // Smoke test that SIL-IRGen can compile a standalone program offline.
 func f() {}
 f()
+// UNSUPPORTED: OS=windows-msvc

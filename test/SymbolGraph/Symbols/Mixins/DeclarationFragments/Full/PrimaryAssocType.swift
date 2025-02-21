@@ -35,3 +35,4 @@ public protocol WithPrimary<Assoc> {
 // CHECK-NEXT:          "spelling": ">"
 // CHECK-NEXT:        }
 // CHECK-NEXT:      ]
+// UNSUPPORTED: OS=windows-msvc

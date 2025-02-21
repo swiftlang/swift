@@ -16,3 +16,4 @@
 public func foo<T: OptionSet>(_ t: T) {}
 
 foo(CEnum.A)
+// UNSUPPORTED: OS=windows-msvc

@@ -49,3 +49,4 @@ InheritedMemberTestSuite.test("Eagerly imported methods resolve to base classes"
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

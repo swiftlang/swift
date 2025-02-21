@@ -26,3 +26,4 @@
 // expected-error@+1{{invalid conditional compilation expression}}
 #if os(macOS) && hasGreeble(blah)
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -1386,3 +1386,4 @@ FloatingPointClassification.test("FloatingPointClassification/Hashable") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

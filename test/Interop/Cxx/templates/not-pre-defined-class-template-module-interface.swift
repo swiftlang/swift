@@ -15,3 +15,4 @@
 // CHECK-NEXT: }
 
 // CHECK-NEXT: typealias MagicallyWrappedIntWithoutDefinition = MagicWrapper<IntWrapper>
+// UNSUPPORTED: OS=windows-msvc

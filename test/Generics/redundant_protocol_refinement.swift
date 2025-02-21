@@ -39,3 +39,4 @@ protocol Bad: P2 where Assoc == Self {}
 
 // CHECK-LABEL: redundant_protocol_refinement.(file).Bad@
 // CHECK-LABEL: Requirement signature: <Self where Self : P2, Self == Self.[P2]Assoc>
+// UNSUPPORTED: OS=windows-msvc

@@ -5,3 +5,4 @@
 public protocol G {
   associatedtype Word: FixedWidthInteger where Word.Magnitude == Word
 }
+// UNSUPPORTED: OS=windows-msvc

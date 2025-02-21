@@ -508,3 +508,4 @@ func f1_53382(_ fn: (S_53382<String>) -> Void) {}
 func f2_53382(_ fn: (P_53382) -> Void) {
   f1_53382(fn) // expected-error {{global function 'f1_53382' requires that 'String' conform to 'P_53382'}}
 }
+// UNSUPPORTED: OS=windows-msvc

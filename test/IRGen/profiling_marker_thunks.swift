@@ -114,3 +114,4 @@ public func test() {
 // ATTRIBUTE: define {{.*}} ptr @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassCyACyxGxcfC"({{.*}}) #[[ATTR]]
 // ATTRIBUTE: define {{.*}} [[INT]] @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassC10someMethodSiyF"({{.*}}) #[[ATTR]]
 // ATTRIBUTE: #[[ATTR]] = { noinline "frame-pointer"="all"
+// UNSUPPORTED: OS=windows-msvc

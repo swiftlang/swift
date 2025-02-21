@@ -38,3 +38,4 @@ struct Struct: Proto {
 // ...
 // 7  swift-frontend           0x0000000100fe80ad swift::SILResultInfo const& claimNext<swift::SILResultInfo>(llvm::ArrayRef<swift::SILResultInfo>&) + 93
 // 8  swift-frontend           0x0000000100fe6cc0 (anonymous namespace)::ResultPlanner::claimNextInnerResult((anonymous namespace)::ResultPlanner::PlanData&) + 32
+// UNSUPPORTED: OS=windows-msvc

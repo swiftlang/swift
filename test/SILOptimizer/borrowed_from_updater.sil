@@ -300,3 +300,4 @@ bb2(%5 : @guaranteed $C):
   return %0 : $C
 }
 
+// UNSUPPORTED: OS=windows-msvc

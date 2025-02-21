@@ -14,3 +14,4 @@ enum NoError: Error, Equatable {
     return true
   }
 }
+// UNSUPPORTED: OS=windows-msvc

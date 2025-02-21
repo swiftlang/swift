@@ -74,3 +74,4 @@ import #^IMPORT^#
 // IMPORT: Begin completion
 // IMPORT-NOT: AppleLogging
 // IMPORT: Decl[Module]/None:                  XLogging[#Module#]; name=XLogging
+// UNSUPPORTED: OS=windows-msvc

@@ -44,3 +44,4 @@
 // TEXTUAL-UNIT: DEPEND END (2)
 
 func test() {}
+// UNSUPPORTED: OS=windows-msvc

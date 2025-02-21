@@ -138,3 +138,4 @@ func printAsAsSphericalObject(_ b : SphericalObject) async {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

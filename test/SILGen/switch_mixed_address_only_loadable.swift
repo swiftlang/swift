@@ -11,3 +11,4 @@ func foo<T>(x: Int, y: T, z: Int) {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

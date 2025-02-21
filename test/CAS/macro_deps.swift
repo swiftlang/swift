@@ -131,3 +131,4 @@ func appTest() {
     test()
     #assertTest(true)
 }
+// UNSUPPORTED: OS=windows-msvc

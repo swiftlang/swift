@@ -72,3 +72,4 @@ module AC {
   export_as A
   export *
 }
+// UNSUPPORTED: OS=windows-msvc

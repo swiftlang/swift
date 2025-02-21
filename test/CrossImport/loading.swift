@@ -138,3 +138,4 @@ import _AlwaysImportedPlatformOverlay
 #if ALWAYS_IMPORTED_LAST
 import AlwaysImported
 #endif
+// UNSUPPORTED: OS=windows-msvc

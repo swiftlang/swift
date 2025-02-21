@@ -34,3 +34,4 @@ bb0(%0 : $Builtin.Int64):
   return %5 : $(Builtin.BridgeObject, Builtin.BridgeObject)
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -78,3 +78,4 @@ struct NonStrictConformer: NonStrictProtocol {
   func send(_ body: () -> Void) {}
   func dontSend(_ body: @Sendable () -> Void) {} // expected-warning {{sendability of function types in instance method 'dontSend' does not match requirement in protocol 'NonStrictProtocol'}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -40,3 +40,4 @@ func test(cond: Int, external: External) async {
 // CHECK-DAG: #dbg_value{{.*}} ![[VAR]], !DIExpression(DW_OP_LLVM_fragment, 128, 64){{.*}} ![[LOC2]]
 // CHECK-DAG: #dbg_value{{.*}} ![[VAR]], !DIExpression(DW_OP_LLVM_fragment, 64, 64){{.*}} ![[LOC2]]
 // CHECK-DAG: #dbg_value{{.*}} ![[VAR]], !DIExpression(DW_OP_LLVM_fragment, 0, 64){{.*}} ![[LOC2]]
+// UNSUPPORTED: OS=windows-msvc

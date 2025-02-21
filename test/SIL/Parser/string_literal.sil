@@ -11,3 +11,4 @@ bb0:
   %6 = tuple ()                                   // user: %7
   return %6 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

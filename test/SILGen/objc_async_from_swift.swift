@@ -221,3 +221,4 @@ actor Dril: NSObject {
         return true
     }
 }
+// UNSUPPORTED: OS=windows-msvc

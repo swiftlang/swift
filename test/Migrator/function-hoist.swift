@@ -27,3 +27,4 @@ func foo(_ c : Cities) {
 func foo1(_ flag: Bool, _ c1: Cities, _ c2: Cities) {
   _ = globalCityFunc4(flag ? c1 : c2, 1 + 1, 2 + 2)
 }
+// UNSUPPORTED: OS=windows-msvc

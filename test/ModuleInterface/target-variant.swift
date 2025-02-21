@@ -11,3 +11,4 @@
 
 // CHECK: public func test()
 public func test() {}
+// UNSUPPORTED: OS=windows-msvc

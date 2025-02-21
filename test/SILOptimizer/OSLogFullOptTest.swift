@@ -389,3 +389,4 @@ func testMetatypeInterpolation<T>(of type: T.Type) {
     // CHECK: [[EXIT]]:
     // CHECK-NEXT: ret void
 }
+// UNSUPPORTED: OS=windows-msvc

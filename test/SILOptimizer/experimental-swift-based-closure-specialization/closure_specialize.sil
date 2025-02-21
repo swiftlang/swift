@@ -941,3 +941,4 @@ bb0(%0 : $Int):
   %empty = tuple ()
   return %empty : $()
 }
+// UNSUPPORTED: OS=windows-msvc

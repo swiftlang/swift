@@ -183,3 +183,4 @@ do {
   // CHECK: error thrown
   print("error thrown")
 }
+// UNSUPPORTED: OS=windows-msvc

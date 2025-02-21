@@ -5,3 +5,4 @@
 // UNSUPPORTED: swift_evolve
 
 var W = [UInt32](repeating: 0, count: 16)
+// UNSUPPORTED: OS=windows-msvc

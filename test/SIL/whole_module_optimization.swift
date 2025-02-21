@@ -35,3 +35,4 @@ public func getAnswer() -> Int32 {
 // NEGATIVE-TESTABLE-NOT: sil {{.+}}privateFn
 // NEGATIVE-NOT: sil {{.+}}compute
 // CHECK-TESTABLE: sil {{.+}}compute
+// UNSUPPORTED: OS=windows-msvc

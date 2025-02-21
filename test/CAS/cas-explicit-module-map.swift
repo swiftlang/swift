@@ -65,3 +65,4 @@ func myTest() {}
 import B
 
 
+// UNSUPPORTED: OS=windows-msvc

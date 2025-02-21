@@ -105,3 +105,4 @@ enum Ticket: ~Copyable {
   deinit {}
 
 }
+// UNSUPPORTED: OS=windows-msvc

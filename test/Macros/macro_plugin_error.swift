@@ -68,3 +68,4 @@ MOCK_PLUGIN([
     "response": {"expandFreestandingMacroResult": {"expandedSource": "3.description", "diagnostics": []}}
   }
 ])
+// UNSUPPORTED: OS=windows-msvc

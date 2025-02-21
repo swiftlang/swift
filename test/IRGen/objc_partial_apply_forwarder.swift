@@ -33,3 +33,4 @@ public struct A<Error: Swift.Error>{
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

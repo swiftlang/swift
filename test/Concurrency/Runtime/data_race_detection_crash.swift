@@ -94,3 +94,4 @@ actor MyActor {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

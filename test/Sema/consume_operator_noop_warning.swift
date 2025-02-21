@@ -58,3 +58,4 @@ func moreProofs(_ share: __shared Int,
    _ = consume snd // expected-note {{consumed}}
    _ = snd // expected-note {{used}}
 } // expected-note {{used here}}
+// UNSUPPORTED: OS=windows-msvc

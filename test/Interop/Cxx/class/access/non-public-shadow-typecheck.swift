@@ -24,3 +24,4 @@ func f(s: Shadow) {
   s.protPrivShadowed() // expected-error {{'protPrivShadowed' is inaccessible due to 'private' protection level}}
   s.privPrivShadowed() // expected-error {{'privPrivShadowed' is inaccessible due to 'private' protection level}}
 }
+// UNSUPPORTED: OS=windows-msvc

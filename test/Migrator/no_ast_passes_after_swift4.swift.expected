@@ -7,3 +7,4 @@ import Bar
 func foo() -> FooComparisonResult {
   return FooComparisonResult.orderedAscending
 }
+// UNSUPPORTED: OS=windows-msvc

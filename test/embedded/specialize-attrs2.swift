@@ -20,3 +20,4 @@ struct Main {
 
 // CHECK: abc
 // CHECK: OK!
+// UNSUPPORTED: OS=windows-msvc

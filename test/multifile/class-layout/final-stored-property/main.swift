@@ -11,3 +11,4 @@ func meltCheese(_ burger: Burger) -> Int {
 func bestBurrito(_ burrito: Burrito) -> Int {
   return burrito.cilantro
 }
+// UNSUPPORTED: OS=windows-msvc

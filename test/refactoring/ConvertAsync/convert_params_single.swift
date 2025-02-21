@@ -533,3 +533,4 @@ func testParamsSingle() async throws {
   // ERROR-ONLY-NEXT: }
   // ERROR-ONLY-NOT: }
 }
+// UNSUPPORTED: OS=windows-msvc

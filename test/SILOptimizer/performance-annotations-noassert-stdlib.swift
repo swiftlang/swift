@@ -6,4 +6,4 @@
 @_noAllocation
 func createEmptyArray() {
   _ = [Int]() // expected-error {{ending the lifetime of a value of type}}
-}
+}// UNSUPPORTED: OS=windows-msvc

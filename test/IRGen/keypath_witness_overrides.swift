@@ -11,3 +11,4 @@ where OS.Index: Hashable {
   let keypath = \OS.[index]
   return keypath
 }
+// UNSUPPORTED: OS=windows-msvc

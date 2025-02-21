@@ -76,3 +76,4 @@ internal class InternalObjCOnlyUsableFromInline {
 ${classBody(names.index("Internal"))}
 }
 
+// UNSUPPORTED: OS=windows-msvc

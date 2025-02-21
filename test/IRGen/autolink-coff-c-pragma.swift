@@ -18,3 +18,4 @@ import AutolinkCoffCPragma
 // CHECK-MSVC-ASM: .section .drectve
 // CHECK-MSVC-ASM-DAG: .ascii " /DEFAULTLIB:module.lib"
 // CHECK-MSVC-ASM-DAG: .ascii " /DEFAULTLIB:transitive-module.lib"
+// UNSUPPORTED: OS=windows-msvc

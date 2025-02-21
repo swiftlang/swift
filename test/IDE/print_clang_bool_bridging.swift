@@ -62,3 +62,4 @@ class Test : NSObject {
   func produceDarwinBooleanBlockTypedef(_ outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (DarwinBoolean) -> DarwinBoolean)?>)
   init()
 }
+// UNSUPPORTED: OS=windows-msvc

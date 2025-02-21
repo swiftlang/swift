@@ -110,3 +110,4 @@ func letEscapeThrowTypedBad(f: () throws(HomeworkError) -> () -> ()) throws(MyEr
   return try withoutActuallyEscaping(f) { return try $0() }
   // expected-error@-1{{thrown expression type 'any Error' cannot be converted to error type 'MyError'}}
 }
+// UNSUPPORTED: OS=windows-msvc

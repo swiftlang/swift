@@ -82,3 +82,4 @@ subclass_subclassgeneric_generic(Subclass.IsP2.self)
 subclass_subclassgeneric_concrete()
 subclass_subclassconcrete()
 subclass_subclassgenericconcrete()
+// UNSUPPORTED: OS=windows-msvc

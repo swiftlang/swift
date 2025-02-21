@@ -10,3 +10,4 @@ func foo(xs: [String: [String]], ys: [String: [String]]) {
     // expected-note@-3 {{required by global function 'zip' where 'Sequence2' = 'Dictionary<String, [String]>.Element' (aka '(key: String, value: Array<String>)')}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

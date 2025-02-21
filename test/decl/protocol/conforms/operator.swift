@@ -17,3 +17,4 @@ struct S0b : P0 {
 struct S0c<T> : P0 {
   static func <<(lhs: S0c<T>, rhs: S0c<T>) -> S0c<T> { return lhs }
 }
+// UNSUPPORTED: OS=windows-msvc

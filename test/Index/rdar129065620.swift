@@ -10,3 +10,4 @@ enum Foo {
 struct S {
   subscript(x: Invalid) -> Invalid {}
 }
+// UNSUPPORTED: OS=windows-msvc

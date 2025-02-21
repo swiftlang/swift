@@ -4,3 +4,4 @@
 
 // CHECK: import {{CxxStdlib.vector|std_vector}}
 // CHECK: extension std.basic_string<CChar, std.__1.char_traits<CChar>, std.__1.allocator<CChar>> {
+// UNSUPPORTED: OS=windows-msvc

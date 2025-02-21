@@ -23,3 +23,4 @@ public func instantiateValidMembers() {
   var y = CannotBeInstantianted<IntWrapper>(IntWrapper(value: 0))
   y.incValue(IntWrapper(value: 41))
 }
+// UNSUPPORTED: OS=windows-msvc

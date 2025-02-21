@@ -15,3 +15,4 @@ struct MicroSequence : Sequence, IteratorProtocol {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

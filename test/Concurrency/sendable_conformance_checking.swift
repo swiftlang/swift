@@ -218,3 +218,4 @@ class TestEscapingOnly: EscapingSendableProtocol {
     // expected-complete-and-tns-note @+1 {{candidate has non-matching type '(@escaping (Int) -> Void) -> ()'}}
     func f(handler: @escaping (Int) -> Void) {}
 }
+// UNSUPPORTED: OS=windows-msvc

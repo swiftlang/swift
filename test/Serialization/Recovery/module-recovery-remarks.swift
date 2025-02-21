@@ -101,3 +101,4 @@ let s = StableType()
 s.member()
 
 let s2 = StableType(42)
+// UNSUPPORTED: OS=windows-msvc

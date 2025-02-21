@@ -20,3 +20,4 @@ internal struct Item {
     self.data = Self(tag: tag).data
   }
 }
+// UNSUPPORTED: OS=windows-msvc

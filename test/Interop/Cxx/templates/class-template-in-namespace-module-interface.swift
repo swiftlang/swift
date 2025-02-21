@@ -18,3 +18,4 @@
 // CHECK:   }
 
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

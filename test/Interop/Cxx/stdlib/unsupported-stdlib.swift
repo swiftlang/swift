@@ -4,3 +4,4 @@
 // XFAIL: OS=windows-msvc
 
 // CHECK: error: invalid library name in argument '-stdlib=invalid'
+// UNSUPPORTED: OS=windows-msvc

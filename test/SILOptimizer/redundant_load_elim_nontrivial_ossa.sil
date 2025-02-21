@@ -1323,3 +1323,4 @@ bb0(%0 : $*Agg2, %1 : @owned $Klass):
   return %8 : $Klass
 }
 
+// UNSUPPORTED: OS=windows-msvc

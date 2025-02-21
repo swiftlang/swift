@@ -995,3 +995,4 @@ bb0(%0 : @owned $Wrapper, %1 : $*Klass):
   %4 = mark_dependence [nonescaping] %1 : $*Klass on %0 : $Wrapper
   unreachable
 }
+// UNSUPPORTED: OS=windows-msvc

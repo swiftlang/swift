@@ -7,3 +7,4 @@ func singleClosure(x: () -> Void) {
   singleClosure {}
 }
 // RUN: not %refactor -trailingclosure -source-filename %s -pos=7:3
+// UNSUPPORTED: OS=windows-msvc

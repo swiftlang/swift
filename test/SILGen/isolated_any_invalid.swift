@@ -19,3 +19,4 @@ func testEraseSyncActorIsolatedPartialApplication(a: MyActor) {
 func testEraseSyncAsAsyncActorIsolatedPartialApplication(a: MyActor) {
   takeAsyncIsolatedAny(fn: a.syncAction)  // expected-error {{actor-isolated instance method 'syncAction()' can not be partially applied}}
 }
+// UNSUPPORTED: OS=windows-msvc

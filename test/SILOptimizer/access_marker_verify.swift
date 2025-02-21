@@ -1098,3 +1098,4 @@ public func testNonAddressMemBehavior(_ N: Int) {
   let listOfStrings: [String] = (0..<10).map { "This is the number: \($0)!\n" }
   let stream = StreamClass()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ struct WitnessUnavailable: ProtoWithAssocType { // expected-error {{type 'Witnes
   @available(macOS, unavailable)
   struct A {} // expected-error {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -34,3 +34,4 @@ class NonGenericSubclass : GenericSubclass<ConcreteClass> {}
   func rambo(c: ConcreteClass) {}
   func rocky(c: NonGenericSubclass) {}
 }
+// UNSUPPORTED: OS=windows-msvc

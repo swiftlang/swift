@@ -69,3 +69,4 @@ extension String {
 // is owned by the Swift module.
 // rdar://58876107
 // ALL-NOT: {{"precise": ?"s:SS"}}
+// UNSUPPORTED: OS=windows-msvc

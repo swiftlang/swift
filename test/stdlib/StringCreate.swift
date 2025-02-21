@@ -292,3 +292,4 @@ StringCreateTests.test("Validating.utf32")
   expectNil(String(validating: AnyCollection(i3), as: UTF32.self))
   expectEqual(String(validating: AnySequence(i4), as: UTF32.self), s4)
 }
+// UNSUPPORTED: OS=windows-msvc

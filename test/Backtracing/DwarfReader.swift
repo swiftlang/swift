@@ -34,3 +34,4 @@ struct DwarfReader {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

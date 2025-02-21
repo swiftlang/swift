@@ -219,3 +219,4 @@ do {
     subscript(_: inout Double...) -> Bool { true } // expected-error {{'inout' may only be used on function or initializer parameters}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

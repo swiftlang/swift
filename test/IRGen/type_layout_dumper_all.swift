@@ -53,3 +53,4 @@ import type_layout_dumper_other
 // CHECK-NEXT:     Alignment:       4
 // CHECK-NEXT:     ExtraInhabitants: 0
 // CHECK-NEXT: ...
+// UNSUPPORTED: OS=windows-msvc

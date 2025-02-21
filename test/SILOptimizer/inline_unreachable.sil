@@ -39,3 +39,4 @@ bb2(%13 : @owned $any Error):
   throw %13                                       
 } 
 
+// UNSUPPORTED: OS=windows-msvc

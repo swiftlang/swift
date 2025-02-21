@@ -131,3 +131,4 @@ DemangleToMetadataTests.test("Objective-C generics") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

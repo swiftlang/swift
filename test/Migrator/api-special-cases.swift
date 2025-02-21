@@ -23,3 +23,4 @@ func foo(_ Opt: NSOpenGLOption, _ pointer: UnsafeMutablePointer<UnsafeMutablePoi
 do {
   _ = abs(1.0)
 }
+// UNSUPPORTED: OS=windows-msvc

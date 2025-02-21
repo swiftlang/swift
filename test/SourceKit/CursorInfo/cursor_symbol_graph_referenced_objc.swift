@@ -48,3 +48,4 @@ struct Parent {
 // OBJC-NEXT: [[FooStruct1_USR]] | public | {{.*}}Foo.h | Foo | User | NonSPI | source.lang.objc
 // OBJC-NEXT:   FooStruct1 swift.struct [[FooStruct1_USR]]
 // OBJC-NEXT: REFERENCED DECLS END
+// UNSUPPORTED: OS=windows-msvc

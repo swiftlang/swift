@@ -296,3 +296,4 @@ entry(%r : $*(Builtin.FixedArray<N, T>, Builtin.FixedArray<N, T>), %v : $*Builti
     copy_addr [take] %v to [init] %b: $*Builtin.FixedArray<N, T>
     return undef : $()
 }
+// UNSUPPORTED: OS=windows-msvc

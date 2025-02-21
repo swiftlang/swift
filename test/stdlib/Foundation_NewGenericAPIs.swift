@@ -75,3 +75,4 @@ func test_NSKeyedUnarchiver_unarchivedObjectOfClasses(from data: Data) throws {
     var r = try NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSString.self, NSData.self, NSArray.self], from: data)
     expectType(Any?.self, &r)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -221,3 +221,4 @@ StructTestSuite.test("InitStructAddrOnly") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

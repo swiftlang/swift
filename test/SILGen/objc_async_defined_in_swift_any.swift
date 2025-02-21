@@ -20,3 +20,4 @@ class FakeClassHolder {
         _ = await self.service.removeKey()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

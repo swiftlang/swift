@@ -43,3 +43,4 @@ enum InvalidAvailableAttribute: CaseIterable {
   @available(deprecated, renamed: "a") // expected-warning {{unknown platform 'deprecated' for attribute 'available'}}
   case b
 }
+// UNSUPPORTED: OS=windows-msvc

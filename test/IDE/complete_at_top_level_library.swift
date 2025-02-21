@@ -142,3 +142,4 @@ protocol MyProtocol {}
 // SCRIPT-DAG: Decl[Struct]/CurrModule: MyStruct[#MyStruct#]; name=MyStruct
 // SCRIPT-DAG: Decl[Protocol]/CurrModule/Flair[RareType]: MyProtocol[#MyProtocol#]; name=MyProtocol
 // SCRIPT-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#]; name=Int
+// UNSUPPORTED: OS=windows-msvc

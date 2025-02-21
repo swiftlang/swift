@@ -20,3 +20,4 @@ let ptr = lookUpClassOpaque("ClassFromLibrary")
 print("Loaded? \(ptr != nil)")
 // WITH-LIB: Loaded? true
 // WITHOUT-LIB: Loaded? false
+// UNSUPPORTED: OS=windows-msvc

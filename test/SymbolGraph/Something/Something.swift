@@ -13,3 +13,4 @@ public struct MyStruct: P {
 // CHECK: "kind": "conformsTo",
 // CHECK-NEXT: "source": "s:9Something8MyStructV",
 // CHECK-NEXT: "target": "s:12SomeProtocol1PP",
+// UNSUPPORTED: OS=windows-msvc

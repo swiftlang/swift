@@ -4,3 +4,4 @@ extension Undeclared {
 
 // RUN: %sourcekitd-test -req=cursor -pos=2:8 %s -- %s
 // CHECK: <Declaration>func foo()
+// UNSUPPORTED: OS=windows-msvc

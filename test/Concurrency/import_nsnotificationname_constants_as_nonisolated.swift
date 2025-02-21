@@ -43,3 +43,4 @@ func testMainActor() {
   print(Test.didTrigger) // Ok
   print(Test.isolatedTrigger) // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

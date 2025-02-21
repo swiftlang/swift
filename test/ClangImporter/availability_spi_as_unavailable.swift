@@ -28,3 +28,4 @@ public let f: SPIInterface2 = .init() // expected-error{{cannot use class 'SPIIn
 public func inlinableUnavailableUsingSPI() {
   SharedInterface.foo()
 }
+// UNSUPPORTED: OS=windows-msvc

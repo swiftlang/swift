@@ -15,4 +15,4 @@ extension Monk {
   public func test() async {
     method()
   }
-}
+}// UNSUPPORTED: OS=windows-msvc

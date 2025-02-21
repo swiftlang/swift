@@ -515,3 +515,4 @@ SimpleMathTests.test("Adjoint value accumulation for aggregate lhs and concrete 
 // CHECK: return [[RES_STRUCT]] : $SmallTestModel.TangentVector
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -344,3 +344,4 @@ func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // expected-error
 
 func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
  // expected-error@-1{{unknown attribute 'noescape'}}
+// UNSUPPORTED: OS=windows-msvc

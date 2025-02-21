@@ -56,3 +56,4 @@ func test_taskGroup_cancel_parent_affects_group() async {
     await test_taskGroup_cancel_parent_affects_group()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

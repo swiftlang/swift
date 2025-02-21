@@ -31,3 +31,4 @@ public func callsNew() {
 // CHECK-NEW-LABEL: declare swiftcc void @"$s36weak_import_deployment_target_helper22hasAvailableDefaultArgyySiF"(i64)
 // CHECK-NEW-LABEL: declare swiftcc i64 @"$s36weak_import_deployment_target_helper17availableFunctionSiyF"()
 // CHECK-NEW-LABEL: declare swiftcc i64 @"$s36weak_import_deployment_target_helper8functionSiyF"()
+// UNSUPPORTED: OS=windows-msvc

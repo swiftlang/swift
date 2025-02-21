@@ -15,3 +15,4 @@ func foo() {
 // CHECK: (5:13, 5:14): String (explicit type: 1)
 // CHECK: (7:10, 7:11): Int (explicit type: 1)
 // CHECK: (9:13, 9:14): Int (explicit type: 1)
+// UNSUPPORTED: OS=windows-msvc

@@ -110,3 +110,4 @@ public func useStuff<T, U, V>(_: T, _: U, _: V) {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

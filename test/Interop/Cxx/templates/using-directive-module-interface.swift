@@ -13,3 +13,4 @@
 // CHECK-NEXT:   var value: Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: typealias UsingWrappedMagicNumber = MagicWrapper<IntWrapper>
+// UNSUPPORTED: OS=windows-msvc

@@ -63,3 +63,4 @@ Reflection.test("Set") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

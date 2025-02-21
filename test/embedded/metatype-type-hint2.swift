@@ -35,3 +35,4 @@ struct Main {
     _ = MyStruct.makeStruct(of: String.self)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

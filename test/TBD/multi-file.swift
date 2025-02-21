@@ -51,3 +51,4 @@ public class Class {
 
     public static func staticFunc(default_: Int = 0) {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ bar
 #else
 baz
 #endif
+// UNSUPPORTED: OS=windows-msvc

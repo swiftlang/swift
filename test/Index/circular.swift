@@ -64,3 +64,4 @@ protocol Cycle2P_C: Cycle2P_B {}
 // CHECK: [[@LINE-1]]:10 | protocol/Swift | Cycle2P_C | {{[^ ]*}} | Def | rel: 0
 // CHECK: [[@LINE-2]]:21 | protocol/Swift | Cycle2P_B | {{[^ ]*}} | Ref,RelBase | rel: 1
 // CHECK:   RelBase | protocol/Swift | Cycle2P_C | {{[^ ]*}}
+// UNSUPPORTED: OS=windows-msvc

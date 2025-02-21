@@ -40,3 +40,4 @@ import OtherClangModule.SubModule
 
 let bar = Bar()
 let baz = OtherBar()
+// UNSUPPORTED: OS=windows-msvc

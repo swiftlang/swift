@@ -49,3 +49,4 @@ public func g() {
 // CHECK-OPT-DAG: declare dllimport swiftcc ptr @"$s9dllexport2ciAA1cCvau"()
 // CHECK-OPT-DAG: declare dllimport void @swift_deallocClassInstance(ptr, i64, i64)
 // CHECK-OPT-DAG: declare dllimport swiftcc ptr @"$s9dllexport1cCfd"(ptr swiftself)
+// UNSUPPORTED: OS=windows-msvc

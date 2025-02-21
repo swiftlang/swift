@@ -95,3 +95,4 @@ public enum WrapperEnum {
         fatalError()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

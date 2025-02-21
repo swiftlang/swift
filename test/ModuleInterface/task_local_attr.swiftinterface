@@ -18,3 +18,4 @@ import _Concurrency
     set
   }
 }
+// UNSUPPORTED: OS=windows-msvc

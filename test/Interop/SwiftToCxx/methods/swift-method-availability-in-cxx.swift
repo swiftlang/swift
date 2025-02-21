@@ -38,3 +38,4 @@ public struct Struct {
 // CHECK: SWIFT_INLINE_THUNK void Struct::unavailableMethod() const SWIFT_UNAVAILABLE_MSG("stuff happened") {
 
 // CHECK: SWIFT_INLINE_THUNK swift::Int Struct::operator [](swift::Int x) const SWIFT_SYMBOL("s:7Methods6StructVyS2icig") SWIFT_AVAILABILITY(macos,introduced=11)
+// UNSUPPORTED: OS=windows-msvc

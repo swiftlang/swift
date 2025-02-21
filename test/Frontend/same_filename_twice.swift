@@ -11,3 +11,4 @@
 // RUN: ls %t/allow_compiler_errors.swiftmodule
 
 // CHECK: filename "File.swift" used twice:
+// UNSUPPORTED: OS=windows-msvc

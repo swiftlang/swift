@@ -180,3 +180,4 @@ public struct S1: Differentiable {
 // CHECK-SIL: struct TangentVector : AdditiveArithmetic, Differentiable {
 // CHECK-SIL:   @_hasStorage var simd: Array<Float>.DifferentiableView { get set }
 // CHECK-SIL:   @_hasStorage var scalar: Float { get set }
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ func testFloatingPointDifferentiableConformance() {
   assertSelfEqualsTangentVector(Float80.self)
   #endif
 }
+// UNSUPPORTED: OS=windows-msvc

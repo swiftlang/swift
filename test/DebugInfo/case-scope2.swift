@@ -16,3 +16,4 @@ public func f(_ s1: Set<Int>?, _ s2: Set<Int>?) {
     consume((a))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

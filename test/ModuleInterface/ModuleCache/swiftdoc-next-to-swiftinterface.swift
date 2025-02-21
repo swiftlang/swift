@@ -23,3 +23,4 @@ public struct SomeStructWithDocumentation {}
 
 // CHECK: Very important documentation!
 // CHECK-NEXT: struct SomeStructWithDocumentation {
+// UNSUPPORTED: OS=windows-msvc

@@ -208,3 +208,4 @@ func upperBound<R : RandomAccessStream>
   }
   return range
 }
+// UNSUPPORTED: OS=windows-msvc

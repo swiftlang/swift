@@ -19,3 +19,4 @@ func exhaustiveSwitch(e: NSEnumAddedCasesIn2017) {
     return    
   }
 }
+// UNSUPPORTED: OS=windows-msvc

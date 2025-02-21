@@ -35,3 +35,4 @@ bb0(%0 : $*(repeat each V)):
   return %ret : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

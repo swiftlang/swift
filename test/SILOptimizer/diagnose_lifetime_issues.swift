@@ -97,3 +97,4 @@ final class Testcl {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

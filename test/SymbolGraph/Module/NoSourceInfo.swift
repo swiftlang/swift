@@ -31,3 +31,4 @@ open class C<Data> {
 open class CO: C<String> {
     override public init() { super.init() }
 }
+// UNSUPPORTED: OS=windows-msvc

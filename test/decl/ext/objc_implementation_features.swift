@@ -12,3 +12,4 @@
 // CHECK-DAG: objc_implementation_features.swift:[[@LINE+2]]:{{[0-9]+}}: error: extension for main class interface should provide implementation for initializer 'init()'{{$}}
 // CHECK-NOT: objc_implementation_features.swift:[[@LINE+1]]:{{[0-9]+}}: error: 'implementation' attribute is only valid when experimental feature ObjCImplementation is enabled
 @objc @implementation extension ObjCBasicInitClass {}
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ func empty() {
 }
 
 empty()
+// UNSUPPORTED: OS=windows-msvc

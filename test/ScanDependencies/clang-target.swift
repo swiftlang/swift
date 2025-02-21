@@ -20,3 +20,4 @@
 // CHECK-NEXT: "{{.*}}-apple-macosx10.14"
 import X
 import XWithTarget
+// UNSUPPORTED: OS=windows-msvc

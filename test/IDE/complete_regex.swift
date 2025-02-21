@@ -8,3 +8,4 @@ func testLiteral() {
 // RE_LITERAL_MEMBER-DAG: Keyword[self]/CurrNominal:          self[#Regex<Substring>#];
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ class AnyColorBox: LessAvailable {} // Ok, exception specifically for AnyColorBo
 @available(macOS 10.15, *)
 @usableFromInline
 class OtherClass: LessAvailable {} // expected-error {{'LessAvailable' is only available in macOS 11 or newer; clients of 'SwiftUI' may have a lower deployment target}}
+// UNSUPPORTED: OS=windows-msvc

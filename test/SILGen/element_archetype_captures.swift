@@ -63,3 +63,4 @@ public func varCaptures<each T, each U>(ts: repeat each T, us: repeat each U) {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

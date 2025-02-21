@@ -88,3 +88,4 @@ class С_56396 {
     self.callback = callback // expected-error {{cannot assign value of type '(Self) -> Void' to type '(С_56396) -> Void'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

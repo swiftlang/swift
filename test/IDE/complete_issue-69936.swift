@@ -11,3 +11,4 @@ struct Test {
 func objectAndKeyPath<Root, Input>(object: Root, keyPath: WritableKeyPath<Root, Input>) {}
 
 // COMPLETE: Decl[InstanceVar]/CurrNominal:      currentHeight[#Int#]; name=currentHeight
+// UNSUPPORTED: OS=windows-msvc

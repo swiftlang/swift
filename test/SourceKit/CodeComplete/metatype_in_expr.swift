@@ -13,3 +13,4 @@ var fooTy2 : Foo.metatype
 
 var foo : Foo
 var fooTy3 = foo.metatype // expected-error {{value of type 'Foo' has no member 'metatype'}}
+// UNSUPPORTED: OS=windows-msvc

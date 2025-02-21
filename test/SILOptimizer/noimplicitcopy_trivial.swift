@@ -1096,3 +1096,4 @@ public func test3(i: consuming Int) -> Int {
 public func test4(i: borrowing Int) -> Int {  // expected-error {{'i' cannot be captured by an escaping closure}}
   takeClosure { i } // expected-note {{closure capturing 'i' here}}
 }
+// UNSUPPORTED: OS=windows-msvc

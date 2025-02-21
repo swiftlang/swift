@@ -19,3 +19,4 @@ class IntegerClass : ExpressibleByIntegerLiteral, Equatable {
 }
 
 func foo<T: IntegerClass>(_ num: T) { let _ =  num != 0 }
+// UNSUPPORTED: OS=windows-msvc

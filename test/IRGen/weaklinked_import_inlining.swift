@@ -37,3 +37,4 @@ func testAlwaysEmitIntoClient() {
   // CHECK-DAG: declare extern_weak {{.+}} @"$s24weaklinked_import_helper2fnyyF"()
   aeicFuncCallingFn()
 }
+// UNSUPPORTED: OS=windows-msvc

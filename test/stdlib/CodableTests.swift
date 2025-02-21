@@ -1222,3 +1222,4 @@ for (name, test) in tests {
 
 runAllTests()
 #endif
+// UNSUPPORTED: OS=windows-msvc

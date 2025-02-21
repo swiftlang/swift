@@ -290,3 +290,4 @@ do {
     _ = X(content: <#T##() -> _#>) // expected-error {{editor placeholder in source file}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

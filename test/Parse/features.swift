@@ -10,3 +10,4 @@
 // CHECK-WITHOUT: cannot find 'complete' in scope
 complete junk
 #endif
+// UNSUPPORTED: OS=windows-msvc

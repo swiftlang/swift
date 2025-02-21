@@ -64,3 +64,4 @@ func returnIntAbs() -> Int {
   let x = abs(-8)
   return x
 }
+// UNSUPPORTED: OS=windows-msvc

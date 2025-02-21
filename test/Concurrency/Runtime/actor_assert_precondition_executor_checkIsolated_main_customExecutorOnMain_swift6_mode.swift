@@ -107,3 +107,4 @@ actor ActorOnNaiveOnMainQueueExecutor {
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

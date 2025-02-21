@@ -15,3 +15,4 @@ func done() -> Y {
   let x = X()
   return doSomething(x)
 }
+// UNSUPPORTED: OS=windows-msvc

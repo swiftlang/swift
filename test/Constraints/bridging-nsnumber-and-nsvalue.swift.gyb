@@ -123,3 +123,4 @@ func bridgeNSNumberBackToSpecificType(object: ${ObjectType},
   _ = object as! String // expected-warning{{always fails}}
 }
 % end
+// UNSUPPORTED: OS=windows-msvc

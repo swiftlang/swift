@@ -49,3 +49,4 @@ struct EncodedView {
 
 // RUN: %sourcekitd-test -req=typecontextinfo -pos=32:43 %s -- %s > %t.response.7
 // RUN: %diff -u %s.response.7 %t.response.7
+// UNSUPPORTED: OS=windows-msvc

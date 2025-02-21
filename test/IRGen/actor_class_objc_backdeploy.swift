@@ -56,3 +56,4 @@ import Foundation
 // CHECK: [[ACTOR_METADATA:%.*]] = extractvalue %swift.metadata_response [[ACTOR_RESPONSE]], 0
 // CHECK: call ptr @class_setSuperclass(ptr [[ACTOR_METADATA]], ptr [[SWIFT_NATIVE_NSOBJECT_CLASS]])
 
+// UNSUPPORTED: OS=windows-msvc

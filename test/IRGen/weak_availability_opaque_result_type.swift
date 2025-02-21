@@ -14,3 +14,4 @@ func useWeakImportedOpaqueResultType<T : P>(_ p: T) {
 
 // CHECK-LABEL: @"$s43weak_availability_opaque_result_type_helper1PPAAE7someAPIQryFQOMQ" = extern_weak global %swift.type_descriptor
 // CHECK-LABEL: declare extern_weak {{.+}} void @"$s43weak_availability_opaque_result_type_helper1PPAAE7someAPIQryF"
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@ protocol P {
 struct S: P {
   subscript(_: sending NonSendableKlass) -> sending NonSendableKlass { NonSendableKlass() }
 }
+// UNSUPPORTED: OS=windows-msvc

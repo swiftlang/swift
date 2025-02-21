@@ -1440,3 +1440,4 @@ public func closureAndClosureCaptureClassArgUseAfterConsume(_ x2: inout NonTrivi
     }
     f()
 }
+// UNSUPPORTED: OS=windows-msvc

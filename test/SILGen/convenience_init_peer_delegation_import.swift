@@ -96,3 +96,4 @@ extension ImportedClass {
     self.init(normalFactory: false)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

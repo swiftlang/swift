@@ -9,3 +9,4 @@ enum SynthesizedEnum : Codable {
 
 }
 
+// UNSUPPORTED: OS=windows-msvc

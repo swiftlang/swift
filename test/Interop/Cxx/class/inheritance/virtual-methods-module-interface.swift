@@ -34,3 +34,4 @@
 // CHECK:  func getOverridden42() -> Int32
 // CHECK:  func get42() -> Int32
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

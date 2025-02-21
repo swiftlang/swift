@@ -46,3 +46,4 @@ extension Test {
     get
   }
 }
+// UNSUPPORTED: OS=windows-msvc

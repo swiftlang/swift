@@ -25,3 +25,4 @@
 // CHECK-DAG: "supportsLibraryEvolution":true
 // CHECK: }
 // CHECK: ]
+// UNSUPPORTED: OS=windows-msvc

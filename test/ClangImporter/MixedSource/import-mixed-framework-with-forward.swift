@@ -17,3 +17,4 @@ BridgingHeader.takeRenamedForward(CustomNameClass())
 
 // Check that we're compiling at all.
 BridgingHeader.takeRenamedForward(SwiftClass(x: 42)) // expected-error {{cannot convert value of type 'SwiftClass' to expected argument type 'CustomNameClass'}}
+// UNSUPPORTED: OS=windows-msvc

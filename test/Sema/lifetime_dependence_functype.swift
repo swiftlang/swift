@@ -46,3 +46,4 @@ func testBorrow(nc: consuming NC) {
   _ = transfer(borrowed)
 }
 
+// UNSUPPORTED: OS=windows-msvc

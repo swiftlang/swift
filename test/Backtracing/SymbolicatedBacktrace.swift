@@ -53,3 +53,4 @@ struct SymbolicatedBacktrace {
     kablam()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

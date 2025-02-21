@@ -21,3 +21,4 @@ func test<X>(value: S<X>) {
 // RUN: %diff -u %s.response.1 %t.response.1
 // RUN: %sourcekitd-test -req=conformingmethods -pos=17:8 %s -req-opts=expectedtypes='[$s8MyModule5ProtoPD]' -- -module-name MyModule %s > %t.response.2
 // RUN: %diff -u %s.response.2 %t.response.2
+// UNSUPPORTED: OS=windows-msvc

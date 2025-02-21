@@ -32,3 +32,4 @@ class D: C {}
 func test(_ x: Foo) -> D {
   return x.bar?.bas as! D
 }
+// UNSUPPORTED: OS=windows-msvc

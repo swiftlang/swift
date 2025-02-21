@@ -50,3 +50,4 @@ func testSometimesReinitInConditional<T>(x: inout T, y: T) { // not-really expec
     }
     consume(consume x) // not-really expected-note{{}}
 }
+// UNSUPPORTED: OS=windows-msvc

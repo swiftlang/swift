@@ -4,3 +4,4 @@
 
 let y = 1
 print("text: \( "he\(/*here*/y)lo" )")
+// UNSUPPORTED: OS=windows-msvc

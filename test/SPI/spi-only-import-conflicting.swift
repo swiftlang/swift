@@ -88,3 +88,4 @@ import Lib
 
 //--- IOI_Default_FileB.swift
 import Lib // expected-warning {{'Lib' inconsistently imported as implementation-only}}
+// UNSUPPORTED: OS=windows-msvc

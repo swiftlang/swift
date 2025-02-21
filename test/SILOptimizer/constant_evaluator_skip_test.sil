@@ -384,3 +384,4 @@ bb0:
   dealloc_stack %5 : $*StructWithSkippedElements
   return %10 : $Builtin.Int64
 } // CHECK: Returns int: 301
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ extension NSObject : CVarArg {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

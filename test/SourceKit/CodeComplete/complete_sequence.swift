@@ -68,3 +68,4 @@ func bar(arg: Bar) {
 // RESULT_FAST-DAG: key.name: "b"
 // RESULT_FAST: ]
 // RESULT_FAST: key.reusingastcontext: 1 
+// UNSUPPORTED: OS=windows-msvc

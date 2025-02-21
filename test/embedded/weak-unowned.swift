@@ -14,3 +14,4 @@ public struct MyStruct {
   unowned var unownedVar: MyClass // expected-error {{attribute 'unowned' cannot be used in embedded Swift}}
   unowned(unsafe) var unownedUnsafe: MyClass
 }
+// UNSUPPORTED: OS=windows-msvc

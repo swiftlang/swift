@@ -71,3 +71,4 @@ public func TF_688<Scalar: Differentiable>(
 ) -> TF_688_Struct<Scalar> {
   reduction(x)
 }
+// UNSUPPORTED: OS=windows-msvc

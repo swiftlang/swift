@@ -489,3 +489,4 @@ sil @test_inline_stack_violating_ossa_func : $@convention(thin) () -> () {
     return %retval : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

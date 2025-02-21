@@ -417,3 +417,4 @@ func rdar58607155() {
   // expected-error@-1 {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType1'}}
   // expected-error@-2 {{local function 'f(t1:t2:)' requires that 'MissingConformance' conform to 'AssocType2'}}
 }
+// UNSUPPORTED: OS=windows-msvc

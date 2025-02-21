@@ -20,3 +20,4 @@ public func test1(_ s: some_struct) -> some_struct {
 public func test2(_ s: inout some_struct) {
   s.out.a = 1
 }
+// UNSUPPORTED: OS=windows-msvc

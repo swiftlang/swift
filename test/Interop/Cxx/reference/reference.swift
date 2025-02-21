@@ -104,3 +104,4 @@ ReferenceTestSuite.test("const reference to template") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

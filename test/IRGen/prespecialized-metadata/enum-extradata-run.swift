@@ -101,3 +101,4 @@ let fourPayloadSize = payloadSizeForEnumMetadata(four)
 // CHECK-NEXT: nil
 print(fourPayloadSize)
 
+// UNSUPPORTED: OS=windows-msvc

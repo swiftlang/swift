@@ -16,3 +16,4 @@ open class UnsafeUnretainedBlockClass {
     self.sc = objc_bool_block()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

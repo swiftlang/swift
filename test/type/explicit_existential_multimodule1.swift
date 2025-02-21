@@ -15,3 +15,4 @@ public protocol P {}
 import M
 func test(_: P) {}
 #endif
+// UNSUPPORTED: OS=windows-msvc

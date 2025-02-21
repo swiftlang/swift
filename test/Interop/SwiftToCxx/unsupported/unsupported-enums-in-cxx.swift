@@ -40,3 +40,4 @@ public enum unsupportedEnumProtocolType {
 // CHECK-NEXT: class unsupportedEnumMultipleAssociatedValues { } SWIFT_UNAVAILABLE_MSG("enum 'unsupportedEnumMultipleAssociatedValues' can not yet be represented in C++ as one of its cases has multiple associated values");
 // CHECK-EMPTY:
 // CHECK-NEXT: class unsupportedEnumProtocolType { } SWIFT_UNAVAILABLE_MSG("enum 'unsupportedEnumProtocolType' can not be represented in C++ as one of its cases has an associated value with type that can't be represented in C++");
+// UNSUPPORTED: OS=windows-msvc

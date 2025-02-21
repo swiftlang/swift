@@ -8,3 +8,4 @@
 
 // BATCH: bin{{/|\\\\}}swift{{c?}}
 // BATCH: @{{[^ ]*}}arguments-{{[0-9a-zA-Z]+}}.resp{{"?}} # -frontend -c -primary-file {{[^ ]+}}/Inputs/main.swift{{"?}} -primary-file {{[^ ]+}}/Inputs/lib.swift
+// UNSUPPORTED: OS=windows-msvc

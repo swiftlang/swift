@@ -30,3 +30,4 @@ func referencesReasyncOverloadAsync() async {
   // due to a sync-vs-async mismatch.
   _ = reasyncOverload
 }
+// UNSUPPORTED: OS=windows-msvc

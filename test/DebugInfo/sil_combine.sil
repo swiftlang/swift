@@ -71,3 +71,4 @@ bb3:
 
 
 // CHECK-IR: ![[DBG_VAR]] = !DILocalVariable(name: "hello"
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ class SomeClass {
 // CHECK-SAME: size: {{64|32}})
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "second", 
 // CHECK-SAME: size: {{128|96}}, offset: {{64|32}})
+// UNSUPPORTED: OS=windows-msvc

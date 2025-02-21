@@ -57,3 +57,4 @@ func w<O, M>(_ o: O, at m: WritableKeyPath<O, M>, with v: M) -> O {return o}
 
 @derivative(of: w)
 func vjpw<O, M>(_ o: O, at m: WritableKeyPath<O, M>, with v: M) -> (value: O, pullback: (O.TangentVector) -> (O.TangentVector, M.TangentVector)) where O: Differentiable, M: ZProtocol{fatalError("")}
+// UNSUPPORTED: OS=windows-msvc

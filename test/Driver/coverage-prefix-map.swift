@@ -7,3 +7,4 @@
 // CHECK-SIMPLE: coverage-prefix-map old=new
 // CHECK-COMPLEX: coverage-prefix-map old=n=ew
 // CHECK-EMPTY: coverage-prefix-map old=
+// UNSUPPORTED: OS=windows-msvc

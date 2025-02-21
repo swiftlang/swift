@@ -45,3 +45,4 @@ let x = 0
 #else
 let y = boom // expected-swift5-error{{'boom'}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

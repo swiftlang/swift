@@ -15,3 +15,4 @@ struct X<T: ExpressibleByIntegerLiteral> {
 
 X().g() // expected-error{{generic parameter 'T' could not be inferred}}
 // expected-note@-1{{explicitly specify the generic arguments to fix this issue}}
+// UNSUPPORTED: OS=windows-msvc

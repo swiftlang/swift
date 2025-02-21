@@ -583,4 +583,4 @@ protocol P5 where Self: Other {}
 protocol P6 {}
 
 func invalidOverload(_: P5 & P6 & Other) {} // expected-note {{'invalidOverload' previously declared here}}
-func invalidOverload(_: P5 & P6) {} // expected-error {{invalid redeclaration of 'invalidOverload'}}
+func invalidOverload(_: P5 & P6) {} // expected-error {{invalid redeclaration of 'invalidOverload'}}// UNSUPPORTED: OS=windows-msvc

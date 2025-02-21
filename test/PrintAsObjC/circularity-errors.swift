@@ -71,3 +71,4 @@ class C1: ProtoImpl, C2 {}
 } // CHECK: @end
 // CHECK-LABEL: @protocol E1 <E2>
 // CHECK: @end
+// UNSUPPORTED: OS=windows-msvc

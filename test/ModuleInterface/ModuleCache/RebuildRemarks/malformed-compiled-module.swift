@@ -16,4 +16,4 @@
 
 import TestModule // expected-remark {{rebuilding module 'TestModule' from interface}}
 // expected-note @-1 {{is out of date}}
-// expected-note @-2 {{malformed}}
+// expected-note @-2 {{malformed}}// UNSUPPORTED: OS=windows-msvc

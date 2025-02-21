@@ -13,3 +13,4 @@
 
 // USER-MODULE-PRINT-NOT-NOT: user module version: 13.13.0.0
 // USER-MODULE-PRINT: user module version: 13.13.0.0
+// UNSUPPORTED: OS=windows-msvc

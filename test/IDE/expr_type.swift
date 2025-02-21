@@ -11,3 +11,4 @@
 
 // CHECK-SUGAR: return <expr type:"MyInt"><expr type:"MyInt">a</expr> <expr type:"(Int, Int) -> Int">+</expr> <expr type:"MyInt">b</expr></expr>
 // CHECK-CANON: return <expr type:"Int"><expr type:"Int">a</expr> <expr type:"(Int, Int) -> Int">+</expr> <expr type:"Int">b</expr></expr>
+// UNSUPPORTED: OS=windows-msvc

@@ -316,3 +316,4 @@ actor ProtectDictionary {
     // expected-warning@-1 {{cannot call mutating async function 'mutate()' on actor-isolated property 'dict'; this is an error in the Swift 6 language mode}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

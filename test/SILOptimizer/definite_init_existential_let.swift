@@ -25,3 +25,4 @@ func immutableP(field: P) {
   x = field
   x.bar = 4 // expected-error{{}}
 }
+// UNSUPPORTED: OS=windows-msvc

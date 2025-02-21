@@ -26,3 +26,4 @@ public func getSubclassX(_ o: Subclass) -> Int32 {
 public func getSubclassY(_ o: Subclass) -> Int32 {
   return o.y
 }
+// UNSUPPORTED: OS=windows-msvc

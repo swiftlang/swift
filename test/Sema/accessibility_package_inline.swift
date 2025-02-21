@@ -170,3 +170,4 @@ public func libFunc() {
   publicFunc()
   packageFunc() // OK
 }
+// UNSUPPORTED: OS=windows-msvc

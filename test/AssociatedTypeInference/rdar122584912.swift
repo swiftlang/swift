@@ -23,4 +23,4 @@ class C: P {
 }
 
 let x: DefaultA.Type = C.A.self
-let y: String.Type = C.B.self
+let y: String.Type = C.B.self// UNSUPPORTED: OS=windows-msvc

@@ -47,3 +47,4 @@ func canImportVersion() {
   let c = 1
 #endif
 }
+// UNSUPPORTED: OS=windows-msvc

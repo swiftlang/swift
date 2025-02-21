@@ -10,3 +10,4 @@ import Foundation
 func mach_task_self() -> mach_port_t {
     return mach_task_self_
 }
+// UNSUPPORTED: OS=windows-msvc

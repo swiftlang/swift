@@ -16,3 +16,4 @@ public func overloadedFuncArgLabel(y _: Float) { }
 // CHECK: // Unavailable in C++: Swift global function 'overloadedFunc(_:)'.
 
 // CHECK: // Unavailable in C++: Swift global function 'overloadedFuncArgLabel(y:)'.
+// UNSUPPORTED: OS=windows-msvc

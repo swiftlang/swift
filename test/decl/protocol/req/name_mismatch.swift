@@ -58,3 +58,4 @@ class MislabeledSubscript : P3 {
     return 1
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -252,3 +252,4 @@ public func useUnavailableMethod(s: UnavailableStruct) {
 }
 
 // CHECK-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper17UnavailableStructV17unavailableMethodyyF"(ptr noalias swiftself)
+// UNSUPPORTED: OS=windows-msvc

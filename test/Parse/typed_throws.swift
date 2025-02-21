@@ -35,3 +35,4 @@ struct S<Element, Failure: Error> {
   init(produce: @escaping () async throws(Failure) -> Element?) {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

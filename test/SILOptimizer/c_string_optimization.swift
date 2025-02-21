@@ -56,3 +56,4 @@ testStringConstantForCFunction()
 // CHECK-OUTPUT: String
 testTypeInterpolation()
 
+// UNSUPPORTED: OS=windows-msvc

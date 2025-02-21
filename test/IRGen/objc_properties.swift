@@ -309,3 +309,4 @@ class SomeWrapperTests {
 // CHECK-NEW:     ptr [[PROTOCOLCLASSPROPERTY_ATTRS]]
 // CHECK-NEW:   }]
 // CHECK-NEW: }, section "__DATA, {{.*}}", align 8
+// UNSUPPORTED: OS=windows-msvc

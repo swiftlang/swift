@@ -15,3 +15,4 @@ class Foo {
 // CHECK: out-file: REMAPPED_OUT_DIR{{/|\\}}indexstore_with_remappings.o
 // CHECK: is-debug: 1
 // CHECK: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
+// UNSUPPORTED: OS=windows-msvc

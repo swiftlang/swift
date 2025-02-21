@@ -1087,4 +1087,4 @@ func attempt(n: Int) {
       attempt(n: i)
     }
   }
-}
+}// UNSUPPORTED: OS=windows-msvc

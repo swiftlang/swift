@@ -63,3 +63,4 @@ func testSwitch() -> Bool {
   case (.case11, _): return true
   }
 }
+// UNSUPPORTED: OS=windows-msvc

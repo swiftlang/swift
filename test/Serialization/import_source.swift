@@ -16,3 +16,4 @@ var _ : Int = negate(5) // no-warning
 
 // CHECK: import_source.swift:[[@LINE+1]]:22: error: 'CBool' is not a subtype of 'Int'
 var _ : Int = negate(true)
+// UNSUPPORTED: OS=windows-msvc

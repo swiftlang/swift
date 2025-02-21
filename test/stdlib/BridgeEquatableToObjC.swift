@@ -48,3 +48,4 @@ BridgeEquatableToObjC.test("Bridge non-equatable struct") {
 
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -49,3 +49,4 @@ distributed actor DefaultDistributedActor {
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

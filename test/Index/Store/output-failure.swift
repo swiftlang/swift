@@ -40,3 +40,4 @@
 // RUN: %FileCheck %s -check-prefix=RECORD_ERR < %t/record2.txt
 
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

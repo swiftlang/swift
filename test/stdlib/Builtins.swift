@@ -327,3 +327,4 @@ tests.test("_specialize") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

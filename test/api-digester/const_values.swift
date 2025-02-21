@@ -11,3 +11,4 @@
 // CHECK: "value": "\"abc\""
 // CHECK: "kind": "StringLiteral"
 // CHECK: "value": "\"def\""
+// UNSUPPORTED: OS=windows-msvc

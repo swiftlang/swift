@@ -27,3 +27,4 @@ public struct server {
         _ = server
     }
 }
+// UNSUPPORTED: OS=windows-msvc

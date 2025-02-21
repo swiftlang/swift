@@ -46,3 +46,4 @@ struct Foo {
         }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

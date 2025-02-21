@@ -20,3 +20,4 @@ class D: C { }
 
 @DefaultInit
 struct E { }
+// UNSUPPORTED: OS=windows-msvc

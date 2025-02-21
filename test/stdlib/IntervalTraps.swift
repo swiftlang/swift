@@ -55,3 +55,4 @@ IntervalTraps.test("Closed")
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

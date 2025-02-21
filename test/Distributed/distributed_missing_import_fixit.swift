@@ -11,3 +11,4 @@ distributed actor MissingImportDistributedActor_0 { }
 
 let t: DistributedActorSystem // expected-error{{cannot find type 'DistributedActorSystem' in scope}}
 
+// UNSUPPORTED: OS=windows-msvc

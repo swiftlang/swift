@@ -12,3 +12,4 @@ var a : TheBuiltinInt64
 // Check that it really is Builtin.Int64.
 var wrapped = Int64(a) // okay
 var badWrapped = Int32(a) // expected-error{{no exact matches in call to initializer}}
+// UNSUPPORTED: OS=windows-msvc

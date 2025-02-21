@@ -49,3 +49,4 @@ package enum PkgEnum {
 
 //--- Client.swift
 import Bar
+// UNSUPPORTED: OS=windows-msvc

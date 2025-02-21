@@ -95,3 +95,4 @@ struct T3<X> where X: P1 {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

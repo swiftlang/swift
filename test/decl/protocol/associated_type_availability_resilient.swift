@@ -16,3 +16,4 @@ protocol P1 {
   @available(macOS 13, *)
   associatedtype C: P = Int
 }
+// UNSUPPORTED: OS=windows-msvc

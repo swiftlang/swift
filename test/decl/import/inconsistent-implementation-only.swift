@@ -39,3 +39,4 @@ import NotSoSecret2 // expected-warning {{'NotSoSecret2' inconsistently imported
 @_implementationOnly import ActuallySecret // no-warning
 import ActuallyOkay // no-warning
 
+// UNSUPPORTED: OS=windows-msvc

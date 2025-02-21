@@ -67,3 +67,4 @@ class HasBlockImpl: HasBlock {
 class GlobalProperty {
   public class var globalCFString: CFString { return constCGlobal }
 }
+// UNSUPPORTED: OS=windows-msvc

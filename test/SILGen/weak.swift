@@ -94,3 +94,4 @@ func testNoneWeak() {
   weak var x: CC? = nil
   weak var y: CC? = .none
 }
+// UNSUPPORTED: OS=windows-msvc

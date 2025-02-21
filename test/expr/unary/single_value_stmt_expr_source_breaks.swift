@@ -20,3 +20,4 @@ func bar() {
     // expected-error@-1 {{unexpected non-void return value in void function}}
     // expected-note@-2 {{did you mean to add a return type?}}
 }
+// UNSUPPORTED: OS=windows-msvc

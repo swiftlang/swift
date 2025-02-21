@@ -160,3 +160,4 @@ public class MacCatalystAvailableClass {
     // CHECK-NEXT: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor
   }
 }
+// UNSUPPORTED: OS=windows-msvc

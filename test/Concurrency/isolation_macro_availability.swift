@@ -26,3 +26,4 @@ func testAvailable5_1() {
   _ = #isolation
   isolatedFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

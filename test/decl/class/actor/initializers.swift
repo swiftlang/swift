@@ -34,3 +34,4 @@ actor SomebodyElse: GoodActor {
     self.x = 0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

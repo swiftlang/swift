@@ -41,3 +41,4 @@ func main() {
 // AST-LABEL: func testSending(_ x: sending String) -> sending String
 // AST-LABEL: func testSendingFunc(_ x: (sending String) -> ())
 // AST-LABEL: func testSendingResultFunc(_ x: () -> sending String)
+// UNSUPPORTED: OS=windows-msvc

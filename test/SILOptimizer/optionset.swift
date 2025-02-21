@@ -42,3 +42,4 @@ public func returnTestOptions() -> TestOptions {
 public func returnEmptyTestOptions() -> TestOptions {
     return []
 }
+// UNSUPPORTED: OS=windows-msvc

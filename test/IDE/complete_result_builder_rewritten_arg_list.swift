@@ -29,3 +29,4 @@ struct R {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

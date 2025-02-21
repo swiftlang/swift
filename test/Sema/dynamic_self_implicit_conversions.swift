@@ -79,3 +79,4 @@ final class Final {
 func testNoErasure(_ body: (Final) -> ()) {
   return Final.useSelf(body)
 }
+// UNSUPPORTED: OS=windows-msvc

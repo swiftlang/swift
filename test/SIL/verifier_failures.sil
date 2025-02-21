@@ -68,3 +68,4 @@ failure(%error : @owned $any Error):
   dealloc_stack %allocation : $*Builtin.SILToken
   throw %error : $any Error
 }
+// UNSUPPORTED: OS=windows-msvc

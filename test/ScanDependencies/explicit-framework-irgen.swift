@@ -64,3 +64,4 @@ import Foo
 // CHECK-NEXT:  count
 // CHECK-NEXT:  string #1 -framework
 // CHECK-NEXT:  string #2 Foo
+// UNSUPPORTED: OS=windows-msvc

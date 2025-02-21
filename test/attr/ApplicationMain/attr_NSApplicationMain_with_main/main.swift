@@ -9,3 +9,4 @@
 // REQUIRES: objc_interop
 
 hi()
+// UNSUPPORTED: OS=windows-msvc

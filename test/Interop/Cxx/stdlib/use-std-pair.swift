@@ -63,3 +63,4 @@ StdPairTestSuite.test("StdPair as CxxPair") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

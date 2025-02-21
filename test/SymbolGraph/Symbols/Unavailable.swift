@@ -37,3 +37,4 @@ extension String {
 extension String {
   public func shouldntAppear2() {}
 }
+// UNSUPPORTED: OS=windows-msvc

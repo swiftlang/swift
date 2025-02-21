@@ -11,3 +11,4 @@
 // REQUIRES: executable_test
 
 #include "generic-function-execution.cpp"
+// UNSUPPORTED: OS=windows-msvc

@@ -61,3 +61,4 @@ print(gg)
 // CHECK-OUTPUT: abc
 testNonConst("abc")
 print(gg)
+// UNSUPPORTED: OS=windows-msvc

@@ -63,3 +63,4 @@ struct Local {
 // CHECK: MyMachine
 // CHECK: ]
 
+// UNSUPPORTED: OS=windows-msvc

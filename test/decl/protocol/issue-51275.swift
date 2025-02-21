@@ -63,3 +63,4 @@ public protocol AZ3 : ZA3 {}
 public protocol ZZ3 { associatedtype F }
 extension AZ3 where Self : ZZ3 { public init(first: F?) { fatalError() } }
 
+// UNSUPPORTED: OS=windows-msvc

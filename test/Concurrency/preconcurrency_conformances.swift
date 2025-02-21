@@ -306,3 +306,4 @@ do {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

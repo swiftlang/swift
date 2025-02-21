@@ -16,3 +16,4 @@ func foo() {
   objc_setUncaughtExceptionHandler { _ in
   }
 }
+// UNSUPPORTED: OS=windows-msvc

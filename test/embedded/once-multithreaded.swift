@@ -65,3 +65,4 @@ struct Main {
     // CHECK-NEXT: All done
   }
 }
+// UNSUPPORTED: OS=windows-msvc

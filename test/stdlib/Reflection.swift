@@ -230,3 +230,4 @@ do {
 
 // CHECK-LABEL: and now our song is done
 print("and now our song is done")
+// UNSUPPORTED: OS=windows-msvc

@@ -83,3 +83,4 @@ struct MyStruct6 {
 
 @_section("__TEXT,__mysection") var gp1: UnsafeMutablePointer<Int>? = nil
 @_section("__TEXT,__mysection") var gp2: UnsafeMutablePointer<Int>? = UnsafeMutablePointer(bitPattern: 0x42424242)
+// UNSUPPORTED: OS=windows-msvc

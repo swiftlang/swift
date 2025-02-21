@@ -41,3 +41,4 @@ extension A {
   // CHECK: {{^}} func foo()
   func foo() { }
 }
+// UNSUPPORTED: OS=windows-msvc

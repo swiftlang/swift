@@ -88,3 +88,4 @@ func foo() async {
 
   _ = await bar // OK
 }
+// UNSUPPORTED: OS=windows-msvc

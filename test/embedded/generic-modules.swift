@@ -47,3 +47,4 @@ public func main() {
   foo(info: [1, 2, 3])
 }
 
+// UNSUPPORTED: OS=windows-msvc

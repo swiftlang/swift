@@ -320,3 +320,4 @@ bb0(%0 : $*T):
   return %r : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

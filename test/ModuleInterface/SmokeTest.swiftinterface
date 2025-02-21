@@ -93,3 +93,4 @@ public var readWriteVar: Int { get set }
 
 // CHECK: public func verySimpleFunction(){{$}}
 public func verySimpleFunction()
+// UNSUPPORTED: OS=windows-msvc

@@ -147,3 +147,4 @@ bb0(%0 : $A):
   %20 = tuple ()
   return %20 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

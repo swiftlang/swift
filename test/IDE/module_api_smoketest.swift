@@ -8,3 +8,4 @@ public struct Struct1 {}
 // CHECK-NEXT:  Structs:
 // CHECK-NEXT:     - Name:            Struct1
 
+// UNSUPPORTED: OS=windows-msvc

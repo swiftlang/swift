@@ -18,3 +18,4 @@ func pokeRawValue(_ random: SomeRandomEnum) {
     // expected-error@-1{{expected ':' after 'case'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

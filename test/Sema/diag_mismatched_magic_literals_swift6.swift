@@ -49,3 +49,4 @@ func passingToFilePath(file: String = #file, fileID: String = #fileID) {
   // expected-warning@-1 {{parameter 'fileID' with default argument '#fileID' passed to parameter 'filePath', whose default argument is '#filePath'}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{20-20=(}} {{26-26=)}}
 }
+// UNSUPPORTED: OS=windows-msvc

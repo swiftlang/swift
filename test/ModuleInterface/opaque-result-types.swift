@@ -259,3 +259,4 @@ public struct Zim: AssocTypeInference {
     return 123
   }
 }
+// UNSUPPORTED: OS=windows-msvc

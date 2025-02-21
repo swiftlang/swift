@@ -81,3 +81,4 @@ public func testBorrowingSafeReferenceUse() {
 }
 
 testBorrowingSafeReferenceUse()
+// UNSUPPORTED: OS=windows-msvc

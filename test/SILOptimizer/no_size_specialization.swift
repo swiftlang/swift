@@ -19,3 +19,4 @@ func foo<T>(_ t: T) -> T {
 public func test() -> Int {
   return foo(27)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -47,3 +47,4 @@ if dlsym(RTLD_DEFAULT, "global") == nil {
   exit(EXIT_FAILURE)
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

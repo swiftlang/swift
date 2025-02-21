@@ -17,3 +17,4 @@ func foo() -> Int {
 // CHECK1-NEXT: 5:3 - inactive
 // CHECK1-NEXT: 8:3 - inactive
 // CHECK1-NEXT: END IF CONFIGS
+// UNSUPPORTED: OS=windows-msvc

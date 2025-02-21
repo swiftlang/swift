@@ -38,3 +38,4 @@ class C { // expected-note {{to match this opening '{'}}
 } // expected-error{{unexpected '}' in conditional compilation block}}
 #endif
 // expected-error@+1{{expected '}' in class}}
+// UNSUPPORTED: OS=windows-msvc

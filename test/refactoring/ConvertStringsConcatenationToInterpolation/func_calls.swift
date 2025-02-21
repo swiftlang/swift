@@ -7,3 +7,4 @@ func testStringConcatenation() {
 // RUN: %empty-directory(%t.result)
 // RUN: %refactor -strings-concatenation-to-interpolation -source-filename %s -pos=5:11 -end-pos=5:80 > %t.result/L5.swift
 // RUN: diff -u %S/Outputs/func_calls/L5.swift.expected %t.result/L5.swift
+// UNSUPPORTED: OS=windows-msvc

@@ -46,3 +46,4 @@ return %0 : $Builtin.Int64
 // CHECK: ![[CONST_VAR]] = !DILocalVariable(name: "const"
 // CHECK: ![[CONSTINT_VAR]] = !DILocalVariable(name: "constint"
 // CHECK: ![[CONSTUPLE_VAR]] = !DILocalVariable(name: "constuple"
+// UNSUPPORTED: OS=windows-msvc

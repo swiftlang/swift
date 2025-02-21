@@ -37,3 +37,4 @@ public func testMetadatComparison() -> Bool {
   // CHECK:         return [[I]]
 }
 // CHECK:       } // end sil function '$s4test0A17MetadatComparisonSbyF'
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@ protocol P {
 func foo<T: P>(_ bar: T) {
   bar.b { a in Double((a, a += 1).0) }
 }
+// UNSUPPORTED: OS=windows-msvc

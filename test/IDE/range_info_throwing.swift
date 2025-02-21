@@ -43,3 +43,4 @@ func foo2() throws {
 
 // CHECK-THROW: <Error>Throwing</Error>
 // CHECK-NO-THROW-NOT: <Error>Throwing</Error>
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@
 // RUN: diff -u %S/Outputs/apinotes-migrator-gen.json %t.result
 // RUN: %api-digester -generate-migration-script --input-paths %t.dump2.json -input-paths %t.dump1.json -o %t.result -json
 // RUN: diff -u %S/Outputs/apinotes-migrator-gen-revert.json %t.result
+// UNSUPPORTED: OS=windows-msvc

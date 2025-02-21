@@ -55,3 +55,4 @@ enum Phantom<T> : Int64 {
   case Up
   case Down
 }
+// UNSUPPORTED: OS=windows-msvc

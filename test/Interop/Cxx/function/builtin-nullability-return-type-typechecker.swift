@@ -18,3 +18,4 @@ public func testMemcpyOptionalReturn(p: UnsafeMutableRawPointer, e: UnsafeRawPoi
   let _ = CustomStringBuiltins.strcpy(pc, c)!
   let _ = CustomStringBuiltins.strcat(pc, c)!
 }
+// UNSUPPORTED: OS=windows-msvc

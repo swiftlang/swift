@@ -20,3 +20,4 @@ bb(%0 : @owned $P):
   %void = tuple ()
   return %void : $()
 }
+// UNSUPPORTED: OS=windows-msvc

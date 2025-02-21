@@ -30,3 +30,4 @@ public class DerivedDerived: Derived {
   // Also skip synthesized constructors
   // CHECK-NOT: "precise": "s:24SuperclassImplementation07DerivedC0CACycfc"
 }
+// UNSUPPORTED: OS=windows-msvc

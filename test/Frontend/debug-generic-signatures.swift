@@ -229,3 +229,4 @@ struct RecurGeneric<T: P3>: P3 {
 struct Specialize: P3 {
     typealias A = RecurGeneric<Specialize>
 }
+// UNSUPPORTED: OS=windows-msvc

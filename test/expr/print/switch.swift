@@ -56,3 +56,4 @@ func foo(_ x: Int?) {
 // CHECK-LABEL:     break
 // CHECK-LABEL:   }
 // CHECK-LABEL: }
+// UNSUPPORTED: OS=windows-msvc

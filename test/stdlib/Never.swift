@@ -21,3 +21,4 @@ if #available(SwiftStdlib 5.9, *) {
   struct ConformsToCodable<T: Codable> {}
   _ = ConformsToCodable<Never>()
 }
+// UNSUPPORTED: OS=windows-msvc

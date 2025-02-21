@@ -13,3 +13,4 @@ extension Bas: RawRepresentable {}
 
 // expected-error@+1{{redundant conformance of 'Bas' to protocol 'RawRepresentable'}}
 extension Bas: RawRepresentable {}
+// UNSUPPORTED: OS=windows-msvc

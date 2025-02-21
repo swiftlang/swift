@@ -353,3 +353,4 @@ protocol P {
   subscript(badS badS: Int) -> Int { read modify } //expected-enabled-error{{expected get, read, or set in a protocol property}}
                                                    //expected-disabled-error@-1{{expected get or set in a protocol property}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -47,3 +47,4 @@ test()
 // SANCOV_TRACE_CMP: call void @__sanitizer_cov_trace_cmp
 
 // SANCOV: call void @__sanitizer_cov
+// UNSUPPORTED: OS=windows-msvc

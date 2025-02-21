@@ -310,3 +310,4 @@ func test_invalid_inout_with_restrictions(lhs: inout any BinaryInteger, rhs: any
   var other: (any BinaryInteger)? = nil
   other = &rhs // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 }
+// UNSUPPORTED: OS=windows-msvc

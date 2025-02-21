@@ -43,3 +43,4 @@ extension Wrapper: Differentiable where T: Differentiable {
     value.move(by: offset.value)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

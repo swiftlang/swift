@@ -93,3 +93,4 @@ enum E : ~Equatable { // expected-error{{conformance to 'Equatable' cannot be su
 enum E_Suppressed : ~BitwiseCopyable {}
 
 extension E_Suppressed : BitwiseCopyable {} // expected-error{{cannot both conform to and suppress conformance to 'BitwiseCopyable'}}
+// UNSUPPORTED: OS=windows-msvc

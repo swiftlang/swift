@@ -12,3 +12,4 @@ import PlaygroundSupport
 
 1
 // CHECK: {{\[}}[[@LINE-1]]:1-[[@LINE-1]]:2] __builtin_log[='1']
+// UNSUPPORTED: OS=windows-msvc

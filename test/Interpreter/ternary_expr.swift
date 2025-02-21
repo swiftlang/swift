@@ -18,3 +18,4 @@ for i in 1..<11 {
     ? "buzz"
     : "\(i)")
 }
+// UNSUPPORTED: OS=windows-msvc

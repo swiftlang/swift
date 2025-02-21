@@ -224,3 +224,4 @@ public func callit6() -> X? {
 
 #endif
 
+// UNSUPPORTED: OS=windows-msvc

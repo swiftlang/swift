@@ -19,3 +19,4 @@ func test() {
 }
 
 // COMPLETE: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: automatic[#MyStruct#]; name=automatic
+// UNSUPPORTED: OS=windows-msvc

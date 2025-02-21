@@ -8,3 +8,4 @@ let a = Hold42WithLongInitCallGraph()
 // CHECK-DAG: define {{.*}}i32 @{{_Z11get42Level2v|"\?get42Level2@@YAHXZ"}}
 // CHECK-DAG: define {{.*}}i32 @{{_Z11get42Level3v|"\?get42Level3@@YAHXZ"}}
 // CHECK-DAG: define {{.*}}i32 @{{_Z11get42Level4v|"\?get42Level4@@YAHXZ"}}
+// UNSUPPORTED: OS=windows-msvc

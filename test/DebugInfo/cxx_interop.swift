@@ -3,3 +3,4 @@
 
 // RUN: %target-swift-frontend -emit-ir -enable-experimental-cxx-interop -g %s -o - | %FileCheck %s
 // CHECK:          !DICompileUnit({{.*}}flags: "-enable-experimental-cxx-interop"
+// UNSUPPORTED: OS=windows-msvc

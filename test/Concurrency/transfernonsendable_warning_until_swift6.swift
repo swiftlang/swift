@@ -62,3 +62,4 @@ func testIsolationCrossingDueToCaptureParameter(_ x: NonSendableType) async {
   }
   useValue(x)
 }
+// UNSUPPORTED: OS=windows-msvc

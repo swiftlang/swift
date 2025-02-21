@@ -6,3 +6,4 @@ struct MyBase {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

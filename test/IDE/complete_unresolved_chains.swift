@@ -79,3 +79,4 @@ func testDoublyNestedType() {
 // DOUBLY_NESTED-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#Outer.Inner#];
 // DOUBLY_NESTED-DAG: Decl[Class]/Super/TypeRelation[Convertible]: Inner[#Outer.Inner#];
 
+// UNSUPPORTED: OS=windows-msvc

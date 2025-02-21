@@ -56,3 +56,4 @@ import XLogging
 public func start() {
   _ = XLogging.setup()
 }
+// UNSUPPORTED: OS=windows-msvc

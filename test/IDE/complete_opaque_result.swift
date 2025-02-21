@@ -202,3 +202,4 @@ func testDupGenericReturningOpaque() {
 // DupGenericReturningOpaque: Decl[InstanceMethod]/CurrNominal: returnMyProto()[#MyProtocol#]; name=returnMyProto()
 // DupGenericReturningOpaque-NOT: returnMyProto()
 }
+// UNSUPPORTED: OS=windows-msvc

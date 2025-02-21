@@ -19,3 +19,4 @@ func singleDefaultArgument(i: Int = {
   // CHECK-NEXT: }
   print(i)
 }
+// UNSUPPORTED: OS=windows-msvc

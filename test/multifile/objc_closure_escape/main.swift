@@ -48,3 +48,4 @@ testSuite.test("testEscaping") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

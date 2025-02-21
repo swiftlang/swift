@@ -60,3 +60,4 @@ func testClosure(_ d: CGFloat) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

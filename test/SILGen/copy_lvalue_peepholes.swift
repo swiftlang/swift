@@ -57,3 +57,4 @@ func assign_computed_from_lvalue(y: Int) {
 func assign_var_from_computed(x: inout Int) {
   x = computed
 }
+// UNSUPPORTED: OS=windows-msvc

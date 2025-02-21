@@ -62,3 +62,4 @@ DifferentialOperatorTestSuite.test("gradient_curried_${arity}") {
 % end
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

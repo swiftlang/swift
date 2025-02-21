@@ -94,3 +94,4 @@ extension ChildProtocol {
   // CHECK: Func/commonRequirementWithoutDocComment {{.*}} DocCommentAsXML=none
 }
 
+// UNSUPPORTED: OS=windows-msvc

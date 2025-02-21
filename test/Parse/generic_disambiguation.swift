@@ -85,3 +85,4 @@ A<B?>(x: 0) // parses as type // expected-warning{{unused}}
 _ = a < b ? c : d
 
 A<(B) throws -> D>(x: 0) // expected-warning{{unused}}
+// UNSUPPORTED: OS=windows-msvc

@@ -36,3 +36,4 @@ distributed actor DA {
 
   func asyncAction() async {}
 }
+// UNSUPPORTED: OS=windows-msvc

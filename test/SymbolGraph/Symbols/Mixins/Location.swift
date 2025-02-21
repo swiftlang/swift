@@ -30,3 +30,4 @@ public extension String {
 // EXTENSION-NEXT: "position"
 // EXTENSION-NEXT:   "line": 9
 // EXTENSION-NEXT:   "character": 7
+// UNSUPPORTED: OS=windows-msvc

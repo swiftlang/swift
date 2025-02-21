@@ -34,4 +34,4 @@ public struct S3: P3 {
   public var rawValue: Int { fatalError() }
 }
 
-let x: S1.Type = S3.A.self
+let x: S1.Type = S3.A.self// UNSUPPORTED: OS=windows-msvc

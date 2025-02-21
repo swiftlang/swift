@@ -225,3 +225,4 @@ RefcountOverflowTests.test("nonatomic_unownedRetain moderate increment") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

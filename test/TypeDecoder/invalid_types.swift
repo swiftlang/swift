@@ -10,3 +10,4 @@
 // the type decoder rejects them.
 // DEMANGLE: $sx1td_t
 // CHECK: Can't resolve type of $sx1td_t
+// UNSUPPORTED: OS=windows-msvc

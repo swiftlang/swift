@@ -14,3 +14,4 @@ public class iOSSPIClass { public init() {} }
 	_ = MacOSSPIClass() // expected-error {{class 'MacOSSPIClass' cannot be used in an '@inlinable' function because it is SPI}}
 	_ = iOSSPIClass()
 }
+// UNSUPPORTED: OS=windows-msvc

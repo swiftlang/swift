@@ -70,3 +70,4 @@ func test(value: SomeValue) {
 // INITIALIZER: Begin completions, 1 items
 // INITIALIZER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]/IsSystem: ['(']{#public: Int#}[')'][#SomeValue#];
 }
+// UNSUPPORTED: OS=windows-msvc

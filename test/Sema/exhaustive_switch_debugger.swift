@@ -229,3 +229,4 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   @unknown case _: break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

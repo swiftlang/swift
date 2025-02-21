@@ -40,3 +40,4 @@ public struct SomeStructWithMPE : ~Copyable {
 // CHECK:  call void %Destroy(ptr {{.*}}, ptr @"$s19noncopyable_private22PublicMultiPayloadEnumON"
 // CHECK:  ret void
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

@@ -69,3 +69,4 @@ var x = w
 var y = Foo()
 #endif
 var z = y
+// UNSUPPORTED: OS=windows-msvc

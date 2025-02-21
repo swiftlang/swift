@@ -35,3 +35,4 @@ struct AlwaysAvailableWithUnavailableGA {}
 @available(*, unavailable)
 @UnavailableGA
 struct UnavailableWithUnavailableGA {}
+// UNSUPPORTED: OS=windows-msvc

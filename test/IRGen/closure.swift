@@ -72,3 +72,4 @@ func no_capture_descriptor(_ c: C, _ d: C, _ e: C, _ f: C, _ g: C) {
 func letEscape(f: () -> ()) -> () -> () {
   return withoutActuallyEscaping(f) { return $0 }
 }
+// UNSUPPORTED: OS=windows-msvc

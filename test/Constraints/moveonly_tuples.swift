@@ -23,3 +23,4 @@ func inferredTuples<T>(x: Int, y: borrowing Butt, z: T) {
     _ = b
     _ = c
 }
+// UNSUPPORTED: OS=windows-msvc

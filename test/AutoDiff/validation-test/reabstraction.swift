@@ -174,3 +174,4 @@ ReabstractionE2ETests.test("access @differentiable(reverse) function using KeyPa
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

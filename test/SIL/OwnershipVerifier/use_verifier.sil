@@ -1424,3 +1424,4 @@ bb0(%0 : @unowned $ThreeDifferingPayloadEnum):
   return %1 : $Builtin.Int32
 }
 
+// UNSUPPORTED: OS=windows-msvc

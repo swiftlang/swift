@@ -88,3 +88,4 @@ struct Spam: ~Escapable {
     @lifetime(borrow base)
     init(base: UnsafePointer<Int>, count: Int) {}
 }
+// UNSUPPORTED: OS=windows-msvc

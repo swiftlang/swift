@@ -8,3 +8,4 @@ func g() {
   var _ : (a : Int, b : Int) = f1()
   var _ : (a : Int, b : Int) = f2()
 }
+// UNSUPPORTED: OS=windows-msvc

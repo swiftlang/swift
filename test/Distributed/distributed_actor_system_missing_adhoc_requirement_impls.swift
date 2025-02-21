@@ -963,3 +963,4 @@ public struct PublicFakeResultHandler: DistributedTargetInvocationResultHandler 
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

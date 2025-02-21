@@ -19,3 +19,4 @@ struct Jawn { }
 extension Jawn: RandomNumberGenerator { }
 // expected-error@-1 {{type 'Jawn' does not conform to protocol 'RandomNumberGenerator'}}
 // expected-error@-2 {{unavailable instance method 'next()' was used to satisfy a requirement of protocol 'RandomNumberGenerator'}}
+// UNSUPPORTED: OS=windows-msvc

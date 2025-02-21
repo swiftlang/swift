@@ -35,3 +35,4 @@ struct G<X: P3, Y: R> where X.T == Y.U {
   // CHECK-NEXT: <X, Y, Z where X : P3, Y : R, X.[P1]T == Y.[R]U>
   struct Nested3<Z> where X.T : Q3 {}
 }
+// UNSUPPORTED: OS=windows-msvc

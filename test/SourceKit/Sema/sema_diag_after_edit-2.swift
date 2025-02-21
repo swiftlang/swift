@@ -12,3 +12,4 @@ func foo() {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

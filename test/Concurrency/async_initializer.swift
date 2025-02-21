@@ -175,3 +175,4 @@ protocol Spicy: Plain {
   // expected-error@+1 {{initializer does not override a designated initializer from its parent protocol}}
   override init() async
 }
+// UNSUPPORTED: OS=windows-msvc

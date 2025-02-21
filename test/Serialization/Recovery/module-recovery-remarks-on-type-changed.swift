@@ -43,3 +43,4 @@ public func bar() {
 import LibWithXRef
 
 bar()
+// UNSUPPORTED: OS=windows-msvc

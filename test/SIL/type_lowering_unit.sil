@@ -310,3 +310,4 @@ bb0(%0 : $*GENEInt<T>):
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

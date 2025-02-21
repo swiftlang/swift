@@ -11,3 +11,4 @@ func I57553() {
 % print("#sourceLocation(file: \"issue-57553.swift\", line: 300)\n")
 % print("#sourceLocation()\n")
 }
+// UNSUPPORTED: OS=windows-msvc

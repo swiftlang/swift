@@ -7,3 +7,4 @@ _ = """
     \("bar
     baz
 
+// UNSUPPORTED: OS=windows-msvc

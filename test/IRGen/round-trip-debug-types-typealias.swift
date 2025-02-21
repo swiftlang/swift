@@ -11,3 +11,4 @@ let crash: AnyProtocol<Any?>
 
 // CHECK: @"$s4main5crashAA8Protocol_pypSg1TAaCPRts_XPvp" =
 // CHECK: !DIGlobalVariable(name: "crash", linkageName: "$s4main5crashAA8Protocol_pypSg1TAaCPRts_XPvp"
+// UNSUPPORTED: OS=windows-msvc

@@ -68,3 +68,4 @@ bb3(%3 : $Gizmo):
   %6 = tuple ()
   return %6 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

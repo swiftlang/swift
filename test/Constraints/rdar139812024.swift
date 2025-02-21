@@ -35,3 +35,4 @@ class Test {
     return nil
   }
 }
+// UNSUPPORTED: OS=windows-msvc

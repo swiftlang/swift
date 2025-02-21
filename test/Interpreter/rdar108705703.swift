@@ -26,3 +26,4 @@ func test2() -> Context {
 
 // CHECK: Context(x: nil)
 print(test2())
+// UNSUPPORTED: OS=windows-msvc

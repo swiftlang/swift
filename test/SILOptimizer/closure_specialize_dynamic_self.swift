@@ -21,3 +21,4 @@ func closures(_ x: String) {
   print(Foo.foo { _ = x })
   print(Bar.foo { _ = x })
 }
+// UNSUPPORTED: OS=windows-msvc

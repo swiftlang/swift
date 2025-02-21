@@ -28,3 +28,4 @@ func testNil() {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

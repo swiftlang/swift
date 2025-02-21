@@ -1047,3 +1047,4 @@ class OtherErrorSub : OtherError { }
 // CHECK-NEXT:  #OtherError.init!allocator: {{.*}} : @$s6errors13OtherErrorSubCACycfC [override]
 // CHECK-NEXT:  #OtherErrorSub.deinit!deallocator: @$s6errors13OtherErrorSubCfD        // OtherErrorSub.__deallocating_deinit
 // CHECK-NEXT:}
+// UNSUPPORTED: OS=windows-msvc

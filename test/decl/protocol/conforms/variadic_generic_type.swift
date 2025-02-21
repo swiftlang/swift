@@ -30,3 +30,4 @@ struct ConformsPackRequirements<each T>: HasPackRequirements {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

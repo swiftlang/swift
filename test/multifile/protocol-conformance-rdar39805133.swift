@@ -27,3 +27,4 @@ protocol AtLeast0 : _Int {}
 extension _0_ : AtLeast0 {}
 protocol AtLeast1 : AtLeast0 {}
 extension Inc : AtLeast1, AtLeast0 where T == _0_ {}
+// UNSUPPORTED: OS=windows-msvc

@@ -35,3 +35,4 @@ class CustomIsolated {
   // CHECK:      [[@LINE-1]]:4 | class/Swift | CustomActor | s:14swift_ide_test11CustomActorC | Ref,RelCont | rel: 1
   // CHECK-NEXT: RelCont | instance-method/Swift | customIsolated() | s:14swift_ide_test14CustomIsolatedC06customE0yyF
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -106,3 +106,4 @@ func test_global_actor_sendable_and_sending_closures() {
     forceIsolation(isolation: #isolation)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

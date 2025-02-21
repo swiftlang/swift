@@ -42,3 +42,4 @@ private import LibWithInternalFoo
 
 var s = Struct()
 s.foo() // This is non-ambiguous
+// UNSUPPORTED: OS=windows-msvc

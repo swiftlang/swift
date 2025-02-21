@@ -91,3 +91,4 @@ class Subclass : NSObject {
 // CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}perform(_:with:)[#(Selector?, Any?) -> Unmanaged<AnyObject>?#]; name=perform(_:with:)
 // CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}myClass[#() -> AnyClass?#]; name=myClass
 // CHECK-IN_SUPER_SELECTOR: Decl[InstanceMethod]/CurrNominal/IsSystem: {{.?}}isEqual(_:)[#(NSObject?) -> Bool#]; name=isEqual(_:)
+// UNSUPPORTED: OS=windows-msvc

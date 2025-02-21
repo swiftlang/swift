@@ -577,3 +577,4 @@ package func runPkg(_ arg: [any PkgProto]) {
 //CHECK-NEXT:   method #PkgSimpleProto.pkgVar!setter: <Self where Self : PkgSimpleProto> (inout Self) -> (Int) -> () : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivsTW
 //CHECK-NEXT:   method #PkgSimpleProto.pkgVar!modify: <Self where Self : PkgSimpleProto> (inout Self) -> () -> () : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivMTW
 //CHECK-NEXT:   method #PkgSimpleProto.pkgFunc: <Self where Self : PkgSimpleProto> (Self) -> () -> Int : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP7pkgFuncSiyFTW
+// UNSUPPORTED: OS=windows-msvc

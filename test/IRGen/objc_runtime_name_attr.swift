@@ -15,3 +15,4 @@ class ThisWillBeRenamed {}
 // CHECK: @"$s22objc_runtime_name_attr17ThisWillBeRenamedCMm" = hidden global %objc_class
 // CHECK: @_DATA_RenamedClass = internal constant
 
+// UNSUPPORTED: OS=windows-msvc

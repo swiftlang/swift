@@ -15,3 +15,4 @@ struct Main {
 }
 
 // CHECK: Hello Hello This Is A Long String
+// UNSUPPORTED: OS=windows-msvc

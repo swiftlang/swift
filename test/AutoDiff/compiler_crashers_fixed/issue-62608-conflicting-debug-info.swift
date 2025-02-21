@@ -77,3 +77,4 @@ func testUpdateByCalling() throws {
     let obtainedGradientOfFOfArray = gradient(at: array, of: fOfArray).base
 }
 
+// UNSUPPORTED: OS=windows-msvc

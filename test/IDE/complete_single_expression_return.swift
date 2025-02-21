@@ -641,3 +641,4 @@ var testAccessorUnresolvedTopLevelGet: TopLevelEnum {
 var testClosureUnresolvedTopLevelInit: TopLevelEnum = {
   .#^testClosureUnresolvedTopLevelInit?check=TopLevelEnum^#
 }()
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ extension Tree {
             }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -106,3 +106,4 @@ func testModuleNameInBody() {
 // BEGIN FileLib5.swift
 import #^MODULE_NAME^#
 
+// UNSUPPORTED: OS=windows-msvc

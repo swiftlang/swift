@@ -23,3 +23,4 @@ struct MyStruct: CustomDebugStringConvertible {
 // CHECK: )
 // CHECK: #endif
 
+// UNSUPPORTED: OS=windows-msvc

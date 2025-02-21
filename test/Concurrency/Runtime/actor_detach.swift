@@ -50,3 +50,4 @@ if #available(SwiftStdlib 5.1, *) {
 // CHECK-DAG: 0
 // CHECK-DAG: other
 // CHECK-DAG: 0
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ if (a) {
 // CHECK-NEXT: [9:1-9:7] pc after
 // CHECK-NEXT: [10:3-10:4] pc before
 // CHECK-NEXT: [10:3-10:4] pc after
+// UNSUPPORTED: OS=windows-msvc

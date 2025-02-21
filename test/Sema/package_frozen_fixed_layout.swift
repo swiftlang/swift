@@ -42,3 +42,4 @@ class FixedInternalKlass  {
   func f() {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

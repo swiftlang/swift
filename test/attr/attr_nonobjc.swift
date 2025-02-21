@@ -116,3 +116,4 @@ extension P_46809 {
 @objc enum SomeEnum: Int {
   @nonobjc case what // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}}
 }
+// UNSUPPORTED: OS=windows-msvc

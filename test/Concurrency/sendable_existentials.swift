@@ -67,3 +67,4 @@ func testErasure() {
 
   let _: any A & Sendable = produce() // no warning
 }
+// UNSUPPORTED: OS=windows-msvc

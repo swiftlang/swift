@@ -37,3 +37,4 @@ module DotDot [extern_c] {
 
 //--- dotdot.h
 void test(void);
+// UNSUPPORTED: OS=windows-msvc

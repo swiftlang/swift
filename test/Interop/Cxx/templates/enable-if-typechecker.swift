@@ -8,3 +8,4 @@ import EnableIf
 let x = HasMethodWithEnableIf()
 x.onlyEnabledForBool("a")
 // CHECK: error: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'HasMethodWithEnableIf::onlyEnabledForBool' could not be converted: String
+// UNSUPPORTED: OS=windows-msvc

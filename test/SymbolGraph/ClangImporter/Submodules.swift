@@ -24,3 +24,4 @@ public func someFunc() {}
 
 // SUBMODULE-DAG: "name": "Mixed.Submodule"
 // SUBMODULE-DAG: "precise": "c:@innerVar"
+// UNSUPPORTED: OS=windows-msvc

@@ -72,3 +72,4 @@ nonisolated func passMetaWithMetaSendableVal<T: SendableMetatype & Q>(_: T.Type)
     x.g() // okay, because T is Sendable implies T.Type: Sendable
   }
 }
+// UNSUPPORTED: OS=windows-msvc

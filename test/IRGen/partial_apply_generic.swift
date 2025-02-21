@@ -99,3 +99,4 @@ func coyote<T, U>(_ t: T, _ u: U) {}
 func hawk<A, B, C>(_: A, _ b: B, _ c: C) {
   let fn: (Optional<(A) -> B>, @escaping (inout B, C) -> ()) -> () = coyote
 }
+// UNSUPPORTED: OS=windows-msvc

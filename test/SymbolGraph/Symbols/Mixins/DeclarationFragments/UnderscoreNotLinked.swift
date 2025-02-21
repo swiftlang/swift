@@ -9,3 +9,4 @@ public struct MyStruct : ShouldBeLinked {}
 
 // CHECK: "spelling": "_ShouldntBeLinked"
 // CHECK-NOT: "preciseIdentifier": "s:19UnderscoreNotLinked011_ShouldntBeC0P"
+// UNSUPPORTED: OS=windows-msvc

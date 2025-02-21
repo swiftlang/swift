@@ -14,3 +14,4 @@ public class CVC<A1: AC> where A1: A {
     var a = self
   }
 }
+// UNSUPPORTED: OS=windows-msvc

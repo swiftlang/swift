@@ -43,3 +43,4 @@ UserInaccessibleAreNotAttributes
 #if hasAttribute(opened)
 #error("SIL type attributes are invalid")
 #endif
+// UNSUPPORTED: OS=windows-msvc

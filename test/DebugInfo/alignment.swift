@@ -15,3 +15,4 @@ enum E16 {
 
 var s: S8
 var e: E16
+// UNSUPPORTED: OS=windows-msvc

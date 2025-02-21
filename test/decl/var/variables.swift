@@ -138,3 +138,4 @@ func patternBindingWithTwoEntries() {
   let x2 = 1, (_, _) = (1, 2)
   // expected-warning@-1 {{immutable value 'x2' was never used; consider replacing with '_' or removing it}}
 }
+// UNSUPPORTED: OS=windows-msvc

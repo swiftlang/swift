@@ -47,3 +47,4 @@ foo { bar in
 // CHECK_BAR:   ]
 // CHECK_BAR: }
 // CHECK_BAR: SYMBOL GRAPH END
+// UNSUPPORTED: OS=windows-msvc

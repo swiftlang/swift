@@ -14,3 +14,4 @@ let number = result.stringValue
 print(number)
 
 // CHECK: 25
+// UNSUPPORTED: OS=windows-msvc

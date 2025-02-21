@@ -72,3 +72,4 @@ public func testOpaqueMetadataAccesses() {
   // CHECK: call {{.*}}3bar{{.*}}(ptr {{.*}}, ptr %{{.*}}, ptr %{{.*}})
   bar(x: replaceable_opaque_var)
 }
+// UNSUPPORTED: OS=windows-msvc

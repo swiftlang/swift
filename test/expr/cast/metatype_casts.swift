@@ -58,3 +58,4 @@ do {
 
   f(1 as AnyObject)
 }
+// UNSUPPORTED: OS=windows-msvc

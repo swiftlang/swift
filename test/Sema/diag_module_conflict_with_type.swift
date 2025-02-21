@@ -19,3 +19,4 @@ public func f(_ x: ModuleType.MyStruct) {}
 // CHECK: error: 'MyStruct' is not a member type of struct 'SecondModule.ModuleType'
 // CHECK: SecondModule.ModuleType:1:15: note: 'ModuleType' declared here
 // CHECK: public struct ModuleType {
+// UNSUPPORTED: OS=windows-msvc

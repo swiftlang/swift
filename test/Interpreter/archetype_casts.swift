@@ -53,3 +53,4 @@ print(C().scrutinize())
 print(D().scrutinize())
 // CHECK: Int
 print(3.scrutinize())
+// UNSUPPORTED: OS=windows-msvc

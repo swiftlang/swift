@@ -10,3 +10,4 @@ class PandaCub : NSObject {}
 extension PandaCub {
   @objc func cuddle(_: PandaStyle) { }
 }
+// UNSUPPORTED: OS=windows-msvc

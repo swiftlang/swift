@@ -38,3 +38,4 @@
 // CHECK-NEXT: }
 
 // CHECK-NEXT: func == (_: FunctionsNS1.FunctionsNS2.FunctionsNS3.Y, _: FunctionsNS1.FunctionsNS2.FunctionsNS3.Y) -> Bool
+// UNSUPPORTED: OS=windows-msvc

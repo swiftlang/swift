@@ -39,3 +39,4 @@ func useAPIs() {
 
   _ = e.publicStruct
 }
+// UNSUPPORTED: OS=windows-msvc

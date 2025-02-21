@@ -127,3 +127,4 @@ b:
 x:
   return undef : $()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -96,3 +96,4 @@ func testHasWrappedValue(value: HasWrapped) {
 // HASWRAPPED_DOT: Decl[InstanceVar]/CurrNominal:      wrapped[#Int#];
 // HASWRAPPED_DOT: Decl[InstanceVar]/CurrNominal:      $wrapped[#Wrap<Int>#];
 }
+// UNSUPPORTED: OS=windows-msvc

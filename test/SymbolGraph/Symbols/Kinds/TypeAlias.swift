@@ -8,3 +8,4 @@
 // CHECK: pathComponents
 // CHECK-NEXT: "Alias"
 public typealias Alias = Int
+// UNSUPPORTED: OS=windows-msvc

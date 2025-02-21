@@ -24,4 +24,4 @@ class D {
 _ = D()
 
 weak var weakSwiftVar: SwiftNoWeakClass? = nil // expected-error {{'SwiftNoWeakClass' is incompatible with 'weak' references}}
-unowned var unownedSwiftVar = SwiftNoWeakClass() // expected-error {{'SwiftNoWeakClass' is incompatible with 'unowned' references}}
+unowned var unownedSwiftVar = SwiftNoWeakClass() // expected-error {{'SwiftNoWeakClass' is incompatible with 'unowned' references}}// UNSUPPORTED: OS=windows-msvc

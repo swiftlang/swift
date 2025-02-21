@@ -47,3 +47,4 @@ bb0(%0 : $*SensitiveStruct, %1 : $*SensitiveStruct):
   return %r : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

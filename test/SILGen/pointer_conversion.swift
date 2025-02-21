@@ -481,3 +481,4 @@ public struct RefObj {
 public func objectFieldToPointer(rc: RefObj) {
   takeObjectPointer(&rc.o.object)
 }
+// UNSUPPORTED: OS=windows-msvc

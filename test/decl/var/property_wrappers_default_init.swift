@@ -15,3 +15,4 @@ struct UseWrapperDefaultInit {
 
 let _ = UseWrapperDefaultInit()
 
+// UNSUPPORTED: OS=windows-msvc

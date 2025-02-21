@@ -7,3 +7,4 @@
 // CHECK: typealias TemplatedSIMDFloat3 = Templated<SIMD3<CFloat>>
 // CHECK: typealias TemplatedSIMDFloat4 = Templated<SIMD4<CFloat>>
 // CHECK: typealias TemplatedSIMDDouble8 = Templated<SIMD8<CDouble>>
+// UNSUPPORTED: OS=windows-msvc

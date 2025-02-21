@@ -15,3 +15,4 @@
 import Builtin
 
 public func something(with x: Builtin.RawPointer) {}
+// UNSUPPORTED: OS=windows-msvc

@@ -151,3 +151,4 @@ func testGeneric(i: Int, gs: Generic<String>, gi: Generic<Int>) {
 
   _ = gs[i]
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -31,3 +31,4 @@ testSetX(2)
 
 // CHECK: sil shared [transparent] @$sSo024NonCopyableHolderDerivedD0V1xSo0aB0Vvau : $@convention(method) (@inout NonCopyableHolderDerivedDerived) -> UnsafeMutablePointer<NonCopyable>
 // CHECK: function_ref @{{(.*)(31NonCopyableHolderDerivedDerived33__synthesizedBaseSetterAccessor_x|__synthesizedBaseSetterAccessor_x@NonCopyableHolderDerivedDerived)(.*)}} : $@convention(cxx_method) (@inout NonCopyableHolderDerivedDerived) -> UnsafeMutablePointer<NonCopyable>
+// UNSUPPORTED: OS=windows-msvc

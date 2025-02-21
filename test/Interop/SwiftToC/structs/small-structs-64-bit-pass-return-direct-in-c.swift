@@ -135,3 +135,4 @@ public func printStructI8AndU32AndI16(_ x: StructI8AndU32AndI16) {
 // CHECK:      SWIFT_EXTERN struct swift_interop_returnStub_Structs_uint64_t_0_8_uint32_t_8_12 $s7Structs024returnNewStructOneI16AndeD0AA0defgeD0VyF(void) SWIFT_NOEXCEPT SWIFT_CALL;
 
 // CHECK:      SWIFT_EXTERN struct swift_interop_returnStub_Structs_uint64_t_0_8 $s7Structs21returnNewStructTwoI32yAA0deF0Vs5Int32VF(int32_t x) SWIFT_NOEXCEPT SWIFT_CALL;
+// UNSUPPORTED: OS=windows-msvc

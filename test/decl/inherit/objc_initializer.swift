@@ -12,3 +12,4 @@ class Foo : NSObject {
 
 class Bar : Foo { // okay: 
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -75,3 +75,4 @@ class PlainClass {}
 // CHECK-NEXT: PlainClass instance bridged as itself
 testBridging(PlainClass(), "PlainClass")
 
+// UNSUPPORTED: OS=windows-msvc

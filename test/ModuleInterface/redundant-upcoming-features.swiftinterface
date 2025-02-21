@@ -7,3 +7,4 @@
 // RUN: echo "import Test" | %target-swift-frontend -typecheck - -I %t/
 
 import Swift
+// UNSUPPORTED: OS=windows-msvc

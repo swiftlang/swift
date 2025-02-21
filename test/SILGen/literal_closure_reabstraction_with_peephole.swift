@@ -30,3 +30,4 @@ func crash2() {
 
 crash1()
 crash2()
+// UNSUPPORTED: OS=windows-msvc

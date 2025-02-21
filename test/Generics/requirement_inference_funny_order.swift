@@ -22,3 +22,4 @@ extension LocalArray where Element : P2 {
 struct LocalArray<Element : P1>: IteratorProtocol {
   func next() -> Element? {}
 }
+// UNSUPPORTED: OS=windows-msvc

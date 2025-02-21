@@ -7,3 +7,4 @@
 
 // CHECK: bin/ld{{"? }}
 // CHECK-SAME: foo.tbd
+// UNSUPPORTED: OS=windows-msvc

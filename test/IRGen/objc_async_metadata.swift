@@ -34,3 +34,4 @@ class MyClass: NSObject {
 @objc protocol MyProto {
   @objc func myProtoRequirement(_ x: String) async -> String
 }
+// UNSUPPORTED: OS=windows-msvc

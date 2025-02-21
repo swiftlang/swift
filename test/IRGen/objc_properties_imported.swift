@@ -27,3 +27,4 @@ func testBoolProperty(hp: HasProperties) {
   hp.enabled = !hp.enabled
   // CHECK: ret void
 }
+// UNSUPPORTED: OS=windows-msvc

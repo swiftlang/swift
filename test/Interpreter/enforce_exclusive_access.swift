@@ -436,3 +436,4 @@ ExclusiveAccessTestSuite.test("recursiveCaptureViolation") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

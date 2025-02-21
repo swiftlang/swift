@@ -160,3 +160,4 @@ import SubE
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "{{.*}}/SwiftShims-{{.*}}.pcm",
 
+// UNSUPPORTED: OS=windows-msvc

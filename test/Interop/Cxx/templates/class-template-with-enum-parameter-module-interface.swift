@@ -3,3 +3,4 @@
 // CHECK: typealias WrappedEnum = Wrapper<MyEnum>
 // CHECK: typealias WrappedEnumClass = Wrapper<MyEnumClass>
 // CHECK: typealias WrappedTypedefEnum = Wrapper<MyTypedefEnum>
+// UNSUPPORTED: OS=windows-msvc

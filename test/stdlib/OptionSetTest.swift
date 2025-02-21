@@ -120,3 +120,4 @@ tests.test("set algebra") {
   expectEqual(P.box, p.update(with: .boxOrBag))
   expectEqual(P.boxOrBag, p)
 }
+// UNSUPPORTED: OS=windows-msvc

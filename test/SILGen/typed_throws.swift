@@ -315,3 +315,4 @@ class MySubclass: MyClass {
 class MySubsubclass: MySubclass {
   override func f() { }
 }
+// UNSUPPORTED: OS=windows-msvc

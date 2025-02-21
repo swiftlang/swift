@@ -40,3 +40,4 @@ print("Swizzled MyNSObjectSwiftClassToBeSwizzled")
 // CHECK: Swizzled MyNSObjectSwiftClassToBeSwizzled
 print("Instantiated the subclass: \(swiftNSObjectSubclass.init())")
 // CHECK: Instantiated the subclass:
+// UNSUPPORTED: OS=windows-msvc

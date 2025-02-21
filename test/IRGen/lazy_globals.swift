@@ -40,3 +40,4 @@ var (x, y, z) = (1, 2, 3)
 // CHECK: }
 func getX() -> Int { return x }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ func optionalIsolated(to actor: isolated (any Actor)?) {
 optionalIsolated(to: nil)
 optionalIsolated(to: MainActor.shared)
 await optionalIsolated(to: MyActor())
+// UNSUPPORTED: OS=windows-msvc

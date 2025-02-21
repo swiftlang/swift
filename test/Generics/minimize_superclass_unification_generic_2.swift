@@ -486,3 +486,4 @@ protocol PcQb {
   associatedtype B3
   associatedtype B4
 }
+// UNSUPPORTED: OS=windows-msvc

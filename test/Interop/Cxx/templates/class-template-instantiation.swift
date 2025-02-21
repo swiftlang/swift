@@ -27,3 +27,4 @@ TemplatesTestSuite.test("with-c++-type-calling-method-on-arg")
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

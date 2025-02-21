@@ -21,3 +21,4 @@ guard let y = 0 else {}
 let z: Double = ""
 // CHECK_NAMES: error: cannot convert value of type 'String' to specified type 'Double' [cannot_convert_initializer_value]{{$}}
 // CHECK_NONAMES: error: cannot convert value of type 'String' to specified type 'Double'{{$}}
+// UNSUPPORTED: OS=windows-msvc

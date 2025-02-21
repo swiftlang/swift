@@ -215,3 +215,4 @@ bb0(%0 : @owned $SomeClass, %1 : @owned $RefStruct):
   return %16 : $RefStruct
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -31,3 +31,4 @@ public class SwiftClass : Foo {}
 // symbols
 
 // XLANG-COUNT-2: selectDate:
+// UNSUPPORTED: OS=windows-msvc

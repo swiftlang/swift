@@ -3,3 +3,4 @@
 import PredefinedMacros
 
 swift3ReadyToGo()
+// UNSUPPORTED: OS=windows-msvc

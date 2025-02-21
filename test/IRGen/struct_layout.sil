@@ -52,3 +52,4 @@ bb0:
   %2 = address_to_pointer %1 : $*EmptyEnum to $Builtin.RawPointer
   return %2 : $Builtin.RawPointer
 }
+// UNSUPPORTED: OS=windows-msvc

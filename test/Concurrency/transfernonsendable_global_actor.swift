@@ -329,3 +329,4 @@ struct Clock {
   // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into global actor 'CustomActor'-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
+// UNSUPPORTED: OS=windows-msvc

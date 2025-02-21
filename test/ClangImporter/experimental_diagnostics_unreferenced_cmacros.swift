@@ -30,3 +30,4 @@ _ = INVALID_INTEGER_LITERAL_2
 // CHECK-NOT: macros.h:{{[0-9]+}}:{{[0-9]+}}: note: macro 'UNSUPPORTED_3' not imported: structure not supported
 // CHECK-NOT: macros.h:{{[0-9]+}}:{{[0-9]+}}: note: macro 'UNSUPPORTED_4' not imported: structure not supported
 // CHECK-NOT: macros.h:{{[0-9]+}}:{{[0-9]+}}: note: macro 'UNSUPPORTED_5' not imported: structure not supported
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@
 // CHECK: struct HasPrivateMutableMember {
 // CHECK:   mutating func bar()
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

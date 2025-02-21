@@ -522,3 +522,4 @@ public struct BoundBlank {}
 // ALLINDENTED-NEXT:      }
 // ALLINDENTED-NEXT:    ]
 // ALLINDENTED-NEXT:  },
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ var index = 1
 _ = {
     p($0)
 } (index)
+// UNSUPPORTED: OS=windows-msvc

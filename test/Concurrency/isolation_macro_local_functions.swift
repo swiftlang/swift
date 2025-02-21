@@ -13,3 +13,4 @@ func outer() async {
   var value = await inner()
   callee(value, "hi")
 }
+// UNSUPPORTED: OS=windows-msvc

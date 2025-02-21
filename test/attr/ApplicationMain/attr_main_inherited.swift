@@ -8,3 +8,4 @@ class MainBase {
 @main
 class Main : MainBase { }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -31,3 +31,4 @@ func fooBar(idxOpt: Int?) {
 
 // RUN: %refactor -convert-to-iflet -source-filename %s -pos=17:3 -end-pos=21:13 > %t.result/L17-3.swift
 // RUN: diff -u %S/Outputs/basic/L17-3.swift.expected %t.result/L17-3.swift
+// UNSUPPORTED: OS=windows-msvc

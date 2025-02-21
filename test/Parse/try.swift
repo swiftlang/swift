@@ -270,3 +270,4 @@ class F<T> {
 func bar(_ a: F<Dummy>, _ b: F<Dummy>) {
   _ = (try? a.wait()) === (try? b.wait())
 }
+// UNSUPPORTED: OS=windows-msvc

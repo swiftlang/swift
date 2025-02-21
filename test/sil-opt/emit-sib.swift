@@ -21,3 +21,4 @@ func test123() -> () {
 
 print("Hello World!")
 test123()
+// UNSUPPORTED: OS=windows-msvc

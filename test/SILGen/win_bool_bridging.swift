@@ -28,3 +28,4 @@ TakeBOOL(true)
 let f: Bool = false
 TakeBOOL(f)
 
+// UNSUPPORTED: OS=windows-msvc

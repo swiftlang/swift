@@ -122,3 +122,4 @@ extension Int8 : Error {}
 enum E: Error {
     case e
 }
+// UNSUPPORTED: OS=windows-msvc

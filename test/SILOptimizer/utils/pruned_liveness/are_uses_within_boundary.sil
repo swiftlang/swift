@@ -255,3 +255,4 @@ die:
   
   unreachable
 }
+// UNSUPPORTED: OS=windows-msvc

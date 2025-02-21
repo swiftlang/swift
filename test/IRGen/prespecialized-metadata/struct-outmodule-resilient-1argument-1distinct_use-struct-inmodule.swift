@@ -29,3 +29,4 @@ func doit() {
   consume( OneArgument(TheArgument(value: 13)) )
 }
 doit()
+// UNSUPPORTED: OS=windows-msvc

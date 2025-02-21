@@ -24,3 +24,4 @@ public enum MyCase: Int {
 // CHECK: @_originallyDefinedIn(module: "Bar", iOS 13.0)
 // CHECK: extension Foo.MyCase : Swift.Hashable {}
 
+// UNSUPPORTED: OS=windows-msvc

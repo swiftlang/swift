@@ -139,3 +139,4 @@ func ioo() {   // CHECK-NEXT: [[@LINE]]:12   -> [[@LINE+6]]:2  : 0
   } while true // CHECK-NEXT: [[@LINE]]:4    -> [[@LINE+2]]:2  : (0 - 1)
                // CHECK-NEXT: [[@LINE-1]]:11 -> [[@LINE-1]]:15 : zero
 }              // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

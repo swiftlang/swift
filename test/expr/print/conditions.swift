@@ -56,3 +56,4 @@ var tryExpr = try? someThrowingFunc()
 // CHECK: @_hasInitialValue internal var tryExpr: SomeError? = try? someThrowingFunc()
 
 var tryForceExpr = try! someThrowingFunc()
+// UNSUPPORTED: OS=windows-msvc

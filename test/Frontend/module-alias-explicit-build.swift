@@ -63,3 +63,4 @@
 
 // RUN: %FileCheck %s -input-file %t/outputs/load-result.output -check-prefix CHECK
 // CHECK: remark: loaded module {{.*}}Bar.swiftmodule
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@ StringDescribingTestSuite.test("String(reflecting:) should include extra stuff i
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

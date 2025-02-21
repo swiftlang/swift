@@ -21,3 +21,4 @@
 // UNSUPPORTED: swift_evolve
 
 
+// UNSUPPORTED: OS=windows-msvc

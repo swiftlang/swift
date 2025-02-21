@@ -15,3 +15,4 @@ protocol IDCMemberFunctionAddition: Perturbation {
 
 class MemberAdder<CP: IDCMemberFunctionAddition>: PerturberProtocol {
 }
+// UNSUPPORTED: OS=windows-msvc

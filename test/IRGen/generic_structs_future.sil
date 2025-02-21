@@ -239,3 +239,4 @@ struct GenericLayoutWithAssocType<T: ParentHasAssociatedType> {
 
 // CHECK:   [[T2:%.*]] = call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness(i64 0, ptr %T.Assoc.HasAssociatedType, ptr %T.Assoc, ptr @"$s22generic_structs_future17HasAssociatedTypeTL", ptr @"$s5Assoc22generic_structs_future17HasAssociatedTypePTl")
 // CHECK:   %T.Assoc.Assoc = extractvalue %swift.metadata_response [[T2]], 0
+// UNSUPPORTED: OS=windows-msvc

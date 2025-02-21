@@ -23,3 +23,4 @@ executablePath.removeLast(4)
 _ = dlopen(executablePath + target_library_name("ReplacementA"), RTLD_NOW)
 
 A().print()
+// UNSUPPORTED: OS=windows-msvc

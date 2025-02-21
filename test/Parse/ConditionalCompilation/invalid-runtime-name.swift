@@ -14,3 +14,4 @@
 
 #if _runtime(Invalid) // expected-error{{unexpected argument for the '_runtime' condition; expected '_Native' or '_ObjC'}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

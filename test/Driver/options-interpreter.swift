@@ -64,3 +64,4 @@
 // RUN: env LD_LIBRARY_PATH=/abc/ %swift_driver_plain -### -target x86_64-unknown-linux-gnu -L/foo/ -L/bar/ %s | %FileCheck -check-prefix=CHECK-LINUX-COMPLEX${LD_LIBRARY_PATH+_LAX} %s
 // CHECK-LINUX-COMPLEX: # LD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/linux:/abc/$}}
 // CHECK-LINUX-COMPLEX_LAX: # LD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/linux:/abc/($|:)}}
+// UNSUPPORTED: OS=windows-msvc

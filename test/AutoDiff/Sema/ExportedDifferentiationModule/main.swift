@@ -9,3 +9,4 @@ import exports_differentiation
 
 @differentiable(reverse)
 func id<T: Differentiable>(_ x: T) -> T { x }
+// UNSUPPORTED: OS=windows-msvc

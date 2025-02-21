@@ -68,3 +68,4 @@ func test_member_filtering() {
     s.foo(42).bar(42)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

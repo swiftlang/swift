@@ -166,3 +166,4 @@ final class KlassB: Sendable {
   // expected-error@+1 {{'nonisolated' cannot be applied to mutable stored properties}}
   nonisolated var test: Int = 1
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -218,3 +218,4 @@ extension MyStruct {
 // CHECK:   "type": "Swift.Int",
 // CHECK:   "valueKind": "RawLiteral",
 // CHECK:   "value": "8"
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ public func foo() {}
 // NO-FORCE-LOAD-NOT: FORCE_LOAD
 // NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibility50"}
 // NO-FORCE-LOAD-NOT: !{!"-lswiftCompatibilityDynamicReplacements"}
+// UNSUPPORTED: OS=windows-msvc

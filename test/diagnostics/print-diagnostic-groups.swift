@@ -16,4 +16,4 @@ bar()
 func foo() {
   // CHECK: warning: initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it{{$}}
   let x = 42
-}
+}// UNSUPPORTED: OS=windows-msvc

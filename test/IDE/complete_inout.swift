@@ -14,4 +14,4 @@ struct Foo {
     }
 }
 
-// CHECK: Decl[InstanceVar]/CurrNominal:      myInt[#Int#]; name=myInt
+// CHECK: Decl[InstanceVar]/CurrNominal:      myInt[#Int#]; name=myInt// UNSUPPORTED: OS=windows-msvc

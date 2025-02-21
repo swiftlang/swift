@@ -10,3 +10,4 @@
 
 // CHECK: public struct SomeStruct
 public struct SomeStruct {}
+// UNSUPPORTED: OS=windows-msvc

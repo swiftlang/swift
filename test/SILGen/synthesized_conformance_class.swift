@@ -126,3 +126,4 @@ func doIt(_ c: FinalHashableClass) -> Int {
 
 
 
+// UNSUPPORTED: OS=windows-msvc

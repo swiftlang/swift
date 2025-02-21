@@ -87,3 +87,4 @@ func testError() {
 }
 
 testError()
+// UNSUPPORTED: OS=windows-msvc

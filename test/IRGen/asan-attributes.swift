@@ -21,3 +21,4 @@ public var x: Int {
 // ASAN: attributes [[COROUTINE_ATTRS]] =
 // ASAN-SAME: sanitize_address
 // ASAN-SAME: }
+// UNSUPPORTED: OS=windows-msvc

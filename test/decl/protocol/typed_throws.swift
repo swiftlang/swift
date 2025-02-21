@@ -8,3 +8,4 @@ protocol TypedThrowsProto {
     init<E>(y: () throws(E) -> Void) throws(E)
     func f<E>(y: () throws(E) -> Void) throws(E)
 }
+// UNSUPPORTED: OS=windows-msvc

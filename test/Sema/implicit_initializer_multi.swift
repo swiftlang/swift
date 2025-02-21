@@ -5,3 +5,4 @@ func test() {
   _ = DefaultInitializable()
   _ = DefaultInitializableClass()
 }
+// UNSUPPORTED: OS=windows-msvc

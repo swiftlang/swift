@@ -107,3 +107,4 @@ func consumingClosure2(_ f: consuming @escaping () -> ()) { }
 func borrowingClosure1(_ f: borrowing () -> ()) { }
 func borrowingClosure2(_ f: borrowing @escaping () -> ()) { }
 
+// UNSUPPORTED: OS=windows-msvc

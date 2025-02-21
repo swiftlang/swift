@@ -70,3 +70,4 @@ struct ConformsToWeakProtoWithAssoc: WeakProtoWithAssoc {
 struct ConformsToWeakProtoWithStrongInheritedAssoc: WeakProtoWithStrongInheritedAssoc {
   typealias Assoc = ConformsToQ
 }
+// UNSUPPORTED: OS=windows-msvc

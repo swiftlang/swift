@@ -8,3 +8,4 @@ class A{}
 // CHECK-NOT: @"\01l_type_metadata_table.1"
 
 
+// UNSUPPORTED: OS=windows-msvc

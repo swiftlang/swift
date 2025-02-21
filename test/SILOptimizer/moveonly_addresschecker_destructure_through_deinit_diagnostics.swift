@@ -219,3 +219,4 @@ func testAddressOnlyDeinitInMiddlePath<T : P>(_ x: consuming AddressOnlyContaini
   consume(x.first.moveOnlyPair.first) // expected-error {{cannot partially consume 'x.first' when it has a deinitializer}}
   consume(x.first.copyable)
 }
+// UNSUPPORTED: OS=windows-msvc

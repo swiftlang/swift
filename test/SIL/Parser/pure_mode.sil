@@ -52,3 +52,4 @@ bb1:
   %9 = struct $_StringGuts (%8 : $_StringObject)
   br bb2
 }
+// UNSUPPORTED: OS=windows-msvc

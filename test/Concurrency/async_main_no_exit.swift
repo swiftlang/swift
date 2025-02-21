@@ -7,3 +7,4 @@ import _Concurrency
   static func main() async {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

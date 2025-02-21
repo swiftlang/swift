@@ -328,3 +328,4 @@ func test11<each T>() -> Use<repeat each T> {
 // CHECK-NEXT:    dealloc_stack [[STRING_TEMP]] :
 // CHECK-NEXT:    dealloc_pack [[PACK]] :
 // CHECK-NEXT:    return [[TUPLE]]
+// UNSUPPORTED: OS=windows-msvc

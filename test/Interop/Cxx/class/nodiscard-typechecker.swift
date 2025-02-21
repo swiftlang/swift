@@ -37,3 +37,4 @@ let error: NoDiscardError = NoDiscardReturnError(10, 10)
 // return value of NoDiscardReturnError() should be a warning, but isn't.
 // Filed as: https://github.com/apple/swift/issues/59002
 NoDiscardReturnError(50, 50)
+// UNSUPPORTED: OS=windows-msvc

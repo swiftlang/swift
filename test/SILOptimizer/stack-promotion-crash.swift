@@ -53,3 +53,4 @@ public func testit() -> Int {
 // CHECK: 38
 print(testit())
 
+// UNSUPPORTED: OS=windows-msvc

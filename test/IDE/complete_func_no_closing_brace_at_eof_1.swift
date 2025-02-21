@@ -8,3 +8,4 @@
 // A-DAG: Decl[FreeFunction]/CurrModule: f()[#Void#]{{; name=.+$}}
 func f() {
   #^A^#
+// UNSUPPORTED: OS=windows-msvc

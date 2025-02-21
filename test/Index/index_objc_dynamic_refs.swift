@@ -24,3 +24,4 @@ class AClass {
         // CHECK: [[@LINE-2]]:27 | instance-property/Swift | property | [[DynamicProperty_USR]] | Ref
     }
 }
+// UNSUPPORTED: OS=windows-msvc

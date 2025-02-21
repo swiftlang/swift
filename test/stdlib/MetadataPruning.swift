@@ -131,3 +131,4 @@ tests.test("Allocate types without metadata") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

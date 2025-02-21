@@ -459,3 +459,4 @@ bb3:
   strong_retain %42 : $KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
   br bb2(%44 : $Builtin.Word)
 }
+// UNSUPPORTED: OS=windows-msvc

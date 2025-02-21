@@ -11,3 +11,4 @@ print("Hello World \(5) \(x) \(s)")
 
 // CHECK: Hello World 5 42 ABCDE
 // CHECK-PRINT-DISABLED-NOT: Hello World
+// UNSUPPORTED: OS=windows-msvc

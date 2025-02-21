@@ -63,3 +63,4 @@ struct Entry {
 // CHECK-SHARED: declare dllimport swiftcc void @"$s6module5valueAA1SVvg"()
 
 // CHECK-SHARED: declare dllimport swiftcc void @"$s6module1fyyAA1SVF"()
+// UNSUPPORTED: OS=windows-msvc

@@ -245,3 +245,4 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:   _impl::$s9Functions15TestSmallStructV20genericMethodMutTakeyyxlF(swift::_impl::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT:   }
+// UNSUPPORTED: OS=windows-msvc

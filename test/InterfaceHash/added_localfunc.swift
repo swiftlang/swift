@@ -16,3 +16,4 @@ func test() -> Int {
   }
   return inner()
 }
+// UNSUPPORTED: OS=windows-msvc

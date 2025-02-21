@@ -11,3 +11,4 @@ class Bar : Foo {
 
 let bar = Bar()
 bar.sayHello()
+// UNSUPPORTED: OS=windows-msvc

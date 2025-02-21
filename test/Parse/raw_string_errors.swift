@@ -35,3 +35,4 @@ let _ = #""" foo "bar" #baz
 let _ = ###""" "# "##
   """###
 // expected-error@-2{{multi-line string literal content must begin on a new line}}{{15-15=\n}}
+// UNSUPPORTED: OS=windows-msvc

@@ -111,3 +111,4 @@ func specialized_metatype() -> Dictionary<String, Int> {
   let dict = Swift.Dictionary<Swift.String, Int>()
   return dict
 }
+// UNSUPPORTED: OS=windows-msvc

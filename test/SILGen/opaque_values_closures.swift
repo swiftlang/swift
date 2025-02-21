@@ -386,3 +386,4 @@ func captureBoxNonopaqueOwnedNonescaping<U>(_ get: () -> U) {
   local()
 }
 
+// UNSUPPORTED: OS=windows-msvc

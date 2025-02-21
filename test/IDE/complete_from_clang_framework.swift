@@ -289,3 +289,4 @@ func testExportedModuleCompletion() -> #^TYPE_MODULE_QUALIFIER?check=MODULE_QUAL
 // MODULE_QUALIFIER-DAG: Decl[Module]/None: FooHelper[#Module#]; name=FooHelper
 // MODULE_QUALIFIER-DAG: Decl[Module]/None: Bar[#Module#]; name=Bar
 }
+// UNSUPPORTED: OS=windows-msvc

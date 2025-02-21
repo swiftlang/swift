@@ -135,3 +135,4 @@ func testGenericResults() async {
   let _: NonSendable = await mainActorGenericReturnNonSendable()
   // expected-error @-1 {{non-Sendable 'NonSendable'-typed result can not be returned from main actor-isolated global function 'mainActorGenericReturnNonSendable()' to nonisolated context}}
 }
+// UNSUPPORTED: OS=windows-msvc

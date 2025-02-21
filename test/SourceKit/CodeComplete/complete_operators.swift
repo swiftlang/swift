@@ -168,3 +168,4 @@ func test6(x: DoesEverything) {
 // KNOWN: ===
 // KNOWN: !==
 // KNOWN: ~=
+// UNSUPPORTED: OS=windows-msvc

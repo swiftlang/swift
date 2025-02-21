@@ -22,3 +22,4 @@ func cast(_ a: Any) {
 // CHECK:   @_hasInitialValue let conditional: (any Archivable)? = a as? any Archivable
 // CHECK:   @_hasInitialValue let forced: any Archivable = a as! any Archivable
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

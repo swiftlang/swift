@@ -36,3 +36,4 @@ public var _: InvalidType
 extension InvalidType {
   public func method() {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ public func test() {
 // CHECK:   call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"
 // CHECK:   call swiftcc void @"$s13back_deployed0A12DeployedFuncyyFTwB"
 // CHECK:   call swiftcc void @"$s13back_deployed0A12DeployedFuncyyF"
+// UNSUPPORTED: OS=windows-msvc

@@ -37,3 +37,4 @@ struct GenericSelf<T> {
     use(x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

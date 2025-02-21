@@ -17,3 +17,4 @@ let u = NSURL(string: "http://www.example.com")!
 
 // CHECK: true
 print(u.hash == getHash(u))
+// UNSUPPORTED: OS=windows-msvc

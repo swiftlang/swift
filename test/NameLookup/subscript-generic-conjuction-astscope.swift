@@ -10,3 +10,4 @@ struct S<Value> {
     return nil
   }
 }
+// UNSUPPORTED: OS=windows-msvc

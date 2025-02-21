@@ -23,3 +23,4 @@ func test(metrics: Metrics) -> Metrics.SomeMetric<MyUnit> {
   metrics.metric
 }
 
+// UNSUPPORTED: OS=windows-msvc

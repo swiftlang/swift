@@ -69,3 +69,4 @@ func a_to_gint(a: A) -> G<Int> {
   return a as! G<Int>
 }
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

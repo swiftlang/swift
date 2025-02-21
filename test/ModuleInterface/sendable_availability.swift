@@ -44,3 +44,4 @@ extension X {
 // RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -target %target-cpu-apple-macosx12.0 -DLIBRARY -module-name Library -module-interface-preserve-types-as-written
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
 // RUN: %FileCheck %s <%t/Library.swiftinterface
+// UNSUPPORTED: OS=windows-msvc

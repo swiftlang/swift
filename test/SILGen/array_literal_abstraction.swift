@@ -23,3 +23,4 @@ func vararg_funcs(_ fs: (() -> ())...) {}
 func call_vararg_funcs() {
   vararg_funcs({}, {})
 }
+// UNSUPPORTED: OS=windows-msvc

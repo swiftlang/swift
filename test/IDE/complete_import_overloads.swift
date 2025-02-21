@@ -57,3 +57,4 @@ extension HasFooNonGeneric {
 // SWIFT5_SELF_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      foo[#String#]; name=foo
 // SWIFT5_SELF_DOT_2-NOT: Decl[InstanceVar]/CurrNominal:      bar[#Int#]; name=bar
 // SWIFT5_SELF_DOT_2-DAG: Decl[InstanceVar]/CurrNominal:      bar[#String#]; name=bar
+// UNSUPPORTED: OS=windows-msvc

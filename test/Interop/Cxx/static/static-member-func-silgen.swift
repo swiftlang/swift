@@ -24,3 +24,4 @@ func callStaticMemberFuncAddr() -> CInt {
 
 // CHECK: // clang name: WithStaticMemberFunc::getStaticMemberFuncAddress
 // CHECK: sil [clang WithStaticMemberFunc.getStaticMemberFuncAddress] @{{_ZN20WithStaticMemberFunc26getStaticMemberFuncAddressEv|\?getStaticMemberFuncAddress@WithStaticMemberFunc@@SAP6AHXZXZ}} : $@convention(c) () -> Optional<@convention(c) () -> Int32>
+// UNSUPPORTED: OS=windows-msvc

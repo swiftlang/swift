@@ -19,3 +19,4 @@ import UsesCxxInterop // expected-error {{module 'UsesCxxInterop' was built with
 public func testFun() { }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

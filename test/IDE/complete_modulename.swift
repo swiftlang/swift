@@ -68,3 +68,4 @@ func test() {
 
 // RUN: %empty-directory(%t/Out)
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %t/App.swift -filecheck %raw-FileCheck -completion-output-dir %t/Out -I %t/Modules
+// UNSUPPORTED: OS=windows-msvc

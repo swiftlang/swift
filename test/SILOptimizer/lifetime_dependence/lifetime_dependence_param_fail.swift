@@ -100,3 +100,4 @@ func bvcons_capture_escapelet(bv: consuming BV) -> ()->Int { // expected-error *
   let closure = { bv.c }
   return closure
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -318,3 +318,4 @@
 
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws
+// UNSUPPORTED: OS=windows-msvc

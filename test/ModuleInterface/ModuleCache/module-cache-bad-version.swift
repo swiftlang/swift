@@ -30,3 +30,4 @@ import LeafModule
 public func TestFunc() {
     print(LeafFunc())
 }
+// UNSUPPORTED: OS=windows-msvc

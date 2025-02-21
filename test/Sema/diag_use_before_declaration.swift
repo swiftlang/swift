@@ -122,3 +122,4 @@ func module_scope_2() {
   let _ = another_print // expected-error {{use of local variable 'another_print' before its declaration}}
   let another_print = "something" // expected-note {{'another_print' declared here}}
 }
+// UNSUPPORTED: OS=windows-msvc

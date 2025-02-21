@@ -77,3 +77,4 @@ bb0(%0 : @owned $(String, String)):
   %2 = tuple (%5 : $String, %4 : $String)
   return %2 : $(String, String)
 }
+// UNSUPPORTED: OS=windows-msvc

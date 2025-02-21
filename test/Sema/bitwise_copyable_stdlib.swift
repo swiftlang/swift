@@ -26,3 +26,4 @@ protocol BearingBits {
 }
 
 func nameBearingBits<T : BearingBits>(_ t: T, _ b: T.Bits) {}
+// UNSUPPORTED: OS=windows-msvc

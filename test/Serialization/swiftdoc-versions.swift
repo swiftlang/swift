@@ -18,3 +18,4 @@
 // RUN: %target-swift-frontend -typecheck -I %t %s -verify -show-diagnostics-after-fatal
 
 import empty // expected-error{{malformed compiled module}}
+// UNSUPPORTED: OS=windows-msvc

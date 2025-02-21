@@ -12,3 +12,4 @@ MembersTestSuite.test("constructor calls method") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

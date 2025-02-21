@@ -52,3 +52,4 @@ public func testMayRelease() -> Base {
 // print("Object:")
 // print(testMayRelease())
 // -----------------------------------------------------------------------------
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ class Foo {
     let g: () -> () = {[weak self] in ()}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

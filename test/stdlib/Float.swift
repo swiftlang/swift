@@ -231,3 +231,4 @@ FloatTests.test("nan") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

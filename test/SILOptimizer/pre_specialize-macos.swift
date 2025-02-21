@@ -28,3 +28,4 @@ public func usePrespecializedEntryPoints() {
 
 // OPT: sil [available 50] [noinline] {{.*}}@$s22pre_specialized_module21publicPrespecialized2yyxlFAA8SomeDataV_Ts5 : $@convention(thin) (SomeData) -> ()
 // OPT: sil [available 50] [noinline] {{.*}}@$s22pre_specialized_module21publicPrespecialized2yyxlF0a1_B8_module213SomeOtherDataV_Ts5 : $@convention(thin) (SomeOtherData) -> ()
+// UNSUPPORTED: OS=windows-msvc

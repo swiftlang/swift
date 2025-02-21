@@ -14,3 +14,4 @@ public struct UseWrapper {
   @Wrapper public var string = "hello"
 }
 
+// UNSUPPORTED: OS=windows-msvc

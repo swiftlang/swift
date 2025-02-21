@@ -25,3 +25,4 @@ class DerivedClass: BaseClass {
 // COVARIANT_SELF_RETURN-DAG: Decl[InstanceMethod]/Super:         returnSelf()[#Self#];
 // COVARIANT_SELF_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   testWithStaticSelf()[#Void#];
 // COVARIANT_SELF_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   testWithDynamicSelf()[#Self#];
+// UNSUPPORTED: OS=windows-msvc

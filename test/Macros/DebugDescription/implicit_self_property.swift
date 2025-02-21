@@ -27,3 +27,4 @@ class MyClass: CustomDebugStringConvertible {
 // CHECK:     /* "main.MyClass" */ 13 as UInt8, 109 as UInt8, 97 as UInt8, 105 as UInt8, 110 as UInt8, 46 as UInt8, 77 as UInt8, 121 as UInt8, 67 as UInt8, 108 as UInt8, 97 as UInt8, 115 as UInt8, 115 as UInt8, 0 as UInt8,
 // CHECK:     /* "name: ${var.name}" */ 18 as UInt8, 110 as UInt8, 97 as UInt8, 109 as UInt8, 101 as UInt8, 58 as UInt8, 32 as UInt8, 36 as UInt8, 123 as UInt8, 118 as UInt8, 97 as UInt8, 114 as UInt8, 46 as UInt8, 110 as UInt8, 97 as UInt8, 109 as UInt8, 101 as UInt8, 125 as UInt8, 0 as UInt8
 // CHECK: )
+// UNSUPPORTED: OS=windows-msvc

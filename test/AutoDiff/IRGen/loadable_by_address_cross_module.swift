@@ -48,3 +48,4 @@ LBATests.test("Correctness") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

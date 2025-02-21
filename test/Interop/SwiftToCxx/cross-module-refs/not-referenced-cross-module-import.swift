@@ -17,3 +17,4 @@ fileprivate func usesStructsAPIsButNotExposed(_ x: StructSeveralI64) -> StructSe
 
 public func doesNotUseStructAPIs() {
 }
+// UNSUPPORTED: OS=windows-msvc

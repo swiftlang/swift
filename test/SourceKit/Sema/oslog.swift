@@ -34,3 +34,4 @@ if #available(SwiftStdlib 5.3, *) {
   let logger = Logger()
   logger.log("Log a foo: \(Foo())")
 }
+// UNSUPPORTED: OS=windows-msvc

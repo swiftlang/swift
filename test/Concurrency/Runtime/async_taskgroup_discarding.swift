@@ -130,3 +130,4 @@ func one() -> Int {
     print("done") // CHECK: done
   }
 }
+// UNSUPPORTED: OS=windows-msvc

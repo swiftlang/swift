@@ -30,3 +30,4 @@ public func calls_number() async -> Int {
 public dynamic func indirectReturnDynamicReplaceable() async throws -> (Int, Int, Int, Int, Int, Int, Int) {
     return (0, 0, 0, 0, 0, 0, 0)
 }
+// UNSUPPORTED: OS=windows-msvc

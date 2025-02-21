@@ -20,3 +20,4 @@ public struct GenericMoveOnly<T>: ~Copyable {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

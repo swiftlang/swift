@@ -78,3 +78,4 @@ func testHasBar(_ hb: HasBar) -> Int {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

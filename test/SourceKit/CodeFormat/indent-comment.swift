@@ -37,3 +37,4 @@ class Foo {}
 /*
 *
 func foo2() {}
+// UNSUPPORTED: OS=windows-msvc

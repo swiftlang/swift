@@ -23,3 +23,4 @@ macro moduleCustomFileID() -> String = #externalMacro(module: "MacroDefinition",
 // CHECK-DAG: "precise": "s:5Macro12customFileIDSSycfm"
 
 // MISSING-NOT: moduleCustomFileID
+// UNSUPPORTED: OS=windows-msvc

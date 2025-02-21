@@ -60,3 +60,4 @@ Tests.test("printKlass") {
     print("printKlass: \(x)")
     print("printKlass: \(x.i)")
 }
+// UNSUPPORTED: OS=windows-msvc

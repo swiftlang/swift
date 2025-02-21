@@ -11,3 +11,4 @@ extension G {
   // CHECK-LABEL: Generic signature: <T, U where T == S, U : AnyObject>
   func f<U>(_: U) where T == S, U : AnyObject {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -34,3 +34,4 @@ public protocol ProtocolWithBuilderProperty {
   // CHECK: @TupleBuilder var myVar: Self.Assoc { get }
   @TupleBuilder var myVar: Assoc { get }
 }
+// UNSUPPORTED: OS=windows-msvc

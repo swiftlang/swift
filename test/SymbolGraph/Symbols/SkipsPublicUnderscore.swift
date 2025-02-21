@@ -86,3 +86,4 @@ extension _ShouldntAppear.InnerShouldntAppear {
 extension _ShouldntAppear.InnerShouldntAppear: Equatable {}
 
 // PUBLIC: "relationships": []
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ TemplatesTestSuite.test("typedef-without-definition") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

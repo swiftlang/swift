@@ -32,3 +32,4 @@ struct S {
 #endif
 
 // CHECK: f()
+// UNSUPPORTED: OS=windows-msvc

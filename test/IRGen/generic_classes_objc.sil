@@ -94,3 +94,4 @@ bb0(%0 : $Optional< @callee_guaranteed @substituted <τ_0_1 where τ_0_1 : Copya
   %2 = tuple ()
   return %2 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

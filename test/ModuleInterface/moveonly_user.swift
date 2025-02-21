@@ -19,3 +19,4 @@ func simpleTest() {
   let msg = handle.file.fd.message()
   print(msg)
 }
+// UNSUPPORTED: OS=windows-msvc

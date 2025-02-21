@@ -64,3 +64,4 @@ ProtocolLookupForeign.test("NSSet") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

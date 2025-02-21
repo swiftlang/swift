@@ -12,3 +12,4 @@
 // RUN: %Benchmark_Driver check 1 --verbose \
 // RUN:                 | %FileCheck %s --check-prefix DOCTORCHECK
 // DOCTORCHECK: Ackermann
+// UNSUPPORTED: OS=windows-msvc

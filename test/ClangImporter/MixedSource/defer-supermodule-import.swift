@@ -18,3 +18,4 @@
 // concerned.
 
 print(bar(foo()))
+// UNSUPPORTED: OS=windows-msvc

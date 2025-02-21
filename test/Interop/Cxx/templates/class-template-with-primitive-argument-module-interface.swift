@@ -29,3 +29,4 @@
 // CHECK: typealias DoubleWrappedMagicIntFixedSizeArr1 = DoubleWrapper<MagicWrapper<Vector<CInt, 42>>>
 // CHECK: typealias DoubleWrappedMagicIntFixedSizeArr2 = DoubleWrapper<MagicWrapper<Vector<CInt, 43>>>
 // CHECK: typealias DoubleWrappedMagicNullPtr = DoubleWrapper<MagicWrapper<nil>>
+// UNSUPPORTED: OS=windows-msvc

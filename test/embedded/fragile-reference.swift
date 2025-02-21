@@ -19,3 +19,4 @@ enum MyEnum: UInt8 {
 
 // CHECK: define {{.*}}@main(
 
+// UNSUPPORTED: OS=windows-msvc

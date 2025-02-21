@@ -90,3 +90,4 @@ SIMDCodableTests.test("roundTrip") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

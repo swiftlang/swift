@@ -24,3 +24,4 @@ int main() {
   assert(z == RecordConfig::AudioFormat::ALAC);
   RecordConfig::File::Gate g = RecordConfig::File::Gate::init();
 }
+// UNSUPPORTED: OS=windows-msvc

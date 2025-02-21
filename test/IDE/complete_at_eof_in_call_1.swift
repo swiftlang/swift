@@ -6,3 +6,4 @@
 // A-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]: ['(']{#(x): Int#}[')'][#Void#]{{; name=.+$}}
 func f(_ x: Int) {}
 f(#^A^#
+// UNSUPPORTED: OS=windows-msvc

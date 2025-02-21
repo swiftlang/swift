@@ -6,3 +6,4 @@ struct Bar<A1, A2> {
 }
 
 enum Foo<A> {}
+// UNSUPPORTED: OS=windows-msvc

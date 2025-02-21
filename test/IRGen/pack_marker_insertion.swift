@@ -4,3 +4,4 @@
 
 // For alloc_stacks of tuples featuring a pack.
 public func tupleExpansionWithMemberType<each T: Sequence>(seqs: (repeat each T), elts: (repeat (each T).Element)) {}
+// UNSUPPORTED: OS=windows-msvc

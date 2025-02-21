@@ -339,3 +339,4 @@ bb0(%0 : @guaranteed $Klass4):
   %res = apply %func(%1) : $@convention(thin) (any Klass3 & P) -> Int32
   return %res : $Int32
 }
+// UNSUPPORTED: OS=windows-msvc

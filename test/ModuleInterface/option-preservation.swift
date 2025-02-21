@@ -25,3 +25,4 @@
 // CHECK-FILELIST-INTERFACE-SAME: -module-name foo
 
 public func foo() { }
+// UNSUPPORTED: OS=windows-msvc

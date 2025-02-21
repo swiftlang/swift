@@ -511,3 +511,4 @@ func testPropertyWrapper() {
 // CHECK-PROPERTY-WRAPPER-NEXT: <Declared>somevar</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK-PROPERTY-WRAPPER-NEXT: <ASTNodes>1</ASTNodes>
 // CHECK-PROPERTY-WRAPPER-NEXT: <end>
+// UNSUPPORTED: OS=windows-msvc

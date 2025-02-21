@@ -32,3 +32,4 @@ func returnLocalOpaque() -> some Any {
 
   return LocalClass()
 }
+// UNSUPPORTED: OS=windows-msvc

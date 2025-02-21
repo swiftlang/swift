@@ -133,3 +133,4 @@ extension Struct : P {
   // CHECK-LABEL: sil hidden [ossa] @$s7sending6StructV29protGenericReturnsNonSendablexylF : $@convention(method) <T> (Struct) -> @sil_sending @out T {
   func protGenericReturnsNonSendable<T>() -> sending T { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

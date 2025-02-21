@@ -30,3 +30,4 @@ public struct Manager {
 public func test(m: Manager) {
   for _ in m.sequence() { }
 }
+// UNSUPPORTED: OS=windows-msvc

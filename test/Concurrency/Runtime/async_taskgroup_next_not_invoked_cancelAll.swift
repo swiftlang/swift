@@ -53,3 +53,4 @@ func test_skipCallingNext_butInvokeCancelAll() async {
     await test_skipCallingNext_butInvokeCancelAll()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

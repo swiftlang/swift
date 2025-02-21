@@ -62,3 +62,4 @@ check() // CHECK-NEXT: .swift:[[@LINE]]
 
 
 check() // CHECK-NEXT: {{^}}k.swift:1002
+// UNSUPPORTED: OS=windows-msvc

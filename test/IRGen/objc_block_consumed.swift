@@ -17,3 +17,4 @@ func passBlockWithConsumedArg(_ g: Gizmo, _ other: Gizmo) {
   // CHECK: objc_method %0 : $Gizmo, #Gizmo.perform!foreign : (Gizmo) -> (((Gizmo?) -> ())?) -> (), $@convention(objc_method) (Optional<@convention(block) (@owned Optional<Gizmo>) -> ()>, Gizmo) -> ()
   g.perform { other in }
 }
+// UNSUPPORTED: OS=windows-msvc

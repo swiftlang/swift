@@ -18,3 +18,4 @@
   @available(iOS, introduced: 10.16)
   @objc func introducedOn10_16() {}
 }
+// UNSUPPORTED: OS=windows-msvc

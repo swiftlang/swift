@@ -7,3 +7,4 @@ import Foundation
   // CHECK: sil private [thunk] [ossa] @$s{{.*}}5thing{{.*}}To : $@convention(objc_method) (ThingHolder) -> @autoreleased NSThing
   @objc let thing: NSThing = NSThing("")
 }
+// UNSUPPORTED: OS=windows-msvc

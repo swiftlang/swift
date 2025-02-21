@@ -34,3 +34,4 @@ func testAvailabilitNew(a: Any) {
   mutateInt(&b)
   // expected-error@-2{{external macro implementation type 'MacroLibrary.MyOldMacro'}}
 }
+// UNSUPPORTED: OS=windows-msvc

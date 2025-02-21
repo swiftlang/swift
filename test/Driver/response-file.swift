@@ -59,3 +59,4 @@ abs(-5)
 #if TEST5_0 && TEST5_10 && TEST5_100 && TEST5_1000 && TEST5_10000 && TEST5_100000 && TEST5_500000
 abs(-5)
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ func testInternalConformance(_ instance: InternalConformance) {
   instance.internalExtensionMember()
   // expected-error@-1 {{'internalExtensionMember' is inaccessible due to 'internal' protection level}}
 }
+// UNSUPPORTED: OS=windows-msvc

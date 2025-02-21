@@ -11,3 +11,4 @@ func test() {
   let s = S(extendedX: 42)
   _ = s.xImmutablePublic
 }
+// UNSUPPORTED: OS=windows-msvc

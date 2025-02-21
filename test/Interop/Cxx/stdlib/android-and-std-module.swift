@@ -27,3 +27,4 @@ func test() {
 
 // CHECK-DAG: Android{{.*}}.pcm
 // CHECK-DAG: std{{.*}}.pcm
+// UNSUPPORTED: OS=windows-msvc

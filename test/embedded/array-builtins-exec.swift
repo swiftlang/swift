@@ -66,3 +66,4 @@ func test() {
 }
 
 @main struct Main { static func main() { test() } }
+// UNSUPPORTED: OS=windows-msvc

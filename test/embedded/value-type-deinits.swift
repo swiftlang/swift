@@ -34,3 +34,4 @@ public func test() {
 // CHECK-LABEL: sil @$e8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Ttg5 :
 // CHECK-NOT:     release
 // CHECK:       } // end sil function '$e8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Ttg5'
+// UNSUPPORTED: OS=windows-msvc

@@ -41,3 +41,4 @@ import MyModule
 func test(act: MyActor) async throws {
     try await act.asyncFunc {}
 }
+// UNSUPPORTED: OS=windows-msvc

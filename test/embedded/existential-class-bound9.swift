@@ -33,3 +33,4 @@ struct Main {
         // CHECK: MyClass.bar()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

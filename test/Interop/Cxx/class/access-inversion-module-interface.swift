@@ -94,3 +94,4 @@
 // CHECK:   public func defaultArgOfPrivateRecConst(_ a: Bool = cxxDefaultArg)
 
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

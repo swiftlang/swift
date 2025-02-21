@@ -489,3 +489,4 @@ extension UnavailableEnum : Swift.Equatable {}
 
 @available(*, unavailable)
 extension UnavailableEnum : Swift.Hashable {}
+// UNSUPPORTED: OS=windows-msvc

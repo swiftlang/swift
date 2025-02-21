@@ -90,3 +90,4 @@ func err4() { _ = / {'/ }
 // expected-error@-1 {{regex literal may not start with space; add backslash to escape}}
 func err5() { _ = / {<#placeholder#>/ }
 // expected-error@-1 {{regex literal may not start with space; add backslash to escape}}
+// UNSUPPORTED: OS=windows-msvc

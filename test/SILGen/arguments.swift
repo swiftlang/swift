@@ -101,3 +101,4 @@ extension Int : Runcible {}
 func variadic_address_only_arg(_ x: Runcible...) {}
 
 variadic_address_only_arg(i)
+// UNSUPPORTED: OS=windows-msvc

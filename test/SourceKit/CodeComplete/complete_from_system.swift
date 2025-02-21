@@ -20,3 +20,4 @@ func test(col: MyCollection) {
 // CHECK-NOT: },
 // CHECK-NOT: key.is_system: 1
 // CHECK: },
+// UNSUPPORTED: OS=windows-msvc

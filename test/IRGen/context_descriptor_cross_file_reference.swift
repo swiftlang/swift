@@ -7,3 +7,4 @@ extension X {
 func force_metadata() {
   print(X.Y())
 }
+// UNSUPPORTED: OS=windows-msvc

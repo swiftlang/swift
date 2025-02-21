@@ -55,3 +55,4 @@ func caller(_ x: HasImportedConf) {
 }
 func caller(_ x: DerivedFromHasImportedConf) { callee(x) }
 func caller(_ x: DerivedFromDerivedFromHasImportedConf) { callee(x) }
+// UNSUPPORTED: OS=windows-msvc

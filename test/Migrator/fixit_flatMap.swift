@@ -16,3 +16,4 @@ func migrate<T, U: Sequence, V: Collection>(lseq: LazySequence<T>, lcol: LazyCol
   _ = seq.flatMap { [$0, $0] }
   _ = col.flatMap { "\($0)" }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -64,3 +64,4 @@
 // CHECK:   typealias Iterator = CxxIterator<HasInputOutputConstIterator>
 // CHECK:   typealias RawIterator = HasInputOutputConstIterator.iterator
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

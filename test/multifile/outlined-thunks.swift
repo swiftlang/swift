@@ -16,3 +16,4 @@ extension P {
     _ = MyPrivate(data as! Self)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

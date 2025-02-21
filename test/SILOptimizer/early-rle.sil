@@ -36,3 +36,4 @@ bb0(%0 : $*Int):
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

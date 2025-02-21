@@ -267,3 +267,4 @@ print("NSObject's type id")
 print(CFGetTypeID(NSObject()))
 // CHECK: NSObject's type id
 // CHECK-NEXT: 1
+// UNSUPPORTED: OS=windows-msvc

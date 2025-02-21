@@ -39,3 +39,4 @@ bb0(%0 : $MyEnum):
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

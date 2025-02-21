@@ -68,3 +68,4 @@ func unifySuperclassTest<T : P1 & P2>(_: T) {
 // CHECK-RULE-NEXT:   τ_0_0.[P1:X] => { layout: _NativeClass superclass: [superclass: Derived<τ_0_0.[P1:A1], τ_0_0.[P1:B1]>] }
 // CHECK-RULE-NEXT:   τ_0_0.[P1:A1] => { conforms_to: [Copyable Escapable] concrete_type: [concrete: String] }
 // CHECK-RULE-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

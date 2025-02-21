@@ -24,3 +24,4 @@ typealias Callback = @convention(block) () -> Void
 func testBlock(block: Callback) {
   withoutActuallyEscaping(block) { $0() }
 }
+// UNSUPPORTED: OS=windows-msvc

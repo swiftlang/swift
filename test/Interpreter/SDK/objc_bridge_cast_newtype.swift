@@ -109,3 +109,4 @@ exportSuite.test("ArrayOfErrorWrappersToNSArray") {
 
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

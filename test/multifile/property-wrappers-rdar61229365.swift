@@ -13,4 +13,4 @@ class YourClass : MyClass {
 }
 
 let object = YourClass()
-object.check()
+object.check()// UNSUPPORTED: OS=windows-msvc

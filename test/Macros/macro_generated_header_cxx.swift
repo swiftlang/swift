@@ -41,3 +41,4 @@ public struct SomeStruct {
   // CHECK-DAG: SWIFT_INLINE_THUNK void cxxFreestanding() const SWIFT_SYMBOL("s:9MacroUser10SomeStructV15cxxFreestandingyyF");
   // CHECK-DAG: SWIFT_INLINE_THUNK void member_SomeStruct() const SWIFT_SYMBOL("s:9MacroUser10SomeStructV07member_cD0yyF");
 }
+// UNSUPPORTED: OS=windows-msvc

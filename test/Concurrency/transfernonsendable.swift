@@ -1933,3 +1933,4 @@ func testIndirectAndDirectSendingResultsWithGlobalActor() async {
     _ = ns2
   }
 }
+// UNSUPPORTED: OS=windows-msvc

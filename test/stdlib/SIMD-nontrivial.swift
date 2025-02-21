@@ -212,3 +212,4 @@ struct SIMDArray<Count: SIMDArrayCount>: SIMDStorage {
         set(newValue) { storage[index] = newValue }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ _ = TyB() // expected-error {{cannot find 'TyB' in scope}}
 // -verify-ignore-unknown is for:
 // <unknown>:0: error: unexpected error produced: could not build Objective-C module 'ObjCFail'
 // <unknown>:0: error: unexpected error produced: missing required module 'ObjCFail'
+// UNSUPPORTED: OS=windows-msvc

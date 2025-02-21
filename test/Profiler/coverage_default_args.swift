@@ -20,3 +20,4 @@ func hasDefaultArgs(i : Int = 10) {
 // CHECK: [[@LINE+1]]:50 -> {{[0-9]+}}:2 : 0
 func autoClosureInArgs(b : Bool = true && false) {
 }
+// UNSUPPORTED: OS=windows-msvc

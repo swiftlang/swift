@@ -152,3 +152,4 @@ extension NSArray {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

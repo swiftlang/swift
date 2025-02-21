@@ -12,3 +12,4 @@ class MyDictionary: NSDictionary {
     super.nonObjCExtensionMethod(x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

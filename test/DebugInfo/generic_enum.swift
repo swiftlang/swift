@@ -27,3 +27,4 @@ switch tg {
 case .x(var t, var u):
   markUsed("\(t) \(u)")
 }
+// UNSUPPORTED: OS=windows-msvc

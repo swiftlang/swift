@@ -14,3 +14,4 @@ public func foo(line: String) {
   let versionRegex = try! RegEx(pattern: "Apple")
   _ = versionRegex.firstMatch(in: line)  
 }
+// UNSUPPORTED: OS=windows-msvc

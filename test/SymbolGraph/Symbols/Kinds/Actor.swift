@@ -11,3 +11,4 @@
 // CHECK-NEXT: "spelling": "actor"
 @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 public actor Q {}
+// UNSUPPORTED: OS=windows-msvc

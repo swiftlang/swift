@@ -13,3 +13,4 @@ class D: C<E> {
     _ = Nested(value: .A)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

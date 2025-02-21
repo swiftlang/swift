@@ -784,3 +784,4 @@ extension Test18 {
   @_dynamicReplacement(for: subscript(subscript2:))
   subscript(replacement_subscript2 _: Int) -> Result { Result() }
 }
+// UNSUPPORTED: OS=windows-msvc

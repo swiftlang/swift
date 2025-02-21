@@ -36,3 +36,4 @@ extension Greeting where Self.SerializationRequirement == Codable {
     greetLocal(name: "Alice") // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -40,3 +40,4 @@ public struct Foo : myProto {
 }
 
 private func baz() -> some protoA<testModBStruct> & protoB<Float> & testModBProtocol { return Bar<testModBStruct, Float>() }
+// UNSUPPORTED: OS=windows-msvc

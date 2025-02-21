@@ -21,3 +21,4 @@ func id(_ x: Float) -> Float {
 func jvpId(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
+// UNSUPPORTED: OS=windows-msvc

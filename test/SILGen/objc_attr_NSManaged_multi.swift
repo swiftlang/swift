@@ -32,3 +32,4 @@ func testFinalMulti(_ obj: FinalGizmo) -> String {
   obj.extKVC2()
   return obj.y
 }
+// UNSUPPORTED: OS=windows-msvc

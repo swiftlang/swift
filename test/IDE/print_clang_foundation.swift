@@ -59,3 +59,4 @@
 
 // CHECK_NSCODER: func failWithError(_ error: any Error)
 // CHECK_NSCODER: {{^}}  var error: (any Error)? { get }
+// UNSUPPORTED: OS=windows-msvc

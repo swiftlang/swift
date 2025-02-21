@@ -8,3 +8,4 @@ func foo() {
   __shared()
   __owned()
 }
+// UNSUPPORTED: OS=windows-msvc

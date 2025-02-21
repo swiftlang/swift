@@ -21,3 +21,4 @@ void headerFunc();
 func useHeaderFunc() {
   headerFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

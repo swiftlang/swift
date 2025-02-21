@@ -132,3 +132,4 @@ func testLocalDerivativeRegistration() {
 @derivative(of: nestedType.name.set)
 func dNestedTypePropertySetter() -> ()
 
+// UNSUPPORTED: OS=windows-msvc

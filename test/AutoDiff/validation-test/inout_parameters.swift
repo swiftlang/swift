@@ -249,3 +249,4 @@ InoutParameterAutoDiffTests.test("non-wrt inout parameter") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

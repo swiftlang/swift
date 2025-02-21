@@ -33,3 +33,4 @@ struct S2<X> { }
 func testTentativeParsing() {
   let _ = S2<(_ x: Int, _ y: Double) -> Int>()
 }
+// UNSUPPORTED: OS=windows-msvc

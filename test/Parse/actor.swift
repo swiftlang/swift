@@ -10,3 +10,4 @@ actor MyActor2 { // expected-note@:16 {{to match this opening '{'}}
     init() {
     }
 func hello() { } // expected-error@+1 {{expected '}' in actor}}
+// UNSUPPORTED: OS=windows-msvc

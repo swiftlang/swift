@@ -14,3 +14,4 @@ public struct Entity {
 // CHECK: $ld$hide$os5.2$_$s14OriginalModule6EntityVN
 // CHECK: $ld$hide$os5.3$_$s14OriginalModule6EntityVN
 // CHECK-NOT: $ld$hide$os5.4$_$s14OriginalModule6EntityVN
+// UNSUPPORTED: OS=windows-msvc

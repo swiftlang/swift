@@ -27,3 +27,4 @@ func powVJP(
 ) -> (value: Double, pullback: (Double) -> (Double, Double)) {
   fatalError()
 }
+// UNSUPPORTED: OS=windows-msvc

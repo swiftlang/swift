@@ -59,3 +59,4 @@ import ImportsMacroSpecificClangModule
 // CHECK-NEXT:          "commandLine": [
 
 // CHECK:                  "TANGERINE=1"
+// UNSUPPORTED: OS=windows-msvc

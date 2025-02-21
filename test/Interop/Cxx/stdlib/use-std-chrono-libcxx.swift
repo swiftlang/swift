@@ -8,3 +8,4 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=linux-gnu
 // REQUIRES: system_wide_libcxx
+// UNSUPPORTED: OS=windows-msvc

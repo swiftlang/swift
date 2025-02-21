@@ -17,3 +17,4 @@
 
 @_alwaysEmitIntoClient
 public func alwaysEmitIntoClientFunc(_ x: Bool) -> Bool { return !x }
+// UNSUPPORTED: OS=windows-msvc

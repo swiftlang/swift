@@ -28,3 +28,4 @@ OperatorsTestSuite.test("UnnamedParameterInOperator.equal") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

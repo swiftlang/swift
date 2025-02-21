@@ -14,3 +14,4 @@ _ = Test . /*test:ref*/init(base:)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="test" -is-function-like -old-name "init(base:)" >> %t.ranges/init.swift.expected
 // RUN: diff -u %S/Outputs/init.swift.expected %t.ranges/init.swift.expected
 
+// UNSUPPORTED: OS=windows-msvc

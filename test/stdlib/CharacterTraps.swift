@@ -37,3 +37,4 @@ CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster")
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

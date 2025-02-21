@@ -29,3 +29,4 @@ func rdar36333688(_ first: Int, _ rest: Int...) {
   // CHECK: function_ref @{{.*}} : $@convention(method) <τ_0_0 where τ_0_0 : RangeReplaceableCollection><τ_1_0 where τ_1_0 : RangeReplaceableCollection, τ_0_0.Element == τ_1_0.Element> (@in_guaranteed τ_0_0, @in_guaranteed τ_1_0, @thick τ_0_0.Type) -> @out τ_0_0
   let _ = [first] +=+ rest
 }
+// UNSUPPORTED: OS=windows-msvc

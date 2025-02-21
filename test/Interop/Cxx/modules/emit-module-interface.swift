@@ -20,3 +20,4 @@
 import Namespaces
 
 var x: Namespace.Parent? = nil
+// UNSUPPORTED: OS=windows-msvc

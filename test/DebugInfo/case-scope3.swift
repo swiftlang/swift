@@ -20,3 +20,4 @@ func f() -> Int {
     }
     return 0
 }
+// UNSUPPORTED: OS=windows-msvc

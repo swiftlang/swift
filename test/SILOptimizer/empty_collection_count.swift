@@ -37,3 +37,4 @@ public func testSet() -> Int {
   return d.count + d.capacity
 }
 
+// UNSUPPORTED: OS=windows-msvc

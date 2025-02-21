@@ -123,3 +123,4 @@ struct AnyBuilder {
 // IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildFinalResult(_ component: Any) -> <#Result#> {|}; name=static func buildFinalResult(_ component: Any) -> <#Result#>; comment=
 // IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildPartialBlock(first: Any) -> Any {|}; name=static func buildPartialBlock(first: Any) -> Any; comment=
 // IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildPartialBlock(accumulated: Any, next: Any) -> Any {|}; name=static func buildPartialBlock(accumulated: Any, next: Any) -> Any; comment=
+// UNSUPPORTED: OS=windows-msvc

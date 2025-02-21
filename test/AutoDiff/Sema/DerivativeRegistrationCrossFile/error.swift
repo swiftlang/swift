@@ -6,3 +6,4 @@ import _Differentiation
 func clamp(_ value: Double, _ lowerBound: Double, _ upperBound: Double) -> Double {
     return Struct.max(min(value, upperBound), lowerBound) // expected-error {{cannot find 'Struct' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

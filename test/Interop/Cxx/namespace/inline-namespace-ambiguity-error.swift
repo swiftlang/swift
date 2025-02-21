@@ -53,3 +53,4 @@ extension Parent.InlineChild.StructInInlineChildAndSiblingInlineChild { // ok
 
 extension Parent.InlineChild.SecondInlineChild.StructInInlineChildAndParent { // expected-error {{'StructInInlineChildAndParent' is not a member type of enum '__ObjC.Parent.InlineChild.SecondInlineChild'}}
 }
+// UNSUPPORTED: OS=windows-msvc

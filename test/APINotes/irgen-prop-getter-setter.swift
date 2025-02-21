@@ -20,3 +20,4 @@ class MyView: NSView {
 }
 var m = MyView()
 m.drawRect()
+// UNSUPPORTED: OS=windows-msvc

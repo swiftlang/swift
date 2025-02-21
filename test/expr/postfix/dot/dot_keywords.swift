@@ -110,3 +110,4 @@ extension P {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

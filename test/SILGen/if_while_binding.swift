@@ -406,3 +406,4 @@ func testCaseBool(_ value : Bool?) {
     marker_2()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

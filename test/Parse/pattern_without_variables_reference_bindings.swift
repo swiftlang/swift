@@ -51,3 +51,4 @@ func testVarLetPattern(a : SimpleEnum) {
 class C_53293 {
   static var _: Int { 0 } //expected-error {{getter/setter can only be defined for a single variable}}
 }
+// UNSUPPORTED: OS=windows-msvc

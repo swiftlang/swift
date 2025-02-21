@@ -48,3 +48,4 @@ let _: S1? = .member_overload
 let _: S1? = .init(failable: ())
 let _: S1? = .member3()
 let _: S1? = .member4
+// UNSUPPORTED: OS=windows-msvc

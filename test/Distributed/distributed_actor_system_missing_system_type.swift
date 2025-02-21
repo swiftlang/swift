@@ -29,3 +29,4 @@ distributed actor BadSystemActor {
   // This system does not exist: but we should not crash, but just diagnose about it:
   typealias ActorSystem = ClusterSystem // expected-error{{cannot find type 'ClusterSystem' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

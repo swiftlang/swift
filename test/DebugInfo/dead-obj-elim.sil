@@ -37,3 +37,4 @@ bb0(%0 : $UInt8):
   dealloc_stack %2 : $*MyObject
   return %31 : $UInt8
 } // end sil function '$myFunc'
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ public func bar() -> MyClass {
   return MySubClass()
 }
 // CHECK-DAG: define {{.*}}ptr @"$e4main3barAA7MyClassCyF"
+// UNSUPPORTED: OS=windows-msvc

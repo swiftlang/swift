@@ -41,3 +41,4 @@ TowersOfHanoi(4, from: 1, to: 2, via: 3)
 // CHECK-NEXT: Move disk from pole 1 to pole 3
 // CHECK-NEXT: Move disk from pole 1 to pole 2
 // CHECK-NEXT: Move disk from pole 3 to pole 2
+// UNSUPPORTED: OS=windows-msvc

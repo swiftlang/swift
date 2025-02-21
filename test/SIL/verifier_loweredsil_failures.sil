@@ -32,3 +32,4 @@ sil @dealloc_pack_metadata_with_bad_operand : $@convention(thin) <each T> () -> 
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

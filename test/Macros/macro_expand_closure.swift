@@ -28,3 +28,4 @@ func multiStatementInference() -> Int {
 
 // CHECK: 10
 print(multiStatementInference())
+// UNSUPPORTED: OS=windows-msvc

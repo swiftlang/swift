@@ -26,3 +26,4 @@ tryWeakReferencing { C() }
 // CHECK-NEXT:  Swift Object
 // CHECK-NEXT:  after giving up strong reference:
 // CHECK-NEXT:  Gone
+// UNSUPPORTED: OS=windows-msvc

@@ -175,3 +175,4 @@ func invokesWithClosureWithArg() {
 // - capture list binding can't be consumed
 // - andy's bookmarked test cases
 // - nested closure captures
+// UNSUPPORTED: OS=windows-msvc

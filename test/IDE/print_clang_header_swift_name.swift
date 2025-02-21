@@ -25,3 +25,4 @@
 // CHECK-NEXT: case SwiftEnumTwoB
 // CHECK-NEXT: case SwiftEnumTwoC
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

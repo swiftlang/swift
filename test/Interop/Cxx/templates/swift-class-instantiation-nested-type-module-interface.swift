@@ -8,3 +8,4 @@
 // CHECK: import ClassTemplateNestedTypeForSwiftModule
 // CHECK: func receiveShipEngine(_ i: inout Space.__CxxTemplateInstN5Space4ShipIbEE)
 // CHECK: func returnShipEngine() -> Space.__CxxTemplateInstN5Space4ShipIbEE
+// UNSUPPORTED: OS=windows-msvc

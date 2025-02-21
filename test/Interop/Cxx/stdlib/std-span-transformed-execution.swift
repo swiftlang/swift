@@ -20,3 +20,4 @@ func canCallSafeSpanAPIs(_ x: Span<CInt>) {
     funcWithSafeWrapper(x)
     funcWithSafeWrapper2(x)
 }
+// UNSUPPORTED: OS=windows-msvc

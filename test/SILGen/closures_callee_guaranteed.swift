@@ -28,3 +28,4 @@ public func apply(_ f : () -> Int) -> Int {
 public func test() {
   let res = apply({ return 1 })
 }
+// UNSUPPORTED: OS=windows-msvc

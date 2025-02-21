@@ -10,3 +10,4 @@
 public func testCastOpaqueArchetype() -> Underlying {
   return returnOpaque() as! Underlying
 }
+// UNSUPPORTED: OS=windows-msvc

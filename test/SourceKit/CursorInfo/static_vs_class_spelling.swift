@@ -29,3 +29,4 @@ func application() {
   // SHARED_COMPUTED_CLASS: <Declaration>class var sharedComputedClass: <Type usr="s:8MyModule14UserCollectionC">UserCollection</Type> { get }</Declaration>
   // SHARED_COMPUTED_CLASS: <decl.var.class><syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>sharedComputedClass</decl.name>: <decl.var.type><ref.class usr="s:8MyModule14UserCollectionC">UserCollection</ref.class></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.class>
 }
+// UNSUPPORTED: OS=windows-msvc

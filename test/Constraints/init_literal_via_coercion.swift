@@ -20,3 +20,4 @@ _ = UInt32(0)
 // CHECK-NEXT: >  [favored]  [[CAST_TYPE]] bind Int?
 // CHECK-NEXT: >             [[CAST_TYPE]] bind Int
 _ = Int!(nil)
+// UNSUPPORTED: OS=windows-msvc

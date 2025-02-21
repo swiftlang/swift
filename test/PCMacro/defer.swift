@@ -32,3 +32,4 @@ foo()
 // CHECK-NEXT: [10:5-10:6] pc before
 // CHECK-NEXT: [10:5-10:6] pc after
 // CHECK-NEXT: [15:1-15:6] pc after
+// UNSUPPORTED: OS=windows-msvc

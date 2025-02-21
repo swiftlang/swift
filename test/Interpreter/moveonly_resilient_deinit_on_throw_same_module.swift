@@ -117,3 +117,4 @@ func main() {
     print("\(Resilient.instanceCount()) instances in total")
 }
 main()
+// UNSUPPORTED: OS=windows-msvc

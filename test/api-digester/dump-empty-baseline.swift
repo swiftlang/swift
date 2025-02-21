@@ -5,3 +5,4 @@
 // RUN: diff -u %S/Outputs/empty-baseline.json %t.result
 // RUN: %api-digester -deserialize-sdk -input-paths %S/Outputs/empty-baseline.json -o %t.result
 // RUN: diff -u %S/Outputs/empty-baseline.json %t.result
+// UNSUPPORTED: OS=windows-msvc

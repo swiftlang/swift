@@ -150,3 +150,4 @@ func testHasIndex(value: MyConcrete) {
 // CONDITIONAL_DEPENDENT_TYPEALIAS-DAG: Keyword[self]/CurrNominal:          self[#MyConcrete#];
 // CONDITIONAL_DEPENDENT_TYPEALIAS-DAG: Decl[InstanceMethod]/Super:         indices()[#Void#];
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -69,3 +69,4 @@ func testConstantIndirectFieldAccess<T>(_ o: GenericObjCSubclass<T>) {
   // because the field offset vector only contains Swift field offsets.
   o.field = 10
 }
+// UNSUPPORTED: OS=windows-msvc

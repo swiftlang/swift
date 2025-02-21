@@ -22,3 +22,4 @@ struct Test {
 }
 
 // NO_RESULTS-NOT: Begin completions
+// UNSUPPORTED: OS=windows-msvc

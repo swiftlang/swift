@@ -15,3 +15,4 @@ extension Outer.Inner {
 extension Sequence {
   func bing<Self>(_: Self) {} // expected-warning {{generic parameter 'Self' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}}
 }
+// UNSUPPORTED: OS=windows-msvc

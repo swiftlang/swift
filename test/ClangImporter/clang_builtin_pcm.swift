@@ -7,3 +7,4 @@
 // CHECK: _Builtin_intrinsics{{.*}}.pcm
 
 import _Builtin_intrinsics
+// UNSUPPORTED: OS=windows-msvc

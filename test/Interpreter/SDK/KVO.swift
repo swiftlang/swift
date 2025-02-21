@@ -72,3 +72,4 @@ precondition(!(fooClassAsAny is Observer.Type), "improper KVO subclass")
 
 // CHECK-NEXT: class metadata checks okay
 print("class metadata checks okay")
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@ func foo<T>(_: Any?) -> T {
 
 // CHECK: function_ref @$s12rdar386258243fooyxyplF : $@convention(thin) <τ_0_0> (@in_guaranteed Any) -> @out τ_0_0
 var _: String = foo("hello")
+// UNSUPPORTED: OS=windows-msvc

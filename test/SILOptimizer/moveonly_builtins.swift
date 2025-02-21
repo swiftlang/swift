@@ -34,3 +34,4 @@ public func checkIllegal() {
   let _: NC = Builtin.zeroInitializer()
 #endif
 }
+// UNSUPPORTED: OS=windows-msvc

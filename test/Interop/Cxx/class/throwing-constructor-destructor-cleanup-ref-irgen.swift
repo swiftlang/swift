@@ -51,3 +51,4 @@ public func test() {
 
 // Make sure we reach the destructor of 'HasDestructor'
 // CHECK: define linkonce_odr {{.*}} @{{_ZN13HasDestructorIiED2Ev|"\?\?1\?\$HasDestructor@H@@QEAA@XZ"}}
+// UNSUPPORTED: OS=windows-msvc

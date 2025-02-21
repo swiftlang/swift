@@ -23,3 +23,4 @@ func testCall() {
 // CHECK: call swiftcc void @"$s15indirect_return3fooSS_S2SAA6Number_pAaC_ptyF"(ptr noalias nocapture %{{.*}}
   print(foo())
 }
+// UNSUPPORTED: OS=windows-msvc

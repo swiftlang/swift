@@ -20,3 +20,4 @@ import Foundation
 func test() {
   print(TestDir)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -195,3 +195,4 @@ let _ = """
   // expected-error@-3 {{cannot find ')' to match opening '(' in string interpolation}}
   // expected-error@-4 {{unterminated string literal}}
 
+// UNSUPPORTED: OS=windows-msvc

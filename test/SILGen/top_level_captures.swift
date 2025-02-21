@@ -17,3 +17,4 @@ func capturesX() {
 func transitiveCapture() {
   capturesX()
 }
+// UNSUPPORTED: OS=windows-msvc

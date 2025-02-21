@@ -43,3 +43,4 @@ public func makeTuple<each T>(_ t: repeat each T) {
 public func makeTuple2<each T, each U, each V: Hashable>(t: repeat each T, u: repeat each U, v: repeat each V) {
   takesMetatype((repeat each T, repeat Array<each U>, repeat Set<each V>).self)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@
 // CHECK-NEXT: 7
 print(#stringify({ 1 + 2 }()))
 print(#stringify({ 3 + 4 }()))
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@ macro Nested() -> Void = #externalMacro(module: "MacroDefinition", type: "Nested
 // CHECK: magic_literal_expansion.swift
 // CHECK: 28
 #Nested
+// UNSUPPORTED: OS=windows-msvc

@@ -56,3 +56,4 @@ import NonExistent
 
 // RUN: not %sourcekitd-test -req=interface-gen -module LibraryNonExistent -- -I %t -target %target-triple %s 2>&1 | %FileCheck --check-prefix TRANSITIVE-NONEXISTENT %s
 // TRANSITIVE-NONEXISTENT: Could not load module: LibraryNonExistent (missing required module 'NonExistent')
+// UNSUPPORTED: OS=windows-msvc

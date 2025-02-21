@@ -44,3 +44,4 @@ test_builder { // expected-error {{no exact matches in call to global function '
   switch (doesntExist()) { // expected-error {{cannot find 'doesntExist' in scope}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

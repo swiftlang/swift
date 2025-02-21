@@ -45,3 +45,4 @@ func bar(eventLoop: EventLoop, process: @escaping (Thing) -> EventLoopFuture<Voi
 
   return doIt(thingsLeft: [][...])
 }
+// UNSUPPORTED: OS=windows-msvc

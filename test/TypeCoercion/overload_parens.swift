@@ -27,3 +27,4 @@ func testParenOverloads(_ x: inout Int, y: Y) {
   x = (y.f1)()
   x = ((y.f1))()
 }
+// UNSUPPORTED: OS=windows-msvc

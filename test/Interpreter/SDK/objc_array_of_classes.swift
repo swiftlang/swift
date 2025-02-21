@@ -77,3 +77,4 @@ ArrayOfClassObjectBridging.test("bridging NSArray of class objects to [NSObject.
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

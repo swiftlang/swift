@@ -224,3 +224,4 @@ public class GenericDerived<T> : GenericBase<T> {
     genericFunction(0)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

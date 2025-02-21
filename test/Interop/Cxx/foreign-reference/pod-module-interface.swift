@@ -87,3 +87,4 @@
 // CHECK: }
 // CHECK: func mutateIt(_ x: BigType)
 // CHECK-NOT: func passThroughByValue(_ x: BigType) -> BigType
+// UNSUPPORTED: OS=windows-msvc

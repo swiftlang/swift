@@ -88,3 +88,4 @@ sil_witness_table hidden <T, U> C<T, U>: P module clsx {
 
 sil_default_witness_table hidden P {
 }
+// UNSUPPORTED: OS=windows-msvc

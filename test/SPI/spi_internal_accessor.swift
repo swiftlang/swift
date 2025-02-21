@@ -89,3 +89,4 @@ public struct InternalSet {
 // CHECK-PRIVATE:   }
 }
 // CHECK-PRIVATE: }
+// UNSUPPORTED: OS=windows-msvc

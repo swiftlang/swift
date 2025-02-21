@@ -68,3 +68,4 @@ package enum TestRawTypePackage: IntLike { // expected-error {{enum cannot be de
 package protocol TestRefinedProtoPackage: BadProto { // expected-error {{package protocol cannot refine an internal protocol}}
 // expected-note @-1 {{protocol 'BadProto' is imported by this file as 'internal' from 'BADLibrary'}}
 }
+// UNSUPPORTED: OS=windows-msvc

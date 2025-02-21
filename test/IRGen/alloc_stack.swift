@@ -15,3 +15,4 @@ class Foobar {
 // CHECK:  ret {{.*}}%0
 // CHECK:}
 
+// UNSUPPORTED: OS=windows-msvc

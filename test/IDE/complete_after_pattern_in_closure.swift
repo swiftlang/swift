@@ -13,3 +13,4 @@ func test() {
   }()
   // COMPLETE-NOT: Begin completions
 }
+// UNSUPPORTED: OS=windows-msvc

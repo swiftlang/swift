@@ -22,3 +22,4 @@ case let intValue is Int: _ = intValue
   // expected-error@-1 {{use 'as' keyword to bind a matched value}}{{19-21=as}}
 default: break
 }
+// UNSUPPORTED: OS=windows-msvc

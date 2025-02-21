@@ -37,3 +37,4 @@ class Foo
 //                         class Foo"
 //                             ..."
 // CHECK: key.sourcetext: "}"
+// UNSUPPORTED: OS=windows-msvc

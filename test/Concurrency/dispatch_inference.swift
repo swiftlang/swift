@@ -43,3 +43,4 @@ func testUnsafeSendableInAsync(queue: DispatchQueue) async {
 
   print(x)
 }
+// UNSUPPORTED: OS=windows-msvc

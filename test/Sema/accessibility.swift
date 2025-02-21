@@ -1725,3 +1725,4 @@ public typealias TestGenericAliasWhereClausePkg<T> = T where T: PackageProto // 
 
 package typealias PackageTestGenericAlias<T: PrivateProto> = T // expected-warning {{type alias should not be declared package because its generic parameter uses a private type}}
 package typealias PackageTestGenericAliasWhereClause<T> = T where T: PrivateProto // expected-warning {{type alias should not be declared package because its generic requirement uses a private type}}
+// UNSUPPORTED: OS=windows-msvc

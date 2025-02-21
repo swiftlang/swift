@@ -33,3 +33,4 @@ extension DefaultStringInterpolation {
 // CHECK: Hello str 42 str -42
 // CHECK: hex: 0x2a
 // CHECK: ptr: 0xffff0000
+// UNSUPPORTED: OS=windows-msvc

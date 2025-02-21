@@ -26,3 +26,4 @@ infix operator +++ {} // expected-error {{operator should no longer be declared 
 infix operator +++* { // expected-error {{operator should no longer be declared with body; use a precedence group instead}}
   associativity right
 }
+// UNSUPPORTED: OS=windows-msvc

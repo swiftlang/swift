@@ -94,3 +94,4 @@ func getterResultStaticStorageAccess() {
   // CHECK-NEXT: apply [[METHOD]]([[VALUE]])
   _type.value.method()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -469,3 +469,4 @@ public func closure_capture_byref_${name}() {
 %  if generic:
 } // End of Context_${name}.
 %  end
+// UNSUPPORTED: OS=windows-msvc

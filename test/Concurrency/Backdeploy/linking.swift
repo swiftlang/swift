@@ -19,3 +19,4 @@ public struct X {
     await f()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

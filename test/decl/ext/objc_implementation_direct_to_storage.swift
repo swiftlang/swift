@@ -31,3 +31,4 @@ func takesObjCPropertyTest(_ o: ObjCPropertyTest) {
   _ = o.prop1
   _ = o.prop2
 }
+// UNSUPPORTED: OS=windows-msvc

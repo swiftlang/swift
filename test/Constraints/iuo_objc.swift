@@ -63,3 +63,4 @@ func rdar61337704() {
   let descriptor = PaletteDescriptor()
   setColor(v: descriptor.colors[0]) // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

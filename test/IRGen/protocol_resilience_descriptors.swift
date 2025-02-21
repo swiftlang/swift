@@ -111,3 +111,4 @@ public func extractAssocConformance<T: ProtocolWithAssocTypeDefaults>(_: T) {
   // CHECK-USAGE: swift_getAssociatedConformanceWitness
   useOtherResilientProtocol(T.T2.self)
 }
+// UNSUPPORTED: OS=windows-msvc

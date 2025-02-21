@@ -69,3 +69,4 @@ entry:
   %z = apply %g() : $@convention(thin) () -> ()
   return %z : $()
 }
+// UNSUPPORTED: OS=windows-msvc

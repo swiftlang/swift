@@ -25,3 +25,4 @@
 // RUN: llvm-objdump -t %t/ResultFoo.o | swift-demangle | %FileCheck %s -check-prefix=CHECK-B
 // CHECK-B: Foo.meow() -> Bar.Klass?
 
+// UNSUPPORTED: OS=windows-msvc

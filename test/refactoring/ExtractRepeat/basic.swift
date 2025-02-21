@@ -14,3 +14,4 @@ func foo(_ a : Int) -> Int {
 // RUN: diff -u %S/Outputs/basic/one-plus-two.swift.expected %t.result/one-plus-two.swift
 // RUN: %refactor -extract-repeat -source-filename %s -pos=4:32 -end-pos=4:38 >> %t.result/foo-one.swift
 // RUN: diff -u %S/Outputs/basic/foo-one.swift.expected %t.result/foo-one.swift
+// UNSUPPORTED: OS=windows-msvc

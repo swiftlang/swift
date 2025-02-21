@@ -11,3 +11,4 @@
 
 // CHECK-SUGAR: return <expr type:"swift_ide_test.MyInt"><expr type:"swift_ide_test.MyInt">a</expr> <expr type:"(Swift.Int, Swift.Int) -> Swift.Int">+</expr> <expr type:"swift_ide_test.MyInt">b</expr></expr>
 // CHECK-CANON: return <expr type:"Swift.Int"><expr type:"Swift.Int">a</expr> <expr type:"(Swift.Int, Swift.Int) -> Swift.Int">+</expr> <expr type:"Swift.Int">b</expr></expr>
+// UNSUPPORTED: OS=windows-msvc

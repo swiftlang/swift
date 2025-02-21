@@ -114,3 +114,4 @@ public struct OKStruct {}
 @_spi(Horse) public struct OKConforms : Proto {
   public typealias A = [OKStruct]
 }
+// UNSUPPORTED: OS=windows-msvc

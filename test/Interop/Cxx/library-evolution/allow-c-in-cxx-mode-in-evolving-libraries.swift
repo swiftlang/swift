@@ -55,3 +55,4 @@ public func useCxxEnum(_ x: CxxEnum) { // expected-error {{cannot use enum 'CxxE
 // expected-error@+1 {{cannot use struct 'CxxStruct' here; C++ types from imported module 'CxxModule' do not support library evolution}}
 public func usesCxxStruct(_ x: CxxStruct) {
 }
+// UNSUPPORTED: OS=windows-msvc

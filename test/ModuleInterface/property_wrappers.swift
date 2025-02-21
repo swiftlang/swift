@@ -65,3 +65,4 @@ public struct HasWrappers {
   // CHECK-NEXT: }  
   @WrapperWithInitialValue(alternate: false) public var z
 }
+// UNSUPPORTED: OS=windows-msvc

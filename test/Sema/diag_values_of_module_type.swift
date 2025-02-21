@@ -111,3 +111,4 @@ func badTest6() {
   _ = { { Swift }() }() // expected-error {{expected module member name after module name}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

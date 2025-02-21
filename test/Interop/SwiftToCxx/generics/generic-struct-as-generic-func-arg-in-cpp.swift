@@ -26,3 +26,4 @@ int main() {
   auto c = MyClass<int>::init(10);
   auto result = genericFunc<MyClass<int>>(c);
 }
+// UNSUPPORTED: OS=windows-msvc

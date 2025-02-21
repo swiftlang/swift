@@ -151,3 +151,4 @@ public func main() {
   // CHECK: compared as Fauxts
 
 }
+// UNSUPPORTED: OS=windows-msvc

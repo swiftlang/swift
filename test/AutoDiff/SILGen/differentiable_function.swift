@@ -125,3 +125,4 @@ func apply() {
 // CHECK-NEXT:  [[ORIG_THICK:%.*]] = thin_to_thick_function [[ORIG]] : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float
 // CHECK-NEXT:  [[LIN:%.*]] = linear_function [parameters 0] [[ORIG_THICK]] : $@callee_guaranteed (Float) -> Float
 
+// UNSUPPORTED: OS=windows-msvc

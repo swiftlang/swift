@@ -30,3 +30,4 @@ func test1() -> Int {
     8
   }
 }
+// UNSUPPORTED: OS=windows-msvc

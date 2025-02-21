@@ -177,3 +177,4 @@
 
 // CHECK-64: CAPTURE DESCRIPTORS:
 // CHECK-64: ====================
+// UNSUPPORTED: OS=windows-msvc

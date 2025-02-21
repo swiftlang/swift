@@ -15,3 +15,4 @@ func test(a: A, a2: isolated A, s: S) async {
 
   s.f(a: a2)
 }
+// UNSUPPORTED: OS=windows-msvc

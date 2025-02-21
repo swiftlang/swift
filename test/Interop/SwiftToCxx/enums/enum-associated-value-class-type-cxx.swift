@@ -74,3 +74,4 @@ public enum G<T> {
 // CHECK-NEXT:       swift::_impl::implClassFor<swift::Array<T_0_0>>::type::initializeWithTake(result, payloadFromDestruction);
 // CHECK-NEXT:     });
 // CHECK-NEXT:   }
+// UNSUPPORTED: OS=windows-msvc

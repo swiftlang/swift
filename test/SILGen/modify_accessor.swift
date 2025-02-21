@@ -118,3 +118,4 @@ struct ModifyAndSet {
     readwrite(&modifiable)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

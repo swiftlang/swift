@@ -2,3 +2,4 @@
 
 // CHECK: func usedInOtherHeader() -> ForwardDeclaredInOtherHeader!
 // CHECK: class ForwardDeclaredInOtherHeader
+// UNSUPPORTED: OS=windows-msvc

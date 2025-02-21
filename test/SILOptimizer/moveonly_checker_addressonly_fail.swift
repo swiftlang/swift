@@ -21,3 +21,4 @@ func test1<T>(_ x: T) {
     consumeValue(x2) // expected-error {{'x2' is borrowed and cannot be consumed}}
     // expected-note @-1 {{consumed here}}
 }
+// UNSUPPORTED: OS=windows-msvc

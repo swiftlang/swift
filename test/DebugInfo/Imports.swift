@@ -32,3 +32,4 @@ markUsed(basic.foo(1, 2))
 
 // DWARF-DAG: file_names{{.*}}
 // DWARF-NEXT: "Imports.swift"
+// UNSUPPORTED: OS=windows-msvc

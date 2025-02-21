@@ -130,3 +130,4 @@ class C3: NSObject {
 // CHECK_RAW17: "zooWithM"
 // CHECK_RAW17: key.namekind: source.lang.name.kind.objc
 // CHECK_RAW17-NOT: key.is_zero_arg_selector
+// UNSUPPORTED: OS=windows-msvc

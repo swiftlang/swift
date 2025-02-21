@@ -17,3 +17,4 @@ func testOptional<T>(_ x: T?) {
   // Test trailing closure syntax.
   _ = x { _ in } ({ _ in })
 }
+// UNSUPPORTED: OS=windows-msvc

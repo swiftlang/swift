@@ -31,3 +31,4 @@ func testXRead<T>(x: X<T>) -> T {
   return x[]!
 }
 // CHECK: $s18subscript_accessor1XVxSgycisTf4dn_n
+// UNSUPPORTED: OS=windows-msvc

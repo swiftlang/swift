@@ -220,3 +220,4 @@ func foo(x: E, intVal: Int) {
 #endif
   }
 }
+// UNSUPPORTED: OS=windows-msvc

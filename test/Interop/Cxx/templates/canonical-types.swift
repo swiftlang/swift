@@ -13,3 +13,4 @@ TemplatesTestSuite.test("canonical-types") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

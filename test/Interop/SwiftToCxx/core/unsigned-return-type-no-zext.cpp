@@ -17,3 +17,4 @@ void test(void *p) {
 
 // CHECK: declare{{( noundef)?}}{{( zeroext)?}} i8 @_Z12getEnumTagi8Pv(ptr noundef)
 // CHECK: declare{{( noundef)?}} i32 @_Z13getEnumTagi32Pv(ptr noundef)
+// UNSUPPORTED: OS=windows-msvc

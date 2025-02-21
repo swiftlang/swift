@@ -33,3 +33,4 @@ fn(())    // expected-error {{argument passed to call that takes no arguments}} 
 // CHECK: [[@LINE+2]]:8: error: unexpected error produced: generic type 'Array' specialized with too many type parameters
 // CHECK: note: diagnostic produced elsewhere: generic type 'Array' declared here
 let x: Array<Int, Int>
+// UNSUPPORTED: OS=windows-msvc

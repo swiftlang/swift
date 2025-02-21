@@ -14,3 +14,4 @@ do {
   1
 }
 // CHECK: {{.*}} __builtin_log[='1']
+// UNSUPPORTED: OS=windows-msvc

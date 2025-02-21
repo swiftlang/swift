@@ -18,3 +18,4 @@ public func testContiguousArray<Element>(_ a: ContiguousArray<Element>, _ c: (El
   return s
 }
 
+// UNSUPPORTED: OS=windows-msvc

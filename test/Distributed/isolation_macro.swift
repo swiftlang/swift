@@ -45,3 +45,4 @@ func closureIsolatedToOuterParam(_ isolatedParam: isolated any DistributedActor)
     print(isolatedParam)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

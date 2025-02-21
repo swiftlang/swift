@@ -647,3 +647,4 @@ func usesAreNotAmbiguous(obj: ObjCClass) {
   obj.categoryMethodNot(fromHeader1: 1)
   obj.categoryMethodNot(fromHeader2: 2)
 }
+// UNSUPPORTED: OS=windows-msvc

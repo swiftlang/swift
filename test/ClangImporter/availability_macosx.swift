@@ -47,3 +47,4 @@ func integerToBezierPathElement(_ i: Int) -> NSBezierPathElement {
     fatalError()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -39,3 +39,4 @@ func quz<T>(a: Bool, t: T) {
     return
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ public func usesStaticMember() {
 
 // CHECK: define {{.*}}i32 @{{_ZN24HasStaticOutOfLineMemberIiE13getFirstValueEv|"\?getFirstValue@\?\$HasStaticOutOfLineMember@H@@SAHXZ"}}()
 // CHECK: %0 = {{.*}} @{{_ZN24HasStaticOutOfLineMemberIiE6valuesE|"\?values@\?\$HasStaticOutOfLineMember@H@@2PAHA"}}
+// UNSUPPORTED: OS=windows-msvc

@@ -39,3 +39,4 @@ let a = A()
 let b = B.self
 let c = (A(), A())
 private let i = Invalid()
+// UNSUPPORTED: OS=windows-msvc

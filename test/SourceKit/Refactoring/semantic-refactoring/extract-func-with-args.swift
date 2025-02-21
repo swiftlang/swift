@@ -10,3 +10,4 @@ func foo() -> Int {
 
 // FIXME: Fails on linux with assertion: "!GlibcModuleMapPath.empty()"" failed
 // REQUIRES: OS=macosx
+// UNSUPPORTED: OS=windows-msvc

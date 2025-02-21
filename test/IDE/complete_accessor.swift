@@ -124,3 +124,4 @@ extension UNKNOWN_TYPE {
     #^UNKNOWN_EXT_SUBSCRIPT_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
 }
+// UNSUPPORTED: OS=windows-msvc

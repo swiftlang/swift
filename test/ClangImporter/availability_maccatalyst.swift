@@ -75,3 +75,4 @@ struct StructUnavailableOnMacCatalystOnly {
   func nestedCheck(_ p: UnavailableOnMacCatalystOnly) {}
   func invertedNestedCheck(_ p: AvailableOnMacCatalystOnly) {} // Would error for an iOS target.
 }
+// UNSUPPORTED: OS=windows-msvc

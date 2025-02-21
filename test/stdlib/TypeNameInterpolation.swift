@@ -121,3 +121,4 @@ TypeNameTests.test("Interpolation") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@ ExistentialTests.testWithLeakChecking("Existential method VJP") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

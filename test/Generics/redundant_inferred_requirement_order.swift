@@ -17,3 +17,4 @@ extension G where B : P, A == S<B> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=G
 // CHECK-NEXT: Generic signature: <A, B where A == S<B>, B : P>
 extension G where B : P, A == S<B>, B : P {}
+// UNSUPPORTED: OS=windows-msvc

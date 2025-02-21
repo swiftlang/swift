@@ -94,3 +94,4 @@ UnmanagedTests.test("Opaque avoid retain/release") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

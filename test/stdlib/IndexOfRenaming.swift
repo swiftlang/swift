@@ -6,3 +6,4 @@ _ = a.index(of: 30) // expected-warning {{'index(of:)' is deprecated: renamed to
 _ = a.firstIndex(of: 30)
 _ = a.index(where: { $0 > 30 }) // expected-warning {{'index(where:)' is deprecated: renamed to 'firstIndex(where:)' [DeprecatedDeclaration]}} expected-note {{use 'firstIndex(where:)' instead}}
 _ = a.firstIndex(where: { $0 > 30 })
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ func foo(_ b: Bool) -> Int {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

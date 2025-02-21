@@ -320,3 +320,4 @@ public func resumeThrowingContinuationThrowing(_ cont: Builtin.RawUnsafeContinua
   // CHECK-NEXT: destroy_value %1 : $any Error
   Builtin.resumeThrowingContinuationThrowing(cont, error)
 }
+// UNSUPPORTED: OS=windows-msvc

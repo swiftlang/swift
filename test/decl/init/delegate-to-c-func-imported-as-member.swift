@@ -6,3 +6,4 @@ extension MyObject {
     self.init(id: 1738)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

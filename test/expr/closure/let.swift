@@ -17,3 +17,4 @@ let a: Int
 
 let b: Int = 1
 { didSet { print("didSet") } } // expected-error{{'let' declarations cannot be observing properties}}
+// UNSUPPORTED: OS=windows-msvc

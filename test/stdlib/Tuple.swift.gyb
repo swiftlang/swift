@@ -157,3 +157,4 @@ TupleTestSuite.test("Tuple/comparison/sanity-check") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

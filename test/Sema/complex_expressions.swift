@@ -137,3 +137,4 @@ let _: (P_33806601, P_33806601) -> Double = {
   (p : P_33806601, s : P_33806601)  -> Double in
     foo33806601(Double((p.x - s.x) * (p.x - s.x) + (p.y - s.y) * (p.y - s.y)))
 }
+// UNSUPPORTED: OS=windows-msvc

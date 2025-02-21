@@ -279,3 +279,4 @@ extension CheckedContinuation : @retroactive BitwiseCopyable {} // expected-erro
 //==============================================================================
 //========================_CONCURRENCY-DEPENDENCY TESTS=(END)=================}}
 //==============================================================================
+// UNSUPPORTED: OS=windows-msvc

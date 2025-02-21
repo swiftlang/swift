@@ -52,3 +52,4 @@ public func singleNonSmolChar() -> Character {
   return "👩‍👩‍👦‍👦"
 }
 
+// UNSUPPORTED: OS=windows-msvc

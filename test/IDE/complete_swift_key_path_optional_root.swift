@@ -53,3 +53,4 @@ let _ : KeyPath<Person?, String> = \Person?. #^TYPE_DOT_OPTIONAL_SPACE^#
 // PERSONTYPE-DOT-OPT-SPACE-NEXT: Decl[InstanceVar]/CurrNominal/IsSystem:   unsafelyUnwrapped[#Person#]; name=unsafelyUnwrapped
 // PERSONTYPE-DOT-OPT-SPACE-NEXT: Decl[InstanceVar]/CurrNominal/IsSystem:   debugDescription[#String#]; name=debugDescription
 // PERSONTYPE-DOT-OPT-SPACE-NEXT: Decl[InstanceVar]/CurrNominal/IsSystem:   customMirror[#Mirror#]; name=customMirror
+// UNSUPPORTED: OS=windows-msvc

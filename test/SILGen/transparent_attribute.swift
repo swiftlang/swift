@@ -12,3 +12,4 @@
 func useTransparentFuncWithDefaultArgument() -> Int {
   return transparentFuncWithDefaultArgument()
 }
+// UNSUPPORTED: OS=windows-msvc

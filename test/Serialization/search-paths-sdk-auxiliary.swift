@@ -19,3 +19,4 @@ import TestFramework2
 
 // CHECK: remark: loaded module 'TestFramework'
 // CHECK: remark: loaded module 'TestFramework2'
+// UNSUPPORTED: OS=windows-msvc

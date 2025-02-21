@@ -8,3 +8,4 @@ let z = { (param: inout String) in }
 // CHECK: (1:10, 1:15): Int (explicit type: 1)
 // CHECK: (5:5, 5:6): (inout String) -> () (explicit type: 0)
 // CHECK: (5:12, 5:17): String (explicit type: 1)
+// UNSUPPORTED: OS=windows-msvc

@@ -38,3 +38,4 @@ func foo(a: FooClassDerived) {
 // CHECK:      key.kind: source.lang.swift.ref.function.free
 // CHECK-NEXT: key.name: "fooFunc1(_:)"
 // CHECK-NEXT: key.usr: "c:@F@fooFunc1"
+// UNSUPPORTED: OS=windows-msvc

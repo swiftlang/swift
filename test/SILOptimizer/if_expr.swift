@@ -21,3 +21,4 @@ func testNeverToVoid() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

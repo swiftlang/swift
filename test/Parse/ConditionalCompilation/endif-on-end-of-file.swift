@@ -15,3 +15,4 @@ func debug(msg: String) {
 }
 // last line of file - make sure no \n sneaks in below #endif.
 #endif
+// UNSUPPORTED: OS=windows-msvc

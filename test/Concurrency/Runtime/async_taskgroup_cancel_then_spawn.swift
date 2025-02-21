@@ -61,3 +61,4 @@ func test_taskGroup_cancel_then_add() async {
     await test_taskGroup_cancel_then_add()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

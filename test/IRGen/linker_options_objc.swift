@@ -12,3 +12,4 @@ import Empty
 // CHECK: !llvm.linker.options =
 // CHECK-DAG: !{{.*}} = !{!"-lswiftCore"}
 // CHECK-DAG: !{{.*}} = !{!"-lobjc"}
+// UNSUPPORTED: OS=windows-msvc

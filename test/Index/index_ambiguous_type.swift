@@ -60,3 +60,4 @@ func foo() {
   // CHECK: 34:27 | struct/Swift | Int | s:Si | Ref,RelCont | rel: 1
   _ = file1.Thing.Nested2<Int>(value: 0)
 }
+// UNSUPPORTED: OS=windows-msvc

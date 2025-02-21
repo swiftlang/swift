@@ -32,3 +32,4 @@ print(yesClass == nil) // CHECK-NEXT: false
 print(isNilGeneric(noClass)) // CHECK-NEXT: true
 print(isNilGeneric(yesClass)) // CHECK-NEXT: false
 
+// UNSUPPORTED: OS=windows-msvc

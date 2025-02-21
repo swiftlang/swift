@@ -36,3 +36,4 @@ public func licm() -> Int {
   return s
 }
 
+// UNSUPPORTED: OS=windows-msvc

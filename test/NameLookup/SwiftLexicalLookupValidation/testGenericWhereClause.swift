@@ -73,3 +73,4 @@ public extension Array {
     closure(&self[index])
   }
 }
+// UNSUPPORTED: OS=windows-msvc

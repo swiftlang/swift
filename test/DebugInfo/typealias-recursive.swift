@@ -53,3 +53,4 @@ let b : D? = nil
 // CHECK-DAG: !DIDerivedType(tag: DW_TAG_member, name: "b", {{.*}} baseType: ![[B1]])
 // CHECK-DAG: ![[B2:[0-9]+]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s4main1DV1BaD"
 // CHECK-DAG: !DIDerivedType(tag: DW_TAG_member, name: "b", {{.*}}, baseType: ![[B2]])
+// UNSUPPORTED: OS=windows-msvc

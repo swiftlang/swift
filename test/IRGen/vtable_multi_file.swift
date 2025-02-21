@@ -24,3 +24,4 @@ func baseClassVtablesIncludeImplicitInits() {
 func forEachFinalizesVTable(_ h: Holder) {
   for _ in h.getSillySequence() {}
 }
+// UNSUPPORTED: OS=windows-msvc

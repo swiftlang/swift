@@ -30,3 +30,4 @@ extension CGColor: Foo { // expected-error{{Core Foundation class 'CGColor' cann
   func foo() {} // expected-error{{method cannot be an implementation of an @objc requirement because Core Foundation types are not classes in Objective-C}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

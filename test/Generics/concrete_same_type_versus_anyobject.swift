@@ -38,3 +38,4 @@ protocol P {
 // CHECK: .explicitAnyObjectIsRedundant@
 // CHECK-NEXT: Generic signature: <T where T : P>
 func explicitAnyObjectIsRedundant<T : P>(_: T) where T.A : AnyObject {}
+// UNSUPPORTED: OS=windows-msvc

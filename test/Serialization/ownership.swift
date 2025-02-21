@@ -24,3 +24,4 @@ class PropertyOwnership {
   }
   // CHECK-NEXT:  deinit
 } // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

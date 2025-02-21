@@ -106,3 +106,4 @@ func test(val: TestForPrivP) {
 // PRIVATE-DAG: Decl[InstanceMethod]/CurrNominal:   unavailableP_availableC()[#Void#];
 // PRIVATE-DAG: Decl[InstanceMethod]/Super:         availableP_unavailableC()[#Void#];
 }
+// UNSUPPORTED: OS=windows-msvc

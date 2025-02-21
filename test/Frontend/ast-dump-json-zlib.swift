@@ -11,3 +11,4 @@
 
 // CHECK:      {"_kind":"source_file",
 // CHECK-SAME: "items":[{
+// UNSUPPORTED: OS=windows-msvc

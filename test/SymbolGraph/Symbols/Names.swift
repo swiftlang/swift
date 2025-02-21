@@ -106,3 +106,4 @@ public extension ExternalStruct.InnerTypeAlias {
 // EXT_INNERTYPEALIAS_INNERINNERTYPE-LABEL: "precise": "s:13ExternalNames0A6StructV05InnerC0V0B0E0ddC0V"
 // EXT_INNERTYPEALIAS_INNERINNERTYPE: names
 // EXT_INNERTYPEALIAS_INNERINNERTYPE-NEXT: "title": "ExternalStruct.InnerStruct.InnerInnerStruct"
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ let sum = a.holder.m + b.holder.holder.m
 
 // CHECK-DAG: define {{.*}}i32 @{{_Z9incrementi|"\?increment@@YAHH@Z"}}(i32 {{.*}})
 // CHECK-DAG: define {{.*}}i32 @{{_Z5get42v|"\?get42@@YAHXZ"}}
+// UNSUPPORTED: OS=windows-msvc

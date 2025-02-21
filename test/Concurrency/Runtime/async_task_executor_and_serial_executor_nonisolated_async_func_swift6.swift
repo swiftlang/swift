@@ -108,3 +108,4 @@ actor DefaultActor {
     }.value
   }
 }
+// UNSUPPORTED: OS=windows-msvc

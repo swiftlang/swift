@@ -50,3 +50,4 @@ func test() async throws {
   let local = Greeter(actorSystem: system)
   _ = try await local.echo(name: "Caplin")
 }
+// UNSUPPORTED: OS=windows-msvc

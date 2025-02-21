@@ -19,3 +19,4 @@
 // CHECK-NEXT:     key.is_deprecated: 1
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

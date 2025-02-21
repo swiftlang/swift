@@ -68,3 +68,4 @@ func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
+// UNSUPPORTED: OS=windows-msvc

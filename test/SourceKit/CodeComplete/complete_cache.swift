@@ -47,3 +47,4 @@ func test3() {
   #^VOID_3,fooFunc^# {}
 }
 // VOID_3-NOT: key.not_recommended
+// UNSUPPORTED: OS=windows-msvc

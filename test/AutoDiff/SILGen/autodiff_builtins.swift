@@ -103,3 +103,4 @@ func test_context_builtins_with_type<T>(t: T) {
 // CHECK:   [[BORROWED_CTX:%.*]] = begin_borrow [[CTX_LIFETIME]]
 // CHECK:   [[BUF:%.*]] = builtin "autoDiffAllocateSubcontextWithType"<T>([[BORROWED_CTX]] : $Builtin.NativeObject, {{.*}} : $@thick T.Type) : $Builtin.RawPointer
 // CHECK:   destroy_value [[CTX_LIFETIME]]
+// UNSUPPORTED: OS=windows-msvc

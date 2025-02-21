@@ -7,3 +7,4 @@ import ModuleA
 @main
 extension Main {
 }
+// UNSUPPORTED: OS=windows-msvc

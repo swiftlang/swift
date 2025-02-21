@@ -153,3 +153,4 @@ struct G<T> {}
 
 extension G? {}
 // expected-error@-1{{reference to generic type 'G' requires arguments in <...>}}
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@ struct EntryPoint {
 extension EntryPoint {
 }
 
+// UNSUPPORTED: OS=windows-msvc

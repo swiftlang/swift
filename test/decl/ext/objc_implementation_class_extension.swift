@@ -31,3 +31,4 @@
   // expected-warning@-1 {{getter for 'otherModuleExtensionPropertyFromHeader2' with Objective-C selector 'otherModuleExtensionPropertyFromHeader2' conflicts with previous declaration with the same Objective-C selector}}
   // expected-warning@-2 {{setter for 'otherModuleExtensionPropertyFromHeader2' with Objective-C selector 'setOtherModuleExtensionPropertyFromHeader2:' conflicts with previous declaration with the same Objective-C selector}}
 }
+// UNSUPPORTED: OS=windows-msvc

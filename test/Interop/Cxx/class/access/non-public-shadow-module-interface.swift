@@ -25,3 +25,4 @@
 // TODO:         public func publOrProt() -> Return
 // TODO:         private func publOrProt() -> Return
 // CHECK:      }
+// UNSUPPORTED: OS=windows-msvc

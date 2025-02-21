@@ -33,3 +33,4 @@ public struct Bat {
 // CHECK-NEXT:   "value": "4"
 // CHECK-NEXT: }
 // CHECK-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

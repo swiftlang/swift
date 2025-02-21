@@ -75,3 +75,4 @@ struct TF_152: Differentiable {
 struct TF_152_Bar: Differentiable {
   @noDerivative let dense: Float
 }
+// UNSUPPORTED: OS=windows-msvc

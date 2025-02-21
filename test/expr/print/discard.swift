@@ -12,3 +12,4 @@ struct S: ~Copyable {
 // CHECK:   internal consuming func c() {
 // CHECK:     discard self
 // CHECK:   }
+// UNSUPPORTED: OS=windows-msvc

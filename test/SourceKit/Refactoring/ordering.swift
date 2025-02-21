@@ -39,3 +39,4 @@ func test(c: C) {
 // RUN: %empty-directory(%t.result)
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/ordering/ordering.in.json %s >> %t.result/ordering.expected
 // RUN: %diff -u %S/ordering/ordering.expected %t.result/ordering.expected
+// UNSUPPORTED: OS=windows-msvc

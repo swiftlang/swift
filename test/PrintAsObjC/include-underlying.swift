@@ -13,3 +13,4 @@
 
 // CHECK-DEFAULT: #import "CoreGraphics-Bridging-Header.h"
 // CHECK-DIR: #import "Headers/PrivateHeaders/CoreGraphics-Bridging-Header.h"
+// UNSUPPORTED: OS=windows-msvc

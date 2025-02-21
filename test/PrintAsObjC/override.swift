@@ -116,3 +116,4 @@ class FixMe : Base {
 
 // No more errors from Clang.
 // CLANG-NOT: error:
+// UNSUPPORTED: OS=windows-msvc

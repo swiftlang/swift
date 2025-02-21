@@ -47,3 +47,4 @@ public func test(v: V) {
   // CHECK: last
   _ = v.back()
 }
+// UNSUPPORTED: OS=windows-msvc

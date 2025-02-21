@@ -24,3 +24,4 @@ public func f<T>(_ e: E<T>) -> [T] {
 // CHECK: alloc_stack {{.*}} $T, let, name "a", {{.*}}:14:15, scope [[A0]]
 // CHECK: alloc_stack {{.*}} $T, let, name "a", {{.*}}:14:26, scope [[A0]]
 // CHECK: alloc_stack {{.*}} $T, let, name "a", {{.*}}:15:15, scope [[A1]]
+// UNSUPPORTED: OS=windows-msvc

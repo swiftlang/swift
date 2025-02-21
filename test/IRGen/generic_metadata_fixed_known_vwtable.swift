@@ -7,3 +7,4 @@ struct Stroct<T> {}
 // CHECK-LABEL: @"$s36generic_metadata_fixed_known_vwtable4EnomOMP" =
 // CHECK-SAME:    $sytWV
 enum Enom<T> {}
+// UNSUPPORTED: OS=windows-msvc

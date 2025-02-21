@@ -81,3 +81,4 @@ func caller() {
   // CHECK: {{%.*}} = function_ref @$s11back_deploy15trivialFunc_iOSyyFTwb : $@convention(thin) () -> ()
   trivialFunc_iOS()
 }
+// UNSUPPORTED: OS=windows-msvc

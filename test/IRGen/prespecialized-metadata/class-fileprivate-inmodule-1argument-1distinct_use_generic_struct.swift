@@ -118,3 +118,4 @@ doit()
 // CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]CMn
 //      CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 //      CHECK: }
+// UNSUPPORTED: OS=windows-msvc

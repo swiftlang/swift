@@ -33,3 +33,4 @@ func testMissingDependence(_ ne: NE) -> NE {
 func testNameConflict(_ borrow: E) -> NE {
   NE()
 }
+// UNSUPPORTED: OS=windows-msvc

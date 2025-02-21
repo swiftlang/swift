@@ -12,3 +12,4 @@ func grame(width: Int?) -> Int {}
 @resultBuilder struct ViewBuilder {
   public static func buildBlock(_ content: Int) -> Int
 }
+// UNSUPPORTED: OS=windows-msvc

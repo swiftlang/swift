@@ -11,3 +11,4 @@ for i in 0 ..< 3 {
 // CHECK-DAG: !DILocalVariable(name: "i", scope: ![[SCOPE2:[0-9]+]]{{.*}}line: [[@LINE-1]]
 // CHECK-DAG: ![[SCOPE2]] = {{.*}}DILexicalBlock({{.*}}line: [[@LINE-2]]
 }
+// UNSUPPORTED: OS=windows-msvc

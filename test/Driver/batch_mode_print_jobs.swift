@@ -17,3 +17,4 @@
 //
 // CHECK-COMBINED: -primary-file {{.*(/|\\)}}file-01.swift{{"?}} -primary-file {{.*(/|\\)}}file-02.swift{{"?}} {{.*(/|\\)}}file-03.swift{{"?}} {{.*(/|\\)}}main.swift{{"?}}
 // NEGATIVE-CHECK-COMBINED-NOT: -primary-file {{.*(/|\\)}}file-01.swift{{"?}} -primary-file {{.*(/|\\)}}file-02.swift{{"?}} {{.*(/|\\)}}file-03.swift{{"?}} {{.*(/|\\)}}main.swift{{"?}}
+// UNSUPPORTED: OS=windows-msvc

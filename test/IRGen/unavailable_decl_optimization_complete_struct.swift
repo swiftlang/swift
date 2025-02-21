@@ -82,3 +82,4 @@ extension UnavailableStruct {
 
 // CHECK-NO-STRIP: s4Test17UnavailableStructVMa
 // CHECK-STRIP-NOT: s4Test17UnavailableStructVMa
+// UNSUPPORTED: OS=windows-msvc

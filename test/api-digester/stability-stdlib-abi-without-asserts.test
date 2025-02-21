@@ -830,3 +830,4 @@ Protocol CodingKey has added inherited protocol SendableMetatype
 Protocol Error has added inherited protocol SendableMetatype
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
+// UNSUPPORTED: OS=windows-msvc

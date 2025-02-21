@@ -27,3 +27,4 @@ struct Main {
     print("success")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

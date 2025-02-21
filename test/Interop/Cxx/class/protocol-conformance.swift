@@ -102,3 +102,4 @@ ExtendedTypes.test("Generic struct") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

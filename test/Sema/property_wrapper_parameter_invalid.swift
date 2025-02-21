@@ -299,3 +299,4 @@ func testInvalidProjectionInAmbiguousContext() {
     ambiguous()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

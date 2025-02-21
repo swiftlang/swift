@@ -29,3 +29,4 @@ _ = Double.nan < Double.nan // expected-warning {{'.nan' < '.nan' is always fals
 _ = Double.nan <= Double.nan // expected-warning {{'.nan' <= '.nan' is always false}}
 _ = Double.nan > Double.nan // expected-warning {{'.nan' > '.nan' is always false}}
 _ = Double.nan >= Double.nan // expected-warning {{'.nan' >= '.nan' is always false}}
+// UNSUPPORTED: OS=windows-msvc

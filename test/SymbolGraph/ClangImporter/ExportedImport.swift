@@ -14,3 +14,4 @@
 // CHECK-DAG: "precise":"s:12ObjcProperty12SomeProtocolPAAE8someFuncyyF::SYNTHESIZED::s:So11ClangStructa12ObjcPropertyE05InnerB0V06NestedB0V",
 
 @_exported import ObjcProperty
+// UNSUPPORTED: OS=windows-msvc

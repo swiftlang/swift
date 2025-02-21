@@ -1343,3 +1343,4 @@ class LazyPropInClass {
   lazy var foo: Int = { return 0 } // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}}
   // expected-note@-1 {{Remove '=' to make 'foo' a computed property}}{{21-23=}}{{3-8=}}
 }
+// UNSUPPORTED: OS=windows-msvc

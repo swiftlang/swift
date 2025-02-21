@@ -24,3 +24,4 @@ actor A3: Hashable {}
 // expected-note@-3 {{automatic synthesis of 'Hashable' is not supported for actor declarations}}
 // expected-note@-4 {{automatic synthesis of 'Equatable' is not supported for actor declarations}}
 // expected-note@-5 {{add stubs for conformance}}
+// UNSUPPORTED: OS=windows-msvc

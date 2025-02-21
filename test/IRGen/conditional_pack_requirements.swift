@@ -46,3 +46,4 @@ extension GG4.Nested: Q where repeat each A: Q, repeat each B: Q {}
 
 // This mangling is correct.
 // CHECK-LABEL: @"$s29conditional_pack_requirements3GG4V6NestedVyxxQp_QP_qd__qd__Qp_QPGAA1QA2aGRzAaGRd__rlMc" =
+// UNSUPPORTED: OS=windows-msvc

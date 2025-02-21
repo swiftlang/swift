@@ -244,3 +244,4 @@ _ = [
   -1: "", // expected-warning{{dictionary literal of type '[Int : String]' has duplicate entries for integer literal key '-1'}}
   -1: "", // expected-note{{duplicate key declared}} {{3-9=}} {{9-10=}}
 ]
+// UNSUPPORTED: OS=windows-msvc

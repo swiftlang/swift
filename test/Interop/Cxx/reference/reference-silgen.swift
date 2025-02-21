@@ -69,3 +69,4 @@ func setStaticIntRefTypealias() {
 // CHECK: sil hidden @$s4main24setStaticIntRefTypealiasyyF : $@convention(thin) () -> ()
 // CHECK: [[REF:%.*]] = function_ref @{{_Z24setStaticIntRefTypealiasRi|\?setStaticIntRefTypealias@@YAXAEAH@Z}} : $@convention(c) (@inout Int32) -> ()
 // CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@inout Int32) -> ()
+// UNSUPPORTED: OS=windows-msvc

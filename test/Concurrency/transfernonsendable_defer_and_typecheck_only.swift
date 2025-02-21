@@ -60,3 +60,4 @@ actor A {
         _ = await a.actorRetsNS()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

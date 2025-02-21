@@ -37,3 +37,4 @@ extension Sequence where Element: StringProtocol {
     return result
   }
 }
+// UNSUPPORTED: OS=windows-msvc

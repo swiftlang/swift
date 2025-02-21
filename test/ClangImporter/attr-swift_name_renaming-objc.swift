@@ -26,3 +26,4 @@ func test() {
   _ = Foo.initWithFoo() // expected-error {{type 'Foo' has no member 'initWithFoo'}}
   _ = Foo.init(foo: ())
 }
+// UNSUPPORTED: OS=windows-msvc

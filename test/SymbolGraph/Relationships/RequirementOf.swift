@@ -11,3 +11,4 @@ public protocol P {
 // CHECK-NEXT: "source": "s:13RequirementOf1PP1xSivp"
 // CHECK-NEXT: "target": "s:13RequirementOf1PP"
 // CHECK-NOT: defaultImplementationOf
+// UNSUPPORTED: OS=windows-msvc

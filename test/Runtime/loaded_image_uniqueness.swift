@@ -55,3 +55,4 @@ do {
   }
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

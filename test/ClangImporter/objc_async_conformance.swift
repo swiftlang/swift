@@ -149,3 +149,4 @@ class ImplementsFloatLoader2: FloatLoader {
   // expected-note@-2 {{rename to 'loadFloat(completionHandler:)' to satisfy this requirement}}
   // expected-note@-3 {{move 'loadFloat(withCompletionHandler:)' to an extension to silence this warning}}
 }
+// UNSUPPORTED: OS=windows-msvc

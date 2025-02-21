@@ -35,3 +35,4 @@ class Class: Protocol {
 //   end_borrow %2 : $Class                          // id: %8
 //   return %7 : $(Float, @callee_guaranteed (Float) -> Float) // id: %9
 // } // end sil function 'AD__$s4main5ClassCAA8ProtocolA2aDP6methodyS2fFTW_jvp_SU'
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@
 @_implementationOnly import abcde
 
 public func foo() {}
+// UNSUPPORTED: OS=windows-msvc

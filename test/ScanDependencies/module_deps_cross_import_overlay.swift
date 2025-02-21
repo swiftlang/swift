@@ -39,3 +39,4 @@ import SubEWrapper
 
 // Ensure a transitive dependency via "_cross_import_E" is recorded in the graph still
 // CHECK:   "clang": "X"
+// UNSUPPORTED: OS=windows-msvc

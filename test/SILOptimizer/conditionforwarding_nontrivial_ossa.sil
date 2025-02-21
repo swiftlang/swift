@@ -429,3 +429,4 @@ bb6(%14 : @guaranteed  $Optional<Klass>):
   %15 = copy_value %14
   return %15
 }
+// UNSUPPORTED: OS=windows-msvc

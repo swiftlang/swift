@@ -49,3 +49,4 @@ func witnessOffsetAfterAssociatedTypeObjC<T: C>(_ x: T) {
   // CHECK:         call swiftcc void [[FOO]]
   x.foo()
 }
+// UNSUPPORTED: OS=windows-msvc

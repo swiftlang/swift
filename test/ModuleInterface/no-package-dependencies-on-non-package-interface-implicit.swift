@@ -33,3 +33,4 @@ package import ModuleC
 //--- Client.swift
 import ModuleA
 
+// UNSUPPORTED: OS=windows-msvc

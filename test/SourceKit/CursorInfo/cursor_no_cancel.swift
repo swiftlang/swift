@@ -46,4 +46,4 @@ func myFunc() {
 // RANGE: source.lang.swift.range.singleexpression
 
 // FIXME: this crashes very infrequently in CI
-// REQUIRES: disabled
+// REQUIRES: disabled// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ extension Main {
     print("hello world")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

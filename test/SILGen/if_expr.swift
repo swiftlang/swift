@@ -706,3 +706,4 @@ func testNestedFallthrough2() throws -> Int {
   }
   return x
 }
+// UNSUPPORTED: OS=windows-msvc

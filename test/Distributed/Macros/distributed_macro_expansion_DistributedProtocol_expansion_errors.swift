@@ -23,3 +23,4 @@ import Distributed
 protocol Fail: DistributedActor {
   distributed func method() -> String
 }
+// UNSUPPORTED: OS=windows-msvc

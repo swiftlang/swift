@@ -341,3 +341,4 @@ sil_moveonlydeinit MOGenericDeinit { @destroy_generic }
 // CHECK:         call {{.*}} @destroy_intlike_struct(
 // CHECK-LABEL: define {{.*}} @"{{.*}}26MOSingleRefcountLikeStructVwxx"
 // CHECK:         call {{.*}} @destroy_single_refcount_like_struct(
+// UNSUPPORTED: OS=windows-msvc

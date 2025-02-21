@@ -6,3 +6,4 @@
 
 // CHECK-NOT: .text.$s16FunctionSections5func2yyF
 // CHECK: .text.$s16FunctionSections5func1yyF
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@ import CenumsNSOptions
 // CHECK-NOT: warning: imported declaration 'NS_SWIFT_NAMED_OptionTwo' could not be mapped to 'SwiftOptionTwo'
 // CHECK-NOT: warning: imported declaration 'NS_SWIFT_NAMED_OptionThree' could not be mapped to 'SwiftOptionThree'
 // CHECK-NOT: warning: imported declaration 'NS_SWIFT_NAMED_OptionFour' could not be mapped to 'SwiftOptionFour'
+// UNSUPPORTED: OS=windows-msvc

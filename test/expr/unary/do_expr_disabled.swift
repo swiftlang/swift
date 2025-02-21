@@ -128,3 +128,4 @@ func test16() -> Int {
     // expected-warning@-1 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

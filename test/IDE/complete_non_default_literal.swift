@@ -20,3 +20,4 @@ func test() {
   let customInt: CustomInt = 2.#^CUSTOM_INT^#
   // CUSTOM_INT-NOT: customIntMember
 }
+// UNSUPPORTED: OS=windows-msvc

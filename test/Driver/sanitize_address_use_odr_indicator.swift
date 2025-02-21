@@ -12,3 +12,4 @@
 // RUN: %swiftc_driver  -sanitize-address-use-odr-indicator \
 // RUN:  %s -o %t 2>&1 | %FileCheck -check-prefix=CHECK-MISSING-ARG %s
 // CHECK-MISSING-ARG: warning: option '-sanitize-address-use-odr-indicator' has no effect when 'address' sanitizer is disabled. Use -sanitize=address to enable the sanitizer
+// UNSUPPORTED: OS=windows-msvc

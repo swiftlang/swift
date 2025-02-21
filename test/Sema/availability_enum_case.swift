@@ -17,3 +17,4 @@ func ride(horse: Horse) {
   // expected-error@-1 {{'kevin' is only available in macOS 50 or newer}}
   // expected-note@-2 {{add 'if #available' version check}}
 }
+// UNSUPPORTED: OS=windows-msvc

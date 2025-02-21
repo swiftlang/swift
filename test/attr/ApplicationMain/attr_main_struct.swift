@@ -9,3 +9,4 @@ struct EntryPoint {
 
 // CHECK-NOT: @main struct EntryPoint {
 // CHECK: struct EntryPoint {
+// UNSUPPORTED: OS=windows-msvc

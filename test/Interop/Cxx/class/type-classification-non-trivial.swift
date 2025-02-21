@@ -33,3 +33,4 @@ AddressOnlyTestSuite.test(
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

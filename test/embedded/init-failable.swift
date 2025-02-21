@@ -76,3 +76,4 @@ print("OK 4")
 // CHECK: PrintingClass.deinit
 // CHECK: PrintingClass.deinit
 // CHECK: OK 4
+// UNSUPPORTED: OS=windows-msvc

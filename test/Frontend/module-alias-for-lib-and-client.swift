@@ -102,3 +102,4 @@ public func runLog() {
   _ = AppleLogging.setup()
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -116,3 +116,4 @@ tests.test("Zalgo")
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

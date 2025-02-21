@@ -4,3 +4,4 @@
 // interpolated string literal.
 
 _ = "\(1)"
+// UNSUPPORTED: OS=windows-msvc

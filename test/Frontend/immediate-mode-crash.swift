@@ -7,3 +7,4 @@
 assert(false)
 // CHECK: Assertion failed
 // CHECK-NOT: Please submit a bug report
+// UNSUPPORTED: OS=windows-msvc

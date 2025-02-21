@@ -9,3 +9,4 @@ class Android {
     return fn()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

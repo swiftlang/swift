@@ -37,3 +37,4 @@ func passP() {
 
   // CHECK: ret void
 }
+// UNSUPPORTED: OS=windows-msvc

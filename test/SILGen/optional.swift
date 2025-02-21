@@ -215,3 +215,4 @@ func optional_to_existential_cast() {
 func optional_to_existential_cast_RETURNED() -> Any {
   return try? {() throws in 3 }()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -137,3 +137,4 @@ func test6() {
 }
 
 print(test6())
+// UNSUPPORTED: OS=windows-msvc

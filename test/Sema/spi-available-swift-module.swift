@@ -24,3 +24,4 @@ public struct Foo {
   public var macos: MacOSSPIClass // expected-error {{cannot use class 'MacOSSPIClass' here; it is an SPI imported from 'Foo'}}
   public var ios: iOSSPIClass
 }
+// UNSUPPORTED: OS=windows-msvc

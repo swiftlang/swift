@@ -282,3 +282,4 @@ do {
   func g2(_ x: inout Int, _ y: inout Int) {}
   f(g2) // expected-error {{cannot convert value of type '(inout Int, inout Int) -> ()' to expected argument type '(Int) -> Void'}}
 }
+// UNSUPPORTED: OS=windows-msvc

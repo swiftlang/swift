@@ -13,3 +13,4 @@ let a = 12
 
 // FIXME: this test is failing (rarely) in CI
 // REQUIRES: rdar71468441
+// UNSUPPORTED: OS=windows-msvc

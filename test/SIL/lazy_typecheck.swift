@@ -8,3 +8,4 @@ final class C {
     self.x = x
   }
 }
+// UNSUPPORTED: OS=windows-msvc

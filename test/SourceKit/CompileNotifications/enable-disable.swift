@@ -29,3 +29,4 @@
 // COMPILE_1: }
 // COMPILE_1-NOT: compile-will-start
 // COMPILE_1-NOT: compile-did-finish
+// UNSUPPORTED: OS=windows-msvc

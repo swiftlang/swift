@@ -16,3 +16,4 @@ func foo() -> Int64 {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

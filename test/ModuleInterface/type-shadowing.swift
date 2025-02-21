@@ -24,3 +24,4 @@ extension Bakery.Cake {
 #endif
 
 // CHECK: extension Bakery.Cake
+// UNSUPPORTED: OS=windows-msvc

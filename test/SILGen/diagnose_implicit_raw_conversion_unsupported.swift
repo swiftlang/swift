@@ -39,3 +39,4 @@ func test_unsupported<T>(arg: T) {
     writeInt8(&byteArray) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<UInt8>' to expected argument type 'UnsafeMutablePointer<Int8>'}}
                           // expected-note@-1 {{arguments to generic parameter 'Pointee' ('UInt8' and 'Int8') are expected to be equal}}
 }
+// UNSUPPORTED: OS=windows-msvc

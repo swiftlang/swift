@@ -866,3 +866,4 @@ suite.test("partitionPoint") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

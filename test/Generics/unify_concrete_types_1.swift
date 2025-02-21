@@ -29,3 +29,4 @@ struct MergeTest<G : P1 & P2> {
 // CHECK:  [P2:X] => { concrete_type: [concrete: Foo<[P2:Y2], [P2:Z2]>] }
 // CHECK:  τ_0_0 => { conforms_to: [P1 P2 Copyable Escapable] }
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

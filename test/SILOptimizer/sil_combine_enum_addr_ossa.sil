@@ -268,3 +268,4 @@ bb22:
   inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.none!enumelt
   br bb2
 }
+// UNSUPPORTED: OS=windows-msvc

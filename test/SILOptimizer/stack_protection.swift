@@ -135,3 +135,4 @@ public func storeBytesToPointer(_ p: UnsafeMutableRawPointer, _ i: Int) {
   p.storeBytes(of: i, as: Int.self)
 }
 
+// UNSUPPORTED: OS=windows-msvc

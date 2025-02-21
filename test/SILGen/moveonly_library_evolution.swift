@@ -119,3 +119,4 @@ func useUsableFromInlineTestKlass() {
 public struct NonCopyableWithInit: ~Copyable {
   init(s: String) {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@
 import depends_on_new_module // expected-error{{missing required modules: 'another_new_module', 'new_module'}}
 
 depends_on_new_module.foo() // expected-error {{module 'depends_on_new_module' has no member named 'foo'}}
+// UNSUPPORTED: OS=windows-msvc

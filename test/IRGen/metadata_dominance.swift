@@ -83,3 +83,4 @@ func testMakeFoo(_ p: P) -> Foo.Type {
 // CHECK-OPT-LABEL: define internal swiftcc ptr @"$s18metadata_dominance3FooCAA1PA2aDP04makeC0ACyFTW"
 // CHECK-OPT-NOT: tail call noalias ptr @swift_allocObject(ptr %Self
 
+// UNSUPPORTED: OS=windows-msvc

@@ -5,3 +5,4 @@
 // RUN: not %target-swift-frontend -emit-module -merge-modules %t/a.partial.swiftmodule -module-name Unrelated 2>&1 | %FileCheck %s
 
 // CHECK: error: cannot load module 'A' as 'Unrelated'
+// UNSUPPORTED: OS=windows-msvc

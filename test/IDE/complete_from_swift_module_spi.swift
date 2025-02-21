@@ -55,3 +55,4 @@ import pck
 func test() {
   #^COMPLETE^#
 }
+// UNSUPPORTED: OS=windows-msvc

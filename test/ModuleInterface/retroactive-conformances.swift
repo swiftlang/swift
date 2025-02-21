@@ -11,3 +11,4 @@
 extension Int: @retroactive Identifiable {
     public var id: Int { self }
 }
+// UNSUPPORTED: OS=windows-msvc

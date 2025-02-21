@@ -21,3 +21,4 @@ public class Baz {
   public var macos: MacOSSPIProto? // expected-error {{cannot use protocol 'MacOSSPIProto' here; it is SPI}}
   public var ios: iOSSPIProto?
 }
+// UNSUPPORTED: OS=windows-msvc

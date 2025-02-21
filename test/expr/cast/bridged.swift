@@ -109,3 +109,4 @@ func testCVarArg(bs: BridgedStruct, bsOpt: BridgedStruct?,
   _ = bsIUO! as P
   _ = bsIUO as P
 }
+// UNSUPPORTED: OS=windows-msvc

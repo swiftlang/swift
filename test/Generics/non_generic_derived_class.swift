@@ -18,3 +18,4 @@ class AbstractFoobar<Foo> {}
 final class SomeFoobar: AbstractFoobar<SomeFoobar.Foo> {
     enum Foo: EmptyProtocol {}
 }
+// UNSUPPORTED: OS=windows-msvc

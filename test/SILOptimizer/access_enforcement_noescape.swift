@@ -473,3 +473,4 @@ func noEscapeBlock() {
   }
 }
 // CHECK-LABEL: sil hidden @$s27access_enforcement_noescape13noEscapeBlockyyF : $@convention(thin) () -> () {
+// UNSUPPORTED: OS=windows-msvc

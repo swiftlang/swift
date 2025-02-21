@@ -21,3 +21,4 @@ public func test(_ a: G<S>, _ b: G<S>) {
   return caller(b)
 }
 
+// UNSUPPORTED: OS=windows-msvc

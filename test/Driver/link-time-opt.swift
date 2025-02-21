@@ -80,3 +80,4 @@
 // RUN: %swiftc_driver -driver-print-jobs %s -lto=llvm-thin -use-ld=gold -target x86_64-unknown-linux-gnu    | %FileCheck -check-prefix PREFER_USE_LD %s
 // RUN: %swiftc_driver -driver-print-jobs %s -lto=llvm-thin -use-ld=gold -target x86_64-unknown-windows-msvc | %FileCheck -check-prefix PREFER_USE_LD %s
 // PREFER_USE_LD: -fuse-ld=gold
+// UNSUPPORTED: OS=windows-msvc

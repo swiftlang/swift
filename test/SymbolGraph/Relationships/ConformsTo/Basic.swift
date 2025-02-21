@@ -14,3 +14,4 @@ public struct S: P {
 // CHECK: "kind": "conformsTo"
 // CHECK-NEXT: "source": "s:5Basic1SV"
 // CHECK-NEXT: "target": "s:5Basic1PP"
+// UNSUPPORTED: OS=windows-msvc

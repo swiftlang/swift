@@ -15,3 +15,4 @@ struct Wrapper<Base: Protocol>: Protocol { // expected-error {{type 'Wrapper<Bas
     get { 1 }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

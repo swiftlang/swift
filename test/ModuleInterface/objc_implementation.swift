@@ -97,3 +97,4 @@ open class SwiftSubclass: ImplClass {
 //
 // Epilogue
 //
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ public class C: B, P {
   // COMPLETE-DAG: Decl[InstanceMethod]/Super:         public override func foo() {|}; name=foo()
   // COMPLETE-DAG: Decl[Constructor]/Super:            override init() {|}; name=init()
 }
+// UNSUPPORTED: OS=windows-msvc

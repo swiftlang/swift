@@ -25,3 +25,4 @@ func foo() {
 
 func foo(_: ToplevelWrapper.internalType) {}
 func bar(_ : FooComparisonResult) {}
+// UNSUPPORTED: OS=windows-msvc

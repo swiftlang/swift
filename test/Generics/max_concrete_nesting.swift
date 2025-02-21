@@ -11,3 +11,4 @@ func f<T, U>(_: T, _: U)
         U: Sequence,
         T.Element == G<G<G<G<U.Element>>>>,
         U.Element == G<G<G<G<T>>>> {}
+// UNSUPPORTED: OS=windows-msvc

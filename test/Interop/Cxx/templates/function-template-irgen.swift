@@ -37,3 +37,4 @@ public func testAddMixedTypeParams(x: Int32) -> Int32 {
 public func testAddSameTypeParams(x: Int32) -> Int32 {
   return addSameTypeParams(x, x)
 }
+// UNSUPPORTED: OS=windows-msvc

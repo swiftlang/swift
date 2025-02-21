@@ -9,3 +9,4 @@ public struct S {
 // CHECK: "kind": "memberOf"
 // CHECK-NEXT: "source": "s:5Basic1SV1xSivp"
 // CHECK-NEXT: "target": "s:5Basic1SV"
+// UNSUPPORTED: OS=windows-msvc

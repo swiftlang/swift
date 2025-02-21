@@ -7,3 +7,4 @@ let foo = CFunctionReturningNSOption()
 CFunctionTakingNSOption(foo)
 let foo2 = NSOptionTypeCheckTest.methodReturningNSOption()
 NSOptionTypeCheckTest.methodTakingNSOption(foo)
+// UNSUPPORTED: OS=windows-msvc

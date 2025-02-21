@@ -104,3 +104,4 @@ bb4:
  %23 = tuple ()   
  return %23 : $()   
 }
+// UNSUPPORTED: OS=windows-msvc

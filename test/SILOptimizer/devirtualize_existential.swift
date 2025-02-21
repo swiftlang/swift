@@ -186,3 +186,4 @@ print(X4<Int>(p: Y4()).testit(i: 1, x: 2))
 // CHECK-OUTPUT: S5<Int>(x: (27, test.C4<Swift.Int>))
 print(X5<Int>(p: Y5()).testit(i: 1, x: 2))
 
+// UNSUPPORTED: OS=windows-msvc

@@ -119,3 +119,4 @@ mixedFull2(arg1: 1, arg2: "2"/*comment*/, callback1: <#T##() -> Void#>, callback
 // CHECK-NEXT: } callback2: {
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

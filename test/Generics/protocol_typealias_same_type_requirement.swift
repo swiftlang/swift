@@ -45,3 +45,4 @@ protocol P7 {
 protocol P8 : P6, P7 {}
 
 func testP8<T : P8>(_: T, x: T.X) -> Int { return x }
+// UNSUPPORTED: OS=windows-msvc

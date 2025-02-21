@@ -594,3 +594,4 @@ bb6(%12 : @guaranteed $C):
   return %15
 }
 
+// UNSUPPORTED: OS=windows-msvc

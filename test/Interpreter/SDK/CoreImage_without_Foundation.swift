@@ -13,3 +13,4 @@ import CoreImage
 var v = CIVector(x:7);
 // CHECK: x = 7
 print("x = \(v.x)")
+// UNSUPPORTED: OS=windows-msvc

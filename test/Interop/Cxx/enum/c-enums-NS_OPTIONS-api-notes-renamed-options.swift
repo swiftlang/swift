@@ -9,3 +9,4 @@ import CenumsNSOptions
 // CHECK-NOT: warning: imported declaration 'API_NOTES_NAMED_OptionTwo' could not be mapped to 'SwiftOptionTwoApiNotes'
 // CHECK-NOT: warning: imported declaration 'API_NOTES_NAMED_OptionThree' could not be mapped to 'SwiftOptionThreeApiNotes'
 // CHECK-NOT: warning: imported declaration 'API_NOTES_NAMED_OptionFour' could not be mapped to 'SwiftOptionFourApiNotes'
+// UNSUPPORTED: OS=windows-msvc

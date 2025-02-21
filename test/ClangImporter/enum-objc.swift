@@ -29,3 +29,4 @@ let _: Int = forwardObjCValue // expected-error {{cannot find 'forwardObjCValue'
 // actually defaultable.
 _ = SomeClass.tryInferDefaultArgumentUnderlyingValue(false) // expected-error {{type 'SomeClass' has no member 'tryInferDefaultArgumentUnderlyingValue'}}
 _ = SomeClass.tryInferDefaultArgumentObjCValue(false) // expected-error {{type 'SomeClass' has no member 'tryInferDefaultArgumentObjCValue'}}
+// UNSUPPORTED: OS=windows-msvc

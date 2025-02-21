@@ -192,3 +192,4 @@ struct MyView {
     else { image }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

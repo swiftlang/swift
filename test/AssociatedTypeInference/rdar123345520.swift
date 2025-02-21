@@ -25,3 +25,4 @@ protocol EP {
     associatedtype B
     func f2<C>(_: (A) -> C) -> G1<C>
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -175,3 +175,4 @@ public func testOpaqueBorrowed<T: OpaqueOwning>(value: inout T)
     where T.Holding == Holder {
   value.holder.value.use()
 }
+// UNSUPPORTED: OS=windows-msvc

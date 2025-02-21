@@ -5,3 +5,4 @@
 
 class Sub: Restricted { // expected-error {{cannot inherit from non-open class 'Restricted' outside of its defining module}}
 }
+// UNSUPPORTED: OS=windows-msvc

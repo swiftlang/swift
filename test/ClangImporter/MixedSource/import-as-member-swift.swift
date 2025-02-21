@@ -11,3 +11,4 @@ internal class OuterBySwiftName_Swift {}
 _ = Outer.Nested(a: 1)
 _ = OuterByObjCName_Swift.Nested(b: 2)
 _ = OuterBySwiftName_Swift.Nested(c: 3)
+// UNSUPPORTED: OS=windows-msvc

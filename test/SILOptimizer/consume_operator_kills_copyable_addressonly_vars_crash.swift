@@ -21,3 +21,4 @@ public func copyableVarArgTestCCFlowReinitOutOfBlockTest(_ k: inout Klass) {
     k.doSomething()
 }
 
+// UNSUPPORTED: OS=windows-msvc

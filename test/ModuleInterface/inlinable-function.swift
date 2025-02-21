@@ -343,3 +343,4 @@ public class HasDefaultDeinit {
     .description
   #endif
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -31,3 +31,4 @@ func main() {
 }
 
 main()
+// UNSUPPORTED: OS=windows-msvc

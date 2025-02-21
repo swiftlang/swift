@@ -18,3 +18,4 @@ import Foundation
 @available(SwiftStdlib 5.1, *)
 public actor SomeActor: NSObject {
 }
+// UNSUPPORTED: OS=windows-msvc

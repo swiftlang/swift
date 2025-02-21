@@ -10,3 +10,4 @@ protocol P {
 }
 
 struct _A<T> {}
+// UNSUPPORTED: OS=windows-msvc

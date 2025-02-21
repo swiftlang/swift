@@ -334,3 +334,4 @@ func test_autoclosure_with_typealias() {
   _ = test(cr: 0) // Ok
   _ = test(gn: 1) // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

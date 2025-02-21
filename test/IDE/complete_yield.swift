@@ -27,3 +27,4 @@ struct YieldVariables {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

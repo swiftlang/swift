@@ -75,3 +75,4 @@ markUsed(bar.directProtocolMethod())
 // CHECK: define {{.*}} swiftcc {{i32|i64}} @"$sSo3BarC5valueABSgs5Int32V_tcfcTO"
 // CHECK:   call {{.*}} @"\01-[Bar initWithValue:]"
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

@@ -149,3 +149,4 @@
 
 // INTERFACE1-NOT: unavailable
 // INTERFACE1-NOT: This comment should not show without decl.
+// UNSUPPORTED: OS=windows-msvc

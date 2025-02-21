@@ -66,3 +66,4 @@ struct StaticBacktracer {
 // entire point.
 
 // LIBS-NOT: libswift{{.*}}.so
+// UNSUPPORTED: OS=windows-msvc

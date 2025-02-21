@@ -5,3 +5,4 @@ public actor Tom {
     init() async {
     }
 }
+// UNSUPPORTED: OS=windows-msvc

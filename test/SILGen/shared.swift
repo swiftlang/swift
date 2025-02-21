@@ -182,3 +182,4 @@ struct Foo {
         return staticSharedArguments(trivial: trivial, value: value, ref: ref)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

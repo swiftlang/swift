@@ -84,3 +84,4 @@ presentBase(Base(x: 2))
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s3foo12SuperDerivedCMr"(ptr %0, ptr %1, ptr %2)
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
 // CHECK:         call swiftcc %swift.metadata_response @swift_initClassMetadata2(ptr %0, [[INT]] 256, {{.*}})
+// UNSUPPORTED: OS=windows-msvc

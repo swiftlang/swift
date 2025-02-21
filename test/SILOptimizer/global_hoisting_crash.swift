@@ -23,3 +23,4 @@ struct Teststruct {
 print(Teststruct.s)
 
 
+// UNSUPPORTED: OS=windows-msvc

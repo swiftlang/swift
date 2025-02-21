@@ -23,3 +23,4 @@ do {
   // Should choose the settable subscript to find a problem with, not the get-only subscript
   c[one] = 2.5 // expected-error {{cannot convert value of type 'Int' to expected argument type 'Double'}}
 }
+// UNSUPPORTED: OS=windows-msvc

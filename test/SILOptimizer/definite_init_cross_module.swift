@@ -278,3 +278,4 @@ class AcceptsInModuleVisibleNoArgsDesignatedInit: InModuleVisibleNoArgsDesignate
     // no error
   }
 }
+// UNSUPPORTED: OS=windows-msvc

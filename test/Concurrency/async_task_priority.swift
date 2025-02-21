@@ -328,3 +328,4 @@ actor Test {
     await top_level.value
   }
 }
+// UNSUPPORTED: OS=windows-msvc

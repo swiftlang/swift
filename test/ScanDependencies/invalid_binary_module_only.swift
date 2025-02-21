@@ -11,3 +11,4 @@ import FooBar
 // CHECK: warning: module file '{{.*}}{{/|\\}}moduleInputs{{/|\\}}FooBar.swiftmodule' is incompatible with this Swift compiler: malformed
 // CHECK: error: Unable to find module dependency: 'FooBar'
 
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ class C<I: P> where I.A: BitwiseCopyable {
     takeE(.next(e))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

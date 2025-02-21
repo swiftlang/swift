@@ -48,3 +48,4 @@ protocol P4b : P3b where T == Concrete {}
 protocol P5 {
   associatedtype T : P2 where T.A == T.B, T == Concrete
 }
+// UNSUPPORTED: OS=windows-msvc

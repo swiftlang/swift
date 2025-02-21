@@ -19,3 +19,4 @@
 // attemtps to resolve optional dependencies contained within.
 //
 // CHECK: "swift": "A"
+// UNSUPPORTED: OS=windows-msvc

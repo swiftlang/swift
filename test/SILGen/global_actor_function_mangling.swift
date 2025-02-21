@@ -7,3 +7,4 @@ func returnsOpt<R>(_ fn: (@MainActor () -> R)?) -> (() -> R)? {
   typealias Fn = (() -> R)?
   return unsafeBitCast(fn, to: Fn.self)
 }
+// UNSUPPORTED: OS=windows-msvc

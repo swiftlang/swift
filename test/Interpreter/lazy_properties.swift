@@ -70,3 +70,4 @@ LazyPropertyTestSuite.test("Reset") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

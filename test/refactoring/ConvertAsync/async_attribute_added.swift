@@ -29,3 +29,4 @@ func otherArgs(first: Int, second: String, completion: @escaping (String) -> Voi
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):5 | %FileCheck -check-prefix=EMPTY-NAMES %s
 func emptyNames(first: Int, _ second: String, completion: @escaping (String) -> Void) { }
 // EMPTY-NAMES: @available(*, renamed: "emptyNames(first:_:)")
+// UNSUPPORTED: OS=windows-msvc

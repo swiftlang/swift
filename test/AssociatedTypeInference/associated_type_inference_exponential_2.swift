@@ -60,3 +60,4 @@ struct G<A>: P {
 
 let x: Int.Type = G<Int>.A.self
 let y: Bool.Type = G<Int>.B.self
+// UNSUPPORTED: OS=windows-msvc

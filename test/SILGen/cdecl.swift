@@ -41,3 +41,4 @@ private func kale(_ x: Int) -> Int {
 @_cdecl("vomits")
 func barfs() throws {}
  */
+// UNSUPPORTED: OS=windows-msvc

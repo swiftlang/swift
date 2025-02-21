@@ -14,3 +14,4 @@ actor Impl: RepoProtocol {
   init() async {}
   func run() async {}
 }
+// UNSUPPORTED: OS=windows-msvc

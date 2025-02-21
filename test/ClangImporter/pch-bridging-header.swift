@@ -64,3 +64,4 @@ let or = MyPredicate.or([not, and])
 // do we actually find the other module's macro definition, or do we just fail
 // to import it?
 if MY_TRUE == 1 {}
+// UNSUPPORTED: OS=windows-msvc

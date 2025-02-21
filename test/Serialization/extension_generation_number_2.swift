@@ -10,3 +10,4 @@ import extension_generation_number
 func foo(x: NSString) {
   x.f()
 }
+// UNSUPPORTED: OS=windows-msvc

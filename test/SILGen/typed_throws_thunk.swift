@@ -137,3 +137,4 @@ func test9() throws {
   // CHECK-NEXT: try_apply [[T8]]<any Error>([[T9]], [[T7]])
   try genericPassThrough(throwExistential)
 }
+// UNSUPPORTED: OS=windows-msvc

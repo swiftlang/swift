@@ -20,3 +20,4 @@ public struct SomeStruct {
 // ...but that they don't show up when it's `public`, since they're marked `internal` to begin with
 // PUBLIC-NOT: "precise": "s:8Implicit9SomeClassCACycfc"
 // PUBLIC-NOT: "precise": "s:8Implicit10SomeStructV3bar5otherACSi_SStcfc"
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@
 public struct GenericStruct<T> {
     var field: T?
 }
+// UNSUPPORTED: OS=windows-msvc

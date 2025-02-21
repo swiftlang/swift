@@ -33,3 +33,4 @@ someSystemFunc(2)
 // But shouldn't if we are.
 //
 // IGNORESYSTEM-NOT: module-name: MySystemFramework
+// UNSUPPORTED: OS=windows-msvc

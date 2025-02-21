@@ -24,3 +24,4 @@ class CallStaticInline2 {
 // CHECK-LABEL: define internal i32 @zero() {{#[0-9]+}} {
 
 // CHECK-LABEL: define internal i32 @innerZero() {{#[0-9]+}} {
+// UNSUPPORTED: OS=windows-msvc

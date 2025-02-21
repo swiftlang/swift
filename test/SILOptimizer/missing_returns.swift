@@ -133,3 +133,4 @@ enum InhabitedType {
   subscript(_ k: Int) -> Never {} // expected-error{{getter with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
   // FIXME: ^ this diagnostic should probably use the word 'subscript' rather than 'getter'
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -107,3 +107,4 @@ func unavailableUseInUnavailableFunction() {
 func foo() {
   let _ =  SubOfOtherWithInit()
 }
+// UNSUPPORTED: OS=windows-msvc

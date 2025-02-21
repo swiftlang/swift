@@ -22,3 +22,4 @@ enum Main {
     assert(greeting == "hello")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@
 // RUN: cat %t/NoVerifiedManyFlags.swiftinterface | %FileCheck --check-prefix FLAG %s
 
 public struct MyStruct {}
+// UNSUPPORTED: OS=windows-msvc

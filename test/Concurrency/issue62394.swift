@@ -19,3 +19,4 @@ struct S : P {
 // CHECK: [[SELF:%.*]] = load [trivial] %0 : $*S
 // CHECK: [[TEST_FN:%.*]] = function_ref @$s10issue623941SV4testyyF : $@convention(method) (S) -> ()
 // CHECK-NEXT: {{.*}} = apply [[TEST_FN]]([[SELF]]) : $@convention(method) (S) -> ()
+// UNSUPPORTED: OS=windows-msvc

@@ -109,3 +109,4 @@ struct Test : ~Copyable {
         }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

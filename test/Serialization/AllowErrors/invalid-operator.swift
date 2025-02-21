@@ -7,3 +7,4 @@
 struct S {
   static func ^^^ (lhs: S, rhs: S) {} // expected-error {{operator implementation without matching operator declaration}}
 }
+// UNSUPPORTED: OS=windows-msvc

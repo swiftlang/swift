@@ -10,3 +10,4 @@
 // CHECK: entry:
 // CHECK:   ret void
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

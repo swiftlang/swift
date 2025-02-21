@@ -12,3 +12,4 @@
 public enum SomeEnum {
   case x
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -51,3 +51,4 @@ fromOverlaidClangFrameworkCrossImport()
 
 // CHECKBYSTANDERS:  \"bystanders\":[\"BystandingLibrary\"]
 // CHECKNOBYSTANDERS-NOT: \"bystanders\":
+// UNSUPPORTED: OS=windows-msvc

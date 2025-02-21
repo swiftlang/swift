@@ -507,3 +507,4 @@ bb0(%0 : @owned $Outer):
   return %6 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

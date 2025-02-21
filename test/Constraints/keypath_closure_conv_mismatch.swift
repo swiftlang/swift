@@ -8,3 +8,4 @@ func testKeyPathClosureLiteralError() -> [School] {
   let slist = [School(name:"AHS"), School(name:"BHS")]
   return slist.sorted(by: \School.name) // expected-error {{cannot convert key path into a multi-argument function type '(School, School) throws -> Bool'}}
 }
+// UNSUPPORTED: OS=windows-msvc

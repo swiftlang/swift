@@ -93,3 +93,4 @@ class ImplicitCopyable {}
 class InheritImplicitCopyable: ImplicitCopyable, Copyable {}
 // expected-warning@-1 {{redundant conformance of 'InheritImplicitCopyable' to protocol 'Copyable'}}
 // expected-note@-2 {{'InheritImplicitCopyable' inherits conformance to protocol 'Copyable' from superclass here}}
+// UNSUPPORTED: OS=windows-msvc

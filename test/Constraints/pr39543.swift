@@ -9,3 +9,4 @@ extension RandomAccessCollection {
     print(String(format: "", Int(distance(from:#^CC^# startIndex, to: startIndex))))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -49,3 +49,4 @@ _ = NSFungingMask.toTheMax
 // Extension conformances get linkage according to the protocol's accessibility, as normal.
 // CHECK-DAG: sil_witness_table hidden NSRuncingOptions: Bub module objc_enum
 
+// UNSUPPORTED: OS=windows-msvc

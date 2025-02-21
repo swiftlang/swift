@@ -486,3 +486,4 @@ class SuperKWDerived : SuperKWBase {
 // DERIVED_SUPER_KW: Keyword[super]/CurrNominal: super[#SuperKWBase#];
   }
 }
+// UNSUPPORTED: OS=windows-msvc

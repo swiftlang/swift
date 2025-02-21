@@ -34,3 +34,4 @@ func foo(_ x: Float) -> Float {
 // (metatype_type
 //   (struct_type decl=main.(file)._AD__$s4main3fooyS2fF_bb0__PB__src_0_wrt_0))
 // Assertion failed: (isa<X>(Val) && "cast<Ty>() argument of incompatible type!"), function cast, file /Users/danielzheng/swift-merge/llvm-project/llvm/include/llvm/Support/Casting.h, line 264.
+// UNSUPPORTED: OS=windows-msvc

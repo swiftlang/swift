@@ -7,3 +7,4 @@ var x = C()
 #endif
 #endif
 var y = x
+// UNSUPPORTED: OS=windows-msvc

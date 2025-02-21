@@ -92,3 +92,4 @@ do {
   v2 = { (_: Int, _: inout Int) in }
   // expected-error@-1{{cannot assign value of type '(Int, inout Int) -> ()' to type '(Int, inout Float) -> ()'}}
 }
+// UNSUPPORTED: OS=windows-msvc

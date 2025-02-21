@@ -25,3 +25,4 @@ func testAnnotated() {
 test()
 testField()
 testAnnotated()
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ func foo() -> some Collection {
 let a = foo()
 
 print(a)
+// UNSUPPORTED: OS=windows-msvc

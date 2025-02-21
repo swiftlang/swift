@@ -376,3 +376,4 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

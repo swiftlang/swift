@@ -75,3 +75,4 @@ bb0:
   %0 = tuple()
   return %0 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

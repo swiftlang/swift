@@ -19,3 +19,4 @@ class C {
         without = 0
     }
 }
+// UNSUPPORTED: OS=windows-msvc

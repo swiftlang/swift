@@ -180,3 +180,4 @@
 
 // CHECK: SWIFT_INLINE_THUNK T_1_0 GenericPair<T_0_0, T_0_1>::genericMethod(const T_1_0& x, const T_0_1& y) const {
 // CHECK: _impl::$s8Generics11GenericPairV13genericMethodyqd__qd___q_tlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), swift::_impl::getOpaquePointer(y), Generics::_impl::swift_interop_passDirect_Generics_[[PTRPTRENC]](_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata(), swift::TypeMetadataTrait<T_1_0>::getTypeMetadata());
+// UNSUPPORTED: OS=windows-msvc

@@ -603,3 +603,4 @@ public func testBOOLStruct() {
   let s = FiveByteStruct()
   MyClass.mymethod(s)
 }
+// UNSUPPORTED: OS=windows-msvc

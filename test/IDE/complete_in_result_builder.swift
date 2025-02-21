@@ -410,3 +410,4 @@ func testInForLoop(_ x: [Int]) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

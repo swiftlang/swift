@@ -1471,3 +1471,4 @@ bb0:
   dealloc_stack %0 : $*X
   return %4 : $Builtin.RawPointer
 }
+// UNSUPPORTED: OS=windows-msvc

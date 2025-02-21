@@ -19,3 +19,4 @@ extension Q {
    public var b: Never { fatalError() } // expected-note {{through reference here}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

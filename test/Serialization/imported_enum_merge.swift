@@ -9,3 +9,4 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -merge-modules -module-name UsesImportedEnums -emit-module -o %t/UsesImportedEnums.swiftmodule %t/UsesImportedEnums-a.swiftmodule
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=windows-msvc

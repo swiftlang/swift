@@ -8,3 +8,4 @@ let x: (String) -> Void = { (: String) in }
 // CHECK-NEXT: (4:5, 4:6): (String) -> Void (explicit type: 1)
 // CHECK-NEXT: </VariableTypes>
 
+// UNSUPPORTED: OS=windows-msvc

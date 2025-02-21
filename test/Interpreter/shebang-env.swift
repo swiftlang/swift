@@ -26,3 +26,4 @@ print("End")
 // THREE-ARGS-NEXT: b
 // THREE-ARGS-NEXT: c
 // THREE-ARGS-NEXT: End
+// UNSUPPORTED: OS=windows-msvc

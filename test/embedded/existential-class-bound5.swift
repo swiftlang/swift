@@ -33,3 +33,4 @@ struct Main {
         test(existential: MyClass() as (any NotClassBound)) // expected-error {{cannot use a value of protocol type 'any NotClassBound' in embedded Swift}}
     }
 }
+// UNSUPPORTED: OS=windows-msvc

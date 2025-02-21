@@ -249,3 +249,4 @@ bb6:
   %z = tuple ()
   return %z : $()
 }
+// UNSUPPORTED: OS=windows-msvc

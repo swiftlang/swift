@@ -83,3 +83,4 @@ bfunc()
 // that get used, we're okay.
 // CHECK-DAG: [[PRIVATE]] = !{!{{"-lautolinking_private"|"/DEFAULTLIB:autolinking_private.lib"}}}
 // CHECK-DAG: [[INDIRECT]] = !{!{{"-lautolinking_indirect"|"/DEFAULTLIB:autolinking_indirect.lib"}}}
+// UNSUPPORTED: OS=windows-msvc

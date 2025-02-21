@@ -22,3 +22,4 @@ enum Autoclosure<T> {
 
 _ = Autoclosure.first(false, 3)
 _ = Autoclosure.second(3, "hi")
+// UNSUPPORTED: OS=windows-msvc

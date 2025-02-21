@@ -219,3 +219,4 @@ func test_async_calls_in_async_context(v: Int) async {
   Test.test(v) // expected-error {{expression is 'async' but is not marked with 'await'}} expected-note {{call is 'async'}}
   Test(v).test(v) // expected-error {{expression is 'async' but is not marked with 'await'}} expected-note {{call is 'async'}}
 }
+// UNSUPPORTED: OS=windows-msvc

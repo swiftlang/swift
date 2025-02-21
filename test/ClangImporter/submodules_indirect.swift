@@ -10,3 +10,4 @@ import ctypes_bits_exported
 // From bits submodule
 public var x : DWORD = MY_INT
 public var y : CInt = x
+// UNSUPPORTED: OS=windows-msvc

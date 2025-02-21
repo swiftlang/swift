@@ -40,3 +40,4 @@ struct X3: P3 {
   func foo() { }
 }
 
+// UNSUPPORTED: OS=windows-msvc

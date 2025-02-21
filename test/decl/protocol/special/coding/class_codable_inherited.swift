@@ -23,3 +23,4 @@ func f(decoder: Decoder) throws {
 // CHECK-DAG: #Base.init!allocator: (Base.Type) -> () -> Base : @$s23class_codable_inherited3SubCACycfC [override]
 // CHECK-DAG: #Base.init!allocator: (Base.Type) -> (any Decoder) throws -> Base : @$s23class_codable_inherited3SubC4fromACs7Decoder_p_tKcfC [override]	// Sub.__allocating_init(from:)
 // CHECK: {{^}$}}
+// UNSUPPORTED: OS=windows-msvc

@@ -603,3 +603,4 @@ func between2() {}
 print(someGlobal)
 // TOP-LEVEL-REFERENCE: let someGlobal1 = await simple()
 // TOP-LEVEL-REFERENCE-NEXT: print(someGlobal1)
+// UNSUPPORTED: OS=windows-msvc

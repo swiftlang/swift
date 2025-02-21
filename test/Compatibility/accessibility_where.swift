@@ -55,3 +55,4 @@ protocol Protocol2 : BaseProtocol where T == InternalStruct {
 protocol Protocol3 : BaseProtocol where T == PublicStruct {
   associatedtype X : BaseProtocol where X.T == PublicStruct
 }
+// UNSUPPORTED: OS=windows-msvc

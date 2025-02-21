@@ -404,3 +404,4 @@ entry(%c : $RootGeneric<Int32>):
 
 // OSIZE: define hidden swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMa"(i64 %0, ptr {{.*}}) [[ATTRS:#[0-9]+]] {{(section)?.*}}{
 // OSIZE: [[ATTRS]] = {{{.*}}noinline
+// UNSUPPORTED: OS=windows-msvc

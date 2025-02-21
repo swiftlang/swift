@@ -68,3 +68,4 @@ public class InClass {
     t?.other?.other = v?.other?.other
   }
 }
+// UNSUPPORTED: OS=windows-msvc

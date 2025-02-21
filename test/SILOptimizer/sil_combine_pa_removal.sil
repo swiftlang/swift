@@ -64,3 +64,4 @@ bb0(%1 : @closureCapture $@sil_unowned K):
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

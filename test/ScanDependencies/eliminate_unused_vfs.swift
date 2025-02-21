@@ -106,3 +106,4 @@ import F
 // MOD-HASH:     "-swift-module-file=Swift={{.*}}{{/|\\}}Swift-[[SHASH]].swiftmodule",
 // MOD-HASH:     "-swift-module-file=SwiftOnoneSupport={{.*}}{{/|\\}}SwiftOnoneSupport-[[SOSHASH]].swiftmodule",
 // MOD-HASH:     ],
+// UNSUPPORTED: OS=windows-msvc

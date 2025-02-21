@@ -18,3 +18,4 @@ public class C {
 
 // RUN: %target-swift-ide-test -fully-qualified-types -print-ast-typechecked -access-filter-internal -source-filename %s | %FileCheck %s -check-prefix=FULLY_QUAL
 // FULLY_QUAL: public var PublicVar: Swift.Int
+// UNSUPPORTED: OS=windows-msvc

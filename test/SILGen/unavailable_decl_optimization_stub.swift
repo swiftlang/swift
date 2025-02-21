@@ -90,3 +90,4 @@ public func obsoletedInSwift1() {}
 // CHECK:       } // end sil function '$s4Test17obsoletedInSwift5yyF'
 @available(swift, obsoleted: 5)
 public func obsoletedInSwift5() {}
+// UNSUPPORTED: OS=windows-msvc

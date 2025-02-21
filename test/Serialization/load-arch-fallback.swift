@@ -16,3 +16,4 @@
 
 import empty
 // CHECK: :[[@LINE-1]]:8: error: malformed compiled module: {{.*}}arm.swiftmodule
+// UNSUPPORTED: OS=windows-msvc

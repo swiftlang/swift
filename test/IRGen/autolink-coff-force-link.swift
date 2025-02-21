@@ -19,3 +19,4 @@ import swiftMSVCRT
 
 // CHECK-ASM-GNU: .ascii " -export:\"__swift_FORCE_LOAD_$_autolink\""
 // CHECK-ASM-MSC: .ascii " /EXPORT:\"__swift_FORCE_LOAD_$_autolink\""
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@
 // CHECK-SAME: flags: DIFlagArtificial, runtimeLang: DW_LANG_Swift, identifier: "$sypXpD")
 
 
+// UNSUPPORTED: OS=windows-msvc

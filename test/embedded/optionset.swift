@@ -24,3 +24,4 @@ print(s.rawValue)
 
 // CHECK: ShippingOptions.all =
 // CHECK-NEXT: 15
+// UNSUPPORTED: OS=windows-msvc

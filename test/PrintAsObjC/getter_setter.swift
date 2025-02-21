@@ -25,3 +25,4 @@ public final class Saiyan: NSObject, PowerProtocol {
     level = 9001
   }
 }
+// UNSUPPORTED: OS=windows-msvc

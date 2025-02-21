@@ -21,3 +21,4 @@
 
 let x: Int? = nil
 x!
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@
 // RUN: diff %t.dia %t_EQ_interpret_mode.dia
 
 var x = 1 x = 2   // expected-error {{consecutive statements on a line must be separated by ';'}} {{10-10=;}}
+// UNSUPPORTED: OS=windows-msvc

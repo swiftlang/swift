@@ -862,3 +862,4 @@ bb0(%0 :  @guaranteed $X):
   return %3 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

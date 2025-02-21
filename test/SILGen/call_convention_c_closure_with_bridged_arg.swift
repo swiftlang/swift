@@ -10,3 +10,4 @@ struct Wrapper {
         self.closure([])
     }
 }
+// UNSUPPORTED: OS=windows-msvc

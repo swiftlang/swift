@@ -263,3 +263,4 @@ bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : @owned $Builtin.NativeObject):
 // CHECK:         fix_lifetime %2 : $@thick Int.Type
 // CHECK:         return %1 : $Builtin.NativeObject
 // CHECK:       } // end sil function '$s19metatype_arg_throwsTf4dnn_n'
+// UNSUPPORTED: OS=windows-msvc

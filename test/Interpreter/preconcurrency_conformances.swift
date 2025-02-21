@@ -169,3 +169,4 @@ print("OK")
 
 // Crash without good message, since via 'dispatch_assert_queue'
 // SWIFT6_CHECK-NOT: OK
+// UNSUPPORTED: OS=windows-msvc

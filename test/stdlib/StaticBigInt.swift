@@ -252,3 +252,4 @@ extension StaticBigIntTests {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -159,3 +159,4 @@ final class MainActorEcho {
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

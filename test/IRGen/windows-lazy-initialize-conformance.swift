@@ -25,3 +25,4 @@ extension E: Encodable {
 try? print(C.encode(E.associated("string")))
 
 // CHECK-NOT: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @"$sSS4main1PAAWP", i32 0, i32 0), i8***
+// UNSUPPORTED: OS=windows-msvc

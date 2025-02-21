@@ -29,3 +29,4 @@ import Foundation
   func magicTupleReturn() async -> (BarClass, Int) { return (self, 0) }
 }
 // CHECK: @end
+// UNSUPPORTED: OS=windows-msvc

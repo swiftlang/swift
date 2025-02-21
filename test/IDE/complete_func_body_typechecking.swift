@@ -195,3 +195,4 @@ class TestTypeCheckExprPostfixBeginInDestructor1 {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

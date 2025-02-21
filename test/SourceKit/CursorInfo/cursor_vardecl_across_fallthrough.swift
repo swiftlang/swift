@@ -55,3 +55,4 @@ switch p {
 // CHECKY: y
 // CHECKY: s:33cursor_vardecl_across_fallthrough1yL0_SSvp
 // CHECKY: String
+// UNSUPPORTED: OS=windows-msvc

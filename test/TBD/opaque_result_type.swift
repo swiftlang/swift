@@ -87,3 +87,4 @@ extension String: P {
     return 0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

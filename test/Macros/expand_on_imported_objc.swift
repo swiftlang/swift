@@ -28,3 +28,4 @@ func testAll(x: Double, y: Double, computer: Computer, untypedComputer: AnyObjec
 }
 
 // CHECK: define linkonce_odr hidden swifttailcc void @"$sSo8ComputerC8multiply_2byS2d_SdtYaF"
+// UNSUPPORTED: OS=windows-msvc

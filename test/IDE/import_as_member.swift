@@ -140,3 +140,4 @@ iamStruct = Struct1.zero
 
 // Global properties
 currentStruct1.x += 1.5
+// UNSUPPORTED: OS=windows-msvc

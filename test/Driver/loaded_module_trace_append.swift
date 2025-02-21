@@ -5,3 +5,4 @@
 
 // CHECK: {{{.*}},"name":"loaded_module_trace_append",{{.*}}]}
 // CHECK-NEXT: {{{.*}},"name":"loaded_module_trace_append2",{{.*}}]}
+// UNSUPPORTED: OS=windows-msvc

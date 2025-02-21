@@ -5,3 +5,4 @@
 // RUN: %target-swift-frontend %s -parse -dump-clang-diagnostics -disable-modules-validate-system-headers 2>&1 | %FileCheck %s -check-prefix=DISABLE
 // DISABLE: -fno-modules-validate-system-headers
 // DISABLE-NOT: -fmodules-validate-system-headers
+// UNSUPPORTED: OS=windows-msvc

@@ -41,3 +41,4 @@ import ObjCFail
 
 // RUN: not %sourcekitd-test -req=interface-gen -module Library -- -Xcc -DFAIL -I %t -target %target-triple %s 2>&1 | %FileCheck --check-prefix TRANSITIVE-FAIL %s
 // TRANSITIVE-FAIL: Could not load module: Library (could not build {{Objective-C|C}} module 'ObjCFail', some error from Clang module)
+// UNSUPPORTED: OS=windows-msvc

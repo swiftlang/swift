@@ -63,3 +63,4 @@ if #available(SwiftStdlib 5.1, *) {
 // CHECK: Canary
 // CHECK-NEXT: canary died
 // CHECK-NEXT: Running the operation...
+// UNSUPPORTED: OS=windows-msvc

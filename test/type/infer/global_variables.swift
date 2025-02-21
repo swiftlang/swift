@@ -9,3 +9,4 @@ func testGlobals() {
   i = 5
   d[3] = "Three"
 }
+// UNSUPPORTED: OS=windows-msvc

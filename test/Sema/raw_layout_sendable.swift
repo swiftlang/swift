@@ -35,3 +35,4 @@ func testUncheckedSendable() {
     checkSendable { _ = s }
 }
 
+// UNSUPPORTED: OS=windows-msvc

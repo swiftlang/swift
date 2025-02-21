@@ -549,3 +549,4 @@ enum HasInitializerEnum : Initializer {
   init(arg: Arg) { self = .A }
 }
   
+// UNSUPPORTED: OS=windows-msvc

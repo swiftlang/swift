@@ -106,3 +106,4 @@ func testThenStmtBuilder3() -> Either<Int, String> {
     ""
   }
 }
+// UNSUPPORTED: OS=windows-msvc

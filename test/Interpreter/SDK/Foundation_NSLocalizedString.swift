@@ -16,3 +16,4 @@ let s2 = NSLocalizedString(key, tableName:nil, bundle: Bundle.main, value: value
 // CHECK: key = inquiens s2 = λαμπερός
 print("key = \(key) s2 = \(s2)")
 
+// UNSUPPORTED: OS=windows-msvc

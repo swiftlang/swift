@@ -20,3 +20,4 @@
 // CHECK-NOT: dontImportAtomicRef
 // CHECK-NOT: setStaticIntRvalueRef
 // CHECK-NOT: setConstStaticIntRvalueRef
+// UNSUPPORTED: OS=windows-msvc

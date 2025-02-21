@@ -317,3 +317,4 @@ bb0(%0 : $*P):
   %tuple = tuple ()
   return %tuple : $()
 }
+// UNSUPPORTED: OS=windows-msvc

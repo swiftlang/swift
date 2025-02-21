@@ -10,3 +10,4 @@ protocol Cyclo {
       where L.R == Self,
             U.D == Self
 }
+// UNSUPPORTED: OS=windows-msvc

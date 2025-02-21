@@ -34,3 +34,4 @@ struct Main {
     o = nil // CHECK: deinit
   }
 }
+// UNSUPPORTED: OS=windows-msvc

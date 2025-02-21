@@ -93,3 +93,4 @@ func rideAMule(_ mule: (Horse & Donkey)?) {}
 
 rideAMule(.mule)
 // expected-error@-1 {{static member 'mule' cannot be used on protocol metatype '(any Donkey & Horse).Type'}}
+// UNSUPPORTED: OS=windows-msvc

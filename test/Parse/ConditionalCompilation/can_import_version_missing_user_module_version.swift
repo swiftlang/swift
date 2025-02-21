@@ -28,3 +28,4 @@ func testCanImportNoUserModuleVersion() {
 #endif
 
 }
+// UNSUPPORTED: OS=windows-msvc

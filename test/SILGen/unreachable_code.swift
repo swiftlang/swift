@@ -176,3 +176,4 @@ func testUnreachableExistential() {
     it?.run() // expected-warning {{code after 'return' will never be executed}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

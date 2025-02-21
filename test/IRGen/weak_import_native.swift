@@ -191,3 +191,4 @@ protocol RefinesP : BaseP {}
 
 // CHECK-DAG: @"$s25weak_import_native_helper1SVAA5BasePAAWP" = extern_weak global ptr
 extension S : RefinesP {}
+// UNSUPPORTED: OS=windows-msvc

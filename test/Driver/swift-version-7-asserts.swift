@@ -42,3 +42,4 @@ asdf
 #else
 jkl
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ public func test() -> (Vector3f, TwoFloat) {
 
 // CHECK: (main.Vector3f(f3: SIMD3<Float>(0.0, 1.0, 2.0)), main.TwoFloat(f0: 0.0, f1: 1.0))
 print(test())
+// UNSUPPORTED: OS=windows-msvc

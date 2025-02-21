@@ -55,3 +55,4 @@ public func incorrectPlatformNotSimilar() {}
 @available(macOS 10.9, *)
 @_originallyDefinedIn(module: "original", swift 5.1) // expected-warning {{unknown platform 'swift' for attribute '@_originallyDefinedIn'}}
 public func swiftVersionMacro() {}
+// UNSUPPORTED: OS=windows-msvc

@@ -235,3 +235,4 @@ let v42 = #selector(otherObjCInstance.internalFunc)
 
 let v51 = #selector(OtherObjCClass.privateFunc) // expected-error{{'privateFunc' is inaccessible due to 'private' protection level}}
 let v52 = #selector(otherObjCInstance.privateFunc) // expected-error{{'privateFunc' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

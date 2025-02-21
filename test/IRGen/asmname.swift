@@ -109,3 +109,4 @@ extension X {
   }
 }
 // NEGATIVE-NOT: define {{.*}}api_
+// UNSUPPORTED: OS=windows-msvc

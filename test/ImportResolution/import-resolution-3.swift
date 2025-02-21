@@ -7,4 +7,4 @@ import asdf
 import sdf
 import struct sdf.S
 
-var uS: S = sdf.S(x: 123)
+var uS: S = sdf.S(x: 123)// UNSUPPORTED: OS=windows-msvc

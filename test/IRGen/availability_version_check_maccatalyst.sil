@@ -38,3 +38,4 @@ bb0:
 // CHECK-NEXT:   ret i32
 }
 
+// UNSUPPORTED: OS=windows-msvc

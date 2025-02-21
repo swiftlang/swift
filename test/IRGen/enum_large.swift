@@ -59,3 +59,4 @@ public func testIt(e : Multipayload) {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -54,3 +54,4 @@ struct MyStruct {
 // IR:  @"$s7section8MyStructV7static0SivpZ" = hidden global %TSi <{ {{(i64|i32)}} 1 }>, section "__DATA,__mysection"
 // IR:  define {{.*}}@"$s7section3fooyyF"(){{.*}} section "__TEXT,__mysection"
 // IR:  define {{.*}}@"$s7section8MyStructV3fooyyF"() #0 section "__TEXT,__mysection"
+// UNSUPPORTED: OS=windows-msvc

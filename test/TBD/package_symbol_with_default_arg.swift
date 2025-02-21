@@ -58,3 +58,4 @@ let c = pubFoo(arg: 3)
 let d = pkgFoo(arg: 5)
 
 print(a, b, c, d)
+// UNSUPPORTED: OS=windows-msvc

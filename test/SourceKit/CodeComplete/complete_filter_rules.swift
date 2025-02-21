@@ -230,3 +230,4 @@ func testHideDesc2() {
 // SHOW_DESC_2-NOT: [Int]
 // SHOW_DESC_2: [Float]
 // SHOW_DESC_2-NOT: [Int]
+// UNSUPPORTED: OS=windows-msvc

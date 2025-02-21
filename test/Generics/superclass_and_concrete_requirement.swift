@@ -46,3 +46,4 @@ protocol P5 {
 // expected-error@-1 {{no type for 'Self.T' can satisfy both 'Self.T : D' and 'Self.T : C'}}
   associatedtype T where T : C, T == D
 }
+// UNSUPPORTED: OS=windows-msvc

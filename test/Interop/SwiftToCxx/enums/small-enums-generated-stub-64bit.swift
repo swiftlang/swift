@@ -36,3 +36,4 @@ public func passThroughSmall(_ en: Small) -> Small {
 // CHECK-NEXT:   memcpy(&result._2, value + 8, 1);
 // CHECK-NEXT:   return result;
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

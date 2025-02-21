@@ -33,3 +33,4 @@ import HasBridgingHeader // expected-error {{failed to import bridging header}} 
 // HEADER-ERROR-NOT: error:
 
 let _ = x // expected-error {{cannot find 'x' in scope}}
+// UNSUPPORTED: OS=windows-msvc

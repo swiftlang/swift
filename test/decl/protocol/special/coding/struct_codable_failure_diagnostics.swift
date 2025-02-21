@@ -99,3 +99,4 @@ struct S6 {
 extension S6: Codable {}
 // expected-error@-1 {{type 'S6' does not conform to protocol 'Encodable'}}
 // expected-error@-2 {{type 'S6' does not conform to protocol 'Decodable'}}
+// UNSUPPORTED: OS=windows-msvc

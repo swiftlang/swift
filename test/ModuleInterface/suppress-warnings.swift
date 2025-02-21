@@ -5,3 +5,4 @@
 // CHECK-NOT: warning
 
 import SuppressWarnings
+// UNSUPPORTED: OS=windows-msvc

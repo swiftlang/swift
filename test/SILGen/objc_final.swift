@@ -30,3 +30,4 @@ func callFoo(_ x: Foo) {
   // CHECK: assign {{%.*}} to [[WRITE]] : $*Int
   x.prop = prop
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -53,3 +53,4 @@ class C {
   // CHECK: [[METADATA:%.*]] =  extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
   // CHECK: call ptr @swift_getWitnessTable(ptr @"$s21dynamic_self_metadata1GVyxGAA1PAAMc", ptr [[METADATA]], ptr undef)
 }
+// UNSUPPORTED: OS=windows-msvc

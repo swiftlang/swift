@@ -159,3 +159,4 @@ class Sub: Super {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@ protocol P2 : class, class { } // expected-error{{redundant 'class' requirement}
 protocol P3 : P2, class { } // expected-error{{'class' must come first in the requirement list}}{{15-15=class, }}{{17-24=}}
 
 struct X : class { } // expected-error{{'class' constraint can only appear on protocol declarations}}
+// UNSUPPORTED: OS=windows-msvc

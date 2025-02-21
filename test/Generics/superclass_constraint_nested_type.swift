@@ -26,3 +26,4 @@ extension P {
   func f2<T>(_: T) where Self : C, T == Q {}
   // expected-warning@-1 {{same-type requirement makes generic parameter 'T' non-generic}}
 }
+// UNSUPPORTED: OS=windows-msvc

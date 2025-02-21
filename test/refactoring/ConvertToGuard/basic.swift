@@ -40,3 +40,4 @@ func barFoo(idxOpt: Int?) {
 
 // RUN: %refactor -convert-to-guard -source-filename %s -pos=23:3 -end-pos=27:4 > %t.result/L23-3.swift
 // RUN: diff -u %S/Outputs/basic/L23-3.swift.expected %t.result/L23-3.swift
+// UNSUPPORTED: OS=windows-msvc

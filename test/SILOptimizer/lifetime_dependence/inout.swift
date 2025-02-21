@@ -45,3 +45,4 @@ struct SuperWrapper<T: BitwiseCopyable>: ~Escapable {
     self.wrapper = Wrapper(span: span)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

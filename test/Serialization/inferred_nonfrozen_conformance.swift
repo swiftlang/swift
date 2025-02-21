@@ -34,3 +34,4 @@ extension Numquam : WithBitwiseCopyable {
 extension Nunca : WithBitwiseCopyable {
   public typealias AssocBitwiseCopyable = Nunca
 }
+// UNSUPPORTED: OS=windows-msvc

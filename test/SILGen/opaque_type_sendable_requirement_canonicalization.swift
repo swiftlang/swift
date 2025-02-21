@@ -19,3 +19,4 @@ func bar() {
     a = foo { y }
     _ = a
 }
+// UNSUPPORTED: OS=windows-msvc

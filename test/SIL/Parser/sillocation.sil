@@ -5,3 +5,4 @@ bb0:
           return undef : $(), loc "foo.sil":12:34
 // CHECK: return undef : $(), loc "foo.sil":12:34
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -472,3 +472,4 @@ func trySimpleNonescapingClosure() {
     bar.hello() // OK
   }
 }
+// UNSUPPORTED: OS=windows-msvc

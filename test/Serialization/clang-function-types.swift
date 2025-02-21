@@ -27,3 +27,4 @@ func test2() {
 // CHECK:         [[FN:%.*]] = function_ref @$s24def_clang_function_types9use_inout3argyxz_tlF : $@convention(thin) <τ_0_0> (@inout τ_0_0) -> ()
 // CHECK:         apply [[FN]]<(@convention(c, cType: "OpaqueTypedefForFP2 (*)(void)") () -> OpaquePointer?)?>
 // CHECK-LABEL: } // end sil function '$s24def_clang_function_types17use_fp_internallyyyF'
+// UNSUPPORTED: OS=windows-msvc

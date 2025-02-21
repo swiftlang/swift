@@ -66,3 +66,4 @@ func terminator() {
 // TRAPFN: attributes [[ATTR0]] = { {{.*}}"trap-func-name"="oopsie" }
 // TRAPFN_OPT: attributes [[ATTR0]] = { {{.*}}"trap-func-name"="oopsie" }
 // NOTRAPFN-NOT: attributes {{.*}} = { {{.*}}"trap-func-name"="oopsie" }
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ import A
 // CHECK-NEXT:   "sourceFiles": [
 // CHECK-NEXT:      "{{.*}}\\test\\ScanDependencies\\escaped.swift"
 // CHECK-NEXT:   ],
+// UNSUPPORTED: OS=windows-msvc

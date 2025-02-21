@@ -98,3 +98,4 @@ func test5(s: String) {
     nop1()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

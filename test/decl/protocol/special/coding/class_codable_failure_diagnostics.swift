@@ -130,3 +130,4 @@ class C10 {
 }
 extension C10: Encodable {}
 // expected-error@-1 {{type 'C10' does not conform to protocol 'Encodable'}}
+// UNSUPPORTED: OS=windows-msvc

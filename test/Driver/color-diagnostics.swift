@@ -7,3 +7,4 @@
 // CHECK-NCD: {{[ ]}}1 = 2
 
 1 = 2
+// UNSUPPORTED: OS=windows-msvc

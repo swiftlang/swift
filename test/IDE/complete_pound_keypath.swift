@@ -85,3 +85,4 @@ func completeInKeyPath6() {
 // CHECK-IN_KEYPATH_BRIDGED_STRING-NOT: name=count
 
 
+// UNSUPPORTED: OS=windows-msvc

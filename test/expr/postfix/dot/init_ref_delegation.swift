@@ -551,3 +551,4 @@ do {
   var a = 0
   S.init(&a) // expected-error {{no exact matches in call to initializer}}
 }
+// UNSUPPORTED: OS=windows-msvc

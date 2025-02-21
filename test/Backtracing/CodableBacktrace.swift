@@ -65,3 +65,4 @@ struct CodableBacktrace {
     level1()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

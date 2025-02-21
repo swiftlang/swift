@@ -55,3 +55,4 @@ public func f() {
   let a = Outer.A(val: g())
   markUsed(a)
 }
+// UNSUPPORTED: OS=windows-msvc

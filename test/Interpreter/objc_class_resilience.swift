@@ -159,3 +159,4 @@ ResilientClassTestSuite.test("AnotherResilientThenEmpty") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

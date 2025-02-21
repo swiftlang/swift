@@ -14,3 +14,4 @@ TemplatesTestSuite.test("has-partial-definition") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

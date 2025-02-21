@@ -9,3 +9,4 @@ public class Derived: Base {}
 // CHECK: "kind": "inheritsFrom"
 // CHECK-NEXT: "source": "s:5Basic7DerivedC"
 // CHECK-NEXT: "target": "s:5Basic4BaseC"
+// UNSUPPORTED: OS=windows-msvc

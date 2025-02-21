@@ -69,3 +69,4 @@ extension Generic.Generic {}
 extension Generic.NonGenericInExtension {}
 extension Generic.UnboundInExtension {}
 extension Generic.GenericInExtension {}
+// UNSUPPORTED: OS=windows-msvc

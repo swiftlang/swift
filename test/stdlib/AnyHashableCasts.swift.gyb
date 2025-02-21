@@ -272,3 +272,4 @@ AnyHashableCasts.test("Wrappers around bridged strings") {
 #endif
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

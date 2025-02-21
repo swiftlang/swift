@@ -69,3 +69,4 @@ import DeclaringLibrary
 // CHECK-DAG: import DeclaringLibrary
 // NEGATIVE-NOT: import BystandingLibrary
 // NEGATIVE-NOT: import _OverlayLibrary
+// UNSUPPORTED: OS=windows-msvc

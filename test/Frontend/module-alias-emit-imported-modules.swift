@@ -46,3 +46,4 @@ import struct XLogging.Logger
 public func start() -> XLogging.Logger? {
   return XLogging.Logger()
 }
+// UNSUPPORTED: OS=windows-msvc

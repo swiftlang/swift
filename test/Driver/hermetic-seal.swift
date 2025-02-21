@@ -17,3 +17,4 @@
 // RUN:   -experimental-hermetic-seal-at-link 2>&1 | %FileCheck %s --check-prefix CHECK-NOLTO
 
 // CHECK-NOLTO: error: -experimental-hermetic-seal-at-link requires -lto=llvm-full or -lto=llvm-thin
+// UNSUPPORTED: OS=windows-msvc

@@ -362,3 +362,4 @@ actor SimpleActorIsolated {
 // CHECK:  [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:  return [[RESULT]] : $()
 // CHECK: } // end sil function '$s14default_deinit19SimpleActorIsolatedCfD'
+// UNSUPPORTED: OS=windows-msvc

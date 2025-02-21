@@ -8,3 +8,4 @@ func foo(_ structDefinedInSameTarget: StructDefinedInSameTarget) {
 // RUN:    -req=print-diags %s == \
 // RUN:    -req=edit %s -pos=2:12 -length=6 -replace='Int' == \
 // RUN:    -req=print-diags %s | %FileCheck %s
+// UNSUPPORTED: OS=windows-msvc

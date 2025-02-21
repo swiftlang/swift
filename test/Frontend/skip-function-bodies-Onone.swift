@@ -5,3 +5,4 @@
 // REQUIRES: optimized_stdlib
 
 // CHECK: module 'SwiftOnoneSupport' cannot be built with any of the -experimental-skip-*-function-bodies* flags; they have been automatically disabled
+// UNSUPPORTED: OS=windows-msvc

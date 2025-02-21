@@ -10,3 +10,4 @@ public func returnInstantiation() -> WrappedMagicInt {
 
 // CHECK: $s4main20receiveInstantiationyySo0024MagicWrapperCInt_npAIefbVzF(ptr ---> @$s4main20receiveInstantiationyySo0024MagicWrapperCInt_npAIefbVzF(ptr
 // CHECK: $s4main19returnInstantiationSo0024MagicWrapperCInt_npAIefbVyF() ---> @$s4main19returnInstantiationSo0024MagicWrapperCInt_npAIefbVyF()
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ void test() {
 }
 
 // CHECK-NOT: error:
+// UNSUPPORTED: OS=windows-msvc

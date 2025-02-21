@@ -29,3 +29,4 @@ public func wrapping<T: ~Copyable>(_ t: consuming T) -> T? {
 
 // No ownership required.
 func checkCopyability(_ t: UnsafePointer<NC>) {}
+// UNSUPPORTED: OS=windows-msvc

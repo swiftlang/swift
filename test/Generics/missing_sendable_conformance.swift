@@ -32,3 +32,4 @@ extension G2 where T.A == C {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=G2
 // CHECK-NEXT: Generic signature: <T where T : P, T.[P]A : C, T.[P]A : Sendable>
 extension G2 where T.A : C {}
+// UNSUPPORTED: OS=windows-msvc

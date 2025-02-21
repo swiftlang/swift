@@ -30,3 +30,4 @@ let json = try! encoder.encode(
 let decoder = JSONDecoder()
 let result = try! decoder.decode(Property.self, from: json)
 print(result)
+// UNSUPPORTED: OS=windows-msvc

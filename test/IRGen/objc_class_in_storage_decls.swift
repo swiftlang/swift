@@ -48,3 +48,4 @@ struct WrapperStruct {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

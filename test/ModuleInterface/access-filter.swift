@@ -287,3 +287,4 @@ extension MultiGenericStruct where First == PublicStruct, Second == InternalStru
 extension MultiGenericStruct where First == InternalStruct_BAD, Second == PublicStruct {
   @usableFromInline internal func internalPublic_BAD() {}
 }
+// UNSUPPORTED: OS=windows-msvc

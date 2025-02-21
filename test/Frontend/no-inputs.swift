@@ -7,3 +7,4 @@
 
 // CHECK1: <unknown>:0: error: no frontend action was selected
 // CHECK2: <unknown>:0: error: this mode requires at least one input file
+// UNSUPPORTED: OS=windows-msvc

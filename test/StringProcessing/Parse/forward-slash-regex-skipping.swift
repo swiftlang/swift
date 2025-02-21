@@ -125,3 +125,4 @@ func err12() { _ = (^^/0oG/) }
 func err13() { _ = (^^/"/) }
 func err14() { _ = (^^/'/) }
 func err15() { _ = (^^/<#placeholder#>/) }
+// UNSUPPORTED: OS=windows-msvc

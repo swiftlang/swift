@@ -88,3 +88,4 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
     await runTest(numCounters: counters, numWorkers: workers, numIterations: iterations)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

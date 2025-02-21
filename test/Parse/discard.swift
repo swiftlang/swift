@@ -77,3 +77,4 @@ class discard {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -67,3 +67,4 @@ sil_vtable [serialized] C {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

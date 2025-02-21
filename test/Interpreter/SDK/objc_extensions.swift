@@ -57,3 +57,4 @@ o.blackHoleWithHawkingRadiation = NSObject()
 let str = "Hello, world"
 // CHECK: I've been frobbed!
 str.frob()
+// UNSUPPORTED: OS=windows-msvc

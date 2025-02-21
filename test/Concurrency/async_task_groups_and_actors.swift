@@ -34,3 +34,4 @@ class MyActor {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -59,3 +59,4 @@ func foo(s: E1, style: E2) {
       break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

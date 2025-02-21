@@ -31,3 +31,4 @@ actor FirstActor {
         await actor.startTest() // do not remove this call
     }
 }
+// UNSUPPORTED: OS=windows-msvc

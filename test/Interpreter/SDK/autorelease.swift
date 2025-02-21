@@ -70,3 +70,4 @@ let result = try autoreleasepool {
 }
 print("result = \"\(result)\"")
 // CHECK-NEXT:      result = "a string"
+// UNSUPPORTED: OS=windows-msvc

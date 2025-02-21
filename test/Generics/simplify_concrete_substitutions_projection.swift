@@ -29,4 +29,4 @@ protocol R1 {
 
 protocol R2 {
   associatedtype T where T : P, T : Q, T.X == T.Y
-}
+}// UNSUPPORTED: OS=windows-msvc

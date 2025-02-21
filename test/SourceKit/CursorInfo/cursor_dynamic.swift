@@ -301,3 +301,4 @@ func structRefs(e: StructE) {
   // CHECK-STRUCTTOSTATIC: s:14cursor_dynamic7StructEV12staticMethodyyFZ
   // CHECK-STRUCTOTSTATIC-NOT: DYNAMIC
 }
+// UNSUPPORTED: OS=windows-msvc

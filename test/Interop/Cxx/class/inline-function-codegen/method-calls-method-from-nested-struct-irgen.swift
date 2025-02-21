@@ -7,3 +7,4 @@ public func getValueFromMethod() -> CInt {
 }
 
 // CHECK: define {{.*}}i32 @{{_ZN13IncrementUser11Incrementor9incrementEi|"\?increment@Incrementor@IncrementUser@@QEAAHH@Z"}}(ptr {{.*}}, i32 {{.*}})
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@
 // CHECK-SWIFTINTERFACE-SAME: -enable-experimental-feature NoImplicitCopy
 
 public func foo() { }
+// UNSUPPORTED: OS=windows-msvc

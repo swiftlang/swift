@@ -27,3 +27,4 @@ extension Int {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

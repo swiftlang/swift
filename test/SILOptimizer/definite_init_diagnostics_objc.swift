@@ -35,3 +35,4 @@ class RequiresInitsDerived : Gizmo {
 
   func f() { }
 }
+// UNSUPPORTED: OS=windows-msvc

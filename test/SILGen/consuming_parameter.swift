@@ -72,3 +72,4 @@ struct Butt {
         return r
     }
 }
+// UNSUPPORTED: OS=windows-msvc

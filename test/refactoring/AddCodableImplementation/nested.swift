@@ -16,3 +16,4 @@ struct Response: Codable {
 
 // RUN: %refactor -add-explicit-codable-implementation -source-filename %s -pos=2:8 > %t.result/outer.swift
 // RUN: diff -u %S/Outputs/nested/outer.swift.expected %t.result/outer.swift
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ func testit(_ x: Int) {
 func nonTrivialInit(_ b: Bool) -> Int {
 	return b ? 0 : 27
 }
+// UNSUPPORTED: OS=windows-msvc

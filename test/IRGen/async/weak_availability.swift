@@ -11,3 +11,4 @@ public func f<S: AsyncSequence>(_ s: S) async throws -> Any.Type {
 
 // MAYBE-AVAILABLE: @"$sScI{{.*next.*}}YaKFTjTu" = extern_weak global
 // MAYBE-AVAILABLE: declare{{.*}} extern_weak{{.*}} @swift_getFunctionTypeMetadataGlobalActor
+// UNSUPPORTED: OS=windows-msvc

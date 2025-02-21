@@ -112,3 +112,4 @@ public struct PublicStruct {
     private var privateProperty = "Some text"
 // SAFETY-PRIVATE: Serialization safety, unsafe: 'privateProperty'
 }
+// UNSUPPORTED: OS=windows-msvc

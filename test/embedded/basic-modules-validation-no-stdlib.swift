@@ -30,3 +30,4 @@ public func main() {
 
 // CHECK-A: error: module 'MyModule' cannot be imported in embedded Swift mode
 // CHECK-B: error: module 'MyModule' cannot be imported because it was built with embedded Swift
+// UNSUPPORTED: OS=windows-msvc

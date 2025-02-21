@@ -43,3 +43,4 @@ func dontCrash() {
 
 // CHECK: Got devices: []
 dontCrash()
+// UNSUPPORTED: OS=windows-msvc

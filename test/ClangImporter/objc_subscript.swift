@@ -69,3 +69,4 @@ func testOverridesWithoutBase(
   _ = o4["abc"]
   o4["abc"] = "xyz"
 }
+// UNSUPPORTED: OS=windows-msvc

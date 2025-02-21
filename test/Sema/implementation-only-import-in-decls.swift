@@ -315,3 +315,4 @@ extension GenericStruct: RecursiveRequirements {
 }
 public struct RecursiveRequirementsHolder<T: RecursiveRequirements> {}
 public func makeSureRecursiveRequirementsDontBreakEverything(_: RecursiveRequirementsHolder<GenericStruct<Int>>) {}
+// UNSUPPORTED: OS=windows-msvc

@@ -138,3 +138,4 @@ public struct HasSubscript {
     set {}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

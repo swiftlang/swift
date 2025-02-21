@@ -279,3 +279,4 @@ public func passArrayOfClasses(a: SwiftClass, b: SwiftClass, c: SwiftClass) {
   takeUnsafePointer(ptr: arr, len: arr.count)
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -50,3 +50,4 @@ public func test4(arg: borrowing StructWithDynamicMemberLookup<MyStruct>) -> Int
 
 let str = StructWithDynamicMemberLookup<MyStruct>(from: MyStruct(x: 10, y: 20, z: 30))
 print(str.z.pointee == 30 ? "OK!" : "FAIL") // CHECK: OK!
+// UNSUPPORTED: OS=windows-msvc

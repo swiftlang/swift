@@ -34,3 +34,4 @@ Tests.test("inference") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

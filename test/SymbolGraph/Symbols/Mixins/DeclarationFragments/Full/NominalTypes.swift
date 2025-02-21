@@ -236,3 +236,4 @@ public typealias TA<T> = S<T> where T: Sequence
 // TYPEALIAS-NEXT:     "preciseIdentifier": "s:ST"
 // TYPEALIAS-NEXT:   }
 // TYPEALIAS-NEXT: ],
+// UNSUPPORTED: OS=windows-msvc

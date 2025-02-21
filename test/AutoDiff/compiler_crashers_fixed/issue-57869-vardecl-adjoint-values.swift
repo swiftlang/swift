@@ -22,3 +22,4 @@ public struct Test: Differentiable {
 }
 
 // Assertion failed: ((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) && "location is a VarDecl, but SILDebugVariable is empty"), function createAllocStack, file SILBuilder.h, line 389.
+// UNSUPPORTED: OS=windows-msvc

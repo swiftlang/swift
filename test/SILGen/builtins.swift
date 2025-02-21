@@ -903,3 +903,4 @@ func getEnumTag<T>(_ x: T) -> Builtin.Int32 {
 func injectEnumTag<T>(_ x: inout T, tag: Builtin.Int32) {
   Builtin.injectEnumTag(&x, tag)
 }
+// UNSUPPORTED: OS=windows-msvc

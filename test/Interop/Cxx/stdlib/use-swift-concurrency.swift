@@ -37,3 +37,4 @@ import Dispatch
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

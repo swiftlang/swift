@@ -87,3 +87,4 @@ public func also_universally_unavailable(
   has_unavailable_in_embedded_overload(.init()) // expected-error {{ambiguous use of 'init()'}}
   has_universally_unavailable_overload(.init()) // not ambiguous, selects available overload
 }
+// UNSUPPORTED: OS=windows-msvc

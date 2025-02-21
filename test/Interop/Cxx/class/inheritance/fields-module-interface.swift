@@ -82,3 +82,4 @@
 // CHECK-NEXT:   var b: Int32
 // CHECK-NEXT:   var c: Int32
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

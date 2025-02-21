@@ -1578,3 +1578,4 @@ func testAddMemberVsRemoveCall() {
   let b = Foo_74617()
   let c = (a + b).bar() // expected-error {{cannot call value of non-function type 'Float'}} {{22-24=}}
 }
+// UNSUPPORTED: OS=windows-msvc

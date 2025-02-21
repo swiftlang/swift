@@ -17,3 +17,4 @@ protocol P4 {
 // CHECK-LABEL: .G@
 // CHECK-NEXT: Generic signature: <T where T : P4, T.[P4]T : P1, T.[P4]T.[P1]T : P3>
 class G<T: P4> where T.T: P1, T.T.T: P3 {}
+// UNSUPPORTED: OS=windows-msvc

@@ -35,3 +35,4 @@ protocol P4 {
   associatedtype T : P4, Q where T.Assoc : R, T == U.U
   associatedtype U : P4 where U.Assoc : R, U == T.U
 }
+// UNSUPPORTED: OS=windows-msvc

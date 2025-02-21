@@ -23,3 +23,4 @@ public struct Outer {
 // This will definitely be on the parents, so this is enough to check that it wasn't
 // applied to the child.
 // CHECK-COUNT-2: "availability":
+// UNSUPPORTED: OS=windows-msvc

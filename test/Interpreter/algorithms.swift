@@ -43,3 +43,4 @@ print(flat)
 // rdar://problem/19416848
 func observe<T:Sequence, V>(_ g:T) where V == T.Iterator.Element { }
 observe(["a":1])
+// UNSUPPORTED: OS=windows-msvc

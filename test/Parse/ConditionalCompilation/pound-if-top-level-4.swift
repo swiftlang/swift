@@ -19,3 +19,4 @@ print("ok")
 #endif
 
 struct D {}
+// UNSUPPORTED: OS=windows-msvc

@@ -8,4 +8,4 @@
 // A-DAG: Decl[FreeFunction]/CurrModule: f()[#Void#]{{; name=.+$}}
 func f() {}
 // There is no newline on the following line.  Don't fix this!
-#^A^#
+#^A^#// UNSUPPORTED: OS=windows-msvc

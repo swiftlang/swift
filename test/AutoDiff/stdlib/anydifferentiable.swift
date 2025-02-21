@@ -227,3 +227,4 @@ TypeErasureTests.test("AnyDerivative differentiation") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

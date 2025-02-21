@@ -16,3 +16,4 @@ public struct UsesAdapterMethod: Foo {
     return identity(d)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

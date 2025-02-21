@@ -136,3 +136,4 @@ extension Base2: P1 {
 }
 assertTypeWitnessForP1_A(in: Base2.self, is: Bool.self)
 assertTypeWitnessForP2_A(in: Derived2.self, is: Bool.self)
+// UNSUPPORTED: OS=windows-msvc

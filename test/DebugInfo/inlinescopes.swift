@@ -27,3 +27,4 @@ func inlined(_ x: Int64) -> Int64 {
   return result
 }
 public func entry() -> Int64 { return  inlined(x) }
+// UNSUPPORTED: OS=windows-msvc

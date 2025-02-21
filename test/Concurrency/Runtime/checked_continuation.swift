@@ -73,3 +73,4 @@ struct TestError: Error {}
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

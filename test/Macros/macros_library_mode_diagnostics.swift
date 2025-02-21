@@ -11,3 +11,4 @@
 #undefinedMacro2 { definitelyNotDefined }
 // expected-error@-1{{no macro named 'undefinedMacro2'}}
 // expected-error@-2{{cannot find 'definitelyNotDefined' in scope}}
+// UNSUPPORTED: OS=windows-msvc

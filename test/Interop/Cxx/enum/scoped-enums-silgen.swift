@@ -26,3 +26,4 @@ public func returnsScopedEnumCharDefined() -> ScopedEnumCharDefined {
   return .x
 }
 
+// UNSUPPORTED: OS=windows-msvc

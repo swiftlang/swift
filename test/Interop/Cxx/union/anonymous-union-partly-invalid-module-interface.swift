@@ -8,3 +8,4 @@
 // CHECK-NEXT:   mutating func f() -> Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: func getSPtr() -> UnsafeMutablePointer<S>!
+// UNSUPPORTED: OS=windows-msvc

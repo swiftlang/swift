@@ -126,3 +126,4 @@ class MyAppDelegate: AppDelegate {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

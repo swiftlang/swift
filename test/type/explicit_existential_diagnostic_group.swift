@@ -10,3 +10,4 @@ do {
   let _: ~Copyable
   // expected-error@-1 {{constraint that suppresses conformance requires 'any'; this will be an error in a future Swift language mode}}
 }
+// UNSUPPORTED: OS=windows-msvc

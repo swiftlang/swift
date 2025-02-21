@@ -8,3 +8,4 @@
 // CHECK: note: could not deserialize type for 'queryInterface'
 // CHECK: error: cannot inherit from class 'Window' because it has overridable members that could not be loaded
 // CHECK: note: could not deserialize 'queryInterface'
+// UNSUPPORTED: OS=windows-msvc

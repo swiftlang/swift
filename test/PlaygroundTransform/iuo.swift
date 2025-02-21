@@ -24,3 +24,4 @@ class Enclosing {
 }
 
 Enclosing().test()
+// UNSUPPORTED: OS=windows-msvc

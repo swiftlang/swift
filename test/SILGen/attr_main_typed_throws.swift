@@ -25,3 +25,4 @@ struct ThrowingMain {
 // CHECK: [[REPORT_FN:%.*]] = function_ref @$ss17_errorInMainTypedys5NeverOxs5ErrorRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Never
 // CHECK-NEXT: apply [[REPORT_FN]]<Err>([[ERR_STACK]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Never
 // CHECK-NEXT: unreachable  
+// UNSUPPORTED: OS=windows-msvc

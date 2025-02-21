@@ -67,3 +67,4 @@ struct TestStruct2 {
 #endif
 }
 
+// UNSUPPORTED: OS=windows-msvc

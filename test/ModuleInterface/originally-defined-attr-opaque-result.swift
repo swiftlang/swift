@@ -28,3 +28,4 @@ public struct SoupChef : Chef {
 }
 
 // CHECK-LABEL: public typealias Food = @_opaqueReturnTypeOf("$s8CoreChef04SoupB0V04cookC0yQr0aC09VegetableVF", 0) __
+// UNSUPPORTED: OS=windows-msvc

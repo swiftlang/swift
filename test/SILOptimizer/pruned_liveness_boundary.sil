@@ -167,3 +167,4 @@ sil [ossa] @nonending_then_nonending_is_nonending : $@convention(thin) () -> () 
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

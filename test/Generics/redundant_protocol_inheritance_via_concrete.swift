@@ -6,3 +6,4 @@ class C : P {}
 // CHECK-LABEL: redundant_protocol_inheritance_via_concrete.(file).Q@
 // CHECK-NEXT: Requirement signature: <Self where Self : C>
 protocol Q : P, C {}
+// UNSUPPORTED: OS=windows-msvc

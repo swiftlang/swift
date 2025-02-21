@@ -136,3 +136,4 @@ public func unavailableFromAsyncFunc() { }
 public func noAsyncFunc() { }
 
 // CHECK-NOT: extension FeatureTest.MyActor : Swift.Sendable
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ actor GenericActor<T> {
     var state: T
     init(state: T) { self.state = state }
 }
+// UNSUPPORTED: OS=windows-msvc

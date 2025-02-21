@@ -15,3 +15,4 @@ public protocol Three: One, Two where MyType: Three {}
 extension Three {
   public func doStuff(_: MyType.MyType.MyType) {}
 }
+// UNSUPPORTED: OS=windows-msvc

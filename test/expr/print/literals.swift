@@ -16,3 +16,4 @@ func test() {
 
 func log(_ a: Any) {
 }
+// UNSUPPORTED: OS=windows-msvc

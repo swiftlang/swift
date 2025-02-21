@@ -15,3 +15,4 @@ public struct S {
     self.x = x
   }
 }
+// UNSUPPORTED: OS=windows-msvc

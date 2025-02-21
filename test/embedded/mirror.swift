@@ -11,4 +11,4 @@ public struct MyStruct {
 public func foo(s: MyStruct) {
   let mirror = Mirror(reflecting: s) // expected-error {{'Mirror' is unavailable}}
   _ = mirror.children
-}
+}// UNSUPPORTED: OS=windows-msvc

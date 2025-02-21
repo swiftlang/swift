@@ -45,3 +45,4 @@ struct TestOldWrapperInits {
   
   @OldWrapperWithInit2 var y = "Hello"
 }
+// UNSUPPORTED: OS=windows-msvc

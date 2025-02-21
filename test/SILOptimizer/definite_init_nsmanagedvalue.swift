@@ -34,3 +34,4 @@ extension Person {
 // CHECK-NEXT: debug_value
 // CHECK-NEXT: debug_value
 // CHECK-NEXT: store {{.*}}, scope [[SCOPE]]
+// UNSUPPORTED: OS=windows-msvc

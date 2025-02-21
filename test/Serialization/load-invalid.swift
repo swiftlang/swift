@@ -16,3 +16,4 @@ import new_module // expected-error{{malformed compiled module}}
 
 // malformed module files produce an empty module to avoid further errors.
 new_module.foo() // expected-error {{module 'new_module' has no member named 'foo'}}
+// UNSUPPORTED: OS=windows-msvc

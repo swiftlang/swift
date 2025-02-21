@@ -99,3 +99,4 @@ func callsExTakesErrorWithError(_ p: P, _ error: Error) {
 func test4(_ p: P, _ error: Error) {
   callsExTakesErrorWithError(p, error)
 }
+// UNSUPPORTED: OS=windows-msvc

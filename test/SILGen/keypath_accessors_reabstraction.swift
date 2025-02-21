@@ -26,3 +26,4 @@ func physicalFunctionValue() {
 // CHECK-NEXT: [[DEST:%[0-9]+]] = struct_element_addr [[FOO]] : $*Foo<Bool>, #Foo.closure
 // CHECK-NEXT: assign [[SRC_REABSTR]] to [[DEST]] : $*@callee_guaranteed @substituted <τ_0_0> () -> @out Optional<τ_0_0> for <Bool>
 // CHECK: } // end sil function '$[[SETTER]]'
+// UNSUPPORTED: OS=windows-msvc

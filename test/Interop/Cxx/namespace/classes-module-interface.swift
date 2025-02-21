@@ -55,3 +55,4 @@
 // CHECK-NEXT:   typealias AliasToLocalNS5 = ClassesNS5.ClassesNS5
 // CHECK-NEXT:   typealias AliasToNS5 = ClassesNS5.ClassesNS5
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

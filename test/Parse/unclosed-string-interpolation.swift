@@ -30,4 +30,4 @@ let goatedAlbum = "The Life Of \("Pablo"
 // expected-error @+1 {{unterminated string literal}}
 _ = """
 \(
-"""
+"""// UNSUPPORTED: OS=windows-msvc

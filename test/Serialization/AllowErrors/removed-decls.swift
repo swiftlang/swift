@@ -102,3 +102,4 @@ extension InheritingClassB {
 extension EnumB {
   func newEnumBMethod() {}
 }
+// UNSUPPORTED: OS=windows-msvc

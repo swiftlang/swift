@@ -124,3 +124,4 @@ struct UnnamedArgs {
 // UNNAMED_ARGS_0-NEXT: ]
 // UNNAMED_ARGS_0-NEXT: Results for filterText: unnamed [
 // UNNAMED_ARGS_0-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

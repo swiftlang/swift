@@ -10,3 +10,4 @@
 // TOP_LEVEL_ERROR-NEXT: key.description: {{.*}}top level
 
 print("hi") // Top-level code.
+// UNSUPPORTED: OS=windows-msvc

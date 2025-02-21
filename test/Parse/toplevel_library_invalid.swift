@@ -13,3 +13,4 @@ x + x; // expected-error {{expressions are not allowed at the top level}} expect
 // expected-error @+2 {{expected Sequence expression for for-each loop}}
 // expected-error @+1 {{expected '{' to start the body of for-each loop}}
 for i
+// UNSUPPORTED: OS=windows-msvc

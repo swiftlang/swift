@@ -12,3 +12,4 @@ public func force_metadata() {
   print(X().nestedTypeField)
   print(X().otherNestedTypeField)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -38,3 +38,4 @@ func testType() {
 // TOPLEVEL-DAG: Decl[Protocol]/CurrModule/Flair[RareType,ExprAtFileScope]: MyProtocol[#MyProtocol#]; name=MyProtocol
 // TOPLEVEL-DAG: Decl[Protocol]/OtherModule[Swift]/Flair[RareType,ExprAtFileScope]/IsSystem: IteratorProtocol[#IteratorProtocol#]; name=IteratorProtocol
 // TOPLEVEL-DAG: Decl[Struct]/OtherModule[Swift]/Flair[ExprAtFileScope]/IsSystem: Int[#Int#]; name=Int
+// UNSUPPORTED: OS=windows-msvc

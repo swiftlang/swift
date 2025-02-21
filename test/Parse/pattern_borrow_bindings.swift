@@ -57,3 +57,4 @@ func testBorrowingPatterns(bar: borrowing Bar) {
         break
     }
 }
+// UNSUPPORTED: OS=windows-msvc

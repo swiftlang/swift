@@ -56,3 +56,4 @@ struct MainType : App {
     typealias Configuration = Config3
 #endif
 }
+// UNSUPPORTED: OS=windows-msvc

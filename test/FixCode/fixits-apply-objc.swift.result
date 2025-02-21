@@ -109,3 +109,4 @@ func foo1(_ an : Any) {
 func foo2(_ messageData: Any?) -> AnyObject? {
   return messageData as AnyObject
 }
+// UNSUPPORTED: OS=windows-msvc

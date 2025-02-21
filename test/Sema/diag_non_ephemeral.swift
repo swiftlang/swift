@@ -543,3 +543,4 @@ func testTuplingNonEphemeral(_ ptr: UnsafePointer<Int>) {
   // wanted to.
   fn(([1], ptr)) // expected-error {{cannot convert value of type '([Int], UnsafePointer<Int>)' to expected argument type '(UnsafePointer<Int>, UnsafePointer<Int>)'}}
 }
+// UNSUPPORTED: OS=windows-msvc

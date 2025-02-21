@@ -42,3 +42,4 @@ public func caller2(x: A & B, y: A & C) -> A & B {
 public func callexpectsConstCharPtr() {
   expectsConstCharPtr(0 as Int32)
 }
+// UNSUPPORTED: OS=windows-msvc

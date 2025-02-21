@@ -124,3 +124,4 @@ nsValueBridging.test("NSValue fetching method should be able to convert construc
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

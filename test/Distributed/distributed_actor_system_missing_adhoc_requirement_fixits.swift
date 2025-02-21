@@ -150,3 +150,4 @@ public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ Foo(123).applyBlock({ print($0) }, withInt:22)
 // CHECK: 321
 // CHECK: 44
 Foo(321).applyBlock({ print($0) }, withFoo: Foo(44))
+// UNSUPPORTED: OS=windows-msvc

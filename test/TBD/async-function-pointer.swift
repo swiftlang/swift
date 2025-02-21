@@ -11,3 +11,4 @@ public func foo() async {}
 open class C {
   private func f() async { }
 }
+// UNSUPPORTED: OS=windows-msvc

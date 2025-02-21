@@ -36,3 +36,4 @@ public func forceMetadata() {
 
 // CHECK-LABEL: @"$s4test1SVSQAAMc" = hidden constant
 // CHECK-LABEL: @"$s4test1SVMn" = hidden constant
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@
 import ClangModuleWithOverlay
 let c = ClangType(i: 0)
 fromSwiftOverlay()
+// UNSUPPORTED: OS=windows-msvc

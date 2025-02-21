@@ -22,3 +22,4 @@ public class Sub: Super<Int> {
   required public init(coder: NSCoder) {}
   override public func encode(with: NSCoder) {}
 }
+// UNSUPPORTED: OS=windows-msvc

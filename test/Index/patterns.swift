@@ -44,3 +44,4 @@ if prop2 is Foo {}
 if prop2 is Foo.Bar {}
 // CHECK: [[@LINE-1]]:13 | struct/Swift | Foo |
 // CHECK: [[@LINE-2]]:17 | struct/Swift | Bar |
+// UNSUPPORTED: OS=windows-msvc

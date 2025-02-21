@@ -281,3 +281,4 @@ bb5(%r : $Builtin.Int32):
   return %r : $Builtin.Int32
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -94,3 +94,4 @@ class TestErrorSub : TestError {
   convenience init(block: @escaping () -> Void) throws
   init()
 }
+// UNSUPPORTED: OS=windows-msvc

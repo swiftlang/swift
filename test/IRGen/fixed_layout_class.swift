@@ -113,3 +113,4 @@ public func callVirtualMethod(_ o: OutsideParent) {
 // Make sure we emit the dispatch thunk:
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience22MyChildOfOutsideParentC9newMethodyyFTj"(ptr swiftself %0)
+// UNSUPPORTED: OS=windows-msvc

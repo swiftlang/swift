@@ -12,3 +12,4 @@
 // UNSUPPORTED: CPU=x86_64 && (DARWIN_SIMULATOR=ios || DARWIN_SIMULATOR=watchos || DARWIN_SIMULATOR=tvos)
 
 // UNSUPPORTED: freestanding
+// UNSUPPORTED: OS=windows-msvc

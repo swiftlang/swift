@@ -121,3 +121,4 @@ func testInlinable() {
 // CHECK-LABEL: sil @$s1A9InlinableV1xACSi_tcfC : $@convention(method) (Int, @thin Inlinable.Type) -> Inlinable
 
 // CHECK-LABEL: sil shared @$s1A11TransparentV1xSivi : $@convention(thin) (Int, @thin Transparent.Type) -> @out Int
+// UNSUPPORTED: OS=windows-msvc

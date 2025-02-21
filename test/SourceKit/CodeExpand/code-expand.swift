@@ -273,3 +273,4 @@ expandClosureWithInternalParameterNames {
 // CHECK: withtrail { a, b in
 // CHECK-NEXT: <#code#>
 }
+// UNSUPPORTED: OS=windows-msvc

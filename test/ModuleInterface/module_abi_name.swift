@@ -3,3 +3,4 @@
 // RUN: %FileCheck %s < %t/Hello.swiftinterface
 
 // CHECK: -module-abi-name Goodbye
+// UNSUPPORTED: OS=windows-msvc

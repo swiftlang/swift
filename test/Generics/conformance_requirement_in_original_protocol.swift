@@ -133,3 +133,4 @@ public protocol Q8a {
 public protocol Q8b : P1 {
   associatedtype Y : Q8a where Self == Self.Y.Z
 }
+// UNSUPPORTED: OS=windows-msvc

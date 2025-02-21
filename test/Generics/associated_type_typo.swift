@@ -82,3 +82,4 @@ class D {
 }
 
 func typoSuperclass2<T : D>(_: T, _: T.Element) { } // expected-error{{'Element' is not a member type of type 'T'}}
+// UNSUPPORTED: OS=windows-msvc

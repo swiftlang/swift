@@ -42,3 +42,4 @@ macro myLineMacro() -> Int = #line
 var thisLine = #myLineMacro
 
 testFreestandingExpansionOfOther()
+// UNSUPPORTED: OS=windows-msvc

@@ -48,3 +48,4 @@ public struct StructConformingToProtoWithAssociatedType: ProtoWithAssociatedType
 // CHECK-NEXT:    method #ProtoWithAssociatedType.requirement: <Self where Self : ProtoWithAssociatedType> (Self) -> () -> Self.A : @$s4Test41StructConformingToProtoWithAssociatedTypeVAA0efgH0A2aDP11requirement1AQzyFTW
 // CHECK-NEXT:    method #ProtoWithAssociatedType.otherRequirement: <Self where Self : ProtoWithAssociatedType> (Self) -> (Self.A) -> () : @$s4Test41StructConformingToProtoWithAssociatedTypeVAA0efgH0A2aDP16otherRequirementyy1AQzFTW
 // CHECK-NEXT:  }
+// UNSUPPORTED: OS=windows-msvc

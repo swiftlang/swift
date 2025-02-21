@@ -120,3 +120,4 @@ func test4<each T>(function: @escaping (_: Any) -> (), type: (repeat each T).Typ
 // CHECK-NEXT:    destroy_addr [[ANY_TEMP]] : $*Any
 // CHECK-NEXT:    dealloc_stack [[ANY_TEMP]] : $*Any
 // CHECK-NEXT:    return [[VOID]] : $()
+// UNSUPPORTED: OS=windows-msvc

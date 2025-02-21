@@ -217,3 +217,4 @@ bb0(%0 : $Derived):
   return %7 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

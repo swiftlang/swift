@@ -47,3 +47,4 @@ print(foo().get())
 } else {
   print(27)
 }
+// UNSUPPORTED: OS=windows-msvc

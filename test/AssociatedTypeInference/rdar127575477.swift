@@ -12,3 +12,4 @@ extension G: Collection {
 }
 
 extension G: BidirectionalCollection where T: BidirectionalCollection {}
+// UNSUPPORTED: OS=windows-msvc

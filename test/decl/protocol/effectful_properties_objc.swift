@@ -12,3 +12,4 @@
  // members that are representable in ObjC, and this is not representable.
  @nonobjc var sugar : Bool { get async } // expected-error{{property with 'throws' or 'async' is not representable in Objective-C}} expected-note{{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 }
+// UNSUPPORTED: OS=windows-msvc

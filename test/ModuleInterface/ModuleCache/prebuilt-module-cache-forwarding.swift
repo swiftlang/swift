@@ -52,3 +52,4 @@ let _: X = Lib.testValue
 // FROM-PREBUILT: [[@LINE-2]]:16: error: cannot convert value of type 'FromPrebuilt' to specified type 'X'
 
 // REQUIRES: rdar58578342
+// UNSUPPORTED: OS=windows-msvc

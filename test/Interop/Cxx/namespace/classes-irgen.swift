@@ -33,3 +33,4 @@ public func forwardDeclared() {
   var nestedForwardDeclaredStruct = ClassesNS1.ClassesNS2.ForwardDeclaredStruct()
   nestedForwardDeclaredStruct.basicMember()
 }
+// UNSUPPORTED: OS=windows-msvc

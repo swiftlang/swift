@@ -55,3 +55,4 @@ func test() {
 // CHECK-INVALID: error: allowing deserialization of error type '<null>' in module 'errors'
 // CHECK-INVALID: error: allowing deserialization of invalid declaration 'invalidFuncRet()' (global function) in module 'errors'
 // CHECK-INVALID-NOT: invalid-uses.swift:{{.*}} error:
+// UNSUPPORTED: OS=windows-msvc

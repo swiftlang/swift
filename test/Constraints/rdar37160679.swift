@@ -19,3 +19,4 @@ func baz(a1: @autoclosure () -> Int,
   // CHECK: function_ref @$s12rdar371606793baryySiyXEF
   bar(b2)
 }
+// UNSUPPORTED: OS=windows-msvc

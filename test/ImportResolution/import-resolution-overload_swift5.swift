@@ -52,3 +52,4 @@ extension HasFooNonGeneric {
     _ = y2
   }
 }
+// UNSUPPORTED: OS=windows-msvc

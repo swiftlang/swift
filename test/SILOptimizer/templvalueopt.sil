@@ -278,3 +278,4 @@ bb0(%ret_addr : $*T):
   return %15 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

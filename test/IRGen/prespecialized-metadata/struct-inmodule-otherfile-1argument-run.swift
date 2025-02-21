@@ -22,3 +22,4 @@ func doit() {
   // CHECK: [[METADATA_ADDRESS]] 3 @ 23
   consume(oneArgument: OneArgument(3))
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -147,3 +147,4 @@ public func noAnnotations() -> View {
     // CHECK-NO-LIFETIMES-NOT: error
     // CHECK-NO-LIFETIMES-NOT: warning
 }
+// UNSUPPORTED: OS=windows-msvc

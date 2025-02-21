@@ -91,3 +91,4 @@ bb1(%2 : @guaranteed $FakeOptional<C>):
   %4 = tuple ()
   return %4 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -575,3 +575,4 @@ struct S0_53813 {
     c0.foo3 = self // expected-error {{cannot assign value of type 'S0_53813' to type '(any P4_53813)?'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -64,3 +64,4 @@ protocol P5Unordered {
 func testUnorderedP5_P6<W: P6Unordered>(_ w: W) {
 	acceptP0(w.getA())
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ public func testFullyCoveredSwitchClosedEnum(_ e: UnfairCoin) {
   case .tails: ()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

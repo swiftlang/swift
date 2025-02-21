@@ -164,3 +164,4 @@ class C12: P12 {
   // expected-note@-3 {{move 'prop' to an extension to silence this warning}}
   // expected-note@-4 {{make 'prop' private to silence this warning}}
 }
+// UNSUPPORTED: OS=windows-msvc

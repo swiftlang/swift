@@ -58,3 +58,4 @@ var i: Int = b.my_identity()
 
 
 
+// UNSUPPORTED: OS=windows-msvc

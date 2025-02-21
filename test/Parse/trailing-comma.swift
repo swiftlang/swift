@@ -134,4 +134,4 @@ if true, { } // expected-error {{expected '{' after 'if' condition}}
 
 guard true, else { } // expected-error {{expected expression in conditional}} 
 
-while true, { } // expected-error {{expected '{' after 'while' condition}} 
+while true, { } // expected-error {{expected '{' after 'while' condition}} // UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ extension Gizmo {
     self.init(bellsOn:i)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

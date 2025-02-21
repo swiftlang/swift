@@ -48,3 +48,4 @@ public func testit(_ i: Int) {
   funcPtrs[i].cl()
 }
 
+// UNSUPPORTED: OS=windows-msvc

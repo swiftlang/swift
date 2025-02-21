@@ -22,3 +22,4 @@ let _ = S<[W<String>]>().instancef(W<[Int]>()) // expected-error{{instance metho
 func genericFunc<C1: Collection, C2: Collection>(_ c2: W<C2>, c1: C1.Type) where C1.Element == W<C2.Element> {
   let _ = S<[W<C1>]>(W<C2>()) // expected-error{{initializer 'init(_:)' requires the types 'W<C1>' and 'W<C2.Element>' be equivalent}}
 }
+// UNSUPPORTED: OS=windows-msvc

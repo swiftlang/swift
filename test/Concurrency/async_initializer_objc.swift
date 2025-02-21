@@ -14,3 +14,4 @@ class X: NSObject {
   @objc init(_ i : Int) async { }
 }
 
+// UNSUPPORTED: OS=windows-msvc

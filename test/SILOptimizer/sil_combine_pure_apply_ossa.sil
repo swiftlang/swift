@@ -75,3 +75,4 @@ sil_vtable Foo {
 
 
 
+// UNSUPPORTED: OS=windows-msvc

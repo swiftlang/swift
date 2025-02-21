@@ -7,3 +7,4 @@ public enum E: CaseIterable {
 }
 
 // CHECK: sil_witness_table E: CaseIterable module Test
+// UNSUPPORTED: OS=windows-msvc

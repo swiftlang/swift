@@ -36,3 +36,4 @@ import PrivateSwift
 // expected-remark @-1 {{rebuilding module 'PrivateSwift' from interface}}
 // expected-note @-2 {{compiled module is out of date}}
 // expected-note @-3 {{: malformed}}
+// UNSUPPORTED: OS=windows-msvc

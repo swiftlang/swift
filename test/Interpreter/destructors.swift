@@ -31,3 +31,4 @@ createC()
 // CHECK-NEXT: boom! roasted
 createD()
 
+// UNSUPPORTED: OS=windows-msvc

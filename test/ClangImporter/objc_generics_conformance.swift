@@ -41,3 +41,4 @@ protocol WithAssocElement {
 extension GenericClass : WithAssocElement {
   typealias Element = Int
 }
+// UNSUPPORTED: OS=windows-msvc

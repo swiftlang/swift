@@ -33,3 +33,4 @@ bb0(%0 : $Builtin.Int64):
 // CHECK: ![[VAR_DI]] = !DILocalVariable(name: "x"
 // CHECK-SAME:                           line: 1
 // CHECK-NOT: !DILocalVariable(name: "x"
+// UNSUPPORTED: OS=windows-msvc

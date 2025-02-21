@@ -32,3 +32,4 @@ bb0(%0: $A):
   %result = tuple ()
   return %result : $()
 }
+// UNSUPPORTED: OS=windows-msvc

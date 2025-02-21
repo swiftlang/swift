@@ -20,3 +20,4 @@ import Foo
 import Foo
 import Bar
 #endif
+// UNSUPPORTED: OS=windows-msvc

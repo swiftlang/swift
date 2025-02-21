@@ -106,3 +106,4 @@ func testCategoryWithoutInitializer(obj: PropertiesNoInitCategory) {
   obj.readwriteChange = Base() // CHECK-PRIVATE-NOT: [[@LINE]]:{{.+}}: error
   // CHECK-PUBLIC: [[@LINE-1]]:7: error: cannot assign to property: 'readwriteChange' is a get-only property
 }
+// UNSUPPORTED: OS=windows-msvc

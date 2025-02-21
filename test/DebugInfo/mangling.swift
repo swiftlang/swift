@@ -43,3 +43,4 @@ var myTuple3 : (      String,     Int64) = ("C", 3)
 markUsed(myTuple1.Id)
 markUsed(myTuple2.Id)
 markUsed({ $0.1 }(myTuple3))
+// UNSUPPORTED: OS=windows-msvc

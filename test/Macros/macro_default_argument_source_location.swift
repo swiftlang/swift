@@ -134,3 +134,4 @@ let printWithFileLine = buildPrinter { }
         sameColumn()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

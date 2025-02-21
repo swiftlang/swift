@@ -13,3 +13,4 @@ func unused() -> Int { 5 }
 // IR: @__llvm_coverage_mapping
 // IR: @__llvm_prf_nm
 // IR: define {{.*}} @"$s17coverage_deadcode6unusedSiyF"
+// UNSUPPORTED: OS=windows-msvc

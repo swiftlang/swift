@@ -67,3 +67,4 @@ public struct MineOwnIterator<Element>: AsyncSequence, AsyncIteratorProtocol {
   // CHECK:      @_implements(_Concurrency.AsyncSequence, Failure)
   // CHECK-SAME: public typealias __AsyncSequence_Failure = Swift.Never
 }
+// UNSUPPORTED: OS=windows-msvc

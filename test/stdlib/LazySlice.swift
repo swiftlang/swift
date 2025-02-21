@@ -15,3 +15,4 @@ tests.test("CommuteLaziness") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

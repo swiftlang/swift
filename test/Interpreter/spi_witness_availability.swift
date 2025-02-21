@@ -67,3 +67,4 @@ doIt(NoSecrets())
 // CHECK-CONFORMANCES-AVAILABLE:      Secret
 // CHECK-CONFORMANCES-AVAILABLE-API:  Secret
 doIt(HasSecrets())
+// UNSUPPORTED: OS=windows-msvc

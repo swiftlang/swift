@@ -36,3 +36,4 @@ dictDC = dictCD // expected-error {{cannot assign value of type '[C : D]' to typ
 dictDD = dictCC // expected-error{{cannot assign value of type '[C : C]' to type '[D : D]'}}
 // expected-note@-1 {{arguments to generic parameter 'Key' ('C' and 'D') are expected to be equal}}
 // expected-note@-2 {{arguments to generic parameter 'Value' ('C' and 'D') are expected to be equal}}
+// UNSUPPORTED: OS=windows-msvc

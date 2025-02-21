@@ -55,3 +55,4 @@ let ct1ref1 : @convention(c, cType: "void (*)(void)") = ct1 // expected-error{{e
 let ct1ref2 : @convention(c, ) () -> () = ct1 // expected-error{{expected 'cType' label in 'convention' attribute}}
 let ct1ref3 : @convention(c, cType) () -> () = ct1 // expected-error{{expected ':' after 'cType' for 'convention' attribute}}
 let ct1ref4 : @convention(c, cType: ) () -> () = ct1 // expected-error{{expected string literal containing clang type for 'cType' in 'convention' attribute}}
+// UNSUPPORTED: OS=windows-msvc

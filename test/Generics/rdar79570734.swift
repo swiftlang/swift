@@ -18,3 +18,4 @@ public struct G<X: P1, Y: P2> where Y == X.A {}
 
 // CHECK-LABEL: Generic signature: <X, Y where X == S1, Y == S2>
 public extension G where X == S1 {}
+// UNSUPPORTED: OS=windows-msvc

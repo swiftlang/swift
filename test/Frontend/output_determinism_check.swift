@@ -39,3 +39,4 @@
 
 public var x = 1
 public func test() {}
+// UNSUPPORTED: OS=windows-msvc

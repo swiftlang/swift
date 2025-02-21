@@ -82,3 +82,4 @@ protocol P2 {
   associatedtype AT
 }
 protocol P3: P2 where AT == Y<X> {}
+// UNSUPPORTED: OS=windows-msvc

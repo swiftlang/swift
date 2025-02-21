@@ -95,3 +95,4 @@ extension Crap {}
 // CHECK-DESCRIPTIVE-NEXT:  |
 // CHECK-DESCRIPTIVE-NEXT: Nominal Types
 // CHECK-DESCRIPTIVE-NEXT: -------------
+// UNSUPPORTED: OS=windows-msvc

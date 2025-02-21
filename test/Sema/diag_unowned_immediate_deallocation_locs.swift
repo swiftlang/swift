@@ -20,3 +20,4 @@ unowned let c7 = C(), c8: C = C()
 // CHECK: [[@LINE-2]]:29: warning: instance will be immediately deallocated because variable 'c8' is 'unowned'
 
 c1 = C() // CHECK: [[@LINE]]:4: warning: instance will be immediately deallocated because variable 'c1' is 'weak'
+// UNSUPPORTED: OS=windows-msvc

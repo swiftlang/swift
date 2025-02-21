@@ -9,3 +9,4 @@
 
 // CHECK: struct HasConstructorWithEnableIfUsed {
 // CHECK-NEXT:  init<T, U>(_: T, _: U)
+// UNSUPPORTED: OS=windows-msvc

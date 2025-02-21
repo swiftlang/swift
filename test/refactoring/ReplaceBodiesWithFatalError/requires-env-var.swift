@@ -14,3 +14,4 @@ var bar: Int {
 // RUN: %refactor -actions -source-filename %s -pos=1:1 -end-pos=3:2 | %FileCheck %s -check-prefix CHECK-NO-ENV
 
 // RUN: env SWIFT_ENABLE_INTERNAL_REFACTORING_ACTIONS=1 %refactor -actions -source-filename %s -pos=1:1 -end-pos=3:2 | %FileCheck %s -check-prefix CHECK-ENV
+// UNSUPPORTED: OS=windows-msvc

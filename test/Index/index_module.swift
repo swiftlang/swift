@@ -39,3 +39,4 @@ public typealias GenericTypealias<T> = Optional<T>
 // CHECK-NOT: constructor/Swift
 
 // CHECK: 0:0 | type-alias/Swift | GenericTypealias | [[TYPEALIAS_USR]] | Def | rel: 0
+// UNSUPPORTED: OS=windows-msvc

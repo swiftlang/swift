@@ -64,3 +64,4 @@ struct MoveOnlyStruct: ~Copyable {
     foo()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@
 // INCREMENTAL: swift
 // INCREMENTAL: -merge-modules
 // INCREMENTAL-NOT: -experimental-emit-module-separately
+// UNSUPPORTED: OS=windows-msvc

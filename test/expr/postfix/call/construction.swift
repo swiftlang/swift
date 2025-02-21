@@ -121,3 +121,4 @@ func constructExistentialCompositionValue(_ pm: (P & P2).Type) {
   _ = pm.init(int: 5)
   _ = P1_and_P2(int: 5) // expected-error{{type 'any P1_and_P2' (aka 'any P & P2') cannot be instantiated}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -31,3 +31,4 @@ macro ConformanceViaExtension() = #externalMacro(module: "MacroDefinition", type
 
 @ConformanceViaExtension
 class Parent {}
+// UNSUPPORTED: OS=windows-msvc

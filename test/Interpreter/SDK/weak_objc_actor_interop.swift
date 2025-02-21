@@ -33,3 +33,4 @@ if #available(SwiftStdlib 5.1, *) {
   // CHECK-NEXT:  after giving up strong reference:
   // CHECK-NEXT:  Gone
 }
+// UNSUPPORTED: OS=windows-msvc

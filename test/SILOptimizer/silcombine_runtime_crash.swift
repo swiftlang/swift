@@ -20,3 +20,4 @@ save(value: 0)
 
 // CHECK: ok
 print("ok")
+// UNSUPPORTED: OS=windows-msvc

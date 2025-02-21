@@ -83,3 +83,4 @@ func testEditorPlaceHolder() {
 }
 // LITERAL10-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .utf16[#String.UTF16View#]; name=utf16
 // LITERAL10-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: .utf8[#String.UTF8View#]; name=utf8
+// UNSUPPORTED: OS=windows-msvc

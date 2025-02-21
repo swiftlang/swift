@@ -36,3 +36,4 @@ func ios_extension_call_ios_extension() {
 func ios_extension_call_ios() {
     ios() // expected-error {{'ios()' is unavailable}}
 }
+// UNSUPPORTED: OS=windows-msvc

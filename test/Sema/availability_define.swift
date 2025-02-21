@@ -118,3 +118,4 @@ public func forbidMacrosInInlinableCode2() {
     if #available(_iOS54Aligned, *) { } // expected-error {{availability macro cannot be used in a '@backDeployed' function}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ bb1(%4 : @owned $Builtin.NativeObject, %5 : @unowned $Builtin.NativeObject, %6 :
   %9999 = tuple()
   return %9999 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

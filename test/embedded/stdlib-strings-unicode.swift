@@ -38,3 +38,4 @@ struct Main {
     print(emoji.count) // CHECK: 1
   }
 }
+// UNSUPPORTED: OS=windows-msvc

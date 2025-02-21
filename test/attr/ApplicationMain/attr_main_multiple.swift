@@ -17,3 +17,4 @@ class MyMain3 {
   static func main() {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

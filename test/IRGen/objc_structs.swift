@@ -63,3 +63,4 @@ func convertRectFromBase(_ v: NSView, r: NSRect) -> NSRect {
 func useStructOfNSStrings(_ s: StructOfNSStrings) -> StructOfNSStrings {
   return useStructOfNSStringsInObjC(s)
 }
+// UNSUPPORTED: OS=windows-msvc

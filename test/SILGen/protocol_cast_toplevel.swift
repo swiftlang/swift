@@ -6,3 +6,4 @@
 
 let c = C()
 let unrelated = c as! Unrelated
+// UNSUPPORTED: OS=windows-msvc

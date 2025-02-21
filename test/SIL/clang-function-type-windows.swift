@@ -9,3 +9,4 @@ public func f(g: @convention(c, cType: "void (*)(size_t)") (Int) -> ()) { g(0) }
 // CHECK: sil @$s4main1f1gyySiXzC9_ZTSPFvyE_tF : $@convention(thin) (@convention(c, cType: "void (*)(unsigned long long)") (Int) -> ()) -> () {
 // CHECK: bb0(%0 : $@convention(c, cType: "void (*)(unsigned long long)") (Int) -> ()):
 // CHECK:   debug_value %0 : $@convention(c, cType: "void (*)(unsigned long long)") (Int) -> (), let, name "g", argno 1 // id: %1
+// UNSUPPORTED: OS=windows-msvc

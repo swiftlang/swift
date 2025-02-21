@@ -21,3 +21,4 @@ add(3, 4)
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 // CHECK-NEXT: {{.*}} __builtin_log[='7']
 
+// UNSUPPORTED: OS=windows-msvc

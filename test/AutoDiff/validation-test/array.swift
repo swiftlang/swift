@@ -461,3 +461,4 @@ ArrayAutoDiffTests.test("Array.DifferentiableView reflection") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -576,3 +576,4 @@ func h(_ z1: Copy,
        // expected-explicit-any-warning@-1 {{use of 'Copy' (aka 'Copyable') as a type must be written 'any Copy' (aka 'any Copyable'); this will be an error in a future Swift language mode}}
        _ z2: Copyable) {}
        // expected-explicit-any-warning@-1 {{use of protocol 'Copyable' as a type must be written 'any Copyable'; this will be an error in a future Swift language mode}}
+// UNSUPPORTED: OS=windows-msvc

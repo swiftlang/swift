@@ -285,3 +285,4 @@ bb0(%0 : $B, %1: $B):
   %5 = tuple()
   return %5 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -3,3 +3,4 @@
 // REQUIRES: OS=windows
 
 // CHECK: -plugin-path {{[^ ]+}}\bin
+// UNSUPPORTED: OS=windows-msvc

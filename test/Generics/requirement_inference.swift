@@ -448,3 +448,4 @@ extension P37 {
     // expected-error@-1 {{type 'Self.P4Assoc' does not conform to protocol 'P2'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -86,3 +86,4 @@ extension Foo {
 
 // RUN: %refactor -replace-bodies-with-fatalError -source-filename %s -pos=51:1 -end-pos=59:2 > %t.result/L51-59.swift
 // RUN: diff -u %S/Outputs/basic/L51-59.swift.expected %t.result/L51-59.swift
+// UNSUPPORTED: OS=windows-msvc

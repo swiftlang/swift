@@ -62,3 +62,4 @@ public func testExecutionConcurrent() async {}
 @execution(caller)
 public func testExecutionCaller() async {}
 // CHECK: @execution(caller) public func testExecutionCaller() async
+// UNSUPPORTED: OS=windows-msvc

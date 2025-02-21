@@ -56,3 +56,4 @@ public var irm: Int {
 // CHECK-OLD:       }
 } // public var irm
 }
+// UNSUPPORTED: OS=windows-msvc

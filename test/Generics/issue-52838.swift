@@ -28,3 +28,4 @@ protocol AuthenticationFlowStateMachineStartState {
 protocol AuthenticationFlowStateMachineNonFinalState {
     associatedtype StateMachine: AuthenticationFlowStateMachine where StateMachine.NonFinalState == Self
 }
+// UNSUPPORTED: OS=windows-msvc

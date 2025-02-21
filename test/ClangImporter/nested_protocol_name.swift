@@ -41,3 +41,4 @@ class NormalBranch: Branch { // expected-error {{cannot find type 'Branch' in sc
 class WeakBranch: TrunkBranchProtocol { // expected-error {{'TrunkBranchProtocol' has been renamed to 'Trunk.Branch'}}
   func flower() {}
 }
+// UNSUPPORTED: OS=windows-msvc

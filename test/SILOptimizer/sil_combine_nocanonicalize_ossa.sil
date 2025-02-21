@@ -103,3 +103,4 @@ bb1:
   return %c : $Optional<Builtin.NativeObject>
 }
 
+// UNSUPPORTED: OS=windows-msvc

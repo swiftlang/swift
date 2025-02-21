@@ -62,3 +62,4 @@ class ClassWithExcludedVarMembers : Codable {
         case p1, p2
     }
 }
+// UNSUPPORTED: OS=windows-msvc

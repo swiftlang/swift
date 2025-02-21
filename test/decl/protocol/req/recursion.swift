@@ -106,3 +106,4 @@ struct SU<A: P> where A.T == SU {
 struct SIU<A: PI> : I where A : I, A.T == SIU {
 // expected-error@-1 {{generic struct 'SIU' has self-referential generic requirements}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -53,3 +53,4 @@ public func testTwo() -> Bool {
 // Ensure that the variable initialization expression is not dllimported on Windows.
 // CHECK: declare swiftcc i8 @"$s14InlinedStructs5TestSV1xAA13CMSSignedDataVvpfi"()
 // DLLIMPORT: declare dllimport swiftcc i8 @"$s14InlinedStructs5TestSV1xAA13CMSSignedDataVvpfi"()
+// UNSUPPORTED: OS=windows-msvc

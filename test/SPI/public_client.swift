@@ -45,3 +45,4 @@ func inlinable() -> SPIClass { // expected-error {{cannot find type 'SPIClass' i
   spiFunc() // expected-error {{cannot find 'spiFunc' in scope}}
   _ = SPIClass() // expected-error {{cannot find 'SPIClass' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -180,3 +180,4 @@ dynamic var x4: some P {
     return ConcreteP()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

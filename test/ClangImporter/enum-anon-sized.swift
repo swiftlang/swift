@@ -37,3 +37,4 @@ public func testIR(x: UnsafePointer<Struct>) -> CInt {
   return x.pointee.lastField
 } // CHECK-NEXT: {{^}$}}
 
+// UNSUPPORTED: OS=windows-msvc

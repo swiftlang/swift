@@ -8,3 +8,4 @@
 // CHECK-SAME:           dwoId:
 
 public let p = Point(x: 1, y: 2)
+// UNSUPPORTED: OS=windows-msvc

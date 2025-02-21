@@ -57,3 +57,4 @@ extension Conditional {
         // expected-note@-2 {{use 'name_lookup_min_max_conditional_conformance.' to reference the global function in module 'name_lookup_min_max_conditional_conformance'}} {{13-13=name_lookup_min_max_conditional_conformance.}}
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -45,3 +45,4 @@ func bar() {}
 @#^POUND_ELIF_GBLATTR^#
 func bar() {}
 #endif
+// UNSUPPORTED: OS=windows-msvc

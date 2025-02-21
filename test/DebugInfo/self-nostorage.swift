@@ -8,3 +8,4 @@ public struct S {
     // CHECK: ![[SELF]] = !DILocalVariable(name: "self", arg: 1,
   }
 }
+// UNSUPPORTED: OS=windows-msvc

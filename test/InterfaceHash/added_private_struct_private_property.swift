@@ -50,3 +50,4 @@ struct S {
 // CHECK-DIFFERENT-TYPE-FINGERPRINT-DAG: -potentialMember interface      4main1S{{[^ ]+}} '' true
 // CHECK-DIFFERENT-TYPE-FINGERPRINT-DAG: +potentialMember implementation 4main1S{{[^ ]+}} '' true
 // CHECK-DIFFERENT-TYPE-FINGERPRINT-DAG: +potentialMember interface      4main1S{{[^ ]+}} '' true
+// UNSUPPORTED: OS=windows-msvc

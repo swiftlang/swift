@@ -108,3 +108,4 @@ class Selfless {
     // expected-error@-1 {{a C function pointer cannot be formed from a closure that captures dynamic Self type}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

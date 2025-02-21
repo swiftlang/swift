@@ -81,3 +81,4 @@ internal import B
 //--- B.swift
 public func b() {}
 
+// UNSUPPORTED: OS=windows-msvc

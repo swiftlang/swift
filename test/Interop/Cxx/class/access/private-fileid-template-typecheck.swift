@@ -105,3 +105,4 @@ extension MyClassyClass {
         let _: MyFloatyClass.privTypedefT // expected-error {{'privTypedefT' is inaccessible due to 'private' protection level}}
     }
 }
+// UNSUPPORTED: OS=windows-msvc

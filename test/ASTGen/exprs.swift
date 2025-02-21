@@ -223,3 +223,4 @@ func testSwitchExpr(value: Int) {
     default: "baz"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@
 // CHECK-NEXT:   public init()
 // CHECK-NEXT:   private var smart_ptr: std.
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

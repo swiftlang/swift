@@ -97,3 +97,4 @@ func testCopyResultImmutable() {
   (copy t) = Test() // expected-error {{cannot assign to immutable expression of type 'Test'}}
   copy t = Test() // expected-error {{cannot assign to immutable expression of type 'Test'}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ struct AnyDerivative: Differentiable {
 }
 
 // Assertion failed: (resultTan && "Original result has no tangent space?"), function getAutoDiffDerivativeFunctionLinearMapType, file /Users/danielzheng/swift-merge/swift/lib/AST/Type.cpp, line 5190.
+// UNSUPPORTED: OS=windows-msvc

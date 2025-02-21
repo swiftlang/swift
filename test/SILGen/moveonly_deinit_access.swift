@@ -28,3 +28,4 @@ func deinitAccessConsumeTest(_ x: inout FD) {
     x = FD()
 }
 
+// UNSUPPORTED: OS=windows-msvc

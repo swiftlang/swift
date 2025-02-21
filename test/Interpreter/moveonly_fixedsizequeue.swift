@@ -85,3 +85,4 @@ func main() throws {
 }
 
 try main()
+// UNSUPPORTED: OS=windows-msvc

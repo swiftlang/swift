@@ -73,3 +73,4 @@ func foo() { }
 
 // RUN: %swiftc_driver -target x86_64-apple-ios13.1-macabi -target-variant x86_64-apple-macosx10.15 -emit-library -module-name foo %s -o %t.reversed.dylib
 // RUN: %otool-classic -l %t.reversed.dylib | %FileCheck %s --check-prefix=CHECK-ZIPPERED
+// UNSUPPORTED: OS=windows-msvc

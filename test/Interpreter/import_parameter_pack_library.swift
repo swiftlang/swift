@@ -50,3 +50,4 @@ ImportParameterPackTests.test("multi-input") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ func callFunction() {
 }
 
 // CHECK-NOT: {{(5|")Hello}}
+// UNSUPPORTED: OS=windows-msvc

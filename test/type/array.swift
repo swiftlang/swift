@@ -134,3 +134,4 @@ _ = [TupleWith<String>.And<Int>](repeating: ("", 0), count: 0)
 _ = [TupleWith.And<Int>](repeating: ("", 0), count: 0)
 _ = [TupleWith<String>.And](repeating: ("", 0), count: 0)
 _ = [TupleWith.And](repeating: ("", 0), count: 0)
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ extension Crap {}
 // OVERRIDE-NEXT:   "{{[/\\]+}}educational{{[/\\]+}}notes{{[/\\]+}}path{{[/\\]+}}prefix{{[/\\]+}}nominal-types.md"
 // OVERRIDE-NEXT: ]
 
+// UNSUPPORTED: OS=windows-msvc

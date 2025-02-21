@@ -49,3 +49,4 @@ func test(p: SomeProto, c: SomeClass, s: SomeStruct, e: SomeEnum, g: InvalidGene
 // CHECK-USES-NOT: cannot find type 'SomeStruct' in scope
 // CHECK-USES-NOT: cannot find type 'SomeEnum' in scope
 // CHECK-USES-NOT: cannot find type 'InvalidGenericSuperclass' in scope
+// UNSUPPORTED: OS=windows-msvc

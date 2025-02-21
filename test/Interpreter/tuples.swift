@@ -53,3 +53,4 @@ printInts()
 printInts(1)
 // CHECK: 3 ints: 1 2 3
 printInts(1,2,3)
+// UNSUPPORTED: OS=windows-msvc

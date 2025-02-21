@@ -182,3 +182,4 @@ bb0(%0 : $Builtin.RawPointer):
   %r = tuple ()
   return %r : $()
 }
+// UNSUPPORTED: OS=windows-msvc

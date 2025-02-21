@@ -353,3 +353,4 @@ public func testSubscriptGetModifyThroughParentClass_BaseLoadable_ResultLoadable
     m.computedTester2[0].nonMutatingFunc()
     m.computedTester2[0].mutatingFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

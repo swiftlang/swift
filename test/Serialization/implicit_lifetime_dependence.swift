@@ -69,3 +69,4 @@ func testReadMutateAccessors() {
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence15borrowAndCreateyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> @lifetime(copy 0) @owned BufferView
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence9ContainerV4viewAA10BufferViewVvg : $@convention(method) (@guaranteed Container) -> @lifetime(borrow 0) @owned BufferView
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence7WrapperV4viewAA10BufferViewVvr : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed BufferView
+// UNSUPPORTED: OS=windows-msvc

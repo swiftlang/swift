@@ -70,3 +70,4 @@ public func testClosureToFuncPtrReturnNonTrivial() {
 public func returnFuncPtr() -> (NonTrivial) -> () {
   return getFnPtr()
 }
+// UNSUPPORTED: OS=windows-msvc

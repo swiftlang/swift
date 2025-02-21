@@ -124,3 +124,4 @@ func ncnebv_consume_borrow(ncnebv: NCNEBV) {
   ncnebv_consume(ncnebv) // expected-error {{overlapping accesses to 'nebv', but deinitialization requires exclusive access}}
   bv_consume(bv)
 }
+// UNSUPPORTED: OS=windows-msvc

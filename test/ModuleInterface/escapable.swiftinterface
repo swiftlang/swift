@@ -11,3 +11,4 @@ import _SwiftConcurrencyShims
 
 public struct S : Swift.Escapable {
 }
+// UNSUPPORTED: OS=windows-msvc

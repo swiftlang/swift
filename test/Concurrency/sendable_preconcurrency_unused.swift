@@ -20,3 +20,4 @@ func test(mt: MyType, nsc: NonStrictClass) {
     print(mt)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

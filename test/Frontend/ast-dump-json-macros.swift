@@ -52,3 +52,4 @@ struct ThisWillBePeered {}
 // CHECK-SAME: "_kind":"struct_decl",
 // CHECK-SAME: "usr":"s:4main20FixedNameFreestanderV",
 // CHECK-SAME: "buffer_id":"@__swiftmacro_4main0033astdumpjsonmacrosswift_GwAFheaeGafMX{{[0-9]+}}_{{[0-9]+}}_33_{{[0-9A-F]+}}Ll18injectFreestandingfMf_.swift"
+// UNSUPPORTED: OS=windows-msvc

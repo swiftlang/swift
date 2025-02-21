@@ -98,3 +98,4 @@ func test() async throws {
   try await ref.test2(S(data: SomeClass<Int>()))
   try await ref.test3(.init())
 }
+// UNSUPPORTED: OS=windows-msvc

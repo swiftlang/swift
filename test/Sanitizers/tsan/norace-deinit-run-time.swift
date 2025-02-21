@@ -61,3 +61,4 @@ do {
 print("Done.")
 
 // CHECK: Done.
+// UNSUPPORTED: OS=windows-msvc

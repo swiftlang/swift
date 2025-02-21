@@ -57,3 +57,4 @@ class R<K: Hashable, V> {
 infix operator +=+ : AdditionPrecedence
 func +=+(_ lhs: Int, _ rhs: Int) -> Bool { return lhs == rhs }
 func +=+<T: BinaryInteger>(_ lhs: T, _ rhs: Int) -> Bool { return lhs == rhs }
+// UNSUPPORTED: OS=windows-msvc

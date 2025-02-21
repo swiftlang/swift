@@ -20,3 +20,4 @@ _ = c.index(c.startIndex, offsetBy: i64) // expected-warning {{'index(_:offsetBy
 
 let _: Int64 = c.distance(from: c.startIndex, to: c.endIndex) // expected-warning {{distance(from:to:)' is deprecated: all index distances are now of type Int [DeprecatedDeclaration]}}
 
+// UNSUPPORTED: OS=windows-msvc

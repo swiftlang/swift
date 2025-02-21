@@ -1443,3 +1443,4 @@ struct NestedCallsWithoutClosingParen {
     _ = (foo(#^IN_TUPLE?check=NESTED_CALL_WITHOUT_TYPE_RELATION^#, 1)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

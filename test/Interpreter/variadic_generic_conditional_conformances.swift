@@ -79,3 +79,4 @@ conformances.test("shape") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

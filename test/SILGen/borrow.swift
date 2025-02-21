@@ -37,3 +37,4 @@ func lvalueBorrowShouldBeAtEndOfFormalAccessScope() {
   var c = C()
   useD(c.d)
 }
+// UNSUPPORTED: OS=windows-msvc

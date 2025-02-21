@@ -106,3 +106,4 @@ int main() {
   // CHECK-NEXT: EOF
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

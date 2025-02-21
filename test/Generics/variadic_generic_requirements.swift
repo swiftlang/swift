@@ -35,3 +35,4 @@ _ = Outer<Array<Int>>.Inner<Set<Int>, Set<String>>.self  // expected-error {{'Ou
 
 _ = Outer<Array<Int>, Array<String>>.InnerShape<Set<String>, Set<Int>>.self  // ok
 _ = Outer<Array<Int>>.InnerShape<Set<Int>, Set<String>>.self  // expected-error {{'Outer<Array<Int>>.InnerShape' requires the type packs 'Array<Int>' and 'Set<Int>, Set<String>' have the same shape}}
+// UNSUPPORTED: OS=windows-msvc

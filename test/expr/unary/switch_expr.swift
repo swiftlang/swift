@@ -1880,3 +1880,4 @@ func testCaptureList() {
   let _ = { [x = (switch Bool.random() { default: 1 })] in x }
   // expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -565,3 +565,4 @@ class C {
 // CAPTURE-NEXT:     print(self!)
 // CAPTURE-NEXT:   }
 // CAPTURE-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

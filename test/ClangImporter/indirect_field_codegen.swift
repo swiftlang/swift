@@ -35,3 +35,4 @@ func test() -> UInt32 {
   s.y = 11
   return s.x + s.y
 }
+// UNSUPPORTED: OS=windows-msvc

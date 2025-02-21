@@ -168,3 +168,4 @@ public func subscript9() {
   s[] += 1
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

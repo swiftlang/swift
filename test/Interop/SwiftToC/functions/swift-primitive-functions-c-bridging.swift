@@ -90,3 +90,4 @@ public func passThroughUnsafeRawPointer(_ x: UnsafeRawPointer) -> UnsafeRawPoint
 public func passThroughUnsafeMutableRawPointer(_ x: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer { return x }
 
 public func roundTwoPassThroughUnsafeMutableRawPointer(_ x: UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer? { return x }
+// UNSUPPORTED: OS=windows-msvc

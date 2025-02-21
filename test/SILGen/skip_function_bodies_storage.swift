@@ -48,3 +48,4 @@ func testAutoclosureInLazyVar(_ y: Int?) {
   struct R {}
   lazy var x = y ?? 0
 }
+// UNSUPPORTED: OS=windows-msvc

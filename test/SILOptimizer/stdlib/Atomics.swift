@@ -111,3 +111,4 @@ func testNonescapingClosure() {
   testInt(foo.load(ordering: .relaxed)) // OK
   testInt(bar.load(ordering: .relaxed)) // OK
 }
+// UNSUPPORTED: OS=windows-msvc

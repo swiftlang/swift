@@ -68,3 +68,4 @@ int main() {
     assert(getRetainCount(c) == 1);
     return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

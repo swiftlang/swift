@@ -8,3 +8,4 @@ for i in 0 ..< 3 {
   // CHECK-SAME:                           ![[I:[0-9]+]],
   // CHECK: ![[I]] = !DILocalVariable(name: "i",
 }
+// UNSUPPORTED: OS=windows-msvc

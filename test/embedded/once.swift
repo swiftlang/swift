@@ -34,3 +34,4 @@ struct Main {
     // CHECK: MyStruct.foo
   }
 }
+// UNSUPPORTED: OS=windows-msvc

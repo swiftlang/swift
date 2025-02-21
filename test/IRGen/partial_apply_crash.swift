@@ -29,3 +29,4 @@ public func testit<Element: Equatable>(_ x: Outer<Inner<Element>>) {
   foo(x, ==)
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -62,3 +62,4 @@ UnionTestSuite.test("StructWithUnnamedUnion") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

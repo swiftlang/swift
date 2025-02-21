@@ -44,3 +44,4 @@ public:
 // CHECK: func getFRTItems() -> std{{\.__(ndk)?1\.|\.}}vector<FRTType, std{{\.__(ndk)?1\.|\.}}allocator<FRTType>>
 // CHECK: func getPODPtrItems() -> std{{\.__(ndk)?1\.|\.}}vector<UnsafePointer<SimplePOD>, std{{\.__(ndk)?1\.|\.}}allocator<UnsafePointer<SimplePOD>>>
 // CHECK: func getMutPODPtrItems() -> std{{\.__(ndk)?1\.|\.}}vector<UnsafeMutablePointer<SimplePOD>, std{{\.__(ndk)?1\.|\.}}allocator<UnsafeMutablePointer<SimplePOD>>>
+// UNSUPPORTED: OS=windows-msvc

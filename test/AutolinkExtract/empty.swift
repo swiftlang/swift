@@ -6,3 +6,4 @@
 // CHECK-elf: -lswiftCore
 // CHECK-coff: -lswiftCore
 // CHECK-wasm: -lswiftCore
+// UNSUPPORTED: OS=windows-msvc

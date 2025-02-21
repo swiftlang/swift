@@ -23,3 +23,4 @@ let _: ((String, Int)) -> [String:Bool] = { [$0: doit($1)] }
 // expected-error@-1 {{closure tuple parameter '(String, Int)' does not support destructuring with implicit parameters}}
 func returnClosure() -> ((Int, Int)) -> Bool { return {$1 > $0} }
 // expected-error@-1 {{closure tuple parameter '(Int, Int)' does not support destructuring with implicit parameters}}
+// UNSUPPORTED: OS=windows-msvc

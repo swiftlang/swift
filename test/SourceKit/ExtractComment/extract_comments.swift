@@ -26,3 +26,4 @@
 // RUN: %diff -u %s.CommentIndent2.response %t.CommentIndent2.response
 
 // RUN: %sourcekitd-test -req=extract-comment -pass-as-sourcetext %S/Inputs/NotComment1.swift
+// UNSUPPORTED: OS=windows-msvc

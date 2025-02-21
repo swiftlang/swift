@@ -31,3 +31,4 @@ class Sub: Super {
   nonisolated override func g2(_: NotSendable) async { }
   // expected-warning@-1{{non-sendable parameter type 'NotSendable' cannot be sent from caller of superclass instance method 'g2' into nonisolated override}}
 }
+// UNSUPPORTED: OS=windows-msvc

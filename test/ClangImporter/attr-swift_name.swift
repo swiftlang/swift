@@ -42,3 +42,4 @@ func test(_ i: Int) {
   // CHECK-NOT: {{warning|note}}:
   // CHECK: SWIFT_NAME(MutuallyCircularNameB.Inner) @interface MutuallyCircularNameA : NSObject @end
 }
+// UNSUPPORTED: OS=windows-msvc

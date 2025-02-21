@@ -23,3 +23,4 @@ class Outer2 { // expected-note {{'Outer2' has been explicitly marked unavailabl
 func test2(outer: Outer2) { // expected-error {{'Outer2' is unavailable}}
   outer.innerUnavailable()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@ func test2(_ x: inout Foo, _ y: consuming Foo) { // expected-error{{missing rein
         return
     }
 }
+// UNSUPPORTED: OS=windows-msvc

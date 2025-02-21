@@ -39,3 +39,4 @@
 // of this file. This file is dedicated for assert only symbols.
 
 // RegexBuilder Symbols
+// UNSUPPORTED: OS=windows-msvc

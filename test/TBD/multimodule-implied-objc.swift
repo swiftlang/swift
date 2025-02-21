@@ -56,3 +56,4 @@ public enum extendedAPI {}
 extension extendedAPI {
     public class Square : SwiftDependency.Rectangle {}
 }
+// UNSUPPORTED: OS=windows-msvc

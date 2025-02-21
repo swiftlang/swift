@@ -18,3 +18,4 @@
 // CHECK-SAME: -o {{.*[\\/]}}file-[[B1]]-{{[a-z0-9]+}}.swiftmodule{{"?}} -o {{.*[\\/]}}file-[[B2]]-{{[a-z0-9]+}}.swiftmodule{{"?}} -o {{.*[\\/]}}file-[[B3]]-{{[a-z0-9]+}}.swiftmodule{{"?}}
 // CHECK: {{.*[\\/]}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} {{.*}}-primary-file {{[^ ]*[\\/]}}file-[[C1:[0-9]+]].swift{{"?}} {{.*}}-primary-file {{[^ ]*[\\/]}}file-[[C2:[0-9]+]].swift{{"?}} {{.*}}-primary-file {{[^ ]*[\\/]}}file-[[C3:[0-9]+]].swift{{"?}}
 // CHECK-SAME: -o {{.*[\\/]}}file-[[C1]]-{{[a-z0-9]+}}.swiftmodule{{"?}} -o {{.*[\\/]}}file-[[C2]]-{{[a-z0-9]+}}.swiftmodule{{"?}} -o {{.*[\\/]}}file-[[C3]]-{{[a-z0-9]+}}.swiftmodule{{"?}}
+// UNSUPPORTED: OS=windows-msvc

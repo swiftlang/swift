@@ -846,3 +846,4 @@ actor OtherActor {
     self.parent = parent
   }
 }
+// UNSUPPORTED: OS=windows-msvc

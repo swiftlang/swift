@@ -306,3 +306,4 @@ simpleTestVar6a(false)
 simpleTestVar6a(true)
 simpleTestVar6b(false)
 simpleTestVar6b(true)
+// UNSUPPORTED: OS=windows-msvc

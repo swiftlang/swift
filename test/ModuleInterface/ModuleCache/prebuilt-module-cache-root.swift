@@ -26,3 +26,4 @@ let _: X = Lib.testValue
 // FROM-INTERFACE: [[@LINE-2]]:16: error: cannot convert value of type 'FromInterface' to specified type 'X'
 // FROM-PREBUILT: [[@LINE-3]]:16: error: cannot convert value of type 'FromPrebuilt' to specified type 'X'
 
+// UNSUPPORTED: OS=windows-msvc

@@ -51,3 +51,4 @@ class ClassError : NSError {
 printDynamicTypeAndAddressForExistential(ClassError() as Error)
 
 stopRemoteAST()
+// UNSUPPORTED: OS=windows-msvc

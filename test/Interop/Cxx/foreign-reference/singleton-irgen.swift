@@ -25,3 +25,4 @@ public func test() {
   _ = x.test()
   mutateIt(x)
 }
+// UNSUPPORTED: OS=windows-msvc

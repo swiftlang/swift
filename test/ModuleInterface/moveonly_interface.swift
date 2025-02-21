@@ -31,3 +31,4 @@ public class FileHandle {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

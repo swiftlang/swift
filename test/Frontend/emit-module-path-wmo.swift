@@ -9,3 +9,4 @@
 // RUN: %target-swift-frontend -emit-module -module-name foo -emit-module-path %t/bar.swiftmodule -whole-module-optimization %s
 // RUN: test -f %t/bar.swiftmodule
 // RUN: not test -f %t/foo.swiftmodule
+// UNSUPPORTED: OS=windows-msvc

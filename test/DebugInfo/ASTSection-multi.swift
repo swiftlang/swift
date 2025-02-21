@@ -50,3 +50,4 @@
 // CHECK-DAG: Import successful!
 // CHECK-DAG: Importing a3...
 
+// UNSUPPORTED: OS=windows-msvc

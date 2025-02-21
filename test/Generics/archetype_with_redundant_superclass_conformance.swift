@@ -33,3 +33,4 @@ func takesPWithC<T : P, U>(_ t: T) -> U where T.T : C<U> {
   return u
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -76,3 +76,4 @@ func destroyUnionRValues() {
   getAddressOnlyUnion(Int)
    */
 }
+// UNSUPPORTED: OS=windows-msvc

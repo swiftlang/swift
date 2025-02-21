@@ -99,3 +99,4 @@ callThroughToOverload(arg: RefinedProtocolAdopter2())
 // CHECK: Assoc := Array<RefinedProtocolAdopter3>, Bssoc := RefinedProtocolAdopter3
 callThroughToOverload(arg: RefinedProtocolAdopter3())
 
+// UNSUPPORTED: OS=windows-msvc

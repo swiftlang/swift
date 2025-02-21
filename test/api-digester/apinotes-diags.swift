@@ -16,3 +16,4 @@
 // RUN: %clang -E -P -x c %S/Outputs/apinotes-diags-3-4.txt -o - | sed '/^\s*$/d' > %t.expected
 // RUN: %clang -E -P -x c %t.result -o - | sed '/^\s*$/d' > %t.result.tmp
 // RUN: diff -u %t.expected %t.result.tmp
+// UNSUPPORTED: OS=windows-msvc

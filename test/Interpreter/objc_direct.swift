@@ -46,3 +46,4 @@ print(Bar.directClassMethod2())
 
 print(bar.directProtocolMethod())
 // CHECK: called directProtocolMethod
+// UNSUPPORTED: OS=windows-msvc

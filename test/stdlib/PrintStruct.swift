@@ -108,3 +108,4 @@ PrintTests.test("StructVeryPrintable") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

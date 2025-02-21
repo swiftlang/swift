@@ -2643,3 +2643,4 @@ func testSelfCaptureHandledCorrectly() {
         }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

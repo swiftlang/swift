@@ -12,3 +12,4 @@
 
 // Make sure we don't try to output a result:
 // CHECK-NOT: "kind": "Root",
+// UNSUPPORTED: OS=windows-msvc

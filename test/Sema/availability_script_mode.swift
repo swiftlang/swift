@@ -32,3 +32,4 @@ var unavailableOnMacOSVar: UnavailableOnMacOS = .init()
 
 @available(*, unavailable) // expected-error {{global variable cannot be marked unavailable with '@available' in script mode}}
 var unconditionallyUnavailableVar: UnavailableUnconditionally = .init()
+// UNSUPPORTED: OS=windows-msvc

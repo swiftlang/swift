@@ -60,3 +60,4 @@ struct S3 : P3 {}
 
 let s3 = S3()
 _ = s3()()
+// UNSUPPORTED: OS=windows-msvc

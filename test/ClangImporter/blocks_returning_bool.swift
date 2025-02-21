@@ -16,3 +16,4 @@ import BlocksReturningBool
 func foo() -> Aggregate {
   return Aggregate(takePredicate: nil)
 }
+// UNSUPPORTED: OS=windows-msvc

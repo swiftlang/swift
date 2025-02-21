@@ -47,3 +47,4 @@ public struct ShadowyHorror {
 }
 
 public struct TestModule {}
+// UNSUPPORTED: OS=windows-msvc

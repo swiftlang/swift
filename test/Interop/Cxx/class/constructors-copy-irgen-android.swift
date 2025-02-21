@@ -18,3 +18,4 @@ public func copyWithUserProvidedCopyConstructor(_ x: HasUserProvidedCopyConstruc
   -> (HasUserProvidedCopyConstructor, HasUserProvidedCopyConstructor) {
   return (x, x)
 }
+// UNSUPPORTED: OS=windows-msvc

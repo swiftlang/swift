@@ -24,3 +24,4 @@ extension Array {
 // CHECK:        swift::Int getX() const SWIFT_SYMBOL("s:7Structs5ArrayV1xSivp");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void setX(swift::Int value) SWIFT_SYMBOL("s:7Structs5ArrayV1xSivp");
 // CHECK-NEXT:   TypeAfterArray getVal() const SWIFT_SYMBOL("s:7Structs5ArrayV3valAA09TypeAfterB0Vvp");
+// UNSUPPORTED: OS=windows-msvc

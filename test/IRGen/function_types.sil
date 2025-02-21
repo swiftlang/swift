@@ -64,3 +64,4 @@ entry(%x : $*X):
   return %z : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

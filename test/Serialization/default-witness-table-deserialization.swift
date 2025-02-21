@@ -10,3 +10,4 @@ public class MyType {
 public protocol MyProto {
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -4,3 +4,4 @@
 // REQUIRES: OS=ios
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=windows-msvc

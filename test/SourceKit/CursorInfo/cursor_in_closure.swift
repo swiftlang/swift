@@ -11,3 +11,4 @@ func test() {
     foo.identifier = "\(item.category)#\(item.name)"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

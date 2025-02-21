@@ -51,3 +51,4 @@ struct Main {
     // CHECK-NEXT: MyStructA.init done
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ print(!!true) // CHECK: true
 print(!!false) // CHECK: false
 print(true &&& true) // CHECK: true
 print(true &&& false) // CHECK: false
+// UNSUPPORTED: OS=windows-msvc

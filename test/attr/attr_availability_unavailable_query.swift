@@ -69,3 +69,4 @@ func log(format: String, _ args: Any...) { fatalError() } // expected-note {{'lo
 func testUnavailableRenamedFromVariadicDoesntAssert() {
   log(format: "") // expected-error{{'log(format:_:)' has been renamed to 'log(message:)'}}
 }
+// UNSUPPORTED: OS=windows-msvc

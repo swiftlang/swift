@@ -37,3 +37,4 @@
 // LLDB-NOT: -module-name
 // LLDB-NOT: -target{{ }}
 // LLDB: "
+// UNSUPPORTED: OS=windows-msvc

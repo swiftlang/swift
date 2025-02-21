@@ -51,3 +51,4 @@ class D : B {
     super.$0 // expected-error{{expected identifier or 'init'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

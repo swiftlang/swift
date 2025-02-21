@@ -31,3 +31,4 @@ public func test() {
 // CHECK-LABEL: sil{{ \[available .*\] | }}[clang MoveOnly.create] @{{_ZN8MoveOnly6createEv|\?create\@MoveOnly\@\@SAPEAU1\@XZ}} : $@convention(c) () -> MoveOnly
 
 // CHECK-LABEL: sil{{ \[available .*\] | }}[clang MoveOnly.test] @{{_ZNK8MoveOnly4testEv|\?test\@MoveOnly\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed MoveOnly) -> Int32
+// UNSUPPORTED: OS=windows-msvc

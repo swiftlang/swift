@@ -156,3 +156,4 @@ print("testNonOptionalNullString:")
 testNonOptionalNullString()
 // CHECK-NEXT: end
 print("end")
+// UNSUPPORTED: OS=windows-msvc

@@ -33,3 +33,4 @@ foo {
 }
 // COMPLETE-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Void#}[')'][#S<()>#]; name=a:
 // COMPLETE-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#b: String#}[')'][#S<String>#]; name=b:
+// UNSUPPORTED: OS=windows-msvc

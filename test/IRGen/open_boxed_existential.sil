@@ -19,3 +19,4 @@ entry(%b : $Error):
   // CHECK: ret [[INT]] [[RESULT]]
   return %c : $Int
 }
+// UNSUPPORTED: OS=windows-msvc

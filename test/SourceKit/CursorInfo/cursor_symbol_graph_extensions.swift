@@ -11,3 +11,4 @@ extension ResourceRecordType {
         }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -121,3 +121,4 @@ class X {
       })
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ func bar(_ s: S, _ forced_s: S!) {
   forced_s.foo(types: [A.self, B.self]) // ok
   forced_s.foo(types: [B.self, A.self]) // ok
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ public struct C<T, Content: Proto> {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

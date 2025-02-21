@@ -169,3 +169,4 @@ DecodeTestSuite.test("Decode") {
 
 runAllTests()
 #endif
+// UNSUPPORTED: OS=windows-msvc

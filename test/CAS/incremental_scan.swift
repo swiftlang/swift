@@ -16,3 +16,4 @@
 // INVALIDATE: Incremental module scan: Dependency info for module '{{.*}}' invalidated due to an out-of-date dependency.
 // REUSE: Incremental module scan: Serializing module scanning dependency cache to
 import E
+// UNSUPPORTED: OS=windows-msvc

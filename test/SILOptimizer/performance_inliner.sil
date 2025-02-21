@@ -989,3 +989,4 @@ entry(%executor: $Builtin.Executor):
   %r = tuple ()
   return %r : $()
 }
+// UNSUPPORTED: OS=windows-msvc

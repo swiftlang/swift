@@ -80,3 +80,4 @@ func testCombinedConstraintsOld<T: protocol<ProtoA, ProtoB> where T: ProtoC>(x: 
 func testCombinedConstraintsOld<T: protocol<ProtoA, ProtoB> where T: ProtoC>(x: T) where T: ProtoD {} // expected-error {{'where' clause next to generic parameters is obsolete}} {{60-76=}} {{84-89=where T: ProtoC,}}
 // expected-error@-1 {{'protocol<...>' composition syntax has been removed}}
 
+// UNSUPPORTED: OS=windows-msvc

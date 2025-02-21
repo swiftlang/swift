@@ -3,3 +3,4 @@
 
 // REQUIRES: OS=linux-gnu
 // REQUIRES: static_stdlib
+// UNSUPPORTED: OS=windows-msvc

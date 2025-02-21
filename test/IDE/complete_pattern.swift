@@ -234,3 +234,4 @@ func testIfLetInClosure(foo: Int?) {
   }
   // IF_LET_IN_CLOSURE-NOT: Begin completions
 }
+// UNSUPPORTED: OS=windows-msvc

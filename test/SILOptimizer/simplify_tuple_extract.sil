@@ -37,3 +37,4 @@ bb0(%0 : @guaranteed $String, %1 : @guaranteed $String):
   return %4 : $String
 }
 
+// UNSUPPORTED: OS=windows-msvc

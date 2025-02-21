@@ -6,3 +6,4 @@
 // RUN: %target-swift-ide-test -print-module -source-filename %s -I %t -module-to-print=foo_swift_module > %t.printed.txt
 // RUN: diff -u %S/Inputs/foo_swift_module.printed.comments.txt %t.printed.txt
 
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ public class Holder {
     get throws { "" } // expected-error {{getter cannot be '@_borrowed' if it is 'async' or 'throws'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

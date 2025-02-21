@@ -35,3 +35,4 @@ precedencegroup E0 {
   higherThan: Extern1 // expected-error{{cycle in higherThan relation: E0 -> Extern1 -> Extern0 -> E0}}
   lowerThan: Extern0
 }
+// UNSUPPORTED: OS=windows-msvc

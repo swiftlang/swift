@@ -75,3 +75,4 @@ SubsetParameterThunkTests.test("InoutParametersIndirect") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

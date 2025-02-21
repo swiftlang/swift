@@ -71,3 +71,4 @@
 // CHECK-APPKIT: func addLayoutConstraints(_: Set<NSLayoutConstraint>)
 // CHECK-APPKIT: func add(_: NSRect)
 // CHECK-APPKIT: class func conjureRect(_: NSRect)
+// UNSUPPORTED: OS=windows-msvc

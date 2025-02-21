@@ -69,3 +69,4 @@ func test_multiple_lo_indirectly_escalated() async {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

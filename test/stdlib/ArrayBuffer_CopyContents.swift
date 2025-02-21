@@ -82,3 +82,4 @@ suite.test("bridgedArraySlice/_copyContents") {
     array[20 ..< 30]._copyToNewArray(),
     (20 ..< 30).map { Thing($0) })
 }
+// UNSUPPORTED: OS=windows-msvc

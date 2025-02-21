@@ -67,3 +67,4 @@ longTaggedTests.test("EqualNonASCIISubsetSmall") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

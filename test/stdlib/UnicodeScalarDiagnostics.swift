@@ -32,3 +32,4 @@ func test_UnicodeScalarDoesNotImplementArithmetic(_ us: UnicodeScalar, i: Int) {
   let d4 = i / us // expected-error {{cannot convert value of type 'UnicodeScalar' (aka 'Unicode.Scalar') to expected argument type 'Int'}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

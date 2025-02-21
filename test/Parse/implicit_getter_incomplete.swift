@@ -16,3 +16,4 @@ func test2() { // expected-note {{match}}
     switch i { // expected-error {{cannot find 'i' in scope; did you mean 'a'}} expected-error{{'switch' statement body must have at least one 'case'}}
 }
 // expected-error@+1 2 {{expected '}'}}
+// UNSUPPORTED: OS=windows-msvc

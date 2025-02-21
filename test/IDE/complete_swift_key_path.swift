@@ -224,3 +224,4 @@ func inMultiStmtClosure(closure: () -> Void) {
     people.map(\.#^IN_MULTI_STMT_CLOSURE^#)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

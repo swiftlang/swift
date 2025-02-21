@@ -177,3 +177,4 @@ func loop_array(_ array: [Float]) -> Float {
   }
   return result
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@ bb0(%0 : $Int64, %1 : $Int64):
   dealloc_stack %4 : $*Empty, loc "sroa.swift":8:9, scope 1
   return %0 : $Int64, loc "sroa.swift":11:5, scope 1
 } // end sil function 'foo'
+// UNSUPPORTED: OS=windows-msvc

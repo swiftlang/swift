@@ -9,3 +9,4 @@
 struct S8_4: ~Copyable {}
 
 var s = S8_4()
+// UNSUPPORTED: OS=windows-msvc

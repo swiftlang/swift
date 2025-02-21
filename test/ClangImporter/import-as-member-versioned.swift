@@ -18,3 +18,4 @@ import ImportAsMemberSwiftVersioned
 public func callFoo() -> Any {
   return call_foo()
 }
+// UNSUPPORTED: OS=windows-msvc

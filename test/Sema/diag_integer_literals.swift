@@ -19,3 +19,4 @@ if 0?? {} // expected-error 2{{cannot use optional chaining on non-optional valu
 let _ = 0? as Int? // expected-error {{cannot use optional chaining on non-optional value of type 'Int'}}
 let _ = nil? as Int? // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
 let _ = ""? as String? // expected-error {{cannot use optional chaining on non-optional value of type 'String'}}
+// UNSUPPORTED: OS=windows-msvc

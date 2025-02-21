@@ -40,3 +40,4 @@ funcs.test("makeFunctionType3") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

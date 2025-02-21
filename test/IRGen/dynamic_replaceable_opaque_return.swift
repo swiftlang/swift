@@ -98,3 +98,4 @@ extension Container {
 public func noOpaqueAccessor() -> some P {
   return 0
 }
+// UNSUPPORTED: OS=windows-msvc

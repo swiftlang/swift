@@ -41,3 +41,4 @@ func testDifferentiableFunction() {
 // CHECK-SIL:   [[VJP_FN:%.*]] = thin_to_thick_function [[VJP_FN_REF]]
 // CHECK-SIL:   [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_FN]] : $@callee_guaranteed (Float) -> Float with_derivative {[[JVP_FN]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), [[VJP_FN]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
 // CHECK-SIL: }
+// UNSUPPORTED: OS=windows-msvc

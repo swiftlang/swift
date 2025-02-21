@@ -16,3 +16,4 @@ func test(action: Action) { }
 // CHECK-NEXT: source.refactoring.kind.rename.global
 // CHECK-NEXT: Global Rename
 // CHECK-NOT: cannot be renamed
+// UNSUPPORTED: OS=windows-msvc

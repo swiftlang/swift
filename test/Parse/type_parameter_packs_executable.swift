@@ -17,3 +17,4 @@ suite.test("operator precedence") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

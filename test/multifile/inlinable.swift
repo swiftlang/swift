@@ -8,3 +8,4 @@
 public func mutatingFunc(_: inout Int) -> Int {
   return 0
 }
+// UNSUPPORTED: OS=windows-msvc

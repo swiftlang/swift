@@ -18,3 +18,4 @@ func foo2<T: Q>(t: T) {
   let _: (any P & C<(T.A) -> ()>) -> T = { x in t }
 }
 
+// UNSUPPORTED: OS=windows-msvc

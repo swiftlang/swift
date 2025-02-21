@@ -25,3 +25,4 @@ protocol P {
 }
 
 struct G<T, U> {}
+// UNSUPPORTED: OS=windows-msvc

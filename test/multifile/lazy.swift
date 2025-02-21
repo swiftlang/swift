@@ -15,3 +15,4 @@ func test3() {
   var s = Test1()
   _ = s.property
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -140,3 +140,4 @@ struct NonCopyable: ~Copyable {
 func f() {
     _ = (Optional<NonCopyable>.none)?.shared
 }
+// UNSUPPORTED: OS=windows-msvc

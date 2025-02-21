@@ -184,3 +184,4 @@ struct MyWrapper {
   // Non-optional types are okay with property wrappers.
   @IBOutlet @MyWrapper var value: AnyObject
 }
+// UNSUPPORTED: OS=windows-msvc

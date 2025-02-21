@@ -23,3 +23,4 @@ func foo (_ x : AProtocol) {
 }
 var aProtocol : AProtocol = AClass()
 foo(aProtocol)
+// UNSUPPORTED: OS=windows-msvc

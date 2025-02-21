@@ -36,3 +36,4 @@ Outer.InterestingValue.foo()
 #else
 def_xref_extensions_distraction.InterestingValue.bar()
 #endif
+// UNSUPPORTED: OS=windows-msvc

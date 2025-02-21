@@ -60,3 +60,4 @@ module Dummy {
 
 //--- Dummy.h
 void dummy(void);
+// UNSUPPORTED: OS=windows-msvc

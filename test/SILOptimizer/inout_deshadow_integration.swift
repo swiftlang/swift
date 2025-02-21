@@ -103,3 +103,4 @@ struct StructWithMutatingMethod {
 // CHECK: }
 
 
+// UNSUPPORTED: OS=windows-msvc

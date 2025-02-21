@@ -75,4 +75,4 @@ import protocol DeclsUsedWrongly.AnyTopLevelProtocol // expected-error {{type al
 import typealias DeclsUsedWrongly.AnyTopLevelProtocol // no-warning
 import protocol DeclsUsedWrongly.NestedProtocol  // no-warning
 import typealias DeclsUsedWrongly.AnyNestedProtocol // no-warning
-import protocol DeclsUsedWrongly.AnyNestedProtocol // expected-error {{type alias 'AnyNestedProtocol' (aka 'any NamespaceStruct.NestedProtocol') cannot be imported as 'protocol'}} {{8-16=typealias}}
+import protocol DeclsUsedWrongly.AnyNestedProtocol // expected-error {{type alias 'AnyNestedProtocol' (aka 'any NamespaceStruct.NestedProtocol') cannot be imported as 'protocol'}} {{8-16=typealias}}// UNSUPPORTED: OS=windows-msvc

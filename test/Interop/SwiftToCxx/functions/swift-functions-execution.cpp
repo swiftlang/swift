@@ -32,3 +32,4 @@ int main() {
 // CHECK-NEXT: passIntReturnVoid -1
 // CHECK-NEXT: passTwoIntReturnIntNoArgLabel
 // CHECK-NEXT: passVoidReturnNever
+// UNSUPPORTED: OS=windows-msvc

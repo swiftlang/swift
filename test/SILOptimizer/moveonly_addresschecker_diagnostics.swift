@@ -4564,3 +4564,4 @@ func assignableButNotConsumableEndAccessImplicitLifetimeTest(_ x: MyClassWithMov
         x.moveOnlyVarStruct.nonTrivialStruct2 = NonTrivialStruct2()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

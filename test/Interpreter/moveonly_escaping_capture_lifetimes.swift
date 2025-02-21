@@ -45,3 +45,4 @@ func main() {
 }
 main()
 print("done")
+// UNSUPPORTED: OS=windows-msvc

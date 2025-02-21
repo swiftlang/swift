@@ -4,3 +4,4 @@
 
 public class Main {
 }
+// UNSUPPORTED: OS=windows-msvc

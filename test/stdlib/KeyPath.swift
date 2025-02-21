@@ -1161,3 +1161,4 @@ if #available(SwiftStdlib 5.9, *) {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

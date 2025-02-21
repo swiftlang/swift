@@ -16,3 +16,4 @@ public func useTypes(
   _: Outer.InnerAlias,
   _: OuterClass.Inner,
   _: OuterClass.InnerAlias) {}
+// UNSUPPORTED: OS=windows-msvc

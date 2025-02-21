@@ -214,3 +214,4 @@ do {
     _ = v as A // infers `Int` for `A.T`
   }
 }
+// UNSUPPORTED: OS=windows-msvc

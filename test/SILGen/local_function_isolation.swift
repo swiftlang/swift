@@ -99,3 +99,4 @@ func outerFunction(_ a: any Actor) async {
 
   await middleFunction(a)
 }
+// UNSUPPORTED: OS=windows-msvc

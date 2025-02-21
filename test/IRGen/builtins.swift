@@ -871,3 +871,4 @@ func allocateVector<Element>(elementType: Element.Type, capacity: Builtin.Word) 
 }
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}
+// UNSUPPORTED: OS=windows-msvc

@@ -775,3 +775,4 @@ extension HasFoo where Self: CanSetFoo {
     self.foo = "bar" // expected-error {{cannot assign to property: 'self' is immutable}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@ var x = foo()
 // CHECK-NO-SKIP: sil hidden{{.*}} @$s4Test3fooSiyF : $@convention(thin) () -> Int {
 // CHECK-SKIP: sil hidden_external @$s4Test3fooSiyF : $@convention(thin) () -> Int
 func foo() -> Int { return 1 }
+// UNSUPPORTED: OS=windows-msvc

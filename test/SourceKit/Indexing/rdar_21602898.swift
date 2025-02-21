@@ -4,3 +4,4 @@
 protocol P {}
 class C {
 extension Int: P {}
+// UNSUPPORTED: OS=windows-msvc

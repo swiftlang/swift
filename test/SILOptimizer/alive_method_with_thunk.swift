@@ -26,3 +26,4 @@ public class DerivedClass: BaseClass<Double> {
 // CHECK-NEXT:  #DerivedClass.deinit!deallocator: @$s23alive_method_with_thunk12DerivedClassCfD
 // CHECK-NEXT: }
 
+// UNSUPPORTED: OS=windows-msvc

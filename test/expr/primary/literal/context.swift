@@ -22,3 +22,4 @@ func collectionLiteralDisambiguation() {
   _ = [#line, #column]
   _ = [#line : #column]
 }
+// UNSUPPORTED: OS=windows-msvc

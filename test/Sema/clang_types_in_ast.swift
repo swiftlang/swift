@@ -47,3 +47,4 @@ public func my_signal4() -> Optional<@convention(c) (Int32) -> Void> {
   return Foo.DUMMY_SIGNAL2
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -39,3 +39,4 @@ func f<each T>(
   _: @escaping (D) -> Void // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
 )
 where repeat each T: D {} // expected-warning {{'D' is deprecated [DeprecatedDeclaration]}}
+// UNSUPPORTED: OS=windows-msvc

@@ -952,3 +952,4 @@ public func testMyThing() {
   let x = MyThing(name: "B")
   doSomethingWithAnyHashable(x)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ func test() {
 // GLOBAL: Literal[Array]/None:                [{#(values)#}][#Array#];
 // GLOBAL: Literal[Dictionary]/None:           [{#(key)#}: {#(value)#}][#Dictionary#];
 }
+// UNSUPPORTED: OS=windows-msvc

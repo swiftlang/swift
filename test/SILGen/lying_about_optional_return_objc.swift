@@ -99,3 +99,4 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
 
 
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -38,3 +38,4 @@ package import Bar
 import Foo
 
 
+// UNSUPPORTED: OS=windows-msvc

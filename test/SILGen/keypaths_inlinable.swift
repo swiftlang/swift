@@ -44,3 +44,4 @@ public struct KeypathStruct {
 
 // CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$s18keypaths_inlinable13KeypathStructVySbSi_SStcipACTkq : $@convention(keypath_accessor_setter) (@in_guaranteed Bool, @inout KeypathStruct, @in_guaranteed (Int, String)) -> ()
 
+// UNSUPPORTED: OS=windows-msvc

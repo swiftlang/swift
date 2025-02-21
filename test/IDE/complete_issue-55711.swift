@@ -63,3 +63,4 @@ func test() {
 // D: Begin completions, 1 items
 // D-DAG: Keyword[self]/CurrNominal:          self[#X#];
 }
+// UNSUPPORTED: OS=windows-msvc

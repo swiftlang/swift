@@ -9,3 +9,4 @@ class rdar29374163 {
     return itf.foo as! Int
   }
 }
+// UNSUPPORTED: OS=windows-msvc

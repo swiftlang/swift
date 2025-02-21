@@ -11,3 +11,4 @@
 func callsGenericAutoclosure<T>(_ t: T) {
   takesGenericAutoclosure(t)
 }
+// UNSUPPORTED: OS=windows-msvc

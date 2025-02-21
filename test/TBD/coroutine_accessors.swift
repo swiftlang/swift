@@ -21,3 +21,4 @@ public protocol P {
 public protocol Q : P {
   override var s: S { read set }
 }
+// UNSUPPORTED: OS=windows-msvc

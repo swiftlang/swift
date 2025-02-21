@@ -64,3 +64,4 @@
 
 // CACHE-PATH: -module-cache-path /path/to/cache
 
+// UNSUPPORTED: OS=windows-msvc

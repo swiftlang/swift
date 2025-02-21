@@ -9,3 +9,4 @@ import protocol_with_self_conforming_existential_other
 
 struct MyP2: P2 {}
 
+// UNSUPPORTED: OS=windows-msvc

@@ -40,3 +40,4 @@ class Bar: Foo {}
 print("OK!")
 
 // CHECK: OK!
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@
 // Ensure that no forward declaration is emitted
 // CHECK-2-NOT: "$s6comdat1C33_{{.*}}LLCMa" = comdat any
 // CHECK-2-NOT: "$s6comdat1C33_{{.*}}LLCMn" = comdat any
+// UNSUPPORTED: OS=windows-msvc

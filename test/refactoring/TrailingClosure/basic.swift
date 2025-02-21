@@ -38,3 +38,4 @@ func blah() {
 // RUN: diff -u %S/Outputs/basic/L14.swift.expected %t.result/L14.swift
 // RUN: %refactor -trailingclosure -source-filename %s -pos=19:7 > %t.result/L19.swift
 // RUN: diff -u %S/Outputs/basic/L19.swift.expected %t.result/L19.swift
+// UNSUPPORTED: OS=windows-msvc

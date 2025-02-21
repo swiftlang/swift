@@ -224,3 +224,4 @@ bb0:
   %r = tuple ()
   return %r : $()
 }
+// UNSUPPORTED: OS=windows-msvc

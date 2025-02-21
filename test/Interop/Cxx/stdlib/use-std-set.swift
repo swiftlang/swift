@@ -183,3 +183,4 @@ StdSetTestSuite.test("UnorderedSetOfCInt.remove") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

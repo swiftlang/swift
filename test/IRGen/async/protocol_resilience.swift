@@ -48,3 +48,4 @@ struct ConformsToAwaitable<T> : Awaitable {
     return value
   }
 }
+// UNSUPPORTED: OS=windows-msvc

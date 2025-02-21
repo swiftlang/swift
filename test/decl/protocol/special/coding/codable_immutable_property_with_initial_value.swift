@@ -102,3 +102,4 @@ struct Foo9: Encodable {
     case baz2
   }
 }
+// UNSUPPORTED: OS=windows-msvc

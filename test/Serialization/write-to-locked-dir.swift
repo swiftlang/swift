@@ -9,3 +9,4 @@
 // RUN: chmod +w %t
 // RUN: test -s %t/main.swiftmodule
 // RUN: test -s %t/main.swiftdoc
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@
 
 // CHECK: var BAR
 // CHECK: var BAZ
+// UNSUPPORTED: OS=windows-msvc

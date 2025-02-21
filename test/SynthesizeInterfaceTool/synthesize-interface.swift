@@ -8,3 +8,4 @@
 // CHECK-DAG: extension MyStruct {
 // CHECK-DAG:     public func printValue()
 // CHECK-DAG: }
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@
 // The @_weakLinked attribute should not be printed in swiftinterfaces.
 // CHECK-NOT: @_weakLinked
 @_weakLinked import Other
+// UNSUPPORTED: OS=windows-msvc

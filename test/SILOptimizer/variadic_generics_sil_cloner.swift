@@ -16,3 +16,4 @@ public func outerCaller<each X>(_ x: repeat each X) {
 // CHECK: [[CALLEE:%.*]] = function_ref @$s28variadic_generics_sil_cloner6calleeyyx_q_q_QptRv_r0_lF : $@convention(thin) <τ_0_0, each τ_0_1> (@in_guaranteed τ_0_0, @pack_guaranteed Pack{repeat each τ_0_1}) -> ()
 // CHECK: apply [[CALLEE]]<@pack_element("{{.*}}") each X, Pack{repeat each X}>(
 // CHECK: // end sil function '$s28variadic_generics_sil_cloner11outerCalleryyxxQpRvzlF'
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ struct MyVector<let N: Int, T: ~Copyable>: ~Copyable {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

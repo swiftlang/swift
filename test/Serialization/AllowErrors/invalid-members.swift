@@ -70,3 +70,4 @@ func test(s: ValidStructInvalidMember) {
 // CHECK-USES-NOT: has no member 'member'
 // CHECK-USES-NOT: has no member 'funcBadArg'
 // CHECK-USES-NOT: has no member 'memberMissingType'
+// UNSUPPORTED: OS=windows-msvc

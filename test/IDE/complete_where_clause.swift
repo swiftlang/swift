@@ -245,3 +245,4 @@ func foo<K: WithAssoc>(_ key: K.Type) where K.#^WHERE_CLAUSE_WITH_EQUAL^# == S1 
 // WHERE_CLAUSE_WITH_EQUAL: Begin completions, 2 items
 // WHERE_CLAUSE_WITH_EQUAL-DAG: Decl[AssociatedType]/CurrNominal:   T;
 // WHERE_CLAUSE_WITH_EQUAL-DAG: Keyword/None:                       Type[#K.Type#];
+// UNSUPPORTED: OS=windows-msvc

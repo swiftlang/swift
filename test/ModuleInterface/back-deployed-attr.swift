@@ -83,3 +83,4 @@ public func backDeployTopLevelFunc_macOS12_1() -> Int { return 48 }
 // CHECK: public func backDeployTopLevelFunc_myProject() -> Swift.Int { return 49 }
 @backDeployed(before: _myProject 1.0)
 public func backDeployTopLevelFunc_myProject() -> Int { return 49 }
+// UNSUPPORTED: OS=windows-msvc

@@ -49,3 +49,4 @@
 // CHECK: s2.o-[[S2_HASH]]
 // CHECK: --------
 // CHECK: out-file: REMAPPED_OUT_DIR{{/|\\}}s2.o
+// UNSUPPORTED: OS=windows-msvc

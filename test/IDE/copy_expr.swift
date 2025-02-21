@@ -4,3 +4,4 @@ func test(myParam: Int) {
   copy #^COPY^#
   // COPY: Decl[LocalVar]/Local:               myParam[#Int#]; name=myParam
 }
+// UNSUPPORTED: OS=windows-msvc

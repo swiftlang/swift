@@ -47,3 +47,4 @@ let bar = f(21)
 // CHECK-NEXT: {{.*}} __builtin_log[='50']
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 // CHECK-NEXT: {{.*}} __builtin_log[foo='50']
+// UNSUPPORTED: OS=windows-msvc

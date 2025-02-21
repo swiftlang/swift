@@ -49,3 +49,4 @@ public func localTypeAliasTestGeneric<T: Cow>(cow: T) {
   let info = UnsafeMutablePointer<C>.allocate(capacity: 1)
   _ = info
 }
+// UNSUPPORTED: OS=windows-msvc

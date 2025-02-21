@@ -43,3 +43,4 @@ func match(_ f: Fox) {
   case .`init`(let n): _ = n
   }
 }
+// UNSUPPORTED: OS=windows-msvc

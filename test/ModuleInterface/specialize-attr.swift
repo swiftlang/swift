@@ -17,3 +17,4 @@ public func specializeWithAvailability<T>(_ t: T) {}
 // CHECK: public func specializeWithStdlibAvailability<T>(value: T) async
 @_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
 public func specializeWithStdlibAvailability<T>(value: T) async {}
+// UNSUPPORTED: OS=windows-msvc

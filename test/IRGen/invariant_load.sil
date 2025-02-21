@@ -42,3 +42,4 @@ bb0(%0 : $C):
   return %val : $Builtin.Int32
 }
 
+// UNSUPPORTED: OS=windows-msvc

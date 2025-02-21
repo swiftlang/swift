@@ -13,3 +13,4 @@
 // CHECK-DEPS:      "modulePath": "{{.*}}separate_clang_scan_cache.swift.tmp.module-cache{{/|\\\\}}A-{{.*}}.swiftmodule"
 
 import A
+// UNSUPPORTED: OS=windows-msvc

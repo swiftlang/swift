@@ -31,3 +31,4 @@ func reachable_returns_Int() {
 f_returns_Int() // no-warning
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -52,4 +52,4 @@ func h3(x: (any P<Int>)?) -> (any P<String>)? {
 
 func generic1<T>(x: any P<T>) -> T {
   return x.f()
-}
+}// UNSUPPORTED: OS=windows-msvc

@@ -37,3 +37,4 @@
   let c = 1
 #endif
 // NOTE: ...the next time the version goes up.
+// UNSUPPORTED: OS=windows-msvc

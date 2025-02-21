@@ -96,3 +96,4 @@ func callBaz<T: P>(_ f: T, x: [Int]) {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

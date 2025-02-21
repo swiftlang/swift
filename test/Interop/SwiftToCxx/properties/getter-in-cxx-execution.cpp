@@ -68,3 +68,4 @@ int main() {
   }
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

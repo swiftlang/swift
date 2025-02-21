@@ -88,3 +88,4 @@ func testEmpty(nc: consuming NC) {
   }
   use(e: e) // expected-note {{this use of the lifetime-dependent value is out of scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

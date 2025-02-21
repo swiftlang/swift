@@ -26,3 +26,4 @@ func returnNSObject(obj: NSObject) -> NSObject {
   // CHECK: @llvm.objc.retain
   return obj
 }
+// UNSUPPORTED: OS=windows-msvc

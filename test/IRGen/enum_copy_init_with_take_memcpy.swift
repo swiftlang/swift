@@ -36,3 +36,4 @@ struct HasAnEnum {
 // CHECK:  ret i64 [[R]]
 
 }
+// UNSUPPORTED: OS=windows-msvc

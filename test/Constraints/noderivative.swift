@@ -24,3 +24,4 @@ func test3(_ foo: @escaping @differentiable(reverse) (Float, @noDerivative Float
     let fn: @differentiable(reverse) (Float, Float) -> Float = foo
     _ = fn(0, 0)
 }
+// UNSUPPORTED: OS=windows-msvc

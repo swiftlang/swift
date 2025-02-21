@@ -19,3 +19,4 @@
 // CHECK: sil shared [serialized]{{.*}} @$sSo7YesOrNoV8rawValueABSgs5Int32V_tcfC : $@convention(method) (Int32, @thin YesOrNo.Type) -> Optional<YesOrNo> {
 // CHECK:   return {{%.*}} : $Optional<YesOrNo>
 // CHECK: } // end sil function '$sSo7YesOrNoV8rawValueABSgs5Int32V_tcfC'
+// UNSUPPORTED: OS=windows-msvc

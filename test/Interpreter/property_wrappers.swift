@@ -87,3 +87,4 @@ func testMyType(_ myType: MyType<Int>) {
 }
 
 testMyType(MyType(x: 17))
+// UNSUPPORTED: OS=windows-msvc

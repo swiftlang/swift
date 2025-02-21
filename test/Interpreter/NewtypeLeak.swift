@@ -40,3 +40,4 @@ Tests.test("dontLeak") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

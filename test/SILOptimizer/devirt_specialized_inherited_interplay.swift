@@ -192,3 +192,4 @@ public func driver() {
   WhatShouldIDo(b4)
   WhatShouldIDo2(b4)
 }
+// UNSUPPORTED: OS=windows-msvc

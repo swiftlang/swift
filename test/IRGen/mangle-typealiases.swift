@@ -97,3 +97,4 @@ public class Myclass<T> {
     let newAnyObject = unsafeBitCast(t, to: Myalias.self)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

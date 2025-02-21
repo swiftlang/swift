@@ -17,3 +17,4 @@ extension C {
     privMethod() // expected-error {{'privMethod' is inaccessible due to 'fileprivate' protection level}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -105,3 +105,4 @@ public func localVsImportedType3(a: LocalType, b: FileprivateImportType) {} // e
 /// Only this one points to the imported type.
 public func localVsImportedType4(a: FileprivateImportType, b: LocalType) {} // expected-error {{function cannot be declared public because its parameter uses a fileprivate type}}
 // expected-note @-1 {{struct 'FileprivateImportType' is imported by this file as 'fileprivate' from 'FileprivateLib'}}
+// UNSUPPORTED: OS=windows-msvc

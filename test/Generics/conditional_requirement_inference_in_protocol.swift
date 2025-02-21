@@ -16,3 +16,4 @@ protocol Bad {
   associatedtype T : Equatable
   associatedtype U where T == Array<U>
 }
+// UNSUPPORTED: OS=windows-msvc

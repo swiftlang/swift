@@ -33,3 +33,4 @@ framework module OptionalRequirementOf {
 @optional
 - (void)objcReq;
 @end
+// UNSUPPORTED: OS=windows-msvc

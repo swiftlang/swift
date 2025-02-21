@@ -201,3 +201,4 @@ bbRet:
   %25 = tuple ()
   return %25 : $()
 } // end sil function 'multi_end_licm_loop_exit'
+// UNSUPPORTED: OS=windows-msvc

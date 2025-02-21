@@ -80,3 +80,4 @@ bb0(%0 : $Int, %1 : $Float):
   %r = tuple ()
   return %r : $()
 }
+// UNSUPPORTED: OS=windows-msvc

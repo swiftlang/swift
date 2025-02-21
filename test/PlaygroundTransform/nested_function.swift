@@ -57,3 +57,4 @@ returnSum()
 // CHECK-NEXT: [9:{{.*}}] __builtin_log_scope_exit
 // CHECK-NEXT: [27:{{.*}}] __builtin_log[='25']
 // CHECK-NOT: __builtin
+// UNSUPPORTED: OS=windows-msvc

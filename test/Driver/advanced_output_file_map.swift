@@ -94,3 +94,4 @@
 // RUN: test ! -e %t/d/advanced_output_file_map.d
 // RUN: test ! -e %t/d/main.d -a ! -s %t/d/main.d
 // RUN: test ! -e %t/d/lib.d  -a ! -s %t/d/lib.d
+// UNSUPPORTED: OS=windows-msvc

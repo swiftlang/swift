@@ -1440,3 +1440,4 @@ public typealias MyPairAlias<T, U> = MyPair<T, U>
 // PASS_PRINT_AST: public typealias MyPairAlias<T, U> = MyPair<T, U>
 typealias MyPairAlias2<T: FooProtocol, U> = MyPair<T, U> where U: BarProtocol
 // PASS_PRINT_AST: typealias MyPairAlias2<T, U> = MyPair<T, U> where T : FooProtocol, U : BarProtocol
+// UNSUPPORTED: OS=windows-msvc

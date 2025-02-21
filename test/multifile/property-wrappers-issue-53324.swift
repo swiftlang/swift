@@ -10,3 +10,4 @@ class Holder {
 func main() {
   let h = Holder()
 }
+// UNSUPPORTED: OS=windows-msvc

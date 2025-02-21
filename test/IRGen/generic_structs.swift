@@ -37,3 +37,4 @@ public struct GenericStruct<T : Proto> {
 
   public init() {}
 }
+// UNSUPPORTED: OS=windows-msvc

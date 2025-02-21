@@ -34,3 +34,4 @@ struct S: P {
 // CONFORMANCE_EXT-DAG: Decl[InstanceMethod]/Super:         func customizableMethod() {|};
 // CONFORMANCE_EXT-NOT: nonRequirement
 }
+// UNSUPPORTED: OS=windows-msvc

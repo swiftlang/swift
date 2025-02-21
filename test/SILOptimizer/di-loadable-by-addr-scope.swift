@@ -104,3 +104,4 @@ public class DependencyResolver<P: PackageContainerProvider> {
         return AnySequence([])
     }
 }
+// UNSUPPORTED: OS=windows-msvc

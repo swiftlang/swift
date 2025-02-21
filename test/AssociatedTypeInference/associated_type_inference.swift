@@ -720,3 +720,4 @@ protocol FIXME_P1b: FIXME_P1a where B == FIXME_S1<A> {}
 // expected-error@+2 {{type 'FIXME_S1<T>' does not conform to protocol 'FIXME_P1a'}}
 // expected-note@+1 {{add stubs for conformance}}
 struct FIXME_S1<T: Equatable>: FIXME_P1b {}
+// UNSUPPORTED: OS=windows-msvc

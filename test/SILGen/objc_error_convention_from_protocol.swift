@@ -24,3 +24,4 @@ class CallerBImpl: CallerB {
   func use(_ x: Int, thenCall callback: @escaping () -> ()) throws { }
 }
 
+// UNSUPPORTED: OS=windows-msvc

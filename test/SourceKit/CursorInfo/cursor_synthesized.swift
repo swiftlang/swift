@@ -31,3 +31,4 @@ func synthesized(hasher: inout Hasher) {
   // HASH-NEXT: s:18cursor_synthesized11SynthesizedV4hash4intoys6HasherVz_tF
   // HASH: SYNTHESIZED
 }
+// UNSUPPORTED: OS=windows-msvc

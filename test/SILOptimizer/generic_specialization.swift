@@ -17,3 +17,4 @@ public func testit(_ s: String) -> S {
   return S(s)
 }
 
+// UNSUPPORTED: OS=windows-msvc

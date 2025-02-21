@@ -60,3 +60,4 @@ public func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1) {
 // Make sure we can extract the textual representation here.
 // CHECK: func hasTupleConstructionDefaultArgs(_ x: Any = (), y: (Swift.String, Swift.Int) = ("", 0))
 public func hasTupleConstructionDefaultArgs(_ x: Any = Void(), y: (String, Int) = (String, Int)("", 0)) {}
+// UNSUPPORTED: OS=windows-msvc

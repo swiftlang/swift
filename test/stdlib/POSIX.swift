@@ -267,3 +267,4 @@ POSIXTests.test("fcntl(CInt, CInt, UnsafeMutableRawPointer): locking and unlocki
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

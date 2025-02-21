@@ -77,3 +77,4 @@ public func mutateBaseArray(_ arr: inout [Base], _ x: Base) {
 
 // CHECK-MODULELL: [[F:![0-9]]] = !DIFile(filename: "{{.*}}IRGen/multithread_module.swift", directory: "{{.*}}")
 // CHECK-MODULELL: DICompileUnit(language: DW_LANG_Swift, file: [[F]],
+// UNSUPPORTED: OS=windows-msvc

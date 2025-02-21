@@ -63,3 +63,4 @@ extension AnotherResilientNSObjectSubclass {
 extension AnotherResilientNSObjectSubclass {
   @objc public func categoryThreeMethod() {}
 }
+// UNSUPPORTED: OS=windows-msvc

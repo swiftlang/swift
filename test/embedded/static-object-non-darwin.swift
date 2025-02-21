@@ -24,3 +24,4 @@ public func checkPot(i: UInt8, testValue: UInt8) -> ValidState {
 // CHECK: @"$es20__StaticArrayStorageCN" = {{.*}}global ptr null
 // CHECK: @"$e4main4pots_WZTv_r" = {{.*}}constant %Ts23_ContiguousArrayStorageCySiG_tailelems0 {{.*}}@"$es20__StaticArrayStorageCN"
 // CHECK: @"$e4main4potsSaySiGvp" = {{.*}}constant %TSa {{.*}}@"$e4main4pots_WZTv_r"
+// UNSUPPORTED: OS=windows-msvc

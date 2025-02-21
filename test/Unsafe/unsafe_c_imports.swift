@@ -23,3 +23,4 @@ struct StoreAllTheThings {
 
   let sc: SomeColor
 };
+// UNSUPPORTED: OS=windows-msvc

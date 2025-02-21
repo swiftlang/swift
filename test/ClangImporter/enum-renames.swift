@@ -6,3 +6,4 @@ func testEvent(event: Event) {
   if event == .`init` { print("Initialize") }
   if event == .reset { print("Reset") }
 }
+// UNSUPPORTED: OS=windows-msvc

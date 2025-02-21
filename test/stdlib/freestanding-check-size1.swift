@@ -11,3 +11,4 @@
 // RUN: %{python} %utils/check_freestanding_size.py --path %t/a.out --triple %module-target-triple --size-path %llvm-size
 
 print("Hello world")
+// UNSUPPORTED: OS=windows-msvc

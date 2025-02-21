@@ -21,3 +21,4 @@ public struct Other : Simple {}
 // CHECK-SAME: @"$ss5OtherVs6SimplesHc"
 // CHECK-SAME: @"$ss5OtherVHn"
 // CHECK-SAME: ], section "llvm.metadata"
+// UNSUPPORTED: OS=windows-msvc

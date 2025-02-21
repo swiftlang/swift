@@ -10,3 +10,4 @@
 import Foundation
 
 @objc protocol P: Sendable { }
+// UNSUPPORTED: OS=windows-msvc

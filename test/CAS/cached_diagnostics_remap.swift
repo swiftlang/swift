@@ -47,3 +47,4 @@
 int test(int);
 
 #warning warning in bridging header
+// UNSUPPORTED: OS=windows-msvc

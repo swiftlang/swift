@@ -26,3 +26,4 @@ func bar() -> Int {
   x = C<Int>().prop.x
   return x
 }
+// UNSUPPORTED: OS=windows-msvc

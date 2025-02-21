@@ -122,3 +122,4 @@ final class C_51408_Complex : P_51408_Complex {
   func f() -> (Bool, C_51408_Complex?) {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

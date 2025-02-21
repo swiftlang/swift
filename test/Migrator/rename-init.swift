@@ -7,3 +7,4 @@ import Bar
 func foo() {
   _ = BarForwardDeclaredClass(oldLabel0:1)
 }
+// UNSUPPORTED: OS=windows-msvc

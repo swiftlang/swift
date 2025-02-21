@@ -63,3 +63,4 @@ public func inoutLarge(_ en: inout Large, _ x: Int) {
 // CHECK:      SWIFT_INLINE_THUNK void printLarge(const Large& en) noexcept SWIFT_SYMBOL("s:5Enums10printLargeyyAA0C0OF") {
 // CHECK-NEXT:   Enums::_impl::$s5Enums10printLargeyyAA0C0OF(Enums::_impl::_impl_Large::getOpaquePointer(en));
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

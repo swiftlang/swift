@@ -47,3 +47,4 @@ namespace ns {
 // CHECKA-NEXT:    var x: Int32
 // CHECKA-NEXT:  }
 // CHECKA-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

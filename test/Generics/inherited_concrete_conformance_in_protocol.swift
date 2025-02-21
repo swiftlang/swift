@@ -12,3 +12,4 @@ struct MyCollection : Collection {}
 protocol P {
   associatedtype T : Collection where T == MyCollection
 }
+// UNSUPPORTED: OS=windows-msvc

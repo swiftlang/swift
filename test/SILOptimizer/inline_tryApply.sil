@@ -33,3 +33,4 @@ bb0:
   return %0 : $()                                 // id: %1
 }
 
+// UNSUPPORTED: OS=windows-msvc

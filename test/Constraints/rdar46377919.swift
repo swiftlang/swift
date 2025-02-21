@@ -10,3 +10,4 @@ class Foo {
 func foo() -> Foo {
   return Foo(lhs: 2, rhs: 2)
 }
+// UNSUPPORTED: OS=windows-msvc

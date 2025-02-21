@@ -104,3 +104,4 @@ func runTest(numCounters: Int, numWorkers: Int) {
     runTest(numCounters: numCounters, numWorkers: workers)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

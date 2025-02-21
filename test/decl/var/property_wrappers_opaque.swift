@@ -25,3 +25,4 @@ struct FB7699647 {
 struct FB7699647b {
   @WrapperWithDefaultInit var property: some P // expected-error{{generic parameter 'T' could not be inferred}} expected-error{{property declares an opaque return type, but cannot infer the underlying type from its initializer expression}}
 }
+// UNSUPPORTED: OS=windows-msvc

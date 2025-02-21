@@ -22,3 +22,4 @@ func foo(a: Int, b: Int) {
     // LOCAL: [[@LINE-1]]:9 | variable(local)/Swift | [[x_USR:.*]] | Def,RelChild | rel: 1
     // CHECK-NOT: [[@LINE-2]]:9 | variable(local)/Swift | {{.*}} | Def,RelChild | rel: 1
 }
+// UNSUPPORTED: OS=windows-msvc

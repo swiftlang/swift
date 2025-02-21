@@ -44,3 +44,4 @@ class A {
     // CHECK: return
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -55,3 +55,4 @@
 // CHECK-SWIFT-5-DAG: class var accessorsOnlyRenamedRetypedClass: Any!
 
 // CHECK-BOTH: {{^}$}}
+// UNSUPPORTED: OS=windows-msvc

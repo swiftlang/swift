@@ -76,3 +76,4 @@ func func2() {
 // CHECK-32: !9 = !{i64 68, !"$s4main7MyClassC3baryyFTq"}
 // CHECK-32: !10 = !{i64 80, !"$s4main7MyClassCACycfCTq"}
 // CHECK-32: !11 = !{i64 1, i64 56, i64 84}
+// UNSUPPORTED: OS=windows-msvc

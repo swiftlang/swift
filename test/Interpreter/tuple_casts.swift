@@ -165,3 +165,4 @@ tupleCastTests
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

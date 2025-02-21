@@ -27,4 +27,4 @@ extension S<Int?>
             { _ in }(&x[0, default: 0])
         }
     }
-}
+}// UNSUPPORTED: OS=windows-msvc

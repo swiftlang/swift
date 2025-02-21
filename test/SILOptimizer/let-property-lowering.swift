@@ -191,3 +191,4 @@ func pred() -> Bool {
 
 struct E : Error {}
 
+// UNSUPPORTED: OS=windows-msvc

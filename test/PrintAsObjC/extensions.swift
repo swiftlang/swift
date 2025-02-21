@@ -191,3 +191,4 @@ extension PettableContainer {
   @objc func extract() -> T { fatalError() }
   @objc func extract2() -> T? { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

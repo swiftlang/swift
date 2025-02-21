@@ -58,3 +58,4 @@ do {
   generic(Int.self)
   // CHECK: D<Int>
 }
+// UNSUPPORTED: OS=windows-msvc

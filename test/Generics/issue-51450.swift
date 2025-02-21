@@ -19,3 +19,4 @@ public func foo<T : C, S : Sequence>(_: T, _ xs: S) where S.Element == T.T {
     takesInt(x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

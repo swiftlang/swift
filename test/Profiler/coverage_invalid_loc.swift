@@ -29,3 +29,4 @@ public struct Callable {
 public func foo(a: Callable) {
   a({ (x : Int) -> Int in x })
 }
+// UNSUPPORTED: OS=windows-msvc

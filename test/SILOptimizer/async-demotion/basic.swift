@@ -55,3 +55,4 @@ public
 func checkIt(_ t: Task<Int, Never>) async -> Int {
   await t.value
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ extension Tensor {
     return self.reduce(0) { $0 + $1 * $1 }.squareRoot()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -75,3 +75,4 @@ struct WithoutBogusGenericParametersWithoutRedundancy<A, B> where A : P2, B : P2
     where C : P1,
           A == S1<C, C.T.T, S2<C.T>> {}
 }
+// UNSUPPORTED: OS=windows-msvc

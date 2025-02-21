@@ -15,3 +15,4 @@ import UserA
 public func callFortyTwo() -> CInt {
   return getFortyTwo()
 }
+// UNSUPPORTED: OS=windows-msvc

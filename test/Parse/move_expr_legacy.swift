@@ -4,3 +4,4 @@
 func oldMoveSyntax(x: String) {
   _ = _move x // expected-warning{{renamed to 'consume'}} {{7-12=consume}}
 }
+// UNSUPPORTED: OS=windows-msvc

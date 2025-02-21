@@ -72,3 +72,4 @@ func function_with_type_generic<T>() -> T {
     // expected-error@-1 {{attribute '_section' cannot be used in a generic context}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

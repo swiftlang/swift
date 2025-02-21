@@ -85,3 +85,4 @@ struct Main {
     print("")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -41,3 +41,4 @@ func customSourceLocation(a: Int) {}
 // RUN: %sourcekitd-test -req=cursor -pos=12:27 %s -- %s | %FileCheck -check-prefix=CHECK-CUSTOM-SOURCELOCATION %s
 // CHECK-CUSTOM-SOURCELOCATION: s:17cursor_info_param20customSourceLocation1aySi_tFACL_Sivp
 // CHECK-CUSTOM-SOURCELOCATION: PARENT OFFSET: 233
+// UNSUPPORTED: OS=windows-msvc

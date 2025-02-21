@@ -40,3 +40,4 @@ class C {
     print(value)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

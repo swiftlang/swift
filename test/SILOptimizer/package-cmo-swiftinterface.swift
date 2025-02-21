@@ -64,3 +64,4 @@ public func run() -> Int {
 // CHECK-PKG-INTERFACE:   @inline(never) package func bar() -> Swift.Int
 // CHECK-PKG-INTERFACE:   @inline(never) package func foo(_ arg: Lib.PkgKlass) -> Swift.Int?
 // CHECK-INTERFACE: public func run() -> Swift.Int
+// UNSUPPORTED: OS=windows-msvc

@@ -23,3 +23,4 @@ public func noStackProtector() {
 }
 // CHECK: [[SSPATTRS]] = { sspreq {{.*}}"stack-protector-buffer-size"="8"
 
+// UNSUPPORTED: OS=windows-msvc

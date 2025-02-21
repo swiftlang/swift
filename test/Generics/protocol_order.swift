@@ -19,3 +19,4 @@ protocol P4 {}
 protocol P5 {
   associatedtype T : P1 & P3 where T.T : P4
 }
+// UNSUPPORTED: OS=windows-msvc

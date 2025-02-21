@@ -21,3 +21,4 @@
 // COMPAT: "version": "2"
 
 // BOGUS: invalid dynamic library compatibility version 'not_a_version_string'
+// UNSUPPORTED: OS=windows-msvc

@@ -318,3 +318,4 @@ bb5:
 bb6(%28 : $Bool):
   return %28 : $Bool
 }
+// UNSUPPORTED: OS=windows-msvc

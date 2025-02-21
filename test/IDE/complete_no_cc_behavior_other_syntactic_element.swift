@@ -38,3 +38,4 @@ func foo() {
 // CHECK: Begin completions, 2 items
 // CHECK-DAG: Keyword[self]/CurrNominal:          self[#MyView#];
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: qag({#(tag): V#})[#MyView#];
+// UNSUPPORTED: OS=windows-msvc

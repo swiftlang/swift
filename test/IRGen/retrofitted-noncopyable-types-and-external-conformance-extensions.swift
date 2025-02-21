@@ -41,3 +41,4 @@ func main() {
     print("done testing")
 }
 main()
+// UNSUPPORTED: OS=windows-msvc

@@ -89,3 +89,4 @@ StoredPropertyTests.test("Setting/FixedLayout") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

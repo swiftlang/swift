@@ -10,3 +10,4 @@
 public func test(_ start: UnsafeRawPointer, _ count: Int) -> CInt {
   return 0
 }
+// UNSUPPORTED: OS=windows-msvc

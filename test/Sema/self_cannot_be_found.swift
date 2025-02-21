@@ -19,3 +19,4 @@ struct aStruct {
 let _ = aStruct.self
 let initialized = aStruct().self
 _ = initialized.b
+// UNSUPPORTED: OS=windows-msvc

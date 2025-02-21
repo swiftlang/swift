@@ -194,3 +194,4 @@ func main_${introducer}() {
 
 main_let()
 main_var()
+// UNSUPPORTED: OS=windows-msvc

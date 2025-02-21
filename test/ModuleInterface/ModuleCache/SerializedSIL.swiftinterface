@@ -52,3 +52,4 @@ public func verySimpleFunction()
 
 // NEGATIVE-NOT: sil_vtable
 // NEGATIVE-NOT: sil_witness_table
+// UNSUPPORTED: OS=windows-msvc

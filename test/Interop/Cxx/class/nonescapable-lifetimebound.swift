@@ -165,3 +165,4 @@ public func test() {
 public func test2(_ x: AggregateView) {
     let _ = AggregateView(member: x.member)
 }
+// UNSUPPORTED: OS=windows-msvc

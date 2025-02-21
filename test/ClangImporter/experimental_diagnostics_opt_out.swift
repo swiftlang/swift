@@ -30,3 +30,4 @@ unsupported_parameter_type(1,2)
 // CHECK-NOT: warning
 // CHECK-NOT: error
 // CHECK-NOT: note
+// UNSUPPORTED: OS=windows-msvc

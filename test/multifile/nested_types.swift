@@ -22,3 +22,4 @@ public func test() {
 
   print("a \(c)")
 }
+// UNSUPPORTED: OS=windows-msvc

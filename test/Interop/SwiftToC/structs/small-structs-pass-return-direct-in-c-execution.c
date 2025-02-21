@@ -87,3 +87,4 @@ int main() {
 // CHECK-NEXT: StructI8AndU32AndI16.x = -100, y = 123456, z = -3456
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

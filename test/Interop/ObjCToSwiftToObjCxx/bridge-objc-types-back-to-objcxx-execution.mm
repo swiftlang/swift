@@ -190,3 +190,4 @@ int main() {
 // DESTROY: destroy ObjCKlassConforming
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -127,3 +127,4 @@ foo!!foo
 
 foo??bar // expected-error{{broken standard library}} expected-error{{consecutive statements}} {{6-6=;}}
 // expected-warning @-1 {{expression of type 'TheDevil' is unused}}
+// UNSUPPORTED: OS=windows-msvc

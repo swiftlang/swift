@@ -52,3 +52,4 @@
 // RUN: chmod +x %t/usr/bin/lldb
 // RUN: %host-library-env %t/usr/bin/swift -sdk "" -repl -### | %FileCheck -check-prefix=LLDB %s
 // RUN: %host-library-env %t/usr/bin/swift -sdk "" -### | %FileCheck -check-prefix=LLDB %s
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@ struct A: Collection {
 extension A.Index {
   // Force validate "A".
 }
+// UNSUPPORTED: OS=windows-msvc

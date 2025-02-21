@@ -61,3 +61,4 @@ struct Gen<T> {
 // Generic types must be taken using their value witness.
 // CHECK-LABEL: define internal ptr @"$s20weak_value_witnesses3GenVwtk"(ptr noalias %dest, ptr noalias %src, ptr %"Gen<T>")
 // CHECK:         call ptr
+// UNSUPPORTED: OS=windows-msvc

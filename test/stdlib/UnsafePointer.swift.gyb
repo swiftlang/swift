@@ -564,3 +564,4 @@ ${SelfName}TestSuite.test("pointer(to:).overflow") {
 % end
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

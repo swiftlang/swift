@@ -21,3 +21,4 @@ a + b
 
 // CHECK: [12:1-12:6] pc before
 // CHECK-NEXT: [12:1-12:6] pc after
+// UNSUPPORTED: OS=windows-msvc

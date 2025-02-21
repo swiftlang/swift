@@ -35,3 +35,4 @@ func greet(_ name: String, _ day: String) -> String {
 
 print("Hello World")
 print(greet("Bob", "Tuesday"))
+// UNSUPPORTED: OS=windows-msvc

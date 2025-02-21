@@ -7,3 +7,4 @@ struct Test {
 
 // CHECK: START RANGES
 // CHECK-NEXT: END RANGES
+// UNSUPPORTED: OS=windows-msvc

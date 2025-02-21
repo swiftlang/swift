@@ -7,3 +7,4 @@ class C {
   // CHECK: [[@LINE+1]]:55 -> [[@LINE+1]]:79 : 0
   var completionHandler: (String, [String]) -> Void = { (foo, bar) in return }
 }
+// UNSUPPORTED: OS=windows-msvc

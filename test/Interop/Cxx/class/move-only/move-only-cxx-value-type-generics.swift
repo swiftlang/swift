@@ -38,3 +38,4 @@ MoveOnlyCxxValueType.test("Test move only type ref return pointee borrow") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

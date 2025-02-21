@@ -36,3 +36,4 @@ x.func1_live()
 
 // NM:     $s4main8MyStructV10func1_liveyyF
 // NM-NOT: $s4main8MyStructV10func2_deadyyF
+// UNSUPPORTED: OS=windows-msvc

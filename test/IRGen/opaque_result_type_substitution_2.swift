@@ -131,3 +131,4 @@ struct Test<Label : W> {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

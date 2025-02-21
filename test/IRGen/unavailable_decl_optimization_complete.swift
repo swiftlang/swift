@@ -13,3 +13,4 @@ public let globalConstant = true
 // CHECK-STRIP-NOT: s4Test15unavailableFuncyyF
 @available(*, unavailable)
 public func unavailableFunc() {}
+// UNSUPPORTED: OS=windows-msvc

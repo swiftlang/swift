@@ -8,3 +8,4 @@ import unicode
 // CHECK-C: typealias WCHAR = wchar_t
 // CHECK-CXX: typealias WCHAR = CWideChar
 // CHECK: var UNICODE_NULL: WCHAR { get }
+// UNSUPPORTED: OS=windows-msvc

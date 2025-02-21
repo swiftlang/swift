@@ -38,3 +38,4 @@ class ClassNeedingUpdate {
 // CHECK-LABEL: define{{( protected)?}} private void @runtime_registration
 // CHECK:             call void @swift_instantiateObjCClass({{.*}} @"$s21jit_metadata_strategy14FixedSizeClassCN")
 // CHECK-NOT:         call void @swift_instantiateObjCClass({{.*}} @"$s21jit_metadata_strategy18ClassNeedingUpdateCN")
+// UNSUPPORTED: OS=windows-msvc

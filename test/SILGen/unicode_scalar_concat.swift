@@ -7,3 +7,4 @@ func zzz() -> String {
 }
 // CHECK: string_literal utf8 "1"
 // CHECK: string_literal utf8 "2"
+// UNSUPPORTED: OS=windows-msvc

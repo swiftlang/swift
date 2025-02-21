@@ -13,3 +13,4 @@
 // CHECK-WHOLE-MODULE-SAME: -emit-objc-header-path {{.+}}/foo.h
 // CHECK-WHOLE-MODULE-NOT: -merge-modules
 // CHECK-WHOLE-MODULE: {{(bin/)?}}ld
+// UNSUPPORTED: OS=windows-msvc

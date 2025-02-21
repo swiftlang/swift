@@ -37,3 +37,4 @@ public struct Outer {
     public func foo() {}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

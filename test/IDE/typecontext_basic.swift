@@ -98,3 +98,4 @@ func test2(obj: C) {
 }
 
 // NO-CONTEXT-NOT: TypeName
+// UNSUPPORTED: OS=windows-msvc

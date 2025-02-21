@@ -13,3 +13,4 @@ open class NSSet {
 // Ensure that the _bridgeToObjectiveC function (from the same module) is not annotated
 // with 'dllimport'.
 // CHECK: declare swiftcc ptr @"$ss11AnyHashableV10FoundationE19_bridgeToObjectiveCAC8NSObjectCyF"
+// UNSUPPORTED: OS=windows-msvc

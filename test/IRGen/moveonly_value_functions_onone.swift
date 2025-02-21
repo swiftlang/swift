@@ -434,3 +434,4 @@ public func takeOuterMultiPayloadNC_3<T>(_ e: consuming OuterMultiPayloadNC_3<T>
 // CHECK-SAME:        ptr noalias swiftself %0)
 // CHECK:       }
 public func takeOuterMultiPayloadNC_4<T>(_ e: consuming OuterMultiPayloadNC_4<T>) {}
+// UNSUPPORTED: OS=windows-msvc

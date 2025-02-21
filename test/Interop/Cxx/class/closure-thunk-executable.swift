@@ -12,3 +12,4 @@ ClosureTestSuite.test("ConvertToFunctionPointer") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

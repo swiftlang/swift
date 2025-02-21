@@ -275,3 +275,4 @@ func testSwiftWrapperInSwift4() {
   let _: EnclosingStruct.Identifier = .member
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

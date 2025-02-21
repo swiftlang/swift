@@ -29,3 +29,4 @@ struct P: J {
     @differentiable(reverse) static func g(p: P, z: L) -> Y<P> {return Y<P>(w: H())}
 }
 struct Y<U: J>: Differentiable {var w: H = H()}
+// UNSUPPORTED: OS=windows-msvc

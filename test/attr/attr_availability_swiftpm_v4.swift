@@ -79,3 +79,4 @@ unconditionallyRenamed() // expected-error {{'unconditionallyRenamed()' has been
 func unconditionallyRenamedAndIntroducedLater() {} // expected-note {{'unconditionallyRenamedAndIntroducedLater()' has been explicitly marked unavailable here}}
 
 unconditionallyRenamedAndIntroducedLater() // expected-error {{'unconditionallyRenamedAndIntroducedLater()' has been renamed to 'shortFour'}}
+// UNSUPPORTED: OS=windows-msvc

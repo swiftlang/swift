@@ -67,3 +67,4 @@ struct CrashWithThunk {
 // FRIENDLY-NEXT:   |         ^
 // FRIENDLY-NEXT: 30|   }
 // FRIENDLY-NEXT: 31| }
+// UNSUPPORTED: OS=windows-msvc

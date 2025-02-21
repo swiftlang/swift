@@ -26,3 +26,4 @@ func conditional_compilation() {
   if #available(Windows 10, *) {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

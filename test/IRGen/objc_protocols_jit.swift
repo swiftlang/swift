@@ -15,3 +15,4 @@
 class Bar: Foo {
   @objc var x: Int8 = 0
 }
+// UNSUPPORTED: OS=windows-msvc

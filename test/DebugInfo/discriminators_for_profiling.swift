@@ -14,3 +14,4 @@ public func lobster(_ n: Int) -> Bool {
 
   return n < 120
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -50,3 +50,4 @@ struct Test {
 
   func compute<R, V>(root: R, _: KeyPath<R, V>) {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ f(A())
 // CHECK: [{{.*}}] __builtin_log_scope_entry
 // CHECK-NEXT: [{{.*}}] __builtin_log_scope_exit
 // CHECK-NOT: __builtin_log
+// UNSUPPORTED: OS=windows-msvc

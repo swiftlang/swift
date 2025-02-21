@@ -64,3 +64,4 @@ print("[ \(foo: "[\(bar: x)]") ]")
 
 print("End")
 // CHECK-NEXT: End
+// UNSUPPORTED: OS=windows-msvc

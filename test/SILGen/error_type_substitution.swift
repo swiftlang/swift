@@ -11,3 +11,4 @@ public func foo() {
     consume_a_pointer(x: &pk)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

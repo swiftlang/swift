@@ -8,3 +8,4 @@
 // RUN: %target-swift-frontend-typecheck -disable-implicit-concurrency-module-import -target %target-cpu-apple-macosx13.0 -F %S/Inputs %s -module-cache-path %t/module-cache -backup-module-interface-path %S/Inputs/alternative-interfaces
 
 import BrokenFramework
+// UNSUPPORTED: OS=windows-msvc

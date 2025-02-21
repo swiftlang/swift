@@ -14,3 +14,4 @@ protocol CharacterPrinter {
 class PutCharPrinter: CharacterPrinter {
     public required init() {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@
 // REQUIRES: rdar66644853
 
 let zero = 0
+// UNSUPPORTED: OS=windows-msvc

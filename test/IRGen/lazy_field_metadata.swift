@@ -34,3 +34,4 @@ struct HasPropertyType {
 
 // NEGATIVE-NOT: @"$s19lazy_field_metadata14TypeOfPropertyVMn"
 // NEGATIVE-NOT: @"$s19lazy_field_metadata15HasPropertyTypeVMn"
+// UNSUPPORTED: OS=windows-msvc

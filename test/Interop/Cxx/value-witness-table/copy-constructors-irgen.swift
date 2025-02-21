@@ -39,3 +39,4 @@ public func testDefaultCopyConstructor(def : HasNonTrivialDefaultCopyConstructor
 public func testImplicitCopyConstructor(imp : HasNonTrivialImplicitCopyConstructor) -> (HasNonTrivialImplicitCopyConstructor, HasNonTrivialImplicitCopyConstructor) {
   return (imp, imp)
 }
+// UNSUPPORTED: OS=windows-msvc

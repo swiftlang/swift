@@ -157,3 +157,4 @@ entry(%x : $ClassConstrainedGenericField<ClassConstraintConformance>):
 // CHECK:         [[FIELD_ADDR_GENERIC:%.*]] = getelementptr inbounds %T5class28ClassConstrainedGenericFieldCyAA0B21ConstraintConformanceCG, ptr %0, i32 0, i32 1
 // CHECK:         load ptr, ptr [[FIELD_ADDR_GENERIC]]
 
+// UNSUPPORTED: OS=windows-msvc

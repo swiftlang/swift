@@ -12,3 +12,4 @@ import UIKit
 // CHECK-NOT: (initWithTitle:delegate:cancelButtonTitle:destructiveButtonTitle:otherButtonTitles:)
 
 _ = UIActionSheet(title: "abc", delegate: nil, cancelButtonTitle: nil, destructiveButtonTitle: nil)
+// UNSUPPORTED: OS=windows-msvc

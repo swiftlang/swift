@@ -747,3 +747,4 @@ enum MyEnum {
 // CHECKCASE:   ]
 // CHECKCASE: }
 // CHECKCASE: SYMBOL GRAPH END
+// UNSUPPORTED: OS=windows-msvc

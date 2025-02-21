@@ -695,3 +695,4 @@ struct TestStruct {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

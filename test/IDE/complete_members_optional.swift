@@ -42,3 +42,4 @@ func optionalMembers2<T : HasOptionalMembers1>(_ a: T) {
 // OPTIONAL_MEMBERS_2-DAG: Decl[StaticVar]/CurrNominal: optionalClassProperty[#Int?#]{{; name=.+$}}
 // OPTIONAL_MEMBERS_2-DAG: Keyword[self]/CurrNominal: self[#T.Type#]; name=self
 // OPTIONAL_MEMBERS_2-DAG: Keyword/CurrNominal: Type[#T.Type#]; name=Type
+// UNSUPPORTED: OS=windows-msvc

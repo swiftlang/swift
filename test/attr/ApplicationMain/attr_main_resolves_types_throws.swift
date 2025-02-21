@@ -18,3 +18,4 @@ struct S {
 @main
 extension S : P {}
 
+// UNSUPPORTED: OS=windows-msvc

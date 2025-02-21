@@ -33,3 +33,4 @@ public enum Metasyntactics: String, RawRepresentable {
     case xyzzy
     case thud
 }
+// UNSUPPORTED: OS=windows-msvc

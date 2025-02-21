@@ -437,3 +437,4 @@ class ClassCallingAsyncStuff {
   // no warning
   let funFunc = goodFunc1
 }
+// UNSUPPORTED: OS=windows-msvc

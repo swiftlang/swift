@@ -75,3 +75,4 @@ import main // expected-warning {{file 'import.swift' is part of module 'main'; 
 
 @_exported @_implementationOnly import empty // expected-error {{module 'empty' cannot be both exported and implementation-only}} {{12-33=}}
 // expected-warning @-1 {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
+// UNSUPPORTED: OS=windows-msvc

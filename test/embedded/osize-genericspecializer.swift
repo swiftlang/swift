@@ -16,3 +16,4 @@ public func baz<T>(n: T) {
 }
 
 // CHECK: define {{.*}}@main(
+// UNSUPPORTED: OS=windows-msvc

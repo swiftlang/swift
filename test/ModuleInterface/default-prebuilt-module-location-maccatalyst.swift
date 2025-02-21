@@ -27,3 +27,4 @@ import PrebuiltModule
 func x<T>(_ x: T) {}
 
 x(InPrebuiltModule.self)
+// UNSUPPORTED: OS=windows-msvc

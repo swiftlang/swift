@@ -4,3 +4,4 @@
 var x: Int = 1
 _ = type(of: x)
 
+// UNSUPPORTED: OS=windows-msvc

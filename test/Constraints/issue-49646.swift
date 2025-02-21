@@ -13,3 +13,4 @@ class C : NSObject, NSWobbling {
 func testDynamicOptionalRequirement(_ a: AnyObject) {
   a.optionalRequirement?()
 }
+// UNSUPPORTED: OS=windows-msvc

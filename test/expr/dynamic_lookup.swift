@@ -7,3 +7,4 @@
 func testStaticProperty(classObj: AnyObject.Type) {
   _ = classObj.staticVar1
 }
+// UNSUPPORTED: OS=windows-msvc

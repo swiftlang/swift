@@ -144,3 +144,4 @@ public struct register {
 }
 
 // CHECK: } // namespace Structs
+// UNSUPPORTED: OS=windows-msvc

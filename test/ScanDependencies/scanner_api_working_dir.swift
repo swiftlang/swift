@@ -22,3 +22,4 @@ import A
 
 //--- A.swift
 public func a() {}
+// UNSUPPORTED: OS=windows-msvc

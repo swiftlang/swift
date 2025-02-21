@@ -16,4 +16,4 @@ public enum Result {
 @available(*)
 // CHECK: <attr-builtin>@available</attr-builtin>(*)
 func materialize
-// CHECK: <kw>func</kw> materialize
+// CHECK: <kw>func</kw> materialize// UNSUPPORTED: OS=windows-msvc

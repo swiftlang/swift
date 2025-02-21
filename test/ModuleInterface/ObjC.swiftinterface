@@ -54,3 +54,4 @@ public class SomeNSObjectInlinable : NSObject {
   }
   @objc deinit
 }
+// UNSUPPORTED: OS=windows-msvc

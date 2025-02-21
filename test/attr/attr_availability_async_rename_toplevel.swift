@@ -20,3 +20,4 @@ if #available(SwiftStdlib 5.5, *) {
     process(data: data, completion: { print($0) })
   }
 }
+// UNSUPPORTED: OS=windows-msvc

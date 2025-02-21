@@ -152,3 +152,4 @@ func piecewise_Agg_Package(_ a: consuming Agg_Package) {
 func call_call_piecewise_Agg_Internal_UFI_Frozen() {
   call_piecewise_Agg_Internal_UFI_Frozen()
 }
+// UNSUPPORTED: OS=windows-msvc

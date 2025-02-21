@@ -5,3 +5,4 @@
 let f: @convention(c) () -> Void = { // expected-error {{a C function pointer cannot be formed from a closure that captures generic parameters}}
     func g<T>(_ x: T) {}
 }
+// UNSUPPORTED: OS=windows-msvc

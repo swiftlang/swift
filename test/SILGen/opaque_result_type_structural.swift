@@ -55,3 +55,4 @@ func g() -> Any {
 // CHECK: [[ADDR:%.*]] = init_existential_addr %0 : $*Any, $G<@_opaqueReturnTypeOf("$s29opaque_result_type_structural2f2AA1GVyQrGmyF", 0) __>.Type
 // CHECK: store [[METATYPE]] to [trivial] [[ADDR]] : $*@thick G<S>.Type
 // CHECK: return
+// UNSUPPORTED: OS=windows-msvc

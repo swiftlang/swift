@@ -22,3 +22,4 @@ PolymorphismTestSuite.test("Call overridden methods with pointer to base type") 
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

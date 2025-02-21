@@ -10,3 +10,4 @@ import has_generic_subscript
 var sillyDict = GenericSubscript()
 _ = sillyDict as GenericSubscriptProto
 var value: Int = sillyDict["beer"]
+// UNSUPPORTED: OS=windows-msvc

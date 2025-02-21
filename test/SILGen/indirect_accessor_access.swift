@@ -20,3 +20,4 @@ public struct Foo {
       _modify {fatalError()}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

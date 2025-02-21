@@ -15,3 +15,4 @@ func foo() {
 }
 
 func bar(_ n: String) {}
+// UNSUPPORTED: OS=windows-msvc

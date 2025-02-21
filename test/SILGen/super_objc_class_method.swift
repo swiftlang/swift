@@ -10,3 +10,4 @@ class MyFunkyDictionary: NSDictionary {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

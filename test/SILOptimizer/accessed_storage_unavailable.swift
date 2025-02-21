@@ -8,3 +8,4 @@ public struct Unavailable {
 
   static let j = S()
 }
+// UNSUPPORTED: OS=windows-msvc

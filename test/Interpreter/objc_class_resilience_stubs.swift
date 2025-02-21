@@ -78,3 +78,4 @@ ResilientClassTestSuite.test("category on other class")
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@ class MyClass: NSObject {
         return 0
     }()
 }
+// UNSUPPORTED: OS=windows-msvc

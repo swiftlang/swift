@@ -11,3 +11,4 @@ public func f() -> Int {
   // CHECK: debug_value undef : $Builtin.Int{{32|64}}, let, name "b", type $Int, expr op_constu:3:op_fragment:#Int._value
   return a + b
 }
+// UNSUPPORTED: OS=windows-msvc

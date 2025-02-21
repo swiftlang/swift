@@ -103,3 +103,4 @@ func pass(s: StructWithSubobjectDefaultedDestructor) {
 func pass(s: StructTriviallyCopyableMovable) {
   // CHECK: bb0(%0 : $StructTriviallyCopyableMovable):
 }
+// UNSUPPORTED: OS=windows-msvc

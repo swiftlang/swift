@@ -23,3 +23,4 @@ extension HasPrivateInitValue {
 extension PublicStructHasInitValue {
   init(z: Int) {}
 }
+// UNSUPPORTED: OS=windows-msvc

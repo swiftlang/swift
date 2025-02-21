@@ -37,3 +37,4 @@ struct AlwaysInlinedMember : AlwaysInline {
 }
 
 // CHECK-LABEL: sil private [transparent] [thunk] [always_inline] [ossa] @$s13inline_always19AlwaysInlinedMemberVAA0C6InlineA2aDP0bD0yyFTW : $@convention(witness_method: AlwaysInline) (@in_guaranteed AlwaysInlinedMember) -> () {
+// UNSUPPORTED: OS=windows-msvc

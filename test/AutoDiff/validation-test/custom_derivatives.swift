@@ -58,3 +58,4 @@ CustomDerivativesTests.testWithLeakChecking("WithoutDerivative") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

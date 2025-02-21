@@ -402,3 +402,4 @@ actor Ahmad {
   // CHECK: } // end sil function '$s4test5AhmadCACyYacfc'
   nonisolated init() async {}
 }
+// UNSUPPORTED: OS=windows-msvc

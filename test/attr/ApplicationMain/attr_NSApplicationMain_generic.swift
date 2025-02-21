@@ -7,3 +7,4 @@ import AppKit
 @NSApplicationMain // expected-error{{generic 'NSApplicationMain' classes are not supported}}
 class MyDelegate<T>: NSObject, NSApplicationDelegate {
 }
+// UNSUPPORTED: OS=windows-msvc

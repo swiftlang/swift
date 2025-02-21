@@ -9,3 +9,4 @@ public func add(_ lhs: inout LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> L
 
 // CHECK-WIN: call void [[NAME:@"\?\?HLoadableIntWrapper@@QEBA\?AU0@U0@@Z"]](ptr %{{[0-9]+}}, ptr {{.*}} sret(%TSo18LoadableIntWrapperV) {{.*}}, i32 %{{[0-9]+}})
 // CHECK-WIN: declare dso_local void [[NAME]](ptr {{.*}}, ptr {{.*}} sret(%struct.LoadableIntWrapper) {{.*}}, i32)
+// UNSUPPORTED: OS=windows-msvc

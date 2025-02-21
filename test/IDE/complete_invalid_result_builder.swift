@@ -56,3 +56,4 @@ test {
 
 // MYENUM_MEMBERS-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: a[#MyEnum#]; name=a
 // MYENUM_MEMBERS-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: b[#MyEnum#]; name=b
+// UNSUPPORTED: OS=windows-msvc

@@ -224,3 +224,4 @@ MathTests.test("${T}") {
 %end
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

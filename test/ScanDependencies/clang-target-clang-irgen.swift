@@ -50,3 +50,4 @@
 //--- test.swift
 import Bar
 print(Bar.funcBar())
+// UNSUPPORTED: OS=windows-msvc

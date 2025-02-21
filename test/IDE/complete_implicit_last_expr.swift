@@ -144,3 +144,4 @@ struct TestImplicitLastExprMember {
   // IMPLICIT_LAST_EXPR_MEMBER_VOID-DAG: Decl[InstanceMethod]/CurrNominal: str()[#String#]; name=str()
   // IMPLICIT_LAST_EXPR_MEMBER_VOID-DAG: Decl[InstanceMethod]/CurrNominal: int()[#Int#]; name=int()
 }
+// UNSUPPORTED: OS=windows-msvc

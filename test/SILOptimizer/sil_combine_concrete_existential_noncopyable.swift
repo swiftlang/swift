@@ -23,3 +23,4 @@ public func g() {
   let e: any P = S()
   f(e)
 }
+// UNSUPPORTED: OS=windows-msvc

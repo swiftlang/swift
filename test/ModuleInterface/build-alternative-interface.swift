@@ -36,3 +36,4 @@
 import FooBar
 import Foo
 import Bar
+// UNSUPPORTED: OS=windows-msvc

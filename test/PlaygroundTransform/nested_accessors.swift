@@ -169,3 +169,4 @@ Playground.doit()
 // CHECK-NEXT: [{{.*}}] __builtin_log[y='8']
 // CHECK-NEXT: [{{.*}}] __builtin_log_scope_exit
 // CHECK-NEXT: [{{.*}}] __builtin_log_scope_exit
+// UNSUPPORTED: OS=windows-msvc

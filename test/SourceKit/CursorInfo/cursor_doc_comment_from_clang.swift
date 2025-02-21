@@ -26,3 +26,4 @@ func test() {
 // CHECK: - And a list
 // CHECK-LABEL: DOC COMMENT XML
 // CHECK: <Function file="{{.*}}" line="9" column="6"><Name>testCDecl</Name><USR>c:@F@testCDecl</USR><Declaration>func testCDecl()</Declaration><Abstract><Para> This comment contains `markup`.</Para></Abstract><Discussion><Para> - And a list</Para></Discussion></Function>
+// UNSUPPORTED: OS=windows-msvc

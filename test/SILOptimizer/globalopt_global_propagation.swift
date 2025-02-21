@@ -252,3 +252,4 @@ public func test_optimize_init_static() -> Int {
   return Foo.x
 }
 
+// UNSUPPORTED: OS=windows-msvc

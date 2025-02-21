@@ -147,3 +147,4 @@ enum TrivialEnum : TriviallyConstructible {
     try self.init(throwingMiddle: throwingUpper)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

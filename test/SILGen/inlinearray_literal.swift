@@ -75,3 +75,4 @@ func nontrivial() -> InlineArray<2, String> {
 func noncopyable() -> InlineArray<2, Atomic<Int>> {
   [Atomic(0), Atomic(1)]
 }
+// UNSUPPORTED: OS=windows-msvc

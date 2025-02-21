@@ -38,3 +38,4 @@ RenamedObjCDemangleTests.test("@objc classes") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

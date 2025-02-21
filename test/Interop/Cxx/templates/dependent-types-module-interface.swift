@@ -14,3 +14,4 @@
 // TODO: Currently not imported (rdar://89034440).
 // CHECK-NOT: dependentRef
 // CHECK-NOT: dependentRefAndRefInferred
+// UNSUPPORTED: OS=windows-msvc

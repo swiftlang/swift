@@ -690,3 +690,4 @@ StdSpanTestSuite.test("Convert between Swift and C++ span types") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

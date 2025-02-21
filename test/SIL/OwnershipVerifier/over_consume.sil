@@ -292,3 +292,4 @@ bb1(%errorEmptyTup: $()):
 bb2(%error : @owned $Error):
   throw %error : $Error
 }
+// UNSUPPORTED: OS=windows-msvc

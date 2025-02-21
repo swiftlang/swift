@@ -9,3 +9,4 @@ protocol A : a {
 class a : A {
   typealias e = a
 }
+// UNSUPPORTED: OS=windows-msvc

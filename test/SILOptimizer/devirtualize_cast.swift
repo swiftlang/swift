@@ -10,3 +10,4 @@ func foo(y : Y) {
   x.ping()
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -75,3 +75,4 @@ class Foobar {
   }
 }
 class Foobar1 : Foobar, Baz { }
+// UNSUPPORTED: OS=windows-msvc

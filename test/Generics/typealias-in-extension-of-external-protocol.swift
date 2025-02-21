@@ -10,3 +10,4 @@ extension AnExternalProtocol {
 
   func methodUsingAlias(_ alias: Self.TypeAlias) {}
 }
+// UNSUPPORTED: OS=windows-msvc

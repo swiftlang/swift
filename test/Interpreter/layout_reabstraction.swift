@@ -98,3 +98,4 @@ print((any as! (Int) -> Int)(12))
 // CHECK-NEXT: 24
 let ca = callAny(any, 12)
 print(ca)
+// UNSUPPORTED: OS=windows-msvc

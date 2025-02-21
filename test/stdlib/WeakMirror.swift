@@ -295,3 +295,4 @@ mirrors.test("struct/StructHasObjCClassBoundExistential") {
 #endif
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

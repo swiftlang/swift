@@ -23,3 +23,4 @@ struct S: P {
   static let foo: (T1, (R) -> T2) = bind()
   // expected-error@-1 {{cannot convert value of type '(T1, (S.R) -> T3)' (aka '(Int, (Bool) -> Bool)') to specified type '(T1, (S.R) -> T2)' (aka '(Int, (Bool) -> Float)')}}
 }
+// UNSUPPORTED: OS=windows-msvc

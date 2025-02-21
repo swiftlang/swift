@@ -38,3 +38,4 @@ func f() {
 // VFS: .file  [[DEF:[0-9]+]] "{{(//|\\\\\\\\)}}absolute{{(/|\\\\)}}path" "def.swift"
 // VFS: .loc  [[DEF]] 142
 // VFS: .asciz "{{.*}}test/DebugInfo"
+// UNSUPPORTED: OS=windows-msvc

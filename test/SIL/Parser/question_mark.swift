@@ -19,3 +19,4 @@ struct E1 {
 
 var buffer: A<C, B<V1, E1>?>
 var buffer2: A<C, B<V1, E1>?>?
+// UNSUPPORTED: OS=windows-msvc

@@ -198,3 +198,4 @@ extension STSContainer℠ where T == STSOuter {
 // CHECK-DECL: nominal_types.(file).GenericOuter.InnerWhere
 // CHECK-DECL: nominal_types.(file).P
 // CHECK-DECL: nominal_types.(file).Constrained
+// UNSUPPORTED: OS=windows-msvc

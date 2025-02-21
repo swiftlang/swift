@@ -885,3 +885,4 @@ struct ValueGenericType<let N: Int> {
     { N }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

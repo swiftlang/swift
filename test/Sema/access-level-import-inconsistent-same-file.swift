@@ -116,3 +116,4 @@ struct ClangType1 {};
 //--- ClangLib2.h
 struct ClangType2 {};
 //--- ClangLib3.h
+// UNSUPPORTED: OS=windows-msvc

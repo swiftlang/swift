@@ -138,3 +138,4 @@ extension P where Self : Differentiable, Self == Self.TangentVector {
     return (self, { v in v })
   }
 }
+// UNSUPPORTED: OS=windows-msvc

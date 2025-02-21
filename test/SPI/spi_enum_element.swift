@@ -46,3 +46,4 @@ public enum SPIEnumWithPayloads {
   case publicPayloadCase(_ s: PublicStruct)
   case spiPayloadCase(_ s: SPIStruct)
 }
+// UNSUPPORTED: OS=windows-msvc

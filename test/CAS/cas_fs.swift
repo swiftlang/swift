@@ -26,3 +26,4 @@
 // RUN: %empty-directory(%t)
 
 func testFunc() {}
+// UNSUPPORTED: OS=windows-msvc

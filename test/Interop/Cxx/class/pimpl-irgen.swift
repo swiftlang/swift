@@ -13,3 +13,4 @@ let _ = createHasPIMPL()
 let _ = createHasSmartPIMPL()
 
 // CHECK-NOT: @"get_type_metadata {{.*}}default_delete{{.*}}
+// UNSUPPORTED: OS=windows-msvc

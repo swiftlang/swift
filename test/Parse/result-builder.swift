@@ -38,3 +38,4 @@ extension B {
   2
   3
 }
+// UNSUPPORTED: OS=windows-msvc

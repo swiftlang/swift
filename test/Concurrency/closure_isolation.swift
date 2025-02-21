@@ -87,3 +87,4 @@ func someAsyncFunc() async { }
   // CHECK: actor_isolated
   acceptEscapingAsyncClosure { () async in print("hello") }
 }
+// UNSUPPORTED: OS=windows-msvc

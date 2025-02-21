@@ -32,3 +32,4 @@ public func run() {
   }
   test(&p, size: size)
 }
+// UNSUPPORTED: OS=windows-msvc

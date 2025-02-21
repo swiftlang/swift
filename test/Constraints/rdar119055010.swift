@@ -41,3 +41,4 @@ struct Test {
     .flatMap(\.executable)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

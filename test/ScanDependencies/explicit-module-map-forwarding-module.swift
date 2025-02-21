@@ -50,3 +50,4 @@
 // RUN: %target-swift-ide-test -print-module-comments -module-to-print=Foo -enable-swiftsourceinfo -source-filename %s -explicit-swift-module-map-file %t/inputs/map.json | %FileCheck %s
 
 // CHECK: foo.swift:2:13: Func/foo RawComment=[/// Some cool comments
+// UNSUPPORTED: OS=windows-msvc

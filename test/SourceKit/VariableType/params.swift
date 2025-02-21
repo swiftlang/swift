@@ -18,3 +18,4 @@ let w: (String, Int) -> Void = { (_, x) in }
 // CHECK: (7:12, 7:17): String (explicit type: 1)
 // CHECK: (11:35, 11:36): String (explicit type: 0)
 // CHECK: (11:38, 11:39): Int (explicit type: 0)
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ _ = DispatchQueue.GlobalQueuePriority.low // expected-warning {{'low' is depreca
 let b = DispatchQueue.GlobalQueuePriority.background // expected-warning {{'background' is deprecated in watchOS: Use qos attributes instead}}
 
 _ = DispatchQueue.global(priority:b)   // expected-warning {{'global(priority:)' is deprecated in watchOS}}
+// UNSUPPORTED: OS=windows-msvc

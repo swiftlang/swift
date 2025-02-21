@@ -80,3 +80,4 @@ public protocol P {
 // SUBHEADING-NEXT:     "preciseIdentifier": "s:Si"
 // SUBHEADING-NEXT:   }
 // SUBHEADING-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

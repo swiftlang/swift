@@ -20,3 +20,4 @@ actor TestActor : TestableAsync {
   // CHECK: hop_to_executor {{%.*}} : $MainActor 
   func test() { }
 }
+// UNSUPPORTED: OS=windows-msvc

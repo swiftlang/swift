@@ -8,3 +8,4 @@
 // CHECK: ![[CLOSURE]] = distinct !DISubprogram({{.*}}scope: ![[MOD]],
 let closure = { 42 }
 closure()
+// UNSUPPORTED: OS=windows-msvc

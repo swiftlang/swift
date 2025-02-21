@@ -17,3 +17,4 @@ public func introduced11_0() { }
 // CHECK-NEXT: public func introduced11_0()
 
 
+// UNSUPPORTED: OS=windows-msvc

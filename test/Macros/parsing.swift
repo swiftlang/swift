@@ -57,3 +57,4 @@ macro am2()
 #m1 + 1
 // expected-warning @-1 {{result of operator '+' is unused}}
 // expected-error @-2 {{external macro implementation type 'A.M1' could not be found for macro 'm1()'}}
+// UNSUPPORTED: OS=windows-msvc

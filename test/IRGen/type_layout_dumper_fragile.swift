@@ -35,3 +35,4 @@ import type_layout_dumper_other
 // NEGATIVE-NOT: Name: Int.NestedInExtension{{$}}
 // NEGATIVE-NOT: Name: NonDependentResilientEnum{{$}}
 // NEGATIVE-NOT: Name: NonDependentResilientStruct{{$}}
+// UNSUPPORTED: OS=windows-msvc

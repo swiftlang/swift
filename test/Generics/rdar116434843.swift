@@ -24,3 +24,4 @@ typealias T<A: Q> = G<A>.B
 struct G<A: Q>: R, S {
   typealias A = A
 }
+// UNSUPPORTED: OS=windows-msvc

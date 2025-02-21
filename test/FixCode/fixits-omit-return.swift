@@ -27,3 +27,4 @@ let cl_fixit_addreturn_ifdecl: () -> String = {
     // expected-note@-1 {{did you mean to return the last expression?}}{{5-5=return }}
     #endif
 }
+// UNSUPPORTED: OS=windows-msvc

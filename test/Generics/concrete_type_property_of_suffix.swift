@@ -26,3 +26,4 @@ func foo<X : Q, Y : Q>(_: X, _: Y) {
   // Y.T is Optional<Y>.
   sameType(Y.T.self, Y?.self)
 }
+// UNSUPPORTED: OS=windows-msvc

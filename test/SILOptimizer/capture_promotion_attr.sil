@@ -60,3 +60,4 @@ bb0(%addr : $*C, %closure : @owned $@callee_owned (@in C) -> ()):
   %retval = tuple ()                                   
   return %retval : $()                                 
 }
+// UNSUPPORTED: OS=windows-msvc

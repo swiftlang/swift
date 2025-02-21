@@ -39,3 +39,4 @@ public struct MyStruct: R {
 // MyStruct gets no synthesized `bar` and `qux`, because it has its own implementation.
 // CHECK-COUNT-2: "precise": {{.*}}::SYNTHESIZED::
 // CHECK-NOT:     "precise": {{.*}}::SYNTHESIZED::
+// UNSUPPORTED: OS=windows-msvc

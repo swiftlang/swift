@@ -95,3 +95,4 @@ func multipleCaptures(bar: Int, baz: Int) {
 // MULTIPLE_CAPTURES_BAZ_REF: source.lang.swift.ref.var.local ([[#FUNCSTART+3]]:23-[[#FUNCSTART+3]]:26)
 // MULTIPLE_CAPTURES_BAZ_REF: SECONDARY SYMBOLS BEGIN
 // MULTIPLE_CAPTURES_BAZ_REF-NEXT: SECONDARY SYMBOLS END
+// UNSUPPORTED: OS=windows-msvc

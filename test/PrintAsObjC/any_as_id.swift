@@ -72,3 +72,4 @@ class AnyAsIdTest : NSObject {
 
 extension NSArray { @objc func forceToExist() {} }
 
+// UNSUPPORTED: OS=windows-msvc

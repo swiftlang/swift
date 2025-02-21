@@ -31,3 +31,4 @@ public func g(_ s : S) {
 // CHECK:   call void @f(%struct.S %[[LOAD]])
 // CHECK: }
 
+// UNSUPPORTED: OS=windows-msvc

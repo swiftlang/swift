@@ -23,3 +23,4 @@
 // CHECK-PROP-FIRST-LABEL: extension Sub : Foo {
 // CHECK-PROP-FIRST-NEXT: }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -97,3 +97,4 @@ struct Main {
 // CHECK-IR-NEXT:   call {{.*}}@llvm.lifetime.end.p0
 // CHECK-IR-NEXT:   ret {{.*}}0
 // CHECK-IR-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

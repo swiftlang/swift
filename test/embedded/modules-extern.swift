@@ -32,3 +32,4 @@ func some_c_api()
 
 some_c_api()
 publicFuncInAModule()
+// UNSUPPORTED: OS=windows-msvc

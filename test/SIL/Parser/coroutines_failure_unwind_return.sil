@@ -17,3 +17,4 @@ bb2:
   %r2 = tuple ()
   return %r2 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

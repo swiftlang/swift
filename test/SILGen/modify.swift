@@ -558,3 +558,4 @@ extension HasConditionalSubscript: ConditionalSubscript where T: ConditionalSubs
 // CHECK:   method #Totalled.total!setter: {{.*}} : @$s6modify4BillVAA8TotalledA2aDP5totalSivsTW
 // CHECK:   method #Totalled.total!modify: {{.*}} : @$s6modify4BillVAA8TotalledA2aDP5totalSivMTW
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

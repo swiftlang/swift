@@ -7,3 +7,4 @@
 import Darwin
 
 _ = pthread_mutexattr_t() // expected-warning {{'init()' is deprecated: This zero-initializes the backing memory of the struct}}
+// UNSUPPORTED: OS=windows-msvc

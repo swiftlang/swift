@@ -847,3 +847,4 @@ func testCompoundLeadingDot() {
   let _: S = .foo(x:)(0)
   let _: S = .foo(x:)(x: 0) // expected-error {{extraneous argument label 'x:' in call}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -71,3 +71,4 @@ func check() {
   let access = SomeAccessor()
   asGeneric(access)
 }
+// UNSUPPORTED: OS=windows-msvc

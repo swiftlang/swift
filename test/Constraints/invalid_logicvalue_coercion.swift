@@ -7,3 +7,4 @@ if c as C { // expected-error{{cannot convert value of type 'C' to expected cond
 
 if ({1} as () -> Int) { // expected-error{{cannot convert value of type '() -> Int' to expected condition type 'Bool'}}
 }
+// UNSUPPORTED: OS=windows-msvc

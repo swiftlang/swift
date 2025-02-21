@@ -16,3 +16,4 @@ func test(seq: any AsyncSequence) async {
     error.printMe()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

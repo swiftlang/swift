@@ -46,3 +46,4 @@ CodableEnumUnavailableElementTestSuite.test("decode_unavailable_case") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

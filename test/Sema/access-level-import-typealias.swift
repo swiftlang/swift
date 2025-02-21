@@ -33,3 +33,4 @@ public class InheritsFromClazzAlias: ClazzAlias {}
   // expected-error@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used in an '@inlinable' function because 'Original' was not imported publicly}}
   _ = ClazzAlias.self
 }
+// UNSUPPORTED: OS=windows-msvc

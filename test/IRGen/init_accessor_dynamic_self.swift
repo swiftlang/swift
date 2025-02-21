@@ -19,3 +19,4 @@ public class C {
 }
 
 let c = C()
+// UNSUPPORTED: OS=windows-msvc

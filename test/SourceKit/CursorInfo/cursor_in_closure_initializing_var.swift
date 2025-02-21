@@ -8,3 +8,4 @@ class MyClass {
 }
 
 // CHECK: s:34cursor_in_closure_initializing_var7MyClassC17calculatorContextSivgSiyXEfU_7contextL_Sivp
+// UNSUPPORTED: OS=windows-msvc

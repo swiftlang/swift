@@ -11,3 +11,4 @@ extension Letter: Strideable {
     Self( rawValue: self.rawValue.advanced( by: n ) )!
   }
 }
+// UNSUPPORTED: OS=windows-msvc

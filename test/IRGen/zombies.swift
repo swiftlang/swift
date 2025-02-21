@@ -13,3 +13,4 @@ class C {
 // CHECK: define hidden void @"$s7zombies1CC1i33_45489CBEFBF369AB7AEE3A799A95D78DLLSivg"()
 // CHECK: entry:
 // CHECK:  tail call void @swift_deletedMethodError()
+// UNSUPPORTED: OS=windows-msvc

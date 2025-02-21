@@ -17,3 +17,4 @@ func bar() {
 func useAProtocol() -> ProtocolOnlyUsedAsAType? {
   return nil
 }
+// UNSUPPORTED: OS=windows-msvc

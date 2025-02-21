@@ -147,3 +147,4 @@ func f7() -> Int { // CHECK-NEXT: [[@LINE]]:18 -> [[@LINE+10]]:2 : 0
     return 1
   }
 } // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

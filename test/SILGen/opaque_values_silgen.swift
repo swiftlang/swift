@@ -885,3 +885,4 @@ struct Twople<T> {
 func throwTypedValue(_ e: Err) throws(Err) { throw e }
 
 struct Err : Error {}
+// UNSUPPORTED: OS=windows-msvc

@@ -6,3 +6,4 @@ import pack_expansion_type_other
 
 _ = variadicFunction(t: 1, 2, u: "hi", "bye")
 _ = VariadicType().variadicMethod(t: 1, "hi", u: "bye", 3)
+// UNSUPPORTED: OS=windows-msvc

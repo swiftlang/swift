@@ -65,3 +65,4 @@ int main() {
 // CHECK-NEXT: destroy ActorWithField
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

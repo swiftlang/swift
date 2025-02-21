@@ -99,3 +99,4 @@ func useFoo10WayOff() {
     // expected-note@-1{{add 'if #available' version check}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

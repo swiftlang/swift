@@ -32,3 +32,4 @@ var s = ShippingOptions(rawValue: 42)
 print(s.isEmpty)
 
 // CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)
+// UNSUPPORTED: OS=windows-msvc

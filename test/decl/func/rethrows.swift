@@ -688,3 +688,4 @@ func takesArbitraryAndRethrows<T>(_ value: T, body: () throws -> Void) rethrows 
 func testArbitraryAndRethrows() {
   takesArbitraryAndRethrows(throwingFunc) { }
 }
+// UNSUPPORTED: OS=windows-msvc

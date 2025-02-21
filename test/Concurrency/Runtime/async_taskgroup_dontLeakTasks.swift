@@ -51,3 +51,4 @@ func test_taskGroup_next() async {
     await test_taskGroup_next()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

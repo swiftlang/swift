@@ -10,3 +10,4 @@ class Crasher {
 
 Crasher.called(argument: .meth) // expected-error {{type 'String' has no member 'meth'}}
 Crasher.called(argument: String.meth) // expected-error {{type 'String' has no member 'meth'}}
+// UNSUPPORTED: OS=windows-msvc

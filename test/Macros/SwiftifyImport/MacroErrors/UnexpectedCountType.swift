@@ -15,3 +15,4 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ len: String) {
 // CHECK-NEXT: }
 
 // expected-error@_SwiftifyImport:2{{no exact matches in call to initializer}}
+// UNSUPPORTED: OS=windows-msvc

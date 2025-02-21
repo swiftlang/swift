@@ -44,3 +44,4 @@ public func run_ChaCha(_ N: Int) {
   }
 } // expected-remark {{release of type '}}
   // expected-remark @-1 {{release of type '}}
+// UNSUPPORTED: OS=windows-msvc

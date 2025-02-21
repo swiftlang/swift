@@ -41,3 +41,4 @@ public enum TestE : Int{
 // CHECK: typedef SWIFT_ENUM(NSInteger, TestE, closed)
 // CHECK-NEXT: {{^}} A2 SWIFT_COMPILE_NAME("A1") = 0,
 // CHECK-NEXT: {{^}} TestEB1 = 1,
+// UNSUPPORTED: OS=windows-msvc

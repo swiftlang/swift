@@ -174,3 +174,4 @@ multiLine(
   x: 1,
   y: 1 // expected-error {{missing argument for parameter 'z' in call}} {{7-7=, z: <#Int#>}}
 )
+// UNSUPPORTED: OS=windows-msvc

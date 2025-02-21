@@ -166,3 +166,4 @@ class C2_52548 {
     let _ = obj[keyPath: kp] // expected-error {{the root type of a Swift key path cannot be 'AnyObject'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

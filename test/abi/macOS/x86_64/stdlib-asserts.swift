@@ -66,3 +66,4 @@ Added: _$ss24_RuntimeFunctionCountersV07runtimebC7OffsetsSPys6UInt16VGvpZMV
 
 // Runtime Symbols
 Added: _swift_clearSensitive
+// UNSUPPORTED: OS=windows-msvc

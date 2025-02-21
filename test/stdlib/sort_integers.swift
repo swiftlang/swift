@@ -123,3 +123,4 @@ randomize(1900, sort_verifier)
 //CHECK: Test3 - Done
 print("Test3 - Done")
 
+// UNSUPPORTED: OS=windows-msvc

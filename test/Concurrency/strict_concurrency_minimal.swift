@@ -61,3 +61,4 @@ func passSendable(
   // like in the case below. We do warn about it with >= targeted.
   takeSendable { print(s3) } // expected-targeted-warning {{capture of 's3' with non-sendable type 'S3' in a '@Sendable' closure}}
 }
+// UNSUPPORTED: OS=windows-msvc

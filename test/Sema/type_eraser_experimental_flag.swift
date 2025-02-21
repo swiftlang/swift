@@ -43,3 +43,4 @@ public struct ConcreteP: P, Hashable {
 // CHECK-UNDERLYING-TYPE2-LABEL: s31import_with_opaque_type_erasure6erasedQrvg
 // CHECK-UNDERLYING-TYPE2: bb0(%0 : $*AnyP):
 // CHECK-UNDERLYING-TYPE2: function_ref @$s7erasure14testTypeErasedQryF : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <AnyP>
+// UNSUPPORTED: OS=windows-msvc

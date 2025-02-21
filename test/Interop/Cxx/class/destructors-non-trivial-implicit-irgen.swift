@@ -16,3 +16,4 @@ public func testHasNonTrivialImplicitDestructor() {
 // CHECK-LABEL: define {{.*}}@{{_ZN31HasNonTrivialImplicitDestructorD2Ev|"\?\?1HasNonTrivialImplicitDestructor@@QEAA@XZ"}}(ptr
 // CHECK: call {{.*}}@{{_ZN25HasUserProvidedDestructorD(1|2)Ev|"\?\?1HasUserProvidedDestructor@@QEAA@XZ"}}
 // CHECK: ret
+// UNSUPPORTED: OS=windows-msvc

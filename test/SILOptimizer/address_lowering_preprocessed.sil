@@ -35,3 +35,4 @@ bb0(%t : @owned $T, %box : $*Box<T>):
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

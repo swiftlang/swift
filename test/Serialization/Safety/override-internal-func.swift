@@ -75,3 +75,4 @@ public class OtherFinalDerived : Derived {
 func foo() {
     let a = Derived()
 }
+// UNSUPPORTED: OS=windows-msvc

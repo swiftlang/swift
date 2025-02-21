@@ -11,3 +11,4 @@ protocol P1 {
 protocol P2 {
   associatedtype X where X == Self
 }
+// UNSUPPORTED: OS=windows-msvc

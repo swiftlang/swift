@@ -29,3 +29,4 @@ struct Bunny {
   static func main() {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

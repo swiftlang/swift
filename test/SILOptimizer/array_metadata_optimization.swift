@@ -21,3 +21,4 @@ public class C {}
 public func makeArrayClass(x: C) -> [C] {
   return [x, x, x]
 }
+// UNSUPPORTED: OS=windows-msvc

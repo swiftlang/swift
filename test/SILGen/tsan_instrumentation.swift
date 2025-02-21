@@ -114,3 +114,4 @@ func testInstrumentNonEmptyStruct() {
 // CHECK-LLVM-IR: tsan_external_write
   s.mutate()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,4 +15,4 @@ final class FakeExecutor: SerialExecutor {
   // implements the __owned requirement in "old" SDK:
   //    func enqueue(_ job: __owned Job)
   func enqueue(_ job: consuming ExecutorJob) {}
-}
+}// UNSUPPORTED: OS=windows-msvc

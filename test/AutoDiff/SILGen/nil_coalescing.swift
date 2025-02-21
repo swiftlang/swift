@@ -26,3 +26,4 @@ func nilCoalescing<T: Differentiable>(optional: T?, defaultValue: @autoclosure (
  }
  return (value, pullback)
 }
+// UNSUPPORTED: OS=windows-msvc

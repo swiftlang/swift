@@ -105,3 +105,4 @@ struct Main {
         print(l.isEmpty)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

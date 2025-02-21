@@ -214,3 +214,4 @@ public func clientFunc() {}
 struct T {}
 struct U {}
 func f() -> T { return U() }
+// UNSUPPORTED: OS=windows-msvc

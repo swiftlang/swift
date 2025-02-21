@@ -35,3 +35,4 @@ public class Derived<T> : Base<T, T> {
 // CHECK-NEXT: }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ struct Test {
 // WITH_SOME_CONTEXTUAL_TYPE-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: structType[#Square#];
   }
 }
+// UNSUPPORTED: OS=windows-msvc

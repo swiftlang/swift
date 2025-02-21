@@ -11,3 +11,4 @@ public func testit(_ s: [Int : Int]) -> Int? {
   return s[27]
 }
 
+// UNSUPPORTED: OS=windows-msvc

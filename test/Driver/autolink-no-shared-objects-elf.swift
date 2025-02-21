@@ -3,3 +3,4 @@
 // REQUIRES: autolink-extract
 
 // CHECK-NOT: swift-autolink-extract {{.+}}.o {{.+}}Inputs/libEmpty.so -o {{.+}}.autolink
+// UNSUPPORTED: OS=windows-msvc

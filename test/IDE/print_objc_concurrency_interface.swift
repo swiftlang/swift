@@ -88,3 +88,4 @@ import _Concurrency
 // CHECK: @available(*, unavailable)
 // CHECK-NEXT: extension NonSendableStringStruct : @unchecked Sendable {
 
+// UNSUPPORTED: OS=windows-msvc

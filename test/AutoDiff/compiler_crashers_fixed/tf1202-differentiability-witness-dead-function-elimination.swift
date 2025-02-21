@@ -15,3 +15,4 @@ import tf1202
 func callit() -> Float {
   return foo()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -127,3 +127,4 @@ func _withParameterTypeInfo(
     return
   }
 }
+// UNSUPPORTED: OS=windows-msvc

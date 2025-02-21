@@ -11,3 +11,4 @@ public func warningForDeadDelegate() {
   listener.delegate = delegate
   listener.resume()
 }
+// UNSUPPORTED: OS=windows-msvc

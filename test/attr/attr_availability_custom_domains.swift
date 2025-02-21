@@ -39,3 +39,4 @@ func test() {
   availableInDynamicDomain() // FIXME: [availability] should be diagnosed
   availableInUnknownDomain() // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

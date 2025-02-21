@@ -12,3 +12,4 @@ class DelegateBase : NSObject, NSApplicationDelegate { }
 // expected-deprecated-note@-1 {{use @main instead}} {{1-19=@main}}
 class MyDelegate : DelegateBase { }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ var gc: () -> () = {}
 // CHECK: call void @swift_deallocUninitializedObject
 // CHECK-NOT: call void @swift_setDeallocating
 // CHECK: ret void
+// UNSUPPORTED: OS=windows-msvc

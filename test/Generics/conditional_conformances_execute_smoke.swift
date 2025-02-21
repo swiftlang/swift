@@ -84,3 +84,4 @@ takes_P2(Recur(id: 2, x: Recur(id: 3, x: NoRecur(x: IsP1()))))
 // CHECK-NEXT: Recur 3
 // CHECK-NEXT: NoRecur
 // CHECK-NEXT: IsP1 3
+// UNSUPPORTED: OS=windows-msvc

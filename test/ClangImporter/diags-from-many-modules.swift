@@ -21,3 +21,4 @@ import Warnings9
 // CHECK: Warnings7.h:{{.+}}: warning: 'old' is deprecated
 // CHECK: Warnings8.h:{{.+}}: warning: 'old' is deprecated
 // CHECK: Warnings9.h:{{.+}}: warning: 'old' is deprecated
+// UNSUPPORTED: OS=windows-msvc

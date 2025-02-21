@@ -9,3 +9,4 @@ var x: Int
 
 // BEGIN b.swift
 var y: Int
+// UNSUPPORTED: OS=windows-msvc

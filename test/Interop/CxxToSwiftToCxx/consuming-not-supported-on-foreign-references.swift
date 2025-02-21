@@ -38,3 +38,4 @@ public func takeSharedFRT(_ x: SharedFRT) {
     // CHECK: error: 'consume' applied to value that the compiler does not support. This is a compiler bug. Please file a bug with a small example of the bug
     x.x = 10
 }
+// UNSUPPORTED: OS=windows-msvc

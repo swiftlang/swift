@@ -15,3 +15,4 @@ class A {
 
 let a = A()
 a.foo()
+// UNSUPPORTED: OS=windows-msvc

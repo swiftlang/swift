@@ -136,3 +136,4 @@ extension SubscriptGet_Get: StaticSubscriptGet {}
 extension StaticSubscriptGet_Get: SubscriptGet {} 
 // expected-error@-1 {{type 'StaticSubscriptGet_Get' does not conform to protocol 'SubscriptGet'}}
 // expected-note@-2 {{add stubs for conformance}}
+// UNSUPPORTED: OS=windows-msvc

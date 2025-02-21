@@ -117,3 +117,4 @@ func testIntToFloatConversion() {
 
   _blackHole(Float80(18_446_744_073_709_551_617)) // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

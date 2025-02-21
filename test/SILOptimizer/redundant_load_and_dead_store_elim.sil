@@ -201,3 +201,4 @@ bb0(%0 : $*AA):
   return %9999 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

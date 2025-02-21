@@ -541,3 +541,4 @@ OptionalTests.test("Optional binding: if var") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

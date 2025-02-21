@@ -5,3 +5,4 @@
 class DictStringInt {
   init(dictionaryLiteral xs: ()...) {} // expected-error{{broken standard library: cannot find Array type}}
 }
+// UNSUPPORTED: OS=windows-msvc

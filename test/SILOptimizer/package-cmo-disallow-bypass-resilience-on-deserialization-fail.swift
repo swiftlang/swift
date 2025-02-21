@@ -165,3 +165,4 @@ module ObjCAPI {
   header "ObjCAPI.h"
   export *
 }
+// UNSUPPORTED: OS=windows-msvc

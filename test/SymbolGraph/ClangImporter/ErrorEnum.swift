@@ -46,3 +46,4 @@ typedef NS_ERROR_ENUM(int, MyErrorCode, MyErrorDomain) {
   /// This is second error.
   MyErrSecond,
 };
+// UNSUPPORTED: OS=windows-msvc

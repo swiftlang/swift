@@ -41,3 +41,4 @@ import LibLocal
 func someFunc() {
   log(level: 1)
 }
+// UNSUPPORTED: OS=windows-msvc

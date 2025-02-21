@@ -163,3 +163,4 @@
 // CHECK:   var pointee: Int32 { get nonmutating set }
 // CHECK:   typealias Pointee = Int32
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

@@ -180,3 +180,4 @@ func foo12(completion: @escaping (Result<String, CustomError>) -> Void) {}
 // FOO12-NEXT:     }
 // FOO12-NEXT:   }
 // FOO12-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

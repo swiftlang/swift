@@ -227,3 +227,4 @@
 // CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
 // CHECK-NEXT:   private var x: Int32
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

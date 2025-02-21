@@ -219,3 +219,4 @@ package func getPkgModuleKlassMemberTBD() -> Int {
 
 
 // CHECK-LABEL: sil [_semantics "optimize.no.crossmodule"] @$s9Submodule19incrementByOneNoCMOyS2iF : $@convention(thin) (Int) -> Int
+// UNSUPPORTED: OS=windows-msvc

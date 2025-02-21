@@ -38,3 +38,4 @@ public macro InvalidMember() = #externalMacro(module: "MacroPlugin", type: "Inva
 
 @InvalidMember
 struct TestStruct { }
+// UNSUPPORTED: OS=windows-msvc

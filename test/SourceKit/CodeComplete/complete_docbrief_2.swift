@@ -43,3 +43,4 @@ func test() {
   // CHECK-NEXT:       key.sourcetext: "foo()"
   // CHECK-NEXT:     }
 }
+// UNSUPPORTED: OS=windows-msvc

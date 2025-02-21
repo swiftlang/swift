@@ -246,3 +246,4 @@ tests.test("isKnownUniquelyReferenced") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

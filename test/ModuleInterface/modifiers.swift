@@ -98,3 +98,4 @@ public struct MyStruct {
   }
   // CHECK-NEXT: }
 }
+// UNSUPPORTED: OS=windows-msvc

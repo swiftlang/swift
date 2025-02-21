@@ -51,3 +51,4 @@ func for_each(r: AsyncRange<Int>, iir: AsyncIntRange<Int>) async { // expected-n
             // expected-error @-4 {{expected Sequence expression for for-each loop}}
   for await i in r sum = sum + i; // expected-error{{expected '{' to start the body of for-each loop}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ import Foo
 public func bar() -> Int {
   functionToSerialize()
 }
+// UNSUPPORTED: OS=windows-msvc

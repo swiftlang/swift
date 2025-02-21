@@ -212,3 +212,4 @@ public func inoutStructDoubleAndFloat(_ s: inout StructDoubleAndFloat) {
 // CHECK-NEXT:    Structs::_impl::swift_interop_returnDirect_Structs_[[StructU16AndPointer]](result, Structs::_impl::$s7Structs28returnNewStructU16AndPointeryAA0defG0VSvF(x));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

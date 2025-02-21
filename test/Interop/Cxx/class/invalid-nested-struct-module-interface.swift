@@ -2,3 +2,4 @@
 
 // CHECK-NOT: CannotImport
 // CHECK-NOT: ForwardDeclaredSibling
+// UNSUPPORTED: OS=windows-msvc

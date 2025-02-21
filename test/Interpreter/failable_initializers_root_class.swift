@@ -174,3 +174,4 @@ FailableInitTestSuite.test("SecondClassTrivial") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

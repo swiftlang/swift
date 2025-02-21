@@ -72,3 +72,4 @@ public struct ConstMacro: ExpressionMacro {
     return "42"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

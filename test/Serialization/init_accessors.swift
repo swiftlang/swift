@@ -60,3 +60,4 @@ _ = test1.x
 
 let test2 = TestMulti(data: ("Question", 42), b: -1)
 _ = print("\(test2.data), \(test2.b)")
+// UNSUPPORTED: OS=windows-msvc

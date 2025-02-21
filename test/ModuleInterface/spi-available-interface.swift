@@ -18,3 +18,4 @@ public func bar(_ c: SPIInterface1) {}
 import Foo
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

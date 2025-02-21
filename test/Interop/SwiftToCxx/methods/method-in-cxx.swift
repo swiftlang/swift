@@ -210,3 +210,4 @@ public func createPassStructInClassMethod() -> PassStructInClassMethod {
 // CHECK-NEXT: SWIFT_INLINE_THUNK void PassStructInClassMethod::updateStruct(swift::Int x, const LargeStruct& y) {
 // CHECK-NEXT: _impl::$s7Methods23PassStructInClassMethodC06updateC0yySi_AA05LargeC0VtF(x, Methods::_impl::_impl_LargeStruct::getOpaquePointer(y), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

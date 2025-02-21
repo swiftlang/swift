@@ -29,3 +29,4 @@ class ObjCSwiftSub: ObjCBase {
 class ResilientSwiftSub: ResilientBase {
     var z: Int = 0
 }
+// UNSUPPORTED: OS=windows-msvc

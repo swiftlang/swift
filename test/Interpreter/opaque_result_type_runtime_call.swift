@@ -19,3 +19,4 @@ func caller<T: P>(t: T) {
 
 // CHECK: Hello, world
 caller(t: "Hello, world")
+// UNSUPPORTED: OS=windows-msvc

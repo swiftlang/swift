@@ -436,3 +436,4 @@ bb0(%0 : $(Builtin.Int32, Builtin.Int64)):
   return %9 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

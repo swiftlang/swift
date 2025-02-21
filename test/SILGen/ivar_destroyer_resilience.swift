@@ -37,3 +37,4 @@ public class DoesNotNeedIVarDestroyer : Base {
 // CHECK-NEXT: #DoesNotNeedIVarDestroyer.x!modify: (DoesNotNeedIVarDestroyer) -> () -> ()
 // CHECK-NEXT: #DoesNotNeedIVarDestroyer.deinit!deallocator
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

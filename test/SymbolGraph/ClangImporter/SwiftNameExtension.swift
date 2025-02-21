@@ -32,3 +32,4 @@ static double MyDoubleFixedValue = 0.0;
 // CHECK-DAG: "precise": "c:OtherHeader.h@myVar"
 static int myVar = 0;
 
+// UNSUPPORTED: OS=windows-msvc

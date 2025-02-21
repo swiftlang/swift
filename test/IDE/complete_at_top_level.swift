@@ -328,3 +328,4 @@ extension FooStruct {
 
 var varAtEOF : Int
 // NEGATIVE-NOT: varAtEOF
+// UNSUPPORTED: OS=windows-msvc

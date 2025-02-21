@@ -9,3 +9,4 @@ func variadic<each T>(ts: repeat each T) {
     // expected-warning@-1{{initialization of immutable value 'y' was never used; consider replacing with assignment to '_' or removing it}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

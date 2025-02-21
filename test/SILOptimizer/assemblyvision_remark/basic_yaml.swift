@@ -143,3 +143,4 @@ public func useGlobal() {
              // expected-remark @-5:12 {{release of type}}
              // expected-note @-9 {{of 'x'}}
 }
+// UNSUPPORTED: OS=windows-msvc

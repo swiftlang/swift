@@ -18,3 +18,4 @@ public func main() {
   // CHECK-SAME:  loc {{.*}}:11:10, scope [[S]]
 	use(a.a)
 }
+// UNSUPPORTED: OS=windows-msvc

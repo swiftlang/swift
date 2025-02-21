@@ -358,3 +358,4 @@ public func spiAvailableFunc() {}
  // CHECK-SPI-NEXT:  "categories": [],
 // CHECK-SPI-NEXT:   "version": "1.0"
 // CHECK-SPI-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

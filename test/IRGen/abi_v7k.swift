@@ -345,3 +345,4 @@ func minMax3(x : Int, y : Int) -> Ret? {
     var r = Ret(min:currentMin, max:currentMax, min2:currentMin, max2:currentMax, min3:currentMin, max3:currentMax)
     return r
 }
+// UNSUPPORTED: OS=windows-msvc

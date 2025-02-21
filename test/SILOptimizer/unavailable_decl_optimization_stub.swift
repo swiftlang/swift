@@ -14,3 +14,4 @@ public func unavailableFunc() -> S {
   // inserted call to _diagnoseUnavailableCodeReached() makes it unreachable.
   return S()
 }
+// UNSUPPORTED: OS=windows-msvc

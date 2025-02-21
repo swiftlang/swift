@@ -525,3 +525,4 @@ enum CasesWithMissingElement: Int {
   case b = "hello", // expected-error{{expected identifier after comma in enum 'case' declaration}}
   // expected-error@-1 {{cannot convert value of type 'String' to raw type 'Int'}}
 }
+// UNSUPPORTED: OS=windows-msvc

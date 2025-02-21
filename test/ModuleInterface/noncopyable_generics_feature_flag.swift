@@ -18,3 +18,4 @@ import Library
 struct NC: ~Copyable {}
 
 let x: Hello<NC> = .init()
+// UNSUPPORTED: OS=windows-msvc

@@ -3,3 +3,4 @@
 // REQUIRES: autolink-extract
 
 // CHECK: swift-autolink-extract {{.+}}.o -o {{.+}}.autolink
+// UNSUPPORTED: OS=windows-msvc

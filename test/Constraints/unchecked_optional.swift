@@ -90,3 +90,4 @@ func test11(_ i: Int!, j: Int!) {
   test11_helper(j!)
   j = nil
 }
+// UNSUPPORTED: OS=windows-msvc

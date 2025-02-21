@@ -77,3 +77,4 @@ bb0:
   end_apply %2 as $()
   unreachable
 }
+// UNSUPPORTED: OS=windows-msvc

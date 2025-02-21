@@ -28,3 +28,4 @@ extension Klass {
   __consuming
   func noimplicitcopy_method_attr() {}
 }
+// UNSUPPORTED: OS=windows-msvc

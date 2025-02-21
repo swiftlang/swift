@@ -8,3 +8,4 @@
 // CHECK-LABEL: <OPTIONS_BLOCK
 // CHECK:      <XCC abbrevid={{[0-9]+}}/> blob data = '--target=arm64e-apple-macos12.12'
 // CHECK: </OPTIONS_BLOCK>
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@
 // CHECK: failed to find output for cache key
 
 func testFunc() {}
+// UNSUPPORTED: OS=windows-msvc

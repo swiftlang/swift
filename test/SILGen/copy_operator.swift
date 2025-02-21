@@ -63,3 +63,4 @@ public func useCopy(_ k: Klass) -> Klass {
 public func useCopy<T : AnyObject>(_ k: T) -> T {
     copy k
 }
+// UNSUPPORTED: OS=windows-msvc

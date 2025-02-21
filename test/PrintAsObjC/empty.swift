@@ -45,3 +45,4 @@
 // CHECK-NOT: {{[@;{}]}}
 
 // CUSTOM-OBJC-PROLOGUE: swift/objc-prologue.h:1:2: error: "Prologue included"
+// UNSUPPORTED: OS=windows-msvc

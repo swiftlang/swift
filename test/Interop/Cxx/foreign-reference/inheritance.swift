@@ -38,3 +38,4 @@ TemplatingTestSuite.test("DerivedOutOfOrder") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

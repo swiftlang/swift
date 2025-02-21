@@ -66,3 +66,4 @@ extension Outer.Inner {
         priv()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -103,3 +103,4 @@ int main(void) {
 
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

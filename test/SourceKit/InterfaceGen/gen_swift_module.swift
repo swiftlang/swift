@@ -106,3 +106,4 @@ func f(s : inout [Int]) {
 // CHECK-DECLARATIONS-ARRAY-NOT: int_function
 // CHECK-DECLARATIONS-ARRAY-NOT: fp_function
 // CHECK-DECLARATIONS-ARRAY-NOT: priv_function
+// UNSUPPORTED: OS=windows-msvc

@@ -213,3 +213,4 @@ struct LastMember {
 //
 // INDEPENDENT_ATTR_NOT-NOT: freestandingExprMacro
 // INDEPENDENT_ATTR_NOT-NOT: freestandingDeclMacro
+// UNSUPPORTED: OS=windows-msvc

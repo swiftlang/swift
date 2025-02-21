@@ -29,3 +29,4 @@ func foo(o: Int?) {
 // CHECK-NEXT:     key.is_system: 1
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

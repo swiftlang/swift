@@ -9,3 +9,4 @@ public func staticstring() -> StaticString {
 
 // CHECK: !llvm.linker.options = !{}
 // CHECK-NOT: -lswiftCore
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@ func f<S: AsyncSequence>(s: S) async throws {
   // CHECK: next()
   for try await x in s { }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -61,3 +61,4 @@ struct BacktraceWithTop {
     doFrames(6, limit: 30, top: 4)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

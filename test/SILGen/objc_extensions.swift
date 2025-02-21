@@ -192,3 +192,4 @@ extension PettableContainer {
 // CHECK-LABEL: sil private [thunk] [ossa] @$sSo17PettableContainerC15objc_extensionsE8extract2xSgyFTo : $@convention(objc_method) @pseudogeneric <T where T : Pettable> (PettableContainer<T>) -> @autoreleased Optional<T>
   @objc public func extract2() -> T? { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

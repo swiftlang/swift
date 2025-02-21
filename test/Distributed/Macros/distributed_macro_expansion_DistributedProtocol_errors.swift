@@ -39,3 +39,4 @@ public protocol SomeRoot: DistributedActor, Sendable
   static var staticValue: String { get }
   var value: String { get }
 }
+// UNSUPPORTED: OS=windows-msvc

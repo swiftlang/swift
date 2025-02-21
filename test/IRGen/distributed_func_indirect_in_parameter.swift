@@ -25,3 +25,4 @@ distributed actor D {
   @_silgen_name("takeLarge")
   distributed func takeLarge(_ l: LargeValue) {}
 }
+// UNSUPPORTED: OS=windows-msvc

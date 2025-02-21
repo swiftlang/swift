@@ -2,4 +2,4 @@
 
 import SomeModule
 
-// CHECK: @available(swift, obsoleted: 3, renamed: "NSValueTransformerName.unarchiveFromDataTransformerName")
+// CHECK: @available(swift, obsoleted: 3, renamed: "NSValueTransformerName.unarchiveFromDataTransformerName")// UNSUPPORTED: OS=windows-msvc

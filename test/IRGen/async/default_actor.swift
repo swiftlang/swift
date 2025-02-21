@@ -12,3 +12,4 @@
 // CHECK:     call swiftcc void @swift_defaultActor_deallocate(
 // CHECK:     ret void
 actor A {}
+// UNSUPPORTED: OS=windows-msvc

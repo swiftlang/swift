@@ -4,3 +4,4 @@
 // REQUIRES: objc_interop
 
 import ConflictingNames // expected-error {{could not build Objective-C module 'ConflictingNames'}}
+// UNSUPPORTED: OS=windows-msvc

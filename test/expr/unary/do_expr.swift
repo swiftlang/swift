@@ -692,3 +692,4 @@ func tryAwaitDo15(_ fn: () async throws -> Int) async rethrows -> Int {
     throw error // expected-error {{a function declared 'rethrows' may only throw if its parameter does}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

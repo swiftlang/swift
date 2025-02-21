@@ -87,3 +87,4 @@ public protocol DistributedWorker<WorkItem, WorkResult>: DistributedActor where 
 // CHECK-NEXT: {
 // CHECK:        public typealias ActorSystem = LocalTestingDistributedActorSystem
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

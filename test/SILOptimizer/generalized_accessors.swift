@@ -728,3 +728,4 @@ struct TestYieldInForcedUnwrappingt<T> {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

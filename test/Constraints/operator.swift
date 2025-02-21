@@ -329,3 +329,4 @@ enum I60954 {
   }
   init?<S>(_ string: S) where S: StringProtocol {} // expected-note{{where 'S' = 'I60954'}}
 }
+// UNSUPPORTED: OS=windows-msvc

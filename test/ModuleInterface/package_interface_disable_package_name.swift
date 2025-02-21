@@ -26,3 +26,4 @@ public struct PubStruct {}
 @_spi(bar) public struct SPIStruct {}
 
 package struct PkgStruct {}
+// UNSUPPORTED: OS=windows-msvc

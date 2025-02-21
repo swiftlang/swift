@@ -42,3 +42,4 @@ func availableOn50() { // expected-note {{enclosing scope here}}
 // Make sure we don't warn at the top level
 if #available(OSX 10.8, *) {
 }
+// UNSUPPORTED: OS=windows-msvc

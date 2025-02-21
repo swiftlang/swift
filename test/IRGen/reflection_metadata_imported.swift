@@ -19,3 +19,4 @@ func takesRawRepresentable<T : RawRepresentable>(_: T) {}
 func passesRawRepresentable(_ c: CrappyColor) {
   takesRawRepresentable(c)
 }
+// UNSUPPORTED: OS=windows-msvc

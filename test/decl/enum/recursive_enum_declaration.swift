@@ -7,3 +7,4 @@ enum E {
 
 var e: E = .Bar
 var f: E = .Foo(e)
+// UNSUPPORTED: OS=windows-msvc

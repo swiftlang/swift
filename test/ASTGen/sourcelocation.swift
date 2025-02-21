@@ -38,3 +38,4 @@ test(arg: 2)
 // CHECK-NEXT: {{^}}                        ^~~~~~~~~~~~~~~~~~
 // CHECK-NEXT: {{^}}                        "first/foo.swift"
 
+// UNSUPPORTED: OS=windows-msvc

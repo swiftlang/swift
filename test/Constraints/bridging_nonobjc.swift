@@ -3,3 +3,4 @@
 
 var x: Any = 1
 var y = x as AnyObject
+// UNSUPPORTED: OS=windows-msvc

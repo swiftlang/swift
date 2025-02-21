@@ -20,3 +20,4 @@ open class A {
 
 // CHECK: }
 }
+// UNSUPPORTED: OS=windows-msvc

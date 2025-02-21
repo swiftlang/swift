@@ -55,3 +55,4 @@ protocol HasOperatorCall {
 }
 
 extension HasStaticOperatorCall : HasOperatorCall {}
+// UNSUPPORTED: OS=windows-msvc

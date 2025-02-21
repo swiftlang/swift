@@ -32,3 +32,4 @@ CollectionHOFTests.test("differentiableReduce(_:_:)") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

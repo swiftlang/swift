@@ -33,3 +33,4 @@ public protocol Q<A> {
 public struct S<A>: Q {
   public init() {}
 }
+// UNSUPPORTED: OS=windows-msvc

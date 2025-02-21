@@ -33,3 +33,4 @@ public func f() {
 // CHECK: ![[LET_TY:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type,
 // CHECK-SAME:                                baseType: ![[TY:[0-9]+]])
 // CHECK: ![[V1]] = !DILocalVariable(name: "s1", {{.*}}type: ![[LET_TY]])
+// UNSUPPORTED: OS=windows-msvc

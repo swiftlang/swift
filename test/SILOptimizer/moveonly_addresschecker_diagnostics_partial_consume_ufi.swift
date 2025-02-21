@@ -53,3 +53,4 @@ public func call_piecewise_Agg_Internal_UFI() {
   piecewise_Agg_Internal_UFI(a)
 }
 
+// UNSUPPORTED: OS=windows-msvc

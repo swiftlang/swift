@@ -12,3 +12,4 @@ extension Duration {
     self = .seconds(10) + .nanoseconds(20)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

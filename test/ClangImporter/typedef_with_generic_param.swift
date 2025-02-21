@@ -7,3 +7,4 @@ typealias Handler<T> = (T?, Error?) -> Void
 func foo<T>(_ handler: Handler<T>?) {}
 
 let _ = Foo<AnyObject>(completionBlock: foo)
+// UNSUPPORTED: OS=windows-msvc

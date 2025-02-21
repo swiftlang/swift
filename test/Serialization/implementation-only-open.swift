@@ -23,3 +23,4 @@ open class Object {
   }
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

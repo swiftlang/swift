@@ -13,3 +13,4 @@ extension MyIterator : FakeIterator {}
 // CHECK:   [[RESULT:%.*]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

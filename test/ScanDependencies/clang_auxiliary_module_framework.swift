@@ -18,3 +18,4 @@ import AuxClangModule
 // CHECK-DAG: "swift": "Swift"
 // CHECK-DAG: "swift": "SwiftOnoneSupport"
 // CHECK: ],
+// UNSUPPORTED: OS=windows-msvc

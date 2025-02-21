@@ -5,3 +5,4 @@
 import ClassProtocolNameClash
 
 class Subclass : TheClashingName {}
+// UNSUPPORTED: OS=windows-msvc

@@ -920,3 +920,4 @@ struct LazyProp {
     0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

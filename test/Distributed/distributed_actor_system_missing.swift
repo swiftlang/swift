@@ -29,3 +29,4 @@ distributed actor Server { // expected-error 2 {{distributed actor 'Server' does
   typealias SerializationRequirement = any Codable
   distributed func send() { }
 }
+// UNSUPPORTED: OS=windows-msvc

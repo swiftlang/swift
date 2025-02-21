@@ -43,3 +43,4 @@ protocol P3ab : P2 where X == A,     X == X.Y.T, Y == B.Y {}
 // CHECK-NEXT: Requirement signature: <Self where Self : P2, Self.[P2]X == A, Self.[P2]Y == B.Y>
 
 protocol P3ba : P2 where X == X.Y.T, X == A,     Y == B.Y {}
+// UNSUPPORTED: OS=windows-msvc

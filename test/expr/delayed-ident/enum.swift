@@ -36,3 +36,4 @@ extension Optional where Wrapped == S_55797 {
 func f_55797<T>(_: T?) { }
 
 f_55797(.v55797)
+// UNSUPPORTED: OS=windows-msvc

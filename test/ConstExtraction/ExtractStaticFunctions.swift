@@ -83,3 +83,4 @@ struct Statics: MyProto {
 // CHECK-NEXT:    "memberLabel": "three",
 // CHECK-NEXT:    "arguments": []
 // CHECK-NEXT:  }
+// UNSUPPORTED: OS=windows-msvc

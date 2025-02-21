@@ -183,3 +183,4 @@ testGlobal()
 testImplementationOnly()
 testPrivateVar()
 
+// UNSUPPORTED: OS=windows-msvc

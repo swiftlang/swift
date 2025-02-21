@@ -12,3 +12,4 @@ public struct Foo {
   }
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

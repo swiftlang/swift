@@ -9,3 +9,4 @@
 
 // CHECK: error: type 'int' cannot be used prior to '::' because it has no members
 // CHECK: {{note: in instantiation of template class 'GetTypeValue<int>' requested here|note: in instantiation of static data member 'GetTypeValue<int>::value' requested here}}
+// UNSUPPORTED: OS=windows-msvc

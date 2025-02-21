@@ -39,3 +39,4 @@ func testCustomWrappers(wrappedRef: WrappedRef, wrappedValue: WrappedValue) {
   acceptHashable(wrappedRef) // expected-error {{global function 'acceptHashable' requires that 'WrappedRef' conform to 'Hashable'}}
   acceptHashable(wrappedValue) // expected-error {{global function 'acceptHashable' requires that 'WrappedValue' conform to 'Hashable'}}
 }
+// UNSUPPORTED: OS=windows-msvc

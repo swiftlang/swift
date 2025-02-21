@@ -15,3 +15,4 @@ x.deallocate();
 
 // There should be no ASan instrumentation in this case.
 // NO_ASAN_RECOVER-NOT: declare void @__asan_load
+// UNSUPPORTED: OS=windows-msvc

@@ -66,3 +66,4 @@ func testMe(c: C) {
   acceptSendable(c)
 }
 
+// UNSUPPORTED: OS=windows-msvc

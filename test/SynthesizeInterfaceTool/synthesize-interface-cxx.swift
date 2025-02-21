@@ -5,3 +5,4 @@
 // CHECK-DAG:     public init()
 // CHECK-DAG:     public func printValue()
 // CHECK-DAG: }
+// UNSUPPORTED: OS=windows-msvc

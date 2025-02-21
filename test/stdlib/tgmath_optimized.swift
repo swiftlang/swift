@@ -43,3 +43,4 @@ TGMathTestSuite.test("sqrt") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

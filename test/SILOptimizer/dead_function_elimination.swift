@@ -242,3 +242,4 @@ public func keepPtrAlive() {
 
 // CHECK-TESTING-LABEL: sil_witness_table Adopt: Prot
 // CHECK-TESTING: DeadWitness{{.*}}: @{{.*}}DeadWitness
+// UNSUPPORTED: OS=windows-msvc

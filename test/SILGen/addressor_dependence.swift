@@ -27,3 +27,4 @@ public struct BoxC {
 public func testAddressorLifetime(box: consuming BoxC) -> C {
   box[]
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -5,3 +5,4 @@
 public func test() { }
 
 // CHECK: "SDK Version", [3 x i32] [i32 10, i32 15, i32 4]
+// UNSUPPORTED: OS=windows-msvc

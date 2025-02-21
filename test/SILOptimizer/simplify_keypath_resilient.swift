@@ -19,3 +19,4 @@ public func testit() {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

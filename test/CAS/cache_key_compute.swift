@@ -115,3 +115,4 @@ func a() {}
 
 //--- b.swift
 func b() {}
+// UNSUPPORTED: OS=windows-msvc

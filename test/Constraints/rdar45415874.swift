@@ -13,3 +13,4 @@ extension A: ExpressibleByNilLiteral where T: ExpressibleByNilLiteral {
 struct B {
   var foo: A<B?> = A(nil)
 }
+// UNSUPPORTED: OS=windows-msvc

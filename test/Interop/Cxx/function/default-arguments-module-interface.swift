@@ -70,3 +70,4 @@
 // CHECK:   func invalidDefaultExprMethod(_ x: Base<NoDefinition>)
 // CHECK: }
 // CHECK: typealias InvalidStructNoDef = InvalidStruct<NoDefinition>
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ struct S {
 }
 
 S().visible()
+// UNSUPPORTED: OS=windows-msvc

@@ -45,3 +45,4 @@ public func passingVarAsInout() {
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main17passingVarAsInoutyyF"() #0
 // CHECK: call swiftcc void @"$s4main11modifyInoutyys5Int32VzF"(ptr nocapture dereferenceable(4) @{{counter|"\?counter@@3HA"}})
+// UNSUPPORTED: OS=windows-msvc

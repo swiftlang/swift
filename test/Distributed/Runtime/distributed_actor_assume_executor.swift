@@ -109,3 +109,4 @@ actor OtherMain {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

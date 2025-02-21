@@ -94,3 +94,4 @@ struct TestMacroArgs {
   // https://github.com/swiftlang/swift/issues/75500
   @m1<UInt> struct Args11 {} // expected-warning {{cannot specialize a non-generic external macro 'm1()'}}
 }
+// UNSUPPORTED: OS=windows-msvc

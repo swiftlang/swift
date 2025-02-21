@@ -4,3 +4,4 @@ import Swift
 
 @_alwaysEmitConformanceMetadata
 protocol Test {}
+// UNSUPPORTED: OS=windows-msvc

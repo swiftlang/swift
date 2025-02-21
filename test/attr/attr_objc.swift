@@ -2696,3 +2696,4 @@ class issue55246 {
   subscript<T>(foo : [T]) -> Int { return 0 }
   // access-note-adjust{{@objc}} expected-error@-1 {{subscript cannot be marked @objc because it has generic parameters}}
 }
+// UNSUPPORTED: OS=windows-msvc

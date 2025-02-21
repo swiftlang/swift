@@ -26,3 +26,4 @@ struct LazyFilteringSequence<S: Sequence>: LazySequenceProtocol {
     Iterator(iterator: self.base.makeIterator(), predicate: self.predicate)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

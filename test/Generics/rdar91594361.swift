@@ -18,3 +18,4 @@ extension P1 where T : P2 {
   func foo<X>(_: X) where T == G<X> {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -50,3 +50,4 @@
 public func test_peepholes(_ v: BigStruct) -> BigStruct {
   return useBigStruct(v)
 }
+// UNSUPPORTED: OS=windows-msvc

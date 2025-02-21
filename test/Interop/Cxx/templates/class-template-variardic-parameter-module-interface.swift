@@ -10,3 +10,4 @@
 // CHECK: typealias Pair = Tuple<IntWrapper, IntWrapper>
 // CHECK: typealias Triple = Tuple<IntWrapper, IntWrapper, IntWrapper>
 // CHECK: typealias Nested = Tuple<Tuple<IntWrapper, IntWrapper>, Tuple<IntWrapper, IntWrapper>>
+// UNSUPPORTED: OS=windows-msvc

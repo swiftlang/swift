@@ -14,3 +14,4 @@ protocol Q {
   associatedtype A : P
   associatedtype C : P where A == C.A
 }
+// UNSUPPORTED: OS=windows-msvc

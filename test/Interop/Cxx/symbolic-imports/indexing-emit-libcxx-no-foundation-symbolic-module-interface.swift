@@ -14,3 +14,4 @@ import Foundation
 
 // FILES: std-{{.*}}.pcm.symbolicswiftinterface
 // FILES-NOT: Foundation*
+// UNSUPPORTED: OS=windows-msvc

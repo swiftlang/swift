@@ -79,3 +79,4 @@ func test() {
 // RUN: %sourcekitd-test -json-request-path %S/Inputs/custom-completion/custom.json == \
 // RUN:     -req=complete.open -pos=3:4 %s -req-opts=filtertext=asdffdsa -- %s | %FileCheck %s -check-prefix=NOCUSTOM
 // NOCUSTOM-NOT: myuid
+// UNSUPPORTED: OS=windows-msvc

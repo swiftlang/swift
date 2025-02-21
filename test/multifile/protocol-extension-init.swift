@@ -6,3 +6,4 @@ extension P {
     self.init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

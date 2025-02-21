@@ -22,3 +22,4 @@ public enum ResultTest<Value, Error: MyErrorType> {
         }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -42,3 +42,4 @@
 // MIXEDTHRESHOLD-NOT: -primary-filelist
 // MIXEDTHRESHOLD: -supplementary-output-file-map
 // MIXEDTHRESHOLD-NOT: -output-filelist
+// UNSUPPORTED: OS=windows-msvc

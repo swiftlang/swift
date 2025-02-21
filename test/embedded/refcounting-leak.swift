@@ -34,3 +34,4 @@ struct Main {
         // CHECK: OK!
     }
 }
+// UNSUPPORTED: OS=windows-msvc

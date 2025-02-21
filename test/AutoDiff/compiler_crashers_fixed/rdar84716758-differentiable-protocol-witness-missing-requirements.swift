@@ -42,3 +42,4 @@ class Function2<Input: Differentiable, Output: Differentiable>: Layer {
     body(input)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

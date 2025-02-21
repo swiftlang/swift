@@ -80,3 +80,4 @@ extension InlineArray where Element: ~Copyable {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

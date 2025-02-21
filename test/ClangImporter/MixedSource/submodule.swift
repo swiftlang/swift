@@ -12,3 +12,4 @@ func test() {
   topLevel()
   fromSubmodule()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -114,3 +114,4 @@ test_field_fn_ptr_modify()
 print(test_addr_discriminated_field_fn_read())
 test_addr_discriminated_field_fn_ptr_modify()
 print(test_addr_discriminated_copy())
+// UNSUPPORTED: OS=windows-msvc

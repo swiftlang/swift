@@ -11,3 +11,4 @@ func testAnimatorProxy(_ constraint:NSLayoutConstraint) {
   _ = x!.constant
 }
 
+// UNSUPPORTED: OS=windows-msvc

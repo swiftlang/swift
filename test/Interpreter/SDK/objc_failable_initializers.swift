@@ -87,3 +87,4 @@ ObjCFailableInitTestSuite.test("InitFailure_Before") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

@@ -313,3 +313,4 @@ public func couldActuallyEscape(_ closure: @escaping () -> (), _ villain: Danger
   villain.malicious(closure)
 }
 
+// UNSUPPORTED: OS=windows-msvc

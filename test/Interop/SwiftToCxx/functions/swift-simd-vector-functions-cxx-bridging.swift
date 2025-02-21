@@ -31,3 +31,4 @@ public func passThroughfloat4(_ x: float4) -> float4 { return x }
 public func passThroughdouble2(_ x: double2) -> double2 { return x }
 public func passThroughint3(_ x: int3) -> int3 { return x }
 public func passThroughuint4(_ x: uint4) -> uint4 { return x }
+// UNSUPPORTED: OS=windows-msvc

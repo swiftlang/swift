@@ -11,3 +11,4 @@ import cfuncs
 func test_puts(_ s: String) {
   _ = puts(s) + (32 as Int32)
 }
+// UNSUPPORTED: OS=windows-msvc

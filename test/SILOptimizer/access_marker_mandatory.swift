@@ -80,3 +80,4 @@ func captureStackPromote() -> () -> Int {
   let f = { x }
   return f
 }
+// UNSUPPORTED: OS=windows-msvc

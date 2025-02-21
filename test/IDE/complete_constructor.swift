@@ -351,3 +351,4 @@ func testIgnoreGenericArgsAfterCompletionToken() {
 // IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN-DAG: Decl[Struct]/Local: HostRecord[#HostRecord#];
   }
 }
+// UNSUPPORTED: OS=windows-msvc

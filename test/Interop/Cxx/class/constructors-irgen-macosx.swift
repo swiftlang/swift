@@ -45,3 +45,4 @@ public func createTemplatedConstructor() {
   // ITANIUM_X64-LABEL: define {{.*}}void @_ZN20TemplatedConstructorC1I7ArgTypeEET_(ptr {{.*}}, i32 {{.*}})
   let templated = TemplatedConstructor(ArgType())
 }
+// UNSUPPORTED: OS=windows-msvc

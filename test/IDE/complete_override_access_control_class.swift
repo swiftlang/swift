@@ -187,3 +187,4 @@ public class TestPublicCD : BaseCPublic, ProtocolD {
 // TEST_PUBLIC_CD-DAG: Decl[InstanceMethod]/Super:         public override func collidingGeneric<T>(x: T) {|}; name=collidingGeneric(x:)
 // TEST_PUBLIC_CD-DAG: Decl[Constructor]/Super:            public override init(fromBaseC: TagPC) {|}; name=init(fromBaseC:)
 
+// UNSUPPORTED: OS=windows-msvc

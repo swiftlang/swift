@@ -624,3 +624,4 @@ public func rdar56410009_inlinedBoth() {
   // CHECK: = apply [[INLINABLE_EXTERNAL_RESILIENT_WRAPPER]]({{%.+}}, {{%.+}}) : $@convention(thin) (Int64) -> @out WrapperP2<Int64>
   _ = inlinableExternalResilientWrapper(inlinableExternalResilient())
 } // CHECK:  end sil function '$s1A24rdar56410009_inlinedBothyyF'
+// UNSUPPORTED: OS=windows-msvc

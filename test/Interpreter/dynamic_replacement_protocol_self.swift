@@ -26,3 +26,4 @@ extension NewUserModel {
 }
 
 typealias NewUserModel = TestModuleLinking.NewUserModel
+// UNSUPPORTED: OS=windows-msvc

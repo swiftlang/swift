@@ -27,3 +27,4 @@ func testMandatoryInlining(_ x: Float, b: Bool) -> Float {
 // CHECK: br                                                     {{.*}} line:22:10:minlined
 }
 
+// UNSUPPORTED: OS=windows-msvc

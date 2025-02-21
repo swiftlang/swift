@@ -19,3 +19,4 @@ extension X {
 }
 public class Base: X {}
 public class Sub: Base {}
+// UNSUPPORTED: OS=windows-msvc

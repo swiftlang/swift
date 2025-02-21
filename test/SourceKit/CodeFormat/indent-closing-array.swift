@@ -38,3 +38,4 @@ struct Foo {
 // CHECK: key.sourcetext: "        ]"
 // CHECK: key.sourcetext: "        ])"
 // CHECK: key.sourcetext: "        ])"
+// UNSUPPORTED: OS=windows-msvc

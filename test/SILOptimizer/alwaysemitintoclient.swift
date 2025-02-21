@@ -31,3 +31,4 @@ public func caller() {
 
 #endif
 
+// UNSUPPORTED: OS=windows-msvc

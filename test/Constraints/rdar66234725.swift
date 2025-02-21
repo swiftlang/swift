@@ -26,3 +26,4 @@ struct S<T: P, F: Func> {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

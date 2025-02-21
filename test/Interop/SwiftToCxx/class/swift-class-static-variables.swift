@@ -11,3 +11,4 @@ public class FileUtilities {
 }
 
 // CHECK: SWIFT_INLINE_THUNK FileUtilities FileUtilities::getShared() {
+// UNSUPPORTED: OS=windows-msvc

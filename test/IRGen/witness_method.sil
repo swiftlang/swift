@@ -132,3 +132,4 @@ entry(%ret : $*T.GrowthHack, %self : $*T):
 }
 
 sil_vtable TPSReport {}
+// UNSUPPORTED: OS=windows-msvc

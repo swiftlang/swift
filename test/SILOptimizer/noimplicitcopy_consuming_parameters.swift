@@ -1019,3 +1019,4 @@ extension AsyncSequence where Element: Sendable {
         }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

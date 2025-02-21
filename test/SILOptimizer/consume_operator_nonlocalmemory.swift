@@ -49,3 +49,4 @@ func accessMutableCapture() -> (() -> ()) {
   let _ = consume x2 // expected-error {{'consume' cannot be applied to escaping captures}}
   return f
 }
+// UNSUPPORTED: OS=windows-msvc

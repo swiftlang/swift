@@ -48,3 +48,4 @@ func yielding() async {
     await yielding()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

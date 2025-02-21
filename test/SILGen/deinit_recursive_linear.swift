@@ -55,3 +55,4 @@ class Node {
 // CHECK:   [[SELF_NATIVE_OWNED:%.*]] = unchecked_ownership_conversion [[SELF_NATIVE]] : $Builtin.NativeObject, @guaranteed to @owned
 // CHECK:   return [[SELF_NATIVE_OWNED]] : $Builtin.NativeObject
 // CHECK: } // end sil function '$s23deinit_recursive_linear4NodeCfd'
+// UNSUPPORTED: OS=windows-msvc

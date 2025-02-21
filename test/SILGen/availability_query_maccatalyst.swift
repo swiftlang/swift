@@ -25,3 +25,4 @@ if #available(OSX 10.53.8, iOS 51.1.2, *) {
 // CHECK: [[QUERY_RESULT:%.*]] = apply [[FUNC]]([[MAJOR]], [[MINOR]], [[PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 if #available(OSX 10.53.8, iOS 51.1.2, macCatalyst 53.2.3, *) {
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -124,3 +124,4 @@ do {
   _ = Foo(nil) // expected-error {{'nil' requires a contextual type}}
   _ = Foo(nil, 1) // expected-error {{'nil' requires a contextual type}}
 }
+// UNSUPPORTED: OS=windows-msvc

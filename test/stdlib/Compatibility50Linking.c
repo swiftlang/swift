@@ -12,3 +12,4 @@
 // Test this by linking it into a plain C program and making sure it builds.
 
 int main(void) {}
+// UNSUPPORTED: OS=windows-msvc

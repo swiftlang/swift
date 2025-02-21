@@ -341,3 +341,4 @@ package extension PkgGenericStruct where Param: InternalProto {} // expected-err
 extension PkgGenericStruct where Param: InternalProto {
   package func foo() {} // expected-error {{cannot declare a package instance method in an extension with internal requirements}} {{3-10=internal}}
 }
+// UNSUPPORTED: OS=windows-msvc

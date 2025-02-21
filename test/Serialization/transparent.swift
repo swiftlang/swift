@@ -74,3 +74,4 @@ func test_open_existentials(p: P, cp: CP) {
   // SIL: open_existential_ref [[EXIST:%[0-9]+]] : $any CP to $@opened([[M:".*"]], any CP) Self
   open_existentials(p: p, cp: cp)
 }
+// UNSUPPORTED: OS=windows-msvc

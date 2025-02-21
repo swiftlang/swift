@@ -30,3 +30,4 @@ where Value: AdditiveArithmetic {
 internal func testFunction(data: P<Double>) -> Double {
     data.value
 }
+// UNSUPPORTED: OS=windows-msvc

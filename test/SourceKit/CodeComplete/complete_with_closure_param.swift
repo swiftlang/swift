@@ -18,3 +18,4 @@ C().
 // CHECK-NEXT: key.name: "foo2(:)",
 // CHECK-NEXT: key.description: "foo2(x: (Int) -> Int)",
 // CHECK: key.sourcetext: "foo2(<#T##x: (Int) -> Int##(Int) -> Int#>)"
+// UNSUPPORTED: OS=windows-msvc

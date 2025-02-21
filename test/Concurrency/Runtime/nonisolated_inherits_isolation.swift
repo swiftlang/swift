@@ -122,3 +122,4 @@ tests.test("Check if execution concurrent isolation does crash (custom actor)") 
 }
 
 await run()
+// UNSUPPORTED: OS=windows-msvc

@@ -96,3 +96,4 @@ import AmbiguousClientName
 
 public func refToImportedType(_ a: SomeType) {}
 public func refToImportedUnderlying(_ a: UnderlyingType) {}
+// UNSUPPORTED: OS=windows-msvc

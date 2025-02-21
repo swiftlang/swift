@@ -8,3 +8,4 @@
 import _Volatile
 
 // CHECK: importing _Volatile module requires '-enable-experimental-feature Volatile'
+// UNSUPPORTED: OS=windows-msvc

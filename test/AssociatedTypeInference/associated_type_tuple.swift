@@ -26,3 +26,4 @@ extension Tuple: P3 where repeat each T: P3 { // expected-error {{type '(repeat 
   // expected-note@-1 {{possibly intended match 'Int' is unsuitable for tuple conformance; the associated type requirement must be fulfilled by a type alias with underlying type '(repeat (each T).C)'}}
   func f() -> Int {}
 }
+// UNSUPPORTED: OS=windows-msvc

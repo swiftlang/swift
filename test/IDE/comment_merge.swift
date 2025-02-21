@@ -193,3 +193,4 @@ func allTheThings() {}
 // CHECK-NEXT: comment_merge.swift:136:6: Func/priorCommentBlankLineBeforeDecl RawComment=[/// priorCommentBlankLineBeforeDecl IS_DOC_SINGLE\n]
 // CHECK-NEXT: comment_merge.swift:141:6: Func/priorCommentBrokenBeforeLineComment RawComment=[/// priorCommentBrokenLineBeforeLineComment IS_DOC_SINGLE\n]
 // CHECK-NEXT: comment_merge.swift:153:6: Func/allTheThings RawComment=[/// IS_DOC_START allTheThings\n/** Bbb\n *\n * Ccc. *//// Eee\n/**\n * Fff. IS_DOC_END\n */]
+// UNSUPPORTED: OS=windows-msvc

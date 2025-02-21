@@ -105,3 +105,4 @@ struct InvalidYieldParsing {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

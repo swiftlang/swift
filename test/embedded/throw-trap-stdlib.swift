@@ -10,3 +10,4 @@ public func test() {
 }
 
 // CHECK: swift_willThrow
+// UNSUPPORTED: OS=windows-msvc

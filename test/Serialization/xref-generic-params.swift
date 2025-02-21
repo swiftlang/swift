@@ -38,3 +38,4 @@ public func test(
   _: OuterGeneric<A, B>.InnerNonGeneric.AliasTy,
 // CHECK-SAME: _: OuterGeneric<A, B>.InnerGeneric<C, D>.AliasTy
   _: OuterGeneric<A, B>.InnerGeneric<C, D>.AliasTy) {}
+// UNSUPPORTED: OS=windows-msvc

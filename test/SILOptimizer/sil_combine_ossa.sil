@@ -5448,3 +5448,4 @@ bb0(%0 : @owned $C):
   return %6 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

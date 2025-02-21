@@ -45,3 +45,4 @@ public class M {
 // CHECK-NEXT:   dealloc_stack %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope [[SCOPE1]]
 // CHECK-NEXT:   throw %{{.*}} : $any Error, loc {{.*}}:26:5, scope [[SCOPE1]]
 // CHECK: end sil function '$s3del1MC4fromAcA12WithDelegate_p_tKcfc'
+// UNSUPPORTED: OS=windows-msvc

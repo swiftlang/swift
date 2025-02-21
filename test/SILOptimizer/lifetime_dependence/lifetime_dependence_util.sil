@@ -317,3 +317,4 @@ bb0(%0 : @owned $NCNEInt):
   %99 = tuple()
   return %99 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

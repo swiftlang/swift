@@ -1740,3 +1740,4 @@ bb0(%0 : $TestClass, %1: $MayHaveDeinit):
 // CHECK-LABEL: sil @testSummarizeFunction
 // CHECK-NOT: begin_access {{.*}}no_nested_conflict
 // CHECK: } // end sil function 'testSummarizeFunction'
+// UNSUPPORTED: OS=windows-msvc

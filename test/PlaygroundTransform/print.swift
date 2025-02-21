@@ -44,3 +44,4 @@ debugPrint("One", terminator: "", to: &str)
 // CHECK-NEXT: [{{.*}}] __builtin_postPrint
 // CHECK-NEXT: [{{.*}}] __builtin_postPrint
 
+// UNSUPPORTED: OS=windows-msvc

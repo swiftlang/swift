@@ -47,3 +47,4 @@ func test(
   takesUnsafePointerUInt8(s)
   takesUnsafePointerVoid(s)
 }
+// UNSUPPORTED: OS=windows-msvc

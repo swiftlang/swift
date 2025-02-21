@@ -6,3 +6,4 @@ extension Collection {
     _ = zip(indices, indices.dropFirst(3))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

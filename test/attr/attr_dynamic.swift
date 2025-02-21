@@ -60,3 +60,4 @@ class InheritsDynamic: Foo {
 class ObjCMemberCheck {
   dynamic var s = NotObjCAble(c: Foo())
 }
+// UNSUPPORTED: OS=windows-msvc

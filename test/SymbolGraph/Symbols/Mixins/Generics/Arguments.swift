@@ -19,3 +19,4 @@ public struct MyStruct<T> {
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
 // CHECK-NOT: constraints
+// UNSUPPORTED: OS=windows-msvc

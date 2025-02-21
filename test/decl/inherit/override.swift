@@ -86,3 +86,4 @@ class ObjCSub : ObjCSuper {
 
   @objc(method3:withInt:) func method3(_ x: Sub, with y: Int) { } // expected-error{{method3(_:with:)' with Objective-C selector 'method3:withInt:' conflicts with method 'method3(_:withInt:)' from superclass 'ObjCSuper' with the same Objective-C selector}}
 }
+// UNSUPPORTED: OS=windows-msvc

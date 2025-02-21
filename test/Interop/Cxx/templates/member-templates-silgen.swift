@@ -70,3 +70,4 @@ func testStaticMembers() {
 // CHECK: sil hidden_external [clang HasStaticMemberTemplates.addTwoTemplates] @{{_ZN24HasStaticMemberTemplates15addTwoTemplatesIlcEET_S1_T0_|\?\?\$addTwoTemplates@_JD@HasStaticMemberTemplates@@SA_J_JD@Z}} : $@convention(c) (Int, Int8) -> Int
 
 // CHECK: sil hidden_external [clang HasStaticMemberTemplates.removeReference] @{{_ZN24HasStaticMemberTemplates15removeReferenceIlEET_RS1_|\?\?\$removeReference@_J@HasStaticMemberTemplates@@SA_JAEA_J@Z}} : $@convention(c) (@inout Int) -> Int
+// UNSUPPORTED: OS=windows-msvc

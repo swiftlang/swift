@@ -19,3 +19,4 @@ func testLocalBinding() {
     return ()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

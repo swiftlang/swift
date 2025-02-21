@@ -29,3 +29,4 @@ spiFunc() // expected-error{{cannot find 'spiFunc' in scope}}
 let x = SPIStruct() // expected-error{{cannot find 'SPIStruct' in scope}}
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

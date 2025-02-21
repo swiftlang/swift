@@ -65,3 +65,4 @@ extension _ExternalUnderscored: CustomDebugStringConvertible {
 
 // CHECK: "symbols": []
 // CHECK: "relationships": []
+// UNSUPPORTED: OS=windows-msvc

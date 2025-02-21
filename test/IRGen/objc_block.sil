@@ -21,3 +21,4 @@ entry(%b : $@convention(block) (Foo) -> Foo, %x : $Foo):
 // CHECK:         [[T4:%.*]] = call ptr [[T1]](ptr %0, ptr %1)
 // CHECK:         ret ptr [[T4]]
 // CHECK:       }
+// UNSUPPORTED: OS=windows-msvc

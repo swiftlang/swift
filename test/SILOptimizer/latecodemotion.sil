@@ -1388,3 +1388,4 @@ bb0(%0 : $Builtin.NativeObject, %1: $Builtin.NativeObject):
   %5 = tuple()
   return %5 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

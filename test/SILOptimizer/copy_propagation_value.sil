@@ -66,3 +66,4 @@ bb2:
   %22 = builtin "willThrow"(%19 : $any Error) : $()
   throw %19 : $any Error
 }
+// UNSUPPORTED: OS=windows-msvc

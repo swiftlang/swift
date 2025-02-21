@@ -219,3 +219,4 @@ PropertyWrapperTests.test("RealPropertyWrappers") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

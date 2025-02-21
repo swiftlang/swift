@@ -253,3 +253,4 @@ func patatino<T: Comparable>(_ vers1: T, _ vers2: T) -> Bool {
 public struct MovedHere {
   public func foo() {}
 }
+// UNSUPPORTED: OS=windows-msvc

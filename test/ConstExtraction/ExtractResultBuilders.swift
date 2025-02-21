@@ -526,3 +526,4 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:     ]
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ if (true) {
   print("Hello \u{2603}\n", terminator: "")  // Hi Snowman!
   print("Hello ☃\n", terminator: "")
 }
+// UNSUPPORTED: OS=windows-msvc

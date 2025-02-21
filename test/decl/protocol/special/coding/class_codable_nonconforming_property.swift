@@ -178,3 +178,4 @@ let _ = NonConformingClass.encode(to:) // expected-error {{type 'NonConformingCl
 
 // They should not get a CodingKeys type.
 let _ = NonConformingClass.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ class MyConcreteClass: MyGenericClass<NSObject> {
 	}
 }
 
+// UNSUPPORTED: OS=windows-msvc

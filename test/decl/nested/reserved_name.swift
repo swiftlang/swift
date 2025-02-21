@@ -16,3 +16,4 @@ struct S2 {
 
 let s1: S1.Type = .A // expected-error {{type 'S1.Type' has no member 'A'}}
 let s2: S2.`Type` = .A // no-error
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ public struct Gadget {
     case theOther
   }
 }
+// UNSUPPORTED: OS=windows-msvc

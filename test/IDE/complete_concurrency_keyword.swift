@@ -40,3 +40,4 @@ struct Something {
   var x = #^MEMBERINIT?check=EXPR^#
   func testFunc(x: Int = #^METHODDEFAULTPARAM?check=EXPR^#) {}
 }
+// UNSUPPORTED: OS=windows-msvc

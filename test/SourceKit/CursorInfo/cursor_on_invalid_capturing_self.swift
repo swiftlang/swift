@@ -6,3 +6,4 @@ class Items {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

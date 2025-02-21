@@ -522,3 +522,4 @@ class InAccessorTestQualified {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

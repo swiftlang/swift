@@ -14,3 +14,4 @@ func f<T : P>(_ t: T) {
   // the problematic conformance popped up.
   _ = { [weak t] in _ = t }
 }
+// UNSUPPORTED: OS=windows-msvc

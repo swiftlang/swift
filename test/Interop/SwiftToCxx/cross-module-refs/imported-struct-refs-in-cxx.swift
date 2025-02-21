@@ -65,3 +65,4 @@ public func passThroughStructSmallDirect(_ x: SmallStructDirectPassing) -> Small
 // CHECK-NEXT:   UsesStructs::_impl::$s11UsesStructs0aB6StructV1x0B00C10SeveralI64Vvg(result, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@ class GrandchildClass: ChildClass {
 	}
 }
 
+// UNSUPPORTED: OS=windows-msvc

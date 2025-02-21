@@ -21,3 +21,4 @@ public class MyDerived<X>: MyBase<X> {
   public func bar(x: AliasU) -> AliasInt { fatalError() }
 // CHECK:  public func bar(x: MyModule.MyDerived<X>.AliasU) -> MyModule.MyDerived<X>.AliasInt
 }
+// UNSUPPORTED: OS=windows-msvc

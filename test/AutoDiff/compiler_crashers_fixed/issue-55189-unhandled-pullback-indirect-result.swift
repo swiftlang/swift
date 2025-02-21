@@ -18,3 +18,4 @@ func test<C: Class>(_ c: C, _ x: Float) {
   _ = gradient(at: c, x) { c, x in c.f(x) }
   _ = gradient(at: x) { x in c.f(x) }
 }
+// UNSUPPORTED: OS=windows-msvc

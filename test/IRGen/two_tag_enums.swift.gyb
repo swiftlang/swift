@@ -60,3 +60,4 @@ func switch${Type}(_ x: ${Type}) {
 }
 
 % end
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ class ComputedPropertyClass {
     return "15"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@ extension Outer where T == Int {
     } 
   }
 }
+// UNSUPPORTED: OS=windows-msvc

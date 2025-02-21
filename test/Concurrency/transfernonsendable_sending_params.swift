@@ -658,3 +658,4 @@ func testNonSendableCaptures(ns: NonSendableKlass, a: isolated MyActor) {
     let _ = ns
   }
 }
+// UNSUPPORTED: OS=windows-msvc

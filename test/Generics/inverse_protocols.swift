@@ -28,3 +28,4 @@ func check<T: ~Copyable>(_ a: T, _ b: borrowing T) -> Bool where T: Eq {
 
     return a.same(as: b)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -163,4 +163,4 @@ func tupleCovariantConversion2<T>(fn: @escaping () -> ((any P<T>)?, Int)) -> (()
   return fn // expected-error {{runtime support for parameterized protocol types is only available in}}
   // expected-note @-1 {{add 'if #available' version check}}
 
-}
+}// UNSUPPORTED: OS=windows-msvc

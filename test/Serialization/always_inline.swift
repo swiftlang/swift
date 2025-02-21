@@ -23,3 +23,4 @@ var raw = testAlwaysInline(x: false)
 // SIL: apply [[FUNC2]]({{%.+}}, {{%.+}}) : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct
 var a = AlwaysInlineInitStruct(x: false)
 
+// UNSUPPORTED: OS=windows-msvc

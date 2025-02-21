@@ -28,3 +28,4 @@ public class Class {
 
 // CHECK-DAG:      [[O1]]  = !{{{.*}} @"objc_classes_$s4main5ClassCN", i32 0, [[O1A:!.*]]}
 // CHECK-DAG:      [[O1A]] = !{{{.*}} @"$s4main5ClassCN"}
+// UNSUPPORTED: OS=windows-msvc

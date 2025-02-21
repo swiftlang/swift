@@ -53,3 +53,4 @@
 // MODULECACHE-COUNT-2: SystemDependencies-{{[^ ]+}}.swiftmodule
 
 import SomeCModule
+// UNSUPPORTED: OS=windows-msvc

@@ -91,3 +91,4 @@ struct InitLogicalUseBeforeDef {
     offset = UInt16(value)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

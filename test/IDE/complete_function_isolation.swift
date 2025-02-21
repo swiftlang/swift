@@ -22,3 +22,4 @@ func test3(_ x: (@isolated(any) () -> Void)?) {
   // ISOLATED_ANY_OPTIONAL_FN-DAG: Pattern/CurrNominal/Erase[1]: ?.isolation[#(any Actor)?#]; name=isolation
   // ISOLATED_ANY_OPTIONAL_FN-DAG: Keyword[self]/CurrNominal: self[#(@isolated(any) () -> Void)?#]; name=self
 }
+// UNSUPPORTED: OS=windows-msvc

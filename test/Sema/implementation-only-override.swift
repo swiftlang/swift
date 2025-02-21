@@ -162,3 +162,4 @@ public class NaughtyGrandchild: GoodChild {
 }
 
 #endif // ERRORS
+// UNSUPPORTED: OS=windows-msvc

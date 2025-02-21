@@ -11,3 +11,4 @@ func myFunc(_ ptr: UnsafeMutablePointer<CInt>, _ len: CInt) {
 // CHECK-NEXT:     return myFunc(ptr.baseAddress!, CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
 
+// UNSUPPORTED: OS=windows-msvc

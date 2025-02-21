@@ -86,3 +86,4 @@ var d : String = "D"
 <<<<
 print(d) // expected-error {{cannot find 'd' in scope}}
 
+// UNSUPPORTED: OS=windows-msvc

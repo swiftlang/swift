@@ -50,3 +50,4 @@ public func g(x: ZeroSizedStruct) {
 // CHECK: // Unavailable in C++: Swift global function 'g(x:)'.
 
 // CHECK: } // namespace Structs
+// UNSUPPORTED: OS=windows-msvc

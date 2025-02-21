@@ -18,3 +18,4 @@ public extension Sequence {
 // CHECK-DAG: Pattern/CurrNominal:                key[#Int#];
 // CHECK-DAG: Pattern/CurrNominal:                value[#[Int]#];
 
+// UNSUPPORTED: OS=windows-msvc

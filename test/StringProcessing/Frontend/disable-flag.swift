@@ -12,3 +12,4 @@ _ = /x/
 _ = #/x/# // expected-error {{expected a macro identifier}}
 
 func foo(_ x: Regex<Substring>) {} // expected-error {{cannot find type 'Regex' in scope}}
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ Regex { // expected-error {{regex builder requires the 'RegexBuilder' module be 
 }
 
 import C
+// UNSUPPORTED: OS=windows-msvc

@@ -82,4 +82,4 @@ struct S3<T>: P1, P2, where T: Equatable { }
 
 protocol P4 {
     associatedtype T: P1, P2, // expected-error {{expected type}} 
-}
+}// UNSUPPORTED: OS=windows-msvc

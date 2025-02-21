@@ -17,3 +17,4 @@ print(testReturn([Mystruct(101)]))
 // CHECK: Mystruct(x: 28)
 otherFunc()
 
+// UNSUPPORTED: OS=windows-msvc

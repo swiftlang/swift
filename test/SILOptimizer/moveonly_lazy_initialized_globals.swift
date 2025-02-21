@@ -32,3 +32,4 @@ struct Doit {
       rewriteTwo(&m3.s1, &m4.s2)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

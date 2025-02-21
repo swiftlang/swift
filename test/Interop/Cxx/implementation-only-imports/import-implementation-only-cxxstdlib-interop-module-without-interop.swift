@@ -11,3 +11,4 @@ import UseCxxStdlibImplOnly
 public func testCallsAPI() {
     testUsesCxxStdlib()
 }
+// UNSUPPORTED: OS=windows-msvc

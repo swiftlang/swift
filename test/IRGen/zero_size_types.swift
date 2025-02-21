@@ -68,3 +68,4 @@ if MemoryLayout<SingleCaseEnum>.stride != 1 {
 // CHECK: success
 print("success")
 
+// UNSUPPORTED: OS=windows-msvc

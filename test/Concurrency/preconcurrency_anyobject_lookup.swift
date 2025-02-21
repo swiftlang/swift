@@ -15,3 +15,4 @@ func foo(_ x: AnyObject) {
   bar(x.foo)
   let _ = AnyObject.foo
 }
+// UNSUPPORTED: OS=windows-msvc

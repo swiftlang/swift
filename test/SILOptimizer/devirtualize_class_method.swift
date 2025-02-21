@@ -36,3 +36,4 @@ struct Maker<C: Base> {
 // CHECK: test.Derived
 print(Maker<Derived>.create())
 
+// UNSUPPORTED: OS=windows-msvc

@@ -23,3 +23,4 @@ class MyDelegate2: NSObject, UIApplicationDelegate {
 // expected-deprecated-note@-2 {{use @main instead}} {{1-19=@main}}
 class MyDelegate3: NSObject, UIApplicationDelegate {
 }
+// UNSUPPORTED: OS=windows-msvc

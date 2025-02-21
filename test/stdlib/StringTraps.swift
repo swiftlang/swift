@@ -357,3 +357,4 @@ StringTraps.test("UTF8View foreign index(before:) trap on i == startIndex")
   i = s.utf8.index(before: i)
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

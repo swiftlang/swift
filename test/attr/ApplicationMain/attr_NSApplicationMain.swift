@@ -10,3 +10,4 @@ import AppKit
 // expected-deprecated-note@-1 {{use @main instead}} {{1-19=@main}}
 class MyDelegate: NSObject, NSApplicationDelegate {
 }
+// UNSUPPORTED: OS=windows-msvc

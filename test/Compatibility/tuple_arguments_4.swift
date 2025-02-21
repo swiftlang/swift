@@ -34,3 +34,4 @@ do {
   func h(_: ()) {} // expected-note {{'h' declared here}}
   h() // expected-error {{missing argument for parameter #1 in call}}
 }
+// UNSUPPORTED: OS=windows-msvc

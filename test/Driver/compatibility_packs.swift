@@ -5,3 +5,4 @@
 // CHECK:       "libraryName": "swiftCompatibilityPacks",
 // CHECK-NEXT:  "filter": "all",
 // CHECK-NEXT:  "forceLoad": false
+// UNSUPPORTED: OS=windows-msvc

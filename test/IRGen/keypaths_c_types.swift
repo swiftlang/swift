@@ -6,3 +6,4 @@
 struct Foo {
   static let somePath: WritableKeyPath<c_union, some_struct>? = \c_union.some_field
 }
+// UNSUPPORTED: OS=windows-msvc

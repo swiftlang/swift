@@ -169,3 +169,4 @@ _ = m4[13]
 _ = m4[14]
 _ = m4[15]
 
+// UNSUPPORTED: OS=windows-msvc

@@ -52,3 +52,4 @@ func testAddressOnlySubjectDefaultCase(_ e: Enum?) {
   default: return
   }
 }
+// UNSUPPORTED: OS=windows-msvc

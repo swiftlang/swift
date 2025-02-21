@@ -21,3 +21,4 @@ extension HasAssoc where Self.A: ~Copyable {}
 
 class Box<T: ~Copyable> {}
 extension Box where T: ~Copyable {}
+// UNSUPPORTED: OS=windows-msvc

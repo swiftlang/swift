@@ -203,3 +203,4 @@ func slope5(_ x: Float) -> Float {
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
+// UNSUPPORTED: OS=windows-msvc

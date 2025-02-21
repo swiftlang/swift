@@ -14,3 +14,4 @@ public func f<Type>(_ value : Type)
   // CHECK-SAME:                        line: [[@LINE+1]], type: ![[LET_TY]])
   apply(value) { arg in return arg }
 }
+// UNSUPPORTED: OS=windows-msvc

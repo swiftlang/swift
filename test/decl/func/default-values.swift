@@ -195,3 +195,4 @@ let _: Int = badGenericMagicLiteral()
 func genericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #line) -> T { x } // expected-note {{where 'T' = 'String'}}
 let _: Int = genericMagicLiteral()
 let _: String = genericMagicLiteral() // expected-error {{global function 'genericMagicLiteral' requires that 'String' conform to 'ExpressibleByIntegerLiteral'}}
+// UNSUPPORTED: OS=windows-msvc

@@ -33,3 +33,4 @@ _ =/**/2
 _/**/= 2
 typealias A = () ->/* */()
 func test7(x: Int) { _ = x./* desc */ } // expected-error {{expected member name following '.'}}
+// UNSUPPORTED: OS=windows-msvc

@@ -74,3 +74,4 @@ func test2() {
 func testPrivateDesType() {
     returnsStructPrivateDestructor() // expected-error {{'returnsStructPrivateDestructor()' is unavailable: return type is unavailable in Swift}}
 }
+// UNSUPPORTED: OS=windows-msvc

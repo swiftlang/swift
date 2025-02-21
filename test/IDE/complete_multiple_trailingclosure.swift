@@ -266,3 +266,4 @@ func testInitializedVarDecl() {
 
 // INITIALIZED_VARDECL_NEWLINE-DAG: Decl[LocalVar]/Local:               localVal[#TestStruct#];
 }
+// UNSUPPORTED: OS=windows-msvc

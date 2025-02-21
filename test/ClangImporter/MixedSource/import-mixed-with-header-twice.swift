@@ -22,3 +22,4 @@ func useOriginal(a: ForwardClass, b: Derived, c: ForwardClassUser) {
   testOriginal(a, b, conformer)
   doSomething(a)
 }
+// UNSUPPORTED: OS=windows-msvc

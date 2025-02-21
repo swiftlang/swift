@@ -35,3 +35,4 @@ struct InvalidCodingKeys3 : Codable { // expected-error {{type 'InvalidCodingKey
       }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

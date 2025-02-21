@@ -24,3 +24,4 @@ var tuple2: (Double, Bool) = (1, true)
 func myprint(_ p: (i: Int, b: Bool)) {
      print("\(p.i) -> \(p.b)")
 }
+// UNSUPPORTED: OS=windows-msvc

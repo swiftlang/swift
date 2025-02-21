@@ -10,3 +10,4 @@ func foo(a: Int, b: Double) {
 
 // CHECK: variable(local)/Swift | locVar | s:12index_locals3foo1a1bySi_SdtF6locVarL_Sivp | <no-cgname> | Def,RelChild - RelChild,RelAcc
 // CHECK-NEXT: function/acc-set(local)/Swift | setter:locVar | s:12index_locals3foo1a1bySi_SdtF6locVarL_Sivs | <no-cgname> | Def,Impl,RelChild,RelAcc -
+// UNSUPPORTED: OS=windows-msvc

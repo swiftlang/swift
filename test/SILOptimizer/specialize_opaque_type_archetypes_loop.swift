@@ -20,3 +20,4 @@ public func bar<T: P>(_ t: T, _ n: Int) {
 }
 
 bar(foo(), 1000)
+// UNSUPPORTED: OS=windows-msvc

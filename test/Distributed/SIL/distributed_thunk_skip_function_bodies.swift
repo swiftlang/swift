@@ -44,3 +44,4 @@ extension DA {
     blackHole(SKIP_ALL_NO_TYPECHECK)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

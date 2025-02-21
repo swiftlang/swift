@@ -5,3 +5,4 @@
 // RUN: %diff -u %s.response %t.link.response
 // RUN: %sourcekitd-test -req=sema %t.dir/real.swift -- %t.dir/linked.swift | %sed_clean > %t.real.response
 // RUN: %diff -u %s.response %t.real.response
+// UNSUPPORTED: OS=windows-msvc

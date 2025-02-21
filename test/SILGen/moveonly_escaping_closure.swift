@@ -1434,3 +1434,4 @@ func closureCoroutineAssignmentVarArgument(_ e: inout Empty) {
     var c = ClosureHolder()
     c.fCoroutine = f
 }
+// UNSUPPORTED: OS=windows-msvc

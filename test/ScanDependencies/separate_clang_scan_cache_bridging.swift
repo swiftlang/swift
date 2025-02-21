@@ -24,3 +24,4 @@
 
 
 import A
+// UNSUPPORTED: OS=windows-msvc

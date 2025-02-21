@@ -24,3 +24,4 @@ func nonisolatedCaller() async {
 
   await useNonisolatedDefault()
 }
+// UNSUPPORTED: OS=windows-msvc

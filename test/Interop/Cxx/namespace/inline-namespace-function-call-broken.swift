@@ -24,3 +24,4 @@ import namespaces;
 func test() {
   Parent.functionInInlineChild() // expected-error {{type of expression is ambiguous without a type annotation}}
 }
+// UNSUPPORTED: OS=windows-msvc

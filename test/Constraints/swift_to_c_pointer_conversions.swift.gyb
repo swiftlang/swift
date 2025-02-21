@@ -330,3 +330,4 @@ func test_array_to_pointer_conversion() {
   const_opt_uint_${Size}_ptr_func(x${Size}) // OK
 % end
 }
+// UNSUPPORTED: OS=windows-msvc

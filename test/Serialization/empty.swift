@@ -10,3 +10,4 @@
 // CHECK-NOT: <MODULE_BLOCK {{.*}}>
 
 // NEGATIVE-NOT: UnknownCode
+// UNSUPPORTED: OS=windows-msvc

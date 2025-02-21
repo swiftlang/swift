@@ -101,3 +101,4 @@ func testSwitchTwoIsPatternsWithGuard(_ l: B, r: B) {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ R {
   // RUN: %sourcekitd-test -req=conformingmethods -pos %(line + 1):2 %s  -- %s | %FileCheck %s
 }
 // CHECK: key.typeusr: "$s13rdar1411686281RVyAA1SVGD"
+// UNSUPPORTED: OS=windows-msvc

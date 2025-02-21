@@ -49,3 +49,4 @@ baz()
 // IRGEN:       call void @llvm.instrprof.increment({{.*}} @"__profn_{{.*}}main
 // IRGEN:       call void @llvm.instrprof.increment({{.*}} @"__profn_{{.*}}$s18coverage_optimized3bazyyF"
 // IRGEN:       call void @llvm.instrprof.increment({{.*}} @"__profn_{{.*}}$s18coverage_optimized3barSbyF"
+// UNSUPPORTED: OS=windows-msvc

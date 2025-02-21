@@ -7,3 +7,4 @@ class Foo {
         if #available(macOS 11.1, *) {}
     }
 }
+// UNSUPPORTED: OS=windows-msvc

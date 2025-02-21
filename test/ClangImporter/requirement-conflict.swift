@@ -26,3 +26,4 @@ import CoreFeatures
 // a plain swiftmodule file.
 let root = CoreFeatures.RootObject()
 print(root)
+// UNSUPPORTED: OS=windows-msvc

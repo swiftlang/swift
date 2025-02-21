@@ -29,3 +29,4 @@ protocol DoesNotCrash {
   associatedtype ReporterType: Reporter
     where ReporterType.SubReporterType == ReporterType.SubReporterType.SubReporterType
 }
+// UNSUPPORTED: OS=windows-msvc

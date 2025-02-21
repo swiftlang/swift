@@ -57,3 +57,4 @@ func accessMine(_ obj: MyManagedObject) -> String {
 func accessMyMethod(_ obj: MyManagedObject) {
   obj.managedMethod()
 }
+// UNSUPPORTED: OS=windows-msvc

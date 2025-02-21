@@ -11,3 +11,4 @@ class HorseObject : DogObject {
 
   @objc public func flip() {}
 }
+// UNSUPPORTED: OS=windows-msvc

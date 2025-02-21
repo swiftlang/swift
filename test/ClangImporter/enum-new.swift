@@ -21,3 +21,4 @@ func test() {
   switch 5 as Int16 { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; add a default case}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

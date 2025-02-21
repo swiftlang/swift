@@ -58,3 +58,4 @@ func useRope(_ r: Rope, _ s: Rope) {
   _ = s +++ s
   _ = r +++ 5
 }
+// UNSUPPORTED: OS=windows-msvc

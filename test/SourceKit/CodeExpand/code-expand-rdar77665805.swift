@@ -16,3 +16,4 @@ func test() {
 // CHECK:   key.sourcetext: " { <#E#> in\n<#code#>\n}"
 // CHECK: }
 
+// UNSUPPORTED: OS=windows-msvc

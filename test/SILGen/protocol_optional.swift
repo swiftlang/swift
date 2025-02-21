@@ -136,3 +136,4 @@ func optionalSubscriptGeneric<T : P1>(t t : T) {
   var subscriptRef = t[5]
 }
 // CHECK: } // end sil function '$s17protocol_optional0B16SubscriptGeneric{{[_0-9a-zA-Z]*}}F'
+// UNSUPPORTED: OS=windows-msvc

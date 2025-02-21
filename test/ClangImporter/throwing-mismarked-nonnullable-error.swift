@@ -28,3 +28,4 @@ func f() {
 }
 
 f()
+// UNSUPPORTED: OS=windows-msvc

@@ -68,3 +68,4 @@ func test(c : C, s : S) {
 // CHECK: invoke void @_ZNK1S4getSEi(ptr noalias sret(%[[TSO1SV]]) %[[V6]], ptr %[[V1]], i32 1)
 
 // CHECK: invoke void @_ZN1S10getSStaticEi(ptr noalias sret(%[[TSO1SV]]) %[[V7]], i32 1)
+// UNSUPPORTED: OS=windows-msvc

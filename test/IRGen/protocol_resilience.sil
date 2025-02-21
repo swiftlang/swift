@@ -462,3 +462,4 @@ sil_witness_table ConformsWithRequirements : ProtocolWithRequirements module pro
   method #ProtocolWithRequirements.first: @firstWitness
   method #ProtocolWithRequirements.second: @secondWitness
 }
+// UNSUPPORTED: OS=windows-msvc

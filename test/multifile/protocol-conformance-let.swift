@@ -3,3 +3,4 @@
 public struct S : P {
   public var x: Int
 }
+// UNSUPPORTED: OS=windows-msvc

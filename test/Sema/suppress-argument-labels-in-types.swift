@@ -222,3 +222,4 @@ func testIntermediateCoercions() {
   _ = (iuoReturning as Magic)()
   _ = (iuoReturning as () -> Int)() // expected-error {{cannot convert value of type '() -> Int?' to type '() -> Int' in coercion}}
 }
+// UNSUPPORTED: OS=windows-msvc

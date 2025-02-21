@@ -12,4 +12,4 @@ protocol Derived: Base & DoesNotExist { // expected-error {{cannot find type 'Do
 
 // CHECK-LABEL: .OtherDerived@
 // CHECK-NEXT: Requirement signature: <Self where Self : Base>
-protocol OtherDerived: Base<DoesNotExist> {} // expected-error {{cannot find type 'DoesNotExist' in scope}}
+protocol OtherDerived: Base<DoesNotExist> {} // expected-error {{cannot find type 'DoesNotExist' in scope}}// UNSUPPORTED: OS=windows-msvc

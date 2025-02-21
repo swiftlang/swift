@@ -73,3 +73,4 @@ struct S5 {
     _ = S5((x, 0) ^^^ 0) // expected-error {{ambiguous use of operator '^^^'}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

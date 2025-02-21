@@ -18,3 +18,4 @@ public class SPIClass {}
 
 // CHECK-PRIVATE: @_spi_available(macOS, introduced: 10.10)
 // CHECK-PRIVATE: @_spi_available(tvOS, introduced: 14.0)
+// UNSUPPORTED: OS=windows-msvc

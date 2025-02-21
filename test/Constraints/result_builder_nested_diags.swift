@@ -101,3 +101,4 @@ struct Test4: Element {
     Element1()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

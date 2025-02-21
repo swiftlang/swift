@@ -33,3 +33,4 @@ public func foo() {
   }
   catch {}
 }
+// UNSUPPORTED: OS=windows-msvc

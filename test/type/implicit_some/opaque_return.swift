@@ -136,3 +136,4 @@ func createCollection() -> Collection<Int> {
   let a = [9,2,0]
   return a
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -35,3 +35,4 @@ func checkInoutConversionOverloadCompilationDiagnostics() {
 
   _ = String(decodingCString: &u, as: Unicode.UTF8.self) // expected-warning {{'init(decodingCString:as:)' is deprecated: Use String(_ scalar: Unicode.Scalar) [DeprecatedDeclaration]}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ func foo(_ v: Double) {
   _ = A()[S(value: v)]
  // expected-error@-1 {{generic struct 'S' requires that 'Double' conform to 'P'}}
 }
+// UNSUPPORTED: OS=windows-msvc

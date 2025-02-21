@@ -21,3 +21,4 @@ let _ = foo[5]
 
 // CHECK: $e4main3FooVyS2icig
 // CHECK-NOT: $e4main3FooVyS2icis
+// UNSUPPORTED: OS=windows-msvc

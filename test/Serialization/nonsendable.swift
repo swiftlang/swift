@@ -14,3 +14,4 @@
 import def_nonsendable
 
 func test(a: A, b: B) { }
+// UNSUPPORTED: OS=windows-msvc

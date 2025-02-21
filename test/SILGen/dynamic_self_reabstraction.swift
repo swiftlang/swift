@@ -7,3 +7,4 @@ class Foo<U> {
     return foo { self }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

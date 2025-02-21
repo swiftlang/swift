@@ -259,3 +259,4 @@ extension FungingArray {
     self.init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

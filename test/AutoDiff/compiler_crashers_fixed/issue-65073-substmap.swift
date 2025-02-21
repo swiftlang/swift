@@ -26,3 +26,4 @@ public extension Array where Element: Differentiable {
     }
 }
 public struct D<I: Equatable, D> {public subscript(_ index: I) -> D? {get {fatalError()} set {fatalError()}}}
+// UNSUPPORTED: OS=windows-msvc

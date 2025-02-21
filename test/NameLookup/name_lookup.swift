@@ -658,3 +658,4 @@ func useColor() {
   let color = color(with: 123)
   _ = color
 }
+// UNSUPPORTED: OS=windows-msvc

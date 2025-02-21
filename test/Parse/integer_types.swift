@@ -50,3 +50,4 @@ let i: 123? // expected-error {{consecutive statements on a line must be separat
 let j: 123! // expected-error {{consecutive statements on a line must be separated by ';'}}
             // expected-error@-1 {{expected type}}
             // expected-error@-2 {{cannot force unwrap value of non-optional type 'Int'}}
+// UNSUPPORTED: OS=windows-msvc

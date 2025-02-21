@@ -75,3 +75,4 @@ func passingVarAsInout() {
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADDR]] : $*Int32
 // CHECK: [[FUNC:%.*]] = function_ref @$s4main11modifyInoutyys5Int32VzF : $@convention(thin) (@inout Int32) -> ()
 // CHECK: apply [[FUNC]]([[ACCESS]]) : $@convention(thin) (@inout Int32) -> ()
+// UNSUPPORTED: OS=windows-msvc

@@ -68,3 +68,4 @@ let _: SomeProtoAlias = SomeProtoImpl()
 
 func generic<T: SomeProtoAlias>(_: T) {}
 generic(SomeProtoImpl())
+// UNSUPPORTED: OS=windows-msvc

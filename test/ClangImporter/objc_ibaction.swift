@@ -4,3 +4,4 @@
 func foo(object: ConformsToIBActionInProtocol) {
   object.actionMethod(object)
 }
+// UNSUPPORTED: OS=windows-msvc

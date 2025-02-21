@@ -14,3 +14,4 @@ func myFunc(_ ptr: UnsafeRawPointer, _ size: CInt, _ count: CInt) {
 // CHECK-NEXT:     }
 // CHECK-NEXT:     return myFunc(ptr.baseAddress!, size, count)
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

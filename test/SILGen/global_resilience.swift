@@ -105,3 +105,4 @@ public func modifyEmptyGlobal() {
 public func getFixedLayoutGlobal() -> EmptyResilientStruct {
   return fixedLayoutGlobal
 }
+// UNSUPPORTED: OS=windows-msvc

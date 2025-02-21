@@ -4,3 +4,4 @@
 import ReferenceToDerived
 
 func foo(_ x: D) {}
+// UNSUPPORTED: OS=windows-msvc

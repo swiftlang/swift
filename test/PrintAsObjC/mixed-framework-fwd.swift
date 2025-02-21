@@ -43,3 +43,4 @@ public class Dummy: NSNumber {
 #if REQUIRE
 extension Dummy: CustomProto {}
 #endif
+// UNSUPPORTED: OS=windows-msvc

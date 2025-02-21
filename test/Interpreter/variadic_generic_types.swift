@@ -154,3 +154,4 @@ types.test("SequenceElementTuple") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

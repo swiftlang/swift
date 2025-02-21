@@ -319,3 +319,4 @@ func originallyAnySendable() -> sending Any { fatalError() }
 
 @abi(nonisolated func explicitIsolationChanged() -> @Sendable () -> Void)
 @MainActor func explicitIsolationChanged() -> sending () -> Void { fatalError() }
+// UNSUPPORTED: OS=windows-msvc

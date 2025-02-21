@@ -270,3 +270,4 @@ ErrorTests.test("willThrow") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

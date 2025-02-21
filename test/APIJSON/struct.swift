@@ -56,3 +56,4 @@ public struct TestStruct {
 // CHECK-NEXT:   "categories": [],
 // CHECK-NEXT:   "version": "1.0"
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

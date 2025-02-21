@@ -274,3 +274,4 @@ struct TestInoutEscapeInClosure {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

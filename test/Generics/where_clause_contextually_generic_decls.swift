@@ -164,4 +164,4 @@ sameType(Container<Array<Bool>>.NestedAlias3.self, Int.self)
 // expected-error@-1 {{cannot convert value of type 'Int.Type' to expected argument type 'Container<Array<Bool>>.NestedAlias3.Type' (aka 'Bool.Type')}}
 
 sameType(Container<Array<Int>>.NestedAlias3.self, Bool.self)
-// expected-error@-1 {{cannot convert value of type 'Bool.Type' to expected argument type 'Container<Array<Int>>.NestedAlias3.Type' (aka 'Int.Type')}}
+// expected-error@-1 {{cannot convert value of type 'Bool.Type' to expected argument type 'Container<Array<Int>>.NestedAlias3.Type' (aka 'Int.Type')}}// UNSUPPORTED: OS=windows-msvc

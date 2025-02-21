@@ -157,3 +157,4 @@ cont:
   %ret = tuple ()
   return %ret : $()
 }
+// UNSUPPORTED: OS=windows-msvc

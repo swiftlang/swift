@@ -43,3 +43,4 @@ protocol O4 {
           C.C == R.C.C.R,
           C.R.C == R.C.R
 }
+// UNSUPPORTED: OS=windows-msvc

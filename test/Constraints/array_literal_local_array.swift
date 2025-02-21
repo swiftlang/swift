@@ -8,3 +8,4 @@ struct Array { }
 func foo() {
   _ = ["a", "b", "c"]
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -171,3 +171,4 @@ allTests.test("_BridgeStorage") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

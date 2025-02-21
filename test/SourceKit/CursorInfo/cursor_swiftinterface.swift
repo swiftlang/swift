@@ -72,3 +72,4 @@ func test() {
 // CHECK5-NEXT: Global Rename
 // CHECK5-NEXT: symbol without a declaration location cannot be renamed
 // CHECK5-NEXT: ACTIONS END
+// UNSUPPORTED: OS=windows-msvc

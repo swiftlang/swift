@@ -155,3 +155,4 @@ public struct FakeResultHandler: DistributedTargetInvocationResultHandler {
     fatalError("Not implemented: \(#function)")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

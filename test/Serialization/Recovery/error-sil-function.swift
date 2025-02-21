@@ -12,3 +12,4 @@ import Darwin
 public func bar(_ x: Float) -> Float {
   return quux(x)
 }
+// UNSUPPORTED: OS=windows-msvc

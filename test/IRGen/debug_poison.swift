@@ -144,3 +144,4 @@ public func testPoisonOptionalComposite() {
   useOptionalAny(b)
   useNone()
 }
+// UNSUPPORTED: OS=windows-msvc

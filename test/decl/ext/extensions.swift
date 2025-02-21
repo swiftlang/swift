@@ -402,3 +402,4 @@ extension BitwiseCopyable {} // expected-error {{cannot extend protocol 'Bitwise
 
 @_marker protocol MyMarkerProto {}
 extension MyMarkerProto {} // OK
+// UNSUPPORTED: OS=windows-msvc

@@ -75,3 +75,4 @@ struct InfersMainActor : P {
 struct IsolatedType {
   @execution(concurrent) func test() async {}
 }
+// UNSUPPORTED: OS=windows-msvc

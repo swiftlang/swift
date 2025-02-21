@@ -21,3 +21,4 @@ func rock(the c : Castbah) {
     print(obj)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

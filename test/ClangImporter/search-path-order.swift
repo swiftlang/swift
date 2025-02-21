@@ -49,3 +49,4 @@ framework module Module {
 
 //--- SearchPathOrder.swift
 import Module
+// UNSUPPORTED: OS=windows-msvc

@@ -45,3 +45,4 @@ final class Awaitable<Value, Failure>: Sendable where Value: Sendable, Failure: 
 // These GEPs used to cause compiler crashes because they were incorrectly typed...
 // CHECK:   [[DEST_PENDING_CONSUMERS_PTR:%.*]] = getelementptr inbounds %T6stdlib9AwaitableC5StateV{{.*}}, ptr [[DEST_VALUE_PTR]], i32 0, i32 0
 // CHECK:   [[SRC_PENDING_CONSUMERS_PTR:%.*]] = getelementptr inbounds %T6stdlib9AwaitableC5StateV{{.*}}, ptr [[SRC_VALUE_PTR]], i32 0, i32 0
+// UNSUPPORTED: OS=windows-msvc

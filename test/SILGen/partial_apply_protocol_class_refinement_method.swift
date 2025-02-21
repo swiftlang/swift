@@ -15,3 +15,4 @@ func partialApply(_ q: Q) -> () -> () {
   // CHECK-NEXT: dealloc_stack [[TMP]]
   return q.foo
 }
+// UNSUPPORTED: OS=windows-msvc

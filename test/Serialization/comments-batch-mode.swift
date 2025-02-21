@@ -11,3 +11,4 @@
 // CHECK: Inputs/comments-batch/File3.swift:2:13: Func/FuncFromFile3 RawComment=[/// Comment in File3\n]
 // CHECK: Inputs/comments-batch/File4.swift:2:13: Func/FuncFromFile4 RawComment=[/// Comment in File4\n]
 // CHECK: Inputs/comments-batch/File5.swift:2:13: Func/FuncFromFile5 RawComment=[/// Comment in File5\n]
+// UNSUPPORTED: OS=windows-msvc

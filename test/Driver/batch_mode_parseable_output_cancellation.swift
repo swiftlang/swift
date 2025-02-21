@@ -22,3 +22,4 @@
 // CHECK-NEXT:   },
 // CHECK-NEXT:   "error-message": "{{.*}}",
 // CHECK-NEXT:   "signal": 2
+// UNSUPPORTED: OS=windows-msvc

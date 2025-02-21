@@ -15,3 +15,4 @@ import Foundation
 class Foo: NSObject {
   init(x: Int64) { super.init() }
 }
+// UNSUPPORTED: OS=windows-msvc

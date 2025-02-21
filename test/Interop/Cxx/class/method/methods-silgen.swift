@@ -14,3 +14,4 @@ public func use() {
   _ = ReferenceParams(a, b)
   ReferenceParams.staticMethod(a, b)
 }
+// UNSUPPORTED: OS=windows-msvc

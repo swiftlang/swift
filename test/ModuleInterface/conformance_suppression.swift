@@ -6,3 +6,4 @@
 // CHECK:     public enum RecollectionOrganization<T> : ~Swift.BitwiseCopyable, Swift.Copyable where T : ~Copyable {
 // CHECK-NEXT: }
 public enum RecollectionOrganization<T : ~Copyable> : ~BitwiseCopyable, Copyable {}
+// UNSUPPORTED: OS=windows-msvc

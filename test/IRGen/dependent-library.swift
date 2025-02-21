@@ -4,3 +4,4 @@
 // CHECK: ![[oldnames]] = !{!"/DEFAULTLIB:oldnames.lib"}
 // CHECK: ![[msvcrtd]] = !{!"/DEFAULTLIB:msvcrt.lib"}
 
+// UNSUPPORTED: OS=windows-msvc

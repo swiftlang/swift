@@ -34,3 +34,4 @@ withUnsafeTemporaryAllocation(byteCount: 0x0FFF_FFFF, alignment: 1) { buffer in
 // CHECK-LARGE-ALLOC-DAG: br i1 [[IS_SAFE]], label %{{[0-9]+}}, label %{{[0-9]+}}
 // CHECK-LARGE-ALLOC-apple-DAG: [[IS_OS_OK:%[0-9]+]] = {{(tail )?}}call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"
 // CHECK-LARGE-ALLOC-apple-DAG: br i1 [[IS_OS_OK]], label %{{[0-9]+}}, label %{{[0-9]+}}
+// UNSUPPORTED: OS=windows-msvc

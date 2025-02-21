@@ -26,3 +26,4 @@ public class Sub: Base {
 // CHECK-CRASH-DEBUGGER: Stack dump
 // Produced by fatal() because of -disable-deserialization-recovery.
 // CHECK-CRASH-DEBUGGER: Stack dump
+// UNSUPPORTED: OS=windows-msvc

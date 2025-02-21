@@ -17,3 +17,4 @@ func amazingCode() {
 
   _ = a, _ = b
 }
+// UNSUPPORTED: OS=windows-msvc

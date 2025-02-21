@@ -163,3 +163,4 @@ func testMixture() async {
     await testMixture()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

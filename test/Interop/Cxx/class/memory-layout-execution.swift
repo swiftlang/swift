@@ -22,3 +22,4 @@ MemoryLayoutTestSuite.test("PrivateMemberLayout") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

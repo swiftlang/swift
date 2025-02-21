@@ -21,3 +21,4 @@ func testPopFirst() {
 
 
 
+// UNSUPPORTED: OS=windows-msvc

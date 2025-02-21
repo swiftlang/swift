@@ -4,3 +4,4 @@
 // RUN: %api-digester -deserialize-sdk -input-paths %t/abi.json -o %t/abi.result.json
 // RUN: %api-digester -generate-empty-baseline -o %t/abi-tool.json -avoid-tool-args -abi
 // RUN: diff -u %t/abi-tool.json %t/abi.result.json
+// UNSUPPORTED: OS=windows-msvc

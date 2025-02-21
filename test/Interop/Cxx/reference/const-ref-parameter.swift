@@ -67,3 +67,4 @@ func testFunction() {
 // CHECK: [[FN7:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxx7doThingERK13OptionsStruct : $@convention(c) (@in_guaranteed OptionsStruct) -> Int32
 // CHECK-NEXT: apply [[FN7]]
 // CHECK-SAME: : $@convention(c) (@in_guaranteed OptionsStruct) -> Int32
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@
 // CHECK-A-DAG: a.o :
 // NEGATIVE-A-NOT: main.swiftmodule
 // NEGATIVE-A-NOT: main.o
+// UNSUPPORTED: OS=windows-msvc

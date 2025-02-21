@@ -290,3 +290,4 @@ class OverloadVarsByAvailability {
   public var memory: Int16 { get { } set { } }
   // CHECK: [[@LINE-1]]:14 s:14swift_ide_test26OverloadVarsByAvailabilityC6memorys5Int16Vv
 }
+// UNSUPPORTED: OS=windows-msvc

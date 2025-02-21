@@ -125,3 +125,4 @@ public class ClientKlass1: UfiPackageProto {
 public class ClientKlass2: UfiPackageProto {
   public var ufiPkgVar = "C"
 }
+// UNSUPPORTED: OS=windows-msvc

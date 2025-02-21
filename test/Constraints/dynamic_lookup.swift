@@ -486,3 +486,4 @@ do {
   func test(_: AnyObject?) {}
   test(.testProp) // expected-error {{static member 'testProp' cannot be used on protocol metatype '(any AnyObject).Type'}}
 }
+// UNSUPPORTED: OS=windows-msvc

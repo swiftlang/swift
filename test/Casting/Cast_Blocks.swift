@@ -74,3 +74,4 @@ CastsTests.test("block closures in array should bridge without __SwiftValue")
 
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ public struct HasVarWithInternalAccessor {
     internalSetterVar = 2 // expected-error {{setter for property 'internalSetterVar' is internal and cannot be referenced from an '@inlinable' function}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

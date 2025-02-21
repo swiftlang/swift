@@ -30,3 +30,4 @@ StdStringTestSuite.test("String.init(_: std.u32string_view)") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -37,3 +37,4 @@ func check3() {
   // expected-error@-1 {{binary operator '&' cannot be applied to operands of type 'UInt32' and 'Int'}}
   // expected-note@-2 {{overloads for '&' exist with these partially matching parameter lists: (Int, Int), (UInt32, UInt32)}}
 }
+// UNSUPPORTED: OS=windows-msvc

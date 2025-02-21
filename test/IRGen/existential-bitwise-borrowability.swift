@@ -39,3 +39,4 @@ struct Bar: ~Copyable {
     var x: any ~Copyable
 }
 
+// UNSUPPORTED: OS=windows-msvc

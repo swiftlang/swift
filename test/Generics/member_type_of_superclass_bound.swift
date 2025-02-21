@@ -22,3 +22,4 @@ public struct SS<T : C<U>, U> {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

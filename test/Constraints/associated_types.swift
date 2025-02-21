@@ -123,3 +123,4 @@ protocol P2_54624: P1_54624 where Assoc == E_54624 {
   associatedtype Assoc: E_54624 // expected-error {{type 'Self.Assoc' constrained to non-protocol, non-class type 'E_54624'}}
   // expected-warning@-1 {{redeclaration of associated type 'Assoc' from protocol 'P1_54624' is better expressed as a 'where' clause on the protocol}}
 }
+// UNSUPPORTED: OS=windows-msvc

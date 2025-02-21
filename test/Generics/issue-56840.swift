@@ -10,3 +10,4 @@ protocol P {
     where Output.Magnitude == Input
 }
 
+// UNSUPPORTED: OS=windows-msvc

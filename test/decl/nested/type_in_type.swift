@@ -427,3 +427,4 @@ extension OuterGeneric.MidNonGeneric {
 
   }
 }
+// UNSUPPORTED: OS=windows-msvc

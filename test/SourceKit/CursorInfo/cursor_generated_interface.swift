@@ -118,3 +118,4 @@ module LibD {
   header "LibD.h"
   export *
 }
+// UNSUPPORTED: OS=windows-msvc

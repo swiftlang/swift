@@ -62,3 +62,4 @@ public class Derived : Base {
 // NM-NOT: $s4main7DerivedC3fooyyF{{$}}
 // NM:     $s4main8ObjCBaseC3baryyF{{$}}
 // NM:     $s4main8ObjCBaseC3fooyyF{{$}}
+// UNSUPPORTED: OS=windows-msvc

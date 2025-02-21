@@ -1666,3 +1666,4 @@ final class HasInitAccessors {
     ints.append(0)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

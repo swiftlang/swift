@@ -81,3 +81,4 @@ func unlump2<T>(_ x: (T, Int, T)) -> T { return x.0 }
 func unlump3<T>(_ x: (T, Int, T)) -> Int { return x.1 }
 
 
+// UNSUPPORTED: OS=windows-msvc

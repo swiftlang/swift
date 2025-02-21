@@ -62,3 +62,4 @@ func test_DAG_ActorSystem_ActorID_Custom(actorSystem: FakeActorSystem) {
   takeCodable(actor: DAG_ActorSystem_ActorID_Custom<FakeActorSystem>(actorSystem: actorSystem))
   // expected-error@-1{{'DAG_ActorSystem_ActorID_Custom' requires the types 'any FakeActorSystem.SerializationRequirement' (aka 'any Decodable & Encodable') and 'any SerializableButNotCodable' be equivalent}}
 }
+// UNSUPPORTED: OS=windows-msvc

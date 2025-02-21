@@ -46,3 +46,4 @@ struct BacktraceWithLimit {
     doFrames(5)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

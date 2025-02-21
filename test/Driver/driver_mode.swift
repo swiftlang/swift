@@ -16,3 +16,4 @@
 
 // CHECK-SWIFT: 0: input, "{{.*}}driver_mode.swift", swift
 // CHECK-SWIFT: 1: interpret, {0}, none
+// UNSUPPORTED: OS=windows-msvc

@@ -56,3 +56,4 @@ public class SwiftNongenericSubclassOfGenericSubclassOfObjCGeneric
 extension SwiftNongenericSubclassOfGenericSubclassOfObjCGeneric: OBJCProtocol3 {}
 extension SwiftNongenericSubclassOfGenericSubclassOfObjCGeneric: R {}
 
+// UNSUPPORTED: OS=windows-msvc

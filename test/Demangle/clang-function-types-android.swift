@@ -24,3 +24,4 @@ f(ctypes.returns_size_t) // OK: check that importing preserves Clang type
 // CHECK-32: sil @$s3tmp1fyySiyXzC9_ZTSPFjvEF
 // CHECK-64: sil @$s3tmp1fyySiyXzC9_ZTSPFmvEF
 
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ distributed actor MyDistributedActor {
   distributed func transferActorIsolatedArgIntoClosure(
     _ notSendableParamToDistributedFunc: NonSendableKlass) async {}
 }
+// UNSUPPORTED: OS=windows-msvc

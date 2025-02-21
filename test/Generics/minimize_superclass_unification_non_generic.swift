@@ -58,4 +58,4 @@ protocol Pc {
 // CHECK-NEXT: Requirement signature: <Self where Self.[PcQa]T : Pc>
 protocol PcQa {
   associatedtype T where T : Pc, T.T : A
-}
+}// UNSUPPORTED: OS=windows-msvc

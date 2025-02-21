@@ -52,3 +52,4 @@
 // CHECK-NEXT:   init(varPublic: Int32)
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

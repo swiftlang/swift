@@ -23,3 +23,4 @@ func fn(_: Int) {}
 // Used even when one of the above ones is also used, since the diagnostics should only be emitted once
 // ALL-NOT: remark: did not find a prebuilt standard library
 // ALL-NOT: remark: rebuilding module '{{Swift|_Concurrency}}' from interface '{{.*}}'
+// UNSUPPORTED: OS=windows-msvc

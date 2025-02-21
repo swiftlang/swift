@@ -215,3 +215,4 @@ extension MMSub4 : MMP1 { } // expected-warning{{conformance of 'MMSub4' to prot
 extension MMSub4 : MMP2a { } // expected-warning{{conformance of 'MMSub4' to protocol 'MMP2a' was already stated in the type's module 'placement_module_B'}}
 extension MMSub4 : @retroactive MMP3b { } // okay
 extension MMSub4 : AnyObjectRefinement { } // okay
+// UNSUPPORTED: OS=windows-msvc

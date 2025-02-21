@@ -53,3 +53,4 @@ module B {
 
 //--- B.h
 void b(void);
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ import Foundation
 func foo(x: NSString) {
   x.f()
 }
+// UNSUPPORTED: OS=windows-msvc

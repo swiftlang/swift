@@ -35,3 +35,4 @@ func tryCastToQ<T: P>(_: T.Type) -> Q? {
 precondition(tryCastToQ(_: WithCopyable.self) != nil)
 precondition(tryCastToQ(_: WithNonCopyable.self) == nil)
 
+// UNSUPPORTED: OS=windows-msvc

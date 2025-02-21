@@ -9,3 +9,4 @@ class C1 : P {}
 // RUN: %diff -u %S/fill-stub.swift.expected %t.result/fill-stub.swift.expected
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// UNSUPPORTED: OS=windows-msvc

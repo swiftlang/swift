@@ -47,3 +47,4 @@ extension AnonType1 : P {
     return 234
   }
 }
+// UNSUPPORTED: OS=windows-msvc

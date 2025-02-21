@@ -20,3 +20,4 @@ extension TaskGroup: TGP { }
 extension ThrowingTaskGroup: TGP { }
 // expected-warning@-1{{extension declares a conformance of imported type 'ThrowingTaskGroup' to imported protocol 'AsyncIteratorProtocol'}}
 // expected-note@-2{{add '@retroactive' to silence this warning}}
+// UNSUPPORTED: OS=windows-msvc

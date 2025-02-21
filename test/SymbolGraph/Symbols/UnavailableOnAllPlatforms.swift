@@ -20,3 +20,4 @@ public struct ShouldntAppear {
 // CHECK-NOT: shouldntAppearGlobalFunc
 @available(*, unavailable)
 public func shouldntAppearGlobalFunc() {}
+// UNSUPPORTED: OS=windows-msvc

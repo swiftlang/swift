@@ -177,3 +177,4 @@ public class TestablePublicSub: InternalBase {} // expected-error {{cannot find 
 class AccessMemberOfInternalProtocol : ImplementsInternalProtocol {
   func testProperty() { let _ = i } // expected-error {{'i' is inaccessible due to 'internal' protection level}}
 }
+// UNSUPPORTED: OS=windows-msvc

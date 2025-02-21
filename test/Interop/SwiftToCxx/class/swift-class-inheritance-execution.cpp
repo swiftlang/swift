@@ -109,3 +109,4 @@ int main() {
 // CHECK-NEXT: destroy BaseClass
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

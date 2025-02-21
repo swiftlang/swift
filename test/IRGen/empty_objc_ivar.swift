@@ -10,3 +10,4 @@ class EmptyIVar: NSObject {
   var foo: ()
 }
 
+// UNSUPPORTED: OS=windows-msvc

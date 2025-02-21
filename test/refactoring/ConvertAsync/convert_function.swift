@@ -677,3 +677,4 @@ func nestedIgnoredErr() throws {
 // IGNORED-ERR-NEXT:     print("error")
 // IGNORED-ERR-NEXT:   }
 // IGNORED-ERR-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

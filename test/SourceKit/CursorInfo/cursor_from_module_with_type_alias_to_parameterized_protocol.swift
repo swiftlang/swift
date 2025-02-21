@@ -11,3 +11,4 @@ protocol EmptyProto {}
 typealias ConstrainedBar<T: EmptyProto> = Foo<T>
 // RUN: %sourcekitd-test -req=cursor -pos=%(line+1):11 %s -- %s
 typealias ConstrainedBarMetatype<T: P> = Foo<T>.Type
+// UNSUPPORTED: OS=windows-msvc

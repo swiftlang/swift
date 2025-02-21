@@ -9,3 +9,4 @@ public class SwiftNode {
 public struct SwiftLinkedList {
   public var head: SwiftNode
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ public func someAsyncFunction() async { forwardFunction() }
 
 // NEVER-NOT: swift_async_extendedFramePointerFlags
 // NEVER-NOT: 0x1000000000000000
+// UNSUPPORTED: OS=windows-msvc

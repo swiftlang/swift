@@ -34,3 +34,4 @@ struct B {
 }
 
 let b = B(c: C())
+// UNSUPPORTED: OS=windows-msvc

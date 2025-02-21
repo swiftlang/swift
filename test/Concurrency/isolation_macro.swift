@@ -126,3 +126,4 @@ func testContextualType() {
   await concreteActorIsolation()
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -229,3 +229,4 @@ extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendab
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

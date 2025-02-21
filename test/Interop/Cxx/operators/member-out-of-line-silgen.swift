@@ -17,3 +17,4 @@ public func add(_ lhs: LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> Loadabl
 // CHECK-WIN:   apply [[FUNC]]([[ACCESS:%.*]], [[STORE_LOC]]) : $@convention(cxx_method) (LoadableIntWrapper, @in_guaranteed LoadableIntWrapper) -> LoadableIntWrapper
 
 // CHECK-WIN: sil [clang LoadableIntWrapper.__operatorPlus] [[NAME]] : $@convention(cxx_method) (LoadableIntWrapper, @in_guaranteed LoadableIntWrapper) -> LoadableIntWrapper
+// UNSUPPORTED: OS=windows-msvc

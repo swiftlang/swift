@@ -89,3 +89,4 @@ enum MyEnum {
 // SAME AS 'INSTANCE_SELF_DOT'.
   }
 }
+// UNSUPPORTED: OS=windows-msvc

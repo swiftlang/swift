@@ -58,3 +58,4 @@ print(NSStringFromClass(object_getClass(l)!))
 _ = (l as P).anyP
 _ = (lbase as! P).anyP
 // CHECK-NEXT: NSKVONotifying_NSLock
+// UNSUPPORTED: OS=windows-msvc

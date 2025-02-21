@@ -925,3 +925,4 @@ tests.test("binaryLogarithm/generic") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

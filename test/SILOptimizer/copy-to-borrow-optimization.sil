@@ -2156,3 +2156,4 @@ bb0(%0 : $*MultiPayload):
   return %2
 }
 
+// UNSUPPORTED: OS=windows-msvc

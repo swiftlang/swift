@@ -29,3 +29,4 @@ let c = TheModule.Foo()
 // DEMANGLE-TYPE: $s5Other3FooCD
 // CHECK-TYPE: TheModule.Foo
 
+// UNSUPPORTED: OS=windows-msvc

@@ -47,3 +47,4 @@ struct MethodModifiers {
     nonmutating func nonmutating() {}
     __consuming func __consuming() {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ import c_gadget
 public func testInlineAgg(_ rect: MyRect) -> Float {
   return MyRect_Area(rect)
 }
+// UNSUPPORTED: OS=windows-msvc

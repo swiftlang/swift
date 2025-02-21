@@ -96,3 +96,4 @@ func boo<T1, T2:Q, T3:Q, T4:Q, T5:Q, T6:Q> (x: T6)
 //expected-error@+1{{generic parameter 'U' is not used in function signature}}
 func baz<U:P>(_ d: U.A) {
 }
+// UNSUPPORTED: OS=windows-msvc

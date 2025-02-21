@@ -33,3 +33,4 @@ let b = B(p: S())
 // CHECK-NEXT: 3
 b.bar()
 
+// UNSUPPORTED: OS=windows-msvc

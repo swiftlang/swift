@@ -106,3 +106,4 @@ BridgeNonVerbatimTests.test("testing") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

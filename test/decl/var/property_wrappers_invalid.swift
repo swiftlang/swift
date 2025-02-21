@@ -34,3 +34,4 @@ public class Store {
     mutating get { fatalError() }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

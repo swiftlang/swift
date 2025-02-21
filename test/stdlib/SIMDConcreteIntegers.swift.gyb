@@ -96,3 +96,4 @@ ${Scalar}x${n}_TestSuite.test("arithmetic") {
 %end
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

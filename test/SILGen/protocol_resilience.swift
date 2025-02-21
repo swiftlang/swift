@@ -325,3 +325,4 @@ public protocol ResilientAssocTypes {
 // CHECK-NEXT:   associated_conformance (AssocType: P): ConformsToP: P module protocol_resilience
 // CHECK-NEXT:   associated_type AssocType: ConformsToP
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

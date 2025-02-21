@@ -130,3 +130,4 @@ doit()
 // CHECK-SAME:   $s4main5ValueVMz
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

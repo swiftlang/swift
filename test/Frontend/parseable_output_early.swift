@@ -7,3 +7,4 @@
 
 // CHECK:   "kind": "finished",
 // CHECK-NEXT:   "name": "compile",
+// UNSUPPORTED: OS=windows-msvc

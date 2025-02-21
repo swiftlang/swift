@@ -7,3 +7,4 @@ import Foundation
 // CHECK: declref_expr type="module<SomeModule>"
 // CHECK-NEXT: type_expr type="Data.Type"
 let type = SomeModule.Data.self
+// UNSUPPORTED: OS=windows-msvc

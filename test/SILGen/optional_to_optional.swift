@@ -30,3 +30,4 @@ class Foo {
     p2? = p3
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -44,3 +44,4 @@ struct Foo {
 
 // GLOBAL-DAG: Decl[GlobalVar]/CurrModule:         globalAsyncVar[#Int#][' async'];
 // GLOBAL-DAG: Decl[GlobalVar]/CurrModule:         globalAsyncThrowingVar[#Int#][' async'][' throws']
+// UNSUPPORTED: OS=windows-msvc

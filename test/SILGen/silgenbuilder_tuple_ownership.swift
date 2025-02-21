@@ -47,3 +47,4 @@ class Controller {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

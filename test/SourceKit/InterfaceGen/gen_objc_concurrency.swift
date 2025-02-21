@@ -24,3 +24,4 @@
 // OBJC-GEN-INTERFACE:         func method(withHandler operation: String!) async -> Int
 
 // OBJC-GEN-INTERFACE:         @MainActor open func mainActorMethod()
+// UNSUPPORTED: OS=windows-msvc

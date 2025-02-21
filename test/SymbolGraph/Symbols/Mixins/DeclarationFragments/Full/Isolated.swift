@@ -61,3 +61,4 @@ public func asdf(param: isolated SomeActor) {}
 // CHECK-NEXT:          "spelling": ")"
 // CHECK-NEXT:        }
 // CHECK-NEXT:      ],
+// UNSUPPORTED: OS=windows-msvc

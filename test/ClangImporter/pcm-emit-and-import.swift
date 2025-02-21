@@ -13,3 +13,4 @@
 
 import script
 var _ : ScriptTy
+// UNSUPPORTED: OS=windows-msvc

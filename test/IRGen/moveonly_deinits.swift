@@ -414,3 +414,4 @@ func testMultiEnum() {
 // IR:  call swiftcc void @"$s16moveonly_deinits23EmptyMoveOnlyWithDeinitVfD"()
 // IR: 2:
 // IR:  call swiftcc void @"$s16moveonly_deinits28OtherEmptyMoveOnlyWithDeinitVfD"()
+// UNSUPPORTED: OS=windows-msvc

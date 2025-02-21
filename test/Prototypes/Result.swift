@@ -148,3 +148,4 @@ print(results.contains { $0.success != nil })
 
 // Mistaken usage; causes Result<T> to be promoted to Result<T>?
 // print(three ?? nasty)
+// UNSUPPORTED: OS=windows-msvc

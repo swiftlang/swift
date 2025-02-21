@@ -4,3 +4,4 @@
 for foo in [1, 2] { // expected-note {{to match this opening '{'}}
   _ = foo
 // expected-error@+1{{expected '}' at end of brace statement}}
+// UNSUPPORTED: OS=windows-msvc

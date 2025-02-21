@@ -7,3 +7,4 @@
 // CHECK: malformed compiled module: {{.*}}InvalidOverlay.swiftmodule
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=windows-msvc

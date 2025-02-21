@@ -556,3 +556,4 @@ public func testKlassEnumPairWithDeinit() {
         consumeKlassEnumPairWithDeinit(f)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

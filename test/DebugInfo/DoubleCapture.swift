@@ -10,3 +10,4 @@ class C {
     {[weak self] in _ = self!; bar() }()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

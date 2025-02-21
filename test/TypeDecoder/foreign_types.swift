@@ -132,3 +132,4 @@ do {
 // CHECK-DECL: CoreCooling.(file).BlockOfIce
 // CHECK-DECL: foreign_types.(file).CCRefrigerator extension.InternalNestedType
 // CHECK-DECL: foreign_types.(file).CCRefrigerator extension.PrivateNestedType
+// UNSUPPORTED: OS=windows-msvc

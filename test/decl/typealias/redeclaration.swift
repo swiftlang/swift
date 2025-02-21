@@ -43,3 +43,4 @@ protocol OtherProtocol {}
 extension GenericConstrainedExtendedStruct where T : OtherProtocol {
   typealias Horse = String // This is OK!
 }
+// UNSUPPORTED: OS=windows-msvc

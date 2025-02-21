@@ -721,3 +721,4 @@ func consumeInoutAliasable<T>(_ x: inout T, other: T) {
     x = other
   }()
 }
+// UNSUPPORTED: OS=windows-msvc

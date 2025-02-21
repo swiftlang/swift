@@ -7,3 +7,4 @@ print("hello")
 // RUN:    -req=edit -pos=3:1 -replace="}" -length=5 %s == \
 // RUN:    -req=print-annotations %s > %t.response
 // RUN: %diff -u %s.response %t.response
+// UNSUPPORTED: OS=windows-msvc

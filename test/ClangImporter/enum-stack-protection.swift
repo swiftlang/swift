@@ -17,3 +17,4 @@ public func testit() {
 public func useit(_ s: S) {
 }
 
+// UNSUPPORTED: OS=windows-msvc

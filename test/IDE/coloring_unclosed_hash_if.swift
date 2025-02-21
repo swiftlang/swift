@@ -12,3 +12,4 @@ func bar() {
   #if d
 }
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

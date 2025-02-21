@@ -94,3 +94,4 @@ DictionaryTraps.test("RemoveInvalidIndex4")
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@ public struct UnavailableMacOSExtensionsStruct {
   @backDeployed(before: macOS 12)
   public func memberFunc() {}
 }
+// UNSUPPORTED: OS=windows-msvc

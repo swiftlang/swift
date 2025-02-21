@@ -7,3 +7,4 @@
 
 public class Sub : Base {}
   
+// UNSUPPORTED: OS=windows-msvc

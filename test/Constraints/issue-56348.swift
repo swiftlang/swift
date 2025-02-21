@@ -45,3 +45,4 @@ func theProblem(input: Int?) {
 
   _ = enumValue // To silence the warning
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ func test(i: Int) {
   // expected-error@-1{{external macro implementation type 'A.B' could not be found for macro 'resolve'; plugin for module 'A' not found}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

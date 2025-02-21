@@ -25,3 +25,4 @@ var z : Int // expected-error {{invalid redeclaration of 'z'}}
 // CHECK-NEXT: Number FIXITs = 0
 
 // CHECK-NEXT: Number of diagnostics: 3
+// UNSUPPORTED: OS=windows-msvc

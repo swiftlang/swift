@@ -17,3 +17,4 @@ public protocol P { }
 ) -> (AnyObject & Sendable)? {
   nil
 }
+// UNSUPPORTED: OS=windows-msvc

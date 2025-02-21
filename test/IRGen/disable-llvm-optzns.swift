@@ -7,3 +7,4 @@
 func testit() async {
   print(1)
 }
+// UNSUPPORTED: OS=windows-msvc

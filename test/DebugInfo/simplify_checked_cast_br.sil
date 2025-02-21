@@ -37,3 +37,4 @@ bb2(%7 : @owned $AnyObject):
 
 sil_vtable X {
 }
+// UNSUPPORTED: OS=windows-msvc

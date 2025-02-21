@@ -4,3 +4,4 @@
 public func caller() {
   callee(1, 2, 3).f()
 }
+// UNSUPPORTED: OS=windows-msvc

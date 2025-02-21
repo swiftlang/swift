@@ -99,3 +99,4 @@ sil @main : $@convention(c) () -> Int32 {
   %out = struct $Int32 (%out_literal : $Builtin.Int32)
   return %out : $Int32
 }
+// UNSUPPORTED: OS=windows-msvc

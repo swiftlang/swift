@@ -72,3 +72,4 @@ CFunctionTakingACompleteProtocolAsAParameter(nil)
 // CHECK-NOT: IncompleteTypes.h:{{[0-9]+}}:{{[0-9]+}}: note: parameter 'param1' not imported
 // CHECK-NOT: IncompleteTypes.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'CompleteProtocol' is incomplete
 // CHECK-NOT: IncompleteTypes.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'CompleteProtocol' forward declared here
+// UNSUPPORTED: OS=windows-msvc

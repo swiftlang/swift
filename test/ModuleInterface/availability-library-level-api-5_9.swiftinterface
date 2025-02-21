@@ -15,3 +15,4 @@ public typealias A = S
 
 // CHECK: error: 'S' is only available in macOS 11 or newer; clients of 'Test' may have a lower deployment target
 // CHECK: error: failed to verify module interface of 'Test' due to the errors above;
+// UNSUPPORTED: OS=windows-msvc

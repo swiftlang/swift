@@ -16,3 +16,4 @@ protocol P {
   unowned var foo4: Int { get set }
 }
 
+// UNSUPPORTED: OS=windows-msvc

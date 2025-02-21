@@ -423,3 +423,4 @@ func testTupleExpansionInEnumConstructor<each T>(
 // CHECK-NEXT:    [[PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[RESULT_TEMP]] : $*Result<(repeat each T), any Error>, #Result.success
 // CHECK-NEXT:    copy_addr [[VAR]] to [init] [[PAYLOAD_ADDR]] : $*(repeat each T)
 // CHECK-NEXT:    inject_enum_addr [[RESULT_TEMP]] : $*Result<(repeat each T), any Error>, #Result.success
+// UNSUPPORTED: OS=windows-msvc

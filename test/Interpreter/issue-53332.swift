@@ -33,3 +33,4 @@ func baz<T : TypedSupportedType>(_ t: T.Type) {
 // for 'ContentMode : SupportedPropertyType' was incorrectly
 // minimized away.
 baz(ContentMode.self)
+// UNSUPPORTED: OS=windows-msvc

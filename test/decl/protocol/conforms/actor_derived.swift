@@ -28,3 +28,4 @@ class C2: Hashable {
   nonisolated static func ==(lhs: C2, rhs: C2) -> Bool { true }
 }
 
+// UNSUPPORTED: OS=windows-msvc

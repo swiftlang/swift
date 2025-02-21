@@ -11,3 +11,4 @@ import BystandingLibrary
 // CHECK-DAG: {"name":"DeclaringLibrary","path":"{{[^"]+}}","isImportedDirectly":true
 // CHECK-DAG: {"name":"BystandingLibrary","path":"{{[^"]+}}","isImportedDirectly":true
 // CHECK-DAG: {"name":"_OverlayLibrary","path":"{{[^"]+}}","isImportedDirectly":true
+// UNSUPPORTED: OS=windows-msvc

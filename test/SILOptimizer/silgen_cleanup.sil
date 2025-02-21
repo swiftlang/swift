@@ -404,3 +404,4 @@ sil [ossa] @narrowLoadThroughProjectionSequence : $@convention(thin) () -> () {
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

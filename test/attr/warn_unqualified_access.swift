@@ -81,3 +81,4 @@ class Recovery {
     // expected-note@-3 {{use 'Other2.' to reference the global function in module 'Other2'}} {{5-5=Other2.}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

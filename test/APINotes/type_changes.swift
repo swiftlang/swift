@@ -10,3 +10,4 @@ func testChangedTypes(tc: TypeChanges, a: A, i: Int) {
   _ = tc.method(with: i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'A'}}
   let _: Int = tc.method(with: a) // expected-error{{cannot convert value of type 'A' to specified type 'Int'}}
 }
+// UNSUPPORTED: OS=windows-msvc

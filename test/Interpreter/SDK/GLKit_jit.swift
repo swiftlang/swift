@@ -4,3 +4,4 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_interpreter
+// UNSUPPORTED: OS=windows-msvc

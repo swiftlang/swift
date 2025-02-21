@@ -789,3 +789,4 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

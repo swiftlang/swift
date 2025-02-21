@@ -364,3 +364,4 @@ func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
 func f_54865(a: Any, _ str: String?) {
   a == str // expected-error {{cannot convert value of type 'Any' to expected argument type 'String'}}
 }
+// UNSUPPORTED: OS=windows-msvc

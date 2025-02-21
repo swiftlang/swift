@@ -25,3 +25,4 @@ func optionalChainingForeignFunctionTypeProperties(a: SomeCallbacks?) {
   a?.opaquePointerReturning()
 }
 
+// UNSUPPORTED: OS=windows-msvc

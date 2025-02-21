@@ -29,3 +29,4 @@ func testTypeLookup(_: AlreadyDeclaredStruct) {}
 func testTypeLookup(_: NestedDeclaredStruct) {}
 func testTypeLookup(_: ForwardDeclaredStruct) {}
 func testTypeLookup(_: NestedTypedef) {}
+// UNSUPPORTED: OS=windows-msvc

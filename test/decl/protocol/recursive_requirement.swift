@@ -129,3 +129,4 @@ protocol B {
     
     func observeChangeOfProperty(_ property: BC, observable: BA)
 }
+// UNSUPPORTED: OS=windows-msvc

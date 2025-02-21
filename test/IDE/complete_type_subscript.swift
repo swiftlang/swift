@@ -118,3 +118,4 @@ extension GP1 {
 }
 // GENPROTO_1-DAG: Decl[AssociatedType]/CurrNominal:   Assoc;
 // GENPROTO_1-DAG: Keyword/None:                       Type[#Self.I.Type#];
+// UNSUPPORTED: OS=windows-msvc

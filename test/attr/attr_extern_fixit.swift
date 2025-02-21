@@ -5,3 +5,4 @@
 
 @_extern(c) // expected-warning {{C name '+' may be invalid; explicitly specify the name in @_extern(c) to suppress this warning}}
 func +(a: Int, b: Bool) -> Bool
+// UNSUPPORTED: OS=windows-msvc

@@ -227,3 +227,4 @@ func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodySecond
     await test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodySecond()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

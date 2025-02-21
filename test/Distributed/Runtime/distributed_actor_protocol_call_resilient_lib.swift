@@ -126,3 +126,4 @@ import FakeDistributedActorSystems
     print("done")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ namespace ns {
 import CxxModule
 
 // CHECK-NOT: emitting symbolic interface at
+// UNSUPPORTED: OS=windows-msvc

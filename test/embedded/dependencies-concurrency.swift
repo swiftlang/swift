@@ -72,3 +72,4 @@ struct Main {
     // CHECK-NEXT: 42
   }
 }
+// UNSUPPORTED: OS=windows-msvc

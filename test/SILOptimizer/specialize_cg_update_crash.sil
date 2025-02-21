@@ -31,3 +31,4 @@ bb0:
   return %18 : $MyStruct
 }
 
+// UNSUPPORTED: OS=windows-msvc

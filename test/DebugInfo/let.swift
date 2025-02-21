@@ -12,3 +12,4 @@ func foo() -> Int64 {
   let a = machine.query()
   return a
 }
+// UNSUPPORTED: OS=windows-msvc

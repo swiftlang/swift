@@ -68,3 +68,4 @@ extension SafetyError {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

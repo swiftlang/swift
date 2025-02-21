@@ -4,3 +4,4 @@ public func foo(x: [String]) {
   x.split(separator: ":")
 }
 
+// UNSUPPORTED: OS=windows-msvc

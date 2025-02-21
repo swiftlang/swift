@@ -7,3 +7,4 @@
 print(DummyModule.dummyVar) // expected-error {{cannot find 'DummyModule' in scope}}
 print(dummyVar) // expected-error {{cannot find 'dummyVar' in scope}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

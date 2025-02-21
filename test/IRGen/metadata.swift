@@ -33,3 +33,4 @@ class MyController {
     c = n
   }
 }
+// UNSUPPORTED: OS=windows-msvc

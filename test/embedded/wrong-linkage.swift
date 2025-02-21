@@ -7,3 +7,4 @@
 func posix_memalign(_ resultPtr:UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ :Int, _ :Int) -> Int32 { // expected-error {{function has wrong linkage to be called from}}
   return 0
 }
+// UNSUPPORTED: OS=windows-msvc

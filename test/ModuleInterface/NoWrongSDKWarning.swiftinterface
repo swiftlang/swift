@@ -12,3 +12,4 @@ public func empty()
 
 // CHECK-NOT: warning:
 // CHECK-NOT: error:
+// UNSUPPORTED: OS=windows-msvc

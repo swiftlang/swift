@@ -85,3 +85,4 @@ int main(int argc, char *argv[]) {
   }
   mainFunction(argc, argv); // CHECK: howdy mundo
 }
+// UNSUPPORTED: OS=windows-msvc

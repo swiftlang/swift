@@ -701,3 +701,4 @@ Added: _$s15Synchronization20AtomicUpdateOrderingV9releasingACvpZMV
 
 // WordPair to Comparable conformance
 Added: _$s15Synchronization8WordPairVSLAAMc
+// UNSUPPORTED: OS=windows-msvc

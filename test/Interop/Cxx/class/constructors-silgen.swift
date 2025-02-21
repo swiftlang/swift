@@ -69,3 +69,4 @@ public func deletedConstructor(a: UnsafeMutablePointer<Int32>) {
 public func templatedConstructor() {
   let templated = TemplatedConstructor(ArgType())
 }
+// UNSUPPORTED: OS=windows-msvc

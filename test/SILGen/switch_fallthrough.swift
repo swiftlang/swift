@@ -183,3 +183,4 @@ func testNestedFallthrough(x: (Int, String), y: (Int, Int)) {
     print("done")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

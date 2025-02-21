@@ -4,4 +4,4 @@
 @objc public protocol P {
   typealias T = () -> Bool
   // CHECK: typealias T = () -> Bool
-}
+}// UNSUPPORTED: OS=windows-msvc

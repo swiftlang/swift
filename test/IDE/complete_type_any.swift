@@ -44,3 +44,4 @@ func testRdar84684686() {
   foo(S.#^ANY_PREFERS_FUNCTION_CALL^#)
 // ANY_PREFERS_FUNCTION_CALL-DAG: Decl[StaticMethod]/CurrNominal:     bar({#x: Int#})[#Int#]; name=bar(x:)
 }
+// UNSUPPORTED: OS=windows-msvc

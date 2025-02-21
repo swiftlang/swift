@@ -17,3 +17,4 @@ enum TestErrno {
     errno = 0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

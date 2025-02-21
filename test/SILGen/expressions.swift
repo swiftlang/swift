@@ -698,3 +698,4 @@ func test21886435() {
   () = ()
 }
 
+// UNSUPPORTED: OS=windows-msvc

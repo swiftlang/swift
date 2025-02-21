@@ -13,3 +13,4 @@
 // CHECK:   typealias size_t = Int
 // CHECK: }
 
+// UNSUPPORTED: OS=windows-msvc

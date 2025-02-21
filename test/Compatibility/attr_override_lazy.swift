@@ -23,3 +23,4 @@ class Sub : Base {
 // CHECK: #Base.bar!setter: (Base) -> (Int) -> () : {{.*}} // Sub.bar.setter
 // CHECK: #Base.bar!modify: (Base) -> {{.*}} : {{.*}} // Sub.bar.modify
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

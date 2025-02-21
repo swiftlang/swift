@@ -63,3 +63,4 @@ public struct Pub: Proto {
     return arg
   }
 }
+// UNSUPPORTED: OS=windows-msvc

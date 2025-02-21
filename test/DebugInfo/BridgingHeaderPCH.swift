@@ -8,3 +8,4 @@
 // CHECK: !DICompileUnit(language: DW_LANG_{{ObjC|C99|C11}}{{.*}}splitDebugFilename: "{{.*}}.pch",{{.*}}dwoId:
 
 Foo()
+// UNSUPPORTED: OS=windows-msvc

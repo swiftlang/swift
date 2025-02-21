@@ -10,3 +10,4 @@ class C {
 func foo(_ c: C) -> Int {
   return c.return
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -84,3 +84,4 @@ class Foo: SimpleProtocol {
     func foo(_ bar: SimpleInterface) {
     }
 }
+// UNSUPPORTED: OS=windows-msvc

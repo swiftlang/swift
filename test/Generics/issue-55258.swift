@@ -89,3 +89,4 @@ public extension GeneralAdjacencyList
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

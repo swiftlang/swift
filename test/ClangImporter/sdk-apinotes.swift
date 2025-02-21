@@ -4,3 +4,4 @@ import cfuncs
 
 let array: [UnsafePointer<CChar>?] = [nil]
 array.withUnsafeBufferPointer { nullability_note($0.baseAddress!) }
+// UNSUPPORTED: OS=windows-msvc

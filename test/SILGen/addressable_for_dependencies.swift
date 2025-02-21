@@ -106,3 +106,4 @@ extension Bar {
 // CHECK-SAME: $@convention(thin) (Int) -> @lifetime(borrow 0) () {
 @lifetime(borrow i)
 func defaulArgument(i: Int = 0) {}
+// UNSUPPORTED: OS=windows-msvc

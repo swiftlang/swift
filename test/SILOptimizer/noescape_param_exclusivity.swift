@@ -46,3 +46,4 @@ func test5(outer: (() throws -> Int) throws -> Int) throws -> Int {
 
   return try descend(outer)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -35,3 +35,4 @@ distributed actor NotCodableDA<ActorSystem>
     _ = await f(isolatedTo: #isolation)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

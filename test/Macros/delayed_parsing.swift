@@ -18,3 +18,4 @@ macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(mo
 
   return x
 }
+// UNSUPPORTED: OS=windows-msvc

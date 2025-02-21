@@ -13,3 +13,4 @@
 // RUN: %sourcekitd-test -req=doc-info -module Foo.FooSub -- -F %S/../Inputs/libIDE-mock-sdk \
 // RUN:         -target %target-triple %clang-importer-sdk-nosource -I %t | %sed_clean > %t.response
 // RUN: %diff -u %s.sub.response %t.response
+// UNSUPPORTED: OS=windows-msvc

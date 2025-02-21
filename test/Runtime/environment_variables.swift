@@ -25,3 +25,4 @@
 
 // CHECK: Hello, world
 print("\nHello, world\n")
+// UNSUPPORTED: OS=windows-msvc

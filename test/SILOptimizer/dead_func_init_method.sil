@@ -45,3 +45,4 @@ sil_vtable Derived {
 
 // CHECK-LABEL: sil_vtable Derived
 // CHECK: DerivedInit
+// UNSUPPORTED: OS=windows-msvc

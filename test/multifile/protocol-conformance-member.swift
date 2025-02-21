@@ -12,3 +12,4 @@ protocol CoolStructProtocol {
   var coolFactor: Double { get }
 }
 extension CoolStruct : CoolStructProtocol {}
+// UNSUPPORTED: OS=windows-msvc

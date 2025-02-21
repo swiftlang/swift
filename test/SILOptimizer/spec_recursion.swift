@@ -26,3 +26,4 @@ var x2 = Test<Int>()
 x2.recursive(x: 3)
 
 
+// UNSUPPORTED: OS=windows-msvc

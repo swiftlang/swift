@@ -57,3 +57,4 @@ func testString(interpolated: Stringified<String> = #stringify("Hello \(0b10001)
 
 // expected-error@+1{{default argument value of type '(Int, String)' cannot be converted to type 'Int'}}
 func testReturn(wrongType: Int = #stringify(0)) {}
+// UNSUPPORTED: OS=windows-msvc

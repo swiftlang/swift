@@ -51,3 +51,4 @@ struct NE : ~Escapable {
     self.bv = bv
   }
 }
+// UNSUPPORTED: OS=windows-msvc

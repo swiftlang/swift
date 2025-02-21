@@ -329,3 +329,4 @@ public struct Strct {
 
 // CHECK: SWIFT_INLINE_THUNK ns::anonStructInNS Strct::getTransform2() const {
 // CHECK-NEXT: alignas(alignof(ns::anonStructInNS)) char storage[sizeof(ns::anonStructInNS)];
+// UNSUPPORTED: OS=windows-msvc

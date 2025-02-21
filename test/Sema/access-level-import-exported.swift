@@ -53,3 +53,4 @@ public func user(t: TargetType) {}
 
 //--- Client_ImportIndirectLocal.swift
 public func user(t: TargetType) {}
+// UNSUPPORTED: OS=windows-msvc

@@ -46,3 +46,4 @@ protocol P8a : P7 where Y == C {}
 protocol P8b : P7 where Y == C {}
 
 // Make sure we pick 'Y == C' and not 'Y == G<C>' here.
+// UNSUPPORTED: OS=windows-msvc

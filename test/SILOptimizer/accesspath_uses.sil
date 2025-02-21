@@ -297,3 +297,4 @@ bb5:
   %999 = tuple ()
   return %999 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

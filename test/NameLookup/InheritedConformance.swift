@@ -9,3 +9,4 @@ protocol Protocol {}
 class ConformingClass: Protocol {}
 class BaseClass<T: Protocol> {}
 class ConcreteClass<T: ConformingClass> : BaseClass<T> {}
+// UNSUPPORTED: OS=windows-msvc

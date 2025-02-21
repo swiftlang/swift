@@ -805,3 +805,4 @@ func testMatchingNonErrorConformingTypeInClosure(_ x: any Error) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

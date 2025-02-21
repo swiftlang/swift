@@ -4,3 +4,4 @@ public struct SomeType {
 // CHECK: public private(set) var privateSetter: Int
 
 // RUN: %target-swift-ide-test -print-swift-file-interface -source-filename %s | %FileCheck %s
+// UNSUPPORTED: OS=windows-msvc

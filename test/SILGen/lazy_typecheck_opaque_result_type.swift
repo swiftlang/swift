@@ -137,3 +137,4 @@ public func returnsResultOfReturnsLibraryStruct() -> some P {
 public func returnsResulfOfInlinableReturnsLibraryStruct() -> some P {
   return inlinableReturnsLibraryStruct()
 }
+// UNSUPPORTED: OS=windows-msvc

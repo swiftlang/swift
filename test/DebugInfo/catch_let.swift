@@ -53,3 +53,4 @@ multiBinding()
 // CHECK: ![[EXPLICIT_ERROR]] = !DILocalVariable(name: "error"
 // CHECK: ![[IMPLICIT_ERROR]] = !DILocalVariable(name: "error"
 // CHECK: ![[MULTI_BINDING_ERROR]] = !DILocalVariable(name: "error"
+// UNSUPPORTED: OS=windows-msvc

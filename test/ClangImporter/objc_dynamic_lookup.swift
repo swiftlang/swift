@@ -7,3 +7,4 @@ import Foundation
 func useAnyObject(_ obj: AnyObject) {
   _ = obj.isMakingHoney
 }
+// UNSUPPORTED: OS=windows-msvc

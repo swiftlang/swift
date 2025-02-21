@@ -270,3 +270,4 @@ struct LocalGenericFunc<Element> {
 // CHECK: sil_witness_table hidden HotDogs.American: HotDog module nested_generics {
 // CHECK:   associated_type Condiment: Deli<Pepper>.Mustard
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

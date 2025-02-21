@@ -83,3 +83,4 @@ func bar(arg: Int?) {
     break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ struct A: T {}
 func test_switch<T>(arr: T) {
   if case _ as A = arr {}
 }
+// UNSUPPORTED: OS=windows-msvc

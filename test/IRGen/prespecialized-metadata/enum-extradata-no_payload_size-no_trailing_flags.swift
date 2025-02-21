@@ -18,3 +18,4 @@ enum Either<First, Second, Third> {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

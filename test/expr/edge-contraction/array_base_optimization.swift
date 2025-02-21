@@ -7,3 +7,4 @@ var threeDoubles = Array(repeating: 0.0, count: 3)
 var anotherThreeDoubles = Array(repeating: 2.5, count: 3)
 var sixDoubles: [Double] = threeDoubles + anotherThreeDoubles
 print("six has the value [\(sixDoubles[0]), \(sixDoubles[1]), \(sixDoubles[2]), \(sixDoubles[3]), \(sixDoubles[4]), \(sixDoubles[5])]")
+// UNSUPPORTED: OS=windows-msvc

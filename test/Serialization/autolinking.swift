@@ -64,3 +64,4 @@ import someModule
 // PUBLIC-DEP-DAG: !{{[0-9]+}} = !{!{{"-lmagic"|"/DEFAULTLIB:magic.lib"}}}
 // PUBLIC-DEP-DAG: !{{[0-9]+}} = !{!{{"-lmodule"|"/DEFAULTLIB:module.lib"}}}
 // PUBLIC-DEP-DAG: !{{[0-9]+}} = !{!{{"-lanotherLib"|"/DEFAULTLIB:anotherLib.lib"}}}
+// UNSUPPORTED: OS=windows-msvc

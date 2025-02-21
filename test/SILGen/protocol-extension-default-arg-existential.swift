@@ -37,3 +37,4 @@ func checkAgainstExclusivityViolations(x: inout MethodWithDefaultArgGenerator) {
   x.mutate(&x.b)
 }
 
+// UNSUPPORTED: OS=windows-msvc

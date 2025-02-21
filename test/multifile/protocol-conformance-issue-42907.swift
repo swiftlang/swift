@@ -5,3 +5,4 @@
 func definedInMain() { print(MemoryLayout<FourFloats>.size) }
 
 let d = definedInOther()
+// UNSUPPORTED: OS=windows-msvc

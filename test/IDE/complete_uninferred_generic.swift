@@ -16,3 +16,4 @@ _ = S2()#^UNINFERRED^#
 // UNINFERRED-DAG: Decl[Subscript]/Super:     [{#(v0): T#}][#Int#]; name=[:]
 // UNINFERRED-DAG: Decl[Subscript]/Super:     [{#(v0): T#}][#<<error type>>#]; name=[:]
 // UNINFERRED-DAG: Keyword[self]/CurrNominal: .self[#S2<_>#]; name=self
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ public class ClassWithMembers {
   @_spi_available(macOS 10.15, *)
   public func spiFunc() {} // Ok, this declaration is not top level
 }
+// UNSUPPORTED: OS=windows-msvc

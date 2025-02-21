@@ -201,3 +201,4 @@ func run_tests() {
     run_tests()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

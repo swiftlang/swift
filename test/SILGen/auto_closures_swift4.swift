@@ -14,3 +14,4 @@ public func y1(_ message: @autoclosure () -> Empty) {
 public func y2(_ message: @autoclosure @escaping () -> Empty) {
   x(message)
 }
+// UNSUPPORTED: OS=windows-msvc

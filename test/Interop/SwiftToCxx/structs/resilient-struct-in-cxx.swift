@@ -268,3 +268,4 @@ public func mutateSmall(_ x: inout FirstSmallStruct) {
 // CHECK:      SWIFT_INLINE_THUNK void StructWithRefCountStoredProp::dump() const {
 // CHECK-NEXT:   Structs::_impl::$s7Structs28StructWithRefCountStoredPropV4dumpyyF(_getOpaquePointer());
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

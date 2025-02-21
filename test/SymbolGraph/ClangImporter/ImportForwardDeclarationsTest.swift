@@ -7,3 +7,4 @@
 // REQUIRES: objc_interop
 
 // CHECK: "preciseIdentifier": "c:objc(cs)ForwardDeclaration"
+// UNSUPPORTED: OS=windows-msvc

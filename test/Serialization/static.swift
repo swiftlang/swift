@@ -10,3 +10,4 @@
 // CHECK-STATIC: <IS_STATIC abbrevid={{[0-9]+}}/>
 // CHECK-DYNAMIC-NOT: <IS_STATIC abbrevid={{[0-9]+}}/>
 // CHECK: </MODULE_BLOCK>
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@
 public func verySimpleFunction() {}
 
 // CHECK: {{^}}public func otherFileFunction(){{$}}
+// UNSUPPORTED: OS=windows-msvc

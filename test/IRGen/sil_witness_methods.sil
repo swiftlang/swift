@@ -158,3 +158,4 @@ entry:
   %z = partial_apply %w<Foo, Foo, Foo>() : $@convention(witness_method: P) <T, U, V> (@in Bar<T, U, V>) -> @thick Bar<T, U, V>.Type
   return %z : $@callee_owned (@in Bar<Foo, Foo, Foo>) -> @thick Bar<Foo, Foo, Foo>.Type
 }
+// UNSUPPORTED: OS=windows-msvc

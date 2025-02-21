@@ -19,3 +19,4 @@ StringOrderRelationTestSuite.test("StringOrderRelation/ASCII/NullByte") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

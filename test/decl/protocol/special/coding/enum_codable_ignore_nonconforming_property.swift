@@ -24,3 +24,4 @@ let _ = SimpleEnum.encode(to:)
 // The synthesized CodingKeys type should not be accessible from outside the
 // struct.
 let _ = SimpleEnum.XCodingKeys.self // expected-error {{'XCodingKeys' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

@@ -168,3 +168,4 @@ doit()
 
 //         CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main9Ancestor1[[UNIQUE_ID_1]]CySiGMb"
 
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ struct OptionalStreamAdaptor<T : IteratorProtocol> {
   }
   var x: [T]
 }
+// UNSUPPORTED: OS=windows-msvc

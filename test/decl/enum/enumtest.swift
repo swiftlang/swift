@@ -636,3 +636,4 @@ if case nil = foo1 {} // Okay
 if case .none? = foo1 {} // Okay
 if case nil = foo2 {} // Okay
 if case .none?? = foo2 {} // Okay
+// UNSUPPORTED: OS=windows-msvc

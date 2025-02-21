@@ -21,3 +21,4 @@ class CrashMetaType {
     required init() { }
     class func apiRequest<A>(base: String, resource: Resource<A>) {}
 }
+// UNSUPPORTED: OS=windows-msvc

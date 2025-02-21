@@ -13,3 +13,4 @@ public func verySimpleFunction() {}
 public func ownership(_ x: __shared AnyObject) {}
 
 // CHECK-MULTI-FILE: public func otherFileFunction(){{$}}
+// UNSUPPORTED: OS=windows-msvc

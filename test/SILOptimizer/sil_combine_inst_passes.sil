@@ -166,3 +166,4 @@ bb3(%9 : @guaranteed $Buffer):
   %r = tuple ()
   return %r : $()
 }
+// UNSUPPORTED: OS=windows-msvc

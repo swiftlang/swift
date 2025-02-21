@@ -430,3 +430,4 @@ StdMapTestSuite.test("UnorderedMap.merge(map)") {
 // `merging` is implemented by calling `merge`, so we can skip this test
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

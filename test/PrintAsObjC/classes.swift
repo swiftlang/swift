@@ -860,3 +860,4 @@ public class NonObjCClass { }
 // CHECK-NEXT: @interface WeakImportedClass
 // CHECK-NEXT: @end
 @_weakLinked @objc class WeakImportedClass {}
+// UNSUPPORTED: OS=windows-msvc

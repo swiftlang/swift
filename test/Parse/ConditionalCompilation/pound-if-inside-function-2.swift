@@ -8,3 +8,4 @@ func foo() { // expected-note {{to match this opening '{'}}
 #elseif !BLAH
 // expected-error@+2{{expected '}' at end of brace statement}}
 // expected-error@+1{{expected #else or #endif at end of conditional compilation block}}
+// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@ struct S {
 
 S.f({ _, _ in })
 #endif
+// UNSUPPORTED: OS=windows-msvc

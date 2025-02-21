@@ -4,3 +4,4 @@
 func useImportedArrayTypedefInit() -> Name {
   return Name(name: (0, 0, 0, 0))
 }
+// UNSUPPORTED: OS=windows-msvc

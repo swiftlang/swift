@@ -11,3 +11,4 @@
 // RUN: %swiftc_driver -sdk '""' -driver-print-jobs -target i386-apple-watchos4.0 %s > %t.simple.txt 2>&1
 // RUN: %FileCheck -check-prefix WARN_WATCHOS_SIMULATOR %s < %t.simple.txt
 // WARN_WATCHOS_SIMULATOR: warning: inferring simulator environment for target 'i386-apple-watchos4.0'; use '-target i386-apple-watchos4.0-simulator' instead
+// UNSUPPORTED: OS=windows-msvc

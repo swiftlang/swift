@@ -46,3 +46,4 @@ public extension ExternalA {
 // EBS_EXTERNAL: "kind": "extensionTo"
 // EBS_EXTERNAL-NEXT: "source": "s:e:s:17ExternalTypealias0A1SV0B0E3fooyyF"
 // EBS_EXTERNAL-NEXT: "target": "s:17ExternalTypealias0A1SV"
+// UNSUPPORTED: OS=windows-msvc

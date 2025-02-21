@@ -736,3 +736,4 @@ bb0(%0 : $@thick T.Type):
   return %9999 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -75,3 +75,4 @@ do {
   // expected-error@-1 {{cannot convert value of type '(@execution(caller) () async -> ()).Type' to expected argument type '(@isolated(any) () async -> Void).Type'}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

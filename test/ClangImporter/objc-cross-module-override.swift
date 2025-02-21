@@ -17,3 +17,4 @@ final class MyImage : Image {
   // CHECK: ImageInitializers.Image.init:{{.*}}: note: overridden declaration is here
   override required convenience init(imageLiteralResourceName name: String) { }
 }
+// UNSUPPORTED: OS=windows-msvc

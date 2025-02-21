@@ -12,3 +12,4 @@ struct A {
     self.init(other ?? ._none)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

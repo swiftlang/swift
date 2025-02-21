@@ -5,3 +5,4 @@ struct S: ~Escapable {}
 func hello(_ t: some Escapable, _ u: any Escapable) {}
 
 protocol Whatever: Escapable {}
+// UNSUPPORTED: OS=windows-msvc

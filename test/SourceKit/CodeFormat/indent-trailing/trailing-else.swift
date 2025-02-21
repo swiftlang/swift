@@ -4,3 +4,4 @@ func foo(x: Bool) {
 
 // RUN: %sourcekitd-test -req=format -line=4 -length=1 %s | %FileCheck --strict-whitespace %s
 // CHECK: key.sourcetext: "        "
+// UNSUPPORTED: OS=windows-msvc

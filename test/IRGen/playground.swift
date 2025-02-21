@@ -31,3 +31,4 @@ anchor()
 // CHECK-LABEL: define{{( protected)?}} private void @runtime_registration
 // CHECK:         call void @swift_instantiateObjCClass({{.*}} @"$s10playground1CCN"
 
+// UNSUPPORTED: OS=windows-msvc

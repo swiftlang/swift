@@ -11,3 +11,4 @@ FunctionIntroducedIn10_16()
 FunctionIntroducedIn11_0()
 // expected-error@-1 {{'FunctionIntroducedIn11_0()' is only available in macOS 11.0 or newer}}
 // expected-note@-2 {{add 'if #available' version check}}
+// UNSUPPORTED: OS=windows-msvc

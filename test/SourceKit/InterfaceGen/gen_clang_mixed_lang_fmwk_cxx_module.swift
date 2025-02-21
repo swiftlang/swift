@@ -30,3 +30,4 @@ public func testSwiftFunc() {
 // CHECK: }
 
 // CHECK: public func testSwiftFunc()
+// UNSUPPORTED: OS=windows-msvc

@@ -79,3 +79,4 @@
 // CHECK-NEXT:   public var PublicMemberVar: Int32
 // CHECK-NEXT:   private var PrivateMemberVar: Int32
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

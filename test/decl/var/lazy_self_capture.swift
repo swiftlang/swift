@@ -10,3 +10,4 @@ class C {
 
   let x = "hi"
 }
+// UNSUPPORTED: OS=windows-msvc

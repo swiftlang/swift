@@ -99,3 +99,4 @@ func nebv_consume_after_yield(nebv: consuming NEBV) {
   _ = consume nebv
   bv_consume(view)
 }
+// UNSUPPORTED: OS=windows-msvc

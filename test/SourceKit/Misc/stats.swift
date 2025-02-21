@@ -70,3 +70,4 @@ func foo() {}
 // OPEN_TWO_FILES: 2 {{.*}} source.statistic.num-ast-builds
 // OPEN_TWO_FILES: 2 {{.*}} source.statistic.num-asts-in-memory
 // OPEN_TWO_FILES: 2 {{.*}} source.statistic.max-asts-in-memory
+// UNSUPPORTED: OS=windows-msvc

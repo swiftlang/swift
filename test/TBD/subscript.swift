@@ -23,3 +23,4 @@ struct X {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

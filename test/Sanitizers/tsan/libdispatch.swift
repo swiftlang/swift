@@ -54,3 +54,4 @@ print("Done!")
 
 // CHECK-DAG: ThreadSanitizer: data race
 // CHECK-DAG: Done!
+// UNSUPPORTED: OS=windows-msvc

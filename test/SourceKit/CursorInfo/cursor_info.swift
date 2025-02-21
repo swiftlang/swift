@@ -902,3 +902,4 @@ let strInterpolation = "This is a \(stringStr + "ing") interpolation"
 // CHECK100-NEXT: Swift
 // CHECK100-NEXT: <Group>String</Group>
 // CHECK100-NEXT: SYSTEM
+// UNSUPPORTED: OS=windows-msvc

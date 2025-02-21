@@ -5,3 +5,4 @@
 import ExternIntX
 
 let y: CInt = ExternIntX.x
+// UNSUPPORTED: OS=windows-msvc

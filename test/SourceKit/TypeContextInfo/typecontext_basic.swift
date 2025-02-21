@@ -37,3 +37,4 @@ func test(obj: C) {
 // DISABLED-NOT: key.reuseastcontext
 // DISABLED: key.results: [
 // DISABLED-NOT: key.reuseastcontext
+// UNSUPPORTED: OS=windows-msvc

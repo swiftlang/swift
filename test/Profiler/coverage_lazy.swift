@@ -20,3 +20,4 @@ class C {
   // CHECK-NEXT: }
   lazy var offset: Int = .random() ? 30 : 55
 }
+// UNSUPPORTED: OS=windows-msvc

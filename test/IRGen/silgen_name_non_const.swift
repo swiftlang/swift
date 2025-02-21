@@ -14,3 +14,4 @@
 @_silgen_name("g8") var g8: Int = 5 * 5
 
 @_silgen_name("fwd1") var fwd1: Int
+// UNSUPPORTED: OS=windows-msvc

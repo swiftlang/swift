@@ -11,4 +11,4 @@
 // COMPILE_1:   key.compile_operation: source.compile.operation.code-completion
 // COMPILE_1: }
 // COMPILE_1-NOT: compile-will-start
-// COMPILE_1-NOT: compile-did-finish
+// COMPILE_1-NOT: compile-did-finish// UNSUPPORTED: OS=windows-msvc

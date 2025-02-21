@@ -6,3 +6,4 @@
 // expected-error@+1{{expected pointer type, got [CInt] with kind arrayType}}
 func myFunc(_ ptr: [CInt], _ len: String) {
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -561,3 +561,4 @@ struct FreeWhere<T> {
 // CHECK: @availability(<kw>macOS</kw> <float>10.11</float>, *)
 @availability(macOS 10.11, *)
 class HasMisspelledAttr {}
+// UNSUPPORTED: OS=windows-msvc

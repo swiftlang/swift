@@ -53,3 +53,4 @@ public func f(
   // CHECK:      @convention(c, cType: "void (*)(size_t)")
   p3c: @convention(c, cType: "void (*)(void (*)(size_t))") (@convention(c, cType: "void (*)(size_t)") (Int) -> Void) -> Void
 ) {}
+// UNSUPPORTED: OS=windows-msvc

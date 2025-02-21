@@ -91,3 +91,4 @@ func caller() {
   // CHECK: {{%.*}} = function_ref @$s11back_deploy019trivialFunc_iOS_mace1_F8CatalystyyFTwb : $@convention(thin) () -> ()
   trivialFunc_iOS_macOS_macCatalyst()
 }
+// UNSUPPORTED: OS=windows-msvc

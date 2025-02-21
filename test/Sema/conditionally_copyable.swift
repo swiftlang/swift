@@ -20,3 +20,4 @@ func f<T: Base>(_: T.Type) {}
 
 f(G<NotCopyable>.self)  // expected-error {{global function 'f' requires that 'NotCopyable' conform to 'Copyable'}}
 f(G<IsCopyable>.self)  // accepted
+// UNSUPPORTED: OS=windows-msvc

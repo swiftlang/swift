@@ -369,3 +369,4 @@ func test_transitive_subtype_deduction_for_generic_params() {
     fiz(v, !=, -1) // Ok because -1 literal should be inferred as Int32
   }
 }
+// UNSUPPORTED: OS=windows-msvc

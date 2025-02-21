@@ -44,3 +44,4 @@ public struct Foo {
 // CHECK: @"$s8ZeroInit3FooV1yAA9TestFloatVvpZ" ={{.*}} global %T8ZeroInit9TestFloatV zeroinitializer
 // CHECK: @"$s8ZeroInit3FooV1zAA10TestVectorVvpZ" ={{.*}} global %T8ZeroInit10TestVectorV zeroinitializer
 // CHECK-NOT: swift_once
+// UNSUPPORTED: OS=windows-msvc

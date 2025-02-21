@@ -45,3 +45,4 @@ sil_default_witness_table hidden Another {
   no_default
   no_default
 }
+// UNSUPPORTED: OS=windows-msvc

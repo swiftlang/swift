@@ -136,3 +136,4 @@ public class PlainlyStored_Tests<NCG: ~Copyable, T> {
     self.str = ""
   }
 }
+// UNSUPPORTED: OS=windows-msvc

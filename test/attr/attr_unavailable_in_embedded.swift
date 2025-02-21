@@ -13,3 +13,4 @@
 
 @_unavailableInEmbedded
 public func unavailable() {}
+// UNSUPPORTED: OS=windows-msvc

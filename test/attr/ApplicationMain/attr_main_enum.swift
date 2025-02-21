@@ -5,3 +5,4 @@ enum EntryPoint {
   static func main() {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

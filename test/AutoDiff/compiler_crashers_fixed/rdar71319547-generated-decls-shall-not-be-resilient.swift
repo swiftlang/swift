@@ -37,3 +37,4 @@ public func i_have_a_branching_trace_enum(_ x: Float) -> Float {
     return x.squareRoot()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

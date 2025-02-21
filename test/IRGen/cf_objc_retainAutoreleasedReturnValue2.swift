@@ -16,3 +16,4 @@ public func foo() {
 // CHECK: entry:
 // CHECK:   %0 = call {{.*}}@returnsACFBridgedType()
 // CHECK:   %1 = call ptr @swift_retain(ptr returned %0)
+// UNSUPPORTED: OS=windows-msvc

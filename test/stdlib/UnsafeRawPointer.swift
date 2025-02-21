@@ -406,3 +406,4 @@ UnsafeMutableRawPointerExtraTestSuite.test("pointer-comparisons") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ extension CGPoint : MyProto {}
 
 // Dummy statement
 _ = ()
+// UNSUPPORTED: OS=windows-msvc

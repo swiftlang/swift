@@ -95,3 +95,4 @@ func sixth() {
 //                        "        ) {"
 //                        "        }"
 // CHECK: key.sourcetext: "        ."
+// UNSUPPORTED: OS=windows-msvc

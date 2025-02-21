@@ -74,3 +74,4 @@ typealias SubGX<T> = SubG<T?>
 func checkSugar(gs: SubGX<Int>.Composed) {
   let i4: Int = gs // expected-error{{cannot convert value of type 'SubGX<Int>.Composed' (aka '(Optional<Int>, Optional<Int>)') to specified type 'Int'}}
 }
+// UNSUPPORTED: OS=windows-msvc

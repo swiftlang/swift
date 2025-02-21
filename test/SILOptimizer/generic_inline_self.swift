@@ -62,3 +62,4 @@ class C : P {
 }
 
 class D : C {}
+// UNSUPPORTED: OS=windows-msvc

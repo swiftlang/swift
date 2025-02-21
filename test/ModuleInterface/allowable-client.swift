@@ -17,3 +17,4 @@
 // BINARY-MODULE-DAG: allowable client: FooFriend1;
 // BINARY-MODULE-DAG: allowable client: FooFriend2;
 // BINARY-MODULE-DAG: allowable client: FooFriend3;
+// UNSUPPORTED: OS=windows-msvc

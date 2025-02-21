@@ -7,3 +7,4 @@ public class ResilientClass {
 @_fixed_layout public class FixedLayoutClass {
     @inlinable deinit {}
 }
+// UNSUPPORTED: OS=windows-msvc

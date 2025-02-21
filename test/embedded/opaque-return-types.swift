@@ -14,3 +14,4 @@ func foo() -> some Proto {
 }
 
 // CHECK: define {{.*}}@main(
+// UNSUPPORTED: OS=windows-msvc

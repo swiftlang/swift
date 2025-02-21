@@ -5,3 +5,4 @@ class ConsumingClass {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s21value_ownership_class14ConsumingClassC15consumingMethodyyF : $@convention(method) (@owned ConsumingClass) -> () {
+// UNSUPPORTED: OS=windows-msvc

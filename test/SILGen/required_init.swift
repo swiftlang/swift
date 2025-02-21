@@ -22,3 +22,4 @@ class Bar: Foo {
 
 // CHECK-LABEL: sil_vtable Bar {
 // CHECK:         #Foo.init!allocator: {{.*}} : @$s13required_init3BarC{{[_0-9a-zA-Z]*}}fC
+// UNSUPPORTED: OS=windows-msvc

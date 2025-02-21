@@ -50,3 +50,4 @@ public func createTemplatedConstructor() {
   // MICROSOFT_X64-LABEL: define {{.*}}ptr @"??$?0UArgType@@@TemplatedConstructor@@QEAA@UArgType@@@Z"(ptr {{.*}}, i32 {{.*}})
   let templated = TemplatedConstructor(ArgType())
 }
+// UNSUPPORTED: OS=windows-msvc

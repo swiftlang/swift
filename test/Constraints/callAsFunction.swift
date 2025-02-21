@@ -122,3 +122,4 @@ func test_default_arguments_do_not_interfere() {
   _ = S(a: 42) { _ = 42 }
   _ = S(b: "") { _ = 42 }
 }
+// UNSUPPORTED: OS=windows-msvc

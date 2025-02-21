@@ -27,3 +27,4 @@ struct Main {
 // EXCLUDES-NOT: swift_stdlib_scripts
 // INCLUDES:     swift_stdlib_special_mappings
 // EXCLUDES-NOT: swift_stdlib_words
+// UNSUPPORTED: OS=windows-msvc

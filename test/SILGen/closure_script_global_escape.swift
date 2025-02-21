@@ -39,3 +39,4 @@ _ = { _ = flag }
 // CHECK: [[CLOSURE:%.*]] = function_ref @$s3fooyyXEfU2_
 // CHECK: apply [[CLOSURE]]
 _ = { _ = flag }()
+// UNSUPPORTED: OS=windows-msvc

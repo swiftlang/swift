@@ -10,3 +10,4 @@
 // MODULE-CHECK: @_extern(wasm, module: "m0", name: "import1") func import1()
 @_extern(wasm, module: "m0", name: "import1")
 func import1()
+// UNSUPPORTED: OS=windows-msvc

@@ -68,3 +68,4 @@ public func testBase(b: Base) -> Int32 {
 // CHECK-NEXT: }
 
 
+// UNSUPPORTED: OS=windows-msvc

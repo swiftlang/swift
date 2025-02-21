@@ -44,3 +44,4 @@ func use() {
 // CHECK-LABEL: define linkonce_odr hidden ptr @"$s18tuple_conformances1SV_ACtxxQp_tAA1PAAWl"() {{.*}} {
 
 
+// UNSUPPORTED: OS=windows-msvc

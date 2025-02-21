@@ -30,3 +30,4 @@ entry(%1 : $Foo):
 }
 
 sil_vtable Foo {}
+// UNSUPPORTED: OS=windows-msvc

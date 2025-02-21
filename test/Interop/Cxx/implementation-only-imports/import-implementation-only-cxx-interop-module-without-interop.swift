@@ -9,3 +9,4 @@ import UseModuleAImplOnly
 public func testCallsAPI() {
     testUsesA()
 }
+// UNSUPPORTED: OS=windows-msvc

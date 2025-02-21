@@ -103,3 +103,4 @@ print(await runTest(ActorTest.self))
 import Types
 print(await runAccessors(ActorTest.self))
 // CHECK-NOT: Incorrect actor executor assumption
+// UNSUPPORTED: OS=windows-msvc

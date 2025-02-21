@@ -89,3 +89,4 @@ extension TestConditional : @preconcurrency WithAssoc where T == Int {
 
 // CHECK-NOT: #if {{.*}} $DynamicActorIsolation
 // CHECK: extension Client.GlobalActorTest : Swift.Sendable {}
+// UNSUPPORTED: OS=windows-msvc

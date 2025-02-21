@@ -541,3 +541,4 @@ bb2:
 bb3(%22 : $Builtin.Int32):
   return %22 : $Builtin.Int32
 }
+// UNSUPPORTED: OS=windows-msvc

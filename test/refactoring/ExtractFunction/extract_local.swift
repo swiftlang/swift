@@ -16,3 +16,4 @@ func returnFifteen() -> Int {
 // RUN: %refactor -extract-function -source-filename %s -pos=5:1 -end-pos=9:6 >> %t.result/AvoidFilePrivate.swift
 // RUN: diff -u %S/Outputs/extract_local/AvoidFilePrivate.swift.expected %t.result/AvoidFilePrivate.swift
 // REQUIRES: swift_swift_parser
+// UNSUPPORTED: OS=windows-msvc

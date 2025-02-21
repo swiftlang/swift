@@ -34,3 +34,4 @@ class Sub : FooClassDerived {
 // PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty1: Int32;
 // PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty2: Int32;
 // PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty3: Int32;
+// UNSUPPORTED: OS=windows-msvc

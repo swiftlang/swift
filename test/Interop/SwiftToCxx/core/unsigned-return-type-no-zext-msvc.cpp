@@ -15,3 +15,4 @@ void test(void *p) {
 
 // CHECK: declare dso_local noundef i8 @"?getEnumTagi8@@YAEPEAX@Z"(ptr noundef) #1
 // CHECK: declare dso_local noundef i32 @"?getEnumTagi32@@YAIPEAX@Z"(ptr noundef) #1
+// UNSUPPORTED: OS=windows-msvc

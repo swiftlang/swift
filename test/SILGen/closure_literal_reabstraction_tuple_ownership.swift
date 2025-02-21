@@ -9,3 +9,4 @@ struct Butt {
         _ = foo.lazy.compactMap { $0.value.0 }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

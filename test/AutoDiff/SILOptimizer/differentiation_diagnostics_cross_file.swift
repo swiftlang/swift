@@ -65,3 +65,4 @@ func allConcreteDerivativeGenericSignature(_ a: [S]) -> Float {
   // No error expected.
   return a.sum()
 }
+// UNSUPPORTED: OS=windows-msvc

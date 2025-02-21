@@ -76,3 +76,4 @@ public func testit() -> Foo {
 #endif
 
 
+// UNSUPPORTED: OS=windows-msvc

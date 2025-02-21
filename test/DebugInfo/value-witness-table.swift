@@ -6,3 +6,4 @@
 // CHECK-NOT: !DIGlobalVariable
 public enum E1 { case E }
 public func f() -> E1 { return .E }
+// UNSUPPORTED: OS=windows-msvc

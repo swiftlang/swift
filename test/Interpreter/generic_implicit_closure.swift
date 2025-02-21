@@ -37,3 +37,4 @@ must(Truthy())
 shant(Falselike())
 
 print("ok") // CHECK: ok
+// UNSUPPORTED: OS=windows-msvc

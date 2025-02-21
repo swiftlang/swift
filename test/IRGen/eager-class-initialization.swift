@@ -32,3 +32,4 @@ class GenericAncestryWithCustomName : Generic<Double> {}
 // CHECK-NEXT:     [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK-NEXT:     call void asm sideeffect "", "r"(ptr [[METADATA]])
 // CHECK-NEXT:     ret
+// UNSUPPORTED: OS=windows-msvc

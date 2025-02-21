@@ -49,3 +49,4 @@ public func f() {
 // Generic specialization, from the bar call in f
 // CHECK-LABEL: // specialized Bar.bar()
 // CHECK-NEXT: sil private [noinline] @$s14specialization3BarC3bar33_A6E3E43DB6679655BDF5A878ABC489A0LLyyFSi_Tg5Tf4d_n : $@convention(thin) () -> ()
+// UNSUPPORTED: OS=windows-msvc

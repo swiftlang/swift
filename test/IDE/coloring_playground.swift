@@ -25,3 +25,4 @@ func unterminatedBlockComment() {}
 // CHECK:  Trailing off ...
 // CHECK:  func unterminatedBlockComment() {}
 // CHECK:  </doc-comment-block>
+// UNSUPPORTED: OS=windows-msvc

@@ -52,3 +52,4 @@ extension Crap {} // expected-error {{non-nominal type 'Crap' (aka '() -> ()') c
 // CHECK-FIXITS: "offset":
 // CHECK-FIXITS: "text": " as! Int"
 // CHECK-FIXITS: }
+// UNSUPPORTED: OS=windows-msvc

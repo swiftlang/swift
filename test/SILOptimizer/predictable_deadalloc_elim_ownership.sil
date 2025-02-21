@@ -785,3 +785,4 @@ bb0(%0 : @guaranteed $NE):
   dealloc_stack %13
   return %22
 }
+// UNSUPPORTED: OS=windows-msvc

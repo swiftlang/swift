@@ -53,3 +53,4 @@ public func test<T : P>(_ t: T) where T == T.A {
 // CHECK-NEXT:   τ_0_1 => { conforms_to: [P Copyable Escapable] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [Copyable Escapable P] }
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

@@ -110,3 +110,4 @@
 // CHECK-NEXT:     SNSomeClass: -[SNSomeClass objectAtIndexedSubscript:]
 
 // CHECK: Categories: SNSomeClass(), SNSomeClass(Category1)
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ public class Foo: ObjCFoo, SwiftProto {
 }
 
 #endif // TEST
+// UNSUPPORTED: OS=windows-msvc

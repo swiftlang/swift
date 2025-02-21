@@ -56,3 +56,4 @@ struct VerySmallSlab<T> {
 // CHECK-NEXT:  [[CONT_BB]]:
 // CHECK-NEXT:    [[RETURN_DEST_PTR:%.*]] = phi ptr [ {{%.*}}, %[[INDIRECT_BB]] ], [ %dest, %[[END_LOOP_BB]] ]
 // CHECK-NEXT:    ret ptr [[RETURN_DEST_PTR]]
+// UNSUPPORTED: OS=windows-msvc

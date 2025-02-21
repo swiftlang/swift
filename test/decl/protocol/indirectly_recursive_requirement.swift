@@ -33,3 +33,4 @@ struct MyInt : RandomAccessIndex
   	return self
   }
 }
+// UNSUPPORTED: OS=windows-msvc

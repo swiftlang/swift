@@ -50,3 +50,4 @@ func foob() {
   }
   do {}
 }
+// UNSUPPORTED: OS=windows-msvc

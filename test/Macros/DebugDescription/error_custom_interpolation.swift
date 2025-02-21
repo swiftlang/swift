@@ -19,3 +19,4 @@ struct MyStruct2 {
   // expected-error @+1 {{unsupported custom string interpolation expression}}
   var debugDescription: String { "\(30, true)" }
 }
+// UNSUPPORTED: OS=windows-msvc

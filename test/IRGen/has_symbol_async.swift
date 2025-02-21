@@ -52,3 +52,4 @@ public func testActor(_ a: A) {
 // CHECK:   [[V3:%.*]] = icmp ne ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTq", null
 // CHECK:   [[RES:%.*]] = and i1 [[V2]], [[V3]]
 // CHECK:   ret i1 [[RES]]
+// UNSUPPORTED: OS=windows-msvc

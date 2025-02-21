@@ -182,3 +182,4 @@ extension Validator where T == String {
 // GLOBAL-LABEL: @"symbolic _____ySS__G 23associated_type_witness9ValidatorVAASSRszlE1VV7FailureV"
 
 
+// UNSUPPORTED: OS=windows-msvc

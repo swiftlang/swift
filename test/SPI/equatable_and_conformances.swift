@@ -35,3 +35,4 @@ fileprivate struct FilePrivateStruct: PublicProto {
     // OK
   }
 }
+// UNSUPPORTED: OS=windows-msvc

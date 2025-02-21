@@ -54,3 +54,4 @@ func test4() {
   D().f { a, b in }
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

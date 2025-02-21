@@ -35,3 +35,4 @@ public func testConformance() {
   let ptc: P.Type = getPFromC()
   callFoo(ptype: ptc)
 }
+// UNSUPPORTED: OS=windows-msvc

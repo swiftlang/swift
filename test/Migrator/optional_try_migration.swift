@@ -110,3 +110,4 @@ func testCaseMatching() {
         print(x)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

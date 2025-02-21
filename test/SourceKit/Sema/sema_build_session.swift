@@ -122,3 +122,4 @@ func test() {
 
 // CHECK_DISABLED_2-LABEL: ## THREE
 // CHECK_DISABLED_2-NOT: key.description
+// UNSUPPORTED: OS=windows-msvc

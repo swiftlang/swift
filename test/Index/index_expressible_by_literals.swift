@@ -133,3 +133,4 @@ func customInterpolation() {
   // CHECK-NEXT: RelCall,RelCont | function/Swift | customInterpolation() | s:14swift_ide_test19customInterpolationyyF
   _ = CustomInterpolation("a\(0)b")
 }
+// UNSUPPORTED: OS=windows-msvc

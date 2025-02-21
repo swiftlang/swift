@@ -32,3 +32,4 @@ public final class MyBuffer<Element> {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -4,3 +4,4 @@
 
 // CHECK: USAGE: sourcekitd-test [options] <inputs>
 
+// UNSUPPORTED: OS=windows-msvc

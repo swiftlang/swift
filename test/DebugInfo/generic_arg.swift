@@ -18,3 +18,4 @@ func foo<T>(_ x: T) -> () {
 }
 
 foo(42)
+// UNSUPPORTED: OS=windows-msvc

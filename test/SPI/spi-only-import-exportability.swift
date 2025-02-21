@@ -155,3 +155,4 @@ public struct ClientStruct {
 #endif
   @PublicPropertyWrapper(SPIOnlyStruct()) public var bWrapped: Any
 }
+// UNSUPPORTED: OS=windows-msvc

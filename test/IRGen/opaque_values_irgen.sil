@@ -20,3 +20,4 @@ sil hidden [ossa] @f010_irgen_identity : $@convention(thin) <T> (@in T) -> @out 
 bb0(%0 : @owned $T):
   return %0 : $T
 }
+// UNSUPPORTED: OS=windows-msvc

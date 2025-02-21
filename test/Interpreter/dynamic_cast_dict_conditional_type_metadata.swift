@@ -23,3 +23,4 @@ _ = d.object(forKey: "foo" as NSString)
 
 // CHECK: ok
 print("ok")
+// UNSUPPORTED: OS=windows-msvc

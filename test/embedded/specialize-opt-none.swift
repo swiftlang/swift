@@ -20,3 +20,4 @@ public func test() {
 
 // EMBEDDED: // specialized MyStruct.foo()
 // EMBEDDED: sil [Onone] @$e4main8MyStructV3fooyyFAA1XV_Tg5 : $@convention(method) (MyStruct<X>) -> () {
+// UNSUPPORTED: OS=windows-msvc

@@ -61,3 +61,4 @@ import SomeModule
 func test() {
   someFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

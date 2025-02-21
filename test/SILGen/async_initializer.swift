@@ -243,3 +243,4 @@ func makeActorInTask() async {
 func callActorMethodInTask(a: SomeActor) async {
   Task.detached { await a.someMethod() }
 }
+// UNSUPPORTED: OS=windows-msvc

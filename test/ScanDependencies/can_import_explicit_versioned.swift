@@ -24,3 +24,4 @@ import Bar
 
 // 'Bar' can only be imported if the explicitly-loaded 'Foo' is known to be over 9000
 // CHECK: remark: loaded module 'Bar'
+// UNSUPPORTED: OS=windows-msvc

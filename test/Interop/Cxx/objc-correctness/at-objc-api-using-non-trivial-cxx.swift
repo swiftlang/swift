@@ -58,3 +58,4 @@ class ObjCObject: NSObject {
     return Trivial(x: 11)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

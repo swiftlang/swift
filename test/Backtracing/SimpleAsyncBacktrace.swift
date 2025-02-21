@@ -55,3 +55,4 @@ struct SimpleAsyncBacktrace {
     await level1()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

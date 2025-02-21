@@ -10,3 +10,4 @@ func complexFunctionsAvailableInSwift() {
   let complexValue = _Cbuild(1.0, 2.0) // Construct a complex double using MSVC-specific API.
   let _ = creal(complexValue)
 }
+// UNSUPPORTED: OS=windows-msvc

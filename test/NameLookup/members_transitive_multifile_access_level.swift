@@ -228,3 +228,4 @@ extension Int {
 extension Int {
   public var memberInPublicUsesOnlySPIOnly: Int { return self }
 }
+// UNSUPPORTED: OS=windows-msvc

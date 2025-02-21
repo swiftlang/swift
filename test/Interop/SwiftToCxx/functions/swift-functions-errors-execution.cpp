@@ -64,3 +64,4 @@ int main() {
 // CHECK-NEXT: passThrowFunctionWithNeverReturn
 // CHECK-NEXT: Exception
 // CHECK-NEXT: Test destroyed
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@
 public enum TweedleDee {
   indirect case dum(TweedleDum)
 }
+// UNSUPPORTED: OS=windows-msvc

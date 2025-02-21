@@ -66,3 +66,4 @@ public final class OptionalReqsAbsent: OptionalReqs {}
 // CHECK-LABEL: sil @$s16ConformancesUser18testOptionalAbsentySb0A00d4ReqsE0CF
 // CHECK: dynamic_method_br %0 : $OptionalReqsAbsent, #OptionalReqs.method!foreign
 // CHECK: end sil function '$s16ConformancesUser18testOptionalAbsentySb0A00d4ReqsE0CF'
+// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@ macro TestMacro<T>(_ x: T) = #externalMacro(module: "MacroDefinition", type: "In
 struct S {}
 
 // DIAGS-DAG: @__swiftmacro_7if_expr1S9TestMacrofMm_.swift:2:12: error: 'if' may only be used as expression in return, throw, or as the source of an assignment
+// UNSUPPORTED: OS=windows-msvc

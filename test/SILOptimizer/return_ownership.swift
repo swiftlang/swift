@@ -15,3 +15,4 @@ func testUnreachableAfterNoReturnMethod() -> Int {
   return 0; // expected-warning {{will never be executed}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

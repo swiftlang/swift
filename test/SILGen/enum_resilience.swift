@@ -207,3 +207,4 @@ public func resilientIfCase(_ e: MyResilientEnum) -> Bool {
   case .loki: ()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -2,3 +2,4 @@
 find([1,2,3], 1)
 
 // CHECK-NOT: source.lang.swift.ref.function.free
+// UNSUPPORTED: OS=windows-msvc

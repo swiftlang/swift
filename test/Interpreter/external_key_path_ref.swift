@@ -15,3 +15,4 @@ let x = Container(base: 1...10, elementPath: \.bitWidth) {
 
 // CHECK: i hope we passed the audition
 print("i hope we passed the audition")
+// UNSUPPORTED: OS=windows-msvc

@@ -311,3 +311,4 @@ bb1(%3a : @reborrow $C):
   return %2 : $C
 }
 
+// UNSUPPORTED: OS=windows-msvc

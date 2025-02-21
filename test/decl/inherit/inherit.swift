@@ -63,3 +63,4 @@ class InheritBody : T { // expected-error {{cannot find type 'T' in scope}}
 class InheritBodyBad : fn { // expected-error {{cannot find type 'fn' in scope}}
   func fn() {}
 }
+// UNSUPPORTED: OS=windows-msvc

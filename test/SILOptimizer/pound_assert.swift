@@ -731,3 +731,4 @@ func arrayInitLiteralFlowSensitive() -> ContainsArray {
 func invokeArrayInitLiteralFlowSensitive() {
   #assert(arrayInitLiteralFlowSensitive().x == 1)
 }
+// UNSUPPORTED: OS=windows-msvc

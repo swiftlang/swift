@@ -23,3 +23,4 @@ extension TestAddEquatable {
 
 // RUN: %refactor -add-equatable-conformance -source-filename %s -pos=13:13 > %t.result/third.swift
 // RUN: diff -u %S/Outputs/basic/third.swift.expected %t.result/third.swift
+// UNSUPPORTED: OS=windows-msvc

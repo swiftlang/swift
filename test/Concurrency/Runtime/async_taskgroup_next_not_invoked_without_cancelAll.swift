@@ -50,3 +50,4 @@ func test_skipCallingNext() async {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

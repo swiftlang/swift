@@ -8,3 +8,4 @@
 // CHECK: note: Swift Overlay dependency of 'CycleSwiftMiddle' on 'CycleOverlay' via Clang module dependency: 'CycleSwiftMiddle.swiftinterface -> CycleClangMiddle.pcm -> CycleOverlay.pcm'
 
 import CycleOverlay
+// UNSUPPORTED: OS=windows-msvc

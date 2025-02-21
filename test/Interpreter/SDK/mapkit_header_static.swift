@@ -12,3 +12,4 @@ import MapKit
 let rect = MKMapRectMake(1.0, 2.0, 3.0, 4.0)
 // CHECK: {{^}}1.0 2.0 3.0 4.0{{$}}
 print("\(rect.origin.x) \(rect.origin.y) \(rect.size.width) \(rect.size.height)")
+// UNSUPPORTED: OS=windows-msvc

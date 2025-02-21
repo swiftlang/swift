@@ -54,3 +54,4 @@ import Library
 // CHECK-NON-API: String
 // CHECK-API: 1234
 print(fragileFuncUsingOverload())
+// UNSUPPORTED: OS=windows-msvc

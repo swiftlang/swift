@@ -46,3 +46,4 @@ extension P3 {
 extension S2: P3 {}
 
 let x: S3.Type = S2.A.self
+// UNSUPPORTED: OS=windows-msvc

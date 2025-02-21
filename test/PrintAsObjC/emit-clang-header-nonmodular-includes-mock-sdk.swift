@@ -36,3 +36,4 @@ public class HelloWorld: NSObject {
 // CHECK-NEXT: #import <objc/objc.h>
 // CHECK-NEXT: #import <objc/NSObject.h>
 // CHECK-NEXT: #endif
+// UNSUPPORTED: OS=windows-msvc

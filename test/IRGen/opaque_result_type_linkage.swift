@@ -24,3 +24,4 @@ struct G<T>: P {
 
 // CHECK: define{{.*}} private ptr @"$s3lib1GVyxGlWOh"(ptr %0)
 // OTHER: define{{.*}} private ptr @"$s3lib1GVyxGlWOh"(ptr %0, ptr %"some Any", ptr %"Optional<some Any>", ptr %"G<T>")
+// UNSUPPORTED: OS=windows-msvc

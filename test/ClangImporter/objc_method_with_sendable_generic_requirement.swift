@@ -28,3 +28,4 @@ Test<NSNumber>().luck(withNumber: 5)
 // CHECK-NEXT:  [[OPT_NS_NUMBER:%.*]] = enum $Optional<NSNumber>, #Optional.some!enumelt, [[NS_NUMBER]] : $NSNumber
 // CHECK-NEXT:  [[LUCK_METHOD_REF:%.*]] = objc_method %4 : $Test<NSNumber>, #Test.luck!foreign : <N where N : AnyObject, N : Sendable> (Test<N>) -> (N?) -> (), $@convention(objc_method) @pseudogeneric <τ_0_0 where τ_0_0 : AnyObject, τ_0_0 : Sendable> (Optional<τ_0_0>, Test<τ_0_0>) -> ()
 // CHECK-NEXT:  %14 = apply [[LUCK_METHOD_REF]]<NSNumber>([[OPT_NS_NUMBER]], {{.*}}) : $@convention(objc_method) @pseudogeneric <τ_0_0 where τ_0_0 : AnyObject, τ_0_0 : Sendable> (Optional<τ_0_0>, Test<τ_0_0>) -> ()
+// UNSUPPORTED: OS=windows-msvc

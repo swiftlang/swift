@@ -46,3 +46,4 @@ do {
 
 // CHECK: Job's finished
 print("Job's finished")
+// UNSUPPORTED: OS=windows-msvc

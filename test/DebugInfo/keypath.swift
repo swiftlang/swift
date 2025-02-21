@@ -16,3 +16,4 @@ extension Gen where Value : MutableCollection, Value.Index : Hashable {
         return 0
     }
 }
+// UNSUPPORTED: OS=windows-msvc

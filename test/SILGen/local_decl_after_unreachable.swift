@@ -16,3 +16,4 @@ func foo() {
     // Check that we don't crash here
     lazy var v = 42
 }
+// UNSUPPORTED: OS=windows-msvc

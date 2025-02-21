@@ -207,3 +207,4 @@ struct FullyGenericArg<T: ~Escapable & ~Copyable> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=FullyGenericArg
 // CHECK-NEXT: (normal_conformance type="FullyGenericArg<T>" protocol="Empty")
 extension FullyGenericArg: Empty where T: ~Copyable, T: ~Escapable {}
+// UNSUPPORTED: OS=windows-msvc

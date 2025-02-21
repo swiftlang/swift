@@ -29,3 +29,4 @@ public class D : Base {
   public func f() {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

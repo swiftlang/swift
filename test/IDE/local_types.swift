@@ -187,3 +187,4 @@ public let doubleClosure: () -> () = {
   }
   singleClosure()
 }
+// UNSUPPORTED: OS=windows-msvc

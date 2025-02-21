@@ -45,3 +45,4 @@ nonisolated func nonisolatedFunc(expectedExecutor: NaiveQueueExecutor) async {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

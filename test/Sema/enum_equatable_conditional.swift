@@ -23,3 +23,4 @@ case only([T])
 // Okay: T is Equatable here too
 extension WithArrayOfEquatables2: Equatable where T: Equatable { }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -158,3 +158,4 @@ func selectNonInt(e: NoPayload) -> String {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

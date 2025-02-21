@@ -272,3 +272,4 @@ sil_vtable B {
   #B.deinit!deallocator: @$s4test1BCfD
 }
 
+// UNSUPPORTED: OS=windows-msvc

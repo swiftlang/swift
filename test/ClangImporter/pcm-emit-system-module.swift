@@ -6,3 +6,4 @@
 // RUN: %swift-dump-pcm %t/script.pcm | %FileCheck %s --check-prefix=CHECK-SYSTEM-INPUT
 // CHECK-SYSTEM-INPUT: Input file: {{.*[/\\]}}ClangImporter{{/|\\}}Inputs{{/|\\}}custom-modules{{/|\\}}module.modulemap [System]
 import script
+// UNSUPPORTED: OS=windows-msvc

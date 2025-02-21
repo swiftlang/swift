@@ -66,3 +66,4 @@ func memberaccess() {
   let x : Int32 = 7._value // expected-error{{cannot convert value of type 'Builtin.Int32' to specified type 'Int32'}}
   _ = x
 }
+// UNSUPPORTED: OS=windows-msvc

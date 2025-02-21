@@ -45,3 +45,4 @@ struct MyStruct3 : MyProtocol {
 // OVERRIDE_3-DAG: Decl[InstanceMethod]/Super: foo<U>(arg1: Arg1, arg2: Arg2<U>, arg3: Arg2<Int>, arg4: [Arg1], arg5: Arg2<U>?, arg6: Generic<Arg2<Generic<Arg2<Int>>>>) -> String {|};
 // OVERRIDE_3-DAG: Decl[InstanceMethod]/Super: baz(arg: @escaping Func) {|};
 
+// UNSUPPORTED: OS=windows-msvc

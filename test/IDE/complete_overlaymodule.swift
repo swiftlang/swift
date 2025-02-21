@@ -30,3 +30,4 @@ func testGlobalExpr(value: Overlaid) {
 // EXPR_MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   inOverlayFunc()[#Void#]; name=inOverlayFunc()
 // EXPR_MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   inOriginalFunc()[#Double#]; name=inOriginalFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

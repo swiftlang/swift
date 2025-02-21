@@ -28,3 +28,4 @@ LeaksTests.test("Known leak") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

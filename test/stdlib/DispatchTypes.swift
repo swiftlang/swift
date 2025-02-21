@@ -40,3 +40,4 @@ _ = DispatchSource.makeWriteSource(fileDescriptor: 0)
 // dispatch/time.h
 _ = DispatchTime.now()
 _ = DispatchTime.distantFuture
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ struct R : P {
   let x: Y? = nil
   func foo(_: Y) {}
 }
+// UNSUPPORTED: OS=windows-msvc

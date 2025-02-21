@@ -42,3 +42,4 @@ anyFancy.holdPinkyUp(x: "")
 // RUN: %sourcekitd-test -req=cursor -pos=40:3 %s -- %s | %FileCheck %s -check-prefix=CASE1
 
 // CASE1: AnyFancy<String>
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@
 public protocol Defaultable {
   func defaulted()
 }
+// UNSUPPORTED: OS=windows-msvc

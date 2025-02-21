@@ -49,3 +49,4 @@ class C {
 // CHECK-DIFFERENT-TYPE-FINGERPRINT-DAG: -potentialMember interface      4main1C{{[^ ]+}} '' true
 // CHECK-DIFFERENT-TYPE-FINGERPRINT-DAG: +potentialMember implementation 4main1C{{[^ ]+}} '' true
 // CHECK-DIFFERENT-TYPE-FINGERPRINT-DAG: +potentialMember interface      4main1C{{[^ ]+}} '' true
+// UNSUPPORTED: OS=windows-msvc

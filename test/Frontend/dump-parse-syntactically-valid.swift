@@ -7,3 +7,4 @@
 extension X {
   typealias Y = Z
 }
+// UNSUPPORTED: OS=windows-msvc

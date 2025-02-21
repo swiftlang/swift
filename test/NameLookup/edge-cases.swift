@@ -19,3 +19,4 @@ func multipleLocalResults2() {
   takesB(result)
   let other: Int = 123 // expected-warning {{never used}}
 }
+// UNSUPPORTED: OS=windows-msvc

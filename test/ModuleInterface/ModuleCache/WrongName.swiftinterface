@@ -5,3 +5,4 @@
 // RUN: echo 'import WrongName' | not %target-swift-frontend -typecheck -module-cache-path %t -I %S - 2>&1 | %FileCheck %s
 
 // CHECK: :1:8: error: cannot load module 'DreadPirateRoberts' as 'WrongName'
+// UNSUPPORTED: OS=windows-msvc

@@ -87,3 +87,4 @@ import A
 // swift-module-flags: -module-name A -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -user-module-version 1.0
 public func a() { }
 
+// UNSUPPORTED: OS=windows-msvc

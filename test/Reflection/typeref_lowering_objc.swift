@@ -41,3 +41,4 @@
 // CHECK-32-NEXT: (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=0
 // CHECK-32-NEXT:   (field name=unownedRef offset=0
 // CHECK-32-NEXT:     (reference kind=unowned refcounting=unknown)))
+// UNSUPPORTED: OS=windows-msvc

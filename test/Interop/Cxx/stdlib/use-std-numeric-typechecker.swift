@@ -4,3 +4,4 @@
 import StdNumeric
 
 let _ = getGCD(12, 15)
+// UNSUPPORTED: OS=windows-msvc

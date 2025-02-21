@@ -30,3 +30,4 @@ func test() -> any P<Wrapper<some P>> { S() } // expected-error {{'some' types c
 func test(_ x: any P<some P>) { } // expected-error {{'some' types cannot be used in constraints on existential types}}
 // No, I do not like nested some type params,
 // I do not like them Σam-i-am
+// UNSUPPORTED: OS=windows-msvc

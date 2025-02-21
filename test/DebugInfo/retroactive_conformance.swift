@@ -6,3 +6,4 @@ extension Optional: Comparable where Wrapped: Comparable {
 }
 
 // CHECK: sSNyxSgAASL23retroactive_conformancexSLHD1__HCg_GD
+// UNSUPPORTED: OS=windows-msvc

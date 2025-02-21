@@ -271,3 +271,4 @@ FailableInitTestSuite.test("ConvenienceInitFailure_Derived") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

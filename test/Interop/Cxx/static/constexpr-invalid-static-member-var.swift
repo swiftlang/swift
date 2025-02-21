@@ -5,3 +5,4 @@ import InvalidStaticMemberVar
 func test(i: X) { }
 
 // CHECK-NOT: error
+// UNSUPPORTED: OS=windows-msvc

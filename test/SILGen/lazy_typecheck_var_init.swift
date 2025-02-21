@@ -57,3 +57,4 @@ public func returnsS() -> S {
   // CHECK: function_ref @$s4Test1SVACycfC : $@convention(method) (@thin S.Type) -> @out S
   return S()
 }
+// UNSUPPORTED: OS=windows-msvc

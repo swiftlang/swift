@@ -39,3 +39,4 @@ import E
 // CHECK: "swiftPrebuiltExternal": {
 // CHECK: "compiledModulePath":
 // CHECK: "moduleCacheKey":
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@
     import Mod1
     public func bar() {}
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ struct User_E: Encodable {
 }
 // RUN: %refactor -add-explicit-codable-implementation -source-filename %s -pos=17:8 > %t.result/encodable.swift
 // RUN: diff -u %S/Outputs/basic/encodable.swift.expected %t.result/encodable.swift
+// UNSUPPORTED: OS=windows-msvc

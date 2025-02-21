@@ -171,3 +171,4 @@ extension FixedLayoutNSObjectSubclass {
 extension ResilientOutsideParent {
   @objc public func anObjcMethod() {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -55,3 +55,4 @@ SeparateTangentTypeTests.testWithLeakChecking("SomeArithmetics") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

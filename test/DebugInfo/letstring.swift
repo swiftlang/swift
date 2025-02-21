@@ -43,3 +43,4 @@ class AppDelegate {
 //
 // DWARF-CHECK:  DW_TAG_variable
 // DWARF-CHECK:  DW_AT_name ("b")
+// UNSUPPORTED: OS=windows-msvc

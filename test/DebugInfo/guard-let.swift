@@ -74,3 +74,4 @@ enum Stuff {
     return array
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ int main() {
   assert(CdeclFunctions::differentCDeclName(1, 1) == 2);
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

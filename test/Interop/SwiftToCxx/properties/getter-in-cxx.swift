@@ -203,3 +203,4 @@ public func createStructWithRefCountStoredProp() -> StructWithRefCountStoredProp
 // CHECK-NEXT:   Properties::_impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, Properties::_impl::$s10Properties22SmallStructWithGettersV05smallC0ACvg(Properties::_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer())));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

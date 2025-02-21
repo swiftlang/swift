@@ -423,3 +423,4 @@ func bad<S: FakeSequence, O>(_: S, _: O) where S.Element : ObserverType, O == S.
 func ugly<S: FakeSequence, O>(_: S, _: O) where S.Element : ObserverType, O == S.Iterator.Element.E, O == S.Element.E {
   _ = Bad<S, O>()
 }
+// UNSUPPORTED: OS=windows-msvc

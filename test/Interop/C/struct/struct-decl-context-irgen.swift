@@ -101,3 +101,4 @@ public func take(_: StructTypedefName8PtrPtr) {}
 
 // CHECK-LABEL: define {{.*}} void @"$s4main4takeyySo27StructNestedCompletedLater8VF"({{.*}})
 public func take(_: StructNestedCompletedLater8) {}
+// UNSUPPORTED: OS=windows-msvc

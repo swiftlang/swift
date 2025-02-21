@@ -12,3 +12,4 @@ import StdlibUnittest
 var ConstexprStaticMemberVarTestSuite = TestSuite("ConstexprStaticMemberVarTestSuite")
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -135,3 +135,4 @@ qsort(&unsorted, unsorted.count, MemoryLayout.size(ofValue: unsorted[0])) { a, b
 }
 // CHECK-NEXT: [2, 3, 5, 6, 9, 14, 15]
 print(unsorted)
+// UNSUPPORTED: OS=windows-msvc

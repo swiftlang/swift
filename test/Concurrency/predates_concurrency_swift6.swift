@@ -311,3 +311,4 @@ do {
   // If destination is @preconcurrency the Sendable conformance error should be downgraded
   d = data // expected-warning {{type 'Any' does not conform to the 'Sendable' protocol}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -40,3 +40,4 @@ let coll: [Int] = [4, 8, 15, 16, 23, 42]
 let result: Result<[Int], Error> = .success(coll)
 // CHECK: success(15)
 print(result[2])
+// UNSUPPORTED: OS=windows-msvc

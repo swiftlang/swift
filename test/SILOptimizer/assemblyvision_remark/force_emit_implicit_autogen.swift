@@ -14,3 +14,4 @@ struct KlassPair {
                    // expected-note @-3 {{of 'self.rhs'}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

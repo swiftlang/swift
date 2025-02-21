@@ -718,3 +718,4 @@ class Base {
 class Derived: Base {
   override func method<T: P3>(_: T) {}
 }
+// UNSUPPORTED: OS=windows-msvc

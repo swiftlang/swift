@@ -25,3 +25,4 @@ public protocol P4: P2 {}
 // CHECK-LABEL: .P5@
 // CHECK-NEXT: Requirement signature: <Self where Self : CaseIterable, Self : Hashable, Self : RawRepresentable, Self.[RawRepresentable]RawValue == String>
 public protocol P5: Hashable, RawRepresentable, CaseIterable where RawValue == String {}
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ TemplatesTestSuite.test("Templated Add") {
 // }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

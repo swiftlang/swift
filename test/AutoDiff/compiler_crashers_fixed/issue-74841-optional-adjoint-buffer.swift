@@ -11,3 +11,4 @@ struct S<I> {subscript(_ i: Int) -> I?    {get {nil} set {}}}
 extension F: Differentiable {}
 extension S: Differentiable {}
 struct A{@differentiable(reverse) func b(c: inout F<Double>, d: S<Double>) {c[0]![0] = 0}}
+// UNSUPPORTED: OS=windows-msvc

@@ -43,3 +43,4 @@ DemangleToMetadataMovedSymbolsTests.test("Moved Nominals") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

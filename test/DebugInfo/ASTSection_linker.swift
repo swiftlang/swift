@@ -24,3 +24,4 @@
 // CHECK: Importing ASTSection...
 // CHECK: Import successful!
 
+// UNSUPPORTED: OS=windows-msvc

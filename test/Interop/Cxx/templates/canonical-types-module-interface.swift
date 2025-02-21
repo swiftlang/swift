@@ -14,3 +14,4 @@
 // CHECK-NEXT: }
 // CHECK-NEXT: typealias WrappedMagicNumberA = MagicWrapper<IntWrapper>
 // CHECK-NEXT: typealias WrappedMagicNumberB = MagicWrapper<IntWrapper>
+// UNSUPPORTED: OS=windows-msvc

@@ -43,3 +43,4 @@ extension Differentiable {
 public func caller(_ x: Tracked<Float>) -> Tracked<Float> {
   return x.withDerivative(callback)
 }
+// UNSUPPORTED: OS=windows-msvc

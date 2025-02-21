@@ -11,3 +11,4 @@
 // REQUIRES: objc_interop
 
 // RUN: %target-interop-build-clangxx -fsyntax-only -x objective-c++-header %t/full-cxx-swift-cxx-bridging.h -std=gnu++20 -c -fmodules -fcxx-modules -I %t 
+// UNSUPPORTED: OS=windows-msvc

@@ -53,3 +53,4 @@ public class ExclusivityAttrClass {
   public static var staticVar: Int = 27
 }
 
+// UNSUPPORTED: OS=windows-msvc

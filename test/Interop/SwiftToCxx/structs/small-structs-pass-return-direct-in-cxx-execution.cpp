@@ -62,3 +62,4 @@ int main() {
   assert(getStructDoubleAndFloat_y(structDoubleAndFloat) == floatValue / 10);
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ func usePackageClass(_ c: Base) {
 
 // TODO: If cross-module inheritance from package visibility superclasses ever becomes a thing,
 // test serialization of the vtable for the derived class in this file.
+// UNSUPPORTED: OS=windows-msvc

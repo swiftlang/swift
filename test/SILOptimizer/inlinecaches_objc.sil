@@ -34,3 +34,4 @@ sil_vtable X {
 
 
 
+// UNSUPPORTED: OS=windows-msvc

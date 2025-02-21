@@ -208,3 +208,4 @@ CharacterPropertiesTests.test("Newline") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

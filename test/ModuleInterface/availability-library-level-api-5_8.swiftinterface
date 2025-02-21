@@ -16,3 +16,4 @@ public struct S {}
 // the interface was produced with tools that are older than Swift 5.9 we
 // typecheck availability with the deployment target as the floor.
 public typealias A = S
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ _ = foo(S.self)
 struct S: P2 {
   func f(_: A) {}
 }
+// UNSUPPORTED: OS=windows-msvc

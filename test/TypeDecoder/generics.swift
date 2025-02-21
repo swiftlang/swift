@@ -120,4 +120,4 @@ struct OuterBoth<A : First & Second, B : First & Second> {
 // CHECK-DECL: generics.(file).First.Assoc
 
 // DEMANGLE-DECL: $s8generics6SecondP5AssocQa
-// CHECK-DECL: generics.(file).Second.Assoc
+// CHECK-DECL: generics.(file).Second.Assoc// UNSUPPORTED: OS=windows-msvc

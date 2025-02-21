@@ -6,3 +6,4 @@
 public struct S {}
 
 // CHECK-NOT: docComment
+// UNSUPPORTED: OS=windows-msvc

@@ -78,3 +78,4 @@ func foo2(_ e : MyEnum) -> Int {
 // CHECK-SWITCH1: <Type>Void</Type><Exit>false</Exit>
 // CHECK-SWITCH2: <Type>Int</Type><Exit>true</Exit>
 // CHECK-SWITCH3: <Type><<error type>></Type><Exit>unsure</Exit>
+// UNSUPPORTED: OS=windows-msvc

@@ -39,3 +39,4 @@ func useDeprecated() {
 
   deprecatedIn13_0()  // no-warning
 }
+// UNSUPPORTED: OS=windows-msvc

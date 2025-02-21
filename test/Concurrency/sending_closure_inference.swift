@@ -46,3 +46,4 @@ func testSendingResultInference() {
 func testSendingResultOnClosure() {
   let _ = { (x: String) -> sending String in x }
 }
+// UNSUPPORTED: OS=windows-msvc

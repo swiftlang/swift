@@ -54,3 +54,4 @@ func useFromOtherOn99_52() {
   // This will trigger validation of the global in availability_in_multi_other.swift
   _ = globalFromOtherOn99_52
 }
+// UNSUPPORTED: OS=windows-msvc

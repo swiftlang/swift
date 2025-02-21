@@ -22,3 +22,4 @@ class Factory : FactoryPattern {
     self.init(factory: Factory(_string: string))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

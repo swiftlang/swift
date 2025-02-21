@@ -13,3 +13,4 @@
 // CHECK: {{^}}(root version=13.1
 // CHECK-NEXT: {{^}}  (decl_implicit version=14.4 decl=foo()
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

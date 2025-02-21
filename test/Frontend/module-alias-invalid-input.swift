@@ -28,3 +28,4 @@ public class Logger {
   public init() {}
   public func startLogging() {}
 }
+// UNSUPPORTED: OS=windows-msvc

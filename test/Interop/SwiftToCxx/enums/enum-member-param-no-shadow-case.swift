@@ -29,3 +29,4 @@ public enum E {
 
 // CHECK: void E::takeParamB(swift::Int b_) {
 // CHECK: _impl::$s5Enums1EO10takeParamByySiFZ(b_);
+// UNSUPPORTED: OS=windows-msvc

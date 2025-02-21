@@ -3,3 +3,4 @@
 
 class C<throws> {} // expected-error {{expected an identifier to name generic parameter}}
 precedencegroup rethrows {} // expected-error {{expected identifier after 'precedencegroup'}}
+// UNSUPPORTED: OS=windows-msvc

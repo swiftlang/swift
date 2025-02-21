@@ -5,3 +5,4 @@ enum MyEnum {
 // CHECK: param/Swift | artifactID
 // CHECK: param/Swift | hostTriple
 }
+// UNSUPPORTED: OS=windows-msvc

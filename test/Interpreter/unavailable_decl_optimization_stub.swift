@@ -19,3 +19,4 @@ func callFoo()
 // CHECK: Fatal error: Unavailable code reached
 // CHECK-NOT: Can't call this
 callFoo()
+// UNSUPPORTED: OS=windows-msvc

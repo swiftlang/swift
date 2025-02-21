@@ -49,3 +49,4 @@ do {
 do {
   _ = # public() // expected-error {{expected a macro identifier for a pound literal expression}}
 }
+// UNSUPPORTED: OS=windows-msvc

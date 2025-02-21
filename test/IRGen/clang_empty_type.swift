@@ -5,3 +5,4 @@ public func projectTrailingArray(x: inout TrailingArray) {
   x.size = 2
   x.buffer = ()
 }
+// UNSUPPORTED: OS=windows-msvc

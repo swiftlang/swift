@@ -19,3 +19,4 @@ struct TupleMeStructural: Tupled {
     0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

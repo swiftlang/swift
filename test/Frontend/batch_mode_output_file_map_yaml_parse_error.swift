@@ -5,3 +5,4 @@
 // RUN: %FileCheck %s <%t/errs.txt
 // CHECK: Unrecognized escape code
 // CHECK: Output file map parse failed
+// UNSUPPORTED: OS=windows-msvc

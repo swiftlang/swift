@@ -9,3 +9,4 @@ func foo() {
   _ = Foo()
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -312,3 +312,4 @@ class SomeWrapperTests {
     self.s = s
   }
 }
+// UNSUPPORTED: OS=windows-msvc

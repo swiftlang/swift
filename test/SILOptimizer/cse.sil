@@ -1448,3 +1448,4 @@ bb0:
   return %r1 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

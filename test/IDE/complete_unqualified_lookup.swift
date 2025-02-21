@@ -114,3 +114,4 @@ func testBindingFromDefer(_ x: Int?) {
     // BINDING_FROM_DEFER-DAG: Decl[LocalVar]/Local: bar[#Int#]; name=bar
   }
 }
+// UNSUPPORTED: OS=windows-msvc

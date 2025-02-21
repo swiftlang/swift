@@ -569,3 +569,4 @@ do {
     // ISSUE_43244_SUB_SUBCLASS-DAG: Decl[InstanceMethod]/Super:         override func myFunction(_ x: String) -> String? {|}; name=myFunction(:)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

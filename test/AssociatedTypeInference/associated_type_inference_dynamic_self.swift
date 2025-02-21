@@ -15,3 +15,4 @@ class Base {
 }
 
 class Derived: Base, P {}
+// UNSUPPORTED: OS=windows-msvc

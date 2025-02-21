@@ -10,3 +10,4 @@
 // CHECK: public func testFunction()
 // CHECK: #endif
 @unsafe public func testFunction() { }
+// UNSUPPORTED: OS=windows-msvc

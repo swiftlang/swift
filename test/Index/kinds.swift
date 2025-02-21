@@ -257,3 +257,4 @@ var globalCompProp: Int // CHECK: [[@LINE]]:5 | variable/Swift | [[globalCompPro
   // CHECK-NOT: [[@LINE-3]]:1 | function/acc-get/Swift
   return 0
 }
+// UNSUPPORTED: OS=windows-msvc

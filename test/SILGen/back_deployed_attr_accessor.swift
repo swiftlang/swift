@@ -53,3 +53,4 @@ func caller(_ s: TopLevelStruct) {
 
 // CHECK-LABEL: sil shared [thunk] [ossa] @$s11back_deploy14TopLevelStructV8propertyACvpACTK : $@convention(keypath_accessor_getter) (@in_guaranteed TopLevelStruct) -> @out TopLevelStruct
 // CHECK: function_ref @$s11back_deploy14TopLevelStructV8propertyACvgTwb
+// UNSUPPORTED: OS=windows-msvc

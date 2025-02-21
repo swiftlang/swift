@@ -53,4 +53,4 @@
 // RUN: %target-swift-frontend -typecheck %s -prebuilt-module-cache-path %t/PrebuiltModuleCache -module-cache-path %t/ModuleCache -sdk %t/mock-sdk -I %t/mock-sdk -track-system-dependencies
 // RUN: %{python} %S/Inputs/check-is-new.py %t/ModuleCache/SdkLib-*.swiftmodule
 
-import SdkLib
+import SdkLib// UNSUPPORTED: OS=windows-msvc

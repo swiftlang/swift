@@ -7,3 +7,4 @@ public class Main {
     print("ok")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

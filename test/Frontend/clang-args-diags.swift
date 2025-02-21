@@ -8,3 +8,4 @@
 // CHECK-DRIVER-OPTION-DAG: {{clang|LLVM}} version {{[0-9]+\.[0-9]+}}
 // CHECK-DRIVER-OPTION-DAG: error: unable to handle compilation, expected exactly one compiler job
 // CHECK-DRIVER-OPTION-DAG: error: clang importer creation failed
+// UNSUPPORTED: OS=windows-msvc

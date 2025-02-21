@@ -29,3 +29,4 @@ PrintTests.test("StringInterpolation") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

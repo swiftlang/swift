@@ -57,3 +57,4 @@ func test() {
   flat()
   fmwk()
 }
+// UNSUPPORTED: OS=windows-msvc

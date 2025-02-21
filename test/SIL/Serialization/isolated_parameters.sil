@@ -24,3 +24,4 @@ sil [serialized] [ossa] @assumeIsolated : $@convention(method) <τ_0_0 where τ_
 bb0(%0 : @guaranteed $τ_0_0):
   unreachable
 }
+// UNSUPPORTED: OS=windows-msvc

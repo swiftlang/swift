@@ -118,3 +118,4 @@ extension NSObject : Atom {
 protocol Atom : class {
   var valence: Int { get set }
 }
+// UNSUPPORTED: OS=windows-msvc

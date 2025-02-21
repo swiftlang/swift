@@ -41,3 +41,4 @@ func completionMiddle(/*c1s*/ arg1: Int /*c1e*/, /*c2s*/ _ arg2: Int /*c2e*/, /*
 // MIDDLE-ARG-WRAPPER-NEXT:     }, arg3: arg3)
 // MIDDLE-ARG-WRAPPER-NEXT:   }
 // MIDDLE-ARG-WRAPPER-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

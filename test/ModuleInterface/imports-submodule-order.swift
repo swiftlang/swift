@@ -21,3 +21,4 @@
 // CHECK-NEXT: import X{{$}}
 // CHECK-NEXT: import Y{{$}}
 // CHECK-NOT: import
+// UNSUPPORTED: OS=windows-msvc

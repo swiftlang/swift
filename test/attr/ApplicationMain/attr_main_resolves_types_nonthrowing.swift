@@ -20,3 +20,4 @@ extension S : P {}
 
 
 
+// UNSUPPORTED: OS=windows-msvc

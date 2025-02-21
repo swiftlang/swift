@@ -34,3 +34,4 @@ test {
   print(v.count)
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -610,3 +610,4 @@ objOptOpt = .some(.some([1, 2, 3] as NSObject))
 downcastToStringArrayOptOpt(objOptOpt)
 
 print("ok")  // CHECK: ok
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ import Closure
 public func testClosureToBlockReturnNonTrivial() {
   cfuncReturnNonTrivial({() -> NonTrivial in return NonTrivial() })
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -5,3 +5,4 @@
 
 @_versioned func oldVersionedFunction() {}
 // expected-error@-1 {{'@_versioned' has been renamed to '@usableFromInline'}}{{2-12=usableFromInline}}
+// UNSUPPORTED: OS=windows-msvc

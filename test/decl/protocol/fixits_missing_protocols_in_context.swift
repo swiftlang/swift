@@ -43,3 +43,4 @@ class C2 {
   func method() {}
   var property: Int = 0
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -40,3 +40,4 @@ public struct Outer {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

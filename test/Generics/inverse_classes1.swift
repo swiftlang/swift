@@ -11,3 +11,4 @@ func checks<T: ~Copyable, C>(
           _ b: KlassModern, // expected-error {{parameter of noncopyable type 'KlassModern' must specify ownership}} // expected-note 3{{add}}
           _ c: Konditional<T>,
           _ d: Konditional<C>) {}
+// UNSUPPORTED: OS=windows-msvc

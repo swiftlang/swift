@@ -148,3 +148,4 @@ public func throwFunctionWithReturn() throws -> Int {
 // CHECK: #endif
 // CHECK: return SWIFT_RETURN_THUNK(swift::Int, returnValue);
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

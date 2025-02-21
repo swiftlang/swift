@@ -112,3 +112,4 @@ struct FailToMatch4 : ProtocolWithMixedReqs { // expected-error {{type 'FailToMa
   // expected-note @-1 {{candidate has non-matching type '(sending NonSendableKlass) -> sending NonSendableKlass'}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

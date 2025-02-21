@@ -34,3 +34,4 @@ func getObjCTypeEncoding<T>(_: T) {
   use(Builtin.getObjCTypeEncoding(NonObjCClass.self))
 }
 
+// UNSUPPORTED: OS=windows-msvc

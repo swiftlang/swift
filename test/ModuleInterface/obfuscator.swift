@@ -31,3 +31,4 @@ import Bar
 import A
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

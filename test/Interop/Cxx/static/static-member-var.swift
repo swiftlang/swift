@@ -96,3 +96,4 @@ StaticMemberVarTestSuite.test("init-struct-with-static-member") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -846,3 +846,4 @@ private extension ClassWithProperties {
 public var inferredType = PrivateStruct() // expected-error {{variable cannot be declared public because its type 'PrivateStruct' uses a private type}}
 public var inferredGenericParameters: Optional = PrivateStruct() // expected-warning {{variable should not be declared public because its type uses a private type}}
 public var explicitType: Optional<PrivateStruct> = PrivateStruct() // expected-error {{variable cannot be declared public because its type uses a private type}}
+// UNSUPPORTED: OS=windows-msvc

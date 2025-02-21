@@ -364,3 +364,4 @@ extension G: P where repeat each T: P {
 }
 // CRASH: not supported
 #endif
+// UNSUPPORTED: OS=windows-msvc

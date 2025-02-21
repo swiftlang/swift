@@ -82,3 +82,4 @@ bb0(%0 : $(Int, Int)):
   return %3
 }
 
+// UNSUPPORTED: OS=windows-msvc

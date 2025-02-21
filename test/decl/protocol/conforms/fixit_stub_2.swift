@@ -111,3 +111,4 @@ protocol FooProto {
 
 struct FooType : FooProto { // expected-error {{type 'FooType' does not conform to protocol 'FooProto'}} expected-note {{add stubs for conformance}} {{28-28=\n    func doSomething(then completion: @escaping CompletionType) {\n        <#code#>\n    \}\n}}
 }
+// UNSUPPORTED: OS=windows-msvc

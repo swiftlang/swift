@@ -163,3 +163,4 @@ class ErrantClass : ErrantBaseClass {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

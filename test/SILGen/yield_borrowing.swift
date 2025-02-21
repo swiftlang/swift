@@ -18,3 +18,4 @@ struct BigFoo {
         }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

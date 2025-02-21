@@ -70,3 +70,4 @@ struct S {
   // CHECK-NEXT: }
   var x = {.random() ? 1 : 2}
 }
+// UNSUPPORTED: OS=windows-msvc

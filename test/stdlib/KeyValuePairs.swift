@@ -51,3 +51,4 @@ expectType(KeyValuePairs<String, NSString>.self, &stringNSStringLet)
 
 var hetero: KeyValuePairs = ["a": 1 as NSNumber, "b": "Foo" as NSString]
 expectType(KeyValuePairs<String, NSObject>.self, &hetero)
+// UNSUPPORTED: OS=windows-msvc

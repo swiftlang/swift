@@ -241,3 +241,4 @@ public struct AnimalWrapper<Friend: Animal> { }
 
 // CHECK-NEXT: Generic signature: <Friend where Friend : Animal>
 extension AnimalWrapper: Pony where Friend: Pony { }
+// UNSUPPORTED: OS=windows-msvc

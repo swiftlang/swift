@@ -6,3 +6,4 @@ import Foundation
 // Can downcast by bridging
 let bridge = "A" as? NSString // expected-warning {{always succeeds}}
 let bridge1 = 1 as? NSNumber // expected-warning {{always succeeds}}
+// UNSUPPORTED: OS=windows-msvc

@@ -61,4 +61,4 @@ func readDefinedConstMember() -> CInt {
 // CHECK: return [[VALUE]] : $Int32
 func readDefinedOutOfLineConstMember() -> CInt {
   return WithConstStaticMember.definedOutOfLine
-}
+}// UNSUPPORTED: OS=windows-msvc

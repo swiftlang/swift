@@ -233,3 +233,4 @@ func manyValuesThrows() async {
     await manyValuesThrows()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

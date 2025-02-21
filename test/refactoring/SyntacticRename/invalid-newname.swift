@@ -4,3 +4,4 @@
 // RUN: not %refactor -find-rename-ranges -source-filename %s -pos="ignore" -is-function-like -old-name "foo" -new-name "foo( )"
 
 func /*ignore*/foo() {}
+// UNSUPPORTED: OS=windows-msvc

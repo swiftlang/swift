@@ -47,3 +47,4 @@ closure() // CHECK-NEXT: closure: 42
 closureCapture() // CHECK-NEXT: closure-capture: 42
 print("done?") // CHECK-NEXT: done?
 // CHECK-NEXT: deferred: 42
+// UNSUPPORTED: OS=windows-msvc

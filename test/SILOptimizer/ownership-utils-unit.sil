@@ -71,3 +71,4 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

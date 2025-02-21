@@ -48,3 +48,4 @@ public func f(_ i : Int) -> Int { // 301
 // CHECK: ![[L2]] = distinct !DILocation(line: 203, column: 10, scope: ![[G]],
 // CHECK-SAME:                           inlinedAt: ![[L3]])
 
+// UNSUPPORTED: OS=windows-msvc

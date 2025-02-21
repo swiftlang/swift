@@ -110,3 +110,4 @@ struct Overflow {
 
 // FRIENDLY: 5 static Overflow.main() + {{[0-9]+}} in Overflow at {{.*}}/Overflow.swift
 
+// UNSUPPORTED: OS=windows-msvc

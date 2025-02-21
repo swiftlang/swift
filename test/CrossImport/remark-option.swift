@@ -8,3 +8,4 @@ import DeclaringLibrary
 // DeclaringLibrary decl, since the cross-import overlay actually belongs to
 // the DeclaringLibrary. (https://github.com/apple/swift/issues/54649)
 import BystandingLibrary // expected-remark {{import of 'DeclaringLibrary' and 'BystandingLibrary' triggered a cross-import of '_OverlayLibrary'}}
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@
 // Ensure the 'api-digester-breaking-change' category is included in the serialized diagnostics file.
 // CHECK-DIA: warning: ABI breakage: enum Color is a new API without @available attribute [] [api-digester-breaking-change]
 // CHECK-STDERR: warning: ABI breakage: enum Color is a new API without @available attribute
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@ func f() {
     _ = #selector(Renamed.f1)
     _ = #keyPath(Renamed.nested.property)
 }
+// UNSUPPORTED: OS=windows-msvc

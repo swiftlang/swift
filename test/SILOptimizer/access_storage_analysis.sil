@@ -796,3 +796,4 @@ bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
   %t = tuple()
   return %t: $()
 }
+// UNSUPPORTED: OS=windows-msvc

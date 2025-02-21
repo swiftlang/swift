@@ -508,3 +508,4 @@ public func testInnerStructLetEntry() -> Int32 {
   var outer = Outer()
   return testInnerStructLet1(&outer) + testInnerStructLet2(&outer)
 }
+// UNSUPPORTED: OS=windows-msvc

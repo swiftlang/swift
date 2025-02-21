@@ -9,3 +9,4 @@ public var x : DWORD = MY_INT
 public var y : CInt = x
 public var z : DWORD = "" // expected-error {{cannot convert value}}
 
+// UNSUPPORTED: OS=windows-msvc

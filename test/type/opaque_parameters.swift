@@ -146,3 +146,4 @@ public func closureWithOpaqueParameterInConsumingPosition(p: some Any) {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

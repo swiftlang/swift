@@ -15,3 +15,4 @@ class B: A {
 struct X {
   @_nonoverride func foo() { } // expected-error{{'@_nonoverride' can only be specified on class or protocol members}}
 }
+// UNSUPPORTED: OS=windows-msvc

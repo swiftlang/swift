@@ -52,3 +52,4 @@ distributed actor Overloader {
   distributed func overloadedDistParams<A: Sendable & Codable>(param: A) async {} // ok
 }
 
+// UNSUPPORTED: OS=windows-msvc

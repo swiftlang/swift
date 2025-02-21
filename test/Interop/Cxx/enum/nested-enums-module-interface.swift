@@ -16,3 +16,4 @@
 // CHECK-NEXT:    static var kNestedB: ns.nestedNS.EnumInNestedNS { get }
 // CHECK-NEXT:  }
 // CHECK-NEXT:}
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@ c = nil
 
 // CHECK: I am a C
 // CHECK-NEXT: deinitializing...
+// UNSUPPORTED: OS=windows-msvc

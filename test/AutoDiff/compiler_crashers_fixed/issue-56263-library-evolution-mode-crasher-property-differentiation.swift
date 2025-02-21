@@ -75,3 +75,4 @@ public struct Struct: Differentiable {
 // 29 libdyld.dylib            0x00007fff20332689 start + 1
 // 30 libdyld.dylib            0x0000000000000004 start + 18446603339975940476
 // [1]    21458 abort      xcrun $SWIFT_NINJA_BUILD_DIR/bin/swift-frontend -c test2.swift
+// UNSUPPORTED: OS=windows-msvc

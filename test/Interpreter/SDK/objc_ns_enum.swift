@@ -22,3 +22,4 @@ print(UIViewAnimationCurve(rawValue: 20721)!.rawValue)
 
 // CHECK: 20721
 
+// UNSUPPORTED: OS=windows-msvc

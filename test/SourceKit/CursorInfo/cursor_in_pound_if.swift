@@ -10,3 +10,4 @@ func foo() {
 }
 // CHECK-INT: <Declaration>let xxx: <Type usr="s:Si">Int</Type></Declaration>
 // CHECK-STR: <Declaration>let xxx: <Type usr="s:SS">String</Type></Declaration>
+// UNSUPPORTED: OS=windows-msvc

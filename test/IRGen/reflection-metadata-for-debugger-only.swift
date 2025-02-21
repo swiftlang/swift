@@ -39,3 +39,4 @@ public struct MyStruct<T>: MyProtocol {
 // CHECK-NOREFL-NOT: @"$s4main10MyProtocol_pMF"
 // CHECK-NOREFL-NOT: @"$s4main7GenericCMF"
 // CHECK-NOREFL-NOT: @"$s4main8MyStructVMF"
+// UNSUPPORTED: OS=windows-msvc

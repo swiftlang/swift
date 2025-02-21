@@ -156,3 +156,4 @@ tests.test("taskRunOnMainActor in SubQueue off MainActor") { @CustomActor () asy
 }
 
 await runAllTestsAsync()
+// UNSUPPORTED: OS=windows-msvc

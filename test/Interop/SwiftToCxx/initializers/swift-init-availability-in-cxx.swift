@@ -21,3 +21,4 @@ public struct Struct {
 // CHECK: static SWIFT_INLINE_THUNK Struct init(int16_t field) SWIFT_SYMBOL("s:7Methods6StructVyACs5Int16Vcfc") SWIFT_AVAILABILITY(macos,introduced=11);
 
 // CHECK: SWIFT_INLINE_THUNK Struct Struct::init(int16_t field) SWIFT_AVAILABILITY(macos,introduced=11) {
+// UNSUPPORTED: OS=windows-msvc

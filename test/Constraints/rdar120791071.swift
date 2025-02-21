@@ -12,3 +12,4 @@ protocol P<A> {
   func map<D> (_ g:(A) -> D) -> any P<D>
   func k() -> S<A>
 }
+// UNSUPPORTED: OS=windows-msvc

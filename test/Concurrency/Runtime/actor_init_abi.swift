@@ -82,3 +82,4 @@ struct Main {
     test(BigFootObjC())
   }
 }
+// UNSUPPORTED: OS=windows-msvc

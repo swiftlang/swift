@@ -19,3 +19,4 @@ print(SomeImageName)
 
 // CHECK: clang
 // CHECK: '-working-directory' 'SOURCE_DIR/test/ClangImporter/Inputs'
+// UNSUPPORTED: OS=windows-msvc

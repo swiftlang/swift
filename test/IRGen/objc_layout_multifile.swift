@@ -12,3 +12,4 @@ class Foo {
   // CHECK: @llvm.objc.retain
   var bar: Bar?
 }
+// UNSUPPORTED: OS=windows-msvc

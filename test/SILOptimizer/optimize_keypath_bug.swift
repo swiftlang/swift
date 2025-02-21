@@ -28,3 +28,4 @@ open class DateFormatter {
     open var formattingContext: Context = .unknown
 }
 
+// UNSUPPORTED: OS=windows-msvc

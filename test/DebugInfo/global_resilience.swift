@@ -58,3 +58,4 @@ let tuple = (Size(w: 1, h: 2), Size(w: 3, h: 4))
 // CHECK-SAME:            type: ![[TUPLE_TY:[0-9]+]]
 // CHECK: ![[TUPLE_TY]] = !DICompositeType(tag: DW_TAG_structure_type,
 // CHECK-SAME:            name: "$swift.fixedbuffer", 
+// UNSUPPORTED: OS=windows-msvc

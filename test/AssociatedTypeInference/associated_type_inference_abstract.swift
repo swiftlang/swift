@@ -93,4 +93,4 @@ extension P5 where Self: Q {
   func f(_: Self) {}
 }
 
-struct S5: P5, Q {}
+struct S5: P5, Q {}// UNSUPPORTED: OS=windows-msvc

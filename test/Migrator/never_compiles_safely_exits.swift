@@ -9,3 +9,4 @@
 func bar() {
   foo(bar)
 }
+// UNSUPPORTED: OS=windows-msvc

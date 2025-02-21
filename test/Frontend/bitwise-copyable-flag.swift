@@ -6,3 +6,4 @@
 
 struct S : BitwiseCopyable {
 }
+// UNSUPPORTED: OS=windows-msvc

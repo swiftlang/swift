@@ -395,3 +395,4 @@ ProtocolExtensionTestSuite.test("DefaultArgumentsInExtension") {
     expectEqual((40, 20), instance.foo(a: 2))
     expectEqual((40, 20), (instance as any DefaultArgumentsInExtension).foo(a: 2))
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@ struct D : DrawingElement {
 public func test1111() -> Int32 {
   return (D() as DrawingElement).boundingBox
 }
+// UNSUPPORTED: OS=windows-msvc

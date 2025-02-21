@@ -6,3 +6,4 @@
     var someVar: String?
     func someMethod() {}
 }
+// UNSUPPORTED: OS=windows-msvc

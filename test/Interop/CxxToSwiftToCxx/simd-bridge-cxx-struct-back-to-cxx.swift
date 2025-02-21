@@ -45,3 +45,4 @@ public func passStruct(_ x : Struct) {
 // CHECK: class SWIFT_SYMBOL("s:8UseCxxTy6StructV") Struct final {
 // CHECK-NOT: init(
 // CHECK:  // Unavailable in C++: Swift global function 'passStruct(_:)'
+// UNSUPPORTED: OS=windows-msvc

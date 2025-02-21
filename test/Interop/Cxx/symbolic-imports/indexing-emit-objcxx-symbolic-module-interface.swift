@@ -60,3 +60,4 @@ import ObjCxxModule
 // CHECK-EMPTY:
 // CHECK-NEXT:     open func myTestMethod()
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

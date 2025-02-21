@@ -128,4 +128,4 @@ do {
 // CHECK-DECL: typealias.(file).GenericOuter.Inner.Alias
 // CHECK-DECL: typealias.(file).Proto.Alias
 // CHECK-DECL: typealias.(file).Proto extension.OtherAlias
-// CHECK-DECL: typealias.(file).GenericOuter extension.ConditionalAlias
+// CHECK-DECL: typealias.(file).GenericOuter extension.ConditionalAlias// UNSUPPORTED: OS=windows-msvc

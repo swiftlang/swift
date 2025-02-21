@@ -56,3 +56,4 @@ class C {
   // CHECK-SAME:   ptr undef
   // CHECK-SAME: )
 }
+// UNSUPPORTED: OS=windows-msvc

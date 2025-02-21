@@ -768,3 +768,4 @@ extension MyActor {
         await asyncInheritActorContextGlobalActorAcceptsSendableAsyncClosure { print(self) }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

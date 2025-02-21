@@ -176,3 +176,4 @@ struct UnownedGenericCapture<T : AnyObject> {
     return { [unowned optionalObject] in _ = optionalObject }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -52,3 +52,4 @@ class TestStructLike : NSObject {
 }
 // CHECK: @end
 
+// UNSUPPORTED: OS=windows-msvc

@@ -65,3 +65,4 @@ public func getArrayOfLocalCount() -> [NS.LocalCount] {
 // CHECK:        %5 = call ptr @{{_ZN2NS10LocalCount6createEv|"\?create\@LocalCount\@NS\@\@SAPEAU12\@XZ"}}()
 // CHECK-NEXT:   call void @{{_Z8LCRetainPN2NS10LocalCountE|"\?LCRetain\@\@YAXPEAULocalCount\@NS\@\@\@Z"}}(ptr %5)
 // CHECK:      }
+// UNSUPPORTED: OS=windows-msvc

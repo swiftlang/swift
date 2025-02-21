@@ -22,3 +22,4 @@ public func storeBytes<T : BitwiseCopyable>(
 ) {
   Builtin.storeRaw(value, (self + offset)._rawValue)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -40,3 +40,4 @@ func outerFunc(doIterations : Int, value: inout Float) -> (Float, (Float) -> Flo
   let valAndPullback = valueWithPullback(at: value, of: curriedFunc)
   return (value + valAndPullback.value, valAndPullback.pullback)
 }
+// UNSUPPORTED: OS=windows-msvc

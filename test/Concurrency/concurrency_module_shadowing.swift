@@ -19,3 +19,4 @@ func f(_ t : UnsafeCurrentTask) -> Bool {
 
 @available(SwiftStdlib 5.1, *)
 func g(_: _Concurrency.UnsafeCurrentTask) {}
+// UNSUPPORTED: OS=windows-msvc

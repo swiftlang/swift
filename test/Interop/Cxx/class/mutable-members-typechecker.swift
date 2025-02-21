@@ -5,3 +5,4 @@ import MutableMembers
 
 let obj = HasPublicMutableMember(a: 42)
 let i = obj.foo()
+// UNSUPPORTED: OS=windows-msvc

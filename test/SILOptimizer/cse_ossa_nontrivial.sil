@@ -1076,3 +1076,4 @@ bb0(%0 : $*Wrapper):
   %18 = tuple ()
   return %18
 }
+// UNSUPPORTED: OS=windows-msvc

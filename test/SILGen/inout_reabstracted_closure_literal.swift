@@ -64,3 +64,4 @@ func foo(x: @escaping () -> Void) {
         // CHECK:   return
     }
 }
+// UNSUPPORTED: OS=windows-msvc

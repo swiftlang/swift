@@ -38,3 +38,4 @@ func test_taskGroup_cancelAll() async {
     await test_taskGroup_cancelAll()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

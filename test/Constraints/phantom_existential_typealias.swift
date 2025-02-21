@@ -39,3 +39,4 @@ func testHorse() {
         Horse()
     }
 }
+// UNSUPPORTED: OS=windows-msvc

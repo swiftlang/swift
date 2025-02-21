@@ -541,3 +541,4 @@ func testEraseAsyncActorIsolatedPartialApplication(a: MyActor) {
 func extractIsolation(fn: @escaping @isolated(any) @Sendable () -> Void) -> (any Actor)? {
   fn.isolation
 }
+// UNSUPPORTED: OS=windows-msvc

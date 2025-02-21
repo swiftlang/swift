@@ -25,3 +25,4 @@ extension Birthyear: Comparable {}
 func canEatHotChip(_ birthyear:Birthyear) -> Bool {
   return birthyear > .nineties(3) // Okay
 }
+// UNSUPPORTED: OS=windows-msvc

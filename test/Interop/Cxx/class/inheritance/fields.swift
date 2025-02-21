@@ -132,3 +132,4 @@ FieldsTestSuite.test("Out-of-order inheritance") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

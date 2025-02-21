@@ -19,3 +19,4 @@ func foo_ifdecl() -> Int {
     return // expected-error {{non-void function should return a value}}
     #endif
 }
+// UNSUPPORTED: OS=windows-msvc

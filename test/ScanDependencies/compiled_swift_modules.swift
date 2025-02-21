@@ -51,3 +51,4 @@ import Foo
 // Step 8: The new scanner behavior should not give use prebuilt module file because it is out-of-date.
 // RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -I %t -emit-dependencies -emit-dependencies-path %t/deps.d -sdk %t -prebuilt-module-cache-path %t/ResourceDir/%target-sdk-name/prebuilt-modules
 // RUN: %validate-json %t/deps.json | %FileCheck %s -check-prefix=HAS_NO_COMPILED
+// UNSUPPORTED: OS=windows-msvc

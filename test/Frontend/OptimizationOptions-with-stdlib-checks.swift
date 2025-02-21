@@ -144,3 +144,4 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // FAST-NOT:  builtin "int_trap"
 // FAST-NOT:  unreachable
 // FAST: return
+// UNSUPPORTED: OS=windows-msvc

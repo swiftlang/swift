@@ -49,3 +49,4 @@ func test2() {
 // CHECK-32: !1 = !{i64 8, !"$s4main11TheProtocolP10func2_deadyyFTq"}
 // CHECK-32: !2 = !{i64 1, i64 4, i64 12}
 // CHECK-32: !3 = !{}
+// UNSUPPORTED: OS=windows-msvc

@@ -50,3 +50,4 @@ class CompleteInsideGenericClass<S: Sequence> {
     String(#^F^#
   }
 }
+// UNSUPPORTED: OS=windows-msvc

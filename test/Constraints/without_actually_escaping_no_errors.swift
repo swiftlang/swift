@@ -36,3 +36,4 @@ func testBlock(f: @convention(block) () -> ()) {
   let escape: (@escaping @convention(block) () -> ()) -> () = { _ in }
   let _: () = withoutActuallyEscaping(f, do: escape)
 }
+// UNSUPPORTED: OS=windows-msvc

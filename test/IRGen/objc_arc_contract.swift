@@ -28,3 +28,4 @@ public func foo() throws {
   var e: NSError? = nil
   test(x, y, z, w, .usingNewMetadataOnly, &e)
 }
+// UNSUPPORTED: OS=windows-msvc

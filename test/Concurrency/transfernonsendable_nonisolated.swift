@@ -130,3 +130,4 @@ func callMainActorIsolatedFunction() async {
   await useValueAsync(x)
   useValueSync(x)
 }
+// UNSUPPORTED: OS=windows-msvc

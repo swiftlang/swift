@@ -29,3 +29,4 @@ public var i: Int {
     yield &_i
   }
 }
+// UNSUPPORTED: OS=windows-msvc

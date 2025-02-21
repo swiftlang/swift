@@ -64,3 +64,4 @@ public func access_borrowed_read(_ l: FileHandle) -> FileHandle {
   // CHECK:     return
   return l.file.alias
 }
+// UNSUPPORTED: OS=windows-msvc

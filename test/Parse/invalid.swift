@@ -142,3 +142,4 @@ enum E_50734<@indirect T> {} // expected-error {{'indirect' is a declaration mod
 protocol P {
   @available(macOS, introduced: 10.9) associatedtype Assoc
 }
+// UNSUPPORTED: OS=windows-msvc

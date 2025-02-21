@@ -45,3 +45,4 @@ nextToSwiftinterface()
 prebuiltModule()
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

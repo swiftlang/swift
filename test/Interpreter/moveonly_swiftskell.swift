@@ -83,3 +83,4 @@ func testListBasic() {
 
 
 }
+// UNSUPPORTED: OS=windows-msvc

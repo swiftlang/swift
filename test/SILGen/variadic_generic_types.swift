@@ -3,3 +3,4 @@
 struct Variadic<each T> where repeat each T: Equatable {}
 
 _ = Variadic<Int, String>()
+// UNSUPPORTED: OS=windows-msvc

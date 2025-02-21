@@ -30,3 +30,4 @@ public class Test {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

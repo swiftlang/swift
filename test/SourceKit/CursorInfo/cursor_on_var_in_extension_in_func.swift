@@ -4,3 +4,4 @@ func foo() {
     var hex 
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@
 //      when emitted into the interface file.
 
 @_marker public protocol Escapable { }
+// UNSUPPORTED: OS=windows-msvc

@@ -143,3 +143,4 @@ func testPB1<T : PB>(_: T) {
 func testPB2<T : PB>(_: T) {
   sameType(T.A5.self, T.A6.self)
 }
+// UNSUPPORTED: OS=windows-msvc

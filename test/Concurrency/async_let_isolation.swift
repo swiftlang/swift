@@ -53,3 +53,4 @@ func outside() async {
   _ = await x
   _ = await y
 }
+// UNSUPPORTED: OS=windows-msvc

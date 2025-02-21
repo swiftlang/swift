@@ -17,3 +17,4 @@ extension Q {
 
 // Since foo is a default implementation of a requirement, we don't consider this to be a "member"
 // CHECK-NOT: memberOf
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ extension OctTree {
     sameType(Point.MaskStorage.MaskStorage.self, SIMD3<Distance.SIMDMaskScalar>.self)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

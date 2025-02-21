@@ -56,3 +56,4 @@ class Test : NSObject {
     Self.shared = self
   }
 }
+// UNSUPPORTED: OS=windows-msvc

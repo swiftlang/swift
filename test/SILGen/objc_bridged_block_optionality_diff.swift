@@ -4,3 +4,4 @@ import Foundation
 
 TheHandlerBlock = { x in () }
 
+// UNSUPPORTED: OS=windows-msvc

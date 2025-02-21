@@ -82,3 +82,4 @@ import LibB
 @_spiOnly import LibC
 
 public func foo(a: LibAStruct) {}
+// UNSUPPORTED: OS=windows-msvc

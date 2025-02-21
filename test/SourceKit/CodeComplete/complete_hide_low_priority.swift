@@ -47,3 +47,4 @@ func testType() {
 // TYPES-NOHIDENAME: byNameBad
 // TYPES-NOHIDENAME: bynamebad
 // TYPES-NOHIDENAME: {{^}}Int{{$}}
+// UNSUPPORTED: OS=windows-msvc

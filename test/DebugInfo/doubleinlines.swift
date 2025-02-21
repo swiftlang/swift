@@ -22,3 +22,4 @@ func callCondFail(arg: Builtin.Int1, msg: Builtin.RawPointer) {
 // CHECK: ![[SCOPETRAP]] = distinct !DISubprogram(name: "Swift runtime failure: unknown program error"
 
 import Builtin
+// UNSUPPORTED: OS=windows-msvc

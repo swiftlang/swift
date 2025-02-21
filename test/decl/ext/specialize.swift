@@ -86,3 +86,4 @@ class State {
 extension Test.Key<State> {
   static let state = Self<State>()
 }
+// UNSUPPORTED: OS=windows-msvc

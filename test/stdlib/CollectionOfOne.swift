@@ -19,3 +19,4 @@ OneTests.test("Basic tests") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

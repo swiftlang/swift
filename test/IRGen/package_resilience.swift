@@ -280,3 +280,4 @@ package func constructExhaustiveWithResilientMembers() -> SimpleShape {
 // CHECK-NEXT:   [[RESULT:%.*]] = call ptr @swift_lookUpClassMethod(ptr %0, ptr %1, ptr @"$s18package_resilience28ClassWithMyResilientPropertyCMn{{(\.ptrauth.*)?}}")
 // CHECK-NEXT:   ret ptr [[RESULT]]
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

@@ -46,3 +46,4 @@ foo(#/(?/#, #/abc/#) // expected-error@:9 {{expected group specifier}}
 foo(#/(?C/#, #/abc/#) // expected-error@:10 {{expected ')'}}
 
 foo(#/(?'/#, #/abc/#) // expected-error@:10 {{expected group name}}
+// UNSUPPORTED: OS=windows-msvc

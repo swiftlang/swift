@@ -73,3 +73,4 @@ func testDoCatch(foo: Foo) async throws(FooError) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

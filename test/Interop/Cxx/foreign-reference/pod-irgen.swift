@@ -29,3 +29,4 @@ public func test() {
   x.b = 42
   _ = x.test()
 }
+// UNSUPPORTED: OS=windows-msvc

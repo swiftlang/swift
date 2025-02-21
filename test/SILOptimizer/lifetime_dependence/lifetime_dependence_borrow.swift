@@ -85,3 +85,4 @@ func ne_wrap_and_extract_member(cn: borrowing CN) -> BV {
   let ne = NEBV(bv)
   return ne.bv
 }
+// UNSUPPORTED: OS=windows-msvc

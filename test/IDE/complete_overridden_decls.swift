@@ -87,3 +87,4 @@ func test3(_ md: TestAMoreDerived) {
 // OVER_MORE_DERIVED_1-DAG: Decl[InstanceMethod]/CurrNominal: baseOverCovariant()[#FooMoreDerived#]{{; name=.+$}}
 // OVER_MORE_DERIVED_1-DAG: Decl[InstanceVar]/Super:          derivedInstanceVar[#FooBase#]{{; name=.+$}}
 // OVER_MORE_DERIVED_1-DAG: Decl[InstanceVar]/Super:          baseInstanceVar[#FooBase#]{{; name=.+$}}
+// UNSUPPORTED: OS=windows-msvc

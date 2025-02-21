@@ -37,3 +37,4 @@ extension P where T == S {
     missing()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

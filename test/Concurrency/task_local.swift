@@ -45,3 +45,4 @@ class X {
   static func test() {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

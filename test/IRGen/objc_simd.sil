@@ -94,3 +94,4 @@ entry(%x : $float3):
   %y = apply %f(%x) : $@convention(c) (float3) -> float3
   return %y : $float3
 }
+// UNSUPPORTED: OS=windows-msvc

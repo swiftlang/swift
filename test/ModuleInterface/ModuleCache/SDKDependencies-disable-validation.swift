@@ -190,3 +190,4 @@ import SdkLib
 func foo() -> ExportedInterface {
 	return x > 3 ? testValue : testValue2
 }
+// UNSUPPORTED: OS=windows-msvc

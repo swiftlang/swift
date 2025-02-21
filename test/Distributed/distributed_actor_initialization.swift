@@ -69,3 +69,4 @@ distributed actor OKMultiDefaultValues {
 
 }
 
+// UNSUPPORTED: OS=windows-msvc

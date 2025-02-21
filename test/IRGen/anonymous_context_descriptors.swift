@@ -77,3 +77,4 @@ extension MyBuilder {
     return S(content)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

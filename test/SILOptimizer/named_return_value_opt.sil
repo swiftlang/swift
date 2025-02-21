@@ -144,3 +144,4 @@ bb0(%0 : $*AClass, %1 : $*AnyObject):
   return %11 : $()                                // id: %12
 }
 
+// UNSUPPORTED: OS=windows-msvc

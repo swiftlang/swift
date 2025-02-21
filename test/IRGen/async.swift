@@ -49,3 +49,4 @@ public struct S {
       return await callee()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

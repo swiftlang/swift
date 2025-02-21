@@ -23,3 +23,4 @@ public func foo() {}
 // CHECK-NEXT:     "isUnconditionallyDeprecated": true
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

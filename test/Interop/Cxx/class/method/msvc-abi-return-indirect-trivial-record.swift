@@ -69,3 +69,4 @@ public func passTempForIndirectRetToVoidCall() {
 // CHECK: %[[OPRESULT:.*]] = alloca %TSo18LoadableIntWrapperV, align 4
 // CHECK-x86_64: call void @"??YLoadableIntWrapper@@QEAA?AU0@U0@@Z"(ptr {{.*}}, ptr {{.*}} sret(%TSo18LoadableIntWrapperV) %[[OPRESULT]], i32
 // CHECK-aarch64: call void @"??YLoadableIntWrapper@@QEAA?AU0@U0@@Z"(ptr {{.*}}, ptr {{.*}} sret(%TSo18LoadableIntWrapperV) %[[OPRESULT]], i64
+// UNSUPPORTED: OS=windows-msvc

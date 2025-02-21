@@ -31,3 +31,4 @@ final class Results: TaskResult {
 
   func removeMatchedTask(_ task: TaskImpl) {}
 }
+// UNSUPPORTED: OS=windows-msvc

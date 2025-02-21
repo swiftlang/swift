@@ -8,3 +8,4 @@ public class Foo {
 
 // CHECK: @"$s20deinit_isolation_tbd3FooCfZ"
 // CHECK: @"$s20deinit_isolation_tbd3FooCfD"
+// UNSUPPORTED: OS=windows-msvc

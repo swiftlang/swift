@@ -40,3 +40,4 @@ public func mainfunc(x: UnsafePointer<MyStruct>) {
 // CHECK:   call {{.*}}[ "ptrauth"(i32 0, i64 0) ]
 // CHECK: define {{.*}}@"$e4Main5test21xySPySo8MyStructVG_tF"
 // CHECK:   call {{.*}}[ "ptrauth"(i32 0, i64 16962) ]
+// UNSUPPORTED: OS=windows-msvc

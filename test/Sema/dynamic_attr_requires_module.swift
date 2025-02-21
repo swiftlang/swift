@@ -5,3 +5,4 @@ class Oof {
   @objc dynamic func impliesObjC() { }
   // expected-error@-1 {{@objc attribute used without importing module 'Foundation'}}
 }
+// UNSUPPORTED: OS=windows-msvc

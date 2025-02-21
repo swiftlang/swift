@@ -11,3 +11,4 @@ class C {
   func test2() {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

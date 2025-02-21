@@ -15,3 +15,4 @@ class ClassA: MyProto {
 class ClassB: MyProto {
   func foo() {}
 }
+// UNSUPPORTED: OS=windows-msvc

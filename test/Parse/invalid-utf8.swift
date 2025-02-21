@@ -35,3 +35,4 @@ static func foo() {} // expected-error{{static methods may only be declared on a
 
 // Make sure we don't stop processing the whole file.
 static func bar() {} // expected-error{{static methods may only be declared on a type}} {{1-8=}}
+// UNSUPPORTED: OS=windows-msvc

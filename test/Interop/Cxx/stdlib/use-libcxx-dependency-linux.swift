@@ -32,3 +32,4 @@ public func getStdString() -> std.string { return std.string() }
 //--- executable.swift
 import MyLibrary
 print("")
+// UNSUPPORTED: OS=windows-msvc

@@ -410,3 +410,4 @@ bb2(%error : @owned $any Error):
   destroy_value [dead_end] %nonescaping_nothrower : $@noescape @callee_guaranteed () -> (Int, @error any Error) 
   unreachable                                     
 } 
+// UNSUPPORTED: OS=windows-msvc

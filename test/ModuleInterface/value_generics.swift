@@ -26,3 +26,4 @@ public func usesConcreteSlab(_: Slab<Int, 2>) {}
 
 // CHECK: public func usesNegativeSlab(_: ValueGeneric.Slab<Swift.String, -10>)
 public func usesNegativeSlab(_: Slab<String, -10>) {}
+// UNSUPPORTED: OS=windows-msvc

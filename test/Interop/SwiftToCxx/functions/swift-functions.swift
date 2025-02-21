@@ -71,3 +71,4 @@ public func passVoidReturnVoid() { print("passVoidReturnVoid") }
 public func varFunctionSameName(_ x: CInt) {}
 
 public var varFunctionSameName: CInt = 0
+// UNSUPPORTED: OS=windows-msvc

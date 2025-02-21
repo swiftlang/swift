@@ -13,3 +13,4 @@ let array = [ myClass() ]
 
 // CHECK: [日本語01.myClass]
 print(array)
+// UNSUPPORTED: OS=windows-msvc

@@ -104,3 +104,4 @@ public func TestFunc() {
     print(OtherFunc())
 }
 
+// UNSUPPORTED: OS=windows-msvc

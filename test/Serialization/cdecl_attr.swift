@@ -10,3 +10,4 @@
 
 @_cdecl("foo")
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

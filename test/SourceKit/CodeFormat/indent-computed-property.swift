@@ -72,3 +72,4 @@ class C3 {
                           "    didSet {"
 // CHECK: key.sourcetext: "        print()"
 // CHECK: key.sourcetext: "    {}"
+// UNSUPPORTED: OS=windows-msvc

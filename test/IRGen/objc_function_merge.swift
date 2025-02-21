@@ -54,3 +54,4 @@ if #available(macOS 10.13, iOS 11, tvOS 11, watchOS 4, *) {
 }
 // CHECK: okay
 print("okay")
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ import Foundation
 
 // CHECK: func loadAndReturnError() throws
 
+// UNSUPPORTED: OS=windows-msvc

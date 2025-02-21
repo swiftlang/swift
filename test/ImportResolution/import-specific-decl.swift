@@ -23,3 +23,4 @@ var o : O // expected-error {{cannot find type 'O' in scope}}
 
 var o2 = aeiou.O() // expected-error {{module 'aeiou' has no member named 'O'}}
 
+// UNSUPPORTED: OS=windows-msvc

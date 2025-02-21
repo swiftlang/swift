@@ -37,3 +37,4 @@ import ImportsMissingHeader
 
 #endif
 
+// UNSUPPORTED: OS=windows-msvc

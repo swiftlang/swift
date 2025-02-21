@@ -35,3 +35,4 @@ import TestModule // expected-remark {{rebuilding module 'TestModule' from inter
 // expected-note @-3 {{prebuilt module is out of date}}
 // expected-note @-4 {{dependency is out of date}}
 // expected-note @-5 {{SDK build version is '11111'; prebuilt modules were built using SDK build version: '22222'}}
+// UNSUPPORTED: OS=windows-msvc

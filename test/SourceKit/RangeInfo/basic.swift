@@ -104,3 +104,4 @@ struct Something{
 // CHECK12-DAG: <kind>source.lang.swift.range.invalid</kind>
 // CHECK12-DAG: <content></content>
 // CHECK12-DAG: <type></type>
+// UNSUPPORTED: OS=windows-msvc

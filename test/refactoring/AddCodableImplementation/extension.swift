@@ -41,3 +41,4 @@ extension Outer.Inner: Codable {
 // RUN: diff -u %S/Outputs/extension/nested.swift.expected %t.result/nested.swift
 
 // CHECK-NOT: Add Explicit Codable
+// UNSUPPORTED: OS=windows-msvc

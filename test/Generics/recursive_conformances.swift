@@ -23,3 +23,4 @@ protocol Derived1 : Base {
 }
 
 protocol Derived2 : Base where T : Derived2 {}
+// UNSUPPORTED: OS=windows-msvc

@@ -74,3 +74,4 @@ import Library
 class C_With_Int2 {
   let i = Int2.one
 }
+// UNSUPPORTED: OS=windows-msvc

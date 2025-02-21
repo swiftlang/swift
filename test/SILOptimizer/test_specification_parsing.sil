@@ -183,3 +183,4 @@ entry(%0 : $Builtin.Int1):
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

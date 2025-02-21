@@ -207,3 +207,4 @@ public import IndirectClangDepA
 
 public func useTypesB(a: UnderlyingType) {}
 // expected-remark @-1 {{struct 'UnderlyingType' is imported via 'IndirectClangDepA', which reexports definition from 'MixedDep'}}
+// UNSUPPORTED: OS=windows-msvc

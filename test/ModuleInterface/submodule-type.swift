@@ -9,3 +9,4 @@ public func takesHasSubmoduleType(_ x: HasSubmoduleType) {}
 
 // CHECK: public func takesSubmoduleType(_ x: HasSubmodule.SubmoduleType)
 public func takesSubmoduleType(_ x: SubmoduleType) {}
+// UNSUPPORTED: OS=windows-msvc

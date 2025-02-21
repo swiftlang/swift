@@ -49,3 +49,4 @@ func test1() {
   testBaz()
 } // CHECK: end sil function '[[TEST1]]'
 
+// UNSUPPORTED: OS=windows-msvc

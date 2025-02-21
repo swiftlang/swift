@@ -164,3 +164,4 @@ foo1.bar = 2
 // CHECK-NEXT:  [[TUPLE:%.*]] = tuple ()
 // CHECK-NEXT:  return [[TUPLE]] : $()
 // CHECK-END: }
+// UNSUPPORTED: OS=windows-msvc

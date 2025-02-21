@@ -17,3 +17,4 @@
 // CHECK-COFF-MERGE-DAG: !{{[0-9]+}} = !{!"/DEFAULTLIB:module.lib"}
 // CHECK-COFF-MERGE-DAG: !{{[0-9]+}} = !{!"/DEFAULTLIB:transitive-module.lib"}
 // CHECK-COFF-MERGE-DAG: !{{[0-9]+}} = !{!"/DEFAULTLIB:autolink-module-map-link.lib"}
+// UNSUPPORTED: OS=windows-msvc

@@ -13,3 +13,4 @@
 // CHECK: Path: {{.*}}/Inputs, framework=false, system=false
 // CHECK: Importing a0...
 // CHECK: Import successful!
+// UNSUPPORTED: OS=windows-msvc

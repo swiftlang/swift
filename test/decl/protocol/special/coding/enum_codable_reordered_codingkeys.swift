@@ -9,4 +9,4 @@ enum SimpleEnum : Codable {
     	case x
     	case y
     }
-}
+}// UNSUPPORTED: OS=windows-msvc

@@ -49,3 +49,4 @@ func test1() {
 // POUND_EXPR_SELECTORCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: filePath[#ExpressibleByStringLiteral#]; name=filePath
 // POUND_EXPR_SELECTORCONTEXT-DAG: Keyword/None/TypeRelation[Convertible]: selector({#@objc method#})[#Selector#];
 // POUND_EXPR_SELECTORCONTEXT-DAG: Decl[Macro]/OtherModule[Swift]/IsSystem: externalMacro({#module: String#}, {#type: String#})[#T#]; name=externalMacro(module:type:)
+// UNSUPPORTED: OS=windows-msvc

@@ -43,3 +43,4 @@ import Foundation
 // CHECK-LABEL: ret ptr
 
 // CHECK: swift_defaultActor_destroy
+// UNSUPPORTED: OS=windows-msvc

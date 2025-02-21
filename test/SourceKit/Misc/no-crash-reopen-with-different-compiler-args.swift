@@ -20,4 +20,4 @@ struct Foo {}
 // CHECK-NEXT: Foo
 // CHECK-NEXT: s:4main3FooV
 
-// BEGIN secondary.swift
+// BEGIN secondary.swift// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@
 // REQUIRES: swift_feature_Embedded
 
 // CHECK: error: Objective-C interoperability cannot be enabled with embedded Swift.
+// UNSUPPORTED: OS=windows-msvc

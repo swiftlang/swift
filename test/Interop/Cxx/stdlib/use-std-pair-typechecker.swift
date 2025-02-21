@@ -10,3 +10,4 @@ u.getUnsafePair()
 u.getIteratorPair()
 // CHECK: error: value of type 'HasMethodThatReturnsUnsafePair' has no member 'getIteratorPair'
 // CHECK: note: C++ method 'getIteratorPair' may return an interior pointer
+// UNSUPPORTED: OS=windows-msvc

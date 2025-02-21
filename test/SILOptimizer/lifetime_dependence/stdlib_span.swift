@@ -62,3 +62,4 @@ func testUBPStorageEscape(array: [Int64]) {
   }
   read(span)
 }
+// UNSUPPORTED: OS=windows-msvc

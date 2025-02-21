@@ -43,3 +43,4 @@ public extension RemoteP {
 // EXTENSIONTOEBS-NEXT: "source": "s:e:s:7RemotePAAP8ExternalE8someFuncyyF"
 // EXTENSIONTOEBS-NEXT: "target": "s:7RemotePAAP"
 // EXTENSIONTOEBS-NEXT: "targetFallback": "RemoteP.RemoteP"
+// UNSUPPORTED: OS=windows-msvc

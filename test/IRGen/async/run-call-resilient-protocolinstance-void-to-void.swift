@@ -32,3 +32,4 @@ func test_case() async {
     try await test_case()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

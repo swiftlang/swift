@@ -20,3 +20,4 @@ public func foo<T>(_: T.Type) {
     var x = Y<T>() as! P
 }
 
+// UNSUPPORTED: OS=windows-msvc

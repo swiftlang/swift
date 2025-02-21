@@ -36,3 +36,4 @@ public func copyFoo(foo: Foo) -> Foo {
   let copy = foo
   return copy
 }
+// UNSUPPORTED: OS=windows-msvc

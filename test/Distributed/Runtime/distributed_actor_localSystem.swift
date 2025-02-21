@@ -45,3 +45,4 @@ distributed actor Worker {
     print("g = \(g)") // CHECK: g = hi!
   }
 }
+// UNSUPPORTED: OS=windows-msvc

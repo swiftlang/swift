@@ -27,3 +27,4 @@ public protocol P4 where T3.T2 == Self {
 public protocol P5 {
     associatedtype T2: P4
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -148,3 +148,4 @@
 // CHECK-NEXTZ: #pragma clang diagnostic pop
 
 // CHECK: } // namespace swift
+// UNSUPPORTED: OS=windows-msvc

@@ -168,3 +168,4 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
 }
 
 sil public_external @invoke_stret : $@convention(c) (@inout_aliasable @block_storage Builtin.RawPointer) -> NSRect
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ public class RequiresStoredPropertyInits {
 
   public init() {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@ func sayHello() {
 }
 
 sayHello()
+// UNSUPPORTED: OS=windows-msvc

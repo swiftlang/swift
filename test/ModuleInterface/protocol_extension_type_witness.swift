@@ -32,3 +32,4 @@ public struct S<B>: P {
 // CHECK-NEXT:    public typealias C = Swift.String
 // CHECK-NEXT:    public typealias D = Swift.String
 // CHECK-NEXT:  }
+// UNSUPPORTED: OS=windows-msvc

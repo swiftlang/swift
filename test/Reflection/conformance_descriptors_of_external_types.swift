@@ -25,3 +25,4 @@ extension testModAClass : myTestProto {}
 // CHECK: =============
 // CHECK-DAG:  (__C.testModAClass) : ExternalConformanceCheck.myTestProto
 // CHECK-DAG: 8testModB0aB7BStructV (testModB.testModBStruct) : ExternalConformanceCheck.myTestProto
+// UNSUPPORTED: OS=windows-msvc

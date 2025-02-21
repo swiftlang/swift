@@ -55,3 +55,4 @@ StdUniquePtrTestSuite.test("Test move only types behind smart pointers") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

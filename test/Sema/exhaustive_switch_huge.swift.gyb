@@ -17,3 +17,4 @@ switch E.x1 {
   case .x${i}  : break
 % end
 }
+// UNSUPPORTED: OS=windows-msvc

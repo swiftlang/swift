@@ -14,3 +14,4 @@
 // Ensure there is a dependency on 'E' even though it is not explicitly imported
 // CHECK:          "swift": "E"
 
+// UNSUPPORTED: OS=windows-msvc

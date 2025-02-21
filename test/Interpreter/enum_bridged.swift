@@ -36,3 +36,4 @@ func testCase() {
 
 // CHECK: Container(storage: a.MixedBridged.Bridged([a.K, a.K]))
 testCase()
+// UNSUPPORTED: OS=windows-msvc

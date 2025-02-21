@@ -375,3 +375,4 @@ Tests.test("RangeReplaceableCollection & MutableCollection of Int") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

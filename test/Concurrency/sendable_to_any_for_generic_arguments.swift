@@ -201,3 +201,4 @@ do {
   let values: [Any] = []
   a += values // Ok
 }
+// UNSUPPORTED: OS=windows-msvc

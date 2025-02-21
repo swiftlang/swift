@@ -90,3 +90,4 @@ internal import Lib
 //--- GeneratedAssetSymbols.swift
 import Lib
 
+// UNSUPPORTED: OS=windows-msvc

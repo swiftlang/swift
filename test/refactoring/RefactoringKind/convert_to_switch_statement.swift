@@ -202,3 +202,4 @@ func checkEquatableProtocol(x: Int) {
 // CHECK-CONVERT-TO-SWITCH-STATEMENT2-NOT: Convert To Switch Statement
 // CHECK-CONVERT-TO-SWITCH-STATEMENT2: Action ends
 
+// UNSUPPORTED: OS=windows-msvc

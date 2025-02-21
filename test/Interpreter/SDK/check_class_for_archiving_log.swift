@@ -153,3 +153,4 @@ func someFunction() {
   // CHECK: Attempting to unarchive Swift class '_Test.({{.+}}).LocalUnarchived'
 }
 someFunction()
+// UNSUPPORTED: OS=windows-msvc

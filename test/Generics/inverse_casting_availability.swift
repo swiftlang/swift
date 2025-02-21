@@ -126,3 +126,4 @@ extension UnsafeMutableRawPointer {
       _ = UnsafeMutableRawPointer(source + count)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

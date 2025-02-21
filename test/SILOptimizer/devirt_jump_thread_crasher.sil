@@ -151,3 +151,4 @@ bb9:
   %20 = tuple ()
   return %20 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

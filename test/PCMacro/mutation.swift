@@ -52,3 +52,4 @@ b.mutateIvar()
 // CHECK-NEXT: [11:3-11:24] pc after
 // CHECK-NEXT: [21:5-21:15] pc after
 // CHECK-NEXT: [26:1-26:15] pc after
+// UNSUPPORTED: OS=windows-msvc

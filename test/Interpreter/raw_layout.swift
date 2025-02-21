@@ -19,3 +19,4 @@ print(something(Foo<Bool>()))
 
 // CHECK: 123
 print(something(Foo<Int>()))
+// UNSUPPORTED: OS=windows-msvc

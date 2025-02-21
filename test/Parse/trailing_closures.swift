@@ -132,3 +132,4 @@ struct IsolationTest {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

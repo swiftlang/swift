@@ -20,3 +20,4 @@ public func callsExtensionMethod() {
 // CHECK-NEW: declare swiftcc %swift.metadata_response @"$s28weak_import_extension_helper3FooVMa"
 // CHECK-NEW: declare swiftcc void @"$s28weak_import_extension_helper3FooVACycfC"
 // CHECK-NEW: declare swiftcc void @"$s28weak_import_extension_helper3FooV0C6MethodyyF"
+// UNSUPPORTED: OS=windows-msvc

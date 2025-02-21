@@ -723,3 +723,4 @@ protocol HasAlias {
 func testHasAlias() {
   _ = \HasAlias.id
 }
+// UNSUPPORTED: OS=windows-msvc

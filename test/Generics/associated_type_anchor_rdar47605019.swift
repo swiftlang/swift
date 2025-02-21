@@ -16,3 +16,4 @@ private final class WrapperDerived<C: ElementTypeProtocol>: WrapperBase<C.Elemen
         let _ = base
     }
 }
+// UNSUPPORTED: OS=windows-msvc

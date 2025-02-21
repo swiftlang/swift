@@ -56,3 +56,4 @@ func add(_ a: UInt, _ b: UInt) async -> UInt {
 }
 
 // CHECK: Done.
+// UNSUPPORTED: OS=windows-msvc

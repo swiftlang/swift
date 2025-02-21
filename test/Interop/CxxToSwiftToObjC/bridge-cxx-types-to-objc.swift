@@ -9,3 +9,4 @@ public func bar(x: Foo, y: UnsafeMutablePointer<UnsafeMutableRawPointer?>) {}
 
 // CHECK: // Unavailable in C++: Swift global function 'bar(x:y:)'.
 // TODO: the message above is not correct, this is actually unavailable in Obj-C.
+// UNSUPPORTED: OS=windows-msvc

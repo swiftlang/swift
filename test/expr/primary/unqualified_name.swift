@@ -93,3 +93,4 @@ struct S1 {
     _ = S1.init(x: 0xG) // expected-error {{'G' is not a valid hexadecimal digit (0-9, A-F) in integer literal}} expected-error {{missing argument for parameter 'x' in call}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

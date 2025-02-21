@@ -122,3 +122,4 @@ func test_ambiguous_subscript_unresolved_member(s: S) {
   _ = s[b: 42] {} // expected-warning {{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'fn2' to suppress this warning}} {{14-15=, fn2: }} {{18-18=]}}
   let _: S = .foo(c: 42) {} // expected-warning {{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'fn2' to suppress this warning}} {{24-25=, fn2: }} {{28-28=)}}
 }
+// UNSUPPORTED: OS=windows-msvc

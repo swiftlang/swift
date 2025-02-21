@@ -134,3 +134,4 @@ if #available(*) == false { // expected-error {{#available cannot be used as an 
 }
 if !#available(*) { // expected-error {{#available cannot be used as an expression, did you mean to use '#unavailable'?}} {{4-15=#unavailable}}
 } 
+// UNSUPPORTED: OS=windows-msvc

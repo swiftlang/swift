@@ -19,3 +19,4 @@ func foo(_ s: S) {
       }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

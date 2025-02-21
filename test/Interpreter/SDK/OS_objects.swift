@@ -43,3 +43,4 @@ if let q = obj as? OS_dispatch_source {
 
 // CHECK-NEXT: DONE
 print("DONE");
+// UNSUPPORTED: OS=windows-msvc

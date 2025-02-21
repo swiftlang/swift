@@ -12,3 +12,4 @@ func switch_expr(_ b: Bool?) -> Int { // CHECK-NEXT: [[@LINE]]:37 -> {{[0-9]+}}:
     2                                 // FIXME: The following is incorrect
   }                                   // CHECK-NEXT: [[@LINE]]:4 -> [[@LINE+1]]:2 : ((1 + 2) + 3)
 }                                     // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

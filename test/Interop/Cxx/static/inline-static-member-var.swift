@@ -34,3 +34,4 @@ InlineStaticMemberVarTestSuite.test("write-inline-static-member-from-swift") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

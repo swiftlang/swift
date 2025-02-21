@@ -24,3 +24,4 @@ func testBrokenSwiftName(x: inout ZXSpectrum) {
 
   ZXSpectrumHelperReset()
 }
+// UNSUPPORTED: OS=windows-msvc

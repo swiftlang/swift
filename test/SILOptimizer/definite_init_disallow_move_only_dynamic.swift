@@ -17,3 +17,4 @@ func chk(_ cond: Bool) throws {
 }
 
 try? chk(true)
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ func build_deep(a: Int32, b: Int32) -> DeepIndirectField {
 func build_deep(c: Int32, d: Int32) -> DeepIndirectField {
     return DeepIndirectField(.init(.init(c: c, d: d)))
 }
+// UNSUPPORTED: OS=windows-msvc

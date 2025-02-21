@@ -933,3 +933,4 @@ bb7:
 bb8(%19 : $Optional<Int>):
   return %19 : $Optional<Int>
 }
+// UNSUPPORTED: OS=windows-msvc

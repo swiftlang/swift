@@ -17,3 +17,4 @@ class Str {
 // RUN:   -req=complete -pos=4:1 %s -- %s -resource-dir %t/rsrc -sdk %t/sdk 2>&1 | %FileCheck %s
 
 // CHECK: error response (Request Failed): Loading the standard library failed
+// UNSUPPORTED: OS=windows-msvc

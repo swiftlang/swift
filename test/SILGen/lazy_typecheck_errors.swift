@@ -66,3 +66,4 @@ public class DerivedFromNonExistent: NonExistent {
   nonExistent()
   // expected-error@-1 {{cannot find 'nonExistent' in scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

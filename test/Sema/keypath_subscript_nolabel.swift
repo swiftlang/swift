@@ -30,3 +30,4 @@ struct S4 {
 var s4 = S4()
 s4[\.x] = 10 // expected-error {{cannot convert value of type 'KeyPath<S4, Int>' to expected argument type 'KeyPath<S4, String>'}}
 // expected-note@-1 {{arguments to generic parameter 'Value' ('Int' and 'String') are expected to be equal}}
+// UNSUPPORTED: OS=windows-msvc

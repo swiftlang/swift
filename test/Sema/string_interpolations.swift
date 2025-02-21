@@ -56,3 +56,4 @@ func test_interpolation_in_case(query: String) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

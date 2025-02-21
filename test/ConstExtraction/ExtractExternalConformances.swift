@@ -44,3 +44,4 @@ extension TestExternalConformanceStruct: TestExternalConformanceProtocol {}
 // CHECK-NEXT:     "properties": []
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

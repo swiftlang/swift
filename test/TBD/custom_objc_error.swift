@@ -12,3 +12,4 @@ extension CustomError : CustomStringConvertible {
     return nsError.description
   }
 }
+// UNSUPPORTED: OS=windows-msvc

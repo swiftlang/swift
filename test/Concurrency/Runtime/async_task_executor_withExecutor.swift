@@ -192,3 +192,4 @@ func testGetCurrentTaskExecutor(_ firstExecutor: MyTaskExecutor,
     await testGetCurrentTaskExecutor(firstExecutor, secondExecutor)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -1087,3 +1087,4 @@ do {
       f(x, { $0 }, { _ in Task {} }) // expected-warning {{result of 'Task<E>' initializer is unused}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

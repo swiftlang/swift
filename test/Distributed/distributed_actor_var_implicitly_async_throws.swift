@@ -81,3 +81,4 @@ func test_outside(distributed: D) async throws {
   // expected-error@-1{{distributed actor-isolated property 'computed' can not be accessed from a nonisolated context}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

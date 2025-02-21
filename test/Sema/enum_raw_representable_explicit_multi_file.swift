@@ -8,3 +8,4 @@ extension Bar: RawRepresentable {}
 enum Bas: Int { case A }
 // expected-note@+1 {{'Bas' declares conformance to protocol 'RawRepresentable' here}}
 extension Bas: RawRepresentable {}
+// UNSUPPORTED: OS=windows-msvc

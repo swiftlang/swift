@@ -73,3 +73,4 @@ extension Array: P where Element == Int {
   // MEMBEREXT-NEXT: "target": "[[EXTID]]"
   public func bar() {}
 }
+// UNSUPPORTED: OS=windows-msvc

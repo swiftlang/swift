@@ -220,3 +220,4 @@ func expect(_ expected: MyTaskExecutor) {
     await testGroupAsyncLet(firstExecutor, secondExecutor)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

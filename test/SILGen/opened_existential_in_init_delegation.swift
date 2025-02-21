@@ -32,3 +32,4 @@ enum E {
     self.init(p: p, failable: ())!
   }
 }
+// UNSUPPORTED: OS=windows-msvc

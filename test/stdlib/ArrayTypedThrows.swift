@@ -15,3 +15,4 @@ func unsafeBuffers() throws(MyError) {
     throw .bad
   }
 }
+// UNSUPPORTED: OS=windows-msvc

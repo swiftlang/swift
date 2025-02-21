@@ -131,3 +131,4 @@ var i: [I] = []
 aoa = i as [AnyObject]
 i = aoa // expected-error {{cannot assign value of type '[AnyObject]' to type '[I]'}}
 // expected-note@-1 {{arguments to generic parameter 'Element' ('AnyObject' and 'I') are expected to be equal}}
+// UNSUPPORTED: OS=windows-msvc

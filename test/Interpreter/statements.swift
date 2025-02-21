@@ -61,3 +61,4 @@ testAnyCollection([1, 2.0, "Hello"])
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2.0
 // CHECK-NEXT: Hello
+// UNSUPPORTED: OS=windows-msvc

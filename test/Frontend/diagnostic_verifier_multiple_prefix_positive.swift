@@ -14,3 +14,4 @@ func test() {
   let z = 5 // expected-second-warning {{}}
   #endif
 }
+// UNSUPPORTED: OS=windows-msvc

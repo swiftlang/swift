@@ -19,3 +19,4 @@ public class A: NSObject {
 public class B: A {
   func doSomething() {}
 }
+// UNSUPPORTED: OS=windows-msvc

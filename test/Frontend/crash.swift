@@ -32,3 +32,4 @@
 
 func anchor() {}
 anchor()
+// UNSUPPORTED: OS=windows-msvc

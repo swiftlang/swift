@@ -28,3 +28,4 @@ theTest()
 
 // CHECK: TheObjCProtocol
 // CHECK: true
+// UNSUPPORTED: OS=windows-msvc

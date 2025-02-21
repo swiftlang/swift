@@ -8,3 +8,4 @@
 extension P {
   func takesT(_: T) {}
 }
+// UNSUPPORTED: OS=windows-msvc

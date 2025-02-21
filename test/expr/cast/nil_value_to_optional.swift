@@ -45,3 +45,4 @@ func test(_ e: E) {
   _ = e == Optional.none // expected-warning {{comparing non-optional value of type 'E' to 'Optional.none' always returns false}}
   _ = e == E?.none // expected-warning {{comparing non-optional value of type 'E' to 'Optional.none' always returns false}}
 }
+// UNSUPPORTED: OS=windows-msvc

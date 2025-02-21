@@ -124,3 +124,4 @@ extension GenericOtherFileNonconforming: AdditiveArithmetic {}
 // expected-error @-2 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of '+' for protocol 'AdditiveArithmetic'}}
 // expected-error @-3 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of '-' for protocol 'AdditiveArithmetic'}}
 // expected-note @-4 3{{add stubs for conformance}}
+// UNSUPPORTED: OS=windows-msvc

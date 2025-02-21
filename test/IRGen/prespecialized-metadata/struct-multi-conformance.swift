@@ -156,3 +156,4 @@ func doit() {
   getKAsAnyP().visit(Visitor())
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

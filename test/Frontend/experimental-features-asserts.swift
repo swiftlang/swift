@@ -12,3 +12,4 @@
 // RUN: %target-swift-frontend -typecheck %s -enable-experimental-feature ParserValidation
 
 import Swift
+// UNSUPPORTED: OS=windows-msvc

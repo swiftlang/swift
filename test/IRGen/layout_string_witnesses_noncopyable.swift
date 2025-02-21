@@ -32,3 +32,4 @@ enum MultiPayloadGeneric<T>: ~Copyable {
     case x(T)
     case y(T)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ print("\(_no_prior_var())")
 print("\(_no_prior_func())")
 print("\(_prior_var())")
 print("\(_prior_func())")
+// UNSUPPORTED: OS=windows-msvc

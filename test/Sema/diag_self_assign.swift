@@ -169,3 +169,4 @@ class SA_Deep1 {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -143,3 +143,4 @@ struct N {
 N.testPrivate()
 
 stopRemoteAST()
+// UNSUPPORTED: OS=windows-msvc

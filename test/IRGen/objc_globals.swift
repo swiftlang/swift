@@ -44,3 +44,4 @@ public func fooLazy() {
 // CHECK-DAG:         [[SELECTOR:%.*]] = load ptr, ptr @OBJC_SELECTOR_REFERENCES_
 // CHECK:         call {{.*}} @objc_msgSend
 // CHECK:         ret
+// UNSUPPORTED: OS=windows-msvc

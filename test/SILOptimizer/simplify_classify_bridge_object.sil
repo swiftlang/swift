@@ -33,3 +33,4 @@ bb0(%0 : $MyArray):
   return %2 : $(Builtin.Int1, Builtin.Int1)
 }
 
+// UNSUPPORTED: OS=windows-msvc

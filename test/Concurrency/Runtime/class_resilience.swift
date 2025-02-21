@@ -74,3 +74,4 @@ func virtualWait<T>(orThrow: Bool, _ c: BaseClass<T>) async throws {
     await task.value
   }
 }
+// UNSUPPORTED: OS=windows-msvc

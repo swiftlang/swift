@@ -191,3 +191,4 @@ sil_vtable C {}
 sil_vtable D {}
 sil_vtable G {}
 sil_vtable E {}
+// UNSUPPORTED: OS=windows-msvc

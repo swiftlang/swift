@@ -12,3 +12,4 @@
 // INVALID-COND-NEXT: warning: conditional compilation flags do not have values in Swift; they are either present or absent (rather than 'Swift=Cool')
 // INVALID-COND-NEXT: error: invalid argument '-D-D'; did you provide a redundant '-D' in your build settings?
 
+// UNSUPPORTED: OS=windows-msvc

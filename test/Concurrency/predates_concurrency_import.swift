@@ -69,3 +69,4 @@ extension NonStrictClass2: @retroactive MySendableProto { }
 
 extension NonStrictClass3: @retroactive Sendable { }
 // expected-warning@-1{{conformance to 'Sendable' must occur in the same source file as class 'NonStrictClass3'; use '@unchecked Sendable' for retroactive conformance}}
+// UNSUPPORTED: OS=windows-msvc

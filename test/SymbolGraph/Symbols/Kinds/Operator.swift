@@ -13,3 +13,4 @@ public struct S {
     return lhs
   }
 }
+// UNSUPPORTED: OS=windows-msvc

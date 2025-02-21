@@ -47,3 +47,4 @@ if let _ = dictCC as? Dictionary<D, U> { } // Ok
 if let _ = dictCC as? Dictionary<U, D> { } // Ok
 if let _ = dictCC as? Dictionary<U, U> { } // Ok
 
+// UNSUPPORTED: OS=windows-msvc

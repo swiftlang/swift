@@ -56,3 +56,4 @@ public actor Lion : ToothyMouth, Actor {
   nonisolated public func chew() {}
   nonisolated public func enqueue(_ job: UnownedJob) { }
 }
+// UNSUPPORTED: OS=windows-msvc

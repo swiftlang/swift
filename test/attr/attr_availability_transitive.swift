@@ -313,3 +313,4 @@ func available_func_call_extension_methods(_ e: ExtendMe) {
   e.unavailable_in_swift4_extension_available_method() //  expected-error {{'unavailable_in_swift4_extension_available_method()' is unavailable}}
   e.available_in_future_swift_extension_available_method() //  expected-error {{'available_in_future_swift_extension_available_method()' is unavailable}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -42,3 +42,4 @@ extension Gizmo: Runcible {
 
 // CHECK-LABEL: @"$sSo6NSRectV33protocol_conformance_records_objc8RuncibleACHc" = private constant
 // CHECK-LABEL: @"$sSo5GizmoC33protocol_conformance_records_objc8RuncibleACHc" = private constant
+// UNSUPPORTED: OS=windows-msvc

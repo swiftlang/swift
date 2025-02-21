@@ -5,3 +5,4 @@
 // CHECK-IGNORED-NOT: profc
 func foo() {}
 foo()
+// UNSUPPORTED: OS=windows-msvc

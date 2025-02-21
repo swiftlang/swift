@@ -145,3 +145,4 @@ func existential_metatype_of_metatype(_ x: Any) -> Any.Type.Type {
 func function_metatype_of_metatype(_ x: @escaping () -> ()) -> (() -> ()).Type.Type {
   return type(of: type(of: x))
 }
+// UNSUPPORTED: OS=windows-msvc

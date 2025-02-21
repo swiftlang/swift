@@ -70,3 +70,4 @@ jkl
 // ERROR_5: [[@LINE-1]]:1: error: {{cannot find 'jkl' in scope}}
 // ERROR_4: [[@LINE-2]]:1: error: {{cannot find 'jkl' in scope}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

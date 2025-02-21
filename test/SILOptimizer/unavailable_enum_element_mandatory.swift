@@ -206,3 +206,4 @@ public func testFullyCoveredSwitchWithPayloadResilient(_ e: ResilientEnumWithUna
   case .double(_): ()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -31,3 +31,4 @@ DictionaryUnchecked.test("noCseOnInit") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

@@ -16,3 +16,4 @@
 // RUN: %FileCheck %s < %t/result.txt
 
 // CHECK-NOT: added as a protocol requirement
+// UNSUPPORTED: OS=windows-msvc

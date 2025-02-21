@@ -31,3 +31,4 @@ func runDetached() {
 func testRunInline<T>(_ cl: () async -> T) -> T {
   return Builtin.taskRunInline(cl)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -241,3 +241,4 @@ func fallback() {
 // FALLBACK-NEXT: let str2 = await badRename2(arg: 1)
 // FALLBACK-NEXT: print(str2)
 // FALLBACK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

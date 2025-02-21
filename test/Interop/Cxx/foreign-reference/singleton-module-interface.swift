@@ -35,3 +35,4 @@
 // CHECK:   var value: Int32
 // CHECK: }
 // CHECK: func mutateIt(_ x: PrivateSpecialMembers)
+// UNSUPPORTED: OS=windows-msvc

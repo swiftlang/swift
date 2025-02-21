@@ -160,3 +160,4 @@ public struct S {
 // YSUBHEADING-NEXT:     "preciseIdentifier": "s:Si"
 // YSUBHEADING-NEXT:   }
 // YSUBHEADING-NEXT: ]
+// UNSUPPORTED: OS=windows-msvc

@@ -86,3 +86,4 @@ enum EError : P { // expected-error{{type 'EError' does not conform to protocol 
   subscript() -> Int { 0 } // expected-note{{candidate has non-matching type '() -> Int'}}
   func f() -> Int { 0 } // expected-note{{candidate has non-matching type '() -> Int'}}
 }
+// UNSUPPORTED: OS=windows-msvc

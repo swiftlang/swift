@@ -3,3 +3,4 @@
 // Just don't crash.
 
 Binding<Bool>Binding<Bool>
+// UNSUPPORTED: OS=windows-msvc

@@ -53,3 +53,4 @@ print(C.k)
 
 // CHECK: false
 print(C.self.responds(to: Selector("setK:")))
+// UNSUPPORTED: OS=windows-msvc

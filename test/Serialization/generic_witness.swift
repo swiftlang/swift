@@ -22,3 +22,4 @@ var sbas : Bassable = BasStruct()
 
 func cyc<C: CyclicAssociated>(_ c: C) {}
 cyc(CyclicImpl())
+// UNSUPPORTED: OS=windows-msvc

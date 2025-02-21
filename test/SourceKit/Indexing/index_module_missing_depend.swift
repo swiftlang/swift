@@ -10,3 +10,4 @@ import empty
 // FIXME: Report the reason we couldn't load a module.
 // CHECK-DISABLED: error response (Request Failed): missing module dependency
 // CHECK: error response (Request Failed): failed to load module
+// UNSUPPORTED: OS=windows-msvc

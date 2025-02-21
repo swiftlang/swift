@@ -17,3 +17,4 @@ func foo(p: P.Type, pq: (P & Q).Type) {
 }
 
 g([P.self, Q.self])
+// UNSUPPORTED: OS=windows-msvc

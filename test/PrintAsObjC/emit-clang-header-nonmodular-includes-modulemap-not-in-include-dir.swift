@@ -19,3 +19,4 @@ public class Bar : Baz {}
 // CHECK-NEXT: #else
 // CHECK: #import <header-regular.h>
 // CHECK: #endif
+// UNSUPPORTED: OS=windows-msvc

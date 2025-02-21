@@ -135,3 +135,4 @@ public extension PubProto {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

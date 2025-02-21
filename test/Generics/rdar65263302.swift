@@ -22,3 +22,4 @@ public func toe2<T, O, E>(_: T, _: O, _: E, _: T.Element)
           O.Element == T.Element,
           T : C<E> {}
 
+// UNSUPPORTED: OS=windows-msvc

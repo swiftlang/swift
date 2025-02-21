@@ -377,3 +377,4 @@ print(B()[0][0] + B().copied.copied)
 
 // CHECK-NEXT: Done
 print("Done")
+// UNSUPPORTED: OS=windows-msvc

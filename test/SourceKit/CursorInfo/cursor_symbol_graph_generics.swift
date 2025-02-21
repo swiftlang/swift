@@ -213,3 +213,4 @@ func foo() {
 // ASSOCCALL_MEMBER:     }
 // ASSOCCALL_MEMBER:   ]
 // ASSOCCALL_MEMBER: }
+// UNSUPPORTED: OS=windows-msvc

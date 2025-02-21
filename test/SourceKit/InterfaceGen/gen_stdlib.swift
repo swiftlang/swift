@@ -86,3 +86,4 @@ var x: Int
 // RUN: %FileCheck -check-prefix=CHECK-ERROR -input-file %t.Error.response %s
 
 // CHECK-ERROR: protocol Error
+// UNSUPPORTED: OS=windows-msvc

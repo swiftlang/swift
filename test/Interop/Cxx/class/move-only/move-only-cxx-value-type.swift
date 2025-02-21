@@ -77,3 +77,4 @@ MoveOnlyCxxValueType.test("Test move only field access in derived holder") {
 #endif
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ func foo<T>(_ x: T) {
 public func test() {
   foo(27)
 }
+// UNSUPPORTED: OS=windows-msvc

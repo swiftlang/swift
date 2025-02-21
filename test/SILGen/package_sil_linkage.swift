@@ -726,3 +726,4 @@ package func w(_ arg: PkgKlass) -> Int {
 // CLIENT-COMMON-LABEL: // w(_:)
 // CLIENT-COMMON-NEXT: // Isolation: unspecified
 // CLIENT-COMMON-NEXT: sil package [ossa] @$s6Client1wySi5Utils8PkgKlassCF : $@convention(thin) (@guaranteed PkgKlass) -> Int
+// UNSUPPORTED: OS=windows-msvc

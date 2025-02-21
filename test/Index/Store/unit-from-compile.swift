@@ -20,3 +20,4 @@
 // CHECK: DEPEND END (2)
 
 // OPT: is-debug: 1
+// UNSUPPORTED: OS=windows-msvc

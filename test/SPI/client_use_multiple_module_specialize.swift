@@ -170,3 +170,4 @@ public func testUseSpecializedSPI() {
   testSomeInternalStruct(1.0)
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

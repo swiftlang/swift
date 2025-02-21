@@ -11,3 +11,4 @@ func foo(x: Float?) -> Float {
    return 0
 }
 gradient(at: 0, of: foo)
+// UNSUPPORTED: OS=windows-msvc

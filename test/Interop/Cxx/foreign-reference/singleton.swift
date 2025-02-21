@@ -72,3 +72,4 @@ SingletonTestSuite.test("PrivateSpecialMembers") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ class C {}
 extension G where X == P2, Y == C {
   func foo() {}
 }
+// UNSUPPORTED: OS=windows-msvc

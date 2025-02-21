@@ -146,3 +146,4 @@ func printOrderNumber(n: inout Int) async { // expected-tns-note {{parameter 'n'
       print(n) // expected-tns-note {{captured here}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -29,3 +29,4 @@
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_CImplementation
 // REQUIRES: swift_feature_ObjCImplementationWithResilientStorage
+// UNSUPPORTED: OS=windows-msvc

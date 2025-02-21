@@ -22,3 +22,4 @@ func run(_ s: Clazz) async throws {
     try await run(Clazz())
   }
 }
+// UNSUPPORTED: OS=windows-msvc

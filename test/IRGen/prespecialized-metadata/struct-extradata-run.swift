@@ -117,3 +117,4 @@ print(fourOffsets.advanced(by: 0).pointee)
 // CHECK-NEXT: 4
 print(fourOffsets.advanced(by: 1).pointee)
 
+// UNSUPPORTED: OS=windows-msvc

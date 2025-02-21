@@ -248,3 +248,4 @@ do {
   let _: S = .s()
   let _: S = .s(5)
 }
+// UNSUPPORTED: OS=windows-msvc

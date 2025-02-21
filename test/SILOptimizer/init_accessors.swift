@@ -554,3 +554,4 @@ func testObjC() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

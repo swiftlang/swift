@@ -27,3 +27,4 @@ func test(si: S<Int>, sf: S<Float>) {
   // SF-NEXT: - Members: []
   // SF-NEXT: -----END CONFORMING METHOD LIST-----
 }
+// UNSUPPORTED: OS=windows-msvc

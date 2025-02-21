@@ -3,3 +3,4 @@
 // RUN: %diff -u %S/gen_header.swift.response %t.response
 
 doSomethingInHead(1)
+// UNSUPPORTED: OS=windows-msvc

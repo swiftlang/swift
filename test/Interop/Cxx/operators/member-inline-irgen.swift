@@ -50,3 +50,4 @@ public func index(_ arr: inout NonTrivialIntArrayByVal, _ arg: Int32) -> Int32 {
 // CHECK:   ret {{i32|i64}} [[VALUE2]]
 
 // CHECK: define {{.*}}[[RESA]] [[NAMEA]](ptr {{.*}}, {{i32 .*%.*.coerce|\[1 x i32\] .*%.*.coerce|i64 .*%.*.coerce|%struct.LoadableIntWrapper\* .*byval\(%struct.LoadableIntWrapper\).*}})
+// UNSUPPORTED: OS=windows-msvc

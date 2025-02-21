@@ -3,3 +3,4 @@
 // REQUIRES: objc_interop
 
 extension AXError: Error { }
+// UNSUPPORTED: OS=windows-msvc

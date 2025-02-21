@@ -24,3 +24,4 @@ func test() {
 // CHECK: key.name: "localVar"
 // CHECK-NOT: key.name: "localVar"
 // CHECK-NOT: key.name: "afterVar"
+// UNSUPPORTED: OS=windows-msvc

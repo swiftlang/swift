@@ -106,3 +106,4 @@ ObjCProtocolsTest.test("OptionalMethodReferencesWithImplementation") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

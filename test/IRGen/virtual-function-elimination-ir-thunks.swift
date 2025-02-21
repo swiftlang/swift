@@ -42,3 +42,4 @@ func func2(o: MyLibraryClass) {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

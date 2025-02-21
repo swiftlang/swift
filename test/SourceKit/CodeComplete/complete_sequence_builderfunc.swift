@@ -49,3 +49,4 @@ struct MyStruct {
 // CHECK: ]
 // CHECK: key.reusingastcontext: 1 
 
+// UNSUPPORTED: OS=windows-msvc

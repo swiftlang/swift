@@ -499,3 +499,4 @@ _ = (^^/0oG/)
 _ = (^^/"/)
 _ = (^^/'/)
 _ = (^^/<#placeholder#>/)
+// UNSUPPORTED: OS=windows-msvc

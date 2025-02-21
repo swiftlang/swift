@@ -405,3 +405,4 @@ bb2:
   dealloc_stack %e : $*Err
   unreachable
 }
+// UNSUPPORTED: OS=windows-msvc

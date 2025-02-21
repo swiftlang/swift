@@ -45,3 +45,4 @@ func doit() {
   assertIsPrespecialized(clazzArgument: Double.self, is: false) // Clazz<Double> is not prespecialized
 }
 doit()
+// UNSUPPORTED: OS=windows-msvc

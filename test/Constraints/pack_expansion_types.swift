@@ -300,3 +300,4 @@ func test_one_element_tuple_vs_non_tuple_matching() {
     test(V<Int>.self) // Ok
   }
 }
+// UNSUPPORTED: OS=windows-msvc

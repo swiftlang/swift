@@ -24,3 +24,4 @@ bb1:
   dealloc_stack %22 : $*Bool
   return %0 : $Bool
 }
+// UNSUPPORTED: OS=windows-msvc

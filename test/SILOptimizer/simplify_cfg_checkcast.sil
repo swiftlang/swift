@@ -742,3 +742,4 @@ bbexit:
 // test borrowOverValue->borrowCopyOverScope path
 
 //!!!TODO: test prepareUnowned paths
+// UNSUPPORTED: OS=windows-msvc

@@ -87,3 +87,4 @@ actor GenericActor<T> : SendableObjCProtocol {
 @objc protocol SendableObjCProtocol : Sendable {
   func evokeAsync() async
 }
+// UNSUPPORTED: OS=windows-msvc

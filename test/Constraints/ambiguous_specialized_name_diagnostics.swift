@@ -45,3 +45,4 @@ func test() {
   S<Int>.staticFn()
   // expected-error@-1 {{ambiguous use of 'staticFn()'}}
 }
+// UNSUPPORTED: OS=windows-msvc

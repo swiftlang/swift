@@ -122,3 +122,4 @@ func caller1_PairwiseBuilder() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

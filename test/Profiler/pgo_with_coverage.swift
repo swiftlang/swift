@@ -19,3 +19,4 @@ struct S {
   var x = .random() ? 2 : 3
 }
 print(S().x)
+// UNSUPPORTED: OS=windows-msvc

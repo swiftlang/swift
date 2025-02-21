@@ -12,3 +12,4 @@
 // RUN: %target-swift-frontend -typecheck -swift-version 5 %t/spi_main_module/SpiMainModule.swiftinterface -I %t/helper_module -I %S/Inputs
 
 // CHECK: public func funcTakingForeignStruct(_ param: ForeignB.ForeignStruct)
+// UNSUPPORTED: OS=windows-msvc

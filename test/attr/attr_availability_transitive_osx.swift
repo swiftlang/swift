@@ -580,3 +580,4 @@ func osx_unavailable_func(
   return (s1, s2, s3, s4, s5)
 }
 
+// UNSUPPORTED: OS=windows-msvc

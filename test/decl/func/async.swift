@@ -62,3 +62,4 @@ func testAsyncExistentialOpen(_ v: P1) async {
   try! _openExistential(v, do: syncThrowsUnderlyingType)
   try! await _openExistential(v, do: asyncThrowsUnderlyingType)
 }
+// UNSUPPORTED: OS=windows-msvc

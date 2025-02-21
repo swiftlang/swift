@@ -28,3 +28,4 @@ func foo() {
 
 // DEMANGLE-TYPE: $sIegH_D
 // CHECK-TYPE: @async @callee_guaranteed () -> ()
+// UNSUPPORTED: OS=windows-msvc

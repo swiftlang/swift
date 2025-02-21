@@ -39,3 +39,4 @@ suite.test("Bridged NSArray without direct memory sharing") {
 
   x = nil
 }
+// UNSUPPORTED: OS=windows-msvc

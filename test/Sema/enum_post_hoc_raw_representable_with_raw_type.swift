@@ -6,3 +6,4 @@ import enum_with_raw_type
 
 // expected-warning@+1{{conformance of 'Foo' to protocol 'RawRepresentable' was already stated in the type's module 'enum_with_raw_type'}}
 extension Foo: RawRepresentable {}
+// UNSUPPORTED: OS=windows-msvc

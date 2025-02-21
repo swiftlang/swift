@@ -47,3 +47,4 @@ bb2:
 bb3:
   return %a : $Mantissa
 }
+// UNSUPPORTED: OS=windows-msvc

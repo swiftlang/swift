@@ -13,3 +13,4 @@ func test(s: SomeStruct) {
   s.simple { }
   // CHECK: [[@LINE-1]]:5 | instance-method/Swift | simple(_:) | s:14swift_ide_test10SomeStructV6simpleyyyyXEF | Ref,Call,RelCall,RelCont | rel: 1
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -8,4 +8,4 @@ import Foundation
 @_noObjCBridging
 func useOfExistentialNoObjc() -> NSArray.Type {
   NSArray.self // expected-error{{calls of Objective-C methods can have unpredictable performance}}
-}
+}// UNSUPPORTED: OS=windows-msvc

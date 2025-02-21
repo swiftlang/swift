@@ -74,3 +74,4 @@ func testWithUnsafeBytes<T>(_ t: T) {
 }
 
 testWithUnsafeBytes([])
+// UNSUPPORTED: OS=windows-msvc

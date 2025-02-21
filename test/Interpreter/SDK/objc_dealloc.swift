@@ -26,3 +26,4 @@ autoreleasepool {
 }
 // CHECK: deallocating root
 // CHECK-NEXT: deallocating associated
+// UNSUPPORTED: OS=windows-msvc

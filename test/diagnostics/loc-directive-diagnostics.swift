@@ -5,3 +5,4 @@ func 1() {}
 #sourceLocation()
 
 // CHECK: anything.swift:1:6: error: function name
+// UNSUPPORTED: OS=windows-msvc

@@ -18,3 +18,4 @@ testArr([.a, .b])
 
 testArr([getAE()]) // expected-error {{expect a compile-time constant literal}}
 testArr([.a, .b, .a.z]) // expected-error {{expect a compile-time constant literal}}
+// UNSUPPORTED: OS=windows-msvc

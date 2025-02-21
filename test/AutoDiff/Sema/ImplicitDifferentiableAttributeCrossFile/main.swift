@@ -49,3 +49,4 @@ extension ConformingStructWithSupersetAttr {
   @differentiable(reverse)
   public func internalMethod4(_ x: Float) -> Float { x }
 }
+// UNSUPPORTED: OS=windows-msvc

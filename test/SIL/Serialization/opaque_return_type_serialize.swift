@@ -16,3 +16,4 @@ public func horse<T>(_: T) {}
 }
 
 public func opaque() -> some Any { return 3 }
+// UNSUPPORTED: OS=windows-msvc

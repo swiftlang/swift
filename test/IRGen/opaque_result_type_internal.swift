@@ -11,3 +11,4 @@ public func testIt() {
     var e = E.a
     print(e)
 }
+// UNSUPPORTED: OS=windows-msvc

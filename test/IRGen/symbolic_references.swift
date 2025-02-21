@@ -17,3 +17,4 @@ fileprivate struct Foo {
     typealias A = Innermost
   }
 }
+// UNSUPPORTED: OS=windows-msvc

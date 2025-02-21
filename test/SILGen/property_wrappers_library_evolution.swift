@@ -17,3 +17,4 @@ public struct StructUsesPublishedAsPrivate {
   // CHECK: sil non_abi [serialized] [ossa] @$s35property_wrappers_library_evolution28StructUsesPublishedAsPrivateV6stringSSvpfP : $@convention(thin) (@owned String) -> @out MyPublished<String>
   @MyPublished var string: String = "Hello"
 }
+// UNSUPPORTED: OS=windows-msvc

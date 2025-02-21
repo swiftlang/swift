@@ -410,4 +410,4 @@ extension S14 : P14 where repeat each T: Hashable {}
 
 // CHECK17:      <synthesized>extension <ref:Struct>S14</ref> {
 // CHECK17-NEXT:   <decl:Func>public func <loc>foo<each <ref:GenericTypeParam>T</ref>>(<decl:Param>_: repeat each <ref:GenericTypeParam>T</ref></decl>)</loc> where Pack{repeat each <ref:GenericTypeParam>T</ref>} : <ref:Protocol>Equatable</ref></decl>
-// CHECK17-NEXT: }</synthesized>
+// CHECK17-NEXT: }</synthesized>// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ func test() {
 //AFTER_TRAILINGCLOSURE-NEXT:    - Name: returnConcreteP()
 //AFTER_TRAILINGCLOSURE-NEXT:      TypeName: ConcreteP
 //AFTER_TRAILINGCLOSURE-NEXT: -----END CONFORMING METHOD LIST-----
+// UNSUPPORTED: OS=windows-msvc

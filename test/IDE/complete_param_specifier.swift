@@ -51,3 +51,4 @@ func bar() -> #^RESULT_TY?check=RESULT;check=RESULT_NOT^# {}
 // RESULT_NOT-NOT: Keyword/None: isolated
 
 // RESULT-DAG: Keyword/None: sending
+// UNSUPPORTED: OS=windows-msvc

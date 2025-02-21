@@ -67,3 +67,4 @@ public struct Foo {}
 extension A {
   public func bar() {}
 }
+// UNSUPPORTED: OS=windows-msvc

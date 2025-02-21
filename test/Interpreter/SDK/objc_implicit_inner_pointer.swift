@@ -24,3 +24,4 @@ do {
   } // CHECK: -[Foo dealloc]
 }
 
+// UNSUPPORTED: OS=windows-msvc

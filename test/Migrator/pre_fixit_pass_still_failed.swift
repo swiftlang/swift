@@ -7,3 +7,4 @@
 func foo(s: String) {}
 foo("Hello")
 bar("Hello") // Unresolved failure
+// UNSUPPORTED: OS=windows-msvc

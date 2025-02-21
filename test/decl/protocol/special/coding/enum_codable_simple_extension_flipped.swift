@@ -36,3 +36,4 @@ let _ = SimpleEnum.encode(to:)
 let _ = SimpleEnum.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
 let _ = SimpleEnum.ACodingKeys.self // expected-error {{'ACodingKeys' is inaccessible due to 'private' protection level}}
 let _ = SimpleEnum.BCodingKeys.self // expected-error {{'BCodingKeys' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

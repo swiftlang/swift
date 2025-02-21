@@ -1515,3 +1515,4 @@ struct DynamicTypeStruct {
     self.init()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

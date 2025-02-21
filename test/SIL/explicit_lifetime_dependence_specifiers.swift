@@ -158,3 +158,4 @@ func getConsumingView(_ x: consuming Container) -> BufferView {
 func getBorrowingView(_ x: borrowing Container) -> BufferView {
   return BufferView(independent: x.ptr)
 }
+// UNSUPPORTED: OS=windows-msvc

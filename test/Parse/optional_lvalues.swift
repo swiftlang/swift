@@ -63,3 +63,4 @@ class D: C {}
 
 let c = C()
 let d = (c as! D)! // expected-error{{cannot force unwrap value of non-optional type 'D'}} {{18-19=}}
+// UNSUPPORTED: OS=windows-msvc

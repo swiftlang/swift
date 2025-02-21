@@ -18,3 +18,4 @@ final class FakeExecutor1: SerialExecutor {
 final class FakeExecutor2: SerialExecutor {
   func enqueue(_ job: __owned Job) {}
 }
+// UNSUPPORTED: OS=windows-msvc

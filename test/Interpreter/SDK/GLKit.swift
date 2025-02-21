@@ -122,3 +122,4 @@ let xx = GLKVector2Make(1, 0)
 let yy = GLKVector2Make(0, 1)
 print(GLKVector2DotProduct(xx, yy)) // CHECK-NEXT: 0.0
 
+// UNSUPPORTED: OS=windows-msvc

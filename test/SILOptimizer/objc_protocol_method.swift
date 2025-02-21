@@ -22,3 +22,4 @@ func callsG(_ c: C) {
 }
 
 callsG(C())
+// UNSUPPORTED: OS=windows-msvc

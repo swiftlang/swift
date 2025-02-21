@@ -35,3 +35,4 @@ struct Y: Codable {
   // expected-note@-2{{cannot automatically synthesize 'Decodable' because 'Wrapper<Int>' does not conform to 'Decodable'}}
   
 }
+// UNSUPPORTED: OS=windows-msvc

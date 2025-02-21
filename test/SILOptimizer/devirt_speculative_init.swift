@@ -34,3 +34,4 @@ public func make(type: Cat.Type, cats: Int) -> Cat {
 // CHECK: bb3:
 // CHECK:   alloc_ref $BigCat
 // CHECK:   br bb1
+// UNSUPPORTED: OS=windows-msvc

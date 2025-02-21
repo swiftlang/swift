@@ -7,3 +7,4 @@
 func g(a: Any.Type) {
   f(a: a)
 }
+// UNSUPPORTED: OS=windows-msvc

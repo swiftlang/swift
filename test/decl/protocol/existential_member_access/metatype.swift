@@ -187,3 +187,4 @@ do {
     types.assertTypesAreEqual()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

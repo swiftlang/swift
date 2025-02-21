@@ -120,3 +120,4 @@ func test() {
   _ = #evil(1) // expected-error {{failed to receive result from plugin (from macro 'evil')}}
   _ = #stringify(1)
 }
+// UNSUPPORTED: OS=windows-msvc

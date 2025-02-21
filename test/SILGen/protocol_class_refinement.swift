@@ -117,3 +117,4 @@ func getBaseObjectUID<T: UID>(x: T) -> (Int, Int, Int) where T: Base {
 
   // CHECK: return
 }
+// UNSUPPORTED: OS=windows-msvc

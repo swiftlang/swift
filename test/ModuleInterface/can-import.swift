@@ -18,3 +18,4 @@ externalFunc()
 #if canImport(LibraryWithoutThisArchitecture)
 #error("should not return true (or diagnose a loader failure) for library that does not exist")
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -69,3 +69,4 @@ Added: _$s17_StringProcessing7DSLTreeV4_ASTO20QuantificationAmountV9zeroOrOneAGv
 Added: _$s17_StringProcessing7DSLTreeV4_ASTO9GroupKindV17negativeLookaheadAGvpZMV
 Added: _$s17_StringProcessing7DSLTreeV4_ASTO9GroupKindV18atomicNonCapturingAGvpZMV
 Added: _$s17_StringProcessing7DSLTreeV4_ASTO9GroupKindV9lookaheadAGvpZMV
+// UNSUPPORTED: OS=windows-msvc

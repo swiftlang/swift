@@ -28,3 +28,4 @@ public func test<T>(_ t: __owned T) {
 }
 
 test(Klass())
+// UNSUPPORTED: OS=windows-msvc

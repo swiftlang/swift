@@ -28,3 +28,4 @@ public class Test: NSObject {
   @objc public func isEnabled() -> Bool { true }
   // CHECK-NEXT: init
 } // CHECK-NEXT: @end
+// UNSUPPORTED: OS=windows-msvc

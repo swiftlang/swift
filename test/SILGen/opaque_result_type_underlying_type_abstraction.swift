@@ -27,3 +27,4 @@ func withTupleOfMetatypeAndFunction() -> some Any {
   let f: () -> () = {}
   return (S.self, f)
 }
+// UNSUPPORTED: OS=windows-msvc

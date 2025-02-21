@@ -56,3 +56,4 @@ func testUnavailableCases(_ value: UnavailableCases) {
   case .B: break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

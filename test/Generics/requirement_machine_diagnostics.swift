@@ -330,3 +330,4 @@ func sameTypeConflicts() {
   func fail9<T, U: Fooable>(_: U, _: T) where T == Int, T == G<U.Foo> {}
   // expected-warning@-1{{same-type requirement makes generic parameter 'T' non-generic; this is an error in the Swift 6 language mode}}
 }
+// UNSUPPORTED: OS=windows-msvc

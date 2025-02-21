@@ -43,3 +43,4 @@ distributed actor WorkerPool<Worker: DistributedWorker> {
     fatalError()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

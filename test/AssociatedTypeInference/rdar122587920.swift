@@ -27,3 +27,4 @@ extension S: Collection {
 }
 
 let x: S<Int>.Type = S<Int>.Iterator.self
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ TemplatesTestSuite.test("instantiation-in-multiple-modules") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

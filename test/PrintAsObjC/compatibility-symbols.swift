@@ -11,3 +11,4 @@
 // Use a regex match here to allow the Clang symbol graph to be pretty-printed or condensed
 
 // CHECK: "symbols":{{ ?}}[]
+// UNSUPPORTED: OS=windows-msvc

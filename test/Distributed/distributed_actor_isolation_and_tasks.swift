@@ -72,3 +72,4 @@ func test_outside(system: FakeActorSystem) async throws {
 func test_outside_isolated(phil: isolated Philosopher) async throws {
   phil.log.info("works on isolated")
 }
+// UNSUPPORTED: OS=windows-msvc

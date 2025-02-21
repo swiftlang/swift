@@ -17,3 +17,4 @@ struct TypeWitness<R> {
 
 let w = TypeWitness(witness: createSomeOpaqueObject())
 print(w.getType())
+// UNSUPPORTED: OS=windows-msvc

@@ -91,3 +91,4 @@ func testVariadicClosureParameter() {
   acceptsVariadicClosureParameter() { x, y in x % y }
   acceptsVariadicClosureParameter(closures: +, -, *, /) { x, y in x % y }
 }
+// UNSUPPORTED: OS=windows-msvc

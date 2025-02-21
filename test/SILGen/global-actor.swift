@@ -24,3 +24,4 @@ func someFunc() async {
   await doMeow()
   await doHiss()
 }
+// UNSUPPORTED: OS=windows-msvc

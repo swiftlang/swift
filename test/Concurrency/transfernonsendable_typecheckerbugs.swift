@@ -82,3 +82,4 @@ public enum MarketplaceKitError : Sendable {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

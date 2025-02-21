@@ -62,3 +62,4 @@ public struct Freestanding<T: ~Copyable> where T: ~Escapable {}
 extension Outer {}
 extension Outer.InnerVariation1 where A: ~Copyable {}
 extension Outer.InnerVariation2 where D: ~Escapable, A: ~Copyable {}
+// UNSUPPORTED: OS=windows-msvc

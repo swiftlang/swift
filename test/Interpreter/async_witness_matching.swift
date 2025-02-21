@@ -24,3 +24,4 @@ let p: P = S()
 let ans = await p.foo()
 print(ans)
 // CHECK: async
+// UNSUPPORTED: OS=windows-msvc

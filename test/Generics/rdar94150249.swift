@@ -27,3 +27,4 @@ extension P1 where Value: P2 {
 }
 
 func takeP3<T : P3>(_: T.Type) {}
+// UNSUPPORTED: OS=windows-msvc

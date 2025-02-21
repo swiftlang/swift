@@ -26,3 +26,4 @@ func foo<T : Generic<U>, U>(_: T, _: U) {
 // CHECK-NEXT:   τ_0_1 => { conforms_to: [Copyable Escapable] }
 // CHECK-NEXT:   τ_0_0 => { layout: AnyObject superclass: [superclass: Generic<τ_0_1>] }
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

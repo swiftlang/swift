@@ -25,3 +25,4 @@ struct User {
 // RUN: diff -u %S/Outputs/property-wrapper-split/someValue.swift.expected %t.ranges/property-wrapper-split-someValue.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="split" -is-function-like -old-name "init(initialValue:fieldName:special:)" >> %t.ranges/property-wrapper-split-split.swift
 // RUN: diff -u %S/Outputs/property-wrapper-split/split.swift.expected %t.ranges/property-wrapper-split-split.swift
+// UNSUPPORTED: OS=windows-msvc

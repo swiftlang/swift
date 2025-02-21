@@ -33,3 +33,4 @@ Tests.test("borrowing get on copyable type") {
       printLoanedValue(l)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

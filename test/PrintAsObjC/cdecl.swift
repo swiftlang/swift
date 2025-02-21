@@ -57,3 +57,4 @@ func returnNever() -> Never { fatalError() }
 // CHECK-LABEL: SWIFT_EXTERN void takes_iuo(C * _Null_unspecified c) SWIFT_NOEXCEPT;
 @_cdecl("takes_iuo")
 func takesIUO(c: C!) {}
+// UNSUPPORTED: OS=windows-msvc

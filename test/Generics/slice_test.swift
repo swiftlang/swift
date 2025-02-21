@@ -125,3 +125,4 @@ protocol Eq {
   static func ==(lhs: Self, rhs: Self) -> Bool
   static func !=(lhs: Self, rhs: Self) -> Bool
 }
+// UNSUPPORTED: OS=windows-msvc

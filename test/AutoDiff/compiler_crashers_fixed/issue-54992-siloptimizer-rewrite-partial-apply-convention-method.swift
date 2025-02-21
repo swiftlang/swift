@@ -25,3 +25,4 @@ let _: @differentiable(reverse) (Struct) -> Struct = { $0.method() }
 //      // function_ref specialized Protocol.method()
 //   %5 = function_ref @$s7crasher8ProtocolPAAE6methodxyFAA6StructV_TG5 : $@convention(method) (@in_guaranteed Struct) -> @out Struct // user: %6
 // ->   %6 = thin_to_thick_function %5 : $@convention(method) (@in_guaranteed Struct) -> @out Struct to $@callee_guaranteed (@in_guaranteed Struct) -> @out Struct // user: %11
+// UNSUPPORTED: OS=windows-msvc

@@ -74,4 +74,4 @@ func foo<T>(_: T) {
 foo() { (x: Int) -> Int in return x }
 // CHECK: found type: (Int) -> Int
 
-stopRemoteAST()
+stopRemoteAST()// UNSUPPORTED: OS=windows-msvc

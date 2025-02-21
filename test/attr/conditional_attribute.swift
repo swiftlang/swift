@@ -92,3 +92,4 @@ func f2() {
 #endif
   struct S3 { }
 }
+// UNSUPPORTED: OS=windows-msvc

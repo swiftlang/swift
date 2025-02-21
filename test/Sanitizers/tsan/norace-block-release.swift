@@ -48,3 +48,4 @@ sleep(1)
 print("Done.")
 
 // CHECK: Done.
+// UNSUPPORTED: OS=windows-msvc

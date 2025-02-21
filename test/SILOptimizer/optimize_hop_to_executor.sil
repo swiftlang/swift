@@ -302,3 +302,4 @@ bb0(%0 : @guaranteed $MyActor):
   %r = tuple ()
   return %r : $()
 }
+// UNSUPPORTED: OS=windows-msvc

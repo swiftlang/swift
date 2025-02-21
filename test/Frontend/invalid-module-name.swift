@@ -14,3 +14,4 @@
 // RUN: %target-swift-frontend -emit-silgen %S/Inputs/invalid-module-name.swift > /dev/null
 // RUN: %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo > /dev/null
 // RUN: %target-swift-frontend -typecheck -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo
+// UNSUPPORTED: OS=windows-msvc

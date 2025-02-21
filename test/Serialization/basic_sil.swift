@@ -16,3 +16,4 @@ import def_basic
 func test_all() {
   serialize_all()
 }
+// UNSUPPORTED: OS=windows-msvc

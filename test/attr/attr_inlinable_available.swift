@@ -1857,3 +1857,4 @@ extension AtDeploymentTarget {
     public override func afterDeploymentTargetMethod() {}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

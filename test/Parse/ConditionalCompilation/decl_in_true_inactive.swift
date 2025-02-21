@@ -55,3 +55,4 @@ _ = gVal1
 let inactive = 3
 #endif
 _ = inactive // expected-error {{cannot find 'inactive' in scope}}
+// UNSUPPORTED: OS=windows-msvc

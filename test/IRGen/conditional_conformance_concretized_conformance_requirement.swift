@@ -19,3 +19,4 @@ public protocol P2 {
 extension G: P2 where T.A == Int {
   public func f() {}
 }
+// UNSUPPORTED: OS=windows-msvc

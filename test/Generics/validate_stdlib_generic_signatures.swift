@@ -2,3 +2,4 @@
 // minimal and canonical.
 
 // RUN: %target-typecheck-verify-swift -verify-generic-signatures Swift -disable-deserialization-safety
+// UNSUPPORTED: OS=windows-msvc

@@ -154,3 +154,4 @@ func funcContext() {
     ImportedPublic.packageFunc() // expected-error {{module 'ImportedPublic' has no member named 'packageFunc'}}
     ImportedPublic.publicFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

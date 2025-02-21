@@ -27,3 +27,4 @@ class D {
 // CHECK-COFF: @objc_categories = {{.*}}, section ".objc_catlist$B"
 // CHECK-COFF: @objc_non_lazy_classes = {{.*}}, section ".objc_nlclslist$B"
 
+// UNSUPPORTED: OS=windows-msvc

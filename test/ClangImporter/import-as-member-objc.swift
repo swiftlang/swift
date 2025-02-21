@@ -10,3 +10,4 @@ func doIt(s: SomeClass) {
 func doItDynamic(s: AnyObject) {
   s.doIt() // expected-error {{value of type 'AnyObject' has no member 'doIt'}}
 }
+// UNSUPPORTED: OS=windows-msvc

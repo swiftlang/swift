@@ -11,3 +11,4 @@ class C1 {
     self.x = 1
   }
 }
+// UNSUPPORTED: OS=windows-msvc

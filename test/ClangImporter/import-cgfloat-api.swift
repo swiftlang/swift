@@ -20,3 +20,4 @@ func test() -> UnsafeMutablePointer<CGFloat>? {
 // Allow redundant conformances on CoreFoundation
 // types where the conformance is in CoreGraphics.
 extension CGFloat: CustomStringConvertible {}
+// UNSUPPORTED: OS=windows-msvc

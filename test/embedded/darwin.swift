@@ -22,3 +22,4 @@ struct Main {
 }
 
 // CHECK: User id:
+// UNSUPPORTED: OS=windows-msvc

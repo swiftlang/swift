@@ -51,3 +51,4 @@ extension Holder.Transform where Value == Int {
         return transform(Holder(value: -holder.value))
     }
 }
+// UNSUPPORTED: OS=windows-msvc

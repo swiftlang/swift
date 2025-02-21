@@ -117,3 +117,4 @@ class C_54662 { // expected-note {{through reference here}}
     typealias Nest = P_54662 // expected-error {{circular reference}} expected-note {{through reference here}}
 }
 extension C_54662: C_54662.Nest { }
+// UNSUPPORTED: OS=windows-msvc

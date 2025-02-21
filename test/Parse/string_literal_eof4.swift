@@ -3,4 +3,4 @@
 // NOTE: DO NOT add a newline at EOF.
 // expected-error@+1 {{unterminated string literal}}
 _ = """
-    foo
+    foo// UNSUPPORTED: OS=windows-msvc

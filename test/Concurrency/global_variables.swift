@@ -101,3 +101,4 @@ func testImportedGlobals() { // expected-note{{add '@MainActor' to make global f
   let _ = Globals.nonisolatedUnsafeIntegerMutable
   let _ = Globals.actorInteger // expected-error{{main actor-isolated static property 'actorInteger' can not be referenced from a nonisolated context}}
 }
+// UNSUPPORTED: OS=windows-msvc

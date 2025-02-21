@@ -30,3 +30,4 @@ func testReconstructingEscapingClosureWithSendingParam() async throws -> Sendabl
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -2620,3 +2620,4 @@ bb(%class : $SwiftClass):
   %result = partial_apply [callee_guaranteed] %method_with_out_param(%class) : $@convention(method) @yield_once (SwiftClass) -> @out Int
   return %result : $@callee_guaranteed @yield_once () -> @out Int
 }
+// UNSUPPORTED: OS=windows-msvc

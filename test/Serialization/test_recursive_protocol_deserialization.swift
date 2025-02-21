@@ -39,3 +39,4 @@ class B : P3 {
   // expected-error@-2 {{'P3' requires that 'B' inherit from 'C'}}
   // expected-note@-3 {{requirement specified as 'Self' : 'C' [with Self = B]}}
 }
+// UNSUPPORTED: OS=windows-msvc

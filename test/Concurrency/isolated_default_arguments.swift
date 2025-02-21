@@ -336,3 +336,4 @@ class PreconcurrencyInit {
 
 // expected-warning@+1 {{main actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
 func downgrade(_: PreconcurrencyInit = .init()) {}
+// UNSUPPORTED: OS=windows-msvc

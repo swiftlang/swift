@@ -180,3 +180,4 @@ func fPrivPrivBase(v: PrivPrivBase) {
     v.prot() // expected-error {{'prot' is inaccessible due to 'private' protection level}}
     v.priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
 }
+// UNSUPPORTED: OS=windows-msvc

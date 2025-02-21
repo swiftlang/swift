@@ -175,3 +175,4 @@ struct Crash {
 
 // OPTNODEBUG: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{([0-9a-f]+|<no build ID>)}}{{ +}}CrashOptNoDebug{{ +}}{{.*}}/CrashOptNoDebug
 
+// UNSUPPORTED: OS=windows-msvc

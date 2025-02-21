@@ -62,3 +62,4 @@ let _ : MyEnum? = .none // expected-warning {{assuming you mean 'Optional<MyEnum
 // RUN:   -typecheck -serialize-diagnostics -serialize-diagnostics-path %t/test.diag -Rcache-compile-job 2>&1 | %FileCheck %s -check-prefix CACHE-HIT
 // CACHE-MISS: remark: cache miss
 // CACHE-HIT: remark: replay output file '<cached-diagnostics>'
+// UNSUPPORTED: OS=windows-msvc

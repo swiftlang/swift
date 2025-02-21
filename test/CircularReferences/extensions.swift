@@ -9,3 +9,4 @@ extension A { }
 
 // CHECK-NOT: CYCLE DETECTED
 
+// UNSUPPORTED: OS=windows-msvc

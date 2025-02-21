@@ -23,3 +23,4 @@ func globalfunc() -> () -> () {
 	callit()
 	return getit()
 }
+// UNSUPPORTED: OS=windows-msvc

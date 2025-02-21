@@ -50,3 +50,4 @@ func takesCPtr() { let swiftPtr = intPtr!; takesValue(swiftPtr) }
 
 // TODO: function pointers are not yet supported but they should be
 // func takesCFnPtr() { takesValue(functionPtr) }
+// UNSUPPORTED: OS=windows-msvc

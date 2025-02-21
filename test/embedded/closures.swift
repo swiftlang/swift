@@ -10,3 +10,4 @@ public func foo<Result>(_ body: () -> Result) -> Result {
 public func main() {
     foo() { }
 }
+// UNSUPPORTED: OS=windows-msvc

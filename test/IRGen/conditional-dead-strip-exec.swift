@@ -104,3 +104,4 @@ p.bark()
 // (8)
 // NM-NOT: $s4main9UsedClassCAA11UnusedProtoAAMc
 // NM-NOT: $s4main9UsedClassCAA11UnusedProtoAAWP
+// UNSUPPORTED: OS=windows-msvc

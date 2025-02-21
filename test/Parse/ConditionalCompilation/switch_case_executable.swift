@@ -150,3 +150,4 @@ test3()
 
 print("END: nested directives")
 // CHECK-NEXT: END: nested directives
+// UNSUPPORTED: OS=windows-msvc

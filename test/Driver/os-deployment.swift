@@ -20,3 +20,4 @@
 
 // CHECK-IOS-11: iOS 11 does not support 32-bit programs
 // CHECK-IOS-12: iOS 12 does not support 32-bit programs
+// UNSUPPORTED: OS=windows-msvc

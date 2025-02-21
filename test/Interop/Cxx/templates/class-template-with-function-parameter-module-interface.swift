@@ -14,3 +14,4 @@
 // CHECK: typealias FuncIntIntToInt = function_wrapper<((CInt, CInt) -> CInt)>
 // CHECK: typealias FuncIntIntToVoid = function_wrapper<((CInt, CInt) -> Void)>
 // CHECK: typealias FuncIntIntBoolToVoid = function_wrapper<((CInt, CInt, CBool) -> Void)>
+// UNSUPPORTED: OS=windows-msvc

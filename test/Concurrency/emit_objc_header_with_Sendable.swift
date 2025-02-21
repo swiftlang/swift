@@ -27,3 +27,4 @@ import Foundation
   // CHECK: - (void)data4:(id _Nullable)_;
   func data4(_: (any Sendable)?)
 }
+// UNSUPPORTED: OS=windows-msvc

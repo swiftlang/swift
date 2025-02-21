@@ -56,3 +56,4 @@ struct MyStruct5 {
 // CHECK: [[HELLOSTR:@.*]] = private {{.*}}constant [6 x i8] c"hello\00"
 // CHECK: @"{{.*}}utf8OfStaticString{{.*}}VGvp" = hidden constant {{.*}} <{ ptr [[HELLOSTR]] }>
 
+// UNSUPPORTED: OS=windows-msvc

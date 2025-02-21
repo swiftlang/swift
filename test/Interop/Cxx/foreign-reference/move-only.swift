@@ -50,3 +50,4 @@ MoveOnlyTestSuite.test("BadCopyCtor") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

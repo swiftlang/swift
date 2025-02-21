@@ -13,3 +13,4 @@ sil_global @referencing_object : $Int = {
   // expected-error @-1 {{cannot find type 'Int_' in scope}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -94,3 +94,4 @@ public func userOfPrivate(_ argUserOfPrivate: PrivateNameStruct) {}
 public func userOfPublic(_ argUserOfPublic: PublicNameStruct) {}
 // CLIENT-PUBLIC: argUserOfPublic: PublicLib.PublicNameStruct
 // CLIENT-PRIVATE: argUserOfPublic: PublicLib.PublicNameStruct
+// UNSUPPORTED: OS=windows-msvc

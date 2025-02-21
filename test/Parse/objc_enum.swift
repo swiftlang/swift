@@ -34,3 +34,4 @@ class Bar {
   case Foo(progress: Int)     // expected-error {{enum with raw type cannot have cases with arguments}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

@@ -100,3 +100,4 @@ ${Scalar}x${n}Mask_TestSuite.test("replacing") {
 %end
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

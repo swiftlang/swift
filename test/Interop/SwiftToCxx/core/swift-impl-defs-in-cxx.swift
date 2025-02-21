@@ -228,3 +228,4 @@
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
 // CHECK-NEXT: #endif
+// UNSUPPORTED: OS=windows-msvc

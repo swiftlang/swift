@@ -35,3 +35,4 @@ func testPrivateConformance(_ instance: PrivateConformance) {
   instance.internalFPExtensionMember()
   // expected-error@-1 {{'internalFPExtensionMember' is inaccessible due to 'fileprivate' protection level}}
 }
+// UNSUPPORTED: OS=windows-msvc

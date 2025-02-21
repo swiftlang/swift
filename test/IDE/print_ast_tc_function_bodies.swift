@@ -262,3 +262,4 @@ class InClassSubscript4 {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

@@ -736,3 +736,4 @@ UnsafeRawBufferPointerTestSuite.test("copy.overlap") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

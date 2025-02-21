@@ -29,3 +29,4 @@ _ = glVertexPointer // expected-error{{cannot find 'glVertexPointer' in scope}}
 // <unknown>:0: error: unexpected warning produced: 'cacheAlphaComputed' is deprecated
 // <unknown>:0: error: unexpected warning produced: 'keepCacheWindow' is deprecated
 // <unknown>:0: error: unexpected error produced: 'memoryless' is unavailable
+// UNSUPPORTED: OS=windows-msvc

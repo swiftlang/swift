@@ -70,3 +70,4 @@ actor ActorOnNaiveQueueExecutor {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

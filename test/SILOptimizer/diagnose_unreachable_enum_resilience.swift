@@ -150,3 +150,4 @@ public func testExhaustiveInlinable(_ e: Exhaustive) {
   // Ok, @unknown suppresses "default will never be executed"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

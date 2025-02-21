@@ -28,3 +28,4 @@ bb0(%owned_value : @owned $T):
   return %instance : $UnownedBox<T>
 }
 
+// UNSUPPORTED: OS=windows-msvc

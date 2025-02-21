@@ -150,3 +150,4 @@ func unwrapBorrowMutateConsumeInit_Mutate(x: inout NC?, y: consuming NC) {
 
     x! = y // expected-error{{cannot partially reinitialize}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ _ = X().foo
 // CHECK-NEXT: [12:9-12:17] pc after
 // CHECK-NEXT: [16:1-16:12] pc after
 
+// UNSUPPORTED: OS=windows-msvc

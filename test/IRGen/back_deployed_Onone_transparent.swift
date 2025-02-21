@@ -18,3 +18,4 @@ public func test() {
 
 // CHECK: define{{.*}} hidden swiftcc i1 @"$ss31_stdlib_isOSVersionAtLeast_AEICyBi1_Bw_BwBwtF"
 // CHECK:   call i32 @__isPlatformVersionAtLeast
+// UNSUPPORTED: OS=windows-msvc

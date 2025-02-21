@@ -105,3 +105,4 @@ struct FailToMatch3 : ProtocolWithMixedReqs {
 struct FailToMatch4 : ProtocolWithMixedReqs {
   func nonSendingParamAndSendingResult(_ x: sending NonSendableKlass) -> sending NonSendableKlass { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

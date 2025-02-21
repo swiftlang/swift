@@ -73,3 +73,4 @@ int main() {
   VERIFY_PASSTHROUGH_VALUE(passThroughUnsafeGenericOptionalPointer, nullptr);
   VERIFY_PASSTHROUGH_VALUE(passThroughUnsafeGenericPointer, &x);
 }
+// UNSUPPORTED: OS=windows-msvc

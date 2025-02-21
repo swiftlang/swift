@@ -29,3 +29,4 @@ extension ImplClass: MyProto {
 // CHECK:   "label": "notStoredProperty",
 // CHECK:   "type": "Swift.Bool",
 // CHECK:   "value": "true"
+// UNSUPPORTED: OS=windows-msvc

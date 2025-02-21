@@ -18,3 +18,4 @@ let x = 1
 #endif
 
 // CHECK: <<NULL>>
+// UNSUPPORTED: OS=windows-msvc

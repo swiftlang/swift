@@ -19,3 +19,4 @@ public func f<T>(_ t: T) async -> T {
   let dyna = t
   return dyna
 }
+// UNSUPPORTED: OS=windows-msvc

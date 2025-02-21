@@ -26,3 +26,4 @@ final class C2: Q {
 class C3: Q {
   func foo<T: P>(_: T, _: C3) where T.T: C3 {}
 }
+// UNSUPPORTED: OS=windows-msvc

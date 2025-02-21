@@ -622,3 +622,4 @@ func testAnimationSignpost(cond: Bool, x: Int, y: Float) {
   // CHECK: string_literal oslog "animation begins here %ld isAnimation=YES"
   // CHECK: string_literal oslog "animation begins here %ld %f isAnimation=YES"
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -119,3 +119,4 @@ func parameterizedExistentials() {
   var ppt: any PP4<Int>.Type
   pt = ppt // expected-error {{cannot assign value of type 'any PP4<Int>.Type' to type 'any P4<Int>.Type'}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -94,3 +94,4 @@ import SomeExternalModule
 // CHECK-MAKE-DEPS-SAME: BridgingOther.h
 // CHECK-MAKE-DEPS-SAME: module.modulemap
 
+// UNSUPPORTED: OS=windows-msvc

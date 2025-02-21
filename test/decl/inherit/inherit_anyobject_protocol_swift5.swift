@@ -8,3 +8,4 @@ protocol P3: class, P2 {}
 // expected-warning@-1 {{using 'class' keyword to define a class-constrained protocol is deprecated; use 'AnyObject' instead}} {{14-19=AnyObject}}
 protocol P4: P2, class {} // expected-error {{'class' must come first in the requirement list}}
 // expected-warning@-1 {{using 'class' keyword to define a class-constrained protocol is deprecated; use 'AnyObject' instead}} {{18-23=AnyObject}}
+// UNSUPPORTED: OS=windows-msvc

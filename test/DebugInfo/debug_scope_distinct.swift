@@ -74,3 +74,4 @@ struct V: Differentiable {
   var s: S<Float>
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

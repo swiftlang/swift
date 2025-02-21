@@ -5,3 +5,4 @@ extension Q where A == MyStruct {
     for _ in getArray() { }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

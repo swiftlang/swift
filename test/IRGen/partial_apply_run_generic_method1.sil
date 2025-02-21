@@ -209,3 +209,4 @@ sil_vtable C {
   #C.init!allocator: (C.Type) -> () -> C : @$s4main1CCACycfC	
   #C.deinit!deallocator: @$s4main1CCfD	
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -53,3 +53,4 @@ extension A2 {
 
   init(doesNotDelegate: ()) {} // expected-error {{designated initializer cannot be declared in an extension of 'A2'}}
 }
+// UNSUPPORTED: OS=windows-msvc

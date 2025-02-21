@@ -6,3 +6,4 @@
 // wrong unavailability. rdar://problem/53956555
 
 print(SharedInterface.foo())
+// UNSUPPORTED: OS=windows-msvc

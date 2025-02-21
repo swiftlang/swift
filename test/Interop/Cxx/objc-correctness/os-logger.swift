@@ -6,3 +6,4 @@
 import os
 
 var _: os.Logger! = nil
+// UNSUPPORTED: OS=windows-msvc

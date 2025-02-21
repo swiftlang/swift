@@ -17,3 +17,4 @@ import Observation
 func foo() -> Observable<Int> {
   return .just(42)
 }
+// UNSUPPORTED: OS=windows-msvc

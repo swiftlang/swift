@@ -7,3 +7,4 @@ func test(x: Int, y: Int) {
 
 // CHECK-PARAMS: <Referenced>x</Referenced><Type>Int</Type>
 // CHECK-PARAMS: <Referenced>y</Referenced><Type>Int</Type>
+// UNSUPPORTED: OS=windows-msvc

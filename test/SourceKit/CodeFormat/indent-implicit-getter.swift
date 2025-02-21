@@ -67,3 +67,4 @@ class var foo: Int {
 // CHECK: key.sourcetext: "}"
 // CHECK: key.sourcetext: "    var foo: Int {"
 // CHECK: key.sourcetext: "    class var foo: Int {"
+// UNSUPPORTED: OS=windows-msvc

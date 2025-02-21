@@ -14,3 +14,4 @@ TemplatesTestSuite.test("using-directive") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

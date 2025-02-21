@@ -5,3 +5,4 @@
 int test() {
   return 1;
 }
+// UNSUPPORTED: OS=windows-msvc

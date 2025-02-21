@@ -36,3 +36,4 @@
 // RUN: chmod +x %t.dir/swift-foo
 // RUN: env PATH=%t.dir SWIFT_USE_OLD_DRIVER=1 %swift_driver_plain foo | %FileCheck -check-prefix=CHECK-SWIFT-SUBCOMMAND %s
 // CHECK-SWIFT-SUBCOMMAND: exec: {{.*}}/swift-foo
+// UNSUPPORTED: OS=windows-msvc

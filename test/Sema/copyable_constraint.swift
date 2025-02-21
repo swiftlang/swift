@@ -16,3 +16,4 @@
 func nextTime<T>(_ t: T) {} // expected-note {{Copyable' is implicit here}}
 
 nextTime(MO()) // expected-error {{global function 'nextTime' requires that 'MO' conform to}}
+// UNSUPPORTED: OS=windows-msvc

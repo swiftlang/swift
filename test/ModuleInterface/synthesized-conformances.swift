@@ -78,3 +78,4 @@ extension NoRawValueWithExplicitHashable : Hashable {
 
 // NEGATIVE-NOT: NoRawValueWithExplicitHashable : Swift.Equatable
 // NEGATIVE-NOT: NoRawValueWithExplicitHashable : Swift.Hashable {}
+// UNSUPPORTED: OS=windows-msvc

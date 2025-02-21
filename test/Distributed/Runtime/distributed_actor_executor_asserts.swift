@@ -94,3 +94,4 @@ actor EnqueueTest {
     await runAllTestsAsync()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

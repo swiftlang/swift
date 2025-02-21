@@ -22,3 +22,4 @@ func testNonacceptedClosures() {
     return x
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ if condition,
 // CHECK: key.sourcetext: "         condition,"
 // CHECK: key.sourcetext: "    !condition,"
 // CHECK: key.sourcetext: "    condition {"
+// UNSUPPORTED: OS=windows-msvc

@@ -78,3 +78,4 @@ packFunction(x: S1(f1: true),
              ts: S2(f2: true), S2(f2: true),
              us: S3(f3: true), S3(f3: false),
              vs: S4(f4: false), S4(f4: false), S4(f4: true), S4(f4: true))
+// UNSUPPORTED: OS=windows-msvc

@@ -43,3 +43,4 @@ public func useConcreteTemplate() {
 // CHECK-NEXT:}
 // CHECK-EMPTY:
 // CHECK-NEXT: public typealias TemplateRecordInt = ns.TemplateRecord
+// UNSUPPORTED: OS=windows-msvc

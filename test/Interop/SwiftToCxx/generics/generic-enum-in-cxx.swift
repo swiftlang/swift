@@ -341,3 +341,4 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: #endif
 // CHECK-NEXT: return Generics::_impl::$s8Generics10GenericOptO12computedPropSivg(swift::TypeMetadataTrait<GenericOpt<T_0_0>>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

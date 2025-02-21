@@ -53,3 +53,4 @@ struct HasWrappers {
 func trigger() {
   _ = HasWrappers(y: false, z: "hello")
 }
+// UNSUPPORTED: OS=windows-msvc

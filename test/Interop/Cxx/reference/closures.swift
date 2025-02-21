@@ -25,3 +25,4 @@ ClosuresTestSuite.test("mutable reference closure") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

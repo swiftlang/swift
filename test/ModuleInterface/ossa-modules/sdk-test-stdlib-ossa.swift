@@ -41,3 +41,4 @@ public func foo() -> Klass {
 
 
 
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@ func test(_ o: P1?) -> String {
 // RUN: %sourcekitd-test -req=cursor -pos=14:13 %s -- %s | %FileCheck -check-prefix=CHECK3 %s
 // CHECK3: source.lang.swift.ref.var.local (5:13-5:14)
 // CHECK3: (any P1)?
+// UNSUPPORTED: OS=windows-msvc

@@ -37,3 +37,4 @@ class MyView : NSView {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

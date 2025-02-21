@@ -8,3 +8,4 @@ protocol P {
 extension P {
   typealias T = Self
 }
+// UNSUPPORTED: OS=windows-msvc

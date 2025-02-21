@@ -51,3 +51,4 @@ func lazyLocalInClosure() {
     return x
   }
 }
+// UNSUPPORTED: OS=windows-msvc

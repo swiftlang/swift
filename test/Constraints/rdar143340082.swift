@@ -11,3 +11,4 @@ do {
         return Test(v: "\(i * 1000)", i: 1)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

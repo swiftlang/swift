@@ -23,3 +23,4 @@ public final class FinalClass {
     set {}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

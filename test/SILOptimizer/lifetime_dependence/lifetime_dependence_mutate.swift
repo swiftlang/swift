@@ -134,3 +134,4 @@ func test_mutate_iterate() {
   }
   // end mutable 'array' access
 }
+// UNSUPPORTED: OS=windows-msvc

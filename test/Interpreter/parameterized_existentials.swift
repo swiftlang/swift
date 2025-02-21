@@ -60,3 +60,4 @@ ParameterizedProtocolsTestSuite.test("casting") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

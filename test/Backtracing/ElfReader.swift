@@ -133,3 +133,4 @@ struct ElfReader {
 
 }
 
+// UNSUPPORTED: OS=windows-msvc

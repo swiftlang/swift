@@ -21,3 +21,4 @@ public enum EnumPublic: ProtoPublic {
   case bar3
   case bar4(arg: Int)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -275,3 +275,4 @@ struct UseBuilder: P2 {
     let extractedExpr: some P2 = 5
   }
 }
+// UNSUPPORTED: OS=windows-msvc

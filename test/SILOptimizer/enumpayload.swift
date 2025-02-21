@@ -62,3 +62,4 @@ func test_enum() {
 }
 
 test_enum()
+// UNSUPPORTED: OS=windows-msvc

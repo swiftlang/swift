@@ -821,3 +821,4 @@ actor ActorContainingSendableStruct {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

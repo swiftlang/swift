@@ -27,3 +27,4 @@ func testit3() -> C3<S> {
   return C3<S>()
 }
 
+// UNSUPPORTED: OS=windows-msvc

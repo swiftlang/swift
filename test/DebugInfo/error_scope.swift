@@ -23,3 +23,4 @@ public func f() {
     sink(error)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

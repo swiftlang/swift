@@ -7,3 +7,4 @@
 import new_module // expected-error{{no such module 'new_module'}}
 
 new_module.getZero() // expected-error {{cannot find 'new_module' in scope}}
+// UNSUPPORTED: OS=windows-msvc

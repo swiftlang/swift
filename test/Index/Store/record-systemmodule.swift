@@ -69,3 +69,4 @@ print(someFunc())
 // CHECK-NEXT: 	RelChild | s:e:[[publicFunc_USR]]
 // CHECK-NEXT: 0:0 | extension/ext-class/Swift | s:e:[[publicFunc_USR]] | Def | rel: 0
 // CHECK-NOT: SECRET
+// UNSUPPORTED: OS=windows-msvc

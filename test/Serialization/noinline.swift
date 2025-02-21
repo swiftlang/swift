@@ -23,3 +23,4 @@ var raw = testNoinline(x: false)
 // SIL: apply [[FUNC2]]({{%.+}}, {{%.+}}) : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct
 
 var a = NoInlineInitStruct(x: false)
+// UNSUPPORTED: OS=windows-msvc

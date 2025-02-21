@@ -30,3 +30,4 @@ import AliasedLib
 func main() {
   AliasedLib.foo()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -62,3 +62,4 @@ func testDeliberateRedef() {
 #endif
 }
 
+// UNSUPPORTED: OS=windows-msvc

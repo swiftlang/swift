@@ -19,3 +19,4 @@ func testMe(ms: MyAsyncSequence<String>) {
 
   let _: AsyncFlatMapSequence<MyAsyncSequence<String>, MyAsyncSequence<[Character]>> = flatMS
 }
+// UNSUPPORTED: OS=windows-msvc

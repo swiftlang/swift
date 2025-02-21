@@ -21,3 +21,4 @@ func test1(f: () throws -> ()) throws {
   } catch MyError.case1 {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

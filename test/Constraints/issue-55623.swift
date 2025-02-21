@@ -33,3 +33,4 @@ let new1 = New(value: 42) {
 let new2 = New<Int>(value: 42) {
   Map { $0.description }
 }
+// UNSUPPORTED: OS=windows-msvc

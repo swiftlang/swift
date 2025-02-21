@@ -10,3 +10,4 @@
 // DEBUG_LINUX: -o main
 // DEBUG_LINUX-NOT: dsymutil
 
+// UNSUPPORTED: OS=windows-msvc

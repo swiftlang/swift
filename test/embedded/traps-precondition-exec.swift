@@ -32,3 +32,4 @@ func test(i: Int) {
 }
 
 test(i: 42)
+// UNSUPPORTED: OS=windows-msvc

@@ -5,3 +5,4 @@ import Foundation
 public func test_nocrash_rdar34913689() {
   _ = \ObjCFoo.objcExtraProp
 }
+// UNSUPPORTED: OS=windows-msvc

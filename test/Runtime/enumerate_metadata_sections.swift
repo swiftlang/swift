@@ -47,3 +47,4 @@ EnumerateMetadataSections.test("swift_enumerateAllMetadataSections works") {
 runAllTests()
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

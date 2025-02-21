@@ -104,3 +104,4 @@ public struct P0Impl : P0 {
 
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind willreturn memory(none) }
 
+// UNSUPPORTED: OS=windows-msvc

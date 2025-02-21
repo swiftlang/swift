@@ -37,3 +37,4 @@
 // CHECK-ANDROID-NEXT: mapping real file '{{.*}}{{/|\\}}resources{{/|\\}}android{{/|\\}}aarch64{{/|\\}}SwiftBionic.h' to virtual file '{{.*}}{{/|\\}}sdk{{/|\\}}usr{{/|\\}}include{{/|\\}}SwiftBionic.h'
 
 // CHECK-ANDROID-CXX: clang importer driver args: {{.*}}'-fmodule-map-file={{.*}}resources{{/|\\}}android{{/|\\}}libcxxshim.modulemap'
+// UNSUPPORTED: OS=windows-msvc

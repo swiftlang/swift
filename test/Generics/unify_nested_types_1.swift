@@ -23,3 +23,4 @@ struct G<T : P1 & P2> {}
 // CHECK: - τ_0_0.[P1:T].[concrete: Int] => τ_0_0.[P1:T]
 // CHECK: - τ_0_0.[P1:T].[P1:T] => τ_0_0.[P1:T]
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

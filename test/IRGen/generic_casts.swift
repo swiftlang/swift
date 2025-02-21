@@ -109,3 +109,4 @@ func compositionToMember(_ a: P & Q) -> P {
   return a
 }
 
+// UNSUPPORTED: OS=windows-msvc

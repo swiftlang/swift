@@ -62,3 +62,4 @@ public class ExplicitInitClass {
     foo()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

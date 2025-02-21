@@ -8,3 +8,4 @@ func test(_ n: NSNotification.Name) {}
 
 test(NSNotification.Name.SpaceShip)
 test(NSNotification.Name.CExtern)
+// UNSUPPORTED: OS=windows-msvc

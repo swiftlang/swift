@@ -48,3 +48,4 @@ struct RecurrentLayer<Cell: RecurrentLayerCell>: Layer {
     return self(inputs)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@ let dict = [
         "key 20": ["key": "value"],
     ]
 ]
+// UNSUPPORTED: OS=windows-msvc

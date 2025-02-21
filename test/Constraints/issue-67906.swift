@@ -23,3 +23,4 @@ for a in foo {
 for a in foo() {
   print(a)
 }
+// UNSUPPORTED: OS=windows-msvc

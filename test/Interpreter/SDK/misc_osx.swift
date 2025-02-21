@@ -15,3 +15,4 @@ func testFSEventStreamRef(stream: FSEventStreamRef) {
 
   let _: AnyObject = stream // expected-error {{value of type 'FSEventStreamRef' (aka 'OpaquePointer') expected to be instance of class or class-constrained type}}
 }
+// UNSUPPORTED: OS=windows-msvc

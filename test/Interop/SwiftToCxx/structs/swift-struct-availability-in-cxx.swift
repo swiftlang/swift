@@ -35,3 +35,4 @@ public struct StructWithUnavailable {
 // CHECK: class SWIFT_UNAVAILABLE_MSG("stuff happened") _impl_StructWithUnavailable {
 // CHECK: struct SWIFT_UNAVAILABLE_MSG("stuff happened") TypeMetadataTrait<Struct::StructWithUnavailable> {
 // CHECK: struct SWIFT_UNAVAILABLE_MSG("stuff happened") implClassFor<Struct::StructWithUnavailable>
+// UNSUPPORTED: OS=windows-msvc

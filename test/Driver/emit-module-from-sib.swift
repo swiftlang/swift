@@ -45,3 +45,4 @@ public class MyClass {
     return x * input
   }
 }
+// UNSUPPORTED: OS=windows-msvc

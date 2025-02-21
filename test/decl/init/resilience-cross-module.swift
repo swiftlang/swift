@@ -36,3 +36,4 @@ extension OtherResilientProtocol {
     self = other
   }
 }
+// UNSUPPORTED: OS=windows-msvc

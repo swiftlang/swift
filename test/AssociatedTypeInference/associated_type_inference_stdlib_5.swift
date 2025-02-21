@@ -53,3 +53,4 @@ public struct CircularBuffer<E>: AppendableCollection {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

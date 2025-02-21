@@ -16,3 +16,4 @@ import Interface
 
 // CHECK: ("MacroUser/macro_default_argument_swiftinterface.swift", "#fileID")
 print(foo())
+// UNSUPPORTED: OS=windows-msvc

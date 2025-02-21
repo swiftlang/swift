@@ -17,3 +17,4 @@ enum Intents {
 }
 
 let rdar75978086: some Intent = .orderedList() // Ok
+// UNSUPPORTED: OS=windows-msvc

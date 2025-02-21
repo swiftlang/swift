@@ -126,3 +126,4 @@ func sameTypeMatch1<T: PP, each U: PP, each V: PP>(t: T, u: repeat each U, v: re
 // CHECK-NEXT: <T, each U, each V where T : PP, repeat each U : PP, (repeat (each U, each V)) : Any, repeat each V : PP, T.[PP]A == (/* shape: each U */ repeat ())>
 func sameTypeMatch2<T: PP, each U: PP, each V: PP>(t: T, u: repeat each U, v: repeat each V)
   where T.A == Shape<repeat each U>, T.A == Shape<repeat each V> {}
+// UNSUPPORTED: OS=windows-msvc

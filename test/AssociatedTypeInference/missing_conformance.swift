@@ -162,3 +162,4 @@ extension CountSteps1 // expected-error {{type 'CountSteps1<T>' does not conform
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

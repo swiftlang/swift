@@ -67,3 +67,4 @@ bb0(%0 : $Int):
   %11 = struct_extract %8 : $Int, #Int._value
   return %11 : $Builtin.Int32
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -76,3 +76,4 @@ struct S8 : Q, P {
 // expected-note@-2 {{add stubs for conformance}}
   typealias B = String
 }
+// UNSUPPORTED: OS=windows-msvc

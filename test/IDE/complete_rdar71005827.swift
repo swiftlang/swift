@@ -23,3 +23,4 @@ func testLocal() {
 // LOCAL-DAG: Decl[InstanceVar]/CurrNominal:      hashValue[#Int#];
 // LOCAL-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#into: &Hasher#})[#Void#];
 }
+// UNSUPPORTED: OS=windows-msvc

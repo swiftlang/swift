@@ -362,3 +362,4 @@ func testBlocksWithGenerics(hba: HasBlockArray) -> Any {
 // CHECK-DAG: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_VAR]] = !DILocalVariable(name: "constr_generic_obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[LET_SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
 // CHECK-DAG: ![[LET_SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
 // CHECK-DAG: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo27SwiftConstrGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
+// UNSUPPORTED: OS=windows-msvc

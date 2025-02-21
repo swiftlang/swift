@@ -217,3 +217,4 @@ public func testConditionalCastNStoSwiftString(_ nsString: NSString) -> String? 
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

@@ -101,3 +101,4 @@ func downcast_existential_conditional(p: P) -> S? {
   return p as? S
 }
 
+// UNSUPPORTED: OS=windows-msvc

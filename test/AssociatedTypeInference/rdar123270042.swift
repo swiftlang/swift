@@ -25,3 +25,4 @@ struct CustomCollection<Element>: RandomAccessCollection, MutableCollection {
     }
 }
 
+// UNSUPPORTED: OS=windows-msvc

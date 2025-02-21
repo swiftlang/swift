@@ -79,3 +79,4 @@ bb0(%0 : @noImplicitCopy @_eagerMove $BufferView):
   return %12 : $BufferView                        
 } 
 
+// UNSUPPORTED: OS=windows-msvc

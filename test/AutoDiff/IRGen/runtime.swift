@@ -17,3 +17,4 @@ func test_context_builtins_with_type<T>(t: T) {
 // CHECK:   [[CTX:%.*]] = call swiftcc ptr @swift_autoDiffCreateLinearMapContextWithType(ptr %T)
 // CHECK:   call swiftcc ptr @swift_autoDiffProjectTopLevelSubcontext(ptr [[CTX]])
 // CHECK:   [[BUF:%.*]] = call swiftcc ptr @swift_autoDiffAllocateSubcontextWithType(ptr [[CTX]], ptr %T)
+// UNSUPPORTED: OS=windows-msvc

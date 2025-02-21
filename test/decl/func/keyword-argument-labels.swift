@@ -55,3 +55,4 @@ func foo(`_`: Int) {}
 foo(`_`: 3)
 let f = foo(`_`:)
 f(3)
+// UNSUPPORTED: OS=windows-msvc

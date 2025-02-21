@@ -10,3 +10,4 @@
 print("howdy from foobar")
 
  
+// UNSUPPORTED: OS=windows-msvc

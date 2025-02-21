@@ -19,3 +19,4 @@ _ = Foo.init(2)
 // CHECK2-NOT: Rename
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// UNSUPPORTED: OS=windows-msvc

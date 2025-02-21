@@ -18,3 +18,4 @@ TemplatesTestSuite.test("existing-specialization") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

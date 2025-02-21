@@ -30,3 +30,4 @@ class D : C {
     await call_f(c)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

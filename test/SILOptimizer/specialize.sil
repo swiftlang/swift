@@ -759,3 +759,4 @@ bb0:
 
 sil @$s7closures5UInt8V_Tg5 : $@convention(thin) (UInt8) -> ()
 
+// UNSUPPORTED: OS=windows-msvc

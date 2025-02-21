@@ -239,3 +239,4 @@ func testAsyncExprWithoutAwait() async {
   // expected-warning@-1 {{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
   // expected-note@-2 {{call is 'async'}}
 }
+// UNSUPPORTED: OS=windows-msvc

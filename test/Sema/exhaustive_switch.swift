@@ -1489,3 +1489,4 @@ do {
       case (e: .y, b: true)?: break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

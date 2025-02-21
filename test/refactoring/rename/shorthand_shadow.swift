@@ -10,3 +10,4 @@ func renameShorthandBinding(opt: Int?) {
     _ = opt
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ import somemod2
 // CHECK-TOP: name=some_func12(); comment=some_func12 is cool function.
 // CHECK-TOP: name=some_func21(); comment=some_func21 is cool function.
 // CHECK-TOP: name=some_func22(); comment=some_func22 is cool function.
+// UNSUPPORTED: OS=windows-msvc

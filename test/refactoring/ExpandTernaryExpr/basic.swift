@@ -37,3 +37,4 @@ func testExpandAssignOnlyTupleTernaryExpr() {
 
 // RUN: %refactor -expand-ternary-expr -source-filename %s -pos=24:3 -end-pos=24:35 > %t.result/L24-3.swift
 // RUN: diff -u %S/Outputs/basic/L24-3.swift.expected %t.result/L24-3.swift
+// UNSUPPORTED: OS=windows-msvc

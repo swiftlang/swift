@@ -12,3 +12,4 @@
 // CHECK-NEXT: {{.*}} = apply [[FOO_REF]]([[BAR]], {{.*}}, {{.*}}) : $@convention(method) (Int, Bool, @thin Foo.Type) -> Foo
 
 _ = Foo(baz: true)
+// UNSUPPORTED: OS=windows-msvc

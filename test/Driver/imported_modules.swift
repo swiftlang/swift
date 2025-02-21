@@ -17,3 +17,4 @@ import Garbage
 #if !canImport(Swift) // To wit, false
 import Garbage
 #endif
+// UNSUPPORTED: OS=windows-msvc

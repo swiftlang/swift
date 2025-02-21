@@ -59,3 +59,4 @@ testSdump()
 // IR-NONTRIVIAL: call {{.*}} @_ZN1SC1ERKS_
 // IR-NONTRIVIAL: call {{.*}} @_ZNK1S4dumpEv
 // IR-NONTRIVIAL: call {{.*}} @_ZN1SD1Ev
+// UNSUPPORTED: OS=windows-msvc

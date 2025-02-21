@@ -23,3 +23,4 @@ extension Int {
 import ExperimentalFeatures
 
 _ = Int.fortytwo
+// UNSUPPORTED: OS=windows-msvc

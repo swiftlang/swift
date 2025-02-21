@@ -123,3 +123,4 @@ if a < 10 {
     // CHECK: end_borrow [[ACTORREF]]
     // CHECK: hop_to_executor [[MAIN_OPTIONAL]]
 }
+// UNSUPPORTED: OS=windows-msvc

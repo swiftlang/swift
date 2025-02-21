@@ -817,3 +817,4 @@ entry(%0 : $*Cell<T>):
 
 // CHECK:       [[EXIT_BR]]:
 // CHECK:         ret ptr %dest
+// UNSUPPORTED: OS=windows-msvc

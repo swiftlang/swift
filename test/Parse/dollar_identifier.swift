@@ -123,3 +123,4 @@ let _ = S().$café // Okay
 // https://github.com/apple/swift/issues/55538
 infix operator $ // expected-error{{'$' is considered an identifier and must not appear within an operator name}}
 infix operator `$` // expected-error{{'$' is considered an identifier and must not appear within an operator name}}
+// UNSUPPORTED: OS=windows-msvc

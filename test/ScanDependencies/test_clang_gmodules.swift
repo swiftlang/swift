@@ -10,3 +10,4 @@ import X
 // CHECK: "commandLine": [
 // CHECK-DAG: "-fmodule-format=obj"
 // CHECK-DAG: "-dwarf-ext-refs"
+// UNSUPPORTED: OS=windows-msvc

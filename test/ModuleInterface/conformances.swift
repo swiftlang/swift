@@ -251,3 +251,4 @@ public struct NestedAvailabilityOuter {
 
 // CHECK-END: @usableFromInline
 // CHECK-END-NEXT: internal protocol _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+// UNSUPPORTED: OS=windows-msvc

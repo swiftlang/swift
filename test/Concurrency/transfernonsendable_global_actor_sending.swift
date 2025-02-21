@@ -48,3 +48,4 @@ func useValue<T>(_ t: T) {}
 
   useValue(ns)
 }
+// UNSUPPORTED: OS=windows-msvc

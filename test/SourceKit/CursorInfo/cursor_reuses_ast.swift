@@ -21,3 +21,4 @@
 // CHECK: source.lang.swift.decl.function.free
 // CHECK: foo()
 // CHECK: DID REUSE AST CONTEXT: 1
+// UNSUPPORTED: OS=windows-msvc

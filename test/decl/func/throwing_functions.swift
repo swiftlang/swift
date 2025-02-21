@@ -291,3 +291,4 @@ struct Wrapper {
 struct Repro {
   @Wrapper var x // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
 }
+// UNSUPPORTED: OS=windows-msvc

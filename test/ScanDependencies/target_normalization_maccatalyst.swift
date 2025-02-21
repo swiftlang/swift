@@ -53,3 +53,4 @@ import Unzippered
 // CHECK-NEXT:   "[[NORM_ARCH]]-apple-ios15.0-macabi"
 // CHECK-NOT:    "-target-variant"
 // CHECK:        "contextHash": "[[ZIPPERED_HASH]]",
+// UNSUPPORTED: OS=windows-msvc

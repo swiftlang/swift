@@ -42,3 +42,4 @@ func testCrash() {
 }
 
 testCrash()
+// UNSUPPORTED: OS=windows-msvc

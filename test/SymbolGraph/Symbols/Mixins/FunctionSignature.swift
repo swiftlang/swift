@@ -136,3 +136,4 @@ public struct MyStruct {
 // FUNC2-NEXT: "preciseIdentifier": "s:s4Voida"
     
 }
+// UNSUPPORTED: OS=windows-msvc

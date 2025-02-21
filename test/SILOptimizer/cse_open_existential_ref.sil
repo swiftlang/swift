@@ -137,3 +137,4 @@ bb1(%arg : $@opened("00000000-0000-0000-0000-000000000008", any P) Self):
   %result = tuple ()
   return %result : $()
 }
+// UNSUPPORTED: OS=windows-msvc

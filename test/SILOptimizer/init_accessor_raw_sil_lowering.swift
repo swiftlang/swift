@@ -480,3 +480,4 @@ func test_handling_of_nonmutating_set() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

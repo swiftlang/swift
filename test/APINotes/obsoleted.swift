@@ -9,3 +9,4 @@ let _: Foo_ID
 
 let _: BarContainerOld.Sub // expected-error{{'Sub' has been renamed to 'BarContainerCanonical.Sub'}}
 let _: BarContainerCanonical.Sub
+// UNSUPPORTED: OS=windows-msvc

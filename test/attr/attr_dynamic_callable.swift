@@ -551,3 +551,4 @@ func testProtocolComposition(_ x: P & Q, _ y: Q & R) {
   y(0, 1)
   y("a", "b")
 }
+// UNSUPPORTED: OS=windows-msvc

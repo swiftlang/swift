@@ -50,3 +50,4 @@ mutT?.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let'
 mutT?.immS? = S() // expected-error{{cannot assign to value: 'immS' is a 'let' constant}}
 mutT?.immS?.x += 0 // expected-error{{left side of mutating operator isn't mutable: 'immS' is a 'let' constant}}
 mutT?.immS?.y -= 0 // expected-error{{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
+// UNSUPPORTED: OS=windows-msvc

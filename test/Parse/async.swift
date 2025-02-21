@@ -80,3 +80,4 @@ func testAsyncLet() async {
 }
 
 async func asyncIncorrectly() { } // expected-error{{'async' must be written after the parameter list of a function}}{{1-7=}}{{30-30= async}}
+// UNSUPPORTED: OS=windows-msvc

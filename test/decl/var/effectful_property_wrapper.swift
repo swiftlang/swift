@@ -39,3 +39,4 @@ struct S {
     get throws { 0 }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

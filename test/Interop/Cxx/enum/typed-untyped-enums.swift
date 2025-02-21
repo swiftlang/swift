@@ -18,3 +18,4 @@ let integer : Int = kBlue // expected-error {{cannot convert value of type 'Colo
 // These correctly fail. Cannot convert |Int| <-> |Pet| (an enum class).
 let animal : Pet = 7 // expected-error {{cannot convert value of type 'Int' to specified type 'Pet'}}
 let number : Int = Pet.goat // expected-error {{cannot convert value of type 'Pet' to specified type 'Int'}}
+// UNSUPPORTED: OS=windows-msvc

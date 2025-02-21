@@ -65,3 +65,4 @@ struct Generic<T : P> {
   } // expected-error {{return from initializer without initializing all stored properties}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

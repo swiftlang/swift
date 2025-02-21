@@ -26,3 +26,4 @@ func opaqueResult(_ x: Float) -> some Differentiable { x }
 //  for 'opaqueResult(_:)' (at swift/test/AutoDiff/compiler_crashers/sr12656-differentiation-opaque-result-type.swift:13:1)
 // 6.      While generating pullback for SIL function "@$s4main12opaqueResultyQrSfF".
 //  for 'opaqueResult(_:)' (at swift/test/AutoDiff/compiler_crashers/sr12656-differentiation-opaque-result-type.swift:13:1)
+// UNSUPPORTED: OS=windows-msvc

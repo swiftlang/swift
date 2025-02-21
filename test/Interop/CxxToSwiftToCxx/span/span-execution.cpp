@@ -132,3 +132,4 @@ int main() {
   // CHECK-NEXT: {2, 4, 6}
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

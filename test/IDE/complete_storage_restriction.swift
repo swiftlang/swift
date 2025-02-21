@@ -65,3 +65,4 @@ struct TestArgument {
     get { 1 }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

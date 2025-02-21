@@ -130,3 +130,4 @@ func nonSendableIsolatedAny(
 ) {
   let _: @Sendable () -> Void = fn  // expected-warning {{using non-sendable parameter 'fn' in a context expecting a @Sendable closure}}
 }
+// UNSUPPORTED: OS=windows-msvc

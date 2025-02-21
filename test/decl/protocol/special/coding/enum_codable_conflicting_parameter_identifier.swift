@@ -8,3 +8,4 @@ enum Duplicate : Codable { // expected-error {{type 'Duplicate' does not conform
   // expected-note@-3 {{cannot automatically synthesize 'Encodable' for 'Duplicate' because user defined parameter name '_0' in 'a' conflicts with automatically generated parameter name}}
   // expected-note@-4 {{cannot automatically synthesize 'Encodable' for 'Duplicate' because user defined parameter name '_1' in 'a' conflicts with automatically generated parameter name}}
 }
+// UNSUPPORTED: OS=windows-msvc

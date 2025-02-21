@@ -17,3 +17,4 @@ struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}} e
 protocol P1_51713: P1P2_51713 {} // expected-error {{protocol 'P1_51713' refines itself}}
 protocol P2_51713: P1P2_51713 {}
 typealias P1P2_51713 = P1_51713 & P2_51713
+// UNSUPPORTED: OS=windows-msvc

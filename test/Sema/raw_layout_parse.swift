@@ -29,3 +29,4 @@ struct SizeWithoutAlignment: ~Copyable {}
 @_rawLayout(likeArrayOf: Optional<Int>) // expected-error{{expected count argument after likeArrayOf argument in @_rawLayout attribute}}
 struct ArrayWithoutSize: ~Copyable {}
 
+// UNSUPPORTED: OS=windows-msvc

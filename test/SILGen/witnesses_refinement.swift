@@ -54,3 +54,4 @@ struct ConformsToP3: P3 {
 // CHECK-LABEL: sil_witness_table hidden ConformsToP3: P0
 // CHECK:         associated_type A: ConformsToP
 // CHECK-NEXT:   }
+// UNSUPPORTED: OS=windows-msvc

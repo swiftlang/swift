@@ -15,3 +15,4 @@ extension GenericClass {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} private void @runtime_registration
 // CHECK-NOT: @__swift_instantiateConcreteTypeFromMangledName
 // CHECK: ret void
+// UNSUPPORTED: OS=windows-msvc

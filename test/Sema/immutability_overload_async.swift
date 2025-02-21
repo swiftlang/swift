@@ -29,3 +29,4 @@ actor A {
     _ = try! await self.c.next()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

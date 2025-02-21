@@ -12,3 +12,4 @@ func syncContext() {        // expected-note 3 {{add 'async' to function 'syncCo
     async let y = await f() // expected-error{{'async let' in a function that does not support concurrency}}
     await omnom(y)          // expected-error{{'async let' in a function that does not support concurrency}}
 }
+// UNSUPPORTED: OS=windows-msvc

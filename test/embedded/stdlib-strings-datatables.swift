@@ -27,3 +27,4 @@ public func test1() {
 }
 
 test1()
+// UNSUPPORTED: OS=windows-msvc

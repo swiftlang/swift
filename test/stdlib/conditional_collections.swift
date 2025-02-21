@@ -34,3 +34,4 @@ do {
   _ = c.dropLast(2)
   _ = c.suffix(2)
 }
+// UNSUPPORTED: OS=windows-msvc

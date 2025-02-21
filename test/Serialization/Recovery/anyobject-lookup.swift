@@ -27,3 +27,4 @@ func use(_ obj: AnyObject) {
 }
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

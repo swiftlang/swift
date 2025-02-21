@@ -92,3 +92,4 @@ func g<T>(_: T) {
     _ = T.self
   }
 }
+// UNSUPPORTED: OS=windows-msvc

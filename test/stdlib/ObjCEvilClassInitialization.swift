@@ -25,3 +25,4 @@ tests.test("GenericOnEvilClass") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

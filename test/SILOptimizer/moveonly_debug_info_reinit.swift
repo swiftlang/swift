@@ -63,3 +63,4 @@ func inoutParam(_ x: inout Foo, y: consuming Foo, z: consuming Foo) {
     // CHECK: debug_value [[X]] : $*Foo, var, name "x"
     x = z
 }
+// UNSUPPORTED: OS=windows-msvc

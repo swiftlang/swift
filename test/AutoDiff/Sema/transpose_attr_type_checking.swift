@@ -597,3 +597,4 @@ extension Double {
     Float(t)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

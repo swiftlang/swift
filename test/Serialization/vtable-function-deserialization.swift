@@ -5,3 +5,4 @@
 import Swift
 
 var a = A()
+// UNSUPPORTED: OS=windows-msvc

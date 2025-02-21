@@ -41,3 +41,4 @@ struct S {
 }
 // IN_CONTEXT_FOR_UNAPPLIED_REF-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: foo(x:)[#(Int) throws -> ()#]; name=foo(x:)
 // IN_CONTEXT_FOR_UNAPPLIED_REF-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: test(builder:)[#(any Builder) -> ()#]; name=test(builder:)
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ actor Test {
 }
 
 class NonSendableValue {}
+// UNSUPPORTED: OS=windows-msvc

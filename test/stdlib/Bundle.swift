@@ -24,3 +24,4 @@ BundleTests.test("Bundle.bundleForNilClass") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

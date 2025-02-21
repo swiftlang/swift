@@ -23,3 +23,4 @@ int main() {
   // passThroughCUnsignedLong
   VERIFY_PASSTHROUGH_VALUE($s9Functions24passThroughCUnsignedLongyS2uF, 0xFFFFFFFF);
 }
+// UNSUPPORTED: OS=windows-msvc

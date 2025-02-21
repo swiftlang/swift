@@ -216,3 +216,4 @@
 //
 //    Check that the unit output is not based on -o
 //    RUN: c-index-test core -print-unit %/t/idx_index_with | %FileCheck -check-prefixes=INDEX_WITH_NEGATIVE %s
+// UNSUPPORTED: OS=windows-msvc

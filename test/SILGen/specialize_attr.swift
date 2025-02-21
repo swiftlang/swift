@@ -342,3 +342,4 @@ extension InternalThing2 {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

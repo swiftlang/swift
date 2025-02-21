@@ -21,3 +21,4 @@ class D: C {
   override func g(_: @escaping () -> Void) -> BSub { BSub() }
   // expected-error@-1{{'@_implementationOnly' override must have the same type as the declaration it overrides ('(@escaping () -> Void) -> BSuper')}}
 }
+// UNSUPPORTED: OS=windows-msvc

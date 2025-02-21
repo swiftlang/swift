@@ -15,3 +15,4 @@ import module
 
 // CHECK-GNU-ASM: .section	.swift1_autolink_entries{{.*}}
 // CHECK-GNU-ASM: .asciz  "-lmodule"
+// UNSUPPORTED: OS=windows-msvc

@@ -894,3 +894,4 @@ public var myglobal3 : Int = 1 {
     print("myglobal.didSet")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

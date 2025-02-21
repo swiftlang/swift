@@ -55,3 +55,4 @@ DlopenRaceTests.test("race") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

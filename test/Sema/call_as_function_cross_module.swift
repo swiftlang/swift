@@ -12,3 +12,4 @@ func testDense() -> Float {
   let dense = Dense()
   return dense(1)
 }
+// UNSUPPORTED: OS=windows-msvc

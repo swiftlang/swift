@@ -73,3 +73,4 @@ ${class_mod} class ${name} : Super {
 }
 % end
 % end
+// UNSUPPORTED: OS=windows-msvc

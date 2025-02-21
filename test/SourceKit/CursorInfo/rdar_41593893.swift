@@ -21,3 +21,4 @@ class BaseChatViewController {
 extension BaseChatViewController: ChatDataSourceDelegateProtocol {
     func chatDataSourceDidUpdate() { fatalError() }
 }
+// UNSUPPORTED: OS=windows-msvc

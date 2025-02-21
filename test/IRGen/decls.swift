@@ -23,3 +23,4 @@ func test1() {
 // CHECK-DAG: @"$s5decls5test1yyF1aL_CMn" = internal constant
 // CHECK-DAG: @"$s5decls5test1yyF1bL_CMn" = internal constant
 
+// UNSUPPORTED: OS=windows-msvc

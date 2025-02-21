@@ -54,3 +54,4 @@ struct Main {
     // CHECK-NEXT: executor: job [[JOB3]] running
   }
 }
+// UNSUPPORTED: OS=windows-msvc

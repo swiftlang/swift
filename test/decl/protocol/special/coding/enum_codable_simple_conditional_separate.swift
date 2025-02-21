@@ -43,3 +43,4 @@ let _ = Conditional<OnlyDec>.encode(to:) // expected-error {{referencing instanc
 let _ = Conditional<Int>.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
 let _ = Conditional<Int>.ACodingKeys.self // expected-error {{'ACodingKeys' is inaccessible due to 'private' protection level}}
 let _ = Conditional<Int>.BCodingKeys.self // expected-error {{'BCodingKeys' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

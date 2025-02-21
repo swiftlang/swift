@@ -168,3 +168,4 @@ CFunctionTakingAForwardDeclaredProtocolAsAParameter(nil)
 // CHECK-NEXT: IncompleteTypes.h:{{[0-9]+}}:1: note: protocol 'ForwardDeclaredProtocol' forward declared here
 // CHECK-NEXT: @protocol ForwardDeclaredProtocol;
 // CHECK-NEXT: ^
+// UNSUPPORTED: OS=windows-msvc

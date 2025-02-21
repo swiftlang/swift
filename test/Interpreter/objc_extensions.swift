@@ -86,3 +86,4 @@ let cache = NSCache(ofObjects: OuterClass.InnerClass.self, forKeys: NSString.sel
 
 // CHECK: InnerClasses
 print(cache.name)
+// UNSUPPORTED: OS=windows-msvc

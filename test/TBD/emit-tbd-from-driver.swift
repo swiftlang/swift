@@ -12,3 +12,4 @@
 // RUN: %validate-json %t/multifile.tbd | %FileCheck %s 
 
 // CHECK: s9multifile3fooQryFQOMQ
+// UNSUPPORTED: OS=windows-msvc

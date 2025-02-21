@@ -12,3 +12,4 @@
 // CHECK-NEXT:   class func bar() -> Int32
 // CHECK-NEXT:   func bar() -> Int32
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

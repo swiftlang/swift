@@ -47,3 +47,4 @@ import Foo.FooSub#^CLANG_IMPORT6^#
 
 import Foo.FooSub #^CLANG_IMPORT7^#
 // CLANG_IMPORT7: Begin completions
+// UNSUPPORTED: OS=windows-msvc

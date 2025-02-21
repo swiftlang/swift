@@ -37,3 +37,4 @@ func minusTen(value: UInt) -> UInt {
 }
 
 _ = minusTen(value: 5)
+// UNSUPPORTED: OS=windows-msvc

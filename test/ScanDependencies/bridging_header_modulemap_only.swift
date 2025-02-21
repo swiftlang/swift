@@ -49,3 +49,4 @@ import A
 
 // CHECK-CLANG-COMMAND: -fmodule-map-file={{.*}}{{/|\\}}CHeaders{{/|\\}}module.modulemap
 // CHECK-CLANG-COMMAND-NOT: -fmodule-map-file={{.*}}{{/|\\}}swift{{/|\\}}shims{{/|\\}}module.modulemap
+// UNSUPPORTED: OS=windows-msvc

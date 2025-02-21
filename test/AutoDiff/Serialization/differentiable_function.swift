@@ -27,3 +27,4 @@ func f(_ f: @differentiable(reverse) (inout Float) -> Float) {}
 
 func g(_ f: @differentiable(reverse) (inout Float, Float) -> Float) {}
 // CHECK: func g(_ f: @differentiable(reverse) (inout Float, Float) -> Float)
+// UNSUPPORTED: OS=windows-msvc

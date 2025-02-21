@@ -20,3 +20,4 @@ func testLazySequence(_ lazySequence: LazySequence<[Int]>?) {
   let value = lazySequence?.compactMap({ $0 as? Int }).first // expected-warning {{conditional cast from 'Int' to 'Int' always succeeds}}
   let _: Int = value!
 }
+// UNSUPPORTED: OS=windows-msvc

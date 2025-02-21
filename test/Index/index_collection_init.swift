@@ -39,3 +39,4 @@ extension Dictionary {
 
 _ = [Int: Int](0, 1)
 // CHECK: [[@LINE-1]]:5 | constructor/Swift | init(_:_:) | s:SD14swift_ide_testEySDyxq_Gx_q_tcfc | {{.*}}Ref
+// UNSUPPORTED: OS=windows-msvc

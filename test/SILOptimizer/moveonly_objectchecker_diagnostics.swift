@@ -4282,3 +4282,4 @@ func rdar_118059326_example2(_ path: String) {
   _ = consume decoded // expected-note {{consumed}}
   borrowVal(decoded) // expected-note {{used}}
 }
+// UNSUPPORTED: OS=windows-msvc

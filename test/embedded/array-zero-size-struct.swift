@@ -20,3 +20,4 @@ public func copy(_ a: inout [MyStruct]) {
 
 // CHECK: define {{.*}}@"$e4mainAAyyF"
 // CHECK: define {{.*}}@"$e4main4copyyySayAA8MyStructVGzF"
+// UNSUPPORTED: OS=windows-msvc

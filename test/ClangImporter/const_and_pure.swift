@@ -13,3 +13,4 @@ func testit() {
 // CHECK: sil [clang normal_function] @normal_function : $@convention(c) () -> Int32
 
 
+// UNSUPPORTED: OS=windows-msvc

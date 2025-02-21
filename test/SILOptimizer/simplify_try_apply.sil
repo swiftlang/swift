@@ -39,3 +39,4 @@ sil_vtable Bar {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

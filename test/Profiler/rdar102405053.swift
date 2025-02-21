@@ -2,3 +2,4 @@
 // RUN: %target-swift-frontend -emit-module -experimental-skip-non-inlinable-function-bodies-without-types -profile-generate -profile-coverage-mapping %s
 
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

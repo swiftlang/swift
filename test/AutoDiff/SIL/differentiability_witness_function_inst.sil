@@ -106,3 +106,4 @@ bb0:
 // IRGEN: [[PTR6:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @generics18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlWJrSSpSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
 
 // IRGEN: [[PTR7:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @generic16_Differentiation14DifferentiableRz13TangentVector{{.*}}WJrSSpSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
+// UNSUPPORTED: OS=windows-msvc

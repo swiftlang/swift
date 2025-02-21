@@ -42,3 +42,4 @@ public func testNonExhaustive(_ value: NonExhaustive) {
   @unknown case _: break // no-warning
   }
 }
+// UNSUPPORTED: OS=windows-msvc

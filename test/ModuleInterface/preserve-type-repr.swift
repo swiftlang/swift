@@ -71,3 +71,4 @@ extension My where T: Pet {
 // DONTPREFER: public func isNoMore(_ pet: PreferTypeRepr.Ex<PreferTypeRepr.Parrot>) -> Swift.Bool
 public func isNoMore(_ pet: Ex<Parrot>) -> Bool {}
 #endif
+// UNSUPPORTED: OS=windows-msvc

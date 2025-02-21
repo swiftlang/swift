@@ -37,3 +37,4 @@ bb0(%0 : $Builtin.Int1):
   return %r : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

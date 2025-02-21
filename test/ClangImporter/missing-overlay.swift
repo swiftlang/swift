@@ -6,3 +6,4 @@
 
 // When run without the underlying SDK, we should get an error here.
 import ClangModuleWithOverlay // expected-error{{cannot load underlying module for 'ClangModuleWithOverlay'}}
+// UNSUPPORTED: OS=windows-msvc

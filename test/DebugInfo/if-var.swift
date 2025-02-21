@@ -9,3 +9,4 @@ public func f(_ s : String?)
     markUsed(str)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

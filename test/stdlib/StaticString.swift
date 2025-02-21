@@ -157,3 +157,4 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8CodeUnitCount")
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

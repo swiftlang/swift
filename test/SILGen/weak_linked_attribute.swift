@@ -3,3 +3,4 @@
 
 // CHECK-LABEL: sil [weak_imported] [ossa] @$s21weak_linked_attribute0A8FunctionyyF : $@convention(thin) () -> ()
 @_weakLinked public func weakFunction() {}
+// UNSUPPORTED: OS=windows-msvc

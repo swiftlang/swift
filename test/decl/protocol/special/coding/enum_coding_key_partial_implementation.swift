@@ -145,3 +145,4 @@ let _ = NoRawTypeKey13.a.stringValue
 let _ = NoRawTypeKey13(stringValue: "a")
 let _ = NoRawTypeKey13.a.intValue
 let _ = NoRawTypeKey13(intValue: 0)
+// UNSUPPORTED: OS=windows-msvc

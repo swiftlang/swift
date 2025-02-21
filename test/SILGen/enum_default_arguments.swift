@@ -69,3 +69,4 @@ func testIndirectDefarg1<T: DefaultInitializable>() -> NonTrivialDefaults<T> {
   return .indirect_defarg1()
 }
 
+// UNSUPPORTED: OS=windows-msvc

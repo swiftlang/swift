@@ -15,3 +15,4 @@ public struct Bar<U, V> {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

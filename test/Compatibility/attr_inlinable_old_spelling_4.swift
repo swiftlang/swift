@@ -7,3 +7,4 @@
 
 // No warning here
 @_inlineable @_versioned func redundantAttribute() {}
+// UNSUPPORTED: OS=windows-msvc

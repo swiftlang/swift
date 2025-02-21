@@ -105,3 +105,4 @@ func testURL() {
   _ = NSURLRequest.requestWithString("http://www.llvm.org") // expected-error{{'requestWithString' has been replaced by 'init(string:)'}}
   _ = NSURLRequest.URLRequestWithURL(url as URL) // expected-error{{'URLRequestWithURL' has been replaced by 'init(url:)'}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -44,3 +44,4 @@ s.a.append(300)
 // CHECK-NEXT: Set
 // CHECK-NEXT: [13:13-13:25] pc after
 // CHECK-NEXT: [20:1-20:16] pc after
+// UNSUPPORTED: OS=windows-msvc

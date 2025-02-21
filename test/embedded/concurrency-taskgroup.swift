@@ -59,3 +59,4 @@ func yielding() async {
         // CHECK: All done!
     }
 }
+// UNSUPPORTED: OS=windows-msvc

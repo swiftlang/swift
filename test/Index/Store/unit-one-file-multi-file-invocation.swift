@@ -25,3 +25,4 @@
 func test1() {
   funcSwiftA()
 }
+// UNSUPPORTED: OS=windows-msvc

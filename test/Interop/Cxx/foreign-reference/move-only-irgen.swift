@@ -21,3 +21,4 @@ public func test() {
   var x = MoveOnly.create()
   _ = x.test()
 }
+// UNSUPPORTED: OS=windows-msvc

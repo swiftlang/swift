@@ -15,3 +15,4 @@ import UIKit
 var _: AttributeScopes.UIKitAttributes.UnderlineStyleAttribute! = nil
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

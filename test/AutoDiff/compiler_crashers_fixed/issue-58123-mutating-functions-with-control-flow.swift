@@ -213,3 +213,4 @@ Stack dump without symbol names (ensure you have llvm-symbolizer in your PATH or
 15 swift-frontend           0x0000000104454900 swift::mainEntry(int, char const**) + 500
 16 dyld                     0x0000000110f490f4 start + 520
 */
+// UNSUPPORTED: OS=windows-msvc

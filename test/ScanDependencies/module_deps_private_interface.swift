@@ -14,3 +14,4 @@
 import Foo
 
 // CHECK: "moduleInterfacePath": "{{.*}}Foo.private.swiftinterface",
+// UNSUPPORTED: OS=windows-msvc

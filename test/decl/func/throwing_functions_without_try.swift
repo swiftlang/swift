@@ -68,3 +68,4 @@ class C_53406 {
     // expected-note @-3 {{did you mean to disable error propagation?}}{{5-5=try! }}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

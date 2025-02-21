@@ -15,3 +15,4 @@ func main() -> Int {
 }
 
 // CHECK: Hello!
+// UNSUPPORTED: OS=windows-msvc

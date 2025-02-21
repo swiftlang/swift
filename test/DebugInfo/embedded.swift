@@ -10,3 +10,4 @@
 // REQUIRES: swift_feature_Embedded
 
 // CHECK:          !DICompileUnit({{.*}}flags: "-enable-embedded-swift"
+// UNSUPPORTED: OS=windows-msvc

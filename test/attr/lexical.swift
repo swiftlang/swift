@@ -56,3 +56,4 @@ extension MoveOnly {
   @_eagerMove // expected-error {{@_eagerMove cannot be applied to NonCopyable types}}
   func zoo() {}
 }
+// UNSUPPORTED: OS=windows-msvc

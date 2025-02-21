@@ -110,3 +110,4 @@ bb0(%0 : @owned $Fooer):
   %17 = tuple ()                                  // user: %18
   return %17 : $()                                // id: %18
 } // end sil function '$s4main5FooerC3fooyyF'
+// UNSUPPORTED: OS=windows-msvc

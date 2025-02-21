@@ -96,3 +96,4 @@
 // CHECK-NEXT:     key.length: 3
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],
+// UNSUPPORTED: OS=windows-msvc

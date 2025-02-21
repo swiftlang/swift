@@ -47,3 +47,4 @@ struct h<i>{
 }
 
 // CHECK: define internal ptr @"$s4main1mVwCP"
+// UNSUPPORTED: OS=windows-msvc

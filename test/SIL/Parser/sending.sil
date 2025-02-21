@@ -18,4 +18,4 @@ sil [ossa] @$test2 : $@convention(thin) <τ_0_0> (@sil_sending @in_guaranteed τ
 bb0(%0 : $*τ_0_0):
   %9999 = tuple ()
   return %9999 : $()
-}
+}// UNSUPPORTED: OS=windows-msvc

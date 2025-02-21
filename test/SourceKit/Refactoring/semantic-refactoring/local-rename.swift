@@ -34,3 +34,4 @@ func foo() {
 
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// UNSUPPORTED: OS=windows-msvc

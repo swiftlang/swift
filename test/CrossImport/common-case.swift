@@ -41,3 +41,4 @@ fromOverlaidClangFrameworkCrossImport()
 OverlaidClangFramework.fromOverlaidClangFramework()
 OverlaidClangFramework.fromOverlaidClangFrameworkOverlay()
 OverlaidClangFramework.fromOverlaidClangFrameworkCrossImport()
+// UNSUPPORTED: OS=windows-msvc

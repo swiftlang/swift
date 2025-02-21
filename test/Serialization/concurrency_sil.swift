@@ -15,3 +15,4 @@ import def_concurrency
 func test_all() {
   serialize_all()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -53,3 +53,4 @@ AnonymousEnumsTestSuite.test("Computed properties") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

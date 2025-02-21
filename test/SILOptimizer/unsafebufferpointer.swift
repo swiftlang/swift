@@ -89,3 +89,4 @@ public func testSubscript(_ ubp: UnsafeRawBufferPointer) -> Int64 {
   }
   return sum
 }
+// UNSUPPORTED: OS=windows-msvc

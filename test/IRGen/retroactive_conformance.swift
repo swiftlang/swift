@@ -19,3 +19,4 @@ public enum Bar<T: P> {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

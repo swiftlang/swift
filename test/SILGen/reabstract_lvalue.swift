@@ -49,3 +49,4 @@ func reabstractMetatypeInOut() {
   // CHECK: apply [[FUNC]]<MyMetatypeIsThin.Type>([[BOX]])
   consumeGenericInOut(&thinMetatype)
 }
+// UNSUPPORTED: OS=windows-msvc

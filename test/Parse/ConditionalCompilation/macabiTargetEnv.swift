@@ -34,3 +34,4 @@ let i: SomeType = "SomeString" // no-error
 func underOSMacCatalyst() {
 }
 #endif
+// UNSUPPORTED: OS=windows-msvc

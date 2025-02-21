@@ -13,3 +13,4 @@
 // CHECK-SAME: --- Name ---
 // CHECK-MULTIPLE: {compile: {{.*}}empty.swift}
 // CHECK: {{[0-9]+}}.{{[0-9]+}} (100.0%) {{[0-9]+}}.{{[0-9]+}} (100.0%) {{[0-9]+}}.{{[0-9]+}} (100.0%) {{[0-9]+}}.{{[0-9]+}} (100.0%) {{.*}} {compile: {{.*}}driver-time-compilation.swift}
+// UNSUPPORTED: OS=windows-msvc

@@ -1224,3 +1224,4 @@ bb0(%0 : @owned $Nontrivial):
   %14 = tuple ()
   return %14 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

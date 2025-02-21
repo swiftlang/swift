@@ -107,3 +107,4 @@ func fib(_ n: Int) -> Int {
     runAllTests()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

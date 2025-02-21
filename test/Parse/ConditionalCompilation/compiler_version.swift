@@ -77,3 +77,4 @@
   // This shouldn't emit any diagnostics.
   asdf asdf asdf asdf
 #endif
+// UNSUPPORTED: OS=windows-msvc

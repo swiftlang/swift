@@ -63,3 +63,4 @@ void notused(void);
 // swift-module-flags: -module-name B -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -user-module-version 1.0
 public func c() { }
 
+// UNSUPPORTED: OS=windows-msvc

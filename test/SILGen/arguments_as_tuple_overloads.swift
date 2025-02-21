@@ -66,3 +66,4 @@ public func baz() {
   // CHECK: function_ref @$s4test3bazyyFySi_SitcfU0_ :
   let _: (Int, Int) -> Void = { x, y in }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ public struct MyStruct {
   }
 }
 // CHECK-DAG: }
+// UNSUPPORTED: OS=windows-msvc

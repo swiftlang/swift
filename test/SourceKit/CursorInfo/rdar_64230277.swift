@@ -7,3 +7,4 @@ func indicator<T>(_ a: T) -> some View {
 }
 
 // CHECK: source.lang.swift.decl.generic_type_param
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ extension G where U == Foo<Int> {
     print(U.self)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

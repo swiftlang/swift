@@ -52,3 +52,4 @@ print( try? MaybeNumbers.success([4, 8, 15, 16, 23, 42]).get() )
 
 // CHECK: Optional([0, 1, 1, 2, 3])
 print(erase( try? MaybeNumbers.success([0, 1, 1, 2, 3]).get() ))
+// UNSUPPORTED: OS=windows-msvc

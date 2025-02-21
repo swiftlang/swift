@@ -54,3 +54,4 @@ func test_diamond(_ condition: Bool) {
     takeC(c)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

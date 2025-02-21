@@ -66,3 +66,4 @@ bb6:
   return %40 : $()                                // id: %41
 }
 
+// UNSUPPORTED: OS=windows-msvc

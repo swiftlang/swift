@@ -10,3 +10,4 @@ public func caller() async {
   let result = await future
   result()
 }
+// UNSUPPORTED: OS=windows-msvc

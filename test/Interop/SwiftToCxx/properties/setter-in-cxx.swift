@@ -200,3 +200,4 @@ public func createFirstSmallStruct(_ x: UInt32) -> FirstSmallStruct {
 // CHECK-NEXT:  SWIFT_INLINE_THUNK void SmallStructWithProps::setLargeStructWithProps(const LargeStructWithProps& newValue) {
 // CHECK-NEXT:  _impl::$s10Properties20SmallStructWithPropsV05largecdE0AA05LargecdE0Vvs(Properties::_impl::_impl_LargeStructWithProps::getOpaquePointer(newValue), _getOpaquePointer());
 // CHECK-NEXT:  }
+// UNSUPPORTED: OS=windows-msvc

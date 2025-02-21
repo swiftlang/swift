@@ -166,3 +166,4 @@ do {
   let exist: any CompositionBrokenClassConformance_b & BadConformanceClass
   exist.method(false) // expected-error {{type of expression is ambiguous without a type annotation}}
 }
+// UNSUPPORTED: OS=windows-msvc

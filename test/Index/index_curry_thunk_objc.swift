@@ -13,3 +13,4 @@ extension Foo {
   // CHECK-DAG: static-property/Swift | boom
   static let boom = Foo(object: self)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ import property_wrappers_B
 struct Test {
   @Wrapper var x: Int = 17
 }
+// UNSUPPORTED: OS=windows-msvc

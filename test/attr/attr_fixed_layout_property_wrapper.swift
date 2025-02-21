@@ -44,3 +44,4 @@ public struct Wrapper<T> {
   @Wrapper private var z1: PackageTypeForInline
   @Wrapper private var z2 = PackageTypeForInline()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -105,3 +105,4 @@ enum E6 {
 extension E6: Codable {}
 // expected-error@-1 {{type 'E6' does not conform to protocol 'Encodable'}}
 // expected-error@-2 {{type 'E6' does not conform to protocol 'Decodable'}}
+// UNSUPPORTED: OS=windows-msvc

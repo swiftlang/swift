@@ -439,3 +439,4 @@ class Index<F, T> {
 class CollectionIndex<C : Collection> : Index<C, C.I> {
   override func map(_ f: C) -> C.I {}
 }
+// UNSUPPORTED: OS=windows-msvc

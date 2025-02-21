@@ -12,3 +12,4 @@
 // RUN: %sourcekitd-test -req=doc-info -module Other -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  -target %target-triple -I %S/../Inputs/CrossImport -I %t.mod/ -module-cache-path %t.mod/mcp > %t.response
 // RUN: %diff -u %s.Other.response %t.response
 
+// UNSUPPORTED: OS=windows-msvc

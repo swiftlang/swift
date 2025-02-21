@@ -43,3 +43,4 @@ _ = /*MyClass:unknown*/MyClass()
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="MyClass" -is-non-protocol-type -old-name "MyClass" -new-name "YourClass" >> %t.ranges/textual_MyClass.swift
 // All occcurrences of MyClass are outside of comments and string literals, so there's nothing to rename. swift-refactor indicates this by outputing empty results.
 // RUN: diff -u %t.ranges/textual_MyClass.swift -
+// UNSUPPORTED: OS=windows-msvc

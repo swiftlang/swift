@@ -6,3 +6,4 @@ protocol P {
   static func <<= (lhs: inout Self, rhs: Self)
   static func >>= (lhs: inout Self, rhs: Self)
 }
+// UNSUPPORTED: OS=windows-msvc

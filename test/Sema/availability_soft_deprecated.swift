@@ -44,3 +44,4 @@ func testDeprecated() {
   deprecatedFarFuture()
   let _: any Proto = HasSoftDeprecatedConformanceToProto()
 }
+// UNSUPPORTED: OS=windows-msvc

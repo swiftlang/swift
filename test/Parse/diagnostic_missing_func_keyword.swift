@@ -61,3 +61,4 @@ class C2 {
                                  // expected-note @-1 {{in declaration of 'classProperty'}}
                                  // expected-error @-2 {{expected declaration}}
 }
+// UNSUPPORTED: OS=windows-msvc

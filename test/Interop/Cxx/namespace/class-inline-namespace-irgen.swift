@@ -123,3 +123,4 @@ extension Parent.NamespaceInInlineChild.InNamespaceInInlineChild {
 public func test3(_ x: Parent.InlineChild.NamespaceInInlineChild.InNamespaceInInlineChild) {
   x.doSomethingElse()
 }
+// UNSUPPORTED: OS=windows-msvc

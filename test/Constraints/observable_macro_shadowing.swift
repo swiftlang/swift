@@ -36,3 +36,4 @@ extension Observable {
     return Observable<Bool>.empty()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

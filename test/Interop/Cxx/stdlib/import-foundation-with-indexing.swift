@@ -10,3 +10,4 @@ import Foundation
 func test(d: Date) {}
 
 // CHECK: Foundation-{{.*}}.pcm
+// UNSUPPORTED: OS=windows-msvc

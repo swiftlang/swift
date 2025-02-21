@@ -18,3 +18,4 @@ func reasyncFunction(_ value: Optional<Int>, _ fn: () async throws -> Int) reasy
 func callsReasyncFunction() -> Int {
   return reasyncFunction(nil, { return 321 } )
 }
+// UNSUPPORTED: OS=windows-msvc

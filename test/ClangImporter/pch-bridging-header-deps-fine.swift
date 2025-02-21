@@ -24,3 +24,4 @@ print(app_function(1))
 // CHECK-SWIFTDEPS: externalDepend {{.*}} '{{.*}}{{/|\\}}test{{/|\\}}ClangImporter{{/|\\}}Inputs{{/|\\}}chained-unit-test-bridging-header-to-pch.h'
 
 // CHECK-SWIFTDEPS2-NOT: {{.*}}.pch
+// UNSUPPORTED: OS=windows-msvc

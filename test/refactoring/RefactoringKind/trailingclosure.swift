@@ -52,3 +52,4 @@ func testTrailingClosure() -> String {
 // CHECK-NO-TRAILING-CLOSURE: Action begins
 // CHECK-NO-TRAILING-CLOSURE-NOT: Convert To Trailing Closure
 // CHECK-NO-TRAILING-CLOSURE: Action ends
+// UNSUPPORTED: OS=windows-msvc

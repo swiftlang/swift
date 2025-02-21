@@ -94,3 +94,4 @@ class Misc {
     get throws { 0 }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

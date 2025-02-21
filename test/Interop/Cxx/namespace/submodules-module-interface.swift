@@ -17,3 +17,4 @@
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

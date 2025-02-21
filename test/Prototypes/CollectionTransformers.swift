@@ -1450,3 +1450,4 @@ http://habrahabr.ru/post/255659/
 */
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -63,3 +63,4 @@ class Foo: NSManagedObject {
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22<_TtP19objc_property_attrs1P_><_TtP19objc_property_attrs1Q_>\22,N,&,Vpq\00"
   @objc var pq: (P & Q)?
 }
+// UNSUPPORTED: OS=windows-msvc

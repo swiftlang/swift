@@ -20,3 +20,4 @@ class Bar<T> {
 }
 
 // CHECK-NOT: swift_getExtendedExistentialTypeMetadata
+// UNSUPPORTED: OS=windows-msvc

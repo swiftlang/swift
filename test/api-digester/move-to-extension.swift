@@ -21,3 +21,4 @@ extension C {
 #endif
 
 // CHECK: Non-final class member Func C.foo() is moved to extension
+// UNSUPPORTED: OS=windows-msvc

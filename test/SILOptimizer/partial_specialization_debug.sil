@@ -64,3 +64,4 @@ bb0(%0 : $*U):
   return %13 : $()
 } // end sil function 'simple_generic_caller1'
 
+// UNSUPPORTED: OS=windows-msvc

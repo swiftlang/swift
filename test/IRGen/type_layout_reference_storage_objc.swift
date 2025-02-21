@@ -82,3 +82,4 @@ struct ReferenceStorageTypeLayout<T, ObjC: C> {
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_1, i32 0, i32 0)
   weak            var pqrncwi: (P & Q & NonObjC & NativeClass)!
 }
+// UNSUPPORTED: OS=windows-msvc

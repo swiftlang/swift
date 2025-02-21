@@ -71,3 +71,4 @@ class C6: ConcurrentProtocol {
 class C7: NSObject {
   @SomeGlobalActor override var description: String { "on an actor" }
 }
+// UNSUPPORTED: OS=windows-msvc

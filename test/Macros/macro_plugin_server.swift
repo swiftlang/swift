@@ -114,3 +114,4 @@ func testStringify(a: Int, b: Int) {
   // expected-error @+1 {{type 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '}}
   _ = #notMacro()
 }
+// UNSUPPORTED: OS=windows-msvc

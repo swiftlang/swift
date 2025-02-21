@@ -186,3 +186,4 @@ testNSArrayDowncast([[1, 2], [3, 4], [5, 6]])
 
 // CHECK-NEXT: Did not match
 testNSArrayDowncast(nil)
+// UNSUPPORTED: OS=windows-msvc

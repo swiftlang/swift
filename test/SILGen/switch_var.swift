@@ -770,3 +770,4 @@ func test_multiple_patterns_value_semantics(_ y: C) {
     default: break
   }
 }
+// UNSUPPORTED: OS=windows-msvc

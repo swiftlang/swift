@@ -21,3 +21,4 @@ var mysection_end: Int
 // CHECK: @"$s20linker_set_low_level10my_global2Sivp" = {{.*}}constant %TSi <{ {{(i64|i32)}} 46 }>, section "__TEXT,__mysection
 // CHECK: @"\01section$start$__TEXT$__mysection" = {{.*}}global %TSi
 // CHECK: @"\01section$end$__TEXT$__mysection" = {{.*}}global %TSi
+// UNSUPPORTED: OS=windows-msvc

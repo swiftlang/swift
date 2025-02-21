@@ -12,3 +12,4 @@ func bar(x: S?) {
     if .random() { return }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

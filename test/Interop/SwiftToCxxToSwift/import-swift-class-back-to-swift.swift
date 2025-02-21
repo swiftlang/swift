@@ -98,3 +98,4 @@ testSwiftClassInClass()
 // SIL-LABEL: @$s8SwiftMod04testa7ClassInD0yyF : $@convention(thin) () -> () {
 // SIL: $@convention(c) (@in_guaranteed ExposedToCxx) -> @out InClass
 // SIL: $@convention(cxx_method) (@in_guaranteed InClass) -> @owned ExposedToCxx
+// UNSUPPORTED: OS=windows-msvc

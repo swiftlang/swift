@@ -103,3 +103,4 @@ sil @main : $@convention(c) () -> Int32 {
 sil_witness_table hidden I: P module main {
   method #P.printMe: <Self where Self : P> (Self) -> () async -> Int64 : @I_P_printMe
 }
+// UNSUPPORTED: OS=windows-msvc

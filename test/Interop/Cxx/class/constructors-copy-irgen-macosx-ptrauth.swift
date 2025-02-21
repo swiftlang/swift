@@ -9,3 +9,4 @@ public func copyPtrAuthMemberWithDefaultCopyConstructor(_ x: HasPtrAuthMember)
   -> (HasPtrAuthMember, HasPtrAuthMember) {
   return (x, x)
 }
+// UNSUPPORTED: OS=windows-msvc

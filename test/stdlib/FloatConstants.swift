@@ -31,3 +31,4 @@ _ = DBL_MAX // expected-warning {{is deprecated: Please use 'Double.greatestFini
 _ = DBL_EPSILON // expected-warning {{is deprecated: Please use 'Double.ulpOfOne' or '.ulpOfOne'. [DeprecatedDeclaration]}}
 _ = DBL_MIN // expected-warning {{is deprecated: Please use 'Double.leastNormalMagnitude' or '.leastNormalMagnitude'. [DeprecatedDeclaration]}}
 _ = DBL_TRUE_MIN // expected-warning {{is deprecated: Please use 'Double.leastNonzeroMagnitude' or '.leastNonzeroMagnitude'. [DeprecatedDeclaration]}}
+// UNSUPPORTED: OS=windows-msvc

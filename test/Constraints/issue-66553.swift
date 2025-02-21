@@ -10,3 +10,4 @@ func baz(y: [Int], z: Int) -> Int {
     z
   }
 }
+// UNSUPPORTED: OS=windows-msvc

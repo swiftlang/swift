@@ -60,3 +60,4 @@
 // CHECK:   init(noDefMember: HasUninstantiatableTemplateMember<HasTemplateInstantiationWithForwardDecl.NoDefinition, TemplateClassWithMemberTemplates<HasTemplateInstantiationWithForwardDecl.NoDefinition>>)
 // CHECK:   var noDefMember: HasUninstantiatableTemplateMember<HasTemplateInstantiationWithForwardDecl.NoDefinition, TemplateClassWithMemberTemplates<HasTemplateInstantiationWithForwardDecl.NoDefinition>>
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

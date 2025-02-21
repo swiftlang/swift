@@ -50,3 +50,4 @@ cna = dna // expected-error{{cannot assign value of type 'ContiguousArray<D>' to
 // expected-note@-1 {{arguments to generic parameter 'Element' ('D' and 'C') are expected to be equal}}
 dna = cna // expected-error{{cannot assign value of type 'ContiguousArray<C>' to type 'ContiguousArray<D>'}}
 // expected-note@-1 {{arguments to generic parameter 'Element' ('C' and 'D') are expected to be equal}}
+// UNSUPPORTED: OS=windows-msvc

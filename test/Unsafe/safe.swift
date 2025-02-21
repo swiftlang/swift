@@ -168,3 +168,4 @@ func testMyArray(ints: MyArray<Int>) {
     unsafe print(buffer.baseAddress!)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

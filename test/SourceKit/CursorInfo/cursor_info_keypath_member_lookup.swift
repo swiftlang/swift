@@ -75,3 +75,4 @@ func testKeyPath() {
 // KEYPATH: source.refactoring.kind.rename.global
 // KEYPATH: ACTIONS END
 
+// UNSUPPORTED: OS=windows-msvc

@@ -303,3 +303,4 @@
 // CHECK-SWIFT-5: var multiVersionedGlobal345Both_5: Int32
 // CHECK-SWIFT-5: @available(swift, obsoleted: 5, renamed: "multiVersionedGlobal34_4_2")
 // CHECK-SWIFT-5: var multiVersionedGlobal34_4_2_not_5: Int32
+// UNSUPPORTED: OS=windows-msvc

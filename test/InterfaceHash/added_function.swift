@@ -15,3 +15,4 @@ func f() {}
 // BEGIN b.swift
 func f() {}
 func g() {}
+// UNSUPPORTED: OS=windows-msvc

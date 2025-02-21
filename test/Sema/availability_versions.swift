@@ -1889,3 +1889,4 @@ struct PropertyObservers {
     didSet { }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

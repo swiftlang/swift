@@ -54,3 +54,4 @@ extension Outer.Inner {
     // expected-error@-1{{extensions of classes from generic context cannot contain '@objc' members}}
     func outerInner2() {}
 }
+// UNSUPPORTED: OS=windows-msvc

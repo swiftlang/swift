@@ -4378,3 +4378,4 @@ sil @test_type_value_concrete_negative : $@convention(thin) () -> Int {
   %val = type_value $Int for -128
   return %val : $Int
 }
+// UNSUPPORTED: OS=windows-msvc

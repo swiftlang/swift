@@ -35,3 +35,4 @@ extension S {
 // EXTENSION: shouldAppear
 // EXTENSION-NOT: shouldntAppear
 // EXTENSION_EBS-COUNT-1: "swift.extension"
+// UNSUPPORTED: OS=windows-msvc

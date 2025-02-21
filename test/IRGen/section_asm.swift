@@ -47,3 +47,4 @@
 // CHECKELF: $s7section2g4SpySiGSgvp:
 // CHECKELF: $s7section2g5SpySiGSgvp:
 // CHECKELF: $s7section8MyStructV7static0SivpZ:
+// UNSUPPORTED: OS=windows-msvc

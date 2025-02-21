@@ -53,3 +53,4 @@ autoreleasepool {
   print(bytes[2]) // CHECK-NEXT: 17
   print(bytes[3]) // CHECK-NEXT: 19
 } // CHECK-NEXT: died
+// UNSUPPORTED: OS=windows-msvc

@@ -7,3 +7,4 @@ public struct Main {
     print("ok")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

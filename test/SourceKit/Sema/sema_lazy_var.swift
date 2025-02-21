@@ -8,3 +8,4 @@ class C1 {
 
 // RUN: %sourcekitd-test -req=sema %s -- %s > %t.response
 // RUN: %diff -u %s.response %t.response
+// UNSUPPORTED: OS=windows-msvc

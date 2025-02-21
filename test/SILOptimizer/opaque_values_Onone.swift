@@ -244,3 +244,4 @@ func maybeCastGenericToMeta<T>(_ t: T) -> AnyObject.Type? {
   }
   return nil
 }
+// UNSUPPORTED: OS=windows-msvc

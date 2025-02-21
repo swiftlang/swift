@@ -9,3 +9,4 @@ import Foundation
   var foo: Int = 10
   override init() {}
 }
+// UNSUPPORTED: OS=windows-msvc

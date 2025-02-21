@@ -146,3 +146,4 @@ public func sorted(_ span: borrowing MutableSpan<Int>) -> Bool {
   return true
 }
 
+// UNSUPPORTED: OS=windows-msvc

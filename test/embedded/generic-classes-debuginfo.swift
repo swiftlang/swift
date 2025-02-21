@@ -47,3 +47,4 @@ struct Main {
 
 // CHECK: Implementor.protofoo
 
+// UNSUPPORTED: OS=windows-msvc

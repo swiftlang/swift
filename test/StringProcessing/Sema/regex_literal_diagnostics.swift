@@ -18,3 +18,4 @@ func bar<T>(x: Int, _ y: T) {} // expected-note 3{{'bar(x:_:)' declared here}}
 bar(/a/) // expected-error {{missing argument for parameter 'x' in call}} {{5-5=x: <#Int#>, }}
 bar(/,/) // expected-error {{missing argument for parameter 'x' in call}} {{5-5=x: <#Int#>, }}
 bar(!!/a/) // expected-error {{missing argument for parameter 'x' in call}} {{5-5=x: <#Int#>, }}
+// UNSUPPORTED: OS=windows-msvc

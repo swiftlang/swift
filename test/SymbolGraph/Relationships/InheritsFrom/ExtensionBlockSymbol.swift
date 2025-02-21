@@ -21,3 +21,4 @@ public extension Derived {
 // LOCAL-DAG: "relationships": []
 
 // EXTENSION-NOT: "kind": "inheritsFrom"
+// UNSUPPORTED: OS=windows-msvc

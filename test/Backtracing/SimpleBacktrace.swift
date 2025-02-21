@@ -47,3 +47,4 @@ struct SimpleBacktrace {
     level1()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

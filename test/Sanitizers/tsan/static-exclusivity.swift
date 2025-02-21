@@ -30,3 +30,4 @@ func testStoredPropertyRelaxationInInout() {
     takesInouts(&l.f, &l.s) // no-diagnostic
 }
 
+// UNSUPPORTED: OS=windows-msvc

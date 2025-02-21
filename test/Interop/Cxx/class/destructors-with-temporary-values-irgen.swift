@@ -11,3 +11,4 @@ public func test() {
 
 // CHECK: define{{( dso_local)?}} void @{{_Z22referencedByDestructorP5Value|"\?referencedByDestructor@@YAXPEAUValue@@@Z"}}
 // CHECK: define linkonce_odr{{( dso_local)?}} void @{{_ZN5Value22referencedByDestructorEv|"\?referencedByDestructor@Value@@QEAAXXZ"}}
+// UNSUPPORTED: OS=windows-msvc

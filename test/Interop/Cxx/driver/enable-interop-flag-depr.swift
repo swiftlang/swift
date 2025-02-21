@@ -16,3 +16,4 @@ import Test
 
 // CHECK: error: do not pass both '-enable-experimental-cxx-interop' and '-cxx-interoperability-mode'; remove '-enable-experimental-cxx-interop'
 // CHECK: note: Swift will maintain source compatibility for imported APIs based on the selected compatibility mode, so updating the Swift compiler will not change how APIs are imported
+// UNSUPPORTED: OS=windows-msvc

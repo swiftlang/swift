@@ -6,3 +6,4 @@ protocol P {
     S : Sequence
   >(elements: S) -> Self where S.Iterator.Element == Self
 }
+// UNSUPPORTED: OS=windows-msvc

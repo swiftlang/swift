@@ -25,3 +25,4 @@ func customBoolLiterals() {
   _ = b
 }
 
+// UNSUPPORTED: OS=windows-msvc

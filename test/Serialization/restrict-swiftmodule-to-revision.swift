@@ -63,3 +63,4 @@ foo()
 // RUN: env SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION=1.0.0.1.1 \
 // RUN:   not %target-swift-frontend -typecheck %t/TaggedClient.swift -swift-version 5 -I %t/build -parse-stdlib -module-cache-path %t/cache 2>&1 | %FileCheck %s --check-prefix=CHECK-TAGGED
 // CHECK-TAGGED: error: compiled module was created by a different version of the compiler '1.0.0.0.1'; rebuild 'TaggedLib' and try again: {{.*}}TaggedLib.swiftmodule
+// UNSUPPORTED: OS=windows-msvc

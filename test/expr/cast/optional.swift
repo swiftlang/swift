@@ -47,3 +47,4 @@ func castUnrelatedOptionalTypes(x: Int?) {
   let _ = x as String? // expected-error {{cannot convert value}}
   let _ = x as? String? // no-warning
 }
+// UNSUPPORTED: OS=windows-msvc

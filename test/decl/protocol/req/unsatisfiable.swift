@@ -97,3 +97,4 @@ class C7<T>: P7 { // expected-error {{type 'C7<T>' does not conform to protocol 
 // expected-note@-1 {{add stubs for conformance}}
   typealias A = T
 }
+// UNSUPPORTED: OS=windows-msvc

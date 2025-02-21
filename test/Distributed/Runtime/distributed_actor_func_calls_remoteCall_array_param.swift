@@ -82,3 +82,4 @@ func test() async throws {
     // CHECK: Done
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ func test_shadow(_ flag: Bool) -> Bool {
   return flag ? YES : NO
 }
 
+// UNSUPPORTED: OS=windows-msvc

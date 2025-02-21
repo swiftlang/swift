@@ -6,3 +6,4 @@ func apply(_: (Foo) -> () -> Void) {}
 
 apply(Foo.someMethod)
 
+// UNSUPPORTED: OS=windows-msvc

@@ -19,3 +19,4 @@ Darwin.fakeAPIUsingByteInDarwin() as Int // expected-error {{cannot convert valu
 
 _ = FALSE // expected-error {{cannot find 'FALSE' in scope}}
 _ = DYLD_BOOL.FALSE
+// UNSUPPORTED: OS=windows-msvc

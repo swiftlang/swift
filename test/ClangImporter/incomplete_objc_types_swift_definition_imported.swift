@@ -172,3 +172,4 @@ _ = returnAProtocolBaz()
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolBaz' forward declared here
 // CHECK-NEXT: @protocol ProtocolBaz;
 // CHECK-NEXT: ^
+// UNSUPPORTED: OS=windows-msvc

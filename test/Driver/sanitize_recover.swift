@@ -20,3 +20,4 @@
 
 // ASAN_WITHOUT_RECOVER: swift
 // ASAN_WITHOUT_RECOVER: -sanitize=address
+// UNSUPPORTED: OS=windows-msvc

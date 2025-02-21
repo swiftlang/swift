@@ -171,3 +171,4 @@ extension Container.Conformancy3: HasAssoc where T == Outer {
 
 // CHECK-CONSTANTS-LABEL: @"$s15nested_generics9ContainerO11ConformancyVyx_qd__GAA8HasAssocAAWP" =
 // CHECK-CONSTANTS-SAME: @"symbolic{{.*}}15nested_generics5OuterO"
+// UNSUPPORTED: OS=windows-msvc

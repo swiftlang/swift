@@ -16,3 +16,4 @@ func testBadDefaultInit() {
   _ = NotInitializableOptionalStruct()
   _ = NotInitializableOptionalClass()
 }
+// UNSUPPORTED: OS=windows-msvc

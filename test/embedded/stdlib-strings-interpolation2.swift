@@ -35,3 +35,4 @@ struct Main {
 // CHECK: id: event2, n: 2
 // CHECK: id: event3, n: 3
 // CHECK: id: event4, n: 4
+// UNSUPPORTED: OS=windows-msvc

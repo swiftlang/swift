@@ -12,3 +12,4 @@
 extension Sequence {
   func foo() {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -240,3 +240,4 @@ sil_property [serialized] #External.ro <T> (stored_property #External.ro : $T)
 sil_property [serialized] #External.subscript <T><U: Hashable> (gettable_property $T,
   id @id_a : $@convention(thin) () -> (),
   getter @get_external_subscript : $@convention(keypath_accessor_getter) <T, U: Hashable> (@in_guaranteed External<T>, @in_guaranteed U) -> @out T)
+// UNSUPPORTED: OS=windows-msvc

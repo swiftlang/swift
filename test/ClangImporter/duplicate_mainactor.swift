@@ -7,4 +7,4 @@
 
 // CHECK: DoubleMainActor.h:{{[0-9]+}}:{{[0-9]+}}: warning: this attribute for global actor '@MainActor' is invalid; the declaration already has attribute for global actor '@UIActor'
 
-protocol P : DoubleMainActor {}
+protocol P : DoubleMainActor {}// UNSUPPORTED: OS=windows-msvc

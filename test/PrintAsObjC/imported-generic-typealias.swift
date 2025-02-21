@@ -12,3 +12,4 @@
 // CHECK-NEXT: @interface MyRedBarn : Barn
 // CHECK-NEXT: - (void)feed:(Hay)_;
 // CHECK-NEXT: @end
+// UNSUPPORTED: OS=windows-msvc

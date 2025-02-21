@@ -69,3 +69,4 @@ int main() {
   assert(totalAllocs != 0);
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

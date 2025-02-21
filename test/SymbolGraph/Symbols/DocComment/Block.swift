@@ -27,3 +27,4 @@ public struct S4 {}
 // CHECK-NEXT:   "character": 7
 // CHECK: "text": "block."
 
+// UNSUPPORTED: OS=windows-msvc

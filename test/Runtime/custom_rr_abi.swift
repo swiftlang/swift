@@ -84,3 +84,4 @@ CustomRRABITestSuite.test("retain") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

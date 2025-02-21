@@ -28,3 +28,4 @@
 import new_module
 
 new_module.foo()
+// UNSUPPORTED: OS=windows-msvc

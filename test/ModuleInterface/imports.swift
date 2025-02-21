@@ -28,3 +28,4 @@ import NotSoSecret2 // expected-warning {{'NotSoSecret2' inconsistently imported
 // CHECK-NEXT: {{^}}@_exported import empty{{$}}
 // CHECK-NEXT: {{^}}@_exported import emptyButWithLibraryEvolution{{$}}
 // CHECK-NOT: import
+// UNSUPPORTED: OS=windows-msvc

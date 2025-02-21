@@ -14,3 +14,4 @@ let array = [1, 2, 3]
 let dict = ["abc": 42]
 let s = Set([1, 3, 5])
 print("Hello \(array) \(dict) \(s)")
+// UNSUPPORTED: OS=windows-msvc

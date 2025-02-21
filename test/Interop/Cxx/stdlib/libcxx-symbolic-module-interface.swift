@@ -25,3 +25,4 @@
 // MAP: struct map {
 
 // CHECK-NOT: enum std
+// UNSUPPORTED: OS=windows-msvc

@@ -59,3 +59,4 @@ enum DynamicMultiPayloadEnum<T> {
 }
  */
 
+// UNSUPPORTED: OS=windows-msvc

@@ -87,3 +87,4 @@ struct ShadowedTest {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

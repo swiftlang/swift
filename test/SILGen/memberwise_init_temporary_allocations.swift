@@ -16,3 +16,4 @@ struct Butt {
     let y: Int
 }
 
+// UNSUPPORTED: OS=windows-msvc

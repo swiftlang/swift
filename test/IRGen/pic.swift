@@ -100,3 +100,4 @@ public func use_global() -> Int {
 
 // s390x-LABEL: $s4main10use_globalSiyF:
 // s390x:        lgrl    %[[REG1:r[0-9]+]], ($s4main6globalSivp)
+// UNSUPPORTED: OS=windows-msvc

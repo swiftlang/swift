@@ -7,3 +7,4 @@ extension Array: Error where Element: Error { }
 public struct GenericType<G> {
     public func test<T>(_ value: TestType<[T]>) { }
 }
+// UNSUPPORTED: OS=windows-msvc

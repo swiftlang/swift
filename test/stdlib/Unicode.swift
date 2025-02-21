@@ -111,3 +111,4 @@ UnicodeAPIs.test("UTF-8 and UTF-16 queries") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

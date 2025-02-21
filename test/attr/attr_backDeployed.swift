@@ -459,3 +459,4 @@ public func expectedRightParenFunc() {} // expected-error {{expected ')' in '@ba
 
 @_backDeploy(before: macOS 12.0)
 public func legacyBackDeployFunc() {}
+// UNSUPPORTED: OS=windows-msvc

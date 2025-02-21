@@ -67,3 +67,4 @@ bb0(%0 : $CCRefrigerator, %1: $CCMutableRefrigerator):
 // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds ptr, ptr %0, i32 2
 // CHECK-NEXT: store ptr [[T1]], ptr [[T3]], align
 // CHECK-NEXT: ret %swift.metadata_response zeroinitializer
+// UNSUPPORTED: OS=windows-msvc

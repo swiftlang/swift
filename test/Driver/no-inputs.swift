@@ -5,3 +5,4 @@
 // CHECK-NOT: error: no input files
 
 // CHECK-ERROR: error: no input files
+// UNSUPPORTED: OS=windows-msvc

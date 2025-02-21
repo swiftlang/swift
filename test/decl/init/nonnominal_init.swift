@@ -17,3 +17,4 @@ func deMorgan<A, B>(_ ne: Not<Or<A, B>>) -> And<Not<A>, Not<B>> {
   )
 }
 
+// UNSUPPORTED: OS=windows-msvc

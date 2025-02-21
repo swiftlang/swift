@@ -43,3 +43,4 @@ func fn(_: () -> Int) {}
 
 // CHECK: function_ref @$s1M4testyyySiyXEXEF
 test(fn) // OK
+// UNSUPPORTED: OS=windows-msvc

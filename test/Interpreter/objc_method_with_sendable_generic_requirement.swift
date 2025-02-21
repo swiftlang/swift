@@ -52,3 +52,4 @@ static void NSPrint(NSString *format, ...)
 //--- main.swift
 Test<NSNumber>().luck(withNumber: 5)
 // CHECK: Lucky number: 5
+// UNSUPPORTED: OS=windows-msvc

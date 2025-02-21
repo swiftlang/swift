@@ -71,3 +71,4 @@ enum NotCaseIterableMacOSObsoletedCase: CaseIterable { // expected-error {{type 
   @available(macOS, obsoleted: 10.9)
   case b
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@
 
 // CHECK: starting 1738
 // CHECK-NEXT: finishing 679
+// UNSUPPORTED: OS=windows-msvc

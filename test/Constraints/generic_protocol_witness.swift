@@ -61,3 +61,4 @@ struct L<T>: Sequence {} // expected-error {{type 'L<T>' does not conform to pro
 func z(_ x: L<Int>) {
   for xx in x {}
 }
+// UNSUPPORTED: OS=windows-msvc

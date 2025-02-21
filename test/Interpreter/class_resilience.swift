@@ -332,3 +332,4 @@ if #available(macOS 10.10, iOS 8, *) {
 } else {
   runNoTests()
 }
+// UNSUPPORTED: OS=windows-msvc

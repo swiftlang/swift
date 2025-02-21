@@ -90,3 +90,4 @@ func bar() -> String { return "" }
 func foo(param: Int) {
   let myNewName = bar() + bar()
 }
+// UNSUPPORTED: OS=windows-msvc

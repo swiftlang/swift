@@ -19,3 +19,4 @@ func testFoo(foo: Foo, x: X, y: Y) {
   foo.doSomethingElse(x: x)
 }
 
+// UNSUPPORTED: OS=windows-msvc

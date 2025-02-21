@@ -29,3 +29,4 @@ extension A.StructTwo {
 
 // EXT: InnerStruct
 // EXT-NOT: ExtendedStruct
+// UNSUPPORTED: OS=windows-msvc

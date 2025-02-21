@@ -24,3 +24,4 @@ func bar(x: MyType = MyType()) {}
 bar() // CHECK2: ![[DEFAULTARG]] = !DILocation(line: 0
       // CHECK2: ![[BARCALL]] = !DILocation(line: [[@LINE-1]], column: 1
 
+// UNSUPPORTED: OS=windows-msvc

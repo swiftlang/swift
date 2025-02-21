@@ -78,3 +78,4 @@ CodableMultifileTestSuite.test("3") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

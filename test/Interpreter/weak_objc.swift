@@ -47,3 +47,4 @@ func testObjCClass() {
 }
 
 testObjCClass()
+// UNSUPPORTED: OS=windows-msvc

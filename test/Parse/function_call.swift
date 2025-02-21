@@ -2,3 +2,4 @@
 
 func foo(x: Int) {}
 foo(: 1) // expected-error{{expected argument label before colon}} expected-error{{missing argument label 'x:' in call}}
+// UNSUPPORTED: OS=windows-msvc

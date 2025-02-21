@@ -13,3 +13,4 @@ struct Dense: Differentiable {
   @differentiable(reverse)
   var bias: Float?
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -12,3 +12,4 @@ let _ = MyTimeAdd(
 let _ = MyTimeAdd(
   kMyTimeZero,
   kMyTimeZero)
+// UNSUPPORTED: OS=windows-msvc

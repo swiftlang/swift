@@ -272,3 +272,4 @@ extension Size {
     self = other
   }
 }
+// UNSUPPORTED: OS=windows-msvc

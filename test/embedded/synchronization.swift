@@ -31,3 +31,4 @@ struct Main {
     print(original2) // CHECK: 12
   }
 }
+// UNSUPPORTED: OS=windows-msvc

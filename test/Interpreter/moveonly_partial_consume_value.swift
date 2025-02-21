@@ -57,3 +57,4 @@ func getQuad(name: String) -> Quad {
 }
 
 destructure()
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ func foo() {
 // CHECK-NEXT: s:24cursor_on_if_let_binding3fooyyF5myVarL0_Sivp
 // CHECK-NEXT: source.lang.swift
 // CHECK-NEXT: Int
+// UNSUPPORTED: OS=windows-msvc

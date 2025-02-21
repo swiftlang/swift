@@ -10,3 +10,4 @@ var p: CoolInt
 
 // CHECK: source.lang.swift.ref.struct
 // CHECK-NEXT: CoolInt
+// UNSUPPORTED: OS=windows-msvc

@@ -394,3 +394,4 @@ func deprecatedOnMacOS() {
 
 @available(OSX 51, *)
 typealias FinalDecl = Int
+// UNSUPPORTED: OS=windows-msvc

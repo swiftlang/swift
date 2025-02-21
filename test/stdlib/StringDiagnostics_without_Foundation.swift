@@ -27,3 +27,4 @@ func testStringCollectionTypes(s: String) {
   acceptsBidirectionalCollection(s)
   acceptsRandomAccessCollection(s) // expected-error{{global function 'acceptsRandomAccessCollection' requires that 'String' conform to 'RandomAccessCollection'}}
 }
+// UNSUPPORTED: OS=windows-msvc

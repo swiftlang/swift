@@ -101,3 +101,4 @@ public class derivedRegister: auto {}
 // CHECK:        using auto_::auto_;
 // CHECK:        using auto_::operator=;
 // CHECK:        SWIFT_INLINE_THUNK derivedRegister(void * _Nonnull ptr) noexcept : auto_(ptr) {}
+// UNSUPPORTED: OS=windows-msvc

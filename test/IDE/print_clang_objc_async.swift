@@ -154,3 +154,4 @@ import _Concurrency
 // FIXME: Should be imported as Unmanaged!
 // CHECK: var sendableIndirectField: any Sendable & AnyObject
 // CHECK: var sendableComputed: any Sendable { get }
+// UNSUPPORTED: OS=windows-msvc

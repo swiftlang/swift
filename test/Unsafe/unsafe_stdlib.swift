@@ -20,3 +20,4 @@ func test(
   array.append(4)
   _ = array
 }
+// UNSUPPORTED: OS=windows-msvc

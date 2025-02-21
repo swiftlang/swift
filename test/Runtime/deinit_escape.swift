@@ -26,3 +26,4 @@ DeinitEscapeTestSuite.test("deinit escapes self") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

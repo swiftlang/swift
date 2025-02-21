@@ -4,3 +4,4 @@ func foo(x: UnsafeMutablePointer<UnsafeMutablePointer<()>?>) { // expected-warni
   _ = x.pointee?.pointee
   _ = x.pointee.map { type(of: $0) }
 }
+// UNSUPPORTED: OS=windows-msvc

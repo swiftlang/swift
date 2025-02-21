@@ -64,3 +64,4 @@ func resumeContinuation(_unused : UnsafeMutableRawPointer) -> UnsafeMutableRawPo
     runAllTests()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

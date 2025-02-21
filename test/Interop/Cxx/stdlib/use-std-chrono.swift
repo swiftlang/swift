@@ -120,3 +120,4 @@ if #available(SwiftStdlib 5.7, *) {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

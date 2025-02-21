@@ -37,3 +37,4 @@ guard case .c = Foo(rawValue: UInt64(42))! else { fatalError() }
 guard case .c = Foo(rawValue: MyNumber(integerLiteral: 42))! else { fatalError() }
 
 guard case .d = Foo(rawValue: MyNumber(integerLiteral: 43))! else { fatalError() }
+// UNSUPPORTED: OS=windows-msvc

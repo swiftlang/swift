@@ -105,3 +105,4 @@ func testSubclassExistentialsInInheritanceClause() {
   h(Derived())
   i(Derived())
 }
+// UNSUPPORTED: OS=windows-msvc

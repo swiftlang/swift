@@ -31,3 +31,4 @@ var x2a: X2 = .create(5)
 x2a = .createGeneric(5, u: 3.14159)
 var x2b: X2 = .createGeneric(5, u: 3.14159)
 var x2c: X2 = .createMaybe(5)
+// UNSUPPORTED: OS=windows-msvc

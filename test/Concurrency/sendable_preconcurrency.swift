@@ -62,3 +62,4 @@ struct NonStrictConformer: NonStrictProtocol {
   func send(_ body: () -> Void) {}
   func dontSend(_ body: @Sendable () -> Void) {} // no-warning
 }
+// UNSUPPORTED: OS=windows-msvc

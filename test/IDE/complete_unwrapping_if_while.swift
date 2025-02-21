@@ -81,3 +81,4 @@ func testInsideAFunction() {
     #^IN_FUNCTION_WHILE_4^#
   }
 }
+// UNSUPPORTED: OS=windows-msvc

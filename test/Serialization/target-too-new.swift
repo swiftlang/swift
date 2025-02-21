@@ -24,3 +24,4 @@
 
 // CHECK: :[[@LINE+1]]:8: error: compiling for macOS 10.9, but module 'empty' has a minimum deployment target of macOS 50: {{.*}}empty.swiftmodule{{$}}
 import empty
+// UNSUPPORTED: OS=windows-msvc

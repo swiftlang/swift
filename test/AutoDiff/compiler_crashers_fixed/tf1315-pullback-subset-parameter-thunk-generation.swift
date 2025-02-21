@@ -24,3 +24,4 @@ func TF_1315(_ x: Float) -> Float {
   foo(1, 2, &x)
   return x
 }
+// UNSUPPORTED: OS=windows-msvc

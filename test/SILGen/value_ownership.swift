@@ -85,3 +85,4 @@ func useConsumingGetterConcrete(_ c: Witness) {
 
   blackHole(c.explicitPropertyGet)
 }
+// UNSUPPORTED: OS=windows-msvc

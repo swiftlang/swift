@@ -37,3 +37,4 @@ Class.firstMethod()
 // OPT-NEXT:   #Class.thirdMethod: (Class.Type) -> () -> () : @$s28vtable_deserialization_input5ClassC11thirdMethodyyFZ
 // OPT-NEXT:   #Class.deinit!deallocator: @$s28vtable_deserialization_input5ClassCfD
 // OPT-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

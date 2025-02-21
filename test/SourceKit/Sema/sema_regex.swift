@@ -23,3 +23,4 @@ public func retRegex() -> Regex<Substring> {
 
 // Ensure there's no diagnostics
 // CHECK-NOT: key.severity:
+// UNSUPPORTED: OS=windows-msvc

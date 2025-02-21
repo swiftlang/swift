@@ -13,3 +13,4 @@
 
 // CHECK: import Module1
 // CHECK-NOT: import Module2
+// UNSUPPORTED: OS=windows-msvc

@@ -50,3 +50,4 @@ import Android
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

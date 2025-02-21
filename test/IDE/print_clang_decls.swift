@@ -165,3 +165,4 @@
 // CHECK-BRIDGED-TYPEDEF: func acceptNSMyAmazingStringAlias(_ param: NSMyAmazingStringAlias?)
 // CHECK-BRIDGED-TYPEDEF: func acceptNSMyAmazingStringAliasArray(_ param: [NSMyAmazingStringAlias])
 // CHECK-BRIDGED-TYPEDEF: func acceptIndirectedAmazingAlias(_ param: AutoreleasingUnsafeMutablePointer<NSString>?)
+// UNSUPPORTED: OS=windows-msvc

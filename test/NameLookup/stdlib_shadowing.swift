@@ -7,3 +7,4 @@ import HasResult
 func foo() -> Result<Int, Error> {
   return Result<Int, Error>.success(42)
 }
+// UNSUPPORTED: OS=windows-msvc

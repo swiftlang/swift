@@ -23,3 +23,4 @@ struct S {
     let _: [Test] = flattened // Ok (find .`bar` after unwrap)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

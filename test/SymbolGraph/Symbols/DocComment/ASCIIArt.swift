@@ -37,3 +37,4 @@ public struct S6 {}
 // CHECK-NEXT:   "character": 7
 // CHECK: "text": "art."
 
+// UNSUPPORTED: OS=windows-msvc

@@ -58,3 +58,4 @@ class SwiftGizmo : A {
   override init() {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

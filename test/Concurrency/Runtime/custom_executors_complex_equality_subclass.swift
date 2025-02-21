@@ -108,3 +108,4 @@ actor MyActor {
 // CHECK-NEXT: BASE BaseExecutor.isSameExclusiveExecutionContext: consider LeftExecutor('left') and RightExecutor('right') executors as equal context
 // CHECK-NEXT: MyActor: [left] on same context as [right]
 // CHECK-NEXT: end
+// UNSUPPORTED: OS=windows-msvc

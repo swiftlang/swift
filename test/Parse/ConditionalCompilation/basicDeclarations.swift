@@ -85,3 +85,4 @@ func constants2() -> Int {
 	return 1
 #endif
 }
+// UNSUPPORTED: OS=windows-msvc

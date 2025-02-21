@@ -30,3 +30,4 @@ public struct MyStruct {
 // CHECK-LABEL: @"$s32reflection_metadata_typed_throws8MyStructVMF" = internal constant
 // CHECK-PRESENT-SAME: ptr @"symbolic yy_____YKc 32reflection_metadata_typed_throws7MyErrorO"
 // CHECK-SUPPRESSED-SAME: ptr @"get_type_metadata yy32reflection_metadata_typed_throws7MyErrorOYKc.1"
+// UNSUPPORTED: OS=windows-msvc

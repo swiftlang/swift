@@ -33,3 +33,4 @@ func protocolToProtocolClass() -> Protocol {
   // CHECK: return [[COPIED_PROTO]]
   return OP.self
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ print("optional binding") // CHECK-NEXT: optional binding
 var y: Int? = nil
 y? += printAndReturn(4)
 print("done with binding test") // CHECK-NEXT: done with binding test
+// UNSUPPORTED: OS=windows-msvc

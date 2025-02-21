@@ -65,3 +65,4 @@ public struct X {
   @inlinable
   public init() {}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -90,4 +90,4 @@ func foo(_ c: Proto2Conformer) { _ = c }
 
 // RUN: %sourcekitd-test -req=collect-type %s -req-opts=expectedtypes='[s:8filtered4ProtP;s:8filtered5Prot1P]' -- %s | %FileCheck %s -check-prefix=BOTH
 // RUN: %sourcekitd-test -req=collect-type %s -req-opts=expectedtypes='[s:8filtered5Prot1P]' -- %s | %FileCheck %s -check-prefix=PROTO1
-// RUN: %sourcekitd-test -req=collect-type %s -req-opts=expectedtypes='[s:8filtered6Proto2P]' -- %s | %FileCheck %s -check-prefix=PROTO2
+// RUN: %sourcekitd-test -req=collect-type %s -req-opts=expectedtypes='[s:8filtered6Proto2P]' -- %s | %FileCheck %s -check-prefix=PROTO2// UNSUPPORTED: OS=windows-msvc

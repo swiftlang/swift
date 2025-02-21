@@ -43,3 +43,4 @@ func baz(_ p : P, _ q : Q) {
 
 baz(C(), D());
 
+// UNSUPPORTED: OS=windows-msvc

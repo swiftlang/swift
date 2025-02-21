@@ -8,3 +8,4 @@
 // CHECK-O-NOT: -enable-anonymous-context-mangled-names
 // CHECK-OSIZE-NOT: -enable-anonymous-context-mangled-names
 
+// UNSUPPORTED: OS=windows-msvc

@@ -325,3 +325,4 @@ let aliasedPrivateAlias: Leaky.AliasToPrivateAlias = Leaky.staticReturningPrivat
 let aliasedPrivateRec: Leaky.AliasToPrivateRec = Leaky.staticReturningPrivateRec()
 let aliasedPrivateEnum: Leaky.AliasToPrivateEnum = Leaky.staticReturningPrivateEnum()
 let aliasedPrivateEnumClass: Leaky.AliasToPrivateEnumClass = Leaky.staticReturningPrivateEnumClass()
+// UNSUPPORTED: OS=windows-msvc

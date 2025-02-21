@@ -36,3 +36,4 @@ struct App {
         print("test complete")
     }
 }
+// UNSUPPORTED: OS=windows-msvc

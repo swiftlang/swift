@@ -21,3 +21,4 @@
 public extension Foo {
     enum Bar { }
 }
+// UNSUPPORTED: OS=windows-msvc

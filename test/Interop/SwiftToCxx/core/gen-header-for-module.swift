@@ -24,3 +24,4 @@ public func reprintedInImportedModule() -> Int {
 
 // CHECK: namespace Core SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Core") {
 // CHECK: swift::Int reprintedInImportedModule() noexcept SWIFT_SYMBOL("s:4Core25reprintedInImportedModuleSiyF") SWIFT_WARN_UNUSED_RESULT {
+// UNSUPPORTED: OS=windows-msvc

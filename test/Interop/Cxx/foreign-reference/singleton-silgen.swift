@@ -39,3 +39,4 @@ public func test() {
 // CHECK-LABEL: sil{{ \[available .*\] | }}[clang DeletedSpecialMembers.test] @{{_ZNK21DeletedSpecialMembers4testEv|\?test\@DeletedSpecialMembers\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed DeletedSpecialMembers) -> Int32
 
 // CHECK-LABEL: sil{{ \[available .*\] | }}[serialized] [clang mutateIt] @{{_Z8mutateItR21DeletedSpecialMembers|\?mutateIt\@\@YAXAEAUDeletedSpecialMembers\@\@\@Z}} : $@convention(c) (DeletedSpecialMembers) -> ()
+// UNSUPPORTED: OS=windows-msvc

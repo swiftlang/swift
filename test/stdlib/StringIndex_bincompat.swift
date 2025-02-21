@@ -27,3 +27,4 @@ suite.test("String.index(before:) on an index near the start") {
   let i = string.utf8.index(after: string.utf8.startIndex)
   expectEqual(string.index(before: i), string.startIndex)
 }
+// UNSUPPORTED: OS=windows-msvc

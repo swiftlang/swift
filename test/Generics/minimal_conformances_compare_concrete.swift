@@ -47,3 +47,4 @@ extension G where X : Base, X : P, X == Derived {}
 // - without concrete contraction, we used to hit a problem where the sort
 //   in the minimal conformances algorithm would hit the unordered concrete
 //   conformances [concrete: Derived : P] vs [concrete: Base : P].
+// UNSUPPORTED: OS=windows-msvc

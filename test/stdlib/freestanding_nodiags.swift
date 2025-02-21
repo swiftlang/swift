@@ -41,3 +41,4 @@ func foo2(
 func foo3(
     body: @Hoo @Sendable () throws -> () // fine because unavailable
 ) {}
+// UNSUPPORTED: OS=windows-msvc

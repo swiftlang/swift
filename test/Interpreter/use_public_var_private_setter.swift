@@ -4,3 +4,4 @@
 import public_var_private_setter
 
 class Class: BaseClass {}
+// UNSUPPORTED: OS=windows-msvc

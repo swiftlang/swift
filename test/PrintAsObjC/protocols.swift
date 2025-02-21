@@ -238,3 +238,4 @@ extension ParentClass {
 
 // Deliberately at the end of the file.
 @objc protocol ZZZ {}
+// UNSUPPORTED: OS=windows-msvc

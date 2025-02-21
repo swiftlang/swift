@@ -13,3 +13,4 @@ let _ = testGetX()
 // CHECK: {{.*}}(%[[SELF_VAL:.*]] : $*CopyTrackedDerivedClass):
 // CHECK: function_ref @{{.*}}__synthesizedBaseGetterAccessor_{{.*}} : $@convention(cxx_method) (@in_guaranteed CopyTrackedDerivedClass) -> Int32
 // CHECK-NEXT: apply %{{.*}}(%[[SELF_VAL]])
+// UNSUPPORTED: OS=windows-msvc

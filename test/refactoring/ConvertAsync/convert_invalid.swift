@@ -31,3 +31,4 @@ func testUnknownErrorInContinuation(completionHandler: @escaping (Int?, Error?) 
 // UNKNOWN-ERROR-IN-CONTINUATION-NEXT:     }
 // UNKNOWN-ERROR-IN-CONTINUATION-NEXT:   }
 // UNKNOWN-ERROR-IN-CONTINUATION-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

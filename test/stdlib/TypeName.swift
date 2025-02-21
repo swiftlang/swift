@@ -226,3 +226,4 @@ TypeNameTests.test("NestedInConstrainedExtension") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -570,3 +570,4 @@ public struct Struct {
   // CHECK-SIL-SKIP-NONINLINE: "Struct.varWithTransparentGetter.getter"
   // CHECK-SIL-SKIP-WITHOUTTYPES: "Struct.varWithTransparentGetter.getter"
 }
+// UNSUPPORTED: OS=windows-msvc

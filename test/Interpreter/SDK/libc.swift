@@ -98,3 +98,4 @@ assert(statbuf1.st_mode == S_IFREG | S_IRUSR | S_IWUSR | S_IXUSR)
 #endif
 assert(statbuf1.st_mode == statbuf2.st_mode)
 
+// UNSUPPORTED: OS=windows-msvc

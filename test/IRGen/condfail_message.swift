@@ -14,3 +14,4 @@ func testit(_ a: Int8) -> Int8 {
 // CHECK: [[FAILURE_FUNC]] = distinct !DISubprogram(name: "Swift runtime failure: arithmetic overflow", scope: {{.*}}, file: {{.*}}, type: [[FUNC_TYPE:![0-9]+]], flags: DIFlagArtificial, spFlags: DISPFlagDefinition, {{.*}})
 // CHECK: [[FUNC_TYPE]] = !DISubroutineType(types: null)
  
+// UNSUPPORTED: OS=windows-msvc

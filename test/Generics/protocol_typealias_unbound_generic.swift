@@ -5,3 +5,4 @@ protocol P {
 
   associatedtype X where X == A // expected-error {{reference to generic type 'Self.A' (aka 'Array') requires arguments in <...>}}
 }
+// UNSUPPORTED: OS=windows-msvc

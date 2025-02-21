@@ -27,3 +27,4 @@ struct Q {
     // expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

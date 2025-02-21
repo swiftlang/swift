@@ -90,3 +90,4 @@ if #available(SwiftStdlib 5.5, *) {
     expectNotEqual(0, NSKeyedUnarchiver._swift_checkClassAndWarnForKeyedArchiving(LocalClass.self, operation: op))
   }
 }
+// UNSUPPORTED: OS=windows-msvc

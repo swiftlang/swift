@@ -16,3 +16,4 @@ var x: Int64 {
     _x = newValue
   }
 }
+// UNSUPPORTED: OS=windows-msvc

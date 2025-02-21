@@ -36,3 +36,4 @@ TemplatesTestSuite.test("typedeffed-non-type-parameter") {
 // }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

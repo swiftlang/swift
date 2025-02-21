@@ -25,3 +25,4 @@ public func unavailableInHeaderFunc(_ x: StructSeveralI64) -> StructSeveralI64 {
 }
 
 // CHECK: // Unavailable in C++: Swift global function 'unavailableInHeaderFunc(_:)'.
+// UNSUPPORTED: OS=windows-msvc

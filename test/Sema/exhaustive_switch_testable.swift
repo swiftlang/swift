@@ -23,3 +23,4 @@ func testNonFrozen(_ e: NonFrozenEnum) -> Int {
   case .b, .c: return 2
   }
 }
+// UNSUPPORTED: OS=windows-msvc

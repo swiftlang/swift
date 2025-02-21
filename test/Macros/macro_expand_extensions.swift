@@ -266,3 +266,4 @@ struct HasNestedType {
 // extensions of nested types when the outer type has an
 // attached macro that can add other nested types.
 extension HasNestedType.Inner {}
+// UNSUPPORTED: OS=windows-msvc

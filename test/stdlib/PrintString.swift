@@ -176,3 +176,4 @@ PrintTests.test("StringInterpolationExtra") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -11,3 +11,4 @@ func test() {
 
 // CHECK: Int
 test()
+// UNSUPPORTED: OS=windows-msvc

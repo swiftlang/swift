@@ -20,3 +20,4 @@
 // EMPTY-NOT: P1
 // EMPTY-NOT: P2
 // EMPTY-NOT: MyClass
+// UNSUPPORTED: OS=windows-msvc

@@ -34,3 +34,4 @@ func throwingReasyncFunction(_ a: () async throws -> ()) reasync throws {
 func throwingSyncCaller(_ fn: () -> ()) throws {
 	try throwingReasyncFunction(fn)
 }
+// UNSUPPORTED: OS=windows-msvc

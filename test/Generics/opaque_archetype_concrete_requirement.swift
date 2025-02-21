@@ -52,3 +52,4 @@ extension HasP where T == DefinesOpaqueP1.T, U == G<T.T> {
   func checkSameType1(_ t: T.T) -> DefinesOpaqueP1.T.T { return t }
   func checkSameType2(_ u: T.U) -> DefinesOpaqueP1.T.U { return u }
 }
+// UNSUPPORTED: OS=windows-msvc

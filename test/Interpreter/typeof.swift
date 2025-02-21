@@ -87,3 +87,4 @@ print(boxedExistentialMetatype(GrilledCheese()))
 print(boxedExistentialMetatype(GrilledCheese() as Meltdown))
 // CHECK: (x: Int, y: Int, Double)
 print(type(of: labeledTuple()))
+// UNSUPPORTED: OS=windows-msvc

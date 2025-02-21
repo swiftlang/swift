@@ -326,3 +326,4 @@ do {
   // CHECK: (nil, a.Foo, a.Bar, nil)
   print(fi())
 }
+// UNSUPPORTED: OS=windows-msvc

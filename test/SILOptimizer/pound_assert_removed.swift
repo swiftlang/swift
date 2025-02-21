@@ -6,3 +6,4 @@ public func builtinRemoved() {
   #assert(true)
   // CHECK-NOT: builtin "poundAssert"
 }
+// UNSUPPORTED: OS=windows-msvc

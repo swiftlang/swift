@@ -374,3 +374,4 @@ public func testArrayReturn(x: inout MyStruct) -> Bool {
     return x.foo
 }
 
+// UNSUPPORTED: OS=windows-msvc

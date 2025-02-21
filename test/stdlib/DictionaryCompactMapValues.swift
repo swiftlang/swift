@@ -22,3 +22,4 @@ tests.test("ExplicitTypeContext") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

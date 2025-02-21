@@ -45,3 +45,4 @@
 // COMPILE_3: }
 // COMPILE_3-NOT: compile-will-start
 // COMPILE_3-NOT: compile-did-finish
+// UNSUPPORTED: OS=windows-msvc

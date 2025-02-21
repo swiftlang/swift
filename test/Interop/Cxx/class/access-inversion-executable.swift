@@ -52,3 +52,4 @@ AccessInversionTestSuite.test("usePrivateDefaultArgs") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

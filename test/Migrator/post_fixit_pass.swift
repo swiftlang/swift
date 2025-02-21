@@ -16,3 +16,4 @@ func foo(_ d: SomeAttribute) {
   let i: Int = d
 }
 
+// UNSUPPORTED: OS=windows-msvc

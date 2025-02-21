@@ -62,3 +62,4 @@ func test4() {
   } catch {
   }
 }
+// UNSUPPORTED: OS=windows-msvc

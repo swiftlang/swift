@@ -98,3 +98,4 @@ func test_usedToBeSync_but_remoteImplIsAsyncNow() async throws {
     try! await test_usedToBeSync_but_remoteImplIsAsyncNow()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

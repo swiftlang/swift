@@ -22,3 +22,4 @@ func BatchNorm_callAsFunction(_ input: Tensor) -> Tensor {
 func LayerNorm_callAsFunction(_ input: Tensor) -> Tensor {
   rsqrt(input)
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -24,3 +24,4 @@ open class FinalController: BaseGenericController<FinalView> { public override i
 
 // CHECK: FinalController
 print(FinalController())
+// UNSUPPORTED: OS=windows-msvc

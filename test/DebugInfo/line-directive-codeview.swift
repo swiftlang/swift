@@ -26,3 +26,4 @@ func myFunc() {
 // CV-CHECK: .cv_file [[DEF:[0-9]+]] "{{.*}}def.swift"
 // CV-CHECK: .cv_loc [[MYFUNC]] [[DEF]] 142 {{0?}}
 // CV-CHECK: .cv_linetable [[MYFUNC]], $s4main6myFuncyyF
+// UNSUPPORTED: OS=windows-msvc

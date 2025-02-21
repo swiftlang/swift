@@ -76,3 +76,4 @@ CastsTests.test("type(of:) should look through extended existentials (metatype)"
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

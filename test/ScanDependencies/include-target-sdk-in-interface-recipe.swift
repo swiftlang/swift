@@ -10,3 +10,4 @@ func foo() { print(1) }
 // CHECK-NEXT: "macosx15.0.test_name"
 // CHECK: "-target-sdk-version",
 // CHECK-NEXT: "15.0"
+// UNSUPPORTED: OS=windows-msvc

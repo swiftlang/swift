@@ -14,3 +14,4 @@ class MyDelegate: NSObject, NSApplicationDelegate {
 }
 
 func hi() {}
+// UNSUPPORTED: OS=windows-msvc

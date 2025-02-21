@@ -20,3 +20,4 @@ class AttrAnnots {
   // CHECK: [[@LINE-1]]:22 | instance-property(GKI)/Swift | gkString |
 }
 
+// UNSUPPORTED: OS=windows-msvc

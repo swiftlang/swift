@@ -92,3 +92,4 @@ bb0(%0 : $@sil_unowned P):
 // CHECK-NEXT: store ptr [[NEW]], ptr [[DEST_X]], align 8
 // CHECK-NEXT: call void @swift_unownedRelease(ptr [[OLD]])
 // CHECK-NEXT: ret ptr [[DEST_OPQ]]
+// UNSUPPORTED: OS=windows-msvc

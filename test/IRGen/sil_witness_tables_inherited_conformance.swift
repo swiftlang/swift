@@ -42,3 +42,4 @@ func wangle<T : Cat>(_ t: T.Type) {
 feed(Cat())
 wangle(Cat.self)
 Anesthesiologist<Cat>().disentangle(Cat())
+// UNSUPPORTED: OS=windows-msvc

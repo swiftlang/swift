@@ -152,3 +152,4 @@ bb0(%0 : $@sil_unowned C):
   return %0 : $@sil_unowned C
 }
 
+// UNSUPPORTED: OS=windows-msvc

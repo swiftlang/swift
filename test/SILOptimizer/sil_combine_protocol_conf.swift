@@ -393,3 +393,4 @@ public func entryPoint() {
   let c = ConformerClass()
   repo(c)
 }
+// UNSUPPORTED: OS=windows-msvc

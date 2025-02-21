@@ -14,3 +14,4 @@ public func useNSOption(foo param: StandardNSOption) {}
 
 // CHECK: [[FUNC_LINKAGE_NAME:\$s.*useNSOption.*$]]
 // CHECK: [[FUNC_LINKAGE_NAME]]
+// UNSUPPORTED: OS=windows-msvc

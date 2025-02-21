@@ -42,3 +42,4 @@ public enum UsesDefaultEquals : Int {
 // CHECK: bb0(%0 : $*UsesDefaultEquals, %1 : $*UsesDefaultEquals, %2 : $@thick UsesDefaultEquals.Type):
 // CHECK: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
 // CHECK: return
+// UNSUPPORTED: OS=windows-msvc

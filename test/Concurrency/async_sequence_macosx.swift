@@ -33,3 +33,4 @@ class Store<Action: Sendable> {
 
     }
 }
+// UNSUPPORTED: OS=windows-msvc

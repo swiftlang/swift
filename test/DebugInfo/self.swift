@@ -22,3 +22,4 @@ public func f() {
 // CHECK: ![[SELF]] = !DILocalVariable(name: "self", scope
 // CHECK-SAME:                         type: ![[STUFFSTRUCT]]
 
+// UNSUPPORTED: OS=windows-msvc

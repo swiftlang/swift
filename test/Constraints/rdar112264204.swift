@@ -13,3 +13,4 @@ func bar(_ x: Int) {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

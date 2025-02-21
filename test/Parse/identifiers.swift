@@ -60,3 +60,4 @@ func localScope() {
   @Wrapper var variable
   _ = 0
 }
+// UNSUPPORTED: OS=windows-msvc

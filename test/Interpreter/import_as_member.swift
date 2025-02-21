@@ -13,3 +13,4 @@ print("Norm: \(v3.norm)") // CHECK: Norm: 3.0
 
 // TODO: Test protocols
 
+// UNSUPPORTED: OS=windows-msvc

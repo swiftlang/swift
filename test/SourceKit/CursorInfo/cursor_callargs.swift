@@ -30,3 +30,4 @@ c1.meth(0, passFloat: 0)
 // RUN: %sourcekitd-test -req=related-idents -pos=7:15 %s -- %s | %FileCheck -check-prefix=CHECK-IDS %s
 // CHECK-IDS:      START RANGES
 // CHECK-IDS-NEXT: END RANGES
+// UNSUPPORTED: OS=windows-msvc

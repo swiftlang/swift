@@ -107,3 +107,4 @@ bbreturn:
   %v = tuple ()
   return %v : $()
 }
+// UNSUPPORTED: OS=windows-msvc

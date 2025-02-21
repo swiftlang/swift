@@ -47,3 +47,4 @@ func bar() -> ((P1 & P2)?).Type {
 }
 
 typealias A1 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'any P1.Type' cannot be used within a protocol-constrained type}}
+// UNSUPPORTED: OS=windows-msvc

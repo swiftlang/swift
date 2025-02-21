@@ -19,3 +19,4 @@ class MyDelegate : NSObject, UIApplicationDelegate {
     exit(EXIT_SUCCESS)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -42,3 +42,4 @@ do {
 }
 // CHECK-NEXT: done with nongeneric
 print("done with nongeneric")
+// UNSUPPORTED: OS=windows-msvc

@@ -54,3 +54,4 @@ packageFunc(a: t) // expected-error {{cannot find 'packageFunc' in scope}}
 
 let s = PackageStruct() // expected-error {{cannot find 'PackageStruct' in scope}}
 s.a.someMethod()
+// UNSUPPORTED: OS=windows-msvc

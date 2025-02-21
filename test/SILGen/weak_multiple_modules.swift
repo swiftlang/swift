@@ -21,3 +21,4 @@ func doSomething(ui: UI) -> Bool {
   // CHECK: return
   return ui.environment.router.flags.asBoolean()
 }
+// UNSUPPORTED: OS=windows-msvc

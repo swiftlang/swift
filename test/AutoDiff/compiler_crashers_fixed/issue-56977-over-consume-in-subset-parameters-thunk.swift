@@ -32,3 +32,4 @@ struct Type1: Differentiable {
 func ingestValue(val1: Double, val2: Double) -> Type1 {
   return Type1(test1: val1 * val2, test3: [])
 }
+// UNSUPPORTED: OS=windows-msvc

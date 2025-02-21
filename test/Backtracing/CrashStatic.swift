@@ -58,3 +58,4 @@ struct CrashStatic {
 // CHECK: Images ({{[0-9]+}} omitted):
 
 // CHECK: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{([0-9a-f]+|<no build ID>)}}{{ +}}CrashStatic{{ +}}{{.*}}/CrashStatic
+// UNSUPPORTED: OS=windows-msvc

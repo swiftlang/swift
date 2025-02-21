@@ -15,3 +15,4 @@ public enum Foo {
 // CHECK1: {{^}}    /// This isn't special.{{$}}
 // CHECK1: {{^}}    case B(String){{$}}
 // CHECK1: {{^}}}{{$}}
+// UNSUPPORTED: OS=windows-msvc

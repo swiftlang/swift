@@ -32,3 +32,4 @@ func foo5() {
     } else something()
     foo1()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@ var x: Int
 
 // BEGIN b.swift
 var x: Float
+// UNSUPPORTED: OS=windows-msvc

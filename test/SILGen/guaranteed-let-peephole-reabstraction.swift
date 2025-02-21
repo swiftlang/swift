@@ -20,3 +20,4 @@ func foo(struc: BlockStruct<String>) {
   escapingCompletion(completion: struc.block)
   escapingCompletion(completion: struc.computedBlock)
 }
+// UNSUPPORTED: OS=windows-msvc

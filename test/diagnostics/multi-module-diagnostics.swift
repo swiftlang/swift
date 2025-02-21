@@ -91,3 +91,4 @@ open class SubClass: ParentClass {
 // RUN: mv %t/alternative.swift-moved %t/alternative.swift
 // RUN: mv %t/moda.swift %t/moda.swift-moved
 // RUN: not %target-swift-frontend -typecheck -I %t/mods -D MODB %s 2>&1 | %FileCheck -check-prefix=CHECK-GENERATED %s
+// UNSUPPORTED: OS=windows-msvc

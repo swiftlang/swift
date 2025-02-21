@@ -66,3 +66,4 @@ ZipperedAvailabilityTestSuite.test("zippered availability iOS") {
 
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

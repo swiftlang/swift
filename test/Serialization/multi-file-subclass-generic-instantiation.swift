@@ -6,3 +6,4 @@
 
 class Superclass<T> {}
 class Subclass: Superclass<Subclass.MemberTypeFromOtherFile> {}
+// UNSUPPORTED: OS=windows-msvc

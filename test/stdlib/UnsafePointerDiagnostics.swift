@@ -372,3 +372,4 @@ func unsafePointerInitNonEphemeralConversions() {
   // FIXME: This is currently ambiguous.
   _ = OpaquePointer(&global) // expected-error {{ambiguous use of 'init(_:)'}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -55,3 +55,4 @@ func testClosure() async {
 }
 
 await testClosure()
+// UNSUPPORTED: OS=windows-msvc

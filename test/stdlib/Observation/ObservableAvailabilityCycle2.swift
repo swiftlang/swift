@@ -12,3 +12,4 @@
 
 @available(SwiftStdlib 5.9, *)
 let x = AnotherObservableClass(name: "Hello")
+// UNSUPPORTED: OS=windows-msvc

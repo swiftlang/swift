@@ -18,3 +18,4 @@ import Swift
 
 public var a = doSomething()
 a.isBConfused()
+// UNSUPPORTED: OS=windows-msvc

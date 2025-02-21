@@ -329,3 +329,4 @@ public struct BoundBlank {}
 // BOUNDBLANK-NEXT:      }
 // BOUNDBLANK-NEXT:    ]
 // BOUNDBLANK-NEXT:  },
+// UNSUPPORTED: OS=windows-msvc

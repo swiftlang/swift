@@ -49,3 +49,4 @@ func a_function() {}
 @interface ObjCGoo
 - (instancetype)initWithMyVal:(void (*)())myVal;
 @end
+// UNSUPPORTED: OS=windows-msvc

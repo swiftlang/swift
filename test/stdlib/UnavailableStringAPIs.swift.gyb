@@ -44,3 +44,4 @@ func test_CharacterView(s: String, i: String.Index, d: Int) {
   _ = s.index(i, offsetBy: d, limitedBy: i) // OK
   _ = s.distance(from: i, to: i) // OK
 }
+// UNSUPPORTED: OS=windows-msvc

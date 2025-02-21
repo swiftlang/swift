@@ -9,4 +9,4 @@ protocol P {
   var outputURL : URL? { get set }
 }
 
-extension ObjCKlass : P {}
+extension ObjCKlass : P {}// UNSUPPORTED: OS=windows-msvc

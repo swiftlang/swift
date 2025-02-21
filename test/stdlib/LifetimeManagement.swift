@@ -26,3 +26,4 @@ suite.test("move") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

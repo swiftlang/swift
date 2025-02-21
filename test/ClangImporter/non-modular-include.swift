@@ -18,3 +18,4 @@
 import Foo
 
 _ = Foo.x
+// UNSUPPORTED: OS=windows-msvc

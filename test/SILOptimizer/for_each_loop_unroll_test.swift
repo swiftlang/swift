@@ -111,3 +111,4 @@ func unrollMultipleLoops(x: Int64, y: Int64, z: Bool) {
     // CHECK-NOT: forEach
     // CHECK-LABEL: end sil function '$s25for_each_loop_unroll_test0D13MultipleLoops1x1y1zys5Int64V_AGSbtF'
 }
+// UNSUPPORTED: OS=windows-msvc

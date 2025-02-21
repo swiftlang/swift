@@ -25,3 +25,4 @@ struct Storage : ~Escapable, BitwiseCopyable {}
 func take<T : BitwiseCopyable & ~Escapable>(_ t: T) {}
 
 func passStorage(_ s: Storage) { take(s) }
+// UNSUPPORTED: OS=windows-msvc

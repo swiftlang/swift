@@ -59,4 +59,4 @@ func foo() {
 // CHECK-DECL: local_types.(file).foo().Outer.Inner
 
 // DEMANGLE-DECL: $s11local_types3fooyyF5OuterL_V12GenericInnerV
-// CHECK-DECL: local_types.(file).foo().Outer.GenericInner
+// CHECK-DECL: local_types.(file).foo().Outer.GenericInner// UNSUPPORTED: OS=windows-msvc

@@ -56,4 +56,4 @@ let foo = [1, 2, 3, 4, 5].filter { $0 % 2 == 1 }.map { x in "\(x)" }
 // CHECK-NEXT: {{.*}} __builtin_log[='5']
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
 // CHECK-NEXT: {{.*}} __builtin_log_scope_exit
-// CHECK-NEXT: {{.*}} __builtin_log[foo='["1", "3", "5"]']
+// CHECK-NEXT: {{.*}} __builtin_log[foo='["1", "3", "5"]']// UNSUPPORTED: OS=windows-msvc

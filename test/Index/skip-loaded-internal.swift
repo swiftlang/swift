@@ -24,3 +24,4 @@ extension InternalS {
 
 //--- lib2.swift
 public struct Lib2S {}
+// UNSUPPORTED: OS=windows-msvc

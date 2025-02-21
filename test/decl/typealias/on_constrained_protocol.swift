@@ -53,3 +53,4 @@ extension ProtocolWithAssoctype where Self: MarkerProtocol {
   func useAssocTypeInExtension() -> MyAssocType {} // expected-error {{'MyAssocType' is ambiguous for type lookup in this context}}
 }
 func useAssocTypeOutsideExtension() -> ProtocolWithAssoctype.MyAssocType {} // expected-error {{ambiguous type name 'MyAssocType' in 'ProtocolWithAssoctype'}}
+// UNSUPPORTED: OS=windows-msvc

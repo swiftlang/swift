@@ -114,3 +114,4 @@ func migrate() -> EitherIO<Error, Prelude.Unit> {
     )))
     .map(const(unit))
 }
+// UNSUPPORTED: OS=windows-msvc

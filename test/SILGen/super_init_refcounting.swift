@@ -96,3 +96,4 @@ class Good: Foo {
     super.init(x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

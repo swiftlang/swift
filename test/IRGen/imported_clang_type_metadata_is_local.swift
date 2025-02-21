@@ -51,3 +51,4 @@ public struct TestUseFieldB {
 // but it doesn't need to dllimport it across the module boundary, as it's
 // emitted in the same module.
 // CHECK: @"$sSo17ImportedClangTypeVMn" = external global %swift.type_descriptor
+// UNSUPPORTED: OS=windows-msvc

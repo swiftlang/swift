@@ -24,3 +24,4 @@ test()
 
 // CHECK: declare void @default_arg_value(i32)
 @_extern(c) func default_arg_value(_: Int32 = 42)
+// UNSUPPORTED: OS=windows-msvc

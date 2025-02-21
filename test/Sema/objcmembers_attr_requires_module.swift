@@ -4,3 +4,4 @@
 @objcMembers class Oof {
   // expected-error@-1 {{@objcMembers attribute used without importing module 'Foundation'}}
 }
+// UNSUPPORTED: OS=windows-msvc

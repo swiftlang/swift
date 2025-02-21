@@ -126,3 +126,4 @@ public struct ProtoLibImpl : Proto {
 // CHECK-WITNESS-TABLE: }
 
 #endif // TEST
+// UNSUPPORTED: OS=windows-msvc

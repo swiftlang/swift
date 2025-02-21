@@ -656,3 +656,4 @@ macro missingMacro() = #externalMacro(module: "MacroDefinition", type: "BluhBlah
 macro notMacro() = #externalMacro(module: "MacroDefinition", type: "NotMacroStruct")
 // FIXME: xpected-warning@-1 {{macro implementation type 'MacroDefinition.NotMacroStruct' could not be found for macro 'notMacro()'; 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

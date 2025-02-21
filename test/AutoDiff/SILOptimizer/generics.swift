@@ -367,3 +367,4 @@ extension SuperclassRequirement {
   }
 }
 */
+// UNSUPPORTED: OS=windows-msvc

@@ -9,3 +9,4 @@ func foo<T>(_: T.Type, _ fn: () -> T) {}
 func test() {
   foo(C.self) { C() }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@ Foo(
 
 // RUN: %sourcekitd-test -req=complete -pos=7:5 %s -- %s > %t.response
 // RUN: %diff -u %s.response %t.response
+// UNSUPPORTED: OS=windows-msvc

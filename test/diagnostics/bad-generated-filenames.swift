@@ -14,3 +14,4 @@ func test(a: String, b: Int) -> Bool {
   // CHECK-DIA: SlashB./_operator
   a / b
 }
+// UNSUPPORTED: OS=windows-msvc

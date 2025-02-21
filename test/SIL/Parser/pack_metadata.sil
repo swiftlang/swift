@@ -21,3 +21,4 @@ sil [no_onstack_pack_metadata] @annotation : $() -> () {
   %retval = tuple ()
   return %retval : $()
 }
+// UNSUPPORTED: OS=windows-msvc

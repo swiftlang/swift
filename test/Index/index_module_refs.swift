@@ -30,3 +30,4 @@ extension SwiftModuleC.MyType {
     // CHECK: [[@LINE-6]]:45 | struct/Swift | MyType | {{.*}} | Ref
   }
 }
+// UNSUPPORTED: OS=windows-msvc

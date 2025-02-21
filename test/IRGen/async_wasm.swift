@@ -11,3 +11,4 @@
 // NOTAIL-NOT: @swift_task_alloc
 // NOTAIL-NOT: musttail call
 // NOTAIL: call swiftcc void @swift_task_future_wait_throwing(ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}})
+// UNSUPPORTED: OS=windows-msvc

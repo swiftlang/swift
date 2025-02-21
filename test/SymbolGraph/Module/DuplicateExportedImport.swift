@@ -14,3 +14,4 @@
 
 @_exported import A
 @_exported import class A.ClassTwo
+// UNSUPPORTED: OS=windows-msvc

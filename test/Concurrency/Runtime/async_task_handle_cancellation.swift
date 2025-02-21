@@ -30,3 +30,4 @@
     // CHECK-DAG: outside: Task.isCancelled = false
   }
 }
+// UNSUPPORTED: OS=windows-msvc

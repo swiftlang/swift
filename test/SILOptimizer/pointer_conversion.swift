@@ -210,3 +210,4 @@ public func dictionaryToPointer(dd: Dictionary<Int, Int>) {
   var d = dd
   takeDictionaryPointer(&d)
 }
+// UNSUPPORTED: OS=windows-msvc

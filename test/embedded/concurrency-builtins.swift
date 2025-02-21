@@ -26,3 +26,4 @@ public func test() async {
 // CHECK:   call {{.*}}@llvm.coro.end.async
 // CHECK:   unreachable
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

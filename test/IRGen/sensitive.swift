@@ -149,3 +149,4 @@ struct Container<T> {
     checkLargeCStructs();
   }
 }
+// UNSUPPORTED: OS=windows-msvc

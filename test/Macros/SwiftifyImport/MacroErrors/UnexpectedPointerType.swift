@@ -10,3 +10,4 @@ func myFunc(_ ptr: CInt, _ len: CInt) {
 @_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"))
 func myFunc2(_ ptr: UnsafeBufferPointer<CInt>, _ len: CInt) {
 }
+// UNSUPPORTED: OS=windows-msvc

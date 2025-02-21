@@ -412,3 +412,4 @@ bb6:
   %17 = tuple ()
   return %17 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

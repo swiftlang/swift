@@ -160,3 +160,4 @@ private class CodingH : NSObject, AlsoNSCoding { // expected-error{{private clas
 // Don't allow one to write @_staticInitializeObjCMetadata!
 @_staticInitializeObjCMetadata // expected-error{{unknown attribute '_staticInitializeObjCMetadata'}}
 class DontAllowStaticInits { }
+// UNSUPPORTED: OS=windows-msvc

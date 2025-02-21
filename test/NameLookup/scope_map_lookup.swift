@@ -125,3 +125,4 @@ extension S // expected-error{{expected '{' in extension}}
 let a = b ; let b = a
 // expected-note@-1 {{'a' declared here}}
 // expected-error@-2 {{ambiguous use of 'a'}}
+// UNSUPPORTED: OS=windows-msvc

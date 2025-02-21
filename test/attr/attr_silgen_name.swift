@@ -30,3 +30,4 @@ func liveEphemerally()
 
 @_cdecl("swift_retain") // expected-warning{{reserved}}
 func liveFrivolously() {}
+// UNSUPPORTED: OS=windows-msvc

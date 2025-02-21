@@ -137,3 +137,4 @@ func test_conforming_actor_to_global_actor_protocol() {
   actor MyValue : GloballyIsolatedProto {}
   // expected-error@-1 {{actor 'MyValue' cannot conform to global actor isolated protocol 'GloballyIsolatedProto'}}
 }
+// UNSUPPORTED: OS=windows-msvc

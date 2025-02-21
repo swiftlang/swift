@@ -37,3 +37,4 @@ func m() {
 func o(_: consuming Atomic<Int>) {} // OK
 
 func p(_: (consuming Atomic<Int>) -> ()) {} // OK
+// UNSUPPORTED: OS=windows-msvc

@@ -30,3 +30,4 @@ class protocolTestClass : ForwardDeclaredProtocol {}
 
 // CHECK: error: 'ForwardDeclaredInterface' cannot be constructed because it has no accessible initializers
 let interfaceTestInstance = ForwardDeclaredInterface()
+// UNSUPPORTED: OS=windows-msvc

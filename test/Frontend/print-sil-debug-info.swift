@@ -11,3 +11,4 @@ func foo(x: Int, y: Int) -> Int {
     // CHECK-GNONE-NOT: loc "{{.*}}.swift":{{[0-9]+}}:{{[0-9]+}}, scope {{[0-9]+}}
     x + y
 }
+// UNSUPPORTED: OS=windows-msvc

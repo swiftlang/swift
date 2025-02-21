@@ -92,3 +92,4 @@ func genericComposedWhere<T>(proto: T) where T: SwiftProto & SwiftProtoSame & Sw
   type(of: proto).staticMethod()
   // CHECK: [[@LINE-1]]:19 | static-method/Swift | staticMethod() | [[ProtoSameStaticMethod_USR]] | Ref,Call,Dyn,RelCall,RelCont | rel: 1
 }
+// UNSUPPORTED: OS=windows-msvc

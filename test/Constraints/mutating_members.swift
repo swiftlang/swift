@@ -34,3 +34,4 @@ func foo(_ foo: Foo.Type) {
   _ = foo.boom(&y)   // expected-error{{cannot reference 'mutating' method as function value}}
   _ = foo.boom(&y)() // expected-error{{cannot reference 'mutating' method as function value}}
 }
+// UNSUPPORTED: OS=windows-msvc

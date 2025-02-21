@@ -75,3 +75,4 @@ func iterateFakeCollection<T>(_ x: FakeCollection<T>) {
     useT(y)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

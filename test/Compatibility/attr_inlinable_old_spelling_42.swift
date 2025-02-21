@@ -10,3 +10,4 @@
 
 @inlinable @usableFromInline func redundantAttribute() {}
 // expected-warning@-1 {{'@usableFromInline' attribute has no effect on '@inlinable' global function 'redundantAttribute()'}}
+// UNSUPPORTED: OS=windows-msvc

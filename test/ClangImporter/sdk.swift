@@ -17,3 +17,4 @@ func unavailable_Class(_ a: Class) {} // expected-error {{cannot find type 'Clas
 func unavailable_BOOL(_ a: BOOL) {} // expected-error {{cannot find type 'BOOL' in scope; did you mean to use 'ObjCBool'?}} {{28-32=ObjCBool}}
 func unavailable_SEL(_ a: SEL) {} // expected-error {{cannot find type 'SEL' in scope; did you mean to use 'Selector'?}} {{27-30=Selector}}
 func unavailable_NSUInteger(_ a: NSUInteger) {} // expected-error {{cannot find type 'NSUInteger' in scope; did you mean to use 'Int'?}} {{34-44=Int}} expected-note {{did you mean to use 'UInt'?}} {{34-44=UInt}}
+// UNSUPPORTED: OS=windows-msvc

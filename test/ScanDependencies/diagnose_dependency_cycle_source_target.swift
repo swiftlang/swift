@@ -11,3 +11,4 @@
 import CycleSwiftMiddle
 
 
+// UNSUPPORTED: OS=windows-msvc

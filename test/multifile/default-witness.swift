@@ -8,3 +8,4 @@ public extension GraphType {
     func insert<N: Node>(_: N, _: GraphNode<N.Output>) {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

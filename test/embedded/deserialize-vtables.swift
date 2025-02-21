@@ -34,3 +34,4 @@ extension Array<UInt8> {
         putchar(10)
     }
 }
+// UNSUPPORTED: OS=windows-msvc

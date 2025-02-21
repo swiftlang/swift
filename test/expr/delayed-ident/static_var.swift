@@ -65,3 +65,4 @@ struct ImplicitMembers {
 func implicit(_ i: inout ImplicitMembers) {
     if i =% .optional {}
 }
+// UNSUPPORTED: OS=windows-msvc

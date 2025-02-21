@@ -256,3 +256,4 @@ func takesClosure(_: (() -> ())) throws -> Int {}
 func passesClosure() {
     _ = try takesClosure { } // expected-error {{errors thrown from here are not handled}}
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@
 class C {}
 
 sil_vtable C {}
+// UNSUPPORTED: OS=windows-msvc

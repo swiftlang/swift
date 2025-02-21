@@ -33,3 +33,4 @@ struct EnumWithUndeclaredCodingKeys : Codable { // expected-error {{type 'EnumWi
   // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'CodingKeys' does not conform to CodingKey}}
   // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'CodingKeys' does not conform to CodingKey}}
 }
+// UNSUPPORTED: OS=windows-msvc

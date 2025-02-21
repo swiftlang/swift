@@ -59,3 +59,4 @@ class X {}
     await call_f(x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

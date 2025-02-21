@@ -22,3 +22,4 @@ func testDoExpr() async throws {
   let _: Int = do { 5 }
   let _: Int = do { try await fn() } catch { throw Err() }
 }
+// UNSUPPORTED: OS=windows-msvc

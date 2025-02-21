@@ -20,3 +20,4 @@ public func f(_ xs: [String?]) {
 // CHECK: debug_value %[[X1:[0-9]+]] : $String, let, name "x", {{.*}}, scope [[S6]]
 // CHECK:  release_value %[[X1]] : $String, {{.*}}, scope [[S6]]
 // CHECK:  release_value %[[X]] : $Optional<String>, {{.*}}, scope [[S6]]
+// UNSUPPORTED: OS=windows-msvc

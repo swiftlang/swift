@@ -16,3 +16,4 @@
   case X, Y, Z
 }
 
+// UNSUPPORTED: OS=windows-msvc

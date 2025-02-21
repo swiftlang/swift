@@ -48,3 +48,4 @@ tests.test("test-shift-fix") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

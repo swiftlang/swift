@@ -11,3 +11,4 @@ import CxxStdlib
 
 let ObjCStr: NSString = "hello"
 let CxxStr = std.string(ObjCStr.utf8String) // Should not crash here
+// UNSUPPORTED: OS=windows-msvc

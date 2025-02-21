@@ -22,3 +22,4 @@ enum MyEnum {
 
 @Observable // expected-error {{'@Observable' cannot be applied to struct type 'MyStruct'}}
 struct MyStruct {}
+// UNSUPPORTED: OS=windows-msvc

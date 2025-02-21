@@ -55,3 +55,4 @@ import Bar
 // RESULT-NOT: key.description: "Bar",
 // RESULT: ]
 // RESULT: key.reusingastcontext: 1
+// UNSUPPORTED: OS=windows-msvc

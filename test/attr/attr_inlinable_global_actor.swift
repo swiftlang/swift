@@ -60,3 +60,4 @@ public struct PublicGA {
   _ = { @UFIGA in }
   _ = { @PublicGA in }
 }
+// UNSUPPORTED: OS=windows-msvc

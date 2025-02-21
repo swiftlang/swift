@@ -53,3 +53,4 @@ func test() {
 // CHECK: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
 // CHECK: Unit | user | SwiftModuleA | {{.*}}{{/|\\}}SwiftModuleA.swiftmodule
 // CHECK: DEPEND END
+// UNSUPPORTED: OS=windows-msvc

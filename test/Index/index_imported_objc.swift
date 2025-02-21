@@ -42,3 +42,4 @@ func test() { // CHECK: [[@LINE]]:6 | function/Swift | test() | [[s:.*]] | Def |
   c.protocolAddedMethod()
   // CHECK: [[@LINE-1]]:5 | instance-method/Swift | protocolAddedMethod() | c:objc(pl)MemberAdding(im)protocolAddedMethod | Ref,Call,Dyn,RelRec,RelCall,RelCont | rel: 2 
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -102,3 +102,4 @@ def fixit_loc(start_col, orig_suffix):
 // CHECK-NEXT:  //   'Foo/other_file_b.swift' => 'third/other_file_b.swift' (alternate)
 // CHECK-NEXT:  //   'Foo/other_file_c.swift' => 'first/other_file_c.swift'
 // CHECK-NEXT:  //   'Foo/other_file_c.swift' => 'second/other_file_c.swift' (alternate)
+// UNSUPPORTED: OS=windows-msvc

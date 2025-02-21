@@ -68,3 +68,4 @@ public class MyClass {
 // NONRESILIENT: @_hasInitialValue public var topLevelVar: Swift.Bool
 // RESILIENT: {{^}}public var topLevelVar: Swift.Bool
 public var topLevelVar: Bool = Bool(false && !true)
+// UNSUPPORTED: OS=windows-msvc

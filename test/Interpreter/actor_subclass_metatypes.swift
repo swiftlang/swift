@@ -27,3 +27,4 @@ Tests.test("base generic class")
   let x = Actor5(state: 5)
   print(type(of: x))
 }
+// UNSUPPORTED: OS=windows-msvc

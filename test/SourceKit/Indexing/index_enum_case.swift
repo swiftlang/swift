@@ -30,3 +30,4 @@ func brokenEnums() {
     return "one"
   }
 }
+// UNSUPPORTED: OS=windows-msvc

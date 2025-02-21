@@ -67,3 +67,4 @@ public var globalCopyable: IsCopyable = IsCopyable()
 // Shouldn't get a property descriptor since it's global
 // NEG-NOT: sil_property #{{.*}}globalNoncopyable
 public var globalNoncopyable: IsntCopyable = IsntCopyable()
+// UNSUPPORTED: OS=windows-msvc

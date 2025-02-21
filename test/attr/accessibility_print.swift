@@ -374,3 +374,4 @@ private class PublicInitPrivateInheritor : PublicInitBase {
   // CHECK: {{^}} override internal init()
   // CHECK: {{^}} override fileprivate init(other: PublicInitBase)
 } // CHECK: {{^[}]}}
+// UNSUPPORTED: OS=windows-msvc

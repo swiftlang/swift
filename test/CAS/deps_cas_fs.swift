@@ -30,3 +30,4 @@
 
 import E
 import SubE
+// UNSUPPORTED: OS=windows-msvc

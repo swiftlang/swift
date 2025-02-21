@@ -46,3 +46,4 @@ import Dispatch
     await task.get()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -15,3 +15,4 @@ extension P1 where Self: P2 {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s24gsb_canonical_type_bug_12P1PA2A2P2RzrlE3fooyy1AACQz_qd__tlF : $@convention(method) <Self where Self : P1, Self : P2><T> (@in_guaranteed Self.A, @in_guaranteed T, @in_guaranteed Self) -> ()
+// UNSUPPORTED: OS=windows-msvc

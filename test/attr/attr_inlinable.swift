@@ -371,3 +371,4 @@ private func deferBodyTestCall() {} // expected-note {{global function 'deferBod
   }
   _ = ()
 }
+// UNSUPPORTED: OS=windows-msvc

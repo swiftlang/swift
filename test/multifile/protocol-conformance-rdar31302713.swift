@@ -4,3 +4,4 @@ public struct FunctionalFurryAnimal<Fangs : Animal> : FurryAnimal
     where Fangs.AnimalSnackType.EatWith == Fangs {
   public func bite(with: Fangs) {}
 }
+// UNSUPPORTED: OS=windows-msvc

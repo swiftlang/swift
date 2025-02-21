@@ -19,3 +19,4 @@ var c = ObjCSwiftBridge(embedded: b)
 // CHECK: {{%[0-9]+}} = objc_method {{%[0-9]+}} : $ObjCSwiftBridge, #ObjCSwiftBridge.init!initializer.foreign : (ObjCSwiftBridge.Type) -> (IntWrapper) -> ObjCSwiftBridge?, $@convention(objc_method) (@in_guaranteed IntWrapper, @owned ObjCSwiftBridge) -> @owned Optional<ObjCSwiftBridge>
 // CHECK: {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(objc_method) (@in_guaranteed IntWrapper, @owned ObjCSwiftBridge) -> @owned Optional<ObjCSwiftBridge>
 // CHECK: dealloc_stack {{%[0-9]+}} : $*IntWrapper
+// UNSUPPORTED: OS=windows-msvc

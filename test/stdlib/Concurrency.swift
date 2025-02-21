@@ -14,3 +14,4 @@ extension PartialAsyncTask {
 @available(SwiftStdlib 5.1, *)
 extension UnownedJob {
 }
+// UNSUPPORTED: OS=windows-msvc

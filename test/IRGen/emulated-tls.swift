@@ -13,3 +13,4 @@ _swift_stdlib_gettid()
 
 // NOEMUTLS-NOT: __emutls_v._swift_stdlib_gettid.tid
 // NOEMUTLS-NOT: __emutls_get_address
+// UNSUPPORTED: OS=windows-msvc

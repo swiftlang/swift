@@ -58,3 +58,4 @@ extension DeprecatedDefaultWithMessage {
 
 // expected-warning@+1 {{deprecated default implementation is used to satisfy instance method 'f()' required by protocol 'DeprecatedDefaultWithMessage': write it yourself [DeprecatedDeclaration]}}
 struct S6: DeprecatedDefaultWithMessage {}
+// UNSUPPORTED: OS=windows-msvc

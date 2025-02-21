@@ -27,3 +27,4 @@ func test(arr: [any P]) {
 // CHECK: function_ref == infix<A>(_:_:)
 // CHECK-NEXT: [[GENERIC_OP:%.*]] = function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
 // CHECK-NEXT: apply [[GENERIC_OP]]<E>([[LHS_ARG]], [[RHS_ARG]])
+// UNSUPPORTED: OS=windows-msvc

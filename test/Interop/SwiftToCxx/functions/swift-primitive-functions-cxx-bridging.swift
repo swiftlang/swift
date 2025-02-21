@@ -222,3 +222,4 @@ public func passThroughUnsafeGenericMutablePointer(_ x: UnsafeMutablePointer<Int
 public func passThroughUnsafeGenericMutableOptionalPointer(_ x: UnsafeMutablePointer<Int32>?) -> UnsafeMutablePointer<Int32>? {
     return x
 }
+// UNSUPPORTED: OS=windows-msvc

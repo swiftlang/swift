@@ -6,3 +6,4 @@
 // REQUIRES: OS=macosx
 
 // RUN: %{python} %utils/python_lint.py
+// UNSUPPORTED: OS=windows-msvc

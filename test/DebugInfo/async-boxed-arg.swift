@@ -19,3 +19,4 @@ extension Collection where Element: Sendable {
 
 // CHECK: ![[BOXTY:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s5IndexSlQzz_x_SlRzs8Sendable7ElementSTRpzlXXD"
 // CHECK: !DILocalVariable(name: "i", arg: 3, {{.*}}type: ![[BOXTY]]
+// UNSUPPORTED: OS=windows-msvc

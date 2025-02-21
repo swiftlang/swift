@@ -68,3 +68,4 @@ bb3(%36 : $String, %37 : $String):                // Preds: bb2 bb1
   %44 = tuple ()
   return %44 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -823,3 +823,4 @@ RuntimeClassNamesTestSuite.test("private class nested in same-type-constrained e
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

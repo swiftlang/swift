@@ -9,3 +9,4 @@
 // REQUIRES: objc_interop
 
 useType()
+// UNSUPPORTED: OS=windows-msvc

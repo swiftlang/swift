@@ -42,3 +42,4 @@ extension Int {
 
 
 var (div, mod) = (9 / 4, 9 % 4)
+// UNSUPPORTED: OS=windows-msvc

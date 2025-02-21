@@ -40,3 +40,4 @@ struct internalMacroExtensionAidedEntityHelper {}
 // CHECK-DAG: 21PreservedConformances16MacroAddedStructV (PreservedConformances.MacroAddedStruct) : PreservedConformanceProtocols.TestEntity
 // CHECK-DAG: 21PreservedConformances36_Peer_internalMacroAidedEntityHelperV (PreservedConformances._Peer_internalMacroAidedEntityHelper) : PreservedConformanceProtocols.TestEntity
 // CHECK-DAG: 21PreservedConformances39internalMacroExtensionAidedEntityHelperV (PreservedConformances.internalMacroExtensionAidedEntityHelper) : PreservedConformanceProtocols.TestEntity
+// UNSUPPORTED: OS=windows-msvc

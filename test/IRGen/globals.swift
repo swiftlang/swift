@@ -67,3 +67,4 @@ public struct Implementer : Some {
 }
 
 let g : some Some = Implementer()
+// UNSUPPORTED: OS=windows-msvc

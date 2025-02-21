@@ -7,3 +7,4 @@ let countString = "len"
 @_SwiftifyImport(.countedBy(pointer: .param(1), count: countString))
 func myFunc(_ ptr: UnsafePointer<CInt>, _ len: String) {
 }
+// UNSUPPORTED: OS=windows-msvc

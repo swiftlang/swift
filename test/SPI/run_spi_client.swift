@@ -47,3 +47,4 @@ e.spiMethod()
 var ps = PublicStruct()
 ps.spiMethod()
 // CHECK: PublicStruct.spiMethod
+// UNSUPPORTED: OS=windows-msvc

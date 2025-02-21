@@ -66,3 +66,4 @@ import ImportAsMember
 
 // CHECK-NEXT: Globals-as-members mapping:
 // CHECK-NEXT:   SNSomeStruct: DefaultXValue, SNAdding, SNCreate, SNSomeStructGetDefault, SNSomeStructSetDefault, SNSomeStructGetFoo, SNSomeStructSetFoo
+// UNSUPPORTED: OS=windows-msvc

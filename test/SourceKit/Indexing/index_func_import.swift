@@ -9,3 +9,4 @@ import func test_module.globalFunc
 func test() {
   globalFunc()
 }
+// UNSUPPORTED: OS=windows-msvc

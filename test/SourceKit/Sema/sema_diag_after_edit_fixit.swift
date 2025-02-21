@@ -56,3 +56,4 @@ let a = 0; let b = 0 }; unresolved
 // CHECK-NEXT:   key.offset: 33,
 // CHECK-NEXT:   key.length: 10
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

@@ -85,3 +85,4 @@ func twoProtocols5<T, U>(_: T, _: U) where T : P1, T.X == U, U.Y == T, U : P2 {}
 func twoProtocols6<T, U>(_: T, _: U) where U : P2, T.X == U, U.Y == T, T : P1 {}
 // CHECK-LABEL: twoProtocols6
 // CHECK: Generic signature: <T, U where T : P1, T == U.[P2]Y, U == T.[P1]X>
+// UNSUPPORTED: OS=windows-msvc

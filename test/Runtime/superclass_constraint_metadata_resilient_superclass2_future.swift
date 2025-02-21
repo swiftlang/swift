@@ -45,3 +45,4 @@ public func consume<T>(_ t: T) {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

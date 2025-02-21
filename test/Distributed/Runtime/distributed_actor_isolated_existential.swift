@@ -62,3 +62,4 @@ distributed actor NormalWorker {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

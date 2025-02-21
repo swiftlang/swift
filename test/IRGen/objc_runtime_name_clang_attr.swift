@@ -17,3 +17,4 @@ public func foo(_: ObjCRuntimeNamed) {}
 
 // CHECK-LABEL: define{{.*}}3fooyySo21ObjCProtoRuntimeNamed_pF
 public func foo(_: ObjCProtoRuntimeNamed) {}
+// UNSUPPORTED: OS=windows-msvc

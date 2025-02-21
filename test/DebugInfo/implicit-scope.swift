@@ -16,3 +16,4 @@ public func main() {
     print("break here ...")
   }
 }
+// UNSUPPORTED: OS=windows-msvc

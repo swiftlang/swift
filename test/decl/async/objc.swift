@@ -43,3 +43,4 @@ func testSelectors() {
   _ = Selector("canary:") // expected-warning{{no method declared with Objective-C selector 'canary:'}}
   // expected-note@-1{{wrap the selector name in parentheses to suppress this warning}}
 }
+// UNSUPPORTED: OS=windows-msvc

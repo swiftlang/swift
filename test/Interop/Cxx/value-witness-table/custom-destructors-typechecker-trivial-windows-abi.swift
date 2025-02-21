@@ -8,3 +8,4 @@ _ = HasUserProvidedDestructor() // expected-error {{non-trivial C++ class with t
 _ = HasEmptyDestructorAndMemberWithUserDefinedConstructor() // expected-error {{non-trivial C++ class with trivial ABI is not yet available in Swift}}
 _ = HasNonTrivialImplicitDestructor() // expected-error {{non-trivial C++ class with trivial ABI is not yet available in Swift}}
 _ = HasNonTrivialDefaultedDestructor() // expected-error {{non-trivial C++ class with trivial ABI is not yet available in Swift}}
+// UNSUPPORTED: OS=windows-msvc

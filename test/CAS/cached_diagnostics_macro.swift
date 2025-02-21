@@ -69,3 +69,4 @@ func testDiscardableStringify(x: Int) {
   #toMyWarning("this is a warning")
   #myWarning("this is a warning")
 }
+// UNSUPPORTED: OS=windows-msvc

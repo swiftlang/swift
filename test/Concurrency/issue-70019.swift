@@ -14,3 +14,4 @@ struct Bar: Sendable {
   // FIXME: This warning should only be thrown in library evolution mode. If @usableFromInline is removed from Foo the Sendable conformance is synthesized as expected.
   var foo: Foo // expected-warning {{stored property 'foo' of 'Sendable'-conforming struct 'Bar' has non-sendable type 'Foo'}}
 }
+// UNSUPPORTED: OS=windows-msvc

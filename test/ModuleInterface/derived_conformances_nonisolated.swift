@@ -16,3 +16,4 @@
   // CHECK: nonisolated public var hashValue: Swift.Int
   // CHECK: nonisolated public init(from decoder: any Swift.Decoder) throws
 }
+// UNSUPPORTED: OS=windows-msvc

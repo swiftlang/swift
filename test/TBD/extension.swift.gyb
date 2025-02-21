@@ -106,3 +106,4 @@ extension ${sname}StructOneExtension: ${", ".join("Extension" + p for p in all_d
 % end
 }
 % end
+// UNSUPPORTED: OS=windows-msvc

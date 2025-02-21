@@ -1,3 +1,4 @@
 // RUN: %llvm-nm --defined-only -C %platform-dylib-dir/%target-library-name(swiftCore) | %FileCheck --allow-empty %s
 // CHECK-NOT: [^:]llvm::
 // UNSUPPORTED: freestanding
+// UNSUPPORTED: OS=windows-msvc

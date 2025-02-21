@@ -7,3 +7,4 @@ protocol Fooable { func foo() }
 
 class A<B: Fooable> where B: AnyObject{
 }
+// UNSUPPORTED: OS=windows-msvc

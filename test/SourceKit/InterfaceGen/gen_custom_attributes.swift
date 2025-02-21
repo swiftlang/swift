@@ -112,3 +112,4 @@ public struct TestStruct {
 // DOCINFO:     @MyModule.PublicBuilder var publicBuilderVal: Int { get }
 // DOCINFO:     var internalBuilderVal: Int { get }
 // DOCINFO: }
+// UNSUPPORTED: OS=windows-msvc

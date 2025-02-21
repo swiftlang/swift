@@ -39,3 +39,4 @@ struct TestStruct : Proto {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

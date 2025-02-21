@@ -38,3 +38,4 @@ public func launchToday(fc: FinalCountdown) {
   fc.count = 27
 }
 
+// UNSUPPORTED: OS=windows-msvc

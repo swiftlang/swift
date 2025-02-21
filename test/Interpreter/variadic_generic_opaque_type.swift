@@ -45,3 +45,4 @@ opaque.test("Opaque2") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

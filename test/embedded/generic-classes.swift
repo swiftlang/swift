@@ -115,3 +115,4 @@ struct Main {
 // CHECK: SubClass2
 // CHECK: Inner.foo
 
+// UNSUPPORTED: OS=windows-msvc

@@ -36,3 +36,4 @@
 // CHECK-OFM-SAME: -o main.ast
 // CHECK-OFM-NEXT: -dump-ast
 // CHECK-OFM-SAME: -o a.ast
+// UNSUPPORTED: OS=windows-msvc

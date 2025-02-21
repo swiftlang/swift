@@ -41,3 +41,4 @@ private func baz() -> Int { return 2 }
 // CHECK: key.sourcetext: "    internal var foo: Int { return 0 }"
 // CHECK: key.sourcetext: "    static var bar: Int { return 1 }"
 // CHECK: key.sourcetext: "    private func baz() -> Int { return 2 }"
+// UNSUPPORTED: OS=windows-msvc

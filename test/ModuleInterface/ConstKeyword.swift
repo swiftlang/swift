@@ -18,3 +18,4 @@ public struct A {
 // CHECK: _const public static let A: Swift.String
 // CHECK: public func takeConst1(a: _const Swift.Int)
 // CHECK: public func takeConst2(a b: _const Swift.Int)
+// UNSUPPORTED: OS=windows-msvc

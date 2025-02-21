@@ -70,3 +70,4 @@ func testGlobals() {
 
 public struct ErrorsOnly<T: Error> {}
 public func testErrorConformance(_ code: ErrorsOnly<SKWidget.Error>? = nil) {}
+// UNSUPPORTED: OS=windows-msvc

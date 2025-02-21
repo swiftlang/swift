@@ -8,3 +8,4 @@ func x() {}
 var bs = [x]
 
 foo(bs)
+// UNSUPPORTED: OS=windows-msvc

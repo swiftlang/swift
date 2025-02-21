@@ -9,3 +9,4 @@
 
 // RUN: not %target-swift-frontend -enforce-exclusivity=other %s -emit-silgen 2>&1 | %FileCheck -check-prefix=EXCLUSIVITY_UNRECOGNIZED %s
 // EXCLUSIVITY_UNRECOGNIZED: unsupported argument 'other' to option '-enforce-exclusivity='
+// UNSUPPORTED: OS=windows-msvc

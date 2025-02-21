@@ -64,3 +64,4 @@ extension NormalImportedType {
 // CHECK: funcForThisOS
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

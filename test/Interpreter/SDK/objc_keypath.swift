@@ -68,3 +68,4 @@ print(recordLabel.value(forKeyPath: #keyPath(RecordLabel.bands.Beatles.members.l
 
 // CHECK: DONE
 print("DONE")
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@ public class MyClass : XCTestCase {
   func test_startsWithTest_takesNoParams_returnsVoid_andThrows() throws {}
 }
 
+// UNSUPPORTED: OS=windows-msvc

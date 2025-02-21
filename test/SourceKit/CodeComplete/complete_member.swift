@@ -78,3 +78,4 @@ func testOverrideUSR() {
 // CHECK-OVERRIDE_USR-NEXT:     key.modulename: "complete_member",
 // CHECK-OVERRIDE_USR-NEXT:     key.sourcetext: "foo()"
 // CHECK-OVERRIDE_USR-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

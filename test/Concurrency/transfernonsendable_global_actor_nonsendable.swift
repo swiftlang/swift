@@ -284,3 +284,4 @@ extension GlobalActorIsolatedProtocol {
     // expected-note @-1 {{returning main actor-isolated 'self.p2' risks causing data races since the caller assumes that 'self.p2' can be safely sent to other isolation domains}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

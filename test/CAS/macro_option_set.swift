@@ -51,3 +51,4 @@ assert(options.contains(.nextDay))
 assert(options.contains(.secondDay))
 assert(!options.contains(.standard))
 
+// UNSUPPORTED: OS=windows-msvc

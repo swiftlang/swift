@@ -98,3 +98,4 @@ func consumingSwitchSubject3(ncp: consuming NCPair) {
       break
     }
 }
+// UNSUPPORTED: OS=windows-msvc

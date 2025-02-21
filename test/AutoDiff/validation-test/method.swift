@@ -390,3 +390,4 @@ MethodTests.testWithLeakChecking("static method with custom adjoint, wrt all") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

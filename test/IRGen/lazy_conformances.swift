@@ -39,3 +39,4 @@ extension MyCollection : BidirectionalCollection
     fatalError()
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ class Person : Named {
 }
 
 var person = Person()
+// UNSUPPORTED: OS=windows-msvc

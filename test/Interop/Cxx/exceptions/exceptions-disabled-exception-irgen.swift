@@ -94,3 +94,4 @@ let _ = testClassWithThrowingConstructor()
 // CHECK: define {{.*}} @"$s4test0A28ClassWithThrowingConstructors5Int32VyF"() #[[#SWIFTMETA]] {
 // CHECK-NOT: invoke
 // CHECK: }
+// UNSUPPORTED: OS=windows-msvc

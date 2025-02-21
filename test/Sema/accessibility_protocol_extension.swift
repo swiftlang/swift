@@ -76,3 +76,4 @@ extension P {
   public var usesPackageStructProp: PackageStruct { get { } set { } }
   // expected-error@-1 {{property cannot be declared public because its type uses a package type}}
 }
+// UNSUPPORTED: OS=windows-msvc

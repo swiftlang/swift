@@ -58,3 +58,4 @@ func test<DA: WorkerProtocol>(actor: DA) async throws -> String {
     print("v2 = \(v2)") // CHECK: v2 = implemented!
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -17,3 +17,4 @@ extension DispatchData {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -190,3 +190,4 @@ func testHeaderGuard() {
   _ = IS_HEADER_GUARD // expected-error {{cannot find 'IS_HEADER_GUARD' in scope}}
   _ = LOOKS_LIKE_HEADER_GUARD_BUT_IS_USEFUL_CONSTANT
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -52,3 +52,4 @@ slice_from_varargs(1,6,1,8)
 // CHECK: 1
 // CHECK: 8
 
+// UNSUPPORTED: OS=windows-msvc

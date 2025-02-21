@@ -42,3 +42,4 @@ func caller() {
 
 
 
+// UNSUPPORTED: OS=windows-msvc

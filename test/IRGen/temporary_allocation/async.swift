@@ -11,3 +11,4 @@ func f() async {
 }
 
 // CHECK-NOT: swift_task_alloc
+// UNSUPPORTED: OS=windows-msvc

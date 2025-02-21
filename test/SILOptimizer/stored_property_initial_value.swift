@@ -27,3 +27,4 @@ class C<T, U : BinaryInteger> {
 
   init() {}
 }
+// UNSUPPORTED: OS=windows-msvc

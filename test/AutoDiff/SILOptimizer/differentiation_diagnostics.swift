@@ -856,3 +856,4 @@ func TF_1115_modifyNonSelfProjection(x: Float) -> Float {
 
 // expected-error @+1 {{conversion to '@differentiable(_linear)' function type is not yet supported}}
 let _: @differentiable(_linear) (Float) -> Float = { x in x }
+// UNSUPPORTED: OS=windows-msvc

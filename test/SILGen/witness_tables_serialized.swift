@@ -55,3 +55,4 @@ internal struct UsableFromInlineStruct : PublicProtocol, UsableFromInlineProtoco
 // CHECK-NONRESILIENT-DAG: sil_witness_table package PackageStruct: UsableFromInlineProtocol
 // CHECK-NONRESILIENT-DAG: sil_witness_table package PackageStruct: PackageProtocol
 // CHECK-NONRESILIENT-DAG: sil_witness_table hidden PackageStruct: InternalProtocol
+// UNSUPPORTED: OS=windows-msvc

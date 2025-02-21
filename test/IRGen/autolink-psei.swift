@@ -9,3 +9,4 @@ import module
 // CHECK-IR: !llvm.linker.options = !{[[LIST:![0-9]+]]}
 // CHECK-IR: [[LIST]] = !{!"\01module"}
 
+// UNSUPPORTED: OS=windows-msvc

@@ -150,3 +150,4 @@ import Foundation
     return .Zung
   }
 }
+// UNSUPPORTED: OS=windows-msvc

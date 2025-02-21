@@ -20,3 +20,4 @@ import MismatchedNames
 func test() {
   _ = Selector(("usingIndex:")) // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}
 }
+// UNSUPPORTED: OS=windows-msvc

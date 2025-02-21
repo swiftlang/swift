@@ -15,3 +15,4 @@ public func use() -> CInt {
 // CHECK: call void @_ZN10HasMethods28nonConstPassThroughAsWrapperEi(ptr noalias sret(%TSo19NonTrivialInWrapperV) %[[result]], ptr %[[instance]], i32 42)
 
 // CHECK: define {{.*}} void @_ZN10HasMethods28nonConstPassThroughAsWrapperEi(ptr {{.*}} sret(%struct.NonTrivialInWrapper) {{.*}} %{{.*}}, ptr {{.*}} %{{.*}}, i32{{( noundef)?}} %{{.*}})
+// UNSUPPORTED: OS=windows-msvc

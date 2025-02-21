@@ -79,3 +79,4 @@ func genericWait<T : Awaitable>(orThrow: Bool, _ t: T) async throws {
     await task.value
   }
 }
+// UNSUPPORTED: OS=windows-msvc

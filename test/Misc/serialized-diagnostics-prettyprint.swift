@@ -12,3 +12,4 @@ var x = String.init // expected-error{{ambiguous use of 'init'}}
 // CHECK: CONTENTS OF FILE Swift.String.init:
 // CHECK: struct String {
 // CHECK:    public init(_ content: Substring.UnicodeScalarView)
+// UNSUPPORTED: OS=windows-msvc

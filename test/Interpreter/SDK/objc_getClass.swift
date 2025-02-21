@@ -270,3 +270,4 @@ testSuite.test("NotPresent") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -75,3 +75,4 @@ class DerivedClassWithNonTrivialProperties : RootClassWithoutProperties {
 // CHECK-NEXT:    #DerivedClassWithNonTrivialProperties.deinit!deallocator
 // CHECK-NEXT:    #DerivedClassWithNonTrivialProperties!ivardestroyer
 // CHECK-NEXT:  }
+// UNSUPPORTED: OS=windows-msvc

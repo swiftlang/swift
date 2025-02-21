@@ -36,3 +36,4 @@ public struct Cell<T: ~Copyable>: ~Copyable {
     address.deinitialize(count: 1)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

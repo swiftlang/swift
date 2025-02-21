@@ -21,3 +21,4 @@ int main() {
 }
 
 // STATIC_ASSERT_ERROR: type cannot be used in a Swift generic context
+// UNSUPPORTED: OS=windows-msvc

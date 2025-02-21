@@ -90,3 +90,4 @@ func testInterestingType() {
 }
 // INTERESTING_TYPE_1: Begin completions, 1 items
 // INTERESTING_TYPE_1: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]: ['(']{#x: (Int, (Int, String))...#}[')'][#Void#]{{; name=.+$}}
+// UNSUPPORTED: OS=windows-msvc

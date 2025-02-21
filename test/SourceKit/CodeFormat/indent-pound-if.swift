@@ -39,3 +39,4 @@ print(false)
 // CHECK: key.sourcetext: "    func b () {"
 // CHECK: key.sourcetext: "#elseif os(OSX)"
 // CHECK: key.sourcetext: "    func b () {"
+// UNSUPPORTED: OS=windows-msvc

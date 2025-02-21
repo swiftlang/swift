@@ -13,3 +13,4 @@
 // NO-DAG: cdecl_implementation_features.swift:[[@LINE+2]]:{{[0-9]+}}: error: 'implementation' attribute is only valid when experimental feature CImplementation is enabled
 // YES-NOT: cdecl_implementation_features.swift:[[@LINE+1]]:{{[0-9]+}}: error: 'implementation' attribute is only valid when experimental feature CImplementation is enabled
 @implementation @_cdecl("CImplFunc2") func CImplFunc2(_: Double) {}
+// UNSUPPORTED: OS=windows-msvc

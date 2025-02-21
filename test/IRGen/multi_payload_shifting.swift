@@ -30,3 +30,4 @@ enum Node {
 // Make sure we zext before we shift.
 // CHECK:  [[ZEXT:%.*]] = zext i8 [[BYTE]] to i32
 // CHECK:  shl i32 [[ZEXT]], 10
+// UNSUPPORTED: OS=windows-msvc

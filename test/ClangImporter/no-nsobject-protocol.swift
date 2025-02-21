@@ -7,3 +7,4 @@ var a = Bar()!
 var b = a.barFunc()!;
 b.nsobjectFunc()
 b.fooFunc()
+// UNSUPPORTED: OS=windows-msvc

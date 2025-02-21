@@ -29,3 +29,4 @@ func testInitWithIntIUO() {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

@@ -449,3 +449,4 @@ class MathClass {
 
   static func intMethod() -> Int { return 0 }
 }
+// UNSUPPORTED: OS=windows-msvc

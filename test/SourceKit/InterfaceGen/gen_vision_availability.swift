@@ -37,3 +37,4 @@ public struct TestStruct {
 // DOCINFO: struct TestStruct {
 // DOCINFO:      func availableMethod()
 // DOCINFO: }
+// UNSUPPORTED: OS=windows-msvc

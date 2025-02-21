@@ -76,3 +76,4 @@ public func callTest() {
 } // CHECK: {{^[}]$}}
 
 // NEGATIVE-NOT: LocalClassDisabled
+// UNSUPPORTED: OS=windows-msvc

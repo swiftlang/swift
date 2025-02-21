@@ -16,3 +16,4 @@ struct Broken {
   var b = True // expected-error{{cannot find 'True' in scope}} 
 }
 
+// UNSUPPORTED: OS=windows-msvc

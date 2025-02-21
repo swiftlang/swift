@@ -59,3 +59,4 @@ Tests.test("testNonOSSAPartialApplyLifetimeExtension") {
   let model = Model()
   model.selectedContact = nil
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ public struct S: CustomStringConvertible {
 // CHECK-NEXT: "source": "s:14TargetFallback1SV",
 // CHECK-NEXT: "target": "s:s23CustomStringConvertibleP",
 // CHECK-NEXT: "targetFallback": "Swift.CustomStringConvertible"
+// UNSUPPORTED: OS=windows-msvc

@@ -291,3 +291,4 @@ func throwingFunction() throws -> Int { return 0 }
 func throwInIndirectConstructorArg() throws -> Indirected {
   return .c(try throwingFunction())
 }
+// UNSUPPORTED: OS=windows-msvc

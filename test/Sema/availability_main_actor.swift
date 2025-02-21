@@ -18,3 +18,4 @@ struct AvailableSwift5_1 {}
 @available(SwiftStdlib 5.1, *)
 @preconcurrency @MainActor
 struct AvailableSwift5_1Unsafe {}
+// UNSUPPORTED: OS=windows-msvc

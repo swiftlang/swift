@@ -119,3 +119,4 @@ struct UnsafeContinuation<T, E: Error> {
     #endif
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@
 // expected-error@+1 {{'@_moveOnly' attribute is deprecated and will be removed; use '~Copyable' instead}}
 @_moveOnly actor A {} // expected-error {{'@_moveOnly' attribute is only valid on structs or enums}}{{1-12=}}
 @_moveOnly extension C {} // expected-error {{'@_moveOnly' attribute cannot be applied to this declaration}}{{1-12=}}
+// UNSUPPORTED: OS=windows-msvc

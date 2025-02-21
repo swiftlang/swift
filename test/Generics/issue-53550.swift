@@ -22,3 +22,4 @@ public protocol ComparableFieldAlgebra: FieldAlgebra where Self.ComparableSubalg
 public func test<F: FieldAlgebra>(_ f: F) {
     _ = F.ComparableSubalgebra.zero
 }
+// UNSUPPORTED: OS=windows-msvc

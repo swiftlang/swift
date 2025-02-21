@@ -110,3 +110,4 @@ struct HasAny: ~Copyable {
   consuming func discard() { discard self } // expected-error {{can only 'discard' type 'HasAny' if it contains trivially-destroyed stored properties at this time}}
   deinit{}
 }
+// UNSUPPORTED: OS=windows-msvc

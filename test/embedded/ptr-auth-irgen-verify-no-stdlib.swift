@@ -9,3 +9,4 @@ struct String {}
 public func test() { }
 
 // CHECK-LABEL: define {{.*}}void @"$es4testyyF"()
+// UNSUPPORTED: OS=windows-msvc

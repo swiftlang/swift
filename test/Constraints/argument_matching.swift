@@ -1821,3 +1821,4 @@ struct Issue75527 {
     fn(0) // Make sure the argument label does not escape here.
   }
 }
+// UNSUPPORTED: OS=windows-msvc

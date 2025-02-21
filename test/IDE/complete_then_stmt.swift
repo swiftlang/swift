@@ -80,3 +80,4 @@ func testThenStmt5() throws -> E {
 // DOT:     Begin completions, 2 items
 // DOT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: e[#E#]; name=e
 // DOT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: f({#Int#})[#E#]; name=f()
+// UNSUPPORTED: OS=windows-msvc

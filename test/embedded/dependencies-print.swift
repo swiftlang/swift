@@ -33,3 +33,4 @@
 print("Hello Embedded Swift!") // CHECK: Hello Embedded Swift!
 print(42) // CHECK: 42
 print(false) // CHECK: false
+// UNSUPPORTED: OS=windows-msvc

@@ -189,3 +189,4 @@ public func subscriptUnnamed(_ unnamed: SubscriptUnnamedParameter, _ arg: Int32)
 // CHECK: sil [clang PtrToPtr.__operatorSubscript] [[PTRTOPTR]] : $@convention(cxx_method) (Int32, @inout PtrToPtr) -> Optional<UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int32>>>>
 // CHECK: sil [clang ConstOpPtrByVal.__operatorSubscriptConst] [[CONSTOPPTRBYVAL]] : $@convention(cxx_method) (Int32, @in_guaranteed ConstOpPtrByVal) -> Optional<UnsafePointer<Int32>>
 // CHECK: sil [clang ConstPtrByVal.__operatorSubscriptConst] [[CONSTPTRBYVAL]] : $@convention(cxx_method) (Int32, @inout ConstPtrByVal) -> Optional<UnsafePointer<Int32>>
+// UNSUPPORTED: OS=windows-msvc

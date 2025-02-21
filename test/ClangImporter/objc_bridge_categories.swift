@@ -36,3 +36,4 @@ func testStringBridge() {
   i = 17
   _ = i
 }
+// UNSUPPORTED: OS=windows-msvc

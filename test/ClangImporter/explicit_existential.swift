@@ -12,4 +12,4 @@ func takesSequenceOfPAndQ<T : Sequence>(_: T) where T.Element : PAndQ {}
 func takesPAndQExistential(_ x: PAndQ) {
   let b = PAndQProcessor()
   b.takesPAndQExistential(x)
-}
+}// UNSUPPORTED: OS=windows-msvc

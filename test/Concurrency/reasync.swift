@@ -163,3 +163,4 @@ func callReasyncWithAutoclosure4(_: () async -> ()) reasync {
     _ = await x
   }
 }
+// UNSUPPORTED: OS=windows-msvc

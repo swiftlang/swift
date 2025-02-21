@@ -16,3 +16,4 @@ func test() {
     let t: DerivedProtocol.Type = Foo.self
     t.run()
 }
+// UNSUPPORTED: OS=windows-msvc

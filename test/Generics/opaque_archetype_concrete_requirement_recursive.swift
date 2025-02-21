@@ -34,3 +34,4 @@ protocol HasRecursiveP {
 extension HasRecursiveP where T == DefinesRecursiveP.T {
   func checkSameType(_ t: T) -> DefinesRecursiveP.T { return t }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -28,3 +28,4 @@
 @_objcRuntimeName(RenamedClass) class ThisWillBeRenamed {}
 
 @_swift_native_objc_runtime_base(NSMagicBase) class TestNativeObjCRuntimeBase {}
+// UNSUPPORTED: OS=windows-msvc

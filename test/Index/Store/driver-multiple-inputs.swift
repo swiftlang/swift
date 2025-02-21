@@ -8,3 +8,4 @@
 // CHECK: s1.o-{{[A-Z0-9]*}}
 // CHECK: --------
 // CHECK: out-file: {{.*}}s1.o
+// UNSUPPORTED: OS=windows-msvc

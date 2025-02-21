@@ -16,3 +16,4 @@ let _ = B.foo
 
 // CHECK: B.foo
 let _ = C.foo
+// UNSUPPORTED: OS=windows-msvc

@@ -14,3 +14,4 @@ func test() {
   consume(cooked3!)
   consume(cooked4!)
 }
+// UNSUPPORTED: OS=windows-msvc

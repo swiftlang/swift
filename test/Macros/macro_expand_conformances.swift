@@ -110,3 +110,4 @@ func requiresP(_ value: (some P).Type) {
 // CHECK: Wrapped.requirement
 requiresP(Generic<Wrapped>.self)
 #endif
+// UNSUPPORTED: OS=windows-msvc

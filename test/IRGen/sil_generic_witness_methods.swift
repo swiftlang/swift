@@ -54,3 +54,4 @@ func call_existential_methods(_ x: P, y: S) {
   // CHECK: call swiftcc void [[GENERIC_METHOD_PTR]](ptr noalias {{.*}}, ptr {{.*}} @"$s27sil_generic_witness_methods1SVMf", {{.*}} ptr noalias swiftself {{%.*}}, ptr [[METADATA]], ptr [[WTABLE]])
   x.generic_method(y)
 }
+// UNSUPPORTED: OS=windows-msvc

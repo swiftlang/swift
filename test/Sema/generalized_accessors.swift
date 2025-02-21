@@ -112,3 +112,4 @@ struct ImplicitlyUnwrapped {
     _modify { yield &x }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -31,3 +31,4 @@ extension P where Self : Derived {
 // CHECK-NEXT:   [Escapable] => { conforms_to: [Escapable] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [P] layout: _NativeClass superclass: [superclass: Derived] }
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

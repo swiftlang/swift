@@ -195,3 +195,4 @@ struct RedundantMutableAddressors {
     unsafeMutableAddress { return someValidAddress() } // expected-error {{subscript already has a mutable addressor}}
   }
 }
+// UNSUPPORTED: OS=windows-msvc

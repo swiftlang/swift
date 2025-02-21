@@ -20,3 +20,4 @@ enum SimpleEnum : Codable {
   // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'SimpleEnum' has duplicate case name 'z'}}
   // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'SimpleEnum' has duplicate case name 'z'}}
 }
+// UNSUPPORTED: OS=windows-msvc

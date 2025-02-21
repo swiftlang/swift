@@ -45,3 +45,4 @@
 func test() {
   _ = #fooMacro(1)
 }
+// UNSUPPORTED: OS=windows-msvc

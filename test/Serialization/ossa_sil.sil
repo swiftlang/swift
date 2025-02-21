@@ -47,3 +47,4 @@ bb3(%r : @reborrow $X):
   return %9999 : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

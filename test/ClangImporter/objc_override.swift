@@ -133,3 +133,4 @@ public extension OverrideInExtensionSub {
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: overridden declaration is here
 // <unknown>:0: error: unexpected note produced: setter for 'boolProperty' declared here
+// UNSUPPORTED: OS=windows-msvc

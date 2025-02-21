@@ -95,3 +95,4 @@ extension ImplicitModifier {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

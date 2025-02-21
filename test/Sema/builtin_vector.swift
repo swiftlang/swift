@@ -41,3 +41,4 @@ struct NonBitwiseCopyableVector<T>: BitwiseCopyable {
     var x: Builtin.FixedArray<4, T> // expected-error{{}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

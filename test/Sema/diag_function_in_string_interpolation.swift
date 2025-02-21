@@ -8,3 +8,4 @@ print("\(f)")
 // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{10-10=String(describing: }} {{11-11=)}}
 
 print("\(String(describing: f))") // No warning
+// UNSUPPORTED: OS=windows-msvc

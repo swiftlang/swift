@@ -6,3 +6,4 @@ import Swift
 
 var x = X()
 makeZDoSomething(x)
+// UNSUPPORTED: OS=windows-msvc

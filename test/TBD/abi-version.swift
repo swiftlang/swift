@@ -20,3 +20,4 @@
 // 4. Look in the TBD for the same version listed
 
 // CHECK: "abi": [[VERSION]]
+// UNSUPPORTED: OS=windows-msvc

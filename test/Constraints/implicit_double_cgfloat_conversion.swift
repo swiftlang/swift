@@ -347,3 +347,4 @@ func test_init_validation() {
 func optional_to_optional(x: CGFloat?) -> Double? {
   return x
 }
+// UNSUPPORTED: OS=windows-msvc

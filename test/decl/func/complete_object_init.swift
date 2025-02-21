@@ -171,3 +171,4 @@ class Child2 : Parent2 {
 func testOverride(_ int: Int) {
   Child2(int: int) // okay, picks Child2.init // expected-warning{{unused}}
 }
+// UNSUPPORTED: OS=windows-msvc

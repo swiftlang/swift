@@ -79,3 +79,4 @@ func makeSignatureDirect() {
 // CHECK:  [[THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float
 // CHECK:  [[ORIG_2:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[ORIG_1]])
 // CHECK:  differentiable_function [parameters 0] [results 0] [[ORIG_2]]
+// UNSUPPORTED: OS=windows-msvc

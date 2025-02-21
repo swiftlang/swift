@@ -29,3 +29,4 @@ func testAvailability() {
   _ = (1 as Int32) <=< (1 as Int32)   // okay
   _ = (1 as Int32) >=> (1 as Int32)   // expected-error{{'>=>' is unavailable}}
 }
+// UNSUPPORTED: OS=windows-msvc

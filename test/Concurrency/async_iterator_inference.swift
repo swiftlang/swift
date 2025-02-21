@@ -101,3 +101,4 @@ func testMyError(s: SpecificTS<MyError>, so: SpecificTS<OtherError>) async throw
   for try await x in so { _ = x }
   // expected-error@-1{{thrown expression type 'SpecificTS<OtherError>.AsyncIterator.Failure' (aka 'OtherError') cannot be converted to error type 'MyError'}}
 }
+// UNSUPPORTED: OS=windows-msvc

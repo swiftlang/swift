@@ -40,3 +40,4 @@ public class Dummy: NSNumber {
 } // CHECK: @end
 
 // CHECK: #pragma clang diagnostic pop
+// UNSUPPORTED: OS=windows-msvc

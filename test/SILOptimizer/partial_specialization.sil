@@ -152,3 +152,4 @@ bb3:
   %13 = tuple ()
   return %13 : $()
 } // end sil function 'simple_generic_caller4'
+// UNSUPPORTED: OS=windows-msvc

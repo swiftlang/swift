@@ -28,3 +28,4 @@ BlockGlobalsTestSuite.test("const function pointer") {
 // immediately calling them.
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

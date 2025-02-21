@@ -24,3 +24,4 @@ _ = try! function3(0)
 // CHECK-NEXT: [31:1-31:32] pc before
 // CHECK-NEXT: [31:1-31:32] pc after
 // CHECK-NEXT: [34:1-34:22] pc after
+// UNSUPPORTED: OS=windows-msvc

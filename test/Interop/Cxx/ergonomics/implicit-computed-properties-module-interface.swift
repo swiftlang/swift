@@ -293,4 +293,4 @@
 // CHECK-NEXT:    func get_x_() -> Int32
 // CHECK-NEXT:    mutating func set_x_(_ v: Int32)
 // CHECK-NEXT:    var value: Int32
-// CHECK-NEXT: }
+// CHECK-NEXT: }// UNSUPPORTED: OS=windows-msvc

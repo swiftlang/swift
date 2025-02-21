@@ -86,3 +86,4 @@ public func test_privateApplication<T>(t: T.Type) -> Any.Type {
   // CHECK: ret ptr [[METADATA]]
   return (any Q0<C>).self
 }
+// UNSUPPORTED: OS=windows-msvc

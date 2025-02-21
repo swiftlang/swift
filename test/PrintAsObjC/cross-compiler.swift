@@ -10,3 +10,4 @@
 // PrintAsClang refactor to make macros data-driven). By compiling it alongside a freshly-generated
 // header, we can make sure that the macro definitions are the same before and after the switch.
 
+// UNSUPPORTED: OS=windows-msvc

@@ -22,3 +22,4 @@ func doTheLaundry(_ service: NSLaundry, clothing: Garment & Coat) {
   service.wash(clothing)
   _ = service.dry()
 }
+// UNSUPPORTED: OS=windows-msvc

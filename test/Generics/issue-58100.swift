@@ -27,3 +27,4 @@ struct Foo<Value> {
   // CHECK-NEXT: <Value, C where Value == C.[CProtocol]A, C : CProtocol>
   func bar<C: CProtocol>(c: C) where C.A == Value {}
 }
+// UNSUPPORTED: OS=windows-msvc

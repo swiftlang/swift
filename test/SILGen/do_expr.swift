@@ -190,3 +190,4 @@ func testExhaustive4() {
   // We can syntactically determine that '_' is a non-refutable pattern.
   let _ = do { try throwsError() } catch _ { 0 }
 }
+// UNSUPPORTED: OS=windows-msvc

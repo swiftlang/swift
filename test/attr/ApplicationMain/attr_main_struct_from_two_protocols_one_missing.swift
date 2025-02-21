@@ -21,3 +21,4 @@ struct EntryPoint : Runnable {
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

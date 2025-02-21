@@ -13,3 +13,4 @@ class Conforms : Opt {
 func g(x: Conforms) {
   x.f(callback: {})
 }
+// UNSUPPORTED: OS=windows-msvc

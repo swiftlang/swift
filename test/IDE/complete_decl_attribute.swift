@@ -408,3 +408,4 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
 // KEYWORD_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#Global Actor#]; name=MyGenericGlobalActor
 // KEYWORD_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
+// UNSUPPORTED: OS=windows-msvc

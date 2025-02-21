@@ -7,3 +7,4 @@ print("Cannot import Foo!")
 #endif
 
 // CHECK-NOT: rebuilding module 'Foo' from interface
+// UNSUPPORTED: OS=windows-msvc

@@ -20,3 +20,4 @@ public struct CommonSugars : MyProto {
 
 // CHECK:             "label": "demerara",
 // CHECK-NEXT:        "type": "Swift.Optional<Swift.Bool>",
+// UNSUPPORTED: OS=windows-msvc

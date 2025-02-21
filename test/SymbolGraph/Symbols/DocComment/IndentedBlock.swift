@@ -26,3 +26,4 @@ public struct S5 {}
 // CHECK-NEXT:   "line": 7 
 // CHECK-NEXT:   "character": 25
 // CHECK: "text": "with more indentation."
+// UNSUPPORTED: OS=windows-msvc

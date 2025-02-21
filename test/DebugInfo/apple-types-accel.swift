@@ -32,3 +32,4 @@ func main() -> Int64 {
 }
 
 main()
+// UNSUPPORTED: OS=windows-msvc

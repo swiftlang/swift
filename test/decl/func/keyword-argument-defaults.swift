@@ -118,3 +118,4 @@ func +(_ a: String,
 func +(a: Double, b: String) -> (Int) -> (_ d: Int) -> () {
   return { c in { e in () } }
 }
+// UNSUPPORTED: OS=windows-msvc

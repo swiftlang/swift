@@ -22,3 +22,4 @@ struct CErrorOr<T>
     value = .none
   }
 }
+// UNSUPPORTED: OS=windows-msvc

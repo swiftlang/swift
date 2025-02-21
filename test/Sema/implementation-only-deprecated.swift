@@ -22,3 +22,4 @@ public struct SomeType {}
 // expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}} {{1-21=internal}}
 
 internal func foo(_: SomeType) {}
+// UNSUPPORTED: OS=windows-msvc

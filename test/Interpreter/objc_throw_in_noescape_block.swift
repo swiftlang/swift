@@ -24,3 +24,4 @@ ThrowingTestSuite.test("noescape verification") {
 
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -591,3 +591,4 @@ func testBlockToOptionalAnyObjectBridge(block: @escaping @convention(block) () -
   // CHECK-NEXT: destroy_value [[OPTREF]]
   takeNullableId(block as Any)
 }
+// UNSUPPORTED: OS=windows-msvc

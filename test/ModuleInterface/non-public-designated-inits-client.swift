@@ -25,3 +25,4 @@ open class B : A {
 
 print(B(hi: ())) // expected-error {{cannot convert value of type '()' to expected argument type 'Int'}}
 // expected-error @-1 {{extraneous argument label 'hi:' in call}}
+// UNSUPPORTED: OS=windows-msvc

@@ -281,3 +281,4 @@ class ZZZ_EOF : NSObject {
 // CHECK: - (void)test:
 // CHECK: @end
 
+// UNSUPPORTED: OS=windows-msvc

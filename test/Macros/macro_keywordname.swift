@@ -59,3 +59,4 @@ func test() {
   let _: Int = #`class`()
   let _: Int = #normal()
 }
+// UNSUPPORTED: OS=windows-msvc

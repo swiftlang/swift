@@ -27,3 +27,4 @@ public func foo(ptr: UnsafeMutablePointer<CxxStruct>?) {
 }
 
 foo(ptr: nil)
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ print("opposite of \(foo) is \(negfoo)")
 
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=2:15 -new-name bar >> %t.result/operator_ref.swift
 // RUN: diff -u %S/Outputs/prefix_operator/refactor.swift.expected %t.result/operator_ref.swift
+// UNSUPPORTED: OS=windows-msvc

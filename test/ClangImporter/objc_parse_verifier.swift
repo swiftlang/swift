@@ -12,3 +12,4 @@ func test() {
   // Properties with instancetype getters.
   _ = InstancetypeAccessor.prop
 }
+// UNSUPPORTED: OS=windows-msvc

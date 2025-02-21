@@ -5,3 +5,4 @@
 class Implementation: A {
     var aValue: Int = 1
 }
+// UNSUPPORTED: OS=windows-msvc

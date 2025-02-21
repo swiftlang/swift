@@ -18,3 +18,4 @@
 // CHECK-objc-simulator-true: D $ld$previous$/System/Previous/iOS/ToasterKit.dylib$$7$10.2$13.0$_$s10ToasterKit7VehicleVMa$
 // CHECK-objc-simulator-true: D $ld$previous$/System/Previous/iOS/ToasterKit.dylib$$7$10.2$13.0$_$s10ToasterKit7VehicleVMn$
 // CHECK-objc-simulator-true: D $ld$previous$/System/Previous/iOS/ToasterKit.dylib$$7$10.2$13.0$_$s10ToasterKit7VehicleVN$
+// UNSUPPORTED: OS=windows-msvc

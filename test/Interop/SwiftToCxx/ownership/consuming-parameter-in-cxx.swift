@@ -176,3 +176,4 @@ public struct TheGenericContainerInitNonTriv {
 
 // CHECK: SWIFT_INLINE_THUNK TheGenericContainerInitTriv TheGenericContainerInitTriv::init(const TheGenericContainer<swift::Int>& x) {
 // CHECK-NON_EVO-NEXT: return
+// UNSUPPORTED: OS=windows-msvc

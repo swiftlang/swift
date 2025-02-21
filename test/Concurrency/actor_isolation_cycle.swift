@@ -32,3 +32,4 @@ final class ClassConforming<ID: Hashable,Value>: ProtocolWithAssociatedTypes {
         set { fatalError() }
     }
 }
+// UNSUPPORTED: OS=windows-msvc

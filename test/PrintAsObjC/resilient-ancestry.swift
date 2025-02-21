@@ -50,3 +50,4 @@ public class ResilientNSObjectSubclass : ResilientNSObjectOutsideParent {}
 
 @objc(RenamedNSObjectSubclass)
 public class UnrenamedNSObjectSubclass : ResilientNSObjectOutsideParent {}
+// UNSUPPORTED: OS=windows-msvc

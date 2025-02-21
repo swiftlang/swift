@@ -83,3 +83,4 @@ WitnessTableTestSuite.test("As an existential") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

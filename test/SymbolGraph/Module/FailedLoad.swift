@@ -13,3 +13,4 @@ import A
 public struct Outer {
     public var Something: A.Inner
 }
+// UNSUPPORTED: OS=windows-msvc

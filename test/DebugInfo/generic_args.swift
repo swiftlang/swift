@@ -51,3 +51,4 @@ func apply<T, U> (_ x: T, f: (T) -> (U)) -> U {
   return f(x)
 }
 
+// UNSUPPORTED: OS=windows-msvc

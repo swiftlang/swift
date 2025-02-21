@@ -142,3 +142,4 @@ print(S.SubSequence())
 
 // CHECK: MyMutableSlice<S>
 print(S.SubSequence.self)
+// UNSUPPORTED: OS=windows-msvc

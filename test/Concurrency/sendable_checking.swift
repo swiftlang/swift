@@ -494,3 +494,4 @@ func checkOpaqueType() -> some Sendable {
 class MainActorSub: MainActorSuper<MainActorSub.Nested> {
   struct Nested {}  // no cycle
 }
+// UNSUPPORTED: OS=windows-msvc

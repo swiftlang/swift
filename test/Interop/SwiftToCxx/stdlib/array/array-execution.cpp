@@ -75,3 +75,4 @@ int main() {
 // CHECK-NEXT: DONE PRINTING
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -34,3 +34,4 @@ struct R {
 }
 
 func flim() {}
+// UNSUPPORTED: OS=windows-msvc

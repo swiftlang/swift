@@ -88,3 +88,4 @@ func /*mixed:def*/withAllOfTheAbove(x: Int = 2, _: Int..., z: Int = 2, c: () -> 
 // RUN: diff -u %S/Outputs/callsites/trailing.swift.expected %t.ranges/callsites_trailing.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="trailing-only" -is-function-like -old-name "trailingOnly(a:)" >> %t.ranges/callsites_trailing_only.swift
 // RUN: diff -u %S/Outputs/callsites/trailing_only.swift.expected %t.ranges/callsites_trailing_only.swift
+// UNSUPPORTED: OS=windows-msvc

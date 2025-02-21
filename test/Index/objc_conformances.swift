@@ -15,3 +15,4 @@ class C : P {
   // CHECK: RelOver | instance-method/Swift | g() | c:@M@swift_ide_test@objc(pl)P(im)g
   // CHECK: RelChild | class/Swift | C | s:14swift_ide_test1CC
 }
+// UNSUPPORTED: OS=windows-msvc

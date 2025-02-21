@@ -61,3 +61,4 @@ import UIKit
 #error("Unsupported platform")
 #endif
 #endif
+// UNSUPPORTED: OS=windows-msvc

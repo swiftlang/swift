@@ -23,3 +23,4 @@
 
 // CHECK-OVERWRITTEN:topLevel{{.*}}EmptyStruct{{.*}}true
 
+// UNSUPPORTED: OS=windows-msvc

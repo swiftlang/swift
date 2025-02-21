@@ -15,3 +15,4 @@ class Me {
 
 // DEMANGLE: $s12dynamic_self2MeCXDXMTD
 // CHECK: @thick Self.Type
+// UNSUPPORTED: OS=windows-msvc

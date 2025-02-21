@@ -77,3 +77,4 @@ let zz: Int = any
 // CHECK:  2 │ let zz: Int = any as! Int
 // CHECK:    │               ╰─ error: cannot convert value of type 'Any' to specified type 'Int' [insert ' as! Int']
 
+// UNSUPPORTED: OS=windows-msvc

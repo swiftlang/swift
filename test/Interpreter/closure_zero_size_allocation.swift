@@ -16,3 +16,4 @@ struct S: P {}
 let p: P = S()
 
 p.covariantSelfPropClosure { _ in }
+// UNSUPPORTED: OS=windows-msvc

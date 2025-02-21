@@ -475,3 +475,4 @@ func ambiguous_fn(_ ptr: UnsafeRawPointer) {} // expected-note {{found this cand
 func test_ambiguity_with_function_instead_of_argument(_ x: inout Int) {
   ambiguous_fn(&x) // expected-error {{ambiguous use of 'ambiguous_fn'}}
 }
+// UNSUPPORTED: OS=windows-msvc

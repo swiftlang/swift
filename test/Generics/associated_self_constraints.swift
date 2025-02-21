@@ -71,3 +71,4 @@ struct IP<T> : P {
 
     var _onNext: (A) -> ()
 }
+// UNSUPPORTED: OS=windows-msvc

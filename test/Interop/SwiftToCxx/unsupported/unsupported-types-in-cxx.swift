@@ -42,3 +42,4 @@ public struct Container {
 public typealias unsupportedTypeAliasNested = Container.NestedStruct
 
 // CHECK: // Unavailable in C++: Swift type alias 'unsupportedTypeAliasNested'
+// UNSUPPORTED: OS=windows-msvc

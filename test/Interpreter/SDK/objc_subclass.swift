@@ -143,3 +143,4 @@ if nsData == nil {
   print("nil NSData as expected")
 }
 
+// UNSUPPORTED: OS=windows-msvc

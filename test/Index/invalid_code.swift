@@ -46,3 +46,4 @@ extension Protector where T: RangeReplaceableCollection {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

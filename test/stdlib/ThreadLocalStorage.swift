@@ -39,3 +39,4 @@ PThreadTests.test("destructor") {
 
 runAllTests()
 
+// UNSUPPORTED: OS=windows-msvc

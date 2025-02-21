@@ -29,3 +29,4 @@ func testSendableBuiltinConformances(
   // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   acceptSendable((i, ns)) // expected-error{{type 'NotSendable' does not conform to the 'Sendable' protocol}}
 }
+// UNSUPPORTED: OS=windows-msvc

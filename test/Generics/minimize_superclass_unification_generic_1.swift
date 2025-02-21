@@ -184,4 +184,4 @@ protocol R6b {
 protocol P7 {
   associatedtype V where V : P1, V.T : A<W>
   associatedtype W
-}
+}// UNSUPPORTED: OS=windows-msvc

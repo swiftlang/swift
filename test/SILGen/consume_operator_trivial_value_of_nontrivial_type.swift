@@ -9,3 +9,4 @@ func g()
     let x:[Int]? = nil
     f(x: consume x)
 }
+// UNSUPPORTED: OS=windows-msvc

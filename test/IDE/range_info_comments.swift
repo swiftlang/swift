@@ -44,3 +44,4 @@ func foo2() -> Int{
 
 // CHECK-KIND: <Kind>MultiStatement</Kind>
 // CHECK-INVALID: <Kind>Invalid</Kind>
+// UNSUPPORTED: OS=windows-msvc

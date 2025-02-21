@@ -14,3 +14,4 @@ struct MyBase {
 // CHECK-AST-NEXT:    (return_stmt implicit
 // CHECK-AST-NEXT:      (try_expr implicit
 // CHECK-AST-NEXT:        (call_expr implicit type="()"
+// UNSUPPORTED: OS=windows-msvc

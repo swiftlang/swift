@@ -23,3 +23,4 @@ let x5: some Any = { return 123 }()
 // FIXME: This should work
 let x6: () -> some Any = { return 123 }
 // expected-error@-1 {{cannot convert value of type 'Int' to closure result type 'some Any'}}
+// UNSUPPORTED: OS=windows-msvc

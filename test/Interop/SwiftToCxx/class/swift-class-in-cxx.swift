@@ -140,3 +140,4 @@ public func takeClassWithIntFieldInout(_ x: inout ClassWithIntField) {
 // CHECK: SWIFT_INLINE_THUNK void takeClassWithIntFieldInout(ClassWithIntField& x) noexcept SWIFT_SYMBOL("s:5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF") {
 // CHECK-NEXT:    _impl::$s5Class04takeA17WithIntFieldInoutyyAA0acdE0CzF(&::swift::_impl::_impl_RefCountedClass::getOpaquePointerRef(x));
 // CHECK-NEXT:  }
+// UNSUPPORTED: OS=windows-msvc

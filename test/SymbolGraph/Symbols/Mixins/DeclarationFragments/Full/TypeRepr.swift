@@ -49,3 +49,4 @@ public func asdf(param: _const String? = nil) {}
 // CHECK-NEXT:     "spelling": "? = nil)"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],
+// UNSUPPORTED: OS=windows-msvc

@@ -25,3 +25,4 @@
 // FILE2: DEPEND START
 // FILE2: Unit | system | {{.*}}Swift.swiftmodule
 // FILE2: DEPEND END
+// UNSUPPORTED: OS=windows-msvc

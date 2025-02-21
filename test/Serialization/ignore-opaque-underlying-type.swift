@@ -120,3 +120,4 @@ if #available(SwiftStdlib 5.1, *) {
   let _ = v.inlinableOpaqueVar
   let _ = v.inlinableOpaqueVarPattern
 }
+// UNSUPPORTED: OS=windows-msvc

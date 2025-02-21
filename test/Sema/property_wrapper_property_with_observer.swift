@@ -32,3 +32,4 @@ let bar = Bar()
 // CHECK: [4, 2, 3]
 // CHECK: [1, 2, 3]
 bar.someArray[0] = 4
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@
 // REQUIRES: swift_feature_Embedded
 
 // CHECK: error: Whole module optimization (wmo) must be enabled with embedded Swift.
+// UNSUPPORTED: OS=windows-msvc

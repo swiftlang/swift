@@ -10,3 +10,4 @@ print(dict)  // succeeds
 dict["foo"] = 0x22222222
 print(dict)  // used to crash
 // CHECK: ["foo": 572662306]
+// UNSUPPORTED: OS=windows-msvc

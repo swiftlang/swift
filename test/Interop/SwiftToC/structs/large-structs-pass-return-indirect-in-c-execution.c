@@ -28,3 +28,4 @@ int main() {
 // CHECK-NEXT: StructSeveralI64.1 = 42, .2 = 581, .3 = -17, .4 = -12345612, .5 = -65530
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

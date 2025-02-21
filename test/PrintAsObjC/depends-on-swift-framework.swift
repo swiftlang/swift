@@ -29,3 +29,4 @@ public class Test: NSObject {
   // CHECK: - (void)testGenericTypealias:(FungibleContainer<id <Fungible>> * _Nonnull)_;
   @objc func testGenericTypealias(_: FungibleContainer<AliasForFungible>) {}
 } // CHECK: @end
+// UNSUPPORTED: OS=windows-msvc

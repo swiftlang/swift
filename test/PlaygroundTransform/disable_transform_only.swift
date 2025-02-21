@@ -14,3 +14,4 @@ var a = 2
 var b = 3
 a + b
 // CHECK-NOT: __builtin_log
+// UNSUPPORTED: OS=windows-msvc

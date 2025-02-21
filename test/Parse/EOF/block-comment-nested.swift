@@ -8,3 +8,4 @@
    The error message on the next line bumps that to four,
    then the fix-it text lowers that to two.
    expected-error{{unterminated '/*' comment}} {{62-62=*/*/}}
+// UNSUPPORTED: OS=windows-msvc

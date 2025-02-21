@@ -17,3 +17,4 @@ public class C {
 
 public func foo(_ c: C) {
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -10,3 +10,4 @@ import Swift
 extension Int {
   public static var fortytwo: Int = 42
 }
+// UNSUPPORTED: OS=windows-msvc

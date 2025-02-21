@@ -53,3 +53,4 @@ func testOptionalIsolation_checked(isolation: isolated MyActor?) {
     return 0
   }
 }
+// UNSUPPORTED: OS=windows-msvc

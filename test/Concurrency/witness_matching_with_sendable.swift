@@ -68,3 +68,4 @@ extension Adopter : PreConcurrency { // expected-swift6-error {{type 'Adopter' d
   @preconcurrency func req(_: [String: any Sendable], _: ((any Sendable)?) -> Void) {}
   // expected-swift6-note@-1 {{candidate has non-matching type '([String : any Sendable], ((any Sendable)?) -> Void) -> ()'}}
 }
+// UNSUPPORTED: OS=windows-msvc

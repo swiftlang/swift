@@ -166,3 +166,4 @@ struct ConformsToProtoWithAssocTypeAndReq_InferredUnavailable: ProtoWithAssocTyp
 
   func req(_ a: InferredUnavailable) {}
 }
+// UNSUPPORTED: OS=windows-msvc

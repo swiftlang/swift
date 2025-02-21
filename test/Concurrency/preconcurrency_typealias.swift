@@ -65,3 +65,4 @@ class C { // expected-complete-tns-note {{class 'C' does not conform to the 'Sen
       })
   }
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -8,3 +8,4 @@
 // CHECK: public protocol AsyncIteratorProtocol
 public protocol AsyncIteratorProtocol {
 }
+// UNSUPPORTED: OS=windows-msvc

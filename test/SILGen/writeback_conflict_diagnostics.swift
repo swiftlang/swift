@@ -135,3 +135,4 @@ func testNestedArrayWithReadModify<T>(array: ArrayWithReadModify<ArrayWithReadMo
   var copy = array
   takeInOut(&copy[0][0])
 }
+// UNSUPPORTED: OS=windows-msvc

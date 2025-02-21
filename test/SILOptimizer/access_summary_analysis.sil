@@ -556,3 +556,4 @@ bb0(%0 : $*Builtin.Int64):
   %t = tuple ()
   return %t : $()
 }
+// UNSUPPORTED: OS=windows-msvc

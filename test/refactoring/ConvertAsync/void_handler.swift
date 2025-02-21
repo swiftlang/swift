@@ -13,3 +13,4 @@ func voidCompletion(completion: @escaping (Void) -> Void) {}
 // VOID-HANDLER-NEXT: }
 // VOID-HANDLER-NEXT: }
 // VOID-HANDLER: func voidCompletion() async {}
+// UNSUPPORTED: OS=windows-msvc

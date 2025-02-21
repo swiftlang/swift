@@ -2,3 +2,4 @@
 
 // CHECK: define{{.*}} swiftcc void @"$s4main5helloyyF"
 public func hello() { }
+// UNSUPPORTED: OS=windows-msvc

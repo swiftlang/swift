@@ -14,3 +14,4 @@ _ = [b].filter { type(of: $0) == Derived.self }
 
 // Trailing closure...
 let _: (() -> ()).Type = type { }
+// UNSUPPORTED: OS=windows-msvc

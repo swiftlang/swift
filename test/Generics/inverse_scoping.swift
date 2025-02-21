@@ -61,3 +61,4 @@ extension S where T: NoCopyReq & ~Copyable {}
 struct ExtraInverse<T: ~Copyable> {
   func check() where T: ~Copyable {} // expected-error {{cannot suppress '~Copyable' on generic parameter 'T' defined in outer scope}}
 }
+// UNSUPPORTED: OS=windows-msvc

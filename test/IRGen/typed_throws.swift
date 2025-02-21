@@ -349,3 +349,4 @@ func callSmallErrorLargerResult() {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

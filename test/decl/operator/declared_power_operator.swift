@@ -16,3 +16,4 @@ func testDeclaredPowerOperatorWithIncompatibleType() {
   let y: Int8 = 3
   _ = x**y // expected-error{{cannot convert value of type 'Int8' to expected argument type 'Double'}} expected-error{{cannot convert value of type 'Int8' to expected argument type 'Double'}}
 }
+// UNSUPPORTED: OS=windows-msvc

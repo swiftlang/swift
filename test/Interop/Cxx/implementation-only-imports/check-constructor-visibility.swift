@@ -15,3 +15,4 @@ import UserA
 public func createAWrapper() {
   let _ = MagicWrapper()
 }
+// UNSUPPORTED: OS=windows-msvc

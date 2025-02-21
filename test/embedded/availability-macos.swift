@@ -10,3 +10,4 @@
 
 func f(_: Span<Int>) { } // Span is @available(SwiftStdlib 6.1, *)
 func g(_: Int128) { } // Int128 is @available(SwiftStdlib 6.0, *)
+// UNSUPPORTED: OS=windows-msvc

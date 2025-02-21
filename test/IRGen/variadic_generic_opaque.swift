@@ -51,3 +51,4 @@ extension Outer.Inner: P where (repeat (each T, each U)): Any {}
 func concreteOuterInner() -> some P {
   Outer<Int>.Inner<String>()
 }
+// UNSUPPORTED: OS=windows-msvc

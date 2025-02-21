@@ -78,3 +78,4 @@ func noEscapeBlock() {
     doBlockInout({ _ = x }, &x)
   }
 }
+// UNSUPPORTED: OS=windows-msvc

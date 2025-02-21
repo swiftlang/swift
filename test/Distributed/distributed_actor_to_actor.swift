@@ -55,3 +55,4 @@ distributed actor WorkerPool<Worker, ActorSystem: DistributedActorSystem>: Async
   nonisolated func makeAsyncIterator() -> WorkerPool { self }
   nonisolated func next() async -> Int? { nil }
 }
+// UNSUPPORTED: OS=windows-msvc

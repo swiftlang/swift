@@ -15,3 +15,4 @@ import ReferenceCounted
 
 protocol P2 {}
 extension GlobalCount : P2 {}
+// UNSUPPORTED: OS=windows-msvc

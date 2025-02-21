@@ -327,3 +327,4 @@ bb0:
 
 // REMARKS_PASSED-NOT: remark:
 // REMARKS_MISSED-NOT: remark:
+// UNSUPPORTED: OS=windows-msvc

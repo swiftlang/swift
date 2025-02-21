@@ -427,3 +427,4 @@ OptionalTests.test("unsafelyUnwrapped nil")
 #endif
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ import CenumsNSOptions
 // CHECK:      extension NSAttributedString {
 // CHECK-NEXT:   init!(__options options: __NSAttributedStringFormattingOptions = [])
 // CHECK-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

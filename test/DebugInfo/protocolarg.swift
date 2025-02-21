@@ -29,3 +29,4 @@ public func printSomeNumbers(_ gen: IGiveOutInts) {
   use(&gen)
 }
 
+// UNSUPPORTED: OS=windows-msvc

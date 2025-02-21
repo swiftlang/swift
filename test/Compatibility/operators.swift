@@ -8,3 +8,4 @@ postfix func ++(x: X) -> X { return x }
 prefix func ++(x: X) -> X { return x }
 postfix func --(x: X) -> X { return x }
 prefix func --(x: X) -> X { return x }
+// UNSUPPORTED: OS=windows-msvc

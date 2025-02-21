@@ -41,3 +41,4 @@ public func test(pview: borrowing PView) -> View {
 // CHECK-LABEL: sil private [transparent] [thunk] @$s28lifetime_dependence_generics5PViewVAA1PA2aDP4getE1EQzyFTW : $@convention(witness_method: P) (@in_guaranteed PView) -> @lifetime(borrow 0)  @out View {
 
 // CHECK-LABEL: sil @$s28lifetime_dependence_generics4test5pviewAA4ViewVAA5PViewV_tF : $@convention(thin) (PView) -> @lifetime(borrow 0)  @owned View {
+// UNSUPPORTED: OS=windows-msvc

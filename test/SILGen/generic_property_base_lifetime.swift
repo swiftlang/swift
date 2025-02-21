@@ -107,3 +107,4 @@ func getIntPropGeneric<T: ProtocolO>(_ a: T) -> Int {
 func setIntPropGeneric<T: ProtocolO>(_ a: T) {
   a.intProp = 0
 }
+// UNSUPPORTED: OS=windows-msvc

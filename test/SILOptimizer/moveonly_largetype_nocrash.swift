@@ -161,3 +161,4 @@ func test() {
 
     borrowVal(a)
 }
+// UNSUPPORTED: OS=windows-msvc

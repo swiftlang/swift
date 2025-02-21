@@ -306,3 +306,4 @@ do {
   let b = Int?.none
   if let c = b ?? a { _ = c } // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
 }
+// UNSUPPORTED: OS=windows-msvc

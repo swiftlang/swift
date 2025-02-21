@@ -169,3 +169,4 @@ print(someFunc())
 //
 // --- Check the index.
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck -check-prefix=UNIT %s
+// UNSUPPORTED: OS=windows-msvc

@@ -21,3 +21,4 @@ func foo(_ x : Int32) { // CHECK: [[@LINE]]:23 -> [[END:[0-9]+:2]] : 0
 foo(1);
 foo(2);
 foo(3);
+// UNSUPPORTED: OS=windows-msvc

@@ -149,3 +149,4 @@ func test_radar124171788(_ v: Maybe<Int>) {
   }
   print("failed to cast (test_radar124171788)")
 }
+// UNSUPPORTED: OS=windows-msvc

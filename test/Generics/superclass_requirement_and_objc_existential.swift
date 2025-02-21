@@ -37,3 +37,4 @@ func f4<T : Q>(_: T) where T.A : C, T.A == any (C & P3) {}
 // expected-error@-1 {{no type for 'T.A' can satisfy both 'T.A : C' and 'T.A == any C & P3'}}
 // expected-error@-2 {{no type for 'T.A' can satisfy both 'T.A : _NativeClass' and 'T.A == any C & P3'}}
 
+// UNSUPPORTED: OS=windows-msvc

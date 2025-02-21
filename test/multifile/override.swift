@@ -20,3 +20,4 @@ class Foo {
 struct Into<T> { }
 
 // CHECK: overriding declaration requires an 'override' keyword
+// UNSUPPORTED: OS=windows-msvc

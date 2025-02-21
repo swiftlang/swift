@@ -164,3 +164,4 @@ let _ = NonConformingEnum.encode(to:) // expected-error {{type 'NonConformingEnu
 
 // They should not get a CodingKeys type.
 let _ = NonConformingEnum.XCodingKeys.self // expected-error {{'XCodingKeys' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

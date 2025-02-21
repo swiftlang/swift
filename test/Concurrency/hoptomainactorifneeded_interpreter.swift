@@ -68,3 +68,4 @@ tests.test("No crash if run on main actor in both modes") { @MainActor () async 
 }
 
 await runAllTestsAsync()
+// UNSUPPORTED: OS=windows-msvc

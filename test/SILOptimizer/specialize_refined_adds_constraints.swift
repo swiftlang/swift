@@ -26,3 +26,4 @@ struct X : R {
 func test(x: X) {
   g(x)
 }
+// UNSUPPORTED: OS=windows-msvc

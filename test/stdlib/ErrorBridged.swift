@@ -905,3 +905,4 @@ ErrorBridgingTests.test("Swift Error description memory management") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

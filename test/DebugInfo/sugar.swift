@@ -15,3 +15,4 @@ let p: (((((Int)))), Int) = (0, 0)
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "$sSiXSaXSa_SaySiGXSaSaySiXSaGSayAAGtD", {{.*}})
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "$sSiSfXSD_SDySiSfGtD", {{.*}})
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "$sSi_SitD", {{.*}})
+// UNSUPPORTED: OS=windows-msvc

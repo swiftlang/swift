@@ -33,3 +33,4 @@ AllocationsTestSuite.test("absurd.allocation.gargantuan") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

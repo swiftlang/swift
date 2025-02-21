@@ -18,3 +18,4 @@ public func createStack() {
     _ = s.size
 }
 
+// UNSUPPORTED: OS=windows-msvc

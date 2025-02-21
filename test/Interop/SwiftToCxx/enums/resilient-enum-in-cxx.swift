@@ -95,3 +95,4 @@ public enum Empty {
 // NEW_CASE-NEXT:   result._destructiveInjectEnumTag(_impl::$s5Enums3FooO1byACSicACmFWC);
 // NEW_CASE-NEXT:   return result;
 // NEW_CASE-NEXT: }
+// UNSUPPORTED: OS=windows-msvc

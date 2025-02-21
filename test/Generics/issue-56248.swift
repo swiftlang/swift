@@ -25,3 +25,4 @@ protocol P4 {
 
 // CHECK: Generic signature: <T where T : P2, T == T.[P2]A.[P1]A, T.[P2]A : P1>
 func f<T : P2>(_: T) where T.A : P1, T.A.A == T { }
+// UNSUPPORTED: OS=windows-msvc

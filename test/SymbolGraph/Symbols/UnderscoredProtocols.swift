@@ -40,3 +40,4 @@ public struct SomeStruct {}
 extension SomeStruct: _HiddenProtocol {
     public func someFunc() {}
 }
+// UNSUPPORTED: OS=windows-msvc

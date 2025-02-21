@@ -20,3 +20,4 @@ public extension String {
         case bar
     }
 }
+// UNSUPPORTED: OS=windows-msvc

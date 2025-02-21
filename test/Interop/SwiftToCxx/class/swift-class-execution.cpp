@@ -163,3 +163,4 @@ int main() {
 // CHECK-NEXT: destroy ClassWithIntField
   return 0;
 }
+// UNSUPPORTED: OS=windows-msvc

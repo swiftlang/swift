@@ -207,3 +207,4 @@ public func doTest7() {
 }
 
 
+// UNSUPPORTED: OS=windows-msvc

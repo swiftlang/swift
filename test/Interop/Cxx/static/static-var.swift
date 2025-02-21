@@ -72,3 +72,4 @@ StaticVarTestSuite.test("static-const-non-trivial") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

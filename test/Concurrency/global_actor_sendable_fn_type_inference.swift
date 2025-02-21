@@ -20,3 +20,4 @@ func allowNonSendableCaptures() {
     let _ = nonSendable // okay
   }
 }
+// UNSUPPORTED: OS=windows-msvc

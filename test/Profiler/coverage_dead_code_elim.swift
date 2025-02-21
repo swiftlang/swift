@@ -4,3 +4,4 @@
 // CHECK-NOT: llvm_coverage_mapping = internal constant
 
 func foo() {}
+// UNSUPPORTED: OS=windows-msvc

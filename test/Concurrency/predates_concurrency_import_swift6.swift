@@ -27,3 +27,4 @@ extension NonStrictClass {
 extension StrictStruct {
   @Sendable func f() { } // expected-warning{{instance method of non-Sendable type 'StrictStruct' cannot be marked as '@Sendable'}}
 }
+// UNSUPPORTED: OS=windows-msvc

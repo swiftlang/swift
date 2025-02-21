@@ -41,3 +41,4 @@ let _ = NonStrongStruct.encode(to:)
 // The synthesized CodingKeys type should not be accessible from outside the
 // class.
 let _ = NonStrongStruct.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
+// UNSUPPORTED: OS=windows-msvc

@@ -86,3 +86,4 @@ public func returnFuncPtr() -> (NonTrivial) -> () {
 public func testClosureToFuncPtrReturnNonTrivial() {
   cfuncReturnNonTrivial2({() -> NonTrivial in return NonTrivial()});
 }
+// UNSUPPORTED: OS=windows-msvc

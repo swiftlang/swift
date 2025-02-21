@@ -7,3 +7,4 @@
 
 // CHECK-MINIMAL: -warn-swift3-objc-inference-minimal
 // CHECK-COMPLETE: -warn-swift3-objc-inference-complete
+// UNSUPPORTED: OS=windows-msvc

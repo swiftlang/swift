@@ -10,3 +10,4 @@ class Z { init() throws {} }
 class X {
   required init(_: Z) throws {}
 }
+// UNSUPPORTED: OS=windows-msvc

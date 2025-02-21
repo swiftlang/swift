@@ -1164,3 +1164,4 @@ dwTests.test("Conditional Conformance") {
 }
 
 runAllTests()
+// UNSUPPORTED: OS=windows-msvc

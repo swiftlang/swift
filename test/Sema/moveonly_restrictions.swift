@@ -257,3 +257,4 @@ enum BarUnion { // expected-note {{consider adding '~Copyable' to enum 'BarUnion
   init() {}
   deinit {} // expected-error {{deinitializer cannot be declared in enum 'BarUnion' that conforms to 'Copyable'}}
 }
+// UNSUPPORTED: OS=windows-msvc

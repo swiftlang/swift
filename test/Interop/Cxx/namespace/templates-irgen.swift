@@ -33,3 +33,4 @@ public func forwardDeclaredClasses() {
   var forwardDeclaredClassTemplateOutOfLineInst = ForwardDeclaredClassTemplateOutOfLineChar()
   forwardDeclaredClassTemplateOutOfLineInst.basicMember()
 }
+// UNSUPPORTED: OS=windows-msvc

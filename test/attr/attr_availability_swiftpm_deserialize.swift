@@ -17,3 +17,4 @@ let package = Package(
 
 // FOURTWO: note: 'buildSettings' was introduced in PackageDescription 4.3
 package.buildSettings = ["Foo": "Bar"]
+// UNSUPPORTED: OS=windows-msvc

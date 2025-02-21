@@ -17,3 +17,4 @@ private class MacroApplication<Context: MacroExpansionContext>: SyntaxRewriter {
     }
   }
 }
+// UNSUPPORTED: OS=windows-msvc

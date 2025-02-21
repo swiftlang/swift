@@ -82,3 +82,4 @@ protocol MyProtocol {
          """) // expected-warning @-2 {{warnings support multi-line string literals}}
 
 #warning(#"warnings support \(custom string delimiters)"#) // expected-warning {{warnings support \\(custom string delimiters)}}
+// UNSUPPORTED: OS=windows-msvc

@@ -78,3 +78,4 @@ public func copy_indirect<NE: ~Escapable>(ne: borrowing NE) -> NE {
 public func copy_inout<NE: ~Escapable>(ne: inout NE) -> NE {
   return copy ne
 }
+// UNSUPPORTED: OS=windows-msvc

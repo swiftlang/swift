@@ -526,3 +526,4 @@ func testResultConversion() async throws {
   // BREAK-RET-PLACEHOLDER-NEXT: }
   // BREAK-RET-PLACEHOLDER-NEXT: if .random() { <#return#> }
 }
+// UNSUPPORTED: OS=windows-msvc

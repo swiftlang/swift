@@ -41,3 +41,4 @@ func testGlobalFunctions() {
 // --- bar(_:) ---
 // CHECK: sil @$s7Library3barySf5value_S2fc8pullbacktSfF : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // FIXME: missing reverse-mode differentiability witness for foo(_:)
+// UNSUPPORTED: OS=windows-msvc

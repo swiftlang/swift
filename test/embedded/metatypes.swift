@@ -21,3 +21,4 @@ public func callCastToExistential() {
   castToExistential(x: 42)    // expected-note {{called from here}}
 }
 
+// UNSUPPORTED: OS=windows-msvc

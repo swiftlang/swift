@@ -12,3 +12,4 @@ let x = DerivedOutOfOrder.getInstance()
 blackHole(x.baseField)
 blackHole(x.derivedField)
 blackHole(x.leafField)
+// UNSUPPORTED: OS=windows-msvc

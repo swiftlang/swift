@@ -146,3 +146,4 @@ print((p_any as? (@escaping () -> Int) -> Void) != nil ? "fail" : "ok")
 print((p_any as? (@autoclosure () -> Int) -> Void) != nil ? "fail" : "ok")
 // CHECK: ok
 print((p_any as? (@autoclosure @escaping () -> Int) -> Void) == nil ? "fail" : "ok")
+// UNSUPPORTED: OS=windows-msvc

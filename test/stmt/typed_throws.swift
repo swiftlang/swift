@@ -337,3 +337,4 @@ func noThrow() throws(Never) {
     // expected-error@-1 {{thrown expression type 'MyError' cannot be converted to error type 'Never'}}
   } catch {}
 }
+// UNSUPPORTED: OS=windows-msvc

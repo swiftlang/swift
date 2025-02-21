@@ -29,3 +29,4 @@
 // CHECK: DEPEND START
 // CHECK: Unit | system | {{.*}}Swift.swiftmodule
 // CHECK: DEPEND END
+// UNSUPPORTED: OS=windows-msvc

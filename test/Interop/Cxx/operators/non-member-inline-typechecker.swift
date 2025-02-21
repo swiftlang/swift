@@ -37,3 +37,4 @@ var rhsBool = LoadableBoolWrapper(value: false)
 
 let resultAmpAmp = lhsBool && rhsBool
 let resultPipePipe = lhsBool && rhsBool
+// UNSUPPORTED: OS=windows-msvc

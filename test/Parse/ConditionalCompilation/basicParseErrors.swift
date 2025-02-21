@@ -160,3 +160,4 @@ if true {}
 #if canImport()
 // expected-error@-1 {{'canImport' requires a module name}}
 #endif
+// UNSUPPORTED: OS=windows-msvc

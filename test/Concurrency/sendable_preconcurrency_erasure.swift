@@ -36,3 +36,4 @@ public struct Data {
   @preconcurrency var test: (any Sendable, Array<(Int, any Sendable)>)? = nil
   // CHECK-LABEL: sil [transparent] [ossa] @$s31sendable_preconcurrency_erasure4DataV4testyp_SaySi_yptGtSgvpfi
 }
+// UNSUPPORTED: OS=windows-msvc

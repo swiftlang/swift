@@ -71,3 +71,4 @@ func testSyncMember(obj: MyActor) async -> Int {
 // NOTE: Doing twice is to ensure that the completion cache is used.
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %t/App.swift -filecheck %raw-FileCheck -completion-output-dir %t/output -I %t/Modules -completion-cache-path %t/ccp -module-cache-path %t/mcp
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %t/App.swift -filecheck %raw-FileCheck -completion-output-dir %t/output -I %t/Modules -completion-cache-path %t/ccp -module-cache-path %t/mcp
+// UNSUPPORTED: OS=windows-msvc

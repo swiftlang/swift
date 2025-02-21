@@ -16,3 +16,4 @@ public func dont_fold_inf_inf_cmp() -> Bool {
   0x1.0p128 < Float.infinity
 }
 
+// UNSUPPORTED: OS=windows-msvc

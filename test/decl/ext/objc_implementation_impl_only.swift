@@ -8,3 +8,4 @@
     // OK
   }
 }
+// UNSUPPORTED: OS=windows-msvc

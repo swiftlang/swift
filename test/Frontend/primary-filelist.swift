@@ -31,3 +31,4 @@ func test() {
     let x: Foo = other()
   #endif
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -27,3 +27,4 @@ func testAsyncClosure() {
 func testAwait() async {
   let _ = await asyncGlobal1()
 }
+// UNSUPPORTED: OS=windows-msvc

@@ -26,3 +26,4 @@
 // CHECK-WITH-FORWARD-DECLS-DAG: class func description() -> String
 // CHECK-WITH-FORWARD-DECLS-DAG: func forwardInvocation(_ anInvocation: NSInvocation!)
 // CHECK: {{^[}]$}}
+// UNSUPPORTED: OS=windows-msvc

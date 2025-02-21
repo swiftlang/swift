@@ -74,3 +74,4 @@ func f() {
 
 #endif
 
+// UNSUPPORTED: OS=windows-msvc

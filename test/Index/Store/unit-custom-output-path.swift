@@ -244,3 +244,4 @@
 //    RUN:     -module-name mod_name \
 //    RUN:     -primary-file %t/main.swift %t/second.swift \
 //    RUN:     -o %t/main_out.o -index-unit-output-path %t/custom_output.o
+// UNSUPPORTED: OS=windows-msvc

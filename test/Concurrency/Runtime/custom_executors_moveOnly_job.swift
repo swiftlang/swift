@@ -105,3 +105,4 @@ actor Custom {
 // CHECK-NEXT: unownedExecutor: InlineExecutor_ExecutorJob
 // CHECK-NEXT: custom.count == 1
 // CHECK-NEXT: end
+// UNSUPPORTED: OS=windows-msvc

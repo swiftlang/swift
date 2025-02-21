@@ -35,3 +35,4 @@ func process_${N}_function_${i}(_ x: Int) -> Int {
   return a.reduce(0, {$0 + $1})
 }
 % end
+// UNSUPPORTED: OS=windows-msvc

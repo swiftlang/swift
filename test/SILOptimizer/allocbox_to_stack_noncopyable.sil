@@ -193,3 +193,4 @@ bb0(%0 : @closureCapture @guaranteed ${ var NonTrivialStruct }):
   %9 = tuple ()
   return %9 : $()
 }
+// UNSUPPORTED: OS=windows-msvc

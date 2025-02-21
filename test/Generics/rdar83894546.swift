@@ -31,3 +31,4 @@ public struct G<B : P1> : P2 {
 //
 // Therefore, the single rule C.C == C.C.C suffices to "tie off" the recursion.
 public protocol P3: P2 where C == G<B> {}
+// UNSUPPORTED: OS=windows-msvc

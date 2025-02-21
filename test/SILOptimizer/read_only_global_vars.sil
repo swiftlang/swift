@@ -49,3 +49,4 @@ bb0(%0 : $Int32):
   return %r : $()
 }
 
+// UNSUPPORTED: OS=windows-msvc

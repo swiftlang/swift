@@ -22,3 +22,4 @@ class Model {
 // CHECK-NEXT:   %2 = load ptr, ptr %[[Self]]
 // CHECK-NOT:    !dbg
 // CHECK-SAME:  {{$}}
+// UNSUPPORTED: OS=windows-msvc

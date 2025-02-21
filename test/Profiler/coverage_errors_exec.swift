@@ -440,3 +440,4 @@ func test44() throws -> Int {            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
   return x                               // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 }                                        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 _ = try? test44()                        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+// UNSUPPORTED: OS=windows-msvc

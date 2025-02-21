@@ -10,3 +10,4 @@ protocol Q: P {}
 extension Q where A == Int {
   typealias B = Int
 }
+// UNSUPPORTED: OS=windows-msvc

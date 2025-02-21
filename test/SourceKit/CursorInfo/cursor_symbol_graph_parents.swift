@@ -195,3 +195,4 @@ extension Parent.Inner.DeepNested<T> where T: Equatable {
 // ACCESSORINLOCAL-NEXT: extensionOfDeepNestedMethod() swift.method s:27cursor_symbol_graph_parents6ParentV5InnerV10DeepNestedCAASQRzlE011extensionOfgH6MethodyyF
 // ACCESSORINLOCAL-NEXT: InAccessor swift.struct s:27cursor_symbol_graph_parents6ParentV5InnerV10DeepNestedCAASQRzlE011extensionOfgH6MethodyyF04deepH8ComputedL_Sivg10InAccessorL_V
 // ACCESSORINLOCAL-NEXT: PARENT CONTEXTS END
+// UNSUPPORTED: OS=windows-msvc

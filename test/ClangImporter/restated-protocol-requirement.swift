@@ -8,3 +8,4 @@ func giveMeAQ(_ q: Q) {
   _ = q[q]
   _ = type(of: q).init(foo: q)
 }
+// UNSUPPORTED: OS=windows-msvc

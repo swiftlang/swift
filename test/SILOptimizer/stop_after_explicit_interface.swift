@@ -20,3 +20,4 @@ public func caller() {
 }
 
 // SKIPPING-NOT: *** SIL function after {{.*}}, stage MidLevel,Function, pass {{.*}}: PerfInliner (inline)
+// UNSUPPORTED: OS=windows-msvc

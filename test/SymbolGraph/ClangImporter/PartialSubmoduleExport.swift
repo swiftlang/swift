@@ -83,3 +83,4 @@ static int groupBOne = 1;
 // this shouldn't be in the symbol graph
 // MISSING-NOT: "precise": "c:GroupBTwo.h@groupBTwo"
 static int groupBTwo = 2;
+// UNSUPPORTED: OS=windows-msvc

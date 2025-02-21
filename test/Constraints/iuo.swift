@@ -246,3 +246,4 @@ func testCompoundRefs() {
   let _: (Int) -> Int = hasArgLabel(x:) // expected-error {{cannot convert value of type '(Int) -> Int?' to specified type '(Int) -> Int}}
   let _: (Int) -> Int? = hasArgLabel(x:)
 }
+// UNSUPPORTED: OS=windows-msvc

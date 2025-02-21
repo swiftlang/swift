@@ -23,3 +23,4 @@ struct S0 : NeedsF0 {  // expected-error {{type 'S0' does not conform to protoco
   }
 }
 
+// UNSUPPORTED: OS=windows-msvc

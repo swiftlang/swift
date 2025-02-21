@@ -77,3 +77,4 @@ public protocol HasRethrowingMap: Sequence {
 }
 
 extension Array: HasRethrowingMap {}
+// UNSUPPORTED: OS=windows-msvc

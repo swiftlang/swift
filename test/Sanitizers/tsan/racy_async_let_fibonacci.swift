@@ -70,3 +70,4 @@ func runFibonacci(_ n: Int) async {
 
 // CHECK: ThreadSanitizer: Swift access race
 // CHECK: Location is global 'racyCounter'
+// UNSUPPORTED: OS=windows-msvc

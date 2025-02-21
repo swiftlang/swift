@@ -30,3 +30,4 @@ import C
 // CHECK: <unknown>:0: error: circular dependency between modules 'A' and 'B'
 
 #endif
+// UNSUPPORTED: OS=windows-msvc

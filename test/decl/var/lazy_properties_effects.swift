@@ -15,3 +15,4 @@ struct InstanceLazyWithEffects {
   lazy var x = try throwsFunc() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
   lazy var y = await asyncFunc() // expected-error {{'async' call cannot occur in a property initializer}}
 }
+// UNSUPPORTED: OS=windows-msvc

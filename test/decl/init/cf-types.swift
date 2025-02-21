@@ -38,3 +38,4 @@ public func useInit() {
   let _ = CGMutablePath(value: true)
   let _ = CGMutablePath(string: "value")
 }
+// UNSUPPORTED: OS=windows-msvc

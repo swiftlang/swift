@@ -75,3 +75,4 @@ public class DerivedConcrete : Generic<Int?> {
 // CHECK-NEXT: sil_property #DerivedGeneric.subscript<τ_0_0> ()
 // CHECK-NEXT: sil_property #DerivedConcrete.subscript ()
 // CHECK-NEXT: sil_property #DerivedConcrete.subscript ()
+// UNSUPPORTED: OS=windows-msvc

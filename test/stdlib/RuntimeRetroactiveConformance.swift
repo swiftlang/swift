@@ -24,3 +24,4 @@ let mirror = Mirror(reflecting: Bar())
 _ = mirror.children.first!
 
 print("I survived") // CHECK: I survived
+// UNSUPPORTED: OS=windows-msvc

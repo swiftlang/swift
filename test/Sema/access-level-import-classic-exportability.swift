@@ -207,3 +207,4 @@ extension Array: PrivateConstrainedExtensionProtoInPrivate where Element == Priv
 extension PrivateImportType {
     private func privateMethod() {}
 }
+// UNSUPPORTED: OS=windows-msvc

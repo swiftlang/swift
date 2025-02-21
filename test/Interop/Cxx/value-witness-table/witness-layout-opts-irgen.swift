@@ -25,3 +25,4 @@ extension I8Size : Dummy { }
 // CHECK-DAG: @"$sSo7I32SizeVWV" = linkonce_odr hidden constant %swift.vwtable { {{.*}} i8* bitcast (i32 (%swift.opaque*, i32, %swift.type*)* @"$sSo7I32SizeVwet" to i8*), i8* bitcast (void (%swift.opaque*, i32, i32, %swift.type*)* @"$sSo7I32SizeVwst" to i8*)
 // CHECK-DAG: "$sSo7I32SizeVMf" = linkonce_odr hidden constant {{.*}}@"$sSo7I32SizeVWV"
 extension I32Size : Dummy { }
+// UNSUPPORTED: OS=windows-msvc

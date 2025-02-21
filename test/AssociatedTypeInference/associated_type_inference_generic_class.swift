@@ -86,4 +86,4 @@ extension Q {
   func f() -> C<Self> { fatalError() }
 }
 
-struct QQ: Q {}
+struct QQ: Q {}// UNSUPPORTED: OS=windows-msvc
