@@ -22,6 +22,9 @@
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
+// FIXME: [availability] Remove this when possible
+#include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
@@ -792,6 +795,143 @@ bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
     return attr->isSPI();
 
   return false;
+}
+
+static std::optional<AvailabilityDomain>
+getAvailabilityDomainForName(Identifier identifier,
+                             const DeclContext *declContext) {
+  if (auto builtinDomain = AvailabilityDomain::builtinDomainForString(
+          identifier.str(), declContext))
+    return builtinDomain;
+
+  auto &ctx = declContext->getASTContext();
+  if (auto customDomain =
+          ctx.MainModule->getAvailabilityDomainForIdentifier(identifier))
+    return customDomain;
+
+  return std::nullopt;
+}
+
+std::optional<SemanticAvailableAttr>
+SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
+                                       const AvailableAttr *attr,
+                                       const Decl *decl) const {
+  if (attr->hasCachedDomain())
+    return SemanticAvailableAttr(attr);
+
+  auto &ctx = decl->getASTContext();
+  auto &diags = ctx.Diags;
+  auto attrLoc = attr->getLocation();
+  auto attrName = attr->getAttrName();
+  auto domainLoc = attr->getDomainLoc();
+  auto introducedVersion = attr->getRawIntroduced();
+  auto deprecatedVersion = attr->getRawDeprecated();
+  auto obsoletedVersion = attr->getRawObsoleted();
+  auto mutableAttr = const_cast<AvailableAttr *>(attr);
+  auto domain = attr->getCachedDomain();
+
+  if (!domain) {
+    auto domainIdentifier = attr->getDomainIdentifier();
+    ASSERT(domainIdentifier);
+
+    // Attempt to resolve the domain specified for the attribute and diagnose
+    // if no domain is found.
+    auto declContext = decl->getInnermostDeclContext();
+    domain = getAvailabilityDomainForName(*domainIdentifier, declContext);
+    if (!domain) {
+      auto domainString = domainIdentifier->str();
+      if (auto suggestion = closestCorrectedPlatformString(domainString)) {
+        diags
+            .diagnose(domainLoc, diag::attr_availability_suggest_platform,
+                      domainString, attrName, *suggestion)
+            .fixItReplace(SourceRange(domainLoc), *suggestion);
+      } else {
+        diags.diagnose(attrLoc, diag::attr_availability_unknown_platform,
+                       domainString, attrName);
+      }
+      return std::nullopt;
+    }
+
+    if (domain->isCustom() &&
+        !ctx.LangOpts.hasFeature(Feature::CustomAvailability) &&
+        !declContext->isInSwiftinterface()) {
+      diags.diagnose(domainLoc,
+                     diag::attr_availability_requires_custom_availability,
+                     domain->getNameForAttributePrinting(), attr);
+      return std::nullopt;
+    }
+
+    mutableAttr->setCachedDomain(*domain);
+  }
+
+  auto domainName = domain->getNameForAttributePrinting();
+  auto semanticAttr = SemanticAvailableAttr(attr);
+
+  bool hasVersionSpec =
+      (introducedVersion || deprecatedVersion || obsoletedVersion);
+
+  if (!domain->isVersioned() && hasVersionSpec) {
+    SourceRange versionSourceRange;
+    if (introducedVersion)
+      versionSourceRange = semanticAttr.getIntroducedSourceRange();
+    else if (deprecatedVersion)
+      versionSourceRange = semanticAttr.getDeprecatedSourceRange();
+    else if (obsoletedVersion)
+      versionSourceRange = semanticAttr.getObsoletedSourceRange();
+
+    diags
+        .diagnose(attrLoc, diag::attr_availability_unexpected_version, attr,
+                  domainName)
+        .highlight(versionSourceRange);
+    return std::nullopt;
+  }
+
+  if (domain->isSwiftLanguage() || domain->isPackageDescription()) {
+    switch (attr->getKind()) {
+    case AvailableAttr::Kind::Deprecated:
+      diags.diagnose(attrLoc,
+                     diag::attr_availability_expected_deprecated_version,
+                     attrName, domainName);
+      return std::nullopt;
+
+    case AvailableAttr::Kind::Unavailable:
+      diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
+                     "unavailable", attrName, domainName);
+      return std::nullopt;
+
+    case AvailableAttr::Kind::NoAsync:
+      diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
+                     "noasync", attrName, domainName);
+      return std::nullopt;
+
+    case AvailableAttr::Kind::Default:
+      break;
+    }
+
+    if (!hasVersionSpec) {
+      diags.diagnose(attrLoc, diag::attr_availability_expected_version_spec,
+                     attrName, domainName);
+      return std::nullopt;
+    }
+  }
+
+  // Canonicalize platform versions.
+  // FIXME: [availability] This should be done when remapping versions instead.
+  if (domain->isPlatform()) {
+    auto canonicalizeVersion = [&](llvm::VersionTuple version) {
+      return canonicalizePlatformVersion(domain->getPlatformKind(), version);
+    };
+    if (introducedVersion)
+      mutableAttr->setRawIntroduced(canonicalizeVersion(*introducedVersion));
+
+    if (deprecatedVersion)
+      mutableAttr->setRawDeprecated(canonicalizeVersion(*deprecatedVersion));
+
+    if (obsoletedVersion)
+      mutableAttr->setRawObsoleted(canonicalizeVersion(*obsoletedVersion));
+  }
+
+  return semanticAttr;
 }
 
 AvailabilityRange
