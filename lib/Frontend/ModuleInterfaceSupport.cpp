@@ -25,6 +25,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Version.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Frontend/Frontend.h"
@@ -130,7 +131,11 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
         ignorableFlags, [&out](StringRef str) { out << str; },
         [&out] { out << " "; });
 
-    out << " -interface-compiler-version " << version::getCompilerVersion();
+    auto currentVersion = version::Version::getCurrentLanguageVersion();
+    // Prints only major + minor to maintain compatibility with older
+    // compilers.
+    out << " -interface-compiler-version " << currentVersion[0] << '.'
+        << currentVersion[1];
     out << "\n";
   }
 }
