@@ -222,13 +222,16 @@ public struct WindowsBool: ExpressibleByBooleanLiteral {
   }
 }
 
+#if SWIFT_ENABLE_REFLECTION
 extension WindowsBool: CustomReflectable {
   /// Returns a mirror that reflects `self`.
   public var customMirror: Mirror {
     return Mirror(reflecting: boolValue)
   }
 }
+#endif
 
+@_unavailableInEmbedded
 extension WindowsBool: CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
