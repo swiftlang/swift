@@ -1683,8 +1683,8 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
         trackingInfo.setTaskExecutor(taskExecutor);
       }
 
-      // This thread is now going to follow the task on this actor. It may hop off
-      // the actor
+      // This thread is now going to follow the task on this actor.
+      // It may hop off the actor
       runJobInEstablishedExecutorContext(job);
 
       // We could have come back from the job on a generic executor and not as
@@ -2027,7 +2027,9 @@ static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
   // run jobs.  Actor executors won't expect us to switch off them
   // during this operation.  But do allow switching if the executor
   // is generic.
-  if (!executor.isGeneric()) trackingInfo.disallowSwitching();
+  if (!executor.isGeneric()) {
+    trackingInfo.disallowSwitching();
+  }
 
   auto taskExecutor = executor.isGeneric()
                           ? TaskExecutorRef::fromTaskExecutorPreference(job)
@@ -2323,6 +2325,28 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
 
   _swift_task_clearCurrent();
   task->flagAsAndEnqueueOnExecutor(newExecutor);
+}
+
+SWIFT_CC(swift)
+static void swift_task_startSynchronouslyImpl(AsyncTask* task) {
+  swift_retain(task);
+
+  auto currentTracking = ExecutorTrackingInfo::current();
+  if (currentTracking) {
+    auto currentExecutor = currentTracking->getActiveExecutor();
+    AsyncTask * originalTask = _swift_task_clearCurrent();
+
+    swift_job_run(task, currentExecutor);
+    _swift_task_setCurrent(originalTask);
+  } else {
+    // FIXME: this is not correct; we'll keep reusing this thread when we should not have been. See tests with actors.
+    SerialExecutorRef executor = SerialExecutorRef::generic(); // _task_task_getRunSynchronouslyExecutor();
+    auto originalTask = ActiveTask::swap(task);
+    assert(!originalTask);
+
+     swift_job_run(task, executor);
+    _swift_task_setCurrent(originalTask);
+  }
 }
 
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS

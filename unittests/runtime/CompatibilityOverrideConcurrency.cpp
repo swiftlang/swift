@@ -109,6 +109,11 @@ static void swift_task_startOnMainActor_override(AsyncTask* task) {
   Ran = true;
 }
 
+SWIFT_CC(swift)
+static void swift_task_startSynchronously_override(AsyncTask* task) {
+  Ran = true;
+}
+
 #ifdef RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
 [[noreturn]] SWIFT_CC(swift)
 static void swift_task_asyncMainDrainQueue_override_fn(
@@ -328,6 +333,10 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_escalate) {
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startOnMainActorImpl) {
   swift_task_startOnMainActor(nullptr);
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startSynchronously) {
+  swift_task_startSynchronously(nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest,
