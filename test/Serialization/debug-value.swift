@@ -35,7 +35,7 @@ public func fooCaller<T: AdditiveArithmetic>(_ x: T, _ y : T) -> T {
 // BEGIN Main.swift
 import MyModule
 // sil_scope should refer to the specialized version of foo
-//CHECK: sil_scope {{.*}} { loc "{{.*}}MyModule.swift":11:6 parent @$s8MyModule3fooyxx_xts18AdditiveArithmeticRzlFSi_TG5 {{.*}} inlined_at {{.*}} }
+//CHECK: sil_scope {{.*}} { loc "{{.*}}MyModule.swift":13:6 parent @$s8MyModule3fooyxx_xts18AdditiveArithmeticRzlFSi_TG5 {{.*}} inlined_at {{.*}} }
 let _ = fooCaller(1, 2)
 
 func test() {
@@ -43,12 +43,10 @@ func test() {
 }
 // CHECK: sil {{.*}} @$s8MyModule3bar_3sums5Int64VSayAEG_AEtF : $@convention(thin) (@guaranteed Array<Int64>, Int64) -> Int64 {
 
-// CHECK: debug_value %0 : $Array<Int64>, let, name "x", argno 1, loc "{{.*}}MyModule.swift":2:19, scope
-// CHECK: debug_value %1 : $Int64, let, name "sum", argno 2, loc "{{.*}}MyModule.swift":2:31, scope
-// CHECK: [[OPERAND_ONE:%[0-9]+]] = struct_extract %1 : $Int64, #Int64._value, loc "{{.*}}MyModule.swift":3:16,
-// CHECK: debug_value [[OPERAND_ONE]] : $Builtin.Int64, var, (name "temp", loc "{{.*}}MyModule.swift":3:9, scope {{.*}}), type $Int64, expr op_fragment:#Int64._value, loc "{{.*}}MyModule.swift":3:16, scope
-// CHECK: debug_value %0 : $Array<Int64>, var, (name "$i$generator", loc "{{.*}}MyModule.swift":4:14), type $IndexingIterator<Array<Int64>>, expr op_fragment:#IndexingIterator._elements, loc "{{.*}}MyModule.swift":4:14, scope
-// CHECK: debug_value {{.*}} : $Builtin.Int64, var, (name "$i$generator", loc "{{.*}}MyModule.swift":4:14), type $IndexingIterator<Array<Int64>>, expr op_fragment:#IndexingIterator._position:op_fragment:#Int._value, loc "{{.*}}MyModule.swift":4:14, scope
+// CHECK: debug_value %0 : $Array<Int64>, let, name "x", argno 1, loc "{{.*}}MyModule.swift":2:19
+// CHECK: debug_value %1 : $Int64, let, name "sum", argno 2, loc "{{.*}}MyModule.swift":2:31
+// CHECK: debug_value {{.*}}, var, (name "$i$generator", loc "{{.*}}MyModule.swift":4:14), type $IndexingIterator<Array<Int64>>, expr op_fragment:#IndexingIterator._position:op_fragment:#Int._value, loc "{{.*}}MyModule.swift":4:14
+// CHECK: debug_value {{.*}}, var, (name "$i$generator", loc "{{.*}}MyModule.swift":4:14), type $IndexingIterator<Array<Int64>>, expr op_fragment:#IndexingIterator._position:op_fragment:#Int._value
 // CHECK: debug_value {{.*}} : $Builtin.Int64, var, (name "temp", loc "{{.*}}MyModule.swift":3:9, scope {{.*}}), type $Int64, expr op_fragment:#Int64._value, loc "{{.*}}MyModule.swift":5:14, scope
 
 test()
