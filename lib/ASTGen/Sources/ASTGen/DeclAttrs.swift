@@ -2066,17 +2066,18 @@ extension ASTGenVisitor {
       kind = .weak
       guard node.detail == nil else {
         // TODO: Diagnose.
-        return nil
+        fatalError("invalid argument for 'weak' modifier")
       }
     case .unowned:
-      switch node.detail?.detail.keywordKind {
-      case .safe, nil:
+      switch node.detail?.detail.rawText {
+      case "safe", nil:
         kind = .unowned
-      case .unsafe:
+      case "unsafe":
         kind = .unmanaged
-      case _?:
+      case let text?:
         // TODO: Diagnose
-        kind = .unowned
+        _ = text
+        fatalError("invalid argument for 'unowned' modifier")
       }
     default:
       preconditionFailure("ReferenceOwnership modifier must be 'weak' or 'unowned'")
