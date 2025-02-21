@@ -790,32 +790,35 @@ class ClangInheritanceInfo {
   /// gets clamped to the least permissive level between its current value and
   /// the inheritance access specifier.
   ///
-  /// See ClangInheritanceInfo::cumulativeInheritedAccess() for an example.
-  clang::AccessSpecifier access;
-
-  /// This flag indicates that we encountered private inheritance beyond the
-  /// direct base class when crawling up the class hierarchy, meaning all of the
-  /// inherited members from further up the hierarchy should be treated as if
-  /// they were declared private and marked unavailable.
+  /// If we encounter \e nested private inheritance in the class hierarchy
+  /// (i.e., private inheritance beyond the first level of inheritance), we set
+  /// the access level to nullopt to indicate that none of the members from
+  /// classes beyond that point in the hierarchy should be accessible. This case
+  /// must be treated separately from non-nested private inheritance, where
+  /// inherited members are private but accessible from extensions.
   ///
-  /// See ClangInheritanceInfo::cumulativeNestedPrivate() for an example.
-  bool nestedPrivate;
+  /// See ClangInheritanceInfo::cumulativeInheritedAccess() for an example.
+  std::optional<clang::AccessSpecifier> access;
 
 public:
   /// Default constructor for this class that is used as the base case when
   /// recursively walking up a class inheritance hierarchy.
-  ClangInheritanceInfo() : access(clang::AS_none), nestedPrivate(false) {}
+  ClangInheritanceInfo() : access(clang::AS_none) {}
 
   /// Inductive case for this class that is used to accumulate inheritance
   /// metadata for cases of (nested) inheritance.
   ClangInheritanceInfo(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base)
-      : access(cumulativeInheritedAccess(prev, base)),
-        nestedPrivate(cumulativeNestedPrivate(prev, base)) {}
+      : access(computeAccess(prev, base)) {}
 
-  /// Whether this is info represents a case of C++ inheritance.
+  /// Whether this info represents a case of nested private inheritance.
+  bool isNestedPrivate() const { return !access.has_value(); }
+
+  /// Whether this info represents a case of C++ inheritance.
   ///
   /// Returns \c false for the default instance of this class.
-  bool isInheriting() const { return access != clang::AS_none; }
+  bool isInheriting() const {
+    return isNestedPrivate() || *access != clang::AS_none;
+  }
 
   /// Whether this is info represents a case of C++ inheritance.
   operator bool() const { return isInheriting(); }
@@ -841,54 +844,52 @@ public:
                                  ValueDecl *clonedDecl) const;
 
   friend llvm::hash_code hash_value(const ClangInheritanceInfo &info) {
-    return llvm::hash_combine(info.access, info.nestedPrivate);
+    return llvm::hash_combine(info.access);
   }
 
 private:
-  /// An example of how ClangInheritanceInfo:iaccess is accumulated while
-  /// recursively traversing the class hierarchy starting from \c D:
+  /// An example of how ClangInheritanceInfo:access is accumulated while
+  /// recursively traversing the class hierarchy starting from \c E:
   ///
   /// \code{.cpp}
-  /// struct A { ... };               // access = private
-  /// struct B : public    A { ... }; // access = private
-  /// struct C : private   B { ... }; // access = protected
-  /// struct D : protected C { ... }; // access = none [base case]
+  /// struct A { ... };               // access = nullopt (nested private)
+  /// struct B : private   A { ... }; // access = protected
+  /// struct C : public    B { ... }; // access = protected
+  /// struct D : protected C { ... }; // access = public
+  /// struct E : public    D { ... }; // access = none [base case]
   /// \endcode
-  static clang::AccessSpecifier
-  cumulativeInheritedAccess(ClangInheritanceInfo prev,
+  ///
+  /// Another example, this time with non-nested private inheritance:
+  ///
+  /// \code{.cpp}
+  /// struct A { ... };               // access = nullopt
+  /// struct B : public    A { ... }; // access = nullopt
+  /// struct C : private   B { ... }; // access = private
+  /// struct D : public    C { ... }; // access = private
+  /// struct E : private   D { ... }; // access = none [base case]
+  /// \endcode
+  static std::optional<clang::AccessSpecifier>
+  computeAccess(ClangInheritanceInfo prev,
                             clang::CXXBaseSpecifier base) {
-    assert(base.getAccessSpecifier() != clang::AS_none &&
+    auto baseAccess = base.getAccessSpecifier();
+    assert(baseAccess != clang::AS_none &&
            "this should always be public, protected, or private");
+
+    if (!prev.isInheriting())
+      // This is the first level of inheritance, so we just take the access
+      // specifier from CXXBaseSpecifier. Note that this is the only scenario 
+      // where we can have access = private.
+      return {baseAccess};
+
+    if (prev.isNestedPrivate() || baseAccess == clang::AS_private)
+      // This is a case of nested inheritance, and either we encountered nested
+      // private inheritance before, or this is our first time encountering it.
+      return std::nullopt;
+
     static_assert(clang::AS_private > clang::AS_protected &&
                   clang::AS_protected > clang::AS_public &&
                   "using std::max() relies on this ordering");
-    if (prev)
-      return std::max(prev.access, base.getAccessSpecifier());
-
-    return base.getAccessSpecifier();
-  }
-
-  /// An example of how ClangInheritanceInfo::nestedPrivate is accumulated while
-  /// recursively traversing the class hierarchy starting from \c D:
-  ///
-  /// \code{.cpp}
-  /// struct A { ... };             // nestedPrivate = true
-  /// struct B : public  A { ... }; // nestedPrivate = true
-  /// struct C : private B { ... }; // nestedPrivate = false
-  /// struct D : private C { ... }; // nestedPrivate = false [base case]
-  /// \endcode
-  static bool cumulativeNestedPrivate(ClangInheritanceInfo prev,
-                                      clang::CXXBaseSpecifier base) {
-    if (prev.nestedPrivate)
-      // Encountered private inheritance before, so that should be propagated
-      return true;
-
-    if (prev.isInheriting())
-      // This is a case of nested inheritance; return true if it is private
-      return base.getAccessSpecifier() == clang::AS_private;
-
-    // This is the first level of inheritance
-    return false;
+    return {std::max(*prev.access, baseAccess)};
   }
 };
 

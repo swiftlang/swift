@@ -8461,7 +8461,8 @@ ClangInheritanceInfo::accessForBaseDecl(const ValueDecl *baseDecl) const {
 
   static_assert(AccessLevel::Private < AccessLevel::Public &&
                 "std::min() relies on this ordering");
-  auto inherited = importer::convertClangAccess(access);
+  auto inherited = access ? importer::convertClangAccess(*access)
+                          : AccessLevel::Private;
   return std::min(baseDecl->getFormalAccess(), inherited);
 }
 
@@ -8479,7 +8480,7 @@ void ClangInheritanceInfo::setUnavailableIfNecessary(
 
   if (clangDecl->getAccess() == clang::AS_private)
     msg = "this base member is not accessible because it is private";
-  else if (nestedPrivate)
+  else if (isNestedPrivate())
     msg = "this base member is not accessible because of private inheritance";
 
   if (msg)
