@@ -672,13 +672,14 @@ void swift::conformToCxxOptionalIfNeeded(
 
   llvm::errs() << "{{{\n";
   llvm::errs() << __FUNCTION__ << ":" << __LINE__ << ": trying to conform " << decl->getNameStr() << " to CxxOptional\n";
-  decl->dump(llvm::errs());
-  clangDecl->dump(llvm::errs());
   if (!isStdDecl(clangDecl, {"optional"})) {
     llvm::errs() << __FUNCTION__ << ":" << __LINE__ << ": !isStdDecl()\n";
     llvm::errs() << "}}}\n\n";
     return;
   }
+  llvm::errs() << __FUNCTION__ << ":" << __LINE__ << ": isStdDecl(optional) (we're in the running)\n";
+  decl->dump(llvm::errs());
+  clangDecl->dump(llvm::errs());
 
   ProtocolDecl *cxxOptionalProto =
       ctx.getProtocol(KnownProtocolKind::CxxOptional);
