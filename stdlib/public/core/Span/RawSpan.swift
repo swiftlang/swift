@@ -744,7 +744,6 @@ extension RawSpan {
 
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
-  @available(SwiftStdlib 6.1, *)
   @frozen
   public struct _Cursor: ~Escapable, Copyable, BitwiseCopyable {
     /// The address of this cursor.
@@ -765,7 +764,12 @@ extension RawSpan {
     
     @_alwaysEmitIntoClient
     public func isEqual(to other: borrowing _Cursor) -> Bool {
-      other._pointer == _pointer
+      _pointer == other._pointer 
+    }
+
+    @_alwaysEmitIntoClient
+    public func isLessThan(_ other: borrowing _Cursor) -> Bool {
+      _pointer < other._pointer 
     }
   }
 
@@ -778,6 +782,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _startCursor() -> _Cursor {
+    _precondition(_pointer != nil, "Tried to get start of empty RawSpan")
     let cursor = _Cursor(_unsafePointer: _start())
     return _overrideLifetime(cursor, copying: self)
   }
@@ -788,6 +793,21 @@ extension RawSpan {
     var end = _startCursor()
     end._pointer += _count
     return end
+  }
+  
+  @_alwaysEmitIntoClient
+  public func _offsetCursor(_ cursor: inout _Cursor, byByteCount offset: Int) {
+    let newPointer = cursor._pointer + offset
+    let start = _start()
+    _precondition(newPointer >= start, "")
+    _precondition(newPointer <= start + _count, "")
+    cursor._pointer = newPointer
+  }
+
+  @unsafe
+  @_alwaysEmitIntoClient
+  public func _unsafeUncheckedOffsetCursor(_ cursor: inout _Cursor, byByteCount offset: Int) {
+    cursor._pointer += offset
   }
   
   @_alwaysEmitIntoClient
