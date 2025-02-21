@@ -838,13 +838,13 @@ bb4:
 
 // Test a dead begin_borrow (with no scope ending uses). Make sure
 // copy-propagation doesn't end the lifetime before the dead borrow.
+// (Indeed, it doesn't end the lifetime at all.)
 //
 // CHECK-LABEL: sil hidden [ossa] @testDeadBorrow : {{.*}} {
-// CHECK: bb0:
-// CHECK-NOT: copy_value
-// CHECK:   begin_borrow
-// CHECK:   destroy_value
-// CHECK:   unreachable
+// CHECK:       bb0:
+// CHECK-NOT:     copy_value
+// CHECK:         begin_borrow
+// CHECK-NEXT:    unreachable
 // CHECK-LABEL: } // end sil function 'testDeadBorrow'
 sil hidden [ossa] @testDeadBorrow : $@convention(thin) () -> () {
 bb0:

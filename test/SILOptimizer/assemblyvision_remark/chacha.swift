@@ -28,8 +28,8 @@ func checkResult(_ plaintext: [UInt8]) {
 
 @_semantics("optremark.sil-assembly-vision-remark-gen")
 public func run_ChaCha(_ N: Int) {
-  let key = Array(repeating: UInt8(1), count: 32) // expected-remark {{release of type '}}
-  let nonce = Array(repeating: UInt8(2), count: 12) // expected-remark {{release of type '}}
+  let key = Array(repeating: UInt8(1), count: 32) // expected-note {{of 'key}}
+  let nonce = Array(repeating: UInt8(2), count: 12) // expected-note {{of 'nonce}}
 
   var checkedtext = Array(repeating: UInt8(0), count: 1024) // expected-note {{of 'checkedtext}}
   ChaCha20.encrypt(bytes: &checkedtext, key: key, nonce: nonce)
@@ -44,3 +44,5 @@ public func run_ChaCha(_ N: Int) {
   }
 } // expected-remark {{release of type '}}
   // expected-remark @-1 {{release of type '}}
+  // expected-remark @-2 {{release of type '}}
+  // expected-remark @-3 {{release of type '}}

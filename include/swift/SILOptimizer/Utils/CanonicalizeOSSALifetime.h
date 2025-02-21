@@ -370,9 +370,7 @@ public:
     currentDef = def;
     currentLexicalLifetimeEnds = lexicalLifetimeEnds;
 
-    if (maximizeLifetime || respectsDeinitBarriers()) {
-      liveness->initializeDiscoveredBlocks(&discoveredBlocks);
-    }
+    liveness->initializeDiscoveredBlocks(&discoveredBlocks);
     liveness->initializeDef(getCurrentDef());
   }
 

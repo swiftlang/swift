@@ -885,6 +885,33 @@ die:
   unreachable
 }
 
+// CHECK-LABEL: begin running test {{.*}} on consume_copy_before_use_in_dead_end_2
+// CHECK-LABEL: sil [ossa] @consume_copy_before_use_in_dead_end_2 : {{.*}} {
+// CHECK-NOT:     destroy_value [dead_end]
+// CHECK-LABEL: } // end sil function 'consume_copy_before_use_in_dead_end_2'
+// CHECK-LABEL: end running test {{.*}} on consume_copy_before_use_in_dead_end_2
+sil [ossa] @consume_copy_before_use_in_dead_end_2 : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  cond_br undef, exit, die
+
+exit:
+  destroy_value %c
+  %retval = tuple ()
+  return %retval
+
+die:
+  %move = move_value %c
+  %copy = copy_value %move
+  specify_test "canonicalize_ossa_lifetime true false true %move"
+  apply undef(%move) : $@convention(thin) (@owned C) -> ()
+  %addr = alloc_stack $C
+  %token = store_borrow %copy to %addr
+  apply undef() : $@convention(thin) () -> ()
+  %reload = load_borrow %token
+  apply undef(%reload) : $@convention(thin) (@guaranteed C) -> ()
+  unreachable
+}
+
 // The destroy of a value must not be hoisted over a destroy of a copy of a
 // partial_apply [on_stack] which captures the value.
 // CHECK-LABEL: begin running test {{.*}} on destroy_after_pa_copy_destroy
