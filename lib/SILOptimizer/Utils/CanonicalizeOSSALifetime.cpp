@@ -274,6 +274,18 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   return true;
 }
 
+/// Extend liveness to the copy-extended availability boundary of currentDef.
+/// Prevents destroys from being inserted between borrows of (copies of) the
+/// def and dead-ends.
+///
+/// Example:
+///     %def need not be lexical
+///     %c = copy_value %def
+///     %sb = store_borrow %c to %addr
+///     // Must extend lifetime of %def up to this point.  Otherwise, a
+///     // destroy_value could be inserted within a borrow scope or interior
+///     // pointer use.
+///     unreachable
 void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
   // TODO: OSSALifetimeCompletion: Once lifetimes are always complete, delete
   //                               this method.
@@ -1356,8 +1368,8 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
     clear();
     return false;
   }
+  extendLivenessToDeadEnds();
   if (respectsDeinitBarriers()) {
-    extendLivenessToDeadEnds();
     extendLivenessToDeinitBarriers();
   }
   if (accessBlockAnalysis) {
