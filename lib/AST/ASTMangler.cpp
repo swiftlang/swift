@@ -3379,8 +3379,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   }
 }
 
-static ParamSpecifier
-getDefaultOwnership(const ValueDecl *forDecl) {
+ParamSpecifier swift::getDefaultParamSpecifier(const ValueDecl *forDecl) {
   // `consuming` is the default ownership for initializers and setters.
   // Everything else defaults to borrowing.
   if (!forDecl) {
@@ -3451,7 +3450,7 @@ getParameterFlagsForMangling(ParameterTypeFlags flags,
 void ASTMangler::appendFunctionInputType(
     AnyFunctionType *fnType, ArrayRef<AnyFunctionType::Param> params,
     GenericSignature sig, const ValueDecl *forDecl, bool isRecursedInto) {
-  auto defaultSpecifier = getDefaultOwnership(forDecl);
+  auto defaultSpecifier = getDefaultParamSpecifier(forDecl);
   
   switch (params.size()) {
   case 0:

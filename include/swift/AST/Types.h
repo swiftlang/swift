@@ -2378,6 +2378,10 @@ enum class ParamSpecifier : uint8_t {
 
 StringRef getNameForParamSpecifier(ParamSpecifier name);
 
+/// What does \c ParamSpecifier::Default mean for a parameter that's directly
+/// attached to \p VD ? Pass \c nullptr for the value for a closure.
+ParamSpecifier getDefaultParamSpecifier(const ValueDecl *VD);
+
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
 class ParameterTypeFlags {
