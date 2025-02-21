@@ -388,3 +388,6 @@ Added: _$ss33withTaskPriorityEscalationHandler9operation02onC9Escalated9isolatio
 Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvgZ
 Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvpZMV
 Added: _swift_task_getCurrentTaskName
+
+// Task.startSynchronously
+Added: _swift_task_startSynchronously

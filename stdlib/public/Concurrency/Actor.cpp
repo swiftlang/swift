@@ -579,6 +579,29 @@ swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
                                                isCurrentExecutorFlag);
 }
 
+SWIFT_CC(swift)
+static void swift_task_startSynchronouslyImpl(AsyncTask* task) {
+  fprintf(stderr, "[%s:%d](%s) run it...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  swift_retain(task);
+
+  AsyncTask * originalTask = _swift_task_clearCurrent();
+  auto currentTracking = ExecutorTrackingInfo::current();
+  if (currentTracking) {
+    fprintf(stderr, "[%s:%d](%s) executor tracking active exec   = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, currentTracking->getActiveExecutor());
+    fprintf(stderr, "[%s:%d](%s) executor tracking task executor = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, currentTracking->getTaskExecutor());
+    auto currentExecutor = currentTracking->getActiveExecutor();
+
+    fprintf(stderr, "[%s:%d](%s) run sync task = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+            task);
+    swift_job_run(task, currentExecutor);
+  } else {
+    assert(false && "to the special inline executor here");
+  }
+  fprintf(stderr, "[%s:%d](%s) set current to original = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          originalTask);
+  _swift_task_setCurrent(originalTask);
+}
+
 /// Logging level for unexpected executors:
 /// 0 - no logging -- will be IGNORED when Swift6 mode of isCurrentExecutor is used
 /// 1 - warn on each instance -- will be IGNORED when Swift6 mode of isCurrentExecutor is used
