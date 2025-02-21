@@ -361,10 +361,13 @@ public struct ObservationTrackedMacro: AccessorMacro {
       }
       """
 
+    // the guard else case must include the assignment else
+    // cases that would notify then drop the side effects of `didSet` etc
     let setAccessor: AccessorDeclSyntax =
       """
       set {
         guard shouldNotifyObservers(_\(identifier), newValue) else {
+          _\(identifier) = newValue
           return
         }
         withMutation(keyPath: \\.\(identifier)) {
