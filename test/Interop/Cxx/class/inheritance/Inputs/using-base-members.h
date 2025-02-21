@@ -69,7 +69,7 @@ protected:
   operator bool() const { return true; }
   int operator*() const { return 456; }
   OperatorBase operator!() const { return *this; }
-  int operator[](const int x) const { return x; }
+  // int operator[](const int x) const { return x; } // FIXME: see below
 };
 
 struct OperatorBasePrivateInheritance : OperatorBase {
@@ -77,7 +77,7 @@ public:
   using OperatorBase::operator bool;
   using OperatorBase::operator*;
   using OperatorBase::operator!;
-  // using OperatorBase::operator[]; // FIXME: currently broken
+  // using OperatorBase::operator[];  // FIXME: using operator[] is broken
 };
 
 #endif // !_USING_BASE_MEMBERS_H

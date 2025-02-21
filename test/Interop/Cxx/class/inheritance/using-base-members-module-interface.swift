@@ -1,5 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -print-access -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -print-access -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | tee %s.output | tee %s.output | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -print-access -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | tee %s.output | %FileCheck %s
 
 // CHECK:      public struct PublicBase {
 // CHECK-NEXT:   public init()
@@ -78,4 +78,7 @@
 // CHECK-NEXT:   public func __convertToBool() -> Bool
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   public func __operatorStar() -> Int32
+// CHECK-NEXT:   prefix public static func ! (lhs: OperatorBasePrivateInheritance) -> OperatorBase
+// CHECK-NEXT:   @available(*, unavailable, message: "use ! instead")
+// CHECK-NEXT:   public func __operatorExclaim() -> OperatorBase
 // CHECK-NEXT: }
