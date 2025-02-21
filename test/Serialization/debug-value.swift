@@ -50,3 +50,4 @@ func test() {
 // CHECK: debug_value {{.*}} : $Builtin.Int64, var, (name "temp", loc "{{.*}}MyModule.swift":3:9, scope {{.*}}), type $Int64, expr op_fragment:#Int64._value, loc "{{.*}}MyModule.swift":5:14, scope
 
 test()
+// CHECK-NOT: UnknownCode
