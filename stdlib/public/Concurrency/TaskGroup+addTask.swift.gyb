@@ -245,13 +245,13 @@ extension ${TYPE} {
     #if $BuiltinCreateAsyncTaskName
     if var name {
       task =
-        name.withUTF8 { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           ${TASK_CREATE_FN}(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,
             taskGroup: _group,
             initialTaskExecutorConsuming: taskExecutor,
-            taskName: nameBytes.baseAddress?._rawValue,
+            taskName: nameBytes.baseAddress!._rawValue,
             operation: operation).0
         }
     }
