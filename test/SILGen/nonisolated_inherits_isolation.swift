@@ -1,8 +1,8 @@
-// RUN: %target-swift-emit-silgen -swift-version 6 -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 6 -enable-experimental-feature AsyncCallerExecution %s | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
-// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+// REQUIRES: swift_feature_AsyncCallerExecution
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Declarations

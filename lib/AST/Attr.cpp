@@ -305,6 +305,9 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
 
 void ExecutionTypeAttr::printImpl(ASTPrinter &printer,
                                   const PrintOptions &options) const {
+  if (options.SuppressExecutionAttribute)
+    return;
+
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@execution");
   printer << "(";

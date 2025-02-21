@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -swift-version 6 -g %import-libdispatch -import-objc-header %S/Inputs/RunOnMainActor.h -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext )
+// RUN: %target-run-simple-swift( -swift-version 6 -g %import-libdispatch -import-objc-header %S/Inputs/RunOnMainActor.h -enable-experimental-feature ExecutionAttribute -enable-experimental-feature AsyncCallerExecution )
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -6,7 +6,8 @@
 // REQUIRES: libdispatch
 // REQUIRES: asserts
 
-// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+// REQUIRES: swift_feature_ExecutionAttribute
+// REQUIRES: swift_feature_AsyncCallerExecution
 
 // UNSUPPORTED: freestanding
 

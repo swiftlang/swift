@@ -4725,6 +4725,12 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   }
 
   case TypeAttrKind::Execution: {
+    if (!Context.LangOpts.hasFeature(Feature::ExecutionAttribute)) {
+      diagnose(Tok, diag::requires_experimental_feature, "@execution", false,
+               getFeatureName(Feature::ExecutionAttribute));
+      return makeParserError();
+    }
+
     SourceLoc lpLoc = Tok.getLoc(), behaviorLoc, rpLoc;
     if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
       if (!justChecking) {
