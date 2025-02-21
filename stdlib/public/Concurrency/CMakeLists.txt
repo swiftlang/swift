@@ -144,7 +144,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Task+TaskExecutor.swift
   TaskCancellation.swift
   TaskGroup.swift
-  TaskGroup+TaskExecutor.swift
+  TaskGroup+Embedded.swift
   DiscardingTaskGroup.swift
   TaskLocal.swift
   TaskSleep.swift
@@ -180,6 +180,9 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
+
+  GYB_SOURCES
+    TaskGroup+addTask.swift.gyb
 
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc

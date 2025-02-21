@@ -208,6 +208,8 @@ TaskExecutorRef _task_taskExecutor_getTaskExecutorRef(
 
 TaskExecutorRef
 InitialTaskExecutorOwnedPreferenceTaskOptionRecord::getExecutorRefFromUnownedTaskExecutor() const {
+  if (!Identity) return TaskExecutorRef::undefined();
+
   TaskExecutorRef executorRef = _task_taskExecutor_getTaskExecutorRef(
       Identity,
       /*selfType=*/swift_getObjectType(Identity),
@@ -721,6 +723,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // Collect the options we know about.
   SerialExecutorRef serialExecutor = SerialExecutorRef::generic();
   TaskExecutorRef taskExecutor = TaskExecutorRef::undefined();
+  const char* taskName = nullptr;
   bool taskExecutorIsOwned = false;
   TaskGroup *group = nullptr;
   AsyncLet *asyncLet = nullptr;
@@ -736,8 +739,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     case TaskOptionRecordKind::InitialTaskExecutorUnowned:
       taskExecutor = cast<InitialTaskExecutorRefPreferenceTaskOptionRecord>(option)
                          ->getExecutorRef();
-      jobFlags.task_setHasInitialTaskExecutorPreference(true);
       taskExecutorIsOwned = false;
+      jobFlags.task_setHasInitialTaskExecutorPreference(true);
       break;
 
     case TaskOptionRecordKind::InitialTaskExecutorOwned:
@@ -749,6 +752,12 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       taskExecutorIsOwned = true;
       jobFlags.task_setHasInitialTaskExecutorPreference(true);
       #endif
+      break;
+
+    case TaskOptionRecordKind::InitialTaskName:
+      taskName = cast<InitialTaskNameTaskOptionRecord>(option)
+                         ->getTaskName();
+      jobFlags.task_setHasInitialTaskName(true);
       break;
 
     case TaskOptionRecordKind::TaskGroup:
@@ -1123,13 +1132,14 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     task->_private().Local.initializeLinkParent(task, parent);
   }
 
-  // FIXME: add discarding flag
-  // FIXME: add task executor
   concurrency::trace::task_create(
       task, parent, group, asyncLet,
       static_cast<uint8_t>(task->Flags.getPriority()),
       task->Flags.task_isChildTask(), task->Flags.task_isFuture(),
-      task->Flags.task_isGroupChildTask(), task->Flags.task_isAsyncLetTask());
+      task->Flags.task_isGroupChildTask(), task->Flags.task_isAsyncLetTask(),
+      taskCreateFlags.isDiscardingTask(),
+      task->Flags.task_hasInitialTaskExecutorPreference(),
+      taskName);
 
   // Attach to the group, if needed.
   if (group) {
@@ -1155,17 +1165,24 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     asyncLet_addImpl(task, asyncLet, !hasAsyncLetResultBuffer);
   }
 
-  // Task executor preference
-  // If the task does not have a specific executor set already via create
-  // options, and there is a task executor preference set in the parent, we
-  // inherit it by deep-copying the preference record. if
-  // (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
-  if (jobFlags.task_hasInitialTaskExecutorPreference()) {
-    // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
-    // because the group takes a fast-path when attaching the child record.
-    assert(jobFlags.task_hasInitialTaskExecutorPreference());
-    task->pushInitialTaskExecutorPreference(
-        taskExecutor, /*owned=*/taskExecutorIsOwned);
+  // ==== Initial Task records
+  {
+    // Task executor preference
+    // If the task does not have a specific executor set already via create
+    // options, and there is a task executor preference set in the parent, we
+    // inherit it by deep-copying the preference record. if
+    // (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
+    if (jobFlags.task_hasInitialTaskExecutorPreference()) {
+      // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
+      // because the group takes a fast-path when attaching the child record.
+      task->pushInitialTaskExecutorPreference(taskExecutor,
+                                              /*owned=*/taskExecutorIsOwned);
+    }
+
+    // Task name
+    if (jobFlags.task_hasInitialTaskName()) {
+      task->pushInitialTaskName(taskName);
+    }
   }
 
   // If we're supposed to enqueue the task, do so now.
