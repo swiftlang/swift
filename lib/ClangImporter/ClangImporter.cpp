@@ -8461,8 +8461,8 @@ ClangInheritanceInfo::accessForBaseDecl(const ValueDecl *baseDecl) const {
 
   static_assert(AccessLevel::Private < AccessLevel::Public &&
                 "std::min() relies on this ordering");
-  auto inherited = access ? importer::convertClangAccess(*access)
-                          : AccessLevel::Private;
+  auto inherited =
+      access ? importer::convertClangAccess(*access) : AccessLevel::Private;
   return std::min(baseDecl->getFormalAccess(), inherited);
 }
 

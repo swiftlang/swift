@@ -687,8 +687,10 @@ void swift::conformToCxxOptionalIfNeeded(
   //
   // This causes SwiftDeclConverter::VisitUsingShadowDecl to (unintentionally)
   // import two pointee members, one public and one private.
-  for (auto *pointee : lookupDirectWithoutExtensions(decl, ctx.getIdentifier("pointee"))) {
-    if (!isa<VarDecl>(pointee) || pointee->getFormalAccess() < AccessLevel::Public)
+  for (auto *pointee :
+       lookupDirectWithoutExtensions(decl, ctx.getIdentifier("pointee"))) {
+    if (!isa<VarDecl>(pointee) ||
+        pointee->getFormalAccess() < AccessLevel::Public)
       // Try next "pointee" member
       continue;
     Type pointeeTy = pointee->getInterfaceType();

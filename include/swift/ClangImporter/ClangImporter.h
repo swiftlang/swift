@@ -869,15 +869,14 @@ private:
   /// struct E : private   D { ... }; // access = none [base case]
   /// \endcode
   static std::optional<clang::AccessSpecifier>
-  computeAccess(ClangInheritanceInfo prev,
-                            clang::CXXBaseSpecifier base) {
+  computeAccess(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base) {
     auto baseAccess = base.getAccessSpecifier();
     assert(baseAccess != clang::AS_none &&
            "this should always be public, protected, or private");
 
     if (!prev.isInheriting())
       // This is the first level of inheritance, so we just take the access
-      // specifier from CXXBaseSpecifier. Note that this is the only scenario 
+      // specifier from CXXBaseSpecifier. Note that this is the only scenario
       // where we can have access = private.
       return {baseAccess};
 
