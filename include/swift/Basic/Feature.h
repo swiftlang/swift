@@ -21,7 +21,7 @@ namespace swift {
 class LangOptions;
 
 /// Enumeration describing all of the named features.
-enum class Feature {
+enum class Feature : uint16_t {
 #define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
   FeatureName,
 #include "swift/Basic/Features.def"

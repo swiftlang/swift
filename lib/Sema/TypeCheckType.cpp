@@ -46,6 +46,7 @@
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/EnumMap.h"
+#include "swift/Basic/FixedBitSet.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"

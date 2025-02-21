@@ -847,9 +847,6 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
                        option.getPrefixedName(), argValue);
         continue;
       }
-
-      // Adoption mode is not plumbed through; ignore it.
-      continue;
     }
 
     // Skip features that are already enabled or disabled.
@@ -858,7 +855,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // Enable the feature if requested.
     if (isEnableFeatureFlag)
-      Opts.enableFeature(*feature);
+      Opts.enableFeature(*feature, /*forAdoption=*/featureMode.has_value());
   }
 
   // Since pseudo-features don't have a boolean on/off state, process them in

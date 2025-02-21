@@ -38,6 +38,8 @@ struct FeatureWrapper final {
 // the type they take.
 namespace swift {
 void PrintTo(const StrictConcurrency &, std::ostream *);
+void PrintTo(const LangOptions::FeatureState &, std::ostream *);
+void PrintTo(const LangOptions::FeatureState::Kind &, std::ostream *);
 } // end namespace swift
 
 #endif // FEATURE_PARSING_TEST_H
