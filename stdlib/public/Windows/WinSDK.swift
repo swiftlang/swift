@@ -200,7 +200,7 @@ public extension FILETIME {
 ///
 /// The C type is a typedef for `int`.
 @frozen
-public struct WindowsBool : ExpressibleByBooleanLiteral {
+public struct WindowsBool: ExpressibleByBooleanLiteral {
   @usableFromInline
   var _value: Int32
 
@@ -222,21 +222,21 @@ public struct WindowsBool : ExpressibleByBooleanLiteral {
   }
 }
 
-extension WindowsBool : CustomReflectable {
+extension WindowsBool: CustomReflectable {
   /// Returns a mirror that reflects `self`.
   public var customMirror: Mirror {
     return Mirror(reflecting: boolValue)
   }
 }
 
-extension WindowsBool : CustomStringConvertible {
+extension WindowsBool: CustomStringConvertible {
   /// A textual representation of `self`.
   public var description: String {
     return self.boolValue.description
   }
 }
 
-extension WindowsBool : Equatable {
+extension WindowsBool: Equatable {
   @_transparent
   public static func ==(lhs: WindowsBool, rhs: WindowsBool) -> Bool {
     return lhs.boolValue == rhs.boolValue
