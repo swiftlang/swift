@@ -2563,7 +2563,21 @@ namespace {
           if (declAndParameterType.first != result)
             continue;
 
+          llvm::errs() << "\n====\n";
           auto getterAndSetter = subscriptInfo.second;
+          auto f = getterAndSetter.second ? getterAndSetter.second : getterAndSetter.first;
+          if (!f->getClangNode()) {
+            llvm::errs() << "\n====\n";
+            llvm::errs() << "getterImpl has no clang node\n";
+            declAndParameterType.first->dump();
+            llvm::errs() << "---\n";
+            declAndParameterType.second->dump();
+            llvm::errs() << "---\n";
+            f->dump();
+            llvm::errs() << "---\n";
+            f->getDeclContext()->dumpContext();
+            llvm::errs() << "====\n\n";
+          }
           auto subscript = synthesizer.makeSubscript(getterAndSetter.first,
                                                      getterAndSetter.second);
           // Also add subscripts directly because they won't be found from the

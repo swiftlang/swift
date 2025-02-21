@@ -670,23 +670,39 @@ void swift::conformToCxxOptionalIfNeeded(
   assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
 
-  if (!isStdDecl(clangDecl, {"optional"}))
+  llvm::errs() << "{{{\n";
+  llvm::errs() << __FUNCTION__ << ":" << __LINE__ << ": trying to conform " << decl->getNameStr() << " to CxxOptional\n";
+  decl->dump(llvm::errs());
+  clangDecl->dump(llvm::errs());
+  if (!isStdDecl(clangDecl, {"optional"})) {
+    llvm::errs() << __FUNCTION__ << ":" << __LINE__ << ": !isStdDecl()\n";
+    llvm::errs() << "}}}\n\n";
     return;
+  }
 
   ProtocolDecl *cxxOptionalProto =
       ctx.getProtocol(KnownProtocolKind::CxxOptional);
   // If the Cxx module is missing, or does not include one of the necessary
   // protocol, bail.
-  if (!cxxOptionalProto)
+  if (!cxxOptionalProto) {
+    llvm::errs() << __FUNCTION__ << ":" << __LINE__ << ": !cxxOptionalProto\n";
+    llvm::errs() << "}}}\n\n";
     return;
+  }
 
   auto pointeeId = ctx.getIdentifier("pointee");
   auto pointees = lookupDirectWithoutExtensions(decl, pointeeId);
-  if (pointees.size() != 1)
+  if (pointees.size() != 1) {
+    llvm::errs() << __FUNCTION__ << ":" << __LINE__ << ": point.size() != 1 (==" << pointees.size() << ") \n";
+    llvm::errs() << "}}}\n\n";
     return;
+  }
   auto pointee = dyn_cast<VarDecl>(pointees.front());
-  if (!pointee)
+  if (!pointee) {
+    llvm::errs() << __FUNCTION__ << ":" << __LINE__ << ": !pointee\n";
+    llvm::errs() << "}}}\n\n";
     return;
+  }
   auto pointeeTy = pointee->getInterfaceType();
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"), pointeeTy);
