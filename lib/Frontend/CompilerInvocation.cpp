@@ -3630,6 +3630,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_async_frame_push_pop_metadata,
                  OPT_disable_async_frame_push_pop_metadata,
                  Opts.EmitAsyncFramePushPopMetadata);
+  Opts.EmitTypeMallocForCoroFrame =
+  Args.hasFlag(OPT_enable_emit_type_malloc_for_coro_frame,
+              OPT_disable_emit_type_malloc_for_coro_frame,
+              Opts.EmitTypeMallocForCoroFrame);
   Opts.AsyncFramePointerAll = Args.hasFlag(OPT_enable_async_frame_pointer_all,
                                            OPT_disable_async_frame_pointer_all,
                                            Opts.AsyncFramePointerAll);
