@@ -964,14 +964,14 @@ class RefCounts {
     }
 
     //We want to generate a single branch on the useSlowRC bit before bothering
-    // to check for immortality, so we avoid hasSideTable here which checks both
-    if (SWIFT_UNLIKELY(bits.hasSideTableOrIsImmortal())) {
-      if (bits.isImmortal(false)) {
-        return false;
-      }
-      return bits.getSideTable()->isUniquelyReferenced();
-    }
-    
+//    // to check for immortality, so we avoid hasSideTable here which checks both
+//    if (SWIFT_UNLIKELY(bits.hasSideTableOrIsImmortal())) {
+//      if (bits.isImmortal(false)) {
+//        return false;
+//      }
+//      return bits.getSideTable()->isUniquelyReferenced();
+//    }
+//    
     return false;
   }
 
