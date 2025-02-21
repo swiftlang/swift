@@ -87,6 +87,8 @@ EDUCATIONAL_NOTES(regionbasedisolation_named_send_yields_race,
                   "sending-risks-data-race.md")
 EDUCATIONAL_NOTES(regionbasedisolation_type_send_yields_race,
                   "sending-risks-data-race.md")
+EDUCATIONAL_NOTES(regionbasedisolation_typed_tns_passed_sending_closure,
+                  "sending-closure-risks-data-race.md")
 EDUCATIONAL_NOTES(shared_mutable_state_decl,
                   "mutable-global-variable.md")
 EDUCATIONAL_NOTES(shared_immutable_state_decl,
