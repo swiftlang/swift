@@ -768,11 +768,11 @@ extension Task where Failure == Never {
     #if $BuiltinCreateAsyncTaskName
     if var name {
       task =
-        name.withUTF8 { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,
-            taskName: nameBytes.baseAddress?._rawValue,
+            taskName: nameBytes.baseAddress!._rawValue,
             operation: operation).0
       }
     }
@@ -937,11 +937,11 @@ self._task = task
   #if $BuiltinCreateAsyncTaskName
 if var name {
   task =
-    name.withUTF8 { nameBytes in
+    name.utf8CString.withUnsafeBufferPointer { nameBytes in
       Builtin.createTask(
         flags: flags,
         initialSerialExecutor: builtinSerialExecutor,
-        taskName: nameBytes.baseAddress?._rawValue,
+        taskName: nameBytes.baseAddress!._rawValue,
         operation: operation).0
     }
 }
@@ -1078,11 +1078,11 @@ extension Task where Failure == Never {
     #if $BuiltinCreateAsyncTaskName
     if var name {
       task =
-        name.withUTF8 { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,
-            taskName: nameBytes.baseAddress?._rawValue,
+            taskName: nameBytes.baseAddress!._rawValue,
             operation: operation).0
         }
     }
@@ -1220,11 +1220,11 @@ extension Task where Failure == Error {
     #if $BuiltinCreateAsyncTaskName
     if var name {
       task =
-        name.withUTF8 { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,
-            taskName: nameBytes.baseAddress?._rawValue,
+            taskName: nameBytes.baseAddress!._rawValue,
             operation: operation).0
         }
     }
