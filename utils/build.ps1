@@ -130,7 +130,7 @@ param
   [string[]] $AndroidSDKs = @(),
   [string[]] $WindowsSDKs = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
-  [string] $ToolchainIdentifier = $(if (${env:TOOLCHAIN_VERSION}) { "${env:TOOLCHAIN_VERSION}" } else { "${env:USERNAME}.development" }),
+  [string] $ToolchainIdentifier = $(if ($Env:TOOLCHAIN_VERSION) { $Env:TOOLCHAIN_VERSION } else { "$Env:USERNAME.development" }),
   [string] $PinnedBuild = "",
   [ValidatePattern("^[A-Fa-f0-9]{64}$")]
   [string] $PinnedSHA256 = "",
@@ -158,7 +158,7 @@ param
     "ZLib")]
   [string] $BuildTo = "",
   [ValidateSet("AMD64", "ARM64")]
-  [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432 -ne $null) { "$env:PROCESSOR_ARCHITEW6432" } else { "$env:PROCESSOR_ARCHITECTURE" }),
+  [string] $HostArchName = $(if ($Env:PROCESSOR_ARCHITEW6432) { $Env:PROCESSOR_ARCHITEW6432 } else { $Env:PROCESSOR_ARCHITECTURE }),
   [ValidateSet("Asserts", "NoAsserts")]
   [string] $Variant = "Asserts",
   [switch] $Clean,
@@ -174,15 +174,14 @@ Set-StrictMode -Version 3.0
 
 # Avoid being run in a "Developer" shell since this script launches its own sub-shells targeting
 # different architectures, and these variables cause confusion.
-if ($null -ne $env:VSCMD_ARG_HOST_ARCH -or $null -ne $env:VSCMD_ARG_TGT_ARCH) {
+if ($Env:VSCMD_ARG_HOST_ARCH -or $Env:VSCMD_ARG_TGT_ARCH) {
   throw "At least one of VSCMD_ARG_HOST_ARCH and VSCMD_ARG_TGT_ARCH is set, which is incompatible with this script. Likely need to run outside of a Developer shell."
 }
 
 # Prevent elsewhere-installed swift modules from confusing our builds.
 $env:SDKROOT = ""
 
-$BuildArchName = $env:PROCESSOR_ARCHITEW6432
-if ($null -eq $BuildArchName) { $BuildArchName = $env:PROCESSOR_ARCHITECTURE }
+$BuildArchName = if ($Env:PROCESSOR_ARCHITEW6432) { $Env:PROCESSOR_ARCHITEW6432 } else { $Env:PROCESSOR_ARCHITECTURE }
 
 if ($PinnedBuild -eq "") {
   switch ($BuildArchName) {
@@ -2129,6 +2128,7 @@ function Build-ExperimentalRuntime {
      -Defines @{
        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
        dispatch_DIR = "$(Get-TargetProjectBinaryCache $Arch Dispatch)\cmake\modules";
      }
   }
@@ -3267,7 +3267,8 @@ if ($Stage) {
 }
 
 if (-not $IsCrossCompiling) {
-  if ($Test -ne $null -and (Compare-Object $Test @("clang", "lld", "lldb", "llvm", "swift") -PassThru -IncludeEqual -ExcludeDifferent) -ne $null) {
+  $CompilersTests = @("clang", "lld", "lldb", "llvm", "swift")
+  if ($Test | Where-Object { $CompilersTests -contains $_ }) {
     $Tests = @{
       "-TestClang" = $Test -contains "clang";
       "-TestLLD" = $Test -contains "lld";
