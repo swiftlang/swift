@@ -79,7 +79,7 @@
       key.length: 1
     },
     {
-      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.kind: source.lang.swift.syntaxtype.typeidentifier,
       key.offset: 153,
       key.length: 3
     },
@@ -99,7 +99,7 @@
       key.length: 1
     },
     {
-      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.kind: source.lang.swift.syntaxtype.typeidentifier,
       key.offset: 171,
       key.length: 5
     },

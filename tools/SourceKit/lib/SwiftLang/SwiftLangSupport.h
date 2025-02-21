@@ -534,6 +534,10 @@ public:
   // LangSupport Interface
   //==========================================================================//
 
+  void *getOpaqueSwiftIDEInspectionInstance() override {
+    return IDEInspectionInst.get();
+  }
+
   void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) override;
 
   void dependencyUpdated() override;

@@ -1,11 +1,33 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
+
+@_unsafeNonescapableResult
+@lifetime(borrow source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, borrowing source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
+
+@_unsafeNonescapableResult
+@lifetime(source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
 
 // TODO: Use real Range
 public struct FakeRange<Bound> {
@@ -130,10 +152,11 @@ extension Span {
   public subscript(bounds: FakeRange<SpanIndex<Element>>) -> Self {
   @lifetime(self)
     get {
-      Span(
+      let span = Span(
         start: bounds.lowerBound,
         count: bounds.upperBound.distance(to:bounds.lowerBound) / MemoryLayout<Element>.stride
       )
+      return _overrideLifetime(span, copying: self)
     }
   }
 

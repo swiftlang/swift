@@ -40,11 +40,11 @@ private func registerPass(
   }
 }
 
-protocol SILCombineSimplifyable : Instruction {
+protocol SILCombineSimplifiable : Instruction {
   func simplify(_ context: SimplifyContext)
 }
 
-private func run<InstType: SILCombineSimplifyable>(_ instType: InstType.Type,
+private func run<InstType: SILCombineSimplifiable>(_ instType: InstType.Type,
                                                    _ bridgedCtxt: BridgedInstructionPassCtxt) {
   let inst = bridgedCtxt.instruction.getAs(instType)
   let context = SimplifyContext(_bridged: bridgedCtxt.passContext,
@@ -53,10 +53,10 @@ private func run<InstType: SILCombineSimplifyable>(_ instType: InstType.Type,
   inst.simplify(context)
 }
 
-private func registerForSILCombine<InstType: SILCombineSimplifyable>(
+private func registerForSILCombine<InstType: SILCombineSimplifiable>(
       _ instType: InstType.Type,
       _ runFn: @escaping (@convention(c) (BridgedInstructionPassCtxt) -> ())) {
-  String(describing: instType)._withBridgedStringRef { instClassStr in
+  "\(instType)"._withBridgedStringRef { instClassStr in
     SILCombine_registerInstructionPass(instClassStr, runFn)
   }
 }
@@ -68,7 +68,6 @@ private func registerSwiftPasses() {
   registerPass(stackProtection, { stackProtection.run($0) })
 
   // Function passes
-  registerPass(allocVectorLowering, { allocVectorLowering.run($0) })
   registerPass(asyncDemotion, { asyncDemotion.run($0) })
   registerPass(booleanLiteralFolding, { booleanLiteralFolding.run($0) })
   registerPass(letPropertyLowering, { letPropertyLowering.run($0) })
@@ -91,6 +90,7 @@ private func registerSwiftPasses() {
   registerPass(stripObjectHeadersPass, { stripObjectHeadersPass.run($0) })
   registerPass(deadStoreElimination, { deadStoreElimination.run($0) })
   registerPass(redundantLoadElimination, { redundantLoadElimination.run($0) })
+  registerPass(mandatoryRedundantLoadElimination, { mandatoryRedundantLoadElimination.run($0) })
   registerPass(earlyRedundantLoadElimination, { earlyRedundantLoadElimination.run($0) })
   registerPass(deinitDevirtualizer, { deinitDevirtualizer.run($0) })
   registerPass(lifetimeDependenceDiagnosticsPass, { lifetimeDependenceDiagnosticsPass.run($0) })
@@ -117,6 +117,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(DestructureTupleInst.self, { run(DestructureTupleInst.self, $0) })
   registerForSILCombine(TypeValueInst.self, { run(TypeValueInst.self, $0) })
   registerForSILCombine(ClassifyBridgeObjectInst.self, { run(ClassifyBridgeObjectInst.self, $0) })
+  registerForSILCombine(PointerToAddressInst.self,  { run(PointerToAddressInst.self, $0) })
   registerForSILCombine(UncheckedEnumDataInst.self, { run(UncheckedEnumDataInst.self, $0) })
 
   // Test passes

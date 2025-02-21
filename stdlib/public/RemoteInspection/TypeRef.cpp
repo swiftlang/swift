@@ -178,6 +178,9 @@ public:
     if (F->getExtFlags().hasSendingResult()) {
       printField("", "sending-result");
     }
+    if (F->getExtFlags().isNonIsolatedCaller()) {
+      printField("execution", "caller");
+    }
 
     stream << "\n";
     Indent += 2;
@@ -395,6 +398,19 @@ public:
     printHeader("opaque");
     stream << ")";
   }
+
+  void visitIntegerTypeRef(const IntegerTypeRef *I) {
+    printHeader("integer");
+    printField("value", std::to_string(I->getValue()));
+    stream << ")";
+  }
+
+  void visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    printHeader("builtin_fixed_array");
+    printRec(BA->getSizeType());
+    printRec(BA->getElementType());
+    stream << ")";
+  }
 };
 
 struct TypeRefIsConcrete
@@ -505,6 +521,14 @@ struct TypeRefIsConcrete
 
   bool visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
     return true;
+  }
+
+  bool visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return true;
+  }
+
+  bool visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return visit(BA->getElementType());
   }
 };
 
@@ -766,6 +790,15 @@ public:
 
     auto funcNode = Dem.createNode(kind);
 
+    // This needs to use the same order as the demangler.
+
+    // TODO: the C function type would go here
+
+    if (F->getExtFlags().hasSendingResult()) {
+      auto node = Dem.createNode(Node::Kind::SendingResultFunctionType);
+      funcNode->addChild(node, Dem);
+    }
+
     if (auto globalActor = F->getGlobalActor()) {
       auto node = Dem.createNode(Node::Kind::GlobalActorFunctionType);
       auto globalActorNode = visit(globalActor);
@@ -774,8 +807,8 @@ public:
     } else if (F->getExtFlags().isIsolatedAny()) {
       auto node = Dem.createNode(Node::Kind::IsolatedAnyFunctionType);
       funcNode->addChild(node, Dem);
-    } else if (F->getExtFlags().hasSendingResult()) {
-      auto node = Dem.createNode(Node::Kind::SendingResultFunctionType);
+    } else if (F->getExtFlags().isNonIsolatedCaller()) {
+      auto node = Dem.createNode(Node::Kind::NonIsolatedCallerFunctionType);
       funcNode->addChild(node, Dem);
     }
 
@@ -1049,6 +1082,27 @@ public:
     
     return node;
   }
+
+  Demangle::NodePointer createInteger(intptr_t value) {
+    if (value >= 0) {
+      return Dem.createNode(Node::Kind::Integer, value);
+    } else {
+      return Dem.createNode(Node::Kind::NegativeInteger, value);
+    }
+  }
+
+  Demangle::NodePointer visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return createInteger(I->getValue());
+  }
+
+  Demangle::NodePointer visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    auto ba = Dem.createNode(Node::Kind::BuiltinFixedArray);
+
+    ba->addChild(visit(BA->getSizeType()), Dem);
+    ba->addChild(visit(BA->getElementType()), Dem);
+
+    return ba;
+  }
 };
 
 Demangle::NodePointer TypeRef::getDemangling(Demangle::Demangler &Dem) const {
@@ -1277,6 +1331,14 @@ public:
     return O;
   }
 
+  const TypeRef *visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return I;
+  }
+
+  const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return BuiltinFixedArrayTypeRef::create(Builder, visit(BA->getSizeType()),
+                                            visit(BA->getElementType()));
+  }
 };
 
 static const TypeRef *
@@ -1530,6 +1592,15 @@ public:
     return OpaqueArchetypeTypeRef::create(Builder, O->getID(), O->getDescription(),
                                           O->getOrdinal(),
                                           newArgLists);
+  }
+
+  const TypeRef *visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return I;
+  }
+
+  const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return BuiltinFixedArrayTypeRef::create(Builder, visit(BA->getSizeType()),
+                                            visit(BA->getElementType()));
   }
 };
 

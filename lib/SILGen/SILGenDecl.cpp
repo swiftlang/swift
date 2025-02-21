@@ -1582,38 +1582,34 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD, unsigned idx,
     return nullptr;
   };
 
-  auto emitInitializer = [&](Expr *initExpr, VarDecl *var, bool forLocalContext,
-                             InitializationPtr &initialization) {
-    // If an initial value expression was specified by the decl, emit it into
-    // the initialization.
-    FullExpr Scope(Cleanups, CleanupLocation(initExpr));
+  auto *initExpr = PBD->getExecutableInit(idx);
 
-    if (forLocalContext) {
-      if (auto *orig = var->getOriginalWrappedProperty()) {
-        if (auto *initExpr = getWrappedValueExpr(var)) {
-          auto value = emitRValue(initExpr);
-          emitApplyOfPropertyWrapperBackingInitializer(
-            PBD, orig, getForwardingSubstitutionMap(), std::move(value))
-            .forwardInto(*this, SILLocation(PBD), initialization.get());
-          return;
-        }
-      }
-    }
+  // If we do not have an explicit initialization expression, just mark the
+  // initialization as unfinished for DI to resolve.
+  if (!initExpr) {
+    return initialization->finishUninitialized(*this);
+  }
 
-    emitExprInto(initExpr, initialization.get());
-  };
+  // Otherwise, an initial value expression was specified by the decl... emit it
+  // into the initialization.
+  FullExpr Scope(Cleanups, CleanupLocation(initExpr));
 
   auto *singleVar = PBD->getSingleVar();
-  if (auto *Init = PBD->getExecutableInit(idx)) {
-    // If an initial value expression was specified by the decl, emit it into
-    // the initialization.
-    bool isLocalVar =
-        singleVar && singleVar->getDeclContext()->isLocalContext();
-    emitInitializer(Init, singleVar, isLocalVar, initialization);
-  } else {
-    // Otherwise, mark it uninitialized for DI to resolve.
-    initialization->finishUninitialized(*this);
+  bool isLocalSingleVar =
+      singleVar && singleVar->getDeclContext()->isLocalContext();
+  if (isLocalSingleVar) {
+    if (auto *orig = singleVar->getOriginalWrappedProperty()) {
+      if (auto *initExpr = getWrappedValueExpr(singleVar)) {
+        auto value = emitRValue(initExpr);
+        emitApplyOfPropertyWrapperBackingInitializer(
+            PBD, orig, getForwardingSubstitutionMap(), std::move(value))
+            .forwardInto(*this, SILLocation(PBD), initialization.get());
+        return;
+      }
+    }
   }
+
+  emitExprInto(initExpr, initialization.get());
 }
 
 void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD,
@@ -1765,7 +1761,7 @@ SILValue SILGenFunction::emitZipperedOSVersionRangeCheck(
   VersionRange VariantOSVersion = variantRange;
 
   // We're building zippered, so we need to pass both macOS and iOS
-  // versions to the the runtime version range check. At run time
+  // versions to the runtime version range check. At run time
   // that check will determine what kind of process this code is loaded
   // into. In a macOS process it will use the macOS version; in an
   // macCatalyst process it will use the iOS version.
@@ -2401,7 +2397,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
       }
 
       // Handle trivial arguments.
-      if (auto *move = dyn_cast<MoveValueInst>(mark->getOperand())) {
+      if (isa<MoveValueInst>(mark->getOperand())) {
         emitDestroy(mark);
         return;
       }
@@ -2421,18 +2417,23 @@ void BlackHoleInitialization::performPackExpansionInitialization(
 
 void BlackHoleInitialization::copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                                                   ManagedValue value, bool isInit) {
-  // Normally we do not do anything if we have a black hole
-  // initialization... but if we have a move only object, insert a move value.
-  if (!value.getType().isMoveOnly())
+  // If we do not have a noncopyable type, just insert an ignored use.
+  if (!value.getType().isMoveOnly()) {
+    SGF.B.createIgnoredUse(loc, value.getValue());
     return;
+  }
 
-  // If we have an address, then this will create a new temporary allocation
-  // which will trigger the move checker. If we have an object though, we need
-  // to insert an extra move_value to make sure the object checker behaves
-  // correctly.
+  // If we have a noncopyable type, we need to do a little more work to satisfy
+  // the move checkers. If we have an address, then this will create a new
+  // temporary allocation which will trigger the move checker...
   value = value.ensurePlusOne(SGF, loc);
-  if (value.getType().isAddress())
+  if (value.getType().isAddress()) {
+    SGF.B.createIgnoredUse(loc, value.getValue());
     return;
+  }
 
+  // If we have an object though, we need to insert an extra move_value to make
+  // sure the object checker behaves correctly.
   value = SGF.B.createMoveValue(loc, value);
+  SGF.B.createIgnoredUse(loc, value.getValue());
 }

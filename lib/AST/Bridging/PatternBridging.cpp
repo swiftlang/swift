@@ -106,7 +106,8 @@ BridgedTuplePattern BridgedTuplePattern_createParsed(
   llvm::SmallVector<TuplePatternElt, 4> elements;
   elements.reserve(cElements.Length);
   llvm::transform(cElements.unbridged<BridgedTuplePatternElt>(),
-                  elements.begin(), [](const BridgedTuplePatternElt &elt) {
+                  std::back_inserter(elements),
+                  [](const BridgedTuplePatternElt &elt) {
                     return TuplePatternElt(elt.Label.unbridged(),
                                            elt.LabelLoc.unbridged(),
                                            elt.ThePattern.unbridged());

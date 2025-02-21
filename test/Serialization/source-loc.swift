@@ -14,6 +14,6 @@ let _ = foo(x: 100)
 //CHECK: {{.*builtin "cmp_ult_Int64".*}} loc "{{.*}}def_source_loc.swift":3:11
 //CHECK: {{.*cond_br.*}} loc "{{.*}}def_source_loc.swift":3:11
 //CHECK: {{.*integer_literal.*}} 1, loc "{{.*}}def_source_loc.swift":7:12
-//CHECK: {{.*struct \$UInt64.*}} loc "{{.*}}def_source_loc.swift":7:12
 //CHECK: {{.*br.*}} loc "{{.*}}def_source_loc.swift":7:5
+//CHECK: {{.*struct \$UInt64.*}} loc "{{.*}}def_source_loc.swift":7:12
 //CHECK: {{.*return.*}} loc "{{.*}}def_source_loc.swift":8:2

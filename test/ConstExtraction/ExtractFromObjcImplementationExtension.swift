@@ -24,7 +24,7 @@ extension ImplClass: MyProto {
 
 // CHECK:   "label": "defaultNilProperty",
 // CHECK:   "type": "Swift.Optional<AnyObject>",
-// CHECK:   "value": "nil"
+// CHECK:   "valueKind": "NilLiteral"
 
 // CHECK:   "label": "notStoredProperty",
 // CHECK:   "type": "Swift.Bool",

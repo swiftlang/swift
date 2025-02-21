@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "alloc-stack-hoisting"
 
-#include "swift/AST/Availability.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"

@@ -192,10 +192,7 @@ ArrayAutoDiffTests.test("ArrayLiteralTuple") {
       return [tuple.0, tuple.1]
     }
     let pb = pullback(at: Float(3), 4, of: { tupleElementGeneric($0, $1) })
-    // FIXME(TF-977): Fix incorrect derivative for array literal with
-    // `tuple_element_addr` elements.
-    // expectEqual((1, 1), pb(FloatArrayTan([1, 1])))
-    expectEqual((0, 2), pb(FloatArrayTan([1, 1])))
+    expectEqual((1, 1), pb(FloatArrayTan([1, 1])))
   }
 }
 

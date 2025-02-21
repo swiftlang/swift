@@ -1085,7 +1085,7 @@ namespace {
           baseObjTy = baseObjTy->getWithoutSpecifierType();
         }
 
-        if (baseObjTy->isArrayType()) {
+        if (auto elementTy = baseObjTy->isArrayType()) {
 
           if (auto arraySliceTy = 
                 dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
@@ -1095,7 +1095,7 @@ namespace {
           if (argList->isUnlabeledUnary() &&
               isa<IntegerLiteralExpr>(argList->getExpr(0))) {
 
-            outputTy = baseObjTy->getAs<BoundGenericType>()->getGenericArgs()[0];
+            outputTy = elementTy;
             
             if (isLValueBase)
               outputTy = LValueType::get(outputTy);
@@ -1159,10 +1159,9 @@ namespace {
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
-      CS.addConstraint(ConstraintKind::ApplicableFunction,
-                       FunctionType::get(params, outputTy),
-                       memberTy,
-                       fnLocator);
+      CS.addApplicationConstraint(FunctionType::get(params, outputTy), memberTy,
+                                  /*trailingClosureMatching=*/std::nullopt,
+                                  CurDC, fnLocator);
 
       Type fixedOutputType =
           CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
@@ -1404,7 +1403,7 @@ namespace {
 
       switch (expr->getKind()) {
       // Magic pointer identifiers are of type UnsafeMutableRawPointer.
-#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING)                               \
       case MagicIdentifierLiteralExpr::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
       {
@@ -1486,9 +1485,9 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
           TVO_CanBindToNoEscape);
 
-      CS.addConstraint(ConstraintKind::ApplicableFunction,
-                       FunctionType::get(params, resultType), memberType,
-                       fnLoc);
+      CS.addApplicationConstraint(
+          FunctionType::get(params, resultType), memberType,
+          /*trailingClosureMatching=*/std::nullopt, CurDC, fnLoc);
 
       if (constr->isFailable())
         return OptionalType::get(witnessType);
@@ -1559,16 +1558,13 @@ namespace {
           // value packs cannot be referenced without `each` immediately
           // preceding them.
           if (auto *expansionType = knownType->getAs<PackExpansionType>()) {
-            if (auto *parentExpansionExpr = getParentPackExpansionExpr(E);
-                parentExpansionExpr &&
-                !isExpr<PackElementExpr>(CS.getParentExpr(E))) {
+            if (!isExpr<PackElementExpr>(CS.getParentExpr(E))) {
               auto packType = expansionType->getPatternType();
               (void)CS.recordFix(
                   IgnoreMissingEachKeyword::create(CS, packType, locator));
-              auto eltType =
-                  openPackElement(packType, locator, parentExpansionExpr);
-              CS.setType(E, eltType);
-              return eltType;
+
+              return openPackElement(packType, locator,
+                                     getParentPackExpansionExpr(E));
             }
           }
 
@@ -3321,10 +3317,10 @@ namespace {
       SmallVector<AnyFunctionType::Param, 8> params;
       getMatchingParams(expr->getArgs(), params);
 
-      CS.addConstraint(ConstraintKind::ApplicableFunction,
-                       FunctionType::get(params, resultType, extInfo),
-                       CS.getType(fnExpr),
-        CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
+      CS.addApplicationConstraint(
+          FunctionType::get(params, resultType, extInfo), CS.getType(fnExpr),
+          /*trailingClosureMatching=*/std::nullopt, CurDC,
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
       // If we ended up resolving the result type variable to a concrete type,
       // set it as the favored type for this expression.
@@ -3508,7 +3504,7 @@ namespace {
       auto boolDecl = ctx.getBoolDecl();
 
       if (!boolDecl) {
-        ctx.Diags.diagnose(SourceLoc(), diag::broken_bool);
+        ctx.Diags.diagnose(SourceLoc(), diag::broken_stdlib_type, "Bool");
         return Type();
       }
 
@@ -3619,10 +3615,12 @@ namespace {
       // Force-unwrap an optional of type T? to produce a T.
       auto locator = CS.getConstraintLocator(expr);
 
-      auto objectTy = CS.createTypeVariable(locator,
-                                            TVO_PrefersSubtypeBinding |
-                                            TVO_CanBindToLValue |
-                                            TVO_CanBindToNoEscape);
+      auto options = TVO_CanBindToLValue | TVO_CanBindToNoEscape;
+
+      if (isExpr<UnresolvedDotExpr>(expr->getSubExpr()))
+        options |= TVO_PrefersSubtypeBinding;
+
+      auto objectTy = CS.createTypeVariable(locator, options);
 
       auto *valueExpr = expr->getSubExpr();
       // It's invalid to force unwrap `nil` literal e.g. `_ = nil!` or
@@ -3937,14 +3935,6 @@ namespace {
       llvm_unreachable("Handled by the walker directly");
     }
 
-    Type visitOneWayExpr(OneWayExpr *expr) {
-      auto locator = CS.getConstraintLocator(expr);
-      auto resultTypeVar = CS.createTypeVariable(locator, 0);
-      CS.addConstraint(ConstraintKind::OneWayEqual, resultTypeVar,
-                       CS.getType(expr->getSubExpr()), locator);
-      return resultTypeVar;
-    }
-
     Type visitTapExpr(TapExpr *expr) {
       DeclContext *varDC = expr->getVar()->getDeclContext();
       ASSERT(varDC != nullptr);
@@ -4079,10 +4069,11 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
           TVO_CanBindToNoEscape);
 
-      CS.addConstraint(
-          ConstraintKind::ApplicableFunction,
+      CS.addApplicationConstraint(
           FunctionType::get(params, resultType),
           macroRefType,
+          /*trailingClosureMatching=*/std::nullopt,
+          CurDC,
           CS.getConstraintLocator(
             expr, ConstraintLocator::ApplyFunction));
 
@@ -4107,7 +4098,6 @@ namespace {
                                JoinInout,
                                JoinMeta,
                                JoinNonexistent,
-                               OneWay,
     };
 
     static TypeOperation getTypeOperation(UnresolvedDotExpr *UDE,
@@ -4121,7 +4111,6 @@ namespace {
 
       return llvm::StringSwitch<TypeOperation>(
                  UDE->getName().getBaseIdentifier().str())
-          .Case("one_way", TypeOperation::OneWay)
           .Case("type_join", TypeOperation::Join)
           .Case("type_join_inout", TypeOperation::JoinInout)
           .Case("type_join_meta", TypeOperation::JoinMeta)
@@ -4135,7 +4124,6 @@ namespace {
 
       switch (op) {
       case TypeOperation::None:
-      case TypeOperation::OneWay:
         llvm_unreachable(
             "We should have a valid type operation at this point!");
 
@@ -4332,12 +4320,7 @@ namespace {
           auto typeOperation =
               ConstraintGenerator::getTypeOperation(UDE, CS.getASTContext());
 
-          if (typeOperation == ConstraintGenerator::TypeOperation::OneWay) {
-            // For a one-way constraint, create the OneWayExpr node.
-            auto *unaryArg = apply->getArgs()->getUnlabeledUnaryExpr();
-            assert(unaryArg);
-            expr = new (CS.getASTContext()) OneWayExpr(unaryArg);
-          } else if (typeOperation !=
+          if (typeOperation !=
                          ConstraintGenerator::TypeOperation::None) {
             // Handle the Builtin.type_join* family of calls by replacing
             // them with dot_self_expr of type_expr with the type being the
@@ -4504,11 +4487,19 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 static std::optional<SequenceIterationInfo>
 generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                                ForEachStmt *stmt, Pattern *typeCheckedPattern,
-                               bool shouldBindPatternVarsOneWay,
-                               bool ignoreForEachWhereClause) {
+                               bool shouldBindPatternVarsOneWay) {
   ASTContext &ctx = cs.getASTContext();
   bool isAsync = stmt->getAwaitLoc().isValid();
   auto *sequenceExpr = stmt->getParsedSequence();
+
+  // If we have an unsafe expression for the sequence, lift it out of the
+  // sequence expression. We'll put it back after we've introduced the
+  // various calls.
+  UnsafeExpr *unsafeExpr = dyn_cast<UnsafeExpr>(sequenceExpr);
+  if (unsafeExpr) {
+    sequenceExpr = unsafeExpr->getSubExpr();
+  }
+
   auto contextualLocator = cs.getConstraintLocator(
       sequenceExpr, LocatorPathElt::ContextualType(CTP_ForEachSequence));
   auto elementLocator = cs.getConstraintLocator(
@@ -4558,8 +4549,14 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
         ctx, sequenceExpr, makeIterator->getName());
     makeIteratorRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
-    auto *makeIteratorCall =
+    Expr *makeIteratorCall =
         CallExpr::createImplicitEmpty(ctx, makeIteratorRef);
+
+    // Swap in the 'unsafe' expression.
+    if (unsafeExpr) {
+      unsafeExpr->setSubExpr(makeIteratorCall);
+      makeIteratorCall = unsafeExpr;
+    }
 
     Pattern *pattern = NamedPattern::createImplicit(ctx, makeIteratorVar);
     auto *PB = PatternBindingDecl::createImplicit(
@@ -4636,6 +4633,12 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
           AwaitExpr::createImplicit(ctx, nextCall->getLoc(), nextCall);
     }
 
+    // Wrap the 'next' call in 'unsafe', if there is one.
+    if (unsafeExpr) {
+      nextCall = new (ctx) UnsafeExpr(unsafeExpr->getLoc(), nextCall, Type(),
+                                      /*implicit=*/true);
+    }
+
     // The iterator type must conform to IteratorProtocol.
     {
       ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
@@ -4679,24 +4682,6 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                      elementTypeLoc);
     cs.addConstraint(ConstraintKind::Conversion, elementType, initType,
                      elementLocator);
-  }
-
-  // Generate constraints for the "where" expression, if there is one.
-  auto *whereExpr = stmt->getWhere();
-  if (whereExpr && !ignoreForEachWhereClause) {
-    Type boolType = dc->getASTContext().getBoolType();
-    if (!boolType)
-      return std::nullopt;
-
-    SyntacticElementTarget whereTarget(whereExpr, dc, CTP_Condition, boolType,
-                                       /*isDiscarded=*/false);
-    if (cs.generateConstraints(whereTarget, FreeTypeVariableBinding::Disallow))
-      return std::nullopt;
-
-    cs.setTargetFor(whereExpr, whereTarget);
-
-    ContextualTypeInfo contextInfo(boolType, CTP_Condition);
-    cs.setContextualInfo(whereExpr, contextInfo);
   }
 
   // Populate all of the information for a for-each loop.
@@ -4752,8 +4737,7 @@ generateForEachPreambleConstraints(ConstraintSystem &cs,
     target.getForEachStmtInfo() = *packIterationInfo;
   } else {
     auto sequenceIterationInfo = generateForEachStmtConstraints(
-        cs, dc, stmt, pattern, target.shouldBindPatternVarsOneWay(),
-        target.ignoreForEachWhereClause());
+        cs, dc, stmt, pattern, target.shouldBindPatternVarsOneWay());
     if (!sequenceIterationInfo) {
       return std::nullopt;
     }
@@ -5080,11 +5064,9 @@ void ConstraintSystem::removePropertyWrapper(Expr *anchor) {
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::applyPropertyWrapperToParameter(
     Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
-    ConstraintKind matchKind, ConstraintLocatorBuilder locator) {
-  Expr *anchor = getAsExpr(locator.getAnchor());
-  if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
-    anchor = apply->getFn();
-  }
+    ConstraintKind matchKind, ConstraintLocator *locator,
+    ConstraintLocator *calleeLocator) {
+  Expr *anchor = getAsExpr(calleeLocator->getAnchor());
 
   auto recordPropertyWrapperFix = [&](ConstraintFix *fix) -> TypeMatchResult {
     if (!shouldAttemptFixes())

@@ -37,8 +37,18 @@ ERROR(error_unsupported_target_arch, none,
       "unsupported target architecture: '%0'", (StringRef))
 
 WARNING(warning_upcoming_feature_on_by_default, none,
-      "upcoming feature '%0' is already enabled as of Swift version %1",
-      (StringRef, unsigned))
+        "upcoming feature '%0' is already enabled as of Swift version %1",
+        (StringRef, unsigned))
+
+GROUPED_WARNING(unrecognized_feature, StrictLanguageFeatures, DefaultIgnore,
+                "'%0' is not a recognized "
+                "%select{experimental|upcoming}1 feature",
+                (StringRef, bool))
+
+GROUPED_WARNING(feature_not_experimental, StrictLanguageFeatures, DefaultIgnore,
+                "'%0' is not an experimental feature, "
+                "use -%select{disable|enable}1-upcoming-feature instead",
+                (StringRef, bool))
 
 ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
@@ -178,8 +188,6 @@ WARNING(warn_implicit_concurrency_import_failed,none,
         "unable to perform implicit import of \"_Concurrency\" module: no such module found", ())
 REMARK(warn_implicit_string_processing_import_failed,none,
        "unable to perform implicit import of \"_StringProcessing\" module: no such module found", ())
-REMARK(warn_implicit_backtracing_import_failed,none,
-       "unable to perform implicit import of \"_Backtracing\" module: no such module found", ())
 
 ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"
@@ -346,16 +354,8 @@ ERROR(placeholder_dependency_module_map_corrupted,none,
       "Swift placeholder dependency module map from %0 is malformed",
       (StringRef))
 
-ERROR(batch_scan_input_file_missing,none,
-      "cannot open batch dependencies scan input file from %0",
-      (StringRef))
-
 ERROR(const_extract_protocol_list_input_file_missing,none,
       "cannot open constant extraction protocol list input file from %0",
-      (StringRef))
-
-ERROR(batch_scan_input_file_corrupted,none,
-      "batch dependencies scan input file from %0 is malformed",
       (StringRef))
 
 ERROR(const_extract_protocol_list_input_file_corrupted,none,
@@ -588,6 +588,20 @@ ERROR(package_cmo_requires_library_evolution, none,
 ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",
       (StringRef))
+
+GROUPED_WARNING(command_line_conflicts_with_strict_safety,Unsafe,none,
+      "'%0' is not memory-safe and should not be combined with "
+      "strict memory safety checking", (StringRef))
+
+ERROR(json_zlib_not_supported,none,
+      "this compiler was not built with zlib compression support enabled; "
+      "'-dump-ast-format json-zlib' cannot be used", ())
+
+ERROR(ast_format_requires_dump_ast,none,
+      "structured AST formats are only supported when using -dump-ast", ())
+
+ERROR(unknown_dump_ast_format,none,
+      "unknown format '%0' requested with '-dump-ast-format'", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -1515,9 +1515,6 @@ public:
     printDebugVar(AVI->getVarInfo(false),
                   &AVI->getModule().getASTContext().SourceMgr);
   }
-  void visitAllocVectorInst(AllocVectorInst *AVI) {
-    *this << AVI->getElementType() << ", " << getIDAndType(AVI->getCapacity());
-  }
   void visitAllocPackInst(AllocPackInst *API) {
     *this << API->getType().getObjectType();
   }
@@ -2728,7 +2725,7 @@ public:
     *this << getIDAndType(I->getReference()) << " of "
           << getIDAndType(I->getOperand(1));
   }
-  void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
+  void visitDestroyNotEscapedClosureInst(DestroyNotEscapedClosureInst *CUI) {
     if (CUI->getVerificationType())
       *this << "[objc] ";
     *this << getIDAndType(CUI->getOperand());
@@ -2873,6 +2870,10 @@ public:
     *this << GI->getFormalResumeType();
   }
 
+  void visitIgnoredUseInst(IgnoredUseInst *i) {
+    *this << getIDAndType(i->getOperand());
+  }
+
   void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *GI) {
     if (GI->throws())
       *this << "[throws] ";
@@ -2885,7 +2886,7 @@ public:
           << ", resume " << Ctx.getID(AI->getResumeBB());
     
     if (auto errorBB = AI->getErrorBB()) {
-      *this << ", error " << Ctx.getID(AI->getErrorBB());
+      *this << ", error " << Ctx.getID(errorBB);
     }
   }
 

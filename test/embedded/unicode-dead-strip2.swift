@@ -19,7 +19,6 @@ struct Main {
 // The code uses String case conversion, should need the mapping tables, and not the others.
 // EXCLUDES-NOT: swift_stdlib_case
 // EXCLUDES-NOT: swift_stdlib_graphemeBreakProperties
-// EXCLUDES-NOT: swift_stdlib_linkingConsonant
 // INCLUDES:     swift_stdlib_mappings
 // EXCLUDES-NOT: swift_stdlib_names
 // EXCLUDES-NOT: swift_stdlib_nfc

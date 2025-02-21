@@ -95,6 +95,12 @@ void SplitterStep::computeFollowupSteps(
   // Contract the edges of the constraint graph.
   CG.optimize();
 
+  if (CS.getASTContext().TypeCheckerOpts.SolverDisableSplitter) {
+    steps.push_back(std::make_unique<ComponentStep>(
+          CS, 0, &CS.InactiveConstraints, Solutions));
+    return;
+  }
+
   // Compute the connected components of the constraint graph.
   auto components = CG.computeConnectedComponents(CS.getTypeVariables());
   unsigned numComponents = components.size();

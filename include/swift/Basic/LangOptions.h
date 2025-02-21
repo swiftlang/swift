@@ -201,7 +201,7 @@ namespace swift {
     /// Maximum number of typo corrections we are allowed to perform.
     /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
     unsigned TypoCorrectionLimit = 0;
-    
+
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
@@ -260,7 +260,7 @@ namespace swift {
 
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
-    
+
     /// Emit a remark on early exit in explicit interface build
     bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
 
@@ -411,19 +411,12 @@ namespace swift {
     /// implementation quirk of previous compilers.
     bool DisableNamedLazyImportAsMemberLoading = false;
 
-    /// Enable inference of Sendable conformances for public types.
-    bool EnableInferPublicSendable = false;
-
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
         !SWIFT_IMPLICIT_CONCURRENCY_IMPORT;
 
     /// Disable the implicit import of the _StringProcessing module.
     bool DisableImplicitStringProcessingModuleImport = false;
-
-    /// Disable the implicit import of the _Backtracing module.
-    bool DisableImplicitBacktracingModuleImport =
-        !SWIFT_IMPLICIT_BACKTRACING_IMPORT;
 
     /// Disable the implicit import of the Cxx module.
     bool DisableImplicitCxxModuleImport = false;
@@ -610,6 +603,12 @@ namespace swift {
     /// from source.
     bool AllowNonResilientAccess = false;
 
+    /// When Package CMO is enabled, deserialization checks ensure that a decl's
+    /// members are correctly deserialized to maintain the proper layout—a prerequisite
+    /// for bypassing resilience when accessing the decl. By default, a warning is issued
+    /// if a deserialization failure is found; this flag causes the build to fail fast instead.
+    bool AbortOnDeserializationFailForPackageCMO = false;
+
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 
@@ -684,7 +683,7 @@ namespace swift {
     void clearAllPlatformConditionValues() {
       PlatformConditionValues.clear();
     }
-    
+
     /// Returns the value for the given platform condition or an empty string.
     StringRef getPlatformConditionValue(PlatformConditionKind Kind) const;
 
@@ -845,7 +844,7 @@ namespace swift {
 
     /// If non-zero, abort the expression type checker if it takes more
     /// than this many seconds.
-    unsigned ExpressionTimeoutThreshold = 600;
+    unsigned ExpressionTimeoutThreshold = 0;
 
     /// The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
@@ -864,7 +863,7 @@ namespace swift {
     /// 4.2 GHz Intel Core i7.
     /// (It's arbitrary, but will keep the compiler from taking too much time.)
     unsigned SwitchCheckingInvocationThreshold = 200000;
-    
+
     /// If true, the time it takes to type-check each function will be dumped
     /// to llvm::errs().
     bool DebugTimeFunctionBodies = false;
@@ -906,16 +905,12 @@ namespace swift {
     /// is for testing purposes.
     std::vector<std::string> DebugForbidTypecheckPrefixes;
 
-    /// The upper bound to number of sub-expressions unsolved
-    /// before termination of the shrink phrase of the constraint solver.
-    unsigned SolverShrinkUnsolvedThreshold = 10;
-
     /// Disable the shrink phase of the expression type checker.
     bool SolverDisableShrink = false;
 
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
-    
+
     /// Disable constraint system performance hacks.
     bool DisableConstraintSolverPerformanceHacks = false;
 
@@ -928,6 +923,9 @@ namespace swift {
     /// Allow request evalutation to perform type checking lazily, instead of
     /// eagerly typechecking source files after parsing.
     bool EnableLazyTypecheck = false;
+
+    /// Disable the component splitter phase of the expression type checker.
+    bool SolverDisableSplitter = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
@@ -959,6 +957,9 @@ namespace swift {
 
     /// The bridging header or PCH that will be imported.
     std::string BridgingHeader;
+
+    /// The bridging header PCH file.
+    std::string BridgingHeaderPCH;
 
     /// When automatically generating a precompiled header from the bridging
     /// header, place it in this directory.
@@ -1081,6 +1082,9 @@ namespace swift {
     /// compilation source targets.
     std::vector<std::string>
     getReducedExtraArgsForSwiftModuleDependency() const;
+
+    /// Get PCH input path. Return empty string if there is no PCH input.
+    std::string getPCHInputPath() const;
   };
 
 } // end namespace swift

@@ -54,6 +54,10 @@ class FindCapturedVars : public ASTWalker {
   /// can go here too.
   llvm::SetVector<GenericEnvironment *> CapturedEnvironments;
 
+  /// The captured types.
+  SmallVector<CapturedType, 4> CapturedTypes;
+  llvm::SmallDenseMap<CanType, unsigned, 4> CapturedTypeEntryNumber;
+
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
   DynamicSelfType *DynamicSelf = nullptr;
@@ -83,7 +87,8 @@ public:
 
     return CaptureInfo(Context, Captures, dynamicSelfToRecord,
                        OpaqueValue, HasGenericParamCaptures,
-                       CapturedEnvironments.getArrayRef());
+                       CapturedEnvironments.getArrayRef(),
+                       CapturedTypes);
   }
 
   bool hasGenericParamCaptures() const {
@@ -156,6 +161,22 @@ public:
       }));
     }
 
+    // Note that we're using a generic type.
+    auto recordUseOfGenericType = [&](Type type) {
+      if (!HasGenericParamCaptures) {
+        GenericParamCaptureLoc = loc;
+        HasGenericParamCaptures = true;
+      }
+
+      auto [insertionPos, inserted] = CapturedTypeEntryNumber.insert(
+          {type->getCanonicalType(), CapturedTypes.size()});
+      if (inserted) {
+        CapturedTypes.push_back(CapturedType(type, loc));
+      } else if (CapturedTypes[insertionPos->second].getLoc().isInvalid()) {
+        CapturedTypes[insertionPos->second] = CapturedType(type, loc);
+      }
+    };
+
     // Similar to dynamic 'Self', IRGen doesn't really need type metadata
     // for class-bound archetypes in nearly as many cases as with opaque
     // archetypes.
@@ -174,23 +195,18 @@ public:
             CapturedEnvironments.insert(env);
         }
 
-        if ((t->is<PrimaryArchetypeType>() ||
-             t->is<PackArchetypeType>() ||
-             t->is<GenericTypeParamType>()) &&
-            !HasGenericParamCaptures) {
-          GenericParamCaptureLoc = loc;
-          HasGenericParamCaptures = true;
+        if (t->is<PrimaryArchetypeType>() ||
+            t->is<PackArchetypeType>() ||
+            t->is<GenericTypeParamType>()) {
+          recordUseOfGenericType(t);
         }
       }));
     }
 
     if (auto *gft = type->getAs<GenericFunctionType>()) {
       TypeCaptureWalker walker(ObjC, [&](Type t) {
-        if (t->is<GenericTypeParamType>() &&
-            !HasGenericParamCaptures) {
-          GenericParamCaptureLoc = loc;
-          HasGenericParamCaptures = true;
-        }
+        if (t->is<GenericTypeParamType>())
+          recordUseOfGenericType(t);
       });
 
       for (const auto &param : gft->getParams())
@@ -241,10 +257,9 @@ public:
   }
 
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
-    // We don't want to walk into lazy initializers because they're not
-    // really present at this level.  We'll catch them when processing
-    // the getter.
-    return LazyInitializerWalking::None;
+    // Captures for lazy initializers are computed as part of the parent
+    // accessor.
+    return LazyInitializerWalking::InAccessor;
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
@@ -642,12 +657,6 @@ public:
 
     if (auto *PEE = dyn_cast<PackElementExpr>(E))
       return walkToPackElementExpr(PEE);
-
-    // Look into lazy initializers.
-    if (auto *LIE = dyn_cast<LazyInitializerExpr>(E)) {
-      LIE->getSubExpr()->walk(*this);
-      return Action::Continue(E);
-    }
 
     // When we see a reference to the 'super' expression, capture 'self' decl.
     if (auto *superE = dyn_cast<SuperRefExpr>(E)) {

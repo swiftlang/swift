@@ -221,7 +221,7 @@ private:
 
     llvm::Constant *cache = nullptr;
     Retain = getRuntimeFn(
-        getModule(), cache,
+        getModule(), cache, "Swift",
         isNonAtomic(OrigI) ? "swift_nonatomic_retain" : "swift_retain",
         DefaultCC, RuntimeAvailability::AlwaysAvailable, {ObjectPtrTy},
         {ObjectPtrTy}, {NoUnwind, FirstParamReturned}, {});
@@ -237,7 +237,7 @@ private:
     auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
-    Release = getRuntimeFn(getModule(), cache,
+    Release = getRuntimeFn(getModule(), cache, "Swift",
                            isNonAtomic(OrigI) ? "swift_nonatomic_release"
                                               : "swift_release",
                            DefaultCC, RuntimeAvailability::AlwaysAvailable,
@@ -274,7 +274,7 @@ private:
 
     llvm::Constant *cache = nullptr;
     RetainN = getRuntimeFn(
-        getModule(), cache,
+        getModule(), cache, "Swift",
         isNonAtomic(OrigI) ? "swift_nonatomic_retain_n" : "swift_retain_n",
         DefaultCC, RuntimeAvailability::AlwaysAvailable, {ObjectPtrTy},
         {ObjectPtrTy, Int32Ty}, {NoUnwind, FirstParamReturned}, {});
@@ -291,7 +291,7 @@ private:
     auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
-    ReleaseN = getRuntimeFn(getModule(), cache,
+    ReleaseN = getRuntimeFn(getModule(), cache, "Swift",
                             isNonAtomic(OrigI) ? "swift_nonatomic_release_n"
                                                : "swift_release_n",
                             DefaultCC, RuntimeAvailability::AlwaysAvailable,
@@ -310,7 +310,7 @@ private:
 
     llvm::Constant *cache = nullptr;
     UnknownObjectRetainN = getRuntimeFn(
-        getModule(), cache,
+        getModule(), cache, "Swift",
         isNonAtomic(OrigI) ? "swift_nonatomic_unknownObjectRetain_n"
                            : "swift_unknownObjectRetain_n",
         DefaultCC, RuntimeAvailability::AlwaysAvailable, {ObjectPtrTy},
@@ -329,7 +329,7 @@ private:
 
     llvm::Constant *cache = nullptr;
     UnknownObjectReleaseN = getRuntimeFn(
-        getModule(), cache,
+        getModule(), cache, "Swift",
         isNonAtomic(OrigI) ? "swift_nonatomic_unknownObjectRelease_n"
                            : "swift_unknownObjectRelease_n",
         DefaultCC, RuntimeAvailability::AlwaysAvailable, {VoidTy},
@@ -347,7 +347,7 @@ private:
 
     llvm::Constant *cache = nullptr;
     BridgeRetainN = getRuntimeFn(
-        getModule(), cache,
+        getModule(), cache, "Swift",
         isNonAtomic(OrigI) ? "swift_nonatomic_bridgeObjectRetain_n"
                            : "swift_bridgeObjectRetain_n",
         DefaultCC, RuntimeAvailability::AlwaysAvailable, {BridgeObjectPtrTy},
@@ -366,7 +366,7 @@ private:
 
     llvm::Constant *cache = nullptr;
     BridgeReleaseN = getRuntimeFn(
-        getModule(), cache,
+        getModule(), cache, "Swift",
         isNonAtomic(OrigI) ? "swift_nonatomic_bridgeObjectRelease_n"
                            : "swift_bridgeObjectRelease_n",
         DefaultCC, RuntimeAvailability::AlwaysAvailable, {VoidTy},

@@ -18,6 +18,7 @@
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeChecker.h"
+#include "TypeCheckUnsafe.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -1905,6 +1906,8 @@ bool isFragileClangDecl(const clang::Decl *decl) {
     return isFragileClangType(pd->getType());
   if (auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl))
     return isFragileClangType(typedefDecl->getUnderlyingType());
+  if (auto *enumDecl = dyn_cast<clang::EnumDecl>(decl))
+    return enumDecl->isScoped();
   if (auto *rd = dyn_cast<clang::RecordDecl>(decl)) {
     auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(rd);
     if (!cxxRecordDecl)
@@ -2016,7 +2019,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
       // Decls with @_spi_available aren't hidden entirely from public interfaces,
       // thus public interfaces may still refer them. Be forgiving here so public
       // interfaces can compile.
-      if (where.getUnavailablePlatformKind().has_value())
+      if (where.getAvailability().isUnavailable())
         return DisallowedOriginKind::None;
       // We should only diagnose SPI_AVAILABLE usage when the library level is API.
       // Using SPI_AVAILABLE symbols in private frameworks or executable targets
@@ -2110,7 +2113,9 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
           continue;
         assert(inheritedEntries.size() == 1);
         auto inherited = inheritedEntries.front();
-        checkType(inherited.getType(), inherited.getTypeRepr(), ownerDecl);
+        checkType(inherited.getType(), inherited.getTypeRepr(), ownerDecl,
+                  ExportabilityReason::General,
+                  DeclAvailabilityFlag::DisableUnsafeChecking);
       }
     }
 
@@ -2125,7 +2130,9 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
       forAllRequirementTypes(WhereClauseOwner(
                                const_cast<GenericContext *>(ownerCtx)),
                              [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, ownerDecl);
+        checkType(type, typeRepr, ownerDecl,
+                  ExportabilityReason::General,
+                  DeclAvailabilityFlag::DisableUnsafeChecking);
       });
     }
   }
@@ -2272,7 +2279,9 @@ public:
     if (assocType->getTrailingWhereClause()) {
       forAllRequirementTypes(assocType,
                              [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, assocType);
+        checkType(type, typeRepr, assocType,
+                  ExportabilityReason::General,
+                  DeclAvailabilityFlag::DisableUnsafeChecking);
       });
     }
   }
@@ -2298,19 +2307,22 @@ public:
 
     for (TypeLoc inherited : nominal->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
-                ExportabilityReason::Inheritance, flags);
+                ExportabilityReason::Inheritance,
+                flags | DeclAvailabilityFlag::DisableUnsafeChecking);
     }
   }
 
   void visitProtocolDecl(ProtocolDecl *proto) {
     for (TypeLoc requirement : proto->getInherited().getEntries()) {
       checkType(requirement.getType(), requirement.getTypeRepr(), proto,
-                ExportabilityReason::General);
+                ExportabilityReason::General,
+                DeclAvailabilityFlag::DisableUnsafeChecking);
     }
 
     if (proto->getTrailingWhereClause()) {
       forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, proto);
+        checkType(type, typeRepr, proto, ExportabilityReason::General,
+                  DeclAvailabilityFlag::DisableUnsafeChecking);
       });
     }
   }
@@ -2384,7 +2396,8 @@ public:
                            : ExportabilityReason::ExtensionWithConditionalConformances;
 
     forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, ED, reason);
+      checkType(type, typeRepr, ED, reason,
+                DeclAvailabilityFlag::DisableUnsafeChecking);
     });
   }
 
@@ -2398,10 +2411,11 @@ public:
     //
     // 1) If the extension defines conformances, the conformed-to protocols
     // must be exported.
+    DeclAvailabilityFlags flags = DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+    flags |= DeclAvailabilityFlag::DisableUnsafeChecking;
     for (TypeLoc inherited : ED->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), ED,
-                ExportabilityReason::Inheritance,
-                DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol);
+                ExportabilityReason::Inheritance, flags);
     }
 
     auto wasWhere = Where;

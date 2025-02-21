@@ -46,6 +46,7 @@ struct A {
 // CHECK:   [[BASE:%.*]] = load [[T0]] : $*UnsafeMutablePointer<Int32>
 // CHECK:   return [[BASE]] : $UnsafeMutablePointer<Int32>
 
+// SILGEN-LABEL: sil hidden [ossa] @$s10addressors5test0yyF : $@convention(thin) () -> () {
 // CHECK-LABEL: sil hidden @$s10addressors5test0yyF : $@convention(thin) () -> () {
 func test0() {
 // CHECK: [[A:%.*]] = alloc_stack [var_decl] $A
@@ -55,12 +56,16 @@ func test0() {
 // CHECK: store [[AVAL]] to [[A]]
   var a = A()
 
-// CHECK: [[ACCESS:%.*]] = begin_access [read] [static] [[A]] : $*A
+// SILGEN: [[ACCESS:%.*]] = begin_access [read] [unknown] %{{.*}} : $*A
+// SILGEN: [[LD:%.*]] = load [trivial] [[ACCESS]] : $*A
+// SILGEN: [[T3:%.*]] = pointer_to_address %{{.*}} : $Builtin.RawPointer to [strict] $*Int32
+// SILGEN: [[MD:%.*]] = mark_dependence [unresolved] [[T3]] : $*Int32 on [[LD]] : $A
+
 // CHECK: [[T0:%.*]] = function_ref @$s10addressors1AVys5Int32VAEcilu :
 // CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[AVAL]])
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[T3]] : $*Int32 on [[ACCESS]] : $*A
+// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[T3]] : $*Int32 on [[AVAL]] : $A
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unsafe] [[MD]] : $*Int32
 // CHECK: [[Z:%.*]] = load [[ACCESS]] : $*Int32
   let z = a[10]

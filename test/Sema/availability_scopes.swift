@@ -321,6 +321,22 @@ func testStringInterpolation() {
     """
 }
 
+// CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=result
+// CHECK-NEXT: {{^}}    (decl_implicit version=50 decl=unusedA
+// CHECK-NEXT: {{^}}    (decl_implicit version=50 decl=unusedB
+
+func testSequenceExprs(b: Bool, x: Int?) {
+  let result = b
+    ? x.map {
+        let unusedA: Int
+        return $0
+      }
+    : x.map {
+        let unusedB: Int
+        return $0
+      }
+}
+
 // CHECK-NEXT: {{^}}  (decl version=50 unavailable=macOS decl=unavailableOnMacOS()
 // CHECK-NEXT: {{^}}    (decl_implicit version=50 unavailable=macOS decl=x
 

@@ -17,202 +17,128 @@
 #ifndef SWIFT_AST_AVAILABILITY_SPEC_H
 #define SWIFT_AST_AVAILABILITY_SPEC_H
 
+#include "swift/AST/ASTAllocated.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
 class ASTContext;
 
-enum class VersionComparison { GreaterThanEqual };
-
 enum class AvailabilitySpecKind {
-    /// A platform-version constraint of the form "PlatformName X.Y.Z"
-    PlatformVersionConstraint,
+  /// A platform-version constraint of the form "PlatformName X.Y.Z"
+  PlatformVersionConstraint,
 
-    /// A wildcard constraint, spelled '*', that is equivalent
-    /// to CurrentPlatformName >= MinimumDeploymentTargetVersion
-    OtherPlatform,
+  /// A wildcard constraint, spelled '*', that is equivalent
+  /// to CurrentPlatformName >= MinimumDeploymentTargetVersion
+  Wildcard,
 
-    /// A language-version constraint of the form "swift X.Y.Z"
-    LanguageVersionConstraint,
+  /// A language-version constraint of the form "swift X.Y.Z"
+  LanguageVersionConstraint,
 
-    /// A PackageDescription version constraint of the form "_PackageDescription X.Y.Z"
-    PackageDescriptionVersionConstraint,
+  /// A PackageDescription version constraint of the form "_PackageDescription
+  /// X.Y.Z"
+  PackageDescriptionVersionConstraint,
 };
 
 /// The root class for specifications of API availability in availability
 /// queries.
 class AvailabilitySpec : public ASTAllocated<AvailabilitySpec> {
+protected:
   AvailabilitySpecKind Kind;
 
+  std::optional<AvailabilityDomain> Domain;
+
+  /// The range of the entire spec, including the version if there is one.
+  SourceRange SrcRange;
+
+  /// The version (may be empty if there was no version specified).
+  llvm::VersionTuple Version;
+
+  /// If there is a version specified, this is its start location within the
+  /// overall source range.
+  SourceLoc VersionStartLoc;
+
+  // Location of the availability macro expanded to create this spec.
+  SourceLoc MacroLoc;
+
+  AvailabilitySpec(AvailabilitySpecKind Kind,
+                   std::optional<AvailabilityDomain> Domain,
+                   SourceRange SrcRange, llvm::VersionTuple Version,
+                   SourceLoc VersionStartLoc)
+      : Kind(Kind), Domain(Domain), SrcRange(SrcRange), Version(Version),
+        VersionStartLoc(VersionStartLoc) {}
+
 public:
-  AvailabilitySpec(AvailabilitySpecKind Kind) : Kind(Kind) {}
+  /// Creates a wildcard availability specification that guards execution
+  /// by checking that the run-time version is greater than the minimum
+  /// deployment target. This specification is designed to ease porting
+  /// to new platforms. Because new platforms typically branch from
+  /// existing platforms, the wildcard allows an #available() check to do the
+  /// "right" thing (executing the guarded branch) on the new platform without
+  /// requiring a modification to every availability guard in the program. Note
+  /// that we still do compile-time availability checking with '*', so the
+  /// compiler will still catch references to potentially unavailable symbols.
+  static AvailabilitySpec *createWildcard(ASTContext &ctx, SourceLoc starLoc);
+
+  /// Creates an availability specification that guards execution based on the
+  /// compile-time platform agnostic version, e.g., swift >= 3.0.1,
+  /// package-description >= 4.0.
+  static AvailabilitySpec *createPlatformAgnostic(ASTContext &ctx,
+                                                  AvailabilitySpecKind kind,
+                                                  SourceLoc nameLoc,
+                                                  llvm::VersionTuple version,
+                                                  SourceRange versionRange);
+
+  /// Creates an availability specification that guards execution based on the
+  /// run-time platform and version, e.g., macOS >= 10.10.
+  static AvailabilitySpec *createPlatformVersioned(ASTContext &ctx,
+                                                   PlatformKind platform,
+                                                   SourceLoc platformLoc,
+                                                   llvm::VersionTuple version,
+                                                   SourceRange versionRange);
+
+  AvailabilitySpec *clone(ASTContext &ctx) const {
+    return new (ctx)
+        AvailabilitySpec(Kind, Domain, SrcRange, Version, VersionStartLoc);
+  }
 
   AvailabilitySpecKind getKind() const { return Kind; }
 
-  SourceRange getSourceRange() const;
-};
+  bool isWildcard() { return getKind() == AvailabilitySpecKind::Wildcard; }
 
-/// An availability specification that guards execution based on the
-/// run-time platform and version, e.g., OS X >= 10.10.
-class PlatformVersionConstraintAvailabilitySpec : public AvailabilitySpec {
-  PlatformKind Platform;
-  SourceLoc PlatformLoc;
+  SourceRange getSourceRange() const { return SrcRange; }
+  SourceLoc getStartLoc() const { return SrcRange.Start; }
 
-  llvm::VersionTuple Version;
+  std::optional<AvailabilityDomain> getDomain() const { return Domain; }
 
-  // For macOS Big Sur, we canonicalize 10.16 to 11.0 for compile-time
-  // checking since clang canonicalizes availability markup. However, to
-  // support Beta versions of macOS Big Sur where the OS
-  // reports 10.16 at run time, we need to compare against 10.16,
-  //
-  // This means for:
-  //
-  // if #available(macOS 10.16, *) { ... }
-  //
-  // we need to keep around both a canonical version for use in compile-time
-  // checks and an uncanonicalized version for the version to actually codegen
-  // with.
-  llvm::VersionTuple RuntimeVersion;
-
-  SourceRange VersionSrcRange;
-
-  // Location of the macro expanded to create this spec.
-  SourceLoc MacroLoc;
-
-public:
-  PlatformVersionConstraintAvailabilitySpec(PlatformKind Platform,
-                                            SourceLoc PlatformLoc,
-                                            llvm::VersionTuple Version,
-                                            llvm::VersionTuple RuntimeVersion,
-                                            SourceRange VersionSrcRange)
-    : AvailabilitySpec(AvailabilitySpecKind::PlatformVersionConstraint),
-      Platform(Platform),
-      PlatformLoc(PlatformLoc), Version(Version),
-      RuntimeVersion(RuntimeVersion),
-      VersionSrcRange(VersionSrcRange) {}
-
-  /// The required platform.
-  PlatformKind getPlatform() const { return Platform; }
-  SourceLoc getPlatformLoc() const { return PlatformLoc; }
-
-  /// Returns true when the constraint is for a platform that was not
-  /// recognized. This enables better recovery during parsing but should never
-  /// be true after parsing is completed.
-  bool isUnrecognizedPlatform() const { return Platform == PlatformKind::none; }
+  PlatformKind getPlatform() const {
+    if (auto domain = getDomain())
+      return domain->getPlatformKind();
+    return PlatformKind::none;
+  }
 
   // The platform version to compare against.
-  llvm::VersionTuple getVersion() const { return Version; }
-  SourceRange getVersionSrcRange() const { return VersionSrcRange; }
+  llvm::VersionTuple getVersion() const;
 
   // The version to be used in codegen for version comparisons at run time.
   // This is required to support beta versions of macOS Big Sur that
   // report 10.16 at run time.
-  llvm::VersionTuple getRuntimeVersion() const { return RuntimeVersion; }
+  llvm::VersionTuple getRuntimeVersion() const { return Version; }
 
-  SourceRange getSourceRange() const;
+  SourceRange getVersionSrcRange() const {
+    if (!VersionStartLoc)
+      return SourceRange();
+    return SourceRange(VersionStartLoc, SrcRange.End);
+  }
 
   // Location of the macro expanded to create this spec.
   SourceLoc getMacroLoc() const { return MacroLoc; }
   void setMacroLoc(SourceLoc loc) { MacroLoc = loc; }
-
-  void print(raw_ostream &OS, unsigned Indent) const;
-  
-  static bool classof(const AvailabilitySpec *Spec) {
-    return Spec->getKind() == AvailabilitySpecKind::PlatformVersionConstraint;
-  }
-
-  void *
-  operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(PlatformVersionConstraintAvailabilitySpec)){
-    return AvailabilitySpec::operator new(Bytes, C, AllocationArena::Permanent,
-                                          Alignment);
-  }
-};
-
-/// An availability specification that guards execution based on the
-/// compile-time platform agnostic version, e.g., swift >= 3.0.1,
-/// package-description >= 4.0.
-class PlatformAgnosticVersionConstraintAvailabilitySpec : public AvailabilitySpec {
-  SourceLoc PlatformAgnosticNameLoc;
-
-  llvm::VersionTuple Version;
-  SourceRange VersionSrcRange;
-
-public:
-  PlatformAgnosticVersionConstraintAvailabilitySpec(
-      AvailabilitySpecKind AvailabilitySpecKind,
-      SourceLoc PlatformAgnosticNameLoc, llvm::VersionTuple Version,
-      SourceRange VersionSrcRange)
-      : AvailabilitySpec(AvailabilitySpecKind),
-        PlatformAgnosticNameLoc(PlatformAgnosticNameLoc), Version(Version),
-        VersionSrcRange(VersionSrcRange) {
-    assert(AvailabilitySpecKind == AvailabilitySpecKind::LanguageVersionConstraint ||
-           AvailabilitySpecKind == AvailabilitySpecKind::PackageDescriptionVersionConstraint);
-  }
-
-  SourceLoc getPlatformAgnosticNameLoc() const { return PlatformAgnosticNameLoc; }
-
-  // The platform version to compare against.
-  llvm::VersionTuple getVersion() const { return Version; }
-  SourceRange getVersionSrcRange() const { return VersionSrcRange; }
-
-  SourceRange getSourceRange() const;
-
-  bool isLanguageVersionSpecific() const {
-      return getKind() == AvailabilitySpecKind::LanguageVersionConstraint;
-  }
-
-  void print(raw_ostream &OS, unsigned Indent) const;
-
-  static bool classof(const AvailabilitySpec *Spec) {
-    return Spec->getKind() == AvailabilitySpecKind::LanguageVersionConstraint ||
-      Spec->getKind() == AvailabilitySpecKind::PackageDescriptionVersionConstraint;
-  }
-
-  void *
-  operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(PlatformAgnosticVersionConstraintAvailabilitySpec)){
-    return AvailabilitySpec::operator new(Bytes, C, AllocationArena::Permanent,
-                                          Alignment);
-  }
-};
-
-/// A wildcard availability specification that guards execution
-/// by checking that the run-time version is greater than the minimum
-/// deployment target. This specification is designed to ease porting
-/// to new platforms. Because new platforms typically branch from
-/// existing platforms, the wildcard allows an #available() check to do the
-/// "right" thing (executing the guarded branch) on the new platform without
-/// requiring a modification to every availability guard in the program. Note
-/// that we still do compile-time availability checking with '*', so the
-/// compiler will still catch references to potentially unavailable symbols.
-class OtherPlatformAvailabilitySpec : public AvailabilitySpec {
-  SourceLoc StarLoc;
-
-public:
-  OtherPlatformAvailabilitySpec(SourceLoc StarLoc)
-      : AvailabilitySpec(AvailabilitySpecKind::OtherPlatform),
-        StarLoc(StarLoc) {}
-
-  SourceLoc getStarLoc() const { return StarLoc; }
-
-  SourceRange getSourceRange() const { return SourceRange(StarLoc, StarLoc); }
-
-  void print(raw_ostream &OS, unsigned Indent) const;
-
-  static bool classof(const AvailabilitySpec *Spec) {
-    return Spec->getKind() == AvailabilitySpecKind::OtherPlatform;
-  }
-
-  void *
-  operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(OtherPlatformAvailabilitySpec)) {
-    return AvailabilitySpec::operator new(Bytes, C, AllocationArena::Permanent,
-                                          Alignment);
-  }
 };
 
 /// Maps of macro name and version to availability specifications.
@@ -221,11 +147,40 @@ public:
 /// parsing a version tuple.
 class AvailabilityMacroMap {
 public:
-  typedef llvm::DenseMap<llvm::VersionTuple,
-                         SmallVector<AvailabilitySpec *, 4>> VersionEntry;
+  typedef llvm::DenseMap<llvm::VersionTuple, SmallVector<AvailabilitySpec *, 4>>
+      VersionEntry;
+  llvm::StringMap<VersionEntry> Impl;
 
-  bool WasParsed = false;
-  llvm::DenseMap<StringRef, VersionEntry> Impl;
+  bool hasMacroName(StringRef name) const {
+    return Impl.find(name) != Impl.end();
+  }
+
+  bool hasMacroNameVersion(StringRef name, llvm::VersionTuple version) const {
+    auto entry = Impl.find(name);
+    if (entry == Impl.end()) {
+      return false;
+    }
+    return entry->second.find(version) != entry->second.end();
+  }
+
+  void addEntry(StringRef name, llvm::VersionTuple version,
+                ArrayRef<AvailabilitySpec *> specs) {
+    assert(!hasMacroNameVersion(name, version));
+    Impl[name][version].assign(specs.begin(), specs.end());
+  }
+
+  ArrayRef<AvailabilitySpec *> getEntry(StringRef name,
+                                        llvm::VersionTuple version) const {
+    auto versions = Impl.find(name);
+    if (versions == Impl.end()) {
+      return {};
+    }
+    auto entry = versions->second.find(version);
+    if (entry == versions->second.end()) {
+      return {};
+    }
+    return entry->second;
+  }
 };
 
 } // end namespace swift

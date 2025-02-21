@@ -449,16 +449,17 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
       for (auto *parentDC = fromDC; !parentDC->isModuleScopeContext();
            parentDC = parentDC->getParentForLookup()) {
         auto *parentNominal = parentDC->getSelfNominalTypeDecl();
+        if (!parentNominal) {
+          continue;
+        }
+
         if (parentNominal == nominalType)
           return parentDC->getDeclaredInterfaceType();
-        if (isa<ExtensionDecl>(parentDC)) {
-          auto *extendedType = parentNominal;
-          while (extendedType != nullptr) {
-            if (extendedType == nominalType)
-              return extendedType->getDeclaredInterfaceType();
-            extendedType = extendedType->getParent()->getSelfNominalTypeDecl();
-          }
-        }
+
+        // `parentDC` is either a nominal or an extension thereof. Either way,
+        // continue climbing up the nominal. Do not to climb up an extension
+        // because they are not allowed to be nested.
+        parentDC = parentNominal;
       }
     }
 
@@ -531,6 +532,14 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
   assert(foundDC);
 
+  // Protocols cannot be nested in generic contexts. Use the declared interface
+  // type, which won't have a parent.
+  if (auto *proto = dyn_cast<ProtocolDecl>(typeDecl)) {
+    if (proto->isUnsupportedNestedProtocol()) {
+      return typeDecl->getDeclaredInterfaceType();
+    }
+  }
+
   // selfType is the self type of the context, unless the
   // context is a protocol type, in which case we might have
   // to use the existential type or superclass bound as a
@@ -551,15 +560,17 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
     selfType = foundDC->getSelfInterfaceType();
 
     if (selfType->is<GenericTypeParamType>()) {
-      if (isa<ProtocolDecl>(typeDecl->getDeclContext())) {
-        if (isa<AssociatedTypeDecl>(typeDecl) ||
-            (isa<TypeAliasDecl>(typeDecl) &&
-             !cast<TypeAliasDecl>(typeDecl)->isGeneric() &&
-             !isSpecialized)) {
-          if (getStage() == TypeResolutionStage::Structural) {
-            return DependentMemberType::get(selfType, typeDecl->getName());
-          } else if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-            typeDecl = assocType->getAssociatedTypeAnchor();
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+        if (getStage() == TypeResolutionStage::Structural) {
+          return DependentMemberType::get(selfType, typeDecl->getName());
+        }
+
+        typeDecl = assocType->getAssociatedTypeAnchor();
+      } else if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+        if (isa<ProtocolDecl>(typeDecl->getDeclContext()) &&
+            getStage() == TypeResolutionStage::Structural) {
+          if (aliasDecl && !aliasDecl->isGeneric()) {
+            return adjustAliasType(aliasDecl->getStructuralType());
           }
         }
       }
@@ -739,6 +750,9 @@ namespace {
         if (secondType->is<IntegerType>())
           return true;
 
+        if (secondType->is<PlaceholderType>())
+          return true;
+
         return false;
       }
 
@@ -895,11 +909,15 @@ static Type applyGenericArguments(Type type,
     auto parameterized =
         ParameterizedProtocolType::get(ctx, protoType, argTys);
 
+    // FIXME: Can this not be done in ExistentialTypeSyntaxChecker?
     if (resolution.getOptions().isConstraintImplicitExistential() &&
         !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-      diags.diagnose(loc, diag::existential_requires_any, parameterized,
-                     ExistentialType::get(parameterized),
-                     /*isAlias=*/isa<TypeAliasType>(type.getPointer()));
+      diags
+          .diagnose(loc, diag::existential_requires_any, parameterized,
+                    ExistentialType::get(parameterized),
+                    /*isAlias=*/isa<TypeAliasType>(type.getPointer()))
+          .warnUntilSwiftVersion(7);
+
       return ErrorType::get(ctx);
     }
 
@@ -1333,7 +1351,7 @@ static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
                    decl->getName());
   } else {
     ty.findIf([&](Type t) -> bool {
-      if (auto unbound = t->getAs<UnboundGenericType>()) {
+      if (t->is<UnboundGenericType>()) {
         ctx.Diags.diagnose(loc,
             diag::generic_type_requires_arguments, t);
         return true;
@@ -1712,32 +1730,6 @@ static void diagnoseGenericArgumentsOnSelf(const TypeResolution &resolution,
   }
 }
 
-/// Diagnose when this is one of the Span types, which currently requires
-/// an experimental feature to use.
-static void diagnoseSpanType(TypeDecl *typeDecl, SourceLoc loc,
-                             const DeclContext *dc) {
-  if (loc.isInvalid())
-    return;
-
-  if (!typeDecl->isStdlibDecl())
-    return;
-
-  ASTContext &ctx = typeDecl->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::Span))
-    return;
-
-  auto nameString = typeDecl->getName().str();
-  if (nameString != "Span" && nameString != "RawSpan")
-    return;
-
-  // Don't require this in the standard library or _Concurrency library.
-  auto module = dc->getParentModule();
-  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
-    return;
-
-  ctx.Diags.diagnose(loc, diag::span_requires_feature_flag, nameString);
-}
-
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 /// \param silContext Used to look up generic parameters in SIL mode.
@@ -1873,8 +1865,6 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
-
-    diagnoseSpanType(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -2096,8 +2086,6 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
     member = memberTypes.back().Member;
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
-
-    diagnoseSpanType(member, repr->getLoc(), DC);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);
@@ -2254,8 +2242,7 @@ namespace {
     }
 
     bool isInterfaceFile() const {
-      auto SF = getDeclContext()->getParentSourceFile();
-      return (SF && SF->Kind == SourceFileKind::Interface);
+      return getDeclContext()->isInSwiftinterface();
     }
 
     /// Short-hand to query the current stage of type resolution.
@@ -3491,40 +3478,33 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   // using claimAllWhere so that the work doen is proportional to the
   // number of attributes that were actually written.
 
-  if (auto uncheckedAttr = claim<UncheckedTypeAttr>(attrs)) {
-    if (ty->hasError()) return ty;
+  // Handle a type attribute that can only be used in inheritance clauses.
+  // Returns true if we need to exit early, false otherwise.
+  auto handleInheritedOnly = [&](AtTypeAttrBase *attr) {
+    if (!attr) return false;
+
+    if (ty->hasError()) return true;
 
     if (!options.is(TypeResolverContext::Inherited) ||
         getDeclContext()->getSelfProtocolDecl()) {
-      diagnoseInvalid(repr, uncheckedAttr->getAtLoc(),
-                      diag::unchecked_not_inheritance_clause);
+      diagnoseInvalid(repr, attr->getAtLoc(),
+                      diag::typeattr_not_inheritance_clause,
+                      attr->getAttrName());
       ty = ErrorType::get(getASTContext());
     } else if (!ty->isConstraintType()) {
-      diagnoseInvalid(repr, uncheckedAttr->getAtLoc(),
-                      diag::unchecked_not_existential, ty);
+      diagnoseInvalid(repr, attr->getAtLoc(),
+                      diag::typeattr_not_existential, attr->getAttrName(), ty);
       ty = ErrorType::get(getASTContext());
     }
 
     // Nothing to record in the type.
-  }
+    return false;
+  };
 
-  if (auto preconcurrencyAttr = claim<PreconcurrencyTypeAttr>(attrs)) {
-    if (ty->hasError())
-      return ty;
-
-    if (!options.is(TypeResolverContext::Inherited) ||
-        getDeclContext()->getSelfProtocolDecl()) {
-      diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                      diag::preconcurrency_not_inheritance_clause);
-      ty = ErrorType::get(getASTContext());
-    } else if (!ty->isConstraintType()) {
-      diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                      diag::preconcurrency_not_existential, ty);
-      ty = ErrorType::get(getASTContext());
-    }
-
-    // Nothing to record in the type.
-  }
+  if (handleInheritedOnly(claim<UncheckedTypeAttr>(attrs)) ||
+      handleInheritedOnly(claim<PreconcurrencyTypeAttr>(attrs)) ||
+      handleInheritedOnly(claim<UnsafeTypeAttr>(attrs)))
+    return ty;
 
   if (auto retroactiveAttr = claim<RetroactiveTypeAttr>(attrs)) {
     if (ty->hasError()) return ty;
@@ -4193,6 +4173,52 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  if (auto executionAttr = claim<ExecutionTypeAttr>(attrs)) {
+    if (!repr->isAsync()) {
+      diagnoseInvalid(repr, executionAttr->getAtLoc(),
+                      diag::attr_execution_type_attr_only_on_async);
+    }
+
+    switch (isolation.getKind()) {
+    case FunctionTypeIsolation::Kind::NonIsolated:
+      break;
+
+    case FunctionTypeIsolation::Kind::GlobalActor:
+      diagnoseInvalid(
+          repr, executionAttr->getAtLoc(),
+          diag::attr_execution_type_attr_incompatible_with_global_isolation,
+          isolation.getGlobalActorType());
+      break;
+
+    case FunctionTypeIsolation::Kind::Parameter:
+      diagnoseInvalid(
+          repr, executionAttr->getAtLoc(),
+          diag::attr_execution_type_attr_incompatible_with_isolated_param);
+      break;
+
+    case FunctionTypeIsolation::Kind::Erased:
+      diagnoseInvalid(
+          repr, executionAttr->getAtLoc(),
+          diag::attr_execution_type_attr_incompatible_with_isolated_any);
+      break;
+
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      llvm_unreachable("cannot happen because multiple @execution attributes "
+                       "aren't allowed.");
+    }
+
+    if (!repr->isInvalid()) {
+      switch (executionAttr->getBehavior()) {
+      case ExecutionKind::Concurrent:
+        isolation = FunctionTypeIsolation::forNonIsolated();
+        break;
+      case ExecutionKind::Caller:
+        isolation = FunctionTypeIsolation::forNonIsolatedCaller();
+        break;
+      }
+    }
+  }
+
   if (auto *lifetimeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
           repr->getResultTypeRepr())) {
     diagnoseInvalid(lifetimeRepr, lifetimeRepr->getLoc(),
@@ -4229,12 +4255,15 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     thrownTy = resolveType(thrownTypeRepr, thrownTypeOptions);
     if (thrownTy->hasError()) {
       thrownTy = Type();
-    } else if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
-               !thrownTy->hasTypeParameter() &&
-               !checkConformance(thrownTy, ctx.getErrorDecl())) {
-      diagnoseInvalid(
-          thrownTypeRepr, thrownTypeRepr->getLoc(), diag::thrown_type_not_error,
-          thrownTy);
+    } else if (inStage(TypeResolutionStage::Interface) &&
+               !options.contains(TypeResolutionFlags::SilenceErrors)) {
+      auto thrownTyInContext = GenericEnvironment::mapTypeIntoContext(
+        resolution.getGenericSignature().getGenericEnvironment(), thrownTy);
+      if (!checkConformance(thrownTyInContext, ctx.getErrorDecl())) {
+        diagnoseInvalid(
+            thrownTypeRepr, thrownTypeRepr->getLoc(), diag::thrown_type_not_error,
+            thrownTy);
+      }
     }
   }
 
@@ -4720,6 +4749,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
 
       case TypeAttrKind::SILSending:
         parameterOptions |= SILParameterInfo::Sending;
+        return true;
+
+      case TypeAttrKind::SILImplicitLeadingParam:
+        parameterOptions |= SILParameterInfo::ImplicitLeading;
         return true;
 
       default:
@@ -5396,32 +5429,40 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   }
 
   if (doDiag && !options.contains(TypeResolutionFlags::SilenceErrors)) {
-    // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
-    if (ctx.isSwiftVersionAtLeast(5)) {
-      // Mark this repr as invalid. This is the only way to indicate that
-      // something went wrong without supressing checking other reprs in
-      // the same type. For example:
-      //
-      // struct S<T, U> { ... }
-      //
-      // _ = S<Int!, String!>(...)
-      //
-      // Compiler should diagnose both `Int!` and `String!` as invalid,
-      // but returning `ErrorType` from here would stop type resolution
-      // after `Int!`.
-      repr->setInvalid();
+    // In language modes up to Swift 5, we allow `T!` in invalid position for
+    // compatibility and downgrade the error to a warning.
+    const unsigned swiftLangModeForError = 5;
 
-      diagnose(repr->getStartLoc(),
-               diag::implicitly_unwrapped_optional_in_illegal_position)
-          .fixItReplace(repr->getExclamationLoc(), "?");
-    } else if (options.is(TypeResolverContext::ExplicitCastExpr)) {
-      diagnose(
-          repr->getStartLoc(),
-          diag::implicitly_unwrapped_optional_deprecated_in_this_position);
-    } else {
-      diagnose(
-          repr->getStartLoc(),
-          diag::implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional)
+    // If we are about to error, mark this node as invalid.
+    // This is the only way to indicate that something went wrong without
+    // supressing checking of sibling nodes.
+    // For example:
+    //
+    // struct S<T, U> { ... }
+    //
+    // _ = S<Int!, String!>(...)
+    //
+    // Compiler should diagnose both `Int!` and `String!` as invalid,
+    // but returning `ErrorType` from here would stop type resolution
+    // after `Int!`.
+    if (ctx.isSwiftVersionAtLeast(swiftLangModeForError)) {
+      repr->setInvalid();
+    }
+
+    Diag<> diagID = diag::iuo_deprecated_here;
+    if (ctx.isSwiftVersionAtLeast(swiftLangModeForError)) {
+      diagID = diag::iuo_invalid_here;
+    }
+
+    diagnose(repr->getExclamationLoc(), diagID)
+        .warnUntilSwiftVersion(swiftLangModeForError);
+
+    // Suggest a regular optional, but not when `T!` is the right-hand side of
+    // a cast expression.
+    // In this case, the user is likely trying to cast an expression of optional
+    // type, and this fix-it is not generally helpful.
+    if (!options.is(TypeResolverContext::ExplicitCastExpr)) {
+      diagnose(repr->getExclamationLoc(), diag::iuo_use_optional_instead)
           .fixItReplace(repr->getExclamationLoc(), "?");
     }
   }
@@ -5659,6 +5700,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         inStage(TypeResolutionStage::Interface) &&
         !moveOnlyElementIndex.has_value() &&
         !ty->hasUnboundGenericType() &&
+        !ty->hasTypeVariable() &&
         !isa<TupleTypeRepr>(tyR)) {
       auto contextTy = GenericEnvironment::mapTypeIntoContext(
           resolution.getGenericSignature().getGenericEnvironment(), ty);
@@ -5885,38 +5927,39 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
   if (constraintType->hasError())
     return ErrorType::get(getASTContext());
 
+  if (constraintType->isConstraintType()) {
+    return ExistentialType::get(constraintType);
+  }
+
   //TO-DO: generalize this and emit the same erorr for some P?
-  if (!constraintType->isConstraintType()) {
-    // Emit a tailored diagnostic for the incorrect optional
-    // syntax 'any P?' with a fix-it to add parenthesis.
-    auto wrapped = constraintType->getOptionalObjectType();
-    if (wrapped && (wrapped->is<ExistentialType>() ||
-                    wrapped->is<ExistentialMetatypeType>())) {
-      std::string fix;
-      llvm::raw_string_ostream OS(fix);
-      constraintType->print(OS, PrintOptions::forDiagnosticArguments());
-      diagnose(repr->getLoc(), diag::incorrect_optional_any,
-               constraintType)
+  //
+  // Emit a tailored diagnostic for the incorrect optional
+  // syntax 'any P?' with a fix-it to add parenthesis.
+  auto wrapped = constraintType->getOptionalObjectType();
+  if (wrapped && (wrapped->is<ExistentialType>() ||
+                  wrapped->is<ExistentialMetatypeType>())) {
+    std::string fix;
+    llvm::raw_string_ostream OS(fix);
+    constraintType->print(OS, PrintOptions::forDiagnosticArguments());
+    diagnose(repr->getLoc(), diag::incorrect_optional_any, constraintType)
         .fixItReplace(repr->getSourceRange(), fix);
-      return constraintType;
-    }
-    
+
+    // Recover by returning the intended type, but mark the type
+    // representation as invalid to prevent it from being diagnosed elsewhere.
+    repr->setInvalid();
+  } else if (constraintType->is<ExistentialType>()) {
     // Diagnose redundant `any` on an already existential type e.g. any (any P)
     // with a fix-it to remove first any.
-    if (constraintType->is<ExistentialType>()) {
-      diagnose(repr->getLoc(), diag::redundant_any_in_existential,
-               ExistentialType::get(constraintType))
-          .fixItRemove(repr->getAnyLoc());
-      return constraintType;
-    }
-
+    diagnose(repr->getLoc(), diag::redundant_any_in_existential,
+             ExistentialType::get(constraintType))
+        .fixItRemove(repr->getAnyLoc());
+  } else {
     diagnose(repr->getLoc(), diag::any_not_existential,
              constraintType->isTypeParameter(), constraintType)
         .fixItRemove(repr->getAnyLoc());
-    return constraintType;
   }
 
-  return ExistentialType::get(constraintType);
+  return constraintType;
 }
 
 NeverNullType TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
@@ -6115,6 +6158,8 @@ Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
     // Cope with the presence of unbound generic types, which are ill-formed
     // at this point but break the invariants of getContextSubstitutionMap().
     if (baseTy->hasUnboundGenericType()) {
+      memberType = memberType->getReducedType(aliasDecl->getGenericSignature());
+
       if (memberType->hasTypeParameter())
         return ErrorType::get(memberType);
 
@@ -6148,18 +6193,15 @@ namespace {
 /// written syntax.
 class ExistentialTypeSyntaxChecker : public ASTWalker {
   ASTContext &Ctx;
-  bool checkStatements;
+  const bool checkStatements;
   bool hitTopStmt;
-  bool warnUntilSwift7;
 
   unsigned exprCount = 0;
   llvm::SmallVector<TypeRepr *, 4> reprStack;
     
 public:
-  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements,
-                               bool warnUntilSwift7 = false)
-      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false),
-        warnUntilSwift7(warnUntilSwift7) {}
+  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements)
+      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) {}
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::ArgumentsAndExpansion;
@@ -6192,7 +6234,7 @@ public:
   }
 
   PostWalkAction walkToTypeReprPost(TypeRepr *T) override {
-    assert(reprStack.back() == T);
+    ASSERT(reprStack.back() == T);
     reprStack.pop_back();
     return Action::Continue();
   }
@@ -6316,14 +6358,13 @@ private:
     diag.fixItReplace(replacementT->getSourceRange(), fix);
   }
 
-  /// Returns a Boolean value indicating whether the type representation being
-  /// visited, assuming it is a constraint type demanding `any` or `some`, is
-  /// missing either keyword.
-  bool isAnyOrSomeMissing() const {
-    assert(isa<DeclRefTypeRepr>(reprStack.back()));
+  /// Returns a Boolean value indicating whether the currently visited
+  /// `DeclRefTypeRepr` node has a `some` or `any` keyword that applies to it.
+  bool currentNodeHasAnyOrSomeKeyword() const {
+    ASSERT(isa<DeclRefTypeRepr>(reprStack.back()));
 
     if (reprStack.size() < 2) {
-      return true;
+      return false;
     }
 
     auto it = reprStack.end() - 1;
@@ -6333,50 +6374,65 @@ private:
         break;
       }
 
-      // Look through parens, inverses, metatypes, and compositions.
+      // Look through parens, inverses, `.Type` metatypes, and compositions.
       if ((*it)->isParenType() || isa<InverseTypeRepr>(*it) ||
           isa<CompositionTypeRepr>(*it) || isa<MetatypeTypeRepr>(*it)) {
-        continue;
-      }
-
-      // Look through '?' and '!' too; `any P?` et al. is diagnosed in the
-      // type resolver.
-      if (isa<OptionalTypeRepr>(*it) ||
-          isa<ImplicitlyUnwrappedOptionalTypeRepr>(*it)) {
         continue;
       }
 
       break;
     }
 
-    return !(isa<OpaqueReturnTypeRepr>(*it) || isa<ExistentialTypeRepr>(*it));
+    return isa<OpaqueReturnTypeRepr>(*it) || isa<ExistentialTypeRepr>(*it);
+  }
+
+  /// Returns the behavior with which to diagnose a missing `any` or `some`
+  /// keyword.
+  ///
+  /// \param constraintTy The constraint type that is missing the keyword.
+  /// \param isInverted Whether the constraint type is an object of an `~`
+  ///  inversion.
+  static bool shouldDiagnoseMissingAnyOrSomeKeyword(Type constraintTy,
+                                                    bool isInverted,
+                                                    ASTContext &ctx) {
+    // `Any` and `AnyObject` are always exempt from `any` syntax.
+    if (constraintTy->isAny() || constraintTy->isAnyObject()) {
+      return false;
+    }
+
+    // A missing `any` or `some` is always diagnosed if this feature is enabled.
+    if (ctx.LangOpts.hasFeature(Feature::ExistentialAny)) {
+      return true;
+    }
+
+    // If the type is inverted, a missing `any` or `some` is always diagnosed.
+    if (isInverted) {
+      return true;
+    }
+
+    // If one of the protocols is inverted, a missing `any` or `some` is
+    // always diagnosed.
+    if (auto *PCT = constraintTy->getAs<ProtocolCompositionType>()) {
+      if (!PCT->getInverses().empty()) {
+        return true;
+      }
+    }
+
+    // If one of the protocols has "Self or associated type" requirements,
+    // a missing `any` or `some` is always diagnosed.
+    auto layout = constraintTy->getExistentialLayout();
+    for (auto *protoDecl : layout.getProtocols()) {
+      if (protoDecl->hasSelfOrAssociatedTypeRequirements()) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   void checkDeclRefTypeRepr(DeclRefTypeRepr *T) const {
-    assert(!T->isInvalid());
-
     if (Ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
       return;
-    }
-
-    // Backtrack the stack, looking just through parentheses and metatypes. If
-    // we find an inverse (which always requires `any`), diagnose it specially.
-    if (reprStack.size() > 1) {
-      auto it = reprStack.end() - 2;
-      while (it != reprStack.begin() &&
-             ((*it)->isParenType() || isa<MetatypeTypeRepr>(*it))) {
-        --it;
-        continue;
-      }
-
-      if (auto *inverse = dyn_cast<InverseTypeRepr>(*it);
-          inverse && isAnyOrSomeMissing()) {
-        auto diag = Ctx.Diags.diagnose(inverse->getTildeLoc(),
-                                       diag::inverse_requires_any);
-        diag.warnUntilSwiftVersionIf(warnUntilSwift7, 7);
-        emitInsertAnyFixit(diag, T);
-        return;
-      }
     }
 
     auto *decl = T->getBoundDecl();
@@ -6384,49 +6440,62 @@ private:
       return;
     }
 
-    if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-      if (proto->existentialRequiresAny() && isAnyOrSomeMissing()) {
-        auto diag =
-            Ctx.Diags.diagnose(T->getNameLoc(), diag::existential_requires_any,
-                               proto->getDeclaredInterfaceType(),
-                               proto->getDeclaredExistentialType(),
-                               /*isAlias=*/false);
-        diag.warnUntilSwiftVersionIf(warnUntilSwift7, 7);
-        emitInsertAnyFixit(diag, T);
-      }
-    } else if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
-      auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
-
-      // If this is a type alias to a constraint type, the type
-      // alias name must be prefixed with 'any' to be used as an
-      // existential type.
-      if (type->isConstraintType() && !type->isAny() && !type->isAnyObject()) {
-        bool diagnose = false;
-
-        // Look for protocol members that require 'any'.
-        auto layout = type->getExistentialLayout();
-        for (auto *protoDecl : layout.getProtocols()) {
-          if (protoDecl->existentialRequiresAny()) {
-            diagnose = true;
-            break;
-          }
-        }
-
-        // If inverses are present, require 'any' too.
-        if (auto *PCT = type->getAs<ProtocolCompositionType>())
-          diagnose |= !PCT->getInverses().empty();
-
-        if (diagnose && isAnyOrSomeMissing()) {
-          auto diag = Ctx.Diags.diagnose(
-              T->getNameLoc(), diag::existential_requires_any,
-              alias->getDeclaredInterfaceType(),
-              ExistentialType::get(alias->getDeclaredInterfaceType()),
-              /*isAlias=*/true);
-          diag.warnUntilSwiftVersionIf(warnUntilSwift7, 7);
-          emitInsertAnyFixit(diag, T);
-        }
-      }
+    if (!isa<ProtocolDecl>(decl) && !isa<TypeAliasDecl>(decl)) {
+      return;
     }
+
+    // If there is already an `any` or `some` that applies to this node,
+    // move on.
+    if (currentNodeHasAnyOrSomeKeyword()) {
+      return;
+    }
+
+    const auto type = decl->getDeclaredInterfaceType();
+
+    // A type alias may need to be prefixed with `any` only if it stands for a
+    // constraint type.
+    if (isa<TypeAliasDecl>(decl) && !type->isConstraintType()) {
+      return;
+    }
+
+    // First, consider the possibility of the current node being an object of
+    // an inversion, e.g. `~(Copyable)`.
+    // Climb up the stack, looking just through parentheses and `.Type`
+    // metatypes.
+    // If we find an inversion, we will diagnose it specially.
+    InverseTypeRepr *const outerInversion = [&] {
+      if (reprStack.size() < 2) {
+        return (InverseTypeRepr *)nullptr;
+      }
+
+      auto it = reprStack.end() - 2;
+      while (it != reprStack.begin() &&
+             ((*it)->isParenType() || isa<MetatypeTypeRepr>(*it))) {
+        --it;
+        continue;
+      }
+
+      return dyn_cast<InverseTypeRepr>(*it);
+    }();
+
+    if (!shouldDiagnoseMissingAnyOrSomeKeyword(
+            type, /*isInverted=*/outerInversion, this->Ctx)) {
+      return;
+    }
+
+    std::optional<InFlightDiagnostic> diag;
+    if (outerInversion) {
+      diag.emplace(Ctx.Diags.diagnose(outerInversion->getTildeLoc(),
+                                      diag::inverse_requires_any));
+    } else {
+      diag.emplace(Ctx.Diags.diagnose(T->getNameLoc(),
+                                      diag::existential_requires_any, type,
+                                      ExistentialType::get(type),
+                                      /*isAlias=*/isa<TypeAliasDecl>(decl)));
+    }
+
+    diag->warnUntilSwiftVersion(7);
+    emitInsertAnyFixit(*diag, T);
   }
 
 public:
@@ -6449,8 +6518,7 @@ void TypeChecker::checkExistentialTypes(Decl *decl) {
     return;
 
   // Skip diagnosing existential `any` requirements in swiftinterfaces.
-  auto sourceFile = decl->getDeclContext()->getParentSourceFile();
-  if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
+  if (decl->getDeclContext()->isInSwiftinterface())
     return;
 
   auto &ctx = decl->getASTContext();
@@ -6498,18 +6566,10 @@ void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt,
     return;
 
   // Skip diagnosing existential `any` requirements in swiftinterfaces.
-  auto sourceFile = DC->getParentSourceFile();
-  if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
+  if (DC->isInSwiftinterface())
     return;
 
-  // Previously we missed this diagnostic on 'catch' statements, downgrade
-  // to a warning until Swift 7.
-  auto downgradeUntilSwift7 = false;
-  if (auto *CS = dyn_cast<CaseStmt>(stmt))
-    downgradeUntilSwift7 = CS->getParentKind() == CaseParentKind::DoCatch;
-
-  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true,
-                                       downgradeUntilSwift7);
+  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true);
   stmt->walk(checker);
 }
 
@@ -6668,45 +6728,4 @@ Type ExplicitCaughtTypeRequest::evaluate(
   }
 
   llvm_unreachable("Unhandled catch node");
-}
-
-void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
-                               AvailabilityContext availability,
-                               llvm::function_ref<void(Type)> diagnose) {
-  if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
-    return;
-
-  if (!type->isUnsafe())
-    return;
-
-  if (availability.allowsUnsafe())
-    return;
-
-  // Look for a specific @unsafe nominal type.
-  Type specificType;
-  type.findIf([&specificType](Type type) {
-    if (auto typeDecl = type->getAnyNominal()) {
-      if (typeDecl->isUnsafe()) {
-        specificType = type;
-        return false;
-      }
-    }
-
-    return false;
-  });
-
-  diagnose(specificType ? specificType : type);
-
-  if (specificType) {
-    if (auto specificTypeDecl = specificType->getAnyNominal()) {
-      specificTypeDecl->diagnose(diag::unsafe_decl_here, specificTypeDecl);
-    }
-  }
-}
-
-void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
-                               const DeclContext *dc,
-                               llvm::function_ref<void(Type)> diagnose) {
-  auto availability = TypeChecker::availabilityAtLocation(loc, dc);
-  return diagnoseUnsafeType(ctx, loc, type, availability, diagnose);
 }

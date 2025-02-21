@@ -719,6 +719,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::KeyPathInst:
       case SILInstructionKind::SwitchEnumAddrInst:
       case SILInstructionKind::SelectEnumAddrInst:
+      case SILInstructionKind::IgnoredUseInst:
         break;
       case SILInstructionKind::DebugValueInst:
         if (cast<DebugValueInst>(inst)->hasAddrVal())
@@ -1457,12 +1458,16 @@ public:
                 "kind since guaranteed and owned values can always be passed "
                 "in unowned positions");
 
-        require(operand.getOperandOwnership() !=
-                        OperandOwnership::InteriorPointer ||
-                    InteriorPointerOperandKind::get(&operand) !=
-                        InteriorPointerOperandKind::Invalid,
-                "All operands with InteriorPointer operand ownership should be "
-                "added to the InteriorPointerOperand utility");
+        switch (operand.getOperandOwnership()) {
+        default:
+          break;
+        case OperandOwnership::InteriorPointer:
+        case OperandOwnership::AnyInteriorPointer:
+          require(InteriorPointerOperandKind::get(&operand) !=
+                  InteriorPointerOperandKind::Invalid,
+                  "All operands with InteriorPointer operand ownership should be "
+                  "added to the InteriorPointerOperand utility");
+        }
       }
     }
 
@@ -1794,13 +1799,6 @@ public:
     // dealloc_stack. This can come up if the source contains a
     // withUnsafePointer where the pointer escapes.
     // It's illegal code but the compiler should not crash on it.
-  }
-
-  void checkAllocVectorInst(AllocVectorInst *AI) {
-    require(AI->getType().isAddress(),
-            "result of alloc_vector must be an address type");
-    require(AI->getOperand()->getType().is<BuiltinIntegerType>(),
-            "capacity needs integer type");
   }
 
   void checkAllocPackInst(AllocPackInst *AI) {
@@ -3799,13 +3797,10 @@ public:
     };
     require(isa<SILUndef>(DI->getOperand()) ||
                 isa<AllocStackInst>(DI->getOperand()) ||
-                isa<AllocVectorInst>(DI->getOperand()) ||
                 (isa<PartialApplyInst>(DI->getOperand()) &&
                  cast<PartialApplyInst>(DI->getOperand())->isOnStack()) ||
                 (isTokenFromCalleeAllocatedBeginApply(DI->getOperand())),
-            "Operand of dealloc_stack must be an alloc_stack, alloc_vector or "
-            "partial_apply "
-            "[stack]");
+            "Operand of dealloc_stack must be an alloc_stack or partial_apply [stack]");
   }
   void checkDeallocPackInst(DeallocPackInst *DI) {
     require(isa<SILUndef>(DI->getOperand()) ||
@@ -5956,7 +5951,7 @@ public:
         "final component should match leaf value type of key path type");
   }
 
-  void checkIsEscapingClosureInst(IsEscapingClosureInst *IEC) {
+  void checkDestroyNotEscapedClosureInst(DestroyNotEscapedClosureInst *IEC) {
     // The closure operand is allowed to be an optional closure.
     auto operandType = IEC->getOperand()->getType();
     if (operandType.getOptionalObjectType())
@@ -5967,11 +5962,11 @@ public:
                 !fnType->isNoEscape() &&
                 fnType->getExtInfo().getRepresentation() ==
                     SILFunctionTypeRepresentation::Thick,
-            "is_escaping_closure must have a thick "
+            "destroy_not_escaped_closure must have a thick "
             "function operand");
-    require(IEC->getVerificationType() == IsEscapingClosureInst::ObjCEscaping ||
+    require(IEC->getVerificationType() == DestroyNotEscapedClosureInst::ObjCEscaping ||
                 IEC->getVerificationType() ==
-                    IsEscapingClosureInst::WithoutActuallyEscaping,
+                    DestroyNotEscapedClosureInst::WithoutActuallyEscaping,
             "unknown verification type");
   }
 
@@ -7230,11 +7225,18 @@ public:
 
   void verifyParentFunctionSILFunctionType(CanSILFunctionType FTy) {
     bool foundIsolatedParameter = false;
+    bool foundExplicitParameter = false;
+
     for (const auto &parameterInfo : FTy->getParameters()) {
+      foundExplicitParameter |=
+          !parameterInfo.hasOption(SILParameterInfo::ImplicitLeading);
+      require(!foundExplicitParameter ||
+                  !parameterInfo.hasOption(SILParameterInfo::ImplicitLeading),
+              "Implicit parameters must be before /all/ explicit parameters");
+
       if (parameterInfo.hasOption(SILParameterInfo::Isolated)) {
-           auto argType = parameterInfo.getArgumentType(F.getModule(),
-                                                     FTy,
-                                                     F.getTypeExpansionContext());
+        auto argType = parameterInfo.getArgumentType(
+            F.getModule(), FTy, F.getTypeExpansionContext());
 
         if (argType->isOptional())
           argType = argType->lookThroughAllOptionalTypes()->getCanonicalType();
@@ -7242,10 +7244,11 @@ public:
         auto genericSig = FTy->getInvocationGenericSignature();
         auto &ctx = F.getASTContext();
         auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
-        auto *distributedProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+        auto *distributedProtocol =
+            ctx.getProtocol(KnownProtocolKind::DistributedActor);
         require(argType->isAnyActorType() ||
-                genericSig->requiresProtocol(argType, actorProtocol) ||
-                genericSig->requiresProtocol(argType, distributedProtocol),
+                    genericSig->requiresProtocol(argType, actorProtocol) ||
+                    genericSig->requiresProtocol(argType, distributedProtocol),
                 "Only any actor types can be isolated");
         require(!foundIsolatedParameter, "Two isolated parameters");
         foundIsolatedParameter = true;
@@ -7714,8 +7717,6 @@ void SILGlobalVariable::verify() const {
       assert(!init->use_empty() && "dead instruction in static initializer");
       assert(!isa<ObjectInst>(init) &&
              "object instruction is only allowed for final initial value");
-      assert(!isa<VectorInst>(init) &&
-             "vector instruction is only allowed for final initial value");
     }
     assert(I.getParent() == &StaticInitializerBlock);
   }

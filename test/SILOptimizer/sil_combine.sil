@@ -1420,7 +1420,9 @@ bb0(%0 : $*@callee_owned (@in ()) -> @out AnotherClass, %1 : $*AnotherClass):
 
 sil @convertible_result_with_error : $@convention(thin) () -> (@owned AnotherClass, @error Error)
 
-// TODO
+// CHECK-LABEL: sil @peephole_convert_function_result_change_with_error : {{.*}} {
+// CHECK-NOT:     convert_function
+// CHECK-LABEL: } // end sil function 'peephole_convert_function_result_change_with_error'
 sil @peephole_convert_function_result_change_with_error : $@convention(thin) () -> () {
 entry:
   %f = function_ref @convertible_result_with_error : $@convention(thin) () -> (@owned AnotherClass, @error Error)

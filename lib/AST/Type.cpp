@@ -603,6 +603,27 @@ void TypeBase::getTypeVariables(
          "Did not find type variables!");
 }
 
+Type TypeBase::getDependentMemberRoot() {
+  Type t(this);
+
+  while (auto *dmt = t->getAs<DependentMemberType>())
+    t = dmt->getBase();
+
+  return t;
+}
+
+bool TypeBase::isTypeVariableOrMember() {
+  return getDependentMemberRoot()->is<TypeVariableType>();
+}
+
+bool TypeBase::isTypeParameter() {
+  return getDependentMemberRoot()->is<GenericTypeParamType>();
+}
+
+GenericTypeParamType *TypeBase::getRootGenericParam() {
+  return getDependentMemberRoot()->castTo<GenericTypeParamType>();
+}
+
 static bool isLegalSILType(CanType type);
 
 static bool isLegalSILTypeOrPackExpansion(CanType type) {
@@ -787,8 +808,11 @@ CanType CanType::wrapInOptionalTypeImpl(CanType type) {
 
 Type TypeBase::isArrayType() {
   if (auto boundStruct = getAs<BoundGenericStructType>()) {
-    if (boundStruct->getDecl() == getASTContext().getArrayDecl())
+    if (isArray())
       return boundStruct->getGenericArgs()[0];
+
+    if (isInlineArray())
+      return boundStruct->getGenericArgs()[1];
   }
   return Type();
 }
@@ -3542,7 +3566,7 @@ RecursiveTypeProperties ArchetypeType::archetypeProperties(
   properties |= subs.getRecursiveProperties();
 
   for (auto proto : conformsTo) {
-    if (proto->isUnsafe()) {
+    if (proto->getExplicitSafety() == ExplicitSafety::Unsafe) {
       properties |= RecursiveTypeProperties::IsUnsafe;
       break;
     }

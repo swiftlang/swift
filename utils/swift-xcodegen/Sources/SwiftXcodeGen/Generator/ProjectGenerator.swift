@@ -34,7 +34,7 @@ fileprivate final class ProjectGenerator {
   private var groups: [RelativePath: CachedGroup] = [:]
   private var files: [RelativePath: Xcode.FileReference] = [:]
   private var targets: [String: Xcode.Target] = [:]
-  private var unbuildableSources: [ClangTarget.Source] = []
+  private var unbuildableSources: [RelativePath] = []
   private var runnableBuildTargets: [RunnableTarget: Xcode.Target] = [:]
 
   /// The group in which external files are stored.
@@ -154,8 +154,9 @@ fileprivate final class ProjectGenerator {
     guard let path else { return true }
 
     // Not very efficient, but excludedPaths should be small in practice.
-    guard let excluded = spec.excludedPaths.first(where: { path.hasPrefix($0.path) })
-    else {
+    guard let excluded = spec.excludedPaths.first(
+      where: { path.starts(with: $0.path) }
+    ) else {
       return true
     }
     if let description, let reason = excluded.reason {
@@ -213,10 +214,18 @@ fileprivate final class ProjectGenerator {
     _ name: String, at parentPath: RelativePath?, canUseBuildableFolder: Bool,
     productType: Xcode.Target.ProductType?, includeInAllTarget: Bool
   ) -> Xcode.Target? {
-    guard targets[name] == nil else {
-      log.warning("Duplicate target '\(name)', skipping")
-      return nil
-    }
+    let name = {
+      // If we have a same-named target, disambiguate.
+      if targets[name] == nil {
+        return name
+      }
+      var i = 2
+      var newName: String { "\(name)\(i)" }
+      while targets[newName] != nil {
+        i += 1
+      }
+      return newName
+    }()
     var buildableFolder: Xcode.FileReference?
     if let parentPath, !parentPath.components.isEmpty {
       // If we've been asked to use buildable folders, see if we can create
@@ -230,7 +239,9 @@ fileprivate final class ProjectGenerator {
               group(for: repoRelativePath.appending(parentPath)) != nil else {
         // If this isn't a child of an explicitly added reference, something
         // has probably gone wrong.
-        if !spec.referencesToAdd.contains(where: { parentPath.hasPrefix($0.path) }) {
+        if !spec.referencesToAdd.contains(
+          where: { parentPath.starts(with: $0.path) }
+        ) {
           log.warning("""
             Target '\(name)' at '\(repoRelativePath.appending(parentPath))' is \
             nested in a folder reference; skipping. This is likely an xcodegen bug.
@@ -310,12 +321,11 @@ fileprivate final class ProjectGenerator {
       return false
     }
     let parent = clangTarget.parentPath
-    let sources = clangTarget.sources.map(\.path)
-    let hasConsistentArgs = try sources.allSatisfy {
+    let hasConsistentArgs = try clangTarget.sources.allSatisfy {
       try !buildDir.clangArgs.hasUniqueArgs(for: $0, parent: parent)
     }
     guard hasConsistentArgs else { return false }
-    return try canUseBuildableFolder(at: parent, sources: sources)
+    return try canUseBuildableFolder(at: parent, sources: clangTarget.sources)
   }
 
   func canUseBuildableFolder(
@@ -383,15 +393,14 @@ fileprivate final class ProjectGenerator {
     let sourcesToBuild = target.addSourcesBuildPhase()
 
     for source in targetInfo.sources {
-      let sourcePath = source.path
-      guard let sourceRef = getOrCreateRepoRef(.file(sourcePath)) else {
+      guard let sourceRef = getOrCreateRepoRef(.file(source)) else {
         continue
       }
       let buildFile = sourcesToBuild.addBuildFile(fileRef: sourceRef)
 
       // Add any per-file settings.
       var fileArgs = try buildDir.clangArgs.getUniqueArgs(
-        for: sourcePath, parent: targetPath, infer: source.inferArgs
+        for: source, parent: targetPath, infer: spec.inferArgs
       )
       if !fileArgs.isEmpty {
         applyBaseSubstitutions(to: &fileArgs)
@@ -747,12 +756,7 @@ fileprivate final class ProjectGenerator {
       let target = try buildDir.getClangTarget(
         for: targetSource, knownUnbuildables: spec.knownUnbuildables
       )
-      guard var target else { continue }
-      // We may have a Swift target with the same name, disambiguate.
-      // FIXME: We ought to be able to support mixed-source targets.
-      if targets[target.name] != nil {
-        target.name = "\(target.name)-clang"
-      }
+      guard let target else { continue }
       try generateClangTarget(target)
     }
 

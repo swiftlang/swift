@@ -525,12 +525,12 @@ static ManagedValue createInputFunctionArgument(
     SILGenBuilder &B, SILType type, SILLocation loc, ValueDecl *decl = nullptr,
     bool isNoImplicitCopy = false,
     LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
-    bool isClosureCapture = false,
-    bool isFormalParameterPack = false) {
+    bool isClosureCapture = false, bool isFormalParameterPack = false,
+    bool isImplicitParameter = false) {
   auto &SGF = B.getSILGenFunction();
   SILFunction &F = B.getFunction();
-  assert((F.isBare() || isFormalParameterPack || decl) &&
-         "Function arguments of non-bare functions must have a decl");
+  assert((F.isBare() || isFormalParameterPack || decl || isImplicitParameter) &&
+         "explicit function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
   if (auto *pd = dyn_cast_or_null<ParamDecl>(decl)) {
     if (!arg->getType().isMoveOnly()) {
@@ -585,11 +585,10 @@ static ManagedValue createInputFunctionArgument(
 ManagedValue SILGenBuilder::createInputFunctionArgument(
     SILType type, ValueDecl *decl, bool isNoImplicitCopy,
     LifetimeAnnotation lifetimeAnnotation, bool isClosureCapture,
-    bool isFormalParameterPack) {
-  return ::createInputFunctionArgument(*this, type, SILLocation(decl), decl,
-                                       isNoImplicitCopy, lifetimeAnnotation,
-                                       isClosureCapture,
-                                       isFormalParameterPack);
+    bool isFormalParameterPack, bool isImplicit) {
+  return ::createInputFunctionArgument(
+      *this, type, SILLocation(decl), decl, isNoImplicitCopy,
+      lifetimeAnnotation, isClosureCapture, isFormalParameterPack, isImplicit);
 }
 
 ManagedValue SILGenBuilder::createInputFunctionArgument(

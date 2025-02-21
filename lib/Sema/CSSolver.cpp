@@ -243,11 +243,6 @@ Solution ConstraintSystem::finalize() {
     solution.appliedPropertyWrappers.insert(appliedWrapper);
   }
 
-  // Remember implicit value conversions.
-  for (const auto &valueConversion : ImplicitValueConversions) {
-    solution.ImplicitValueConversions.push_back(valueConversion);
-  }
-
   // Remember argument lists.
   for (const auto &argListMapping : ArgumentLists) {
     solution.argumentLists.insert(argListMapping);
@@ -442,13 +437,6 @@ void ConstraintSystem::replaySolution(const Solution &solution,
         applyPropertyWrapper(getAsExpr(appliedWrapper.first), applied);
     } else {
       ASSERT(found->second.size() == appliedWrapper.second.size());
-    }
-  }
-
-  for (auto &valueConversion : solution.ImplicitValueConversions) {
-    if (ImplicitValueConversions.count(valueConversion.first) == 0) {
-      recordImplicitValueConversion(valueConversion.first,
-                                    valueConversion.second);
     }
   }
 
@@ -870,9 +858,10 @@ bool ConstraintSystem::Candidate::solve(
     auto constraintKind = ConstraintKind::Conversion;
     if (CTP == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
-
-    cs.addConstraint(constraintKind, cs.getType(E), CT,
-                     cs.getConstraintLocator(E), /*isFavored=*/true);
+    if (!CT->hasUnboundGenericType()) {
+      cs.addConstraint(constraintKind, cs.getType(E), CT,
+                       cs.getConstraintLocator(E), /*isFavored=*/true);
+    }
   }
 
   // Try to solve the system and record all available solutions.
@@ -2587,6 +2576,17 @@ bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
   {
     llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
     findReferencedVariables(cs, referencedVars);
+
+    if (cs.isDebugMode()) {
+      auto indent = cs.solverState->getCurrentIndent();
+      auto &log = llvm::errs().indent(indent);
+      log << "(Element type variables in scope: ";
+      interleave(
+        referencedVars,
+        [&](TypeVariableType *typeVar) { log << "$T" << typeVar->getID(); },
+        [&] { log << ", "; });
+      log << ")\n";
+    }
 
     for (auto *typeVar : referencedVars)
       cs.addTypeVariable(typeVar);

@@ -240,10 +240,6 @@ bool witnessHasImplementsAttrForRequiredName(ValueDecl *witness,
 bool witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
                                                  ValueDecl *requirement);
 
-/// Suggest that the context of the given conformance be marked to suppress
-/// warnings about uses of unsafe constructs.
-void suggestUnsafeMarkerOnConformance(NormalProtocolConformance *conformance);
-
 }
 
 #endif // SWIFT_SEMA_PROTOCOL_H

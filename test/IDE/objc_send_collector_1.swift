@@ -17,7 +17,7 @@
 // RUN: echo "    - FooBar" >> %t/blocklist.yml
 
 // RUN: SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH=%t/given_trace_3.json %target-swift-frontend  -I %t/lib/swift -typecheck %s %S/Inputs/objc_send_collector_2.swift -module-name FooBar -swift-version 5 -F %S/Inputs/mock-sdk -emit-loaded-module-trace-path %t/.MODULE_TRACE -blocklist-file %t/blocklist.yml
-// RUN: not ls %t/given_trace_3.json
+// RUN: cat %t/given_trace_3.json | %{python} -c 'import json, sys; json.dump(json.loads(sys.stdin.read()), sys.stdout, sort_keys=True, indent=2)' | %FileCheck %s  --check-prefix=CHECK-BLOCKED
 
 // RUN: SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH=%t/given_trace_4.json %target-swift-frontend  -I %t/lib/swift -typecheck %s %S/Inputs/objc_send_collector_2.swift -module-name FooBar -swift-version 5 -F %S/Inputs/mock-sdk -emit-loaded-module-trace-path %t/.MODULE_TRACE -disable-fine-module-tracing
 // RUN: not ls %t/given_trace_4.json
@@ -45,3 +45,5 @@ public func testProperties(_ x: FooClassBase, _ y: FooProtocolBase) {
 // CHECK-DAG: "file_path": "SOURCE_DIR/test/IDE/objc_send_collector_1.swift"
 // CHECK-DAG: "file_path": "SOURCE_DIR/test/IDE/Inputs/objc_send_collector_2.swift"
 // CHECK-DAG: "swift-compiler-version":
+
+// CHECK-BLOCKED-NOT: "FooClassBase"

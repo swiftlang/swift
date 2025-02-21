@@ -285,10 +285,74 @@ func checkAsync() async {
     await invoke { try await impl.nonMatching_f1(false) }
 }
 
+enum SmallError: Error {
+    case a(Int)
+}
+
+@inline(never)
+func smallResultLargerError() throws(SmallError) -> Int8? {
+  return 10
+}
+
+func callSmallResultLargerError() {
+  let res = try! smallResultLargerError()
+  print("Result is: \(String(describing: res))")
+}
+
+enum UInt8OptSingletonError: Error {
+  case a(Int8?)
+}
+
+@inline(never)
+func smallErrorLargerResult() throws(UInt8OptSingletonError) -> Int {
+  throw .a(10)
+}
+
+func callSmallErrorLargerResult() {
+  do {
+    _ = try smallErrorLargerResult()
+  } catch {
+    switch error {
+      case .a(let x):
+        print("Error value is: \(String(describing: x))")
+    }
+  }
+}
+
+enum MyError: Error {
+    case x
+    case y
+}
+
+protocol AsyncGenProto<A> {
+  associatedtype A
+  func fn(arg: Int) async throws(MyError) -> A
+}
+
+@inline(never)
+func callAsyncIndirectResult<A>(p: any AsyncGenProto<A>, x: Int) async throws(MyError) -> A {
+  return try await p.fn(arg: x)
+}
+
+
+struct AsyncGenProtoImpl: AsyncGenProto {
+    func fn(arg: Int) async throws(MyError) -> Int {
+        print("Arg is \(arg)")
+        return arg
+    }
+}
+
 @main
 public struct Main {
     public static func main() async {
         await checkSync()
         await checkAsync()
+        // CHECK: Arg is 10
+        print(try! await callAsyncIndirectResult(p: AsyncGenProtoImpl(), x: 10))
+
+        // CHECK: Result is: Optional(10)
+        callSmallResultLargerError()
+        // CHECK: Error value is: Optional(10)
+        callSmallErrorLargerResult()
     }
 }

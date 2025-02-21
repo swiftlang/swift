@@ -40,6 +40,7 @@ public let keyPath2FromLibB = \AStruct.Type.property2
 public let keyPath3FromLibB = \AStruct.Type.property3
 public let keyPath4FromLibB = \AStruct.Type.property4
 public var keyPath5FromLibB = \AStruct.Type.property1 // WritableKeyPath with public setter
+public var keyPath6FromLibB = \Int.Type.zero
 
 //--- LibC.swift
 import LibA
@@ -48,6 +49,8 @@ public let keyPath1FromLibC = \AStruct.Type.property1
 public let keyPath2FromLibC = \AStruct.Type.property2
 public let keyPath3FromLibC = \AStruct.Type.property3 // Read-only with private setter
 public let keyPath4FromLibC = \AStruct.Type.property4
+public var keyPath5FromLibC = \Int.Type.zero
+public var keyPath6FromLibC = \Int.Type.max
 
 //--- main.swift
 import LibB
@@ -65,3 +68,8 @@ print(keyPath3FromLibB != keyPath4FromLibC)
 
 // CHECK: false
 print(keyPath5FromLibB == keyPath3FromLibC)
+
+// Check: true
+print(keyPath6FromLibB == keyPath5FromLibC)
+// Check: false
+print(keyPath6FromLibB == keyPath6FromLibC)

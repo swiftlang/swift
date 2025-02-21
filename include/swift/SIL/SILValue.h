@@ -848,6 +848,13 @@ struct OperandOwnership {
     /// value are in scope.
     /// (ref_element_addr, open_existential_box)
     InteriorPointer,
+
+    // TODO: Remove AnyInteriorPointer after fixing
+    // OperandOwnership::getOwnershipConstraint() to allow InteriorPointer
+    // operands to take any operand ownership.  This will prevent useless borrow
+    // scopes from being generated, so it will require some SIL migration. But
+    // all OSSA utilities need to correctly handle interior uses anyway.
+    AnyInteriorPointer,
     /// Forwarded Borrow. Propagates the guaranteed value within the base's
     /// borrow scope.
     /// (tuple_extract, struct_extract, cast, switch)
@@ -942,6 +949,9 @@ inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::ForwardingConsume:
     return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
+  case OperandOwnership::AnyInteriorPointer:
+    return {OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding};
+  // TODO: InteriorPointer should be handled like AnyInteriorPointer.
   case OperandOwnership::InteriorPointer:
   case OperandOwnership::GuaranteedForwarding:
     return {OwnershipKind::Guaranteed,
@@ -971,6 +981,7 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::ForwardingConsume:
   case OperandOwnership::InteriorPointer:
+  case OperandOwnership::AnyInteriorPointer:
   case OperandOwnership::GuaranteedForwarding:
   case OperandOwnership::EndBorrow:
   case OperandOwnership::Reborrow:
@@ -1022,7 +1033,7 @@ class Operand {
 public:
   enum { numCustomBits = 8 };
 
-  constexpr static const size_t maxBitfieldID =
+  constexpr static const uint64_t maxBitfieldID =
       std::numeric_limits<uint64_t>::max() >> numCustomBits;
 
 private:

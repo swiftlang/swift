@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-span.swift -typecheck -module-name UseSpan -emit-clang-header-path %t/UseSpan.h -I %t -enable-experimental-cxx-interop -Xcc -Xclang -Xcc -fmodule-format=raw -Xcc -std=c++20 -clang-header-expose-decls=all-public
+// RUN: %target-swift-frontend %t/use-span.swift -module-name UseSpan -typecheck -verify -emit-clang-header-path %t/UseSpan.h -I %t -enable-experimental-cxx-interop -Xcc -Xclang -Xcc -fmodule-format=raw -Xcc -std=c++20 -clang-header-expose-decls=all-public
 
 // RUN: %target-interop-build-clangxx -std=c++20 -c %t/use-span.cpp -I %t -o %t/swift-cxx-execution.o
 // RUN: %target-interop-build-swift %t/use-span.swift -o %t/swift-cxx-execution -Xlinker %t/swift-cxx-execution.o -module-name UseSpan -Xfrontend -entry-point-function-name -Xfrontend swiftMain -I %t -O -Xcc --std=c++20

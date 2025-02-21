@@ -2,12 +2,10 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   -enable-experimental-feature LifetimeDependenceDiagnoseTrivial
+// RUN:   -enable-experimental-feature LifetimeDependence
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 // Simply test that it is possible for a module to define a pseudo-Optional type without triggering any compiler errors.
 
@@ -22,9 +20,9 @@ public enum Nillable<Wrapped: ~Copyable & ~Escapable>: ~Copyable & ~Escapable {
   case some(Wrapped)
 }
 
-extension Nillable: Copyable where Wrapped: Copyable {}
+extension Nillable: Copyable where Wrapped: Copyable, Wrapped: ~Escapable {}
 
-extension Nillable: Escapable where Wrapped: Escapable {}
+extension Nillable: Escapable where Wrapped: Escapable, Wrapped: ~Copyable {}
 
 extension Nillable: Sendable where Wrapped: ~Copyable & ~Escapable & Sendable { }
 

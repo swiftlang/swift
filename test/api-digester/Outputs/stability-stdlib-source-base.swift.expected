@@ -213,7 +213,6 @@ Accessor UnsafePointer.hashValue.Get() has generic signature change from <Pointe
 Accessor UnsafePointer.pointee.Get() has been removed
 Accessor UnsafePointer.subscript(_:).Get() has been removed
 Class ManagedBuffer has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
-Constructor ClosedRange.init(uncheckedBounds:) is now with @unsafe
 Constructor ExpressibleByNilLiteral.init(nilLiteral:) has generic signature change from <Self where Self : Swift.ExpressibleByNilLiteral> to <Self where Self : Swift.ExpressibleByNilLiteral, Self : ~Copyable>
 Constructor ManagedBufferPointer.init(bufferClass:minimumCapacity:makingHeaderWith:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Constructor ManagedBufferPointer.init(unsafeBufferObject:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
@@ -221,7 +220,6 @@ Constructor OpaquePointer.init(_:) has generic signature change from <T> to <T w
 Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
 Constructor Optional.init(_:) has parameter 0 changing from Default to Owned
 Constructor Optional.init(nilLiteral:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
-Constructor Range.init(uncheckedBounds:) is now with @unsafe
 Constructor Result.init(catching:) has generic signature change from <Success, Failure where Failure == any Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable>
 Constructor UnsafeBufferPointer.init(_:) has generic signature change from <Element> to <Element where Element : ~Copyable>
 Constructor UnsafeBufferPointer.init(start:count:) has generic signature change from <Element> to <Element where Element : ~Copyable>
@@ -363,18 +361,5 @@ Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has generic signature ch
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without rethrows
 
-// Adoption of @unsafe
-Func unsafeBitCast(_:to:) is now with @unsafe
-Func unsafeDowncast(_:to:) is now with @unsafe
-Struct CVaListPointer is now with @unsafe
-Struct OpaquePointer is now with @unsafe
-Struct Unmanaged is now with @unsafe
-Struct UnsafeBufferPointer is now with @unsafe
-Struct UnsafeMutableBufferPointer is now with @unsafe
-Struct UnsafeMutablePointer is now with @unsafe
-Struct UnsafeMutableRawBufferPointer is now with @unsafe
-Struct UnsafeMutableRawPointer is now with @unsafe
-Struct UnsafePointer is now with @unsafe
-Struct UnsafeRawBufferPointer is now with @unsafe
-Struct UnsafeRawPointer is now with @unsafe
-Var Optional.unsafelyUnwrapped is now with @unsafe
+Protocol CodingKey has added inherited protocol SendableMetatype
+Protocol Error has added inherited protocol SendableMetatype

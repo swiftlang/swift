@@ -2120,9 +2120,9 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
       }
       case Node::Kind::ImplFunctionAttribute: {
         char FuncAttr = llvm::StringSwitch<char>(Child->getText())
-                        .Case("@Sendable", 'h')
-                        .Case("@async", 'H')
-                        .Default(0);
+                            .Case("@Sendable", 'h')
+                            .Case("@async", 'H')
+                            .Default(0);
         if (!FuncAttr) {
           return MANGLING_ERROR(ManglingError::InvalidImplFunctionAttribute,
                                Child);
@@ -3472,6 +3472,12 @@ ManglingError Remangler::mangleGlobalActorFunctionType(Node *node,
 ManglingError Remangler::mangleIsolatedAnyFunctionType(Node *node,
                                                        unsigned depth) {
   Buffer << "YA";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleNonIsolatedCallerFunctionType(Node *node,
+                                                             unsigned depth) {
+  Buffer << "YC";
   return ManglingError::Success;
 }
 

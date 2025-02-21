@@ -12,7 +12,7 @@
 
 import SIL
 
-extension InitEnumDataAddrInst : OnoneSimplifyable {
+extension InitEnumDataAddrInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
     // Optimize the sequence

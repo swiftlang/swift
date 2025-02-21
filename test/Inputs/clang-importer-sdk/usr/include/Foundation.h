@@ -867,6 +867,8 @@ extern void CGColorRelease(CGColorRef color) __attribute__((availability(macosx,
 
 typedef NSString *_Nonnull NSNotificationName
     __attribute((swift_newtype(struct)));
+typedef NSString *_Nonnull NSFileAttributeKey
+    __attribute((swift_newtype(struct)));
 
 NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 extern NSString * const NSConnectionReplyMode;

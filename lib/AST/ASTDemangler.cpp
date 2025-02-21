@@ -155,7 +155,7 @@ Type ASTBuilder::createNominalType(GenericTypeDecl *decl, Type parent) {
     return Type();
 
   // If the declaration is generic, fail.
-  if (auto list = nominalDecl->getGenericParams())
+  if (nominalDecl->isGeneric())
     return Type();
 
   // Imported types can be renamed to be members of other (non-generic)
@@ -460,6 +460,8 @@ Type ASTBuilder::createFunctionType(
     isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
   } else if (extFlags.isIsolatedAny()) {
     isolation = FunctionTypeIsolation::forErased();
+  } else if (extFlags.isNonIsolatedCaller()) {
+    isolation = FunctionTypeIsolation::forNonIsolatedCaller();
   }
 
   auto noescape =
@@ -677,6 +679,10 @@ Type ASTBuilder::createImplFunctionType(
     auto type = result.getType()->getCanonicalType();
     auto conv = getResultConvention(result.getConvention());
     auto options = *getResultOptions(result.getOptions());
+    // We currently set sending result at the function level, but we set sending
+    // result on each result.
+    if (flags.hasSendingResult())
+      options |= SILResultInfo::IsSending;
     funcResults.emplace_back(type, conv, options);
   }
 

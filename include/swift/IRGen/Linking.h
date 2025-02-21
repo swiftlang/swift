@@ -56,10 +56,15 @@ public:
   /// be promoted to public external. Used by the LLDB expression evaluator.
   bool ForcePublicDecls;
 
+  /// When true, allows duplicate external and hidden declarations by marking
+  /// them as linkonce / weak.
+  bool MergeableSymbols;
+
   explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
-                       bool forcePublicDecls, bool isStaticLibrary);
+                       bool forcePublicDecls, bool isStaticLibrary,
+                       bool mergeableSymbols);
 
   /// In case of multiple llvm modules (in multi-threaded compilation) all
   /// private decls must be visible from other files.
@@ -1663,6 +1668,8 @@ public:
 
   /// Determine whether entity that represents a symbol is in DATA segment.
   bool isData() const { return !isText(); }
+
+  bool isTypeKind() const { return isTypeKind(getKind()); }
 
   bool isAlwaysSharedLinkage() const;
 #undef LINKENTITY_GET_FIELD

@@ -16,7 +16,7 @@ public func blackHole<T>(_ _: T) {  }
 ReferenceCountedTestSuite.test("Local") {
     var x = createLocalCount()
 #if NO_OPTIMIZATIONS
-    expectEqual(x.value, 6) // This is 6 because of "var x" "x.value" * 2 and "(x, x, x)".
+    expectEqual(x.value, 2)
 #endif
 
     let t = (x, x, x)

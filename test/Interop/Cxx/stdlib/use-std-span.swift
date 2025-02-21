@@ -4,6 +4,9 @@
 // FIXME swift-ci linux tests do not support std::span
 // UNSUPPORTED: OS=linux-gnu
 
+// TODO: test failed in Windows PR testing: rdar://144384453
+// UNSUPPORTED: OS=windows-msvc
+
 // REQUIRES: executable_test
 
 import StdlibUnittest

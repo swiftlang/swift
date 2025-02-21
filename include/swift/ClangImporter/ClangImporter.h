@@ -16,7 +16,9 @@
 #ifndef SWIFT_CLANG_IMPORTER_H
 #define SWIFT_CLANG_IMPORTER_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
 /// The maximum number of SIMD vector elements we currently try to import.
@@ -506,6 +508,8 @@ public:
   /// information will be augmented with information about the given
   /// textual header inputs.
   ///
+  /// \param headerPath the path to the header to be scanned.
+  ///
   /// \param clangScanningTool The clang dependency scanner.
   ///
   /// \param cache The module dependencies cache to update, with information
@@ -513,7 +517,8 @@ public:
   ///
   /// \returns \c true if an error occurred, \c false otherwise
   bool getHeaderDependencies(
-      ModuleDependencyID moduleID,
+      ModuleDependencyID moduleID, std::optional<StringRef> headerPath,
+      std::optional<llvm::MemoryBufferRef> sourceBuffer,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       ModuleDependenciesCache &cache,
       ModuleDependencyIDSetVector &headerClangModuleDependencies,
@@ -675,6 +680,11 @@ public:
   const clang::TypedefType *getTypeDefForCXXCFOptionsDefinition(
       const clang::Decl *candidateDecl) override;
 
+  /// Create cache key for embedded bridging header.
+  static llvm::Expected<llvm::cas::ObjectRef>
+  createEmbeddedBridgingHeaderCacheKey(
+      llvm::cas::ObjectStore &CAS, llvm::cas::ObjectRef ChainedPCHIncludeTree);
+
   SourceLoc importSourceLocation(clang::SourceLocation loc) override;
 };
 
@@ -729,6 +739,22 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
                                      NominalTypeDecl *selfType,
                                      std::optional<Type> parameterType);
 
+/// Map the access specifier of a Clang record member to a Swift access level.
+///
+/// This mapping is conservative: the resulting Swift access should be at _most_
+/// as permissive as the input C++ access.
+AccessLevel convertClangAccess(clang::AccessSpecifier access);
+
+/// Read file IDs from 'private_fileid' Swift attributes on a Clang decl.
+///
+/// May return >1 fileID when a decl is annotated more than once, which should
+/// be treated as an error and appropriately diagnosed (using the included
+/// SourceLocation).
+///
+/// The returned fileIDs may not be of a valid format (e.g., missing a '/'),
+/// and should be parsed using swift::SourceFile::FileIDStr::parse().
+SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
+getPrivateFileIDAttrs(const clang::Decl *decl);
 } // namespace importer
 
 struct ClangInvocationFileMapping {

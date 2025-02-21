@@ -119,7 +119,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         /*addedRequirements=*/{},
         /*inferenceSources=*/{},
         repr->getLoc(),
-        /*isExtension=*/false,
+        /*forExtension=*/nullptr,
         /*allowInverses=*/true};
 
     interfaceSignature = evaluateOrDefault(
@@ -689,7 +689,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   SmallVector<TypeBase *, 2> inferenceSources;
   SmallVector<Requirement, 2> extraReqs;
   SourceLoc loc;
-  bool inferInvertibleReqs = true;
 
   if (auto VD = dyn_cast<ValueDecl>(GC->getAsDecl())) {
     loc = VD->getLoc();
@@ -727,7 +726,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
           typeRepr = specifier->getBase();
 
-        if (auto *packExpansion = dyn_cast<VarargTypeRepr>(typeRepr)) {
+        if (isa<VarargTypeRepr>(typeRepr)) {
           paramOptions.setContext(TypeResolverContext::VariadicFunctionInput);
         } else {
           paramOptions.setContext(TypeResolverContext::FunctionInput);
@@ -787,20 +786,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
     loc = ext->getLoc();
 
-    // If the extension introduces conformance to invertible protocol IP, do not
-    // infer any conditional requirements that the generic parameters to conform
-    // to invertible protocols. This forces people to write out the conditions.
-    inferInvertibleReqs = !ext->isAddingConformanceToInvertible();
-
-    // FIXME: to workaround a reverse condfail, always infer the requirements if
-    //  the extension is in a swiftinterface file. This is temporary and should
-    //  be removed soon. (rdar://130424971)
-    if (auto *sf = ext->getOutermostParentSourceFile()) {
-      if (sf->Kind == SourceFileKind::Interface
-          && !ctx.LangOpts.hasFeature(Feature::SE427NoInferenceOnExtension))
-        inferInvertibleReqs = true;
-    }
-
     collectAdditionalExtensionRequirements(ext->getExtendedType(), extraReqs);
 
     auto *extendedNominal = ext->getExtendedNominal();
@@ -838,8 +823,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       parentSig.getPointer(),
       genericParams, WhereClauseOwner(GC),
       extraReqs, inferenceSources, loc,
-      /*isExtension=*/isa<ExtensionDecl>(GC),
-      /*allowInverses=*/inferInvertibleReqs};
+      /*forExtension=*/dyn_cast<ExtensionDecl>(GC),
+      /*allowInverses=*/true};
   return evaluateOrDefault(ctx.evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }
@@ -1141,11 +1126,6 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
                                               /*placeholderHandler*/ nullptr,
                                               /*packElementOpener*/ nullptr)
           .resolveType(underlyingTypeRepr);
-
-  // Don't build a generic siganture for a protocol extension, because this
-  // request might be evaluated while building a protocol requirement signature.
-  if (parentDC->getSelfProtocolDecl())
-    return result;
 
   Type parent;
   if (parentDC->isTypeContext())

@@ -1,6 +1,7 @@
 // REQUIRES: OS=macosx
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -c -update-code -swift-version 4 -disable-migrator-fixits -primary-file %s -emit-migrated-file-path %t/remove_override.result.swift -o %t/rename-func-decl.swift.remap %api_diff_data_dir
+// RUN: %empty-directory(%t/cache)
+// RUN: %target-swift-frontend -c -update-code -swift-version 4 -disable-migrator-fixits -primary-file %s -emit-migrated-file-path %t/remove_override.result.swift -o %t/rename-func-decl.swift.remap %api_diff_data_dir -module-cache-path %t/cache
 // RUN: diff -u %S/remove_override.swift.expected %t/remove_override.result.swift
 
 import AppKit

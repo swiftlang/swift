@@ -63,6 +63,21 @@ public:
 
     /// The function's isolation is statically erased with @isolated(any).
     Erased,
+
+    /// Inherits isolation from the caller. This is only applicable
+    /// to asynchronous function types.
+    ///
+    /// NOTE: The difference in between NonIsolatedCaller and
+    /// NonIsolated is that NonIsolatedCaller is a strictly
+    /// weaker form of nonisolation. While both in their bodies cannot
+    /// access isolated state directly, NonIsolatedCaller functions
+    /// /are/ allowed to access state isolated to their caller via
+    /// function arguments since we know that the callee will stay
+    /// in the caller's isolation domain. In contrast, NonIsolated
+    /// is strongly nonisolated and is not allowed to access /any/
+    /// isolated state (even via function parameters) since it is
+    /// considered safe to run on /any/ actor.
+    NonIsolatedCaller,
   };
 
   static constexpr size_t NumBits = 3; // future-proof this slightly
@@ -87,6 +102,9 @@ public:
   static FunctionTypeIsolation forErased() {
     return { Kind::Erased };
   }
+  static FunctionTypeIsolation forNonIsolatedCaller() {
+    return { Kind::NonIsolatedCaller };
+  }
 
   Kind getKind() const { return value.getInt(); }
   bool isNonIsolated() const {
@@ -104,6 +122,9 @@ public:
   }
   bool isErased() const {
     return getKind() == Kind::Erased;
+  }
+  bool isNonIsolatedCaller() const {
+    return getKind() == Kind::NonIsolatedCaller;
   }
 
   // The opaque accessors below are just for the benefit of ExtInfoBuilder,

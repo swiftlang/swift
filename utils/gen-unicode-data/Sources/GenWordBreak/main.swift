@@ -73,7 +73,6 @@ struct WordBreakEntry : Comparable {
   let property: Unicode.WordBreakProperty
 }
 
-
 func getWordBreakPropertyData(
   for path: String
 ) -> [(ClosedRange<UInt32>, Unicode.WordBreakProperty)] {
@@ -163,8 +162,8 @@ func emit(
 func generateWordBreak() {
   var result = readFile("Input/WordData.h")
   
-  let baseData = getWordBreakPropertyData(for: "Data/15/WordBreakProperty.txt")
-  let emojiData = getWordBreakPropertyData(for: "Data/15/emoji-data.txt")
+  let baseData = getWordBreakPropertyData(for: "Data/16/WordBreakProperty.txt")
+  let emojiData = getWordBreakPropertyData(for: "Data/16/emoji-data.txt")
   
   var idx = 0
   let data = flatten(baseData + emojiData).map { (values) -> WordBreakEntry in

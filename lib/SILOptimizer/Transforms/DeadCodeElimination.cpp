@@ -12,19 +12,20 @@
 
 #define DEBUG_TYPE "sil-dce"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/NodeBits.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
-#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -94,7 +95,7 @@ static bool seemsUseful(SILInstruction *I) {
   if (isa<DebugValueInst>(I))
     return isa<SILFunctionArgument>(I->getOperand(0))
       || isa<SILUndef>(I->getOperand(0));
-  
+
 
   // Don't delete allocation instructions in DCE.
   if (isa<AllocRefInst>(I) || isa<AllocRefDynamicInst>(I)) {
@@ -131,7 +132,7 @@ class DCE {
   DominanceInfo *DT;
   DeadEndBlocks *deadEndBlocks;
   llvm::DenseMap<SILBasicBlock *, ControllingInfo> ControllingInfoMap;
-  llvm::SmallVector<SILValue> valuesToComplete;
+  SmallBlotSetVector<SILValue, 8> valuesToComplete;
 
   // Maps instructions which produce a failing condition (like overflow
   // builtins) to the actual cond_fail instructions which handle the failure.
@@ -212,7 +213,7 @@ public:
     markLive();
     return removeDead();
   }
-  
+
   bool mustInvalidateCalls() const { return CallsChanged; }
   bool mustInvalidateBranches() const { return BranchesChanged; }
 };
@@ -637,7 +638,7 @@ void DCE::endLifetimeOfLiveValue(Operand *op, SILInstruction *insertPt) {
   // If DCE is going to delete the block in which we have to insert a
   // compensating lifetime end, let complete lifetimes utility handle it.
   if (!LiveBlocks.contains(insertPt->getParent())) {
-    valuesToComplete.push_back(lookThroughBorrowedFromDef(value));
+    valuesToComplete.insert(lookThroughBorrowedFromDef(value));
     return;
   }
 
@@ -731,9 +732,23 @@ bool DCE::removeDead() {
           endLifetimeOfLiveValue(predOp, insertPt);
         }
       }
-      erasePhiArgument(&BB, i, /*cleanupDeadPhiOps=*/true,
-                       InstModCallbacks().onCreateNewInst(
-                           [&](auto *inst) { markInstructionLive(inst); }));
+      erasePhiArgument(
+          &BB, i, /*cleanupDeadPhiOps=*/true,
+          InstModCallbacks()
+              .onCreateNewInst([&](auto *inst) { markInstructionLive(inst); })
+              .onDelete([&](auto *inst) {
+                for (auto result : inst->getResults()) {
+                  result = lookThroughBorrowedFromDef(result);
+                  if (valuesToComplete.count(result)) {
+                    valuesToComplete.erase(result);
+                  }
+                }
+                inst->replaceAllUsesOfAllResultsWithUndef();
+                if (isa<ApplyInst>(inst))
+                  CallsChanged = true;
+                ++NumDeletedInsts;
+                inst->eraseFromParent();
+              }));
       Changed = true;
       BranchesChanged = true;
     }
@@ -747,7 +762,8 @@ bool DCE::removeDead() {
       // We want to replace dead terminators with unconditional branches to
       // the nearest post-dominator that has useful instructions.
       if (auto *termInst = dyn_cast<TermInst>(Inst)) {
-        SILBasicBlock *postDom = nearestUsefulPostDominator(Inst->getParent());
+        SILBasicBlock *postDom =
+            nearestUsefulPostDominator(termInst->getParent());
         if (!postDom)
           continue;
 
@@ -757,12 +773,13 @@ bool DCE::removeDead() {
           }
         }
         LLVM_DEBUG(llvm::dbgs() << "Replacing branch: ");
-        LLVM_DEBUG(Inst->dump());
+        LLVM_DEBUG(termInst->dump());
         LLVM_DEBUG(llvm::dbgs()
                    << "with jump to: BB" << postDom->getDebugID() << "\n");
 
-        replaceBranchWithJump(Inst, postDom);
-        Inst->eraseFromParent();
+        replaceBranchWithJump(termInst, postDom);
+        ++NumDeletedInsts;
+        termInst->eraseFromParent();
         BranchesChanged = true;
         Changed = true;
         continue;
@@ -780,6 +797,12 @@ bool DCE::removeDead() {
           }
         }
       }
+      for (auto result : Inst->getResults()) {
+        result = lookThroughBorrowedFromDef(result);
+        if (valuesToComplete.count(result)) {
+          valuesToComplete.erase(result);
+        }
+      }
       Inst->replaceAllUsesOfAllResultsWithUndef();
 
       if (isa<ApplyInst>(Inst))
@@ -792,7 +815,9 @@ bool DCE::removeDead() {
 
   OSSALifetimeCompletion completion(F, DT, *deadEndBlocks);
   for (auto value : valuesToComplete) {
-    completion.completeOSSALifetime(value,
+    if (!value.has_value())
+      continue;
+    completion.completeOSSALifetime(*value,
                                     OSSALifetimeCompletion::Boundary::Liveness);
   }
 
@@ -849,9 +874,9 @@ void DCE::computeLevelNumbers(PostDomTreeNode *root) {
     auto entry = workList.pop_back_val();
     PostDomTreeNode *node = entry.first;
     unsigned level = entry.second;
-    
+
     insertControllingInfo(node->getBlock(), level);
-    
+
     for (PostDomTreeNode *child : *node) {
       workList.push_back({child, level + 1});
     }

@@ -61,7 +61,9 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
     if (fs.exists(ModPath)) {
       // The module file will be loaded directly.
       auto dependencies =
-          scanModuleFile(ModPath, IsFramework, isTestableDependencyLookup);
+          scanModuleFile(ModPath, IsFramework,
+                         isTestableDependencyLookup,
+                         /* isCandidateForTextualModule */ false);
       if (dependencies) {
         this->dependencies = std::move(dependencies.get());
         return std::error_code();
@@ -155,7 +157,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
       realModuleName.str(), moduleInterfacePath.str(), sdkPath,
       StringRef(), SourceLoc(),
       [&](ASTContext &Ctx, ModuleDecl *mainMod, ArrayRef<StringRef> BaseArgs,
-          ArrayRef<StringRef> PCMArgs, StringRef Hash, StringRef UserModVer) {
+          StringRef Hash, StringRef UserModVer) {
         assert(mainMod);
         std::string InPath = moduleInterfacePath.str();
         auto compiledCandidates =
@@ -164,8 +166,9 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
             Ctx.SearchPathOpts.ScannerModuleValidation) {
           assert(compiledCandidates.size() == 1 &&
                  "Should only have 1 candidate module");
-          auto BinaryDep = scanModuleFile(compiledCandidates[0], isFramework,
-                                          isTestableImport);
+          auto BinaryDep = scanModuleFile(compiledCandidates[0],
+                                          isFramework, isTestableImport,
+                                          /* isCandidateForTextualModule */ true);
           if (BinaryDep) {
             Result = *BinaryDep;
             return std::error_code();
@@ -240,14 +243,18 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
             linkName = *(linkNameArgIt+1);
           linkLibraries.push_back({linkName,
                                    isFramework ? LibraryKind::Framework : LibraryKind::Library,
-                                   true});
+                                   /*static=*/false, /*force_load=*/true});
         }
         bool isStatic = llvm::find(ArgsRefs, "-static") != ArgsRefs.end();
 
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
-            outputPathBase.str().str(), InPath, compiledCandidatesRefs,
-            ArgsRefs, linkLibraries, PCMArgs, Hash, isFramework, isStatic, {},
-            /*module-cache-key*/ "", UserModVer);
+            InPath, compiledCandidatesRefs, ArgsRefs, {}, {}, linkLibraries,
+            isFramework, isStatic, {}, /*module-cache-key*/ "", UserModVer);
+
+        // We do NOT need the code below to set output path in the dependency
+        // info because it will be calculated again later. We do not want to
+        // create output paths that do not exist in the end.
+        // Result->setOutputPathAndHash(outputPathBase.str().str(), Hash);
 
         if (Ctx.CASOpts.EnableCaching) {
           std::vector<std::string> clangDependencyFiles;

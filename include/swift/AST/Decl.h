@@ -19,7 +19,7 @@
 
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -34,6 +34,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeAnnotation.h"
+#include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/StorageImpl.h"
@@ -95,6 +96,7 @@ namespace swift {
   class MacroDefinition;
   class ModuleDecl;
   class NamedPattern;
+  enum NLOptions : unsigned;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
@@ -231,6 +233,16 @@ enum class AssociatedValueCheck {
   NoAssociatedValues,
   /// The enum contains at least one case with associated values.
   HasAssociatedValues,
+};
+
+/// An explicit declaration of the safety of
+enum class ExplicitSafety {
+  /// There was no explicit declaration of the safety of the given entity.
+  Unspecified,
+  /// The entity was explicitly declared safe with @safe.
+  Safe,
+  /// The entity was explicitly declared unsafe with @unsafe.
+  Unsafe
 };
 
 /// Diagnostic printing of \c StaticSpellingKind.
@@ -724,7 +736,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -790,7 +802,10 @@ protected:
     AllowNonResilientAccess : 1,
 
     /// Whether this module has been built with -package-cmo.
-    SerializePackageEnabled : 1
+    SerializePackageEnabled : 1,
+
+    /// Whether this module has enabled strict memory safety checking.
+    StrictMemorySafety : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -854,7 +869,6 @@ protected:
   friend class ExpandPeerMacroRequest;
   friend class GlobalActorAttributeRequest;
   friend class SPIGroupsRequest;
-  friend class IsUnsafeRequest;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
@@ -1022,6 +1036,17 @@ public:
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
 
+  /// Register the relationship between \c this and \p attr->abiDecl , assuming
+  /// that \p attr is attached to \c this . This is necessary for
+  /// \c ABIRoleInfo::ABIRoleInfo() to determine that \c attr->abiDecl
+  /// is ABI-only and locate its API counterpart.
+  void recordABIAttr(ABIAttr *attr);
+
+  /// Set this declaration's attributes to the specified attribute list,
+  /// applying any post-processing logic appropriate for attributes parsed
+  /// from source code.
+  void attachParsedAttrs(DeclAttributes attrs);
+
   /// True if this declaration provides an implementation for an imported
   /// Objective-C declaration. This implies various restrictions and special
   /// behaviors for it and, if it's an extension, its members.
@@ -1187,13 +1212,9 @@ public:
   /// Whether this declaration predates the introduction of concurrency.
   bool preconcurrency() const;
 
-  /// Whether this declaration is considered "unsafe", i.e., should not be
-  /// used in a "safe" dialect.
-  bool isUnsafe() const;
-
-  /// Whether this declaration explicitly states that it is allowed to contain
-  /// unsafe code.
-  bool allowsUnsafe() const;
+  /// Query whether this declaration was explicitly declared to be safe or
+  /// unsafe.
+  ExplicitSafety getExplicitSafety() const;
 
 private:
   bool isUnsafeComputed() const {
@@ -1395,31 +1416,50 @@ public:
   /// and its DeclContext does not.
   bool isOutermostPrivateOrFilePrivateScope() const;
 
-  /// Returns the availability domain associated with the given `AvailableAttr`
-  /// that is attached to this decl.
-  AvailabilityDomain getDomainForAvailableAttr(const AvailableAttr *attr) const;
+  /// Returns an iterable list of the valid `AvailableAttr` and
+  /// `AvailabilityDomain` pairs. Unless \p includeInactive is true, attributes
+  /// that are considered inactive for the compilation context are filtered out.
+  SemanticAvailableAttributes
+  getSemanticAvailableAttrs(bool includeInactive = true) const;
+
+  /// Returns the SemanticAvailableAttr associated with the given
+  /// `AvailableAttr` that is attached to this decl. Returns `std::nullopt` if a
+  /// valid semantic version of the attribute cannot be constructed (e.g. the
+  /// domain cannot be resolved).
+  std::optional<SemanticAvailableAttr>
+  getSemanticAvailableAttr(const AvailableAttr *attr) const;
 
   /// Returns the active platform-specific `@available` attribute for this decl.
   /// There may be multiple `@available` attributes that are relevant to the
   /// current platform, but the returned one has the highest priority.
-  const AvailableAttr *getActiveAvailableAttrForCurrentPlatform(
-      bool ignoreAppExtensions = false) const;
+  std::optional<SemanticAvailableAttr>
+  getActiveAvailableAttrForCurrentPlatform() const;
+
+  /// Returns the active platform-specific `@available` attribute that should be
+  /// used to determine the platform introduction version of the decl.
+  ///
+  /// If the declaration does not have a platform introduction attribute of its
+  /// own and is a member of an extension then the platform introduction
+  /// attribute attached to the extension will be returned instead unless \p
+  /// checkExtension is false.
+  std::optional<SemanticAvailableAttr>
+  getAvailableAttrForPlatformIntroduction(bool checkExtension = true) const;
 
   /// Returns true if the declaration is deprecated at the current deployment
   /// target.
-  bool isDeprecated() const { return getDeprecatedAttr() != nullptr; }
+  bool isDeprecated() const { return getDeprecatedAttr().has_value(); }
 
   /// Returns the first `@available` attribute that indicates that this decl
   /// is deprecated on current deployment target, or `nullptr` otherwise.
-  const AvailableAttr *getDeprecatedAttr() const;
+  std::optional<SemanticAvailableAttr> getDeprecatedAttr() const;
 
   /// Returns the first `@available` attribute that indicates that this decl
   /// will be deprecated in the future, or `nullptr` otherwise.
-  const AvailableAttr *getSoftDeprecatedAttr() const;
+  std::optional<SemanticAvailableAttr> getSoftDeprecatedAttr() const;
 
   /// Returns the first @available attribute that indicates this decl is
   /// unavailable from asynchronous contexts, or `nullptr` otherwise.
-  const AvailableAttr *getNoAsyncAttr() const;
+  std::optional<SemanticAvailableAttr> getNoAsyncAttr() const;
 
   /// Returns true if the decl has been marked unavailable in the Swift language
   /// version that is currently active.
@@ -1434,13 +1474,12 @@ public:
   ///
   /// Note that this query only considers the attributes that are attached
   /// directly to this decl (or the extension it is declared in, if applicable).
-  bool isUnavailable() const { return getUnavailableAttr() != nullptr; }
+  bool isUnavailable() const { return getUnavailableAttr().has_value(); }
 
   /// If the decl is always unavailable in the current compilation
   /// context, returns the attribute attached to the decl (or its parent
   /// extension) that makes it unavailable.
-  const AvailableAttr *
-  getUnavailableAttr(bool ignoreAppExtensions = false) const;
+  std::optional<SemanticAvailableAttr> getUnavailableAttr() const;
 
   /// Returns true if the decl is effectively always unavailable in the current
   /// compilation context. This query differs from \c isUnavailable() because it
@@ -1476,6 +1515,10 @@ public:
 
   /// Returns true if this declaration has any `@backDeployed` attributes.
   bool hasBackDeployedAttr() const;
+
+  /// Apply the specified function to decls that should be placed _next_ to
+  /// this decl when constructing AST.
+  void forEachDeclToHoist(llvm::function_ref<void(Decl *)> callback) const;
 
   /// Emit a diagnostic tied to this declaration.
   template<typename ...ArgTypes>
@@ -1761,14 +1804,8 @@ public:
 /// An entry in the "inherited" list of a type or extension.
 struct InheritedEntry : public TypeLoc {
 private:
-  /// Whether there was an @unchecked attribute.
-  bool IsUnchecked : 1;
-
-  /// Whether there was an @retroactive attribute.
-  bool IsRetroactive : 1;
-
-  /// Whether there was an @preconcurrency attribute.
-  bool IsPreconcurrency : 1;
+  /// Options on a protocol conformance that are expressed as attributes.
+  unsigned RawOptions: 8;
 
   /// Whether there was a ~ indicating suppression.
   ///
@@ -1778,21 +1815,62 @@ private:
 public:
   InheritedEntry(const TypeLoc &typeLoc);
 
-  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive,
-                 bool isPreconcurrency, bool isSuppressed = false)
-      : TypeLoc(typeLoc), IsUnchecked(isUnchecked),
-        IsRetroactive(isRetroactive), IsPreconcurrency(isPreconcurrency),
+  InheritedEntry(const TypeLoc &typeLoc, ProtocolConformanceOptions options,
+                 bool isSuppressed = false)
+      : TypeLoc(typeLoc), RawOptions(options.toRaw()),
         IsSuppressed(isSuppressed) {}
 
-  bool isUnchecked() const { return IsUnchecked; }
-  bool isRetroactive() const { return IsRetroactive; }
-  bool isPreconcurrency() const { return IsPreconcurrency; }
+  ProtocolConformanceOptions getOptions() const {
+    return ProtocolConformanceOptions(RawOptions);
+  }
+
+  bool isUnchecked() const {
+    return getOptions().contains(ProtocolConformanceFlags::Unchecked);
+  }
+  bool isRetroactive() const {
+    return getOptions().contains(ProtocolConformanceFlags::Retroactive);
+  }
+  bool isPreconcurrency() const {
+    return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
+  }
+
+  ExplicitSafety getExplicitSafety() const {
+    if (getOptions().contains(ProtocolConformanceFlags::Unsafe))
+      return ExplicitSafety::Unsafe;
+    if (getOptions().contains(ProtocolConformanceFlags::Safe))
+      return ExplicitSafety::Safe;
+    return ExplicitSafety::Unspecified;
+  }
+
   bool isSuppressed() const { return IsSuppressed; }
+
+  void setOption(ProtocolConformanceFlags flag) {
+    RawOptions = (getOptions() | flag).toRaw();
+  }
+
+  void setOption(ExplicitSafety safety) {
+    RawOptions = (getOptions() - ProtocolConformanceFlags::Unsafe
+                    - ProtocolConformanceFlags::Safe).toRaw();
+    switch (safety) {
+    case ExplicitSafety::Unspecified:
+      break;
+    case ExplicitSafety::Safe:
+      RawOptions = (getOptions() | ProtocolConformanceFlags::Safe).toRaw();
+      break;
+    case ExplicitSafety::Unsafe:
+      RawOptions = (getOptions() | ProtocolConformanceFlags::Unsafe).toRaw();
+      break;
+    }
+  }
 
   void setSuppressed() {
     assert(!IsSuppressed && "setting suppressed again!?");
     IsSuppressed = true;
   }
+
+  void dump(raw_ostream &os) const;
+
+  SWIFT_DEBUG_DUMP;
 };
 
 /// A wrapper for the collection of inherited types for either a `TypeDecl` or
@@ -1912,7 +1990,6 @@ class ExtensionDecl final : public GenericContext, public Decl,
   friend class Decl;
 public:
   using Decl::getASTContext;
-  using Decl::allowsUnsafe;
 
   /// Create a new extension declaration.
   static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
@@ -2054,7 +2131,12 @@ public:
 
   /// Does this extension add conformance to an invertible protocol for the
   /// extended type?
-  bool isAddingConformanceToInvertible() const;
+  ///
+  /// Returns \c nullopt if the extension does not add conformance to any
+  /// invertible protocol. Returns one of the invertible protocols being
+  /// conformed to otherwise.
+  std::optional<InvertibleProtocolKind>
+  isAddingConformanceToInvertible() const;
 
   /// If this extension represents an imported Objective-C category, returns the
   /// category's name. Otherwise returns the empty identifier.
@@ -2647,6 +2729,11 @@ public:
 
   /// Returns \c true if this pattern binding was created by the debugger.
   bool isDebuggerBinding() const { return Bits.PatternBindingDecl.IsDebugger; }
+
+  /// Returns the \c VarDecl in this PBD at the same offset in the same
+  /// pattern entry as \p otherVar is in its PBD, or \c nullptr if this PBD is
+  /// too different from \p otherVar 's to find an equivalent variable.
+  VarDecl *getVarAtSimilarStructuralPosition(VarDecl *otherVar);
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;
@@ -3280,6 +3367,10 @@ public:
   /// Get the decl for this value's opaque result type, if it has one.
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
 
+  /// Gets the decl for this value's opaque result type if it has already been
+  /// computed, or `nullopt` otherwise. This should only be used for dumping.
+  std::optional<OpaqueTypeDecl *> getCachedOpaqueResultTypeDecl() const;
+
   /// Get the representative for this value's opaque result type, if it has one.
   /// Returns a `TypeRepr` instead of an `OpaqueReturnTypeRepr` because 'some'
   /// types might appear in one or more structural positions, e.g.  (some P,
@@ -3385,7 +3476,6 @@ public:
   using DeclContext::operator new;
   using DeclContext::operator delete;
   using TypeDecl::getDeclaredInterfaceType;
-  using Decl::allowsUnsafe;
 
   static bool classof(const DeclContext *C) {
     if (auto D = C->getAsDecl())
@@ -3908,7 +3998,7 @@ public:
   /// type parameter.
   ///
   /// \code
-  /// struct Vector<Element, let N: Int>
+  /// struct InlineArray<let count: Int, Element: ~Copyable>
   /// \endcode
   bool isValue() const {
     return getParamKind() == GenericTypeParamKind::Value;
@@ -4335,6 +4425,9 @@ public:
     IncludeAttrImplements = 1 << 0,
     /// Whether to exclude members of macro expansions.
     ExcludeMacroExpansions = 1 << 1,
+    /// If @abi attributes are present, return the decls representing the ABI,
+    /// not the API.
+    ABIProviding = 1 << 2,
   };
 
   /// Find all of the declarations with the given name within this nominal type
@@ -5498,12 +5591,6 @@ public:
   /// - `Self` appears in non-covariant position in the type signature of a
   ///   value requirement.
   bool hasSelfOrAssociatedTypeRequirements() const;
-
-  /// Determine whether an existential type constrained by this protocol must
-  /// be written using `any` syntax.
-  ///
-  /// \Note This method takes language feature state into account.
-  bool existentialRequiresAny() const;
 
   /// Returns a list of protocol requirements that must be assessed to
   /// determine a concrete's conformance effect polymorphism kind.
@@ -6772,6 +6859,7 @@ public:
 
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
+  friend class ParameterList;
   friend class DefaultArgumentInitContextRequest;
   friend class DefaultArgumentExprRequest;
   friend class DefaultArgumentTypeRequest;
@@ -6798,7 +6886,8 @@ class ParamDecl : public VarDecl {
 
     /// Stores the context for the default argument as well as a bit to
     /// indicate whether the default expression has been type-checked.
-    llvm::PointerIntPair<Initializer *, 1, bool> InitContextAndIsTypeChecked;
+    llvm::PointerIntPair<DefaultArgumentInitializer *, 1, bool>
+        InitContextAndIsTypeChecked;
 
     StringRef StringRepresentation;
     CaptureInfo Captures;
@@ -6806,7 +6895,8 @@ class ParamDecl : public VarDecl {
 
   /// Retrieve the cached initializer context for the parameter's default
   /// argument without triggering a request.
-  std::optional<Initializer *> getCachedDefaultArgumentInitContext() const;
+  std::optional<DefaultArgumentInitializer *>
+  getCachedDefaultArgumentInitContext() const;
 
   /// NOTE: This is stored using bits from TyReprAndFlags and
   /// DefaultValueAndFlags.
@@ -6915,12 +7005,11 @@ public:
                  DeclContext *Parent,
                  ParamSpecifier specifier = ParamSpecifier::Default);
 
-  static ParamDecl *createParsed(ASTContext &Context, SourceLoc specifierLoc,
-                                 SourceLoc argumentNameLoc,
-                                 Identifier argumentName,
-                                 SourceLoc parameterNameLoc,
-                                 Identifier parameterName, Expr *defaultValue,
-                                 DeclContext *dc);
+  static ParamDecl *createParsed(
+      ASTContext &Context, SourceLoc specifierLoc, SourceLoc argumentNameLoc,
+      Identifier argumentName, SourceLoc parameterNameLoc,
+      Identifier parameterName, Expr *defaultValue,
+      DefaultArgumentInitializer *defaultValueInitContext, DeclContext *dc);
 
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const {
@@ -6942,7 +7031,9 @@ public:
 
   /// Retrieve the TypeRepr corresponding to the parsed type of the parameter, if it exists.
   TypeRepr *getTypeRepr() const { return TyReprAndFlags.getPointer(); }
-  void setTypeRepr(TypeRepr *repr) { TyReprAndFlags.setPointer(repr); }
+
+  /// Set the parsed TypeRepr on the parameter.
+  void setTypeRepr(TypeRepr *repr);
 
   bool isDestructured() const {
     auto flags = ArgumentNameAndFlags.getInt();
@@ -7031,7 +7122,7 @@ public:
   /// Retrieve the initializer context for the parameter's default argument.
   Initializer *getDefaultArgumentInitContext() const;
 
-  void setDefaultArgumentInitContext(Initializer *initContext);
+  void setDefaultArgumentInitContext(DefaultArgumentInitializer *initContext);
 
   CaptureInfo getDefaultArgumentCaptureInfo() const;
 
@@ -7721,6 +7812,10 @@ public:
   /// Retrieves the thrown interface type.
   Type getThrownInterfaceType() const;
 
+  /// Returns the thrown interface type of this function if it has already been
+  /// computed, otherwise `nullopt`. This should only be used for dumping.
+  std::optional<Type> getCachedThrownInterfaceType() const;
+
   /// Retrieve the "effective" thrown interface type, or std::nullopt if
   /// this function cannot throw.
   ///
@@ -7988,7 +8083,11 @@ public:
   /// source buffers for e.g. code-completion.
   SourceRange getOriginalBodySourceRange() const;
 
-  /// Retrieve the source range of the function declaration name + patterns.
+  /// Retrieve the source range of the function declaration name and parameter list.
+  SourceRange getParameterListSourceRange() const;
+
+  /// Retrieve the source range of the function declaration name, parameter list,
+  /// and effects. For FuncDecl, this does not include the return type.
   SourceRange getSignatureSourceRange() const;
 
   CaptureInfo getCaptureInfo() const;
@@ -8044,6 +8143,8 @@ public:
   AbstractFunctionDecl *getOverriddenDecl() const {
     return cast_or_null<AbstractFunctionDecl>(ValueDecl::getOverriddenDecl());
   }
+
+  std::optional<ExecutionKind> getExecutionBehavior() const;
 
   /// Whether the declaration is later overridden in the module
   ///
@@ -8272,14 +8373,16 @@ public:
 
   TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }
 
-  void setDeserializedResultTypeLoc(TypeLoc ResultTyR);
-
   SourceRange getResultTypeSourceRange() const {
     return FnRetType.getSourceRange();
   }
 
   /// Retrieve the result interface type of this function.
   Type getResultInterfaceType() const;
+
+  /// Returns the result interface type of this function if it has already been
+  /// computed, otherwise `nullopt`. This should only be used for dumping.
+  std::optional<Type> getCachedResultInterfaceType() const;
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation.  This check is a syntactic rather than type-based check,
@@ -8569,7 +8672,7 @@ public:
   /// Get the list of elements declared in this case.
   ArrayRef<EnumElementDecl *> getElements() const {
     return {getTrailingObjects<EnumElementDecl *>(),
-            Bits.EnumCaseDecl.NumElements};
+            static_cast<size_t>(Bits.EnumCaseDecl.NumElements)};
   }
   SourceRange getSourceRange() const;
 
@@ -8796,9 +8899,6 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// inserted at the end of the initializer by SILGen.
   Expr *CallToSuperInit = nullptr;
 
-  /// Valid when lifetime dependence specifiers are present.
-  TypeLoc InitRetType;
-
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                   bool Failable, SourceLoc FailabilityLoc,
@@ -8807,7 +8907,7 @@ public:
                   TypeLoc thrownTy,
                   ParameterList *BodyParams,
                   GenericParamList *GenericParams,
-                  DeclContext *Parent, TypeRepr *InitRetTy);
+                  DeclContext *Parent);
 
   static ConstructorDecl *
   createImported(ASTContext &ctx, ClangNode clangNode, DeclName name,
@@ -8828,10 +8928,6 @@ public:
 
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();
-
-  TypeRepr *getResultTypeRepr() const { return InitRetType.getTypeRepr(); }
-
-  void setDeserializedResultTypeLoc(TypeLoc ResultTyR);
 
   /// Get the typechecked call to super.init expression, which needs to be
   /// inserted at the end of the initializer by SILGen.
@@ -9481,6 +9577,10 @@ public:
   /// Retrieve the interface type produced when expanding this macro.
   Type getResultInterfaceType() const;
 
+  /// Returns the result interface type of this macro if it has already been
+  /// computed, otherwise `nullopt`. This should only be used for dumping.
+  std::optional<Type> getCachedResultInterfaceType() const;
+
   /// Determine the contexts in which this macro can be applied.
   MacroRoles getMacroRoles() const;
 
@@ -9768,6 +9868,126 @@ const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 /// Retrieve parameter declaration from the given source at given index, or
 /// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const DeclContext *source, unsigned index);
+
+class ABIRole {
+public:
+  enum Value : uint8_t {
+    Neither = 0,
+    ProvidesABI = 1 << 0,
+    ProvidesAPI = 1 << 1,
+    Either = ProvidesABI | ProvidesAPI,
+  };
+
+  Value value;
+
+  ABIRole(Value value)
+    : value(value)
+  { }
+
+  ABIRole()
+    : ABIRole(Neither)
+  { }
+
+  explicit ABIRole(NLOptions opts);
+
+  template<typename FlagType>
+  explicit ABIRole(OptionSet<FlagType> flags)
+    : value(flags.contains(FlagType::ABIProviding) ? ProvidesABI : ProvidesAPI)
+  { }
+
+  inline ABIRole operator|(ABIRole rhs) const {
+    return ABIRole(ABIRole::Value(value | rhs.value));
+  }
+  inline ABIRole &operator|=(ABIRole rhs) {
+    value = ABIRole::Value(value | rhs.value);
+    return *this;
+  }
+  inline ABIRole operator&(ABIRole rhs) const {
+    return ABIRole(ABIRole::Value(value & rhs.value));
+  }
+  inline ABIRole &operator&=(ABIRole rhs) {
+    value = ABIRole::Value(value & rhs.value);
+    return *this;
+  }
+  inline ABIRole operator~() const {
+    return ABIRole(ABIRole::Value(~value));
+  }
+
+  operator bool() const {
+    return value != Neither;
+  }
+};
+
+namespace abi_role_detail {
+
+using Storage = llvm::PointerIntPair<Decl *, 2, ABIRole::Value>;
+Storage computeStorage(Decl *decl);
+
+}
+
+/// Specifies the \c ABIAttr -related behavior of this declaration
+/// and provides access to its counterpart.
+///
+/// A given declaration may provide the API, the ABI, or both. If it provides
+/// API, the counterpart is the matching ABI-providing decl; if it provides
+/// ABI, the countepart is the matching API-providing decl. A declaration
+/// which provides both API and ABI is its own counterpart.
+///
+/// If the counterpart is \c nullptr , this indicates a fundamental mismatch
+/// between decl and counterpart. Sometimes this mismatch is a difference in
+/// decl kind; in these cases, \c getCounterpartUnchecked() will return the
+/// incorrect counterpart.
+template<typename SpecificDecl>
+class ABIRoleInfo {
+  friend abi_role_detail::Storage abi_role_detail::computeStorage(Decl *);
+
+  abi_role_detail::Storage counterpartAndFlags;
+
+  ABIRoleInfo(abi_role_detail::Storage storage)
+    : counterpartAndFlags(storage)
+  { }
+
+public:
+  explicit ABIRoleInfo(const SpecificDecl *decl)
+    : ABIRoleInfo(abi_role_detail::computeStorage(const_cast<SpecificDecl *>(decl)))
+  { }
+
+  Decl *getCounterpartUnchecked() const {
+    return counterpartAndFlags.getPointer();
+  }
+
+  SpecificDecl *getCounterpart() const {
+    return dyn_cast_or_null<SpecificDecl>(getCounterpartUnchecked());
+  }
+
+  ABIRole getRole() const {
+    return ABIRole(ABIRole::Value(counterpartAndFlags.getInt()));
+  }
+
+  bool matches(ABIRole desiredRole) const {
+    return getRole() & desiredRole;
+  }
+
+  template<typename Options>
+  bool matchesOptions(Options opts) const {
+    return matches(ABIRole(opts));
+  }
+
+  bool providesABI() const {
+    return matches(ABIRole::ProvidesABI);
+  }
+
+  bool providesAPI() const {
+    return matches(ABIRole::ProvidesAPI);
+  }
+
+  bool hasABIAttr() const {
+    return !providesABI();
+  }
+};
+
+template<typename SpecificDecl>
+ABIRoleInfo(const SpecificDecl *decl) -> ABIRoleInfo<SpecificDecl>;
 
 StringRef
 getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article,

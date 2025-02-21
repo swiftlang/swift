@@ -149,11 +149,11 @@ protected:
     return S.getOverloadChoiceIfAvailable(locator);
   }
 
-  /// Retrieve overload choice resolved for a callee for the anchor
-  /// of a given locator.
+  /// Retrieve the overload choice for the callee associated with the given
+  /// locator, if any.
   std::optional<SelectedOverload>
   getCalleeOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
-    return getOverloadChoiceIfAvailable(S.getCalleeLocator(locator));
+    return S.getCalleeOverloadChoiceIfAvailable(locator);
   }
 
   ConstraintLocator *
@@ -1074,17 +1074,6 @@ public:
     std::sort(Indices.begin(), Indices.end());
     assert(getFromType()->is<AnyFunctionType>() && getToType()->is<AnyFunctionType>());
   }
-
-  bool diagnoseAsError() override;
-};
-
-/// Diagnose situations when @autoclosure argument is passed to @autoclosure
-/// parameter directly without calling it first.
-class AutoClosureForwardingFailure final : public FailureDiagnostic {
-public:
-  AutoClosureForwardingFailure(const Solution &solution,
-                               ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;
 };
@@ -3241,6 +3230,24 @@ public:
   InvalidTypeAsKeyPathSubscriptIndex(const Solution &solution, Type argType,
                                      ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), ArgType(resolveType(argType)) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose when an inline array literal has an incorrect number of elements
+/// for the contextual inline array type it's initializing.
+///
+/// \code
+/// let x: InlineArray<4, Int> = [1, 2] // expected '4' elements but got '2'
+/// \endcode
+class IncorrectInlineArrayLiteralCount final : public FailureDiagnostic {
+  Type lhsCount, rhsCount;
+
+public:
+  IncorrectInlineArrayLiteralCount(const Solution &solution, Type lhsCount,
+                            Type rhsCount, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), lhsCount(resolveType(lhsCount)),
+        rhsCount(resolveType(rhsCount)) {}
 
   bool diagnoseAsError() override;
 };

@@ -19,15 +19,14 @@
 #ifndef SWIFT_AVAILABILITYSCOPE_H
 #define SWIFT_AVAILABILITYSCOPE_H
 
-#include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Stmt.h" // for PoundAvailableInfo
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
@@ -99,6 +98,7 @@ private:
   /// Represents the AST node that introduced an availability scope.
   class IntroNode {
     Reason IntroReason;
+    const DeclContext *DC;
     union {
       SourceFile *SF;
       Decl *D;
@@ -109,24 +109,25 @@ private:
     };
 
   public:
-    IntroNode(SourceFile *SF) : IntroReason(Reason::Root), SF(SF) {}
-    IntroNode(Decl *D, Reason introReason = Reason::Decl)
-        : IntroReason(introReason), D(D) {
-      (void)getAsDecl();    // check that assertion succeeds
-    }
-    IntroNode(IfStmt *IS, bool IsThen)
+    IntroNode(SourceFile *SF);
+    IntroNode(Decl *D, Reason introReason = Reason::Decl);
+    IntroNode(IfStmt *IS, const DeclContext *DC, bool IsThen)
         : IntroReason(IsThen ? Reason::IfStmtThenBranch
                              : Reason::IfStmtElseBranch),
-          IS(IS) {}
-    IntroNode(PoundAvailableInfo *PAI)
-        : IntroReason(Reason::ConditionFollowingAvailabilityQuery), PAI(PAI) {}
-    IntroNode(GuardStmt *GS, bool IsFallthrough)
+          DC(DC), IS(IS) {}
+    IntroNode(PoundAvailableInfo *PAI, const DeclContext *DC)
+        : IntroReason(Reason::ConditionFollowingAvailabilityQuery), DC(DC),
+          PAI(PAI) {}
+    IntroNode(GuardStmt *GS, const DeclContext *DC, bool IsFallthrough)
         : IntroReason(IsFallthrough ? Reason::GuardStmtFallthrough
                                     : Reason::GuardStmtElseBranch),
-          GS(GS) {}
-    IntroNode(WhileStmt *WS) : IntroReason(Reason::WhileStmtBody), WS(WS) {}
+          DC(DC), GS(GS) {}
+    IntroNode(WhileStmt *WS, const DeclContext *DC)
+        : IntroReason(Reason::WhileStmtBody), DC(DC), WS(WS) {}
 
     Reason getReason() const { return IntroReason; }
+
+    const DeclContext *getDeclContext() const { return DC; }
 
     SourceFile *getAsSourceFile() const {
       assert(IntroReason == Reason::Root);
@@ -201,37 +202,39 @@ public:
 
   /// Create an availability scope for the Then branch of the given IfStmt.
   static AvailabilityScope *createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
+                                                const DeclContext *DC,
                                                 AvailabilityScope *Parent,
                                                 const AvailabilityContext Info);
 
   /// Create an availability scope for the Else branch of the given IfStmt.
   static AvailabilityScope *createForIfStmtElse(ASTContext &Ctx, IfStmt *S,
+                                                const DeclContext *DC,
                                                 AvailabilityScope *Parent,
                                                 const AvailabilityContext Info);
 
   /// Create an availability scope for the true-branch control flow to
   /// further StmtConditionElements following a #available() query in
   /// a StmtCondition.
-  static AvailabilityScope *
-  createForConditionFollowingQuery(ASTContext &Ctx, PoundAvailableInfo *PAI,
-                                   const StmtConditionElement &LastElement,
-                                   AvailabilityScope *Parent,
-                                   const AvailabilityContext Info);
+  static AvailabilityScope *createForConditionFollowingQuery(
+      ASTContext &Ctx, PoundAvailableInfo *PAI,
+      const StmtConditionElement &LastElement, const DeclContext *DC,
+      AvailabilityScope *Parent, const AvailabilityContext Info);
 
   /// Create an availability scope for the fallthrough of a GuardStmt.
   static AvailabilityScope *createForGuardStmtFallthrough(
       ASTContext &Ctx, GuardStmt *RS, BraceStmt *ContainingBraceStmt,
-      AvailabilityScope *Parent, const AvailabilityContext Info);
+      const DeclContext *DC, AvailabilityScope *Parent,
+      const AvailabilityContext Info);
 
   /// Create an availability scope for the else branch of a GuardStmt.
   static AvailabilityScope *
-  createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
+  createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS, const DeclContext *DC,
                          AvailabilityScope *Parent,
                          const AvailabilityContext Info);
 
   /// Create an availability scope for the body of a WhileStmt.
   static AvailabilityScope *
-  createForWhileStmtBody(ASTContext &Ctx, WhileStmt *WS,
+  createForWhileStmtBody(ASTContext &Ctx, WhileStmt *WS, const DeclContext *DC,
                          AvailabilityScope *Parent,
                          const AvailabilityContext Info);
 

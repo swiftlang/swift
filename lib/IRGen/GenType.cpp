@@ -1378,11 +1378,6 @@ namespace {
                                const llvm::Twine &name) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
-    StackAddress allocateVector(IRGenFunction &IGF, SILType T,
-                                llvm::Value *capacity,
-                                const Twine &name) const override {
-      llvm_unreachable("should not call on an immovable opaque type");
-    }
     void deallocateStack(IRGenFunction &IGF, StackAddress addr,
                          SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -2375,7 +2370,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
   case TypeKind::Integer:
-    llvm_unreachable("implement me");
+    llvm_unreachable("should not be asking for the type info an IntegerType");
   }
   }
   llvm_unreachable("bad type kind");

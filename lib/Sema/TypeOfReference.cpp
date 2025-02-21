@@ -72,6 +72,14 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
       if (found == subs.end())
         continue;
 
+      // When a nominal type is declared in generic local context (which is
+      // not actually valid anyway), the context substitution map will map
+      // the outer generic parameters to themselves. Skip such entries to
+      // avoid introducing constraints that contain type parameters into
+      // the solver.
+      if (found->second->hasTypeParameter())
+        continue;
+
       addConstraint(ConstraintKind::Bind, pair.second, found->second,
                     locator);
     }
@@ -750,14 +758,15 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
       continue;
     }
 
-    auto *wrappedType = cs.createTypeVariable(cs.getConstraintLocator(locator), 0);
+    auto *loc = cs.getConstraintLocator(locator);
+    auto *wrappedType = cs.createTypeVariable(loc, 0);
     auto paramType = paramTypes[i].getParameterType();
     auto paramLabel = paramTypes[i].getLabel();
     auto paramInternalLabel = paramTypes[i].getInternalLabel();
     adjustedParamTypes.push_back(AnyFunctionType::Param(
         wrappedType, paramLabel, ParameterTypeFlags(), paramInternalLabel));
     cs.applyPropertyWrapperToParameter(paramType, wrappedType, paramDecl, argLabel,
-                                       ConstraintKind::Equal, locator);
+                                       ConstraintKind::Equal, loc, loc);
   }
 
   return FunctionType::get(adjustedParamTypes, functionType->getResult(),
@@ -1928,8 +1937,9 @@ void ConstraintSystem::bindOverloadType(
         {FunctionType::Param(argTy, ctx.Id_dynamicMember)}, resultTy);
 
     ConstraintLocatorBuilder builder(callLoc);
-    addConstraint(ConstraintKind::ApplicableFunction, callerTy, fnTy,
-                  builder.withPathElement(ConstraintLocator::ApplyFunction));
+    addApplicationConstraint(
+        callerTy, fnTy, /*trailingClosureMatching=*/std::nullopt, useDC,
+        builder.withPathElement(ConstraintLocator::ApplyFunction));
 
     if (isExpr<KeyPathExpr>(locator->getAnchor())) {
       auto paramTy = fnTy->getParams()[0].getParameterType();
@@ -2083,8 +2093,9 @@ void ConstraintSystem::bindOverloadType(
       // Add a constraint for the inner application that uses the args of the
       // original call-site, and a fresh type var result equal to the leaf type.
       ConstraintLocatorBuilder kpLocBuilder(keyPathLoc);
-      addConstraint(
-          ConstraintKind::ApplicableFunction, adjustedFnTy, memberTy,
+      addApplicationConstraint(
+          adjustedFnTy, memberTy, /*trailingClosureMatching=*/std::nullopt,
+          useDC,
           kpLocBuilder.withPathElement(ConstraintLocator::ApplyFunction));
 
       addConstraint(ConstraintKind::Equal, subscriptResultTy, leafTy,

@@ -2118,7 +2118,8 @@ class InferredGenericSignatureRequest :
                                                     WhereClauseOwner,
                                                     SmallVector<Requirement, 2>,
                                                     SmallVector<TypeBase *, 2>,
-                                                    SourceLoc, bool, bool),
+                                                    SourceLoc, ExtensionDecl *,
+                                                    bool),
                          RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2134,7 +2135,8 @@ private:
            WhereClauseOwner whereClause,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeBase *, 2> inferenceSources,
-           SourceLoc loc, bool isExtension, bool allowInverses) const;
+           SourceLoc loc, ExtensionDecl *forExtension,
+           bool allowInverses) const;
 
 public:
   /// Inferred generic signature requests don't have source-location info.
@@ -3134,7 +3136,7 @@ public:
 /// Computes an initializer context for a parameter with a default argument.
 class DefaultArgumentInitContextRequest
     : public SimpleRequest<DefaultArgumentInitContextRequest,
-                           Initializer *(ParamDecl *),
+                           DefaultArgumentInitializer *(ParamDecl *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3143,14 +3145,14 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Initializer * evaluate(Evaluator &evaluator,
-                                         ParamDecl *param) const;
+  DefaultArgumentInitializer *evaluate(Evaluator &evaluator,
+                                       ParamDecl *param) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  std::optional<Initializer *> getCachedResult() const;
-  void cacheResult(Initializer *init) const;
+  std::optional<DefaultArgumentInitializer *> getCachedResult() const;
+  void cacheResult(DefaultArgumentInitializer *init) const;
 };
 
 /// Computes the fully type-checked default argument expression for a given
@@ -5173,24 +5175,6 @@ void simple_display(llvm::raw_ostream &out,
                     RegexLiteralPatternFeatureKind kind);
 SourceLoc extractNearestSourceLoc(RegexLiteralPatternFeatureKind kind);
 
-class IsUnsafeRequest
-    : public SimpleRequest<IsUnsafeRequest,
-                           bool(Decl *decl),
-                           RequestFlags::SeparatelyCached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
-
-public:
-  bool isCached() const { return true; }
-  std::optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
-};
-
 class GenericTypeParamDeclGetValueTypeRequest
     : public SimpleRequest<GenericTypeParamDeclGetValueTypeRequest,
                            Type(GenericTypeParamDecl *decl),
@@ -5221,6 +5205,27 @@ private:
 
 public:
   bool isCached() const { return true; }
+};
+
+class SemanticAvailableAttrRequest
+    : public SimpleRequest<SemanticAvailableAttrRequest,
+                           std::optional<SemanticAvailableAttr>(
+                               const AvailableAttr *, const Decl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<SemanticAvailableAttr> evaluate(Evaluator &evaluator,
+                                                const AvailableAttr *attr,
+                                                const Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<std::optional<SemanticAvailableAttr>> getCachedResult() const;
+  void cacheResult(std::optional<SemanticAvailableAttr> value) const;
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

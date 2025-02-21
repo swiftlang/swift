@@ -1222,6 +1222,7 @@ class TargetExtendedFunctionTypeFlags {
 
     // Values for the enumerated isolation kinds
     IsolatedAny            = 0x00000002U,
+    NonIsolatedCaller      = 0x00000004U,
 
     // Values if we have a sending result.
     HasSendingResult  = 0x00000010U,
@@ -1254,6 +1255,12 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
+  withNonIsolatedCaller() const {
+    return TargetExtendedFunctionTypeFlags<int_type>((Data & ~IsolationMask) |
+                                                     NonIsolatedCaller);
+  }
+
+  const TargetExtendedFunctionTypeFlags<int_type>
   withSendingResult(bool newValue = true) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
         (Data & ~HasSendingResult) |
@@ -1271,6 +1278,10 @@ public:
 
   bool isIsolatedAny() const {
     return (Data & IsolationMask) == IsolatedAny;
+  }
+
+  bool isNonIsolatedCaller() const {
+    return (Data & IsolationMask) == NonIsolatedCaller;
   }
 
   bool hasSendingResult() const {
@@ -1678,7 +1689,7 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncContextResume = 0xd707; // = 55047
   const uint16_t AsyncContextYield = 0xe207; // = 57863
   const uint16_t CancellationNotificationFunction = 0x1933; // = 6451
-  const uint16_t EscalationNotificationFunction = 0x5be4; // = 23524
+  const uint16_t EscalationNotificationFunction = 0xf59d; // = 62877
   const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
   const uint16_t AsyncFutureFunction = 0x720f; // = 29199
 

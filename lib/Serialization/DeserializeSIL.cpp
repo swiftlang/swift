@@ -1707,16 +1707,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Attr == 0 ? OpenedExistentialAccess::Immutable
                   : OpenedExistentialAccess::Mutable);
     break;
-  case SILInstructionKind::AllocVectorInst:
-    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
-           "Layout should be OneTypeOneOperand.");
-    ResultInst = Builder.createAllocVector(
-        Loc,
-        getLocalValue(
-            Builder.maybeGetFunction(), ValID,
-            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
-        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
-    break;
   case SILInstructionKind::DynamicPackIndexInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
@@ -2241,6 +2231,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                            getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
     break;
   }
+  case SILInstructionKind::IgnoredUseInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Should be one operand");
+    auto Ty = MF->getType(TyID);
+    ResultInst = Builder.createIgnoredUse(
+        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
+                           getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
   case SILInstructionKind::DeallocPackInst: {
     auto Ty = MF->getType(TyID);
     ResultInst = Builder.createDeallocPack(
@@ -2540,10 +2538,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
 
-  case SILInstructionKind::IsEscapingClosureInst: {
+  case SILInstructionKind::DestroyNotEscapedClosureInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     unsigned verificationType = Attr;
-    ResultInst = Builder.createIsEscapingClosure(
+    ResultInst = Builder.createDestroyNotEscapedClosure(
         Loc,
         getLocalValue(
             Builder.maybeGetFunction(), ValID,

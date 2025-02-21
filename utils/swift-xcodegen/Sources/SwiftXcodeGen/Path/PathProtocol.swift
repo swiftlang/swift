@@ -78,8 +78,8 @@ public extension PathProtocol {
     return exts.contains(where: { ext == $0.rawValue })
   }
 
-  func hasPrefix(_ other: Self) -> Bool {
-    rawPath.hasPrefix(other.rawPath)
+  func starts(with other: Self) -> Bool {
+    self.storage.starts(with: other.storage)
   }
 
   var components: FilePath.ComponentView {

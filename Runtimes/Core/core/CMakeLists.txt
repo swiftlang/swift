@@ -86,6 +86,7 @@ add_library(swiftCore
   HashTable.swift
   Identifiable.swift
   Indices.swift
+  InlineArray.swift
   InputStream.swift
   IntegerParsing.swift
   Integers.swift
@@ -148,6 +149,8 @@ add_library(swiftCore
   Slice.swift
   SmallString.swift
   Sort.swift
+  Span/Span.swift
+  Span/RawSpan.swift
   StaticString.swift
   StaticPrint.swift
   Stride.swift
@@ -220,6 +223,7 @@ add_library(swiftCore
   Int128.swift
   Mirror.swift
   PlaygroundDisplay.swift
+  SwiftifyImport.swift
   CommandLine.swift
   SliceBuffer.swift
   StaticBigInt.swift
@@ -270,58 +274,39 @@ if(APPLE AND BUILD_SHARED_LIBS)
 endif()
 
 target_compile_options(swiftCore PRIVATE
+  # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
+  # see also 327ea8bce2d1107a847d444651b19ca6a2901c9e
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
-  $<$<COMPILE_LANGUAGE:Swift>:-disable-autolinking-runtime-compatibility-dynamic-replacements>
-  $<$<COMPILE_LANGUAGE:Swift>:-no-link-objc-runtime>
-  $<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-library-level api>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-runtime-compatibility-version none>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature MemberImportVisibility>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature TypedThrows>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Macros>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature FreestandingMacros>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BitwiseCopyable>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Extern>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-objc-attr-requires-foundation-module>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -empty-abi-descriptor>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-backtracing-module-import>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -prespecialize-generic-metadata>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-inline-generics>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-partial-specialization>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>")
+
+if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
+  # Using these in MinSizeRel would result in a 15% increase in the binary size
+  target_compile_options(swiftCore PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-inline-generics>"
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-partial-specialization>")
+endif()
 
 target_compile_definitions(swiftCore PRIVATE
   $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
   $<$<BOOL:${SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS}>:-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER>
-  $<$<COMPILE_LANGUAGE:C,CX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftCore>)
+  $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftCore>)
 target_compile_options(swiftCore PRIVATE
   "$<$<AND:$<BOOL:${BUILD_SHARED_LIBS}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -DswiftCore_EXPORTS>")
 
-target_link_libraries(swiftCore PRIVATE swiftShims)
 target_link_libraries(swiftCore
   PRIVATE
     swiftRuntime
     swiftLLVMSupport
     swiftDemangling
+    swiftShims
     swiftStdlibStubs
-    swiftThreading)
+    swiftThreading
+    $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>)
 target_link_options(swiftCore PRIVATE
   -nostartfiles)
 if(NOT POLICY CMP0157)
@@ -333,22 +318,21 @@ if(NOT POLICY CMP0157)
     $<TARGET_OBJECTS:swiftThreading>)
 endif()
 
-if(WIN32)
-  target_link_libraries(swiftCore PRIVATE shell32 DbgHelp Synchronization)
-elseif(NOT APPLE AND NOT LINUX AND NOT ANDROID AND UNIX)
+if(NOT ANDROID AND NOT APPLE AND NOT LINUX AND NOT WIN32 AND UNIX)
   find_library(EXECINFO_LIBRARY execinfo)
   target_link_libraries(swiftCore PRIVATE "${EXECINFO_LIBRARY}")
 endif()
 
-install(TARGETS swiftCore)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Swift.swiftmodule"
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/Swift.swiftmodule"
-  RENAME "${SwiftCore_MODULE_TRIPLE}.swiftmodule")
+install(TARGETS swiftCore
+  ARCHIVE DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
+  LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)
 
 # Configure plist creation for Darwin platforms.
 generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftCore)
+embed_manifest(swiftCore)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/swiftCore.cmake" OPTIONAL)
 

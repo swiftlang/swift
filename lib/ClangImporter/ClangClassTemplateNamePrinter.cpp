@@ -12,6 +12,7 @@
 
 #include "ClangClassTemplateNamePrinter.h"
 #include "ImporterImpl.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/TemplateArgumentVisitor.h"
 #include "clang/AST/TypeVisitor.h"
 
@@ -24,10 +25,14 @@ struct TemplateInstantiationNamePrinter
   NameImporter *nameImporter;
   ImportNameVersion version;
 
+  ClangImporter::Implementation *importerImpl;
+
   TemplateInstantiationNamePrinter(ASTContext &swiftCtx,
                                    NameImporter *nameImporter,
-                                   ImportNameVersion version)
-      : swiftCtx(swiftCtx), nameImporter(nameImporter), version(version) {}
+                                   ImportNameVersion version,
+                                   ClangImporter::Implementation *importerImpl)
+      : swiftCtx(swiftCtx), nameImporter(nameImporter), version(version),
+        importerImpl(importerImpl) {}
 
   std::string VisitType(const clang::Type *type) {
     // Print "_" as a fallback if we couldn't emit a more meaningful type name.
@@ -59,9 +64,31 @@ struct TemplateInstantiationNamePrinter
         namedArg = typeDefDecl;
       llvm::SmallString<128> storage;
       llvm::raw_svector_ostream buffer(storage);
-      nameImporter->importName(namedArg, version, clang::DeclarationName())
-          .getDeclName()
-          .print(buffer);
+
+      // Print the fully-qualified type name.
+      std::vector<DeclName> qualifiedNameComponents;
+      auto unqualifiedName = nameImporter->importName(namedArg, version);
+      qualifiedNameComponents.push_back(unqualifiedName.getDeclName());
+      const clang::DeclContext *parentCtx =
+          unqualifiedName.getEffectiveContext().getAsDeclContext();
+      while (parentCtx) {
+        if (auto namedParentDecl = dyn_cast<clang::NamedDecl>(parentCtx)) {
+          // If this component of the fully-qualified name is a decl that is
+          // imported into Swift, remember its name.
+          auto componentName =
+              nameImporter->importName(namedParentDecl, version);
+          qualifiedNameComponents.push_back(componentName.getDeclName());
+          parentCtx = componentName.getEffectiveContext().getAsDeclContext();
+        } else {
+          // If this component is not imported into Swift, skip it.
+          parentCtx = parentCtx->getParent();
+        }
+      }
+
+      llvm::interleave(
+          llvm::reverse(qualifiedNameComponents),
+          [&](const DeclName &each) { each.print(buffer); },
+          [&]() { buffer << "."; });
       return buffer.str().str();
     }
     return "_";
@@ -78,9 +105,7 @@ struct TemplateInstantiationNamePrinter
     bool isReferenceType = false;
     if (auto tagDecl = type->getPointeeType()->getAsTagDecl()) {
       if (auto *rd = dyn_cast<clang::RecordDecl>(tagDecl))
-        isReferenceType =
-            ClangImporter::Implementation::recordHasReferenceSemantics(
-                rd, swiftCtx);
+        isReferenceType = recordHasReferenceSemantics(rd, importerImpl);
     }
 
     TagTypeDecorator decorator;
@@ -145,8 +170,9 @@ struct TemplateArgumentPrinter
   TemplateInstantiationNamePrinter typePrinter;
 
   TemplateArgumentPrinter(ASTContext &swiftCtx, NameImporter *nameImporter,
-                          ImportNameVersion version)
-      : typePrinter(swiftCtx, nameImporter, version) {}
+                          ImportNameVersion version,
+                          ClangImporter::Implementation *importerImpl)
+      : typePrinter(swiftCtx, nameImporter, version, importerImpl) {}
 
   void VisitTemplateArgument(const clang::TemplateArgument &arg,
                              llvm::raw_svector_ostream &buffer) {
@@ -197,7 +223,8 @@ struct TemplateArgumentPrinter
 std::string swift::importer::printClassTemplateSpecializationName(
     const clang::ClassTemplateSpecializationDecl *decl, ASTContext &swiftCtx,
     NameImporter *nameImporter, ImportNameVersion version) {
-  TemplateArgumentPrinter templateArgPrinter(swiftCtx, nameImporter, version);
+  TemplateArgumentPrinter templateArgPrinter(swiftCtx, nameImporter, version,
+                                             nameImporter->getImporterImpl());
 
   llvm::SmallString<128> storage;
   llvm::raw_svector_ostream buffer(storage);

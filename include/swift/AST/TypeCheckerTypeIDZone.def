@@ -206,7 +206,7 @@ SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
                                          WhereClauseOwner,
                                          SmallVector<Requirement, 2>,
                                          SmallVector<TypeBase *, 2>,
-                                         SourceLoc, bool, bool),
+                                         SourceLoc, ExtensionDecl *, bool),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DistributedModuleIsAvailableRequest,
               bool(const ValueDecl *), Cached, NoLocationInfo)
@@ -605,12 +605,14 @@ SWIFT_REQUEST(TypeChecker, CaptureInfoRequest,
 SWIFT_REQUEST(TypeChecker, ParamCaptureInfoRequest,
               CaptureInfo(ParamDecl *),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsUnsafeRequest,
-              bool(Decl *),
-              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CustomDerivativesRequest,
               CustomDerivativesResult(SourceFile *),
               Cached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, GenericTypeParamDeclGetValueTypeRequest,
               Type(GenericTypeParamDecl *), Cached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, SemanticAvailableAttrRequest,
+              std::optional<SemanticAvailableAttr>
+              (const AvailableAttr *, const Decl *),
+              SeparatelyCached, NoLocationInfo)

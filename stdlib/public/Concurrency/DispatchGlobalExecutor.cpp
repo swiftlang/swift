@@ -32,6 +32,7 @@
 
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
+#include "swift/Runtime/STLCompatibility.h"
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include "swift/Runtime/HeapObject.h"
@@ -55,27 +56,6 @@
 #include "TaskPrivate.h"
 
 using namespace swift;
-
-// Ensure that Job's layout is compatible with what Dispatch expects.
-// Note: MinimalDispatchObjectHeader just has the fields we care about, it is
-// not complete and should not be used for anything other than these asserts.
-struct MinimalDispatchObjectHeader {
-  const void *VTable;
-  int Opaque0;
-  int Opaque1;
-  void *Linkage;
-};
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wgnu-offsetof-extensions"
-static_assert(
-    offsetof(Job, metadata) == offsetof(MinimalDispatchObjectHeader, VTable),
-    "Job Metadata field must match location of Dispatch VTable field.");
-static_assert(offsetof(Job, SchedulerPrivate[Job::DispatchLinkageIndex]) ==
-                  offsetof(MinimalDispatchObjectHeader, Linkage),
-              "Dispatch Linkage field must match Job "
-              "SchedulerPrivate[DispatchLinkageIndex].");
-#pragma clang diagnostic pop
 
 /// The function passed to dispatch_async_f to execute a job.
 static void __swift_run_job(void *_job) {
@@ -119,11 +99,11 @@ static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
   if (SWIFT_RUNTIME_WEAK_CHECK(dispatch_async_swift_job))
     func = SWIFT_RUNTIME_WEAK_USE(dispatch_async_swift_job);
 #elif defined(_WIN32)
-  func = reinterpret_cast<dispatchEnqueueFuncType>(
+  func = std::bit_cast<dispatchEnqueueFuncType>(
       GetProcAddress(LoadLibraryW(L"dispatch.dll"),
       "dispatch_async_swift_job"));
 #else
-  func = reinterpret_cast<dispatchEnqueueFuncType>(
+  func = std::bit_cast<dispatchEnqueueFuncType>(
       dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
 #endif
 #endif
@@ -147,9 +127,9 @@ static constexpr size_t globalQueueCacheCount =
     static_cast<size_t>(JobPriority::UserInteractive) + 1;
 static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
 
+#if defined(__APPLE__) && !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
 static constexpr size_t dispatchQueueCooperativeFlag = 4;
-
-#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || !defined(__APPLE__)
+#else
 extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
 #endif
 
@@ -275,6 +255,13 @@ void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
 
   job->schedulerPrivate[SwiftJobDispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
+
+  // dispatch_time takes a signed int64_t. SwiftJobDelay is unsigned, so
+  // extremely large values get interpreted as negative numbers, which results
+  // in zero delay. Clamp the value to INT64_MAX. That's about 292 years, so
+  // there should be no noticeable difference.
+  if (delay > (SwiftJobDelay)INT64_MAX)
+    delay = INT64_MAX;
 
   dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delay);
   dispatch_after_f(when, queue, dispatchContext, dispatchFunction);

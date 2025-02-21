@@ -17,6 +17,8 @@
 #include "swift/AST/AvailabilityScope.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
@@ -27,6 +29,14 @@
 #include "swift/Basic/SourceManager.h"
 
 using namespace swift;
+
+AvailabilityScope::IntroNode::IntroNode(SourceFile *SF)
+    : IntroReason(Reason::Root), DC(SF), SF(SF) {}
+
+AvailabilityScope::IntroNode::IntroNode(Decl *D, Reason introReason)
+    : IntroReason(introReason), DC(D->getDeclContext()), D(D) {
+  (void)getAsDecl(); // check that assertion succeeds
+}
 
 AvailabilityScope::AvailabilityScope(ASTContext &Ctx, IntroNode Node,
                                      AvailabilityScope *Parent,
@@ -97,67 +107,66 @@ AvailabilityScope *AvailabilityScope::createForDeclImplicit(
                                      Parent, SrcRange, Info);
 }
 
-AvailabilityScope *
-AvailabilityScope::createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
-                                       AvailabilityScope *Parent,
-                                       const AvailabilityContext Info) {
-  assert(S);
-  assert(Parent);
-  return new (Ctx) AvailabilityScope(Ctx, IntroNode(S, /*IsThen=*/true), Parent,
-                                     S->getThenStmt()->getSourceRange(), Info);
-}
-
-AvailabilityScope *
-AvailabilityScope::createForIfStmtElse(ASTContext &Ctx, IfStmt *S,
-                                       AvailabilityScope *Parent,
-                                       const AvailabilityContext Info) {
+AvailabilityScope *AvailabilityScope::createForIfStmtThen(
+    ASTContext &Ctx, IfStmt *S, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
   assert(S);
   assert(Parent);
   return new (Ctx)
-      AvailabilityScope(Ctx, IntroNode(S, /*IsThen=*/false), Parent,
+      AvailabilityScope(Ctx, IntroNode(S, DC, /*IsThen=*/true), Parent,
+                        S->getThenStmt()->getSourceRange(), Info);
+}
+
+AvailabilityScope *AvailabilityScope::createForIfStmtElse(
+    ASTContext &Ctx, IfStmt *S, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
+  assert(S);
+  assert(Parent);
+  return new (Ctx)
+      AvailabilityScope(Ctx, IntroNode(S, DC, /*IsThen=*/false), Parent,
                         S->getElseStmt()->getSourceRange(), Info);
 }
 
 AvailabilityScope *AvailabilityScope::createForConditionFollowingQuery(
     ASTContext &Ctx, PoundAvailableInfo *PAI,
-    const StmtConditionElement &LastElement, AvailabilityScope *Parent,
-    const AvailabilityContext Info) {
+    const StmtConditionElement &LastElement, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
   assert(PAI);
   assert(Parent);
   SourceRange Range(PAI->getEndLoc(), LastElement.getEndLoc());
-  return new (Ctx) AvailabilityScope(Ctx, PAI, Parent, Range, Info);
+  return new (Ctx)
+      AvailabilityScope(Ctx, IntroNode(PAI, DC), Parent, Range, Info);
 }
 
 AvailabilityScope *AvailabilityScope::createForGuardStmtFallthrough(
     ASTContext &Ctx, GuardStmt *RS, BraceStmt *ContainingBraceStmt,
-    AvailabilityScope *Parent, const AvailabilityContext Info) {
+    const DeclContext *DC, AvailabilityScope *Parent,
+    const AvailabilityContext Info) {
   assert(RS);
   assert(ContainingBraceStmt);
   assert(Parent);
   SourceRange Range(RS->getEndLoc(), ContainingBraceStmt->getEndLoc());
-  return new (Ctx) AvailabilityScope(Ctx, IntroNode(RS, /*IsFallthrough=*/true),
-                                     Parent, Range, Info);
+  return new (Ctx) AvailabilityScope(
+      Ctx, IntroNode(RS, DC, /*IsFallthrough=*/true), Parent, Range, Info);
 }
 
-AvailabilityScope *
-AvailabilityScope::createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
-                                          AvailabilityScope *Parent,
-                                          const AvailabilityContext Info) {
+AvailabilityScope *AvailabilityScope::createForGuardStmtElse(
+    ASTContext &Ctx, GuardStmt *RS, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
   assert(RS);
   assert(Parent);
   return new (Ctx)
-      AvailabilityScope(Ctx, IntroNode(RS, /*IsFallthrough=*/false), Parent,
+      AvailabilityScope(Ctx, IntroNode(RS, DC, /*IsFallthrough=*/false), Parent,
                         RS->getBody()->getSourceRange(), Info);
 }
 
-AvailabilityScope *
-AvailabilityScope::createForWhileStmtBody(ASTContext &Ctx, WhileStmt *S,
-                                          AvailabilityScope *Parent,
-                                          const AvailabilityContext Info) {
+AvailabilityScope *AvailabilityScope::createForWhileStmtBody(
+    ASTContext &Ctx, WhileStmt *S, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
   assert(S);
   assert(Parent);
-  return new (Ctx)
-      AvailabilityScope(Ctx, S, Parent, S->getBody()->getSourceRange(), Info);
+  return new (Ctx) AvailabilityScope(Ctx, IntroNode(S, DC), Parent,
+                                     S->getBody()->getSourceRange(), Info);
 }
 
 void AvailabilityScope::addChild(AvailabilityScope *Child, ASTContext &Ctx) {
@@ -261,15 +270,13 @@ getAvailabilityConditionVersionSourceRange(const PoundAvailableInfo *PAI,
                                            PlatformKind Platform,
                                            const llvm::VersionTuple &Version) {
   SourceRange Range;
-  for (auto *S : PAI->getQueries()) {
-    if (auto *V = dyn_cast<PlatformVersionConstraintAvailabilitySpec>(S)) {
-      if (V->getPlatform() == Platform && V->getVersion() == Version) {
-        // More than one: return invalid range, no unique choice.
-        if (Range.isValid())
-          return SourceRange();
-        else
-          Range = V->getVersionSrcRange();
-      }
+  for (auto *Spec : PAI->getQueries()) {
+    if (Spec->getPlatform() == Platform && Spec->getVersion() == Version) {
+      // More than one: return invalid range, no unique choice.
+      if (Range.isValid())
+        return SourceRange();
+      else
+        Range = Spec->getVersionSrcRange();
     }
   }
   return Range;
@@ -294,21 +301,19 @@ static SourceRange getAvailabilityConditionVersionSourceRange(
 }
 
 static SourceRange
-getAvailabilityConditionVersionSourceRange(const DeclAttributes &DeclAttrs,
-                                           PlatformKind Platform,
+getAvailabilityConditionVersionSourceRange(const Decl *D, PlatformKind Platform,
                                            const llvm::VersionTuple &Version) {
   SourceRange Range;
-  for (auto *Attr : DeclAttrs) {
-    if (auto *AA = dyn_cast<AvailableAttr>(Attr)) {
-      if (AA->Introduced.has_value() && AA->Introduced.value() == Version &&
-          AA->getPlatform() == Platform) {
+  for (auto Attr : D->getSemanticAvailableAttrs()) {
+    if (Attr.getIntroduced().has_value() &&
+        Attr.getIntroduced().value() == Version &&
+        Attr.getPlatform() == Platform) {
 
-        // More than one: return invalid range.
-        if (Range.isValid())
-          return SourceRange();
-        else
-          Range = AA->IntroducedRange;
-      }
+      // More than one: return invalid range.
+      if (Range.isValid())
+        return SourceRange();
+      else
+        Range = Attr.getIntroducedSourceRange();
     }
   }
   return Range;
@@ -318,8 +323,8 @@ SourceRange AvailabilityScope::getAvailabilityConditionVersionSourceRange(
     PlatformKind Platform, const llvm::VersionTuple &Version) const {
   switch (getReason()) {
   case Reason::Decl:
-    return ::getAvailabilityConditionVersionSourceRange(
-        Node.getAsDecl()->getAttrs(), Platform, Version);
+    return ::getAvailabilityConditionVersionSourceRange(Node.getAsDecl(),
+                                                        Platform, Version);
 
   case Reason::IfStmtThenBranch:
   case Reason::IfStmtElseBranch:
@@ -355,8 +360,8 @@ AvailabilityScope::getExplicitAvailabilityRange() const {
 
   case Reason::Decl: {
     auto decl = Node.getAsDecl();
-    if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(decl))
-      return AvailabilityInference::availableRange(attr, decl->getASTContext());
+    if (auto attr = decl->getAvailableAttrForPlatformIntroduction())
+      return attr->getIntroducedRange(decl->getASTContext());
 
     return std::nullopt;
   }

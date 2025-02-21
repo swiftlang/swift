@@ -21,9 +21,10 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "DerivedConformances.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
@@ -331,8 +332,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*ThrownType=*/TypeLoc(), paramList, /*GenericParams=*/nullptr, decl,
-      /*LifetimeDependentTypeRepr*/ nullptr);
+      /*ThrownType=*/TypeLoc(), paramList, /*GenericParams=*/nullptr, decl);
 
   // Mark implicit.
   ctor->setImplicit();
@@ -817,17 +817,16 @@ createDesignatedInitOverride(ClassDecl *classDecl,
 
   // Create the initializer declaration, inheriting the name,
   // failability, and throws from the superclass initializer.
-  auto implCtx = classDecl->getImplementationContext()->getAsGenericContext();
+  auto implCtx = classDecl->getImplementationContext();
   auto ctor = new (ctx) ConstructorDecl(
-      superclassCtor->getName(), classDecl->getBraces().Start,
+      superclassCtor->getName(), implCtx->getBraces().Start,
       superclassCtor->isFailable(),
       /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/superclassCtor->hasAsync(),
       /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/superclassCtor->hasThrows(),
       /*ThrowsLoc=*/SourceLoc(), TypeLoc::withoutLoc(thrownType), bodyParams,
-      genericParams, implCtx,
-      /*LifetimeDependentTypeRepr*/ nullptr);
+      genericParams, implCtx->getAsGenericContext());
 
   ctor->setImplicit();
 
@@ -1334,9 +1333,8 @@ static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
     return false;
 
   // Don't add implicit constructors in module interfaces.
-  if (auto *SF = decl->getParentSourceFile())
-    if (SF->Kind == SourceFileKind::Interface)
-      return false;
+  if (decl->getDeclContext()->isInSwiftinterface())
+    return false;
 
   // Don't attempt if we know the decl is invalid.
   if (decl->isInvalid())
@@ -1726,6 +1724,15 @@ bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
     return v->isLet() && v->hasInitialValue();
   });
+}
+
+bool swift::addNonIsolatedToSynthesized(DerivedConformance &derived,
+                                        ValueDecl *value) {
+  if (auto *conformance = derived.Conformance) {
+    if (conformance && conformance->isPreconcurrency())
+      return false;
+  }
+  return addNonIsolatedToSynthesized(derived.Nominal, value);
 }
 
 bool swift::addNonIsolatedToSynthesized(NominalTypeDecl *nominal,

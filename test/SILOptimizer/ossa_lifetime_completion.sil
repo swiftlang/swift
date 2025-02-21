@@ -216,11 +216,12 @@ bb3:
 }
 
 // Ensure no assert fires while handling lifetime end of partial_apply
-sil [ossa] @testPartialApplyStack2 : $@convention(thin) (@guaranteed C) -> () {
-bb0(%0 : @guaranteed $C):
+sil [ossa] @testPartialApplyStack2 : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
   specify_test "ossa_lifetime_completion @instruction[1] availability"
   %2 = alloc_stack $C
   %3 = copy_value %0 : $C
+  store %0 to [init] %2
   %4 = begin_borrow %3 : $C
   %5 = function_ref @foo : $@convention(thin) (@guaranteed C) -> ()
   %6 = partial_apply [callee_guaranteed] [on_stack] %5(%4) : $@convention(thin) (@guaranteed C) -> ()
@@ -228,6 +229,7 @@ bb0(%0 : @guaranteed $C):
   destroy_value %7 : $@noescape @callee_guaranteed () -> ()
   end_borrow %4 : $C
   destroy_value %3 : $C
+  destroy_addr %2 : $*C
   dealloc_stack %2 : $*C
   %12 = tuple ()
   return %12 : $()
@@ -954,5 +956,42 @@ exit:
   %retval = tuple ()
   return %retval : $()
 die:
+  unreachable
+}
+
+class Klass {}
+
+struct Wrapper {
+  var c: Klass
+}
+
+// CHECK-LABEL: begin running test {{.*}} on testInteriorMarkDepNonEscAddressValue: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @testInteriorMarkDepNonEscAddressValue : {{.*}} {
+// CHECK: mark_dependence [nonescaping]
+// CHECK: end_borrow
+// CHECK-LABEL: } // end sil function 'testInteriorMarkDepNonEscAddressValue'
+// CHECK-LABEL: end running test {{.*}} on testInteriorMarkDepNonEscAddressValue: ossa_lifetime_completion
+sil [ossa] @testInteriorMarkDepNonEscAddressValue : $@convention(thin) (@owned Wrapper, @inout Klass) -> () {
+bb0(%0 : @owned $Wrapper, %1 : $*Klass):
+  specify_test "ossa_lifetime_completion %2 liveness"
+  %2 = begin_borrow %0 : $Wrapper
+  %3 = struct_extract %2 : $Wrapper, #Wrapper.c
+  %4 = mark_dependence [nonescaping] %1 : $*Klass on %3 : $Klass
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on testOwnedMarkDepNonEscAddressValue: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @testOwnedMarkDepNonEscAddressValue : {{.*}} {
+// CHECK: end_borrow
+// CHECK: mark_dependence [nonescaping]
+// CHECK: destroy_value [dead_end] %0
+// CHECK-LABEL: } // end sil function 'testOwnedMarkDepNonEscAddressValue'
+// CHECK-LABEL: end running test {{.*}} on testOwnedMarkDepNonEscAddressValue: ossa_lifetime_completion
+sil [ossa] @testOwnedMarkDepNonEscAddressValue : $@convention(thin) (@owned Wrapper, @inout Klass) -> () {
+bb0(%0 : @owned $Wrapper, %1 : $*Klass):
+  specify_test "ossa_lifetime_completion %0 liveness"
+  %2 = begin_borrow %0 : $Wrapper
+  %3 = struct_extract %2 : $Wrapper, #Wrapper.c
+  %4 = mark_dependence [nonescaping] %1 : $*Klass on %0 : $Wrapper
   unreachable
 }

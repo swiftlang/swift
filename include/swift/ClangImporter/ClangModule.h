@@ -90,8 +90,6 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
-  virtual bool shouldCollectDisplayDecls() const override;
-
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
   virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const override;
@@ -108,7 +106,7 @@ public:
 
   Identifier
   getDiscriminatorForPrivateDecl(const Decl *D) const override {
-    llvm_unreachable("no private decls in Clang modules");
+    llvm_unreachable("Clang modules do not need discriminators");
   }
 
   virtual version::Version getLanguageVersionBuiltWith() const override {

@@ -172,6 +172,7 @@ SILValue swift::stripCasts(SILValue v) {
     if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
       if (isIdentityPreservingRefCast(svi) ||
           isa<UncheckedTrivialBitCastInst>(v) || isa<MarkDependenceInst>(v) ||
+          isa<UncheckedOwnershipConversionInst>(v) ||
           isa<BeginAccessInst>(v)) {
         v = cast<SingleValueInstruction>(v)->getOperand(0);
         continue;
@@ -334,7 +335,21 @@ bool swift::isEndOfScopeMarker(SILInstruction *user) {
 
 bool swift::isIncidentalUse(SILInstruction *user) {
   return isEndOfScopeMarker(user) || user->isDebugInstruction() ||
-         isa<FixLifetimeInst>(user) || isa<EndLifetimeInst>(user);
+         isa<FixLifetimeInst>(user) || isa<EndLifetimeInst>(user) ||
+         isa<IgnoredUseInst>(user);
+}
+
+bool swift::isMoveOnlyWrapperUse(SILInstruction *user) {
+  switch (user->getKind()) {
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+    return true;
+  default:
+    return false;
+  }
 }
 
 bool swift::onlyAffectsRefCount(SILInstruction *user) {
@@ -364,7 +379,7 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
 }
 
 bool swift::mayCheckRefCount(SILInstruction *User) {
-  return isa<IsUniqueInst>(User) || isa<IsEscapingClosureInst>(User) ||
+  return isa<IsUniqueInst>(User) || isa<DestroyNotEscapedClosureInst>(User) ||
          isa<BeginCOWMutationInst>(User);
 }
 
@@ -622,6 +637,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::DebugStepInst:
   case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::TypeValueInst:
+  case SILInstructionKind::IgnoredUseInst:
     return RuntimeEffect::NoEffect;
       
   case SILInstructionKind::OpenExistentialMetatypeInst:
@@ -766,7 +782,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::MetaData;
 
   case SILInstructionKind::AllocStackInst:
-  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::ProjectBoxInst: {
     SILType allocType = cast<SingleValueInstruction>(inst)->getType();
     if (allocType.hasArchetype() && !allocType.isLoadable(*inst->getFunction())) {
@@ -915,7 +930,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::BeginDeallocRefInst:
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
     return ifNonTrivial(inst->getOperand(0)->getType(),

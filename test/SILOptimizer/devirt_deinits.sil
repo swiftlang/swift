@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types %s -deinit-devirtualizer -module-name=test | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -deinit-devirtualizer -module-name=test -enable-experimental-cxx-interop -I %S/Inputs | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -7,6 +7,7 @@ sil_stage canonical
 import Builtin
 import Swift
 import SwiftShims
+import CXXTypesWithUserProvidedDestructor
 
 @inline(never) func log(_ s: StaticString)
 
@@ -281,6 +282,16 @@ bb0(%0 : $*T):
   destroy_addr %0 : $*T
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nodevirt_of_cxx_type :
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'nodevirt_of_cxx_type'
+sil [ossa] @nodevirt_of_cxx_type : $@convention(thin) (@in NonCopyable) -> () {
+bb0(%0 : $*NonCopyable):
+  destroy_addr %0
+  %5 = tuple ()
+  return %5
 }
 
 // CHECK-LABEL: sil @test_non_ossa :

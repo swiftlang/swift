@@ -465,7 +465,7 @@ $sS3fIedgyywTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swi
 $sS3fIedgyyTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned sending Swift.Float) -> (@unowned Swift.Float)
 $s4testA2A5KlassCyYTF ---> test.test() -> sending test.Klass
 $s4main5KlassCACYTcMD ---> demangling cache variable for type metadata for (main.Klass) -> sending main.Klass
-$s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncResult() -> sending null.NonSendableKlass
+$s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncResult() async -> sending null.NonSendableKlass
 $s4null16NonSendableKlassCIegHo_ACs5Error_pIegHTrzo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed @async () -> (@owned null.NonSendableKlass) to @escaping @callee_guaranteed @async () -> sending (@out null.NonSendableKlass, @error @owned Swift.Error)
 $sSRyxG15Synchronization19AtomicRepresentableABRi_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
 $sSRyxG15Synchronization19AtomicRepresentableABRi0_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Escapable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
@@ -481,5 +481,10 @@ $s2hi1SVIetMIy_TC  ---> coroutine continuation prototype for @escaping @conventi
 $s4mainAAyyycAA1CCFTTI ---> identity thunk of main.main(main.C) -> () -> ()
 $s4mainAAyyycAA1CCFTTH ---> hop to main actor thunk of main.main(main.C) -> () -> ()
 
-$s4main6VectorVy$1_SiG ---> main.Vector<2, Swift.Int>
+$s4main4SlabVy$1_SiG ---> main.Slab<2, Swift.Int>
 $s$n3_SSBV ---> Builtin.FixedArray<-4, Swift.String>
+$s3red7MyActorC3runyxxyYaKACYcYTXEYaKlFZ ---> static red.MyActor.run<A>(@red.MyActor () async throws -> sending A) async throws -> A
+$s3red7MyActorC3runyxxyYaKYAYTXEYaKlFZ ---> static red.MyActor.run<A>(@isolated(any) () async throws -> sending A) async throws -> A
+$s7ToolKit10TypedValueOACs5Error_pIgHTnTrzo_A2CsAD_pIegHiTrzr_TR ---> {T:} reabstraction thunk helper from @callee_guaranteed @async (@in_guaranteed sending ToolKit.TypedValue) -> sending (@out ToolKit.TypedValue, @error @owned Swift.Error) to @escaping @callee_guaranteed @async (@in sending ToolKit.TypedValue) -> (@out ToolKit.TypedValue, @error @out Swift.Error)
+$s16sending_mangling16NonSendableKlassCACIegTiTr_A2CIegTxTo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed (@in sending sending_mangling.NonSendableKlass) -> sending (@out sending_mangling.NonSendableKlass) to @escaping @callee_guaranteed (@owned sending sending_mangling.NonSendableKlass) -> sending (@owned sending_mangling.NonSendableKlass)
+$s3red7MyActorC3runyxxyYaKYCXEYaKlFZ ---> static red.MyActor.run<A>(@execution(caller) () async throws -> A) async throws -> A

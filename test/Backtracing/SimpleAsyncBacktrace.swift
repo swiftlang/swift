@@ -12,7 +12,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-import _Backtracing
+import Runtime
 
 @available(SwiftStdlib 5.1, *)
 func level1() async {

@@ -47,6 +47,10 @@
 namespace swift {
 
 class AliasAnalysis;
+class SILCombineCanonicalize;
+namespace test {
+struct SILCombinerProcessInstruction;
+}
 
 /// This is a class which maintains the state of the combiner and simplifies
 /// many operations such as removing/adding instructions and syncing them with
@@ -257,7 +261,6 @@ public:
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
-  SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
   SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
@@ -365,8 +368,6 @@ public:
       SingleValueInstruction *user, SingleValueInstruction *value,
       function_ref<SILValue()> newValueGenerator);
 
-  SILInstruction *optimizeAlignment(PointerToAddressInst *ptrAdrInst);
-
   InstModCallbacks &getInstModCallbacks() { return deleter.getCallbacks(); }
 
 private:
@@ -414,6 +415,11 @@ private:
 
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
+
+  void processInstruction(SILInstruction *instruction,
+                          SILCombineCanonicalize &scCanonicalize,
+                          bool &MadeChange);
+  friend test::SILCombinerProcessInstruction;
 
   /// Add reachable code to the worklist. Meant to be used when starting to
   /// process a new function.

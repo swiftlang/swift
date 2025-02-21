@@ -442,7 +442,7 @@ enum class BuiltinThrowsKind : uint8_t {
 static FuncDecl *getBuiltinGenericFunction(
     Identifier Id, ArrayRef<AnyFunctionType::Param> ArgParamTypes, Type ResType,
     GenericParamList *GenericParams, GenericSignature Sig, bool Async,
-    BuiltinThrowsKind Throws, bool SendingResult) {
+    BuiltinThrowsKind Throws, Type ThrownError, bool SendingResult) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -471,7 +471,7 @@ static FuncDecl *getBuiltinGenericFunction(
       Context, StaticSpellingKind::None, Name,
       /*NameLoc=*/SourceLoc(),
       Async,
-      Throws != BuiltinThrowsKind::None, /*thrownType=*/Type(),
+      Throws != BuiltinThrowsKind::None, ThrownError,
       GenericParams, paramList, ResType, DC);
 
   func->setSendingResult(SendingResult);
@@ -696,6 +696,7 @@ namespace {
     Type InterfaceResult;
     bool Async = false;
     BuiltinThrowsKind Throws = BuiltinThrowsKind::None;
+    Type ThrownError;
     bool SendingResult = false;
 
     // Accumulate params and requirements here, so that we can call
@@ -741,6 +742,11 @@ namespace {
     }
 
     template <class G>
+    void setThrownError(const G &generator) {
+      ThrownError = generator.build(*this);
+    }
+
+    template <class G>
     void addConformanceRequirement(const G &generator, KnownProtocolKind kp) {
       addConformanceRequirement(generator, Context.getProtocol(kp));
     }
@@ -776,7 +782,7 @@ namespace {
           /*allowInverses=*/false);
       return getBuiltinGenericFunction(name, InterfaceParams, InterfaceResult,
                                        TheGenericParamList, GenericSig, Async,
-                                       Throws, SendingResult);
+                                       Throws, ThrownError, SendingResult);
     }
 
     // Don't use these generator classes directly; call the make{...}
@@ -1131,6 +1137,8 @@ static ValueDecl *getStackDeallocOperation(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
+// Obsolete: only there to be able to read old Swift.interface files which still
+// contain the builtin.
 static ValueDecl *getAllocVectorOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted),
@@ -2231,17 +2239,31 @@ static ValueDecl *getAddressOfRawLayout(ASTContext &ctx, Identifier id) {
 }
 
 static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
-  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 2);
 
-  auto T = makeGenericParam();
+  // <T: ~Copyable, E: Error>(
+  //   _: (Builtin.RawPointer) throws(E) -> ()
+  // ) throws(E) -> T
+
+  auto T = makeGenericParam(0);
   builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
+
+  auto E = makeGenericParam(1);
+  builder.addConformanceRequirement(E, KnownProtocolKind::Error);
+
+  auto extInfo = ASTExtInfoBuilder()
+      .withNoEscape()
+      .withThrows(/* throws */ true, E.build(builder))
+      .build();
 
   auto fnParamTy = FunctionType::get(FunctionType::Param(ctx.TheRawPointerType),
                                      ctx.TheEmptyTupleType,
-                                     ASTExtInfo().withNoEscape());
+                                     extInfo);
 
   builder.addParameter(makeConcrete(fnParamTy), ParamSpecifier::Borrowing);
   builder.setResult(T);
+  builder.setThrows();
+  builder.setThrownError(E);
 
   return builder.build(id);
 }

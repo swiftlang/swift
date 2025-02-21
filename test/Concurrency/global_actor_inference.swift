@@ -120,14 +120,14 @@ func testNotAllInP1(nap1: NotAllInP1) { // expected-note{{add '@SomeGlobalActor'
 // Make sure we don't infer 'nonisolated' for stored properties.
 @MainActor
 protocol Interface {
-  nonisolated var baz: Int { get } // expected-note{{'baz' declared here}}
+  nonisolated var baz: Int { get } // expected-note{{requirement 'baz' declared here}}
 }
 
 @MainActor
 class Object: Interface {
   // expected-note@-1{{add '@preconcurrency' to the 'Interface' conformance to defer isolation checking to run time}}{{15-15=@preconcurrency }}
 
-  var baz: Int = 42 // expected-warning{{main actor-isolated property 'baz' cannot be used to satisfy nonisolated protocol requirement}}
+  var baz: Int = 42 // expected-warning{{main actor-isolated property 'baz' cannot be used to satisfy nonisolated requirement from protocol 'Interface'}}
 }
 
 

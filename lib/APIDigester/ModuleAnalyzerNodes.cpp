@@ -130,7 +130,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         SugaredGenericSig(Info.SugaredGenericSig),
         FixedBinaryOrder(Info.FixedBinaryOrder),
         introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
-                       Info.IntrowatchOS, Info.Introswift}),
+                       Info.IntrowatchOS, Info.IntrovisionOS, Info.Introswift}),
         ObjCName(Info.ObjCName) {}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
@@ -1339,14 +1339,14 @@ std::optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
 // check for if it has @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 static bool isABIPlaceHolder(Decl *D) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
-  for (auto *ATT: D->getAttrs()) {
-    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->getPlatform() != PlatformKind::none && AVA->Introduced &&
-          AVA->Introduced->getMajor() == 9999) {
-        Platforms.insert(AVA->getPlatform());
-      }
+  for (auto attr : D->getSemanticAvailableAttrs()) {
+    if (attr.isPlatformSpecific() && attr.getIntroduced().has_value() &&
+        attr.getIntroduced()->getMajor() == 9999) {
+      Platforms.insert(attr.getPlatform());
     }
   }
+
+  // FIXME: [availability] This probably isn't correct now that visionOS exists
   return Platforms.size() == 4;
 }
 
@@ -1361,11 +1361,10 @@ static bool isABIPlaceholderRecursive(Decl *D) {
 StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
   if (!D)
     return StringRef();
-  for (auto *ATT: D->getAttrs()) {
-    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->getPlatform() == Kind && AVA->Introduced) {
-        return buffer(AVA->Introduced->getAsString());
-      }
+  for (auto attr : D->getSemanticAvailableAttrs()) {
+    auto domain = attr.getDomain();
+    if (domain.getPlatformKind() == Kind && attr.getIntroduced()) {
+      return buffer(attr.getIntroduced()->getAsString());
     }
   }
   return StringRef();
@@ -1374,11 +1373,11 @@ StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
 StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
   if (!D)
     return StringRef();
-  for (auto *ATT: D->getAttrs()) {
-    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
-      if (AVA->isLanguageVersionSpecific() && AVA->Introduced) {
-        return buffer(AVA->Introduced->getAsString());
-      }
+  for (auto attr : D->getSemanticAvailableAttrs()) {
+    auto domain = attr.getDomain();
+
+    if (domain.isSwiftLanguage() && attr.getIntroduced()) {
+      return buffer(attr.getIntroduced()->getAsString());
     }
   }
   return getLanguageIntroVersion(D->getDeclContext()->getAsDecl());
@@ -1469,6 +1468,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
+      IntrovisionOS(Ctx.getPlatformIntroVersion(D, PlatformKind::visionOS)),
       Introswift(Ctx.getLanguageIntroVersion(D)),
       ObjCName(Ctx.getObjcName(D)),
       InitKind(Ctx.getInitKind(D)),

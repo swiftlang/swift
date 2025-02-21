@@ -98,11 +98,26 @@ intptr_t swift_ASTGen_configuredRegions(
 void swift_ASTGen_freeConfiguredRegions(
     BridgedIfConfigClauseRangeInfo *_Nullable regions, intptr_t numRegions);
 
+bool swift_ASTGen_validateUnqualifiedLookup(
+    void *_Nonnull sourceFile,
+    BridgedASTContext astContext,
+    BridgedSourceLoc sourceLoc,
+    bool finishInSequentialScope,
+    BridgedArrayRef astScopeResultRef);
+
 size_t
 swift_ASTGen_virtualFiles(void *_Nonnull sourceFile,
                           BridgedVirtualFile *_Nullable *_Nonnull virtualFiles);
 void swift_ASTGen_freeBridgedVirtualFiles(
     BridgedVirtualFile *_Nullable virtualFiles, size_t numFiles);
+
+bool swift_ASTGen_parseAvailabilityMacroDefinition(
+    BridgedASTContext ctx, BridgedDeclContext dc, BridgedDiagnosticEngine diags,
+    BridgedStringRef buffer,
+    BridgedAvailabilityMacroDefinition *_Nonnull outPtr);
+
+void swift_ASTGen_freeAvailabilityMacroDefinition(
+    BridgedAvailabilityMacroDefinition *_Nonnull definition);
 
 #ifdef __cplusplus
 }

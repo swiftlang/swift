@@ -76,30 +76,30 @@ package func usePkgStruct(_ arg: Int) -> PkgStruct {
 
 //--- Lib.swift
 
-// CHECK: sil package [serialized_for_package] [canonical] @$s3Lib6libPkgyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PkgStruct {
+// CHECK: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib6libPkgyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PkgStruct {
   // CHECK: struct $PkgStruct
-  // CHECK: store {{.*}} to %0 : $*PkgStruct
+  // CHECK: store {{.*}} to [trivial] %0 : $*PkgStruct
 
-// CHECK: sil [serialized_for_package] [canonical] @$s3Lib6libPubyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
+// CHECK: sil [serialized_for_package] [canonical] [ossa] @$s3Lib6libPubyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
   // CHECK: struct $PubStruct
-  // CHECK: store {{.*}} to %0 : $*PubStruct
+  // CHECK: store {{.*}} to [trivial] %0 : $*PubStruct
 
-// CHECK: sil package [serialized_for_package] [canonical] @$s3Lib9libUfiPkgyAA0cD6StructVSiF : $@convention(thin) (Int) -> @out UfiPkgStruct {
+// CHECK: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib9libUfiPkgyAA0cD6StructVSiF : $@convention(thin) (Int) -> @out UfiPkgStruct {
   // CHECK: struct $UfiPkgStruct
-  // CHECK: store {{.*}} to %0 : $*UfiPkgStruct
+  // CHECK: store {{.*}} to [trivial] %0 : $*UfiPkgStruct
 
 /// @inlinable package func inLibUfiPkg(_ arg: Int) -> UfiPkgStruct
-// CHECK: sil [serialized] [canonical] @$s3Lib02inA6UfiPkgyAA0cD6StructVSiF : $@convention(thin) (Int) -> @out UfiPkgStruct {
+// CHECK: sil [serialized] [canonical] [ossa] @$s3Lib02inA6UfiPkgyAA0cD6StructVSiF : $@convention(thin) (Int) -> @out UfiPkgStruct {
   // CHECK: function_ref @$s3Lib12UfiPkgStructVyACSicfC : $@convention(method) (Int, @thin UfiPkgStruct.Type) -> @out UfiPkgStruct
   // CHECK: function_ref @$s3Lib12UfiPkgStructV03ufiC0SivM : $@yield_once @convention(method) (@inout UfiPkgStruct) -> @yields @inout Int
 
 /// @inlinable func inLibUfiHid(_ arg: Int) -> UfiHidStruct
-// CHECK: sil [serialized] [canonical] @$s3Lib02inA6UfiHidyAA0cD6StructVSiF : $@convention(thin) (Int) -> @out UfiHidStruct {
+// CHECK: sil [serialized] [canonical] [ossa] @$s3Lib02inA6UfiHidyAA0cD6StructVSiF : $@convention(thin) (Int) -> @out UfiHidStruct {
   // CHECK: function_ref @$s3Lib12UfiHidStructVyACSicfC : $@convention(method) (Int, @thin UfiHidStruct.Type) -> @out UfiHidStruct
   // CHECK: function_ref @$s3Lib12UfiHidStructV03ufiC0SivM : $@yield_once @convention(method) (@inout UfiHidStruct) -> @yields @inout Int
 
 /// @inlinable public func inLibPub(_ arg: Int) -> PubStruct
-// CHECK: sil [serialized] [canonical] @$s3Lib02inA3PubyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
+// CHECK: sil [serialized] [canonical] [ossa] @$s3Lib02inA3PubyAA0C6StructVSiF : $@convention(thin) (Int) -> @out PubStruct {
   // CHECK: function_ref @$s3Lib9PubStructVyACSicfC : $@convention(method) (Int, @thin PubStruct.Type) -> @out PubStruct
   // CHECK: function_ref @$s3Lib9PubStructV3pubSivM : $@yield_once @convention(method) (@inout PubStruct) -> @yields @inout Int
 

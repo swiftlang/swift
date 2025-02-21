@@ -33,6 +33,7 @@
 #include "llvm/Support/VersionTuple.h"
 #include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace swift {
@@ -258,7 +259,7 @@ public:
   SmallVector<LinkLibrary, 4> LinkLibraries;
 
   /// The public dependent libraries specified on the command line.
-  std::vector<std::string> PublicLinkLibraries;
+  std::vector<std::tuple<std::string, bool>> PublicLinkLibraries;
 
   /// If non-empty, the (unmangled) name of a dummy symbol to emit that can be
   /// used to force-load this module.
@@ -306,7 +307,7 @@ public:
 
   /// Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
-  
+
   /// Whether we should run LLVM optimizations after IRGen.
   unsigned DisableLLVMOptzns : 1;
 
@@ -377,7 +378,7 @@ public:
   /// Force public linkage for private symbols. Used only by the LLDB
   /// expression evaluator.
   unsigned ForcePublicLinkage : 1;
-  
+
   /// Force lazy initialization of class metadata
   /// Used on Windows to avoid cross-module references.
   unsigned LazyInitializeClassMetadata : 1;
@@ -439,7 +440,7 @@ public:
   /// Whether to disable shadow copies for local variables on the stack. This is
   /// only used for testing.
   unsigned DisableDebuggerShadowCopies : 1;
-  
+
   /// Whether to disable using mangled names for accessing concrete type metadata.
   unsigned DisableConcreteTypeMetadataMangledNameAccessors : 1;
 
@@ -459,6 +460,8 @@ public:
 
   /// Internalize symbols (static library) - do not export any public symbols.
   unsigned InternalizeSymbols : 1;
+
+  unsigned MergeableSymbols : 1;
 
   /// Emit a section with references to class_ro_t* in generic class patterns.
   unsigned EmitGenericRODatas : 1;
@@ -524,7 +527,7 @@ public:
   };
 
   TypeInfoDumpFilter TypeInfoFilter;
-  
+
   /// Pull in runtime compatibility shim libraries by autolinking.
   std::optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
   std::optional<llvm::VersionTuple>
@@ -543,13 +546,13 @@ public:
   llvm::CallingConv::ID PlatformCCallingConvention;
 
   /// Use CAS based object format as the output.
-  bool UseCASBackend;
+  bool UseCASBackend = false;
 
   /// The output mode for the CAS Backend.
   llvm::CASBackendMode CASObjMode;
 
   /// Emit a .casid file next to the object file if CAS Backend is used.
-  bool EmitCASIDFile;
+  bool EmitCASIDFile = false;
 
   /// Paths to the pass plugins registered via -load-pass-plugin.
   std::vector<std::string> LLVMPassPlugins;
@@ -589,6 +592,7 @@ public:
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
+        MergeableSymbols(false),
         EmitGenericRODatas(true), NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),

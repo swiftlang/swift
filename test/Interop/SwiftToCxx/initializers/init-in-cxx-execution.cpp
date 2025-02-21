@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/init-in-cxx.swift -typecheck -module-name Init -clang-header-expose-decls=all-public -emit-clang-header-path %t/inits.h
+// RUN: %target-swift-frontend %S/init-in-cxx.swift -module-name Init -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/inits.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-init-execution.o
 // RUN: %target-interop-build-swift %S/init-in-cxx.swift -o %t/swift-init-execution -Xlinker %t/swift-init-execution.o -module-name Init -Xfrontend -entry-point-function-name -Xfrontend swiftMain

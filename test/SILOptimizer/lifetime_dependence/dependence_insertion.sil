@@ -1,0 +1,94 @@
+// RUN: %target-sil-opt %s \
+// RUN:   --lifetime-dependence-insertion \
+// RUN:   -sil-verify-all \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   2>&1 | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
+
+sil_stage raw
+
+import Swift
+
+struct NE: ~Escapable {
+  var p: UnsafeRawPointer
+
+  @lifetime(immortal)
+  init()
+}
+
+struct NCE: ~Escapable, ~Copyable {
+  var p: UnsafeRawPointer
+
+  @lifetime(immortal)
+  init()
+}
+
+sil @getPtr : $@convention(thin) () -> @out UnsafeRawPointer
+sil @getSpan : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @out NE
+sil @getInoutSpan : $@convention(thin) (@inout AnyObject) -> @lifetime(borrow 0) @out NCE
+
+// Check that the inserted dependence is on the 'self' argument, not the temporary borrow.
+//
+// CHECK-LABEL: sil [available 9999] [ossa] @testSpanProp : $@convention(method) (@guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE {
+// CHECK: bb0(%0 : @guaranteed $AnyObject):
+// CHECK:   [[OUT:%.*]] = alloc_stack $NE
+// CHECK:   [[TEMP:%.*]] = begin_borrow
+// CHECK:   [[MV:%.*]] = moveonlywrapper_to_copyable [guaranteed] [[TEMP]]
+// CHECK:   [[IN:%.*]] = alloc_stack $AnyObject
+// CHECK:   [[SB:%.*]] = store_borrow [[MV]] to [[IN]]
+// CHECK:   apply %{{.*}}([[OUT]], [[SB]]) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @out NE
+// CHECK:   [[MD:%.*]] = mark_dependence [unresolved] [[OUT]] on %0
+// CHECK:   end_borrow [[SB]]
+// CHECK:   end_borrow [[TEMP]]
+// CHECK:   [[LD:%.*]] = load [take] [[OUT]]
+// CHECK:   return [[LD]]
+// CHECK-LABEL: } // end sil function 'testSpanProp'
+sil [available 9999] [ossa] @testSpanProp : $@convention(method) (@guaranteed AnyObject) -> @lifetime(borrow 0) @owned NE {
+bb0(%0 : @guaranteed $AnyObject):
+  // setup the 'self' variable
+  %1 = copyable_to_moveonlywrapper [guaranteed] %0
+  %2 = copy_value %1
+  %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
+  debug_value %3, let, name "self", argno 1
+  %5 = alloc_stack $NE
+
+  // temporarily borrow 'self' but don't depend on this borrow.
+  %6 = begin_borrow %3
+  %7 = moveonlywrapper_to_copyable [guaranteed] %6
+  %8 = alloc_stack $AnyObject
+  %9 = store_borrow %7 to %8
+
+  %10 = function_ref @getSpan : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @out NE
+  %11 = apply %10(%5, %9) : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @out NE
+  end_borrow %9
+  dealloc_stack %8
+  end_borrow %6
+  %15 = load [take] %5
+  dealloc_stack %5
+  destroy_value %3
+  return %15
+}
+
+// CHECK-LABEL: sil [available 9999] [ossa] @testInoutSpanProp : $@convention(method) (@inout AnyObject) -> @lifetime(borrow 0) @owned NCE {
+// CHECK: bb0(%0 : $*AnyObject):
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $NCE
+// CHECK:   [[MD:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ALLOC]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] %0
+// CHECK:   apply %{{.*}}([[MD]], [[ACCESS]]) : $@convention(thin) (@inout AnyObject) -> @lifetime(borrow 0) @out NCE
+// CHECK:   mark_dependence [unresolved] [[ALLOC]] on [[ACCESS]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK-LABEL: } // end sil function 'testInoutSpanProp'
+sil [available 9999] [ossa] @testInoutSpanProp : $@convention(method) (@inout AnyObject) -> @lifetime(borrow 0) @owned NCE {
+bb0(%0 : $*AnyObject):
+  %1 = alloc_stack $NCE
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1
+  %3 = begin_access [modify] [unknown] %0
+  %4 = function_ref @getInoutSpan : $@convention(thin) (@inout AnyObject) -> @lifetime(borrow 0) @out NCE
+  %5 = apply %4(%2, %3) : $@convention(thin) (@inout AnyObject) -> @lifetime(borrow 0) @out NCE
+  end_access %3
+  %7 = load [take] %2
+  dealloc_stack %1
+  return %7
+}

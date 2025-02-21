@@ -72,6 +72,7 @@ public:
                                     getRuntimeLibPath(),
                                     /*diagnosticDocumentationPath*/ "",
                                     SourceKit::createSwiftLangSupport,
+                                    [](SourceKit::Context &Ctx){ return nullptr; },
                                     /*dispatchOnMain=*/false)) {
     INITIALIZE_LLVM();
     // This is avoiding destroying \p SourceKit::Context because another
@@ -334,7 +335,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
   EXPECT_EQ(strlen("fog"), Info.Length);
 }
 
-TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
+TEST_F(CursorInfoTest, DISABLED_CursorInfoMustWaitDueTokenRace) {
+  // Disabled due to a race condition (rdar://88652757)
   const char *DocName = "test.swift";
   const char *Contents = "let value = foo\n"
                          "let foo = 0\n";

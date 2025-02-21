@@ -1254,7 +1254,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
     encodeDecl->getAttrs().add(attr);
   }
 
-  addNonIsolatedToSynthesized(derived.Nominal, encodeDecl);
+  addNonIsolatedToSynthesized(derived, encodeDecl);
 
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
@@ -1889,8 +1889,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
                               /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/true, SourceLoc(),
                               /*ThrownType=*/TypeLoc(), paramList,
-                              /*GenericParams=*/nullptr, conformanceDC,
-                              /*LifetimeDependentTypeRepr*/ nullptr);
+                              /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();
 
@@ -1906,7 +1905,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
     initDecl->getAttrs().add(reqAttr);
   }
 
-  addNonIsolatedToSynthesized(derived.Nominal, initDecl);
+  addNonIsolatedToSynthesized(derived, initDecl);
 
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext*/ true);

@@ -1,7 +1,10 @@
 include(CheckSourceCompiles)
 include(CheckCompilerFlag)
 
-# Use C+17
+# Use Swift 5 mode
+set(CMAKE_Swift_LANGUAGE_VERSION 5)
+
+# Use C++17
 set(SwiftCore_MIN_CXX_STANDARD 17)
 # Unset CMAKE_CXX_STANDARD if it's too low and in the CMakeCache.txt
 if($CACHE{CMAKE_CXX_STANDARD} AND $CACHE{CMAKE_CXX_STANDARD} LESS ${SwiftCore_MIN_CXX_STANDARD})

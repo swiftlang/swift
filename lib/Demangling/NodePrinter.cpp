@@ -572,6 +572,7 @@ private:
     case Node::Kind::DifferentiableFunctionType:
     case Node::Kind::GlobalActorFunctionType:
     case Node::Kind::IsolatedAnyFunctionType:
+    case Node::Kind::NonIsolatedCallerFunctionType:
     case Node::Kind::SendingResultFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
@@ -898,16 +899,37 @@ private:
       // handled earlier
       ++startIndex;
     }
+
+    // Be sure to check for function signature components in the same
+    // order that they're added by the demangler, which is the reverse
+    // of the order that they appear in the mangling grammar.
+
+    if (node->getChild(startIndex)->getKind() ==
+        Node::Kind::SendingResultFunctionType) {
+      ++startIndex;
+      hasSendingResult = true;
+    }
+
+    // function-isolation; note that these can't actually both appear.
     if (node->getChild(startIndex)->getKind()
             == Node::Kind::IsolatedAnyFunctionType) {
       print(node->getChild(startIndex), depth + 1);
       ++startIndex;
     }
+
+    Node *nonIsolatedCallerNode = nullptr;
+    if (node->getChild(startIndex)->getKind() ==
+          Node::Kind::NonIsolatedCallerFunctionType) {
+      nonIsolatedCallerNode = node->getChild(startIndex);
+      ++startIndex;
+    }
+
     if (node->getChild(startIndex)->getKind() ==
           Node::Kind::GlobalActorFunctionType) {
       print(node->getChild(startIndex), depth + 1);
       ++startIndex;
     }
+
     if (node->getChild(startIndex)->getKind() ==
         Node::Kind::DifferentiableFunctionType) {
       diffKind =
@@ -932,11 +954,6 @@ private:
       ++startIndex;
       isAsync = true;
     }
-    if (node->getChild(startIndex)->getKind() ==
-        Node::Kind::SendingResultFunctionType) {
-      ++startIndex;
-      hasSendingResult = true;
-    }
 
     switch (diffKind) {
     case MangledDifferentiabilityKind::Forward:
@@ -954,6 +971,9 @@ private:
     case MangledDifferentiabilityKind::NonDifferentiable:
       break;
     }
+
+    if (nonIsolatedCallerNode)
+      print(nonIsolatedCallerNode, depth + 1);
 
     if (isSendable)
       Printer << "@Sendable ";
@@ -3099,6 +3119,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::IsolatedAnyFunctionType:
     Printer << "@isolated(any) ";
+    return nullptr;
+  case Node::Kind::NonIsolatedCallerFunctionType:
+    Printer << "@execution(caller) ";
     return nullptr;
   case Node::Kind::SendingResultFunctionType:
     Printer << "sending ";

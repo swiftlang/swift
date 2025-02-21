@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -predictable-memaccess-opts -predictable-deadalloc-elim  | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -mandatory-redundant-load-elimination -predictable-deadalloc-elim  | %FileCheck %s
 
 sil_stage raw
 
@@ -21,11 +21,6 @@ struct SomeClassPair {
 // Eliminate the load [copy]
 // Update the mark_dependence base to the available value.
 //
-// FIXME: This creates an extra copy in order to promote a load to a copy_value.
-// Fix predictable memopts so it never introduces new copies.
-// A copy_value should only be introduced if the corresponding store can be
-// eliminated.
-//
 // TODO: box promotion is unsupported:
 // - Eliminate the allocation and store
 // - Update the mark_dependence base to the available value
@@ -33,8 +28,7 @@ struct SomeClassPair {
 // CHECK-LABEL: sil [ossa] @markdep_base_promote_box : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> @owned SomeClass {
 // CHECK: [[ST:%.*]] = copy_value %0 : $SomeClass
 // CHECK: store %0 to [init]
-// CHECK: [[LD:%.*]] = copy_value [[ST]] : $SomeClass
-// CHECK: return [[LD]]
+// CHECK: return [[ST]]
 // CHECK-LABEL: } // end sil function 'markdep_base_promote_box'
 sil [ossa] @markdep_base_promote_box : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> @owned SomeClass {
 bb0(%0 : @owned $SomeClass, %1 : $UnsafeMutablePointer<Int>):
@@ -60,10 +54,8 @@ bb0(%0 : @owned $SomeClass, %1 : $UnsafeMutablePointer<Int>):
 // CHECK-LABEL: sil [ossa] @markdep_base_promote_stack : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> @owned SomeClass {
 // CHECK: [[ST:%.*]] = copy_value %0 : $SomeClass
 // CHECK: [[MD:%.*]] = mark_dependence %1 : $UnsafeMutablePointer<Int> on %0 : $SomeClass
-// CHECK: [[LD:%.*]] = copy_value [[ST]] : $SomeClass
-// CHECK: destroy_value [[ST]] : $SomeClass
 // CHECK: struct_extract [[MD]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
-// CHECK: return [[LD]] : $SomeClass
+// CHECK: return [[ST]] : $SomeClass
 // CHECK-LABEL: } // end sil function 'markdep_base_promote_stack'
 sil [ossa] @markdep_base_promote_stack : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> @owned SomeClass {
 bb0(%0 : @owned $SomeClass, %1 : $UnsafeMutablePointer<Int>):
@@ -118,10 +110,8 @@ bb0(%0 : $Int, %1 : $UnsafeMutablePointer<Int>):
 // CHECK: [[CP1:%.*]] = copy_value %0 : $SomeClass
 // CHECK: store %0 to [init]
 // CHECK: [[MD:%.*]] = mark_dependence [[CP1]] : $SomeClass on %1 : $SomeClass
-// CHECK: [[CP2:%.*]] = copy_value [[MD]] : $SomeClass
-// CHECK: destroy_value [[MD]] : $SomeClass
 // CHECK: destroy_value %{{.*}} : $<τ_0_0> { var τ_0_0 } <SomeClass>
-// CHECK: return [[CP2]] : $SomeClass
+// CHECK: return [[MD]] : $SomeClass
 // CHECK-LABEL: } // end sil function 'markdep_source_promote_box'
 sil [ossa] @markdep_source_promote_box : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
 bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
@@ -141,11 +131,10 @@ bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
 //
 // CHECK-LABEL: sil [ossa] @markdep_source_promote_stack : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
 // CHECK:   [[CP1:%.*]] = copy_value %0 : $SomeClass
+// CHECK:   [[MD_OLD:%.*]] = mark_dependence %0 : $SomeClass on %1 : $SomeClass
 // CHECK:   [[MD:%.*]] = mark_dependence [[CP1]] : $SomeClass on %1 : $SomeClass
-// CHECK:   [[CP2:%.*]] = copy_value [[MD]] : $SomeClass
-// CHECK:   destroy_value [[MD]] : $SomeClass
-// CHECK:   destroy_value %0 : $SomeClass
-// CHECK:   return [[CP2]] : $SomeClass
+// CHECK:   destroy_value [[MD_OLD]] : $SomeClass
+// CHECK:   return [[MD]] : $SomeClass
 // CHECK-LABEL: } // end sil function 'markdep_source_promote_stack'
 sil [ossa] @markdep_source_promote_stack: $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
 bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
@@ -246,10 +235,8 @@ bb0(%0 : @owned $SomeClass, %1 : $UnsafeMutablePointer<Int>):
 // CHECK: [[CP1:%.*]] = copy_value %0 : $SomeClass
 // CHECK: store %0 to [init]
 // CHECK: [[MD:%.*]] = mark_dependence [[CP1]] : $SomeClass on %1 : $SomeClass
-// CHECK: [[CP2:%.*]] = copy_value [[MD]] : $SomeClass
-// CHECK: destroy_value [[MD]] : $SomeClass
 // CHECK: destroy_value %{{.*}} : $<τ_0_0> { var τ_0_0 } <SomeClass>
-// CHECK: destroy_value [[CP2]] : $SomeClass
+// CHECK: destroy_value [[MD]] : $SomeClass
 // CHECK-LABEL: } // end sil function 'markdep_source_dead_box'
 sil [ossa] @markdep_source_dead_box : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> () {
 bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
@@ -271,11 +258,10 @@ bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
 // CHECK-LABEL: sil [ossa] @markdep_source_dead_stack : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> () {
 // CHECK: bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
 // CHECK-NEXT: [[CP1:%.*]] = copy_value %0 : $SomeClass
+// CHECK-NEXT: [[MD_OLD:%.*]] = mark_dependence %0 : $SomeClass on %1 : $SomeClass
 // CHECK-NEXT: [[MD:%.*]] = mark_dependence [[CP1]] : $SomeClass on %1 : $SomeClass
-// CHECK-NEXT: [[CP2:%.*]] = copy_value [[MD]] : $SomeClass
+// CHECK-NEXT: destroy_value [[MD_OLD]] : $SomeClass
 // CHECK-NEXT: destroy_value [[MD]] : $SomeClass
-// CHECK-NEXT: destroy_value %0 : $SomeClass
-// CHECK-NEXT: destroy_value [[CP2]] : $SomeClass
 // CHECK-LABEL: } // end sil function 'markdep_source_dead_stack'
 sil [ossa] @markdep_source_dead_stack: $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> () {
 bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
@@ -362,16 +348,20 @@ bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass)
 
 // Test mark_dependence source: load from dependent phi value.
 //
-// TODO: Phis are not handled by load promotion.
-//
-// CHECK-LABEL: sil [ossa] @markdep_source_load_phi : $@convention(thin) (@guaranteed SomeClass) -> () {
-// CHECK: bb0(%0 : @guaranteed $SomeClass):
-// CHECK: [[ALLOC:%.*]] = alloc_stack $SomeClass
-// CHECK: [[MD:%.*]] = mark_dependence [[ALLOC]] : $*SomeClass on %0 : $SomeClass
-// CHECK: [[LD:%.*]] = load [copy] [[MD]] : $*SomeClass
-// CHECK: destroy_addr %1 : $*SomeClass
+// CHECK-LABEL: sil [ossa] @markdep_source_load_phi :
+// CHECK:       bb0(%0 : @guaranteed $SomeClass):
+// CHECK-NEXT:    [[CP0:%.*]] = copy_value %0 : $SomeClass
+// CHECK:       bb1:
+// CHECK-NEXT:    [[CP1:%.*]] = copy_value [[CP0]]
+// CHECK-NEXT:    br bb3([[CP1]] : $SomeClass)
+// CHECK:       bb2:
+// CHECK-NEXT:    [[CP2:%.*]] = copy_value [[CP0]]
+// CHECK-NEXT:    br bb3([[CP2]] : $SomeClass)
+// CHECK:       bb3([[PHI:%.*]] : @owned $SomeClass):
+// CHECK:         [[MD:%.*]] = mark_dependence [[PHI]] : $SomeClass on %0 : $SomeClass
+// CHECK:         return [[MD]]
 // CHECK-LABEL: } // end sil function 'markdep_source_load_phi'
-sil [ossa] @markdep_source_load_phi : $@convention(thin) (@guaranteed SomeClass) -> () {
+sil [ossa] @markdep_source_load_phi : $@convention(thin) (@guaranteed SomeClass) -> @owned SomeClass {
 bb0(%0 : @guaranteed $SomeClass):
   %1 = alloc_stack $SomeClass
   %copy = copy_value %0 : $SomeClass
@@ -388,11 +378,9 @@ bb2:
 bb3:
   %md = mark_dependence %1 : $*SomeClass on %0 : $SomeClass
   %ld = load [copy] %md : $*SomeClass
-  destroy_value %ld : $SomeClass
   destroy_addr %1 : $*SomeClass
   dealloc_stack %1 : $*SomeClass
-  %9999 = tuple()
-  return %9999 : $()
+  return %ld : $SomeClass
 }
 
 // Test mark_dependence source: dead dependent phi.

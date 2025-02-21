@@ -6,7 +6,8 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// REQUIRES: rdar139384166
+// rdar://143894191
+// REQUIRES: swift_test_mode_optimize_none
 
 enum TL {
   @TaskLocal

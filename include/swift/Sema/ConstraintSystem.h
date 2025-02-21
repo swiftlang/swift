@@ -23,7 +23,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/Types.h"
@@ -39,6 +38,7 @@
 #include "swift/Sema/SolutionResult.h"
 #include "swift/Sema/SyntacticElementTarget.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
@@ -339,21 +339,17 @@ class TypeVariableType::Implementation {
   /// The corresponding node in the constraint graph.
   constraints::ConstraintGraphNode *GraphNode = nullptr;
 
-  ///  Index into the list of type variables, as used by the
-  ///  constraint graph.
-  unsigned GraphIndex;
+  /// Temporary state for ConstraintGraph::computeConnectedComponents(),
+  /// stored inline for performance.
+  llvm::PointerIntPair<TypeVariableType *, 1, unsigned> Component;
 
   friend class constraints::SolverTrail;
 
 public:
   /// Retrieve the type variable associated with this implementation.
-  TypeVariableType *getTypeVariable() {
-    return reinterpret_cast<TypeVariableType *>(this) - 1;
-  }
-
-  /// Retrieve the type variable associated with this implementation.
-  const TypeVariableType *getTypeVariable() const {
-    return reinterpret_cast<const TypeVariableType *>(this) - 1;
+  TypeVariableType *getTypeVariable() const {
+    return reinterpret_cast<TypeVariableType *>(
+        const_cast<Implementation *>(this)) - 1;
   }
 
   explicit Implementation(constraints::ConstraintLocator *locator,
@@ -406,17 +402,6 @@ public:
   void setGraphNode(constraints::ConstraintGraphNode *newNode) { 
     GraphNode = newNode; 
   }
-
-  /// Retrieve the index into the constraint graph's list of type variables.
-  unsigned getGraphIndex() const { 
-    assert(GraphNode && "Graph node isn't set");
-    return GraphIndex;
-  }
-
-  /// Set the index into the constraint graph's list of type variables.
-  void setGraphIndex(unsigned newIndex) {
-    GraphIndex = newIndex;
-  }
   
   /// Check whether this type variable either has a representative that
   /// is not itself or has a fixed type binding.
@@ -428,6 +413,12 @@ public:
     // Check whether the representative is different from our own type
     // variable.
     return ParentOrFixed.get<TypeVariableType *>() != getTypeVariable();
+  }
+
+  /// Low-level accessor; use getRepresentative() or getFixedType() instead.
+  llvm::PointerUnion<TypeVariableType *, TypeBase *>
+  getRepresentativeOrFixed() const {
+    return ParentOrFixed;
   }
 
   /// Record the current type-variable binding.
@@ -637,6 +628,37 @@ public:
       impl.recordBinding(*trail);
 
     impl.getTypeVariable()->Bits.TypeVariableType.Options |= TVO_CanBindToHole;
+  }
+
+  void setComponent(TypeVariableType *parent) {
+    Component.setPointerAndInt(parent, /*valid=*/false);
+  }
+
+  TypeVariableType *getComponent() const {
+    auto *rep = getTypeVariable();
+    while (rep != rep->getImpl().Component.getPointer())
+      rep = rep->getImpl().Component.getPointer();
+
+    // Path compression
+    if (rep != getTypeVariable()) {
+      const_cast<TypeVariableType::Implementation *>(this)
+          ->Component.setPointer(rep);
+    }
+
+    return rep;
+  }
+
+  bool isValidComponent() const {
+    ASSERT(Component.getPointer() == getTypeVariable());
+    return Component.getInt();
+  }
+
+  bool markValidComponent() {
+    if (Component.getInt())
+      return false;
+    ASSERT(Component.getPointer() == getTypeVariable());
+    Component.setInt(1);
+    return true;
   }
 
   /// Print the type variable to the given output stream.
@@ -1165,9 +1187,11 @@ struct Score {
     bool hasNonDefault = false;
     for (unsigned int i = 0; i < NumScoreKinds; ++i) {
       if (Data[i] != 0) {
-        out << " [component: ";
+        out << " [";
         out << getNameFor(ScoreKind(i));
-        out << "(s), value: ";
+        out << "(s), weight: ";
+        out << std::to_string(NumScoreKinds - i);
+        out << ", impact: ";
         out << std::to_string(Data[i]);
         out << "]";
         hasNonDefault = true;
@@ -1548,10 +1572,6 @@ public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::DenseSet<ConstraintLocator *> DefaultedConstraints;
 
-  /// Implicit value conversions applied for a given locator.
-  std::vector<std::pair<ConstraintLocator *, ConversionRestrictionKind>>
-      ImplicitValueConversions;
-
   /// The node -> type mappings introduced by this solution.
   llvm::DenseMap<ASTNode, Type> nodeTypes;
 
@@ -1601,6 +1621,13 @@ public:
   /// A map from argument expressions to their applied property wrapper expressions.
   llvm::DenseMap<ASTNode, SmallVector<AppliedPropertyWrapper, 2>> appliedPropertyWrappers;
 
+  ArrayRef<AppliedPropertyWrapper> getAppliedPropertyWrappers(ASTNode anchor) {
+    auto found = appliedPropertyWrappers.find(anchor);
+    if (found != appliedPropertyWrappers.end())
+      return found->second;
+    return ArrayRef<AppliedPropertyWrapper>();
+  }
+
   /// A mapping from the constraint locators for references to various
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument lists for the call to that locator.
@@ -1621,7 +1648,11 @@ public:
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
-  Type simplifyType(Type type) const;
+  ///
+  /// \param wantInterfaceType If true, maps the resulting type out of context,
+  /// and replaces type variables for opened generic parameters with the
+  /// generic parameter types. Should only be used for diagnostic logic.
+  Type simplifyType(Type type, bool wantInterfaceType = false) const;
 
   // To aid code completion, we need to attempt to convert type placeholders
   // back into underlying generic parameters if possible, since type
@@ -1711,8 +1742,12 @@ public:
     return *getOverloadChoiceIfAvailable(locator);
   }
 
-  /// Retrieve the overload choice associated with the given
+  /// Retrieve the overload choice for the callee associated with the given
   /// locator.
+  SelectedOverload getCalleeOverloadChoice(ConstraintLocator *locator) const;
+
+  /// Retrieve the overload choice associated with the given
+  /// locator, if any.
   std::optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
     auto known = overloadChoices.find(locator);
@@ -1720,6 +1755,11 @@ public:
       return known->second;
     return std::nullopt;
   }
+
+  /// Retrieve the overload choice for the callee associated with the given
+  /// locator, if any.
+  std::optional<SelectedOverload>
+  getCalleeOverloadChoiceIfAvailable(ConstraintLocator *locator) const;
 
   std::optional<SyntacticElementTarget>
   getTargetFor(SyntacticElementTargetKey key) const;
@@ -1757,10 +1797,6 @@ public:
   /// and resolve all of the type variables in contains to form a fully
   /// "resolved" concrete type.
   Type getResolvedType(ASTNode node) const;
-
-  /// Resolve type variables present in the raw type, using generic parameter
-  /// types where possible.
-  Type resolveInterfaceType(Type type) const;
 
   Type getContextualType(ASTNode anchor) const {
     for (const auto &entry : contextualTypes) {
@@ -1814,6 +1850,9 @@ public:
   /// Retrieve the argument list that is associated with a call at the given
   /// locator.
   ArgumentList *getArgumentList(ConstraintLocator *locator) const;
+
+  std::optional<ConversionRestrictionKind>
+  getConversionRestriction(CanType type1, CanType type2) const;
 
   SWIFT_DEBUG_DUMP;
 
@@ -2321,11 +2360,6 @@ private:
   llvm::DenseMap<ConstraintLocator *, MatchCallArgumentResult>
       argumentMatchingChoices;
 
-  /// The set of implicit value conversions performed by the solver on
-  /// a current path to reach a solution.
-  llvm::SmallDenseMap<ConstraintLocator *, ConversionRestrictionKind, 2>
-      ImplicitValueConversions;
-
   /// The worklist of "active" constraints that should be revisited
   /// due to a change.
   ConstraintList ActiveConstraints;
@@ -2335,7 +2369,7 @@ private:
   ConstraintList InactiveConstraints;
 
   /// The constraint graph.
-  ConstraintGraph &CG;
+  ConstraintGraph CG;
 
   /// A mapping from constraint locators to the set of opened types associated
   /// with that locator.
@@ -2487,9 +2521,8 @@ private:
         }
       }
 
-      unsigned threshold =
-          cs->getASTContext().TypeCheckerOpts.SolverShrinkUnsolvedThreshold;
-      return unsolvedDisjunctions >= threshold;
+      // The threshold used to be `TypeCheckerOpts.SolverShrinkUnsolvedThreshold`
+      return unsolvedDisjunctions >= 10;
     }
   };
 
@@ -2772,7 +2805,7 @@ public:
   ~ConstraintSystem();
 
   /// Retrieve the constraint graph associated with this constraint system.
-  ConstraintGraph &getConstraintGraph() const { return CG; }
+  ConstraintGraph &getConstraintGraph() { return CG; }
 
   /// Retrieve the AST context.
   ASTContext &getASTContext() const { return Context; }
@@ -3328,10 +3361,11 @@ public:
   ConstraintLocator *getOpenOpaqueLocator(
       ConstraintLocatorBuilder locator, OpaqueTypeDecl *opaqueDecl);
 
-  /// Open the given existential type, recording the opened type in the
-  /// constraint system and returning both it and the root opened archetype.
-  std::pair<Type, OpenedArchetypeType *> openExistentialType(
-      Type type, ConstraintLocator *locator);
+  /// Open the given existential type or existential metatype, recording the
+  /// opened archetype in the constraint system and returning both the opened
+  /// type and opened archetype.
+  std::pair<Type, OpenedArchetypeType *>
+  openAnyExistentialType(Type type, ConstraintLocator *locator);
 
   /// Update OpenedExistentials and record a change in the trail.
   void recordOpenedExistentialType(ConstraintLocator *locator,
@@ -3603,6 +3637,11 @@ public:
   /// Add a requirement as a constraint to the constraint system.
   void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
                      bool isFavored = false);
+
+  void addApplicationConstraint(
+      FunctionType *appliedFn, Type calleeType,
+      std::optional<TrailingClosureMatching> trailingClosureMatching,
+      DeclContext *useDC, ConstraintLocatorBuilder locator);
 
   /// Add the appropriate constraint for a contextual conversion.
   void addContextualConversionConstraint(Expr *expr, Type conversionType,
@@ -4639,16 +4678,15 @@ public:
     inline bool isFailure() const { return Kind == SolutionKind::Error; }
     inline bool isAmbiguous() const { return Kind == SolutionKind::Unsolved; }
 
-    static TypeMatchResult success(ConstraintSystem &cs) {
+    static TypeMatchResult success() {
       return {SolutionKind::Solved};
     }
 
-    static TypeMatchResult failure(ConstraintSystem &cs,
-                                   ConstraintLocatorBuilder location) {
+    static TypeMatchResult failure() {
       return {SolutionKind::Error};
     }
 
-    static TypeMatchResult ambiguous(ConstraintSystem &cs) {
+    static TypeMatchResult ambiguous() {
       return {SolutionKind::Unsolved};
     }
 
@@ -4753,15 +4791,15 @@ public: // FIXME: public due to statics in CSSimplify.cpp
                              ConstraintLocatorBuilder locator);
 
   TypeMatchResult getTypeMatchSuccess() {
-    return TypeMatchResult::success(*this);
+    return TypeMatchResult::success();
   }
 
   TypeMatchResult getTypeMatchFailure(ConstraintLocatorBuilder locator) {
-    return TypeMatchResult::failure(*this, locator);
+    return TypeMatchResult::failure();
   }
 
   TypeMatchResult getTypeMatchAmbiguous() {
-    return TypeMatchResult::ambiguous(*this);
+    return TypeMatchResult::ambiguous();
   }
 
 public:
@@ -5000,8 +5038,9 @@ private:
 
   /// Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(
-      Type type1, Type type2,
+      FunctionType *appliedFn, Type calleeTy,
       std::optional<TrailingClosureMatching> trailingClosureMatching,
+      DeclContext *useDC,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the DynamicCallableApplicableFunction constraint.
@@ -5083,10 +5122,6 @@ private:
                  ConstraintKind matchKind,
                  TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
-
-  /// Update ImplicitValueConversions and record a change in the trail.
-  void recordImplicitValueConversion(ConstraintLocator *locator,
-                                     ConversionRestrictionKind restriction);
 
   /// Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.
@@ -5191,7 +5226,8 @@ public:
   /// property wrapper type by applying the property wrapper.
   TypeMatchResult applyPropertyWrapperToParameter(
       Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
-      ConstraintKind matchKind, ConstraintLocatorBuilder locator);
+      ConstraintKind matchKind, ConstraintLocator *locator,
+      ConstraintLocator *calleeLocator);
 
   /// Used by applyPropertyWrapperToParameter() to update appliedPropertyWrappers
   /// and record a change in the trail.
@@ -5207,7 +5243,9 @@ public:
 
   /// Get bindings for the given type variable based on current
   /// state of the constraint system.
-  BindingSet getBindingsFor(TypeVariableType *typeVar, bool finalize = true);
+  ///
+  /// FIXME: Remove this.
+  BindingSet getBindingsFor(TypeVariableType *typeVar);
 
 private:
   /// Add a constraint to the constraint system.

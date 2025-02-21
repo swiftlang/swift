@@ -67,9 +67,6 @@ do {
 
   // Invalid examples.
 
-  let _: Int!.Wrapped // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}
-  let _: (Int!).Wrapped // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}
-
   let _: Any.Undef // expected-error {{'Undef' is not a member type of type 'Any'}}
   let _: Int.Type.Undef // expected-error {{'Undef' is not a member type of type 'Swift.Int.Type'}}
   let _: P1.Protocol.Undef // expected-error {{'Undef' is not a member type of type '(any test.P1).Type'}}

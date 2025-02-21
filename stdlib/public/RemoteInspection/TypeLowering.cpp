@@ -217,6 +217,13 @@ public:
       stream << ")";
       return;
     }
+
+    case TypeInfoKind::Array: {
+      printHeader("array");
+      printBasic(TI);
+      stream << ")";
+      return;
+    }
     }
 
     swift_unreachable("Bad TypeInfo kind");
@@ -473,6 +480,26 @@ BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const
     }
   }
   return mask;
+}
+
+ArrayTypeInfo::ArrayTypeInfo(intptr_t size, const TypeInfo *elementTI)
+    : TypeInfo(TypeInfoKind::Array,
+               /* size */ elementTI->getStride() * size,
+               /* alignment */ elementTI->getAlignment(),
+               /* stride */ elementTI->getStride() * size,
+               /* numExtraInhabitants */ elementTI->getNumExtraInhabitants(),
+               /* isBitwiseTakable */ elementTI->isBitwiseTakable()),
+      ElementTI(elementTI) {}
+
+bool ArrayTypeInfo::readExtraInhabitantIndex(
+    remote::MemoryReader &reader, remote::RemoteAddress address,
+    int *extraInhabitantIndex) const {
+  return ElementTI->readExtraInhabitantIndex(reader, address,
+                                             extraInhabitantIndex);
+}
+
+BitMask ArrayTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+  return ElementTI->getSpareBits(TC, hasAddrOnly);
 }
 
 class UnsupportedEnumTypeInfo: public EnumTypeInfo {
@@ -1786,6 +1813,14 @@ public:
   bool visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     return false;
   }
+
+  bool visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return false;
+  }
+
+  bool visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return visit(BA->getElementType());
+  }
 };
 
 bool TypeConverter::hasFixedSize(const TypeRef *TR) {
@@ -1921,6 +1956,14 @@ public:
   MetatypeRepresentation visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     return MetatypeRepresentation::Unknown;
   }
+
+  MetatypeRepresentation visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return MetatypeRepresentation::Unknown;
+  }
+
+  MetatypeRepresentation visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return visit(BA->getElementType());
+  }
 };
 
 class EnumTypeInfoBuilder {
@@ -1996,12 +2039,21 @@ public:
           // We don't have typeinfo; something is very broken.
           Invalid = true;
           return nullptr;
+	} else if (Case.Indirect) {
+	  // An indirect case is non-empty (it stores a pointer)
+	  // and acts like a non-generic (because the pointer has spare bits)
+	  ++NonGenericNonEmptyPayloadCases;
+          LastPayloadCaseTR = CaseTR;
         } else if (Case.Generic) {
+	  // Otherwise, we never consider spare bits from generic cases
           ++GenericPayloadCases;
           LastPayloadCaseTR = CaseTR;
         } else if (CaseTI->getSize() == 0) {
+	  // Needed to distinguish a "single-payload enum"
+	  // whose only case is empty.
           ++NonGenericEmptyPayloadCases;
         } else {
+	  // Finally, we consider spare bits from regular payloads
           ++NonGenericNonEmptyPayloadCases;
           LastPayloadCaseTR = CaseTR;
         }
@@ -2543,6 +2595,18 @@ public:
     // with additional information?
     DEBUG_LOG(fprintf(stderr, "Can't lower unresolved opaque archetype TypeRef"));
     return nullptr;
+  }
+
+  const TypeInfo *visitIntegerTypeRef(const IntegerTypeRef *I) {
+    DEBUG_LOG(fprintf(stderr, "Can't lower integer TypeRef"));
+    return nullptr;
+  }
+
+  const TypeInfo *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    auto elementTI = visit(BA->getElementType());
+    auto size = cast<IntegerTypeRef>(BA->getSizeType())->getValue();
+
+    return TC.makeTypeInfo<ArrayTypeInfo>(size, elementTI);
   }
 };
 

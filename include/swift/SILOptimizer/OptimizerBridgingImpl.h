@@ -260,9 +260,6 @@ BridgedValue BridgedPassContext::getSILUndef(BridgedType type) const {
   return {swift::SILUndef::get(invocation->getFunction(), type.unbridged())};
 }
 
-bool BridgedPassContext::optimizeMemoryAccesses(BridgedFunction f) const {
-  return swift::optimizeMemoryAccesses(f.getFunction());
-}
 bool BridgedPassContext::eliminateDeadAllocations(BridgedFunction f) const {
   return swift::eliminateDeadAllocations(f.getFunction(),
                                          this->getDomTree().di);
@@ -569,6 +566,11 @@ BridgedPassContext::AssertConfiguration BridgedPassContext::getAssertConfigurati
 bool BridgedPassContext::shouldExpand(BridgedType ty) const {
   swift::SILModule &mod = *invocation->getPassManager()->getModule();
   return swift::shouldExpand(mod, ty.unbridged());
+}
+
+bool BridgedPassContext::enableWMORequiredDiagnostics() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().EnableWMORequiredDiagnostics;
 }
 
 static_assert((int)BridgedPassContext::SILStage::Raw == (int)swift::SILStage::Raw);

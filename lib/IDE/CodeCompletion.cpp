@@ -686,7 +686,7 @@ static void addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
 }
 
 static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
-                            bool IsConcurrencyEnabled) {
+                            const LangOptions &langOpts) {
   auto isTypeDeclIntroducer = [](CodeCompletionKeywordKind Kind,
                                  std::optional<DeclAttrKind> DAK) -> bool {
     switch (Kind) {
@@ -799,9 +799,15 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
       return;
 
     // Remove keywords only available when concurrency is enabled.
-    if (DAK.has_value() && !IsConcurrencyEnabled &&
+    if (DAK.has_value() && !langOpts.EnableExperimentalConcurrency &&
         DeclAttribute::isConcurrencyOnly(*DAK))
       return;
+
+    // Remove experimental keywords.
+    if (DAK.has_value())
+      if (auto feature = DeclAttribute::getRequiredFeature(*DAK))
+        if (!langOpts.hasFeature(*feature))
+          return;
 
     CodeCompletionFlair flair = getFlair(Kind, DAK);
 
@@ -1019,8 +1025,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     LLVM_FALLTHROUGH;
   }
   case CompletionKind::StmtOrExpr:
-    addDeclKeywords(Sink, CurDeclContext,
-                    Context.LangOpts.EnableExperimentalConcurrency);
+    addDeclKeywords(Sink, CurDeclContext, Context.LangOpts);
     addStmtKeywords(Sink, CurDeclContext, MaybeFuncBody);
     addClosureSignatureKeywordsIfApplicable(Sink, CurDeclContext);
 
@@ -1122,8 +1127,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
         .Default(false);
     }) != ParsedKeywords.end();
     if (!HasDeclIntroducer) {
-      addDeclKeywords(Sink, CurDeclContext,
-                      Context.LangOpts.EnableExperimentalConcurrency);
+      addDeclKeywords(Sink, CurDeclContext, Context.LangOpts);
       addLetVarKeywords(Sink);
     }
     break;

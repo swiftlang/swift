@@ -1215,9 +1215,8 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
       llvm::SaveAndRestore<std::shared_ptr<std::atomic<bool>>> DisableCancellationDuringSILGen(CompIns.getASTContext().CancellationFlag, nullptr);
       SILOptions SILOpts = Invocation.getSILOptions();
 
-      // Disable PerformanceDiagnostics SIL pass, which in some cases requires
-      // WMO (e.g. for Embedded Swift diags) but SourceKit compiles without WMO.
-      SILOpts.EnablePerformanceDiagnostics = false;
+      // Disable diagnostics that require WMO (as SourceKit disables it).
+      SILOpts.EnableWMORequiredDiagnostics = false;
 
       auto &TC = CompIns.getSILTypes();
       std::unique_ptr<SILModule> SILMod = performASTLowering(*SF, TC, SILOpts);

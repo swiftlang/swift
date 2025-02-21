@@ -19,6 +19,7 @@
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
@@ -834,6 +835,11 @@ Result Parser::parseIfConfigRaw(
       // determined solely by which block has the completion token.
       !ideInspectionClauseLoc.isValid();
 
+  // For constructing syntactic structures, we need AST nodes even for
+  // non-active regions.
+  bool allActive = SF.getParsingOptions().contains(
+      SourceFile::ParsingFlags::PoundIfAllActive);
+
   bool foundActive = false;
   bool isVersionCondition = false;
   CharSourceRange activeBodyRange;
@@ -892,6 +898,9 @@ Result Parser::parseIfConfigRaw(
     // Treat the region containing code completion token as "active".
     if (ideInspectionClauseLoc.isValid() && !foundActive)
       isActive = (ClauseLoc == ideInspectionClauseLoc);
+
+    if (allActive)
+      isActive = true;
 
     foundActive |= isActive;
 

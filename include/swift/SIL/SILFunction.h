@@ -18,7 +18,7 @@
 #define SWIFT_SIL_SILFUNCTION_H
 
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
@@ -1561,6 +1561,17 @@ public:
     for (auto &Block : const_cast<SILFunction &>(*this)) {
       if (Block.getTerminator()->isFunctionExiting()) {
         output.emplace_back(&Block);
+      }
+    }
+  }
+
+  /// Populate \p output with every block terminated by an unreachable
+  /// instruction.
+  void visitUnreachableTerminatedBlocks(
+      llvm::function_ref<void(SILBasicBlock &)> visitor) const {
+    for (auto &block : const_cast<SILFunction &>(*this)) {
+      if (isa<UnreachableInst>(block.getTerminator())) {
+        visitor(block);
       }
     }
   }

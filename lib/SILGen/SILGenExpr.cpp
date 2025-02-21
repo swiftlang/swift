@@ -977,7 +977,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   }
 
   // If this is a reference to a var, emit it as an l-value and then load.
-  if (auto *var = dyn_cast<VarDecl>(decl))
+  if (isa<VarDecl>(decl))
     return emitRValueForNonMemberVarDecl(loc, declRef, refType, semantics, C);
 
   assert(!isa<TypeDecl>(decl));
@@ -4098,7 +4098,6 @@ lowerKeyPathSubscriptIndexTypes(
                  SmallVectorImpl<IndexTypePair> &indexPatterns,
                  SubscriptDecl *subscript,
                  SubstitutionMap subscriptSubs,
-                 ResilienceExpansion expansion,
                  bool &needsGenericContext) {
   // Capturing an index value dependent on the generic context means we
   // need the generic context captured in the key path.
@@ -4118,7 +4117,8 @@ lowerKeyPathSubscriptIndexTypes(
 
     auto indexLoweredTy = SGM.Types.getLoweredType(
         AbstractionPattern::getOpaque(), indexTy,
-        TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
+        TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+          ResilienceExpansion::Minimal));
     indexLoweredTy = indexLoweredTy.mapTypeOutOfContext();
     indexPatterns.push_back({indexTy->mapTypeOutOfContext()
                                     ->getCanonicalType(),
@@ -4286,11 +4286,13 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       // The mapTypeIntoContext() / mapTypeOutOfContext() dance is there
       // to handle the case where baseTy being a type parameter subject
       // to a superclass requirement.
-      componentTy = var->getValueInterfaceType().subst(
-        GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)
-          ->getContextSubstitutionMap(var->getDeclContext()))
-          ->mapTypeOutOfContext()
-          ->getCanonicalType();
+      componentTy =
+          var->getValueInterfaceType()
+              .subst(GenericEnvironment::mapTypeIntoContext(
+                         genericEnv, baseTy->getMetatypeInstanceType())
+                         ->getContextSubstitutionMap(var->getDeclContext()))
+              ->mapTypeOutOfContext()
+              ->getCanonicalType();
     }
 
     // The component type for an @objc optional requirement needs to be
@@ -4345,7 +4347,6 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     SmallVector<IndexTypePair, 4> indexTypes;
     lowerKeyPathSubscriptIndexTypes(*this, indexTypes,
                                     decl, subs,
-                                    expansion,
                                     needsGenericContext);
     
     SmallVector<KeyPathPatternComponent::Index, 4> indexPatterns;
@@ -4551,8 +4552,8 @@ visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
 RValue RValueEmitter::
 visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   switch (E->getKind()) {
-#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND)
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING)
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case MagicIdentifierLiteralExpr::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
     return SGF.emitLiteral(E, C);
@@ -4598,7 +4599,76 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
+static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
+                              SGFContext C) {
+  ArgumentScope scope(SGF, E);
+
+  auto iaTy = E->getType()->castTo<BoundGenericType>();
+  auto loweredIAType = SGF.getLoweredType(iaTy);
+  auto elementType = iaTy->getGenericArgs()[1]->getCanonicalType();
+  auto loweredElementType = SGF.getLoweredType(elementType);
+  auto &eltTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(), elementType);
+
+  SILValue alloc = SGF.emitTemporaryAllocation(E, loweredIAType);
+  SILValue addr = SGF.B.createUncheckedAddrCast(E, alloc,
+                                            loweredElementType.getAddressType());
+
+  // Cleanups for any elements that have been initialized so far.
+  SmallVector<CleanupHandle, 8> cleanups;
+
+  for (unsigned index : range(E->getNumElements())) {
+    auto destAddr = addr;
+
+    if (index != 0) {
+      SILValue indexValue = SGF.B.createIntegerLiteral(
+          E, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+      destAddr = SGF.B.createIndexAddr(E, addr, indexValue,
+                                   /*needsStackProtection=*/ false);
+    }
+
+    // Create a dormant cleanup for the value in case we exit before the
+    // full vector has been constructed.
+
+    CleanupHandle destCleanup = CleanupHandle::invalid();
+    if (!eltTL.isTrivial()) {
+      destCleanup = SGF.enterDestroyCleanup(destAddr);
+      SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
+      cleanups.push_back(destCleanup);
+    }
+
+    TemporaryInitialization init(destAddr, destCleanup);
+
+    ArgumentSource(E->getElements()[index])
+        .forwardInto(SGF, AbstractionPattern::getOpaque(), &init, eltTL);
+  }
+
+  // Kill the per-element cleanups. The inline array will take ownership of them.
+  for (auto destCleanup : cleanups)
+    SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
+
+  SILValue iaVal;
+
+  // If the inline array is naturally address-only, then we can adopt the stack
+  // slot as the value directly.
+  if (loweredIAType.isAddressOnly(SGF.F)) {
+    iaVal = SGF.B.createUncheckedAddrCast(E, alloc, loweredIAType);
+  } else {
+    // Otherwise, this inline array is loadable. Load it.
+    iaVal = SGF.B.createTrivialLoadOr(E, alloc, LoadOwnershipQualifier::Take);
+  }
+
+  auto iaMV = SGF.emitManagedRValueWithCleanup(iaVal);
+  auto ia = RValue(SGF, E, iaMV);
+
+  return scope.popPreservingValue(std::move(ia));
+}
+
 RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
+  // Handle 'InlineArray' literals separately.
+  if (E->getType()->isInlineArray()) {
+    return emitInlineArrayLiteral(SGF, E, C);
+  }
+
   auto loc = SILLocation(E);
   ArgumentScope scope(SGF, loc);
 
@@ -5307,7 +5377,19 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
           value = value.ensurePlusOne(SGF, loc);
           if (value.getType().isObject())
             value = SGF.B.createMoveValue(loc, value);
+          SGF.B.createIgnoredUse(loc, value.getValue());
+          return;
         }
+
+        // Emit the ignored use instruction like we would do in emitIgnoredExpr.
+        if (!rv.isNull()) {
+          SmallVector<ManagedValue, 16> values;
+          std::move(rv).getAll(values);
+          for (auto v : values) {
+            SGF.B.createIgnoredUse(loc, v.getValue());
+          }
+        }
+
         return;
       }
 
@@ -5960,6 +6042,33 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
                                              });
 }
 
+namespace {
+class DestroyNotEscapedClosureCleanup : public Cleanup {
+  SILValue v;
+public:
+  DestroyNotEscapedClosureCleanup(SILValue v) : v(v) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    // Now create the verification of the withoutActuallyEscaping operand.
+    // Either we fail the uniqueness check (which means the closure has escaped)
+    // and abort or we continue and destroy the ultimate reference.
+    auto isEscaping = SGF.B.createDestroyNotEscapedClosure(
+        l, v, DestroyNotEscapedClosureInst::WithoutActuallyEscaping);
+    SGF.B.createCondFail(l, isEscaping, "non-escaping closure has escaped");
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "DestroyNotEscapedClosureCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Value:" << v << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+
 RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
     MakeTemporarilyEscapableExpr *E, SGFContext C) {
   // Emit the non-escaping function value.
@@ -5994,19 +6103,15 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   }
 
   // Convert it to an escaping function value.
-  auto escapingClosure =
+  auto ec =
       SGF.createWithoutActuallyEscapingClosure(E, functionValue, escapingFnTy);
+  SILValue ecv = ec.forward(SGF);
+  SGF.Cleanups.pushCleanup<DestroyNotEscapedClosureCleanup>(ecv);
+  auto escapingClosure = ManagedValue::forOwnedRValue(ecv, SGF.Cleanups.getTopCleanup());
   auto loc = SILLocation(E);
   auto borrowedClosure = escapingClosure.borrow(SGF, loc);
   RValue rvalue = visitSubExpr(borrowedClosure, false /* isClosureConsumable */);
 
-  // Now create the verification of the withoutActuallyEscaping operand.
-  // Either we fail the uniqueness check (which means the closure has escaped)
-  // and abort or we continue and destroy the ultimate reference.
-  auto isEscaping = SGF.B.createIsEscapingClosure(
-      loc, borrowedClosure.getValue(),
-      IsEscapingClosureInst::WithoutActuallyEscaping);
-  SGF.B.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
   return rvalue;
 }
 
@@ -6958,7 +7063,24 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
 
   // Otherwise, emit the result (to get any side effects), but produce it at +0
   // if that allows simplification.
-  emitRValue(E, SGFContext::AllowImmediatePlusZero);
+  RValue rv = emitRValue(E, SGFContext::AllowImmediatePlusZero);
+
+  // Return early if we do not have any result.
+  if (rv.isNull())
+    return;
+
+  // Then emit ignored use on all of the rvalue components. We purposely do not
+  // implode the tuple since if we have a tuple formation like:
+  //
+  // let _ = (x, y)
+  //
+  // we want the use to be on x and y and not on the imploded tuple. It also
+  // helps us avoid emitting unnecessary code.
+  SmallVector<ManagedValue, 16> values;
+  std::move(rv).getAll(values);
+  for (auto v : values) {
+    B.createIgnoredUse(E, v.getValue());
+  }
 }
 
 /// Emit the given expression as an r-value, then (if it is a tuple), combine

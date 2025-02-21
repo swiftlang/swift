@@ -42,7 +42,14 @@ class SwiftPM(product.Product):
     def should_build(self, host_target):
         return True
 
-    def run_bootstrap_script(self, action, host_target, additional_params=[]):
+    def run_bootstrap_script(
+            self,
+            action,
+            host_target,
+            additional_params=[],
+            *,
+            compile_only_for_running_host_architecture=False,
+    ):
         script_path = os.path.join(
             self.source_dir, 'Utilities', 'bootstrap')
 
@@ -85,7 +92,10 @@ class SwiftPM(product.Product):
             ]
 
         # Pass Cross compile host info
-        if self.has_cross_compile_hosts():
+        if (
+            not compile_only_for_running_host_architecture
+            and self.has_cross_compile_hosts()
+        ):
             if self.is_darwin_host(host_target):
                 helper_cmd += ['--cross-compile-hosts']
                 for cross_compile_host in self.args.cross_compile_hosts:
@@ -108,13 +118,27 @@ class SwiftPM(product.Product):
         shell.call(helper_cmd)
 
     def build(self, host_target):
-        self.run_bootstrap_script('build', host_target, ["--reconfigure"])
+        self.run_bootstrap_script(
+            'build',
+            host_target,
+            additional_params=[
+                "--reconfigure",
+                "--verbose",
+            ],
+        )
 
     def should_test(self, host_target):
         return self.args.test_swiftpm
 
     def test(self, host_target):
-        self.run_bootstrap_script('test', host_target)
+        self.run_bootstrap_script(
+            'test',
+            host_target,
+            compile_only_for_running_host_architecture=True,
+            additional_params=[
+                '--verbose'
+            ]
+        )
 
     def should_clean(self, host_target):
         return self.args.clean_swiftpm
@@ -130,6 +154,7 @@ class SwiftPM(product.Product):
         install_prefix = install_destdir + self.args.install_prefix
 
         self.run_bootstrap_script('install', host_target, [
+            '--verbose',
             '--prefix', install_prefix
         ])
 

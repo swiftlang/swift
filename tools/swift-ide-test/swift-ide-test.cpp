@@ -317,6 +317,11 @@ ImportPaths("I", llvm::cl::desc("add a directory to the import search path"),
             llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
+SystemImportPaths("isystem",
+                  llvm::cl::desc("add a directory to the system import search path"),
+                  llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
 FrameworkPaths("F",
                llvm::cl::desc("add a directory to the framework search path"),
                llvm::cl::cat(Category));
@@ -457,6 +462,11 @@ FileCheckPath("filecheck", llvm::cl::value_desc("path"),
 static llvm::cl::opt<bool>
 SkipFileCheck("skip-filecheck", llvm::cl::desc("Skip 'FileCheck' checking"),
                                 llvm::cl::cat(Category));
+static llvm::cl::opt<std::string>
+FileCheckSuffix("filecheck-additional-suffix",
+                           llvm::cl::value_desc("check-prefix-suffix"),
+                           llvm::cl::desc("Additional suffix to add to check prefixes as an alternative"),
+                           llvm::cl::cat(Category));
 
 // '-code-completion' options.
 
@@ -822,16 +832,6 @@ static llvm::cl::opt<bool>
 DisableImplicitStringProcessingImport("disable-implicit-string-processing-module-import",
                                       llvm::cl::desc("Disable implicit import of _StringProcessing module"),
                                       llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-EnableImplicitBacktracingImport("enable-implicit-backtracing-module-import",
-                                 llvm::cl::desc("Enable implicit import of _Backtracing module"),
-                                 llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-DisableImplicitBacktracingImport("disable-implicit-backtracing-module-import",
-                                 llvm::cl::desc("Disable implicit import of _Backtracing module"),
-                                 llvm::cl::init(false));
 
 static llvm::cl::opt<bool> EnableExperimentalNamedOpaqueTypes(
     "enable-experimental-named-opaque-types",
@@ -1537,11 +1537,32 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
         options::CodeCompletionToken != Token.Name)
       continue;
 
+    SmallVector<std::string, 4> expandedCheckPrefixes;
+
     llvm::errs() << "----\n";
     llvm::errs() << "Token: " << Token.Name << "; offset=" << Token.Offset
                  << "; pos=" << Token.Line << ":" << Token.Column;
-    for (auto Prefix : Token.CheckPrefixes) {
-      llvm::errs() << "; check=" << Prefix;
+    for (auto joinedPrefix : Token.CheckPrefixes) {
+      if (options::FileCheckSuffix.empty()) {
+        // Simple case: just copy what we have
+        expandedCheckPrefixes.push_back(joinedPrefix.str());
+      } else {
+        // For each comma-separated prefix, insert a variant with the suffix
+        // added to it: "X,Y" with suffix "_FOO" -> "X,X_FOO,Y,Y_FOO"
+        std::string expandedPrefix;
+        llvm::raw_string_ostream os(expandedPrefix);
+
+        SmallVector<StringRef, 4> splitPrefix;
+        joinedPrefix.split(splitPrefix, ',');
+
+        llvm::interleaveComma(splitPrefix, os, [&](StringRef prefix) {
+          os << prefix << ',' << prefix << options::FileCheckSuffix;
+        });
+
+        expandedCheckPrefixes.push_back(expandedPrefix);
+      }
+
+      llvm::errs() << "; check=" << expandedCheckPrefixes.back();
     }
     llvm::errs() << "\n";
 
@@ -1662,7 +1683,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
     assert(!options::FileCheckPath.empty());
 
     bool isFileCheckFailed = false;
-    for (auto Prefix : Token.CheckPrefixes) {
+    for (auto Prefix : expandedCheckPrefixes) {
       StringRef FileCheckArgs[] = {options::FileCheckPath, SourceFilename,
                                    "--check-prefixes",     Prefix,
                                    "--input-file",         resultFilename};
@@ -4439,13 +4460,6 @@ int main(int argc, char *argv[]) {
   if (options::DisableImplicitStringProcessingImport) {
     InitInvok.getLangOptions().DisableImplicitStringProcessingModuleImport = true;
   }
-  if (options::DisableImplicitBacktracingImport) {
-    InitInvok.getLangOptions().DisableImplicitBacktracingModuleImport = true;
-  } else if (options::EnableImplicitBacktracingImport) {
-    InitInvok.getLangOptions().DisableImplicitBacktracingModuleImport = false;
-  } else {
-    InitInvok.getLangOptions().DisableImplicitBacktracingModuleImport = true;
-  }
 
   if (options::EnableExperimentalNamedOpaqueTypes) {
     InitInvok.getLangOptions().enableFeature(Feature::NamedOpaqueTypes);
@@ -4488,8 +4502,15 @@ int main(int argc, char *argv[]) {
   }
   InitInvok.getClangImporterOptions().PrecompiledHeaderOutputDir =
     options::PCHOutputDir;
-  InitInvok.setImportSearchPaths(options::ImportPaths);
-  std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
+  std::vector<SearchPathOptions::SearchPath> ImportPaths;
+  for (const auto &path : options::ImportPaths) {
+    ImportPaths.push_back({path, /*isSystem=*/false});
+  }
+  for (const auto &path : options::SystemImportPaths) {
+    ImportPaths.push_back({path, /*isSystem=*/true});
+  }
+  InitInvok.setImportSearchPaths(ImportPaths);
+  std::vector<SearchPathOptions::SearchPath> FramePaths;
   for (const auto &path : options::FrameworkPaths) {
     FramePaths.push_back({path, /*isSystem=*/false});
   }
@@ -4503,6 +4524,9 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getClangImporterOptions().BridgingHeader =
     options::ImportObjCHeader;
+  if (!options::ImportObjCHeader.empty())
+    InitInvok.getFrontendOptions().ModuleHasBridgingHeader = true;
+
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
   InitInvok.getLangOptions().EnableDeserializationSafety =

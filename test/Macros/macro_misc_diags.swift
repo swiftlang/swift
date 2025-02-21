@@ -48,6 +48,15 @@ public struct MakeBinding : DeclarationMacro {
   }
 }
 
+public struct MakeFunc : DeclarationMacro {
+  static public func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    ["func expansionFn() -> Int { 0 }"]
+  }
+}
+
 //--- Client.swift
 @freestanding(expression)
 macro identity<T>(_ x: T) -> T = #externalMacro(module: "MacroPlugin", type: "IdentityMacro")
@@ -57,6 +66,9 @@ macro trailingClosure<T>(_ x: T) -> T = #externalMacro(module: "MacroPlugin", ty
 
 @freestanding(declaration, names: named(x))
 macro makeBinding<T>(_ x: T) = #externalMacro(module: "MacroPlugin", type: "MakeBinding")
+
+@freestanding(declaration, names: named(expansionFn))
+macro makeFunc<T>(_ x: T) = #externalMacro(module: "MacroPlugin", type: "MakeFunc")
 
 @available(*, deprecated)
 func deprecatedFunc() -> Int { 0 }
@@ -132,12 +144,19 @@ struct rdar138997009 {
 class rdar138997009_Class {
   func foo() {}
   func bar() {
+    // rdar://141963700 - Downgrade these to a warning for the macro argument,
+    // but is still an error in the expansion.
     _ = {
       _ = #trailingClosure {
         foo()
         // CHECK-DIAG: @__swiftmacro_6Client0017Clientswift_yEEFcfMX[[@LINE-3]]{{.*}}trailingClosurefMf_.swift:2:9: error: call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit
-        // CHECK-DIAG: Client.swift:[[@LINE-2]]:9: error: call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit
+        // CHECK-DIAG: Client.swift:[[@LINE-2]]:9: warning: call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit; this will be an error in a future Swift language mode
       }
+      // Use an attribute to force a MacroExpansionDecl (otherwise we parse a
+      // MacroExpansionExpr)
+      @discardableResult
+      #makeFunc(foo())
+      // CHECK-DIAG: Client.swift:[[@LINE-1]]:17: warning: call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit; this will be an error in a future Swift language mode
     }
   }
 }

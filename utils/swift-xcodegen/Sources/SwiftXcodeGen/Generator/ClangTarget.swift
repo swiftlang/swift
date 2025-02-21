@@ -13,13 +13,13 @@
 struct ClangTarget {
   var name: String
   var parentPath: RelativePath
-  var sources: [Source]
-  var unbuildableSources: [Source]
+  var sources: [RelativePath]
+  var unbuildableSources: [RelativePath]
   var headers: [RelativePath]
 
   init(
     name: String, parentPath: RelativePath,
-    sources: [Source], unbuildableSources: [Source] = [],
+    sources: [RelativePath], unbuildableSources: [RelativePath] = [],
     headers: [RelativePath]
   ) {
     self.name = name
@@ -27,13 +27,6 @@ struct ClangTarget {
     self.sources = sources
     self.unbuildableSources = unbuildableSources
     self.headers = headers
-  }
-}
-
-extension ClangTarget {
-  struct Source {
-    var path: RelativePath
-    var inferArgs: Bool
   }
 }
 
@@ -58,24 +51,15 @@ extension RepoBuildDir {
       return nil
     }
 
-    var sources: [ClangTarget.Source] = []
-    var unbuildableSources: [ClangTarget.Source] = []
+    var sources: [RelativePath] = []
+    var unbuildableSources: [RelativePath] = []
     for path in sourcePaths {
-      let source: ClangTarget.Source? =
-        if try clangArgs.hasBuildArgs(for: path) {
-          .init(path: path, inferArgs: false)
-        } else if target.inferArgs {
-          .init(path: path, inferArgs: true)
-        } else {
-          nil
-        }
-      guard let source else { continue }
-
-      // If we're inferring arguments, or have a known unbuildable, treat as not
+      // If we have no arguments, or have a known unbuildable, treat as not
       // buildable. We'll still include it in the project, but in a separate
       // target that isn't built by default.
-      if source.inferArgs || knownUnbuildables.contains(path) {
-        unbuildableSources.append(source)
+      if try !clangArgs.hasBuildArgs(for: path) ||
+          knownUnbuildables.contains(path) {
+        unbuildableSources.append(path)
         continue
       }
       // If we have no '.o' present for a given file, assume it's not buildable.
@@ -84,10 +68,10 @@ extension RepoBuildDir {
       if target.mayHaveUnbuildableFiles,
           try !clangArgs.isObjectFilePresent(for: path) {
         log.debug("! Treating '\(path)' as unbuildable; no '.o' file")
-        unbuildableSources.append(source)
+        unbuildableSources.append(path)
         continue
       }
-      sources.append(source)
+      sources.append(path)
     }
 
     return ClangTarget(

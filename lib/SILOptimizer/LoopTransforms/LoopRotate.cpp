@@ -18,6 +18,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -43,6 +44,9 @@ static llvm::cl::opt<int> LoopRotateSizeLimit("looprotate-size-limit",
                                               llvm::cl::init(20));
 static llvm::cl::opt<bool> RotateSingleBlockLoop("looprotate-single-block-loop",
                                                  llvm::cl::init(false));
+static llvm::cl::opt<bool>
+    LoopRotateInfiniteBudget("looprotate-infinite-budget",
+                             llvm::cl::init(false));
 
 static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
                        SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
@@ -117,9 +121,7 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
     if (!inst->mayHaveSideEffects() && !inst->mayReadFromMemory() &&
         !isa<TermInst>(inst) &&
         !isa<AllocationInst>(inst) && /* not marked mayhavesideeffects */
-        !isa<CopyValueInst>(inst) &&
-        !isa<MoveValueInst>(inst) &&
-        !isa<BeginBorrowInst>(inst) &&
+        !hasOwnershipOperandsOrResults(inst) &&
         hasLoopInvariantOperands(inst, loop, invariants)) {
       moves.push_back(inst);
       invariants.insert(inst);
@@ -132,7 +134,7 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
     cost += (int)instructionInlineCost(instRef);
   }
 
-  return cost < LoopRotateSizeLimit;
+  return cost < LoopRotateSizeLimit || LoopRotateInfiniteBudget;
 }
 
 static void mapOperands(SILInstruction *inst,
@@ -371,6 +373,15 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   // It does not make sense to rotate the loop if the new header is loop
   // exiting as well.
   if (loop->isLoopExiting(newHeader)) {
+    return false;
+  }
+
+  // Incomplete liveranges in the dead-end exit block can cause a missing adjacent
+  // phi-argument for a re-borrow if there is a borrow-scope is in the loop.
+  // But even when we have complete lifetimes, it's probably not worth rotating
+  // a loop where the header block branches to a dead-end block.
+  auto *deBlocks = pm->getAnalysis<DeadEndBlocksAnalysis>()->get(exit->getParent());
+  if (deBlocks->isDeadEnd(exit)) {
     return false;
   }
 

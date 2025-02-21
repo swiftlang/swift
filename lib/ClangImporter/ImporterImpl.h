@@ -464,6 +464,10 @@ public:
   std::unordered_set<ImportDiagnostic, ImportDiagnosticHasher>
       CollectedDiagnostics;
 
+  // Keeps track of `clang::RecordDecl`s where diagnostics have already been
+  // emitted due to failed SWIFT_SHARED_REFERENCE inference.
+  std::unordered_set<const clang::RecordDecl *> DiagnosedCxxRefDecls;
+
   const bool ImportForwardDeclarations;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
@@ -1203,9 +1207,9 @@ public:
 
   /// Create a decl with error type and an "unavailable" attribute on it
   /// with the specified message.
-  ValueDecl *createUnavailableDecl(Identifier name, DeclContext *dc,
-                                   Type type, StringRef UnavailableMessage,
-                                   bool isStatic, ClangNode ClangN);
+  ValueDecl *createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
+                                   StringRef UnavailableMessage, bool isStatic,
+                                   ClangNode ClangN, AccessLevel access);
 
   /// Add a synthesized typealias to the given nominal type.
   void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
@@ -1746,6 +1750,7 @@ public:
 
   void importSwiftAttrAttributes(Decl *decl);
   void importBoundsAttributes(FuncDecl *MappedDecl);
+  void importSpanAttributes(FuncDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///
@@ -1868,11 +1873,6 @@ public:
       return *SinglePCHImport;
     return StringRef();
   }
-
-  /// Returns true if the given C/C++ record should be imported as a reference
-  /// type into Swift.
-  static bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
-                                          ASTContext &ctx);
 };
 
 class ImportDiagnosticAdder {
@@ -1892,6 +1892,11 @@ public:
 };
 
 namespace importer {
+
+/// Returns true if the given C/C++ record should be imported as a reference
+/// type into Swift.
+bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
+                                 ClangImporter::Implementation *importerImpl);
 
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
@@ -1952,15 +1957,19 @@ class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
 
+  ClangImporter::Implementation *importerImpl;
+
 public:
   SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
                            LookupTableMap &tables, ASTContext &ctx,
                            ClangSourceBufferImporter &buffersForDiagnostics,
-                           const PlatformAvailability &avail)
+                           const PlatformAvailability &avail,
+                           ClangImporter::Implementation *importerImpl)
       : // Update in response to D97702 landing.
-        clang::ModuleFileExtension(),
-        pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
-        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
+        clang::ModuleFileExtension(), pchLookupTable(pchLookupTable),
+        lookupTables(tables), swiftCtx(ctx),
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
+        importerImpl(importerImpl) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   void hashExtension(ExtensionHashBuilder &HBuilder) const override;

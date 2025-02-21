@@ -15,16 +15,13 @@ struct ClangTargetSource {
   var name: String
   var path: RelativePath
   var mayHaveUnbuildableFiles: Bool
-  var inferArgs: Bool
 
   init(
     at path: RelativePath, named name: String,
-    mayHaveUnbuildableFiles: Bool,
-    inferArgs: Bool
+    mayHaveUnbuildableFiles: Bool
   ) {
     self.name = name
     self.path = path
     self.mayHaveUnbuildableFiles = mayHaveUnbuildableFiles
-    self.inferArgs = inferArgs
   }
 }

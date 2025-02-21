@@ -802,17 +802,6 @@ GenericArgumentsMismatch *GenericArgumentsMismatch::create(
       GenericArgumentsMismatch(cs, actual, required, mismatches, locator);
 }
 
-bool AutoClosureForwarding::diagnose(const Solution &solution,
-                                     bool asNote) const {
-  AutoClosureForwardingFailure failure(solution, getLocator());
-  return failure.diagnose(asNote);
-}
-
-AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
-                                                     ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
-}
-
 bool AllowAutoClosurePointerConversion::diagnose(const Solution &solution,
                                                  bool asNote) const {
   AutoClosurePointerConversionFailure failure(solution, getFromType(),
@@ -2732,4 +2721,19 @@ IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
                                             ConstraintLocator *locator) {
   return new (cs.getAllocator())
       IgnoreKeyPathSubscriptIndexMismatch(cs, argType, locator);
+}
+
+AllowInlineArrayLiteralCountMismatch *
+AllowInlineArrayLiteralCountMismatch::create(ConstraintSystem &cs, Type lhsCount,
+                                             Type rhsCount,
+                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInlineArrayLiteralCountMismatch(cs, lhsCount, rhsCount, locator);
+}
+
+bool AllowInlineArrayLiteralCountMismatch::diagnose(const Solution &solution,
+                                                    bool asNote) const {
+  IncorrectInlineArrayLiteralCount failure(solution, lhsCount, rhsCount,
+                                           getLocator());
+  return failure.diagnose(asNote);
 }

@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "cross-module-serialization-setup"
 #include "swift/AST/Module.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/TBDGen.h"
 #include "swift/SIL/ApplySite.h"
@@ -102,6 +103,11 @@ private:
   bool canSerializeType(SILType type);
   bool canSerializeType(CanType type);
   bool canSerializeDecl(NominalTypeDecl *decl);
+
+  /// Check whether decls imported with certain access levels or attributes
+  /// can be serialized.
+  /// The \p ctxt can e.g. be a NominalType or the context of a function.
+  bool checkImports(DeclContext *ctxt) const;
 
   bool canUseFromInline(DeclContext *declCtxt);
 
@@ -431,6 +437,15 @@ void CrossModuleOptimization::serializeWitnessTablesInModule() {
 }
 
 void CrossModuleOptimization::serializeVTablesInModule() {
+  if (everything) {
+    for (SILVTable *vt : M.getVTables()) {
+      vt->setSerializedKind(IsSerialized);
+      for (auto &entry : vt->getEntries()) {
+        makeFunctionUsableFromInline(entry.getImplementation());
+      }
+    }
+    return;
+  }
   if (!isPackageCMOEnabled(M.getSwiftModule()))
     return;
 
@@ -623,6 +638,8 @@ bool CrossModuleOptimization::canSerializeFieldsByInstructionKind(
             canUse = false;
         },
         [&](SILDeclRef method) {
+          if (!canUse) // If already set to false in the above lambda, return
+            return;
           if (method.isForeign)
             canUse = false;
           else if (isPackageCMOEnabled(method.getModuleContext())) {
@@ -734,7 +751,12 @@ static bool couldBeLinkedStatically(DeclContext *funcCtxt, SILModule &module) {
   // The stdlib module is always linked dynamically.
   if (funcModule == module.getASTContext().getStdlibModule())
     return false;
-    
+
+  // An sdk or system module should be linked dynamically.
+  if (isPackageCMOEnabled(module.getSwiftModule()) &&
+      funcModule->isNonUserModule())
+    return false;
+
   // Conservatively assume the function is in a statically linked module.
   return true;
 }
@@ -744,7 +766,7 @@ bool CrossModuleOptimization::canUseFromInline(DeclContext *declCtxt) {
   if (everything)
     return true;
 
-  if (!M.getSwiftModule()->canBeUsedForCrossModuleOptimization(declCtxt))
+  if (!checkImports(declCtxt))
     return false;
 
   /// If we are emitting a TBD file, the TBD file only contains public symbols
@@ -757,6 +779,58 @@ bool CrossModuleOptimization::canUseFromInline(DeclContext *declCtxt) {
   if (conservative && M.getOptions().emitTBD && couldBeLinkedStatically(declCtxt, M))
     return false;
     
+  return true;
+}
+
+bool CrossModuleOptimization::checkImports(DeclContext *ctxt) const {
+  ModuleDecl *moduleOfCtxt = ctxt->getParentModule();
+
+  // If the context defined in the same module - or is the same module, it's
+  // fine.
+  if (moduleOfCtxt == M.getSwiftModule())
+    return true;
+
+  ModuleDecl::ImportFilter filter;
+
+  if (isPackageCMOEnabled(M.getSwiftModule())) {
+    // When Package CMO is enabled, types imported with `package import`
+    // or `@_spiOnly import` into this module should be allowed to be
+    // serialized. These types may be used in APIs with `package` or
+    // higher access level, with or without `@_spi`, and such APIs should
+    // be serializable to allow direct access by another module if it's
+    // in the same package.
+    //
+    // However, types are from modules imported as `@_implementationOnly`
+    // should not be serialized, even if their defining modules are SDK
+    // or system modules. Since these types are intended to remain hidden
+    // from external clients, their metadata (e.g. field offsets) may be
+    // stripped, making it unavailable for look up at runtime. If serialized,
+    // the client will attempt to use the serialized accessor and fail
+    // because the metadata is missing, leading to a linker error.
+    //
+    // This issue applies to transitively imported types as well;
+    // `@_implementationOnly import Foundation` imports `ObjectiveC`
+    // indirectly, and metadata for types like `NSObject` from `ObjectiveC`
+    // can also be stripped, thus such types should not be allowed for
+    // serialization.
+    filter = { ModuleDecl::ImportFilterKind::ImplementationOnly };
+  } else {
+    // See if context is imported in a "regular" way, i.e. not with
+    // @_implementationOnly, `package import` or @_spiOnly.
+    filter = {
+      ModuleDecl::ImportFilterKind::ImplementationOnly,
+      ModuleDecl::ImportFilterKind::PackageOnly,
+      ModuleDecl::ImportFilterKind::SPIOnly
+    };
+  }
+  SmallVector<ImportedModule, 4> results;
+  M.getSwiftModule()->getImportedModules(results, filter);
+
+  auto &imports = M.getSwiftModule()->getASTContext().getImportCache();
+  for (auto &desc : results) {
+    if (imports.isImportedBy(moduleOfCtxt, desc.importedModule))
+      return false;
+  }
   return true;
 }
 
@@ -921,25 +995,13 @@ void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function
   }
 }
 
-/// Make a nominal type, including it's context, usable from inline.
+/// Make a nominal type, including its context, usable from inline.
 void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
   if (decl->getEffectiveAccess() >= AccessLevel::Package)
-    return;
+    return;  
 
-  // FIXME: rdar://130456707
-  // Currently not all types are visited in canSerialize* calls, sometimes
-  // resulting in an internal type getting @usableFromInline, which is
-  // incorrect.
-  // For example, for `let q = P() as? Q`, where Q is an internal class
-  // inherting a public class P, Q is not visited in the canSerialize*
-  // checks, thus resulting in `@usableFromInline class Q`; this is not
-  // the intended behavior in the conservative mode as it modifies AST.
-  //
-  // To properly fix, instruction visitor needs to be refactored to do
-  // both the "canSerialize" check (that visits all types) and serialize
-  // or update visibility (modify AST in non-conservative modes). 
-  if (isPackageCMOEnabled(M.getSwiftModule()))
-    return;
+  // This function should not be called in Package CMO mode.
+  assert(!isPackageCMOEnabled(M.getSwiftModule()));
 
   // We must not modify decls which are defined in other modules.
   if (M.getSwiftModule() != decl->getDeclContext()->getParentModule())

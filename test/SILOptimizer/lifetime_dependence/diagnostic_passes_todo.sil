@@ -1,11 +1,9 @@
 // RUN: %target-sil-opt -test-runner %s \
 // RUN:     -diagnostics -sil-verify-all \
 // RUN:     -enable-experimental-feature LifetimeDependence \
-// RUN:     -enable-experimental-feature LifetimeDependenceDiagnoseTrivial \
 // RUN:     2>&1 | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 // Test SIL expected from SILGen output. Run all diagnostic passes which includes lifetime dependence handling.
 // These tests are not fully implemented.

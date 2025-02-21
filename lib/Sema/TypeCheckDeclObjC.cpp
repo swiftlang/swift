@@ -14,11 +14,12 @@
 // aspects of declarations.
 //
 //===----------------------------------------------------------------------===//
-#include "TypeCheckObjC.h"
-#include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckObjC.h"
 #include "TypeCheckProtocol.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -504,6 +505,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
     llvm_unreachable("decl cannot have dynamic isolation");
 
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     return false;
@@ -934,7 +936,7 @@ bool swift::isRepresentableInObjC(
         boolDecl = ctx.getBoolDecl();
 
       if (boolDecl == nullptr) {
-        AFD->diagnose(diag::broken_bool);
+        AFD->diagnose(diag::broken_stdlib_type, "Bool");
         return false;
       }
 
@@ -1725,7 +1727,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Members of classes can be @objc.
     isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
   }
-  else if (auto classDecl = dyn_cast<ClassDecl>(VD)) {
+  else if (isa<ClassDecl>(VD)) {
     // Classes can be @objc.
 
 
@@ -3199,7 +3201,7 @@ public:
   {
     assert(!D->hasClangNode() && "passed interface, not impl, to checker");
 
-    if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (isa<AbstractFunctionDecl>(D)) {
       addCandidate(D);
       addRequirement(D->getImplementedObjCDecl());
 

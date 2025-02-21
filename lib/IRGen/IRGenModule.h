@@ -968,8 +968,6 @@ public:
   void fatal_unimplemented(SourceLoc, StringRef Message);
   void error(SourceLoc loc, const Twine &message);
 
-  bool useDllStorage();
-
   bool shouldPrespecializeGenericMetadata();
   
   bool canMakeStaticObjectReadOnly(SILType objectType);
@@ -1138,6 +1136,8 @@ public:
   ForeignClassMetadataLayout &getForeignMetadataLayout(ClassDecl *decl);
 
   ClassMetadataStrategy getClassMetadataStrategy(const ClassDecl *theClass);
+
+  bool IsWellKnownBuiltinOrStructralType(CanType type) const;
 
 private:
   TypeConverter &Types;
@@ -1510,7 +1510,6 @@ public:
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
   llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
-  bool isStandardLibrary() const;
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -1679,9 +1678,6 @@ public:
                                         ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
                                              ConstantInit init = ConstantInit());
-  llvm::Constant *
-  getAddrOfEffectiveValueWitnessTable(CanType concreteType,
-                                      ConstantInit init = ConstantInit());
   std::optional<llvm::Function *>
   getAddrOfIVarInitDestroy(ClassDecl *cd, bool isDestroyer, bool isForeign,
                            ForDefinition_t forDefinition);
