@@ -41,3 +41,22 @@ void swift::PrintTo(const StrictConcurrency &value, std::ostream *os) {
     break;
   }
 }
+
+void swift::PrintTo(const LangOptions::FeatureState &value, std::ostream *os) {
+  PrintTo((const LangOptions::FeatureState::Kind &)value, os);
+}
+
+void swift::PrintTo(const LangOptions::FeatureState::Kind &value,
+                    std::ostream *os) {
+  switch (value) {
+  case LangOptions::FeatureState::Off:
+    *os << "Off";
+    break;
+  case LangOptions::FeatureState::EnabledForAdoption:
+    *os << "EnabledForAdoption";
+    break;
+  case LangOptions::FeatureState::Enabled:
+    *os << "Enabled";
+    break;
+  }
+}
