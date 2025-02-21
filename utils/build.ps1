@@ -2129,6 +2129,7 @@ function Build-ExperimentalRuntime {
      -Defines @{
        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
        dispatch_DIR = "$(Get-TargetProjectBinaryCache $Arch Dispatch)\cmake\modules";
      }
   }
