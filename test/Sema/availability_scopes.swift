@@ -373,6 +373,12 @@ extension SomeEnum {
   func neverAvailable() {}
 }
 
+// CHECK-NEXT: {{^}}  (decl version=50 unavailable=macOS decl=unavailableOnMacOSAndIntroduced()
+
+@available(macOS, unavailable, introduced: 52)
+func unavailableOnMacOSAndIntroduced() {
+}
+
 // CHECK-NEXT: {{^}}  (decl version=50 unavailable=* decl=NeverAvailable
 // CHECK-NEXT: {{^}}    (decl version=50 unavailable=* decl=unavailableOnMacOS()
 
