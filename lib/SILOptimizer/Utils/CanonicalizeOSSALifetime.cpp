@@ -239,6 +239,13 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         break;
       case OperandOwnership::InteriorPointer:
       case OperandOwnership::AnyInteriorPointer:
+        if (liveness->checkAndUpdateInteriorPointer(use) !=
+            AddressUseKind::NonEscaping) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "      Inner address use is escaping! Giving up\n");
+          return false;
+        }
+        break;
       case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::EndBorrow:
         // Guaranteed values are exposed by inner adjacent reborrows. If user is
