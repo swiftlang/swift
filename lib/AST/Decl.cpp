@@ -7874,14 +7874,19 @@ SourceRange VarDecl::getSourceRange() const {
   return getNameLoc();
 }
 
-SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
+SourceRange AbstractStorageDecl::getTypeSourceRangeForDiagnostics() const {
+  // Subscripts always have an explicitly-written type.
+  if (auto *SD = dyn_cast<SubscriptDecl>(this))
+    return SD->getElementTypeSourceRange();
+
   // For a parameter, map back to its parameter to get the TypeLoc.
   if (auto *PD = dyn_cast<ParamDecl>(this)) {
     if (auto typeRepr = PD->getTypeRepr())
       return typeRepr->getSourceRange();
   }
-  
-  Pattern *Pat = getParentPattern();
+
+  auto *VD = cast<VarDecl>(this);
+  Pattern *Pat = VD->getParentPattern();
   if (!Pat || Pat->isImplicit())
     return SourceRange();
 
