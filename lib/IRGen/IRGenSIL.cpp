@@ -965,9 +965,11 @@ public:
   bool shouldShadowVariable(SILDebugVariable varInfo, bool isAnonymous) {
     return !IGM.IRGen.Opts.DisableDebuggerShadowCopies
       && !IGM.IRGen.Opts.shouldOptimize()
-      //Disable shadow in deserialized functions as they might be optimized
+      // Shadow copies are only emitted at -Onone, but a deserialized function
+      // might have been already optimized, so ignore those.
       && !CurSILFn->wasDeserializedCanonical()
-      && (!CurSILFn->isSpecialization() || !CurSILFn->getSpecializationInfo()->getParent()->wasDeserializedCanonical())
+      && (!CurSILFn->isSpecialization() ||
+          !CurSILFn->getSpecializationInfo()->getParent()->wasDeserializedCanonical())
       && !isAnonymous;
   }
 

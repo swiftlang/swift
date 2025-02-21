@@ -316,12 +316,15 @@ namespace sil_block {
 
   using SILDebugValueLayout = BCRecordLayout<
     SIL_DEBUG_VALUE,
-    
-    SILTypeCategoryField, // operand type category
-    SILTypeCategoryField, // debug var type category
-    BCFixed<11>,// poison, movableValueDebuginfo, trace, hasDebugVar, isLet, isDenseMapSingleton(two bits), hasSource, hasLoc, hasExpr
-    BCArray<ValueIDField> // operand info: operand, type, debug var info: name, argno, optional stuff: typeid
-    >;
+
+    SILTypeCategoryField, /// operand type category
+    SILTypeCategoryField, /// debug var type category
+    BCFixed<11>,          /// poison, movableValueDebuginfo, trace,
+                          /// hasDebugVar, isLet, isDenseMapSingleton(two
+                          /// bits), hasSource, hasLoc, hasExpr
+    BCArray<ValueIDField> /// operand info: operand, type, debug var info:
+                          /// name, argno, optional stuff: typeid
+  >;
 
   using DebugValueDelimiterLayout = BCRecordLayout<
     SIL_DEBUG_VALUE_DELIMITER
