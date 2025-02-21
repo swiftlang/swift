@@ -978,6 +978,21 @@ static void dumpAPIIfNeeded(const CompilerInstance &Instance) {
   }
 }
 
+static bool shouldEmitIndexData(const CompilerInvocation &Invocation) {
+  const auto &opts = Invocation.getFrontendOptions();
+  auto action = opts.RequestedAction;
+
+  if (action == FrontendOptions::ActionType::CompileModuleFromInterface &&
+      opts.ExplicitInterfaceBuild) {
+    return true;
+  }
+
+  // FIXME: This predicate matches the status quo, but there's no reason
+  // indexing cannot run for actions that do not require stdlib e.g. to better
+  // facilitate tests.
+  return FrontendOptions::doesActionRequireSwiftStandardLibrary(action);
+}
+
 /// Perform any actions that must have access to the ASTContext, and need to be
 /// delayed until the Swift compile pipeline has finished. This may be called
 /// before or after LLVM depending on when the ASTContext gets freed.
@@ -1072,10 +1087,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     }
   }
 
-  // FIXME: This predicate matches the status quo, but there's no reason
-  // indexing cannot run for actions that do not require stdlib e.g. to better
-  // facilitate tests.
-  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action)) {
+  if (shouldEmitIndexData(Invocation)) {
     emitIndexData(Instance);
   }
 
