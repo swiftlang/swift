@@ -3317,12 +3317,6 @@ Fetch-Dependencies
 
 AndroidEmulator-Run $AndroidX64.LLVMName
 AndroidEmulator-TearDown
-
-Write-Host "******** emulator-stderr.log ********"
-Get-Content -Path "$BinaryCache\emulator-stderr.log"
-
-Write-Host "******** emulator-stdout.log ********"
-Get-Content -Path "$BinaryCache\emulator-stdout.log"
 exit(1)
 
 if ($Clean) {
@@ -3541,11 +3535,13 @@ if (-not $IsCrossCompiling) {
 
   exit 1
 } finally {
-  $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
-  if (Test-Path $adb) {
-    & $adb emu kill | Out-Null
-    & $adb kill-server | Out-Null
-  }
+  AndroidEmulator-TearDown
+
+  Write-Host "******** emulator-stderr.log ********"
+  Get-Content -Path "$BinaryCache\emulator-stderr.log"
+
+  Write-Host "******** emulator-stdout.log ********"
+  Get-Content -Path "$BinaryCache\emulator-stdout.log"
 
   if ($Summary) {
     $TimingData | Select-Object Platform,Arch,Checkout,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
