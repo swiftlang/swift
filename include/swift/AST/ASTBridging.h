@@ -1317,15 +1317,18 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedVarDeclIntroducer cIntorducer, BridgedArrayRef cBindingEntries);
 
 SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:argName:"
-           "argNameLoc:paramName:paramNameLoc:type:defaultValue:"
+           "argNameLoc:paramName:paramNameLoc:defaultValue:"
            "defaultValueInitContext:)")
 BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cArgName,
     BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
-    BridgedSourceLoc cParamNameLoc, BridgedNullableTypeRepr type,
-    BridgedNullableExpr defaultValue,
+    BridgedSourceLoc cParamNameLoc, BridgedNullableExpr defaultValue,
     BridgedNullableDefaultArgumentInitializer cDefaultArgumentInitContext);
+
+SWIFT_NAME("BridgedParamDecl.setTypeRepr(self:_:)")
+BRIDGED_INLINE void BridgedParamDecl_setTypeRepr(BridgedParamDecl cDecl,
+                                                 BridgedTypeRepr cType);
 
 /// The various spellings of ownership modifier that can be used in source.
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedParamSpecifier {

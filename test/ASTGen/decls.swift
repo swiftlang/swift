@@ -49,7 +49,13 @@ func test2(y: Int = 0, oi: Int? = nil) -> Int {
 }
 
 func test3(_ b: inout Bool) {
-  // b = true
+  b = true
+}
+
+func testInOutClosureParam() -> (inout (Int, String)) -> Void {
+  return { (arg: inout (Int, String)) in
+    arg.1 = "rewritten"
+  }
 }
 
 func test4(_ i: _const Int) {

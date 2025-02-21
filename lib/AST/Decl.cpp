@@ -8714,6 +8714,47 @@ ParamDecl *ParamDecl::createParsed(
   return decl;
 }
 
+void ParamDecl::setTypeRepr(TypeRepr *repr) {
+  ASSERT(!getTypeRepr() && "TypeRepr already set");
+
+  TyReprAndFlags.setPointer(repr);
+
+  // Dig through the type to find any attributes or modifiers that are
+  // associated with the type but should also be reflected on the
+  // declaration.
+  {
+    auto unwrappedType = repr;
+    while (true) {
+      if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
+        // At this point we actually don't know if that's valid to mark
+        // this parameter declaration as `autoclosure` because type has
+        // not been resolved yet - it should either be a function type
+        // or typealias with underlying function type.
+        if (ATR->has(TypeAttrKind::Autoclosure))
+          setAutoClosure(true);
+        if (ATR->has(TypeAttrKind::Addressable))
+          setAddressable(true);
+
+        unwrappedType = ATR->getTypeRepr();
+        continue;
+      }
+
+      if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
+        if (isa<IsolatedTypeRepr>(STR))
+          setIsolated(true);
+        else if (isa<CompileTimeConstTypeRepr>(STR))
+          setCompileTimeConst(true);
+        else if (isa<SendingTypeRepr>(STR))
+          setSending(true);
+        unwrappedType = STR->getBase();
+        continue;
+      }
+
+      break;
+    }
+  }
+}
+
 void ParamDecl::setDefaultArgumentKind(DefaultArgumentKind K) {
   assert(getDefaultArgumentKind() == DefaultArgumentKind::None &&
          "Overwrite of default argument kind");

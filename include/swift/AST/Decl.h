@@ -7031,7 +7031,9 @@ public:
 
   /// Retrieve the TypeRepr corresponding to the parsed type of the parameter, if it exists.
   TypeRepr *getTypeRepr() const { return TyReprAndFlags.getPointer(); }
-  void setTypeRepr(TypeRepr *repr) { TyReprAndFlags.setPointer(repr); }
+
+  /// Set the parsed TypeRepr on the parameter.
+  void setTypeRepr(TypeRepr *repr);
 
   bool isDestructured() const {
     auto flags = ArgumentNameAndFlags.getInt();
