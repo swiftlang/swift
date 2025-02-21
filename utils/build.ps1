@@ -1023,8 +1023,11 @@ function AndroidEmulator-Run($ArchName) {
       Invoke-Program $EmuTool -list-avds
 
       Write-Host "Start Android emulator for arch $ArchName"
+      $Args = "-verbose -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -avd $Device"
       foreach($Attempt in 1..5) {
-        $Process = Start-Process -PassThru $EmuTool "@$Device"
+        $Process = Start-Process -PassThru -NoNewWindow $EmuTool -ArgumentList $Args `
+                                 -RedirectStandardError "$BinaryCache\emulator-stderr.log" `
+                                 -RedirectStandardOutput "$BinaryCache\emulator-stdout.log"
         try {
           Write-Host "Waiting for process $($Process.Id) to start"
           Start-Sleep -Seconds 1
@@ -3311,6 +3314,12 @@ Fetch-Dependencies
 
 AndroidEmulator-Run $AndroidX64.LLVMName
 AndroidEmulator-TearDown
+
+Write-Host "******** emulator-stderr.log ********"
+Get-Content -Path "$BinaryCache\emulator-stderr.log"
+
+Write-Host "******** emulator-stdout.log ********"
+Get-Content -Path "$BinaryCache\emulator-stdout.log"
 exit(1)
 
 if ($Clean) {
