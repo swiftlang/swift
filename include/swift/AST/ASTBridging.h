@@ -2510,6 +2510,10 @@ BridgedDictionaryTypeRepr BridgedDictionaryTypeRepr_createParsed(
     BridgedTypeRepr keyType, BridgedSourceLoc cColonloc,
     BridgedTypeRepr valueType, BridgedSourceLoc cRSquareLoc);
 
+SWIFT_NAME("BridgedErrorTypeRepr.create(_:range:)")
+BridgedErrorTypeRepr BridgedErrorTypeRepr_create(BridgedASTContext cContext,
+                                                 BridgedSourceRange cRange);
+
 SWIFT_NAME("BridgedFunctionTypeRepr.createParsed(_:argsType:asyncLoc:throwsLoc:"
            "thrownType:arrowLoc:resultType:)")
 BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(

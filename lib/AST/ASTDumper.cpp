@@ -2563,6 +2563,8 @@ namespace {
       printCommon(SD, "subscript_decl", label);
       printStorageImpl(SD);
       printAttributes(SD);
+      printTypeOrTypeRepr(SD->getCachedElementInterfaceType(),
+                          SD->getElementTypeRepr(), Label::always("element"));
       printAccessors(SD);
       printFoot();
     }

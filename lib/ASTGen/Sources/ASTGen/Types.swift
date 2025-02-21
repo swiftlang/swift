@@ -44,8 +44,8 @@ extension ASTGenVisitor {
       return self.generate(memberType: node).asTypeRepr
     case .metatypeType(let node):
       return self.generate(metatypeType: node)
-    case .missingType:
-      fatalError("unimplemented")
+    case .missingType(let node):
+      return self.generate(missingType: node)
     case .namedOpaqueReturnType(let node):
       return self.generate(namedOpaqueReturnType: node).asTypeRepr
     case .optionalType(let node):
@@ -162,6 +162,13 @@ extension ASTGenVisitor {
         protocolKeywordLoc: tyLoc
       ).asTypeRepr
     }
+  }
+
+  func generate(missingType node: MissingTypeSyntax) -> BridgedTypeRepr {
+    return BridgedErrorTypeRepr.create(
+      self.ctx,
+      range: self.generateSourceRange(node)
+    ).asTypeRepr
   }
 
   func generate(

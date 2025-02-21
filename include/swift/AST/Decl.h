@@ -7459,6 +7459,8 @@ public:
   /// operation.
   Type getElementInterfaceType() const;
 
+  std::optional<Type> getCachedElementInterfaceType() const;
+
   TypeRepr *getElementTypeRepr() const { return ElementTy.getTypeRepr(); }
   SourceRange getElementTypeSourceRange() const {
     return ElementTy.getSourceRange();
