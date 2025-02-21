@@ -21,6 +21,22 @@ struct PublicBaseProtectedInheritance : protected PublicBase {
   using PublicBase::publicSetter;
 };
 
+struct PublicBaseUsingPrivateTypedef : private PublicBase {
+private:
+  typedef PublicBase MyBase;
+public:
+  using MyBase::publicGetter;
+  using MyBase::publicSetter;
+};
+
+struct PublicBaseUsingPrivateUsingType : private PublicBase {
+private:
+  using MyBase = PublicBase;
+public:
+  using MyBase::publicGetter;
+  using MyBase::publicSetter;
+};
+
 struct IntBox {
   int value;
   IntBox(int value) : value(value) {}
@@ -46,6 +62,22 @@ protected:
 
 struct ProtectedMemberPrivateInheritance : private ProtectedBase {
   using ProtectedBase::protectedGetter;
+};
+
+struct OperatorBase {
+protected:
+  operator bool() const { return true; }
+  int operator*() const { return 456; }
+  OperatorBase operator!() const { return *this; }
+  int operator[](const int x) const { return x; }
+};
+
+struct OperatorBasePrivateInheritance : OperatorBase {
+public:
+  using OperatorBase::operator bool;
+  using OperatorBase::operator*;
+  using OperatorBase::operator!;
+  // using OperatorBase::operator[]; // FIXME: currently broken
 };
 
 #endif // !_USING_BASE_MEMBERS_H

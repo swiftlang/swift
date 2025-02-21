@@ -23,6 +23,20 @@ UsingBaseTestSuite.test("PublicBaseProtectedInheritance") {
   expectEqual(987, p.publicGetter())
 }
 
+UsingBaseTestSuite.test("PublicBaseUsingPrivateTypedef") {
+  var p = PublicBaseUsingPrivateTypedef()
+  expectEqual(123, p.publicGetter())
+  p.publicSetter(987)
+  expectEqual(987, p.publicGetter())
+}
+
+UsingBaseTestSuite.test("PublicBaseUsingPrivateUsingType") {
+  var p = PublicBaseUsingPrivateTypedef()
+  expectEqual(123, p.publicGetter())
+  p.publicSetter(987)
+  expectEqual(987, p.publicGetter())
+}
+
 UsingBaseTestSuite.test("UsingBaseConstructorWithParam") {
   let p1 = UsingBaseConstructorWithParam(566 as Int32)
   expectEqual(566, p1.value)
@@ -38,6 +52,16 @@ UsingBaseTestSuite.test("UsingBaseConstructorEmpty") {
 UsingBaseTestSuite.test("ProtectedMemberPrivateInheritance") {
   let p = ProtectedMemberPrivateInheritance()
   expectEqual(456, p.protectedGetter())
+}
+
+UsingBaseTestSuite.test("OperatorBasePrivateInheritance") {
+  let p = OperatorBasePrivateInheritance()
+  expectTrue(Bool(fromCxx: p))
+  expectTrue(Bool(fromCxx: !p)) // this looks a bit nonsensical because
+                                // operator!() doesn't actually do anything,
+                                // it's just the identity function
+  expectEqual(456, p.pointee)
+  expectEqual(789, p[789])
 }
 
 runAllTests()

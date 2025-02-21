@@ -1,5 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -print-access -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -print-access -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -print-access -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | tee %s.output | tee %s.output | %FileCheck %s
 
 // CHECK:      public struct PublicBase {
 // CHECK-NEXT:   public init()
@@ -20,6 +20,26 @@
 
 // CHECK:      public struct PublicBaseProtectedInheritance {
 // CHECK-NEXT:   public init()
+// CHECK-NEXT:   public func publicGetter() -> Int32
+// CHECK-NEXT:   public mutating func publicSetter(_ v: Int32)
+// CHECK-NEXT:   private func notExposed()
+// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
+// CHECK-NEXT:   private var value: Int32
+// CHECK-NEXT: }
+
+// CHECK:      public struct PublicBaseUsingPrivateTypedef {
+// CHECK-NEXT:   public init()
+// CHECK-NEXT:   private typealias MyBase = PublicBase
+// CHECK-NEXT:   public func publicGetter() -> Int32
+// CHECK-NEXT:   public mutating func publicSetter(_ v: Int32)
+// CHECK-NEXT:   private func notExposed()
+// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
+// CHECK-NEXT:   private var value: Int32
+// CHECK-NEXT: }
+
+// CHECK:      public struct PublicBaseUsingPrivateUsingType {
+// CHECK-NEXT:   public init()
+// CHECK-NEXT:   private typealias MyBase = PublicBase
 // CHECK-NEXT:   public func publicGetter() -> Int32
 // CHECK-NEXT:   public mutating func publicSetter(_ v: Int32)
 // CHECK-NEXT:   private func notExposed()
@@ -50,4 +70,12 @@
 // CHECK:      public struct ProtectedMemberPrivateInheritance {
 // CHECK-NEXT:   public init()
 // CHECK-NEXT:   public func protectedGetter() -> Int32
+// CHECK-NEXT: }
+
+// CHECK:      public struct OperatorBasePrivateInheritance : CxxConvertibleToBool {
+// CHECK-NEXT:   public init()
+// CHECK-NEXT:   public var pointee: Int32 { get }
+// CHECK-NEXT:   public func __convertToBool() -> Bool
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   public func __operatorStar() -> Int32
 // CHECK-NEXT: }
