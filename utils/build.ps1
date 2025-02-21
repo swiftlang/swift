@@ -1022,6 +1022,9 @@ function AndroidEmulator-Run($ArchName) {
       Write-Host "$EmuTool -list-avds reports:"
       Invoke-Program $EmuTool -list-avds
 
+      Write-Host "$EmuTool -accel-check reports:"
+      Invoke-Program $EmuTool -accel-check
+
       Write-Host "Start Android emulator for arch $ArchName"
       $Args = "-verbose -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -avd $Device"
       foreach($Attempt in 1..5) {
