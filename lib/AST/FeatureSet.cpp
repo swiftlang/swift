@@ -121,7 +121,7 @@ UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
-UNINTERESTING_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext)
+UNINTERESTING_FEATURE(AsyncCallerExecution)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
@@ -413,6 +413,45 @@ static bool usesFeatureCustomAvailability(Decl *decl) {
 
 static bool usesFeatureBuiltinEmplaceTypedThrows(Decl *decl) {
   // Callers of 'Builtin.emplace' should explicitly guard the usage with #if.
+  return false;
+}
+
+static bool usesFeatureExecutionAttribute(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<ExecutionAttr>())
+    return true;
+
+  auto VD = dyn_cast<ValueDecl>(decl);
+  if (!VD)
+    return false;
+
+  auto hasExecutionAttr = [](TypeRepr *R) {
+    if (!R)
+      return false;
+
+    return R->findIf([](TypeRepr *repr) {
+      if (auto *AT = dyn_cast<AttributedTypeRepr>(repr)) {
+        return llvm::any_of(AT->getAttrs(), [](TypeOrCustomAttr attr) {
+          if (auto *TA = attr.dyn_cast<TypeAttribute *>()) {
+            return isa<ExecutionTypeAttr>(TA);
+          }
+          return false;
+        });
+      }
+      return false;
+    });
+  };
+
+  // Check if any parameters that have `@execution` attribute.
+  if (auto *PL = getParameterList(VD)) {
+    for (auto *P : *PL) {
+      if (hasExecutionAttr(P->getTypeRepr()))
+        return true;
+    }
+  }
+
+  if (hasExecutionAttr(VD->getResultTypeRepr()))
+    return true;
+
   return false;
 }
 

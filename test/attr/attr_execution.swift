@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-experimental-feature ExecutionAttribute
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+// REQUIRES: swift_feature_ExecutionAttribute
 
 @execution(something) func invalidAttr() async {} // expected-error {{unknown option 'something' for attribute 'execution'}}
 

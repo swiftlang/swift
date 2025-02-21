@@ -4759,9 +4759,8 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   // NOTE: This needs to occur before we handle an explicit nonisolated attr,
   // since if @execution and nonisolated are used together, we want to ensure
   // that @execution takes priority. This ensures that if we import code from a
-  // module that was compiled with a different value for
-  // NonIsolatedAsyncInheritsIsolationFromContext, we get the semantics of the
-  // source module.
+  // module that was compiled with a different value for AsyncCallerExecution,
+  // we get the semantics of the source module.
   if (concurrentExecutionAttr) {
     switch (concurrentExecutionAttr->getBehavior()) {
     case ExecutionKind::Concurrent:
@@ -4777,7 +4776,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     // If the nonisolated async inherits isolation from context is set, return
     // caller isolation inheriting.
     if (decl->getASTContext().LangOpts.hasFeature(
-            Feature::NonIsolatedAsyncInheritsIsolationFromContext)) {
+            Feature::AsyncCallerExecution)) {
       if (auto *func = dyn_cast<AbstractFunctionDecl>(decl);
           func && func->hasAsync() &&
           func->getModuleContext() == decl->getASTContext().MainModule) {
@@ -5612,8 +5611,7 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
   }
 
   // If we have an async function... by default we inherit isolation.
-  if (ctx.LangOpts.hasFeature(
-          Feature::NonIsolatedAsyncInheritsIsolationFromContext)) {
+  if (ctx.LangOpts.hasFeature(Feature::AsyncCallerExecution)) {
     if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
         func && func->hasAsync() &&
         func->getModuleContext() == ctx.MainModule) {
@@ -5702,8 +5700,8 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
   // did not have an ExecutionKind::Caller attached to it.
   //
   // DISCUSSION: This occurs when we have a value decl that is explicitly marked
-  // as nonisolated but since NonIsolatedAsyncInheritsIsolationFromContext is
-  // enabled, we return CallerIsolationInheriting.
+  // as nonisolated but since AsyncCallerExecution is enabled, we return
+  // CallerIsolationInheriting.
   if (isolationFromAttr && isolationFromAttr->getKind() ==
           ActorIsolation::CallerIsolationInheriting &&
       !value->getAttrs().hasAttribute<ExecutionAttr>()) {
@@ -6001,7 +5999,7 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
 
         if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
             ctx.LangOpts.hasFeature(
-                Feature::NonIsolatedAsyncInheritsIsolationFromContext) &&
+                Feature::AsyncCallerExecution) &&
             func && func->hasAsync() &&
             func->getModuleContext() == ctx.MainModule &&
             isolation.isNonisolated()) {

@@ -1,13 +1,13 @@
 // RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name attrs \
 // RUN:  -enable-experimental-feature ABIAttribute \
-// RUN:  -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext
+// RUN:  -enable-experimental-feature ExecutionAttribute
 
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name attrs
 
 // RUN: %FileCheck %s --input-file %t.swiftinterface
 
 // REQUIRES: swift_feature_ABIAttribute
-// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+// REQUIRES: swift_feature_ExecutionAttribute
 
 // CHECK: @_transparent public func glass() -> Swift.Int { return 0 }{{$}}
 @_transparent public func glass() -> Int { return 0 }

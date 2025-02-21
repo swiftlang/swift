@@ -1,9 +1,10 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen %s -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -enable-experimental-feature ExecutionAttribute | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -enable-experimental-feature ExecutionAttribute -enable-experimental-feature AsyncCallerExecution | %FileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
-// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+// REQUIRES: swift_feature_ExecutionAttribute
+// REQUIRES: swift_feature_AsyncCallerExecution
 
 // Validate that both with and without the experimental flag we properly codegen
 // execution(caller) and execution(concurrent).
