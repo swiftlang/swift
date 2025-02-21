@@ -4818,20 +4818,41 @@ emitRetconCoroutineEntry(IRGenFunction &IGF, CanSILFunctionType fnType,
   auto prototype =
     IGF.IGM.getOpaquePtr(IGF.IGM.getAddrOfContinuationPrototype(fnType));
 
-  // Use malloc and free as our allocator.
-  auto allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
+  
+
+  // Use free as our deallocator.
   auto deallocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getFreeFn());
 
   // Call the right 'llvm.coro.id.retcon' variant.
   llvm::Value *buffer = emission.getCoroutineBuffer();
-  llvm::Value *id = IGF.Builder.CreateIntrinsicCall(idIntrinsic, {
-    llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferSize.getValue()),
-    llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferAlignment.getValue()),
-    buffer,
-    prototype,
-    allocFn,
-    deallocFn
-  });
+
+  llvm::Value *id;
+  if (IGF.getOptions().EmitTypeMallocForCoroFrame) {
+    // Use swift_coroFrameAlloc as our allocator.
+    auto coroAllocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getCoroFrameAllocFn());
+    auto mallocTypeId = IGF.getMallocTypeId();
+    id = IGF.Builder.CreateIntrinsicCall(idIntrinsic, {
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferSize.getValue()),
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferAlignment.getValue()),
+      buffer,
+      prototype,
+      coroAllocFn,
+      deallocFn,
+      mallocTypeId
+    });
+  } else {
+    // Use mallocas our allocator.
+   auto allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
+    id = IGF.Builder.CreateIntrinsicCall(idIntrinsic, {
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferSize.getValue()),
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferAlignment.getValue()),
+      buffer,
+      prototype,
+      allocFn,
+      deallocFn
+    });
+  }
+  
 
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
   // This serves as a handle that we can pass around to other intrinsics.

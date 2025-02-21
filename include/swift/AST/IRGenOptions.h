@@ -488,6 +488,9 @@ public:
 
   unsigned EmitAsyncFramePushPopMetadata : 1;
 
+  // Whether to emit typed malloc during coroutine frame allocation.
+  unsigned EmitTypeMallocForCoroFrame : 1;
+
   // Whether to use the yield_once ABI when emitting yield_once_2 coroutines.
   unsigned EmitYieldOnce2AsYieldOnce : 1;
 
@@ -597,8 +600,9 @@ public:
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
-        EmitAsyncFramePushPopMetadata(true), EmitYieldOnce2AsYieldOnce(true),
-        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
+        EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(false),
+        EmitYieldOnce2AsYieldOnce(true), AsyncFramePointerAll(false),
+        UseProfilingMarkerThunks(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),

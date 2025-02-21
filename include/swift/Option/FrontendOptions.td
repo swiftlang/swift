@@ -1345,6 +1345,13 @@ def disable_async_frame_push_pop_metadata :
   Flag<["-"], "disable-async-frame-push-pop-metadata">,
   HelpText<"Disable async frame push pop metadata">;
 
+def enable_emit_type_malloc_for_coro_frame :
+  Flag<["-"], "enable-emit-type-malloc-for-coro-frame">,
+  HelpText<"Enable emitting typed malloc for coroutine frame allocation">;
+def disable_emit_type_malloc_for_coro_frame :
+  Flag<["-"], "disable-emit-type-malloc-for-coro-frame">,
+  HelpText<"Disable emitting typed malloc for coroutine frame allocation">;
+
 def enable_async_frame_pointer_all :
   Flag<["-"], "enable-async-frame-pointer-all">,
   HelpText<"Always emit async frame stack frames (frame-pointer=all)">;
