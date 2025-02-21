@@ -12,7 +12,7 @@
 
 import Swift
 
-// FIXME: This is a workaround for trouble including gyb-generated sources in the embedded build.
+// FIXME: This is a workaround for trouble including gyb-generated sources
 
 #if SWIFT_CONCURRENCY_EMBEDDED
 
@@ -37,7 +37,6 @@ extension TaskGroup {
 
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-
 
     _ = Builtin.createTask(
       flags: flags,

@@ -59,7 +59,7 @@ import Swift
 %        ],
 %        ['addTask', 'addTaskUnlessCancelled'],
 %        [
-%          'executorPreference taskExecutor: (any TaskExecutor)?',
+%          'executorPreference taskExecutor: (any TaskExecutor)? = nil',
 %          'priority: TaskPriority? = nil',
 %          # throws and ChildTaskResult will be adjusted per task group type
 %          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'

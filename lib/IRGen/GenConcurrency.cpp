@@ -686,9 +686,9 @@ struct TaskGroupRecordTraits {
 
   void initialize(IRGenFunction &IGF, Address recordAddr,
                   Explosion &taskGroup) const {
-    auto record =
-      IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize());
-    IGF.Builder.CreateStore(taskGroup.claimNext(), record);
+    IGF.Builder.CreateStore(
+        taskGroup.claimNext(),
+        IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize()));
   }
 };
 

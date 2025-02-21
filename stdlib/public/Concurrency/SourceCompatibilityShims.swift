@@ -89,7 +89,7 @@ extension Task where Success == Never, Failure == Never {
 
 @available(SwiftStdlib 5.1, *)
 extension Task where Failure == Error {
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @discardableResult
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
@@ -99,7 +99,7 @@ extension Task where Failure == Error {
   ) -> Task<Success, Failure> {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
-#else
+  #else
   @discardableResult
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "`Task.runDetached` was replaced by `Task.detached` and will be removed shortly.")
@@ -109,7 +109,7 @@ extension Task where Failure == Error {
   ) -> Task<Success, Failure> {
     detached(priority: priority, operation: operation)
   }
-#endif
+  #endif
 }
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -264,9 +264,9 @@ extension Task where Success == Never, Failure == Never {
   @available(*, deprecated, message: "`Task.withGroup` was replaced by `withThrowingTaskGroup` and `withTaskGroup` and will be removed shortly.")
   @_alwaysEmitIntoClient
   public static func withGroup<TaskResult: Sendable, BodyResult>(
-      resultType: TaskResult.Type,
-      returning returnType: BodyResult.Type = BodyResult.self,
-      body: (inout Task.Group<TaskResult>) async throws -> BodyResult
+    resultType: TaskResult.Type,
+    returning returnType: BodyResult.Type = BodyResult.self,
+    body: (inout Task.Group<TaskResult>) async throws -> BodyResult
   ) async rethrows -> BodyResult {
     try await withThrowingTaskGroup(of: resultType) { group in
       try await body(&group)
@@ -275,9 +275,33 @@ extension Task where Success == Never, Failure == Never {
 }
 
 @available(SwiftStdlib 5.1, *)
+extension Task {
+  @available(*, deprecated, message: "get() has been replaced by .value")
+  @_alwaysEmitIntoClient
+  public func get() async throws -> Success {
+    return try await value
+  }
+
+  @available(*, deprecated, message: "getResult() has been replaced by .result")
+  @_alwaysEmitIntoClient
+  public func getResult() async -> Result<Success, Failure>  {
+    return await result
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+extension Task where Failure == Never {
+  @available(*, deprecated, message: "get() has been replaced by .value")
+  @_alwaysEmitIntoClient
+  public func get() async -> Success {
+    return await value
+  }
+}
+
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(SwiftStdlib 5.1, *)
 extension TaskGroup {
-  @available(SwiftStdlib 5.1, *)
-  @available(*, deprecated, renamed: "addTaskUnlessCancelled(priority:operation:)")
+  @available(*, deprecated, renamed: "addTask(priority:operation:)")
   @_alwaysEmitIntoClient
   public mutating func add(
     priority: TaskPriority? = nil,
@@ -294,7 +318,7 @@ extension TaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
-    self.addTask(priority: priority, operation: operation)
+    addTask(priority: priority, operation: operation)
   }
 
   @available(*, deprecated, renamed: "addTaskUnlessCancelled(priority:operation:)")
@@ -324,7 +348,94 @@ extension TaskGroup {
     addTaskUnlessCancelled(priority: priority, operation: operation)
   }
 }
+#else
+@available(SwiftStdlib 5.1, *)
+extension TaskGroup {
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
+  public mutating func add(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) async -> Bool {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
 
+  @available(*, deprecated, renamed: "addTaskUnlessCancelled(operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func add(
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) async -> Bool {
+    return self.addTaskUnlessCancelled {
+      await operation()
+    }
+  }
+
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
+  public mutating func spawn(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+
+  @available(*, deprecated, renamed: "addTask(operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func spawn(
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) {
+    addTask(operation: operation)
+  }
+
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
+  public mutating func spawnUnlessCancelled(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Bool {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+
+  @available(*, deprecated, renamed: "addTaskUnlessCancelled(operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func spawnUnlessCancelled(
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Bool {
+    addTaskUnlessCancelled(operation: operation)
+  }
+
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
+  public mutating func async(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+
+  @available(*, deprecated, renamed: "addTask(operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func async(
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) {
+    addTask(operation: operation)
+  }
+
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
+  public mutating func asyncUnlessCancelled(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Bool {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+
+  @available(*, deprecated, renamed: "addTaskUnlessCancelled(operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func asyncUnlessCancelled(
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Bool {
+    addTaskUnlessCancelled(operation: operation)
+  }
+}
+#endif
+
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
 extension ThrowingTaskGroup {
   @available(*, deprecated, renamed: "addTask(priority:operation:)")
@@ -374,34 +485,92 @@ extension ThrowingTaskGroup {
     addTaskUnlessCancelled(priority: priority, operation: operation)
   }
 }
-
+#else
 @available(SwiftStdlib 5.1, *)
-extension Task {
-  @available(*, deprecated, message: "get() has been replaced by .value")
-  @_alwaysEmitIntoClient
-  public func get() async throws -> Success {
-    return try await value
+extension ThrowingTaskGroup {
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
+  public mutating func add(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) async -> Bool {
+    fatalError("Unavailable in task-to-thread concurrency model")
   }
 
-  @available(*, deprecated, message: "getResult() has been replaced by .result")
+  @available(*, deprecated, renamed: "addTaskUnlessCancelled(operation:)")
   @_alwaysEmitIntoClient
-  public func getResult() async -> Result<Success, Failure>  {
-    return await result
+  public mutating func add(
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) async -> Bool {
+    return self.addTaskUnlessCancelled {
+      try await operation()
+    }
+  }
+
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
+  public mutating func spawn(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+
+  @available(*, deprecated, renamed: "addTask(operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func spawn(
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) {
+    addTask(operation: operation)
+  }
+
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
+  public mutating func spawnUnlessCancelled(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) -> Bool {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+
+  @available(*, deprecated, renamed: "addTaskUnlessCancelled(operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func spawnUnlessCancelled(
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) -> Bool {
+    addTaskUnlessCancelled(operation: operation)
+  }
+
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
+  public mutating func async(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+
+  @available(*, deprecated, renamed: "addTask(operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func async(
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) {
+    addTask(operation: operation)
+  }
+
+  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
+  public mutating func asyncUnlessCancelled(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) -> Bool {
+    fatalError("Unavailable in task-to-thread concurrency model")
+  }
+
+  @available(*, deprecated, renamed: "addTaskUnlessCancelled(operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func asyncUnlessCancelled(
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) -> Bool {
+    addTaskUnlessCancelled(operation: operation)
   }
 }
-
-@available(SwiftStdlib 5.1, *)
-extension Task where Failure == Never {
-  @available(*, deprecated, message: "get() has been replaced by .value")
-  @_alwaysEmitIntoClient
-  public func get() async -> Success {
-    return await value
-  }
-}
-
-// NOTE: We had to move sources touching TaskGroup addTask APIs into TaskGroup+addTask.swift.gyb
-// due to the build having trouble with using the generated source in the same module
-// rdar://145171772
+#endif
 
 @available(SwiftStdlib 5.1, *)
 @available(*, deprecated, message: "please use UnsafeContinuation<..., Error>")

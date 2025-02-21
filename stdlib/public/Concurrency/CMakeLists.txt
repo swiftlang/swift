@@ -277,9 +277,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
 
-      # FIXME: Need to include the TaskGroup+addTask.swift.gyb here,
-      #        but there's trouble with that: Unknown architecture: x86_64-apple-macos
-
       SWIFT_COMPILE_FLAGS
         ${extra_swift_compile_flags} -enable-experimental-feature Embedded
         -parse-stdlib -DSWIFT_CONCURRENCY_EMBEDDED
