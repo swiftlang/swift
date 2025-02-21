@@ -30,6 +30,14 @@
 
 using namespace swift;
 
+AvailabilityScope::IntroNode::IntroNode(SourceFile *SF)
+    : IntroReason(Reason::Root), DC(SF), SF(SF) {}
+
+AvailabilityScope::IntroNode::IntroNode(Decl *D, Reason introReason)
+    : IntroReason(introReason), DC(D->getDeclContext()), D(D) {
+  (void)getAsDecl(); // check that assertion succeeds
+}
+
 AvailabilityScope::AvailabilityScope(ASTContext &Ctx, IntroNode Node,
                                      AvailabilityScope *Parent,
                                      SourceRange SrcRange,
@@ -99,67 +107,66 @@ AvailabilityScope *AvailabilityScope::createForDeclImplicit(
                                      Parent, SrcRange, Info);
 }
 
-AvailabilityScope *
-AvailabilityScope::createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
-                                       AvailabilityScope *Parent,
-                                       const AvailabilityContext Info) {
-  assert(S);
-  assert(Parent);
-  return new (Ctx) AvailabilityScope(Ctx, IntroNode(S, /*IsThen=*/true), Parent,
-                                     S->getThenStmt()->getSourceRange(), Info);
-}
-
-AvailabilityScope *
-AvailabilityScope::createForIfStmtElse(ASTContext &Ctx, IfStmt *S,
-                                       AvailabilityScope *Parent,
-                                       const AvailabilityContext Info) {
+AvailabilityScope *AvailabilityScope::createForIfStmtThen(
+    ASTContext &Ctx, IfStmt *S, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
   assert(S);
   assert(Parent);
   return new (Ctx)
-      AvailabilityScope(Ctx, IntroNode(S, /*IsThen=*/false), Parent,
+      AvailabilityScope(Ctx, IntroNode(S, DC, /*IsThen=*/true), Parent,
+                        S->getThenStmt()->getSourceRange(), Info);
+}
+
+AvailabilityScope *AvailabilityScope::createForIfStmtElse(
+    ASTContext &Ctx, IfStmt *S, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
+  assert(S);
+  assert(Parent);
+  return new (Ctx)
+      AvailabilityScope(Ctx, IntroNode(S, DC, /*IsThen=*/false), Parent,
                         S->getElseStmt()->getSourceRange(), Info);
 }
 
 AvailabilityScope *AvailabilityScope::createForConditionFollowingQuery(
     ASTContext &Ctx, PoundAvailableInfo *PAI,
-    const StmtConditionElement &LastElement, AvailabilityScope *Parent,
-    const AvailabilityContext Info) {
+    const StmtConditionElement &LastElement, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
   assert(PAI);
   assert(Parent);
   SourceRange Range(PAI->getEndLoc(), LastElement.getEndLoc());
-  return new (Ctx) AvailabilityScope(Ctx, PAI, Parent, Range, Info);
+  return new (Ctx)
+      AvailabilityScope(Ctx, IntroNode(PAI, DC), Parent, Range, Info);
 }
 
 AvailabilityScope *AvailabilityScope::createForGuardStmtFallthrough(
     ASTContext &Ctx, GuardStmt *RS, BraceStmt *ContainingBraceStmt,
-    AvailabilityScope *Parent, const AvailabilityContext Info) {
+    const DeclContext *DC, AvailabilityScope *Parent,
+    const AvailabilityContext Info) {
   assert(RS);
   assert(ContainingBraceStmt);
   assert(Parent);
   SourceRange Range(RS->getEndLoc(), ContainingBraceStmt->getEndLoc());
-  return new (Ctx) AvailabilityScope(Ctx, IntroNode(RS, /*IsFallthrough=*/true),
-                                     Parent, Range, Info);
+  return new (Ctx) AvailabilityScope(
+      Ctx, IntroNode(RS, DC, /*IsFallthrough=*/true), Parent, Range, Info);
 }
 
-AvailabilityScope *
-AvailabilityScope::createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
-                                          AvailabilityScope *Parent,
-                                          const AvailabilityContext Info) {
+AvailabilityScope *AvailabilityScope::createForGuardStmtElse(
+    ASTContext &Ctx, GuardStmt *RS, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
   assert(RS);
   assert(Parent);
   return new (Ctx)
-      AvailabilityScope(Ctx, IntroNode(RS, /*IsFallthrough=*/false), Parent,
+      AvailabilityScope(Ctx, IntroNode(RS, DC, /*IsFallthrough=*/false), Parent,
                         RS->getBody()->getSourceRange(), Info);
 }
 
-AvailabilityScope *
-AvailabilityScope::createForWhileStmtBody(ASTContext &Ctx, WhileStmt *S,
-                                          AvailabilityScope *Parent,
-                                          const AvailabilityContext Info) {
+AvailabilityScope *AvailabilityScope::createForWhileStmtBody(
+    ASTContext &Ctx, WhileStmt *S, const DeclContext *DC,
+    AvailabilityScope *Parent, const AvailabilityContext Info) {
   assert(S);
   assert(Parent);
-  return new (Ctx)
-      AvailabilityScope(Ctx, S, Parent, S->getBody()->getSourceRange(), Info);
+  return new (Ctx) AvailabilityScope(Ctx, IntroNode(S, DC), Parent,
+                                     S->getBody()->getSourceRange(), Info);
 }
 
 void AvailabilityScope::addChild(AvailabilityScope *Child, ASTContext &Ctx) {

@@ -412,8 +412,15 @@ class AvailabilityScopeBuilder : private ASTWalker {
   };
   std::vector<DeclBodyContextInfo> DeclBodyContextStack;
 
+  std::vector<const DeclContext *> DeclContextStack;
+
   AvailabilityScope *getCurrentScope() {
     return ContextStack.back().Scope;
+  }
+
+  const DeclContext *getCurrentDeclContext() const {
+    assert(!DeclContextStack.empty());
+    return DeclContextStack.back();
   }
 
   bool isCurrentScopeContainedByDeploymentTarget() {
@@ -467,6 +474,7 @@ public:
       : Context(Context) {
     assert(Scope);
     pushContext(Scope, ParentTy());
+    DeclContextStack.push_back(Scope->getIntroductionNode().getDeclContext());
   }
 
   void build(Decl *D) {
@@ -588,27 +596,30 @@ private:
 
     // Implicit decls don't have source locations so they cannot have a scope.
     // However, some implicit nodes contain non-implicit nodes (e.g. defer
-    // blocks) so continue rather than skipping the node entirely.
-    if (D->isImplicit())
-      return Action::Continue();
+    // blocks) so we must continue through them.
+    if (!D->isImplicit()) {
+      if (shouldSkipDecl(D))
+        return Action::SkipNode();
 
-    if (shouldSkipDecl(D))
-      return Action::SkipNode();
+      // The AST of this decl may not be ready to traverse yet if it hasn't been
+      // full typechecked. If that's the case, we leave a placeholder node in
+      // the tree to indicate that the subtree should be expanded lazily when it
+      // needs to be traversed.
+      if (buildLazyContextForDecl(D))
+        return Action::SkipNode();
 
-    // The AST of this decl may not be ready to traverse yet if it hasn't been
-    // full typechecked. If that's the case, we leave a placeholder node in the
-    // tree to indicate that the subtree should be expanded lazily when it
-    // needs to be traversed.
-    if (buildLazyContextForDecl(D))
-      return Action::SkipNode();
+      // Adds in a scope that covers the entire declaration.
+      if (auto DeclScope = getNewContextForSignatureOfDecl(D)) {
+        pushContext(DeclScope, D);
+      }
 
-    // Adds in a scope that covers the entire declaration.
-    if (auto DeclScope = getNewContextForSignatureOfDecl(D)) {
-      pushContext(DeclScope, D);
+      // Create scopes that cover only the body of the declaration.
+      buildContextsForBodyOfDecl(D);
     }
 
-    // Create scopes that cover only the body of the declaration.
-    buildContextsForBodyOfDecl(D);
+    if (auto *DC = dyn_cast<DeclContext>(D)) {
+      DeclContextStack.push_back(DC);
+    }
 
     // If this decl is the concrete syntax decl for some abstract syntax decl,
     // push it onto the stack so that the abstract syntax decls may be visited.
@@ -622,6 +633,11 @@ private:
   PostWalkAction walkToDeclPost(Decl *D) override {
     if (!ConcreteDeclStack.empty() && ConcreteDeclStack.back() == D) {
       ConcreteDeclStack.pop_back();
+    }
+
+    if (auto *DC = dyn_cast<DeclContext>(D)) {
+      assert(DeclContextStack.back() == DC);
+      DeclContextStack.pop_back();
     }
 
     while (ContextStack.back().ScopeNode.getAsDecl() == D) {
@@ -1041,7 +1057,8 @@ private:
       auto AvailabilityContext =
           constrainCurrentAvailabilityWithPlatformRange(ThenRange.value());
       auto *ThenScope = AvailabilityScope::createForIfStmtThen(
-          Context, IS, getCurrentScope(), AvailabilityContext);
+          Context, IS, getCurrentDeclContext(), getCurrentScope(),
+          AvailabilityContext);
       AvailabilityScopeBuilder(ThenScope, Context).build(IS->getThenStmt());
     } else {
       build(IS->getThenStmt());
@@ -1064,7 +1081,8 @@ private:
       auto AvailabilityContext =
           constrainCurrentAvailabilityWithPlatformRange(ElseRange.value());
       auto *ElseScope = AvailabilityScope::createForIfStmtElse(
-          Context, IS, getCurrentScope(), AvailabilityContext);
+          Context, IS, getCurrentDeclContext(), getCurrentScope(),
+          AvailabilityContext);
       AvailabilityScopeBuilder(ElseScope, Context).build(ElseStmt);
     } else {
       build(IS->getElseStmt());
@@ -1085,7 +1103,8 @@ private:
       auto AvailabilityContext =
           constrainCurrentAvailabilityWithPlatformRange(BodyRange.value());
       auto *BodyScope = AvailabilityScope::createForWhileStmtBody(
-          Context, WS, getCurrentScope(), AvailabilityContext);
+          Context, WS, getCurrentDeclContext(), getCurrentScope(),
+          AvailabilityContext);
       AvailabilityScopeBuilder(BodyScope, Context).build(WS->getBody());
     } else {
       build(WS->getBody());
@@ -1118,7 +1137,8 @@ private:
         auto AvailabilityContext =
             constrainCurrentAvailabilityWithPlatformRange(ElseRange.value());
         auto *TrueScope = AvailabilityScope::createForGuardStmtElse(
-            Context, GS, getCurrentScope(), AvailabilityContext);
+            Context, GS, getCurrentDeclContext(), getCurrentScope(),
+            AvailabilityContext);
 
         AvailabilityScopeBuilder(TrueScope, Context).build(ElseBody);
       } else {
@@ -1135,7 +1155,8 @@ private:
     auto FallthroughAvailability =
         constrainCurrentAvailabilityWithPlatformRange(FallthroughRange.value());
     auto *FallthroughScope = AvailabilityScope::createForGuardStmtFallthrough(
-        Context, GS, ParentBrace, getCurrentScope(), FallthroughAvailability);
+        Context, GS, ParentBrace, getCurrentDeclContext(), getCurrentScope(),
+        FallthroughAvailability);
 
     pushContext(FallthroughScope, ParentBrace);
   }
@@ -1293,7 +1314,8 @@ private:
       auto ConstrainedAvailability =
           constrainCurrentAvailabilityWithPlatformRange(NewConstraint);
       auto *Scope = AvailabilityScope::createForConditionFollowingQuery(
-          Context, Query, LastElement, CurrentScope, ConstrainedAvailability);
+          Context, Query, LastElement, getCurrentDeclContext(), CurrentScope,
+          ConstrainedAvailability);
 
       pushContext(Scope, ParentTy());
       ++NestedCount;
@@ -1399,12 +1421,22 @@ private:
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     (void)consumeDeclBodyContextIfNecessary(E);
+
+    if (auto CE = dyn_cast<ClosureExpr>(E)) {
+      DeclContextStack.push_back(CE);
+    }
+
     return Action::Continue(E);
   }
 
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
     if (ContextStack.back().ScopeNode.getAsExpr() == E) {
       ContextStack.pop_back();
+    }
+
+    if (auto *CE = dyn_cast<ClosureExpr>(E)) {
+      assert(DeclContextStack.back() == CE);
+      DeclContextStack.pop_back();
     }
 
     return Action::Continue(E);
