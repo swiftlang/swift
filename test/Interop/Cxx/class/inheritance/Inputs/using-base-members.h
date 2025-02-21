@@ -65,14 +65,13 @@ struct ProtectedMemberPrivateInheritance : private ProtectedBase {
 };
 
 struct OperatorBase {
-protected:
   operator bool() const { return true; }
   int operator*() const { return 456; }
   OperatorBase operator!() const { return *this; }
   // int operator[](const int x) const { return x; } // FIXME: see below
 };
 
-struct OperatorBasePrivateInheritance : OperatorBase {
+struct OperatorBasePrivateInheritance : private OperatorBase {
 public:
   using OperatorBase::operator bool;
   using OperatorBase::operator*;
