@@ -2730,6 +2730,7 @@ public:
     // 27 is currently unused
     Task_IsAsyncLetTask                   = 28,
     Task_HasInitialTaskExecutorPreference = 29,
+    Task_HasInitialTaskName               = 30,
   };
   // clang-format on
 
@@ -2766,6 +2767,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInitialTaskExecutorPreference,
                                 task_hasInitialTaskExecutorPreference,
                                 task_setHasInitialTaskExecutorPreference)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInitialTaskName,
+                                task_hasInitialTaskName,
+                                task_setHasInitialTaskName)
 };
 
 /// Kinds of task status record.
@@ -2795,6 +2799,9 @@ enum class TaskStatusRecordKind : uint8_t {
   /// enqueued on.
   TaskExecutorPreference = 5,
 
+  /// A human-readable task name.
+  TaskName = 6,
+
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,
   Private_RecordLock = 192
@@ -2818,6 +2825,8 @@ enum class TaskOptionRecordKind : uint8_t {
   /// Set the initial task executor preference of the task.
   InitialTaskExecutorUnowned = 5,
   InitialTaskExecutorOwned = 6,
+  // Set a human-readable task name.
+  InitialTaskName = 7,
   /// Request a child task for swift_task_run_inline.
   RunInline = UINT8_MAX,
 };

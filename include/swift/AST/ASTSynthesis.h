@@ -57,6 +57,7 @@ enum SingletonTypeSynthesizer {
   _taskExecutor,   // the '_Concurrency.TaskExecutor' protocol
   _actor,          // the '_Concurrency.Actor' protocol
   _distributedActor,  // the 'Distributed.DistributedActor' protocol
+  _unsafeRawBufferPointer // UnsafeRawBufferPointer
 };
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
@@ -89,6 +90,8 @@ inline Type synthesizeType(SynthesisContext &SC,
   case _distributedActor:
     return SC.Context.getProtocol(KnownProtocolKind::DistributedActor)
       ->getDeclaredInterfaceType();
+  case _unsafeRawBufferPointer:
+    return SC.Context.getUnsafeRawBufferPointerType();
   case _copyable:
     return SC.Context.getProtocol(KnownProtocolKind::Copyable)
         ->getDeclaredInterfaceType();
