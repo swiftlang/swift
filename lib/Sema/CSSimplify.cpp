@@ -9627,6 +9627,63 @@ ConstraintSystem::simplifyBindTupleOfFunctionParamsConstraint(
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::matchPackElementType(Type elementType, Type patternType,
+                                       ConstraintLocatorBuilder locator) {
+  auto tryFix = [&](llvm::function_ref<ConstraintFix *(void)> fix) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    if (recordFix(fix()))
+      return SolutionKind::Error;
+
+    recordAnyTypeVarAsPotentialHole(elementType);
+    return SolutionKind::Solved;
+  };
+
+  auto *loc = getConstraintLocator(locator);
+  ASSERT(loc->directlyAt<PackExpansionExpr>());
+  auto *packExpansion = castToExpr<PackExpansionExpr>(loc->getAnchor());
+
+  ASSERT(!patternType->hasTypeVariable());
+  auto shapeClass = patternType->getReducedShape();
+
+  // `each` was applied to a concrete type.
+  if (!shapeClass->is<PackArchetypeType>()) {
+    return tryFix([&]() {
+      return AllowInvalidPackElement::create(*this, patternType, loc);
+    });
+  }
+
+  auto shapeParam = CanGenericTypeParamType(cast<GenericTypeParamType>(
+      shapeClass->mapTypeOutOfContext()->getCanonicalType()));
+
+  auto *genericEnv = getPackExpansionEnvironment(packExpansion);
+  if (genericEnv) {
+    if (shapeParam != genericEnv->getOpenedElementShapeClass()) {
+      return tryFix([&]() {
+        auto envShape = genericEnv->mapTypeIntoContext(
+            genericEnv->getOpenedElementShapeClass());
+        if (auto *pack = dyn_cast<PackType>(envShape))
+          envShape = pack->unwrapSingletonPackExpansion()->getPatternType();
+
+        return SkipSameShapeRequirement::create(
+            *this, envShape, shapeClass,
+            getConstraintLocator(loc, ConstraintLocator::PackShape));
+      });
+    }
+  } else {
+    genericEnv = createPackExpansionEnvironment(packExpansion, shapeParam);
+  }
+
+  auto expectedElementTy =
+      genericEnv->mapContextualPackTypeIntoElementContext(patternType);
+  assert(!expectedElementTy->is<PackType>());
+
+  addConstraint(ConstraintKind::Equal, elementType, expectedElementTy, locator);
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
                                                   TypeMatchOptions flags,
                                                   ConstraintLocatorBuilder locator) {
@@ -9660,46 +9717,8 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
   }
 
   // Let's try to resolve element type based on the pattern type.
-  if (!patternType->hasTypeVariable()) {
-    auto *loc = getConstraintLocator(locator);
-    auto shapeClass = patternType->getReducedShape();
-    auto *elementEnv = getPackElementEnvironment(loc, shapeClass);
-
-    // Without an opened element environment, we cannot derive the
-    // element binding.
-    if (!elementEnv) {
-      if (!shouldAttemptFixes())
-        return SolutionKind::Error;
-
-      // `each` was applied to a concrete type.
-      if (!shapeClass->is<PackArchetypeType>()) {
-        if (recordFix(AllowInvalidPackElement::create(*this, patternType, loc)))
-          return SolutionKind::Error;
-      } else {
-        auto envShape = PackExpansionEnvironments.find(loc);
-        if (envShape == PackExpansionEnvironments.end()) {
-          return SolutionKind::Error;
-        }
-        auto *fix = SkipSameShapeRequirement::create(
-            *this, envShape->second.second, shapeClass,
-            getConstraintLocator(loc, ConstraintLocator::PackShape));
-        if (recordFix(fix)) {
-          return SolutionKind::Error;
-        }
-      }
-
-      recordAnyTypeVarAsPotentialHole(elementType);
-      return SolutionKind::Solved;
-    }
-
-    auto expectedElementTy =
-        elementEnv->mapContextualPackTypeIntoElementContext(patternType);
-    assert(!expectedElementTy->is<PackType>());
-
-    addConstraint(ConstraintKind::Equal, elementType, expectedElementTy,
-                  locator);
-    return SolutionKind::Solved;
-  }
+  if (!patternType->hasTypeVariable())
+    return matchPackElementType(elementType, patternType, locator);
 
   // Otherwise we are inferred or checking pattern type.
 

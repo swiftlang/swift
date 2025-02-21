@@ -902,10 +902,10 @@ TypeVarRefCollector::walkToExprPre(Expr *expr) {
   }
 
   if (auto *packElement = getAsExpr<PackElementExpr>(expr)) {
-    // If environment hasn't been established yet, it means that pack expansion
+    // If expansion hasn't been established yet, it means that pack expansion
     // appears inside of this closure.
-    if (auto *outerEnvironment = CS.getPackEnvironment(packElement))
-      inferTypeVars(outerEnvironment);
+    if (auto *outerExpansion = CS.getPackElementExpansion(packElement))
+      inferTypeVars(outerExpansion);
   }
 
   return Action::Continue(expr);
@@ -1214,9 +1214,8 @@ namespace {
       SmallVector<ASTNode, 2> expandedPacks;
       collectExpandedPacks(expr, expandedPacks);
       for (auto pack : expandedPacks) {
-        if (auto *elementExpr = getAsExpr<PackElementExpr>(pack)) {
-          CS.addPackEnvironment(elementExpr, expr);
-        }
+        if (auto *elementExpr = getAsExpr<PackElementExpr>(pack))
+          CS.recordPackElementExpansion(elementExpr, expr);
       }
 
       auto *patternLoc = CS.getConstraintLocator(
@@ -3239,15 +3238,15 @@ namespace {
 
     Type visitPackElementExpr(PackElementExpr *expr) {
       auto packType = CS.getType(expr->getPackRefExpr());
-      auto *packEnvironment = CS.getPackEnvironment(expr);
+      auto *packExpansion = CS.getPackElementExpansion(expr);
       auto elementType = openPackElement(
-          packType, CS.getConstraintLocator(expr), packEnvironment);
-      if (packEnvironment) {
+          packType, CS.getConstraintLocator(expr), packExpansion);
+      if (packExpansion) {
         auto expansionType =
-            CS.getType(packEnvironment)->castTo<PackExpansionType>();
+            CS.getType(packExpansion)->castTo<PackExpansionType>();
         CS.addConstraint(ConstraintKind::ShapeOf, expansionType->getCountType(),
                          packType,
-                         CS.getConstraintLocator(packEnvironment,
+                         CS.getConstraintLocator(packExpansion,
                                                  ConstraintLocator::PackShape));
       } else {
         CS.recordFix(AllowInvalidPackReference::create(

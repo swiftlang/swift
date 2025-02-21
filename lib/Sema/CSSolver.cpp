@@ -256,8 +256,8 @@ Solution ConstraintSystem::finalize() {
     solution.PackExpansionEnvironments.insert(env);
   }
 
-  for (const auto &packEnv : PackEnvironments)
-    solution.PackEnvironments.insert(packEnv);
+  for (const auto &packEnv : PackElementExpansions)
+    solution.PackElementExpansions.insert(packEnv);
 
   for (const auto &synthesized : SynthesizedConformances) {
     solution.SynthesizedConformances.insert(synthesized);
@@ -355,10 +355,10 @@ void ConstraintSystem::replaySolution(const Solution &solution,
       recordPackExpansionEnvironment(expansion.first, expansion.second);
   }
 
-  // Register the solutions's pack environments.
-  for (auto &packEnvironment : solution.PackEnvironments) {
-    if (PackEnvironments.count(packEnvironment.first) == 0)
-      addPackEnvironment(packEnvironment.first, packEnvironment.second);
+  // Register the solutions's pack expansions.
+  for (auto &packEnvironment : solution.PackElementExpansions) {
+    if (PackElementExpansions.count(packEnvironment.first) == 0)
+      recordPackElementExpansion(packEnvironment.first, packEnvironment.second);
   }
 
   // Register the defaulted type variables.

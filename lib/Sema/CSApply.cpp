@@ -3942,21 +3942,15 @@ namespace {
     }
 
     Expr *visitPackExpansionExpr(PackExpansionExpr *expr) {
-      simplifyExprType(expr);
-
       // Set the opened pack element environment for this pack expansion.
-      auto expansionTy = cs.getType(expr)->castTo<PackExpansionType>();
-      auto *locator = cs.getConstraintLocator(expr);
-      auto *environment = cs.getPackElementEnvironment(locator,
-          expansionTy->getCountType()->getCanonicalType());
-
       // Assert that we have an opened element environment, otherwise we'll get
       // an ASTVerifier crash when pack archetypes or element archetypes appear
       // inside the pack expansion expression.
+      auto *environment = solution.getPackExpansionEnvironment(expr);
       assert(environment);
       expr->setGenericEnvironment(environment);
 
-      return expr;
+      return simplifyExprType(expr);
     }
 
     Expr *visitPackElementExpr(PackElementExpr *expr) {

@@ -877,59 +877,53 @@ void ConstraintSystem::recordOpenedExistentialType(
 }
 
 GenericEnvironment *
-ConstraintSystem::getPackElementEnvironment(ConstraintLocator *locator,
-                                            CanType shapeClass) {
-  assert(locator->directlyAt<PackExpansionExpr>());
-
-  std::pair<UUID, Type> uuidAndShape;
-  auto result = PackExpansionEnvironments.find(locator);
-  if (result == PackExpansionEnvironments.end()) {
-    uuidAndShape = std::make_pair(UUID::fromTime(), shapeClass);
-    recordPackExpansionEnvironment(locator, uuidAndShape);
-  } else {
-    uuidAndShape = result->second;
-  }
-
-  if (!shapeClass->is<PackArchetypeType>() ||
-      !shapeClass->isEqual(uuidAndShape.second))
+ConstraintSystem::getPackExpansionEnvironment(PackExpansionExpr *expr) const {
+  auto result = PackExpansionEnvironments.find(expr);
+  if (result == PackExpansionEnvironments.end())
     return nullptr;
 
-  auto shapeParam = cast<GenericTypeParamType>(
-      shapeClass->mapTypeOutOfContext()->getCanonicalType());
+  return result->second;
+}
 
-  auto &ctx = getASTContext();
+GenericEnvironment *ConstraintSystem::createPackExpansionEnvironment(
+    PackExpansionExpr *expr, CanGenericTypeParamType shapeParam) {
   auto *contextEnv = PackElementGenericEnvironments.empty()
                          ? DC->getGenericEnvironmentOfContext()
                          : PackElementGenericEnvironments.back();
-  auto elementSig = ctx.getOpenedElementSignature(
+  auto elementSig = getASTContext().getOpenedElementSignature(
       contextEnv->getGenericSignature().getCanonicalSignature(), shapeParam);
   auto contextSubs = contextEnv->getForwardingSubstitutionMap();
-  return GenericEnvironment::forOpenedElement(elementSig, uuidAndShape.first,
-                                              shapeParam, contextSubs);
+  auto *env = GenericEnvironment::forOpenedElement(elementSig, UUID::fromTime(),
+                                                   shapeParam, contextSubs);
+  recordPackExpansionEnvironment(expr, env);
+  return env;
 }
 
-void ConstraintSystem::recordPackExpansionEnvironment(
-    ConstraintLocator *locator, std::pair<UUID, Type> uuidAndShape) {
-  bool inserted = PackExpansionEnvironments.insert({locator, uuidAndShape}).second;
+void ConstraintSystem::recordPackExpansionEnvironment(PackExpansionExpr *expr,
+                                                      GenericEnvironment *env) {
+  bool inserted = PackExpansionEnvironments.insert({expr, env}).second;
   ASSERT(inserted);
 
   if (solverState)
-    recordChange(SolverTrail::Change::RecordedPackExpansionEnvironment(locator));
+    recordChange(SolverTrail::Change::RecordedPackExpansionEnvironment(expr));
 }
 
 PackExpansionExpr *
-ConstraintSystem::getPackEnvironment(PackElementExpr *packElement) const {
-  const auto match = PackEnvironments.find(packElement);
-  return (match == PackEnvironments.end()) ? nullptr : match->second;
+ConstraintSystem::getPackElementExpansion(PackElementExpr *packElement) const {
+  const auto match = PackElementExpansions.find(packElement);
+  return (match == PackElementExpansions.end()) ? nullptr : match->second;
 }
 
-void ConstraintSystem::addPackEnvironment(PackElementExpr *packElement,
-                                          PackExpansionExpr *packExpansion) {
-  bool inserted = PackEnvironments.insert({packElement, packExpansion}).second;
+void ConstraintSystem::recordPackElementExpansion(
+    PackElementExpr *packElement, PackExpansionExpr *packExpansion) {
+  bool inserted =
+      PackElementExpansions.insert({packElement, packExpansion}).second;
   ASSERT(inserted);
 
-  if (solverState)
-    recordChange(SolverTrail::Change::RecordedPackEnvironment(packElement));
+  if (solverState) {
+    recordChange(
+        SolverTrail::Change::RecordedPackElementExpansion(packElement));
+  }
 }
 
 /// Extend the given depth map by adding depths for all of the subexpressions
@@ -1916,6 +1910,7 @@ size_t Solution::getTotalMemory() const {
   if (TotalMemory)
     return *TotalMemory;
 
+  // clang-format off
   const_cast<Solution *>(this)->TotalMemory
        = sizeof(*this) + size_in_bytes(typeBindings) +
          overloadChoices.getMemorySize() +
@@ -1925,7 +1920,7 @@ size_t Solution::getTotalMemory() const {
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
          OpenedPackExpansionTypes.getMemorySize() +
          PackExpansionEnvironments.getMemorySize() +
-         size_in_bytes(PackEnvironments) +
+         size_in_bytes(PackElementExpansions) +
          (DefaultedConstraints.size() * sizeof(void *)) +
          nodeTypes.getMemorySize() +
          keyPathComponentTypes.getMemorySize() +
@@ -1941,6 +1936,7 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(argumentLists) +
          size_in_bytes(ImplicitCallAsFunctionRoots) +
          size_in_bytes(SynthesizedConformances);
+  // clang-format on
 
   return *TotalMemory;
 }
@@ -4043,6 +4039,15 @@ ASTNode ConstraintSystem::includingParentApply(ASTNode node) {
     }
   }
   return node;
+}
+
+GenericEnvironment *
+Solution::getPackExpansionEnvironment(PackExpansionExpr *expr) const {
+  auto iter = PackExpansionEnvironments.find(expr);
+  if (iter == PackExpansionEnvironments.end())
+    return nullptr;
+
+  return iter->second;
 }
 
 std::optional<FunctionArgApplyInfo>
