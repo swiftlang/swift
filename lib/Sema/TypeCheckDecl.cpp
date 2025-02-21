@@ -1688,6 +1688,14 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   assert(dc->getSelfNominalTypeDecl() &&
          "Must have a nominal or extension context");
 
+  AvailabilityContext contextForConformingDecl =
+      availabilityForDeclSignature(dc->getAsDecl());
+
+  // If the conformance is unavailable then it's irrelevant whether the witness
+  // is potentially unavailable.
+  if (contextForConformingDecl.isUnavailable())
+    return true;
+
   // Make sure that any access of the witness through the protocol
   // can only occur when the witness is available. That is, make sure that
   // on every version where the conforming declaration is available, if the
@@ -1703,7 +1711,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   requirementInfo = AvailabilityInference::availableRange(requirement);
 
   AvailabilityRange infoForConformingDecl =
-      overApproximateAvailabilityAtLocation(dc->getAsDecl()->getLoc(), dc);
+      contextForConformingDecl.getPlatformRange();
 
   // Relax the requirements for @_spi witnesses by treating the requirement as
   // if it were introduced at the deployment target. This is not strictly sound
@@ -2234,6 +2242,12 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   }
 
   auto typeRepr = param->getTypeRepr();
+
+  if (!typeRepr && !param->isImplicit()) {
+    // Untyped closure parameter.
+    return ParamSpecifier::Default;
+  }
+
   assert(typeRepr != nullptr && "Should call setSpecifier() on "
          "synthesized parameter declarations");
 

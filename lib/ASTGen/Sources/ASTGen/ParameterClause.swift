@@ -176,10 +176,12 @@ extension ASTGenVisitor {
       argNameLoc: argNameLoc,
       paramName: paramName,
       paramNameLoc: paramNameLoc,
-      type: type.asNullable,
       defaultValue: initExpr.asNullable,
       defaultValueInitContext: initContext.asNullable
     )
+    if let type {
+      param.setTypeRepr(type)
+    }
     param.asDecl.attachParsedAttrs(attrs)
     return param
   }
@@ -194,11 +196,9 @@ extension ASTGenVisitor {
       argNameLoc: nil,
       paramName: name.identifier,
       paramNameLoc: name.sourceLoc,
-      type: nil,
       defaultValue: nil,
       defaultValueInitContext: nil
     )
-    param.setSpecifier(.default)
     return param
   }
 }
@@ -259,7 +259,6 @@ extension ASTGenVisitor {
       argNameLoc: nil,
       paramName: name,
       paramNameLoc: nameLoc,
-      type: nil,
       defaultValue: nil,
       defaultValueInitContext: nil
     )
@@ -276,7 +275,6 @@ extension ASTGenVisitor {
     params.reserveCapacity(node.parameters.count)
     for (index, node) in node.parameters.enumerated() {
       let param = self.generate(closureParameter: node, at: index)
-      param.setSpecifier(.default)
       params.append(param)
     }
 

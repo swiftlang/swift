@@ -607,40 +607,6 @@ mapParsedParameters(Parser &parser,
 
       param->setTypeRepr(type);
 
-      // Dig through the type to find any attributes or modifiers that are
-      // associated with the type but should also be reflected on the
-      // declaration.
-      {
-        auto unwrappedType = type;
-        while (true) {
-          if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
-            // At this point we actually don't know if that's valid to mark
-            // this parameter declaration as `autoclosure` because type has
-            // not been resolved yet - it should either be a function type
-            // or typealias with underlying function type.
-            if (ATR->has(TypeAttrKind::Autoclosure))
-              param->setAutoClosure(true);
-            if (ATR->has(TypeAttrKind::Addressable))
-              param->setAddressable(true);
-
-            unwrappedType = ATR->getTypeRepr();
-            continue;
-          }
-
-          if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
-            if (isa<IsolatedTypeRepr>(STR))
-              param->setIsolated(true);
-            else if (isa<CompileTimeConstTypeRepr>(STR))
-              param->setCompileTimeConst(true);
-            else if (isa<SendingTypeRepr>(STR))
-              param->setSending(true);
-            unwrappedType = STR->getBase();
-            continue;
-          }
-
-          break;
-        }
-      }
     } else if (paramInfo.SpecifierLoc.isValid()) {
       llvm::SmallString<16> specifier;
       {
@@ -653,10 +619,6 @@ mapParsedParameters(Parser &parser,
                       specifier);
       paramInfo.SpecifierLoc = SourceLoc();
       paramInfo.SpecifierKind = ParamDecl::Specifier::Default;
-
-      param->setSpecifier(ParamSpecifier::Default);
-    } else {
-      param->setSpecifier(ParamSpecifier::Default);
     }
 
     return param;

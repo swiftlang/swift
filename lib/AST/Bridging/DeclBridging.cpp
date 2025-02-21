@@ -193,58 +193,13 @@ BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cArgName,
     BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
-    BridgedSourceLoc cParamNameLoc, BridgedNullableTypeRepr opaqueType,
-    BridgedNullableExpr cDefaultArgument,
+    BridgedSourceLoc cParamNameLoc, BridgedNullableExpr cDefaultArgument,
     BridgedNullableDefaultArgumentInitializer cDefaultArgumentInitContext) {
-  auto *paramDecl = ParamDecl::createParsed(
+  return ParamDecl::createParsed(
       cContext.unbridged(), cSpecifierLoc.unbridged(), cArgNameLoc.unbridged(),
       cArgName.unbridged(), cParamNameLoc.unbridged(), cParamName.unbridged(),
       cDefaultArgument.unbridged(), cDefaultArgumentInitContext.unbridged(),
       cDeclContext.unbridged());
-
-  if (auto type = opaqueType.unbridged()) {
-    paramDecl->setTypeRepr(type);
-
-    // FIXME: Copied from 'Parser::parsePattern()'. This should be in Sema.
-    // Dig through the type to find any attributes or modifiers that are
-    // associated with the type but should also be reflected on the
-    // declaration.
-    auto unwrappedType = type;
-    while (true) {
-      if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
-        auto attrs = ATR->getAttrs();
-        // At this point we actually don't know if that's valid to mark
-        // this parameter declaration as `autoclosure` because type has
-        // not been resolved yet - it should either be a function type
-        // or typealias with underlying function type.
-        bool autoclosure = llvm::any_of(attrs, [](TypeOrCustomAttr attr) {
-          if (auto typeAttr = attr.dyn_cast<TypeAttribute *>())
-            return isa<AutoclosureTypeAttr>(typeAttr);
-          return false;
-        });
-        paramDecl->setAutoClosure(autoclosure);
-
-        unwrappedType = ATR->getTypeRepr();
-        continue;
-      }
-
-      if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
-        if (isa<IsolatedTypeRepr>(STR))
-          paramDecl->setIsolated(true);
-        else if (isa<CompileTimeConstTypeRepr>(STR))
-          paramDecl->setCompileTimeConst(true);
-        else if (isa<SendingTypeRepr>(STR))
-          paramDecl->setSending(true);
-
-        unwrappedType = STR->getBase();
-        continue;
-      }
-
-      break;
-    }
-  }
-
-  return paramDecl;
 }
 
 void BridgedConstructorDecl_setParsedBody(BridgedConstructorDecl decl,

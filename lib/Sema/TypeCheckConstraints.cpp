@@ -1632,11 +1632,11 @@ void ConstraintSystem::print(raw_ostream &out) const {
 
   if (!PackExpansionEnvironments.empty()) {
     out.indent(indent) << "Pack Expansion Environments:\n";
-    for (const auto &env : PackExpansionEnvironments) {
+    for (const auto &[packExpansion, env] : PackExpansionEnvironments) {
       out.indent(indent + 2);
-      env.first->dump(&getASTContext().SourceMgr, out);
-      out << " = (" << env.second.first << ", "
-          << env.second.second->getString(PO) << ")" << '\n';
+      dumpAnchor(packExpansion, &getASTContext().SourceMgr, out);
+      out << " = (" << env->getOpenedElementShapeClass() << ", "
+      << env->getOpenedElementUUID() << ")" << '\n';
     }
   }
 

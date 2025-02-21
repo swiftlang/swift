@@ -3734,19 +3734,21 @@ static void emitBuiltinStackDealloc(IRGenSILFunction &IGF,
 
 static void emitBuiltinCreateAsyncTask(IRGenSILFunction &IGF,
                                        swift::BuiltinInst *i) {
-  assert(i->getOperandValues().size() == 6 &&
-         "createAsyncTask needs 6 operands");
+  assert(i->getOperandValues().size() == 7 &&
+         "createAsyncTask needs 7 operands");
   auto flags = IGF.getLoweredSingletonExplosion(i->getOperand(0));
   auto serialExecutor = IGF.getLoweredOptionalExplosion(i->getOperand(1));
   auto taskGroup = IGF.getLoweredOptionalExplosion(i->getOperand(2));
   auto taskExecutorUnowned = IGF.getLoweredOptionalExplosion(i->getOperand(3));
   auto taskExecutorOwned = IGF.getLoweredOptionalExplosion(i->getOperand(4));
-  Explosion taskFunction = IGF.getLoweredExplosion(i->getOperand(5));
+  //   %11 = enum $Optional<UnsafeRawBufferPointer>, #Optional.some!enumelt, %10 : $UnsafeRawBufferPointer // user: %20
+  auto taskName = IGF.getLoweredOptionalExplosion(i->getOperand(5));
+  Explosion taskFunction = IGF.getLoweredExplosion(i->getOperand(6));
 
   auto taskAndContext =
     emitTaskCreate(IGF, flags, serialExecutor, taskGroup,
                    taskExecutorUnowned, taskExecutorOwned,
-                   taskFunction, i->getSubstitutions());
+                   taskName,  taskFunction, i->getSubstitutions());
   Explosion out;
   out.add(taskAndContext.first);
   out.add(taskAndContext.second);

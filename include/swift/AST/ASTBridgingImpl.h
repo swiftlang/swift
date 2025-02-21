@@ -310,6 +310,11 @@ swift::ParamSpecifier unbridge(BridgedParamSpecifier specifier) {
   }
 }
 
+void BridgedParamDecl_setTypeRepr(BridgedParamDecl cDecl,
+                                  BridgedTypeRepr cType) {
+  cDecl.unbridged()->setTypeRepr(cType.unbridged());
+}
+
 void BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
                                    BridgedParamSpecifier cSpecifier) {
   cDecl.unbridged()->setSpecifier(unbridge(cSpecifier));
