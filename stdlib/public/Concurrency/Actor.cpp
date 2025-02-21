@@ -314,6 +314,18 @@ JobPriority swift::swift_task_getCurrentThreadPriority() {
 #endif
 }
 
+const char *swift_task_getTaskName(AsyncTask *task) {
+  if (!task) {
+    return nullptr;
+  }
+  return task->getTaskName();
+}
+
+const char *swift::swift_task_getCurrentTaskName() {
+  auto task = swift_task_getCurrent();
+  return swift_task_getTaskName(task);
+}
+
 // Implemented in Swift to avoid some annoying hard-coding about
 // SerialExecutor's protocol witness table.  We could inline this
 // with effort, though.
@@ -565,6 +577,29 @@ swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
 
   return swift_task_isCurrentExecutorWithFlags(expectedExecutor,
                                                isCurrentExecutorFlag);
+}
+
+SWIFT_CC(swift)
+static void swift_task_startSynchronouslyImpl(AsyncTask* task) {
+  fprintf(stderr, "[%s:%d](%s) run it...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  swift_retain(task);
+
+  AsyncTask * originalTask = _swift_task_clearCurrent();
+  auto currentTracking = ExecutorTrackingInfo::current();
+  if (currentTracking) {
+    fprintf(stderr, "[%s:%d](%s) executor tracking active exec   = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, currentTracking->getActiveExecutor());
+    fprintf(stderr, "[%s:%d](%s) executor tracking task executor = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, currentTracking->getTaskExecutor());
+    auto currentExecutor = currentTracking->getActiveExecutor();
+
+    fprintf(stderr, "[%s:%d](%s) run sync task = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+            task);
+    swift_job_run(task, currentExecutor);
+  } else {
+    assert(false && "to the special inline executor here");
+  }
+  fprintf(stderr, "[%s:%d](%s) set current to original = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          originalTask);
+  _swift_task_setCurrent(originalTask);
 }
 
 /// Logging level for unexpected executors:
