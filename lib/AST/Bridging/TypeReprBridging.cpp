@@ -109,6 +109,22 @@ BridgedInverseTypeRepr_createParsed(BridgedASTContext cContext,
       InverseTypeRepr(cTildeLoc.unbridged(), cConstraint.unbridged());
 }
 
+BridgedIsolatedTypeRepr
+BridgedIsolatedTypeRepr_createParsed(BridgedASTContext cContext,
+                                     BridgedTypeRepr base,
+                                     BridgedSourceLoc cSpecifierLoc) {
+  return new (cContext.unbridged())
+      IsolatedTypeRepr(base.unbridged(), cSpecifierLoc.unbridged());
+}
+
+BridgedLifetimeDependentTypeRepr
+BridgedLifetimeDependentTypeRepr_createParsed(BridgedASTContext cContext,
+                                              BridgedTypeRepr base,
+                                              BridgedLifetimeEntry cEntry) {
+  return new (cContext.unbridged())
+      LifetimeDependentTypeRepr(base.unbridged(), cEntry.unbridged());
+}
+
 BridgedMetatypeTypeRepr
 BridgedMetatypeTypeRepr_createParsed(BridgedASTContext cContext,
                                      BridgedTypeRepr baseType,
@@ -116,6 +132,13 @@ BridgedMetatypeTypeRepr_createParsed(BridgedASTContext cContext,
   ASTContext &context = cContext.unbridged();
   SourceLoc tyLoc = cTypeLoc.unbridged();
   return new (context) MetatypeTypeRepr(baseType.unbridged(), tyLoc);
+}
+
+BridgedOwnershipTypeRepr BridgedOwnershipTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr base,
+    BridgedParamSpecifier cSpecifier, BridgedSourceLoc cSpecifierLoc) {
+  return new (cContext.unbridged()) OwnershipTypeRepr(
+      base.unbridged(), unbridge(cSpecifier), cSpecifierLoc.unbridged());
 }
 
 BridgedProtocolTypeRepr
@@ -166,43 +189,12 @@ BridgedAttributedTypeRepr_createParsed(BridgedASTContext cContext,
                                     base.unbridged());
 }
 
-BridgedSpecifierTypeRepr BridgedSpecifierTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedTypeRepr base,
-    BridgedAttributedTypeSpecifier specifier, BridgedSourceLoc cSpecifierLoc) {
-  ASTContext &context = cContext.unbridged();
-  SourceLoc loc = cSpecifierLoc.unbridged();
-  TypeRepr *baseType = base.unbridged();
-  switch (specifier) {
-  case BridgedAttributedTypeSpecifierInOut: {
-    return new (context)
-        OwnershipTypeRepr(baseType, ParamSpecifier::InOut, loc);
-  }
-  case BridgedAttributedTypeSpecifierBorrowing: {
-    return new (context)
-        OwnershipTypeRepr(baseType, ParamSpecifier::Borrowing, loc);
-  }
-  case BridgedAttributedTypeSpecifierConsuming: {
-    return new (context)
-        OwnershipTypeRepr(baseType, ParamSpecifier::Consuming, loc);
-  }
-  case BridgedAttributedTypeSpecifierLegacyShared: {
-    return new (context)
-        OwnershipTypeRepr(baseType, ParamSpecifier::LegacyShared, loc);
-  }
-  case BridgedAttributedTypeSpecifierLegacyOwned: {
-    return new (context)
-        OwnershipTypeRepr(baseType, ParamSpecifier::LegacyOwned, loc);
-  }
-  case BridgedAttributedTypeSpecifierSending: {
-    return new (context) SendingTypeRepr(baseType, loc);
-  }
-  case BridgedAttributedTypeSpecifierConst: {
-    return new (context) CompileTimeConstTypeRepr(baseType, loc);
-  }
-  case BridgedAttributedTypeSpecifierIsolated: {
-    return new (context) IsolatedTypeRepr(baseType, loc);
-  }
-  }
+BridgedSendingTypeRepr
+BridgedSendingTypeRepr_createParsed(BridgedASTContext cContext,
+                                    BridgedTypeRepr base,
+                                    BridgedSourceLoc cSpecifierLoc) {
+  return new (cContext.unbridged())
+      SendingTypeRepr(base.unbridged(), cSpecifierLoc.unbridged());
 }
 
 BridgedVarargTypeRepr
@@ -273,6 +265,14 @@ BridgedCompositionTypeRepr_createParsed(BridgedASTContext cContext,
   return CompositionTypeRepr::create(
       context, types, types.front()->getStartLoc(),
       SourceRange{firstAmpLoc, types.back()->getEndLoc()});
+}
+
+BridgedCompileTimeConstTypeRepr
+BridgedCompileTimeConstTypeRepr_createParsed(BridgedASTContext cContext,
+                                             BridgedTypeRepr base,
+                                             BridgedSourceLoc cSpecifierLoc) {
+  return new (cContext.unbridged())
+      CompileTimeConstTypeRepr(base.unbridged(), cSpecifierLoc.unbridged());
 }
 
 BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(
