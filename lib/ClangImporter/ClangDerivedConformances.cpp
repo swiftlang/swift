@@ -680,6 +680,15 @@ void swift::conformToCxxOptionalIfNeeded(
   if (!cxxOptionalProto)
     return;
 
+  llvm::errs() << "{{{\n";
+  llvm::errs() << __FUNCTION__ << ":" << __LINE__ << ": conforming std::optional\n";
+  llvm::errs() << "decl:\n";
+  decl->dump(llvm::errs());
+  llvm::errs() << "\n";
+  llvm::errs() << "clangDecl:\n";
+  clangDecl->dump(llvm::errs());
+  llvm::errs() << "\n";
+
   // HACK: this loop is necessary for MSVC's std::optional, which uses:
   //
   // public:
@@ -687,17 +696,26 @@ void swift::conformToCxxOptionalIfNeeded(
   //
   // This causes SwiftDeclConverter::VisitUsingShadowDecl to (unintentionally)
   // import two pointee members, one public and one private.
+  int i = 0;
   for (auto *pointee :
        lookupDirectWithoutExtensions(decl, ctx.getIdentifier("pointee"))) {
+    llvm::errs() << "Considering pointee " << ++i << ":\n";
+    pointee->dump(llvm::errs());
+    llvm::errs() << "\n";
     if (!isa<VarDecl>(pointee) ||
-        pointee->getFormalAccess() < AccessLevel::Public)
+        pointee->getFormalAccess() < AccessLevel::Public) {
       // Try next "pointee" member
+      llvm::errs() << "Skipped...\n";
       continue;
+    }
+    llvm::errs() << "Conforming...\n";
     Type pointeeTy = pointee->getInterfaceType();
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"), pointeeTy);
     impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxOptional});
+    llvm::errs() << "Successful\n}}}\n";
     return;
   }
+  llvm::errs() << "Not successful\n}}}\n";
 }
 
 void swift::conformToCxxSequenceIfNeeded(
