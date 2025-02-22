@@ -252,7 +252,7 @@ fileprivate class _Lock {
   init() {
     #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
     self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    self.underlying.initialize(to: os_unfair_lock())
+    unsafe self.underlying.initialize(to: os_unfair_lock())
     #elseif os(Windows)
     self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
     InitializeSRWLock(self.underlying)
@@ -280,8 +280,8 @@ fileprivate class _Lock {
     #endif
 
     #if !os(WASI)
-    self.underlying.deinitialize(count: 1)
-    self.underlying.deallocate()
+    unsafe self.underlying.deinitialize(count: 1)
+    unsafe self.underlying.deallocate()
     #endif
   }
 

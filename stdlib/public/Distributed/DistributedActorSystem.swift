@@ -439,7 +439,7 @@ extension DistributedActorSystem {
     // Gen the generic environment (if any) associated with the target.
     let genericEnv =
       targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-        _getGenericEnvironmentOfDistributedTarget(
+        unsafe _getGenericEnvironmentOfDistributedTarget(
           targetNameUTF8.baseAddress!,
           UInt(targetNameUTF8.endIndex))
       }
@@ -449,8 +449,8 @@ extension DistributedActorSystem {
     var numWitnessTables: Int = 0
 
     defer {
-      substitutionsBuffer?.deallocate()
-      witnessTablesBuffer?.deallocate()
+      unsafe substitutionsBuffer?.deallocate()
+      unsafe witnessTablesBuffer?.deallocate()
     }
 
     if let genericEnv = genericEnv {
@@ -465,7 +465,7 @@ extension DistributedActorSystem {
 
       for (offset, substitution) in subs.enumerated() {
         let element = substitutionsBuffer?.advanced(by: offset)
-        element?.initialize(to: substitution)
+        unsafe element?.initialize(to: substitution)
       }
 
       (witnessTablesBuffer, numWitnessTables) = _getWitnessTablesFor(environment: genericEnv,
@@ -479,7 +479,7 @@ extension DistributedActorSystem {
 
     let paramCount =
       targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-        __getParameterCount(
+        unsafe __getParameterCount(
           targetNameUTF8.baseAddress!,
           UInt(targetNameUTF8.endIndex))
       }
@@ -497,12 +497,12 @@ extension DistributedActorSystem {
     // Prepare buffer for the parameter types to be decoded into:
     let argumentTypesBuffer = UnsafeMutableBufferPointer<Any.Type>.allocate(capacity: Int(paramCount))
     defer {
-      argumentTypesBuffer.deallocate()
+      unsafe argumentTypesBuffer.deallocate()
     }
 
     // Demangle and write all parameter types into the prepared buffer
     let decodedNum = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-      __getParameterTypeInfo(
+      unsafe __getParameterTypeInfo(
         targetNameUTF8.baseAddress!,
         UInt(targetNameUTF8.endIndex),
         genericEnv,
@@ -525,7 +525,7 @@ extension DistributedActorSystem {
     var argumentTypes: [Any.Type] = []
     do {
       argumentTypes.reserveCapacity(Int(decodedNum))
-      for argumentType in argumentTypesBuffer {
+      for argumentType in unsafe argumentTypesBuffer {
         argumentTypes.append(argumentType)
       }
     }
@@ -537,7 +537,7 @@ extension DistributedActorSystem {
 
     let maybeReturnTypeFromTypeInfo =
       targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-        __getReturnTypeInfo(
+        unsafe __getReturnTypeInfo(
           /*targetName:*/targetNameUTF8.baseAddress!,
           /*targetLength:*/UInt(targetNameUTF8.endIndex),
           /*genericEnv:*/genericEnv,
@@ -560,16 +560,16 @@ extension DistributedActorSystem {
     var executeDistributedTargetHasThrown = true
 
     func doDestroyReturnTypeBuffer<R>(_: R.Type) {
-      let buf = resultBuffer.assumingMemoryBound(to: R.self)
+      let buf = unsafe resultBuffer.assumingMemoryBound(to: R.self)
 
       if !executeDistributedTargetHasThrown {
         // since the _execute function has NOT thrown,
         // there must be a value in the result buffer that we must deinitialize
-        buf.deinitialize(count: 1)
+        unsafe buf.deinitialize(count: 1)
       } // otherwise, the _execute has thrown and not populated the result buffer
 
       // finally, deallocate the buffer
-      buf.deallocate()
+      unsafe buf.deallocate()
     }
 
     defer {
@@ -581,7 +581,7 @@ extension DistributedActorSystem {
       // let errorType = try invocationDecoder.decodeErrorType() // TODO(distributed): decide how to use when typed throws are done
 
       // Execute the target!
-      try await _executeDistributedTarget(
+      try unsafe await _executeDistributedTarget(
         on: actor,
         /*targetNameData:*/targetName,
         /*targetNameLength:*/UInt(targetName.count),

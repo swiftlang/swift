@@ -18,7 +18,7 @@ import _Concurrency
 internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
   static let _shared: DistributedRemoteActorReferenceExecutor = DistributedRemoteActorReferenceExecutor()
   static var sharedUnownedExecutor: UnownedSerialExecutor {
-    UnownedSerialExecutor(ordinary: _shared)
+    unsafe UnownedSerialExecutor(ordinary: _shared)
   }
 
   internal init() {}
@@ -38,7 +38,7 @@ internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    UnownedSerialExecutor(ordinary: self)
+    unsafe UnownedSerialExecutor(ordinary: self)
   }
 }
 
@@ -57,5 +57,5 @@ internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
 public func buildDefaultDistributedRemoteActorExecutor<Act>(
     _ actor: Act
 ) -> UnownedSerialExecutor where Act: DistributedActor {
-  return DistributedRemoteActorReferenceExecutor.sharedUnownedExecutor
+  return unsafe DistributedRemoteActorReferenceExecutor.sharedUnownedExecutor
 }
