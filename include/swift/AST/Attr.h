@@ -746,11 +746,11 @@ private:
   const StringRef Message;
   const StringRef Rename;
 
-  llvm::VersionTuple Introduced;
+  const llvm::VersionTuple Introduced;
   const SourceRange IntroducedRange;
-  llvm::VersionTuple Deprecated;
+  const llvm::VersionTuple Deprecated;
   const SourceRange DeprecatedRange;
-  llvm::VersionTuple Obsoleted;
+  const llvm::VersionTuple Obsoleted;
   const SourceRange ObsoletedRange;
 
 public:
@@ -908,12 +908,6 @@ private:
 
 private:
   friend class SemanticAvailableAttrRequest;
-
-  void setRawIntroduced(llvm::VersionTuple version) { Introduced = version; }
-
-  void setRawDeprecated(llvm::VersionTuple version) { Deprecated = version; }
-
-  void setRawObsoleted(llvm::VersionTuple version) { Obsoleted = version; }
 
   void setCachedDomain(AvailabilityDomain domain) {
     assert(!DomainOrIdentifier.isDomain());
@@ -3310,10 +3304,8 @@ public:
     return attr->getCachedDomain().value();
   }
 
-  /// The version tuple written in source for the `introduced:` component.
-  std::optional<llvm::VersionTuple> getIntroduced() const {
-    return attr->getRawIntroduced();
-  }
+  /// The version tuple for the `introduced:` component.
+  std::optional<llvm::VersionTuple> getIntroduced() const;
 
   /// The source range of the `introduced:` version component.
   SourceRange getIntroducedSourceRange() const { return attr->IntroducedRange; }
@@ -3322,18 +3314,14 @@ public:
   /// was introduced.
   AvailabilityRange getIntroducedRange(const ASTContext &Ctx) const;
 
-  /// The version tuple written in source for the `deprecated:` component.
-  std::optional<llvm::VersionTuple> getDeprecated() const {
-    return attr->getRawDeprecated();
-  }
+  /// The version tuple for the `deprecated:` component.
+  std::optional<llvm::VersionTuple> getDeprecated() const;
 
   /// The source range of the `deprecated:` version component.
   SourceRange getDeprecatedSourceRange() const { return attr->DeprecatedRange; }
 
-  /// The version tuple written in source for the `obsoleted:` component.
-  std::optional<llvm::VersionTuple> getObsoleted() const {
-    return attr->getRawObsoleted();
-  }
+  /// The version tuple for the `obsoleted:` component.
+  std::optional<llvm::VersionTuple> getObsoleted() const;
 
   /// The source range of the `obsoleted:` version component.
   SourceRange getObsoletedSourceRange() const { return attr->ObsoletedRange; }
