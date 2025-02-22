@@ -237,6 +237,8 @@ private:
   /// copies.
   const MaximizeLifetime_t maximizeLifetime;
 
+  SILFunction *function;
+
   // If present, will be used to ensure that the lifetime is not shortened to
   // end inside an access scope which it previously enclosed.  (Note that ending
   // before such an access scope is fine regardless.)
@@ -354,7 +356,7 @@ public:
       DeadEndBlocksAnalysis *deadEndBlocksAnalysis, DominanceInfo *domTree,
       BasicCalleeAnalysis *calleeAnalysis, InstructionDeleter &deleter)
       : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
-        accessBlockAnalysis(accessBlockAnalysis),
+        function(function), accessBlockAnalysis(accessBlockAnalysis),
         deadEndBlocksAnalysis(deadEndBlocksAnalysis), domTree(domTree),
         calleeAnalysis(calleeAnalysis), deleter(deleter) {}
 
