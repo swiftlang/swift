@@ -824,9 +824,6 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   auto attrLoc = attr->getLocation();
   auto attrName = attr->getAttrName();
   auto domainLoc = attr->getDomainLoc();
-  auto introducedVersion = attr->getRawIntroduced();
-  auto deprecatedVersion = attr->getRawDeprecated();
-  auto obsoletedVersion = attr->getRawObsoleted();
   auto mutableAttr = const_cast<AvailableAttr *>(attr);
   auto domain = attr->getCachedDomain();
 
@@ -867,16 +864,18 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   auto domainName = domain->getNameForAttributePrinting();
   auto semanticAttr = SemanticAvailableAttr(attr);
 
-  bool hasVersionSpec =
-      (introducedVersion || deprecatedVersion || obsoletedVersion);
+  bool hasIntroduced = attr->getRawIntroduced().has_value();
+  bool hasDeprecated = attr->getRawDeprecated().has_value();
+  auto hasObsoleted = attr->getRawObsoleted().has_value();
+  bool hasVersionSpec = (hasIntroduced || hasDeprecated || hasObsoleted);
 
   if (!domain->isVersioned() && hasVersionSpec) {
     SourceRange versionSourceRange;
-    if (introducedVersion)
+    if (hasIntroduced)
       versionSourceRange = semanticAttr.getIntroducedSourceRange();
-    else if (deprecatedVersion)
+    else if (hasDeprecated)
       versionSourceRange = semanticAttr.getDeprecatedSourceRange();
-    else if (obsoletedVersion)
+    else if (hasObsoleted)
       versionSourceRange = semanticAttr.getObsoletedSourceRange();
 
     diags
@@ -915,23 +914,13 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     }
   }
 
-  // Canonicalize platform versions.
-  // FIXME: [availability] This should be done when remapping versions instead.
-  if (domain->isPlatform()) {
-    auto canonicalizeVersion = [&](llvm::VersionTuple version) {
-      return canonicalizePlatformVersion(domain->getPlatformKind(), version);
-    };
-    if (introducedVersion)
-      mutableAttr->setRawIntroduced(canonicalizeVersion(*introducedVersion));
-
-    if (deprecatedVersion)
-      mutableAttr->setRawDeprecated(canonicalizeVersion(*deprecatedVersion));
-
-    if (obsoletedVersion)
-      mutableAttr->setRawObsoleted(canonicalizeVersion(*obsoletedVersion));
-  }
-
   return semanticAttr;
+}
+
+std::optional<llvm::VersionTuple> SemanticAvailableAttr::getIntroduced() const {
+  if (auto version = attr->getRawIntroduced())
+    return canonicalizePlatformVersion(getPlatform(), *version);
+  return std::nullopt;
 }
 
 AvailabilityRange
@@ -942,7 +931,7 @@ SemanticAvailableAttr::getIntroducedRange(const ASTContext &Ctx) const {
   if (!attr->getRawIntroduced().has_value())
     return AvailabilityRange::alwaysAvailable();
 
-  llvm::VersionTuple IntroducedVersion = attr->getRawIntroduced().value();
+  llvm::VersionTuple IntroducedVersion = getIntroduced().value();
   StringRef Platform;
   llvm::VersionTuple RemappedIntroducedVersion;
   if (AvailabilityInference::updateIntroducedPlatformForFallback(
@@ -950,6 +939,18 @@ SemanticAvailableAttr::getIntroducedRange(const ASTContext &Ctx) const {
     IntroducedVersion = RemappedIntroducedVersion;
 
   return AvailabilityRange{VersionRange::allGTE(IntroducedVersion)};
+}
+
+std::optional<llvm::VersionTuple> SemanticAvailableAttr::getDeprecated() const {
+  if (auto version = attr->getRawDeprecated())
+    return canonicalizePlatformVersion(getPlatform(), *version);
+  return std::nullopt;
+}
+
+std::optional<llvm::VersionTuple> SemanticAvailableAttr::getObsoleted() const {
+  if (auto version = attr->getRawObsoleted())
+    return canonicalizePlatformVersion(getPlatform(), *version);
+  return std::nullopt;
 }
 
 namespace {
