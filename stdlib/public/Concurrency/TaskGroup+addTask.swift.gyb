@@ -243,7 +243,7 @@ extension ${TYPE} {
     % # we definitely have the prior ones, as we always keep adding parameters.
     % if HAS_TASK_NAME:
     #if $BuiltinCreateAsyncTaskName
-    if var name {
+    if let name {
       task =
         name.utf8CString.withUnsafeBufferPointer { nameBytes in
           ${TASK_CREATE_FN}(
