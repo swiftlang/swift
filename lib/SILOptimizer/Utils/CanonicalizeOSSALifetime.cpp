@@ -274,6 +274,37 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   return true;
 }
 
+/// Extend liveness to the availability boundary of currentDef.  Even if a copy
+/// is consumed on a path to the dead-end, if the def stays live through to the
+/// dead-end, its lifetime must not be shrunk back from it (eventually we'll
+/// support shrinking it back to deinit barriers).
+///
+/// Example:
+///     %def is lexical
+///     %copy = copy_value %def
+///     consume %copy
+///     apply %foo() // deinit barrier
+///     // Must extend lifetime of %def up to this point per language rules.
+///     unreachable
+void CanonicalizeOSSALifetime::extendLexicalLivenessToDeadEnds() {
+  // TODO: OSSALifetimeCompletion: Once lifetimes are always complete, delete
+  //                               this method.
+  SmallVector<SILBasicBlock *, 32> directDiscoverdBlocks;
+  SSAPrunedLiveness directLiveness(function, &directDiscoverdBlocks);
+  directLiveness.initializeDef(getCurrentDef());
+  directLiveness.computeSimple();
+  OSSALifetimeCompletion::visitAvailabilityBoundary(
+      getCurrentDef(), directLiveness, [&](auto *unreachable, auto end) {
+        if (end == OSSALifetimeCompletion::LifetimeEnd::Boundary) {
+          recordUnreachableLifetimeEnd(unreachable);
+        }
+        unreachable->visitPriorInstructions([&](auto *inst) {
+          liveness->extendToNonUse(inst);
+          return true;
+        });
+      });
+}
+
 /// Extend liveness to the copy-extended availability boundary of currentDef.
 /// Prevents destroys from being inserted between borrows of (copies of) the
 /// def and dead-ends.
@@ -1367,6 +1398,9 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
     LLVM_DEBUG(llvm::dbgs() << "Failed to compute canonical liveness?!\n");
     clear();
     return false;
+  }
+  if (respectsDeinitBarriers()) {
+    extendLexicalLivenessToDeadEnds();
   }
   extendLivenessToDeadEnds();
   if (respectsDeinitBarriers()) {
