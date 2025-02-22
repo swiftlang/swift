@@ -109,4 +109,8 @@ inline void mixedFuncWithSafeWrapper5(ConstSpanOfInt s,
 inline void mixedFuncWithSafeWrapper6(ConstSpanOfInt s,
                                       int * __counted_by(len) p, int len) {}
 
+inline ConstSpanOfInt mixedFuncWithSafeWrapper7(const int * __counted_by(len) p, int len) {
+  return ConstSpanOfInt(p, len);
+}
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H

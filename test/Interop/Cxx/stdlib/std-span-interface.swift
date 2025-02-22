@@ -35,8 +35,9 @@ import CxxStdlib
 // CHECK-NEXT: @lifetime(p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func mixedFuncWithSafeWrapper1(_ p: Span<Int32>) -> Span<CInt>
 // CHECK-NEXT: @lifetime(borrow v)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func mixedFuncWithSafeWrapper2(_ v: borrowing VecOfInt, _ len: Int32) -> UnsafeBufferPointer<Int32>
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func mixedFuncWithSafeWrapper2(_ v: borrowing VecOfInt, _ len: Int32) -> Span<Int32>
 // CHECK-NEXT: @_alwaysEmitIntoClient public func mixedFuncWithSafeWrapper3(_ s: Span<CInt>, _ p: UnsafeMutableBufferPointer<Int32>)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func mixedFuncWithSafeWrapper4(_ s: Span<CInt>, _ p: Span<Int32>)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func mixedFuncWithSafeWrapper5(_ s: ConstSpanOfInt, _ p: Span<Int32>)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func mixedFuncWithSafeWrapper6(_ s: ConstSpanOfInt, _ p: UnsafeMutableBufferPointer<Int32>)
+// CHECK-NEXT: @_alwaysEmitIntoClient public func mixedFuncWithSafeWrapper7(_ p: UnsafeBufferPointer<Int32>) -> ConstSpanOfInt
