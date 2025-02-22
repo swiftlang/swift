@@ -5,6 +5,7 @@
 // RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-move-only \
 // RUN:   -enable-experimental-feature ParserASTGen \
@@ -15,6 +16,7 @@
 // RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-move-only \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
@@ -28,6 +30,7 @@
 // RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-move-only
 
@@ -38,6 +41,7 @@
 // REQUIRES: swift_feature_ExecutionAttribute
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_RawLayout
 // REQUIRES: swift_feature_SymbolLinkageMarkers
 
 // rdar://116686158
@@ -234,3 +238,14 @@ struct ReferenceOwnershipModifierTest<X: AnyObject> {
     unowned(safe) var unownedSafeValue: X
     unowned(unsafe) var unmanagedValue: X
 }
+
+@_rawLayout(like: T) struct RawStorage<T>: ~Copyable {}
+@_rawLayout(likeArrayOf: T, count: 4) struct RawSmallArray<T>: ~Copyable {}
+@_rawLayout(size: 4, alignment: 4) struct Lock: ~Copyable {}
+
+struct LayoutOuter {
+  struct Nested<T> {
+    var value: T
+  }
+}
+@_rawLayout(like: LayoutOuter.Nested<Int>) struct TypeExprTest: ~Copyable {}

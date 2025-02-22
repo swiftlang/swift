@@ -166,7 +166,7 @@ extension ASTGenVisitor {
       case .projectedValueProperty:
         return handle(self.generateProjectedValuePropertyAttr(attribute: node)?.asDeclAttribute)
       case .rawLayout:
-        fatalError("unimplemented")
+        return handle(self.generateRawLayoutAttr(attribute: node)?.asDeclAttribute)
       case .section:
         return handle(self.generateSectionAttr(attribute: node)?.asDeclAttribute)
       case .semantics:
@@ -1443,6 +1443,142 @@ extension ASTGenVisitor {
       range: self.generateAttrSourceRange(node),
       name: name
     )
+  }
+
+  func generateValueOrType(expr node: ExprSyntax) -> BridgedTypeRepr? {
+    var node = node
+
+    // Try value first.
+    let minusLoc: BridgedSourceLoc
+    if let prefixExpr = node.as(PrefixOperatorExprSyntax.self),
+      prefixExpr.operator.rawText == "-",
+      prefixExpr.expression.is(IntegerLiteralExprSyntax.self) {
+      minusLoc = self.generateSourceLoc(prefixExpr.operator)
+      node = prefixExpr.expression
+    } else {
+      minusLoc = nil
+    }
+    if let integerExpr = node.as(IntegerLiteralExprSyntax.self) {
+      let value = self.copyAndStripUnderscores(text: integerExpr.literal.rawText)
+      return BridgedIntegerTypeRepr.createParsed(
+        self.ctx,
+        string: value,
+        loc: self.generateSourceLoc(node), minusLoc: minusLoc
+      ).asTypeRepr
+    }
+
+    assert(!minusLoc.isValid)
+    return self.generateTypeRepr(expr: node)
+  }
+
+  func generateRawLayoutAttr(attribute node: AttributeSyntax) -> BridgedRawLayoutAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      switch args.first?.label?.rawText {
+      case "size":
+        return generateSizeAlignment()
+      case "like":
+        return generateScalarLike()
+      case "likeArrayOf":
+        return generateArrayLike()
+      default:
+        // TODO: Diagnose.
+        fatalError("invalid argument for @rawLayout attribute")
+      }
+
+      func generateSizeAlignment() -> BridgedRawLayoutAttr? {
+        guard let size = generateConsumingIntegerLiteralOption(label: "size") else {
+          // Should already be diagnosed.
+          return nil
+        }
+        guard let alignment = generateConsumingIntegerLiteralOption(label: "alignment") else {
+          // Should already be diagnosed.
+          return nil
+        }
+        return .createParsed(
+          self.ctx,
+          atLoc: self.generateSourceLoc(node.atSign),
+          range: self.generateAttrSourceRange(node),
+          size: size,
+          alignment: alignment
+        )
+      }
+
+      func generateScalarLike() -> BridgedRawLayoutAttr? {
+        let tyR = self.generateConsumingAttrOption(args: &args, label: "like") {
+          self.generateTypeRepr(expr: $0)
+        }
+        guard let tyR else {
+          return nil
+        }
+
+        guard let moveAsLike = args.isEmpty ? false : generateConsumingMoveAsLike() else {
+          return nil
+        }
+
+        return .createParsed(
+          self.ctx,
+          atLoc: self.generateSourceLoc(node.atSign),
+          range: self.generateAttrSourceRange(node),
+          like: tyR,
+          moveAsLike: moveAsLike
+        )
+      }
+
+      func generateArrayLike() -> BridgedRawLayoutAttr? {
+        let tyR = self.generateConsumingAttrOption(args: &args, label: "likeArrayOf") {
+          self.generateTypeRepr(expr: $0)
+        }
+        guard let tyR else {
+          return nil
+        }
+
+        // 'count:' can be integer literal or a generic parameter.
+        let count = self.generateConsumingAttrOption(args: &args, label: "count") {
+          self.generateValueOrType(expr: $0)
+        }
+        guard let count else {
+          return nil
+        }
+
+        guard let moveAsLike = args.isEmpty ? false : generateConsumingMoveAsLike() else {
+          return nil
+        }
+
+        return .createParsed(
+          self.ctx,
+          atLoc: self.generateSourceLoc(node.atSign),
+          range: self.generateAttrSourceRange(node),
+          likeArrayOf: tyR,
+          count: count,
+          moveAsLike: moveAsLike
+        )
+      }
+
+      func generateConsumingIntegerLiteralOption(label: SyntaxText) -> Int? {
+        self.generateConsumingAttrOption(args: &args, label: label) {
+          guard let integerExpr = $0.as(IntegerLiteralExprSyntax.self) else {
+            // TODO: Diagnose
+            fatalError("expected integer literal for '\(String(syntaxText: label)):' in @_rawLayout")
+          }
+          guard let count = integerExpr.representedLiteralValue else {
+            fatalError("invalid value literal for '\(String(syntaxText: label)):' in @_rawLayout")
+          }
+          return count
+        }
+      }
+
+      func generateConsumingMoveAsLike() -> Bool? {
+        self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+          switch $0.rawText {
+          case "moveAsLike":
+            return true
+          default:
+            // TODO: Diagnose.
+            fatalError("expected 'moveAsLike' in @rawLayout attribute")
+          }
+        }
+      }
+    }
   }
 
   // FIXME: This is a decl modifier
