@@ -1508,8 +1508,6 @@ function Get-CMarkBinaryCache($Arch) {
 }
 
 function Build-CMark($Arch) {
-  $ArchName = $Arch.LLVMName
-
   Build-CMakeProject `
     -Src $SourceCache\cmark `
     -Bin (Get-CMarkBinaryCache $Arch) `
@@ -1898,8 +1896,6 @@ function Build-XML2([Platform]$Platform, $Arch) {
 }
 
 function Build-RegsGen2($Arch) {
-  $ArchName = $Arch.LLVMName
-
   Build-CMakeProject `
     -Src $SourceCache\ds2\Tools\RegsGen2 `
     -Bin "$(Get-BuildProjectBinaryCache RegsGen2)" `
@@ -2111,26 +2107,20 @@ function Build-ExperimentalRuntime {
   Isolate-EnvVars {
     $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$(Get-PinnedToolchainRuntime);${env:Path}"
 
-    $CompilersBinaryCache = if ($IsCrossCompiling) {
-      Get-BuildProjectBinaryCache Compilers
-    } else {
-      Get-HostProjectBinaryCache Compilers
-    }
-
-   Build-CMakeProject `
-     -Src $SourceCache\swift\Runtimes\Core `
-     -Bin (Get-TargetProjectBinaryCache $Arch ExperimentalRuntime) `
-     -InstallTo "$($Arch.ExperimentalSDKInstallRoot)\usr" `
-     -Arch $Arch `
-     -Platform $Platform `
-     -UseBuiltCompilers C,CXX,Swift `
-     -UseGNUDriver `
-     -Defines @{
-       BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
-       CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-       dispatch_DIR = "$(Get-TargetProjectBinaryCache $Arch Dispatch)\cmake\modules";
-     }
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Core `
+      -Bin (Get-TargetProjectBinaryCache $Arch ExperimentalRuntime) `
+      -InstallTo "$($Arch.ExperimentalSDKInstallRoot)\usr" `
+      -Arch $Arch `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        dispatch_DIR = "$(Get-TargetProjectBinaryCache $Arch Dispatch)\cmake\modules";
+      }
   }
 }
 
