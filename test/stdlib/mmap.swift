@@ -12,6 +12,8 @@ import StdlibUnittest
   import Android
   // MAP_FAILED is not available on android.
   let MAP_FAILED = UnsafeMutableRawPointer(bitPattern: -1)
+#elseif canImport(FreeBSD)
+  import FreeBSD
 #else
 #error("Unsupported platform")
 #endif
