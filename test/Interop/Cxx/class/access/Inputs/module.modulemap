@@ -1,3 +1,13 @@
+module AccessInversion {
+  header "access-inversion.h"
+  requires cplusplus
+}
+
+module AccessSpecifiers {
+  header "access-specifiers.h"
+  requires cplusplus
+}
+
 module NonPublic {
     requires cplusplus
     header "non-public.h"
@@ -11,4 +21,9 @@ module NonPublicInheritance {
 module NonPublicShadow {
     requires cplusplus
     header "non-public-shadow.h"
+}
+
+module UsingNonPublic {
+  header "using-non-public.h"
+  requires cplusplus
 }

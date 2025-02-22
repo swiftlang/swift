@@ -33,11 +33,6 @@ module UsingBaseMembers {
   requires cplusplus
 }
 
-module UsingBaseMethods {
-  header "using-base-methods.h"
-  requires cplusplus
-}
-
 module VirtualMethods {
   header "virtual-methods.h"
   requires cplusplus

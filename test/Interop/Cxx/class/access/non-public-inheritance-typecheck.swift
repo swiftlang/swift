@@ -14,8 +14,8 @@ import NonPublicInheritance
 extension Base {
     func ext() {
         publ()
-        // TODO: prot()
-        // TODO: priv()
+        prot()
+        priv()
     }
 }
 func fBase(v: Base) {
@@ -27,8 +27,8 @@ func fBase(v: Base) {
 extension PublBase {
     func ext() {
         publ()
-        // TODO: prot()
-        priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
+        prot()
+        priv() // expected-error {{'priv()' is unavailable: this base member is not accessible because it is private}}
     }
 }
 func fPublBase(v: PublBase) {
@@ -40,8 +40,8 @@ func fPublBase(v: PublBase) {
 extension PublPublBase {
     func ext() {
         publ()
-        // TODO: prot()
-        priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
+        prot()
+        priv() // expected-error {{'priv()' is unavailable: this base member is not accessible because it is private}}
     }
 }
 func fPublPublBase(v: PublPublBase) {
@@ -52,9 +52,9 @@ func fPublPublBase(v: PublPublBase) {
 
 extension ProtPublBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
-        priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
+        publ()
+        prot()
+        priv() // expected-error {{'priv()' is unavailable: this base member is not accessible because it is private}}
     }
 }
 func fProtPublBase(v: ProtPublBase) {
@@ -65,9 +65,9 @@ func fProtPublBase(v: ProtPublBase) {
 
 extension PrivPublBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
-        priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
+        publ()
+        prot()
+        priv() // expected-error {{'priv()' is unavailable: this base member is not accessible because it is private}}
     }
 }
 func fPrivPublBase(v: PrivPublBase) {
@@ -78,9 +78,9 @@ func fPrivPublBase(v: PrivPublBase) {
 
 extension ProtBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
-        priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
+        publ()
+        prot()
+        priv() // expected-error {{'priv()' is unavailable: this base member is not accessible because it is private}}
     }
 }
 func fProtBase(v: ProtBase) {
@@ -92,9 +92,9 @@ func fProtBase(v: ProtBase) {
 
 extension PublProtBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
-        priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
+        publ()
+        prot()
+        priv() // expected-error {{'priv()' is unavailable: this base member is not accessible because it is private}}
     }
 }
 func fPublProtBase(v: PublProtBase) {
@@ -105,9 +105,9 @@ func fPublProtBase(v: PublProtBase) {
 
 extension ProtProtBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
-        priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
+        publ()
+        prot()
+        priv() // expected-error {{'priv()' is unavailable: this base member is not accessible because it is private}}
     }
 }
 func fProtProtBase(v: ProtProtBase) {
@@ -118,9 +118,9 @@ func fProtProtBase(v: ProtProtBase) {
 
 extension PrivProtBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
-        priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
+        publ()
+        prot()
+        priv() // expected-error {{'priv()' is unavailable: this base member is not accessible because it is private}}
     }
 }
 func fPrivProtBase(v: PrivProtBase) {
@@ -131,9 +131,9 @@ func fPrivProtBase(v: PrivProtBase) {
 
 extension PrivBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
-        priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
+        publ()
+        prot()
+        priv() // expected-error {{'priv()' is unavailable: this base member is not accessible because it is private}}
     }
 }
 func fPrivBase(v: PrivBase) {
@@ -144,9 +144,9 @@ func fPrivBase(v: PrivBase) {
 
 extension PublPrivBase {
     func ext() {
-        publ() // expected-error {{'publ' is inaccessible due to 'private' protection level}}
-        prot() // expected-error {{'prot' is inaccessible due to 'private' protection level}}
-        priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
+        publ() // expected-error {{'publ()' is unavailable: this base member is not accessible because of private inheritance}}
+        prot() // expected-error {{'prot()' is unavailable: this base member is not accessible because of private inheritance}}
+        priv() // expected-error {{'priv()' is unavailable: this base member is not accessible because it is private}}
     }
 }
 func fPublPrivBase(v: PublPrivBase) {
@@ -157,9 +157,9 @@ func fPublPrivBase(v: PublPrivBase) {
 
 extension ProtPrivBase {
     func ext() {
-        publ() // expected-error {{'publ' is inaccessible due to 'private' protection level}}
-        prot() // expected-error {{'prot' is inaccessible due to 'private' protection level}}
-        priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
+        publ() // expected-error {{'publ()' is unavailable: this base member is not accessible because of private inheritance}}
+        prot() // expected-error {{'prot()' is unavailable: this base member is not accessible because of private inheritance}}
+        priv() // expected-error {{'priv()' is unavailable: this base member is not accessible because it is private}}
     }
 }
 func fProtPrivBase(v: ProtPrivBase) {
@@ -170,9 +170,9 @@ func fProtPrivBase(v: ProtPrivBase) {
 
 extension PrivPrivBase {
     func ext() {
-        publ() // expected-error {{'publ' is inaccessible due to 'private' protection level}}
-        prot() // expected-error {{'prot' is inaccessible due to 'private' protection level}}
-        priv() // expected-error {{'priv' is inaccessible due to 'private' protection level}}
+        publ() // expected-error {{'publ()' is unavailable: this base member is not accessible because of private inheritance}}
+        prot() // expected-error {{'prot()' is unavailable: this base member is not accessible because of private inheritance}}
+        priv() // expected-error {{'priv()' is unavailable: this base member is not accessible because it is private}}
     }
 }
 func fPrivPrivBase(v: PrivPrivBase) {

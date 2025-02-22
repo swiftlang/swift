@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-import UsingBaseMethods
+import UsingNonPublic
 
 var Suite = TestSuite("Using Base methods")
 

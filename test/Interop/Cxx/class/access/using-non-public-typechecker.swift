@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=default
 
-import UsingBaseMethods
+import UsingNonPublic
 
 let _ = PublUser().publUsingPubl()
 let _ = PublUser().protUsingPubl() // expected-error {{'protUsingPubl' is inaccessible due to 'private' protection level}}

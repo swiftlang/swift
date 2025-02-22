@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMethods -print-access -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=UsingNonPublic -print-access -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %s
 
 // CHECK:      public struct PublUser {
 // CHECK-NEXT:   public init()

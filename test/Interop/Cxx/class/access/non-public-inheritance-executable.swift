@@ -1,11 +1,10 @@
+//--- blessed.swift
 // Test that all accessible inherited methods can be called.
 //
-// Note that this test isn't very meaningful until we are allowed to access
-// non-public members (those are the TODOs). It is checked in for now as
-// a placeholder (and it _does_ at least ensure that things haven't gone
-// horribly wrong).
-//
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -cxx-interoperability-mode=default)
+// RUN: split-file %s %t
+// RUN: %target-build-swift -module-name main %t/blessed.swift -I %S/Inputs -o %t/out -Xfrontend -cxx-interoperability-mode=default
+// RUN: %target-codesign %t/out
+// RUN: %target-run %t/out
 //
 // REQUIRES: executable_test
 
@@ -30,72 +29,72 @@ Tests.test("PrivPrivBase") { PrivPrivBase().ext() }
 extension Base {
     func ext() {
         expectEqual(publ(), PUBL_RETURN_VAL)
-        // TODO: prot()
-        // TODO: priv()
+        expectEqual(prot(), PROT_RETURN_VAL)
+        expectEqual(priv(), PRIV_RETURN_VAL)
     }
 }
 
 extension PublBase {
     func ext() {
         expectEqual(publ(), PUBL_RETURN_VAL)
-        // TODO: prot()
+        expectEqual(prot(), PROT_RETURN_VAL)
     }
 }
 
 extension PublPublBase {
     func ext() {
         expectEqual(publ(), PUBL_RETURN_VAL)
-        // TODO: prot()
+        expectEqual(prot(), PROT_RETURN_VAL)
     }
 }
 
 extension ProtPublBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
+        expectEqual(publ(), PUBL_RETURN_VAL)
+        expectEqual(prot(), PROT_RETURN_VAL)
     }
 }
 
 extension PrivPublBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
+        expectEqual(publ(), PUBL_RETURN_VAL)
+        expectEqual(prot(), PROT_RETURN_VAL)
     }
 }
 
 extension ProtBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
+        expectEqual(publ(), PUBL_RETURN_VAL)
+        expectEqual(prot(), PROT_RETURN_VAL)
     }
 }
 
 
 extension PublProtBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
+        expectEqual(publ(), PUBL_RETURN_VAL)
+        expectEqual(prot(), PROT_RETURN_VAL)
     }
 }
 
 extension ProtProtBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
+        expectEqual(publ(), PUBL_RETURN_VAL)
+        expectEqual(prot(), PROT_RETURN_VAL)
     }
 }
 
 extension PrivProtBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
+        expectEqual(publ(), PUBL_RETURN_VAL)
+        expectEqual(prot(), PROT_RETURN_VAL)
     }
 }
 
 extension PrivBase {
     func ext() {
-        // TODO: publ()
-        // TODO: prot()
+        expectEqual(publ(), PUBL_RETURN_VAL)
+        expectEqual(prot(), PROT_RETURN_VAL)
     }
 }
 

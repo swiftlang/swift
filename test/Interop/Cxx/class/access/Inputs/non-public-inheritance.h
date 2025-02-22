@@ -1,9 +1,7 @@
 #ifndef NON_PUBLIC_INHERITANCE_H
 #define NON_PUBLIC_INHERITANCE_H
 
-// TODO: dependent on private_fileid feature
-// #define BLESS __attribute__((__swift_attr__("private_fileid:main/blessed.swift")))
-#define BLESS
+#define BLESS __attribute__((__swift_attr__("private_fileid:main/blessed.swift")))
 
 const int PUBL_RETURN_VAL = 1;
 const int PROT_RETURN_VAL = 2;
