@@ -1922,11 +1922,12 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       }
 
       if (!argument.isCompileTimeConst() && param.isCompileTimeConst()) {
-        auto *locator = cs.getConstraintLocator(loc);
-        SourceRange range;
-        // simplify locator so the anchor is the exact argument.
-        cs.recordFix(NotCompileTimeConst::create(cs, paramTy,
-          simplifyLocator(cs, locator, range)));
+        // ACTODO: Remove
+//        auto *locator = cs.getConstraintLocator(loc);
+//        SourceRange range;
+//        // simplify locator so the anchor is the exact argument.
+//        cs.recordFix(NotCompileTimeConst::create(cs, paramTy,
+//          simplifyLocator(cs, locator, range)));
       }
 
       cs.addConstraint(
