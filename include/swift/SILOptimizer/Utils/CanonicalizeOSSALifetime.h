@@ -499,6 +499,7 @@ private:
                             PrunedLivenessBoundary &boundary);
 
   void extendLivenessToDeadEnds();
+  void extendLexicalLivenessToDeadEnds();
   void extendLivenessToDeinitBarriers();
 
   void extendUnconsumedLiveness(PrunedLivenessBoundary const &boundary);
