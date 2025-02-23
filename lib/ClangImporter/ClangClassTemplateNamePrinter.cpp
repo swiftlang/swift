@@ -183,10 +183,11 @@ struct TemplateArgumentPrinter
   void VisitTypeTemplateArgument(const clang::TemplateArgument &arg,
                                  llvm::raw_svector_ostream &buffer) {
     auto ty = arg.getAsType();
+    if (ty.isConstQualified())
+      buffer << "__cxxConst<";
     buffer << typePrinter.Visit(ty.getTypePtr());
-    if (ty.isConstQualified()) {
-      buffer << "_const";
-    }
+    if (ty.isConstQualified())
+      buffer << ">";
   }
 
   void VisitIntegralTemplateArgument(const clang::TemplateArgument &arg,
