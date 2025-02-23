@@ -14,5 +14,7 @@ import safe_swift_decls
 // TRACE: "strictMemorySafety":true
 
 // Dependencies
-// TRACE: "safe_swift_decls"{{.*}}"strictMemorySafety":true
-// TRACE: "unsafe_swift_decls"{{.*}}"strictMemorySafety":false
+// TRACE-SAME: "safe_swift_decls"
+// TRACE-SAME: "strictMemorySafety":true
+// TRACE-SAME: "unsafe_swift_decls"
+// TRACE-SAME: "strictMemorySafety":false
