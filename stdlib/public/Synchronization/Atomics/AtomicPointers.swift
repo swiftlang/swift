@@ -483,7 +483,7 @@ extension Unmanaged: AtomicRepresentable {
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> Unmanaged<Instance> {
-    Unmanaged<Instance>.fromOpaque(
+    unsafe Unmanaged<Instance>.fromOpaque(
       UnsafeRawPointer.decodeAtomicRepresentation(representation)
     )
   }
@@ -544,7 +544,7 @@ extension Unmanaged: AtomicOptionalRepresentable {
     _ representation: consuming AtomicOptionalRepresentation
   ) -> Unmanaged<Instance>? {
     UnsafeRawPointer.decodeAtomicOptionalRepresentation(representation).map {
-      Unmanaged.fromOpaque($0)
+      unsafe Unmanaged.fromOpaque($0)
     }
   }
 }
@@ -704,7 +704,7 @@ extension ObjectIdentifier: AtomicRepresentable {
     _ representation: consuming AtomicRepresentation
   ) -> ObjectIdentifier {
     // ObjectIdentifier doesn't have a bitPattern init..?
-    unsafeBitCast(
+    unsafe unsafeBitCast(
       Int.decodeAtomicRepresentation(representation),
       to: ObjectIdentifier.self
     )
@@ -735,7 +735,7 @@ extension ObjectIdentifier: AtomicOptionalRepresentable {
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming ObjectIdentifier?
   ) -> AtomicOptionalRepresentation {
-    Int.encodeAtomicRepresentation(
+    unsafe Int.encodeAtomicRepresentation(
       // {U}Int have bitPattern inits for ObjectIdentifier, but not optional
       // ObjectIdentifier :sad:
       unsafeBitCast(value, to: Int.self)
@@ -760,7 +760,7 @@ extension ObjectIdentifier: AtomicOptionalRepresentable {
     _ representation: consuming AtomicOptionalRepresentation
   ) -> ObjectIdentifier? {
     // ObjectIdentifier doesn't have a bitPattern init..?
-    unsafeBitCast(
+    unsafe unsafeBitCast(
       Int.decodeAtomicRepresentation(representation),
       to: ObjectIdentifier?.self
     )
@@ -798,7 +798,7 @@ extension UnsafeBufferPointer: AtomicRepresentable where Element: ~Copyable {
   ) -> AtomicRepresentation {
     let valueCopy = value
 
-    return WordPair.encodeAtomicRepresentation(
+    return unsafe WordPair.encodeAtomicRepresentation(
       WordPair(
         first: UInt(bitPattern: valueCopy.baseAddress),
         second: UInt(truncatingIfNeeded: valueCopy.count)
@@ -824,7 +824,7 @@ extension UnsafeBufferPointer: AtomicRepresentable where Element: ~Copyable {
   ) -> UnsafeBufferPointer<Element> {
     let wp = WordPair.decodeAtomicRepresentation(representation)
 
-    return UnsafeBufferPointer<Element>(
+    return unsafe UnsafeBufferPointer<Element>(
       start: UnsafePointer<Element>(bitPattern: wp.first),
       count: Int(truncatingIfNeeded: wp.second)
     )
@@ -866,7 +866,7 @@ where Element: ~Copyable
   ) -> AtomicRepresentation {
     let valueCopy = value
 
-    return WordPair.encodeAtomicRepresentation(
+    return unsafe WordPair.encodeAtomicRepresentation(
       WordPair(
         first: UInt(bitPattern: valueCopy.baseAddress),
         second: UInt(truncatingIfNeeded: valueCopy.count)
@@ -892,7 +892,7 @@ where Element: ~Copyable
   ) -> UnsafeMutableBufferPointer<Element> {
     let wp = WordPair.decodeAtomicRepresentation(representation)
 
-    return UnsafeMutableBufferPointer<Element>(
+    return unsafe UnsafeMutableBufferPointer<Element>(
       start: UnsafeMutablePointer<Element>(bitPattern: wp.first),
       count: Int(truncatingIfNeeded: wp.second)
     )
@@ -932,7 +932,7 @@ extension UnsafeRawBufferPointer: AtomicRepresentable {
   ) -> AtomicRepresentation {
     let valueCopy = value
 
-    return WordPair.encodeAtomicRepresentation(
+    return unsafe WordPair.encodeAtomicRepresentation(
       WordPair(
         first: UInt(bitPattern: valueCopy.baseAddress),
         second: UInt(truncatingIfNeeded: valueCopy.count)
@@ -958,7 +958,7 @@ extension UnsafeRawBufferPointer: AtomicRepresentable {
   ) -> UnsafeRawBufferPointer {
     let wp = WordPair.decodeAtomicRepresentation(representation)
 
-    return UnsafeRawBufferPointer(
+    return unsafe UnsafeRawBufferPointer(
       start: UnsafeRawPointer(bitPattern: wp.first),
       count: Int(truncatingIfNeeded: wp.second)
     )
@@ -998,7 +998,7 @@ extension UnsafeMutableRawBufferPointer: AtomicRepresentable {
   ) -> AtomicRepresentation {
     let valueCopy = value
 
-    return WordPair.encodeAtomicRepresentation(
+    return unsafe WordPair.encodeAtomicRepresentation(
       WordPair(
         first: UInt(bitPattern: valueCopy.baseAddress),
         second: UInt(truncatingIfNeeded: valueCopy.count)
@@ -1024,7 +1024,7 @@ extension UnsafeMutableRawBufferPointer: AtomicRepresentable {
   ) -> UnsafeMutableRawBufferPointer {
     let wp = WordPair.decodeAtomicRepresentation(representation)
 
-    return UnsafeMutableRawBufferPointer(
+    return unsafe UnsafeMutableRawBufferPointer(
       start: UnsafeMutableRawPointer(bitPattern: wp.first),
       count: Int(truncatingIfNeeded: wp.second)
     )

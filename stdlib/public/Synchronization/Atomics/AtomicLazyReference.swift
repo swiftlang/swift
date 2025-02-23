@@ -30,7 +30,7 @@ public struct AtomicLazyReference<Instance: AnyObject>: ~Copyable {
   @inlinable
   deinit {
     if let unmanaged = storage.load(ordering: .acquiring) {
-      unmanaged.release()
+      unsafe unmanaged.release()
     }
   }
 }
@@ -68,7 +68,7 @@ extension AtomicLazyReference {
   ///   was passed to this function.
   @available(SwiftStdlib 6.0, *)
   public func storeIfNil(_ desired: consuming Instance) -> Instance {
-    let desiredUnmanaged = Unmanaged.passRetained(desired)
+    let desiredUnmanaged = unsafe Unmanaged.passRetained(desired)
     let (exchanged, current) = storage.compareExchange(
       expected: nil,
       desired: desiredUnmanaged,
@@ -78,11 +78,11 @@ extension AtomicLazyReference {
     if !exchanged {
       // The reference has already been initialized. Balance the retain that we
       // performed on 'desired'.
-      desiredUnmanaged.release()
-      return current!.takeUnretainedValue()
+      unsafe desiredUnmanaged.release()
+      return unsafe current!.takeUnretainedValue()
     }
 
-    return desiredUnmanaged.takeUnretainedValue()
+    return unsafe desiredUnmanaged.takeUnretainedValue()
   }
 
   /// Atomically loads and returns the current value of this reference.
@@ -95,7 +95,7 @@ extension AtomicLazyReference {
   @available(SwiftStdlib 6.0, *)
   public func load() -> Instance? {
     let value = storage.load(ordering: .acquiring)
-    return value?.takeUnretainedValue()
+    return unsafe value?.takeUnretainedValue()
   }
 }
 
