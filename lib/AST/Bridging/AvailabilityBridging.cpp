@@ -86,20 +86,6 @@ static BridgedPlatformKind bridge(PlatformKind platform) {
 // MARK: AvailabilitySpec
 //===----------------------------------------------------------------------===//
 
-static AvailabilitySpecKind unbridge(BridgedAvailabilitySpecKind kind) {
-  switch (kind) {
-  case BridgedAvailabilitySpecKindPlatformVersionConstraint:
-    return AvailabilitySpecKind::PlatformVersionConstraint;
-  case BridgedAvailabilitySpecKindWildcard:
-    return AvailabilitySpecKind::Wildcard;
-  case BridgedAvailabilitySpecKindLanguageVersionConstraint:
-    return AvailabilitySpecKind::LanguageVersionConstraint;
-  case BridgedAvailabilitySpecKindPackageDescriptionVersionConstraint:
-    return AvailabilitySpecKind::PackageDescriptionVersionConstraint;
-  }
-  llvm_unreachable("unhandled enum value");
-}
-
 BridgedAvailabilitySpec
 BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
                                        BridgedSourceLoc cLoc) {
@@ -107,27 +93,22 @@ BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
                                           cLoc.unbridged());
 }
 
-BridgedAvailabilitySpec BridgedAvailabilitySpec_createPlatformAgnostic(
-    BridgedASTContext cContext, BridgedAvailabilitySpecKind cKind,
+BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomain(
+    BridgedASTContext cContext, BridgedAvailabilityDomain cDomain,
     BridgedSourceLoc cLoc, BridgedVersionTuple cVersion,
     BridgedSourceRange cVersionRange) {
-  return AvailabilitySpec::createPlatformAgnostic(
-      cContext.unbridged(), unbridge(cKind), cLoc.unbridged(),
+  return AvailabilitySpec::createForDomain(
+      cContext.unbridged(), cDomain.unbridged(), cLoc.unbridged(),
       cVersion.unbridged(), cVersionRange.unbridged());
-}
-
-BridgedAvailabilitySpec BridgedAvailabilitySpec_createPlatformVersioned(
-    BridgedASTContext cContext, BridgedPlatformKind cPlatform,
-    BridgedSourceLoc cPlatformLoc, BridgedVersionTuple cVersion,
-    BridgedSourceRange cVersionSrcRange) {
-  return AvailabilitySpec::createPlatformVersioned(
-      cContext.unbridged(), unbridge(cPlatform), cPlatformLoc.unbridged(),
-      cVersion.unbridged(), cVersionSrcRange.unbridged());
 }
 
 BridgedSourceRange
 BridgedAvailabilitySpec_getSourceRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getSourceRange();
+}
+
+bool BridgedAvailabilitySpec_isWildcard(BridgedAvailabilitySpec spec) {
+  return spec.unbridged()->isWildcard();
 }
 
 BridgedAvailabilityDomain

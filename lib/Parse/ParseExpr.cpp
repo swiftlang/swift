@@ -3707,17 +3707,17 @@ ParserResult<AvailabilitySpec>
 Parser::parsePlatformAgnosticVersionConstraintSpec() {
   SourceLoc PlatformAgnosticNameLoc;
   llvm::VersionTuple Version;
-  std::optional<AvailabilitySpecKind> Kind;
+  std::optional<AvailabilityDomain> Domain;
   SourceRange VersionRange;
 
   if (Tok.isIdentifierOrUnderscore()) {
     if (Tok.getText() == "swift")
-      Kind = AvailabilitySpecKind::LanguageVersionConstraint;
+      Domain = AvailabilityDomain::forSwiftLanguage();
     else if (Tok.getText() == "_PackageDescription")
-      Kind = AvailabilitySpecKind::PackageDescriptionVersionConstraint;
+      Domain = AvailabilityDomain::forPackageDescription();
   }
 
-  if (!Kind.has_value())
+  if (!Domain.has_value())
     return nullptr;
 
   PlatformAgnosticNameLoc = Tok.getLoc();
@@ -3726,8 +3726,8 @@ Parser::parsePlatformAgnosticVersionConstraintSpec() {
                         diag::avail_query_expected_version_number)) {
     return nullptr;
   }
-  return makeParserResult(AvailabilitySpec::createPlatformAgnostic(
-      Context, Kind.value(), PlatformAgnosticNameLoc, Version, VersionRange));
+  return makeParserResult(AvailabilitySpec::createForDomain(
+      Context, Domain.value(), PlatformAgnosticNameLoc, Version, VersionRange));
 }
 
 /// Parse platform-version constraint specification.
@@ -3778,12 +3778,14 @@ ParserResult<AvailabilitySpec> Parser::parsePlatformVersionConstraintSpec() {
       diagnose(PlatformLoc, diag::avail_query_unrecognized_platform_name,
                PlatformIdentifier);
     }
-    Platform = PlatformKind::none;
+    return makeParserResult(AvailabilitySpec::createForUnknownDomain(
+        Context, PlatformIdentifier, PlatformLoc, Version, VersionRange));
   }
 
   // Register the platform name as a keyword token.
   TokReceiver->registerTokenKindChange(PlatformLoc, tok::contextual_keyword);
 
-  return makeParserResult(AvailabilitySpec::createPlatformVersioned(
-      Context, Platform.value(), PlatformLoc, Version, VersionRange));
+  return makeParserResult(AvailabilitySpec::createForDomain(
+      Context, AvailabilityDomain::forPlatform(Platform.value()), PlatformLoc,
+      Version, VersionRange));
 }

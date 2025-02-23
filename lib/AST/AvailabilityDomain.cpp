@@ -168,6 +168,22 @@ AvailabilityDomain AvailabilityDomain::getABICompatibilityDomain() const {
   return *this;
 }
 
+AvailabilityDomain AvailabilityDomain::copy(ASTContext &ctx) const {
+  switch (getKind()) {
+  case Kind::Universal:
+  case Kind::SwiftLanguage:
+  case Kind::PackageDescription:
+  case Kind::Embedded:
+  case Kind::Platform:
+    // These domain kinds aren't ASTContext dependent.
+    return *this;
+  case Kind::Custom:
+    // To support this, the CustomAvailabilityDomain content would need to
+    // be copied to the other context, allocating new storage if necessary.
+    llvm::report_fatal_error("unsupported");
+  }
+}
+
 CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name,
                                                    ModuleDecl *mod, Kind kind)
     : name(name), kind(kind), mod(mod) {
@@ -179,4 +195,13 @@ CustomAvailabilityDomain *
 CustomAvailabilityDomain::create(const ASTContext &ctx, StringRef name,
                                  ModuleDecl *mod, Kind kind) {
   return new (ctx) CustomAvailabilityDomain(ctx.getIdentifier(name), mod, kind);
+}
+
+AvailabilityDomainOrIdentifier
+AvailabilityDomainOrIdentifier::copy(ASTContext &ctx) const {
+  if (auto identifier = getAsIdentifier())
+    return ctx.getIdentifier(identifier->str());
+
+  DEBUG_ASSERT(isDomain());
+  return getAsDomain()->copy(ctx);
 }

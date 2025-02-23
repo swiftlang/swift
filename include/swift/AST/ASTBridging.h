@@ -705,24 +705,19 @@ BridgedAvailabilitySpec
 BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
                                        BridgedSourceLoc cLoc);
 
-SWIFT_NAME(
-    "BridgedAvailabilitySpec.createPlatformAgnostic(_:kind:nameLoc:version:"
-    "versionRange:)")
-BridgedAvailabilitySpec BridgedAvailabilitySpec_createPlatformAgnostic(
-    BridgedASTContext cContext, BridgedAvailabilitySpecKind cKind,
+SWIFT_NAME("BridgedAvailabilitySpec.create(_:domain:nameLoc:version:"
+           "versionRange:)")
+BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomain(
+    BridgedASTContext cContext, BridgedAvailabilityDomain cDomain,
     BridgedSourceLoc cLoc, BridgedVersionTuple cVersion,
     BridgedSourceRange cVersionRange);
-
-SWIFT_NAME("BridgedAvailabilitySpec.createPlatformVersioned(_:platform:"
-           "platformLoc:version:versionRange:)")
-BridgedAvailabilitySpec BridgedAvailabilitySpec_createPlatformVersioned(
-    BridgedASTContext cContext, BridgedPlatformKind cPlatform,
-    BridgedSourceLoc cPlatformLoc, BridgedVersionTuple cVersion,
-    BridgedSourceRange cVersionSrcRange);
 
 SWIFT_NAME("getter:BridgedAvailabilitySpec.sourceRange(self:)")
 BridgedSourceRange
 BridgedAvailabilitySpec_getSourceRange(BridgedAvailabilitySpec spec);
+
+SWIFT_NAME("getter:BridgedAvailabilitySpec.isWildcard(self:)")
+bool BridgedAvailabilitySpec_isWildcard(BridgedAvailabilitySpec spec);
 
 SWIFT_NAME("getter:BridgedAvailabilitySpec.domain(self:)")
 BridgedAvailabilityDomain
