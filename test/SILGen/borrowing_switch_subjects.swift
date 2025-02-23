@@ -31,7 +31,7 @@ func borrowParam(x: borrowing Outer) {
     }
     // CHECK: end_borrow [[BORROW]]
 
-    
+
     // CHECK: [[BORROW_OUTER:%.*]] = begin_borrow {{.*}} : $Outer
     // CHECK: [[BORROW_INNER:%.*]] = struct_extract [[BORROW_OUTER]]
     // CHECK: [[BORROW_FIX:%.*]] = begin_borrow [fixed] [[BORROW_INNER]]
@@ -63,7 +63,7 @@ func borrowParam(x: borrowing Outer) {
     // CHECK: end_apply [[TOKEN]]
     // CHECK: end_borrow [[BORROW_OUTER]]
 
-    // `temporary()` is an rvalue, so we 
+    // `temporary()` is an rvalue, so we
     // CHECK: [[FN:%.*]] = function_ref @{{.*}}9temporary
     // CHECK: [[TMP:%.*]] = apply [[FN]]()
     // CHECK: [[BORROW_OUTER:%.*]] = begin_borrow [fixed] [[TMP]]

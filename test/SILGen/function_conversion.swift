@@ -387,7 +387,7 @@ func convClassBoundMetatypeArchetypeUpcast<T : Parent>(_ f1: @escaping (Parent.T
 }
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s19function_conversion6ParentCXMTxXMTAA7TrivialVIegydd_xXMTACXMTAESgIegydd_ACRbzlTR : $@convention(thin) <T where T : Parent> (@thick T.Type, @guaranteed @callee_guaranteed (@thick Parent.Type) -> (@thick T.Type, Trivial)) -> (@thick Parent.Type, Optional<Trivial>)
-// CHECK: bb0([[META:%.*]] : 
+// CHECK: bb0([[META:%.*]] :
 // CHECK:         upcast %0 : $@thick T.Type
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    destructure_tuple

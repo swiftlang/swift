@@ -13,7 +13,7 @@ struct S1 : P1 {
 
 enum E1 : P1 {
   case A, B
-  
+
   init() { self = .A } // okay
 }
 
@@ -37,7 +37,7 @@ final class C2a : P1 { } // okay
 
 class C2b : P1 { } // expected-error{{initializer requirement 'init()' can only be satisfied by a 'required' initializer in non-final class 'C2b'}}
 
-class C2c { 
+class C2c {
   init(x: Int) { }
 }
 
@@ -45,7 +45,7 @@ extension C2c : P1 {
   convenience init() { self.init(x: 0) } // expected-error{{initializer requirement 'init()' can only be satisfied by a 'required' initializer in the definition of non-final class 'C2c'}}
 }
 
-class C2d { 
+class C2d {
   init(x: Int) { }
   convenience init() { self.init(x: 0) } // expected-note {{'init()' declared here}} {{3-3=required }}
 }

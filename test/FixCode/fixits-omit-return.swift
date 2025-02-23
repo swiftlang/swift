@@ -2,7 +2,7 @@
 
 func ff_fixit_addreturn() -> String {
     print("entering ff_fixit_addreturn()")
-    "foo" // expected-warning {{string literal is unused}} expected-error {{missing return in global function expected to return 'String'}} 
+    "foo" // expected-warning {{string literal is unused}} expected-error {{missing return in global function expected to return 'String'}}
     // expected-note@-1 {{did you mean to return the last expression?}}{{5-5=return }}
 }
 

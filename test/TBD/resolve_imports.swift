@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -resolve-imports -emit-tbd -emit-tbd-path %t/resolve_imports.tbd %s -disable-availability-checking -tbd-install_name resolve_imports
-// RUN: %llvm-nm %t/resolve_imports.tbd |  %FileCheck %s 
+// RUN: %llvm-nm %t/resolve_imports.tbd |  %FileCheck %s
 
-// REQUIRES: OS=macosx 
+// REQUIRES: OS=macosx
 
 // Correct linkage for opaque type descriptor.
 @_alwaysEmitIntoClient public var x: some Any {

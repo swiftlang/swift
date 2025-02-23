@@ -92,7 +92,7 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   public var endIndex: Index {
     return 1
   }
-  
+
   /// Returns the position immediately after the given index.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be `0`.

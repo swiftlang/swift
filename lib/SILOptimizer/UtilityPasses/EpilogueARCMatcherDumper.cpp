@@ -43,14 +43,14 @@ class SILEpilogueARCMatcherDumper : public SILModuleTransform {
       if (!F.isDefinition())
         continue;
 
-      // Find the epilogue releases of each owned argument. 
+      // Find the epilogue releases of each owned argument.
       for (auto Arg : F.getArguments()) {
         auto *EA = PM->getAnalysis<EpilogueARCAnalysis>()->get(&F);
         llvm::outs() <<"START: " <<  F.getName() << "\n";
         llvm::outs() << *Arg;
 
         // Find the retain instructions for the argument.
-        llvm::SmallSetVector<SILInstruction *, 1> RelInsts = 
+        llvm::SmallSetVector<SILInstruction *, 1> RelInsts =
           EA->computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind::Release,
                                              Arg);
         for (auto I : RelInsts) {
@@ -58,7 +58,7 @@ class SILEpilogueARCMatcherDumper : public SILModuleTransform {
         }
 
         // Find the release instructions for the argument.
-        llvm::SmallSetVector<SILInstruction *, 1> RetInsts = 
+        llvm::SmallSetVector<SILInstruction *, 1> RetInsts =
           EA->computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind::Retain,
                                              Arg);
         for (auto I : RetInsts) {
@@ -71,7 +71,7 @@ class SILEpilogueARCMatcherDumper : public SILModuleTransform {
   }
 
 };
-        
+
 } // end anonymous namespace
 
 SILTransform *swift::createEpilogueARCMatcherDumper() {

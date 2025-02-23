@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 
 // 1. functional test:
 

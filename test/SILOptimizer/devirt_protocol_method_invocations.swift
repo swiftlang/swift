@@ -44,7 +44,7 @@ public func testIndirectlyInheritedConformance() {
 }
 
 
-public protocol Foo { 
+public protocol Foo {
   func foo(_ x:Int) -> Int
 }
 
@@ -96,7 +96,7 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 // Check that calls to f.foo() get devirtualized and are not invoked
 // via the expensive witness_method instruction.
 // To achieve that the information about a concrete type C should
-// be propagated from init_existential_addr into witness_method and 
+// be propagated from init_existential_addr into witness_method and
 // apply instructions.
 
 // CHECK-LABEL: sil [noinline] @$s34devirt_protocol_method_invocations05test_a1_b1_C11_invocationySiAA1CCF

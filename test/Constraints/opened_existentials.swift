@@ -52,14 +52,14 @@ func testSimpleExistentialOpening(p: any P, pq: any P & Q, c: any Collection) {
   let _: Int = pqa  // expected-error{{cannot convert value of type '(any Q)?' to specified type 'Int'}}
 
   // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
-  let element = acceptCollection(c) 
+  let element = acceptCollection(c)
   let _: Int = element // expected-error{{cannot convert value of type 'Any' to specified type 'Int'}}
 }
 
 // --- Requirements on nested types
 protocol CollectionOfPs: Collection where Self.Element: P { }
 
-func takeCollectionOfPs<C: Collection>(_: C) -> C.Element.A?    
+func takeCollectionOfPs<C: Collection>(_: C) -> C.Element.A?
   where C.Element: P
 {
   nil

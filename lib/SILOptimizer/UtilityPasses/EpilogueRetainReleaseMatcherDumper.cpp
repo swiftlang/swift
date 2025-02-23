@@ -50,12 +50,12 @@ class SILEpilogueRetainReleaseMatcherDumper : public SILModuleTransform {
       llvm::outs() << "START: sil @" << Fn.getName() << "\n";
 
       // Handle @owned return value.
-      ConsumedResultToEpilogueRetainMatcher RetMap(RCIA->get(&Fn), AA, &Fn); 
+      ConsumedResultToEpilogueRetainMatcher RetMap(RCIA->get(&Fn), AA, &Fn);
       for (auto &RI : RetMap)
         llvm::outs() << *RI;
 
       // Handle @owned function arguments.
-      ConsumedArgToEpilogueReleaseMatcher RelMap(RCIA->get(&Fn), &Fn); 
+      ConsumedArgToEpilogueReleaseMatcher RelMap(RCIA->get(&Fn), &Fn);
       // Iterate over arguments and dump their epilogue releases.
       for (auto Arg : Fn.getArguments()) {
         llvm::outs() << *Arg;
@@ -69,7 +69,7 @@ class SILEpilogueRetainReleaseMatcherDumper : public SILModuleTransform {
   }
 
 };
-        
+
 } // end anonymous namespace
 
 SILTransform *swift::createEpilogueRetainReleaseMatcherDumper() {

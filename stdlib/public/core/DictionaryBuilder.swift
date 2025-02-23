@@ -107,7 +107,7 @@ extension _NativeDictionary {
     // read only, so we shouldn't attempt to write to them.
     if capacity == 0 {
       let c = initializer(
-        UnsafeMutableBufferPointer(start: nil, count: 0), 
+        UnsafeMutableBufferPointer(start: nil, count: 0),
         UnsafeMutableBufferPointer(start: nil, count: 0))
       _precondition(c == 0)
       return

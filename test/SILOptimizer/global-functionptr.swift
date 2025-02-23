@@ -2,7 +2,7 @@
 
 // First test: check if the compilation succeeds and the code is correct.
 
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: touch %t/empty.swift
 // RUN: %target-swift-frontend -O -parse-as-library -num-threads 2 -emit-module -emit-module-path=%t/Test.swiftmodule -module-name=Test %s %t/empty.swift -c -o %t/test.o -o %t/empty.o
 // RUN: %target-build-swift -O -wmo -module-name=Main -I%t %S/Inputs/global-functionptr-main.swift -c -o %t/main.o

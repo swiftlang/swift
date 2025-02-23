@@ -92,7 +92,7 @@ public func compareABIs() {
 public func compareInits() -> Bool {
   let mf = MyInt(rawValue: 1)
   let mfNoLabel = MyInt(1)
-  let res = mf.rawValue == MyInt.one.rawValue 
+  let res = mf.rawValue == MyInt.one.rawValue
         && mfNoLabel.rawValue == MyInt.one.rawValue
   // OPT:  [[ONE:%.*]] = load i32, ptr{{.*}}@kMyIntOne{{.*}}, align 4
   // OPT-NEXT: [[COMP:%.*]] = icmp eq i32 [[ONE]], 1

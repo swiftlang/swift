@@ -1,7 +1,7 @@
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name sil_locations -Xllvm -sil-print-debuginfo -emit-verbose-sil %s | %FileCheck %s
 
-// FIXME: Not sure if this an ideal source info for the branch - 
+// FIXME: Not sure if this an ideal source info for the branch -
 // it points to if, not the last instruction in the block.
 func ifexpr() -> Int {
   var x : Int = 0
@@ -35,8 +35,8 @@ func ifelseexpr() -> Int {
   // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE-7]]:3, {{.*}}:return
 }
 
-// The source locations are handled differently here - since 
-// the return is unified, we keep the location of the return(not the if) 
+// The source locations are handled differently here - since
+// the return is unified, we keep the location of the return(not the if)
 // in the branch.
 func ifexpr_return() -> Int {
   if true {
@@ -99,7 +99,7 @@ func testMethodCall() {
   var l: LocationClass
   l.mem();
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations14testMethodCallyyF
-  
+
   // CHECK: class_method {{.[0-9]+}} : $LocationClass, #LocationClass.mem : {{.*}}, loc "{{.*}}":[[@LINE-3]]:5
 }
 
@@ -117,7 +117,7 @@ func multipleReturnsImplicitAndExplicit() {
 }
 
 func simplifiedImplicitReturn() -> () {
-  var y = 0 
+  var y = 0
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations24simplifiedImplicitReturnyyF
   // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE+1]]:1, {{.*}}:imp_return
 }
@@ -159,7 +159,7 @@ func testIf() {
   // FIXME: Missing location info here.
   // CHECK: function_ref
   // CHECK: apply
-  // 
+  //
   //
   //
   // CHECK: br {{.*}}, loc "{{.*}}":[[@LINE-13]]:6
@@ -183,8 +183,8 @@ func testFor() {
   // CHECK: br bb{{.*}}, loc "{{.*}}":[[@LINE-10]]:7
   // CHECK: destroy_value [[VAR_Y_IN_FOR]] : ${ var Int }
   // CHECK: br bb{{.*}}, loc "{{.*}}":[[@LINE-9]]:5
-  
-  
+
+
 }
 
 func testTuples() {
@@ -196,7 +196,7 @@ func testTuples() {
   // CHECK: integer_literal $Builtin.IntLiteral, 2, loc "{{.*}}":[[@LINE-5]]:12
   // CHECK: integer_literal $Builtin.IntLiteral, 3, loc "{{.*}}":[[@LINE-6]]:14
   // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-6]]:12
-  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-7]]:16  
+  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-7]]:16
 }
 
 // Test tuple imploding/exploding.
@@ -224,30 +224,30 @@ func interpolated_string(_ x: Int, y: String) -> String {
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations19interpolated_string{{[_0-9a-zA-Z]*}}F
   // CHECK: function_ref @$ss26DefaultStringInterpolationV15literalCapacity18interpolationCountABSi_SitcfC
   // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-3]]:10
-  
+
   // CHECK: string_literal utf8 "The ", loc "{{.*}}":[[@LINE-5]]:10
   // CHECK: function_ref @$ss26DefaultStringInterpolationV13appendLiteralyySSF
   // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-7]]:11
-  
+
   // CHECK: store %0 to{{.*}}, loc "{{.*}}":[[@LINE-9]]:17
   // CHECK: function_ref @$ss26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzlF
   // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-11]]:16
-  
+
   // CHECK: string_literal utf8 " Million Dollar ", loc "{{.*}}":[[@LINE-13]]:19
   // CHECK: function_ref @$ss26DefaultStringInterpolationV13appendLiteralyySSF
   // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-15]]:19
-  
+
   // CHECK: store_borrow %1 to {{.*}}, loc "{{.*}}":[[@LINE-17]]:37
   // CHECK: function_ref @$ss26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzs20TextOutputStreamableRzlF
   // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-19]]:36
-  
+
   // CHECK: function_ref @$sSS19stringInterpolationSSs013DefaultStringB0V_tcfC
   // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-22]]:10
 }
 
 
 func int(_ x: Int) {}
-func tuple() -> (Int, Float) { return (1, 1.0) }  
+func tuple() -> (Int, Float) { return (1, 1.0) }
 func tuple_element(_ x: (Int, Float)) {
   int(tuple().0)
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations13tuple_element{{[_0-9a-zA-Z]*}}F
@@ -255,13 +255,13 @@ func tuple_element(_ x: (Int, Float)) {
   // CHECK: apply {{.*}} line:[[@LINE-3]]:7
   // CHECK: destructure_tuple {{.*}}line:[[@LINE-4]]:7
   // CHECK: apply {{.*}} line:[[@LINE-5]]:3
-     
+
 }
 
 func containers() -> ([Int], Dictionary<String, Int>) {
   return ([1, 2, 3], ["Ankeny": 101, "Burnside": 102, "Couch": 103])
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations10containers{{[_0-9a-zA-Z]*}}F
-  
+
   // CHECK: string_literal utf8 "Ankeny", loc "{{.*}}":[[@LINE-3]]:23
 
   // CHECK: integer_literal $Builtin.IntLiteral, 101, loc "{{.*}}":[[@LINE-5]]:33
@@ -282,7 +282,7 @@ func test_isa_2(_ p: P) {
   case _:
     a()
   }
-  
+
 
 
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations10test_isa_2{{[_0-9a-zA-Z]*}}F
@@ -293,7 +293,7 @@ func test_isa_2(_ p: P) {
   //
   // CHECK: checked_cast_addr_br {{.*}}, loc "{{.*}}":[[@LINE-14]]:9
   // CHECK: load {{.*}}, loc "{{.*}}":[[@LINE-15]]:9
-    
+
 }
 
 func runcibleWhy() {}
@@ -311,8 +311,8 @@ func printSinglePayloadAddressOnly(_ v:SinglePayloadAddressOnly) {
   case .y:
     runcibleWhy()
   }
-  
-  
+
+
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations29printSinglePayloadAddressOnly{{[_0-9a-zA-Z]*}}F
   // CHECK: bb0
   // CHECK: switch_enum_addr {{.*}} [[FALSE_BB:bb[0-9]+]], {{.*}}line:[[@LINE-10]]:3
@@ -329,7 +329,7 @@ func testStringForEachStmt() {
       break
     }
   }
-  
+
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations21testStringForEachStmtyyF
   // CHECK: br {{.*}} line:[[@LINE-8]]:3
   // CHECK: switch_enum {{.*}} line:[[@LINE-9]]:3
@@ -340,15 +340,15 @@ func testStringForEachStmt() {
   // CHECK: br {{.*}} line:[[@LINE-9]]:3
   // Condition is false branch:
   // CHECK: br {{.*}} line:[[@LINE-16]]:3
-  
-  
-  
-  
+
+
+
+
 }
 
 
 func testForStmt() {
-  
+
   var m = 0
   for i in 0..<10 {
     m += 1
@@ -362,18 +362,18 @@ func testForStmt() {
 
 
 
-  
 
-  
-  
-  
-  
-  
-  
-  
 
-  
-  
+
+
+
+
+
+
+
+
+
+
 }
 
 
@@ -382,8 +382,8 @@ func testRepeatWhile() {
   repeat {
     m += 1
   } while (m < 200)
-  
-  
+
+
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations15testRepeatWhileyyF
   // CHECK: br {{.*}} line:[[@LINE-6]]:3
   // CHECK: cond_br {{.*}} line:[[@LINE-5]]:14
@@ -402,7 +402,7 @@ func testWhile() {
     }
     m += 1
   }
-  
+
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations9testWhileyyF
   // CHECK: br {{.*}} line:[[@LINE-9]]:3
   // While loop conditional branch:
@@ -415,7 +415,7 @@ func testWhile() {
   // CHECK: br {{.*}} line:[[@LINE-11]]:3
 
 
-  
+
 }
 
 // Check that the sil location of keypath getter/setter functions is

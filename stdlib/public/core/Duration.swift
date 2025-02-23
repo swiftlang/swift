@@ -12,23 +12,23 @@
 
 /// A representation of high precision time.
 ///
-/// `Duration` represents an elapsed time value with high precision in an 
-/// integral form. It may be used for measurements of varying clock sources. In 
-/// those cases it represents the elapsed time measured by that clock. 
-/// Calculations using `Duration` may span from a negative value to a positive 
+/// `Duration` represents an elapsed time value with high precision in an
+/// integral form. It may be used for measurements of varying clock sources. In
+/// those cases it represents the elapsed time measured by that clock.
+/// Calculations using `Duration` may span from a negative value to a positive
 /// value and have a suitable range to at least cover attosecond scale for both
 /// small elapsed durations like sub-second precision to durations that span
 /// centuries.
 ///
 /// Typical construction of `Duration` values should be created via the
-/// static methods for specific time values. 
+/// static methods for specific time values.
 ///
 ///      var d: Duration = .seconds(3)
 ///      d += .milliseconds(33)
 ///      print(d) // 3.033 seconds
 ///
-/// `Duration` itself does not ferry any additional information other than the 
-/// temporal measurement component; specifically leap seconds should be 
+/// `Duration` itself does not ferry any additional information other than the
+/// temporal measurement component; specifically leap seconds should be
 /// represented as an additional accessor since that is specific only to certain
 /// clock implementations.
 @available(SwiftStdlib 5.7, *)
@@ -57,24 +57,24 @@ public struct Duration: Sendable {
   /// no precondition is expressed for the attoseconds being limited to 1e18.
   ///
   ///       let d1 = Duration(
-  ///         secondsComponent: 3, 
+  ///         secondsComponent: 3,
   ///         attosecondsComponent: 123000000000000000)
   ///       print(d1) // 3.123 seconds
   ///
   ///       let d2 = Duration(
-  ///         secondsComponent: 3, 
+  ///         secondsComponent: 3,
   ///         attosecondsComponent: -123000000000000000)
   ///       print(d2) // 2.877 seconds
   ///
   ///       let d3 = Duration(
-  ///         secondsComponent: -3, 
+  ///         secondsComponent: -3,
   ///         attosecondsComponent: -123000000000000000)
   ///       print(d3) // -3.123 seconds
   ///
   /// - Parameters:
-  ///   - secondsComponent: The seconds component portion of the `Duration` 
+  ///   - secondsComponent: The seconds component portion of the `Duration`
   ///                       value.
-  ///   - attosecondsComponent: The attosecond component portion of the 
+  ///   - attosecondsComponent: The attosecond component portion of the
   ///                           `Duration` value.
   public init(secondsComponent: Int64, attosecondsComponent: Int64) {
     self = Duration.seconds(secondsComponent) +
@@ -103,7 +103,7 @@ extension Duration {
 extension Duration {
   /// The number of attoseconds represented by this `Duration`.
   ///
-  /// This property provides direct access to the underlying number of attoseconds 
+  /// This property provides direct access to the underlying number of attoseconds
   /// that the current `Duration` represents.
   ///
   ///     let d = Duration.seconds(1)
@@ -113,7 +113,7 @@ extension Duration {
   public var attoseconds: Int128 {
     Int128(_low: _low, _high: _high)
   }
-  
+
   /// Construct a `Duration` from the given number of attoseconds.
   ///
   /// This directly constructs a `Duration` from the given number of attoseconds.
@@ -131,7 +131,7 @@ extension Duration {
 
 @available(SwiftStdlib 5.7, *)
 extension Duration {
-  /// Construct a `Duration` given a number of seconds represented as a 
+  /// Construct a `Duration` given a number of seconds represented as a
   /// `BinaryInteger`.
   ///
   ///       let d: Duration = .seconds(77)
@@ -146,7 +146,7 @@ extension Duration {
     let highScaled = high * 1_000_000_000_000_000_000
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
-  
+
   /// Construct a `Duration` given a duration and scale, taking care so that
   /// exact integer durations are preserved exactly.
   internal init(_ duration: Double, scale: UInt64) {
@@ -164,7 +164,7 @@ extension Duration {
     )
   }
 
-  /// Construct a `Duration` given a number of seconds represented as a 
+  /// Construct a `Duration` given a number of seconds represented as a
   /// `Double` by converting the value into the closest attosecond scale value.
   ///
   ///       let d: Duration = .seconds(22.93)
@@ -175,7 +175,7 @@ extension Duration {
     Duration(seconds, scale: 1_000_000_000_000_000_000)
   }
 
-  /// Construct a `Duration` given a number of milliseconds represented as a 
+  /// Construct a `Duration` given a number of milliseconds represented as a
   /// `BinaryInteger`.
   ///
   ///       let d: Duration = .milliseconds(645)
@@ -193,7 +193,7 @@ extension Duration {
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
-  /// Construct a `Duration` given a number of seconds milliseconds as a 
+  /// Construct a `Duration` given a number of seconds milliseconds as a
   /// `Double` by converting the value into the closest attosecond scale value.
   ///
   ///       let d: Duration = .milliseconds(88.3)
@@ -204,7 +204,7 @@ extension Duration {
     Duration(milliseconds, scale: 1_000_000_000_000_000)
   }
 
-  /// Construct a `Duration` given a number of microseconds represented as a 
+  /// Construct a `Duration` given a number of microseconds represented as a
   /// `BinaryInteger`.
   ///
   ///       let d: Duration = .microseconds(12)
@@ -222,7 +222,7 @@ extension Duration {
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
-  /// Construct a `Duration` given a number of seconds microseconds as a 
+  /// Construct a `Duration` given a number of seconds microseconds as a
   /// `Double` by converting the value into the closest attosecond scale value.
   ///
   ///       let d: Duration = .microseconds(382.9)
@@ -233,7 +233,7 @@ extension Duration {
     Duration(microseconds, scale: 1_000_000_000_000)
   }
 
-  /// Construct a `Duration` given a number of nanoseconds represented as a 
+  /// Construct a `Duration` given a number of nanoseconds represented as a
   /// `BinaryInteger`.
   ///
   ///       let d: Duration = .nanoseconds(1929)

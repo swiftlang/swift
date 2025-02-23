@@ -143,7 +143,7 @@ func check(base: Int = 0, sub: Int = 0,
 func main() {
   // CHECK: START
   print("START")
-   
+
   // Check that this whole setup works.
   // CHECK-NEXT: init(swift:) Base
   check(base: 1) { Base(swift: ()) }
@@ -153,7 +153,7 @@ func main() {
   check(base: 1) { Base(objc: ()) }
   // CHECK-NEXT: init(objc:) Sub
   check(sub: 1) { Sub(objc: ()) }
-   
+
   // CHECK-NEXT: init(swiftToSwift:) Sub
   // CHECK-NEXT: init(swift:) Sub
   check(sub: 1) { Sub(swiftToSwift: ()) }
@@ -166,7 +166,7 @@ func main() {
   // CHECK-NEXT: init(objcToObjC:) Sub
   // CHECK-NEXT: init(objc:) Sub
   check(sub: 1) { Sub(objcToObjC: ()) }
-   
+
   // CHECK-NEXT: init(swiftToSwiftConvenience:) Sub
   // CHECK-NEXT: init(swiftToSwift:) Sub
   // CHECK-NEXT: init(swift:) Sub
@@ -183,13 +183,13 @@ func main() {
   // CHECK-NEXT: init(objcToObjC:) Sub
   // CHECK-NEXT: init(objc:) Sub
   check(sub: 1) { Sub(objcToObjCConvenience: ()) }
-   
+
   // Force ObjC dispatch without conforming Sub or Base to the protocol,
   // because it's possible that `required` perturbs things and we want to test
   // both ways.
   let SubAsObjC = unsafeBitCast(Sub.self as AnyObject,
                                 to: ForceObjCDispatch.Type.self)
-   
+
   // CHECK-NEXT: init(objc:) Sub
   check(sub: 1) { SubAsObjC.init(objc: ()) }
   // CHECK-NEXT: init(objcToSwift:) Sub

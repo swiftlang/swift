@@ -298,13 +298,13 @@ LargeSILTypeMapper::getNewSILFunctionType(GenericEnvironment *env,
   if (!modifiableFunction(fnType) && !mustTransform) {
     return fnType;
   }
-  
+
   // Map substituted function types according to their substituted generic
   // signature.
   if (fnType->getPatternSubstitutions()) {
     env = getSubstGenericEnvironment(fnType);
   }
-  
+
   auto newParams = getNewParameters(env, fnType, IGM);
   auto newYields = getNewYields(env, fnType, IGM);
   auto newResults = getNewResults(env, fnType, IGM, mustTransform);
@@ -332,7 +332,7 @@ LargeSILTypeMapper::getNewOptionalFunctionType(GenericEnvironment *GenericEnv,
   if (auto objectType = storageType.getOptionalObjectType()) {
     if (auto fnType = objectType.getAs<SILFunctionType>()) {
       if (shouldTransformFunctionType(GenericEnv, fnType, Mod)) {
-        auto newFnType = getNewSILFunctionType(GenericEnv, fnType, Mod);        
+        auto newFnType = getNewSILFunctionType(GenericEnv, fnType, Mod);
         newSILType =
           SILType::getPrimitiveType(newFnType, storageType.getCategory());
         newSILType = SILType::getOptionalType(newSILType);
@@ -2440,7 +2440,7 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
     }
     return;
   }
-  
+
   StructLoweringState pass(F, *currIRMod, MapperCache);
 
   // Rewrite function args and insert allocs.
@@ -3032,7 +3032,7 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
                                    IRGenModule *irgenModule);
 
 /// The entry point to this function transformation.
-void LoadableByAddress::run() {  
+void LoadableByAddress::run() {
   // Set the SIL state before the PassManager has a chance to run
   // verification.
   getModule()->setStage(SILStage::Lowered);

@@ -34,14 +34,14 @@ class OtherIntroduced99_51 {
     return OtherIntroduced99_52()
   }
 
-  func takes99_52(o: OtherIntroduced99_52) { 
+  func takes99_52(o: OtherIntroduced99_52) {
   }
 
   @available(OSX, introduced: 99.52)
   func takes99_52Introduced99_52(o: OtherIntroduced99_52) {
   }
 
-  var propOf99_52: OtherIntroduced99_52 = 
+  var propOf99_52: OtherIntroduced99_52 =
 
 
       OtherIntroduced99_52() // We don't expect an error here because the initializer is not type checked (by design).

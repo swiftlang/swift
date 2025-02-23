@@ -13,7 +13,7 @@
 //  When a ContiguousArray<T> is bridged to Objective-C, and T isn't
 //  "bridged verbatim," Cocoa operations like objectAtIndex may have
 //  to conjure up an object to return, and this object is expected to
-//  outlive the array.  
+//  outlive the array.
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-stdlib-swift
@@ -84,7 +84,7 @@ BridgeNonVerbatimTests.test("testing") {
       var objects: [Int] = [0, 0]
 
       objects.withUnsafeMutableBufferPointer {
-        // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732> 
+        // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732>
         (buf: inout UnsafeMutableBufferPointer<Int>) -> () in
         nsx.available_getObjects(
           AutoreleasingUnsafeMutablePointer(buf.baseAddress!),

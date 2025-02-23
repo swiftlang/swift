@@ -57,17 +57,17 @@ UnmanagedTests.test("_withUnsafeGuaranteedRef/return") {
 UnmanagedTests.test("Opaque") {
   var ref = Foobar()
   let opaquePtr = Unmanaged.passUnretained(ref).toOpaque()
-  
+
   let unknownPtr = Int(bitPattern: opaquePtr)
   let voidPtr = UnsafeRawPointer(bitPattern: unknownPtr)
   expectNotNil(voidPtr, "toOpaque must not return null pointer")
-  
+
   let unmanaged = Unmanaged<Foobar>.fromOpaque(voidPtr!)
   expectEqual(
     ref === unmanaged.takeUnretainedValue(),
     true,
     "fromOpaque must return the same reference")
-  
+
   _fixLifetime(ref)
 }
 
@@ -83,10 +83,10 @@ UnmanagedTests.test("Opaque avoid retain/release") {
   // Create a dangling pointer, usually to unmapped memory.
   let ref = UnsafeRawPointer(bitPattern: 1)!
   // Turn it into a dangling unmanaged reference.
-  // We expect this not to crash, as this operation isn't 
+  // We expect this not to crash, as this operation isn't
   // supposed to dereference the pointer in any way.
   let unmanaged = Unmanaged<Foobar>.fromOpaque(ref)
-  // Similarly, converting the unmanaged reference back to a 
+  // Similarly, converting the unmanaged reference back to a
   // pointer should not ever try to dereference it either.
   let ref2 = unmanaged.toOpaque()
   // ...and we must get back the same pointer.

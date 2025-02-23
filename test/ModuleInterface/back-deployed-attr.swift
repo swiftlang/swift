@@ -12,7 +12,7 @@ public struct TopLevelStruct {
   // CHECK: public func backDeployedFunc_SinglePlatform() -> Swift.Int { return 41 }
   @backDeployed(before: macOS 12.0)
   public func backDeployedFunc_SinglePlatform() -> Int { return 41 }
-  
+
   // CHECK: @backDeployed(before: macOS 12.0, iOS 15.0)
   // CHECK: public func backDeployedFunc_MultiPlatform() -> Swift.Int { return 42 }
   @backDeployed(before: macOS 12.0, iOS 15.0)

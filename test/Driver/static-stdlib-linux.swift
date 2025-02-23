@@ -7,4 +7,4 @@ print("hello world!")
 // RUN: %t/static-stdlib | %FileCheck %s
 // RUN: ldd %t/static-stdlib | %FileCheck %s --check-prefix=LDD
 // CHECK: hello world!
-// LDD-NOT: libswiftCore.so 
+// LDD-NOT: libswiftCore.so

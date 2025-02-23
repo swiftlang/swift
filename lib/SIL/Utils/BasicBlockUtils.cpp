@@ -129,10 +129,10 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
       args.push_back(V);
     return;
   }
-      
+
   case SILInstructionKind::AwaitAsyncContinuationInst: {
     auto AACI = cast<AwaitAsyncContinuationInst>(T);
-    
+
     switch (edgeIdx) {
     case 0:
       // resume BB. this takes the resume value argument if the operand is
@@ -143,7 +143,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
             contOperand->getLoweredResumeType(), OwnershipKind::Owned));
       }
       return;
-        
+
     case 1: {
       assert(AACI->getErrorBB());
       auto &C = AACI->getFunction()->getASTContext();
@@ -154,7 +154,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
           newEdgeBB->createPhiArgument(errorSILTy, OwnershipKind::Owned));
       return;
     }
-        
+
     default:
       llvm_unreachable("only has at most two edges");
     }
@@ -526,7 +526,7 @@ void swift::findJointPostDominatingSet(
       assert(visitedBlocks.contains(predBlock));
       if (visitedBlocksInSecondRun.insert(predBlock)) {
         worklist.push_back(predBlock);
-        
+
         for (auto *succBlock : predBlock->getSuccessorBlocks()) {
           // All not-visited successors of a visited block are "leaking" blocks.
           if (!visitedBlocks.contains(succBlock) &&

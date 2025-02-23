@@ -8,11 +8,11 @@ import Foundation
 enum NSDecimalResult: ExpressibleByStringLiteral, Equatable, CustomStringConvertible {
   case Some(Decimal)
   case Error(Decimal.CalculationError)
-  
+
   init() {
     self = .Some(Decimal())
   }
-  
+
   init(stringLiteral: String) {
     if let value = Decimal(string: stringLiteral) {
       self = .Some(value)
@@ -74,10 +74,10 @@ func +(x: NSDecimalResult, y: NSDecimalResult) -> NSDecimalResult {
     } else {
       return .Some(result)
     }
-    
+
   case let (.Error(error), _):
     return .Error(error)
-    
+
   case let (_, .Error(error)):
     return .Error(error)
 

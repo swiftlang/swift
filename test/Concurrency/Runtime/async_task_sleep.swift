@@ -14,7 +14,7 @@ import Dispatch
 @available(SwiftStdlib 5.1, *)
 @main struct Main {
   static let pause = 500_000_000 // 500ms
-  
+
   static func main() async {
     await testSleepDuration()
     await testSleepDoesNotBlock()

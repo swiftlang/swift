@@ -240,7 +240,7 @@ func testLogMessageWithoutData() {
 
   // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
   // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Optional<UnsafeMutablePointer<NSObject>>, inout Optional<UnsafeMutablePointer<Any>>) -> ()>>({{%.*}}, [[SB:%[0-9]+]])
-  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY:%[0-9]+]] to {{.*}} 
+  // CHECK-DAG: [[SB]] = store_borrow [[ARGSARRAY:%[0-9]+]] to {{.*}}
   // CHECK-DAG: [[ARGSARRAY]] = move_value [var_decl] [[ARGSARRAY:%[0-9]+]]
   // CHECK-DAG: ([[ARGSARRAY]], {{%.*}}) = destructure_tuple [[ARRAYINITRES:%[0-9]+]]
   // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Optional<UnsafeMutablePointer<NSObject>>, inout Optional<UnsafeMutablePointer<Any>>) -> ()>([[ARRAYSIZE:%[0-9]+]])

@@ -18,7 +18,7 @@ import Foundation
 // CHECK:   [[GA:%.*]] = global_addr @$s25access_marker_verify_objc12testCFStringC8cfStringSo0F3RefavpZ : $*CFString
 // CHECK-NOT: begin_access
 // CHECK:   store %{{.*}} to [init] [[GA]] : $*CFString
-// CHECK:   return %{{.*}} : $()                               
+// CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '{{.*}}WZ'
 class testCFString {
   public static let cfString: CFString = "" as CFString
@@ -44,14 +44,14 @@ class HasBlockImpl: HasBlock {
 // CHECK:   [[CVTB:%.*]] = begin_borrow [[CVT]]
 // CHECK:   [[F:%.*]] = function_ref @$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEF : $@convention(method) (@guaranteed @noescape @callee_guaranteed (Int) -> Int, @guaranteed HasBlockImpl) -> ()
 // CHECK:   %{{.*}} = apply [[F]]([[CVTB]], %{{.*}}) : $@convention(method) (@guaranteed @noescape @callee_guaranteed (Int) -> Int, @guaranteed HasBlockImpl) -> ()
-// CHECK:   return %{{.*}} : $()                                
+// CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '$s25access_marker_verify_objc12HasBlockImplC5blockyyS2iXEFTo'
 
 // thunk for @callee_unowned @convention(block) (@unowned Int) -> (@unowned Int)
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sS2iIyByd_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @convention(block) @noescape (Int) -> Int) -> Int {
 // CHECK: bb0(%0 : $Int, %1 : @guaranteed $@convention(block) @noescape (Int) -> Int):
 // CHECK:   %{{.*}} = apply %1(%0) : $@convention(block) @noescape (Int) -> Int
-// CHECK:  return %{{.*}} : $Int                               
+// CHECK:  return %{{.*}} : $Int
 // CHECK-LABEL: } // end sil function '$sS2iIyByd_S2iIegyd_TR'
 
 // --- C global.
@@ -59,7 +59,7 @@ class HasBlockImpl: HasBlock {
 // CHECK-LABEL: sil hidden [ossa] @$s25access_marker_verify_objc14GlobalPropertyC14globalCFStringSo0H3RefavgZ : $@convention(method) (@thick GlobalProperty.Type) -> @owned CFString {
 // CHECK: bb0(%0 : $@thick GlobalProperty.Type):
 // CHECK:   [[GA:%.*]] = global_addr @constCGlobal : $*Optional<CFString>
-// CHECK:   [[STR:%.*]] = load [copy] [[GA]] : $*Optional<CFString>            
+// CHECK:   [[STR:%.*]] = load [copy] [[GA]] : $*Optional<CFString>
 // CHECK: switch_enum [[STR]] : $Optional<CFString>, case #Optional.some!enumelt: [[SOMEBB:bb.*]], case #Optional.none!enumelt: bb{{.*}}
 // CHECK:   [[SOMEBB]]([[R:%.*]] : @owned $CFString):
 // CHECK:   return [[R]] : $CFString

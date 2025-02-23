@@ -15,7 +15,7 @@ class HoldsNonNamespacedNestedStruct {
     struct NamespacedNestingStruct<T> {
         let nested: T
     }
-    
+
     let nestedField = NamespacedNestingStruct<Int>(nested: 1)
 }
 

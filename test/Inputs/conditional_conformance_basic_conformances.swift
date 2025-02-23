@@ -73,35 +73,35 @@ public func single_concrete() {
 // CHECK-PRESPECIALIZED-NEXT:    [[Single_P1:%.*]] = call ptr @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWl"()
 // CHECK-PRESPECIALIZED-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances8takes_p1yyxmAA2P1RzlF"(
 // CHECK-PRESPECIALIZED-SAME:      ptr getelementptr inbounds (
-// CHECK-PRESPECIALIZED-SAME:        %swift.full_type, 
+// CHECK-PRESPECIALIZED-SAME:        %swift.full_type,
 // CHECK-PRESPECIALIZED-SAME:        ptr bitcast (
-// CHECK-PRESPECIALIZED-SAME:          <{ 
-// CHECK-PRESPECIALIZED-SAME:            ptr, 
-// CHECK-PRESPECIALIZED-SAME:            [[INT]], 
-// CHECK-PRESPECIALIZED-SAME:            ptr, 
-// CHECK-PRESPECIALIZED-SAME:            ptr, 
-// CHECK-PRESPECIALIZED-SAME:            i64 
-// CHECK-PRESPECIALIZED-SAME:          }>* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMf" 
+// CHECK-PRESPECIALIZED-SAME:          <{
+// CHECK-PRESPECIALIZED-SAME:            ptr,
+// CHECK-PRESPECIALIZED-SAME:            [[INT]],
+// CHECK-PRESPECIALIZED-SAME:            ptr,
+// CHECK-PRESPECIALIZED-SAME:            ptr,
+// CHECK-PRESPECIALIZED-SAME:            i64
+// CHECK-PRESPECIALIZED-SAME:          }>* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMf"
 // CHECK-PRESPECIALIZED-SAME:          to ptr
-// CHECK-PRESPECIALIZED-SAME:        ), 
-// CHECK-PRESPECIALIZED-SAME:        i32 0, 
+// CHECK-PRESPECIALIZED-SAME:        ),
+// CHECK-PRESPECIALIZED-SAME:        i32 0,
 // CHECK-PRESPECIALIZED-SAME:        i32 1
-// CHECK-PRESPECIALIZED-SAME:      ), 
+// CHECK-PRESPECIALIZED-SAME:      ),
 // CHECK-PRESPECIALIZED-SAME:      ptr getelementptr inbounds (
-// CHECK-PRESPECIALIZED-SAME:        %swift.full_type, 
+// CHECK-PRESPECIALIZED-SAME:        %swift.full_type,
 // CHECK-PRESPECIALIZED-SAME:        ptr bitcast (
-// CHECK-PRESPECIALIZED-SAME:          <{ 
-// CHECK-PRESPECIALIZED-SAME:            ptr, 
-// CHECK-PRESPECIALIZED-SAME:            [[INT]], 
-// CHECK-PRESPECIALIZED-SAME:            ptr, 
-// CHECK-PRESPECIALIZED-SAME:            ptr, 
-// CHECK-PRESPECIALIZED-SAME:            i64 
-// CHECK-PRESPECIALIZED-SAME:          }>* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMf" 
+// CHECK-PRESPECIALIZED-SAME:          <{
+// CHECK-PRESPECIALIZED-SAME:            ptr,
+// CHECK-PRESPECIALIZED-SAME:            [[INT]],
+// CHECK-PRESPECIALIZED-SAME:            ptr,
+// CHECK-PRESPECIALIZED-SAME:            ptr,
+// CHECK-PRESPECIALIZED-SAME:            i64
+// CHECK-PRESPECIALIZED-SAME:          }>* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMf"
 // CHECK-PRESPECIALIZED-SAME:          to ptr
-// CHECK-PRESPECIALIZED-SAME:        ), 
-// CHECK-PRESPECIALIZED-SAME:        i32 0, 
+// CHECK-PRESPECIALIZED-SAME:        ),
+// CHECK-PRESPECIALIZED-SAME:        i32 0,
 // CHECK-PRESPECIALIZED-SAME:        i32 1
-// CHECK-PRESPECIALIZED-SAME:      ), 
+// CHECK-PRESPECIALIZED-SAME:      ),
 // CHECK-PRESPECIALIZED-SAME:      ptr [[Single_P1]]
 // CHECK-PRESPECIALIZED-SAME:    )
 // CHECK-PRESPECIALIZED-NEXT:    ret void

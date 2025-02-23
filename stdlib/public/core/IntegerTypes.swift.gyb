@@ -548,7 +548,7 @@ public struct ${Self}
     let lhsLow = Builtin.zext_Int${bits}_Int${dbits}(dividend.low._value)
     let a = Builtin.or_Int${dbits}(lhsHighShifted, lhsLow)
     let b = Builtin.${z}ext_Int${bits}_Int${dbits}(self._value)
-    
+
     let q = Builtin.${u}div_Int${dbits}(a, b)
     let r = Builtin.${u}rem_Int${dbits}(a, b)
 

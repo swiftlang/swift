@@ -265,8 +265,8 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 // CHECK-SAME:    )
 
 // CHECK-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances8takes_p1yyxmAA2P1RzlF"(
-// CHECK-SAME:      ptr [[Double_TYPE]], 
-// CHECK-SAME:      ptr [[Double_TYPE]], 
+// CHECK-SAME:      ptr [[Double_TYPE]],
+// CHECK-SAME:      ptr [[Double_TYPE]],
 // CHECK-SAME:      ptr [[Double_P1]]
 // CHECK-SAME:    )
 // CHECK-NEXT:    ret void

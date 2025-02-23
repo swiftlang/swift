@@ -46,18 +46,18 @@ bytes[11] = CChar(0)
 print("the magic word is //\(String(cString: bytes))//")
 
 // CHECK: O_CREAT|O_EXCL returned errno *17*
-let errFile = 
+let errFile =
   open(sourcePath, O_RDONLY | O_CREAT | O_EXCL)
-if errFile != -1 { 
-  print("O_CREAT|O_EXCL failed to return an error") 
+if errFile != -1 {
+  print("O_CREAT|O_EXCL failed to return an error")
 } else {
   let e = errno
-  print("O_CREAT|O_EXCL returned errno *\(e)*") 
+  print("O_CREAT|O_EXCL returned errno *\(e)*")
 }
 
 // CHECK-NOT: error
 // CHECK: created mode *{{33216|33060}}* *{{33216|33060}}*
-let tempFile = 
+let tempFile =
   open(tempPath, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IXUSR)
 if tempFile == -1 {
   let e = errno

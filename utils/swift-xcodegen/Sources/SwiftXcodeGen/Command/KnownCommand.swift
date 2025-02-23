@@ -133,9 +133,9 @@ extension Command.Flag {
   static let std = dash("std")
 
   // Swift
-  static let cxxInteroperabilityMode = 
+  static let cxxInteroperabilityMode =
     swiftc(.cxxInteroperabilityMode)
-  static let enableExperimentalCxxInterop = 
+  static let enableExperimentalCxxInterop =
     swiftc(.enableExperimentalCxxInterop)
   static let enableExperimentalFeature =
     swiftc(.enableExperimentalFeature)
@@ -145,7 +145,7 @@ extension Command.Flag {
     swiftc(.experimentalSkipAllFunctionBodies)
   static let experimentalSkipNonInlinableFunctionBodies =
     swiftc(.experimentalSkipNonInlinableFunctionBodies)
-  static let experimentalSkipNonInlinableFunctionBodiesWithoutTypes = 
+  static let experimentalSkipNonInlinableFunctionBodiesWithoutTypes =
     swiftc(.experimentalSkipNonInlinableFunctionBodiesWithoutTypes)
   static let F =
     swiftc(.F)

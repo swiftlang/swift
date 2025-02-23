@@ -102,7 +102,7 @@ func r<T: PCAC> (_ x: (T) -> T.A) {}
 // Structural positions
 
 struct S<T, U> {
-  struct Nested<V> { 
+  struct Nested<V> {
     struct NesNestedted<W> { }
     struct NestedNonGeneric { }
   }
@@ -143,7 +143,7 @@ func w<T>(_: (C<T, T>) -> T) {}
 // CHECK-LABEL: sil {{.*}}1x{{.*}} : $@convention(thin) <T, U, V where V : C<T, U>> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0 where τ_0_0 : _NativeClass> (@guaranteed τ_0_0) -> () for <V>) -> ()
 func x<T, U, V: C<T, U>>(_: (V) -> Void) {}
 
-// We can't generally lower away protocol constraints 
+// We can't generally lower away protocol constraints
 // in nominal type argument positions, because they're necessary for the
 // substitutions to be valid, and associated types may influence the ABI of
 // the nominal type.

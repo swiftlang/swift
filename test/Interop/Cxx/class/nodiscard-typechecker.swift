@@ -6,7 +6,7 @@ import NoDiscard
 
 // Test a function.
 
-// CORRECT: return value not discarded.  
+// CORRECT: return value not discarded.
 var value = NoDiscardAdd(5, 10)
 
 // CORRECT: warning when return value is discarded.
@@ -22,7 +22,7 @@ value = multiplier.Multiply(10, 10)
 // CORRECT: warning when return value is discarded
 multiplier.Multiply(50, 50)  // expected-warning {{result of call to 'Multiply' is unused}}
 
-// CORRECT: return value not discarded.  
+// CORRECT: return value not discarded.
 value = multiplier.Divide(100, 10)
 
 // CORRECT: method has no annotation, thus no warning
@@ -33,7 +33,7 @@ multiplier.Divide(100, 10)
 
 let error: NoDiscardError = NoDiscardReturnError(10, 10)
 
-// INCORRECT: NoDiscardError is declared nodiscard, so ignoring the 
+// INCORRECT: NoDiscardError is declared nodiscard, so ignoring the
 // return value of NoDiscardReturnError() should be a warning, but isn't.
 // Filed as: https://github.com/apple/swift/issues/59002
 NoDiscardReturnError(50, 50)

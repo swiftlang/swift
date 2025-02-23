@@ -25,7 +25,7 @@ func f0<T, U>(_ t: T, _ f: (inout T) -> U) -> U {
 }
 
 struct X2 {
-  func g() -> Float { return 0 }  
+  func g() -> Float { return 0 }
 }
 
 _ = f0(X2(), {$0.g()})
@@ -38,7 +38,7 @@ func inoutToSharedConversions() {
   fooOW({ (x : __owned Int) in return Int(5) }) // '__owned'-to-'__owned' allowed
   fooOW({ (x : __shared Int) in return Int(5) }) // '__shared'-to-'__owned' allowed
   fooOW({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(__owned Int) -> Int'}}
-  
+
   func fooIO<T, U>(_ f : (inout T) -> U) {}
   fooIO({ (x : inout Int) in return Int(5) }) // 'inout'-to-'inout' allowed
   fooIO({ (x : Int) in return Int(5) }) // expected-error {{cannot convert value of type '(Int) -> Int' to expected argument type '(inout Int) -> Int'}}
@@ -91,9 +91,9 @@ func test13811882() {
 /// QoI: "Unexpected trailing closure" should have a fixit to insert a `do`
 /// statement
 do {
-  var inSubcall = true 
+  var inSubcall = true
   {  // expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
-  }  
+  }
   inSubcall = false
 
   // These are a problems, but it's not clear what was intended.
@@ -415,16 +415,16 @@ func r20789423() {
   class C {
     func f(_ value: Int) { }
   }
-  
+
   let p: C
   print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
   // expected-error@-1:11 {{cannot call value of non-function type '()'}}
-  
+
   let _f = { (v: Int) in
     print("a")
     return "hi"
   }
-  
+
 }
 
 /// In the example below, https://github.com/apple/swift/issues/45110 started
@@ -1145,11 +1145,11 @@ struct R_76250381<Result, Failure: Error> {
 }
 
 // https://github.com/apple/swift/issues/55926
-(0..<10).map { x, y in } 
+(0..<10).map { x, y in }
 // expected-error@-1 {{contextual closure type '(Range<Int>.Element) -> ()' (aka '(Int) -> ()') expects 1 argument, but 2 were used in closure body}}
-(0..<10).map { x, y, z in } 
+(0..<10).map { x, y, z in }
 // expected-error@-1 {{contextual closure type '(Range<Int>.Element) -> ()' (aka '(Int) -> ()') expects 1 argument, but 3 were used in closure body}}
-(0..<10).map { x, y, z, w in } 
+(0..<10).map { x, y, z, w in }
 // expected-error@-1 {{contextual closure type '(Range<Int>.Element) -> ()' (aka '(Int) -> ()') expects 1 argument, but 4 were used in closure body}}
 
 // rdar://77022842 - crash due to a missing argument to a ternary operator

@@ -6,7 +6,7 @@
 // <rdar://problem/17821040>
 
 // A minimized version of _dictionaryBridgeToObjectiveC that used to be in the
-// stdlib 
+// stdlib
 public func myDictionaryBridge<
     SrcType, DestType
 >(

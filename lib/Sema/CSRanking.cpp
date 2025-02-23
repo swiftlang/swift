@@ -205,7 +205,7 @@ static bool sameDecl(Decl *decl1, Decl *decl2) {
   // equivalent, then it doesn't matter which declaration is chosen.
   if (isa<TypeDecl>(decl1) && isa<TypeDecl>(decl2))
     return true;
-  
+
   if (decl1->getKind() != decl2->getKind())
     return false;
 
@@ -342,7 +342,7 @@ computeSelfTypeRelationship(DeclContext *dc, ValueDecl *decl1,
 /// Note that this is not a subtype or conversion check - that takes place
 /// in isDeclAsSpecializedAs.
 static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
-  
+
   if (decl1->getKind() != decl2->getKind() || isa<TypeDecl>(decl1))
     return false;
 
@@ -370,7 +370,7 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   if (bothGeneric) {
     auto params1 = sig1.getInnermostGenericParams();
     auto params2 = sig2.getInnermostGenericParams();
-      
+
     if (params1.size() == params2.size()) {
       for (size_t i = 0; i < params1.size(); i++) {
         auto p1 = params1[i];
@@ -386,13 +386,13 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
             });
 
         int aDelta = np1 - np2;
-          
+
         if (aDelta)
           return aDelta > 0;
       }
     }
   }
-  
+
   return false;
 }
 
@@ -997,7 +997,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // Compute relative score.
   unsigned score1 = 0;
   unsigned score2 = 0;
-  
+
   auto foundRefinement1 = false;
   auto foundRefinement2 = false;
 
@@ -1091,11 +1091,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         decl2InSubprotocol = pd2->inheritsFrom(pd1);
       }
     }
-    
+
     // If the kinds of overload choice don't match...
     if (choice1.getKind() != choice2.getKind()) {
       identical = false;
-      
+
       // A declaration found directly beats any declaration found via dynamic
       // lookup, bridging, or optional unwrapping.
       if ((choice1.getKind() == OverloadChoiceKind::Decl) &&
@@ -1194,14 +1194,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
               score2 += weight;
           } else if (ctor1->getInitKind() ==
                      CtorInitializerKind::Convenience) {
-            
+
             // If both are convenience initializers, and the instance type of
             // one is a subtype of the other's, favor the subtype constructor.
             auto resType1 = ctor1->mapTypeIntoContext(
                 ctor1->getResultInterfaceType());
             auto resType2 = ctor2->mapTypeIntoContext(
                 ctor2->getResultInterfaceType());
-            
+
             if (!resType1->isEqual(resType2)) {
               if (TypeChecker::isSubtypeOf(resType1, resType2, cs.DC)) {
                 score1 += weight;
@@ -1268,7 +1268,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       if (isDeclMoreConstrainedThan(decl1, decl2)) {
         foundRefinement1 = true;
       }
-      
+
       if (isDeclMoreConstrainedThan(decl2, decl1)) {
         foundRefinement2 = true;
       }

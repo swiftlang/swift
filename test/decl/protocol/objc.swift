@@ -19,7 +19,7 @@
   var property1: ObjCClass {
     @objc(getProperty1) get { // expected-error{{Objective-C method 'getProperty1' provided by getter for 'property1' does not match the requirement's selector ('property1')}}{{11-23=property1}}
       return ObjCClass()
-    } 
+    }
   }
 
   var property2: ObjCClass {

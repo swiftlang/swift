@@ -29,7 +29,7 @@ struct Str : P {
 
 struct AllocatingStr : P {
   func protoMethod(_ a: Int) -> Int {
-    _ = Cl()                // expected-error {{Using type 'Cl' can cause metadata allocation or locks}} 
+    _ = Cl()                // expected-error {{Using type 'Cl' can cause metadata allocation or locks}}
     return 0
   }
 }
@@ -45,7 +45,7 @@ func callArrayGet(_ a: [Str]) -> Int {
 
 @_noLocks
 func arcOperations(_ x: Cl) -> Cl {
-  return x                // expected-error {{this code performs reference counting operations which can cause locking}} 
+  return x                // expected-error {{this code performs reference counting operations which can cause locking}}
 }
 
 func genFunc<T: P>(_ t: T, _ a: Int) -> Int {
@@ -359,14 +359,14 @@ extension Y {
   func with2(_ body: () -> ()) {
     body()
   }
-  
+
   func with1(_ body: (Int) -> (Int)) -> Int {
     with2 {
       _ = body(48)
     }
     return 777
   }
-  
+
   func Xsort() -> Int {
     with1 { i in
       i

@@ -40,7 +40,7 @@ extension VolatileMappedRegister where Pointee == UInt8 {
   ///
   /// Do not use for inter-thread synchronization.
   @_transparent
-  public func load() -> Pointee { 
+  public func load() -> Pointee {
     UInt8(Builtin.atomicload_monotonic_volatile_Int8(_rawPointer))
   }
 
@@ -61,7 +61,7 @@ extension VolatileMappedRegister where Pointee == UInt16 {
   public func load() -> Pointee {
     UInt16(Builtin.atomicload_monotonic_volatile_Int16(_rawPointer))
   }
-  
+
   /// Perform a 16-bit volatile store operation on the target pointer.
   ///
   /// Do not use for inter-thread synchronization.
@@ -79,7 +79,7 @@ extension VolatileMappedRegister where Pointee == UInt32 {
   public func load() -> Pointee {
     UInt32(Builtin.atomicload_monotonic_volatile_Int32(_rawPointer))
   }
-  
+
   /// Perform a 32-bit volatile store operation on the target pointer.
   ///
   /// Do not use for inter-thread synchronization.
@@ -97,7 +97,7 @@ extension VolatileMappedRegister where Pointee == UInt64 {
   public func load() -> Pointee {
     UInt64(Builtin.atomicload_monotonic_volatile_Int64(_rawPointer))
   }
-  
+
   /// Perform a 64-bit volatile store operation on the target pointer.
   ///
   /// Do not use for inter-thread synchronization.

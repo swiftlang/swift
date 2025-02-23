@@ -29,14 +29,14 @@ actor MyActor {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0A13AsyncFunctionyyYaKF : $@convention(method) @async (@sil_isolated @guaranteed MyActor) -> @error any Error {
-  // CHECK:        hop_to_executor %0 : $MyActor 
+  // CHECK:        hop_to_executor %0 : $MyActor
   // CHECK:        = apply {{.*}} : $@convention(method) @async (Int, @guaranteed MyActor) -> ()
-  // CHECK-NEXT:   hop_to_executor %0 : $MyActor 
+  // CHECK-NEXT:   hop_to_executor %0 : $MyActor
   // CHECK:        try_apply {{.*}}, normal bb1, error bb2
   // CHECK:      bb1({{.*}}):
-  // CHECK-NEXT:   hop_to_executor %0 : $MyActor 
+  // CHECK-NEXT:   hop_to_executor %0 : $MyActor
   // CHECK:      bb2({{.*}}):
-  // CHECK-NEXT:   hop_to_executor %0 : $MyActor 
+  // CHECK-NEXT:   hop_to_executor %0 : $MyActor
   // CHECK:      } // end sil function '$s4test7MyActorC0A13AsyncFunctionyyYaKF'
   func testAsyncFunction() async throws {
     await callee(p)
@@ -45,7 +45,7 @@ actor MyActor {
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC0A22ConsumingAsyncFunctionyyYaF : $@convention(method) @async (@sil_isolated @owned MyActor) -> () {
   // CHECK:        [[BORROWED_SELF:%[0-9]+]] = begin_borrow %0 : $MyActor
-  // CHECK:        hop_to_executor [[BORROWED_SELF]] : $MyActor 
+  // CHECK:        hop_to_executor [[BORROWED_SELF]] : $MyActor
   // CHECK:        = apply {{.*}} : $@convention(method) @async (Int, @guaranteed MyActor) -> ()
   // CHECK:        hop_to_executor [[BORROWED_SELF]] : $MyActor
   // CHECK:      } // end sil function '$s4test7MyActorC0A22ConsumingAsyncFunctionyyYaF'
@@ -64,7 +64,7 @@ actor MyActor {
   // CHECK-LABEL: sil private [ossa] @$s4test7MyActorC0A7ClosureSiyYaFSiyYaXEfU_ : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> Int {
   // CHECK:        [[COPIED_SELF:%[0-9]+]] = copy_value %0 : $MyActor
   // CHECK:        [[BORROWED_SELF:%[0-9]+]] = begin_borrow [[COPIED_SELF]] : $MyActor
-  // CHECK:        hop_to_executor [[BORROWED_SELF]] : $MyActor 
+  // CHECK:        hop_to_executor [[BORROWED_SELF]] : $MyActor
   // CHECK:        = apply
   // CHECK:      } // end sil function '$s4test7MyActorC0A7ClosureSiyYaFSiyYaXEfU_'
   func testClosure() async -> Int {
@@ -121,7 +121,7 @@ actor MyActor {
     await unspecifiedAsync()
   }
 }
-  
+
 @globalActor
 struct GlobalActor {
   static var shared: MyActor = MyActor()
@@ -401,7 +401,7 @@ func testGlobalActorClosure() {
 }
 
 func testGenericGlobalActorClosure<T>(_: T) {
-  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] [ossa] @$sxxIegnr_xxIegHnr_lTR4test28GenericGlobalActorWithGetterVyxGTU 
+  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] [ossa] @$sxxIegnr_xxIegHnr_lTR4test28GenericGlobalActorWithGetterVyxGTU
   // CHECK:         hop_to_executor {{%.*}} : $MyGenericActor<T>
   // CHECK:         apply %2(%0, %1)
   let ggat: @GenericGlobalActorWithGetter<T> (T) -> T

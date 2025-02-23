@@ -34,8 +34,8 @@ class A_Child : Base {
   override func foo(_: Int) -> Int { return 0 }
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y SWIFT_WARN_UNUSED_RESULT;
   override func foo(_ x: Int, y: Int) -> Int { return x + y }
-  
-  
+
+
   // CHECK-NEXT: - (BOOL)doThingAndReturnError:(NSError * _Nullable * _Nullable)error;
   override func doThing() throws {}
 
@@ -82,7 +82,7 @@ class B_EmptyChild : Base {
 // CHECK-LABEL: @interface B_GrandchildViaEmpty : B_EmptyChild
 class B_GrandchildViaEmpty : B_EmptyChild {
   // CHECK-NEXT: @property (nonatomic, getter=getProp) NSUInteger prop;
-  override var prop: Int { 
+  override var prop: Int {
     get { return 0 }
     set {}
   }

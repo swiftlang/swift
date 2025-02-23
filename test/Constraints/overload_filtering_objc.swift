@@ -4,7 +4,7 @@
 // REQUIRES: objc_interop
 
 // This test ensures that we are filtering out overloads based on argument
-// labels, arity, etc., before those terms are visited. 
+// labels, arity, etc., before those terms are visited.
 
 import Foundation
 
@@ -14,7 +14,7 @@ import Foundation
 
   @objc optional func opt(_ i: Int) -> Int
   @objc optional func opt(double: Double) -> Int
-  
+
   subscript(i: Int) -> String { get }
 }
 

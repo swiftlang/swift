@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s > %t.dump 2>&1
 // RUN: %FileCheck -check-prefix CHECK-GENERIC %s < %t.dump
 
 protocol P1 {
@@ -15,7 +15,7 @@ protocol P3 { }
 protocol P4 { }
 
 // expected-error@+1{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}
-func typoAssoc1<T : P1>(x: T.assoc, _: T) { } 
+func typoAssoc1<T : P1>(x: T.assoc, _: T) { }
 
 // expected-error@+2{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{53-58=Assoc}}
 // expected-error@+1{{'U' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{64-69=Assoc}}

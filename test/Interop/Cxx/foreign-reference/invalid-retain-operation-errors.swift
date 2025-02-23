@@ -120,7 +120,7 @@ RefCountedBase {};
 void RCRetain(RefCountedBase *v);
 void RCRelease(RefCountedBase *v);
 
-struct 
+struct
     __attribute__((swift_attr("import_reference")))
     __attribute__((swift_attr("retain:RCRetain")))
     __attribute__((swift_attr("release:RCRelease")))
@@ -162,19 +162,19 @@ Base4FRT : Base2FRT {};
 void base4FRTRetain(GoodRetainRelease *v);
 void base4FRTRelease(Base1FRT *v);
 
-typedef struct 
-__attribute__((swift_attr("import_reference"))) 
-__attribute__((swift_attr("retain:anonymousStructRetain"))) 
-__attribute__((swift_attr("release:anonymousStructRelease"))) 
+typedef struct
+__attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:anonymousStructRetain")))
+__attribute__((swift_attr("release:anonymousStructRelease")))
 {} AnonymousStruct;
 
 void anonymousStructRetain(AnonymousStruct *v);
 void anonymousStructRelease(AnonymousStruct *v);
 
-typedef struct 
-__attribute__((swift_attr("import_reference"))) 
-__attribute__((swift_attr("retain:badAnonymousStructRetain"))) 
-__attribute__((swift_attr("release:badAnonymousStructRelease"))) 
+typedef struct
+__attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:badAnonymousStructRetain")))
+__attribute__((swift_attr("release:badAnonymousStructRelease")))
 {} BadAnonymousStruct;
 
 void badAnonymousStructRetain(AnonymousStruct *v);

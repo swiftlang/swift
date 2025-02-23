@@ -145,7 +145,7 @@ public struct AddPeerStructMacro: PeerMacro {
     @AddMemberVar
     struct _Peer_\(name) {
       #AddMacroAddedVar
-      
+
       @AddPeerVar
       var peerMacroVar = 7
     }

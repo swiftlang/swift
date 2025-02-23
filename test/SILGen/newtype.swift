@@ -52,13 +52,13 @@ class ObjCTest {
   // CHECK-RAW: sil private [thunk] [ossa] @$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> @autoreleased Optional<ErrorDomain> {
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
     return ed
-  }  
+  }
 
   // CHECK-RAW-LABEL: sil hidden [ossa] @$s7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFF : $@convention(method) (MyInt, @guaranteed ObjCTest) -> MyInt {
   // CHECK-RAW: sil private [thunk] [ossa] @$s7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFFTo : $@convention(objc_method) (MyInt, ObjCTest) -> MyInt {
   @objc func integerPassThrough(_ ed: MyInt) -> MyInt {
     return ed
-  }  
+  }
 }
 
 // These use a bridging conversion with a specialization of a generic witness.

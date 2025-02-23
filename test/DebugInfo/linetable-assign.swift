@@ -13,5 +13,5 @@ public func f(_ i: Int32) {
   {
     g(i)
   }
-  return closure() 
+  return closure()
 }

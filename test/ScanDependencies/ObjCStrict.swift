@@ -31,5 +31,5 @@ import C
 // CHECK:            "-o",
 // CHECK-NEXT:       "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
 
-            
+
 

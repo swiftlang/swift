@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s -check-prefix=CHECK-LLVM
 
 // Also do an end-to-end test to check all components, including IRGen.
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 // REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib
@@ -238,15 +238,15 @@ func testit() {
   print(functionArray()[0](100) + functionArray()[1](100) + functionArray()[2](100))
   // CHECK-OUTPUT-NEXT: 27
   print(FStr.globalFunc(27))
-  
+
   let tuples = arrayOfTuples()
   // CHECK-OUTPUT-NEXT: tuples [(1, false), (2, true), (3, false)]
   print("tuples \(tuples)")
-  
+
   let dict = returnDictionary()
   // CHECK-OUTPUT-NEXT: dict 3: 2, 4, 6
   print("dict \(dict.count): \(dict[1]!), \(dict[3]!), \(dict[5]!)")
-  
+
   let sdict = returnStringDictionary()
   // CHECK-OUTPUT-NEXT: sdict 3: 2, 4, 6
   print("sdict \(sdict.count): \(sdict["1"]!), \(sdict["3"]!), \(sdict["5"]!)")

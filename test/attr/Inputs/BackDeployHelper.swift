@@ -152,7 +152,7 @@ extension IntArray {
     get { _values[i] }
     _modify { yield &_values[i] }
   }
-  
+
   @available(BackDeploy 1.0, *)
   @backDeployed(before: BackDeploy 2.0)
   public var rawValues: [Int] {
@@ -204,7 +204,7 @@ extension ReferenceIntArray {
     get { _values[i] }
     _modify { yield &_values[i] }
   }
-  
+
   @available(BackDeploy 1.0, *)
   @backDeployed(before: BackDeploy 2.0)
   public final var rawValues: [Int] {

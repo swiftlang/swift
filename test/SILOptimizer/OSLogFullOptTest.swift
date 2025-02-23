@@ -58,7 +58,7 @@ func testSimpleInterpolation() {
     // CHECK-32-NEXT: tail call swiftcc void @"${{.*}}_os_log_impl_test{{.*}}"({{.*}}, {{.*}}, {{.*}}, {{.*}}, i8* {{(nonnull )?}}getelementptr inbounds ([27 x i8], [27 x i8]* @{{.*}}, i32 0, i32 0), i8* {{(nonnull )?}}[[BUFFER]], i32 8)
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: br label %[[NOT_ENABLED]]
-  
+
     // CHECK: [[NOT_ENABLED]]:
     // CHECK-NEXT: tail call void @swift_release
     // CHECK-NEXT: ret void
@@ -181,7 +181,7 @@ func testNSObjectInterpolation(nsArray: NSArray) {
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK-NEXT: tail call void @swift_release
     // CHECK-NEXT: br label %[[EXIT]]
-  
+
     // CHECK: [[EXIT]]:
     // CHECK-NEXT: ret void
 }
@@ -318,7 +318,7 @@ func testStringInterpolation(stringValue: String) {
     // CHECK-NEXT: [[OFFSET3:%.+]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 3
     // CHECK-64-NEXT: store i8 8, i8* [[OFFSET3]], align 1
     // CHECK-32-NEXT: store i8 4, i8* [[OFFSET3]], align 1
-    
+
     // CHECK: [[STR_POINTER:%.*]] = call swiftcc i8* @"${{.*}}getNullTerminatedUTF8Pointer{{.*}}"(i{{.*}} %0, {{.*}} %1
 
     // CHECK: [[OFFSET_BUFFER:%.*]] = getelementptr inbounds i8, i8* [[BUFFER]], i{{.*}} 4
@@ -334,7 +334,7 @@ func testStringInterpolation(stringValue: String) {
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK: call void @llvm.lifetime.end{{.*}}({{.*}}, i8* {{(nonnull )?}}[[STR_STORAGE_PTR]]
     // CHECK-NEXT: br label %[[EXIT]]
-  
+
     // CHECK: [[EXIT]]:
     // CHECK-NEXT: ret void
 }
@@ -373,7 +373,7 @@ func testMetatypeInterpolation<T>(of type: T.Type) {
     // CHECK-NEXT: [[TYPENAME:%.+]] = tail call swiftcc { i{{.*}}, {{.*}} } @"${{.*}}_typeName{{.*}}"({{.*}} %0
     // CHECK-NEXT: [[TYPENAME_0:%.+]] = extractvalue { i{{.*}}, {{.*}} } [[TYPENAME]], 0
     // CHECK-NEXT: [[TYPENAME_1:%.+]] = extractvalue { i{{.*}}, {{.*}} } [[TYPENAME]], 1
-    
+
     // CHECK: [[STR_POINTER:%.*]] = call swiftcc i8* @"${{.*}}getNullTerminatedUTF8Pointer{{.*}}"(i{{.*}} [[TYPENAME_0]], {{.*}} [[TYPENAME_1]]
 
     // os_log_impl call.
@@ -385,7 +385,7 @@ func testMetatypeInterpolation<T>(of type: T.Type) {
     // CHECK-NEXT: tail call void @swift_slowDealloc(i8* {{(nonnull )?}}[[BUFFER]]
     // CHECK: call void @llvm.lifetime.end{{.*}}({{.*}}, i8* {{(nonnull )?}}[[STR_STORAGE_PTR]]
     // CHECK-NEXT: br label %[[EXIT]]
-  
+
     // CHECK: [[EXIT]]:
     // CHECK-NEXT: ret void
 }

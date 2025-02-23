@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-irgen -O -o %t/loopinfo.ll  %s 
+// RUN: %target-swift-frontend -emit-irgen -O -o %t/loopinfo.ll  %s
 // RUN: %swift-llvm-opt -passes='print<loops>' %t/loopinfo.ll 2>&1 | %FileCheck %s
 
 // CHECK: Loop at depth 1 containing

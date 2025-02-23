@@ -41,7 +41,7 @@ func extensionMethods(b b: B) {
 // CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir19initCallToAllocInit1iys5Int32V_tF"
 func initCallToAllocInit(i i: CInt) {
   // CHECK: call {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfC"
- 
+
   B(int: i)
 }
 

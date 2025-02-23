@@ -15,7 +15,7 @@ class AnotherClass : AProtocol {
 // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "$sq_D",
 // CHECK-DAG: !DILocalVariable(name: "x", arg: 1,{{.*}} type: ![[LET_T:.*]])
 // CHECK-DAG: ![[LET_T]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[T:.*]])
-// CHECK-DAG: ![[T]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sxD", 
+// CHECK-DAG: ![[T]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sxD",
 // CHECK-DAG: !DILocalVariable(name: "y", arg: 2,{{.*}} type: ![[LET_Q:.*]])
 // CHECK-DAG: ![[LET_Q]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[Q:.*]])
 // CHECK-DAG: ![[Q]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sq_D"

@@ -27,7 +27,7 @@ func printState(_ x : SwiftClassBase?) {
 
 func testSwiftClass() {
   print("testSwiftClass")               // CHECK: testSwiftClass
-  
+
   weak var w : SwiftClassBase?
   printState(w)                           // CHECK-NEXT: is nil
   var c : SwiftClassBase = SwiftClass()   // CHECK: SwiftClass Created
@@ -45,7 +45,7 @@ testSwiftClass()
 
 func testSwiftImplicitOptionalClass() {
   print("testSwiftImplicitOptionalClass") // CHECK: testSwiftImplicitOptionalClass
-  
+
   weak var w : SwiftClassBase!
   printState(w)                           // CHECK-NEXT: is nil
   var c : SwiftClassBase = SwiftClass()   // CHECK: SwiftClass Created
@@ -80,14 +80,14 @@ testWeakInLet()
 //======================== Test Classbound Protocols ========================
 
 
-  
+
 func printState(_ x : Protocol?) {
   print((x != nil) ? "is present" : "is nil")
 }
 
 func testProtocol() {
   print("testProtocol")                 // CHECK: testProtocol
-  
+
   weak var w : Protocol?
   printState(w)                           // CHECK-NEXT: is nil
   var c : SwiftClassBase = SwiftClass()   // CHECK: SwiftClass Created

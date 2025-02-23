@@ -10,7 +10,7 @@ public func foo() {
   let _ = returnsACFBridgedType()
 }
 
-// With interop disabled, this should use swift_retain(). 
+// With interop disabled, this should use swift_retain().
 
 // CHECK-LABEL: define {{.*}}swiftcc void @"$s37cf_objc_retainAutoreleasedReturnValue3fooyyF"()
 // CHECK: entry:

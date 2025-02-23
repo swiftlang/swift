@@ -52,7 +52,7 @@ do {
   struct S<T> {
   }
   func test<T>(_: S<T>, _: T.Type) {}
-  
+
   test(S<() async -> Void>(), type(of: callerTest))
   // expected-error@-1 {{cannot convert value of type '(@execution(caller) () async -> ()).Type' to expected argument type '(() async -> Void).Type'}}
 

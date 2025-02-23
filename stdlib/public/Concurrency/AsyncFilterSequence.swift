@@ -33,7 +33,7 @@ extension AsyncSequence {
   ///   that indicates whether to include the element in the filtered sequence.
   /// - Returns: An asynchronous sequence that contains, in order, the elements
   ///   of the base sequence that satisfy the given predicate.
-  @preconcurrency 
+  @preconcurrency
   @inlinable
   public __consuming func filter(
     _ isIncluded: @Sendable @escaping (Element) async -> Bool
@@ -54,7 +54,7 @@ public struct AsyncFilterSequence<Base: AsyncSequence> {
 
   @usableFromInline
   init(
-    _ base: Base, 
+    _ base: Base,
     isIncluded: @escaping (Base.Element) async -> Bool
   ) {
     self.base = base
@@ -142,11 +142,11 @@ extension AsyncFilterSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncFilterSequence: @unchecked Sendable 
-  where Base: Sendable, 
+extension AsyncFilterSequence: @unchecked Sendable
+  where Base: Sendable,
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncFilterSequence.Iterator: @unchecked Sendable 
-  where Base.AsyncIterator: Sendable, 
+extension AsyncFilterSequence.Iterator: @unchecked Sendable
+  where Base.AsyncIterator: Sendable,
         Base.Element: Sendable { }

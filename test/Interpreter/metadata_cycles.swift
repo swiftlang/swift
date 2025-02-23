@@ -116,7 +116,7 @@ MetadataCycleTests.test("rdar://18903483") {
   _ = x
 
   // rdar://19371082
-  _ = test3_List.Cons(7, test3_Box(test3_List.Nil)) 
+  _ = test3_List.Cons(7, test3_Box(test3_List.Nil))
 }
 
 // rdar://19320857

@@ -14,7 +14,7 @@ struct ThrowingMain {
 // CHECK: bb1
 // CHECK: return
 // CHECK: bb2([[ERR:%.*]] : $Err):
-// CHECK-NEXT:  throw [[ERR]] : $Err 
+// CHECK-NEXT:  throw [[ERR]] : $Err
 
 // CHECK-LABEL: sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32
 // CHECK: [[MAIN:%.*]] = function_ref @$s22attr_main_typed_throws12ThrowingMainV5$mainyyAA3ErrVYKFZ : $@convention(method) (@thin ThrowingMain.Type) -> @error Err
@@ -24,4 +24,4 @@ struct ThrowingMain {
 // CHECK-NEXT:  store [[ERR]] to [trivial] [[ERR_STACK]] : $*Err
 // CHECK: [[REPORT_FN:%.*]] = function_ref @$ss17_errorInMainTypedys5NeverOxs5ErrorRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Never
 // CHECK-NEXT: apply [[REPORT_FN]]<Err>([[ERR_STACK]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Never
-// CHECK-NEXT: unreachable  
+// CHECK-NEXT: unreachable

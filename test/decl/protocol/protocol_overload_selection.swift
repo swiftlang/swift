@@ -28,7 +28,7 @@ protocol MutableCollection : Collection {
 }
 
 func insertionSort<
-C: MutableCollection 
+C: MutableCollection
 >(
   _ elements: inout C,
   i: C.Index

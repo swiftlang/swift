@@ -137,7 +137,7 @@ func test_accepted<I: FixedWidthInteger, BC: BitwiseCopyable>(intArg: I, bcArg: 
     read_uchar(&aggregate)
     write_uchar(&aggregate)
 
-    var int: I = intArg 
+    var int: I = intArg
     readBytes(&int)
     writeBytes(&int)
     read_char(&int)

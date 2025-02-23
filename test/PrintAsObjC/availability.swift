@@ -240,14 +240,14 @@
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodInUnavailableClassWithPrimitiveParameters' has been renamed to 'ReplacementAvailableProtocol.methodReplacingInReplacementProtocol(first:second:)': use method in another class instead");
 // CHECK-NEXT: @end
 
-// CHECK-LABEL: SWIFT_CLASS("{{.+}}WholeClassAvailability") 
+// CHECK-LABEL: SWIFT_CLASS("{{.+}}WholeClassAvailability")
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=999)
 // CHECK-NEXT: @interface WholeClassAvailability
 // CHECK-NEXT: - (void)wholeClassAvailability:(id <WholeProtoAvailability> _Nonnull)_;
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 
-// CHECK-LABEL: SWIFT_PROTOCOL("{{.+}}WholeProtoAvailability{{.*}}") 
+// CHECK-LABEL: SWIFT_PROTOCOL("{{.+}}WholeProtoAvailability{{.*}}")
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=999)
 // CHECK-NEXT: @protocol WholeProtoAvailability
 // CHECK-NEXT: - (void)wholeProtoAvailability:(WholeClassAvailability * _Nonnull)_;
@@ -322,7 +322,7 @@
     @available(tvOSApplicationExtension, unavailable)
     @available(watchOSApplicationExtension, unavailable)
     @objc func extensionUnavailable() {}
-  
+
     @objc func overloadMethod(first: Int, second: Int) {}
     func overloadMethod(first: Double, second: Double) {}
 
@@ -361,12 +361,12 @@
     @objc public func deprecatedInstanceMethodRenamedToClassMethod(value: Int) {}
     @available(macOS, deprecated, message: "This method has a renamed attribute point to class method instead of a instance method. It should show the Swift name here", renamed: "classMethodWithACustomObjCName(x:)")
     @objc public func deprecatedOnMacOSInstanceMethodRenamedToClassMethod(value: Int) {}
-    
+
     @available(*, unavailable, message: "This method has a renamed attribute point to class method instead of a instance method. It should show the Swift name here", renamed: "classMethodWithACustomObjCName(x:)")
     @objc public func unavailableInstanceMethodRenamedToClassMethod(value: Int) {}
     @available(macOS, unavailable, message: "This method has a renamed attribute point to class method instead of a instance method. It should show the Swift name here", renamed: "classMethodWithACustomObjCName(x:)")
     @objc public func unavailableOnMacOSInstanceMethodRenamedToClassMethod(value: Int) {}
-        
+
     @available(*, deprecated, message: "This method has a renamed attribute point to instance method instead of a class method. It should show the Swift name here", renamed: "instanceMethodWithACustomObjCName(x:)")
     @objc public class func deprecatedClassMethodRenamedToInstanceMethod(value: Int) {}
     @available(macOS, deprecated, message: "This method has a renamed attribute point to instance method instead of a class method. It should show the Swift name here", renamed: "instanceMethodWithACustomObjCName(x:)")
@@ -376,15 +376,15 @@
     @objc public class func unavailableClassMethodRenamedToInstanceMethod(value: Int) {}
     @available(macOS, unavailable, message: "This method has a renamed attribute point to instance method instead of a class method. It should show the Swift name here", renamed: "instanceMethodWithACustomObjCName(x:)")
     @objc public class func unavailableOnMacOSClassMethodRenamedToInstanceMethod(value: Int) {}
-    
+
     @objc(customObjCNameInstanceMethodWithX:)
     public func instanceMethodWithACustomObjCName(x: Int) {}
 
     @objc(customObjCNameClassMethodWithX:)
     public class func classMethodWithACustomObjCName(x: Int) {}
-  
+
     @nonobjc func methodNotAvailableToObjC() {}
-  
+
     @available(*, deprecated, renamed: "methodNotAvailableToObjC()")
     @objc public func deprecatedMethodRenamedToMethodNotAvailableToObjC() {}
     @available(macOS, deprecated, renamed: "methodNotAvailableToObjC()")
@@ -445,22 +445,22 @@
     @objc init() {}
     @available(macOS 10.10, *)
     @objc init(x: Int) {}
-    
+
     @objc init(first: Int, second: Int) {}
     init(first: Double, second: Double) {}
-    
+
     @available(*, deprecated, renamed: "init(first:second:)")
     @objc init(deprecatedFirst first: Int, second: Int) {}
-    
+
     @available(macOS, deprecated, renamed: "init(first:second:)")
     @objc init(deprecatedOnMacOSFirst first: Int, second: Int) {}
-    
+
     @available(*, unavailable, renamed: "init(first:second:)")
     @objc init(unavailableFirst first: Int, second: Int) {}
-    
+
     @available(macOS, unavailable, renamed: "init(first:second:)")
     @objc init(unavailableOnMacOSFirst first: Int, second: Int) {}
-    
+
     @objc var simpleProperty: Int {
         get {
             return 100
@@ -499,7 +499,7 @@
         }
     }
 
-  
+
     @objc(replaceForUnavailableObjCProperty) var __replaceForUnavailableObjCProperty: Int {
       get {
         return -1
@@ -517,8 +517,8 @@
         return -1
       }
     }
-  
-  
+
+
     @available(macOS, introduced: 10.7, deprecated: 10.9, obsoleted: 10.10)
     @objc var singlePlatCombinedPropertyClass: Availability! {
         get {
@@ -531,7 +531,7 @@
             return -1
         }
     }
-    
+
     @available(*, deprecated, renamed: "simpleMethodReturningInt()")
     @objc var deprecatedPropertyRenamedToMethod: Int {
         get {
@@ -563,7 +563,7 @@
 @available(macOS 999, *)
 extension Availability {
     @objc func extensionAvailability(_: WholeClassAvailability) {}
-    
+
     @available(macOS, deprecated: 10.10)
     @objc var propertyDeprecatedInsideExtension: Int {
         get {
@@ -595,15 +595,15 @@ extension Availability {
 @objc(SWTReplacementAvailable) class ReplacementAvailable {
     @objc(replacingMethodInReplacementClassWithPrimitiveParametersWithFirst:second:)
     func methodReplacingInReplacementClassWithPrimitiveParameters(first: Int, second: Int) -> Void {}
-    
+
     @objc(replacingMethodInReplacementClassWithClassObjectParametersWithFirst:second:)
     func methodReplacingInReplacementClassWithClassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
-    
+
     @available(*, deprecated,
     message: "Deprecated method with the Context name in the renamed attribute - ContextName is self",
     renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithPrimitiveParameters(first:second:)")
     @objc func deprecatedMethodReplacingInReplacementClassWithPrimitiveParameters(first: Int, second: Int) -> Void {}
-    
+
     @available(*, deprecated,
     message: "Deprecated method with the Context name in the renamed attribute - ContextName is self",
     renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)")
@@ -618,7 +618,7 @@ extension Availability {
     @available(macOS, deprecated, message: "use method in another class instead",
     renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithPrimitiveParameters(first:second:)")
     @objc func deprecatedOnMacOSMethodInDeprecatedClassWithPrimitiveParameters(first: Int, second: Int) -> Void {}
-  
+
     @available(*, deprecated, message: "use method in another class instead",
     renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)")
     @objc func deprecatedMethodInDeprecatedClassWithClassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
@@ -633,7 +633,7 @@ extension Availability {
     @objc func unavailableMethodInUnavailableClassWithPrimitiveParameters(first: Int, second: Int) -> Void {}
     @available(macOS, unavailable, message: "use method in another class instead", renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithPrimitiveParameters(first:second:)")
     @objc func unavailableOnMacOSMethodInUnavailableClassWithPrimitiveParameters(first: Int, second: Int) -> Void {}
-  
+
     @available(*, unavailable, message: "use method in another class instead", renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)")
     @objc func unavailableMethodInUnavailableClassWithClassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
     @available(macOS, unavailable, message: "use method in another class instead", renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)")

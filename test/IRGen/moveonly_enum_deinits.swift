@@ -50,7 +50,7 @@ public struct UMA_Small<T>: ~Copyable {
 }
 
 // CHECK-LABEL: define{{.*}} void @"$s21moveonly_enum_deinits4ListOwxx"(
-// CHECK-SAME:      ptr noalias %object, 
+// CHECK-SAME:      ptr noalias %object,
 // CHECK-SAME:      ptr %List)
 // CHECK:       entry:
 // CHECK:         br i1 {{%[^,]+}},
@@ -64,7 +64,7 @@ public struct UMA_Small<T>: ~Copyable {
 
 public struct Box<T : ~Copyable> : ~Copyable {
   public init(_ l: consuming T) {}
-      
+
   deinit {}
 }
 

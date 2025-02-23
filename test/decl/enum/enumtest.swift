@@ -84,9 +84,9 @@ func test3(_ a: ZeroOneTwoThree) {
   test3 // expected-error {{function is unused}}
   // expected-warning @+1 {{unused}}
   (ZeroOneTwoThree.Zero)
-  
+
   var _ : ZeroOneTwoThree = .One(4)
-  
+
   var _ : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{type '(Int, Int) -> ZeroOneTwoThree' has no member 'Two'}}
   var _ : Int = .Two // expected-error{{type 'Int' has no member 'Two'}}
   var _ : MaybeInt = 0 > 3 ? .none : .soma(3) // expected-error {{type 'MaybeInt' has no member 'soma'; did you mean 'some'?}}
@@ -100,7 +100,7 @@ func test3a(_ a: ZeroOneTwoThree) {
 
   // Overload resolution can resolve this to the right constructor.
   var h = ZeroOneTwoThree(1)
-  
+
   var i = 0 > 3 ? .none : .some(3) // expected-error {{cannot infer contextual base in reference to member 'none'}}
 
   test3a;  // expected-error {{function is unused}}
@@ -133,16 +133,16 @@ extension CGSize {
   func area() -> Int {
     return width*self.height
   }
-  
+
   func area_wrapper() -> Int {
     return area()
   }
 }
 
-struct CGRect { 
+struct CGRect {
   var origin : CGPoint,
   size : CGSize
-  
+
   func area() -> Int {
     return self.size.area()
   }
@@ -169,7 +169,7 @@ func test5(_ myorigin: CGPoint) {
   _ = (r : x1.size).r.area() // expected-error {{cannot create a single-element tuple with an element label}}
   _ = x1.size.area()
   _ = (r : x1.size).r.area() // expected-error {{cannot create a single-element tuple with an element label}}
-  
+
   _ = x1.area
 
   _ = x1.search(42)
@@ -181,7 +181,7 @@ func test5(_ myorigin: CGPoint) {
   // TODO: something like this, how do we get it in scope in the {} block?
   //if (var some(x) = somemaybeint) { ... }
 
-  
+
 }
 
 struct StructTest1 {
@@ -213,11 +213,11 @@ struct EmptyStruct {
   func foo() {}
 }
 
-func f() { 
+func f() {
   let a : UnionTest1
   a.bar()
   UnionTest1.baz()  // dot syntax access to a static method.
-  
+
   // Test that we can get the "address of a member".
   var _ : () -> () = UnionTest1.baz
   var _ : (UnionTest1) -> () -> () = UnionTest1.bar
@@ -254,7 +254,7 @@ func units(_ x: Int) -> distance {
 
 
 
-var %% : distance -> distance // expected-error {{expected pattern}} 
+var %% : distance -> distance // expected-error {{expected pattern}}
 
 func badTupleElement() {
   typealias X = (x : Int, y : Int)
@@ -516,8 +516,8 @@ let _: GenericEnumWithStaticNone<Int>? = .none // expected-warning {{assuming yo
 let _: GenericEnumWithStaticNone<String>? = .none // Okay
 
 let _: GenericEnumWithStaticNone? = .none // expected-warning {{assuming you mean 'GenericEnumWithStaticNone<Int>.none'; did you mean 'Optional<GenericEnumWithStaticNone<Int>>.none' instead?}}
-// expected-note@-1 {{use 'Optional<GenericEnumWithStaticNone<Int>>.none' instead}} {{37-37=Optional<GenericEnumWithStaticNone<Int>>}} 
-// expected-note@-2 {{use 'GenericEnumWithStaticNone<Int>.none' instead}} {{37-37=GenericEnumWithStaticNone<Int>}} 
+// expected-note@-1 {{use 'Optional<GenericEnumWithStaticNone<Int>>.none' instead}} {{37-37=Optional<GenericEnumWithStaticNone<Int>>}}
+// expected-note@-2 {{use 'GenericEnumWithStaticNone<Int>.none' instead}} {{37-37=GenericEnumWithStaticNone<Int>}}
 
 enum GenericStructWithStaticNone<T> {
   init() {}
@@ -530,8 +530,8 @@ let _: GenericStructWithStaticNone<Int>? = .none // expected-warning {{assuming 
 let _: GenericStructWithStaticNone<String>? = .none // Okay
 
 let _: GenericStructWithStaticNone? = .none // expected-warning {{assuming you mean 'GenericStructWithStaticNone<Int>.none'; did you mean 'Optional<GenericStructWithStaticNone<Int>>.none' instead?}}
-// expected-note@-1 {{use 'Optional<GenericStructWithStaticNone<Int>>.none' instead}} {{39-39=Optional<GenericStructWithStaticNone<Int>>}} 
-// expected-note@-2 {{use 'GenericStructWithStaticNone<Int>.none' instead}} {{39-39=GenericStructWithStaticNone<Int>}} 
+// expected-note@-1 {{use 'Optional<GenericStructWithStaticNone<Int>>.none' instead}} {{39-39=Optional<GenericStructWithStaticNone<Int>>}}
+// expected-note@-2 {{use 'GenericStructWithStaticNone<Int>.none' instead}} {{39-39=GenericStructWithStaticNone<Int>}}
 
 enum GenericEnumWithoutNone<T> {
   case a
@@ -581,7 +581,7 @@ let foo1: Foo? = Foo.none
 let foo2: Foo?? = Foo.none
 
 switch foo1 {
-  case .none: break 
+  case .none: break
   // expected-warning@-1 {{assuming you mean 'Optional<Foo>.none'; did you mean 'Foo.none' instead?}}
   // expected-note@-2 {{use 'nil' to silence this warning}}{{8-13=nil}}
   // expected-note@-3 {{use 'none?' instead}}{{9-13=none?}}
@@ -590,7 +590,7 @@ switch foo1 {
 }
 
 switch foo2 {
-  case .none: break 
+  case .none: break
   // expected-warning@-1 {{assuming you mean 'Optional<Optional<Foo>>.none'; did you mean 'Foo.none' instead?}}
   // expected-note@-2 {{use 'nil' to silence this warning}}{{8-13=nil}}
   // expected-note@-3 {{use 'none??' instead}}{{9-13=none??}}

@@ -27,7 +27,7 @@ func checkDiagnosticMinimality(x: Runcible?) {
   // expected-note@-3 {{add missing case: '(.hat, .spoon)'}} {{+11:3-3=case (.hat, .spoon):\n<#code#>\n}}
   // expected-note@-4 {{add missing case: '(.spoon, .hat)'}} {{+11:3-3=case (.spoon, .hat):\n<#code#>\n}}
   // expected-note@-5 {{add missing case: '(_, .fork)'}} {{+11:3-3=case (_, .fork):\n<#code#>\n}}
-  // expected-note@-6 {{add missing cases}} {{+11:3-3=case (.fork, _):\n<#code#>\ncase (.hat, .spoon):\n<#code#>\ncase (.spoon, .hat):\n<#code#>\ncase (_, .fork):\n<#code#>\n}} 
+  // expected-note@-6 {{add missing cases}} {{+11:3-3=case (.fork, _):\n<#code#>\ncase (.hat, .spoon):\n<#code#>\ncase (.spoon, .hat):\n<#code#>\ncase (_, .fork):\n<#code#>\n}}
   case (.spoon, .spoon):
     break
   case (.hat, .hat):
@@ -53,7 +53,7 @@ func notQuiteBigEnough() -> Bool {
   switch (LargeSpaceEnum.case1, LargeSpaceEnum.case2) {
   // expected-error@-1 {{switch must be exhaustive}}
   // expected-note@-2 110{{add missing case}}
-  // expected-note@-3 {{add missing cases}} {{+15:3-3=case (.case10, .case0):\n<#code#>\ncase (.case10, .case1):\n<#code#>\ncase (.case10, .case2):\n<#code#>\ncase (.case10, .case3):\n<#code#>\ncase (.case10, .case4):\n<#code#>\ncase (.case10, .case5):\n<#code#>\ncase (.case10, .case6):\n<#code#>\ncase (.case10, .case7):\n<#code#>\ncase (.case10, .case8):\n<#code#>\ncase (.case10, .case9):\n<#code#>\ncase (.case9, .case0):\n<#code#>\ncase (.case9, .case1):\n<#code#>\ncase (.case9, .case2):\n<#code#>\ncase (.case9, .case3):\n<#code#>\ncase (.case9, .case4):\n<#code#>\ncase (.case9, .case5):\n<#code#>\ncase (.case9, .case6):\n<#code#>\ncase (.case9, .case7):\n<#code#>\ncase (.case9, .case8):\n<#code#>\ncase (.case9, .case10):\n<#code#>\ncase (.case8, .case0):\n<#code#>\ncase (.case8, .case1):\n<#code#>\ncase (.case8, .case2):\n<#code#>\ncase (.case8, .case3):\n<#code#>\ncase (.case8, .case4):\n<#code#>\ncase (.case8, .case5):\n<#code#>\ncase (.case8, .case6):\n<#code#>\ncase (.case8, .case7):\n<#code#>\ncase (.case8, .case9):\n<#code#>\ncase (.case8, .case10):\n<#code#>\ncase (.case7, .case0):\n<#code#>\ncase (.case7, .case1):\n<#code#>\ncase (.case7, .case2):\n<#code#>\ncase (.case7, .case3):\n<#code#>\ncase (.case7, .case4):\n<#code#>\ncase (.case7, .case5):\n<#code#>\ncase (.case7, .case6):\n<#code#>\ncase (.case7, .case8):\n<#code#>\ncase (.case7, .case9):\n<#code#>\ncase (.case7, .case10):\n<#code#>\ncase (.case6, .case0):\n<#code#>\ncase (.case6, .case1):\n<#code#>\ncase (.case6, .case2):\n<#code#>\ncase (.case6, .case3):\n<#code#>\ncase (.case6, .case4):\n<#code#>\ncase (.case6, .case5):\n<#code#>\ncase (.case6, .case7):\n<#code#>\ncase (.case6, .case8):\n<#code#>\ncase (.case6, .case9):\n<#code#>\ncase (.case6, .case10):\n<#code#>\ncase (.case5, .case0):\n<#code#>\ncase (.case5, .case1):\n<#code#>\ncase (.case5, .case2):\n<#code#>\ncase (.case5, .case3):\n<#code#>\ncase (.case5, .case4):\n<#code#>\ncase (.case5, .case6):\n<#code#>\ncase (.case5, .case7):\n<#code#>\ncase (.case5, .case8):\n<#code#>\ncase (.case5, .case9):\n<#code#>\ncase (.case5, .case10):\n<#code#>\ncase (.case4, .case0):\n<#code#>\ncase (.case4, .case1):\n<#code#>\ncase (.case4, .case2):\n<#code#>\ncase (.case4, .case3):\n<#code#>\ncase (.case4, .case5):\n<#code#>\ncase (.case4, .case6):\n<#code#>\ncase (.case4, .case7):\n<#code#>\ncase (.case4, .case8):\n<#code#>\ncase (.case4, .case9):\n<#code#>\ncase (.case4, .case10):\n<#code#>\ncase (.case3, .case0):\n<#code#>\ncase (.case3, .case1):\n<#code#>\ncase (.case3, .case2):\n<#code#>\ncase (.case3, .case4):\n<#code#>\ncase (.case3, .case5):\n<#code#>\ncase (.case3, .case6):\n<#code#>\ncase (.case3, .case7):\n<#code#>\ncase (.case3, .case8):\n<#code#>\ncase (.case3, .case9):\n<#code#>\ncase (.case3, .case10):\n<#code#>\ncase (.case2, .case0):\n<#code#>\ncase (.case2, .case1):\n<#code#>\ncase (.case2, .case3):\n<#code#>\ncase (.case2, .case4):\n<#code#>\ncase (.case2, .case5):\n<#code#>\ncase (.case2, .case6):\n<#code#>\ncase (.case2, .case7):\n<#code#>\ncase (.case2, .case8):\n<#code#>\ncase (.case2, .case9):\n<#code#>\ncase (.case2, .case10):\n<#code#>\ncase (.case1, .case0):\n<#code#>\ncase (.case1, .case2):\n<#code#>\ncase (.case1, .case3):\n<#code#>\ncase (.case1, .case4):\n<#code#>\ncase (.case1, .case5):\n<#code#>\ncase (.case1, .case6):\n<#code#>\ncase (.case1, .case7):\n<#code#>\ncase (.case1, .case8):\n<#code#>\ncase (.case1, .case9):\n<#code#>\ncase (.case1, .case10):\n<#code#>\ncase (.case0, .case1):\n<#code#>\ncase (.case0, .case2):\n<#code#>\ncase (.case0, .case3):\n<#code#>\ncase (.case0, .case4):\n<#code#>\ncase (.case0, .case5):\n<#code#>\ncase (.case0, .case6):\n<#code#>\ncase (.case0, .case7):\n<#code#>\ncase (.case0, .case8):\n<#code#>\ncase (.case0, .case9):\n<#code#>\ncase (.case0, .case10):\n<#code#>\n}} 
+  // expected-note@-3 {{add missing cases}} {{+15:3-3=case (.case10, .case0):\n<#code#>\ncase (.case10, .case1):\n<#code#>\ncase (.case10, .case2):\n<#code#>\ncase (.case10, .case3):\n<#code#>\ncase (.case10, .case4):\n<#code#>\ncase (.case10, .case5):\n<#code#>\ncase (.case10, .case6):\n<#code#>\ncase (.case10, .case7):\n<#code#>\ncase (.case10, .case8):\n<#code#>\ncase (.case10, .case9):\n<#code#>\ncase (.case9, .case0):\n<#code#>\ncase (.case9, .case1):\n<#code#>\ncase (.case9, .case2):\n<#code#>\ncase (.case9, .case3):\n<#code#>\ncase (.case9, .case4):\n<#code#>\ncase (.case9, .case5):\n<#code#>\ncase (.case9, .case6):\n<#code#>\ncase (.case9, .case7):\n<#code#>\ncase (.case9, .case8):\n<#code#>\ncase (.case9, .case10):\n<#code#>\ncase (.case8, .case0):\n<#code#>\ncase (.case8, .case1):\n<#code#>\ncase (.case8, .case2):\n<#code#>\ncase (.case8, .case3):\n<#code#>\ncase (.case8, .case4):\n<#code#>\ncase (.case8, .case5):\n<#code#>\ncase (.case8, .case6):\n<#code#>\ncase (.case8, .case7):\n<#code#>\ncase (.case8, .case9):\n<#code#>\ncase (.case8, .case10):\n<#code#>\ncase (.case7, .case0):\n<#code#>\ncase (.case7, .case1):\n<#code#>\ncase (.case7, .case2):\n<#code#>\ncase (.case7, .case3):\n<#code#>\ncase (.case7, .case4):\n<#code#>\ncase (.case7, .case5):\n<#code#>\ncase (.case7, .case6):\n<#code#>\ncase (.case7, .case8):\n<#code#>\ncase (.case7, .case9):\n<#code#>\ncase (.case7, .case10):\n<#code#>\ncase (.case6, .case0):\n<#code#>\ncase (.case6, .case1):\n<#code#>\ncase (.case6, .case2):\n<#code#>\ncase (.case6, .case3):\n<#code#>\ncase (.case6, .case4):\n<#code#>\ncase (.case6, .case5):\n<#code#>\ncase (.case6, .case7):\n<#code#>\ncase (.case6, .case8):\n<#code#>\ncase (.case6, .case9):\n<#code#>\ncase (.case6, .case10):\n<#code#>\ncase (.case5, .case0):\n<#code#>\ncase (.case5, .case1):\n<#code#>\ncase (.case5, .case2):\n<#code#>\ncase (.case5, .case3):\n<#code#>\ncase (.case5, .case4):\n<#code#>\ncase (.case5, .case6):\n<#code#>\ncase (.case5, .case7):\n<#code#>\ncase (.case5, .case8):\n<#code#>\ncase (.case5, .case9):\n<#code#>\ncase (.case5, .case10):\n<#code#>\ncase (.case4, .case0):\n<#code#>\ncase (.case4, .case1):\n<#code#>\ncase (.case4, .case2):\n<#code#>\ncase (.case4, .case3):\n<#code#>\ncase (.case4, .case5):\n<#code#>\ncase (.case4, .case6):\n<#code#>\ncase (.case4, .case7):\n<#code#>\ncase (.case4, .case8):\n<#code#>\ncase (.case4, .case9):\n<#code#>\ncase (.case4, .case10):\n<#code#>\ncase (.case3, .case0):\n<#code#>\ncase (.case3, .case1):\n<#code#>\ncase (.case3, .case2):\n<#code#>\ncase (.case3, .case4):\n<#code#>\ncase (.case3, .case5):\n<#code#>\ncase (.case3, .case6):\n<#code#>\ncase (.case3, .case7):\n<#code#>\ncase (.case3, .case8):\n<#code#>\ncase (.case3, .case9):\n<#code#>\ncase (.case3, .case10):\n<#code#>\ncase (.case2, .case0):\n<#code#>\ncase (.case2, .case1):\n<#code#>\ncase (.case2, .case3):\n<#code#>\ncase (.case2, .case4):\n<#code#>\ncase (.case2, .case5):\n<#code#>\ncase (.case2, .case6):\n<#code#>\ncase (.case2, .case7):\n<#code#>\ncase (.case2, .case8):\n<#code#>\ncase (.case2, .case9):\n<#code#>\ncase (.case2, .case10):\n<#code#>\ncase (.case1, .case0):\n<#code#>\ncase (.case1, .case2):\n<#code#>\ncase (.case1, .case3):\n<#code#>\ncase (.case1, .case4):\n<#code#>\ncase (.case1, .case5):\n<#code#>\ncase (.case1, .case6):\n<#code#>\ncase (.case1, .case7):\n<#code#>\ncase (.case1, .case8):\n<#code#>\ncase (.case1, .case9):\n<#code#>\ncase (.case1, .case10):\n<#code#>\ncase (.case0, .case1):\n<#code#>\ncase (.case0, .case2):\n<#code#>\ncase (.case0, .case3):\n<#code#>\ncase (.case0, .case4):\n<#code#>\ncase (.case0, .case5):\n<#code#>\ncase (.case0, .case6):\n<#code#>\ncase (.case0, .case7):\n<#code#>\ncase (.case0, .case8):\n<#code#>\ncase (.case0, .case9):\n<#code#>\ncase (.case0, .case10):\n<#code#>\n}}
   case (.case0, .case0): return true
   case (.case1, .case1): return true
   case (.case2, .case2): return true
@@ -150,11 +150,11 @@ func infinitelySized() -> Bool {
 // expected-note@-7 {{add missing case: '(.one, .two)'}} {{+13:3-3=case (.one, .two):\n<#code#>\n}}
 // expected-note@-8 {{add missing case: '(_, .recur(_))'}} {{+13:3-3=case (_, .recur(_)):\n<#code#>\n}}
 // expected-note@-9 {{add missing case: '(_, .mutualRecur(_, _))'}} {{+13:3-3=case (_, .mutualRecur(_, _)):\n<#code#>\n}}
-// expected-note@-10 {{add missing cases}} {{+13:3-3=case (.recur(_), _):\n<#code#>\ncase (.mutualRecur(_, _), _):\n<#code#>\ncase (.two, .one):\n<#code#>\ncase (.recur(_), .mutualRecur(_, _)):\n<#code#>\ncase (.mutualRecur(_, _), .mutualRecur(_, _)):\n<#code#>\ncase (.one, .two):\n<#code#>\ncase (_, .recur(_)):\n<#code#>\ncase (_, .mutualRecur(_, _)):\n<#code#>\n}} 
+// expected-note@-10 {{add missing cases}} {{+13:3-3=case (.recur(_), _):\n<#code#>\ncase (.mutualRecur(_, _), _):\n<#code#>\ncase (.two, .one):\n<#code#>\ncase (.recur(_), .mutualRecur(_, _)):\n<#code#>\ncase (.mutualRecur(_, _), .mutualRecur(_, _)):\n<#code#>\ncase (.one, .two):\n<#code#>\ncase (_, .recur(_)):\n<#code#>\ncase (_, .mutualRecur(_, _)):\n<#code#>\n}}
   case (.one, .one): return true
   case (.two, .two): return true
   }
-  
+
   switch (MutuallyRecursive.one, MutuallyRecursive.one) {
   // expected-error@-1 {{switch must be exhaustive}}
   // expected-note@-2 {{add missing case: '(.recur(_), _)'}} {{+13:3-3=case (.recur(_), _):\n<#code#>\n}}
@@ -165,7 +165,7 @@ func infinitelySized() -> Bool {
   // expected-note@-7 {{add missing case: '(.one, .two)'}} {{+13:3-3=case (.one, .two):\n<#code#>\n}}
   // expected-note@-8 {{add missing case: '(_, .recur(_))'}} {{+13:3-3=case (_, .recur(_)):\n<#code#>\n}}
   // expected-note@-9 {{add missing case: '(_, .mutualRecur(_, _))'}} {{+13:3-3=case (_, .mutualRecur(_, _)):\n<#code#>\n}}
-  // expected-note@-10 {{add missing cases}} {{+13:3-3=case (.recur(_), _):\n<#code#>\ncase (.mutualRecur(_, _), _):\n<#code#>\ncase (.two, .one):\n<#code#>\ncase (.recur(_), .mutualRecur(_, _)):\n<#code#>\ncase (.mutualRecur(_, _), .mutualRecur(_, _)):\n<#code#>\ncase (.one, .two):\n<#code#>\ncase (_, .recur(_)):\n<#code#>\ncase (_, .mutualRecur(_, _)):\n<#code#>\n}} 
+  // expected-note@-10 {{add missing cases}} {{+13:3-3=case (.recur(_), _):\n<#code#>\ncase (.mutualRecur(_, _), _):\n<#code#>\ncase (.two, .one):\n<#code#>\ncase (.recur(_), .mutualRecur(_, _)):\n<#code#>\ncase (.mutualRecur(_, _), .mutualRecur(_, _)):\n<#code#>\ncase (.one, .two):\n<#code#>\ncase (_, .recur(_)):\n<#code#>\ncase (_, .mutualRecur(_, _)):\n<#code#>\n}}
   case (.one, .one): return true
   case (.two, .two): return true
   }
@@ -205,7 +205,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   case .b: break
   }
-  
+
   switch value {
   case .a: break
   case .b: break
@@ -303,7 +303,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   // expected-note@-3 {{add missing case: '(_, .microseconds(_))'}} {{+10:3-3=case (_, .microseconds(_)):\n<#code#>\n}}
   // expected-note@-4 {{add missing case: '(_, .nanoseconds(_))'}} {{+10:3-3=case (_, .nanoseconds(_)):\n<#code#>\n}}
   // expected-note@-5 {{add missing case: '(_, .never)'}} {{+10:3-3=case (_, .never):\n<#code#>\n}}
-  // expected-note@-6 {{add missing cases}} {{+10:3-3=case (_, .milliseconds(_)):\n<#code#>\ncase (_, .microseconds(_)):\n<#code#>\ncase (_, .nanoseconds(_)):\n<#code#>\ncase (_, .never):\n<#code#>\n}} 
+  // expected-note@-6 {{add missing cases}} {{+10:3-3=case (_, .milliseconds(_)):\n<#code#>\ncase (_, .microseconds(_)):\n<#code#>\ncase (_, .nanoseconds(_)):\n<#code#>\ncase (_, .never):\n<#code#>\n}}
   case (_, .seconds): break
   case (.a, _): break
   case (.b, _): break
@@ -315,7 +315,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   // expected-note@-3 {{add missing case: '(_, .milliseconds(_))'}} {{+10:3-3=case (_, .milliseconds(_)):\n<#code#>\n}}
   // expected-note@-4 {{add missing case: '(_, .microseconds(_))'}} {{+10:3-3=case (_, .microseconds(_)):\n<#code#>\n}}
   // expected-note@-5 {{add missing case: '(_, .nanoseconds(_))'}} {{+10:3-3=case (_, .nanoseconds(_)):\n<#code#>\n}}
-  // expected-note@-6 {{add missing cases}} {{+10:3-3=case (_, .seconds(_)):\n<#code#>\ncase (_, .milliseconds(_)):\n<#code#>\ncase (_, .microseconds(_)):\n<#code#>\ncase (_, .nanoseconds(_)):\n<#code#>\n}} 
+  // expected-note@-6 {{add missing cases}} {{+10:3-3=case (_, .seconds(_)):\n<#code#>\ncase (_, .milliseconds(_)):\n<#code#>\ncase (_, .microseconds(_)):\n<#code#>\ncase (_, .nanoseconds(_)):\n<#code#>\n}}
   case (_, .never): break
   case (.a, _): break
   case (.b, _): break
@@ -336,7 +336,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   case .b: break
   }
-  
+
   switch payload {
   case .a: break
   case .b: break

@@ -24,8 +24,8 @@ struct Free<T> {}
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="Free<T>" protocol="Escapable"))
 // CHECK-NEXT:    (requirement "T" conforms_to "P1"))
-extension Free: P2 where T: P1 {} 
-// expected-note@-1 {{requirement from conditional conformance of 'Free<U>' to 'P2'}} 
+extension Free: P2 where T: P1 {}
+// expected-note@-1 {{requirement from conditional conformance of 'Free<U>' to 'P2'}}
 // expected-note@-2 {{requirement from conditional conformance of 'Free<T>' to 'P2'}}
 func free_good<U: P1>(_: U) {
     takes_P2(Free<U>())
@@ -503,7 +503,7 @@ extension BinaryInteger {
 protocol P_53382 {}
 struct S_53382<T> {}
 extension S_53382: P_53382 where T: P_53382 {} // expected-note {{requirement from conditional conformance of 'S_53382<String>' to 'P_53382'}}
-	
+
 func f1_53382(_ fn: (S_53382<String>) -> Void) {}
 func f2_53382(_ fn: (P_53382) -> Void) {
   f1_53382(fn) // expected-error {{global function 'f1_53382' requires that 'String' conform to 'P_53382'}}

@@ -8,7 +8,7 @@
 // CHECK-LABEL: @"$s27reflection_metadata_let_var6StruccVMF" = internal constant
 struct Strucc {
 // --             flags (let)
-// CHECK-SAME:    i32 0, 
+// CHECK-SAME:    i32 0,
 // --             type
 // CHECK-SAME:    [[INT]] to
 // --             name
@@ -16,7 +16,7 @@ struct Strucc {
   let x: Int
 
 // --             flags (var)
-// CHECK-SAME:    i32 2, 
+// CHECK-SAME:    i32 2,
 // --             type
 // CHECK-SAME:    [[STRING]] to
 // --             name

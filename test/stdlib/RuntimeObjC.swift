@@ -329,7 +329,7 @@ Runtime.test("typeName") {
 
   var a : Any = SomeObjCClass()
   expectEqual("a.SomeObjCClass", _typeName(type(of: a)))
-  
+
   a = SomeNSObjectSubclass()
   expectEqual("a.SomeNSObjectSubclass", _typeName(type(of: a)))
 
@@ -351,13 +351,13 @@ protocol ProtocolA {}
 protocol ProtocolB {}
 
 class OuterClass {
-    
+
     private class PrivateGeneric<T, U> {
       class InnerGeneric<X> {
         class Inner { }
       }
     }
-    
+
     static func getPrivateGenericName() -> String {
       return NSStringFromClass(OuterClass.PrivateGeneric<Int, Bool>.self)
     }
@@ -428,7 +428,7 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a17MultiGenericClassGVS_13GenericStructSi_GOS_11GenericEnumGS2_Si___",
               NSStringFromClass(MultiGenericClass<GenericStruct<Int>,
                                                   GenericEnum<GenericEnum<Int>>>.self))
-  
+
   expectEqual("_TtGCC1a10OuterClassXXXPrivateGeneric_SiSb_",
               removePrivateDiscriminator(OuterClass.getPrivateGenericName()))
   expectEqual("_TtGCCC1a10OuterClassXXXPrivateGeneric12InnerGeneric_SiSb_Sf_",
@@ -456,7 +456,7 @@ Runtime.test("casting AnyObject to class metatypes") {
     expectTrue(ao as? AnyClass == SomeClass.self)
     expectTrue(ao as? SomeClass.Type == SomeClass.self)
   }
-  
+
   do {
     var ao : AnyObject = SomeNSObjectSubclass()
     expectTrue(ao as? Any.Type == nil)
@@ -477,7 +477,7 @@ Runtime.test("casting AnyObject to class metatypes") {
   do {
     var nso: NSObject = SomeNSObjectSubclass()
     expectTrue(nso as? AnyClass == nil)
-    
+
     nso = (SomeNSObjectSubclass.self as AnyObject) as! NSObject
     expectTrue(nso as? Any.Type == SomeNSObjectSubclass.self)
     expectTrue(nso as? AnyClass == SomeNSObjectSubclass.self)
@@ -508,7 +508,7 @@ var nsStringCanaryCount = 0
     fatalError("don't call this initializer")
   }
   required init(itemProviderData data: Data, typeIdentifier: String) throws {
-    fatalError("don't call this initializer")    
+    fatalError("don't call this initializer")
   }
   deinit {
     nsStringCanaryCount -= 1
@@ -611,7 +611,7 @@ Reflection.test("MetatypeMirror") {
     output = ""
     dump(compositionConcreteMetatype, to: &output)
     expectEqual(expectedComposition, output)
-    
+
     let objcDefinedProtoType = NSObjectProtocol.self
     expectEqual(String(describing: objcDefinedProtoType), "NSObject")
   }

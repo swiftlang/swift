@@ -7,7 +7,7 @@
 
 // The -disable-bridging-pch above isn't actually relevant to the test; however,
 // precompiled headers don't play nice with the way we include the platform
-// module map on non-Apple platforms. See 
+// module map on non-Apple platforms. See
 // https://bugs.llvm.org/show_bug.cgi?id=36245.
 
 import StdlibUnittest

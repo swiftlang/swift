@@ -1,6 +1,6 @@
 // First test: functional correctness
 
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Submodule.swiftmodule -module-name=Submodule %S/Inputs/cross-module/cross-submodule.swift -c -o %t/submodule.o
 // RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/PrivateSubmodule.swiftmodule -module-name=PrivateSubmodule %S/Inputs/cross-module/cross-private-submodule.swift -c -o %t/privatesubmodule.o
 // RUN: %target-clang -c --language=c %S/Inputs/cross-module/c-module.c -o %t/c-module.o

@@ -138,7 +138,7 @@ func overloadtest(x: Int) {
 }
 
 func localtest() {
-  func shadowbug() { 
+  func shadowbug() {
     var Foo = 10
     // expected-warning@-1 {{initialization of variable 'Foo' was never used; consider replacing with assignment to '_' or removing it}}
     func g() {
@@ -149,7 +149,7 @@ func localtest() {
       }
     }
   }
-  func scopebug() { 
+  func scopebug() {
     var Foo = 10
     struct S {
       typealias Foo = Int
@@ -157,7 +157,7 @@ func localtest() {
     Foo = 17
     _ = Foo
   }
-  func scopebug2() { 
+  func scopebug2() {
     struct S1 {}
     struct S2 {
       var x : S1
@@ -219,9 +219,9 @@ print(forwardReferenceVar, terminator: ""); var forwardReferenceVar: Int = 0
 // https://gist.github.com/erynofwales/61768899502b7ac83c6e
 struct Matrix4<T: FloatingPoint> {
   static func size() -> Int {}
-  
+
   private var data: Int = Matrix4.size()   // Ok: Matrix4<T>
-  
+
   init() {
     data = Matrix4.size()  // Ok: Matrix4<T>
   }

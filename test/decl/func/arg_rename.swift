@@ -39,7 +39,7 @@ f6(a: 5)
 
 func f7(var let: Int) { // expected-warning {{'var' in this position is interpreted as an argument label}} {{9-12=`var`}}
   let _ = `let`
-} 
+}
 f7(var: 5)
 
 func f8(let var: Int) { // expected-warning {{'let' in this position is interpreted as an argument label}} {{9-12=`let`}}
@@ -70,7 +70,7 @@ class X {
 infix operator +++
 func +++(lhs lhs: Int, // expected-error{{operator cannot have keyword arguments}}{{10-14=}}
          rhs x: Int) -> Int { // expected-error{{operator cannot have keyword arguments}}{{10-14=}}
-  return lhs + x 
+  return lhs + x
 }
 
 

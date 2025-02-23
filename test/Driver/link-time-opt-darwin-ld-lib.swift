@@ -14,7 +14,7 @@
 // CHECK-SIMPLE-THIN-macosx-DAG: [[OBJECTFILE]]
 
 
-// RUN: %swiftc_driver -driver-print-jobs %S/../Inputs/empty.swift -lto=llvm-full -target x86_64-apple-macosx10.9     | %FileCheck %s --check-prefix=CHECK-SIMPLE-FULL --check-prefix=CHECK-SIMPLE-FULL-macosx 
+// RUN: %swiftc_driver -driver-print-jobs %S/../Inputs/empty.swift -lto=llvm-full -target x86_64-apple-macosx10.9     | %FileCheck %s --check-prefix=CHECK-SIMPLE-FULL --check-prefix=CHECK-SIMPLE-FULL-macosx
 
 // CHECK-SIMPLE-FULL: swift
 // CHECK-SIMPLE-FULL-DAG: -emit-bc

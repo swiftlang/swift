@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver %s -emit-ir -O | %FileCheck %s 
+// RUN: %target-swiftc_driver %s -emit-ir -O | %FileCheck %s
 
 // CHECK: @"$s7optmode7square11nS2i_tF"{{.*}}[[ATTR1:#[0-9]+]]
 @_optimize(none)

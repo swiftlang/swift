@@ -18,7 +18,7 @@ extension P {
 // CHECK-LABEL: sil {{.*}}@$s4test6testityyAA1P_pF
 // CHECK-NOT:     function_ref
 // CHECK:         witness_method
-// CHECK:       } // end sil function '$s4test6testityyAA1P_pF' 
+// CHECK:       } // end sil function '$s4test6testityyAA1P_pF'
 public func testit(_ p: P) {
   var x = 0
   p.genericFunc(&x)

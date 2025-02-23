@@ -8,7 +8,7 @@ struct X1 {
   init(_ a: Int) { }
   func f1(_ a: Int) {}
 }
-X1(a: 5).f1(b: 5) 
+X1(a: 5).f1(b: 5)
 // expected-error@-1 {{extraneous argument label 'a:' in call}} {{4-7=}}
 // expected-error@-2 {{extraneous argument label 'b:' in call}} {{13-16=}}
 
@@ -148,7 +148,7 @@ struct ReorderAndAllLabels {
 func defargs1(x: Int = 1, y: Int = 2, z: Int = 3) {}
 
 // Using defaults (in-order)
-defargs1() 
+defargs1()
 defargs1(x: 1)
 defargs1(x: 1, y: 2)
 
@@ -501,7 +501,7 @@ func testLabelErrorVariadic() {
 }
 
 // -------------------------------------------
-// Positions around defaults and variadics 
+// Positions around defaults and variadics
 // -------------------------------------------
 
 struct PositionsAroundDefaultsAndVariadics {
@@ -522,14 +522,14 @@ struct PositionsAroundDefaultsAndVariadics {
     f1(c: "3", 2, [4]) // expected-error {{unnamed argument #3 must precede argument 'c'}}
 
     f1(c: "3", [4], 2) // expected-error {{unnamed argument #3 must precede argument 'c'}}
-    
+
     f1(c: "3", 2) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
 
     f1(c: "3", [4])
 
     f1(b: "2", [3]) // expected-error {{incorrect argument labels in call (have 'b:_:', expected '_:_:c:_:')}}
     // expected-error@-1 {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
-    
+
     f1(b: "2", 1) // expected-error {{incorrect argument labels in call (have 'b:_:', expected '_:_:c:_:')}}
     // expected-error@-1 {{integer literal value '1' cannot be used as a boolean; did you mean 'true'?}}
 
@@ -570,7 +570,7 @@ struct PositionsAroundDefaultsAndVariadics {
 
     f2(true, 21, [4]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
     // expected-note@-1 {{remove brackets to pass array elements directly}}
-    
+
     f2(true, 21, 22, [4]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
     // expected-note@-1 {{remove brackets to pass array elements directly}}
 
@@ -585,7 +585,7 @@ struct PositionsAroundDefaultsAndVariadics {
     f2()
 
     f2(c: "3", 21) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
-    
+
     f2(c: "3", 21, [4]) // expected-error {{incorrect argument labels in call (have 'c:_:_:', expected '_:_:c:_:')}}
     // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
     // expected-error@-2 {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
@@ -611,9 +611,9 @@ struct PositionsAroundDefaultsAndVariadics {
     f3(true, b: 21, 22, 23, c: "3", [4])
 
     f3(true, b: "21", 22, 23, c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
-    
+
     f3(true, b: 21, "22", 23, c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
-    
+
     f3(true, b: 21, 22, "23", c: "3", [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
 
     f3(true, b: 21, 22, c: "3", [4])
@@ -637,7 +637,7 @@ struct PositionsAroundDefaultsAndVariadics {
     f3(c: "3", [4])
 
     f3([4]) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'Bool'}}
-    
+
     f3()
 
     f3(c: "3", b: 21) // expected-error {{argument 'b' must precede argument 'c'}}
@@ -654,13 +654,13 @@ struct PositionsAroundDefaultsAndVariadics {
 
   func test_f4() {
     f4(true, b: "2", 31, 32, 33, d: [4])
-    
+
     f4(true, b: "2", "31", 32, 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
 
     f4(true, b: "2", 31, "32", 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
-    
+
     f4(true, b: "2", 31, 32, "33", d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
-    
+
     f4(true, b: "2", 31, 32, d: [4])
     f4(true, b: "2", 31, d: [4])
     f4(true, b: "2", d: [4])
@@ -699,7 +699,7 @@ struct PositionsAroundDefaultsAndVariadics {
     f4(b: "2")
 
     f4()
-    
+
     f4(31) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
 
     f4(31, d: [4]) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
@@ -714,13 +714,13 @@ struct PositionsAroundDefaultsAndVariadics {
 
   func test_f5() {
     f5(true, b: "2", c: 31, 32, 33, d: [4])
-    
+
     f5(true, b: "2", c: "31", 32, 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
 
     f5(true, b: "2", c: 31, "32", 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
 
     f5(true, b: "2", c: 31, 32, "33", d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
-    
+
     f5(true, b: "2", c: 31, 32, d: [4])
     f5(true, b: "2", c: 31, d: [4])
     f5(true, b: "2", d: [4])
@@ -739,7 +739,7 @@ struct PositionsAroundDefaultsAndVariadics {
     f5(true, c: 31, 32, d: [4])
 
     f5(b: "2", c: 31, 32, 33, d: [4])
-    
+
     f5(b: "2", c: "31", 32, 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
 
     f5(b: "2", c: 31, "32", 33, d: [4]) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
@@ -1538,7 +1538,7 @@ struct RelabelAndTrailingClosure {
 // -------------------------------------------
 func testValuesOfFunctionType(_ f1: (_: Int, _ arg: Int) -> () ) {
   f1(3, arg: 5) // expected-error{{extraneous argument label 'arg:' in call}}{{9-14=}}
-  f1(x: 3, 5) // expected-error{{extraneous argument label 'x:' in call}} {{6-9=}} 
+  f1(x: 3, 5) // expected-error{{extraneous argument label 'x:' in call}} {{6-9=}}
   f1(3, 5)
 }
 

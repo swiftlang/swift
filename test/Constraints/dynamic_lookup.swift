@@ -22,7 +22,7 @@ class C {
 }
 
 class X {
-  init() {} 
+  init() {}
 
   @objc func foo(_ i: Int) { }
   @objc func bar() { }
@@ -38,7 +38,7 @@ class X {
 }
 
 class Y : P {
-  init() {} 
+  init() {}
 
   @objc func foo(_ s: String) { }
   @objc func wibble() { } // expected-note 2 {{did you mean 'wibble'?}}

@@ -102,10 +102,10 @@ struct BlockObserver { // expected-note {{'init(startHandler:produceHandler:fini
 
 func testBlockObserverExample() {
   _ = BlockObserver { _, _, _ in } // expected-warning {{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'finishHandler' to suppress this warning}}
-  
+
   _ = BlockObserver { _ in } produceHandler: { _, _ in }
   _ = BlockObserver { _ in } finishHandler: { _, _, _ in }
-  
+
   _ = BlockObserver { _ in }
     produceHandler: { _, _ in }
     finishHandler: { _, _, _ in }

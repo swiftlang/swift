@@ -663,7 +663,7 @@ struct BridgedInstruction {
   // =========================================================================//
   //                   Generalized instruction subclasses
   // =========================================================================//
-  
+
   BRIDGED_INLINE SwiftInt MultipleValueInstruction_getNumResults() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedMultiValueResult MultipleValueInstruction_getResult(SwiftInt index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSuccessorArray TermInst_getSuccessors() const;
@@ -1167,7 +1167,7 @@ struct BridgedBuilder{
                                                                            BridgedArgumentConvention calleeConvention,
                                                                            BridgedSubstitutionMap bridgedSubstitutionMap = BridgedSubstitutionMap(),
                                                                            bool hasUnknownIsolation = true,
-                                                                           bool isOnStack = false) const;                                                                                  
+                                                                           bool isOnStack = false) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBranch(BridgedBasicBlock destBlock,
                                                                      BridgedValueArray arguments) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUnreachable() const;
@@ -1207,7 +1207,7 @@ struct BridgedBuilder{
                                                                              bool keepUnique) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkDependence(
     BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind dependenceKind) const;
-    
+
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndAccess(BridgedValue value) const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndApply(BridgedValue value) const;

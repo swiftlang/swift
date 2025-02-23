@@ -30,11 +30,11 @@ namespace irgen {
 enum class FieldAccess : uint8_t {
   /// Instance variable offsets are constant.
   ConstantDirect,
-  
+
   /// Instance variable offsets must be loaded from "direct offset"
   /// global variables.
   NonConstantDirect,
-  
+
   /// Instance variable offsets are kept in fields in metadata, but
   /// the offsets of those fields within the metadata are constant.
   ConstantIndirect

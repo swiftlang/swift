@@ -35,7 +35,7 @@ struct MyInt: FixedWidthInteger { // expected-error {{type 'MyInt' does not conf
 
   static func >><RHS: BinaryInteger>(_ lhs: MyInt, _ rhs: RHS) -> MyInt { fatalError() }
 
-  static func >>=<RHS: BinaryInteger>(_ lhs: inout MyInt, _ rhs: RHS) { fatalError() } 
+  static func >>=<RHS: BinaryInteger>(_ lhs: inout MyInt, _ rhs: RHS) { fatalError() }
   static func <<<RHS: BinaryInteger>(_ lhs: MyInt, _ rhs: RHS) -> MyInt { fatalError() }
   static func <<=<RHS: BinaryInteger>(_ lhs: inout MyInt, _ rhs: RHS) { fatalError() }
 

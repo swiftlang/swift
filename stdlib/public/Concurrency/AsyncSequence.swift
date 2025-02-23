@@ -226,7 +226,7 @@ extension AsyncSequence {
   ) async rethrows -> Bool {
     return try await _contains(self, where: predicate)
   }
-  
+
   /// Returns a Boolean value that indicates whether all elements produced by the
   /// asynchronous sequence satisfy the given predicate.
   ///
@@ -376,17 +376,17 @@ extension AsyncSequence {
     by areInIncreasingOrder: (Element, Element) async throws -> Bool
   ) async rethrows -> Element? {
     var it = makeAsyncIterator()
-    guard var result = try await it.next() else { 
-      return nil 
+    guard var result = try await it.next() else {
+      return nil
     }
     while let e = try await it.next() {
-      if try await areInIncreasingOrder(e, result) { 
-        result = e 
+      if try await areInIncreasingOrder(e, result) {
+        result = e
       }
     }
     return result
   }
-  
+
   /// Returns the maximum element in the asynchronous sequence, using the given
   /// predicate as the comparison between elements.
   ///
@@ -431,12 +431,12 @@ extension AsyncSequence {
     by areInIncreasingOrder: (Element, Element) async throws -> Bool
   ) async rethrows -> Element? {
     var it = makeAsyncIterator()
-    guard var result = try await it.next() else { 
-      return nil 
+    guard var result = try await it.next() else {
+      return nil
     }
     while let e = try await it.next() {
-      if try await areInIncreasingOrder(result, e) { 
-        result = e 
+      if try await areInIncreasingOrder(result, e) {
+        result = e
       }
     }
     return result

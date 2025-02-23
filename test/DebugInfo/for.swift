@@ -4,7 +4,7 @@
 
 for i in 0 ..< 3 {
 // CHECK-DAG: !DILocalVariable(name: "i", scope: ![[SCOPE1:[0-9]+]]{{.*}}line: [[@LINE-1]]
-// CHECK-DAG: ![[SCOPE1]] = {{.*}}DILexicalBlock({{.*}}line: [[@LINE-2]] 
+// CHECK-DAG: ![[SCOPE1]] = {{.*}}DILexicalBlock({{.*}}line: [[@LINE-2]]
 }
 
 for i in 0 ..< 3 {

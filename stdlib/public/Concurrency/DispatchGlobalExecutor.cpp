@@ -352,29 +352,29 @@ void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 
   uint64_t deadline = sec * NSEC_PER_SEC + nsec;
   dispatch_time_t when = clock_and_value_to_time(clock, deadline);
-  
+
   if (tnsec != -1) {
     uint64_t leeway = tsec * NSEC_PER_SEC + tnsec;
 
-    dispatch_source_t source = 
+    dispatch_source_t source =
       dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
     dispatch_source_set_timer(source, when, DISPATCH_TIME_FOREVER, leeway);
 
     size_t sz = sizeof(struct __swift_job_source);
 
-    struct __swift_job_source *jobSource = 
+    struct __swift_job_source *jobSource =
       (struct __swift_job_source *)swift_job_alloc(job, sz);
 
     jobSource->job = job;
     jobSource->source = source;
 
     dispatch_set_context(source, jobSource);
-    dispatch_source_set_event_handler_f(source, 
+    dispatch_source_set_event_handler_f(source,
       (dispatch_function_t)&_swift_run_job_leeway);
 
     dispatch_activate(source);
   } else {
-    dispatch_after_f(when, queue, (void *)job, 
+    dispatch_after_f(when, queue, (void *)job,
       (dispatch_function_t)&__swift_run_job);
   }
 }

@@ -177,7 +177,7 @@ func test_var_3() {
   // CHECK: [[NO_CASE3]]:
   // CHECK:   destroy_value [[WADDR]]
   case var v:
-  // CHECK:   [[VADDR:%.*]] = alloc_box ${ var (Int, Int) } 
+  // CHECK:   [[VADDR:%.*]] = alloc_box ${ var (Int, Int) }
   // CHECK:   [[VLIFETIME:%.*]] = begin_borrow [var_decl] [[VADDR]]
   // CHECK:   [[V:%.*]] = project_box [[VLIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[V]]
@@ -521,7 +521,7 @@ func test_mixed_let_var() {
   // CHECK:   end_borrow [[BORROWED_VAL_MOVE]]
   // CHECK:   destroy_value [[VAL_MOVE]]
   // CHECK:   destroy_value [[VAL]]
-  // CHECK:   br [[CONT]]  
+  // CHECK:   br [[CONT]]
   b(x: y)
 
   // CHECK: [[NOCASE2]]:
@@ -641,7 +641,7 @@ func test_multiple_patterns3() {
     // CHECK:     extend_lifetime [[MV_A_N]] : $Double
     // CHECK:     extend_lifetime [[MV_A_X]] : $Int
     // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[MV_A_X]] : $Int, [[MV_A_N]] : $Double)
-    
+
     // CHECK:   [[B]]([[B_TUP:%.*]] : $(Double, Int)):
     // CHECK:     ([[B_N:%.*]], [[B_X:%.*]]) = destructure_tuple [[B_TUP]]
     // CHECK:     [[MV_B_N:%.*]] = move_value [var_decl] [[B_N]] : $Double
@@ -675,17 +675,17 @@ func test_multiple_patterns4() {
     // CHECK:   [[Y]]([[Y_TUP:%.*]] : $(Foo, Int)):
     // CHECK:     ([[Y_F:%.*]], [[Y_X:%.*]]) = destructure_tuple [[Y_TUP]]
     // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt: [[A:bb[0-9]+]], case #Foo.B!enumelt: [[B:bb[0-9]+]], case #Foo.C!enumelt: [[C:bb[0-9]+]]
-    
+
     // CHECK:   [[A]]([[A_TUP:%.*]] : $(Int, Double)):
     // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
     // CHECK:     [[MV_A:%.*]] = move_value [var_decl] %30 : $Int
     // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[MV_A]] : $Int)
-    
+
     // CHECK:   [[B]]([[B_TUP:%.*]] : $(Double, Int)):
     // CHECK:     ([[B_N:%.*]], [[B_X:%.*]]) = destructure_tuple [[B_TUP]]
     // CHECK:     [[MV_B_X:%.*]] = move_value [var_decl] [[B_X]] : $Int
     // CHECK:     br [[CASE_BODY]]([[MV_B_X]] : $Int)
-    
+
     // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
     // CHECK:     [[MV_Y_X:%.*]] = move_value [var_decl] [[Y_X]] : $Int
     // CHECK:     br [[CASE_BODY]]([[MV_Y_X]] : $Int)
@@ -713,26 +713,26 @@ func test_multiple_patterns5() {
     // CHECK:   [[Y]]([[Y_TUP:%.*]] : $(Foo, Int)):
     // CHECK:     ([[Y_F:%.*]], [[Y_X:%.*]]) = destructure_tuple [[Y_TUP]]
     // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt: [[A:bb[0-9]+]], case #Foo.B!enumelt: [[B:bb[0-9]+]], case #Foo.C!enumelt: [[C:bb[0-9]+]]
-    
+
     // CHECK:   [[A]]([[A_TUP:%.*]] : $(Int, Double)):
     // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
     // CHECK:     [[MV_X:%.*]] = move_value [var_decl] [[A_X]] : $Int
     // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[MV_X]] : $Int)
-    
+
     // CHECK:   [[B]]([[B_TUP:%.*]] : $(Double, Int)):
     // CHECK:     ([[B_N:%.*]], [[B_X:%.*]]) = destructure_tuple [[B_TUP]]
     // CHECK:     [[MV_B_X:%.*]] = move_value [var_decl] [[B_X]] : $Int
     // CHECK:     br [[CASE_BODY]]([[MV_B_X]] : $Int)
-    
+
     // CHECK:   [[C]]({{%.*}} : $(Int, Int, Double)):
     // CHECK:     [[MV_Y_X:%.*]] = move_value [var_decl] [[Y_X]] : $Int
     // CHECK:     br [[CASE_BODY]]([[MV_Y_X]] : $Int)
-    
+
     // CHECK:   [[Z]]([[Z_TUP:%.*]] : $(Int, Foo)):
     // CHECK:     ([[Z_X:%.*]], [[Z_F:%.*]]) = destructure_tuple [[Z_TUP]]
     // CHECK:     [[MV_Z_X:%.*]] = move_value [var_decl] [[Z_X]] : $Int
     // CHECK:     br [[CASE_BODY]]([[MV_Z_X]] : $Int)
-    
+
     // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : $Int):
     // CHECK:     store [[BODY_X]] to [trivial] [[BOX_X:%.*]] : $*Int
     // CHECK:     [[WRITE:%.*]] = begin_access [modify] [unknown] [[BOX_X]]

@@ -105,7 +105,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheUnsafeValueBufferType;
   if (Name == "PackIndex")
     return Context.ThePackIndexType;
-  
+
   if (Name == "FPIEEE32")
     return Context.TheIEEE32Type;
   if (Name == "FPIEEE64")
@@ -120,7 +120,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   if (Name == "Int") {
     return BuiltinUnboundGenericType::get(TypeKind::BuiltinInteger, Context);
   }
-  
+
   // Handle 'int8' and friends.
   if (Name.substr(0, 3) == "Int") {
     unsigned BitWidth;
@@ -128,7 +128,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
         BitWidth <= 2048 && BitWidth != 0)  // Cap to prevent unsound things.
       return BuiltinIntegerType::get(BitWidth, Context);
   }
-  
+
   // Target specific FP types.
   if (Name == "FPIEEE16")
     return Context.TheIEEE16Type;
@@ -154,17 +154,17 @@ StringRef swift::getBuiltinBaseName(ASTContext &C, StringRef Name,
   // builtin-id ::= operation-id ('_' type-id)*
   for (StringRef::size_type Underscore = Name.find_last_of('_');
        Underscore != StringRef::npos; Underscore = Name.find_last_of('_')) {
-    
+
     // Check that the type parameter is well-formed and set it up for returning.
     // This allows operations with underscores in them, like "icmp_eq".
     Type Ty = getBuiltinType(C, Name.substr(Underscore + 1));
     if (Ty.isNull()) break;
-    
+
     Types.push_back(Ty);
-    
+
     Name = Name.substr(0, Underscore);
   }
-  
+
   std::reverse(Types.begin(), Types.end());
   return Name;
 }
@@ -348,7 +348,7 @@ synthesizeGenericSignature(SynthesisContext &SC,
 static FuncDecl *
 getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
   auto &Context = ResType->getASTContext();
-  
+
   ModuleDecl *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
 
@@ -363,7 +363,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
   }
 
   auto *paramList = ParameterList::create(Context, params);
-  
+
   DeclName Name(Context, Id, paramList);
   auto *const FD = FuncDecl::createImplicit(
       Context, StaticSpellingKind::None, Name, /*NameLoc=*/SourceLoc(),
@@ -577,7 +577,7 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
           CheckOutput->castTo<BuiltinIntegerType>()->getGreatestWidth())
       return nullptr;
     break;
-      
+
   case BuiltinValueKind::ZExt:
   case BuiltinValueKind::SExt: {
     if (CheckOutput.isNull() ||
@@ -657,7 +657,7 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
       if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
         if (BIT->isFixedWidth() && BIT->getFixedWidth() == BFT->getBitWidth())
           break;
-      
+
     // Support VecNxInt1 -> IntN bitcast for SIMD comparison results.
     if (auto *Vec = CheckInput->getAs<BuiltinVectorType>())
       if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
@@ -2021,7 +2021,7 @@ static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
 
   Type ArgElts[] = { BoolTy, BoolTy, MessageTy };
   Type ResultTy = TupleType::getEmpty(Context);
-  
+
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
@@ -2098,7 +2098,7 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
                                    Identifier Id,
                                    bool withContext) {
   // (RawPointer, @convention(c) (Context) -> ()[, Context]) -> ()
-  
+
   auto HandleTy = Context.TheRawPointerType;
   auto VoidTy = Context.TheEmptyTupleType;
   SmallVector<AnyFunctionType::Param, 1> CFuncParams;
@@ -2308,7 +2308,7 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
   switch (OK) {
   case OverloadedBuiltinKind::None:
-    return false;  // always fail. 
+    return false;  // always fail.
   case OverloadedBuiltinKind::Integer:
     return T->is<BuiltinIntegerType>();
   case OverloadedBuiltinKind::IntegerOrVector:
@@ -2362,7 +2362,7 @@ llvm::Intrinsic::ID swift::getLLVMIntrinsicID(StringRef InName) {
   if (!InName.starts_with("int_"))
     return llvm::Intrinsic::not_intrinsic;
   InName = InName.drop_front(strlen("int_"));
-  
+
   // Prepend "llvm." and change _ to . in name.
   SmallString<128> NameS;
   NameS.append("llvm.");
@@ -2491,7 +2491,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
     if (!eltType) return Type();
     return makeVector(eltType, D.Vector_Width.getKnownMinValue());
   }
-  
+
   // The element type of a vector type.
   case IITDescriptor::VecElementArgument: {
     Type argType = getTypeArgument(D.getArgumentNumber());
@@ -2528,7 +2528,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
     for (unsigned i = 0; i != D.Struct_NumElements; ++i) {
       Type T = decodeImmediate();
       if (!T) return Type();
-      
+
       Elts.push_back(T);
     }
     return TupleType::get(Elts, Context);
@@ -2628,7 +2628,7 @@ static bool isUnknownOrUnordered(llvm::AtomicOrdering ordering) {
   llvm_unreachable("Unhandled AtomicOrdering in switch.");
 }
 
-static bool isValidCmpXChgOrdering(StringRef SuccessString, 
+static bool isValidCmpXChgOrdering(StringRef SuccessString,
                                    StringRef FailureString) {
   using namespace llvm;
   AtomicOrdering SuccessOrdering = decodeLLVMAtomicOrdering(SuccessString);
@@ -2678,20 +2678,20 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (OperationName.empty()) return nullptr;
     return getIfdefOperation(Context, Id);
   }
-  
+
   // If this starts with fence, we have special suffixes to handle.
   if (OperationName.starts_with("fence_")) {
     OperationName = OperationName.drop_front(strlen("fence_"));
-    
+
     // Verify we have a single integer, floating point, or pointer type.
     if (!Types.empty()) return nullptr;
-    
+
     // Get and validate the ordering argument, which is required.
     auto Underscore = OperationName.find('_');
     if (!isValidFenceOrdering(OperationName.substr(0, Underscore)))
       return nullptr;
     OperationName = OperationName.substr(Underscore);
-    
+
     // Accept singlethread if present.
     if (OperationName.starts_with("_singlethread"))
       OperationName = OperationName.drop_front(strlen("_singlethread"));
@@ -2700,11 +2700,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       return nullptr;
     return getFenceOperation(Context, Id);
   }
-  
+
   // If this starts with cmpxchg, we have special suffixes to handle.
   if (OperationName.starts_with("cmpxchg_")) {
     OperationName = OperationName.drop_front(strlen("cmpxchg_"));
-    
+
     // Verify we have a single integer, floating point, or pointer type.
     if (Types.size() != 1) return nullptr;
     Type T = Types[0];
@@ -2737,13 +2737,13 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   // If this starts with atomicrmw, we have special suffixes to handle.
   if (OperationName.starts_with("atomicrmw_")) {
     OperationName = OperationName.drop_front(strlen("atomicrmw_"));
-    
+
     // Verify we have a single integer or pointer type.
     if (Types.size() != 1) return nullptr;
     Type Ty = Types[0];
     if (!Ty->is<BuiltinIntegerType>() && !Ty->is<BuiltinRawPointerType>())
       return nullptr;
-    
+
     // Get and validate the suboperation name, which is required.
     auto Underscore = OperationName.find('_');
     if (Underscore == StringRef::npos) return nullptr;
@@ -2753,13 +2753,13 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
         SubOp != "min" && SubOp != "umax" && SubOp != "umin")
       return nullptr;
     OperationName = OperationName.drop_front(Underscore+1);
-    
+
     // Get and validate the ordering argument, which is required.
     Underscore = OperationName.find('_');
     if (!isValidRMWOrdering(OperationName.substr(0, Underscore)))
       return nullptr;
     OperationName = OperationName.substr(Underscore);
-    
+
     // Accept volatile and singlethread if present.
     if (OperationName.starts_with("_volatile"))
       OperationName = OperationName.drop_front(strlen("_volatile"));
@@ -2945,7 +2945,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 #include "swift/AST/Builtins.def"
     if (Types.size() != 1) return nullptr;
     return getUnaryOperation(Context, Id, Types[0]);
-      
+
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_CAST_OPERATION(id, name, attrs)  case BuiltinValueKind::id:
 #define BUILTIN_CAST_OR_BITCAST_OPERATION(id, name, attrs)  case BuiltinValueKind::id:
@@ -2957,7 +2957,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::Autorelease:
     if (!Types.empty()) return nullptr;
     return getRefCountingOperation(Context, Id);
-      
+
   case BuiltinValueKind::Load:
   case BuiltinValueKind::LoadRaw:
   case BuiltinValueKind::LoadInvariant:
@@ -2968,7 +2968,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getTakeOperation(Context, Id);
 
-      
+
   case BuiltinValueKind::Destroy:
     if (!Types.empty()) return nullptr;
     return getDestroyOperation(Context, Id);
@@ -2982,7 +2982,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::DestroyArray:
     if (!Types.empty()) return nullptr;
     return getDestroyArrayOperation(Context, Id);
-      
+
   case BuiltinValueKind::CopyArray:
   case BuiltinValueKind::AssignCopyArrayNoAlias:
   case BuiltinValueKind::AssignCopyArrayFrontToBack:
@@ -3071,7 +3071,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CastBitPatternFromBridgeObject:
     if (!Types.empty()) return nullptr;
     return getCastFromBridgeObjectOperation(Context, Id, BV);
-      
+
   case BuiltinValueKind::CastReference:
     if (!Types.empty()) return nullptr;
     return getCastReferenceOperation(Context, Id);
@@ -3079,7 +3079,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::ReinterpretCast:
     if (!Types.empty()) return nullptr;
     return getReinterpretCastOperation(Context, Id);
-      
+
   case BuiltinValueKind::AddressOf:
   case BuiltinValueKind::UnprotectedAddressOf:
     if (!Types.empty()) return nullptr;
@@ -3100,20 +3100,20 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::AssertConf:
     return getAssertConfOperation(Context, Id);
-      
+
   case BuiltinValueKind::FixLifetime:
     return getFixLifetimeOperation(Context, Id);
 
   case BuiltinValueKind::CanBeObjCClass:
     return getCanBeObjCClassOperation(Context, Id);
-      
+
   case BuiltinValueKind::CondUnreachable:
   case BuiltinValueKind::Unreachable:
     return getUnreachableOperation(Context, Id);
-      
+
   case BuiltinValueKind::ZeroInitializer:
     return getZeroInitializerOperation(Context, Id);
-      
+
   case BuiltinValueKind::Once:
   case BuiltinValueKind::OnceWithContext:
     return getOnceOperation(Context, Id, BV == BuiltinValueKind::OnceWithContext);
@@ -3132,7 +3132,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InsertElement:
     if (Types.size() != 3) return nullptr;
     return getInsertElementOperation(Context, Id, Types[0], Types[1], Types[2]);
-      
+
   case BuiltinValueKind::ShuffleVector:
     if (Types.size() != 2) return nullptr;
     return getShuffleVectorOperation(Context, Id, Types[0], Types[1]);
@@ -3271,7 +3271,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TypePtrAuthDiscriminator:
     return getTypePtrAuthDiscriminator(Context, Id);
-    
+
   case BuiltinValueKind::TypeJoin:
     return getTypeJoinOperation(Context, Id);
 
@@ -3353,7 +3353,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::AddressOfRawLayout:
     return getAddressOfRawLayout(Context, Id);
-    
+
   case BuiltinValueKind::Emplace:
     return getEmplace(Context, Id);
   }
@@ -3412,7 +3412,7 @@ bool BuiltinType::isBitwiseCopyable() const {
   case BuiltinTypeKind::BuiltinNonDefaultDistributedActorStorage:
   case BuiltinTypeKind::BuiltinUnboundGeneric:
     return false;
-    
+
   case BuiltinTypeKind::BuiltinFixedArray: {
     // FixedArray<N, X> : BitwiseCopyable whenever X : BitwiseCopyable
     auto bfa = cast<BuiltinFixedArrayType>(this);
@@ -3556,7 +3556,7 @@ BuiltinUnboundGenericType::getBuiltinTypeName() const {
     return BUILTIN_TYPE_NAME_FIXEDARRAY;
   case TypeKind::BuiltinInteger:
     return BUILTIN_TYPE_NAME_INT;
-    
+
   default:
     llvm_unreachable("not a generic builtin kind");
   }
@@ -3570,7 +3570,7 @@ BuiltinUnboundGenericType::getBuiltinTypeNameString() const {
 GenericSignature
 BuiltinUnboundGenericType::getGenericSignature() const {
   auto &C = getASTContext();
-  
+
   switch (BoundGenericTypeKind) {
   case TypeKind::BuiltinFixedArray: {
     auto Count = GenericTypeParamType::get(C.getIdentifier("Count"),
@@ -3581,7 +3581,7 @@ BuiltinUnboundGenericType::getGenericSignature() const {
                                              0, 1, Type(), C);
     return GenericSignature::get({Count, Element}, {});
   }
-  
+
   case TypeKind::BuiltinInteger: {
     auto bits = GenericTypeParamType::get(C.getIdentifier("Bits"),
                                           GenericTypeParamKind::Type,
@@ -3602,7 +3602,7 @@ BuiltinUnboundGenericType::getBound(SubstitutionMap subs) const {
   switch (BoundGenericTypeKind) {
   case TypeKind::BuiltinFixedArray: {
     auto types = subs.getReplacementTypes();
-  
+
     auto size = types[0]->getCanonicalType();
     if (size->getMatchingParamKind() != GenericTypeParamKind::Value) {
       return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
@@ -3611,27 +3611,27 @@ BuiltinUnboundGenericType::getBound(SubstitutionMap subs) const {
     if (element->getMatchingParamKind() != GenericTypeParamKind::Type) {
       return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
     }
-    
+
     return BuiltinFixedArrayType::get(size, element);
   }
-  
+
   case TypeKind::BuiltinInteger: {
     auto size = subs.getReplacementTypes()[0];
     if (size->getMatchingParamKind() != GenericTypeParamKind::Value) {
       return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
     }
-    
+
     // TODO: support actual generic parameters
     auto literalSize = size->getAs<IntegerType>();
-    
+
     if (!literalSize) {
       return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
     }
-    
+
     return BuiltinIntegerType::get(literalSize->getValue().getLimitedValue(),
                                    getASTContext());
   }
-    
+
   default:
     llvm_unreachable("not a generic builtin kind");
   }
@@ -3645,7 +3645,7 @@ BuiltinFixedArrayType::getFixedInhabitedSize() const {
     }
     return intSize->getValue().getLimitedValue();
   }
-  
+
   return std::nullopt;
 }
 

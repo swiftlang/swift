@@ -54,11 +54,11 @@ public macro TaskLocal() =
 /// this defaults to nil, however a different default value may be defined at declaration
 /// site of the task local, like this:
 ///
-///     enum Example { 
+///     enum Example {
 ///         @TaskLocal
 ///         static var traceID: TraceID = TraceID.default
 ///     }
-/// 
+///
 /// The default value is returned whenever the task-local is read
 /// from a context which either: has no task available to read the value from
 /// (e.g. a synchronous function, called without any asynchronous function in its call stack),
@@ -75,7 +75,7 @@ public macro TaskLocal() =
 ///     print(traceID)
 ///
 /// It is possible to perform task-local value reads from either asynchronous
-/// or synchronous functions. 
+/// or synchronous functions.
 ///
 /// ### Binding task-local values
 /// Task local values cannot be `set` directly and must instead be bound using
@@ -90,23 +90,23 @@ public macro TaskLocal() =
 /// ### Using task local values outside of tasks
 /// It is possible to bind and read task local values outside of tasks.
 ///
-/// This comes in handy within synchronous functions which are not guaranteed 
-/// to be called from within a task. When binding a task-local value from 
-/// outside of a task, the runtime will set a thread-local in which the same 
-/// storage mechanism as used within tasks will be used. This means that you 
+/// This comes in handy within synchronous functions which are not guaranteed
+/// to be called from within a task. When binding a task-local value from
+/// outside of a task, the runtime will set a thread-local in which the same
+/// storage mechanism as used within tasks will be used. This means that you
 /// can reliably bind and read task local values without having to worry
 /// about the specific calling context, e.g.:
 ///
 ///     func enter() {
 ///         Example.$traceID.withValue("1234") {
 ///             read() // always "1234", regardless if enter() was called from inside a task or not:
-///         }    
+///         }
 ///     }
-///    
+///
 ///     func read() -> String {
 ///         if let value = Self.traceID {
-///             "\(value)" 
-///         } else { 
+///             "\(value)"
+///         } else {
 ///             "<no value>"
 ///         }
 ///     }
@@ -116,7 +116,7 @@ public macro TaskLocal() =
 ///     enter()
 ///
 ///     // 2) Call 'enter' from Task
-///     Task { 
+///     Task {
 ///         enter()
 ///     }
 ///
@@ -129,11 +129,11 @@ public macro TaskLocal() =
 ///         @TaskLocal
 ///         static var traceID: TraceID?
 ///     }
-///     
+///
 ///     func read() -> String {
 ///         if let value = Self.traceID {
-///             "\(value)" 
-///         } else { 
+///             "\(value)"
+///         } else {
 ///             "<no value>"
 ///         }
 ///     }
@@ -144,7 +144,7 @@ public macro TaskLocal() =
 ///
 ///       async let id = read() // async let child task, traceID: 1234
 ///
-///       await withTaskGroup(of: String.self) { group in 
+///       await withTaskGroup(of: String.self) { group in
 ///           group.addTask { read() } // task group child task, traceID: 1234
 ///           return await group.next()!
 ///       }

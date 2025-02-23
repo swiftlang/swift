@@ -26,7 +26,7 @@ func printDensity(_ d: Int) {
 
 func getMandelbrotIterations(_ c: Complex, _ maxIterations: Int) -> Int {
   var n = 0
-  var z = Complex() 
+  var z = Complex()
   while (n < maxIterations && z.magnitude() < 4.0) {
     z = z*z + c
     n += 1

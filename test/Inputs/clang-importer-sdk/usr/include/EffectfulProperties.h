@@ -48,7 +48,7 @@ ASYNC_NAME("getter:mainDogProp()");
 -(void)doSomethingSlow:(NSString *)operation completionHandler:(void (^)(NSInteger))handler
   ASYNC_NAME("getter:slow(self:)");
 
--(void)doSomethingDangerous:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError * _Nullable))handler 
+-(void)doSomethingDangerous:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError * _Nullable))handler
   ASYNC_NAME("getter:slowAndDanger(self:)");
 
 // This means it can throw in two ways: produce an error synchronously, returning

@@ -86,7 +86,7 @@ infix operator <> : DeclaredInModuleD
 
 // Also declared in lookup_other. To preserve compatibility, we allow an
 // unambiguous lookup that will favor this declaration over lookup_other.
-precedencegroup RedeclaredInModule {} 
+precedencegroup RedeclaredInModule {}
 infix operator *** : RedeclaredInModule // Okay.
 
 func testOperatorLookup() {

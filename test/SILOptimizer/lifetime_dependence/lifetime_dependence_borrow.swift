@@ -37,7 +37,7 @@ struct BV : ~Escapable {
 struct MBV : ~Escapable, ~Copyable {
   let p: UnsafeRawPointer
   let i: Int
-  
+
   @lifetime(borrow p)
   init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p

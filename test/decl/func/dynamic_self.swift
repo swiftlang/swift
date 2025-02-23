@@ -113,7 +113,7 @@ class X {
   func produceX() -> X { }
 }
 
-class Y : X { 
+class Y : X {
   func produceY() -> Y { }
 }
 
@@ -169,7 +169,7 @@ class GX<T> {
   func produceGX() -> GX { }
 }
 
-class GY<T> : GX<[T]> { 
+class GY<T> : GX<[T]> {
   func produceGY() -> GY { }
 }
 
@@ -217,7 +217,7 @@ func testCurryInstanceMethodSelfGeneric() {
 
 // ----------------------------------------------------------------------------
 // Overriding a method with a Self
-class Z : Y { 
+class Z : Y {
   override func instance() -> Self {
   }
 

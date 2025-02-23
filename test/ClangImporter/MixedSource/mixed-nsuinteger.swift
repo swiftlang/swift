@@ -14,7 +14,7 @@ var pp: AutoreleasingUnsafeMutablePointer<AnyObject?>?
 
 var userTypedObj = NSUIntTest()
 
-// Check that the NSUInteger comes across as UInt from user Obj C modules. 
+// Check that the NSUInteger comes across as UInt from user Obj C modules.
 var ur: UInt = userTypedObj.myCustomMethodThatOperates(onNSUIntegers: ui)
 
 userTypedObj.intProp = ui

@@ -627,7 +627,7 @@ static uint64_t getYieldTypesHash(IRGenModule &IGM, CanSILFunctionType type) {
     out << ":";
   }
 
-  return clang::CodeGen::computeStableStringHash(out.str());  
+  return clang::CodeGen::computeStableStringHash(out.str());
 }
 
 llvm::ConstantInt *
@@ -651,12 +651,12 @@ PointerAuthEntity::getTypeDiscriminator(IRGenModule &IGM) const {
       cache = getDiscriminatorForHash(IGM, hash);
       return cache;
     }
-    
+
     // C function pointers are undiscriminated.
     case SILFunctionTypeRepresentation::CXXMethod:
     case SILFunctionTypeRepresentation::CFunctionPointer:
       return llvm::ConstantInt::get(IGM.Int64Ty, 0);
-      
+
     case SILFunctionTypeRepresentation::ObjCMethod:
     case SILFunctionTypeRepresentation::Block: {
       llvm_unreachable("not type discriminated");

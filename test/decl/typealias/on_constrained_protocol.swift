@@ -3,10 +3,10 @@
 // typealias on constrained extension
 
 protocol ConstrainedTypealias {
-  associatedtype MyAssocType	
+  associatedtype MyAssocType
 }
 extension ConstrainedTypealias where MyAssocType == String { // expected-note {{requirement specified as 'Self.MyAssocType' == 'String' [with Self = Self]}} (from useConstrainedTypealiasInExtension)
-  typealias Content = String 
+  typealias Content = String
 }
 extension ConstrainedTypealias where MyAssocType == Int {
   func useConstrainedTypealiasInExtension() -> Content {} // expected-error {{'Self.Content' (aka 'String') requires the types 'Int' and 'String' be equivalent}}

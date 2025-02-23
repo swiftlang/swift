@@ -51,7 +51,7 @@ protocol MyNewerProtocol {}
 @available(*, unavailable, renamed: "MyNewerProtocol")
 protocol MyOlderProtocol {} // expected-note {{'MyOlderProtocol' has been explicitly marked unavailable here}}
 
-extension Int: MyOlderProtocol {} // expected-error {{'MyOlderProtocol' has been renamed to 'MyNewerProtocol'}} 
+extension Int: MyOlderProtocol {} // expected-error {{'MyOlderProtocol' has been renamed to 'MyNewerProtocol'}}
 
 struct MyCollection<Element> {
   @available(*, unavailable, renamed: "Element")
@@ -288,7 +288,7 @@ func someFuncUsingOldAttribute() { }
 
 
 // <rdar://problem/23853709> Compiler crash on call to unavailable "print"
-@available(*, unavailable, message: "Please use the 'to' label for the target stream: 'print((...), to: &...)'")		
+@available(*, unavailable, message: "Please use the 'to' label for the target stream: 'print((...), to: &...)'")
 func print<T>(_: T, _: inout TextOutputStream) {} // expected-note {{}}
 func TextOutputStreamTest(message: String, to: inout TextOutputStream) {
   print(message, &to)  // expected-error {{'print' is unavailable: Please use the 'to' label for the target stream: 'print((...), to: &...)'}}
@@ -602,7 +602,7 @@ func testOperators() {
 
   ***nil // expected-error {{'***' has been renamed to 'add'}} {{none}}
   ***0 // expected-error {{'***' has been replaced by instance method 'Int.foo()'}} {{none}}
-  
+
   nil*** // expected-error {{'***' has been renamed to 'add'}} {{none}}
   0*** // expected-error {{'***' has been replaced by instance method 'Int.foo()'}} {{none}}
 }
@@ -1256,7 +1256,7 @@ func testMultipleTrailingClosures(_ x: TypeWithTrailingClosures) {
   x.variadicTrailingClosures() {} _: {} _: {}
 }
 
-struct UnavailableSubscripts { 
+struct UnavailableSubscripts {
   @available(*, unavailable, renamed: "subscript(new:)")
   subscript(old index: Int) -> Int { 3 } // expected-note * {{'subscript(old:)' has been explicitly marked unavailable here}}
   @available(*, unavailable, renamed: "subscript(new:)")
@@ -1283,7 +1283,7 @@ struct UnavailableSubscripts {
   subscript(to to: Int) -> Int { 3 }
   func subscriptTo(_ index: Int) -> Int { 3 }
 
-  func testUnavailableSubscripts(_ x: UnavailableSubscripts) { 
+  func testUnavailableSubscripts(_ x: UnavailableSubscripts) {
     _ = self[old: 3] // expected-error {{'subscript(old:)' has been renamed to 'subscript(new:)'}} {{14-17=new}}
     _ = x[old: 3] // expected-error {{'subscript(old:)' has been renamed to 'subscript(new:)'}} {{11-14=new}}
 

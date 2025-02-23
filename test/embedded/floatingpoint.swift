@@ -12,7 +12,7 @@
 @inline(never)
 func testLiteral() -> Double {
   return Double(1)
-} 
+}
 
 @main
 struct Main {

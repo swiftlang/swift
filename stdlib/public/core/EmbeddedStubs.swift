@@ -44,12 +44,12 @@ public struct KeyedDecodingContainer<K: CodingKey> { }
 public struct KeyedEncodingContainer<K: CodingKey> { }
 
 @_unavailableInEmbedded
-public protocol UnkeyedDecodingContainer { 
+public protocol UnkeyedDecodingContainer {
   mutating func decode<T>(_ type: T.Type) throws -> T
 }
 
 @_unavailableInEmbedded
-public protocol UnkeyedEncodingContainer { 
+public protocol UnkeyedEncodingContainer {
   mutating func encode<T>(_ value: T) throws
 }
 

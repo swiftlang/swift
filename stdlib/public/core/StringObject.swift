@@ -108,7 +108,7 @@ internal struct _StringObject {
   }
 
 #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
- 
+
   @usableFromInline @frozen
   internal enum Variant {
     case immortal(UInt)
@@ -438,7 +438,7 @@ extension _StringObject.Nibbles {
   internal static func largeCocoa(providesFastUTF8: Bool) -> UInt64 {
     return providesFastUTF8 ? 0x4000_0000_0000_0000 : 0x5000_0000_0000_0000
   }
-  
+
   internal static func largeFastImmortalCocoa() -> UInt64 {
     0xC000_0000_0000_0000
   }
@@ -559,7 +559,7 @@ extension _StringObject {
     return (discriminatedObjectRawBits & 0x4000_0000_0000_0000) != 0
 #endif
   }
-  
+
   @inline(__always)
   internal var largeFastIsConstantCocoa: Bool {
 #if os(Android) && arch(arm64)
@@ -1319,7 +1319,7 @@ extension _StringObject {
 #error("Unknown platform")
 #endif
   }
-  
+
   @_unavailableInEmbedded
   internal init(
     constantCocoa cocoa: AnyObject,

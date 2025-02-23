@@ -50,7 +50,7 @@ extension Int : _ObjectiveCBridgeable {
     return NSNumber()
   }
   public static func _forceBridgeFromObjectiveC(
-    _ x: NSNumber, 
+    _ x: NSNumber,
     result: inout Int?
   ) {
   }
@@ -72,7 +72,7 @@ extension Bool: _ObjectiveCBridgeable {
     return NSNumber()
   }
   public static func _forceBridgeFromObjectiveC(
-    _ x: NSNumber, 
+    _ x: NSNumber,
     result: inout Bool?
   ) {
   }
@@ -188,7 +188,7 @@ extension NSRange : _ObjectiveCBridgeable {
   ) {
     result = x.rangeValue
   }
-  
+
   public static func _conditionallyBridgeFromObjectiveC(
     _ x: NSValue,
     result: inout NSRange?

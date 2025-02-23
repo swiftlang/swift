@@ -1020,7 +1020,7 @@ struct WrapperRequiresP<T: P> {
 
 struct UsesWrapperRequiringP {
   // expected-note@-1{{in declaration of}}
-  
+
   @WrapperRequiresP var x.: UsesWrapperRequiringP
   // expected-error@-1{{expected member name following '.'}}
   // expected-error@-2{{expected declaration}}
@@ -1094,7 +1094,7 @@ struct Test52969503 {
 }
 
 
-// 
+//
 // ---------------------------------------------------------------------------
 // Property wrapper composition
 // ---------------------------------------------------------------------------
@@ -1270,7 +1270,7 @@ struct Bar<T, V> {
 @propertyWrapper
 struct Baz<T> {
   var wrappedValue: T
-  
+
   func onPropertyWrapper() {}
 
   var projectedValue: V {
@@ -1296,7 +1296,7 @@ struct MissingPropertyWrapperUnwrap {
   @Bar<Int, Bool> var y: Int
   @Bar<Int, String> var z: Int
   @Baz var usesProjectedValue: W
-  
+
   func a<T>(_: Foo<T>) {}
   func a<T>(named: Foo<T>) {}
   func b(_: Foo<Int>) {}
@@ -1320,7 +1320,7 @@ struct MissingPropertyWrapperUnwrap {
     self.usesProjectedValue.onProjectedValue() // expected-error {{referencing instance method 'onProjectedValue()' requires wrapper 'V'}}{{10-10=$}}
     self.$usesProjectedValue.onWrapped() // expected-error {{referencing instance method 'onWrapped()' requires wrapped value of type 'W'}}{{10-11=}}
     self._usesProjectedValue.onWrapped() // expected-error {{referencing instance method 'onWrapped()' requires wrapped value of type 'W'}}{{10-11=}}
-    
+
     a(self.w) // expected-error {{cannot convert value 'w' of type 'W' to expected type 'Foo<W>', use wrapper instead}}{{12-12=_}}
     b(self.x) // expected-error {{cannot convert value 'x' of type 'Int' to expected type 'Foo<Int>', use wrapper instead}}{{12-12=_}}
     b(self.w) // expected-error {{cannot convert value of type 'W' to expected argument type 'Foo<Int>'}}
@@ -1578,7 +1578,7 @@ struct AllCompositionsStruct {
   var mgms_mgms: Int
 
   func readonlyContext(x: Int) { // expected-note *{{}}
-    _ = ngxs_ngxs 
+    _ = ngxs_ngxs
     // _ = ngxs_mgxs
     _ = ngxs_ngns
     // _ = ngxs_mgns
@@ -1668,7 +1668,7 @@ struct AllCompositionsStruct {
   }
 
   mutating func mutatingContext(x: Int) {
-    _ = ngxs_ngxs 
+    _ = ngxs_ngxs
     // _ = ngxs_mgxs
     _ = ngxs_ngns
     // _ = ngxs_mgns
@@ -1885,7 +1885,7 @@ struct NonMutatingProjectedValueSetWrapper<Value> {
   var wrappedValue: Value
   var projectedValue: Value {
     get { wrappedValue }
-    nonmutating set { } 
+    nonmutating set { }
   }
 }
 

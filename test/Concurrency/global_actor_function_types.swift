@@ -398,7 +398,7 @@ func test_global_actor_mismatch() {
   // expected-error@-1{{cannot convert type actor-isolated to 'GAB' to type actor-isolated to 'MainActor' at tuple element '#1'}}
 
   f(true ? z : y) // expected-error{{result values in '? :' expression are functions isolated to different actors ('GAB' vs. 'GA')}}
-  
+
   func g<T> ( _ fn: @escaping @GA () -> T) {
     let _: @MainActor () -> T = fn // expected-error{{cannot convert value actor-isolated to 'GA' to specified type actor-isolated to 'MainActor'}}
   }

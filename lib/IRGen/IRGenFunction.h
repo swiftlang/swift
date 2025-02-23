@@ -49,7 +49,7 @@ namespace swift {
 namespace Lowering {
   class TypeConverter;
 }
-  
+
 namespace irgen {
   class DynamicMetadataRequest;
   class Explosion;
@@ -105,7 +105,7 @@ public:
                         bool isOutlined, bool mayPeepholeLoad = false,
                         SILType errorType = {});
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
-  
+
   void emitBBForReturn();
   bool emitBranchToReturnBB();
 
@@ -164,7 +164,7 @@ public:
   }
 
   SmallVector<llvm::Value *, 1> coroutineResults;
-  
+
   void setCoroutineExitBlock(llvm::BasicBlock *block) {
     assert(CoroutineExitBlock == nullptr && "already set exit BB");
     assert(block != nullptr && "setting a null exit BB");
@@ -344,7 +344,7 @@ public:
                                 const llvm::Twine &name ="");
   void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size,
                           llvm::Value *alignMask);
-  
+
   void emitAllocBoxCall(llvm::Value *typeMetadata,
                          llvm::Value *&box,
                          llvm::Value *&valueAddress);
@@ -416,7 +416,7 @@ public:
                                         DynamicMetadataRequest request,
                                         llvm::Value **metadataSlot = nullptr);
   llvm::Value *emitValueWitnessTableRefForMetadata(llvm::Value *metadata);
-  
+
   llvm::Value *emitValueWitnessValue(SILType type, ValueWitness index);
   FunctionPointer emitValueWitnessFunctionRef(SILType type,
                                               llvm::Value *&metadataSlot,
@@ -869,7 +869,7 @@ private:
   DominanceResolverFunction DominanceResolver = nullptr;
   DominancePoint ActiveDominancePoint = DominancePoint::universal();
   ConditionalDominanceScope *ConditionalDominance = nullptr;
-  
+
   /// The value that satisfies metadata lookups for DynamicSelfType.
   llvm::Value *SelfValue = nullptr;
   /// If set, the dynamic Self type is assumed to be equivalent to this exact class.

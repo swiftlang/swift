@@ -45,7 +45,7 @@ func testAmbiguousStringComparisons(s: String) {
   let a10 = nsString <= s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
   let a11 = nsString >= s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
   let a12 = nsString > s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
-  
+
   // Shouldn't suggest 'as' in a pattern-matching context, as opposed to all these other situations
   if case nsString = "" {} // expected-error{{expression pattern of type 'NSString' cannot match values of type 'String'}}
 }
@@ -70,10 +70,10 @@ func acceptsRandomAccessCollection<C: RandomAccessCollection>(_: C) {}
 
 func testStringCollectionTypes(s: String) {
   acceptsCollection(s.utf8)
-  acceptsBidirectionalCollection(s.utf8) 
+  acceptsBidirectionalCollection(s.utf8)
   acceptsRandomAccessCollection(s.utf8) // expected-error{{global function 'acceptsRandomAccessCollection' requires that 'String.UTF8View' conform to 'RandomAccessCollection'}}
 
-  acceptsCollection(s.utf16) 
+  acceptsCollection(s.utf16)
   acceptsBidirectionalCollection(s.utf16)
   acceptsRandomAccessCollection(s.utf16) // expected-error{{global function 'acceptsRandomAccessCollection' requires that 'String.UTF16View' conform to 'RandomAccessCollection'}}
 

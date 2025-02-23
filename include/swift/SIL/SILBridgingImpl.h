@@ -751,7 +751,7 @@ BridgedStringRef BridgedFunction::getName() const {
 }
 
 BridgedLocation BridgedFunction::getLocation() const {
-  return {swift::SILDebugLocation(getFunction()->getLocation(), getFunction()->getDebugScope())}; 
+  return {swift::SILDebugLocation(getFunction()->getLocation(), getFunction()->getDebugScope())};
 }
 
 bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(); }
@@ -2211,23 +2211,23 @@ BridgedInstruction BridgedBuilder::createThinToThickFunction(BridgedValue fn, Br
                                                 resultType.unbridged())};
 }
 
-BridgedInstruction BridgedBuilder::createPartialApply(BridgedValue funcRef, 
+BridgedInstruction BridgedBuilder::createPartialApply(BridgedValue funcRef,
                                                       BridgedValueArray bridgedCapturedArgs,
                                                       BridgedArgumentConvention calleeConvention,
                                                       BridgedSubstitutionMap bridgedSubstitutionMap,
                                                       bool hasUnknownIsolation,
                                                       bool isOnStack) const {
-  llvm::SmallVector<swift::SILValue, 8> capturedArgs;                                        
+  llvm::SmallVector<swift::SILValue, 8> capturedArgs;
   return {unbridged().createPartialApply(
-    regularLoc(), 
-    funcRef.getSILValue(), 
+    regularLoc(),
+    funcRef.getSILValue(),
     bridgedSubstitutionMap.unbridged(),
-    bridgedCapturedArgs.getValues(capturedArgs), 
+    bridgedCapturedArgs.getValues(capturedArgs),
     getParameterConvention(calleeConvention),
     hasUnknownIsolation ? swift::SILFunctionTypeIsolation::Unknown : swift::SILFunctionTypeIsolation::Erased,
     isOnStack ? swift:: PartialApplyInst::OnStack : swift::PartialApplyInst::NotOnStack
   )};
-}                                                                                  
+}
 
 BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, BridgedValueArray arguments) const {
   llvm::SmallVector<swift::SILValue, 16> argValues;

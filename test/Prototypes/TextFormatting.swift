@@ -14,7 +14,7 @@ protocol CustomFormatted : CustomStringConvertible, CustomDebugStringConvertible
 
   associatedtype DebugRepresentation : TextOutputStreamable = String
   associatedtype PrintRepresentation : TextOutputStreamable = DebugRepresentation
-  
+
   /// Produce a textual representation for the REPL and
   /// Debugger.
   ///
@@ -54,7 +54,7 @@ extension CustomFormatted {
   public var description: String {
     return _description
   }
-  
+
   public var debugDescription: String {
     return _debugDescription
   }
@@ -66,7 +66,7 @@ extension CustomFormatted {
     x.format().write(to: &result)
     return result
   }
-  
+
   var _debugDescription: String {
     var result = ""
     x.debugFormat().write(to: &result)
@@ -123,7 +123,7 @@ extension Integer {
     var n = i
     self = 0
     if n == 0 { return }
-    
+
     if n < 0 {
       self -= 1 as Self
     }
@@ -163,7 +163,7 @@ extension CustomFormatted where Self : Integer {
   func debugFormat() -> IntegerFormat<Self> {
     return format(radix: 10)
   }
-  
+
   func format(
     radix: Int = 10, fill: String = " ", width: Int = 0
   ) -> IntegerFormat<Self> {
@@ -179,7 +179,7 @@ public struct IntegerFormat<T: Integer> : TextOutputStreamable {
     self.fill = fill
     self.width = width
   }
-  
+
   private var value: T
   private var radix: T, fill: String, width: Int
 
@@ -194,7 +194,7 @@ public struct IntegerFormat<T: Integer> : TextOutputStreamable {
     let nDigits = _writePositive(rest, &stream)
     let digit = UInt32(value % radix)
     let baseCharOrd : UInt32 = digit <= 9
-      ? UnicodeScalar("0").value 
+      ? UnicodeScalar("0").value
       : UnicodeScalar("A").value - 10
     stream.write(String(UnicodeScalar(baseCharOrd + digit)!))
     return nDigits + 1
@@ -235,7 +235,7 @@ extension UInt : CustomFormatted {}
 /// - Note: This is just for the benefit of the tests
 struct Delimited<T: TextOutputStreamable> : TextOutputStreamable {
   var base: T
-  
+
   func write<S: TextOutputStream>(to output: inout S) {
     "|".write(to: &output)
     base.write(to: &output)

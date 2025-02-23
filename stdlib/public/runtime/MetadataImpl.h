@@ -100,7 +100,7 @@ struct NativeBox {
   static void destroy(T *value) {
     value->T::~T();
   }
-  
+
   static T *initializeWithCopy(T *dest, T *src) {
     return ::new (dest) T(*src);
   }
@@ -110,7 +110,7 @@ struct NativeBox {
     src->T::~T();
     return result;
   }
-  
+
   static T *assignWithCopy(T *dest, T *src) {
     *dest = *src;
     return dest;
@@ -159,7 +159,7 @@ template <class Impl, class T> struct RetainableBoxBase {
     *dest = *src;
     return dest;
   }
-  
+
   static T *assignWithCopy(T *dest, T *src) {
     T oldValue = *dest;
     *dest = Impl::retain(*src);
@@ -419,7 +419,7 @@ struct BridgeObjectBox :
     swift_bridgeObjectRelease(obj);
   }
 };
-  
+
 /// A box implementation class for unmanaged, pointer-aligned pointers.
 /// Metatype values have this layout.
 struct PointerPointerBox : NativeBox<void**> {
@@ -578,7 +578,7 @@ struct AggregateBox {
   static char *initializeWithTake(char *dest, char *src) {
     return Helper::initializeWithTake(dest, src);
   }
-    
+
   static char *assignWithCopy(char *dest, char *src) {
     return Helper::assignWithCopy(dest, src);
   }
@@ -587,7 +587,7 @@ struct AggregateBox {
     return Helper::assignWithTake(dest, src);
   }
 };
-  
+
 /// A template for using the Swift allocation APIs with a known size
 /// and alignment.
 template <size_t Size, size_t Alignment>
@@ -846,21 +846,21 @@ struct NonFixedValueWitnesses :
   static void destroy(OpaqueValue *value, const Metadata *self) {
     return Box::destroy((typename Box::type*) value, self);
   }
-  
+
   static OpaqueValue *initializeWithCopy(OpaqueValue *dest, OpaqueValue *src,
                                          const Metadata *self) {
     return (OpaqueValue*) Box::initializeWithCopy((typename Box::type*) dest,
                                                   (typename Box::type*) src,
                                                   self);
   }
-  
+
   static OpaqueValue *initializeWithTake(OpaqueValue *dest, OpaqueValue *src,
                                          const Metadata *self) {
     return (OpaqueValue*) Box::initializeWithTake((typename Box::type*) dest,
                                                   (typename Box::type*) src,
                                                   self);
   }
-  
+
   static OpaqueValue *assignWithCopy(OpaqueValue *dest, OpaqueValue *src,
                                      const Metadata *self) {
     return (OpaqueValue*) Box::assignWithCopy((typename Box::type*) dest,

@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
@@ -335,7 +335,7 @@ struct WrapperWithDefaultInit<Value> {
   init() {
     print("default init called on \(Value.self)")
   }
-  
+
   var wrappedValue: Value {
     get {
       return _value!
@@ -475,7 +475,7 @@ func testWrapperInitWithDefaultArg() {
   // CHECK: ## InitWithDefaultArg
   print("\n## InitWithDefaultArg")
   let use = S()
-  
+
   use.foo1()
   use.foo2()
   // CHECK-NEXT: DefaultParamInit

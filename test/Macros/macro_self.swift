@@ -15,7 +15,7 @@ func testSelfAsFreestandingMacro() {
 func testCapitalSelfAsFreestandingMacro() {
   _ = #Self
 }
- 
+
 func testSelfAsAttachedMacro() {
   @self // expected-error {{expected expression}}
   struct Foo {}

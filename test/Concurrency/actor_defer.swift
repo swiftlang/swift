@@ -128,7 +128,7 @@ actor Actor {
     }
     doSomething()
   }
-  
+
   func testGlobalActor_task_positive() {
     Task { @MainActor in
       defer { requiresMainActor() }

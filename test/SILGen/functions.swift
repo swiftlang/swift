@@ -48,7 +48,7 @@ class SomeClass {
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : @owned $SomeClass):
   init(x:Int, y:Int) {}
 
-  // CHECK-LABEL: sil hidden [ossa] @$s9functions9SomeClassC6method{{[_0-9a-zA-Z]*}}F : $@convention(method) (Builtin.Int64, @guaranteed SomeClass) -> () 
+  // CHECK-LABEL: sil hidden [ossa] @$s9functions9SomeClassC6method{{[_0-9a-zA-Z]*}}F : $@convention(method) (Builtin.Int64, @guaranteed SomeClass) -> ()
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : @guaranteed $SomeClass):
   func method(_ x: Int) {}
 
@@ -172,7 +172,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   SomeClass.method(c)(i)
 
   // -- Curry the Type onto static method argument lists.
-  
+
   // CHECK: [[READC:%.*]] = begin_access [read] [unknown] [[CADDR]]
   // CHECK: [[C:%[0-9]+]] = load [copy] [[READC]]
   // CHECK: [[META:%.*]] = value_metatype $@thick SomeClass.Type, [[C]]

@@ -37,7 +37,7 @@ func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   sc.methodG(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' must be unwrapped}}
   // expected-note@-1{{coalesce}}
   // expected-note@-2{{force-unwrap}}
-  sc.methodG(sc, second: osc) 
+  sc.methodG(sc, second: osc)
 
   let ci: CInt = 1
   let sc2 = SomeClass(int: ci)

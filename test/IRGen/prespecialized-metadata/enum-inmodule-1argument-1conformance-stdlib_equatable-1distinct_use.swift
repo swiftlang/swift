@@ -28,10 +28,10 @@ doit()
 // CHECK: ; Function Attrs: noinline nounwind memory(none)
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, ptr %1, ptr %2) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK:      call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
-// CHECK-SAME:     [[INT]] %0, 
-// CHECK-SAME:     ptr %1, 
-// CHECK-SAME:     ptr %2, 
-// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     [[INT]] %0,
+// CHECK-SAME:     ptr %1,
+// CHECK-SAME:     ptr %2,
+// CHECK-SAME:     ptr undef,
 // CHECK-SAME:     $s4main5ValueOMn
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

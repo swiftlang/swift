@@ -33,7 +33,7 @@ public class ClassWithResilientField {
 }
 
 if #available(macOS 10.14.4, iOS 12.2, tvOS 12.2, watchOS 5.2, *) {
-  ClassTestSuite.test("RealizeResilientClass") {  
+  ClassTestSuite.test("RealizeResilientClass") {
     print("Nothing to test. We have the new Objective-C runtime.")
     forceMetadata()
   }

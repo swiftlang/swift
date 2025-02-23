@@ -32,7 +32,7 @@ import gizmo
 
   // Bridging dictionary results
   // CHECK-LABEL: sil private [thunk] [ossa] @$s24objc_dictionary_bridging3FooC24bridge_Dictionary_result{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
-  @objc func bridge_Dictionary_result() -> Dictionary<Foo, Foo> { 
+  @objc func bridge_Dictionary_result() -> Dictionary<Foo, Foo> {
     // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]

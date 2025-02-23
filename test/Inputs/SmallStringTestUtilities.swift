@@ -68,7 +68,7 @@ extension _SmallString {
     self.init(str._guts._object)
   }
 
- 
+
 #if _runtime(_ObjC)
   init?(_cocoaString ns: NSString) {
 #if _pointerBitWidth(_32)

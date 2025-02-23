@@ -164,9 +164,9 @@ class Foo {
     autoclosure(testMagicLiterals())
     return x
   }
- 
+
   // CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ
-  // CHECK:         string_literal utf8 "Foo" 
+  // CHECK:         string_literal utf8 "Foo"
   static let x = Foo(int:0)
 
 }
@@ -250,7 +250,7 @@ class ReabstractDefaultArgument<T> {
 // CHECK-NEXT: [[CONV_FN_0:%.*]] = convert_function [[FN]]
 // CHECK-NEXT: [[CONV_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CONV_FN_0]]
 // CHECK: [[INITFN:%[0-9]+]] = function_ref @$s17default_arguments25ReabstractDefaultArgumentC{{[_0-9a-zA-Z]*}}fC
-// CHECK-NEXT: apply [[INITFN]]<Int>([[CONV_FN]], 
+// CHECK-NEXT: apply [[INITFN]]<Int>([[CONV_FN]],
 
 func testDefaultArgumentReabstraction() {
   _ = ReabstractDefaultArgument<Int>()

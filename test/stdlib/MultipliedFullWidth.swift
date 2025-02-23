@@ -33,25 +33,25 @@ func specialValues<T: FixedWidthInteger & SignedInteger>(_ type: T.Type) {
   testCase(T.min,  0,   high: 0, low: 0)
   testCase(T.min,  1,   high: -1, low: umin)
   testCase(T.min, .max, high: .min >> 1, low: umin)
-  
+
   testCase(T(-1), .min, high: 0, low: umin)
   testCase(T(-1), -1,   high: 0, low: 1)
   testCase(T(-1),  0,   high: 0, low: 0)
   testCase(T(-1),  1,   high: -1, low: .max)
   testCase(T(-1), .max, high: -1, low: umin + 1)
-  
+
   testCase(T(0), .min, high: 0, low: 0)
   testCase(T(0), -1,   high: 0, low: 0)
   testCase(T(0),  0,   high: 0, low: 0)
   testCase(T(0),  1,   high: 0, low: 0)
   testCase(T(0), .max, high: 0, low: 0)
-  
+
   testCase(T(1), .min, high: -1, low: umin)
   testCase(T(1), -1,   high: -1, low: .max)
   testCase(T(1),  0,   high: 0, low: 0)
   testCase(T(1),  1,   high: 0, low: 1)
   testCase(T(1), .max, high: 0, low: .max >> 1)
-  
+
   testCase(T.max, .min, high: .min >> 1, low: umin)
   testCase(T.max, -1,   high: -1, low: umin + 1)
   testCase(T.max,  0,   high: 0, low: 0)
@@ -67,7 +67,7 @@ func specialValues<T: FixedWidthInteger & UnsignedInteger>(_ type: T.Type) {
   testCase(T(1),  0,   high: 0, low: 0)
   testCase(T(1),  1,   high: 0, low: 1)
   testCase(T(1), .max, high: 0, low: .max)
-  
+
   testCase(T.max,  0,   high: 0, low: 0)
   testCase(T.max,  1,   high: 0, low: .max)
   testCase(T.max, .max, high: .max-1, low: 1)
@@ -79,7 +79,7 @@ tests.test("Special Values") {
   specialValues(Int32.self)
   specialValues(Int16.self)
   specialValues(Int8.self)
-  
+
   specialValues(UInt.self)
   specialValues(UInt64.self)
   specialValues(UInt32.self)
@@ -106,7 +106,7 @@ tests.test("Random Values") {
   testCase(Int64(-252886279681789793), 1113918432442210295, high: -15270699648874904, low: 4582052466224525929)
   testCase(Int64(-7821806154093904666), -678157520322455918, high: 287553003647030877, low: 6476241133902266156)
   testCase(Int64(-7739162216163589826), 3946867172269483361, high: -1655871907247741938, low: 13863106094322986622)
-  
+
   testCase(UInt64(4052776605025255999), 17841868768407320997, high: 3919884617339462744, low: 486827993115916699)
   testCase(UInt64(6242835766066895539), 14960190906716810460, high: 5062899690398282642, low: 14718350117826688468)
   testCase(UInt64(17427627038899386484), 13127734187148388607, high: 12402473540330496943, low: 11581729162526677900)

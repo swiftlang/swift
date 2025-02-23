@@ -1,4 +1,4 @@
-// REQUIRES: VENDOR=apple 
+// REQUIRES: VENDOR=apple
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
@@ -7,7 +7,7 @@
 // RUN:  -emit-module -emit-module-path %t/Utils.swiftmodule \
 // RUN:  -emit-tbd -emit-tbd-path %t/libUtils.tbd -Xfrontend -tbd-install_name=%t/libUtils.dylib -Xfrontend -validate-tbd-against-ir=all
 
-// RUN: %llvm-nm %t/libUtils.tbd | %FileCheck %s --check-prefix CHECK-TBD 
+// RUN: %llvm-nm %t/libUtils.tbd | %FileCheck %s --check-prefix CHECK-TBD
 // CHECK-TBD-NOT: $s5Utils6pubBar3argS2i_tFfA_
 // CHECK-TBD-NOT: $s5Utils11internalBar3argS2i_tF
 // CHECK-TBD-NOT: $s5Utils11internalBar3argS2i_tFfA_
@@ -25,7 +25,7 @@
 // RUN:  -enable-testing -Xfrontend -validate-tbd-against-ir=all
 
 
-// RUN: %llvm-nm %t/libUtilsForTesting.tbd | %FileCheck %s --check-prefix CHECK-TEST 
+// RUN: %llvm-nm %t/libUtilsForTesting.tbd | %FileCheck %s --check-prefix CHECK-TEST
 // CHECK-TEST-NOT: $s15UtilsForTesting6pubBar3argS2i_tFfA_
 // CHECK-TEST: $s15UtilsForTesting11internalBar3argS2i_tF
 // CHECK-TEST: $s15UtilsForTesting11internalBar3argS2i_tFfA_

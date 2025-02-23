@@ -45,7 +45,7 @@ public func equality() {
     // CHECK-SAME:   ptr noalias {{[^,]*}},
     // CHECK-SAME:   ptr getelementptr inbounds (
     // CHECK-SAME:     %swift.full_type,
-    // CHECK-SAME:     ptr @"$s30synthesized_conformance_future6StructVySiGMf", 
+    // CHECK-SAME:     ptr @"$s30synthesized_conformance_future6StructVySiGMf",
     // CHECK-SAME:     i32 0,
     // CHECK-SAME:     i32 2
     // CHECK-SAME:   ),
@@ -54,13 +54,13 @@ public func equality() {
     doEquality(Struct(x: 1))
     // CHECK: [[Enum_Equatable:%.*]] = call ptr @"$s30synthesized_conformance_future4EnumOySiGACyxGSQAASQRzlWl"()
     // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future10doEqualityyyxSQRzlF"(
-    // CHECK-SAME:   ptr noalias {{%[^,]+}}, 
+    // CHECK-SAME:   ptr noalias {{%[^,]+}},
     // CHECK-SAME:   ptr getelementptr inbounds (
     // CHECK-SAME:     %swift.full_type,
     // CHECK-SAME:     ptr @"$s30synthesized_conformance_future4EnumOySiGMf",
     // CHECK-SAME:     i32 0,
     // CHECK-SAME:     i32 2
-    // CHECK-SAME:   ), 
+    // CHECK-SAME:   ),
     // CHECK-SAME:   ptr [[Enum_Equatable]]
     // CHECK-SAME: )
     doEquality(Enum.a(1))
@@ -71,13 +71,13 @@ func doEncodable<T: Encodable>(_: T) {}
 public func encodable() {
     // CHECK: [[Struct_Encodable:%.*]] = call ptr @"$s30synthesized_conformance_future6StructVySiGACyxGSEAASeRzSERzlWl"()
     // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future11doEncodableyyxSERzlF"(
-    // CHECK-SAME:   ptr noalias {{[^,]*}}, 
+    // CHECK-SAME:   ptr noalias {{[^,]*}},
     // CHECK-SAME:   ptr getelementptr inbounds (
     // CHECK-SAME:     %swift.full_type,
-    // CHECK-SAME:     ptr @"$s30synthesized_conformance_future6StructVySiGMf", 
-    // CHECK-SAME:     i32 0, 
+    // CHECK-SAME:     ptr @"$s30synthesized_conformance_future6StructVySiGMf",
+    // CHECK-SAME:     i32 0,
     // CHECK-SAME:     i32 2
-    // CHECK-SAME:   ), 
+    // CHECK-SAME:   ),
     // CHECK-SAME:   ptr [[Struct_Encodable]]
     // CHECK-SAME: )
     doEncodable(Struct(x: 1))

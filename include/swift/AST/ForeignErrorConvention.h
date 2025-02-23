@@ -87,7 +87,7 @@ public:
     }
   };
 
-private:  
+private:
   Info info;
 
   /// The error parameter type.  This is currently assumed to be an

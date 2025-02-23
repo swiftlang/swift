@@ -35,7 +35,7 @@ let _: Q.Type = type(of: Q())
 let _: Q.Type = Swift.type(of: Q())
 let _: R = Swift.type(of: Q()) // expected-error{{}}
 let _: Q.Type = main.type(of: Q()) // expected-error{{}}
-let _: R = main.type(of: Q()) 
+let _: R = main.type(of: Q())
 
 // Let's make sure that binding of the left-hand side
 // of the dynamic-type-of constraint is not attempted.

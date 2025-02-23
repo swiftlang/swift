@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift \ 
+// RUN: %target-typecheck-verify-swift \
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes
 
 // REQUIRES: swift_feature_SuppressedAssociatedTypes

@@ -228,7 +228,7 @@ func basicSubtyping(
   let _ = baseAndP2 as Derived //expected-error {{'any Base<Int> & P2' is not convertible to 'Derived'}}
   // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{21-23=as!}}
   let _ = baseAndP2 as? Derived
-  
+
   let _ = baseAndP2 as Derived & P3 // expected-error {{'any Base<Int> & P2' is not convertible to 'any Derived & P3'}}
   // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{21-23=as!}}
   let _ = baseAndP2 as? Derived & P3

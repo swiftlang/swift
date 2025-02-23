@@ -152,7 +152,7 @@ DispatchAPI.test("DispatchData.copyBytes") {
     expectEqual(destPtr[4], 0xFF)
     expectEqual(destPtr[5], 0xFF)
 
-    // Copy from offset 2, but only 1 byte. This copy is bounded within the 
+    // Copy from offset 2, but only 1 byte. This copy is bounded within the
     // first region.
     destPtr[1] = 0xFF
     destPtr[2] = 0xFF
@@ -277,7 +277,7 @@ DispatchAPI.test("DispatchData.copyBytesUnsafeRawBufferPointer") {
     expectEqual(destPtr[4], 0xFF)
     expectEqual(destPtr[5], 0xFF)
 
-    // Copy from offset 2, but only 1 byte. This copy is bounded within the 
+    // Copy from offset 2, but only 1 byte. This copy is bounded within the
     // first region.
     destPtr[1] = 0xFF
     destPtr[2] = 0xFF

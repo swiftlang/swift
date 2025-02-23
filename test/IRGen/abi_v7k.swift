@@ -54,7 +54,7 @@ func addStack(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
 // V7K: vldr s0, [sp, #88]
 // V7K: vadd.f32 s0, s14, s0
 // a is assigned to s14, b is via stack, c is via stack since it can't be back-filled to s15
-func addStack2(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double, 
+func addStack2(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
                d5: Double, d6: Double, a: Float, b: Double, c: Float) -> Float {
   return a+c
 }
@@ -179,7 +179,7 @@ func testSingleP(x: SinglePayload) -> Double {
 // CHECK: [[T1:%[0-9]+]] = and i64 [[TEMP]], -4294967296
 // CHECK: [[RESULT:%[0-9]+]] = or i64 [[F1]], [[T1]]
 // CHECK: bitcast i64 [[RESULT]] to double
-// CHECK: sitofp i32 {{.*}} to double 
+// CHECK: sitofp i32 {{.*}} to double
 // CHECK: phi double [ 0.000000e+00, {{.*}} ]
 // CHECK: ret double
 // V7K-LABEL: _$s8test_v7k0A6MultiP

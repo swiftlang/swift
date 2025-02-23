@@ -1017,7 +1017,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // FIXME: @preconcurrency
   bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
   Type valueType =
-      getUnopenedTypeOfReference(varDecl, Type(), useDC, 
+      getUnopenedTypeOfReference(varDecl, Type(), useDC,
                                  getConstraintLocator(locator),
                                  wantInterfaceType);
 

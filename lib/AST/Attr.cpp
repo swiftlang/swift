@@ -1603,7 +1603,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *attr = cast<RawLayoutAttr>(this);
     Printer.printAttrName("@_rawLayout");
     Printer << "(";
-    
+
     if (auto sizeAndAlign = attr->getSizeAndAlignment()) {
       Printer << "size: " << sizeAndAlign->first
               << ", alignment: " << sizeAndAlign->second;
@@ -1945,8 +1945,8 @@ ObjCAttr *ObjCAttr::createUnnamedImplicit(ASTContext &Ctx) {
   return new (Ctx) ObjCAttr(std::nullopt, false);
 }
 
-ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
-                                  SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc,
+                                  SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                   SourceLoc NameLoc, Identifier Name,
                                   SourceLoc RParenLoc) {
   void *mem = Ctx.Allocate(totalSizeToAlloc<SourceLoc>(3), alignof(ObjCAttr));
@@ -1961,8 +1961,8 @@ ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, Identifier Name,
   return new (Ctx) ObjCAttr(ObjCSelector(Ctx, 0, Name), isNameImplicit);
 }
 
-ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc, 
-                                   SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc,
+                                   SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                    ArrayRef<SourceLoc> NameLocs,
                                    ArrayRef<Identifier> Names,
                                    SourceLoc RParenLoc) {
@@ -1975,10 +1975,10 @@ ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc,
                             NameLocs);
 }
 
-ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, 
+ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx,
                                    ArrayRef<Identifier> Names,
                                    bool isNameImplicit) {
-  return new (Ctx) ObjCAttr(ObjCSelector(Ctx, Names.size(), Names), 
+  return new (Ctx) ObjCAttr(ObjCSelector(Ctx, Names.size(), Names),
                             isNameImplicit);
 }
 
@@ -2483,8 +2483,8 @@ DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
                            IndexSubset *parameterIndices,
                            GenericSignature derivativeGenSig) {
   auto &ctx = original->getASTContext();
-  
-  size_t size = totalSizeToAlloc<ParsedAutoDiffParameter>(0); 
+
+  size_t size = totalSizeToAlloc<ParsedAutoDiffParameter>(0);
   void *mem = ctx.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
                                       diffKind, parameterIndices,

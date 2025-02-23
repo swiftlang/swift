@@ -4,9 +4,9 @@ import Builtin
 
 // CHECK-LABEL: sil @storeBytesBitwiseCopyable : {{.*}} {
 // CHECK:       bb0(
-// CHECK-SAME:      [[SELF:%[^,]+]] : $UnsafeMutableRawPointer, 
-// CHECK-SAME:      [[VALUE:%[^,]+]] : $*T, 
-// CHECK-SAME:      [[OFFSET:%[^,]+]] : $Int, 
+// CHECK-SAME:      [[SELF:%[^,]+]] : $UnsafeMutableRawPointer,
+// CHECK-SAME:      [[VALUE:%[^,]+]] : $*T,
+// CHECK-SAME:      [[OFFSET:%[^,]+]] : $Int,
 // CHECK-SAME:      {{%[^,]+}} : $@thick T.Type):
 // CHECK:         [[SELF_RAW_VALUE:%[^,]+]] = struct_extract [[SELF]] : {{.*}} #UnsafeMutableRawPointer._rawValue
 // CHECK:         [[OFFSET_VALUE:%[^,]+]] = struct_extract [[OFFSET]] : {{.*}} #Int._value

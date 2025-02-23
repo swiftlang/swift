@@ -9,7 +9,7 @@ protocol B {
   associatedtype Value
 
   var value: Value { get }
-  
+
   subscript<Subject>(dynamicMember dynamicMember: WritableKeyPath<Value, Subject>) -> Value { get }
 }
 
@@ -20,5 +20,5 @@ extension B {
 }
 
 struct Foo<Value>: B {
-  var value: Value  
+  var value: Value
 }

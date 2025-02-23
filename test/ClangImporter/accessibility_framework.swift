@@ -3,11 +3,11 @@
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
 
-// The accessibility APIs are handled differently. A class might conform to both 
-// NSAccessibility (containing accessibility properties) and individual 
-// accessibility protocols (containing accessibility methods with the same 
-// names as the properties). This should not compile. To avoid the problem, we 
-// import setters and getters instead of the accessibility properties from 
+// The accessibility APIs are handled differently. A class might conform to both
+// NSAccessibility (containing accessibility properties) and individual
+// accessibility protocols (containing accessibility methods with the same
+// names as the properties). This should not compile. To avoid the problem, we
+// import setters and getters instead of the accessibility properties from
 // NSAccessibility.
 //
 // radar://17509751

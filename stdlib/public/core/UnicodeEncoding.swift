@@ -13,7 +13,7 @@
 public protocol _UnicodeEncoding {
   /// The basic unit of encoding
   associatedtype CodeUnit: UnsignedInteger, FixedWidthInteger
-  
+
   /// A valid scalar value as represented in this encoding
   associatedtype EncodedScalar: BidirectionalCollection
     where EncodedScalar.Iterator.Element == CodeUnit
@@ -35,7 +35,7 @@ public protocol _UnicodeEncoding {
   /// Converts a scalar from another encoding's representation, returning
   /// `nil` if the scalar can't be represented in this encoding.
   ///
-  /// A default implementation of this method will be provided 
+  /// A default implementation of this method will be provided
   /// automatically for any conforming type that does not implement one.
   static func transcode<FromEncoding: Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
@@ -45,7 +45,7 @@ public protocol _UnicodeEncoding {
   /// `EncodedScalar`s.
   associatedtype ForwardParser: Unicode.Parser
     where ForwardParser.Encoding == Self
-  
+
   /// A type that can be used to parse a reversed sequence of
   /// `CodeUnits` into `EncodedScalar`s.
   associatedtype ReverseParser: Unicode.Parser

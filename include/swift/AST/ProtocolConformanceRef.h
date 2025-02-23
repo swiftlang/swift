@@ -148,7 +148,7 @@ public:
 
   /// Return the protocol requirement.
   ProtocolDecl *getRequirement() const;
-  
+
   /// Apply a substitution to the conforming type.
   ProtocolConformanceRef subst(Type origType, SubstitutionMap subMap,
                                SubstOptions options = std::nullopt) const;

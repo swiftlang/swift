@@ -3,7 +3,7 @@
 // 1. Make sure the wrapped property setter calls the observers
 // 2. Make sure the synthesized _modify coroutine calls the wrapped property setter
 
-@propertyWrapper 
+@propertyWrapper
 struct Foo {
   private var _storage: [Int] = []
 

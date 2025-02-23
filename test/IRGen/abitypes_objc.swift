@@ -125,7 +125,7 @@ class Foo {
 
   // Ensure that MyRect is passed as an indirect-byval on x86_64 because we run out of registers for direct arguments
   // x86_64-macosx: define internal float @"$s8abitypes3FooC25getXFromRectIndirectByVal{{[_0-9a-zA-Z]*}}FTo"(ptr %0, ptr %1, float %2, float %3, float %4, float %5, float %6, float %7, float %8, ptr byval({{.*}}) align 8 %9) {{[#0-9]*}} {
-  @objc dynamic func getXFromRectIndirectByVal(_: Float, second _: Float, 
+  @objc dynamic func getXFromRectIndirectByVal(_: Float, second _: Float,
                                        third _: Float, fourth _: Float,
                                        fifth _: Float, sixth _: Float,
                                        seventh _: Float, withRect r: MyRect)

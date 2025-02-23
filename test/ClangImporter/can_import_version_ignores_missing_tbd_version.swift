@@ -31,7 +31,7 @@ func canImportUnderlyingVersion() {
   // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for Clang module 'Simple'; version number ignored}}
   let b = 1 // expected-warning {{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
-  
+
 #if canImport(Simple, _underlyingVersion: 4) // expected-warning {{cannot find user version number for Clang module 'Simple'; version number ignored}}
   // TODO(ParserValidation): expected-warning@-1 *{{cannot find user version number for Clang module 'Simple'; version number ignored}}
   let c = 1 // expected-warning {{initialization of immutable value 'c' was never used; consider replacing with assignment to '_' or removing it}}
@@ -47,7 +47,7 @@ func canImportVersion() {
 #if canImport(Simple, _version: 3)
   let b = 1 // expected-warning {{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
-  
+
 #if canImport(Simple, _version: 4)
   let c = 1
 #endif

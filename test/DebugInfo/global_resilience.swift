@@ -49,7 +49,7 @@ let tuple = (Size(w: 1, h: 2), Size(w: 3, h: 4))
 // CHECK: ![[VAR_LARGE]] = distinct !DIGlobalVariable(
 // CHECK-SAME:            type: ![[LARGE_TY:[0-9]+]]
 // CHECK: ![[LARGE_TY]] = !DICompositeType(tag: DW_TAG_structure_type,
-// CHECK-SAME:            name: "$swift.fixedbuffer", 
+// CHECK-SAME:            name: "$swift.fixedbuffer",
 
 // CHECK: ![[TUPLE]] = !DIGlobalVariableExpression(
 // CHECK-SAME:            var: ![[VAR_TUPLE:[0-9]+]]
@@ -57,4 +57,4 @@ let tuple = (Size(w: 1, h: 2), Size(w: 3, h: 4))
 // CHECK: ![[VAR_TUPLE]] = distinct !DIGlobalVariable(
 // CHECK-SAME:            type: ![[TUPLE_TY:[0-9]+]]
 // CHECK: ![[TUPLE_TY]] = !DICompositeType(tag: DW_TAG_structure_type,
-// CHECK-SAME:            name: "$swift.fixedbuffer", 
+// CHECK-SAME:            name: "$swift.fixedbuffer",

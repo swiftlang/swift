@@ -88,7 +88,7 @@ private func optimizeOptionalBridging(forArgumentOf block: BasicBlock,
   guard let originalObjCValueSwitch = isOptionalBridging(of: swiftValue, isBridging: isBridgeToSwiftCall) else {
     return true
   }
-  
+
   let originalObjCValue = originalObjCValueSwitch.enumOp
   if finalObjCValue.type != originalObjCValue.type {
     return true
@@ -106,7 +106,7 @@ private func optimizeOptionalBridging(forArgumentOf block: BasicBlock,
 
   finalObjCValue.uses.replaceAll(with: replacement, context)
   block.eraseArgument(at: 0, context)
-  
+
   // The swift -> ObjC bridging call has no `readonly` attribute, therefore we have to
   // explicitly delete it. The ObjC -> swift call has such an attribute and will be removed
   // buy a later dead-code elimination pass.
@@ -121,7 +121,7 @@ private func optimizeOptionalBridging(forArgumentOf block: BasicBlock,
 /// Returns true if the pass should continue running.
 private func optimizeNonOptionalBridging(_ apply: ApplyInst,
                                          _ context: FunctionPassContext) -> Bool {
-                                              
+
   guard let bridgeToObjcCall = isBridgeToObjcCall(apply) else {
     return true
   }
@@ -147,7 +147,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
                                                      andMakeAvailableIn: bridgeToObjcCall.parentBlock,
                                                      context)
     let builder = Builder(before: bridgeToObjcCall, context)
-    
+
     // We know that it's the some-case.
     let replacement = builder.createUncheckedEnumData(enum: optionalReplacement,
                                                       caseIndex: someCase,
@@ -171,7 +171,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
 
   let originalObjCValue = bridgeToSwiftCall.arguments[0]
   let optionalObjCType = originalObjCValue.type
-  
+
   // The bridging functions from ObjC -> Swift take an optional argument and return a
   // non-optional Swift value. In the nil-case they return an empty (e.g. empty String,
   // empty Array, etc.) swift value.
@@ -215,7 +215,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
   someBuilder.createBranch(to: continueBlock, arguments: [forwardedValue])
 
   let s = continueBlock.addArgument(type: objCType, ownership: .owned, context)
-  
+
   // Now replace the bridged value with the original value in the destination block.
   let replacement = s.makeAvailable(in: bridgeToObjcCall.parentBlock, context)
   bridgeToObjcCall.replace(with: replacement, context)
@@ -232,7 +232,7 @@ private func removeBridgingCodeInPredecessors(of block: BasicBlock, _ context: F
     let branch = pred.terminator as! BranchInst
     let builder = Builder(atEndOf: branch.parentBlock, location: branch.location, context)
     builder.createBranch(to: block)
-    
+
     let en = branch.operands[0].value as! EnumInst
     context.erase(instruction: branch)
     let payload = en.payload
@@ -259,10 +259,10 @@ private func removeBridgingCodeInPredecessors(of block: BasicBlock, _ context: F
 /// ```
 private func isOptionalBridging(of value: Value, isBridging: (Value) -> ApplyInst?) -> SwitchEnumInst? {
   guard let phi = Phi(value) else { return nil }
-  
+
   var noneSwitch: SwitchEnumInst?
   var someSwitch: SwitchEnumInst?
-  
+
   // Check if one incoming value is the none-case and the other is the some-case.
   for incomingVal in phi.incomingValues {
     // In both branches, the result must be an `enum` which is passed to the
@@ -280,7 +280,7 @@ private func isOptionalBridging(of value: Value, isBridging: (Value) -> ApplyIns
         return nil
       }
       let callArgument = bridgingCall.arguments[0]
-      
+
       // If it's an ObjC -> Swift bridging call the argument is wrapped into an optional enum.
       if callArgument.type.isEnum {
         guard let sourceEnum = callArgument as? EnumInst,

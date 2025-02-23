@@ -232,7 +232,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///   - magnitudeOf: A value from which to use the magnitude. The result of
   ///     the initializer has the same magnitude as `magnitudeOf`.
   init(signOf: Self, magnitudeOf: Self)
-  
+
   /// Creates a new value, rounded to the closest possible representation.
   ///
   /// If two representable values are equally close, the result is the value
@@ -329,7 +329,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   static var greatestFiniteMagnitude: Self { get }
 
   /// The mathematical constant pi (π), approximately equal to 3.14159.
-  /// 
+  ///
   /// When measuring an angle in radians, π is equivalent to a half-turn.
   ///
   /// This value is rounded toward zero to keep user computations with angles
@@ -1961,7 +1961,7 @@ extension BinaryFloatingPoint {
     // We define exactness by equality after roundtripping; since NaN is never
     // equal to itself, it can never be converted exactly.
     if value.isNaN { return nil }
-    
+
     if (Source.exponentBitCount > Self.exponentBitCount
         || Source.significandBitCount > Self.significandBitCount)
       && value.isFinite && !value.isZero {
@@ -1980,10 +1980,10 @@ extension BinaryFloatingPoint {
         }
       }
     }
-    
+
     self = Self(value)
   }
-  
+
   @inlinable
   public func isTotallyOrdered(belowOrEqualTo other: Self) -> Bool {
     // Quick return when possible.
@@ -2010,7 +2010,7 @@ extension BinaryFloatingPoint {
 }
 
 extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
-  
+
   public // @testable
   static func _convert<Source: BinaryInteger>(
     from source: Source
@@ -2067,7 +2067,7 @@ extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
       significandBitPattern: significand
     ), fraction == 0)
   }
-  
+
   /// Creates a new value, rounded to the closest possible representation.
   ///
   /// If two representable values are equally close, the result is the value
@@ -2078,7 +2078,7 @@ extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
   public init<Source: BinaryInteger>(_ value: Source) {
     self = Self._convert(from: value).value
   }
-  
+
   /// Creates a new value, if the given integer can be represented exactly.
   ///
   /// If the given integer cannot be represented exactly, the result is `nil`.

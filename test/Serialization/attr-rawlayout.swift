@@ -5,7 +5,7 @@
 
 // REQUIRES: swift_feature_RawLayout
 
-// BC-CHECK: <RawLayout_DECL_ATTR 
+// BC-CHECK: <RawLayout_DECL_ATTR
 
 // MODULE-CHECK: @_rawLayout(size: 5, alignment: 4) struct A_ExplicitSizeAlign
 @_rawLayout(size: 5, alignment: 4)

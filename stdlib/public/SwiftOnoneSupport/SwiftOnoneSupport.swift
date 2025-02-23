@@ -404,7 +404,7 @@ func prespecializeAll() {
 }
 
 // Mark with optimize(none) to make sure its not get
-// rid of by dead function elimination. 
+// rid of by dead function elimination.
 @_optimize(none)
 internal func _swift_forcePrespecializations() {
   prespecializeAll()

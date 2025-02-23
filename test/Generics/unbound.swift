@@ -34,7 +34,7 @@ func f(x: Dict) {} // expected-error{{reference to generic type 'Dict' requires 
 
 
 class GC<T, U> {
-  init() {} 
+  init() {}
 
   func f() -> GC {
     let gc = GC()

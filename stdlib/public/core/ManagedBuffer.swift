@@ -625,7 +625,7 @@ extension ManagedBufferPointer: Equatable {
 
 // FIXME: when our calling convention changes to pass self at +0,
 // inout should be dropped from the arguments to these functions.
-// FIXME(docs): isKnownUniquelyReferenced should check weak/unowned counts too, 
+// FIXME(docs): isKnownUniquelyReferenced should check weak/unowned counts too,
 // but currently does not. rdar://problem/29341361
 
 /// Returns a Boolean value indicating whether the given object is known to

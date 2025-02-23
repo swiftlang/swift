@@ -24,10 +24,10 @@ import SwiftShims
 public enum UnicodeDecodingResult: Equatable, Sendable {
   /// A decoded Unicode scalar value.
   case scalarValue(Unicode.Scalar)
-  
+
   /// An indication that no more Unicode scalars are available in the input.
   case emptyInput
-  
+
   /// An indication of a decoding error.
   case error
 
@@ -479,7 +479,7 @@ extension Unicode.UTF32: UnicodeCodec {
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
     var parser = ForwardParser()
-    
+
     switch parser.parseScalar(from: &input) {
     case .valid(let s): return .scalarValue(UTF32.decode(s))
     case .error:      return .error

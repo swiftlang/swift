@@ -44,7 +44,7 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   @usableFromInline
   internal let _count: Int
 
-  /// FIXME: Remove once supported old compilers can recognize lifetime dependence 
+  /// FIXME: Remove once supported old compilers can recognize lifetime dependence
   @_unsafeNonescapableResult
   @_alwaysEmitIntoClient
   @inline(__always)

@@ -63,7 +63,7 @@ struct Observable<Value> {
     get { fatalError("called wrappedValue getter") }
     set { fatalError("called wrappedValue setter") }
   }
-  
+
   static subscript<EnclosingSelf>(
       _enclosingInstance observed: EnclosingSelf,
       wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>,

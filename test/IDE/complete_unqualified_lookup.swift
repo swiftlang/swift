@@ -10,12 +10,12 @@
 // STRUCT_INSTANCE-NOT: staticFunc
 
 // STRUCT_STATIC-NOT: init()
-// STRUCT_STATIC-NOT: instanceVar 
+// STRUCT_STATIC-NOT: instanceVar
 // STRUCT_STATIC-DAG: Decl[StaticVar]/CurrNominal: staticVar[#Int#];
 // STRUCT_STATIC-DAG: Decl[StaticMethod]/CurrNominal: staticFunc()[#Int#];
 // STRUCT_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(self): MyStruct#})[#() -> Int#];
 // STRUCT_STATIC-NOT: init()
-// STRUCT_STATIC-NOT: instanceVar 
+// STRUCT_STATIC-NOT: instanceVar
 
 struct MyStruct {
   init() { self = MyEnum.east }
@@ -64,14 +64,14 @@ struct MyStruct {
 // ENUM_INSTANCE-NOT: staticFunc
 
 // ENUM_STATIC-NOT: init()
-// ENUM_STATIC-NOT: instanceVar 
+// ENUM_STATIC-NOT: instanceVar
 // ENUM_STATIC-DAG: Decl[EnumElement]/CurrNominal: east[#MyEnum#];
 // ENUM_STATIC-DAG: Decl[EnumElement]/CurrNominal: west[#MyEnum#];
 // ENUM_STATIC-DAG: Decl[StaticVar]/CurrNominal: staticVar[#Int#];
 // ENUM_STATIC-DAG: Decl[StaticMethod]/CurrNominal: staticFunc()[#Int#];
 // ENUM_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(self): MyEnum#})[#() -> Int#];
 // ENUM_STATIC-NOT: init()
-// ENUM_STATIC-NOT: instanceVar 
+// ENUM_STATIC-NOT: instanceVar
 
 enum MyEnum {
   case east, west

@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-var func5 : (_ fn : (Int,Int) -> ()) -> () 
+var func5 : (_ fn : (Int,Int) -> ()) -> ()
 
 // Default arguments for functions.
 func foo3(a: Int = 2, b: Int = 3) {}
@@ -64,7 +64,7 @@ vi.g(f:12.5)
 func foo(_ x: WonkaWibble = 17) { } // expected-error{{cannot find type 'WonkaWibble' in scope}}
 
 // Default arguments for initializers.
-class SomeClass2 { 
+class SomeClass2 {
   init(x: Int = 5) {}
 }
 class SomeDerivedClass2 : SomeClass2 {

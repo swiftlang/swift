@@ -10,7 +10,7 @@ func test() {
   // CHECK-INCLUDE-PLUS-BRIDGING-NOT: cannot find 'includedConst' in scope
   // CHECK-INCLUDE-FRAMEWORK: error: cannot find 'includedConst' in scope
   _ = includedConst
-  
+
   // CHECK-INCLUDE-ONLY: error: cannot find 'errSecSuccess' in scope
   // CHECK-INCLUDE-PLUS-BRIDGING: error: cannot find 'errSecSuccess' in scope
   // CHECK-INCLUDE-FRAMEWORK: error: cannot find 'errSecSuccess' in scope

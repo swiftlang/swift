@@ -42,6 +42,6 @@ struct OldWrapperWithInit2<T> {
 
 struct TestOldWrapperInits {
   @OldWrapperWithInit var x = 17
-  
+
   @OldWrapperWithInit2 var y = "Hello"
 }

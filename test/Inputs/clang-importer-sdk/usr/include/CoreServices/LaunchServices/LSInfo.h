@@ -5,12 +5,12 @@
 #include <CoreFoundation.h>
 #endif
 
-extern OSStatus 
+extern OSStatus
 LSCopyDisplayNameForURL(
   CFURLRef       inURL,
   CFStringRef *  outDisplayName);
-  
-extern OSStatus 
+
+extern OSStatus
 LSGetExtensionInfo(
   UniCharCount    inNameLen,
   const UniChar   inNameBuffer[],

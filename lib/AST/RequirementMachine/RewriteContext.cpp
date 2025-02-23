@@ -35,7 +35,7 @@
 //
 // This saves the effort of rebuilding a new requirement machine from this
 // signature the first time a query is performed, which typically happens when
-// type checking the body of the generic declaration. 
+// type checking the body of the generic declaration.
 //
 // A requirement machine for a generic signature must include rewrite rules
 // for all requirements in protocols referenced from this signature as well.

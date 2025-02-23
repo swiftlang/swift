@@ -539,15 +539,15 @@ class COWBox<
   T: Equatable & CustomStringConvertible>
   : Equatable, CustomStringConvertible {
   var value: T
-  
+
   init(_ value: T) {
     self.value = value
   }
-  
+
   var description: String {
     return "Boxed: \(value.description)"
   }
-  
+
   static func ==(lhs: COWBox, rhs: COWBox) -> Bool {
     return lhs.value == rhs.value
   }
@@ -556,22 +556,22 @@ class COWBox<
 ArrayTestSuite.test("COW.Smoke") {
   var a1 = Array<COWBox<Int>>(repeating: COWBox(0), count: 10)
   let identity1 = a1._rawIdentifier()
-  
+
   a1[0] = COWBox(1)
   a1[1] = COWBox(2)
   a1[2] = COWBox(3)
-  
+
   var a2 = a1
   expectEqual(identity1, a2._rawIdentifier())
-  
+
   a2[3] = COWBox(4)
   expectNotEqual(identity1, a2._rawIdentifier())
-  
+
   a1[4] = COWBox(5)
   expectEqual(identity1, a1._rawIdentifier())
-  
+
   _blackHole(a1)
-  _blackHole(a2)  
+  _blackHole(a2)
 }
 
 ArrayTestSuite.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
@@ -887,7 +887,7 @@ ArrayTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
 //===----------------------------------------------------------------------===//
 // Index tests
 //===----------------------------------------------------------------------===//
-public struct ArrayIndexTest<T: Collection> {  
+public struct ArrayIndexTest<T: Collection> {
   public enum Operation {
     case append(Int)
     case insert(Int, at: Int)
@@ -901,7 +901,7 @@ public struct ArrayIndexTest<T: Collection> {
     case removeClosedSubrange(ClosedRange<Int>)
     case removeHalfClosedSubrange(Range<Int>)
   }
-  
+
   public let data: T
   public let expectedStart: Int
   public let expectedEnd: Int
@@ -909,7 +909,7 @@ public struct ArrayIndexTest<T: Collection> {
   public let operation: Operation
   public let loc: SourceLoc
 
-  public init(data: T, expectedStart: Int, expectedEnd: Int, 
+  public init(data: T, expectedStart: Int, expectedEnd: Int,
         operation: Operation, range: Range<Int>? = nil,
         file: String = #file, line: UInt = #line) {
     self.data = data
@@ -944,7 +944,7 @@ let indexTests: [ArrayIndexTest<[Int]>] = [
     operation: .partition(by: { $0.value > 3000 }),
     range: 1..<3
   ),
-  // Check how partition(by:) affects indices. 
+  // Check how partition(by:) affects indices.
   ArrayIndexTest(
     data: [ 10, 2, -33, 44, -5 ],
     expectedStart: 0,
@@ -1260,8 +1260,8 @@ ArrayTestSuite.test("ArrayIndexTests") {
     case let .insert(v, index):
       a.insert(OpaqueValue(v), at: index)
     case let .partition(c):
-      expectDoesNotThrow({ 
-        _ = try a.partition(by: c) 
+      expectDoesNotThrow({
+        _ = try a.partition(by: c)
       })
     case .removeFirst:
       a.removeFirst()
@@ -1280,7 +1280,7 @@ ArrayTestSuite.test("ArrayIndexTests") {
     case let .removeClosedSubrange(range):
         a.removeSubrange(range)
     }
-    
+
     expectEqual(test.expectedStart, a.startIndex, stackTrace: SourceLocStack().with(test.loc))
     expectEqual(test.expectedEnd, a.endIndex, stackTrace: SourceLocStack().with(test.loc))
   }

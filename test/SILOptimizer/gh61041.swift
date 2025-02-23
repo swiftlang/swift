@@ -3,12 +3,12 @@
 
 // https://github.com/apple/swift/issues/61041
 
-public struct S<T> 
+public struct S<T>
 {
 }
-extension S<Int?> 
+extension S<Int?>
 {
-    public mutating 
+    public mutating
     func foo(x:inout [Int: Int])
     {
         for _:Int in 0 ... 1
@@ -17,12 +17,12 @@ extension S<Int?>
             {
                 if case 0? = y
                 {
-                    continue 
+                    continue
                 }
             }
             else if case 0? = 0 as Int?
             {
-                continue 
+                continue
             }
             { _ in }(&x[0, default: 0])
         }

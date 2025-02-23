@@ -90,7 +90,7 @@ internal struct _StringGutsSlice {
     startingAt idx: String.Index
   ) -> (Unicode.Scalar, scalarLength: Int) {
     let (scalar, len) = _guts.foreignErrorCorrectedScalar(startingAt: idx)
-    if _slowPath(idx.encoded(offsetBy: len) > range.upperBound) { 
+    if _slowPath(idx.encoded(offsetBy: len) > range.upperBound) {
       return (Unicode.Scalar._replacementCharacter, 1)
     }
     return (scalar, len)

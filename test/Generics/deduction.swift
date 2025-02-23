@@ -38,7 +38,7 @@ func useTwoIdentical(_ xi: Int, yi: Float) {
   x = twoIdentical(1, x)
   y = twoIdentical(1.0, y)
   y = twoIdentical(y, 1.0)
-  
+
   twoIdentical(x, y) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. 'Float')}}
 }
 
@@ -53,10 +53,10 @@ func useSwap(_ xi: Int, yi: Float) {
   var x = xi, y = yi
   mySwap(&x, &x)
   mySwap(&y, &y)
-  
+
   mySwap(x, x) // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{10-10=&}}
     // expected-error @-1 {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{13-13=&}}
-  
+
   mySwap(&x, &y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
@@ -84,7 +84,7 @@ func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note {{in call to functio
 
 func testReturnTuple(_ x: Int, y: Float) {
   returnTuple(x) // expected-error{{generic parameter 'U' could not be inferred}}
-  
+
   var _ : (Int, Float) = returnTuple(x)
   var _ : (Float, Float) = returnTuple(y)
 
@@ -273,7 +273,7 @@ func testGetVectorSize(_ vi: MyVector<Int>, vf: MyVector<Float>) {
   var x : X, y : Y
   x = ovlVector(vi)
   x = ovlVector(vf)
-  
+
   var vvi : MyVector<MyVector<Int>>
   y = ovlVector(vvi)
 
@@ -300,7 +300,7 @@ postfix func <*> (_: Test<True>) -> String? { return .none }
 class Test<C: Bool_> : MetaFunction {
   typealias Result = Int
 } // picks first <*>
-typealias Inty = Test<True>.Result 
+typealias Inty = Test<True>.Result
 var iy : Inty = 5 // okay, because we picked the first <*>
 var iy2 : Inty = "hello" // expected-error{{cannot convert value of type 'String' to specified type 'Inty' (aka 'Int')}}
 

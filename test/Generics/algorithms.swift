@@ -71,7 +71,7 @@ func equal<
 
   var e1 = range1.next()
   var e2 = range2.next()
-    
+
   while (e1 != nil) && (e2 != nil) {
     if e1! != e2! {
       return false
@@ -89,7 +89,7 @@ func equalIf<R1 : IteratorProtocol, R2 : IteratorProtocol>
   var range2 = range2
   var e1 = range1.next()
   var e2 = range2.next()
-    
+
   while (e1 != nil) && (e2 != nil) {
     if !predicate(e1!, e2!) {
       return false
@@ -111,7 +111,7 @@ func mismatch<
 
   while true {
     let e1 = range1.next(), e2 = range2.next()
-    
+
     if (e1 == nil) || (e2 == nil) || e1! != e2! { break }
     _ = prev1.next()
     _ = prev2.next()
@@ -129,7 +129,7 @@ func mismatchIf<R1 : IteratorProtocol, R2 : IteratorProtocol>
 
   while true {
     let e1 = range1.next(), e2 = range2.next()
-    
+
     if (e1 == nil) || (e2 == nil) || !predicate(e1!, e2!) { break }
     _ = prev1.next()
     _ = prev2.next()

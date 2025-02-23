@@ -18,8 +18,8 @@ func +++(d: Double, i: Int) {} // expected-note{{found this candidate}}
 1 +++ 2 // expected-error{{ambiguous use of operator '+++'}}
 
 class C {
-  init(_ action: (Int) -> ()) {} 
-  init(_ action: (Int, Int) -> ()) {} 
+  init(_ action: (Int) -> ()) {}
+  init(_ action: (Int, Int) -> ()) {}
 }
 
 func g(_ x: Int) -> () {} // expected-note{{found this candidate}}

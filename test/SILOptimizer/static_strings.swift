@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -O -emit-ir  %s | %FileCheck %s
 // RUN: %target-swift-frontend -Osize -emit-ir  %s | %FileCheck %s
 
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
@@ -123,7 +123,7 @@ func print_strings_from_addressors() {
 @inline(never)
 func testit() {
   // Also check if the generated code is correct.
-  
+
   // CHECK-OUTPUT: abc123a
   // CHECK-OUTPUT: abc123asd3sdj3basfasdf
   // CHECK-OUTPUT: ❄️gastroperiodyni
@@ -132,7 +132,7 @@ func testit() {
   print(get_largestr())
   print(get_unicodestr())
   print("<\(get_emptystr())>")
-  
+
   // CHECK-OUTPUT: abc123a
   // CHECK-OUTPUT: abc123asd3sdj3basfasdf
   // CHECK-OUTPUT: ❄️gastroperiodyni

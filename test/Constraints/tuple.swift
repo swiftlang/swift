@@ -67,7 +67,7 @@ f2(f2ab)
 f2(f2yx)
 
 f3(f3a)
-f3(f3b) // expected-error{{cannot convert value of type '(Int) -> ()' to expected argument type '(Int, Int) -> ()'}} 
+f3(f3b) // expected-error{{cannot convert value of type '(Int) -> ()' to expected argument type '(Int, Int) -> ()'}}
 
 func getIntFloat() -> (int: Int, float: Float) {}
 var values = getIntFloat()
@@ -304,7 +304,7 @@ let _ = (bar: 0, bar: "") // expected-error {{cannot create a tuple with a dupli
 
 let zeroTuple = (0,0)
 
-if case (foo: let x, foo: let y) = zeroTuple { print(x+y) } // expected-error {{cannot create a tuple with a duplicate element label}} 
+if case (foo: let x, foo: let y) = zeroTuple { print(x+y) } // expected-error {{cannot create a tuple with a duplicate element label}}
 // expected-warning@-1 {{'if' condition is always true}}
 
 enum BishBash { case bar(foo: Int, foo: String) }
@@ -334,7 +334,7 @@ var tuple: (Int, Int)
 tuple = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int)' to type '(Int, Int)'}}
 
 var optionalTuple: (Int, Int)?
-var optionalTuple2: (Int64, Int)? = (bignum, 1) 
+var optionalTuple2: (Int64, Int)? = (bignum, 1)
 var optionalTuple3: (UInt64, Int)? = (bignum, 1) // expected-error {{cannot convert value of type '(Int64, Int)' to specified type '(UInt64, Int)'}}
 
 optionalTuple = (bignum, 1) // expected-error {{cannot assign value of type '(Int64, Int)' to type '(Int, Int)'}}

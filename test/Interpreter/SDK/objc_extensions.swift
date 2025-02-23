@@ -53,7 +53,7 @@ drop(o.blackHoleWithHawkingRadiation)
 // CHECK: e-
 o.blackHoleWithHawkingRadiation = NSObject()
 
-// Use of extensions via bridging 
+// Use of extensions via bridging
 let str = "Hello, world"
 // CHECK: I've been frobbed!
 str.frob()

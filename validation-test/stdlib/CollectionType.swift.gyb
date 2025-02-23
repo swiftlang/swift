@@ -167,7 +167,7 @@ CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${di
       }
       expectType([OpaqueValue<Int>].self, &result)
       expectEqual(test.expected, result.map { $0.value })
-      expectEqual(test.sequence, s.map { $0.value }, 
+      expectEqual(test.sequence, s.map { $0.value },
         "collection should not be consumed")
       expectEqual(test.sequence.count, timesClosureWasCalled,
         "filter() should be eager and should only call its predicate once per element")
@@ -564,7 +564,7 @@ CollectionTypeTests.test("firstIndex(of:)/WhereElementIsEquatable/dispatch") {
 // completely different line type-checks
 func callGenericFind_<
   C : Collection
->(_ collection: C, _ element: C.Iterator.Element) -> C.Index? 
+>(_ collection: C, _ element: C.Iterator.Element) -> C.Index?
 where C.Iterator.Element : Equatable {
   return collection.firstIndex(of: element)
 }

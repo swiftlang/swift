@@ -15,15 +15,15 @@ struct SomeType {
   init(init func: () -> ()) { }
 
   // Subscripts
-  subscript (class index: AnyClass) -> Int { 
+  subscript (class index: AnyClass) -> Int {
     return 0
   }
 
-  subscript (class: AnyClass) -> Int { 
+  subscript (class: AnyClass) -> Int {
     return 0
   }
 
-  subscript (struct: Any.Type) -> Int { 
+  subscript (struct: Any.Type) -> Int {
     return 0
   }
 }

@@ -27,11 +27,11 @@ struct SWIFT_ESCAPABLE Owner {
     int data;
 };
 
-Owner f(int* x [[clang::lifetimebound]]) { 
+Owner f(int* x [[clang::lifetimebound]]) {
     return Owner{0};
 }
 
-Owner f2(int* x [[clang::lifetimebound]], int* y [[clang::lifetimebound]]) { 
+Owner f2(int* x [[clang::lifetimebound]], int* y [[clang::lifetimebound]]) {
     return Owner{0};
 }
 

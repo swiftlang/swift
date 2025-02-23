@@ -13,6 +13,6 @@ func test(type: TestType) -> String {
             return c
         }
     }()
-    
+
     return str
 }

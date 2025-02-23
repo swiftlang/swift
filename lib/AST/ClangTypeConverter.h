@@ -65,7 +65,7 @@ public:
   /// For example, String will automatically get translated to NSString
   /// when bridging is available.
   ///
-  /// Additionally, the API is expected to be used only from 
+  /// Additionally, the API is expected to be used only from
   ///
   /// \returns The appropriate clang type on success, nullptr on failure.
   ///

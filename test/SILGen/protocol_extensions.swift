@@ -617,7 +617,7 @@ func test_open_existential_semantics_opaque(_ guaranteed: P1,
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
 
   guaranteed.f1()
-  
+
   // -- Need a guaranteed copy because it's immutable
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
   // CHECK: copy_addr [[READ]] to [init] [[IMMEDIATE:%.*]] :
@@ -776,7 +776,7 @@ extension ClassInitRequirement {
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #ClassInitRequirement.init!allocator : {{.*}} : $@convention(witness_method: ClassInitRequirement) <τ_0_0 where τ_0_0 : ClassInitRequirement> (@owned C, @thick τ_0_0.Type) -> @owned τ_0_0
   // CHECK:         apply [[DELEGATEE]]<Self>([[ARG_COPY_CAST]], [[SELF_TYPE]])
   // CHECK:         end_borrow [[BORROWED_ARG]]
-  
+
   // CHECK: } // end sil function '$s19protocol_extensions20ClassInitRequirementPAAE{{[_0-9a-zA-Z]*}}fC'
   init(d: D) {
     self.init(c: d)
@@ -846,7 +846,7 @@ class RequiredInitClass {
 protocol ProtoDelegatesToRequired { }
 
 extension ProtoDelegatesToRequired where Self : RequiredInitClass {
-  // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions24ProtoDelegatesToRequiredPA2A0F9InitClassC{{[_0-9a-zA-Z]*}}fC 
+  // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions24ProtoDelegatesToRequiredPA2A0F9InitClassC{{[_0-9a-zA-Z]*}}fC
   // CHECK: bb0([[STR:%[0-9]+]] : @owned $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
   // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : RequiredInitClass, τ_0_0 : ProtoDelegatesToRequired> { var τ_0_0 } <Self>

@@ -6,7 +6,7 @@ import Security
 
 _ = kSecClass as CFString
 _ = kSecClassGenericPassword as CFString
-_ = kSecClassGenericPassword as CFDictionary // expected-error {{'CFString?' is not convertible to 'CFDictionary'}} 
+_ = kSecClassGenericPassword as CFDictionary // expected-error {{'CFString?' is not convertible to 'CFDictionary'}}
 // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{30-32=as!}}
 
 func testIntegration() {
@@ -15,7 +15,7 @@ func testIntegration() {
 
   var dataTypeRef: Unmanaged<AnyObject>?
   let status = SecItemCopyMatching(query, &dataTypeRef)
-  
+
   if status == errSecSuccess {
     if let filledRef = dataTypeRef {
       let str: NSString = filledRef.takeRetainedValue() as! NSString

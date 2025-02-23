@@ -52,7 +52,7 @@ ShouldUseBinaryModule:
       "modulePath": "FOOMOD",
       "isFramework": false,
       "isSystem": true
-  },  
+  },
   {
       "moduleName": "SwiftShims",
       "isFramework": false,

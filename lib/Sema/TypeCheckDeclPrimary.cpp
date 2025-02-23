@@ -385,7 +385,7 @@ static void checkInheritanceClause(
                        enumDecl->getDeclaredInterfaceType(), inheritedTy)
              .highlight(inherited.getSourceRange());
       }
-      
+
       // If this is not the first entry in the inheritance clause, complain.
       if (i > 0) {
         auto removeRange = inheritedTypes.getRemovalRange(i);
@@ -475,25 +475,25 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
   // Check if property is a 'static let'
   if (!VD->isStatic() || !VD->isLet())
     return;
-  
+
   auto DC = VD->getDeclContext();
-  
+
   // Make sure property is of same type as the type it is declared in
   if (!VD->getInterfaceType()->isEqual(DC->getSelfInterfaceType()))
     return;
-  
+
   // Make sure this type conforms to OptionSet
   bool conformsToOptionSet =
     (bool)TypeChecker::conformsToKnownProtocol(DC->getSelfTypeInContext(),
                                                KnownProtocolKind::OptionSet);
-  
+
   if (!conformsToOptionSet)
     return;
-  
+
   auto PBD = VD->getParentPatternBinding();
   if (!PBD)
     return;
-  
+
   auto initIndex = PBD->getPatternEntryIndexForVarDecl(VD);
   auto init = PBD->getInit(initIndex);
 
@@ -506,21 +506,21 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
     return;
   if (!isa<ConstructorDecl>(ctorCalledVal))
     return;
-  
+
   // Make sure it is calling the rawValue constructor
   auto *args = ctor->getArgs();
   if (!args->isUnary())
     return;
   if (args->getLabel(0) != VD->getASTContext().Id_rawValue)
     return;
-  
+
   // Make sure the rawValue parameter is a '0' integer literal
   auto intArg = dyn_cast<IntegerLiteralExpr>(args->getExpr(0));
   if (!intArg)
     return;
   if (intArg->getValue() != 0)
     return;
-  
+
   VD->diagnose(diag::option_set_zero_constant, VD->getName());
   VD->diagnose(diag::option_set_empty_set_init)
     .fixItReplace(args->getSourceRange(), "([])");
@@ -867,19 +867,19 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
             currFnTy = currFnTy->getResult()->getAs<AnyFunctionType>();
             otherFnTy = otherFnTy->getResult()->getAs<AnyFunctionType>();
           }
-          
+
           if (currFnTy && otherFnTy) {
             ArrayRef<AnyFunctionType::Param> currParams = currFnTy->getParams();
             ArrayRef<AnyFunctionType::Param> otherParams = otherFnTy->getParams();
-            
+
             if (currParams.size() == otherParams.size()) {
               auto diagnosed = false;
               for (unsigned i : indices(currParams)) {
-                  
+
                 bool currIsIUO = false;
                 bool otherIsIUO = false;
                 bool optionalRedecl = false;
-                
+
                 if (currParams[i].getPlainType()->getOptionalObjectType()) {
                   optionalRedecl = true;
                   auto *param = swift::getParameterAt(current, i);
@@ -887,7 +887,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
                   if (param->isImplicitlyUnwrappedOptional())
                     currIsIUO = true;
                 }
-                
+
                 if (otherParams[i].getPlainType()->getOptionalObjectType()) {
                   auto *param = swift::getParameterAt(other, i);
                   assert(param);
@@ -897,7 +897,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
                 else {
                   optionalRedecl = false;
                 }
-                
+
                 if (optionalRedecl && currIsIUO != otherIsIUO) {
                   ctx.Diags.diagnoseWithNotes(
                     current->diagnose(diag::invalid_redecl, current), [&]() {
@@ -905,7 +905,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
                   });
                   current->diagnose(diag::invalid_redecl_by_optionality_note,
                                     otherIsIUO, currIsIUO);
-                  
+
                   current->setInvalid();
                   diagnosed = true;
                   break;
@@ -1677,7 +1677,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     if (pbd->isStatic() || !pbd->hasStorage() ||
         pbd->isDefaultInitializable() || pbd->isInvalid())
       continue;
-   
+
     for (auto idx : range(pbd->getNumPatternEntries())) {
       if (pbd->isInitialized(idx)) continue;
 
@@ -1833,10 +1833,10 @@ static void diagnoseRetroactiveConformances(
 
     auto proto =
         dyn_cast_or_null<ProtocolDecl>(entry.getType()->getAnyNominal());
-    if (!proto) {  
+    if (!proto) {
       continue;
     }
-    
+
     // As a fallback, to support previous language versions, also allow
     // this through if the protocol has been explicitly module-qualified.
     TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
@@ -2410,7 +2410,7 @@ public:
   void visitGenericTypeParamDecl(GenericTypeParamDecl *D) {
     llvm_unreachable("cannot reach here");
   }
-  
+
   void visitImportDecl(ImportDecl *ID) {
     TypeChecker::checkDeclAttributes(ID);
 
@@ -2689,7 +2689,7 @@ public:
           checkDynamicSelfType(VD, VD->getValueInterfaceType());
       }
     }
-    
+
     checkForEmptyOptionSet(VD);
 
     // Now check all the accessors.
@@ -3075,12 +3075,12 @@ public:
     (void) TAD->getUnderlyingType();
 
     // Make sure to check the underlying type.
-    
+
     TypeChecker::checkDeclAttributes(TAD);
     checkAccessControl(TAD);
     checkGenericParams(TAD);
   }
-  
+
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
     // Force requests that can emit diagnostics.
     (void) OTD->getGenericSignature();
@@ -3088,7 +3088,7 @@ public:
     TypeChecker::checkDeclAttributes(OTD);
     checkAccessControl(OTD);
   }
-  
+
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
     TypeChecker::checkDeclAttributes(AT);
 
@@ -3240,7 +3240,7 @@ public:
                       diag::raw_type_not_literal_convertible, rawTy);
         }
       }
-      
+
       // We need at least one case to have a raw value.
       if (ED->getAllElements().empty()) {
         DE.diagnose(ED->getInherited().getStartLoc(),
@@ -3345,7 +3345,7 @@ public:
       if (!pbd)
         continue;
 
-      if (pbd->isStatic() || !pbd->hasStorage() || 
+      if (pbd->isStatic() || !pbd->hasStorage() ||
           pbd->isDefaultInitializable() || pbd->isInvalid())
         continue;
 
@@ -3682,7 +3682,7 @@ public:
     (void) FD->getInterfaceType();
     (void) FD->getOperatorDecl();
     (void) FD->getDynamicallyReplacedDecl();
-    
+
     dumpGenericSignature(Ctx, FD);
 
     if (!isa<AccessorDecl>(FD)) {
@@ -3727,7 +3727,7 @@ public:
     if (FD->getAsyncLoc().isValid() &&
         !hasHistoricallyWrongAvailability(FD))
       TypeChecker::checkConcurrencyAvailability(FD->getAsyncLoc(), FD);
-    
+
     if (FD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       (void) FD->getTypecheckedBody();
@@ -4059,7 +4059,7 @@ public:
 
       // Force creation of an implicit destructor, if any.
       (void) CD->getDestructor();
-      
+
       // FIXME: Should we duplicate any other logic from visitClassDecl()?
     }
 
@@ -4089,7 +4089,7 @@ public:
     // See swift::performTypeChecking for TopLevelCodeDecl handling.
     llvm_unreachable("TopLevelCodeDecls are handled elsewhere");
   }
-  
+
   void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
     if (PDD->hasBeenEmitted()) { return; }
     PDD->markEmitted();

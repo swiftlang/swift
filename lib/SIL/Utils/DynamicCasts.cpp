@@ -406,7 +406,7 @@ static bool canDynamicallyStoreOptional(CanType type) {
   assert(!type.getOptionalObjectType());
   return type->canDynamicallyBeOptionalType(/* includeExistential */ true);
 }
-  
+
 /// Given two class types, check whether there's a hierarchy relationship
 /// between them.
 static DynamicCastFeasibility
@@ -462,7 +462,7 @@ static bool isCFBridgingConversion(CanType sourceFormalType,
         getNSBridgedClassOfCFClass(sourceFormalType)) {
     return targetFormalType->isExactSuperclassOf(bridgedSource);
   }
-  
+
   return false;
 }
 
@@ -663,7 +663,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
       // but not vice versa.
       if (sourceFunction->isThrowing() && !targetFunction->isThrowing())
         return DynamicCastFeasibility::WillFail;
-      
+
       // The cast can't change the representation at runtime.
       if (targetFunction->getRepresentation()
             != sourceFunction->getRepresentation())
@@ -722,17 +722,17 @@ swift::classifyDynamicCast(ModuleDecl *M,
       // Imported Objective-C generics don't check the generic parameters, which
       // are lost at runtime.
       if (sourceClass->isTypeErasedGenericClass()) {
-      
+
         if (sourceClass == targetClass)
           return DynamicCastFeasibility::WillSucceed;
-        
+
         if (targetClass->isTypeErasedGenericClass()) {
           // If both classes are ObjC generics, the cast may succeed if the
           // classes are related, irrespective of their generic parameters.
 
           if (sourceClass->isSuperclassOf(targetClass))
             return DynamicCastFeasibility::MaySucceed;
-          
+
           if (targetClass->isSuperclassOf(sourceClass))
             return DynamicCastFeasibility::WillSucceed;
 
@@ -826,7 +826,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
     // statically predict the outcome. So, let's be conservative here.
     return DynamicCastFeasibility::MaySucceed;
   }
-  
+
   if (target->isBridgeableObjectType() && mayBridgeToObjectiveC(M, source)) {
     // Try to get the ObjC type which is bridged to source type.
     assert(!source.isAnyExistentialType());
@@ -951,7 +951,7 @@ namespace {
 
     Source emitTopLevel(Source source, Target target) {
       unsigned sourceOptDepth = getOptionalDepth(source.FormalType);
-      unsigned targetOptDepth = getOptionalDepth(target.FormalType);      
+      unsigned targetOptDepth = getOptionalDepth(target.FormalType);
 
       assert(sourceOptDepth <= targetOptDepth);
       return emitAndInjectIntoOptionals(source, target,
@@ -1179,7 +1179,7 @@ namespace {
     // None, then the result may still be Guaranteed for nontrivial types.
     Source emitSome(Source source, Target target, EmitSomeState &state) {
       // If our target is an address, prepareForEmitSome should have set this
-      // up so that we emitted directly into 
+      // up so that we emitted directly into
       if (target.isAddress()) {
         B.createInjectEnumAddr(Loc, target.Address, state.SomeDecl);
         return target.asAddressSource();
@@ -1192,7 +1192,7 @@ namespace {
 
     Source emitNone(Target target) {
       auto noneDecl = Ctx.getOptionalNoneDecl();
-      
+
       if (target.isAddress()) {
         B.createInjectEnumAddr(Loc, target.Address, noneDecl);
         return target.asAddressSource();
@@ -1343,7 +1343,7 @@ bool swift::canIRGenUseScalarCheckedCastInstructions(SILModule &M,
   // since it may conform to Error and require Error-to-NSError
   // bridging, unless we can statically see that the source type inherits
   // NSError.
-  
+
   // A class-constrained archetype may be bound to NSError, unless it has a
   // non-NSError superclass constraint. Casts to archetypes thus must always be
   // indirect.
@@ -1351,7 +1351,7 @@ bool swift::canIRGenUseScalarCheckedCastInstructions(SILModule &M,
     // Only ever permit this if the source type is a reference type.
     if (!objectType.isAnyClassReferenceType())
       return false;
-    
+
     auto super = archetype->getSuperclass();
     if (super.isNull())
       return false;
@@ -1362,11 +1362,11 @@ bool swift::canIRGenUseScalarCheckedCastInstructions(SILModule &M,
       if (auto nserror = M.Types.getNSErrorType())
          return !super->isEqual(nserror);
     }
-    
+
     // If NSError wasn't loaded, any base class constraint must not be NSError.
     return true;
   }
-  
+
   if (M.getASTContext().LangOpts.EnableObjCInterop
       && targetFormalType == M.Types.getNSErrorType()) {
     // If we statically know the source is an NSError subclass, then the cast
@@ -1374,7 +1374,7 @@ bool swift::canIRGenUseScalarCheckedCastInstructions(SILModule &M,
     // killed).
     return targetFormalType->isExactSuperclassOf(objectType);
   }
-  
+
   // Three supported cases:
   // - metatype to metatype
   // - metatype to object
@@ -1385,7 +1385,7 @@ bool swift::canIRGenUseScalarCheckedCastInstructions(SILModule &M,
 
   if (isa<AnyMetatypeType>(objectType) && isa<AnyMetatypeType>(targetFormalType))
     return true;
-  
+
   // Otherwise, we need to use the general indirect-cast functions.
   return false;
 }

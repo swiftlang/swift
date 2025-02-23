@@ -138,7 +138,7 @@ SwiftValueHeader::cacheHashableEquatableConformance() const {
       baseType = reinterpret_cast<uintptr_t>(findHashableBaseType(type));
     } else {
       // If not Hashable, maybe Equatable?
-      auto equatable = 
+      auto equatable =
 	swift_conformsToProtocolCommon(type, &equatable_support::EquatableProtocolDescriptor);
       // Encode the equatable conformance
       conformance = reinterpret_cast<uintptr_t>(equatable) | 1;

@@ -55,7 +55,7 @@ struct B : _ObjectiveCBridgeable {
   }
 }
 
-func testBridgedDowncastAnyObject(_ arr: [AnyObject], arrOpt: [AnyObject]?, 
+func testBridgedDowncastAnyObject(_ arr: [AnyObject], arrOpt: [AnyObject]?,
                                   arrIUO: [AnyObject]!) {
   var b = B()
 
@@ -73,7 +73,7 @@ func testBridgedDowncastAnyObject(_ arr: [AnyObject], arrOpt: [AnyObject]?,
   _ = b
 }
 
-func testBridgedIsAnyObject(_ arr: [AnyObject], arrOpt: [AnyObject]?, 
+func testBridgedIsAnyObject(_ arr: [AnyObject], arrOpt: [AnyObject]?,
                              arrIUO: [AnyObject]!) -> Bool {
   let b = B()
 

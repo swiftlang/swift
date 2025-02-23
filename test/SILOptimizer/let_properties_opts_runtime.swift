@@ -55,7 +55,7 @@ print(testClassLet(Foo1(10)))
 public class C {}
 
 struct Boo3 {
-  //public 
+  //public
   let Prop0: Int32
   let Prop1: Int32
   fileprivate let Prop2: Int32

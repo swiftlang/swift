@@ -17,7 +17,7 @@
 
 using namespace swift;
 
-void SourceEdits::addEdit(SourceManager &SM, CharSourceRange Range, 
+void SourceEdits::addEdit(SourceManager &SM, CharSourceRange Range,
                           StringRef Text) {
   SourceLoc Loc = Range.getStart();
   unsigned BufID = SM.findBufferContainingLoc(Loc);

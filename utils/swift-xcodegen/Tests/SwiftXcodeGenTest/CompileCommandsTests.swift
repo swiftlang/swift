@@ -55,7 +55,7 @@ class CompileCommandsTests: XCTestCase {
     )
 
     assertParse(
-      "clang -DX -I", 
+      "clang -DX -I",
       args: [.option(.D, spacing: .unspaced, value: "X"), .flag(.I)]
     )
 

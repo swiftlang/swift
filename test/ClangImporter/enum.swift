@@ -5,7 +5,7 @@
 
 // REQUIRES: objc_interop
 
-// At one point we diagnosed enum case aliases that referred to unavailable 
+// At one point we diagnosed enum case aliases that referred to unavailable
 // cases in their (synthesized) implementation.
 // CHECK-NOT: unknown
 

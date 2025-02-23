@@ -56,7 +56,7 @@ struct Main {
       // CHECK: MySubSubClass.foo
     }
     print("")
-    
+
     print("5") // CHECK: 5
     objects = []
     // CHECK: MyClass.deinit

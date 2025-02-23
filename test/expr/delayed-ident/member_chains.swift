@@ -63,7 +63,7 @@ struct ImplicitMembers: Equatable {
     static func takesArgClosure(_: Int, _: (Int) -> Void) -> ImplicitMembers { ImplicitMembers() }
     func methodTakesClosure(_: (Int) -> Void) -> ImplicitMembers { ImplicitMembers() }
     func methodTakesArgClosure(_: Int, _: (Int) -> Void) -> ImplicitMembers { ImplicitMembers() }
-    
+
     subscript(arg: Void) -> ImplicitMembers {
         get { ImplicitMembers() }
         set {}

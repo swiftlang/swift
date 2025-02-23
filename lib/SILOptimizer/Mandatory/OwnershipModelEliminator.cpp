@@ -65,7 +65,7 @@ struct OwnershipModelEliminatorVisitor
     : SILInstructionVisitor<OwnershipModelEliminatorVisitor, bool> {
   SmallVector<SILInstruction *, 8> trackingList;
   SmallBlotSetVector<SILInstruction *, 8> instructionsToSimplify;
-  
+
   /// Points at either a user passed in SILBuilderContext or points at
   /// builderCtxStorage.
   SILBuilderContext builderCtx;
@@ -213,7 +213,7 @@ struct OwnershipModelEliminatorVisitor
       return true;
     });
   }
-  
+
   bool visitPartialApplyInst(PartialApplyInst *pai);
 
   void splitDestructure(SILInstruction *destructure,
@@ -487,7 +487,7 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
   // Escaping closures don't need attention beyond what we already perform.
   if (!inst->isOnStack())
     return false;
-  
+
   // A nonescaping closure borrows its captures, but now that we've lowered
   // those borrows away, we need to make those dependence relationships explicit
   // so that the optimizer continues respecting them.
@@ -505,7 +505,7 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
       if (op->getType().isAddress()) {
         break;
       }
-      
+
       // If this is a nontrivial value argument, insert the mark_dependence.
       auto mdi = b.createMarkDependence(loc, newValue, op,
                                         MarkDependenceKind::Escaping);
@@ -515,7 +515,7 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
     }
     return newValue;
   });
-  
+
   // Rewrite all uses other than the root of the new dependence chain, and a
   // `dealloc_stack` of the partial_apply instruction we may have already
   // created, to go through the dependence chain, if there is one.
@@ -534,7 +534,7 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
 done_rewriting:
     return true;
   }
-  
+
   return false;
 }
 
@@ -863,11 +863,11 @@ static bool stripOwnership(SILFunction &func) {
     simplifyAndReplaceAllSimplifiedUsesAndErase(*value, callbacks);
     madeChange |= callbacks.hadCallbackInvocation();
   }
-  
+
   if (madeChange) {
     StackNesting::fixNesting(&func);
   }
-  
+
   return madeChange;
 }
 

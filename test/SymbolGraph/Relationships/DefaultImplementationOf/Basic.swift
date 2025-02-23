@@ -11,7 +11,7 @@ extension P {
   public var x: Int {
     return 2
   }
-}  
+}
 
 // CHECK: "kind": "defaultImplementationOf",
 // CHECK-NEXT: "source": "s:23DefaultImplementationOf1PPAAE1xSivp",

@@ -53,7 +53,7 @@ extension ForwardingInstruction {
   public var forwardingOwnership: Ownership {
     Ownership(bridged: bridged.ForwardingInst_forwardingOwnership())
   }
-  
+
   /// A forwarding instruction preserves reference counts if it has a dynamically non-trivial result in which all references are forwarded from the operand.
   ///
   /// A cast can only forward guaranteed values if it preserves reference counts. Such casts cannot release any references within their operand's value and cannot retain any references owned by their result.
@@ -64,7 +64,7 @@ extension ForwardingInstruction {
 
 extension Value {
   // If this value is produced by a ForwardingInstruction, return that instruction. This is convenient for following the forwarded value chain.
-  // Unlike definingInstruction, a value's forwardingInstruction is not necessarily a valid insertion point. 
+  // Unlike definingInstruction, a value's forwardingInstruction is not necessarily a valid insertion point.
   public var forwardingInstruction: ForwardingInstruction? {
     if let inst = definingInstructionOrTerminator {
       return inst as? ForwardingInstruction

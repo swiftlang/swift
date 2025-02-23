@@ -27,7 +27,7 @@ func match(_ d: DayOfTheWeek) {
 
 enum Fox {
   case `init`(Int)
-  
+
   init() {
     self = .`init`(10)
   }

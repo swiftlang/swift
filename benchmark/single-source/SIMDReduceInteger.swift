@@ -30,7 +30,7 @@ public let benchmarks = [
     runFunction: run_SIMDReduceInt32x4_cast,
     tags: [.validation, .SIMD],
     setUpFunction: { blackHole(int32Data) }
-  ), 
+  ),
   BenchmarkInfo(
     name: "SIMDReduce.Int32x16.Initializer",
     runFunction: run_SIMDReduceInt32x16_init,

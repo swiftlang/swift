@@ -136,13 +136,13 @@ func getBridgedNonverbatimArrayAndNSMutableArray()
   return (Swift._forceBridgeFromObjectiveC(nsa, Array.self), nsa)
 }
 
-func getBridgedVerbatimEquatableArray(_ a: Array<Int>) 
+func getBridgedVerbatimEquatableArray(_ a: Array<Int>)
     -> Array<TestObjCEquatableValueTy> {
   let nsa = getAsEquatableNSArray(a)
   return convertNSArrayToArray(nsa)
 }
 
-func getBridgedNonverbatimEquatableArray(_ a: Array<Int>) 
+func getBridgedNonverbatimEquatableArray(_ a: Array<Int>)
     -> Array<TestBridgedEquatableValueTy> {
   let nsa = getAsEquatableNSArray(a)
   return Swift._forceBridgeFromObjectiveC(nsa, Array.self)
@@ -161,7 +161,7 @@ func getHugeBridgedVerbatimArray() -> Array<AnyObject> {
   return convertNSArrayToArray(nsa)
 }
 
-func getHugeBridgedNonverbatimArray() 
+func getHugeBridgedNonverbatimArray()
     -> Array<TestBridgedValueTy> {
   let nsa = getHugeBridgedVerbatimArrayHelper()
   return Swift._forceBridgeFromObjectiveC(nsa, Array.self)
@@ -260,15 +260,15 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
   let nsa: NSArray = autoreleasepool {
     NSArray(array: getAsNSArray([1010, 1020, 1030]))
   }
-  
+
   let a: [AnyObject] = convertNSArrayToArray(nsa)
-  
+
   let bridgedBack: NSArray = convertArrayToNSArray(a)
-  
+
   expectEqual(
     unsafeBitCast(nsa, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
-  
+
   _blackHole(nsa)
   _blackHole(a)
   _blackHole(bridgedBack)
@@ -278,15 +278,15 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
   let nsa: NSArray = autoreleasepool {
     NSArray(array: getAsNSArray([1010, 1020, 1030]))
   }
-  
+
   let a: [TestBridgedValueTy] = convertNSArrayToArray(nsa)
-  
+
   let bridgedBack: NSArray = convertArrayToNSArray(a)
-  
+
   expectNotEqual(
     unsafeBitCast(nsa, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
-  
+
   _blackHole(nsa)
   _blackHole(a)
   _blackHole(bridgedBack)
@@ -294,7 +294,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
   let nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
-  
+
   CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
   CustomImmutableNSArray.timesObjectAtIndexWasCalled = 0
   CustomImmutableNSArray.timesObjectEnumeratorWasCalled = 0
@@ -304,12 +304,12 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
   expectEqual(0, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
   expectEqual(0, CustomImmutableNSArray.timesObjectEnumeratorWasCalled)
   expectEqual(0, CustomImmutableNSArray.timesCountWasCalled)
-  
+
   let bridgedBack: NSArray = convertArrayToNSArray(a)
   expectEqual(
     unsafeBitCast(nsa, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
-  
+
   _blackHole(nsa)
   _blackHole(a)
   _blackHole(bridgedBack)

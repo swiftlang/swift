@@ -32,7 +32,7 @@ protocol Pattern {
   associatedtype Element : Equatable
   associatedtype Index : Comparable
   associatedtype MatchData = ()
-  
+
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, C.Element == Element
 }
@@ -65,7 +65,7 @@ struct LiteralMatch<T: Collection, Index: Comparable> : Pattern
 where T.Element : Equatable {
   typealias Element = T.Element
   init(_ pattern: T) { self.pattern = pattern }
-  
+
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
   where C.Index == Index, C.Element == Element
   {
@@ -84,9 +84,9 @@ where T.Element : Equatable {
 
 struct MatchAnyOne<T : Equatable, Index : Comparable> : Pattern {
   typealias Element = T
-  
+
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
-  where C.Index == Index, C.Element == Element 
+  where C.Index == Index, C.Element == Element
   {
     return c.isEmpty
     ? .notFound(resumeAt: c.endIndex)
@@ -111,7 +111,7 @@ struct ConsecutiveMatches<M0: Pattern, M1: Pattern> : Pattern
 where M0.Element == M1.Element, M0.Index == M1.Index {
   init(_ m0: M0, _ m1: M1) { self.matchers = (m0, m1) }
   fileprivate let matchers: (M0, M1)
-  
+
   typealias Element = M0.Element
   typealias Index = M0.Index
   typealias MatchData = (midPoint: M0.Index, data: (M0.MatchData, M1.MatchData))
@@ -150,10 +150,10 @@ extension ConsecutiveMatches : CustomStringConvertible {
 struct RepeatMatch<M0: Pattern> : Pattern {
   typealias Element = M0.Element
   typealias MatchData = [(end: M0.Index, data: M0.MatchData)]
-  
+
   let singlePattern: M0
   var repeatLimits: ClosedRange<Int>
-  
+
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<M0.Index, MatchData>
   where C.Index == M0.Index, C.Element == M0.Element
   {
@@ -217,7 +217,7 @@ struct MatchOneOf<M0: Pattern, M1: Pattern> : Pattern
 where M0.Element == M1.Element, M0.Index == M1.Index {
   init(_ m0: M0, _ m1: M1) { self.matchers = (m0, m1) }
   fileprivate let matchers: (M0, M1)
-  
+
   typealias Element = M0.Element
   typealias Index = M0.Index
   typealias MatchData = OneOf<M0.MatchData,M1.MatchData>
@@ -275,9 +275,9 @@ struct MatchStaticString : Pattern {
 
   let content: StaticString
   init(_ x: StaticString) { content = x }
-  
+
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
-  where C.Index == Index, C.Element == Element 
+  where C.Index == Index, C.Element == Element
 {
     return content.withUTF8Buffer {
       LiteralMatch<Buffer, Index>($0).matched(atStartOf: c)
@@ -290,7 +290,7 @@ extension MatchStaticString : CustomStringConvertible {
 
 // A way to force string literals to be interpreted as StaticString
 prefix operator %
-extension StaticString {  
+extension StaticString {
   static prefix func %(x: StaticString) -> MatchStaticString {
     return MatchStaticString(x)
   }
@@ -345,7 +345,7 @@ let source2 = Array("hack hack cough cough cough spork".utf8)
 (%"cough ")+.searchTest(in: source2)
 
 let fancyPattern
-  = %"quick "..((%"brown" | %"black" | %"fox" | %"chicken") .. %" ")+ 
+  = %"quick "..((%"brown" | %"black" | %"fox" | %"chicken") .. %" ")+
   .. (%__)
 
 fancyPattern.searchTest(in: source)
@@ -362,9 +362,9 @@ struct Paired<T: Hashable, I: Comparable> : Pattern {
   typealias Element = T
   typealias Index = I
   typealias MatchData  = PairedStructure<I>
-  
+
   let pairs: Dictionary<T,T>
-  
+
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, C.Element == Element
   {
@@ -374,7 +374,7 @@ struct Paired<T: Hashable, I: Comparable> : Pattern {
     var subStructure: [PairedStructure<I>] = []
     var i = c.index(after: c.startIndex)
     var resumption: Index? = nil
-    
+
     while i != c.endIndex {
       if let m = self.found(in: c[i..<c.endIndex]) {
         i = m.extent.upperBound

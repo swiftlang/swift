@@ -15,7 +15,7 @@ struct HasNSOptionMember {
 FieldTestSuite.test("NSOption as field") {
   var parent = HasNSOptionMember(member: [.SwiftOptionOneApiNotes, .SwiftOptionTwoApiNotes])
   expectEqual(parent.member, [.SwiftOptionOneApiNotes, .SwiftOptionTwoApiNotes])
-  
+
   parent.member = [.SwiftOptionOneApiNotes]
   expectNotEqual(parent.member, [.SwiftOptionOneApiNotes, .SwiftOptionTwoApiNotes])
 }

@@ -255,7 +255,7 @@ public protocol CaseIterable {
   /// A type that can represent a collection of all values of this type.
   associatedtype AllCases: Collection = [Self]
     where AllCases.Element == Self
-  
+
   /// A collection of all values of this type.
   static var allCases: AllCases { get }
 }
@@ -346,7 +346,7 @@ public protocol ExpressibleByFloatLiteral {
   /// Valid types for `FloatLiteralType` are `Float`, `Double`, and `Float80`
   /// where available.
   associatedtype FloatLiteralType: _ExpressibleByBuiltinFloatLiteral
-  
+
   /// Creates an instance initialized to the specified floating-point value.
   ///
   /// Do not call this initializer directly. Instead, initialize a variable or
@@ -469,7 +469,7 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
   /// `String`, and `StaticString`.
   associatedtype ExtendedGraphemeClusterLiteralType
     : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
-  
+
   /// Creates an instance initialized to the given value.
   ///
   /// - Parameter value: The value of the new instance.
@@ -509,12 +509,12 @@ public protocol _ExpressibleByBuiltinStringLiteral
 /// implement the required initializer.
 public protocol ExpressibleByStringLiteral
   : ExpressibleByExtendedGraphemeClusterLiteral {
-  
+
   /// A type that represents a string literal.
   ///
   /// Valid types for `StringLiteralType` are `String` and `StaticString`.
   associatedtype StringLiteralType: _ExpressibleByBuiltinStringLiteral
-  
+
   /// Creates an instance initialized to the given string value.
   ///
   /// - Parameter value: The value of the new instance.
@@ -540,8 +540,8 @@ extension ExpressibleByStringLiteral
 /// initializer, or even as the subject of a nonmutating operation like
 /// `map(_:)` or `filter(_:)`.
 ///
-/// Arrays, sets, and option sets all conform to `ExpressibleByArrayLiteral`, 
-/// and your own custom types can as well. Here's an example of creating a set 
+/// Arrays, sets, and option sets all conform to `ExpressibleByArrayLiteral`,
+/// and your own custom types can as well. Here's an example of creating a set
 /// and an array using array literals:
 ///
 ///     let employeesSet: Set<String> = ["Amir", "Jihye", "Dave", "Alessia", "Dave"]
@@ -726,10 +726,10 @@ public protocol ExpressibleByDictionaryLiteral {
 ///     let message = "One cookie: $\(price), \(number) cookies: $\(price * number)."
 ///     print(message)
 ///     // Prints "One cookie: $2, 3 cookies: $6."
-/// 
+///
 /// Extending the Default Interpolation Behavior
 /// ============================================
-/// 
+///
 /// Add new interpolation behavior to existing types by extending
 /// `DefaultStringInterpolation`, the type that implements interpolation for
 /// types like `String` and `Substring`, to add an overload of
@@ -737,10 +737,10 @@ public protocol ExpressibleByDictionaryLiteral {
 ///
 /// For more information, see the `DefaultStringInterpolation` and
 /// `StringInterpolationProtocol` documentation.
-/// 
+///
 /// Creating a Type That Supports the Default String Interpolation
 /// ==============================================================
-/// 
+///
 /// To create a new type that supports string literals and interpolation, but
 /// that doesn't need any custom behavior, conform the type to
 /// `ExpressibleByStringInterpolation` and implement the
@@ -764,7 +764,7 @@ public protocol ExpressibleByDictionaryLiteral {
 /// For more information, see the `StringInterpolationProtocol` documentation.
 public protocol ExpressibleByStringInterpolation
   : ExpressibleByStringLiteral {
-  
+
 #if !$Embedded
   /// The type each segment of a string literal containing interpolations
   /// should be appended to.
@@ -780,12 +780,12 @@ public protocol ExpressibleByStringInterpolation
 #endif
 
   /// Creates an instance from a string interpolation.
-  /// 
+  ///
   /// Most `StringInterpolation` types will store information about the
   /// literals and interpolations appended to them in one or more properties.
   /// `init(stringInterpolation:)` should use these properties to initialize
   /// the instance.
-  /// 
+  ///
   /// - Parameter stringInterpolation: An instance of `StringInterpolation`
   ///             which has had each segment of the string literal appended
   ///             to it.
@@ -794,9 +794,9 @@ public protocol ExpressibleByStringInterpolation
 
 extension ExpressibleByStringInterpolation
   where StringInterpolation == DefaultStringInterpolation {
-  
+
   /// Creates a new instance from an interpolated string literal.
-  /// 
+  ///
   /// Don't call this initializer directly. It's used by the compiler when
   /// you create a string using string interpolation. Instead, use string
   /// interpolation to create a new string by including values, literals,
@@ -817,28 +817,28 @@ extension ExpressibleByStringInterpolation
 
 /// Represents the contents of a string literal with interpolations while it's
 /// being built up.
-/// 
+///
 /// Each `ExpressibleByStringInterpolation` type has an associated
 /// `StringInterpolation` type which conforms to `StringInterpolationProtocol`.
 /// Swift converts an expression like `"The time is \(time)." as MyString` into
 /// a series of statements similar to:
-/// 
-///     var interpolation = MyString.StringInterpolation(literalCapacity: 13, 
+///
+///     var interpolation = MyString.StringInterpolation(literalCapacity: 13,
 ///                                                      interpolationCount: 1)
-/// 
+///
 ///     interpolation.appendLiteral("The time is ")
 ///     interpolation.appendInterpolation(time)
 ///     interpolation.appendLiteral(".")
 ///
 ///     MyString(stringInterpolation: interpolation)
-/// 
+///
 /// The `StringInterpolation` type is responsible for collecting the segments
 /// passed to its `appendLiteral(_:)` and `appendInterpolation` methods and
 /// assembling them into a whole, converting as necessary. Once all of the
 /// segments are appended, the interpolation is passed to an
 /// `init(stringInterpolation:)` initializer on the type being created, which
 /// must extract the accumulated data from the `StringInterpolation`.
-/// 
+///
 /// In simple cases, you can use `DefaultStringInterpolation` as the
 /// interpolation type for types that conform to the
 /// `ExpressibleByStringLiteral` protocol. To use the default interpolation,
@@ -846,7 +846,7 @@ extension ExpressibleByStringInterpolation
 /// `init(stringLiteral: String)`. Values in interpolations are converted to
 /// strings, and then passed to that initializer just like any other string
 /// literal.
-/// 
+///
 /// Handling String Interpolations
 /// ==============================
 ///
@@ -895,14 +895,14 @@ public protocol StringInterpolationProtocol {
   associatedtype StringLiteralType: _ExpressibleByBuiltinStringLiteral
 
   /// Creates an empty instance ready to be filled with string literal content.
-  /// 
+  ///
   /// Don't call this initializer directly. Instead, initialize a variable or
   /// constant using a string literal with interpolated expressions.
-  /// 
+  ///
   /// Swift passes this initializer a pair of arguments specifying the size of
   /// the literal segments and the number of interpolated segments. Use this
   /// information to estimate the amount of storage you will need.
-  /// 
+  ///
   /// - Parameter literalCapacity: The approximate size of all literal segments
   ///   combined. This is meant to be passed to `String.reserveCapacity(_:)`;
   ///   it may be slightly larger or smaller than the sum of the counts of each
@@ -913,20 +913,20 @@ public protocol StringInterpolationProtocol {
   init(literalCapacity: Int, interpolationCount: Int)
 
   /// Appends a literal segment to the interpolation.
-  /// 
+  ///
   /// Don't call this method directly. Instead, initialize a variable or
   /// constant using a string literal with interpolated expressions.
-  /// 
+  ///
   /// Interpolated expressions don't pass through this method; instead, Swift
   /// selects an overload of `appendInterpolation`. For more information, see
   /// the top-level `StringInterpolationProtocol` documentation.
-  /// 
+  ///
   /// - Parameter literal: A string literal containing the characters
   ///   that appear next in the string literal.
   mutating func appendLiteral(_ literal: StringLiteralType)
 
   // Informal requirement: Any desired appendInterpolation overloads, e.g.:
-  // 
+  //
   //   mutating func appendInterpolation<T>(_: T)
   //   mutating func appendInterpolation(_: Int, radix: Int)
   //   mutating func appendInterpolation<T: Encodable>(json: T) throws

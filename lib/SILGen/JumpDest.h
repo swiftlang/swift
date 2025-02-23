@@ -25,7 +25,7 @@
 namespace swift {
   class SILBasicBlock;
   class CaseStmt;
-  
+
 namespace Lowering {
 
 struct LLVM_LIBRARY_VISIBILITY ThrownErrorInfo {
@@ -86,7 +86,7 @@ public:
     return JumpDest(CleanupLocation::invalid());
   }
 };
-  
+
 } // end namespace Lowering
 } // end namespace swift
 

@@ -22,7 +22,7 @@ struct X2<T> {
   static var NotAnX2 = 0 // expected-error {{static stored properties not supported in generic types}}
 }
 
-var x2: X2<Int> = .AnX2 
+var x2: X2<Int> = .AnX2
 x2 = .AnX2    // reference to isInvalid() decl.
 x2 = .NotAnX2 // expected-error{{member 'NotAnX2' in 'X2<Int>' produces result of type 'Int', but context expects 'X2<Int>'}}
 

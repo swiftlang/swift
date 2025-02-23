@@ -209,7 +209,7 @@ public func doSomethingWithAssocConformances<T: AddAssocTypesProtocol>(_ value: 
   if let simpleType = at2 as? SimpleProtocol.Type {
     return simpleType.getString()
   }
-  
+
   return "missing associated conformance"
 #else
   return "there are no associated conformances yet"

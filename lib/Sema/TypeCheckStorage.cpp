@@ -81,20 +81,20 @@ Expr *TypeChecker::buildDefaultInitializer(Type type) {
 
 /// Does the context allow pattern bindings that don't bind any variables?
 static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
-  
+
   // Property decls in type context must bind variables.
   if (dc->isTypeContext())
     return false;
-  
+
   // Global variable decls must bind variables, except in scripts.
   if (dc->isModuleScopeContext()) {
     if (dc->getParentSourceFile()
         && dc->getParentSourceFile()->isScriptMode())
       return true;
-    
+
     return false;
   }
-  
+
   return true;
 }
 
@@ -568,7 +568,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
                                  : GlobalVariable);
     }
   }
-  
+
   // If the pattern binding appears as a compound stored `let` property with an
   // initializer inside of a struct type, diagnose it as unsupported.
   // This hasn't ever been implemented properly.
@@ -582,7 +582,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     Context.Diags.diagnose(binding->getPattern(entryNumber)->getLoc(),
                            diag::destructuring_let_struct_stored_property_unsupported);
   }
-  
+
   return &pbe;
 }
 
@@ -937,8 +937,8 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
 
   if (prefix.empty())
     return indices;
-  
-  
+
+
   // Otherwise, we need to build up a new parameter list.
   SmallVector<ParamDecl*, 4> elements;
 
@@ -1116,10 +1116,10 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       if (isWrapperRefLValue)
         type = LValueType::get(type);
       memberRefExpr->setType(type);
-      
+
       result = memberRefExpr;
     }
-    
+
     return result;
   };
 
@@ -1181,7 +1181,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
         selfTypeForAccess = MetatypeType::get(selfTypeForAccess);
 
     // Otherwise do a self-reference, which is dynamically bogus but
-    // should be statically valid.  This should only happen in invalid cases.    
+    // should be statically valid.  This should only happen in invalid cases.
     } else {
       semantics = AccessSemantics::Ordinary;
       selfAccessKind = SelfAccessorKind::Peer;
@@ -2009,7 +2009,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
 
   if (auto willSet = VD->getParsedAccessor(AccessorKind::WillSet))
     callObserver(willSet, ValueDecl);
-  
+
   // Create an assignment into the storage or call to superclass setter.
   auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(), true);
   ValueDRE->setType(ValueDecl->getTypeInContext());
@@ -2453,7 +2453,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   // All mutable storage requires a setter.
   assert(storage->requiresOpaqueAccessor(AccessorKind::Set));
-  
+
   // Copy availability from the accessor we'll synthesize the setter from.
   SmallVector<const Decl *, 2> asAvailableAs;
 
@@ -2474,7 +2474,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
     // Setter's availability shouldn't be externally influenced in these
     // cases.
     break;
-      
+
   case WriteImplKind::MutableAddress:
     if (auto addr = storage->getOpaqueAccessor(AccessorKind::MutableAddress)) {
       asAvailableAs.push_back(addr);
@@ -2491,11 +2491,11 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
     }
     break;
   }
-  
+
   if (!asAvailableAs.empty()) {
     AvailabilityInference::applyInferredAvailableAttrs(setter, asAvailableAs);
   }
-  
+
   finishImplicitAccessor(setter, ctx);
 
   return setter;
@@ -3147,7 +3147,7 @@ getSetterMutatingness(VarDecl *var, DeclContext *dc) {
   if (!var->isSettable(nullptr) ||
       !var->isSetterAccessibleFrom(dc))
     return PropertyWrapperMutability::DoesntExist;
-  
+
   return var->isSetterMutating()
     ? PropertyWrapperMutability::Mutating
     : PropertyWrapperMutability::Nonmutating;
@@ -3190,7 +3190,7 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &, VarDecl *var) const {
     return std::nullopt;
 
   PropertyWrapperMutability result;
-  
+
   result.Getter = getGetterMutatingness(firstWrapper.*varMember);
   result.Setter = getSetterMutatingness(firstWrapper.*varMember,
                                         var->getInnermostDeclContext());
@@ -3509,7 +3509,7 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
     SourceLoc typeLoc;
     if (auto *repr = var->getTypeReprOrParentPatternTypeRepr())
       typeLoc = repr->getEndLoc();
-    
+
     if (info.hasStorage()) {
       // Protocols cannot have stored properties.
       if (var->isLet()) {
@@ -3838,7 +3838,7 @@ void HasStorageRequest::cacheResult(bool hasStorage) const {
   // Add an attribute for printing, but only to VarDecls.
   if (isa<ParamDecl>(decl))
     return;
-  
+
   if (auto varDecl = dyn_cast<VarDecl>(decl)) {
     if (hasStorage && !varDecl->getAttrs().hasAttribute<HasStorageAttr>())
       varDecl->getAttrs().add(new (varDecl->getASTContext())

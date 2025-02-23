@@ -2,7 +2,7 @@
 
 // REQUIRES: swift_in_compiler
 
-// Check that values of internal and private global variables, which are provably assigned only 
+// Check that values of internal and private global variables, which are provably assigned only
 // once, are propagated into their uses and enable further optimizations like constant
 // propagation, simplifications, etc.
 
@@ -36,7 +36,7 @@ public func assignSecondTime() {
 
 // Having multiple assignments to a global should prevent from performing the propagation of its value.
 
-// Loads from private global variables can be removed, 
+// Loads from private global variables can be removed,
 // because they cannot be changed outside of this source file.
 // CHECK-LABEL: sil [noinline] @$s28globalopt_global_propagation013test_private_B11_var_doubleSdyF
 // CHECK: bb0:
@@ -46,10 +46,10 @@ public func assignSecondTime() {
 // CHECK: return
 @inline(never)
 public func test_private_global_var_double() -> Double {
-  return PVD + 1.0 
+  return PVD + 1.0
 }
 
-// Loads from private global variables can be removed, 
+// Loads from private global variables can be removed,
 // because they cannot be changed outside of this source file.
 // CHECK-LABEL: sil [noinline] @$s28globalopt_global_propagation013test_private_B8_var_intSiyF
 // CHECK: bb0:
@@ -72,7 +72,7 @@ public func test_private_global_var_int() -> Int {
 // CHECK-WMO: return
 @inline(never)
 public func test_internal_global_var_double() -> Double {
-  return IVD + 1.0 
+  return IVD + 1.0
 }
 
 // Loads from internal global variables can be removed if this is a WMO compilation, because
@@ -97,13 +97,13 @@ public func test_internal_global_var_int() -> Int {
 // CHECK-WMO-NEXT: load
 @inline(never)
 public func test_public_global_var_double() -> Double {
-  return VD + 1.0 
+  return VD + 1.0
 }
 
 
 // Loads from public global variables cannot be removed, because their values could be changed elsewhere.
 // CHECK-LABEL: sil [noinline] @$s28globalopt_global_propagation012test_public_B8_var_intSiyF
-// CHECK: bb0: 
+// CHECK: bb0:
 // CHECK-NEXT: global_addr
 // CHECK-NEXT: begin_access [read] [dynamic]
 // CHECK-NEXT: struct_element_addr
@@ -115,7 +115,7 @@ public func test_public_global_var_int() -> Int {
 
 // Values of globals cannot be propagated as there are multiple assignments to it.
 // CHECK-WMO-LABEL: sil [noinline] @$s28globalopt_global_propagation026test_internal_and_private_B25_var_with_two_assignmentsSiyF
-// CHECK-WMO: bb0: 
+// CHECK-WMO: bb0:
 // CHECK-WMO-DAG: global_addr
 // CHECK-WMO-DAG: struct_element_addr
 // CHECK-WMO-DAG: load

@@ -671,9 +671,9 @@ Base.Iterator.Element == S.Iterator.Element {
     let ptr = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
     let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
     var (remainders,writtenUpTo) = s._copyContents(initializing: buf)
-    expectTrue(remainders.next() == nil, 
+    expectTrue(remainders.next() == nil,
       "_copyContents returned unwritten elements")
-    expectTrue(writtenUpTo == buf.endIndex, 
+    expectTrue(writtenUpTo == buf.endIndex,
       "_copyContents failed to use entire buffer")
     ptr.deinitialize(count: count)
     ptr.deallocate()
@@ -1307,7 +1307,7 @@ prefixDropWhileTests = [
   ([0, 10, 20, 30, 40],     20,     2),
   ([0, 10, 20, 30, 40],     30,     3),
   ([0, 10, 20, 30, 40],     40,     4),
-  ([0, 10, 20, 30, 40],     99,     5) 
+  ([0, 10, 20, 30, 40],     99,     5)
 ]
 
 % for Kind in 'Sequence', 'Forward', 'Bidirectional':

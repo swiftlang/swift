@@ -39,10 +39,10 @@ class Target : NSObject, NSKeyValueObservingCustomization {
         }
     }
     @objc dynamic var objcValue3: String
-    
+
     // This Swift-typed property causes vtable usage on this class.
     var swiftValue: Guts
-    
+
     override init() {
         self.swiftValue = Guts()
         self.objcValue = ""
@@ -50,7 +50,7 @@ class Target : NSObject, NSKeyValueObservingCustomization {
         self.objcValue3 = ""
         super.init()
     }
-    
+
     static func keyPathsAffectingValue(for key: AnyKeyPath) -> Set<AnyKeyPath> {
         if (key == \Target.objcValue) {
             return [\Target.objcValue2, \Target.objcValue3]
@@ -58,14 +58,14 @@ class Target : NSObject, NSKeyValueObservingCustomization {
             return []
         }
     }
-    
+
     static func automaticallyNotifiesObservers(for key: AnyKeyPath) -> Bool {
         if key == \Target.objcValue2 || key == \Target.objcValue3 {
             return false
         }
         return true
     }
-    
+
     func print() {
         Swift.print("swiftValue \(self.swiftValue.value), objcValue \(objcValue)")
     }
@@ -75,16 +75,16 @@ class Target : NSObject, NSKeyValueObservingCustomization {
 class ObserverKVO : NSObject {
     var target: Target?
     var observation: NSKeyValueObservation? = nil
-    
+
     override init() { target = nil; super.init() }
-    
+
     func observeTarget(_ target: Target) {
         self.target = target
         observation = target.observe(\.objcValue) { (object, change) in
             Swift.print("swiftValue \(object.swiftValue.value), objcValue \(object.objcValue)")
         }
     }
-    
+
     func removeTarget() {
         observation!.invalidate()
     }
@@ -198,10 +198,10 @@ print("keyPath == \\Sortable1.name:", descriptor.keyPath == \Sortable1.name)
 //===----------------------------------------------------------------------===//
 
 class TestClassForOptionalKeyPath : NSObject {
-    
+
     // Should not use NSObject? as object type
     @objc dynamic var optionalObject: String?
-    
+
 }
 
 let testObjectForOptionalKeyPath = TestClassForOptionalKeyPath()

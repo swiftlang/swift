@@ -22,9 +22,9 @@ public enum Metasyntactics: String, RawRepresentable {
     case qux
     @available(iOS 16.0, *)
     case quux
-    @available(iOS 999.9.9, *)    
+    @available(iOS 999.9.9, *)
     case corge
-    @available(iOS 18.0, *)    
+    @available(iOS 18.0, *)
     case grault
     case garply
     case waldo

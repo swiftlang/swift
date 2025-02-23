@@ -19,7 +19,7 @@ testSetX(2)
 
 // Beware: this test exhibits a subtle difference between open source Clang and AppleClang:
 // AppleClang runs in an ABI compatibility mode with Clang <= 4, which uses a
-// different criteria to determine whether a C++ type can be passed in 
+// different criteria to determine whether a C++ type can be passed in
 // registers. This causes Swift to assume that NonCopyableHolderDerivedDerived
 // can be both loadable or address-only, depending on the compiler flavor used.
 // (rdar://128424443)

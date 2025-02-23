@@ -35,7 +35,7 @@ if #available(SwiftStdlib 5.1, *) {
 
   // Objective-C protocol:
   // CHECK: Type info:
-  // CHECK: $sSo9NSCopying_Xl 
+  // CHECK: $sSo9NSCopying_Xl
   reflect(any: { () -> NSCopying in NSString("abc") }())
 
   // Generic types involving ObjC and CF types.

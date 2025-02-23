@@ -165,9 +165,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       auto *paramType = GenericTypeParamType::getType(opaqueSignatureDepth, i,
                                                       ctx);
       genericParamTypes.push_back(paramType);
-    
+
       TypeRepr *constraint = currentRepr;
-      
+
       if (auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr)){
         constraint = opaqueReturn->getConstraint();
       }
@@ -1104,7 +1104,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
 }
 
 Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
-                                     TypeAliasDecl *typeAlias) const {  
+                                     TypeAliasDecl *typeAlias) const {
   TypeResolutionOptions options((typeAlias->getGenericParams()
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));

@@ -502,7 +502,7 @@ public func localizationKeyShouldNotAppearInDocComments2() {}
 /// Brief.
 ///
 /// - Tag:
-/// - Tag:  
+/// - Tag:
 /// - Tag: Tag_A
 /// - Tag: Tag B
 /// - Tag: Dedupe tag

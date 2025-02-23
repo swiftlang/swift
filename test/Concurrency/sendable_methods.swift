@@ -24,7 +24,7 @@ struct S : Sendable {
 
 enum E : Sendable {
   case a, b, c
-  
+
   func f() {}
 }
 
@@ -43,7 +43,7 @@ struct InferredSendableS: P {
 enum InferredSendableE: P {
   case a, b
   case c(Int)
-  
+
   func f() { }
 }
 
@@ -152,7 +152,7 @@ partialClass = NonSendable().f // expected-warning{{converting non-sendable func
 partialStruct = NonSendable().f // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
 partialEnum = NonSendable().f // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
 
-// Static Functions 
+// Static Functions
 struct World {
   static func greet () { print("hello") }
 }

@@ -29,17 +29,17 @@ case (var a, a): // expected-error {{cannot find 'a' in scope}}
 
 protocol P { func p() }
 
-class B : P { 
-  init() {} 
+class B : P {
+  init() {}
   func p() {}
   func b() {}
 }
 class D : B {
-  override init() { super.init() } 
+  override init() { super.init() }
   func d() {}
 }
 class E {
-  init() {} 
+  init() {}
   func e() {}
 }
 
@@ -728,7 +728,7 @@ func issue66752(_ x: Result<String, Error>) {
   // expected-error@-1 {{type '()' cannot conform to 'Error}}
   // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
   // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
-  
+
   if case (.failure(), let y) = (x, 0) {}
   // expected-error@-1 {{type '()' cannot conform to 'Error}}
   // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}

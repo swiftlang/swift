@@ -136,7 +136,7 @@ public:
     assert(!base || !base->hasTypeParameter());
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
            "Badly aligned decl");
-    
+
     DeclOrKind = value;
   }
 
@@ -224,7 +224,7 @@ public:
   Type getBaseType() const {
     return BaseAndDeclKind.getPointer();
   }
-  
+
   /// Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {
     if (!DynamicMember.getPointer().empty()) {
@@ -232,7 +232,7 @@ public:
                  ? OverloadChoiceKind::KeyPathDynamicMemberLookup
                  : OverloadChoiceKind::DynamicMemberLookup;
     }
-    
+
     if (DeclOrKind.is<ValueDecl*>()) {
       switch (BaseAndDeclKind.getInt()) {
       case IsDeclViaBridge: return OverloadChoiceKind::DeclViaBridge;

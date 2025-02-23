@@ -163,7 +163,7 @@ struct WritebackReabstractedInoutCleanup final : Cleanup {
       : OrigAddress(origAddress), SubstAddress(substAddress),
         OrigTy(origTy), SubstTy(substTy)
   {}
-  
+
   void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind)
   override {
     Scope s(SGF.Cleanups, l);
@@ -178,7 +178,7 @@ struct WritebackReabstractedInoutCleanup final : Cleanup {
     SGF.B.createStore(l, mv.forward(SGF), OrigAddress,
                       StoreOwnershipQualifier::Init);
   }
-  
+
   void dump(SILGenFunction&) const override {
     llvm::errs() << "WritebackReabstractedInoutCleanup\n";
     OrigAddress->print(llvm::errs());
@@ -697,7 +697,7 @@ public:
 
     if (FormalParamTypes) FormalParamTypes->finish();
     loweredParams.finish();
-    
+
     for (auto addressableParam : AddressableParams) {
       assert(SGF.VarLocs.contains(addressableParam));
       SGF.VarLocs[addressableParam].addressable = true;
@@ -737,7 +737,7 @@ private:
       // A parameter can be directly marked as addressable, or its
       // addressability can be implied by a scoped dependency.
       bool isAddressable = false;
-      
+
       isAddressable = pd->isAddressable()
         || (ScopedDependencies.contains(pd)
             && SGF.getTypeLowering(origType, substType)
@@ -1083,11 +1083,11 @@ private:
 };
 } // end anonymous namespace
 
-  
+
 static void makeArgument(Type ty, ParamDecl *decl,
                          SmallVectorImpl<SILValue> &args, SILGenFunction &SGF) {
   assert(ty && "no type?!");
-  
+
   if (ty->is<PackExpansionType>()) {
     ty = PackType::get(SGF.getASTContext(), {ty});
   }
@@ -1172,7 +1172,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 
   auto *VD = cast<VarDecl>(capture.getDecl());
-  
+
   SILLocation Loc(VD);
   Loc.markAsPrologue();
 
@@ -1196,7 +1196,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   SILType ty = lowering.getLoweredType();
 
   bool isNoImplicitCopy;
-  
+
   if (ty.isTrivial(SGF.F) || ty.isMoveOnly()) {
     isNoImplicitCopy = false;
   } else if (VD->isNoImplicitCopy()) {
@@ -1218,7 +1218,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   } else {
     isNoImplicitCopy = false;
   }
-    
+
   SILValue arg;
   SILFunctionArgument *box = nullptr;
 
@@ -1253,7 +1253,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       addr->finishInitialization(SGF);
       val = addr->getManagedAddress();
     }
-    
+
     if (isNoImplicitCopy && !val.getType().isMoveOnly()) {
       val = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(VD, val);
     }
@@ -1313,7 +1313,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
     fArg->setClosureCapture(true);
     arg = SILValue(fArg);
-    
+
     if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
       switch (argConv) {
       case SILArgumentConvention::Indirect_Inout:
@@ -1326,15 +1326,15 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       case SILArgumentConvention::Pack_Guaranteed:
         arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(VD, arg);
         break;
-        
+
       case SILArgumentConvention::Direct_Owned:
         arg = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(VD, arg);
         break;
-      
+
       case SILArgumentConvention::Direct_Guaranteed:
         arg = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(VD, arg);
         break;
-      
+
       case SILArgumentConvention::Direct_Unowned:
       case SILArgumentConvention::Indirect_Out:
       case SILArgumentConvention::Pack_Out:
@@ -1625,7 +1625,7 @@ uint16_t SILGenFunction::emitBasicProlog(
     ? origClosureType->getFunctionResultType()
     : AbstractionPattern(genericSig.getCanonicalSignature(),
                          resultType->getCanonicalType());
-  
+
   emitIndirectResultParameters(*this, resultType, origResultType, DC);
 
   std::optional<AbstractionPattern> origErrorType;
@@ -1642,7 +1642,7 @@ uint16_t SILGenFunction::emitBasicProlog(
       F.getConventions().hasIndirectSILErrorResults()) {
     emitIndirectErrorParameter(*this, *errorType, *origErrorType, DC);
   }
-  
+
   // Parameters with scoped dependencies may lower differently. Parameters are
   // relative to the current SILGenFunction, not the passed in DeclContext. For
   // example, the an argument initializer's DeclContext is the enclosing
@@ -1673,7 +1673,7 @@ uint16_t SILGenFunction::emitBasicProlog(
                        std::move(scopedDependencyParams))
       .emitParams(origClosureType, paramList, selfParam);
 
-  // Record the ArgNo of the artificial $error inout argument. 
+  // Record the ArgNo of the artificial $error inout argument.
   if (errorType && IndirectErrorResult == nullptr) {
     CanType errorTypeInContext =
       DC->mapTypeIntoContext(*errorType)->getCanonicalType();

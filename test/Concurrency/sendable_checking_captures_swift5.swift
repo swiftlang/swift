@@ -34,7 +34,7 @@ do {
 
   @preconcurrency
   func sendable_preconcurrency(_: @Sendable () -> Void) {}
-  
+
   func withMutable(_: (inout Test) -> Void) {}
 
   withMutable { test in

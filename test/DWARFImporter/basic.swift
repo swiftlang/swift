@@ -18,7 +18,7 @@
 
 // CHECK: Importing basic...
 // CHECK: Import successful!
-// FAIL: Importing basic... 
+// FAIL: Importing basic...
 // FAIL: Import successful!
 // SWIFTONLY: Importing basic...
 // SWIFTONLY: Import successful!
@@ -28,7 +28,7 @@ import ObjCModule
 let pureSwift = Int32(42)
 // FAIL-NOT:  var_decl
 // CHECK:     var_decl {{.*}} "pureSwift"{{.*}} interface_type="Int32"
-// SWIFTONLY: var_decl {{.*}} "pureSwift"{{.*}} interface_type="Int32" 
+// SWIFTONLY: var_decl {{.*}} "pureSwift"{{.*}} interface_type="Int32"
 
 let point = Point(x: 1, y: 2)
 // CHECK:     var_decl {{.*}} "point"{{.*}} interface_type="Point"

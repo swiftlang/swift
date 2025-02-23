@@ -13,7 +13,7 @@ extension P {
   // expected-note@-1 {{candidate would match if 'X.A' (aka 'X') was the same type as 'X.B' (aka 'Int')}}
 }
 
-struct X : P { 
+struct X : P {
   // expected-error@-1 {{type 'X' does not conform to protocol 'P'}}
   // expected-note@-2 {{add stubs for conformance}}
   typealias A = X

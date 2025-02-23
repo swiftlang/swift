@@ -66,7 +66,7 @@ foo1.bar = 2
 // CHECK-LABEL: sil hidden [ossa] @$s28lazy_property_with_observers3FooC3barSivs : $@convention(method) (Int, @guaranteed Foo) -> () {
 // CHECK: bb0([[VALUE:%.*]] : $Int, [[FOO:%.*]] : @guaranteed $Foo):
 // CHECK-NEXT:  debug_value [[VALUE]] : $Int, let, name "value", argno 1
-// CHECK-NEXT:  debug_value [[FOO]] : $Foo, let, name "self", argno 2 
+// CHECK-NEXT:  debug_value [[FOO]] : $Foo, let, name "self", argno 2
 // CHECK-NEXT:  [[GETTER:%.*]] = class_method [[FOO]] : $Foo, #Foo.bar!getter : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
 // CHECK-NEXT:  [[OLDVALUE:%.*]] = apply [[GETTER]]([[FOO]]) : $@convention(method) (@guaranteed Foo) -> Int
 // CHECK-NEXT:  [[MV:%.*]] = move_value [var_decl] [[OLDVALUE]] : $Int
@@ -112,7 +112,7 @@ foo1.bar = 2
 // CHECK-LABEL: sil hidden [ossa] @$s28lazy_property_with_observers3FooC11observable1Sivs : $@convention(method) (Int, @guaranteed Foo) -> () {
 // CHECK: bb0([[VALUE:%.*]] : $Int, [[FOO:%.*]] : @guaranteed $Foo):
 // CHECK-NEXT:  debug_value [[VALUE]] : $Int, let, name "value", argno 1
-// CHECK-NEXT:  debug_value [[FOO]] : $Foo, let, name "self", argno 2 
+// CHECK-NEXT:  debug_value [[FOO]] : $Foo, let, name "self", argno 2
 // CHECK-NEXT:  [[GETTER:%.*]] = class_method [[FOO]] : $Foo, #Foo.observable1!getter : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
 // CHECK-NEXT:  [[OLDVALUE:%.*]] = apply [[GETTER]]([[FOO]]) : $@convention(method) (@guaranteed Foo) -> Int
 // CHECK-NEXT:  [[MV:%.*]] = move_value [var_decl] [[OLDVALUE]] : $Int

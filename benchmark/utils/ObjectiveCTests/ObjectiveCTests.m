@@ -135,7 +135,7 @@
 }
 
 - (void)setUpStringTests:(NSArray<NSString *> *)inBridgedStrings {
-  
+
   const char *taggedContents = "hello";
   const char *tagged2Contents = "hella";
   const char *notTaggedContents = "the quick brown fox jumps over the lazy dog";
@@ -144,7 +144,7 @@
   const char *nonASCII2Contents = "the quick brown fox jumps over the lazy dög";
   const char *longNonASCIIContents = "the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy dïgz";
   const char *longASCIIContents = "the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy the quick brown fox jumps over the lazy dogz";
-  
+
   NSString *tagged = [NSString stringWithUTF8String:taggedContents];
   NSString *tagged2 = [NSString stringWithUTF8String:tagged2Contents];
   NSString *notTagged = [NSString stringWithUTF8String:notTaggedContents];
@@ -159,7 +159,7 @@
   NSString *constantTaggable = @"hello";
   NSString *constantASCII = @"the quick brown fox jumps over the lazy dog";
   NSString *constantNonASCII = @"the quick brown fox jümps over the lazy dog";
-  
+
   unichar taggableUnichars[] = {
     'h', 'e', 'l', 'l', 'o'
   };
@@ -172,7 +172,7 @@
   NSString *nonTaggableFastCustom = [[CustomFastASCIIString alloc] initWithCString:notTaggedContents encoding:NSASCIIStringEncoding];
   NSString *taggableUnicodeCustom = [[CustomFastUnicodeString alloc] initWithCharacters:&taggableUnichars[0] length:sizeof(taggableUnichars) / sizeof(taggableUnichars[0])];
   NSString *nonTaggableUnicodeCustom = [[CustomFastUnicodeString alloc] initWithCharacters:&nonTaggableUnichars[0] length:sizeof(nonTaggableUnichars) / sizeof(nonTaggableUnichars[0])];
-  
+
   cornucopiaOfStrings = [NSArray arrayWithObjects: tagged, tagged2, notTagged, notTagged2, notTaggedLonger, nonASCII, nonASCII2, nonASCIIOther, longNonASCII, noCopyLongASCII, noCopyLongNonASCII, constantASCII, constantNonASCII
                          , taggableCustom, nonTaggableCustom, taggableFastCustom, nonTaggableFastCustom, taggableUnicodeCustom, nonTaggableUnicodeCustom, nil];
   bridgedStrings = inBridgedStrings;

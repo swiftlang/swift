@@ -24,7 +24,7 @@ class Decl;
 /// stored in a separately-allocated side structure.
 struct SourceFileExtras {
 };
-  
+
 }
 
 #endif // SWIFT_AST_SOURCEFILEEXTRAS_H

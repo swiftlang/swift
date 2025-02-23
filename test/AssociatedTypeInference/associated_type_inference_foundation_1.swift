@@ -6,16 +6,16 @@ import Foundation
 
 public struct CustomCollection<T>: RandomAccessCollection {
     public typealias Indices = Range<Int>
-    
+
     public var startIndex: Int { fatalError() }
     public var endIndex: Int { fatalError() }
     public var count: Int { fatalError() }
-    
+
     public subscript(position: Int) -> T {
         get { fatalError() }
         set { fatalError() }
     }
-    
+
     public var underestimatedCount: Int { fatalError() }
 }
 

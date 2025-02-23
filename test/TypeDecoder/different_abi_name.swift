@@ -1,12 +1,12 @@
-// Tests that reconstructing a type from a mangled name whose type is defined 
-// in a separate module which has a different ABI name compared to its regular 
+// Tests that reconstructing a type from a mangled name whose type is defined
+// in a separate module which has a different ABI name compared to its regular
 // name works.
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: cd %t
 
-// RUN: %target-build-swift -emit-library -emit-module -parse-as-library -module-abi-name Other -g %t/TheModule.swift 
+// RUN: %target-build-swift -emit-library -emit-module -parse-as-library -module-abi-name Other -g %t/TheModule.swift
 // RUN: %target-build-swift -emit-executable -I %t -L %t -lTheModule -g -o %t/user -emit-module %t/user.swift
 
 

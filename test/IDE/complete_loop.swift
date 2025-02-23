@@ -61,7 +61,7 @@ class C {
     do {
       for user in a {
         user.#^LOOP_5^#
-// LOOP_5-DAG: Keyword[self]/CurrNominal:          self[#C#]; 
+// LOOP_5-DAG: Keyword[self]/CurrNominal:          self[#C#];
 // LOOP_5-DAG: Decl[InstanceMethod]/CurrNominal:   f1({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#];
 // LOOP_5-DAG: Decl[InstanceMethod]/CurrNominal:   f2({#(Seq): [Int]#}, {#I: Int#}, {#G: Gen#})[#Void#];
 // LOOP_5-DAG: Decl[InstanceMethod]/CurrNominal:   f3({#(G): Gen#})[#Void#];

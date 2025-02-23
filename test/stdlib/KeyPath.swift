@@ -43,14 +43,14 @@ struct Point: Equatable {
   var trackLifetime = LifetimeTracked(123)
   let hypotenuse: Double
   private(set) var secretlyMutableHypotenuse: Double
-  
+
   init(x: Double, y: Double) {
     self.x = x
     self.y = y
     hypotenuse = x*x + y*y
     secretlyMutableHypotenuse = x*x + y*y
   }
-  
+
   static func ==(a: Point, b: Point) -> Bool {
     return a.x == b.x && a.y == b.y
   }
@@ -62,7 +62,7 @@ struct S<T: Equatable>: Equatable {
   var z: T
   var p: Point
   var c: C<T>
-  
+
   static func ==(a: S, b: S) -> Bool {
     return a.x == b.x
       && a.y === b.y
@@ -83,7 +83,7 @@ final class ComputedA {
 
 struct ComputedB {
   var readOnly: ComputedA { fatalError() }
-  var mutating: ComputedA { 
+  var mutating: ComputedA {
     get { fatalError() }
     set { fatalError() }
   }
@@ -148,7 +148,7 @@ keyPath.test("key path in-place instantiation") {
     let cb_mutating = (\ComputedB.mutating as AnyKeyPath) as! WritableKeyPath<ComputedB, ComputedA>
     let cb_nonmutating = (\ComputedB.nonmutating as AnyKeyPath) as! ReferenceWritableKeyPath<ComputedB, ComputedA>
     let cb_reabstracted = (\ComputedB.reabstracted as AnyKeyPath) as! WritableKeyPath<ComputedB, () -> ()>
-  
+
     let ca_readOnly_mutating = (\ComputedA.readOnly.mutating as AnyKeyPath) as! KeyPath<ComputedA, ComputedA>
     let cb_mutating_readOnly = (\ComputedB.mutating.readOnly as AnyKeyPath) as! KeyPath<ComputedB, ComputedB>
     let ca_readOnly_nonmutating = (\ComputedA.readOnly.nonmutating as AnyKeyPath) as! ReferenceWritableKeyPath<ComputedA, ComputedA>
@@ -460,7 +460,7 @@ struct TestOptional2 {
 keyPath.test("optional chaining") {
   let origin_x = \TestOptional.origin?.x
   let canary = \TestOptional.questionableCanary?.value
-  
+
   let withPoint = TestOptional(origin: Point(x: 3, y: 4))
   expectEqual(withPoint[keyPath: origin_x]!, 3)
   expectEqual(withPoint[keyPath: canary]!, 123)
@@ -915,14 +915,14 @@ keyPath.test("tuple key path execution (generic)") {
 
     let kp_t_0 = \T.0
     let kp_t_1 = \T.1
- 
+
     let kp_c_x = \Container<A, B>.x
     let kp_c_x_0 = kp_c_x.appending(path: kp_t_0)
     let kp_c_x_1 = kp_c_x.appending(path: kp_t_1)
 
     let kp_c_y_a = \Container<A, B>.y.a
     let kp_c_y_b = \Container<A, B>.y.b
- 
+
 
     let tuple = (a, b)
     let container = Container(x: (a, b), y: (a, b))
@@ -957,7 +957,7 @@ keyPath.test("key path literal closures") {
   let fnImmutable: (C<String>) -> String = \C<String>.immutable
   let fnSecretlyMutable: (C<String>) -> String = \C<String>.secretlyMutable
   let fnComputed: (C<String>) -> String = \C<String>.computed
-  
+
   let lifetime = LifetimeTracked(249)
   let base = C(x: 1, y: lifetime, z: "SE-0249")
 
@@ -967,27 +967,27 @@ keyPath.test("key path literal closures") {
   expectEqual("1 Optional(249) SE-0249", fnImmutable(base))
   expectEqual("1 Optional(249) SE-0249", fnSecretlyMutable(base))
   expectEqual("SE-0249", fnComputed(base))
-  
+
   // Subscripts
   var callsToComputeIndex = 0
   func computeIndexWithSideEffect(_ i: Int) -> Int {
     callsToComputeIndex += 1
     return -i
   }
-  
+
   let fnSubscriptResultA: (Subscripts<String>) -> SubscriptResult<String, Int>
     = \Subscripts<String>.["A", computeIndexWithSideEffect(13)]
   let fnSubscriptResultB: (Subscripts<String>) -> SubscriptResult<String, Int>
     = \Subscripts<String>.["B", computeIndexWithSideEffect(42)]
-  
+
   let subscripts = Subscripts<String>()
-  
+
   expectEqual("A", fnSubscriptResultA(subscripts).left)
   expectEqual(-13, fnSubscriptResultA(subscripts).right)
-  
+
   expectEqual("B", fnSubscriptResultB(subscripts).left)
   expectEqual(-42, fnSubscriptResultB(subscripts).right)
-  
+
   // Did we compute the indices once per closure construction, or once per
   // closure application?
   expectEqual(2, callsToComputeIndex)

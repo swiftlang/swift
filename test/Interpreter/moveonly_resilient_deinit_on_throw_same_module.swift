@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -o %t/a.out.fragile %s 
+// RUN: %target-build-swift -o %t/a.out.fragile %s
 // RUN: %target-codesign %t/a.out.fragile
 // RUN: %target-run %t/a.out.fragile | %FileCheck %s
 
-// RUN: %target-build-swift -enable-library-evolution -o %t/a.out.resilient %s 
+// RUN: %target-build-swift -enable-library-evolution -o %t/a.out.resilient %s
 // RUN: %target-codesign %t/a.out.resilient
 // RUN: %target-run %t/a.out.resilient | %FileCheck %s
 
@@ -22,7 +22,7 @@ public struct Resilient: ~Copyable {
         Self.nextValue += 1
     }
     deinit { print("resilient deinit \(value)") }
-    
+
     public init(throwing: Bool) throws {
         if throwing {
             throw MyError()

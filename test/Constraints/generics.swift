@@ -69,7 +69,7 @@ class X {
   func f() {}
 }
 
-class Foo<T> : X { 
+class Foo<T> : X {
   func g() { }
 }
 
@@ -225,7 +225,7 @@ func test9215114<T: P19215114, U: Q19215114>(_ t: T) -> (U) -> () {
 // <rdar://problem/21718970> QoI: [uninferred generic param] cannot invoke 'foo' with an argument list of type '(Int)'
 class Whatever<A: Numeric, B: Numeric> {  // expected-note 2 {{'A' declared as parameter to type 'Whatever'}} expected-note {{'B' declared as parameter to type 'Whatever'}}
   static func foo(a: B) {}
-  
+
   static func bar() {}
 
 }

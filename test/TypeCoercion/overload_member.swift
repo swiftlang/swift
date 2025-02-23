@@ -70,7 +70,7 @@ func test_mixed_overload(_ a: A, x: X, y: Y) {
   var x1 = a.mixed(x: x)
   x1 = x
   var y1 = a.mixed(y: y) // expected-error {{static member 'mixed' cannot be used on instance of type 'A'}} {{12-13=A}}
-  
+
   A.mixed(x) // expected-error{{cannot convert value of type 'X' to expected argument type 'A'}}
   var x2 = A.mixed(a)(x: x)
   x2 = x
@@ -178,7 +178,7 @@ extension A {
 
 var clams : X
 
-struct WeirdIvarLookupBehavior { 
+struct WeirdIvarLookupBehavior {
   var clams : Y
 
   func f() {

@@ -2,7 +2,7 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
-import Foundation 
+import Foundation
 @objc public protocol TAService {
     func removeKey() async -> Any
 }

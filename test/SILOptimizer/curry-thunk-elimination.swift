@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
 
 // Also do an end-to-end test to check all components, including IRGen.
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck --check-prefix=CHECK-OUTPUT %s
 

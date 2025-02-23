@@ -76,7 +76,7 @@ func checkEqual<
   S1 : Sequence, S2 : Sequence
 >(_ a1: S1, _ a2: S2, _ expected: Bool)
 where
-S1.Iterator.Element == S2.Iterator.Element, 
+S1.Iterator.Element == S2.Iterator.Element,
 S1.Iterator.Element : Equatable {
   if a1.elementsEqual(a2) != expected {
     let un = expected ? "un" : ""

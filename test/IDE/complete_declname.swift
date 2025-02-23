@@ -62,7 +62,7 @@ struct MyStruct : P {
 
   typealias #^TYPEALIASNAME_CONFORMANCE^#
 // TYPEALIASNAME_CONFORMANCE: Begin completions, 1 items
-// TYPEALIASNAME_CONFORMANCE-NEXT: Decl[AssociatedType]/Super: Assoc = {#(Type)#}; name=Assoc = 
+// TYPEALIASNAME_CONFORMANCE-NEXT: Decl[AssociatedType]/Super: Assoc = {#(Type)#}; name=Assoc =
 }
 struct MyStruct2: P {
   func #^METHODNAME_HASSIG^#() (<#parameters#>} {}

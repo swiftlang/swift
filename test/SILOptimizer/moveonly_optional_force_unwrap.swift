@@ -32,7 +32,7 @@ func unwrapBorrowMutateConsume_Consume(x: consuming NC?) {
 
     borrow(x!)
     mutate(&x!)
-    
+
     consume(x!)
 }
 
@@ -42,7 +42,7 @@ func unwrapBorrowMutateConsume2_Consume(x: consuming NC?) {
 
     borrow(x!)
     mutate(&x!)
-    
+
     x!.consume()
 }
 
@@ -52,7 +52,7 @@ func unwrapBorrowMutateConsumeBorrow_Consume(x: consuming NC?) { // expected-err
 
     borrow(x!)
     mutate(&x!)
-    
+
     consume(x!) // expected-note{{consumed here}}
 
     x!.borrow() // expected-note{{used here}}
@@ -65,7 +65,7 @@ func unwrapBorrowMutateConsumeMutate_Consume(x: consuming NC?) { // expected-err
 
     borrow(x!)
     mutate(&x!)
-    
+
     consume(x!) // expected-note{{consumed here}}
 
     x!.mutate() // expected-note{{used here}}
@@ -78,7 +78,7 @@ func unwrapBorrowMutateConsumeInitBorrow_Consume(x: consuming NC?, y: consuming 
 
     borrow(x!)
     mutate(&x!)
-    
+
     consume(x!)
 
     x = y
@@ -93,7 +93,7 @@ func unwrapBorrowMutateConsumeInitMutate_Consume(x: consuming NC?, y: consuming 
 
     borrow(x!)
     mutate(&x!)
-    
+
     consume(x!)
 
     x = y
@@ -108,7 +108,7 @@ func unwrapBorrowMutateConsumeInitBorrowMutateConsume_Consume(x: consuming NC?, 
 
     borrow(x!)
     mutate(&x!)
-    
+
     consume(x!)
 
     x = y

@@ -13,7 +13,7 @@ func useMyStruct() {
 
   MyStruct.self[1] = "zyzyx"
   MyStruct[2] = "asdfg"
-  
+
   MyStruct()[0] // expected-error {{static member 'subscript' cannot be used on instance of type 'MyStruct'}}
   MyStruct()[1] = "zyzyx" // expected-error {{static member 'subscript' cannot be used on instance of type 'MyStruct'}}
 }

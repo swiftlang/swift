@@ -15,7 +15,7 @@ func testDoSomethingBig() {
 // Verify serialization of async let _ = <expression> pattern
 func testSerializedAsyncLet() async {
   await doSerializedAsyncLet()
-} 
+}
 
 // Verify serialization of async let _ : <type> = <expression> pattern
 func testSerializedAsyncLetTyped() async {

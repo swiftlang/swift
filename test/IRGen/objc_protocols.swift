@@ -179,7 +179,7 @@ func objc_swift_protocol_composition
   x.runce()
   // CHECK: [[RUNCE:%.*]] = load ptr, ptr @"\01L_selector(runce)", align 8
   // CHECK: call void @objc_msgSend(ptr {{%.*}}, ptr [[RUNCE]])
-  /* TODO: Abstraction difference from ObjC protocol composition to 
+  /* TODO: Abstraction difference from ObjC protocol composition to
    * opaque protocol
   x.anse()
    */

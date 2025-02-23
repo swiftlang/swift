@@ -109,7 +109,7 @@ class CategoryInitializerVisitor
 
   llvm::Value *classMetadata;
   llvm::Constant *metaclassMetadata;
-  
+
 public:
   CategoryInitializerVisitor(IRGenFunction &IGF, ExtensionDecl *ext)
     : IGF(IGF)
@@ -140,7 +140,7 @@ public:
       Builder.CreateCall(class_addProtocol, {classMetadata, proto});
     }
   }
-  
+
   void visitMembers(ExtensionDecl *ext) {
     for (Decl *member : ext->getMembers())
       visit(member);
@@ -165,7 +165,7 @@ public:
 
     auto descriptor = emitObjCMethodDescriptorParts(IGM, method,
                                                     /*concrete*/true);
-    
+
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
     llvm::Value *sel = Builder.CreateCall(
@@ -177,7 +177,7 @@ public:
       descriptor.impl,
       descriptor.typeEncoding
     };
-    
+
     Builder.CreateCall(class_replaceMethod, args);
   }
 
@@ -207,7 +207,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *binding) {
     // Ignore the PBD and just handle the individual vars.
   }
-  
+
   void visitVarDecl(VarDecl *prop) {
     if (!requiresObjCPropertyDescriptor(IGM, prop)) return;
 
@@ -235,7 +235,7 @@ public:
                                descriptor.selectorRef);
       llvm::Value *setterArgs[] =
         {theClass, sel, descriptor.impl, descriptor.typeEncoding};
-      
+
       Builder.CreateCall(class_replaceMethod, setterArgs);
     }
   }
@@ -243,7 +243,7 @@ public:
   void visitSubscriptDecl(SubscriptDecl *subscript) {
     assert(!subscript->isStatic() && "objc doesn't support class subscripts");
     if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
-    
+
     auto descriptor = emitObjCGetterDescriptorParts(IGM, subscript);
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
@@ -259,7 +259,7 @@ public:
                                descriptor.selectorRef);
       llvm::Value *setterArgs[] =
         {classMetadata, sel, descriptor.impl, descriptor.typeEncoding};
-      
+
       Builder.CreateCall(class_replaceMethod, setterArgs);
     }
   }
@@ -278,7 +278,7 @@ class ObjCProtocolInitializerVisitor
       protocol_addProtocol;
 
   llvm::Value *NewProto = nullptr;
-  
+
 public:
   ObjCProtocolInitializerVisitor(IRGenFunction &IGF)
     : IGF(IGF)
@@ -290,14 +290,14 @@ public:
         IGM.getProtocolAddMethodDescriptionFunctionPointer();
     protocol_addProtocol = IGM.getProtocolAddProtocolFunctionPointer();
   }
-  
+
   void visitMembers(ProtocolDecl *proto) {
     // Check if the ObjC runtime already has a descriptor for this
     // protocol. If so, use it.
     SmallString<32> buf;
     auto protocolName
       = IGM.getAddrOfGlobalString(proto->getObjCRuntimeName(buf));
-    
+
     auto existing = Builder.CreateCall(objc_getProtocol, protocolName);
     auto isNull = Builder.CreateICmpEQ(existing,
                    llvm::ConstantPointerNull::get(IGM.ProtocolDescriptorPtrTy));
@@ -306,16 +306,16 @@ public:
     auto newBB = IGF.createBasicBlock("new_protocol");
     auto contBB = IGF.createBasicBlock("cont");
     Builder.CreateCondBr(isNull, newBB, existingBB);
-    
+
     // Nothing to do if there's already a descriptor.
     Builder.emitBlock(existingBB);
     Builder.CreateBr(contBB);
-    
+
     Builder.emitBlock(newBB);
-    
+
     // Allocate the protocol descriptor.
     NewProto = Builder.CreateCall(objc_allocateProtocol, protocolName);
-    
+
     // Add the parent protocols.
     for (auto parentProto : proto->getInheritedProtocols()) {
       if (!parentProto->isObjC())
@@ -326,15 +326,15 @@ public:
       parent = IGF.Builder.CreateBitCast(parent, IGM.ProtocolDescriptorPtrTy);
       Builder.CreateCall(protocol_addProtocol, {NewProto, parent});
     }
-    
+
     // Add the members.
     for (Decl *member : proto->getMembers())
       visit(member);
-    
+
     // Register it.
     Builder.CreateCall(objc_registerProtocol, NewProto);
     Builder.CreateBr(contBB);
-    
+
     // Store the reference to the runtime's idea of the protocol descriptor.
     Builder.emitBlock(contBB);
     auto result = Builder.CreatePHI(IGM.ProtocolDescriptorPtrTy, 2);
@@ -367,7 +367,7 @@ public:
 
     auto descriptor = emitObjCMethodDescriptorParts(IGM, method,
                                                     /*concrete*/false);
-    
+
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
     llvm::Value *sel = Builder.CreateCall(
@@ -382,17 +382,17 @@ public:
       llvm::ConstantInt::get(IGM.ObjCBoolTy,
                    isa<ConstructorDecl>(method) || method->isInstanceMember()),
     };
-    
+
     Builder.CreateCall(protocol_addMethodDescription, args);
   }
-  
+
   void visitPatternBindingDecl(PatternBindingDecl *binding) {
     // Ignore the PBD and just handle the individual vars.
   }
-  
+
   void visitAbstractStorageDecl(AbstractStorageDecl *prop) {
     // TODO: Add properties to protocol.
-    
+
     auto descriptor = emitObjCGetterDescriptorParts(IGM, prop);
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
@@ -408,7 +408,7 @@ public:
                              prop->isInstanceMember()),
     };
     Builder.CreateCall(protocol_addMethodDescription, getterArgs);
-    
+
     if (prop->isSettable(nullptr)) {
       auto descriptor = emitObjCSetterDescriptorParts(IGM, prop);
       sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFunctionPointer(),
@@ -605,7 +605,7 @@ void IRGenModule::emitRuntimeRegistration() {
       (!ObjCInterop || (ObjCProtocols.empty() && ObjCClasses.empty() &&
                         ObjCCategoryDecls.empty())))
     return;
-  
+
   // Find the entry point.
   SILFunction *EntryPoint = getSILModule().lookUpFunction(
       getSILModule().getASTContext().getEntryPointFunctionName());
@@ -627,14 +627,14 @@ void IRGenModule::emitRuntimeRegistration() {
       }
     }
   }
-  
+
   if (!EntryPoint)
     return;
-    
+
   llvm::Function *EntryFunction = Module.getFunction(EntryPoint->getName());
   if (!EntryFunction)
     return;
-  
+
   // Create a new function to contain our logic.
   auto fnTy = llvm::FunctionType::get(VoidTy, /*varArg*/ false);
   auto RegistrationFunction = llvm::Function::Create(fnTy,
@@ -642,7 +642,7 @@ void IRGenModule::emitRuntimeRegistration() {
                                            "runtime_registration",
                                            getModule());
   RegistrationFunction->setAttributes(constructInitialAttributes());
-  
+
   // Insert a call into the entry function.
   {
     llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
@@ -654,21 +654,21 @@ void IRGenModule::emitRuntimeRegistration() {
       DebugInfo->setEntryPointLoc(Builder);
     Builder.CreateCall(fnTy, RegistrationFunction, {});
   }
-  
+
   IRGenFunction RegIGF(*this, RegistrationFunction);
   if (DebugInfo && !Context.LangOpts.DebuggerSupport)
     DebugInfo->emitArtificialFunction(RegIGF, RegistrationFunction);
-  
+
   // Register ObjC protocols we added.
   if (ObjCInterop) {
     if (!ObjCProtocols.empty()) {
       // We need to initialize ObjC protocols in inheritance order, parents
       // first.
-      
+
       llvm::DenseSet<ProtocolDecl*> protos;
       for (auto &proto : ObjCProtocols)
         protos.insert(proto.first);
-      
+
       llvm::SmallVector<ProtocolDecl*, 4> protoInitOrder;
 
       std::function<void(ProtocolDecl*)> orderProtocol
@@ -684,7 +684,7 @@ void IRGenModule::emitRuntimeRegistration() {
           protos.erase(found);
           protoInitOrder.push_back(proto);
         };
-      
+
       while (!protos.empty()) {
         orderProtocol(*protos.begin());
       }
@@ -843,14 +843,14 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
     return {getAddrOfExtensionContextDescriptor(ext),
             ConstantReference::Direct};
   }
-      
+
   case DeclContextKind::Package:
     assert(false && "package decl context kind should not have been reached");
   case DeclContextKind::FileUnit:
   case DeclContextKind::MacroDecl:
     parent = parent->getParentModule();
     LLVM_FALLTHROUGH;
-      
+
   case DeclContextKind::Module:
     if (auto *D = ofChild->getAsDecl()) {
       // If the top-level decl has been marked as moved from another module,
@@ -906,7 +906,7 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from,
       return {getAddrOfAnonymousContextDescriptor(Type),
               ConstantReference::Direct};
   }
-  
+
   return getAddrOfContextDescriptorForParent(from->getParent(), from,
                                              fromAnonymousContext);
 }
@@ -1006,7 +1006,7 @@ IRGenModule::getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto) {
     return ConstantReference(cast<llvm::Constant>(refVar.getAddress()),
                              ConstantReference::Indirect);
   }
-  
+
   // Try to form a direct reference to the nominal type descriptor if it's in
   // the same binary, or use the GOT entry if it's from another binary.
   return getAddrOfLLVMVariableOrGOTEquivalent(
@@ -1156,7 +1156,7 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
       f.getLoweredFunctionType()->getSubstGenericSignature()) {
     return true;
   }
-  
+
   if (f.isPossiblyUsedExternally())
     return false;
 
@@ -1200,7 +1200,7 @@ void IRGenerator::emitGlobalTopLevel(
     CurrentIGMPtr IGM = getGenModule(decl ? decl->getDeclContext() : nullptr);
     IGM->emitSILGlobalVariable(&v);
   }
-  
+
   // Emit SIL functions.
   auto &m = PrimaryIGM->getSILModule();
   for (SILFunction &f : m) {
@@ -1230,7 +1230,7 @@ void IRGenerator::emitGlobalTopLevel(
       IGM->emitSILWitnessTable(&wt);
     }
   }
-  
+
   if (!SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     // Emit property descriptors.
     for (auto &prop : PrimaryIGM->getSILModule().getPropertyList()) {
@@ -1724,7 +1724,7 @@ void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
 
   bool isNovelUseOfDescriptor = !entry.IsDescriptorUsed;
   entry.IsDescriptorUsed = true;
-  
+
   if (isNovelUseOfDescriptor) {
     LazyOpaqueTypeDescriptors.push_back(opaque);
   }
@@ -1736,7 +1736,7 @@ void IRGenerator::noteUseOfExtensionDescriptor(ExtensionDecl *ext) {
 
   bool isNovelUseOfDescriptor = !entry.IsDescriptorUsed;
   entry.IsDescriptorUsed = true;
-  
+
   if (isNovelUseOfDescriptor) {
     LazyExtensionDescriptors.push_back(ext);
   }
@@ -2040,7 +2040,7 @@ void IRGenerator::emitEagerClassInitialization() {
     llvm::Value *MetaData = RegisterIGF.emitTypeMetadataRef(Ty);
     assert(CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>());
 
-    // Get the metadata to make sure that the class is registered. We need to 
+    // Get the metadata to make sure that the class is registered. We need to
     // add a use (empty inline asm instruction) for the metadata. Otherwise
     // llvm would optimize the metadata accessor call away because it's
     // defined as "readnone".
@@ -2121,7 +2121,7 @@ void IRGenModule::emitVTableStubs() {
     const SILFunction &F = *I;
     if (! F.isExternallyUsedSymbol())
       continue;
-    
+
     if (!stub) {
       // Create a single stub function which calls swift_deletedMethodError().
       stub = llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
@@ -2563,7 +2563,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
   case DeclKind::Subscript:
     llvm_unreachable("there are no global subscript operations");
-      
+
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
     llvm_unreachable("there are no global enum elements");
@@ -2610,11 +2610,11 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::Func:
     // Handled in SIL.
     return;
-  
+
   case DeclKind::TopLevelCode:
     // All the top-level code will be lowered separately.
     return;
-      
+
   // Operator decls aren't needed for IRGen.
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
@@ -2624,7 +2624,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
   case DeclKind::Module:
     return;
-      
+
   case DeclKind::OpaqueType:
     // TODO: Eventually we'll need to emit descriptors to access the opaque
     // type's metadata.
@@ -2762,7 +2762,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // Mark as llvm.used if @_used, set section if @_section
     if (var->markedAsUsed())
       addUsedGlobal(gvar);
-    else if (var->shouldBePreservedForDebugger() && forDefinition) 
+    else if (var->shouldBePreservedForDebugger() && forDefinition)
       addUsedGlobal(gvar);
     if (auto *sectionAttr = var->getSectionAttr())
       gvar->setSection(sectionAttr->Name);
@@ -3525,7 +3525,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     // If we have an Objective-C Clang declaration, it must be a direct
     // method and we want to generate the IR declaration ourselves.
     if (auto objcDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
-      isObjCDirect = true; 
+      isObjCDirect = true;
       assert(objcDecl->isDirectMethod());
     } else {
       auto globalDecl = getClangGlobalDeclForFunction(clangDecl);
@@ -3683,7 +3683,7 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                       llvm::GlobalValue::PrivateLinkage,
                                       global,
                                       llvm::Twine("got.") + globalName);
-  
+
   // rdar://problem/53836960: i386 ld64 also mis-links relative references
   // to GOT entries.
   // rdar://problem/59782487: issue with on-device JITd expressions.
@@ -3828,7 +3828,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   auto defaultType = overrideDeclType
     ? overrideDeclType
     : entity.getDefaultDeclarationType(*this);
-  
+
   auto existingGlobal = GlobalVars[entity];
   if (existingGlobal) {
     auto existing = cast<llvm::GlobalValue>(existingGlobal);
@@ -3935,7 +3935,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   }
 
   // If we have an existing entry, destroy it, replacing it with the
-  // new variable.  We only really have to do 
+  // new variable.  We only really have to do
   if (existingGlobal) {
     auto existing = cast<llvm::GlobalValue>(existingGlobal);
     auto castVar = llvm::ConstantExpr::getBitCast(var, existing->getType());
@@ -3986,11 +3986,11 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
     if (canDirectlyReferenceSILFunction(silFn)) {
       return {fn, ConstantReference::Direct};
     }
-    
+
     auto gotEquivalent = getOrCreateGOTEquivalent(fn, entity);
     return {gotEquivalent, ConstantReference::Indirect};
   }
-  
+
   // ObjC class references can always be directly referenced, even in
   // the weird cases where we don't see a definition.
   if (entity.isObjCClassRef()) {
@@ -3999,12 +3999,12 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
     return { cast<llvm::Constant>(value.getAddress()),
              ConstantReference::Direct };
   }
-  
+
   // Ensure the variable is at least forward-declared.
   getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
 
   auto entry = GlobalVars[entity];
-  
+
   /// Returns a direct reference.
   auto direct = [&]() -> ConstantReference {
     // FIXME: Relative references to aliases break MC on 32-bit Mach-O
@@ -4014,7 +4014,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
       return {alias->getAliasee(), ConstantReference::Direct};
     return {entry, ConstantReference::Direct};
   };
-  
+
   /// Returns an indirect reference.
   auto indirect = [&]() -> ConstantReference {
     auto gotEquivalent = getOrCreateGOTEquivalent(
@@ -4125,7 +4125,7 @@ IRGenModule::getTypeEntityReference(GenericTypeDecl *decl) {
     assert(!protocol->hasClangNode() && "imported protocols not handled here");
     return getProtocolDescriptorEntityReference(*this, protocol);
   }
-  
+
   if (auto opaque = dyn_cast<OpaqueTypeDecl>(decl)) {
     auto entity = LinkEntity::forOpaqueTypeDescriptor(opaque);
     IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
@@ -4394,7 +4394,7 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     return;
   }
-    
+
   emitProtocolConformance(record);
 
   if (conformanceIsVisibleViaMetadata(record.conformance)) {
@@ -4612,7 +4612,7 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords(bool asContiguousArray) {
     if (typesList.empty()) {
       return;
     }
-                                    
+
     for (auto type : typesList) {
       auto ref = getTypeEntityReference(type);
 
@@ -5177,7 +5177,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
   markGlobalAsUsedBasedOnLinkage(*this, link, var);
-  
+
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     return var;
   }
@@ -5358,7 +5358,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                                  typeOfValue, addr.getValue(), indices),
                              addr.isIndirect());
   }
-  
+
   return addr;
 }
 
@@ -5673,7 +5673,7 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
                              ForDefinition_t forDefinition) {
   auto alignment = entity.getAlignment(IGM);
   auto type = entity.getDefaultDeclarationType(IGM);
-  
+
   // Check whether it's already cached.
   llvm::Constant *&entry = cache[entity];
   if (entry) {
@@ -5754,7 +5754,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Subscript:
       // Handled in SIL.
       continue;
-        
+
     case DeclKind::PatternBinding:
     case DeclKind::Accessor:
     case DeclKind::Constructor:
@@ -5913,7 +5913,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
 
   SmallString<64> name;
   (llvm::Twine(".str.") + llvm::Twine(data.size()) + "." + data).toVector(name);
-  
+
   // \0 is not allowed in variable names. Rewrite any \0s into _s and append
   // information about their original locations so the name remains unique.
   for (size_t i = name.find('\0');
@@ -6018,8 +6018,8 @@ bool IRGenModule::hasResilientMetadata(ClassDecl *D,
     return false;
   }
 
-  // Because the debugger can extend non public types outside of their module, 
-  // also check that "D" is *not* resilient  from the module that contains 
+  // Because the debugger can extend non public types outside of their module,
+  // also check that "D" is *not* resilient  from the module that contains
   // "asViewedFromRootClass".
   if (Context.LangOpts.DebuggerSupport && asViewedFromRootClass &&
       !D->hasResilientMetadata(asViewedFromRootClass->getModuleContext(),

@@ -7,13 +7,13 @@
 
 // expected-note@+2{{add 'async' to function 'missingAsync' to make it asynchronous}}
 @available(SwiftStdlib 5.1, *)
-func missingAsync<T : AsyncSequence>(_ seq: T) throws { 
+func missingAsync<T : AsyncSequence>(_ seq: T) throws {
   for try await _ in seq { } // expected-error{{'async' in a function that does not support concurrency}}
 }
 
 @available(SwiftStdlib 5.1, *)
 func missingThrows<T : AsyncSequence>(_ seq: T) async {
-  for try await _ in seq { } 
+  for try await _ in seq { }
   // expected-error@-1 {{errors thrown from here are not handled}}
 }
 
@@ -23,25 +23,25 @@ func executeAsync(_ work: () async -> Void) { }
 func execute(_ work: () -> Void) { }
 
 @available(SwiftStdlib 5.1, *)
-func missingThrowingInBlock<T : AsyncSequence>(_ seq: T) { 
+func missingThrowingInBlock<T : AsyncSequence>(_ seq: T) {
   executeAsync { // expected-error{{invalid conversion from throwing function of type '() async throws -> Void' to non-throwing function type '() async -> Void'}}
     for try await _ in seq { }
   }
 }
 
 @available(SwiftStdlib 5.1, *)
-func missingTryInBlock<T : AsyncSequence>(_ seq: T) { 
-  executeAsync { 
-    for await _ in seq { } 
+func missingTryInBlock<T : AsyncSequence>(_ seq: T) {
+  executeAsync {
+    for await _ in seq { }
     // expected-error@-1{{call can throw, but the error is not handled}}
     // expected-error@-2{{errors thrown from here are not handled}}
   }
 }
 
 @available(SwiftStdlib 5.1, *)
-func missingAsyncInBlock<T : AsyncSequence>(_ seq: T) { 
+func missingAsyncInBlock<T : AsyncSequence>(_ seq: T) {
   execute { // expected-error{{cannot pass function of type '() async -> Void' to parameter expecting synchronous function type}}
-    do { 
+    do {
       for try await _ in seq { } // expected-note {{'async' inferred from asynchronous operation used here}}
     } catch { }
   }

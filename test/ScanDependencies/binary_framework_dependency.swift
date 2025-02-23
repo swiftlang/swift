@@ -19,7 +19,7 @@ import Foo
 // CHECK:      "swiftPrebuiltExternal": "Foo"
 // CHECK-NEXT:    },
 // CHECK-NEXT:    {
-// CHECK-NEXT:      "modulePath": 
+// CHECK-NEXT:      "modulePath":
 // CHECK-NEXT:      "directDependencies": [
 // CHECK:      "details": {
 // CHECK-NEXT:        "swiftPrebuiltExternal": {

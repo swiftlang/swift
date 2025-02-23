@@ -28,7 +28,7 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK: --- !Missed
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift',
 // CHECK-NEXT:                    Line: [[# @LINE + 42 ]], Column: 12 }
 // CHECK-NEXT: Function:        'getGlobal()'
 // CHECK-NEXT: Args:
@@ -36,14 +36,14 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK-NEXT:   - ValueType:       Klass
 // CHECK-NEXT:   - String:          ''''
 // CHECK-NEXT:   - InferredValue:   'of ''global'''
-// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift',
 // CHECK-NEXT:                        Line: [[# @LINE - 14 ]], Column: 12 }
 // CHECK-NEXT: ...
 //
 // CHECK: --- !Missed
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift',
 // CHECK-NEXT:                    Line: [[# @LINE + 27 ]], Column: 12 }
 // CHECK-NEXT: Function:        'getGlobal()'
 // CHECK-NEXT: Args:
@@ -51,7 +51,7 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK-NEXT:   - ValueType:       Klass
 // CHECK-NEXT:   - String:          ''''
 // CHECK-NEXT:   - InferredValue:   'of ''global'''
-// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift',
 // CHECK-NEXT:                        Line: [[# @LINE - 29 ]], Column: 12 }
 // CHECK-NEXT: ...
 //
@@ -83,7 +83,7 @@ public func getGlobal() -> Klass {
 // CHECK: --- !Missed
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift',
 // CHECK-NEXT:                    Line: [[# @LINE + 51 ]], Column: 11 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
@@ -94,7 +94,7 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT: --- !Missed
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift',
 // CHECK-NEXT:                    Line: [[# @LINE + 40 ]], Column: 5 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
@@ -102,13 +102,13 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT:   - ValueType:       Klass
 // CHECK-NEXT:   - String:          ''''
 // CHECK-NEXT:   - InferredValue:   'of ''x'''
-// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift',
 // CHECK-NEXT:                        Line: [[# @LINE + 29 ]], Column: 9 }
 // CHECK-NEXT: ...
 // CHECK-NEXT: --- !Missed
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift',
 // CHECK-NEXT:                    Line: [[# @LINE + 26 ]], Column: 12 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
@@ -119,7 +119,7 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT: --- !Missed
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift',
 // CHECK-NEXT:                    Line: [[# @LINE + 15 ]], Column: 12 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
@@ -127,7 +127,7 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT:   - ValueType:       Klass
 // CHECK-NEXT:   - String:          ''''
 // CHECK-NEXT:   - InferredValue:   'of ''x'''
-// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift',
 // CHECK-NEXT:                        Line: [[# @LINE + 4 ]], Column: 9 }
 // CHECK-NEXT: ...
 

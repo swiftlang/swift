@@ -22,7 +22,7 @@ struct S1 : P1 {
   }
 }
 
-struct S1Error : P1 { 
+struct S1Error : P1 {
   // expected-error@-1 {{type 'S1Error' does not conform to protocol 'P1'}}
   // expected-note@-2 {{add stubs for conformance}}
   subscript (i: Int) -> Double { // expected-note{{candidate has non-matching type '(Int) -> Double'}}
@@ -62,7 +62,7 @@ protocol SubscriptGetSet {
   subscript(a : Int) -> Int { get set }   // expected-note {{protocol requires subscript with type '(Int) -> Int'}}
 }
 
-class SubscriptGetSet_Get : SubscriptGetSet { 
+class SubscriptGetSet_Get : SubscriptGetSet {
   // expected-error@-1 {{type 'SubscriptGetSet_Get' does not conform to protocol 'SubscriptGetSet'}}
   // expected-note@-2 {{add stubs for conformance}}
   subscript(a : Int) -> Int { return 0 }   // expected-note {{candidate is not settable, but protocol requires it}}
@@ -130,9 +130,9 @@ class StaticSubscriptGetSet_GetSet : StaticSubscriptGetSet {
   static subscript(a : Int) -> Int { get { return 42 } set {} }  // ok
 }
 
-extension SubscriptGet_Get: StaticSubscriptGet {} 
+extension SubscriptGet_Get: StaticSubscriptGet {}
 // expected-error@-1 {{type 'SubscriptGet_Get' does not conform to protocol 'StaticSubscriptGet'}}
 // expected-note@-2 {{add stubs for conformance}}
-extension StaticSubscriptGet_Get: SubscriptGet {} 
+extension StaticSubscriptGet_Get: SubscriptGet {}
 // expected-error@-1 {{type 'StaticSubscriptGet_Get' does not conform to protocol 'SubscriptGet'}}
 // expected-note@-2 {{add stubs for conformance}}

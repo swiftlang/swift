@@ -78,7 +78,7 @@ public struct AsyncThrowingCompactMapSequence<Base: AsyncSequence, ElementOfResu
 
   @usableFromInline
   init(
-    _ base: Base, 
+    _ base: Base,
     transform: @escaping (Base.Element) async throws -> ElementOfResult?
   ) {
     self.base = base
@@ -116,7 +116,7 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
 
     @usableFromInline
     init(
-      _ baseIterator: Base.AsyncIterator, 
+      _ baseIterator: Base.AsyncIterator,
       transform: @escaping (Base.Element) async throws -> ElementOfResult?
     ) {
       self.baseIterator = baseIterator
@@ -188,11 +188,11 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingCompactMapSequence: @unchecked Sendable 
-  where Base: Sendable, 
+extension AsyncThrowingCompactMapSequence: @unchecked Sendable
+  where Base: Sendable,
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingCompactMapSequence.Iterator: @unchecked Sendable 
-  where Base.AsyncIterator: Sendable, 
+extension AsyncThrowingCompactMapSequence.Iterator: @unchecked Sendable
+  where Base.AsyncIterator: Sendable,
         Base.Element: Sendable { }

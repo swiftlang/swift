@@ -5,7 +5,7 @@
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
-// RUN: %target-typecheck-verify-swift %clang-importer-sdk -import-objc-header %S/Inputs/objc_decls.h -enable-experimental-feature ParserASTGen 
+// RUN: %target-typecheck-verify-swift %clang-importer-sdk -import-objc-header %S/Inputs/objc_decls.h -enable-experimental-feature ParserASTGen
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser

@@ -36,7 +36,7 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects") {
   for arg in function.arguments {
     // We are not interested in arguments with trivial types.
     if arg.hasTrivialNonPointerType { continue }
-    
+
     // Also, we don't want to override defined effects.
     if argsWithDefinedEffects.contains(arg.index) { continue }
 
@@ -56,7 +56,7 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects") {
       newEffects.append(effect)
       continue
     }
-  
+
     // Now compute effects for two important cases:
     //   * the argument itself + any value projections, and...
     if addArgEffects(arg, argPath: SmallProjectionPath(), to: &newEffects, returnInst, context) {
@@ -85,11 +85,11 @@ func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
   // Correct the path if the argument is not a class reference itself, but a value type
   // containing one or more references.
   let argPath = arg.type.isClass ? ap : ap.push(.anyValueFields)
-  
+
   guard let result = arg.at(argPath).visit(using: ArgEffectsVisitor(), initialWalkingDirection: .down, context) else {
     return false
   }
-  
+
   // If the function never returns, the argument can not escape to another arg/return.
   guard let returnInst = arg.parentFunction.returnInstruction else {
     return false

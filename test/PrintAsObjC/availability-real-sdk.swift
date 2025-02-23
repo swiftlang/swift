@@ -61,7 +61,7 @@ public class SubClassOfSet: NSSet {
     message: "This method is deprecated in favor to the old anyObject method",
     renamed: "anyObject()")
     @objc func deprecatedMethodOnMacOSInFavorOfAnyObject() -> Any { return 0 }
-    
+
     @available(*, unavailable,
     message: "This method is unavailable in favor to the old anyObject method",
     renamed: "anyObject()")
@@ -70,7 +70,7 @@ public class SubClassOfSet: NSSet {
     message: "This method is unavailable in favor to the old anyObject method",
     renamed: "anyObject()")
     @objc func unavailableMethodOnMacOSInFavorOfAnyObject() -> Any { return 0 }
-    
+
     @available(*, deprecated,
     message: "This property is deprecated in favor to the old count property",
     renamed: "count")
@@ -115,7 +115,7 @@ extension NSArray {
     message: "This method is deprecated in favor to the old reverseObjectEnumerator method",
     renamed: "reverseObjectEnumerator()")
     @objc func deprecatedMethodOnMacOSInFavorOfReverseObjectEnumerator() -> Any { return 0 }
-    
+
     @available(*, unavailable,
     message: "This method is unavailable in favor to the old reverseObjectEnumerator method",
     renamed: "reverseObjectEnumerator()")
@@ -124,8 +124,8 @@ extension NSArray {
     message: "This method is unavailable in favor to the old reverseObjectEnumerator method",
     renamed: "reverseObjectEnumerator()")
     @objc func unavailableMethodOnMacOSInFavorOfReverseObjectEnumerator() -> Any { return 0 }
-    
-    
+
+
     @available(*, deprecated,
     message: "This method is deprecated in favor to the old adding method",
     renamed: "adding(_:)")

@@ -8,7 +8,7 @@
 
 func hedge() {
   struct Value {}
-  
+
   // We rely on not allowing nesting of extensions, so test to make sure
   // this emits an error.
   // CHECK:error: declaration is only valid at file scope

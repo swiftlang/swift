@@ -438,12 +438,12 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   func vjpProperty() -> (value: T, pullback: (T.TangentVector) -> TangentVector) {
     return (x, { v in .init(x: v) })
   }
-  
+
   @derivative(of: computedProperty.get)
   func jvpProperty() -> (value: T, differential: (TangentVector) -> T.TangentVector) {
     fatalError()
   }
-  
+
   @derivative(of: computedProperty.set)
   mutating func vjpPropertySetter(_ newValue: T) -> (
     value: (), pullback: (inout TangentVector) -> T.TangentVector
@@ -828,7 +828,7 @@ extension InoutParameters {
 
 extension InoutParameters {
   // expected-note @+2 {{'mutatingMethod' defined here}}
-  // expected-note @+1 {{'mutatingMethod' defined here}}  
+  // expected-note @+1 {{'mutatingMethod' defined here}}
   mutating func mutatingMethod(_ other: Self) {}
 
   // Test wrt `inout` `self` parameter.

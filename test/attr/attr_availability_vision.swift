@@ -60,7 +60,7 @@ if #available(iOS 17.3, *) {
 
 if #available(visionOS 1.5, *) {
   functionIntroducedOnvisionOS2_2() // expected-error{{'functionIntroducedOnvisionOS2_2()' is only available in visionOS 2.2 or newer}}
-  // expected-note @-1{{add 'if #available' version check}}    
+  // expected-note @-1{{add 'if #available' version check}}
 }
 
 if #available(visionOS 2.2, *) {

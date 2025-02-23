@@ -57,13 +57,13 @@ struct ImmutableStoredProperties: Differentiable {
   let nonmutatingMoveAlongStruct: EmptyWithConcreteNonmutatingMoveAlong
 
   let inheritedNonmutatingMoveAlongStruct: EmptyWithInheritedNonmutatingMoveAlong
-  
+
   let diffClass: EmptyClass // No error on class-bound `let` with a non-mutating `move(by:)`.
 }
 func testImmutableStoredProperties() {
   _ = ImmutableStoredProperties.TangentVector(
-    okay: 1, 
-    nonmutatingMoveAlongStruct: Empty.TangentVector(), 
+    okay: 1,
+    nonmutatingMoveAlongStruct: Empty.TangentVector(),
     inheritedNonmutatingMoveAlongStruct: Empty.TangentVector(),
     diffClass: EmptyClass.TangentVector())
 }

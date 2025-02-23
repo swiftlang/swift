@@ -5,10 +5,10 @@ struct Foo {
 }
 let x = Foo().bar
 x.#^AFTER_DOT^#
-// AFTER_DOT: Pattern/CurrModule/Flair[ArgLabels]/Erase[1]: ({#Int#})[#Int#]; name=() 
+// AFTER_DOT: Pattern/CurrModule/Flair[ArgLabels]/Erase[1]: ({#Int#})[#Int#]; name=()
 
 x. #^AFTER_DOT_AND_SPACE^#
-// AFTER_DOT_AND_SPACE: Pattern/CurrModule/Flair[ArgLabels]/Erase[2]: ({#Int#})[#Int#]; name=() 
+// AFTER_DOT_AND_SPACE: Pattern/CurrModule/Flair[ArgLabels]/Erase[2]: ({#Int#})[#Int#]; name=()
 
 x.#^AFTER_DOT_FOLLOWING_DOT?check=AFTER_DOT^#.
 

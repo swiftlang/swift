@@ -51,7 +51,7 @@ namespace {
     using Flags = UnqualifiedLookupFlags;
     using Options = UnqualifiedLookupOptions;
     using ResultsVector = SmallVector<LookupResultEntry, 4>;
-    
+
   private:
     // Inputs
     const DeclNameRef Name;
@@ -62,7 +62,7 @@ namespace {
 
     /// Used to find the file-local names.
     DebuggerClient *const DebugClient;
-    
+
     const Options options;
     const bool isOriginallyTypeLookup;
     const bool isOriginallyMacroLookup;
@@ -87,9 +87,9 @@ namespace {
                              SmallVectorImpl<LookupResultEntry> &Results,
                              size_t &IndexOfFirstOuterResult);
     // clang-format on
-    
+
     void performUnqualifiedLookup();
-    
+
   private:
     void lookUpTopLevelNamesInModuleScopeContext(const DeclContext *);
 

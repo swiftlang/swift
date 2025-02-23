@@ -7,7 +7,7 @@ public struct Outer<T> {
   public var x: T
   public init(x: T) {
     self.x = x
-  } 
+  }
 }
 
 extension Outer where T == Int {
@@ -23,6 +23,6 @@ extension Outer where T == Int {
     public var x: U
     public init(x: U) {
       self.x = x
-    } 
+    }
   }
 }

@@ -10,7 +10,7 @@ public struct Struct {
   init() {
     field = 0
   }
-    
+
   @available(macOS 11, *)
   public var getterOnly: Int {
     return 0

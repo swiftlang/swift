@@ -46,6 +46,6 @@ protocol RenameableProtocol {
   var name: String { get set } // expected-note {{protocol requires property 'name' with type 'String'}}
 }
 
-extension Linux: RenameableProtocol {} 
+extension Linux: RenameableProtocol {}
 // expected-error@-1 {{type 'Linux' does not conform to protocol 'RenameableProtocol'}}
 // expected-note@-2 {{add stubs for conformance}}

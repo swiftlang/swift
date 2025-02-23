@@ -340,7 +340,7 @@ public:
   IsBitwiseTakable_t isBitwiseTakable() const {
     return IsKnownBitwiseTakable;
   }
-  
+
   /// Return whether the structure is known to be copyable in the local
   /// resilience scope.
   IsCopyable_t isCopyable() const {
@@ -398,7 +398,7 @@ class StructLayout {
 
   /// The size of a header if present.
   Size headerSize;
-  
+
   /// The statically-known spare bit mask.
   SpareBitVector SpareBits;
 
@@ -406,14 +406,14 @@ class StructLayout {
   /// alignment are exact.
   bool IsFixedLayout;
 
-  /// Whether this layout 
+  /// Whether this layout
   bool IsLoadable;
 
   IsTriviallyDestroyable_t IsKnownTriviallyDestroyable;
   IsBitwiseTakable_t IsKnownBitwiseTakable;
   IsCopyable_t IsKnownCopyable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
-  
+
   llvm::Type *Ty;
   SmallVector<ElementLayout, 8> Elements;
 
@@ -452,7 +452,7 @@ public:
   /// passed in the constructor.
   ArrayRef<ElementLayout> getElements() const { return Elements; }
   const ElementLayout &getElement(unsigned i) const { return Elements[i]; }
-  
+
   llvm::Type *getType() const { return Ty; }
   Size getSize() const { return MinimumSize; }
   Size getHeaderSize() const { return headerSize; }

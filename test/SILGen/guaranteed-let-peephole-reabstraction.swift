@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -verify %s 
+// RUN: %target-swift-emit-silgen -verify %s
 class BlockBox<T> {
   let block: (T) -> Void = { _ in }
 

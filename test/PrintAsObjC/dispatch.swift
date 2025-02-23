@@ -9,7 +9,7 @@ import Foundation
 // CHECK: @import Dispatch;
 
 // CHECK-LABEL: @interface Test : NSObject{{$}}
-public class Test : NSObject { 
+public class Test : NSObject {
   // CHECK-NEXT: - (void)thank:(dispatch_queue_t _Nonnull)queue;
   @objc public func thank(_ queue: DispatchQueue) {}
   // CHECK-NEXT: init

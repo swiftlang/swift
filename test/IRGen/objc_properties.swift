@@ -26,7 +26,7 @@
 
   @objc(wobble) var wibble : SomeObject
 
-  @objc init() { 
+  @objc init() {
     bareIvar = SomeObject()
     wibble  = SomeObject()
   }
@@ -254,7 +254,7 @@ class SomeWrapperTests {
 // CHECK:   ptr @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}"
 // CHECK:   ptr @"_CATEGORY_CLASS_METHODS__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}"
 // CHECK:   ptr null,
-// CHECK:   ptr @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}", 
+// CHECK:   ptr @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties{{(\.ptrauth)?}}",
 // CHECK-NEW:   ptr @"_CATEGORY_CLASS_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties",
 // CHECK-OLD:   ptr null,
 // CHECK:   i32 60

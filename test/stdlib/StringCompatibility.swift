@@ -148,13 +148,13 @@ extension MyString : StringProtocol {
   init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
     base = .init(cString: nullTerminatedUTF8)
   }
-  
+
   init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type) {
     base = .init(decodingCString: nullTerminatedCodeUnits, as: sourceEncoding)
   }
-  
+
   func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
     return try base.withCString(body)
@@ -232,7 +232,7 @@ Tests.test("RangeReplaceable.init/generic/\(swift)") {
   check(Substring.self, from: "b" as String)
   // FIXME: Why isn't this working?
   // check(MyString.self, from: "c" as String)
-  
+
   check(String.self, from: "d" as Substring)
   check(Substring.self, from: "e" as Substring)
   // FIXME: Why isn't this working?

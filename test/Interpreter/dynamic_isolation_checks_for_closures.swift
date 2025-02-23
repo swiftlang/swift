@@ -43,7 +43,7 @@ public func runTest(_ fn: @escaping () -> Void) async {
 
 public func syncRunTest(_ fn: @escaping () -> Void) {
   let sem = DispatchSemaphore(value: 0)
-    
+
   Task.detached {
     fn()
     sem.signal()

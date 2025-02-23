@@ -44,7 +44,7 @@ actor BankAccount {
     return curBalance
   }
 
-  func canWithdraw(_ amount : Int) -> Bool { 
+  func canWithdraw(_ amount : Int) -> Bool {
     // call 'balance' from sync through self
     return self.balance() >= amount
   }
@@ -153,7 +153,7 @@ func someAsyncFunc() async {
   let _ = await a.deposit(deposit1)
   let afterXfer = await a.transferAll(from: b)
   let reportedBal = await a.balance()
-  
+
   // check on account A
   guard afterXfer == (deposit1 + deposit2) && afterXfer == reportedBal else {
     print("BUG 1!")
@@ -342,7 +342,7 @@ func walkChain(chain : Chain) async {
 // check various curried applications to ensure we mark the right expression.
 
 actor Calculator {
-  func addCurried(_ x : Int) -> ((Int) -> Int) { 
+  func addCurried(_ x : Int) -> ((Int) -> Int) {
     return { (_ y : Int) in x + y }
   }
 
@@ -351,7 +351,7 @@ actor Calculator {
   }
 }
 
-@BananaActor func bananaAdd(_ x : Int) -> ((Int) -> Int) { 
+@BananaActor func bananaAdd(_ x : Int) -> ((Int) -> Int) {
   return { (_ y : Int) in x + y }
 }
 
@@ -362,7 +362,7 @@ actor Calculator {
   let _ = await (await bananaAdd(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
 
   let calc = Calculator()
-  
+
   let _ = (await calc.addCurried(1))(2)
   let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
 

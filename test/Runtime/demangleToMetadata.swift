@@ -452,7 +452,7 @@ DemangleToMetadataTests.test("Nested types in extensions") {
   expectNil(_typeByName("4main4SG11VA2A2P1RzlE016InnerTConformsToC0VyAA08ConformsfC0V_AHGMa"))
 
   // TODO: Failure case: InnermostUConformsToP3's 'U: P3' constraint not satisfied
-  
+
 }
 
 //

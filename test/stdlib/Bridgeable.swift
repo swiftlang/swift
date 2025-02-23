@@ -24,7 +24,7 @@ func bridgedStatus<T>(_: T.Type) -> String {
   if !bridged && verbatim {
     return "IS NOT BRIDGED BUT IS VERBATIM?!"
   }
-  return bridged ? 
+  return bridged ?
     verbatim ? "is bridged verbatim" : "is custom-bridged"
     : "is unbridged"
 }
@@ -67,7 +67,7 @@ struct UnbridgedValueType {}
 // CHECK-NEXT: UnbridgedValueType is unbridged
 // CHECK-NEXT: UnbridgedValueType instance bridged as itself
 testBridging(UnbridgedValueType(), "UnbridgedValueType")
-  
+
 //===----------------------------------------------------------------------===//
 class PlainClass {}
 

@@ -7,7 +7,7 @@ struct ObjCMemberFuncMacro: MemberMacro {
   static func expansion(
     of node: AttributeSyntax,
     providingMembersOf declaration: some DeclGroupSyntax,
-    conformingTo protocols: [TypeSyntax], 
+    conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
     guard let decl = declaration.asProtocol(NamedDeclSyntax.self) else {
@@ -82,7 +82,7 @@ struct MemberFuncMacro: MemberMacro {
   static func expansion(
     of node: AttributeSyntax,
     providingMembersOf declaration: some DeclGroupSyntax,
-    conformingTo protocols: [TypeSyntax], 
+    conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
     guard let decl = declaration.asProtocol(NamedDeclSyntax.self) else {

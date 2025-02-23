@@ -67,7 +67,7 @@ let _ : Tuple2<Int, String> = ("bar",  // expected-error {{cannot convert value 
 func f() {
   typealias Tuple2b<T1, T2> = (T1, T2)
   let _ : Tuple2b = (1, "foo")
-  
+
 }
 
 
@@ -338,7 +338,7 @@ protocol ErrorP {
 
 typealias ErrorA<T: ErrorP> = T.X.Y
 
-struct ErrorB : ErrorP { 
+struct ErrorB : ErrorP {
   // expected-error@-1 {{type 'ErrorB' does not conform to protocol 'ErrorP'}}
   // expected-note@-2 {{add stubs for conformance}}
   typealias X = ErrorC // expected-note {{possibly intended match 'ErrorB.X' (aka 'ErrorC') does not conform to 'ErrorQ'}}

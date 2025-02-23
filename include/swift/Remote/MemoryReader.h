@@ -57,7 +57,7 @@ public:
   ///
   /// Returns false if the operation failed.
   virtual bool readString(RemoteAddress address, std::string &dest) = 0;
-  
+
   /// Attempts to read an integer from the given address in the remote
   /// process.
   ///
@@ -138,11 +138,11 @@ public:
     auto Ptr = readBytes(address, size);
     if (!Ptr)
       return false;
-    
+
     memcpy(dest, Ptr.get(), size);
     return true;
   }
-  
+
   /// Attempts to resolve a pointer value read from the given remote address.
   virtual RemoteAbsolutePointer resolvePointer(RemoteAddress address,
                                                uint64_t readValue) {
@@ -191,7 +191,7 @@ public:
     } else {
       return std::nullopt;
     }
-    
+
     return resolvePointer(address, pointerData);
   }
 

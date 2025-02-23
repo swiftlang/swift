@@ -2180,7 +2180,7 @@ void BindingSet::forEachLiteralRequirement(
     // Only uncovered defaultable literal protocols participate.
     if (!info.viableAsBinding())
       continue;
-    
+
     if (auto protocolKind = protocol->getKnownProtocolKind())
       callback(*protocolKind);
   }
@@ -2271,7 +2271,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     out << "[attributes: ";
     interleave(attributes, out, ", ");
   }
-  
+
   auto literalKind = getLiteralForScore();
   if (literalKind != LiteralBindingKind::None) {
     if (!attributes.empty()) {
@@ -2345,15 +2345,15 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     static PrintableBinding supertypesOf(Type binding) {
       return PrintableBinding{BindingKind::Supertypes, binding, true};
     }
-    
+
     static PrintableBinding subtypesOf(Type binding) {
       return PrintableBinding{BindingKind::Subtypes, binding, true};
     }
-    
+
     static PrintableBinding exact(Type binding) {
       return PrintableBinding{BindingKind::Exact, binding, true};
     }
-    
+
     static PrintableBinding literalDefaultType(Type binding, bool viable) {
       return PrintableBinding{BindingKind::Literal, binding, viable};
     }
@@ -2427,7 +2427,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
         [&] { out << ", "; });
     out << "]";
   }
-  
+
 }
 
 // Given a possibly-Optional type, return the direct superclass of the
@@ -2855,7 +2855,7 @@ static bool shouldIgnoreHoleForCodeCompletion(ConstraintSystem &cs,
                                               ConstraintLocator *srcLocator) {
   if (!cs.isForCodeCompletion())
     return false;
-  
+
   // Don't penalize solutions with unresolved generics.
   if (typeVar->getImpl().getGenericParameter())
     return true;
@@ -2880,7 +2880,7 @@ static bool shouldIgnoreHoleForCodeCompletion(ConstraintSystem &cs,
       }
     }
   }
-  
+
   // Don't penalize solutions with holes due to missing arguments after the
   // code completion position.
   auto argLoc = srcLocator->findLast<LocatorPathElt::SynthesizedArgument>();
@@ -2956,7 +2956,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto reportHole = [&]() {
     if (shouldIgnoreHoleForCodeCompletion(cs, TypeVar, srcLocator))
       return false;
-    
+
     // Reflect in the score that this type variable couldn't be
     // resolved and had to be bound to a placeholder "hole" type.
     cs.increaseScore(SK_Hole, srcLocator);

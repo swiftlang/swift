@@ -308,7 +308,7 @@ func checkPtr(
     -> UnsafeMutablePointer<Int>)
 ) -> (Check) -> Void {
   return {
-    checkRawPointerCorrectness($0) { destPtr in 
+    checkRawPointerCorrectness($0) { destPtr in
       return { f(destPtr)($0, UnsafeMutablePointer($1), $2) }
     }
   }

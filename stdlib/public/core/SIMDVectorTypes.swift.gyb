@@ -238,7 +238,7 @@ extension ${Self}: SIMDScalar {
     public init() {
       _value = Builtin.zeroInitializer()
     }
-    
+
     @_alwaysEmitIntoClient
     internal init(_ _builtin: Builtin.Vec${n}x${BuiltinName}) {
       _value = _builtin
@@ -292,7 +292,7 @@ extension ${Self} : SIMDScalar {
     public init() {
       _value = Builtin.zeroInitializer()
     }
-    
+
     @_alwaysEmitIntoClient
     internal init(_ _builtin: Builtin.Vec${n}xFPIEEE${bits}) {
       _value = _builtin

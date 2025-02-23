@@ -3,14 +3,14 @@
 class CustomDict: ExpressibleByDictionaryLiteral {
   typealias Key = String
   typealias Value = String
-  
+
   required init(dictionaryLiteral elements: (String, String)...) {}
 }
 func fDict(_ d: [String: String]) {}
 func fCustomDict(_ d: CustomDict) {}
 func fDictGeneric<D>(_ d: D) where D: ExpressibleByDictionaryLiteral {}
 
-// Duplicated 
+// Duplicated
 let _ = [
   // expected-note@+1{{duplicate key declared here}} {{3-11=}} {{11-12=}}
   "A": "A", // expected-warning{{dictionary literal of type '[String : String]' has duplicate entries for string literal key 'A'}}
@@ -33,7 +33,7 @@ let _: [String: String] = [
   // expected-note@+1{{duplicate key declared here}} {{3-11=}} {{11-12=}}
   "A": "A", // expected-warning{{dictionary literal of type '[String : String]' has duplicate entries for string literal key 'A'}}
   "B": "B",
-  "C": "C", 
+  "C": "C",
   "A": "D" // expected-note{{duplicate key declared here}} {{3-12=}} {{36:11-12=}}
 ]
 
@@ -60,7 +60,7 @@ let _: [Bool: String] = [
   true: "3" // expected-note{{duplicate key declared here}} {{3-13=}} {{59:13-14=}}
 ]
 
-// nil literal 
+// nil literal
 let _: [Int?: String] = [
   // expected-note@+1{{duplicate key declared here}} {{3-11=}} {{11-12=}}
   nil: "1", // expected-warning{{dictionary literal of type '[Int? : String]' has duplicate entries for nil literal key}}
@@ -73,7 +73,7 @@ let _: [String: [String: String]] = [
   // expected-note@+1{{duplicate key declared here}} {{3-11=}} {{11-12=}}
   "A": [:], // expected-warning{{dictionary literal of type '[String : [String : String]]' has duplicate entries for string literal key 'A'}}
   "B": [:],
-  "C": [:], 
+  "C": [:],
   "A": [:] // expected-note{{duplicate key declared here}} {{3-12=}} {{76:11-12=}}
 ]
 
@@ -81,7 +81,7 @@ let _: [String: [String: String]] = [
   // expected-note@+1{{duplicate key declared here}} {{3-11=}} {{11-12=}}
   "A": [:], // expected-warning{{dictionary literal of type '[String : [String : String]]' has duplicate entries for string literal key 'A'}}
   "B": [:],
-  "C": [:], 
+  "C": [:],
   "A": ["a": "", "a": ""] // expected-note{{duplicate key declared here}} {{3-27=}} {{84:11-12=}}
   // expected-warning@-1{{dictionary literal of type '[String : String]' has duplicate entries for string literal key 'a'}}
   // expected-note@-2{{duplicate key declared here}} {{9-16=}} {{16-17=}}
@@ -90,9 +90,9 @@ let _: [String: [String: String]] = [
 
 // Parent OK, nested duplicated
 let _: [String: [String: String]] = [
-  "A": [:], 
+  "A": [:],
   "B": [:],
-  "C": [:], 
+  "C": [:],
   // expected-note@+1{{duplicate key declared here}} {{9-16=}} {{16-17=}}
   "D": ["a": "", "a": ""] // expected-warning{{dictionary literal of type '[String : String]' has duplicate entries for string literal key 'a'}}
   // expected-note@-1{{duplicate key declared here}}{{18-25=}} {{18-25=}} {{16-17=}}
@@ -100,7 +100,7 @@ let _: [String: [String: String]] = [
 
 // Ok, because custom implementations of ExpressibleByDictionaryLiteral can allow duplicated keys.
 let _: CustomDict = [
-  "A": "A", 
+  "A": "A",
   "A": "B"
 ]
 
@@ -110,7 +110,7 @@ fDict([
   "A": "B" // expected-note{{duplicate key declared here}} {{3-12=}} {{109:11-12=}}
 ])
 fCustomDict([
-  "A": "A", 
+  "A": "A",
   "A": "B"
 ])
 fDictGeneric([
@@ -129,15 +129,15 @@ let _: [String: String] = [
 
 // OK
 let _ = [
-  "A": "A", 
+  "A": "A",
   "B": "B"
 ]
 let _: [String: String] = [
-  "A": "A", 
+  "A": "A",
   "B": "B"
 ]
 let _: CustomDict = [
-  "A": "A", 
+  "A": "A",
   "B": "B"
 ]
 
@@ -160,7 +160,7 @@ let _: [Bool: String] = [
   false: "2"
 ]
 
-// nil literal 
+// nil literal
 let _: [Int?: String] = [
   nil: "1",
   2: "2"
@@ -172,40 +172,40 @@ let a = "A"
 let _: [String: String] = [
   a: "A",
   "B": "B",
-  "a": "C", 
+  "a": "C",
   a: "D"
 ]
 
 let _: [String: [String: String]] = [
   "A": [:],
   "B": [:],
-  "C": [:], 
+  "C": [:],
   "D": ["a": "", "b": ""]
 ]
 
 fDict([
-  "A": "A", 
+  "A": "A",
   "B": "B"
 ])
 fCustomDict([
-  "A": "A", 
+  "A": "A",
   "B": "B"
 ])
 fDictGeneric([
-  "A": "A", 
+  "A": "A",
   "B": "B"
 ])
 
 func magicFn() {
   let _: [String: String] = [
-    #file: "A", 
+    #file: "A",
     #function: "B"
   ]
 }
 
 // Interpolated literals
 let _: [String: String] = [
-  "\(a)": "A", 
+  "\(a)": "A",
   "\(a)": "B",
   "\(1)": "C"
 ]
@@ -223,7 +223,7 @@ let _: [Int: String] = [#line: "A", #line: "B"] // expected-warning{{dictionary 
 let _: [Int: String] = [#column: "A", #column: "B"] // OK
 
 let _: [Int: String] = [
-  // expected-note@+1{{duplicate key declared here}} {{3-15=}} {{15-16=}} 
+  // expected-note@+1{{duplicate key declared here}} {{3-15=}} {{15-16=}}
   #column: "A", // expected-warning{{dictionary literal of type '[Int : String]' has duplicate entries for #column literal key}}
   #column: "B"  // expected-note{{duplicate key declared here}} {{3-16=}} {{227:15-16=}}
 ]
@@ -240,7 +240,7 @@ _ = [
 ]
 
 _ = [
-  // expected-note@+1{{duplicate key declared}} {{3-9=}} {{9-10=}} 
+  // expected-note@+1{{duplicate key declared}} {{3-9=}} {{9-10=}}
   -1: "", // expected-warning{{dictionary literal of type '[Int : String]' has duplicate entries for integer literal key '-1'}}
   -1: "", // expected-note{{duplicate key declared}} {{3-9=}} {{9-10=}}
 ]

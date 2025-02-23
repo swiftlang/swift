@@ -65,7 +65,7 @@ Optional(.none) // expected-error {{cannot infer contextual base in reference to
 _ = "\(hello), \(world) #\(i)!"
 
 class File {
-  init() { 
+  init() {
     fd = 0
     body = ""
   }
@@ -77,7 +77,7 @@ class File {
 }
 
 // Non-trivial references to metatypes.
-struct Foo { 
+struct Foo {
   struct Inner { }
 }
 extension Foo {

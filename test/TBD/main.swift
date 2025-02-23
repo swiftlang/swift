@@ -1,4 +1,4 @@
-// REQUIRES: VENDOR=apple 
+// REQUIRES: VENDOR=apple
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -module-name test -validate-tbd-against-ir=all %s
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -module-name test -validate-tbd-against-ir=all %s -O
 

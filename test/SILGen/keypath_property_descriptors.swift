@@ -70,7 +70,7 @@ public struct A {
   // CHECK-LABEL: sil_property #A.subscript{{.*}} (){{$}}
   @usableFromInline
   internal subscript(c x: Int) -> Int { return x }
-  
+
   // no descriptor
   // CHECK-NOT: sil_property #A.subscript
   internal subscript(d x: Int) -> Int { return x }
@@ -85,7 +85,7 @@ public struct A {
   // CHECK-LABEL: sil_property #A.subscript{{.*}} (){{$}}
   @usableFromInline
   internal subscript<T>(c x: T) -> T { return x }
-  
+
   // no descriptor
   // CHECK-NOT: sil_property #A.subscript
   internal subscript<T>(d x: T) -> T { return x }

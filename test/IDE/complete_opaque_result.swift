@@ -69,7 +69,7 @@ protocol HasAssocWithConstraintAndDefault {
   func returnAssocWithConstraintAndDefault() -> AssocWithConstraintAndDefault
 }
 protocol HasAssocWithAnyObjectConstraint {
-  associatedtype AssocWithAnyObjectConstraint: AnyObject & MyProtocol 
+  associatedtype AssocWithAnyObjectConstraint: AnyObject & MyProtocol
   func returnAssocWithAnyObjectConstraint() -> AssocWithAnyObjectConstraint
 }
 protocol HasAssocWithConstraintOnProto where Self.AssocWithConstraintOnProto : MyProtocol {

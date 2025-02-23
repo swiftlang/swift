@@ -46,7 +46,7 @@ print("<\(r) \(g) \(b) \(a)>") // CHECK-NEXT: <1.0 0.0 0.0 1.0>
 //
 
 // FIXME: Array type annotation should not be required
-let data = NSData(bytes: [1.5, 2.25, 3.125] as [Double], 
+let data = NSData(bytes: [1.5, 2.25, 3.125] as [Double],
                   length: MemoryLayout<Double>.size * 3)
 var fromData = [0.25, 0.25, 0.25]
 let notFromData = fromData

@@ -96,7 +96,7 @@ extension Zip2Sequence {
     /// Creates an instance around a pair of underlying iterators.
     @inlinable // generic-performance
     internal init(
-    _ iterator1: Sequence1.Iterator, 
+    _ iterator1: Sequence1.Iterator,
     _ iterator2: Sequence2.Iterator
     ) {
       (_baseStream1, _baseStream2) = (iterator1, iterator2)

@@ -78,9 +78,9 @@ func square(x: Float) -> Float {
 func caller_of_more_complex_pb_with_control_flow() -> Float {
     // Need to pass a constant argument to `gradient` so that the call
     // to VJP also receives a constant argument, and it is in turn inlined
-    // as a "pure" call. 
+    // as a "pure" call.
     //
-    // Only after the VJP is inlined can the pullback be inlined, as the 
+    // Only after the VJP is inlined can the pullback be inlined, as the
     // full signature of the pullback (with the branch-trace enum) is never
     // visible at the call site otherwise.
     gradient(at: Float(1), of: more_complex_pb_with_control_flow)

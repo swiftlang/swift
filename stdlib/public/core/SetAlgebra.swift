@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  
+//
 //
 //===----------------------------------------------------------------------===//
 
@@ -55,7 +55,7 @@
 public protocol SetAlgebra<Element>: Equatable, ExpressibleByArrayLiteral {
   /// A type for which the conforming type provides a containment test.
   associatedtype Element
-  
+
   /// Creates an empty set.
   ///
   /// This initializer is equivalent to initializing with an empty array
@@ -70,7 +70,7 @@ public protocol SetAlgebra<Element>: Equatable, ExpressibleByArrayLiteral {
   ///     print(emptySet.isEmpty)
   ///     // Prints "true"
   init()
-  
+
   /// Returns a Boolean value that indicates whether the given element exists
   /// in the set.
   ///
@@ -116,7 +116,7 @@ public protocol SetAlgebra<Element>: Equatable, ExpressibleByArrayLiteral {
   ///   distinguishable (e.g. via `===`), which of these elements is present
   ///   in the result is unspecified.
   __consuming func union(_ other: __owned Self) -> Self
-  
+
   /// Returns a new set with the elements that are common to both this set and
   /// the given set.
   ///
@@ -196,7 +196,7 @@ public protocol SetAlgebra<Element>: Equatable, ExpressibleByArrayLiteral {
   mutating func insert(
     _ newMember: __owned Element
   ) -> (inserted: Bool, memberAfterInsert: Element)
-  
+
   /// Removes the given element and any elements subsumed by the given element.
   ///
   /// - Parameter member: The element of the set to remove.
@@ -233,11 +233,11 @@ public protocol SetAlgebra<Element>: Equatable, ExpressibleByArrayLiteral {
   ///   comparison or some other means.
   ///
   ///   For sets where the set type and element type are the same, like
-  ///   `OptionSet` types, this method returns any intersection between the 
+  ///   `OptionSet` types, this method returns any intersection between the
   ///   set and `[newMember]`, or `nil` if the intersection is empty.
   @discardableResult
   mutating func update(with newMember: __owned Element) -> Element?
-  
+
   /// Adds the elements of the given set to the set.
   ///
   /// In the following example, the elements of the `visitors` set are added to
@@ -359,7 +359,7 @@ public protocol SetAlgebra<Element>: Equatable, ExpressibleByArrayLiteral {
 
   /// A Boolean value that indicates whether the set has no elements.
   var isEmpty: Bool { get }
-  
+
   /// Creates a new set from a finite sequence of items.
   ///
   /// Use this initializer to create a new set from an existing sequence, like
@@ -584,5 +584,5 @@ extension SetAlgebra where Element == ArrayLiteralElement {
   @inlinable // protocol-only
   public init(arrayLiteral: Element...) {
     self.init(arrayLiteral)
-  }  
+  }
 }

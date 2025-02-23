@@ -43,7 +43,7 @@
 @main struct Main {
   static func main() {
     ImplClass.runTests()
-    
+
     do {
       print("*** SwiftClientSubclass init ***")
       let swiftClientSub = SwiftClientSubclass()

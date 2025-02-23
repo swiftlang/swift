@@ -4,7 +4,7 @@
 // RUN: %target-build-swift -Xfrontend -pc-macro -o %t/main -I=%t %t/PlaygroundSupport.o %t/main.swift
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
-// RUN: %target-build-swift -Xfrontend -pc-macro -Xfrontend -playground -Xfrontend -debugger-support -o %t/main2 -I=%t %t/PlaygroundSupport.o %t/main.swift 
+// RUN: %target-build-swift -Xfrontend -pc-macro -Xfrontend -playground -Xfrontend -debugger-support -o %t/main2 -I=%t %t/PlaygroundSupport.o %t/main.swift
 // RUN: %target-codesign %t/main2
 // RUN: %target-run %t/main2 | %FileCheck %s
 // REQUIRES: executable_test
@@ -31,7 +31,7 @@ _ = function1(0)
 // CHECK-NEXT: [12:1-12:17] pc after
 
 func function2(_ x: Int) {
-  
+
 }
 _ = function2(0)
 
@@ -41,7 +41,7 @@ _ = function2(0)
 // CHECK-NEXT: [24:1-24:17] pc after
 
 func function3(_ x: Int) throws {
-  
+
 }
 _ = try! function3(0)
 // this test is XFAIL-ed in func_throw_notype and should be updated to 31:32 instead of 31:25 once fixed.

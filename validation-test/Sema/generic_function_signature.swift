@@ -2,7 +2,7 @@
 enum E<T> {}
 
 protocol P {
-  associatedtype T 
+  associatedtype T
   var closure: () -> E<T> { get }
 }
 

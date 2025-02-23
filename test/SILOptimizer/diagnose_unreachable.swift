@@ -103,13 +103,13 @@ func whileTrueTwoPredecessorsEliminated() -> () {
 
 func unreachableBranch() -> Int {
   if 1 == 0 { // expected-note {{always evaluates to false}}
-    // FIXME: It'd be nice if the warning were on 'if true' instead of the 
+    // FIXME: It'd be nice if the warning were on 'if true' instead of the
     // body.
     if true {
       return 0 // expected-warning {{will never be executed}}
-    } 
+    }
   } else {
-    return 1  
+    return 1
   }
 }
 
@@ -128,8 +128,8 @@ func testIfTrueTransparent() {
 }
 
 // We should not report unreachable user code inside generic instantiations.
-// TODO: This test should start failing after we add support for generic 
-// specialization in SIL. To fix it, add generic instantiation detection 
+// TODO: This test should start failing after we add support for generic
+// specialization in SIL. To fix it, add generic instantiation detection
 // within the DeadCodeElimination pass to address the corresponding FIXME note.
 protocol HavingGetCond {
   func getCond() -> Bool
@@ -177,19 +177,19 @@ func testSwitchEnum(_ xi: Int) -> Int {
   }
 
   switch cond { // expected-warning{{switch condition evaluates to a constant}}
-  case .Two: 
+  case .Two:
     x += 1
-  default: 
+  default:
     userCode() // expected-note{{will never be executed}}
   }
 
   switch cond { // expected-warning{{switch condition evaluates to a constant}}
-  case .One: 
+  case .One:
     userCode() // expected-note{{will never be executed}}
-  default: 
+  default:
     x -= 1
   }
-  
+
   return x
 }
 
@@ -207,7 +207,7 @@ func intConstantTest() -> Int{
   if y == 1 { // expected-note {{condition always evaluates to true}}
     return y
   }
-  
+
   return 1 // expected-warning {{will never be executed}}
 }
 
@@ -227,12 +227,12 @@ test_single_statement_closure() {
 }
 
 class C { }
-class Super { 
+class Super {
   var s = C()
   deinit { // no-warning
   }
 }
-class D : Super { 
+class D : Super {
   var c = C()
   deinit { // no-warning
     exit()

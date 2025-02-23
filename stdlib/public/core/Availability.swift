@@ -89,7 +89,7 @@ public func _stdlib_isOSVersionAtLeast_AEIC(
   return (result32 != (0 as Int32))._value
 #else
   // FIXME: As yet, there is no obvious versioning standard for platforms other
-  // than Darwin-based OSes, so we just assume false for now. 
+  // than Darwin-based OSes, so we just assume false for now.
   // rdar://problem/18881232
   return false._value
 #endif

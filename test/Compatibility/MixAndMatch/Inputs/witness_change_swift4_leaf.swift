@@ -42,7 +42,7 @@ func testMatchAndMix(bridged: RuncibleSpoon, unbridged: NSRuncibleSpoon) {
   let swift4ClassAsProtocol: SomeObjCProtocol.Type = SomeSwift4Class.self
   let swift4InstanceViaProtocol
     = swift4ClassAsProtocol.init(someObjCInitRequirement: unbridged)
-  
+
   let objcPropertyViaClassS4 = swift4InstanceViaClass.someObjCPropertyRequirement
   unbridgedSink = objcPropertyViaClassS4
   let objcPropertyViaProtocolS4 = swift4InstanceViaProtocol.someObjCPropertyRequirement
@@ -56,7 +56,7 @@ func testMatchAndMix(bridged: RuncibleSpoon, unbridged: NSRuncibleSpoon) {
   let swift5ClassAsProtocol: SomeObjCProtocol.Type = SomeSwift5Class.self
   let swift5InstanceViaProtocol
     = swift5ClassAsProtocol.init(someObjCInitRequirement: unbridged)
-  
+
   let objcPropertyViaClassS5 = swift5InstanceViaClass.someObjCPropertyRequirement
   bridgedSink = objcPropertyViaClassS5
   let objcPropertyViaProtocolS5 = swift5InstanceViaProtocol.someObjCPropertyRequirement

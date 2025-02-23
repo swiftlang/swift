@@ -251,7 +251,7 @@ extension MutableCollection {
   {
     fatalError()
   }
-  
+
   public mutating func writePrefix<Source: Collection>(from source: Source)
     -> (writtenCount: Int, afterLastWritten: Index, afterLastRead: Source.Index)
     where Source.Element == Element
@@ -263,7 +263,7 @@ extension MutableCollection {
 
 func testWritePrefixIterator() {
   var a = Array(0..<10)
-  
+
   var underflow = (1..<10).makeIterator()
   var (writtenCount, afterLastWritten) = a.writePrefix(from: underflow) // expected-error {{passing value of type 'IndexingIterator<Range<Int>>' to an inout parameter requires explicit '&'}} {{62-62=&}}
 }

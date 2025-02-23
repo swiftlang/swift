@@ -695,7 +695,7 @@ class SwiftAnyEnjoyer: NSIdLover, NSIdLoving {
   // CHECK: function_ref [[BRIDGE_ANYOBJECT_TO_ANY]]
   override func takesId(_ x: Any) { }
 
-  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_bridging_any15SwiftAnyEnjoyerC7takesId11viaProtocolyyp_tFTo 
+  // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_bridging_any15SwiftAnyEnjoyerC7takesId11viaProtocolyyp_tFTo
   // CHECK: function_ref [[BRIDGE_ANYOBJECT_TO_ANY]]
   func takesId(viaProtocol x: Any) { }
 }

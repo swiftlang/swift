@@ -28,7 +28,7 @@
 // RUN: -Xfrontend -experimental-package-cmo-abort-on-deserialization-fail \
 // RUN: -I %t/artifacts/SwiftBuilds -L %t/artifacts/SwiftBuilds \
 // RUN: -I %t/artifacts/ObjcBuilds -L %t/artifacts/ObjcBuilds \
-// RUN: -lMyCore -lObjCAPI -Rmodule-loading 2>&1 | tee %t/MyUIA-build.txt 
+// RUN: -lMyCore -lObjCAPI -Rmodule-loading 2>&1 | tee %t/MyUIA-build.txt
 // RUN: %FileCheck %s --check-prefix=CHECK-ERROR < %t/MyUIA-build.txt
 // CHECK-ERROR: error: cannot bypass resilience due to member deserialization failure while attempting to access missing member of 'PkgStructA' in module 'MyCore' from module 'MyUIA'
 

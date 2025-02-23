@@ -80,7 +80,7 @@ extension LazyDropWhileSequence.Iterator: IteratorProtocol {
       }
     }
     return nil
-  }  
+  }
 }
 
 extension LazyDropWhileSequence: Sequence {
@@ -155,7 +155,7 @@ extension LazyDropWhileCollection: Collection {
   }
 }
 
-extension LazyDropWhileCollection: BidirectionalCollection 
+extension LazyDropWhileCollection: BidirectionalCollection
 where Base: BidirectionalCollection {
   @inlinable // lazy-performance
   public func index(before i: Index) -> Index {

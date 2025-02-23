@@ -32,11 +32,11 @@ extension EmptyCollection {
   @frozen // trivial-implementation
   public struct Iterator {
     // no properties
-  
+
     /// Creates an instance.
     @inlinable // trivial-implementation
     public init() {}
-  }  
+  }
 }
 
 extension EmptyCollection.Iterator: IteratorProtocol, Sequence {

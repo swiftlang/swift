@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-stdlib -module-name Swift -enable-experimental-feature BuiltinModule 
+// RUN: %target-typecheck-verify-swift -parse-stdlib -module-name Swift -enable-experimental-feature BuiltinModule
 
 // REQUIRES: swift_feature_BuiltinModule
 

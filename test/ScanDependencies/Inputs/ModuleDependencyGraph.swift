@@ -93,7 +93,7 @@ struct SwiftModuleDetails: Codable {
   var isFramework: Bool
 
    /// The bridging header info, if any.
-  var bridgingHeader: BridgingHeader?  
+  var bridgingHeader: BridgingHeader?
 
   /// A set of Swift Overlays of Clang Module Dependencies
   var swiftOverlayDependencies: [ModuleDependencyId]?

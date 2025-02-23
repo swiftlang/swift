@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -O -primary-file %s %S/Inputs/devirt_access_helper.swift -I %t -emit-sil -sil-inline-threshold 1000 -sil-verify-all | %FileCheck -check-prefix=PRIMARY-FILE %s
 
 //PRIMARY-FILE-LABEL: sil hidden @$s13devirt_access012testInternalD0yyF
-//PRIMARY-FILE: class_method 
+//PRIMARY-FILE: class_method
 //WHOLE-MODULE-LABEL: sil hidden @$s13devirt_access012testInternalD0yyF
 //WHOLE-MODULE: function_ref @$s13devirt_access16getInternalClassAA0dE0CyF
 //WHOLE-MODULE: return

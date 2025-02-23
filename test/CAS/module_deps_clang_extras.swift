@@ -36,7 +36,7 @@ void dummy(void);
 
 //--- hmap.json
 {
-  "mappings": {} 
+  "mappings": {}
 }
 
 //--- empty.yaml

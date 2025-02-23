@@ -67,7 +67,7 @@ getImageNameFromSwiftClass(Class _Nullable objcClass,
                            const char * _Nullable * _Nonnull outImageName) {
   if (objcClass == Nil)
     return NO;
-  
+
   auto *classAsMetadata = reinterpret_cast<const ClassMetadata *>(objcClass);
 
   // Is this a Swift class?
@@ -88,7 +88,7 @@ getImageNameFromSwiftClass(Class _Nullable objcClass,
 #endif
     return *outImageName != nullptr;
   }
-  
+
   return NO;
 }
 
@@ -165,9 +165,9 @@ static void patchLazyPointers(const mach_header *mh, const char *symbolName,
   for (uint32_t i = 0; i < cmd_count; ++i) {
     if (cmd->cmd == LC_SEGMENT_COMMAND) {
       const macho_segment_command *seg = (const macho_segment_command *)cmd;
-      if (strcmp(seg->segname, "__TEXT") == 0) 
+      if (strcmp(seg->segname, "__TEXT") == 0)
         slide = (uintptr_t)mh - seg->vmaddr;
-      else if (strcmp(seg->segname,"__LINKEDIT") == 0) 
+      else if (strcmp(seg->segname,"__LINKEDIT") == 0)
         linkEditBase = (const uint8_t *)(seg->vmaddr + slide - seg->fileoff);
     }
     cmd = (const load_command *)(((const char *)cmd)+cmd->cmdsize);
@@ -212,7 +212,7 @@ static void patchLazyPointers(const mach_header *mh, const char *symbolName,
   for (uint32_t i = 0; i < cmd_count; ++i) {
     if (cmd->cmd == LC_SEGMENT_COMMAND) {
       const macho_segment_command *seg = (const macho_segment_command *)cmd;
-      const macho_section * const sectionsStart = 
+      const macho_section * const sectionsStart =
           (const macho_section *)(seg + 1);
       ArrayRef<macho_section> sections(sectionsStart, seg->nsects);
 
@@ -220,7 +220,7 @@ static void patchLazyPointers(const mach_header *mh, const char *symbolName,
         const uint8_t type = sect.flags & SECTION_TYPE;
         if (type != S_LAZY_SYMBOL_POINTERS)
           continue;
-        
+
         const size_t pointerCount = sect.size / sizeof(uintptr_t);
         uintptr_t * const symbolPointers = (uintptr_t *)(sect.addr + slide);
         const uint32_t indirectTableOffset = sect.reserved1;
@@ -233,10 +233,10 @@ static void patchLazyPointers(const mach_header *mh, const char *symbolName,
           }
 
           // Found symbol for this lazy pointer, now lookup address.
-          const char *lazyTargetName = 
+          const char *lazyTargetName =
               &stringTable[symbolTable[symbolIndex].n_un.n_strx];
           if (strcmp(symbolName, lazyTargetName) == 0) {
-            // Can't use the value currently stored here because it may 
+            // Can't use the value currently stored here because it may
             // be a dyld stub binder that will undo our patch if called.
             symbolPointers[lazyIndex] = (uintptr_t)newValue;
           }
@@ -265,7 +265,7 @@ static BOOL callUnpatchedGetImageNameFromClass(
   return outImageName != nullptr;
 }
 
-/// A patched version of class_getImageName that always uses the Swift 
+/// A patched version of class_getImageName that always uses the Swift
 /// implementation.
 ///
 /// The Swift implementation is always set up to chain to another
@@ -300,7 +300,7 @@ static id patchedBundleForClass(id self, SEL _cmd, Class objcClass) {
     return ((id (*)(id, SEL, const char *))objc_msgSend)(
       self, BUNDLE_WITH_EXECUTABLE_PATH_SEL, imageName);
   }
-  
+
   // Call through to the original, which is now found under the patched
   // selector.
   return ((id (*)(id, SEL, Class))objc_msgSend)(
@@ -310,24 +310,24 @@ static id patchedBundleForClass(id self, SEL _cmd, Class objcClass) {
 /// Install the patched +[NSBundle bundleForClass:].
 static void patchNSBundle(void) {
   if (didPatchNSBundle) return;
-  
+
   Class NSBundle = objc_getClass("NSBundle");
   if (!NSBundle) return;
-  
+
   Method origMethod = class_getClassMethod(NSBundle, BUNDLE_FOR_CLASS_SEL);
   if (!origMethod) return;
-  
+
   // Stuff can fail below, but if it does then we can't reasonably try again.
   didPatchNSBundle = true;
-  
+
   BOOL success = class_addMethod(
     object_getClass(NSBundle), PATCHED_BUNDLE_FOR_CLASS_SEL,
     reinterpret_cast<IMP>(patchedBundleForClass), method_getTypeEncoding(origMethod));
   if (!success) return;
-  
+
   Method patchMethod = class_getClassMethod(NSBundle, PATCHED_BUNDLE_FOR_CLASS_SEL);
   if (!patchMethod) return;
-  
+
   method_exchangeImplementations(origMethod, patchMethod);
 }
 #endif
@@ -365,7 +365,7 @@ void swift::setUpObjCRuntimeGetImageNameFromClass() {
 
   } else {
     // On older OSs, manually patch in our new implementation of
-    // class_getImageName, and set it up to chain to the original system 
+    // class_getImageName, and set it up to chain to the original system
     // version.
 
     // This assignment happens through a volatile pointer to make sure it occurs

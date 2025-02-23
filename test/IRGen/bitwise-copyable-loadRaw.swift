@@ -25,5 +25,5 @@ doit()
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
 func blackhole<T>(_ t: T) {
-  print(t) 
+  print(t)
 }

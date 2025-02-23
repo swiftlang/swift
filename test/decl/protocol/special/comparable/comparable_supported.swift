@@ -2,7 +2,7 @@
 
 // Comparable enum synthesis
 enum Angel: Comparable {
-  case lily, elsa, karlie 
+  case lily, elsa, karlie
 }
 
 func pit(_ a: Angel, against b: Angel) -> Bool {
@@ -13,7 +13,7 @@ func pit(_ a: Angel, against b: Angel) -> Bool {
 
 enum NoCasesEnum: Comparable {} // Okay
 
-// Comparable enum conformance through extension 
+// Comparable enum conformance through extension
 enum Birthyear {
   case eighties(Int)
   case nineties(Int)

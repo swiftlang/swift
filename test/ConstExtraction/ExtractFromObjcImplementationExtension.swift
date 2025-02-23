@@ -7,7 +7,7 @@
 
 protocol MyProto { }
 
-extension ImplClass: MyProto { 
+extension ImplClass: MyProto {
     static let notStoredProperty = true
 }
 

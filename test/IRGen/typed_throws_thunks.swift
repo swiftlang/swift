@@ -68,8 +68,8 @@ extension P {
 
 protocol P2 {
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s19typed_throws_thunks2P2P1fyyAA1EOYKFTj"(
-// CHECK-SAME:      ptr noalias swiftself %0, 
-// CHECK-SAME:      ptr noalias nocapture swifterror dereferenceable(8) %1, 
+// CHECK-SAME:      ptr noalias swiftself %0,
+// CHECK-SAME:      ptr noalias nocapture swifterror dereferenceable(8) %1,
 // CHECK-SAME:      ptr %2, ptr %3
 // CHECK-SAME:  )
 // CHECK-SAME:  {
@@ -94,7 +94,7 @@ protocol P2 {
 // CHECK-LABEL: define{{.*}} swiftcc i8 @"$s19typed_throws_thunks2P2P1hs4Int8VyAA1EOYKFTj"(
 // CHECK-SAME:      ptr noalias swiftself %0
 // CHECK-SAME:      ptr noalias nocapture swifterror dereferenceable(8) %1
-// CHECK-SAME:      ptr %2 
+// CHECK-SAME:      ptr %2
 // CHECK-SAME:      ptr %3
 // CHECK-SAME:  )
 // CHECK-SAME:  {

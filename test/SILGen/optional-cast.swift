@@ -188,7 +188,7 @@ class C {}
 
 public struct TestAddressOnlyStruct<T> {
   func f(_ a : T?) {}
-  
+
   // CHECK-LABEL: sil hidden [ossa] @$s4main21TestAddressOnlyStructV8testCall{{[_0-9a-zA-Z]*}}F
   // CHECK: bb0(%0 : $*Optional<T>, %1 : $TestAddressOnlyStruct<T>):
   // CHECK: apply {{.*}}<T>(%0, %1)

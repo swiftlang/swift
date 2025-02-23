@@ -140,7 +140,7 @@ extension ASTGenVisitor {
       nameLoc: self.generateSourceLoc(node.attributeName)
     )
   }
-  
+
   func generateConventionTypeAttr(attribute node: AttributeSyntax) -> BridgedConventionTypeAttr? {
     // FIXME: This doesn't need custom attribute arguments syntax.
     // FIXME: Support 'witness_method' argument.
@@ -148,7 +148,7 @@ extension ASTGenVisitor {
       // TODO: Diangose.
       return nil
     }
-    
+
     let cTypeName: BridgedStringRef?
     let cTypeNameLoc: BridgedSourceLoc?
     if let ctypeString = args.cTypeString {
@@ -158,9 +158,9 @@ extension ASTGenVisitor {
       cTypeName = nil
       cTypeNameLoc = nil
     }
-    
+
     let witnessMethodProtocol: BridgedDeclNameRef = BridgedDeclNameRef()
-    
+
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
@@ -173,7 +173,7 @@ extension ASTGenVisitor {
       clangTypeLoc: cTypeNameLoc ?? BridgedSourceLoc()
     )
   }
-  
+
   func generateExecutionTypeAttr(attribute node: AttributeSyntax) -> BridgedExecutionTypeAttr? {
     let behaviorLoc = self.generateSourceLoc(node.arguments)
     let behavior: BridgedExecutionTypeAttrExecutionKind? = self.generateSingleAttrOption(
@@ -191,7 +191,7 @@ extension ASTGenVisitor {
     guard let behavior else {
       return nil
     }
-      
+
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
@@ -201,7 +201,7 @@ extension ASTGenVisitor {
       behaviorLoc: behaviorLoc
     )
   }
-  
+
   func generateIsolatedTypeAttr(attribute node: AttributeSyntax) -> BridgedIsolatedTypeAttr? {
     let isolationKindLoc = self.generateSourceLoc(node.arguments)
     let isolationKind: BridgedIsolatedTypeAttrIsolationKind? = self.generateSingleAttrOption(
@@ -241,7 +241,7 @@ extension ASTGenVisitor {
       // TODO: Diagnose
       fatalError("expected string literal for @_opaqueReturnTypeOfType type attribute")
     }
-    
+
     let indexLoc = self.generateSourceLoc(args.ordinal)
     let index =  Int(args.ordinal.text, radix: 10)
     guard let index else {
@@ -259,7 +259,7 @@ extension ASTGenVisitor {
       index: index, indexLoc: indexLoc
     )
   }
-  
+
   func generateAttrParensRange(attribute node: AttributeSyntax) -> BridgedSourceRange {
     guard let lParen = node.leftParen else {
       return BridgedSourceRange()

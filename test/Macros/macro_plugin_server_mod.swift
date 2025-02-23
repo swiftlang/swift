@@ -113,7 +113,7 @@ void crashMe(void) {
 @freestanding(expression) public macro evil(_ value: Int) -> String = #externalMacro(module: "EvilMacros", type: "CrashingMacro")
 
 //--- app.swift
-import MacroLibrary 
+import MacroLibrary
 
 func test() {
   _ = #crash() // expected-error {{external macro implementation type 'CrashOnLoad.WhateverMacro' could not be found for macro 'crash()'; failed to load library plugin}}

@@ -77,7 +77,7 @@ func testShuffleTuple() {
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]()
   // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $any P
   // CHECK-NEXT: // function_ref
-  // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples6make_pAA1P_pyF 
+  // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples6make_pAA1P_pyF
   // CHECK-NEXT: apply [[T0]]([[TMP]])
   // CHECK-NEXT: copy_addr [take] [[TMP]] to [init] [[PBX]]
   // CHECK-NEXT: store [[T1]] to [trivial] [[PBY]]
@@ -92,7 +92,7 @@ func testShuffleTuple() {
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]()
   // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $any P
   // CHECK-NEXT: // function_ref
-  // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples6make_pAA1P_pyF 
+  // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples6make_pAA1P_pyF
   // CHECK-NEXT: apply [[T0]]([[TMP]])
   // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: any P, x: Int), 0
   // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[PBPAIR]] : $*(y: any P, x: Int), 1
@@ -106,7 +106,7 @@ func testShuffleTuple() {
   // CHECK-NEXT: [[INT:%.*]] = apply [[T0]]()
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $any P
   // CHECK-NEXT: // function_ref
-  // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples6make_pAA1P_pyF 
+  // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples6make_pAA1P_pyF
   // CHECK-NEXT: apply [[T0]]([[TEMP]])
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBPAIR]] : $*(y: any P, x: Int)
   // CHECK-NEXT: tuple_addr_constructor [assign] [[WRITE]] : $*(y: any P, x: Int) with ([[TEMP]] : $*any P, [[INT]] : $Int)

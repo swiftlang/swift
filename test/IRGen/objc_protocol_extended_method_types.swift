@@ -159,7 +159,7 @@ print(P.self)
 
 // CHECK-JIT: [[FINISH_LABEL]]:
 // CHECK-JIT: [[RESOLVED_PROTOCOL:%.+]] = phi ptr [ [[EXISTING_PROTOCOL]], %[[EXISTING_PROTOCOL_LABEL]] ], [ [[NEW_PROTOCOL]], %[[NEW_PROTOCOL_LABEL]] ]{{$}}
-// CHECK-JIT: store ptr [[RESOLVED_PROTOCOL]], ptr @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP35objc_protocol_extended_method_types1P_", align 8 
+// CHECK-JIT: store ptr [[RESOLVED_PROTOCOL]], ptr @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP35objc_protocol_extended_method_types1P_", align 8
 // CHECK-JIT: ret void
 // CHECK-JIT-NEXT: {{^}$}}
 

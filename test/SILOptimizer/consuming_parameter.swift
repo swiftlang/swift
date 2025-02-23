@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend -c -target %target-swift-5.1-abi-triple -Xllvm --sil-print-final-ossa-module -O -module-name=main -o /dev/null %s 2>&1 | %FileCheck %s
- 
+
 // REQUIRES: concurrency
 
 // CHECK-LABEL: sil [ossa] @async_dead_arg_call : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @noImplicitCopy @_eagerMove @owned
 // CHECK:         destroy_value [[INSTANCE]]
-// CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt 
+// CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
 // CHECK:         [[CALLEE:%[^,]+]] = function_ref @async_callee
 // CHECK:         apply [[CALLEE]]()
 // CHECK:         hop_to_executor [[EXECUTOR]]
@@ -15,10 +15,10 @@ public func async_dead_arg_call(o: consuming AnyObject) async {
   // o should be destroyed here
   await bar()
 }
- 
+
 // CHECK-LABEL: sil [ossa] @async_dead_arg_call_lexical : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @noImplicitCopy @_lexical @owned
-// CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt 
+// CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
 // CHECK:         [[CALLEE:%[^,]+]] = function_ref @async_callee
 // CHECK:         apply [[CALLEE]]()
 // CHECK:         hop_to_executor [[EXECUTOR]]
@@ -47,9 +47,9 @@ public class C {
   // CHECK-LABEL: sil [ossa] @async_dead_arg_call_method : {{.*}} {
   // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @noImplicitCopy @_eagerMove @owned
   // CHECK:         destroy_value [[INSTANCE]]
-  // CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt 
-  // CHECK:         [[CALLEE:%[^,]+]] = function_ref @async_callee : $@convention(thin) @async () -> () 
-  // CHECK:         apply [[CALLEE]]() : $@convention(thin) @async () -> () 
+  // CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK:         [[CALLEE:%[^,]+]] = function_ref @async_callee : $@convention(thin) @async () -> ()
+  // CHECK:         apply [[CALLEE]]() : $@convention(thin) @async () -> ()
   // CHECK:         hop_to_executor [[EXECUTOR]]
   // CHECK-LABEL: } // end sil function 'async_dead_arg_call_method'
   @_silgen_name("async_dead_arg_call_method")

@@ -560,7 +560,7 @@ func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,
   _ = cell as NSObjectProtocol
   _ = cell as NSCopying
   _ = cell as SomeCell
-  
+
   _ = plainObj as CopyableNSObject // expected-error {{cannot convert value of type 'NSObject' to type 'CopyableNSObject' (aka 'any NSCopying & NSObjectProtocol') in coercion}}
   _ = plainCell as CopyableSomeCell // expected-error {{cannot convert value of type 'SomeCell' to type 'CopyableSomeCell' (aka 'any SomeCell & NSCopying') in coercion}}
 }
@@ -659,7 +659,7 @@ class NewtypeUser {
 
   typealias MyTuple = (Int, AnyObject?)
   typealias MyNamedTuple = (a: Int, b: AnyObject?)
-  
+
   @objc func blockWithTypealias(_ input: @escaping (MyTuple) -> MyInt) {}
   // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{function types cannot be represented in Objective-C}}
@@ -698,7 +698,7 @@ func testErrorNewtype() {
   _ = ErrorNewType(3) // expected-error {{argument type 'Int' does not conform to expected type 'Error'}}
 
   // Since we import NSError as Error, and Error is not Hashable...we end up
-  // losing the types for these functions, even though the above assignment 
+  // losing the types for these functions, even though the above assignment
   // works.
   testErrorDictionary(3) // expected-error {{cannot convert value of type 'Int' to expected argument type '[AnyHashable : String]'}}
   testErrorDictionaryNewtype(3) // expected-error {{cannot convert value of type 'Int' to expected argument type '[AnyHashable : String]'}}

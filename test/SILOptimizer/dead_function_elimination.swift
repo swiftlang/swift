@@ -168,7 +168,7 @@ public func callTest() {
 	testProtocols(Adopt())
 }
 
-@_optimize(none) // make sure not eliminated 
+@_optimize(none) // make sure not eliminated
 internal func donotEliminate() {
   return
 }

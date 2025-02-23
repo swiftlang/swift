@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %swift_driver %s >%t/constant_folded_fp_operation_validation.swift
 
 // RUN: %target-swift-frontend -emit-sil -O -suppress-warnings -verify %t/constant_folded_fp_operation_validation.swift 2>&1 | %FileCheck --check-prefix=CHECK-SIL %t/constant_folded_fp_operation_validation.swift
@@ -31,9 +31,9 @@ func createTestFile() {
 
 /////////////////// Protocols ///////////////////
 
-/// Implemented by types that have distinct ways of 
+/// Implemented by types that have distinct ways of
 /// being represented in an expression context vs all
-/// other contexts. 
+/// other contexts.
 protocol Representable {
     func math_name() -> String
     func printable_name() -> String
@@ -41,7 +41,7 @@ protocol Representable {
 
 /// An rough estimation of a type that needs to validate
 /// optimized floating point operations in Swift.
-/// 
+///
 /// Any new validator should conform to this protocol
 /// and then call the generate* functions to generate
 /// corresponding test file code.
@@ -96,7 +96,7 @@ func generateOperandAccessors() {
 
 struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
     /////////////////////// TYPES ///////////////////////
-    
+
     /// Type of floating points this validator deals with.
     enum _FpType : CaseIterable, Representable, Equatable {
         case Float
@@ -221,9 +221,9 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
     typealias FPOperand = _FPOperand
 
     func optimizedFunDeclCheck(
-        fpType: FPType, 
-        op: FPOperation, 
-        op1: FPOperand, 
+        fpType: FPType,
+        op: FPOperation,
+        op1: FPOperand,
         op2: FPOperand
     ) -> String {
         let funcName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
@@ -233,14 +233,14 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
         // CHECK-SIL-NEXT: [global: ]
         // CHECK-SIL-NEXT: bb0:
         // CHECK-SIL-NOT: {{.*}}fcmp{{.*}}
-        // CHECK-SIL: } // end sil function '\(funcName)' 
+        // CHECK-SIL: } // end sil function '\(funcName)'
         """
     }
 
     func unoptimizedFunDeclCheck(
-        fpType: FPType, 
-        op: FPOperation, 
-        op1: FPOperand, 
+        fpType: FPType,
+        op: FPOperation,
+        op1: FPOperand,
         op2: FPOperand
     ) -> String {
         let funcName = [unoptPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
@@ -249,14 +249,14 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
         // CHECK-SIL-LABEL: sil hidden [noinline] [Onone] @\(funcName)
         // CHECK-SIL-NEXT: bb0:
         // CHECK-SIL: {{.*}}fcmp{{.*}}
-        // CHECK-SIL: } // end sil function '\(funcName)' 
+        // CHECK-SIL: } // end sil function '\(funcName)'
         """
     }
 
     func resultComparisonCheck(
-        fpType: FPType, 
-        op: FPOperation, 
-        op1: FPOperand, 
+        fpType: FPType,
+        op: FPOperation,
+        op1: FPOperand,
         op2: FPOperand
     ) -> String {
         let comparisonFuncName = ["comparison", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
@@ -307,13 +307,13 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
                         let comparisonFuncName = ["comparison", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         let optFuncName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         let unoptFuncName = [unoptPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
-                        
+
                         print("""
                         @inline(never) @_silgen_name("\(comparisonFuncName)") @_optimize(none)
                         func \(comparisonFuncName)() -> Bool {
                             return \(optFuncName)() == \(unoptFuncName)()
                         }
-                                
+
                         """)
                     }
                 }
@@ -343,10 +343,10 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
 
     /////////////////////// Utilities ///////////////////////
     private func generateFuncDeclWithCheckDirectives(
-        fpType: FPType, 
-        op: FPOperation, 
-        op1: FPOperand, 
-        op2: FPOperand, 
+        fpType: FPType,
+        op: FPOperation,
+        op1: FPOperand,
+        op2: FPOperand,
         isopt: Bool = false
     ) {
         var operand1 = op1.isSpecial() ? fpType.math_name() + "." + op1.math_name() : op1.math_name()
@@ -372,8 +372,8 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
         let optPrefix = isopt ? optPrefix : unoptPrefix
         let optAttr = isopt ? "" : "@_optimize(none)"
         let funcName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
-        let checkDirectives = isopt ? 
-        optimizedFunDeclCheck(fpType: fpType, op: op, op1: op1, op2: op2) : 
+        let checkDirectives = isopt ?
+        optimizedFunDeclCheck(fpType: fpType, op: op, op1: op1, op2: op2) :
         unoptimizedFunDeclCheck(fpType: fpType, op: op, op1: op1, op2: op2)
 
         print("""
@@ -382,12 +382,12 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
             return \(operand1) \(op.math_name()) \(operand2)
         }
         \(checkDirectives)
-                
+
         """)
     }
 
     // Equality comparisons b/w infinity and non-infinity are not constant folded.
-    // In such comparisons, special floating point types - Float80 and Float16, may 
+    // In such comparisons, special floating point types - Float80 and Float16, may
     // come into play and pattern matching against them complicates the constant folding
     // logic more than we'd like.
     private func checkIfEqCmpBetweenInfAndNonInf(op: FPOperation, op1: FPOperand, op2: FPOperand) -> Bool {
@@ -495,9 +495,9 @@ struct FPConstantFoldedArithmeticOpsValidator: FPOptimizedOpsValidator {
     typealias FPOperand = _FPOperand
 
         func optimizedFunDeclCheck(
-        fpType: FPType, 
-        op: FPOperation, 
-        op1: FPOperand, 
+        fpType: FPType,
+        op: FPOperation,
+        op1: FPOperand,
         op2: FPOperand
     ) -> String {
         let funcName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
@@ -507,14 +507,14 @@ struct FPConstantFoldedArithmeticOpsValidator: FPOptimizedOpsValidator {
         // CHECK-SIL-NEXT: [global: ]
         // CHECK-SIL-NEXT: bb0:
         // CHECK-SIL-NOT: {{.*}}f\(op.printable_name()){{.*}}
-        // CHECK-SIL: } // end sil function '\(funcName)' 
+        // CHECK-SIL: } // end sil function '\(funcName)'
         """
     }
 
     func unoptimizedFunDeclCheck(
-        fpType: FPType, 
-        op: FPOperation, 
-        op1: FPOperand, 
+        fpType: FPType,
+        op: FPOperation,
+        op1: FPOperand,
         op2: FPOperand
     ) -> String {
         let funcName = [unoptPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
@@ -523,14 +523,14 @@ struct FPConstantFoldedArithmeticOpsValidator: FPOptimizedOpsValidator {
         // CHECK-SIL-LABEL: sil hidden [noinline] [Onone] @\(funcName)
         // CHECK-SIL-NEXT: bb0:
         // CHECK-SIL:  {{.*}}f\(op.printable_name()){{.*}}
-        // CHECK-SIL: } // end sil function '\(funcName)' 
+        // CHECK-SIL: } // end sil function '\(funcName)'
         """
     }
 
     func resultComparisonCheck(
-        fpType: FPType, 
-        op: FPOperation, 
-        op1: FPOperand, 
+        fpType: FPType,
+        op: FPOperation,
+        op1: FPOperand,
         op2: FPOperand
     ) -> String {
         let comparisonFuncName = ["comparison", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
@@ -579,13 +579,13 @@ struct FPConstantFoldedArithmeticOpsValidator: FPOptimizedOpsValidator {
                         let comparisonFuncName = ["comparison", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         let optFuncName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         let unoptFuncName = [unoptPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
-                        
+
                         print("""
                         @inline(never) @_silgen_name("\(comparisonFuncName)") @_optimize(none)
                         func \(comparisonFuncName)() -> Bool {
                             return \(optFuncName)() == \(unoptFuncName)()
                         }
-                                
+
                         """)
                     }
                 }
@@ -602,7 +602,7 @@ struct FPConstantFoldedArithmeticOpsValidator: FPOptimizedOpsValidator {
                         print("""
                         \(comparison)
 
-                        """)   
+                        """)
                     }
                 }
             }
@@ -611,10 +611,10 @@ struct FPConstantFoldedArithmeticOpsValidator: FPOptimizedOpsValidator {
 
     /////////////////////// Utilities ///////////////////////
     private func generateFuncDeclWithCheckDirectives(
-        fpType: FPType, 
-        op: FPOperation, 
-        op1: FPOperand, 
-        op2: FPOperand, 
+        fpType: FPType,
+        op: FPOperation,
+        op1: FPOperand,
+        op2: FPOperand,
         isopt: Bool = false
     ) {
         var operand1 = op1.math_name()
@@ -633,8 +633,8 @@ struct FPConstantFoldedArithmeticOpsValidator: FPOptimizedOpsValidator {
         let optPrefix = isopt ? optPrefix : unoptPrefix
         let optAttr = isopt ? "" : "@_optimize(none)"
         let funcName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
-        let checkDirectives = isopt ? 
-        optimizedFunDeclCheck(fpType: fpType, op: op, op1: op1, op2: op2) : 
+        let checkDirectives = isopt ?
+        optimizedFunDeclCheck(fpType: fpType, op: op, op1: op1, op2: op2) :
         unoptimizedFunDeclCheck(fpType: fpType, op: op, op1: op1, op2: op2)
 
         print("""
@@ -643,7 +643,7 @@ struct FPConstantFoldedArithmeticOpsValidator: FPOptimizedOpsValidator {
             return \(operand1) \(op.math_name()) \(operand2)
         }
         \(checkDirectives)
-                
+
         """)
     }
 }

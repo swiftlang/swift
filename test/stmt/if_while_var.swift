@@ -153,14 +153,14 @@ if a == 0, where b == 0 {}  // expected-error {{cannot find 'a' in scope}} expec
 func testIfCase(_ a : Int?) {
   if case nil = a, a != nil {}
   if case let (b?) = a, b != 42 {}
-  
+
   if let case (b?) = a, b != 42 {}  // expected-error {{pattern matching binding is spelled with 'case let', not 'let case'}} {{6-10=}} {{14-14= let}}
-  
+
   if a != nil, let c = a, case nil = a { _ = c}
-  
+
   if let p? = a {_ = p}  // expected-error {{pattern matching in a condition implicitly unwraps optionals}} {{11-12=}}
-  
-  
+
+
   if let .some(x) = a {_ = x}  // expected-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
 
   if case _ = a {}  // expected-warning {{'if' condition is always true}}

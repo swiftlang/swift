@@ -39,13 +39,13 @@ tests.test("convenience") {
     let error1 = CocoaError.error(.fileNoSuchFile)
     expectNotNil((error1 as NSError).localizedDescription)
     expectEqual(CocoaError.Code.fileNoSuchFile.rawValue, (error1 as NSError).code)
-    
+
     let url = URL(string: "file:///tmp/bar/foo")
     let error2 = CocoaError.error(.fileNoSuchFile, url: url)
     expectEqual(url, (error2 as! CocoaError).url)
     expectNotNil((error2 as NSError).localizedDescription)
     expectEqual(url, (error2 as NSError).userInfo[NSURLErrorKey] as? URL)
-    
+
     let error3 = CocoaError.error(.fileNoSuchFile, userInfo: ["foo" : "bar"], url: url)
     expectEqual(url, (error3 as! CocoaError).url)
     expectNotNil((error3 as NSError).localizedDescription)

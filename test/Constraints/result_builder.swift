@@ -15,7 +15,7 @@ struct TupleBuilder {
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
-  
+
   static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
       -> (T1, T2, T3) {
     return (t1, t2, t3)
@@ -312,7 +312,7 @@ func testAcceptColorTagged(b: Bool, i: Int, s: String, d: Double) {
   }
 
   // CHECK: Tagged<
-  TagAccepter<Color>.acceptTagged { () -> Tagged<Color, Int> in 
+  TagAccepter<Color>.acceptTagged { () -> Tagged<Color, Int> in
     if b {
       return i.tag(Color.green)
     } else {
@@ -710,7 +710,7 @@ struct TupleBuilderWithOpt {
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
-  
+
   static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
       -> (T1, T2, T3) {
     return (t1, t2, t3)

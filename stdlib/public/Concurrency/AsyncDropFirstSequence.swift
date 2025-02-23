@@ -40,7 +40,7 @@ extension AsyncSequence {
   public __consuming func dropFirst(
     _ count: Int = 1
   ) -> AsyncDropFirstSequence<Self> {
-    precondition(count >= 0, 
+    precondition(count >= 0,
       "Can't drop a negative number of elements from an async sequence")
     return AsyncDropFirstSequence(self, dropping: count)
   }
@@ -55,8 +55,8 @@ public struct AsyncDropFirstSequence<Base: AsyncSequence> {
 
   @usableFromInline
   let count: Int
-  
-  @usableFromInline 
+
+  @usableFromInline
   init(_ base: Base, dropping count: Int) {
     self.base = base
     self.count = count
@@ -83,7 +83,7 @@ extension AsyncDropFirstSequence: AsyncSequence {
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
-    
+
     @usableFromInline
     var count: Int
 
@@ -157,20 +157,20 @@ extension AsyncDropFirstSequence {
   public __consuming func dropFirst(
     _ count: Int = 1
   ) -> AsyncDropFirstSequence<Base> {
-    // If this is already a AsyncDropFirstSequence, we can just sum the current 
+    // If this is already a AsyncDropFirstSequence, we can just sum the current
     // drop count and additional drop count.
-    precondition(count >= 0, 
+    precondition(count >= 0,
       "Can't drop a negative number of elements from an async sequence")
     return AsyncDropFirstSequence(base, dropping: self.count + count)
   }
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncDropFirstSequence: Sendable 
-  where Base: Sendable, 
+extension AsyncDropFirstSequence: Sendable
+  where Base: Sendable,
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncDropFirstSequence.Iterator: Sendable 
-  where Base.AsyncIterator: Sendable, 
+extension AsyncDropFirstSequence.Iterator: Sendable
+  where Base.AsyncIterator: Sendable,
         Base.Element: Sendable { }

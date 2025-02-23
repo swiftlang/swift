@@ -349,7 +349,7 @@ func local_generic_observing_property<T>(_ arg: Int, _: T) {
       takeInt(localproperty1)
     }
   }
-  
+
   takeInt(localproperty1)
   localproperty1 = arg
 
@@ -359,7 +359,7 @@ func local_generic_observing_property<T>(_ arg: Int, _: T) {
       takeInt(localproperty2)
     }
   }
-  
+
   takeInt(localproperty2)
   localproperty2 = arg
 }

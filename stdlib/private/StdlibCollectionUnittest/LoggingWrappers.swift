@@ -68,7 +68,7 @@ extension LoggingIterator: IteratorProtocol {
 // Sequence and Collection logs
 //===----------------------------------------------------------------------===//
 
-// FIXME: it's not clear if it's really worth this hierarchy. the 
+// FIXME: it's not clear if it's really worth this hierarchy. the
 // test.log pattern requires all the static properties be at the top
 // since Log is an associated type that cannot be refined in extensions
 // that add functionality.
@@ -86,7 +86,7 @@ public class SequenceLogBase {
   public static var withContiguousStorageIfAvailable = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _copyToContiguousArray = TypeIndexed(0)
-  public static var _copyContents = TypeIndexed(0)  
+  public static var _copyContents = TypeIndexed(0)
   // Collection
   public static var startIndex = TypeIndexed(0)
   public static var endIndex = TypeIndexed(0)
@@ -216,7 +216,7 @@ extension LoggingSequence: Sequence {
     SequenceLog.underestimatedCount[selfType] += 1
     return base.underestimatedCount
   }
-  
+
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -248,7 +248,7 @@ extension LoggingSequence: Sequence {
 
 public typealias LoggingCollection<Base: Collection> = LoggingSequence<Base>
 
-extension LoggingCollection: Collection {  
+extension LoggingCollection: Collection {
   public typealias Index = Base.Index
   public typealias Indices = Base.Indices
   public typealias SubSequence = Base.SubSequence
@@ -349,9 +349,9 @@ extension LoggingBidirectionalCollection: BidirectionalCollection {
   }
 }
 
-public typealias LoggingRandomAccessCollection<Base: RandomAccessCollection> 
+public typealias LoggingRandomAccessCollection<Base: RandomAccessCollection>
   = LoggingBidirectionalCollection<Base>
-  
+
 extension LoggingRandomAccessCollection: RandomAccessCollection { }
 
 public typealias LoggingMutableCollection<Base: MutableCollection>
@@ -386,7 +386,7 @@ extension LoggingMutableCollection: MutableCollection {
      Log.partitionBy[selfType] += 1
      return try base.partition(by: belongsInSecondPartition)
    }
-   
+
   @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
@@ -535,12 +535,12 @@ public typealias LoggingRangeReplaceableRandomAccessCollection<
 public struct BufferAccessLoggingMutableCollection<
   Base : MutableCollection
 > {
-  public var base: Base  
+  public var base: Base
 }
 
 extension BufferAccessLoggingMutableCollection: LoggingType {
   public typealias Log = MutableCollectionLog
-  
+
   public init(wrapping base: Base) {
     self.base = base
   }
@@ -613,7 +613,7 @@ extension BufferAccessLoggingMutableCollection: MutableCollection {
     }
     return result
   }
-  
+
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {

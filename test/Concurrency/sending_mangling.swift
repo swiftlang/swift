@@ -43,10 +43,10 @@ struct MethodTest {
 
   // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.testMethodRemoveFunctionArg(__owned sending_mangling.NonSendableKlass) -> () : $@convention(method) (@sil_sending @owned NonSendableKlass, MethodTest) -> () {
   func testMethodRemoveFunctionArg(_ x: sending NonSendableKlass) {}
-  
+
   // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.testNoRemoveFunctionArgSubTypeArg(__owned sending_mangling.S<(sending __owned sending_mangling.NonSendableKlass) -> ()>) -> () : $@convention(method) (@sil_sending S<(sending NonSendableKlass) -> ()>, MethodTest) -> () {
   func testNoRemoveFunctionArgSubTypeArg(_ x: sending S<(sending NonSendableKlass) -> ()>) {}
-  
+
   // DEMANGLE sil hidden [ossa] @sending_mangling.MethodTest.testNoRemoveFunctionArgSubTypeReturn(__owned sending_mangling.S<() -> sending sending_mangling.NonSendableKlass>) -> () : $@convention(method) (@sil_sending S<() -> sending NonSendableKlass>, MethodTest) -> () {
   func testNoRemoveFunctionArgSubTypeReturn(_ x: sending S<() -> sending NonSendableKlass>) {}
 
@@ -56,7 +56,7 @@ struct MethodTest {
 
   // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.testNoRemoveFunctionResultSubTypeArg() -> sending_mangling.S<(sending __owned sending_mangling.NonSendableKlass) -> ()> : $@convention(method) (MethodTest) -> @sil_sending S<(sending NonSendableKlass) -> ()> {
   func testNoRemoveFunctionResultSubTypeArg() -> sending S<(sending NonSendableKlass) -> ()> { fatalError() }
-  
+
   // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.testNoRemoveFunctionResultSubTypeResult() -> sending_mangling.S<() -> sending sending_mangling.NonSendableKlass> : $@convention(method) (MethodTest) -> @sil_sending S<() -> sending NonSendableKlass> {
   func testNoRemoveFunctionResultSubTypeResult() -> sending S<() -> sending NonSendableKlass> { fatalError() }
 

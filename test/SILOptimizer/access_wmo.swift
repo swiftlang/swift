@@ -102,7 +102,7 @@ func setKeyPath(_ c: C, _ kp: ReferenceWritableKeyPath<C, Int>, _ v: Int) {
 // getter, setter, or begin/end_apply calls. The final access remains
 // dynamic because the property is "visibleExternally". i.e. the compiler can't
 // see how other files are using it.
-// 
+//
 // With WMO...
 //
 // access to setterProp and finalProp are promoted to static.

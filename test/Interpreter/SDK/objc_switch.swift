@@ -126,7 +126,7 @@ func testAnyObjectDowncast(_ obj: AnyObject!) {
 
   case let int as Int:
     print("Int: \(int)")
-    
+
   case let nsStrArr as [NSString]:
     print("NSString array: \(nsStrArr)")
 

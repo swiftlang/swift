@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-disable-pass=function-signature-opts -module-name=test -O -target %target-cpu-apple-macos10.15 -emit-sil | %FileCheck %s
 
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O -Xllvm -sil-disable-pass=function-signature-opts -module-name=test %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 

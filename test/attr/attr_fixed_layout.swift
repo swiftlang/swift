@@ -136,8 +136,8 @@ struct Rectangle {
 @frozen public struct BadFields5 {
   private var field: PrivateStruct? { // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
     didSet {}
-    
-    
+
+
   }
 }
 
@@ -145,8 +145,8 @@ struct Rectangle {
 // expected-warning@-1 {{'@frozen' attribute is now used for fixed-layout structs}}
   private var field: PrivateStruct? { // expected-error {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
     didSet {}
-    
-    
+
+
   }
 }
 

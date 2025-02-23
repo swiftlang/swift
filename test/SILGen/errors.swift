@@ -15,7 +15,7 @@ func someValidPointer<T>() -> UnsafePointer<T> { fatalError() }
 func someValidPointer<T>() -> UnsafeMutablePointer<T> { fatalError() }
 
 // CHECK: sil hidden [ossa] @$s6errors10make_a_cat{{.*}}F : $@convention(thin) () -> (@owned Cat, @error any Error) {
-// CHECK:      [[T1:%.*]] = metatype $@thick Cat.Type 
+// CHECK:      [[T1:%.*]] = metatype $@thick Cat.Type
 // CHECK:      [[T0:%.*]] = function_ref @$s6errors3Cat{{.*}} : $@convention(method) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: return [[T2]] : $Cat

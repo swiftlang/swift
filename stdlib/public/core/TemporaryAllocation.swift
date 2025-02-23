@@ -143,14 +143,14 @@ internal func _withUnsafeTemporaryAllocation<
   // Builtin.stackDealloc() will end up blowing it away (and the verifier will
   // notice and complain.)
   let result: R
-  
+
 #if compiler(>=5.5) && $BuiltinStackAlloc
   let stackAddress = Builtin.stackAlloc(
     capacity._builtinWordValue,
     MemoryLayout<T>.stride._builtinWordValue,
     alignment._builtinWordValue
   )
-  
+
   // The multiple calls to Builtin.stackDealloc() are because defer { } produces
   // a child function at the SIL layer and that conflicts with the verifier's
   // idea of a stack allocation's lifetime.

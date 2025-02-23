@@ -13,7 +13,7 @@
 // CHECK: public struct PubStruct
 // CHECK: package struct PkgStruct
 
-/// If -package-name is not passed, a package interface should not be generated even if 
+/// If -package-name is not passed, a package interface should not be generated even if
 /// `-emit-package-module-interface-path` is passed.
 // RUN: %target-build-swift -emit-module %t/Baz.swift -I %t \
 // RUN:   -module-name Baz \

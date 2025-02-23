@@ -22,14 +22,14 @@ import gizmo
 // CHECK-linux: @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing" = weak hidden global ptr @_PROTOCOL_NSRuncing, section {{"__DATA,__objc_protorefs,coalesced,no_dead_strip"|"objc_protorefs"|".objc_protorefs\$B"}}
 
 // CHECK: @_PROTOCOLS__TtC13generic_casts10ObjCClass2 = internal constant { i64, [1 x ptr] } {
-// CHECK:   i64 1, 
+// CHECK:   i64 1,
 // CHECK:   @_PROTOCOL__TtP13generic_casts10ObjCProto2_
 // CHECK: }
 
 // CHECK: @_DATA__TtC13generic_casts10ObjCClass2 = internal constant {{.*}} @_PROTOCOLS__TtC13generic_casts10ObjCClass2
 
 // CHECK: @_PROTOCOL_PROTOCOLS__TtP13generic_casts10ObjCProto2_ = weak hidden constant { i64, [1 x ptr] } {
-// CHECK:   i64 1, 
+// CHECK:   i64 1,
 // CHECK:   @_PROTOCOL__TtP13generic_casts10ObjCProto1_
 // CHECK: }
 

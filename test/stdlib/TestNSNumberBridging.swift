@@ -429,11 +429,11 @@ func testNSNumberBridgeFromInt32() {
             expectEqual(Int(exactly: interestingValue), int)
             let uint = (number!) as? UInt
             expectEqual(UInt(exactly: interestingValue), uint)
-            
+
             let float = (number!) as? Float
             let expectedFloat = Float(exactly: int32!)
             testFloat(expectedFloat, float)
-            
+
             let double = (number!) as? Double
             let expectedDouble = Double(int32!)
             testDouble(expectedDouble, double)
@@ -469,11 +469,11 @@ func testNSNumberBridgeFromUInt32() {
             expectEqual(Int(exactly: interestingValue), int)
             let uint = (number!) as? UInt
             expectEqual(UInt(exactly: interestingValue), uint)
-            
+
             let float = (number!) as? Float
             let expectedFloat = Float(exactly: uint32!)
             testFloat(expectedFloat, float)
-          
+
             let double = (number!) as? Double
             let expectedDouble = Double(uint32!)
             testDouble(expectedDouble, double)
@@ -613,7 +613,7 @@ func testNSNumberBridgeFromUInt() {
             } else {
               testFloat(expectedFloat, float)
             }
-          
+
             let double = (number!) as? Double
             let expectedDouble = Double(exactly: uint!)
             testDouble(expectedDouble, double)
@@ -658,7 +658,7 @@ func testNSNumberBridgeFromFloat() {
             } else {
                 testFloat(expectedFloat, float)
             }
-            
+
             let double = (number!) as? Double
             let expectedDouble = Double(exactly: interestingValue)
             if interestingValue.isNaN {
@@ -708,7 +708,7 @@ func testNSNumberBridgeFromDouble() {
             } else {
                 testFloat(expectedFloat, float)
             }
-            
+
             let double = (number!) as? Double
             let expectedDouble = Double(exactly: interestingValue)
             if interestingValue.isNaN {
@@ -749,7 +749,7 @@ func testNSNumberBridgeFromCGFloat() {
             expectEqual(Int(exactly: interestingValue.native), int)
             let uint = (number!) as? UInt
             expectEqual(UInt(exactly: interestingValue.native), uint)
-            
+
             let float = (number!) as? Float
             let expectedFloat = Float(exactly: interestingValue.native)
             if interestingValue.isNaN {
@@ -758,7 +758,7 @@ func testNSNumberBridgeFromCGFloat() {
             } else {
                 testFloat(expectedFloat, float)
             }
-            
+
             let double = (number!) as? Double
             let expectedDouble = Double(exactly: interestingValue.native)
             if interestingValue.isNaN {
@@ -877,7 +877,7 @@ func testNSNumberBridgeAnyHashable() {
             expectUnreachable("Unable to look up value by NSNumber key.")
             continue
         }
-        
+
         expectEqual(value, ns_value)
     }
 }

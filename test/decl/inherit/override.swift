@@ -3,7 +3,7 @@
 @objc class ObjCClassA {}
 @objc class ObjCClassB : ObjCClassA {}
 
-class A { 
+class A {
   func f1() { } // expected-note{{overri}}
   func f2() -> A { } // expected-note{{overri}}
 
@@ -27,7 +27,7 @@ extension A {
 
 class B : A { }
 
-extension B { 
+extension B {
   func f1() { }  // expected-error{{overri}}
   func f2() -> B { } // expected-error{{overri}}
 

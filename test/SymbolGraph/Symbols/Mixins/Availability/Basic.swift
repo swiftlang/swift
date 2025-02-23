@@ -14,7 +14,7 @@ public struct S {}
 // CHECK-NEXT: "major": 10
 // CHECK-NEXT: "minor": 9
 
-// CHECK: deprecated 
+// CHECK: deprecated
 // CHECK-NEXT: "major": 11
 // CHECK-NEXT: "minor": 0
 

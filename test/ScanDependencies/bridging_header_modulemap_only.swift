@@ -38,7 +38,7 @@
   {
       "moduleName": "A",
       "isFramework": false,
-      "isBridgingHeaderDependency": true,      
+      "isBridgingHeaderDependency": true,
       "clangModulePath": "INPUTSDIR/A.pcm",
       "clangModuleMapPath": "CHEADERSDIR/module.modulemap"
   }

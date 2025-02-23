@@ -5,7 +5,7 @@ func f2(_: Int = 5) -> Int { }
 func f3(_: Int...) -> Int { }
 
 class A { }
-class B : A { 
+class B : A {
   func iAmAB() {}
   func createB() -> B { return B() }
 }
@@ -66,7 +66,7 @@ func forgotOptionalBang(_ a: A, obj: AnyObject) {
   a = a < a // expected-error{{value of optional type 'A?' must be unwrapped to a value of type 'A'}}
   // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}{{7-7=(}}{{12-12=) ?? <#default value#>}}
   // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{7-7=(}}{{12-12=)!}}
-  
+
   // rdar://problem/20377684 -- take care that the '!' doesn't fall into an
   // optional evaluation context
   let bo: B? = b
@@ -124,7 +124,7 @@ class C {
   var a: Int = 1
 }
 var co: C? = nil
-var ciuo: C! = nil 
+var ciuo: C! = nil
 
 if co {} // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{6-6= != nil)}}
 if ciuo {} // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{4-4=(}} {{8-8= != nil)}}

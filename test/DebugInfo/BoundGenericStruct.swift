@@ -29,13 +29,13 @@ public struct S2<T> {
 }
 public let inner = S2<Double>.Inner(t:4.2)
 
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "Inner", 
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "Inner",
 // CHECK-SAME: size: 64, {{.*}}identifier: "$s18BoundGenericStruct2S2V5InnerVySd_GD")
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "$s18BoundGenericStruct2S2VyxGD", 
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "$s18BoundGenericStruct2S2VyxGD",
 // CHECK-SAME: flags: DIFlagFwdDecl, runtimeLang: DW_LANG_Swift)
 
 // DWARF-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "Inner", scope: ![[SCOPE1:[0-9]+]],{{.*}} size: 64, elements: ![[ELEMENTS1:[0-9]+]], {{.*}}templateParams: ![[PARAMS2:[0-9]+]], identifier: "$s18BoundGenericStruct2S2V5InnerVySd_GD", specification: ![[SPECIFICATION:[0-9]+]])
-// DWARF-DAG: ![[SCOPE1]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s18BoundGenericStruct2S2VyxGD", 
+// DWARF-DAG: ![[SCOPE1]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s18BoundGenericStruct2S2VyxGD",
 
 // DWARF-DAG: ![[PARAMS2]] = !{![[PARAMS3:[0-9]+]]}
 // DWARF-DAG: ![[PARAMS3]] = !DITemplateTypeParameter(type: ![[PARAMS4:[0-9]+]])

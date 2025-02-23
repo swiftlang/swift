@@ -4,7 +4,7 @@
 // RUN: %target-build-swift -Xfrontend -pc-macro -o %t/main -I=%t %t/PlaygroundSupport.o %t/main.swift
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
-// RUN: %target-build-swift -Xfrontend -pc-macro -Xfrontend -playground -Xfrontend -debugger-support -o %t/main2 -I=%t %t/PlaygroundSupport.o %t/main.swift 
+// RUN: %target-build-swift -Xfrontend -pc-macro -Xfrontend -playground -Xfrontend -debugger-support -o %t/main2 -I=%t %t/PlaygroundSupport.o %t/main.swift
 // RUN: %target-codesign %t/main2
 // RUN: %target-run %t/main2 | %FileCheck %s
 // REQUIRES: executable_test
@@ -19,11 +19,11 @@ func foo() {
   func bar() {
     2
   }
-  
+
   let baz: () -> Void = {
     3
   }
-  
+
   1
   bar()
   baz()

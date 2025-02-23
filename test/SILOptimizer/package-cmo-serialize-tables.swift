@@ -30,7 +30,7 @@ import Lib
 runPub([PubStruct(rawValue: 2), PubKlassZ(rawValue: 3)])
 runPkg([PkgStruct(rawValue: 2), PkgKlassZ(rawValue: 3)])
 
- 
+
 //--- Lib.swift
 
 public class ParentPubKlass {
@@ -152,7 +152,7 @@ package class PkgKlass: ParentPkgKlass {
     super.init(1)
     pkgVar = arg
   }
-  package func pkgFunc() { 
+  package func pkgFunc() {
     // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib8PkgKlassC7pkgFuncyyF
     print(pkgVar)
   }
@@ -265,7 +265,7 @@ public class PubKlassZ: PubProto {
   }
   public func pubFunc() {
     // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib9PubKlassZCAA0B5ProtoA2aDP7pubFuncyyFTW
-    // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9PubKlassZC7pubFuncyyF 
+    // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib9PubKlassZC7pubFuncyyF
     print(env)
   }
 }
@@ -332,7 +332,7 @@ public struct PubStructX: PubSimpleProto, InternalProto { /// NOTE: witness tabl
     self.intVar = InternalStruct(name: "foo")
     self.pubVar = arg
   }
-  public func pubFunc() -> Int { 
+  public func pubFunc() -> Int {
     // CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib10PubStructXV7pubFuncSiyF
     return pubVar
   }
@@ -437,7 +437,7 @@ package struct PkgStructX: PkgSimpleProto, InternalProto {
     self.intVar = InternalStruct(name: "foo")
     self.pkgVar = arg
   }
-  package func pkgFunc() -> Int { 
+  package func pkgFunc() -> Int {
     // CHECK-DAG: sil shared [transparent] [serialized] [thunk] [canonical] [ossa] @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP7pkgFuncSiyFTW
     // CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib10PkgStructXV7pkgFuncSiyF
     return pkgVar
@@ -573,7 +573,7 @@ package func runPkg(_ arg: [any PkgProto]) {
 //CHECK-NEXT:   method #PkgProto.pkgFunc: <Self where Self : PkgProto> (Self) -> () -> () : @$s3Lib9PkgStructVAA0B5ProtoA2aDP7pkgFuncyyFTW
 
 //CHECK-LABEL:  sil_witness_table package [serialized_for_package] PkgStructX: PkgSimpleProto module Lib {
-//CHECK-NEXT:   method #PkgSimpleProto.pkgVar!getter: <Self where Self : PkgSimpleProto> (Self) -> () -> Int : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivgTW 
+//CHECK-NEXT:   method #PkgSimpleProto.pkgVar!getter: <Self where Self : PkgSimpleProto> (Self) -> () -> Int : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivgTW
 //CHECK-NEXT:   method #PkgSimpleProto.pkgVar!setter: <Self where Self : PkgSimpleProto> (inout Self) -> (Int) -> () : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivsTW
 //CHECK-NEXT:   method #PkgSimpleProto.pkgVar!modify: <Self where Self : PkgSimpleProto> (inout Self) -> () -> () : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP6pkgVarSivMTW
 //CHECK-NEXT:   method #PkgSimpleProto.pkgFunc: <Self where Self : PkgSimpleProto> (Self) -> () -> Int : @$s3Lib10PkgStructXVAA0B11SimpleProtoA2aDP7pkgFuncSiyFTW

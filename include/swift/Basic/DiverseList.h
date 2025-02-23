@@ -107,7 +107,7 @@ public:
     }
     friend bool operator!=(stable_iterator a, stable_iterator b) {
       return !operator==(a, b);
-    }    
+    }
   };
   stable_iterator stable_begin() const {
     return stable_iterator(0);
@@ -155,7 +155,7 @@ protected:
     other.Begin = other.End = other.EndOfAllocation = (char*) (&other + 1);
     assert(other.isAllocatedInline());
   }
-  
+
 public:
   /// Query whether the stack is empty.
   bool empty() const {
@@ -218,7 +218,7 @@ public:
     checkValid();
     assert(Begin <= it.Ptr && it.Ptr <= End);
     return stable_iterator(it.Ptr - Begin);
-  } 
+  }
 
   class const_iterator {
     const char *Ptr;

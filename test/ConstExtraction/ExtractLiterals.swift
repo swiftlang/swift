@@ -45,7 +45,7 @@ public struct PropertyWrappers : MyProto {
     var propertyWrapper3: Int = 128
 
     @Buffered
-    var propertyWrapper4: String    
+    var propertyWrapper4: String
 }
 
 @propertyWrapper
@@ -620,7 +620,7 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
 // CHECK-NEXT:        "line": 48,
 // CHECK-NEXT:        "valueKind": "Runtime"
-// CHECK-NEXT:      } 
+// CHECK-NEXT:      }
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  },
 // CHECK-NEXT:  {

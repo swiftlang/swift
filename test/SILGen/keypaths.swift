@@ -77,7 +77,7 @@ func storedProperties<T>(_: T) {
 func computedProperties<T: P>(_: T) {
   // CHECK: keypath $ReferenceWritableKeyPath<C<T>, S<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $C<τ_0_0>;
-  // CHECK-SAME: settable_property $S<τ_0_0>, 
+  // CHECK-SAME: settable_property $S<τ_0_0>,
   // CHECK-SAME:   id #C.nonfinal!getter : <T> (C<T>) -> () -> S<T>,
   // CHECK-SAME:   getter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
   // CHECK-SAME:   setter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTk : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
@@ -94,7 +94,7 @@ func computedProperties<T: P>(_: T) {
 
   // CHECK: keypath $ReferenceWritableKeyPath<C<T>, S<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $C<τ_0_0>;
-  // CHECK-SAME: settable_property $S<τ_0_0>, 
+  // CHECK-SAME: settable_property $S<τ_0_0>,
   // CHECK-SAME:   id #C.observed!getter : <T> (C<T>) -> () -> S<T>,
   // CHECK-SAME:   getter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
   // CHECK-SAME:   setter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTk : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
@@ -110,7 +110,7 @@ func computedProperties<T: P>(_: T) {
 
   // CHECK: keypath $ReferenceWritableKeyPath<C<T>, () -> ()>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $C<τ_0_0>;
-  // CHECK-SAME: settable_property $() -> (), 
+  // CHECK-SAME: settable_property $() -> (),
   // CHECK-SAME:   id ##C.reabstracted,
   // CHECK-SAME:   getter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>,
   // CHECK-SAME:   setter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTk : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>, @in_guaranteed C<τ_0_0>) -> ()
@@ -148,7 +148,7 @@ func computedProperties<T: P>(_: T) {
 
   // CHECK: keypath $KeyPath<T, Int>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $τ_0_0;
-  // CHECK-SAME: gettable_property $Int, 
+  // CHECK-SAME: gettable_property $Int,
   // CHECK-SAME:   id #P.x!getter : <Self where Self : P> (Self) -> () -> Int,
   // CHECK-SAME:   getter @$s8keypaths1PP1xSivpAaBRzlxTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Int
   // CHECK-SAME: ) <T>
@@ -231,14 +231,14 @@ func keyPathForOptional() {
 class StorageQualified {
   weak var tooWeak: StorageQualified?
   unowned var disowned: StorageQualified
-  
+
   init() { fatalError() }
 }
 
 final class FinalStorageQualified {
   weak var tooWeak: StorageQualified?
   unowned var disowned: StorageQualified
-  
+
   init() { fatalError() }
 }
 
@@ -409,7 +409,7 @@ func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
   _ = \SubscriptDefaults1.[false, bool: false]
   _ = \SubscriptDefaults1.[bool: false, 0]
   _ = \SubscriptDefaults1.[bool: false, 0, 0]
-  
+
   _ = \SubscriptDefaults2.[]
   _ = \SubscriptDefaults2.[0]
   _ = \SubscriptDefaults3.[]
@@ -437,14 +437,14 @@ func check_default_subscripts() {
   // CHECK: [[LOAD:%[0-9]+]] = load [trivial] [[ALLOC]] : $*Int
   // CHECK: [[KEYPATH:%[0-9]+]] = keypath $WritableKeyPath<SubscriptDefaults4, Int>, (root $SubscriptDefaults4; settable_property $Int, id @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluig : $@convention(method) <τ_0_0 where τ_0_0 : Numeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults4) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTK : $@convention(keypath_accessor_getter) (@in_guaranteed SubscriptDefaults4, @in_guaranteed (Int, Int)) -> @out Int, setter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTk : $@convention(keypath_accessor_setter) (@in_guaranteed Int, @inout SubscriptDefaults4, @in_guaranteed (Int, Int)) -> (), indices [%$0 : $Int : $Int, %$1 : $Int : $Int], indices_equals @$sS2iTH : $@convention(keypath_accessor_equals) (@in_guaranteed (Int, Int), @in_guaranteed (Int, Int)) -> Bool, indices_hash @$sS2iTh : $@convention(keypath_accessor_hash) (@in_guaranteed (Int, Int)) -> Int) ([[I]], [[LOAD]])
   _ = \SubscriptDefaults4.[x: 0]
-  
+
   // CHECK: [[STRX_LIT:%[0-9]+]] = string_literal utf8 ""
   // CHECK: [[STRX:%[0-9]+]] = apply %{{[0-9]+}}([[STRX_LIT]], {{.*}}
   // CHECK: [[STRY_LIT:%[0-9]+]] = string_literal utf8 "check_default_subscripts()"
   // CHECK: [[DEF_ARG:%[0-9]+]] = apply %{{[0-9]+}}([[STRY_LIT]], {{.*}}
   // CHECK: keypath $WritableKeyPath<SubscriptDefaults5, String>, (root $SubscriptDefaults5; settable_property $String, id @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluig : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByStringLiteral> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults5) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTK : $@convention(keypath_accessor_getter) (@in_guaranteed SubscriptDefaults5, @in_guaranteed (String, String)) -> @out String, setter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTk : $@convention(keypath_accessor_setter) (@in_guaranteed String, @inout SubscriptDefaults5, @in_guaranteed (String, String)) -> (), indices [%$0 : $String : $String, %$1 : $String : $String], indices_equals @$sS2STH : $@convention(keypath_accessor_equals) (@in_guaranteed (String, String), @in_guaranteed (String, String)) -> Bool, indices_hash @$sS2STh : $@convention(keypath_accessor_hash) (@in_guaranteed (String, String)) -> Int) ([[STRX]], [[DEF_ARG]])
   _ = \SubscriptDefaults5.[x: ""]
-  
+
   // CHECK: [[STRX_LIT:%[0-9]+]] = string_literal utf8 ""
   // CHECK: [[STRX:%[0-9]+]] = apply %{{[0-9]+}}([[STRX_LIT]], {{.*}}
   // CHECK: [[STRY_LIT:%[0-9]+]] = string_literal utf8 ""
@@ -489,7 +489,7 @@ func test_variadics() {
   // CHECK: ([[ARR:%[0-9]+]], %{{[0-9]+}}) = destructure_tuple [[MAKE_ARR]] : $(Array<Int>, Builtin.RawPointer)
   // CHECK: keypath $KeyPath<SubscriptVariadic1, Int>, (root $SubscriptVariadic1; gettable_property $Int,  id @$s8keypaths18SubscriptVariadic1VyS2id_tcig : $@convention(method) (@guaranteed Array<Int>, SubscriptVariadic1) -> Int, getter @$s8keypaths18SubscriptVariadic1VyS2id_tcipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed SubscriptVariadic1, @in_guaranteed Array<Int>) -> @out Int, indices [%$0 : $Array<Int> : $Array<Int>], indices_equals @$sSaySiGTH : $@convention(keypath_accessor_equals) (@in_guaranteed Array<Int>, @in_guaranteed Array<Int>) -> Bool, indices_hash @$sSaySiGTh : $@convention(keypath_accessor_hash) (@in_guaranteed Array<Int>) -> Int) ([[ARR]])
   _ = \SubscriptVariadic1.[]
-  
+
   _ = \SubscriptVariadic2.["", "1"]
   _ = \SubscriptVariadic2.[""]
   // CHECK: [[ARR_COUNT:%[0-9]+]] = integer_literal $Builtin.Word, 2
@@ -500,7 +500,7 @@ func test_variadics() {
   // CHECK: [[FIN_ARR:%[0-9]+]] = apply [[FIN_REF]]<String>([[ARR]])
   // CHECK: keypath $KeyPath<SubscriptVariadic2, String>, (root $SubscriptVariadic2; gettable_property $String,  id @$s8keypaths18SubscriptVariadic2Vyxxd_tcs26ExpressibleByStringLiteralRzluig : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByStringLiteral> (@guaranteed Array<τ_0_0>, SubscriptVariadic2) -> @out τ_0_0, getter @$s8keypaths18SubscriptVariadic2Vyxxd_tcs26ExpressibleByStringLiteralRzluipACSSTK : $@convention(keypath_accessor_getter) (@in_guaranteed SubscriptVariadic2, @in_guaranteed Array<String>) -> @out String, indices [%$0 : $Array<String> : $Array<String>], indices_equals @$sSaySSGTH : $@convention(keypath_accessor_equals) (@in_guaranteed Array<String>, @in_guaranteed Array<String>) -> Bool, indices_hash @$sSaySSGTh : $@convention(keypath_accessor_hash) (@in_guaranteed Array<String>) -> Int) ([[FIN_ARR]])
   _ = \SubscriptVariadic2.["", #function]
-  
+
   _ = \SubscriptVariadic3<String>.[""]
   _ = \SubscriptVariadic3<String>.["", "1"]
   _ = \SubscriptVariadic3<String>.[]

@@ -219,18 +219,18 @@ func testLoadableBorrowingEnum(_ x: borrowing LoadableEnum) {
 // CHECK:   destroy_addr [[STACK]]
 // CHECK: } // end sil function '$s35noimplicitcopy_borrowing_parameters31testAddressOnlyBorrowingConsumeyyAA23GenericNonTrivialStructVyxGAA1PRzlF'
 func testAddressOnlyBorrowingConsume<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
-    let _ = x 
+    let _ = x
     let _ = x.t
 }
 
-func testAddressOnlyBorrowingConsume2<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {    
-    var y = x 
-    y = x 
+func testAddressOnlyBorrowingConsume2<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
+    var y = x
+    y = x
     _ = y
 }
 
-func testAddressOnlyBorrowingConsume3<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {    
-    let y = x 
+func testAddressOnlyBorrowingConsume3<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
+    let y = x
     _ = y
 }
 
@@ -238,9 +238,9 @@ func testAddressOnlyBorrowingUse<T : P>(_ x: borrowing GenericNonTrivialStruct<T
     _ = x
 }
 
-func testAddressOnlyBorrowingUseAndConsume<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {    
+func testAddressOnlyBorrowingUseAndConsume<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
     borrowValDefault(x)
-    let _ = x 
+    let _ = x
 }
 
 func testAddressOnlyBorrowingCallBorrowValDefault<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
@@ -259,9 +259,9 @@ func testAddressOnlyBorrowingCallMethodSelfBorrowing<T : P>(_ x: borrowing Gener
     x.doSomethingBorrowing()
 }
 
-func testAddressOnlyBorrowingEscapingClosure<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {    
+func testAddressOnlyBorrowingEscapingClosure<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
     var f: () -> () = {}
-    f = { 
+    f = {
         _ = x
     }
     _ = f
@@ -269,17 +269,17 @@ func testAddressOnlyBorrowingEscapingClosure<T : P>(_ x: borrowing GenericNonTri
 
 func testAddressOnlyBorrowingNonEscapingClosure<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
     func useNonEscaping(_ f: () -> ()) {}
-    useNonEscaping { 
+    useNonEscaping {
         _ = x
     }
 }
 
 func testAddressOnlyBorrowingCast<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
-    let _ = x as Any 
+    let _ = x as Any
 }
 
 func testAddressOnlyBorrowingCastCheck<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
-    if x is Any { 
+    if x is Any {
     }
 }
 

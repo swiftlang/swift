@@ -292,21 +292,21 @@ public struct Concatenation<Base1: Sequence, Base2: Sequence>: Sequence
     self._base1 = _base1
     self._base2 = base2
   }
-  
+
   public struct Iterator: IteratorProtocol {
     var _iterator1: Base1.Iterator
     var _iterator2: Base2.Iterator
-    
+
     init(_ concatenation: Concatenation) {
       _iterator1 = concatenation._base1.makeIterator()
       _iterator2 = concatenation._base2.makeIterator()
     }
-    
+
     public mutating func next() -> Base1.Element? {
       return _iterator1.next() ?? _iterator2.next()
     }
   }
-  
+
   public func makeIterator() -> Iterator {
     Iterator(self)
   }
@@ -614,7 +614,7 @@ extension Collection {
   /// predicate, as if `self.partition(by: predicate)` had already
   /// been called.
   ///
-  /// - Efficiency: At most log(N) invocations of `predicate`, where 
+  /// - Efficiency: At most log(N) invocations of `predicate`, where
   ///   N is the length of `self`.  At most log(N) index offsetting
   ///   operations if `self` conforms to `RandomAccessCollection`;
   ///   at most N such operations otherwise.
@@ -793,7 +793,7 @@ suite.test("concatenate") {
   let w = "world!"
   let hw = concatenate(h, w)
   expectEqual("Hello, world!", String(hw))
-  
+
   let run = (1...).prefix(10).followed(by: 20...)
   expectEqual(Array(run.prefix(20)), Array(1...10) + (20..<30))
 }

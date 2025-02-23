@@ -38,7 +38,7 @@ func test() { // CHECK: [[@LINE]]:6 | function/Swift | test() | [[s:.*]] | Def |
   // CHECK: [[@LINE-2]]:13 | instance-method/acc-get/Swift | getter:categoryAddedProperty | c:@CM@objc_decls@@objc(cs)ObjCClass(im)categoryAddedProperty | Ref,Call,Dyn,Impl,RelRec,RelCall,RelCont | rel: 2
   let _ = c.protocolAddedProperty
   // CHECK: [[@LINE-1]]:13 | instance-property/Swift | protocolAddedProperty | c:objc(pl)MemberAdding(py)protocolAddedProperty | Ref,Read,Dyn,RelRec,RelCont | rel: 2
-  // CHECK: [[@LINE-2]]:13 | instance-method/acc-get/Swift | getter:protocolAddedProperty | c:@CM@objc_decls@@objc(cs)ObjCClass(im)protocolAddedProperty | Ref,Call,Dyn,Impl,RelRec,RelCall,RelCont | rel: 2 
+  // CHECK: [[@LINE-2]]:13 | instance-method/acc-get/Swift | getter:protocolAddedProperty | c:@CM@objc_decls@@objc(cs)ObjCClass(im)protocolAddedProperty | Ref,Call,Dyn,Impl,RelRec,RelCall,RelCont | rel: 2
   c.protocolAddedMethod()
-  // CHECK: [[@LINE-1]]:5 | instance-method/Swift | protocolAddedMethod() | c:objc(pl)MemberAdding(im)protocolAddedMethod | Ref,Call,Dyn,RelRec,RelCall,RelCont | rel: 2 
+  // CHECK: [[@LINE-1]]:5 | instance-method/Swift | protocolAddedMethod() | c:objc(pl)MemberAdding(im)protocolAddedMethod | Ref,Call,Dyn,RelRec,RelCall,RelCont | rel: 2
 }

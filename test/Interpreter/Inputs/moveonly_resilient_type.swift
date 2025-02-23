@@ -9,7 +9,7 @@ public struct Resilient: ~Copyable {
         Self.nextValue += 1
     }
     deinit { print("resilient deinit \(value)") }
-    
+
     public init(throwing: Bool) throws {
         if throwing {
             throw MyError()
@@ -42,7 +42,7 @@ public struct ResilientCapturesInDeinit: ~Copyable {
         testCapture { value >= 0 }
         print("resilient capture in deinit \(value)")
     }
-    
+
     public init(throwing: Bool) throws {
         if throwing {
             throw MyError()

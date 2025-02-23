@@ -20,12 +20,12 @@ extension RangeSet {
     internal init() {
       _storage = []
     }
-    
+
     @usableFromInline
     internal init(_range: Range<Bound>) {
       _storage = [_range]
     }
-    
+
     @usableFromInline
     internal init(_ranges: [Range<Bound>]) {
       _storage = ContiguousArray(_ranges)
@@ -37,19 +37,19 @@ extension RangeSet {
       _storage.sort {
         $0.lowerBound < $1.lowerBound
       }
-      
+
       // Find the index of the first non-empty range. If all ranges are empty,
       // the result is empty.
       guard let firstNonEmpty = _storage.firstIndex(where: { $0.isEmpty == false }) else {
         _storage = []
         return
       }
-      
+
       // Swap that non-empty range to be first. (This and the swap in the loop
       // might be no-ops, if no empty or overlapping ranges have been found.)
       _storage.swapAt(0, firstNonEmpty)
-      
-      // That single range is now a valid range set, so we set up three sections 
+
+      // That single range is now a valid range set, so we set up three sections
       // of the storage array:
       //
       //    1: a processed, valid range set (0...lastValid)
@@ -62,13 +62,13 @@ extension RangeSet {
       // reshuffle the elements during processing.
       var lastValid = 0
       var current = firstNonEmpty + 1
-      
+
       while current < _storage.count {
         defer { current += 1 }
-        
+
         // Skip over empty ranges.
         if _storage[current].isEmpty { continue }
-        
+
         // If the last valid range overlaps with the current range, extend the
         // last valid range to cover the current.
         if _storage[lastValid].upperBound >= _storage[current].lowerBound {
@@ -78,13 +78,13 @@ extension RangeSet {
           _storage[lastValid] = Range(
             uncheckedBounds: (_storage[lastValid].lowerBound, newUpper))
         } else {
-          // Otherwise, this is a valid new range to add to the range set: 
+          // Otherwise, this is a valid new range to add to the range set:
           // swap it into place at the end of the valid section.
           lastValid += 1
           _storage.swapAt(current, lastValid)
         }
       }
-      
+
       // Now that we've processed the whole array, remove anything left after
       // the valid section.
       _storage.removeSubrange((lastValid + 1) ..< _storage.count)
@@ -140,7 +140,7 @@ extension RangeSet.Ranges {
         $0.upperBound > range.lowerBound
       }
     }
-    
+
     // The ending index for `range` is the first range with a lower bound
     // greater than `range`'s upper bound. If this is the same as
     // `beginningIndex`, than `range` doesn't overlap any of the existing
@@ -154,7 +154,7 @@ extension RangeSet.Ranges {
         $0.lowerBound >= range.upperBound
       }
     }
-    
+
     return beginningIndex ..< endingIndex
   }
 
@@ -187,7 +187,7 @@ extension RangeSet.Ranges {
     guard !indices.isEmpty else {
       return
     }
-    
+
     let overlapsLowerBound =
       range.lowerBound > _storage[indices.lowerBound].lowerBound
     let overlapsUpperBound =
@@ -220,7 +220,7 @@ extension RangeSet.Ranges {
     guard !indices.isEmpty else {
       return Self(_range: bounds)
     }
-    
+
     var result: [Range<Bound>] = []
     var low = bounds.lowerBound
     for range in _storage[indices] {
@@ -244,7 +244,7 @@ extension RangeSet.Ranges {
     let right = other._storage
     var otherRangeIndex = 0
     var result: [Range<Bound>] = []
-    
+
     // Considering these two range sets:
     //
     //     self = [0..<5, 9..<14]
@@ -265,7 +265,7 @@ extension RangeSet.Ranges {
     //       xxxxxxx__   xxxxxxx__       xxxxxxxxxxxxxxx__
     //   yyyyyyyyyyyyyyyyyyy__               yyyyyyyyyyyyyyyyyyy__
     //       zzzzzzz__   zzz__               zzzzzzzzzzz__
-    
+
     for currentRange in left {
       // Search forward in `right` until finding either an overlapping
       // range or one that is strictly higher than this range.
@@ -274,7 +274,7 @@ extension RangeSet.Ranges {
       {
         otherRangeIndex += 1
       }
-      
+
       // For each range in `right` that overlaps with the current range
       // in `left`, append the intersection to the result.
       while otherRangeIndex < right.endIndex &&
@@ -282,7 +282,7 @@ extension RangeSet.Ranges {
       {
         let overlap = right[otherRangeIndex].clamped(to: currentRange)
         result.append(overlap)
-        
+
         // If the range in `right` continues past the current range in
         // `self`, it could overlap the next range in `self`, so break
         // out of examining the current range.
@@ -294,10 +294,10 @@ extension RangeSet.Ranges {
         otherRangeIndex += 1
       }
     }
-    
+
     return Self(_ranges: result)
   }
-  
+
   @usableFromInline
   internal func _union(_ other: Self) -> Self {
     // Empty cases
@@ -306,7 +306,7 @@ extension RangeSet.Ranges {
     } else if self.isEmpty {
       return other
     }
-    
+
     // Instead of naively inserting the ranges of `other` into `self`,
     // which can cause reshuffling with every insertion, this approach
     // uses the guarantees that each array of ranges is non-overlapping and in
@@ -317,13 +317,13 @@ extension RangeSet.Ranges {
     //    1. Finding the current lowest bound of the two range sets.
     //    2. Searching for the first upper bound that is outside the merged
     //       boundaries of the two range sets.
-    
+
     // Use temporaries so that we can swap a/b, to simplify the logic below
     var a = self._storage
     var b = other._storage
     var aIndex = a.startIndex
     var bIndex = b.startIndex
-    
+
     var result: [Range<Bound>] = []
     while aIndex < a.endIndex, bIndex < b.endIndex {
       // Make sure that `a` is the source of the lower bound and `b` is the
@@ -332,10 +332,10 @@ extension RangeSet.Ranges {
         swap(&a, &b)
         swap(&aIndex, &bIndex)
       }
-      
+
       var candidateRange = a[aIndex]
       aIndex += 1
-      
+
       // Look for the correct upper bound, which is the first upper bound that
       // isn't contained in the next range of the "other" ranges array.
       while bIndex < b.endIndex, candidateRange.upperBound >= b[bIndex].lowerBound {
@@ -355,10 +355,10 @@ extension RangeSet.Ranges {
           swap(&aIndex, &bIndex)
         }
       }
-      
+
       result.append(candidateRange)
     }
-    
+
     // Collect any remaining ranges without needing to merge.
     if aIndex < a.endIndex {
       result.append(contentsOf: a[aIndex...])
@@ -381,15 +381,15 @@ extension RangeSet.Ranges: Collection {
   public typealias Index = Int
   public typealias Indices = Range<Index>
   public typealias SubSequence = Slice<Self>
-  
+
   public var startIndex: Index {
     0
   }
-  
+
   public var endIndex: Index {
     _storage.count
   }
-  
+
   public var count: Int {
     self.endIndex
   }
@@ -431,14 +431,14 @@ extension RangeSet.Ranges: CustomStringConvertible {
 /// `replaceSubrange` with just two elements.
 internal struct _Pair<Element>: RandomAccessCollection {
   internal var pair: (first: Element, second: Element)
-  
+
   internal init(_ first: Element, _ second: Element) {
     self.pair = (first, second)
   }
-  
+
   internal var startIndex: Int { 0 }
   internal var endIndex: Int { 2 }
-  
+
   internal subscript(position: Int) -> Element {
     get {
       switch position {

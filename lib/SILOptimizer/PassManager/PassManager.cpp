@@ -709,7 +709,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
                        SILForceVerifyAroundPass.end(), MatchFun)) {
     forcePrecomputeAnalyses(F);
   }
-  
+
   llvm::sys::TimePoint<> startTime = std::chrono::system_clock::now();
   std::chrono::nanoseconds duration(0);
 
@@ -740,7 +740,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
         invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
         F->restoreFromSnapshot(SnapshotID);
       }
-      
+
       // Continue time measurement (including flushing deleted instructions).
       startTime = std::chrono::system_clock::now();
     } else {
@@ -920,12 +920,12 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   SMT->run();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
-  
+
   if (!CurrentPassHasInvalidated && Mod->hasInstructionsScheduledForDeletion()) {
     // Last chance for invalidating analysis if the pass forgot to call invalidateAnalysis.
     invalidateAllAnalysis();
   }
-  
+
   Mod->flushDeletedInsts();
   swiftPassInvocation.finishedModulePassRun();
 
@@ -979,7 +979,7 @@ void SILPassManager::verifyAnalyses() const {
 void SILPassManager::verifyAnalyses(SILFunction *F) const {
   if (Mod->getOptions().VerifyNone)
     return;
-    
+
   for (auto *A : Analyses) {
     A->verify(F);
   }
@@ -1268,7 +1268,7 @@ namespace {
       using value_type = Node*;
       using difference_type = std::ptrdiff_t;
       using pointer = value_type*;
-      using reference = value_type&;    
+      using reference = value_type&;
 
       SmallVectorImpl<Edge>::iterator baseIter;
 
@@ -1922,7 +1922,7 @@ BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
                                      const_cast<PartialApplyInst *>(PAI));
     } else {
       auto *TTTFI = cast<ThinToThickFunctionInst>(closureArg);
-      mangler.setArgumentClosureProp(closureArgIndex, 
+      mangler.setArgumentClosureProp(closureArgIndex,
                                      const_cast<ThinToThickFunctionInst *>(TTTFI));
     }
   }
@@ -2095,14 +2095,14 @@ ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef 
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       applySiteCallee->getInlineStrategy(), applySiteCallee->getEffectsKind(),
       applySiteCallee, applySiteCallee->getDebugScope());
-  
+
   if (!applySiteCallee->hasOwnership()) {
     specializedApplySiteCallee->setOwnershipEliminated();
   }
-  
+
   for (auto &Attr : applySiteCallee->getSemanticsAttrs())
     specializedApplySiteCallee->addSemanticsAttr(Attr);
-  
+
   return {specializedApplySiteCallee};
 }
 
@@ -2255,13 +2255,13 @@ namespace swift {
   class ClosureSpecializationCloner: public SILClonerWithScopes<ClosureSpecializationCloner> {
     friend class SILInstructionVisitor<ClosureSpecializationCloner>;
     friend class SILCloner<ClosureSpecializationCloner>;
-  public: 
+  public:
     using SuperTy = SILClonerWithScopes<ClosureSpecializationCloner>;
     ClosureSpecializationCloner(SILFunction &emptySpecializedFunction): SuperTy(emptySpecializedFunction) {}
   };
 } // namespace swift
 
-BridgedSpecializationCloner::BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction): 
+BridgedSpecializationCloner::BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction):
   closureSpecCloner(new ClosureSpecializationCloner(*emptySpecializedFunction.getFunction())) {}
 
 BridgedFunction BridgedSpecializationCloner::getCloned() const {
@@ -2281,9 +2281,9 @@ void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunc
 void BridgedBuilder::destroyCapturedArgs(BridgedInstruction partialApply) const {
   if (auto *pai = llvm::dyn_cast<PartialApplyInst>(partialApply.unbridged()); pai->isOnStack()) {
     auto b = unbridged();
-    return swift::insertDestroyOfCapturedArguments(pai, b); 
+    return swift::insertDestroyOfCapturedArguments(pai, b);
   } else {
-    assert(false && "`destroyCapturedArgs` must only be called on a `partial_apply` on stack!");   
+    assert(false && "`destroyCapturedArgs` must only be called on a `partial_apply` on stack!");
   }
 }
 

@@ -203,7 +203,7 @@ func testCompleteInStringLiteral() {
     BStack {
       Text("\(island.#^STRING_LITERAL_AS_ARGUMENT?check=STRING_LITERAL_VAR^#turnipPrice)")
       takeTrailingClosure {}
-    } 
+    }
   }
 }
 

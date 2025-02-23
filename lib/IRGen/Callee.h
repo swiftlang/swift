@@ -325,7 +325,7 @@ namespace irgen {
     /// An additional value whose meaning varies by the FunctionPointer's Kind:
     /// - Kind::AsyncFunctionPointer -> pointer to the corresponding function
     ///                                 if the FunctionPointer was created via
-    ///                                 forDirect; nullptr otherwise. 
+    ///                                 forDirect; nullptr otherwise.
     llvm::Value *SecondaryValue;
 
     PointerAuthInfo AuthInfo;
@@ -567,7 +567,7 @@ namespace irgen {
     bool hasSubstitutions() const {
       return Info.Substitutions.hasAnySubstitutableParams();
     }
-    
+
     SubstitutionMap getSubstitutions() const { return Info.Substitutions; }
 
     const FunctionPointer &getFunctionPointer() const { return Fn; }

@@ -40,7 +40,7 @@ class C2 : P1 {
 }
 
 class C3 : P1 {
-  func method(_ x: Int) { } 
+  func method(_ x: Int) { }
 
   var prop: Int = 0
 
@@ -55,7 +55,7 @@ class C3 : P1 {
 class C4 { }
 
 extension C4 : P1 {
-  func method(_ x: Int) { } 
+  func method(_ x: Int) { }
 
   var prop: Int { return 5 }
 
@@ -74,7 +74,7 @@ extension C4 : P1 {
 class C5 : P1 { }
 
 extension C5 {
-  func method(_ x: Int) { } 
+  func method(_ x: Int) { }
 
   var prop: Int { return 5 }
 
@@ -90,7 +90,7 @@ extension C5 {
 class C6 { }
 
 extension C6 : P1 {
-  @nonobjc func method(_ x: Int) { } 
+  @nonobjc func method(_ x: Int) { }
 
   @nonobjc var prop: Int { return 5 }
 

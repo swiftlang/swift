@@ -190,7 +190,7 @@ public func concrete_concrete() {
 // CHECK-NEXT:    [[Z:%.*]] = call ptr @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGACyxq_GAA2P1A2A0I0R_AA0H03AT2RpzAakM_AmaLP3AT3RPzrlWl"()
 // CHECK-NEXT:    call swiftcc void @"$s34conditional_conformance_with_assoc8takes_p1yyxmAA2P1RzlF"(
 // CHECK-SAME:      ptr getelementptr inbounds (
-// CHECK-SAME:        %swift.full_type, 
+// CHECK-SAME:        %swift.full_type,
 // CHECK-SAME:          ptr @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMf"
 // CHECK-SAME:        i32 0,
 // CHECK-SAME:        i32 2

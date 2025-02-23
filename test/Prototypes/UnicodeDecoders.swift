@@ -17,10 +17,10 @@
 // Benchmarking: use the following script with your swift-4-enabled swiftc.
 // The BASELINE timings come from the existing standard library Codecs
 
-/* 
-  for x in BASELINE FORWARD REVERSE SEQUENCE COLLECTION REVERSE_COLLECTION ; do 
+/*
+  for x in BASELINE FORWARD REVERSE SEQUENCE COLLECTION REVERSE_COLLECTION ; do
     echo $x
-    swiftc -DBENCHMARK -D$x -O -swift-version 4 UnicodeDecoders.swift -o /tmp/u3-$x 
+    swiftc -DBENCHMARK -D$x -O -swift-version 4 UnicodeDecoders.swift -o /tmp/u3-$x
     for i in {1..3}; do
       (time nice -19 /tmp/u3-$x) 2>&1 | grep user
     done
@@ -40,7 +40,7 @@ extension Unicode {
   @frozen
   public // @testable
   struct _ParsingIterator<
-    CodeUnitIterator : IteratorProtocol, 
+    CodeUnitIterator : IteratorProtocol,
     Parser: Unicode.Parser
   > where Parser.Encoding.CodeUnit == CodeUnitIterator.Element {
     @inline(__always)
@@ -128,7 +128,7 @@ extension Unicode.DefaultScalarView : Sequence {
     var parsing: Unicode._ParsingIterator<
       CodeUnits.Iterator, Encoding.ForwardParser>
   }
-  
+
   func makeIterator() -> Iterator {
     return Iterator(
       parsing: Unicode._ParsingIterator(
@@ -160,7 +160,7 @@ extension Unicode.DefaultScalarView.Index : Comparable {
   ) -> Bool {
     return lhs.codeUnitIndex < rhs.codeUnitIndex
   }
-  
+
   @inline(__always)
   public static func == (
     lhs: Unicode.DefaultScalarView<CodeUnits,Encoding>.Index,
@@ -226,9 +226,9 @@ extension Unicode.DefaultScalarView : BidirectionalCollection {
   @inline(__always)
   public func index(before i: Index) -> Index {
     var parser = Encoding.ReverseParser()
-    
+
     var more = codeUnits[..<i.codeUnitIndex].reversed().makeIterator()
-    
+
     switch parser.parseScalar(from: &more) {
     case .valid(let scalarContent):
       let d: Int = -scalarContent.count
@@ -273,7 +273,7 @@ func checkStringProtocol<S : StringProtocol, Encoding: Unicode.Encoding>(
       expectEqualSequence(
         expected, utf32(S(cString: ntbs)), "\(S.self) init(cString:)")
     }
-    
+
     var ntbs = Array(utfStr); ntbs.append(0)
     expectEqualSequence(
       expected, utf32(S(decodingCString: ntbs, as: Encoding.self)),
@@ -283,7 +283,7 @@ func checkStringProtocol<S : StringProtocol, Encoding: Unicode.Encoding>(
     s.withCString {
       expectEqual(s, S(cString: $0), "\(S.self) withCString(_:)")
     }
-    
+
     s.withCString(encodedAs: Encoding.self) {
       expectEqual(s, S(decodingCString: $0, as: Encoding.self),
         "\(S.self) withCString(encoding:_:)")
@@ -297,21 +297,21 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
 ) -> AssertionResult {
   var decoded = [UInt32]()
   var expected = expectedHead
-  
+
   func output(_ scalar: UInt32) {
     decoded.append(scalar)
     expectEqual(
       Unicode.Scalar(scalar),
       Codec.decode(Codec.encode(Unicode.Scalar(scalar)!)!))
   }
-  
+
   func output1(_ scalar: Unicode.Scalar) {
     decoded.append(scalar.value)
     expectEqual(scalar, Codec.decode(Codec.encode(scalar)!))
   }
-  
+
   var result = assertionSuccess()
-  
+
   func check<C: Collection>(_ expected: C, _ description: String)
   where C.Element == UInt32
   {
@@ -371,7 +371,7 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
     var iterator = utfStr.makeIterator()
     let errorCount = Codec.ForwardParser._decode(
       &iterator, repairingIllFormedSequences: true, into: output1)
-    
+
     if expectedRepairedTail.isEmpty { expectEqual(0, errorCount) }
     else { expectNotEqual(0, errorCount) }
   }
@@ -384,14 +384,14 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
     else { expectNotEqual(0, errorCount) }
   }
   check(expected.reversed(), "reverse, repairing: true")
-  
+
   //===--- String/Substring Construction and C-String interop -------------===//
   do {
     let s = String(decoding: utfStr, as: Codec.self)
     checkStringProtocol(
       s, utfStr, encodedAs: Codec.self, expectingUTF32: expected)
   }
-  
+
   do {
     let s0 = "\n" + String(decoding: utfStr, as: Codec.self) + "\n"
     let s = s0.dropFirst().dropLast()
@@ -419,7 +419,7 @@ func checkDecodeUTF<Codec : UnicodeCodec>(
         Codec.encode(x)!, from: Codec.self)!
     )
   }
-  
+
   //===--- Scalar View ----------------------------------------------------===//
   let scalars = Unicode.DefaultScalarView(utfStr, fromEncoding: Codec.self)
   expectEqualSequence(expected, scalars.map { $0.value })
@@ -1165,7 +1165,7 @@ UTF8Decoder.test("CodeSpaceBoundaryConditions") {
 
   // U+10FFFF (noncharacter)
   expectTrue(checkDecodeUTF8([ 0x10ffff ], [], [ 0xf4, 0x8f, 0xbf, 0xbf ]))
-  
+
   // U+110000 (invalid)
   expectTrue(checkDecodeUTF8(
       [], [ 0xfffd, 0xfffd, 0xfffd, 0xfffd ],
@@ -2495,7 +2495,7 @@ public func run_UTF8Decode(_ N: Int) {
   }
 
   var total: UInt32 = 0
-  
+
   for _ in 1...200*N {
     for string in strings {
 #if BASELINE

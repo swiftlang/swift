@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/SpanExtras.swiftmodule %S/Inputs/SpanExtras.swift -enable-builtin-module  -enable-experimental-feature LifetimeDependence  -enable-experimental-feature AllowUnsafeAttribute -O
-// RUN: %target-swift-frontend -I %t -O -emit-sil %s -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL 
+// RUN: %target-swift-frontend -I %t -O -emit-sil %s -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL
 // RUN: %target-swift-frontend -I %t -O -emit-ir %s -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-IR
 
 // REQUIRES: swift_in_compiler
@@ -15,7 +15,7 @@ import SpanExtras
 // SIL removes lower bounds check
 // LLVM removes upper bounds check and vectorizes the loop
 
-// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B10_zero_inityy10SpanExtras07MutableH0VySiGzF : 
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B10_zero_inityy10SpanExtras07MutableH0VySiGzF :
 // CHECK-SIL: bb3({{.*}}):
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
@@ -56,7 +56,7 @@ public func span_copy_elemwise(_ output: inout MutableSpan<Int>, _ input: Span<I
 // SIL removes lower bounds check
 // LLVM removes upper bounds check and vectorizes the loop
 
-// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B16_append_elemwiseyy10SpanExtras06OutputH0VySiGz_s0H0VySiGtF : 
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B16_append_elemwiseyy10SpanExtras06OutputH0VySiGz_s0H0VySiGtF :
 // CHECK-SIL: bb3({{.*}}):
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
@@ -74,7 +74,7 @@ public func span_append_elemwise(_ output: inout OutputSpan<Int>, _ input: Span<
 
 // Bounds check should be eliminated
 
-// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF : 
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF :
 // CHECK-SIL: bb3({{.*}}):
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
@@ -107,7 +107,7 @@ public func span_sum_with_trap(_ output: inout MutableSpan<Int>, _ input1: Span<
   }
 }
 
-// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_bubble_sortyy10SpanExtras07MutableH0VySiGzF : 
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_bubble_sortyy10SpanExtras07MutableH0VySiGzF :
 // CHECK-SIL: bb11({{.*}}):
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
@@ -128,7 +128,7 @@ public func span_bubble_sort(_ span: inout MutableSpan<Int>) {
   }
 }
 
-// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests6sortedySb10SpanExtras07MutableG0VySiGF : 
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests6sortedySb10SpanExtras07MutableG0VySiGF :
 // CHECK-SIL: bb4:
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"

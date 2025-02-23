@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -debug-diagnostic-names -target arm64-apple-macos14.4 
+// RUN:   -debug-diagnostic-names -target arm64-apple-macos14.4
 
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchOS || OS=xros
 

@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %S/Inputs/struct_with_fields.swift -parse-as-library -wmo -enable-library-evolution -module-name=Test -emit-module -emit-module-path=%t/Test.swiftmodule -c -o %t/test.o
 
 // RUN: %target-build-swift -O %s -module-name=test -Xfrontend -sil-verify-all -I%t -emit-sil | %FileCheck %s

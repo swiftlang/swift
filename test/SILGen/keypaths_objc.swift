@@ -92,7 +92,7 @@ func objcProtocolRequirement<T: ObjCProto>(_: T) {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}externalObjCProperty
 func externalObjCProperty() {
   // Pure ObjC-dispatched properties do not have external descriptors.
-  // CHECK: keypath $KeyPath<NSObject, String>, 
+  // CHECK: keypath $KeyPath<NSObject, String>,
   // CHECK-NOT: external #NSObject.description
   _ = \NSObject.description
 }
@@ -143,9 +143,9 @@ func dynamicMemberLookupSimple(foo: DynamicClass<Foo>, nonobjc: DynamicClass<Non
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}dynamicMemberLookupNestedKeypaths
 func dynamicMemberLookupNestedKeypaths(foo: DynamicClass<Foo>) {
-  // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar" 
-  // CHECK: keypath $KeyPath<Bar, Foo>, (objc "foo" 
-  // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar" 
+  // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar"
+  // CHECK: keypath $KeyPath<Bar, Foo>, (objc "foo"
+  // CHECK: keypath $KeyPath<Foo, Bar>, (objc "bar"
   _ = foo.bar.foo.bar
 }
 
@@ -155,5 +155,5 @@ func dynamicMemberLookupMixedKeypaths(foo: DynamicClass<Foo>) {
   // CHECK: keypath $KeyPath<Bar, Foo>, (objc "foo"
   // CHECK: keypath $KeyPath<Foo, NonObjC>, (root
   // CHECK: keypath $KeyPath<NonObjC, NSObject>, (root
-  _ = foo.bar.foo.nonobjc.y 
+  _ = foo.bar.foo.nonobjc.y
 }

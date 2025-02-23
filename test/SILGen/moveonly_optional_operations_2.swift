@@ -83,8 +83,8 @@ func consumingSwitchSubject3(ncp: consuming NCPair) {
     // CHECK-NOT: destroy_value
     // CHECK:   end_access [[FIELD_ACCESS]]
     // CHECK-NEXT: end_access [[PAIR_ACCESS]]
-    // CHECK-NEXT: inject_enum_addr 
-    // CHECK-NEXT: br 
+    // CHECK-NEXT: inject_enum_addr
+    // CHECK-NEXT: br
     // CHECK: [[NONE_BB]]:
     // CHECK:   destroy_addr [[FIELD_ACCESS]]
     // CHECK-NEXT: end_access [[FIELD_ACCESS]]

@@ -80,9 +80,9 @@ class ImmutableStoredProperties<T: Differentiable & AnyObject>: Differentiable {
 }
 func testImmutableStoredProperties() {
   _ = ImmutableStoredProperties<Empty>.TangentVector(
-    okay: 1, 
-    letClass: Empty.TangentVector(), 
-    letClassWithInheritedNonmutatingMoveAlong: Empty.TangentVector(), 
+    okay: 1,
+    letClass: Empty.TangentVector(),
+    letClassWithInheritedNonmutatingMoveAlong: Empty.TangentVector(),
     letClassWrappingGeneric: EmptyWrapper<Empty>.TangentVector())
 }
 class MutableStoredPropertiesWithInitialValue: Differentiable {

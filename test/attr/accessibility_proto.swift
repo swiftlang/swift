@@ -233,7 +233,7 @@ package struct NonPackageMemberwiseInitStruct: PackageInitProto {
 public protocol PublicEmptyInit {
   init()
 }
-public struct Buggy: PublicEmptyInit { 
+public struct Buggy: PublicEmptyInit {
   // expected-error@-1 {{initializer 'init()' must be declared public because it matches a requirement in public protocol 'PublicEmptyInit'}}
 }
 

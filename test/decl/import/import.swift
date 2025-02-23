@@ -36,7 +36,7 @@ import func Swift.print
 // rdar://14418336
 #import something_nonexistent
 // expected-error@-1 {{no macro named 'import'}}
-// expected-error@-2 {{consecutive statements on a line}} 
+// expected-error@-2 {{consecutive statements on a line}}
 // expected-error@-3 {{cannot find 'something_nonexistent' in scope}}
 
 // Import specific decls

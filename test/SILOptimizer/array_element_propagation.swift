@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O %s -o %t/a.out
 // RUN: %target-build-swift -O %s -emit-sil |  %FileCheck %s
 // RUN: %target-codesign %t/a.out

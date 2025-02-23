@@ -84,7 +84,7 @@ struct BigStructWithNativeObjects {
   // CHECK: }
 
   @objc func bounds() -> NSRect {
-    return NSRect(origin: NSPoint(x: 0, y: 0), 
+    return NSRect(origin: NSPoint(x: 0, y: 0),
                   size: NSSize(width: 0, height: 0))
   }
   // CHECK: define internal void @"$s17objc_class_export3FooC6boundsSo6NSRectVyFTo"(ptr noalias nocapture sret({{.*}}) %0, ptr %1, ptr %2) {{[#0-9]*}} {

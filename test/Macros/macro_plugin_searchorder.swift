@@ -88,7 +88,7 @@
 //--- test.swift
 @freestanding(expression) macro testMacro() -> String = #externalMacro(module: "MacroDefinition", type: "TestMacro")
 
-print(#testMacro) 
+print(#testMacro)
 
 //--- MacroDefinition.swift
 import SwiftSyntax

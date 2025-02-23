@@ -7,9 +7,9 @@
 
 // CHECK: @"$s4main6Either[[UNIQUE_ID_1:[A-Za-z0-9_]+]]OySiGMf" =
 
-//              CHECK: @"$s4main5Value[[UNIQUE_ID_1]]CyAA6EitherACLLOySiGGMf" = linkonce_odr hidden 
-//   CHECK-apple-SAME: global 
-// CHECK-unknown-SAME: constant 
+//              CHECK: @"$s4main5Value[[UNIQUE_ID_1]]CyAA6EitherACLLOySiGGMf" = linkonce_odr hidden
+//   CHECK-apple-SAME: global
+// CHECK-unknown-SAME: constant
 //         CHECK-SAME: <{
 //         CHECK-SAME:   ptr,
 //         CHECK-SAME:   ptr,
@@ -118,7 +118,7 @@ func consume<T>(_ t: T) {
 // CHECK:   [[METADATA_RESPONSE:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_4:[0-9A-Z_]+]]CyAA6EitherACLLOySiGGMb"([[INT]] 0)
 // CHECK:   [[METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
+// CHECK-SAME:     ptr noalias {{%[0-9]+}},
 // CHECK-SAME:     ptr [[METADATA]])
 // CHECK: }
 func doit() {
@@ -147,10 +147,10 @@ doit()
 //      CHECK: define internal swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 //      CHECK: entry:
 //      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
-//      CHECK:     [[INT]] [[METADATA_REQUEST]], 
-//      CHECK:     ptr %1, 
-//      CHECK:     ptr undef, 
-//      CHECK:     ptr undef, 
+//      CHECK:     [[INT]] [[METADATA_REQUEST]],
+//      CHECK:     ptr %1,
+//      CHECK:     ptr undef,
+//      CHECK:     ptr undef,
 // CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]CMn
 //      CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 //      CHECK: }

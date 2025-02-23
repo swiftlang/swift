@@ -601,7 +601,7 @@ static void validatePrefixList(ArrayRef<std::string> prefixes) {
 /// ones.
 DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
   using llvm::SMLoc;
-  
+
   const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
   StringRef InputFile = SM.getEntireTextForBuffer(BufferID);
 
@@ -761,7 +761,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     else
       PrevExpectedContinuationLine = 0;
 
-    
+
     // Scan for fix-its: {{10-14=replacement text}}
     bool startNewAlternatives = true;
     StringRef ExtraChecks = MatchStart.substr(End+2).ltrim(" \t");
@@ -906,7 +906,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       Expected.Fixits.pop_back();
 
     Expected.ExpectedEnd = ExtraChecks.data();
-    
+
     // Don't include trailing whitespace in the expected-foo{{}} range.
     while (isspace(Expected.ExpectedEnd[-1]))
       --Expected.ExpectedEnd;
@@ -1097,7 +1097,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     // again. We do have to do this after checking fix-its, though, because
     // the diagnostic owns its fix-its.
     CapturedDiagnostics.erase(FoundDiagnosticIter);
-    
+
     // We found the diagnostic, so remove it... unless we allow an arbitrary
     // number of diagnostics, in which case we want to reprocess this.
     if (expected.mayAppear)
@@ -1105,7 +1105,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     else
       ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
   }
-  
+
   // Check to see if we have any incorrect diagnostics.  If so, diagnose them as
   // such.
   auto expectedDiagIter = ExpectedDiagnostics.begin();
@@ -1118,7 +1118,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       if (I->Line != expectedDiagIter->LineNo || I->SourceBufferID != BufferID
             || I->Classification != expectedDiagIter->Classification)
         continue;
-      
+
       // Otherwise, we found it, break out.
       break;
     }
@@ -1199,7 +1199,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     }, "");
     addError(expected.ExpectedStart, message, fixIt);
   }
-  
+
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
   bool HadUnexpectedDiag = false;
   auto CapturedDiagIter = CapturedDiagnostics.begin();

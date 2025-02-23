@@ -70,7 +70,7 @@ func ++++(lhs: Y, rhs: Y) -> Y {} // okay
 
 func useInt(_ x: Int) {}
 func test() {
-  var x : Int  
+  var x : Int
   let y : Int = 42
   // Produce a diagnostic for using the result of an assignment as a value.
   // rdar://12961094
@@ -108,7 +108,7 @@ prefix func -/* this also should be a comment, not an operator */
 func +*/ () {}   // expected-error {{expected identifier in function declaration}} expected-error {{unexpected end of block comment}}
 func errors() {
   */    // expected-error {{unexpected end of block comment}}
-  
+
   // rdar://12962712 - reject */ in an operator as it should end a block comment.
   */+    // expected-error {{unexpected end of block comment}}
 }

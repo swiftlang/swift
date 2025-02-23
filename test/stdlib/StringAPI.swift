@@ -162,20 +162,20 @@ func checkStringComparison(
   expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
   expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
   checkComparable(expected, lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
-  
+
   // Substring / Substring
   // Matching slices of != Strings may still be ==, but not vice versa
   if expected.isEQ() {
     for i in 0 ..< Swift.min(lhs.count, rhs.count) {
       let lhsSub = lhs.dropFirst(i)
       let rhsSub = rhs.dropFirst(i)
-      
+
       expectEqual(expected.isEQ(), lhsSub == rhsSub, stackTrace: stackTrace)
       expectEqual(expected.isNE(), lhsSub != rhsSub, stackTrace: stackTrace)
       checkHashable(
         expectedEqual: expected.isEQ(),
         lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
-      
+
       expectEqual(expected.isLT(), lhsSub < rhsSub, stackTrace: stackTrace)
       expectEqual(expected.isLE(), lhsSub <= rhsSub, stackTrace: stackTrace)
       expectEqual(expected.isGE(), lhsSub >= rhsSub, stackTrace: stackTrace)

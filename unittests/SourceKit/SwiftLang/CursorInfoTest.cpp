@@ -365,9 +365,9 @@ TEST_F(CursorInfoTest, DISABLED_CursorInfoMustWaitDueTokenRace) {
 }
 
 TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
-  // TODO: This test case relies on the following snippet being slow to type 
-  // check so that the first cursor info request takes longer to execute than it 
-  // takes time to schedule the second request. If that is fixed, we need to 
+  // TODO: This test case relies on the following snippet being slow to type
+  // check so that the first cursor info request takes longer to execute than it
+  // takes time to schedule the second request. If that is fixed, we need to
   // find a new way to cause slow type checking. rdar://80582770
   const char *SlowDocName = "slow.swift";
   const char *SlowContents = "func foo(x: Invalid1, y: Invalid2) {\n"

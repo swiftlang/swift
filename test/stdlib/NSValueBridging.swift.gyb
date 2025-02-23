@@ -116,7 +116,7 @@ nsValueBridging.test("NSValue fetching method should be able to convert construc
     let value = NSValue(nonretainedObject: obj)
     let resString = value.value(of: GenericThingNotRootedInObjC<String>.self)
     expectEqual(resString === obj, true) // ensure the value is exactly the same
-    
+
     let resInt = value.value(of: GenericThingNotRootedInObjC<Int>.self)
     expectTrue(resInt == nil)
   }

@@ -75,7 +75,7 @@ func direct_to_static_method(_ obj: AnyObject) {
 func opt_to_class(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
   var obj = obj
-  // CHECK:   [[EXISTBOX:%[0-9]+]] = alloc_box ${ var AnyObject } 
+  // CHECK:   [[EXISTBOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[EXISTLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[EXISTBOX]]
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[EXISTLIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]

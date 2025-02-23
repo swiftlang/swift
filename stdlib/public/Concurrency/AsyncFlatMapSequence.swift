@@ -72,7 +72,7 @@ extension AsyncSequence {
   ///   of this sequence as its parameter and returns an `AsyncSequence`.
   /// - Returns: A single, flattened asynchronous sequence that contains all
   ///   elements in all the asynchronous sequences produced by `transform`.
-  @preconcurrency 
+  @preconcurrency
   @_alwaysEmitIntoClient
   @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
@@ -108,7 +108,7 @@ extension AsyncSequence {
   ///   of this sequence as its parameter and returns an `AsyncSequence`.
   /// - Returns: A single, flattened asynchronous sequence that contains all
   ///   elements in all the asynchronous sequences produced by `transform`.
-  @preconcurrency 
+  @preconcurrency
   @_alwaysEmitIntoClient
   @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
@@ -144,7 +144,7 @@ extension AsyncSequence {
   ///   of this sequence as its parameter and returns an `AsyncSequence`.
   /// - Returns: A single, flattened asynchronous sequence that contains all
   ///   elements in all the asynchronous sequences produced by `transform`.
-  @preconcurrency 
+  @preconcurrency
   @_alwaysEmitIntoClient
   @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
@@ -248,7 +248,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
             finished = true
             return nil
           }
-          do { 
+          do {
             let segment = await transform(item)
             var iterator = segment.makeAsyncIterator()
             guard let element = try await iterator.next() else {
@@ -303,7 +303,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
           do {
             let segment = await transform(item)
             var iterator = segment.makeAsyncIterator()
-            let optElement = try await iterator.next(isolation: actor)  
+            let optElement = try await iterator.next(isolation: actor)
             guard let element = optElement else {
               currentIterator = nil
               continue
@@ -327,16 +327,16 @@ extension AsyncFlatMapSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncFlatMapSequence: @unchecked Sendable 
-  where Base: Sendable, 
-        Base.Element: Sendable, 
-        SegmentOfResult: Sendable, 
+extension AsyncFlatMapSequence: @unchecked Sendable
+  where Base: Sendable,
+        Base.Element: Sendable,
+        SegmentOfResult: Sendable,
         SegmentOfResult.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncFlatMapSequence.Iterator: @unchecked Sendable 
-  where Base.AsyncIterator: Sendable, 
-        Base.Element: Sendable, 
-        SegmentOfResult: Sendable, 
-        SegmentOfResult.Element: Sendable, 
+extension AsyncFlatMapSequence.Iterator: @unchecked Sendable
+  where Base.AsyncIterator: Sendable,
+        Base.Element: Sendable,
+        SegmentOfResult: Sendable,
+        SegmentOfResult.Element: Sendable,
         SegmentOfResult.AsyncIterator: Sendable { }

@@ -179,35 +179,35 @@ func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
   i32 = Builtin.int_bswap_Int32(i32) // CHECK: llvm.bswap.i32(
 
   i16 = Builtin.int_bswap_Int16(i16) // CHECK: llvm.bswap.i16(
-  
+
   var x = Builtin.int_sadd_with_overflow_Int16(i16, i16) // CHECK: call { i16, i1 } @llvm.sadd.with.overflow.i16(
-  
+
   i16 = Builtin.int_vector_reduce_smin_Vec8xInt16(v8i16) // CHECK: llvm.vector.reduce.smin.v8i16(
-  
+
   Builtin.int_trap() // CHECK: llvm.trap()
 }
 
 // CHECK: define hidden {{.*}}void @"$s8builtins19sizeof_alignof_testyyF"()
 func sizeof_alignof_test() {
   // CHECK: store i64 4, ptr
-  var xs = Builtin.sizeof(Int.self) 
+  var xs = Builtin.sizeof(Int.self)
   // CHECK: store i64 4, ptr
-  var xa = Builtin.alignof(Int.self) 
+  var xa = Builtin.alignof(Int.self)
   // CHECK: store i64 1, ptr
-  var ys = Builtin.sizeof(Bool.self) 
+  var ys = Builtin.sizeof(Bool.self)
   // CHECK: store i64 1, ptr
-  var ya = Builtin.alignof(Bool.self) 
+  var ya = Builtin.alignof(Bool.self)
 
 }
 
 // CHECK: define hidden {{.*}}void @"$s8builtins28sizeof_alignof_metatype_testyyF"()
 func sizeof_alignof_metatype_test() {
   // CHECK: store i64 8, ptr
-  var xs = Builtin.sizeof(Int.Type.self) 
+  var xs = Builtin.sizeof(Int.Type.self)
   // CHECK: store i64 8, ptr
-  var xa = Builtin.alignof(Int.Type.self) 
+  var xa = Builtin.alignof(Int.Type.self)
   // CHECK: store i64 8, ptr
-  var xt = Builtin.strideof(Int.Type.self) 
+  var xt = Builtin.strideof(Int.Type.self)
 }
 
 // CHECK: define hidden {{.*}}void @"$s8builtins27generic_sizeof_alignof_testyyxlF"
@@ -309,10 +309,10 @@ func atomicrmw_test(_ ptr: Builtin.RawPointer, a: Builtin.Int32,
 
   // CHECK: atomicrmw volatile max ptr {{.*}}, i32 {{.*}} monotonic
   var y = Builtin.atomicrmw_max_monotonic_volatile_Int32(ptr, a)
-  
+
   // CHECK: atomicrmw volatile xchg ptr {{.*}}, i32 {{.*}} syncscope("singlethread") acquire
   var x = Builtin.atomicrmw_xchg_acquire_volatile_singlethread_Int32(ptr, a)
-  
+
   // rdar://12939803 - ER: support atomic cmpxchg/xchg with pointers
   // CHECK: atomicrmw volatile xchg ptr {{.*}}, i64 {{.*}} syncscope("singlethread") acquire
   var w = Builtin.atomicrmw_xchg_acquire_volatile_singlethread_RawPointer(ptr, ptr2)

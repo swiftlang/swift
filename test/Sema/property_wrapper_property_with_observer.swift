@@ -2,7 +2,7 @@
 
 // REQUIRES: executable_test
 
-@propertyWrapper 
+@propertyWrapper
 struct Foo {
   private var _storage: [Int] = []
 
@@ -19,7 +19,7 @@ struct Foo {
 class Bar {
   @Foo var someArray = [1, 2, 3] {
     willSet {
-      print(newValue) 
+      print(newValue)
     }
 
     didSet {

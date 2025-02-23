@@ -63,7 +63,7 @@ class C {
 // WITHFLAG: Keyword/CurrModule/Flair[ExprSpecific]:               FOO; name=FOO; sourcetext=FOO
 // WITHFLAG: Keyword/CurrModule/Flair[ExprSpecific]:               BAR; name=BAR; sourcetext=BAR
 
-// NOFLAG-NOT: FOO 
+// NOFLAG-NOT: FOO
 // NOFLAG-NOT: BAR
 
 var globalVar = 1

@@ -328,7 +328,7 @@ ParserResult<TypeRepr> Parser::parseType() {
 ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
                                                ParsedTypeAttributeList &attrs) {
   auto LBraceLoc = consumeToken(tok::l_brace);
-  
+
   SmallVector<SILBoxTypeRepr::Field, 4> Fields;
   if (!Tok.is(tok::r_brace)) {
     for (;;) {
@@ -342,22 +342,22 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
         return makeParserError();
       }
       SourceLoc VarOrLetLoc = consumeToken();
-      
+
       auto fieldTy = parseType();
       if (!fieldTy.getPtrOrNull())
         return makeParserError();
       Fields.push_back({VarOrLetLoc, Mutable, fieldTy.get()});
-      
+
       if (!consumeIf(tok::comma))
         break;
     }
   }
-  
+
   if (!Tok.is(tok::r_brace)) {
     diagnose(Tok, diag::sil_box_expected_r_brace);
     return makeParserError();
   }
-  
+
   auto RBraceLoc = consumeToken(tok::r_brace);
 
   SourceLoc LAngleLoc, RAngleLoc;
@@ -376,10 +376,10 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
       diagnose(Tok, diag::sil_box_expected_r_angle);
       return makeParserError();
     }
-    
+
     RAngleLoc = consumeStartingGreater();
   }
-  
+
   auto repr = SILBoxTypeRepr::create(Context, generics,
                                      LBraceLoc, Fields, RBraceLoc,
                                      LAngleLoc, Args, RAngleLoc);
@@ -417,7 +417,7 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   GenericParamList *patternGenerics = nullptr;
   if (isInSILMode()) {
     generics = maybeParseGenericParams().getPtrOrNull();
-    
+
     if (Tok.is(tok::at_sign) && peekToken().getText() == "substituted") {
       consumeToken(tok::at_sign);
       substitutedLoc = consumeToken(tok::identifier);
@@ -427,7 +427,7 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
       }
     }
   }
-  
+
   // In SIL mode, parse box types { ... }.
   if (isInSILMode() && Tok.is(tok::l_brace)) {
     if (patternGenerics) {
@@ -488,7 +488,7 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
           .fixItInsertAfter(tyR->getEndLoc(), ")");
       argsTyR = TupleTypeRepr::create(Context, {tyR}, tyR->getSourceRange());
     }
-    
+
     // Parse substitutions for substituted SIL types.
     MutableArrayRef<TypeRepr *> invocationSubsTypes;
     MutableArrayRef<TypeRepr *> patternSubsTypes;
@@ -949,7 +949,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
     }
     return type;
   };
-  
+
   // Parse the first type
   ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID, reason);
   if (FirstType.isNull())
@@ -986,7 +986,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
         Tok.isContextualKeyword("any")) {
       auto keyword = Tok.getText();
       auto badLoc = consumeToken();
-                
+
       // Suggest moving `some` or `any` in front of the first type unless
       // the first type is an opaque or existential type.
       if (opaqueLoc.isValid() || anyLoc.isValid()) {
@@ -1068,7 +1068,7 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
       diagnose(LAngleLoc, diag::opening_angle);
       Status.setIsParseError();
     }
-    
+
     // Skip until we hit the '>'.
     RAngleLoc = skipUntilGreaterInTypeList(/*protocolComposition=*/true);
   }
@@ -1324,7 +1324,7 @@ ParserResult<TypeRepr> Parser::parseTypeArray(ParserResult<TypeRepr> Base) {
     if (sizeEx.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
   }
-  
+
   SourceLoc rsquareLoc;
   if (parseMatchingToken(tok::r_square, rsquareLoc,
                          diag::expected_rbracket_array_type, lsquareLoc)) {
@@ -1339,7 +1339,7 @@ ParserResult<TypeRepr> Parser::parseTypeArray(ParserResult<TypeRepr> Base) {
   diagnose(lsquareLoc, diag::new_array_syntax)
     .fixItInsert(baseTyR->getStartLoc(), "[")
     .fixItRemove(lsquareLoc);
-  
+
   // Build a normal array slice type for recovery.
   ArrayTypeRepr *ATR = new (Context) ArrayTypeRepr(
       baseTyR, SourceRange(baseTyR->getStartLoc(), rsquareLoc));
@@ -1395,7 +1395,7 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
     // Form the array type.
     TyR = new (Context) ArrayTypeRepr(firstTy.get(), brackets);
   }
-    
+
   return makeParserResult(Status, TyR);
 }
 
@@ -1696,10 +1696,10 @@ bool Parser::canParseType() {
 
     if (!consumeIf(tok::arrow))
       return false;
-    
+
     if (!canParseType())
       return false;
-    
+
     return true;
   }
 
@@ -1741,32 +1741,32 @@ bool Parser::canParseBaseTypeForQualifiedDeclName() {
 
 bool Parser::canParseOldStyleProtocolComposition() {
   consumeToken(tok::kw_protocol);
-  
+
   // Check for the starting '<'.
   if (!startsWithLess(Tok)) {
     return false;
   }
   consumeStartingLess();
-  
+
   // Check for empty protocol composition.
   if (startsWithGreater(Tok)) {
     consumeStartingGreater();
     return true;
   }
-  
+
   // Parse the type-composition-list.
   do {
     if (!canParseType()) {
       return false;
     }
   } while (consumeIf(tok::comma));
-  
+
   // Check for the terminating '>'.
   if (!startsWithGreater(Tok)) {
     return false;
   }
   consumeStartingGreater();
-  
+
   return true;
 }
 
@@ -1810,7 +1810,7 @@ bool Parser::canParseTypeTupleBody() {
       }
     } while (consumeIf(tok::comma));
   }
-  
+
   return consumeIf(tok::r_paren);
 }
 

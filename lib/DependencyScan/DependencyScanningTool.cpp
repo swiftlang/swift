@@ -46,7 +46,7 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
   llvm::StringSaver Saver(Alloc);
   // Ensure that we use the Windows command line parsing on Windows as we need
   // to ensure that we properly handle paths.
-  if (llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows()) 
+  if (llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows())
     llvm::cl::TokenizeWindowsCommandLine(CommandString, Saver, Args);
   else
     llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
@@ -288,7 +288,7 @@ DependencyScanningTool::getDependencies(
       QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
       QueryContext.ScanInstance->getInvocation().getModuleScanningHash());
   // Execute the scanning action, retrieving the in-memory result
-  auto DependenciesOrErr = performModuleScan(*QueryContext.ScanInstance.get(), 
+  auto DependenciesOrErr = performModuleScan(*QueryContext.ScanInstance.get(),
                                              QueryContext.ScanDiagnostics.get(),
                                              cache);
   if (DependenciesOrErr.getError())
@@ -317,7 +317,7 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command,
       *ScanningService, QueryContext.ScanInstance->getMainModule()->getNameStr().str(),
       QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
       QueryContext.ScanInstance->getInvocation().getModuleScanningHash());
-  auto DependenciesOrErr = performModulePrescan(*QueryContext.ScanInstance.get(), 
+  auto DependenciesOrErr = performModulePrescan(*QueryContext.ScanInstance.get(),
                                                 QueryContext.ScanDiagnostics.get(),
                                                 cache);
   if (DependenciesOrErr.getError())
@@ -404,7 +404,7 @@ DependencyScanningTool::initCompilerInstanceForScan(
 
   (void)Instance->getMainModule();
 
-  return ScanQueryInstance{std::move(Instance), 
+  return ScanQueryInstance{std::move(Instance),
                            scannerDiagnosticsCollector};
 }
 

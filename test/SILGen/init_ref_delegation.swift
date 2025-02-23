@@ -11,7 +11,7 @@ struct S {
     // CHECK-NEXT:   [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
     // CHECK-NEXT:   [[MARKED_SELF_LIFETIME:%.*]] = begin_borrow [var_decl] [[MARKED_SELF_BOX]]
     // CHECK-NEXT:   [[PB:%.*]] = project_box [[MARKED_SELF_LIFETIME]]
-    
+
     // CHECK-NEXT:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
     // CHECK:   [[X_CTOR:%[0-9]+]] = function_ref @$s19init_ref_delegation1XV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin X.Type) -> X
     // CHECK-NEXT:   [[X:%[0-9]+]] = apply [[X_CTOR]]([[X_META]]) : $@convention(method) (@thin X.Type) -> X

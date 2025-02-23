@@ -17,16 +17,16 @@ func takes_inout(_ a: inout Int) {}
 func takes_inout_any(_ a: inout Any) {}
 func takes_closure(_ fn: () -> ()) {}
 
-class SomeClass { 
+class SomeClass {
   var x : Int   // expected-note {{'self.x' not initialized}}
-  
+
   var computedProperty : Int { return 42 }
 
   init() { x = 0 }
   init(b : Bool) {
     if (b) {}
   } // expected-error {{return from initializer without initializing all stored properties}}
-  
+
   func baseMethod() {}
 }
 
@@ -46,7 +46,7 @@ func test2() {
   var a3 : Int
   a3 = 4
   takes_inout(&a3)    // ok.
-  
+
   var a4 : Int            // expected-note {{variable defined here}}
   takesPointer(&a4)  // expected-error {{address of variable 'a4' taken before it is initialized}}
 
@@ -76,13 +76,13 @@ func test2() {
   takes_closure {     // ok.
     markUsed(b3)
   }
-    
+
   var b4 : Int?
   takes_closure {     // ok.
     markUsed(b4!)
   }
   b4 = 7
-  
+
   // Structs
   var s1 : SomeStruct
   s1 = SomeStruct()   // ok
@@ -100,8 +100,8 @@ func test2() {
 
   let c2 = SomeClass()
   markUsed(c2.x)          // ok
-  
-  
+
+
   // Weak
   weak var w1 : SomeClass?
   _ = w1                // ok: default-initialized
@@ -112,8 +112,8 @@ func test2() {
   // expected-note@+1 {{'w2' declared here}}
   weak var w2 = SomeClass()
   _ = w2                // ok
-  
-  
+
+
   // Unowned. This is immediately crashing code (it causes a retain of a
   // released object).
   // expected-warning @+1 {{variable 'u1' was never mutated; consider changing to 'let' constant}} {{11-14=let}}
@@ -166,7 +166,7 @@ func test4() {
   var t4 : (Int, Int, Int)   // expected-note 1 {{variable defined here}}
   t4.0 = 1; t4.2 = 42
   _ = t4            // expected-error {{variable 't4.1' used before being initialized}}
-  
+
 
   // Subelement sets.
   var t5 : (a : (Int, Int), b : Int)  // expected-note {{variable defined here}}
@@ -174,7 +174,7 @@ func test4() {
   markUsed(t5.a.0)
   markUsed(t5.a.1)
   markUsed(t5.b)       // expected-error {{variable 't5.b' used before being initialized}}
-  
+
 
   var t6 : (a : (Int, Int), b : Int)  // expected-note {{variable defined here}}
   t6.b = 12; t6.a.1 = 1
@@ -192,7 +192,7 @@ func tupleinout(_ a: inout (lo: Int, hi: Int)) {
 func test5<T>(_ x: T, y: T) {
   var a : ((T, T), T)  // expected-note {{variable defined here}}
   a.0 = (x, y)
-  
+
   _ = a     // expected-error {{variable 'a.1' used before being initialized}}
 }
 
@@ -211,7 +211,7 @@ func test6() -> Int {
 // Control flow.
 func test7(_ cond: Bool) {
   var a : Int
-  
+
   if cond { a = 42 } else { a = 17 }
   markUsed(a)         // ok
 
@@ -237,18 +237,18 @@ func existentials(_ i: Int, dp: DerivedProtocol) {
 
   // expected-warning @+1 {{variable 'c' was never used}} {{7-8=_}}
   var c : Any   // no uses.
-  
+
   // expected-warning @+1 {{variable 'd1' was never mutated}} {{3-6=let}}
   var d1 : Any  // expected-note {{variable defined here}}
   _ = d1   // expected-error {{variable 'd1' used before being initialized}}
-  
+
 
   // expected-warning @+1 {{variable 'e' was never mutated}} {{3-6=let}}
   var e : SomeProtocol  // expected-note {{variable defined here}}
   e.protoMe()           // expected-error {{variable 'e' used before being initialized}}
-  
+
   var f : SomeProtocol = dp  // ok, init'd by existential upcast.
-  
+
   // expected-warning @+1 {{variable 'g' was never mutated}} {{3-6=let}}
   var g : DerivedProtocol   // expected-note {{variable defined here}}
   f = g                     // expected-error {{variable 'g' used before being initialized}}
@@ -285,7 +285,7 @@ func emptyStructTest() {
   useEmptyStruct(a)    // expected-error {{constant 'a' used before being initialized}}
 
   var (b,c,d) : (EmptyStruct,EmptyStruct,EmptyStruct) // expected-note 2 {{variable defined here}}
-  
+
   c = EmptyStruct()
 
   useEmptyStruct(b)     // expected-error {{variable 'b' used before being initialized}}
@@ -294,13 +294,13 @@ func emptyStructTest() {
 
   var (e,f) : (EmptyStruct,EmptyStruct)
   (e, f) = (EmptyStruct(),EmptyStruct())
-  
+
   useEmptyStruct(e)
   useEmptyStruct(f)
 
   var g : (EmptyStruct,EmptyStruct)
   g = (EmptyStruct(),EmptyStruct())
-  
+
   useEmptyStruct(g.0)
   useEmptyStruct(g.1)
 }
@@ -319,7 +319,7 @@ func conditionalInitOrAssign(_ c : Bool, x : Int) {
   }
   t = 2
   _ = t
-  
+
   // Nontrivial type
   var sc : SomeClass
   if c {
@@ -327,7 +327,7 @@ func conditionalInitOrAssign(_ c : Bool, x : Int) {
   }
   sc = SomeClass()
   _ = sc
-  
+
   // Tuple element types
   var tt : (SomeClass, SomeClass)
 
@@ -339,7 +339,7 @@ func conditionalInitOrAssign(_ c : Bool, x : Int) {
 
   tt.0 = SomeClass()
   tt.1 = tt.0
-  
+
   var t2 : (SomeClass, SomeClass)  // expected-note {{variable defined here}}
   t2.0 = SomeClass()
   takesTuplePair(&t2)   // expected-error {{variable 't2.1' passed by reference before being initialized}}
@@ -358,7 +358,7 @@ extension NotInitializedUnion {
 }
 
 enum NotInitializedGenericUnion<T> {
-  init() { 
+  init() {
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
   case X
 }
@@ -366,11 +366,11 @@ enum NotInitializedGenericUnion<T> {
 
 class SomeDerivedClass : SomeClass {
   var y : Int
-  override init() { 
+  override init() {
     y = 42  // ok
     super.init()
   }
-  
+
   init(a : Bool) {
     super.init() // expected-error {{property 'self.y' not initialized at super.init call}}
   }
@@ -381,7 +381,7 @@ class SomeDerivedClass : SomeClass {
     y = 42
     super.init()
   }
-  
+
   init(a : Bool, b : Bool, c : Bool) {
     y = 42
     super.init()
@@ -397,15 +397,15 @@ class SomeDerivedClass : SomeClass {
     super.init()  // expected-error {{property 'self.y' not initialized at super.init call}}
     super.init()  // expected-error {{'super.init' called multiple times in initializer}}
   }
-  
+
   init(a : Bool, b : Bool, c : Bool, d : Bool, e : Bool, f : Bool) {
     y = 11
     if a { super.init() }
     x = 42        // expected-error {{'self' used in property access 'x' before 'super.init' call}}
   }               // expected-error {{'super.init' isn't called on all paths before returning from initializer}}
-  
+
   func someMethod() {}
-  
+
   init(a : Int) {
     y = 42
     super.init()
@@ -422,7 +422,7 @@ class SomeDerivedClass : SomeClass {
     baseMethod()  // expected-error {{'self' used in method call 'baseMethod' before 'super.init' call}}
     super.init()
   }
-  
+
   init(a : Int, b : Int, c : Int) {
     y = computedProperty  // expected-error {{'self' used in property access 'computedProperty' before 'super.init' call}}
     super.init()
@@ -443,7 +443,7 @@ class DelegatingCtorClass {
     self.init()
     _ = ivar // okay: ivar has been initialized by the delegation above
   }
-  
+
   convenience init(x: EmptyStruct, y: EmptyStruct) {
     _ = ivar       // expected-error {{'self' used before 'self.init' call}}
     ivar = x       // expected-error {{'self' used before 'self.init' call}}
@@ -608,7 +608,7 @@ class DerivedUsingConvenienceInits : BaseWithConvenienceInits {
 
 // <rdar://problem/16660680> QoI: preconditionFailure() in init method complains about super.init being called multiple times
 class ClassWhoseInitDoesntReturn : BaseWithConvenienceInits {
-  init() {  
+  init() {
     preconditionFailure("leave me alone dude");
   }
 }
@@ -617,7 +617,7 @@ class ClassWhoseInitDoesntReturn : BaseWithConvenienceInits {
 enum r17233681Lazy<T> {
   case Thunk(() -> T)
   case Value(T)
-  
+
   init(value: T) {
     self = .Value(value)
   }
@@ -841,7 +841,7 @@ struct LetProperties {
     u = 1; v = 13; w = (1,2); y = 1 ; z = u
 
     u.inspect()  // ok, non mutating.
-    
+
     arr = []
     arr[12] = 17   // expected-error {{cannot mutate subscript of immutable value 'self.arr'}}
   }
@@ -853,11 +853,11 @@ protocol TestMutabilityProtocol {
   func toIntMax()
   mutating func changeToIntMax()
 }
- 
+
 class C<T : TestMutabilityProtocol> {
   let x : T
   let y : T
-  
+
   init(a : T) {
     x = a; y = a
     x.toIntMax()
@@ -867,7 +867,7 @@ class C<T : TestMutabilityProtocol> {
 struct MyMutabilityImplementation : TestMutabilityProtocol {
   func toIntMax() {
   }
-  
+
   mutating func changeToIntMax() {
   }
 }
@@ -913,7 +913,7 @@ func testAddressOnlyProperty<T>(_ b : T) -> T {
 class r19254812Base {}
 class r19254812Derived: r19254812Base{
   let pi = 3.14159265359
-  
+
   init(x : ()) {
     markUsed(pi)  // ok, no diagnostic expected.
   }
@@ -923,13 +923,13 @@ class r19254812Derived: r19254812Base{
 // <rdar://problem/19259730> Using mutating methods in a struct initializer with a let property is rejected
 struct StructMutatingMethodTest {
   let a, b: String  // expected-note 2 {{'self.b' not initialized}}
-  
+
   init(x: String, y: String) {
     a = x
     b = y
     mutate()   // ok
   }
-  
+
   init(x: String) {
     a = x
     mutate() // expected-error {{'self' used before all stored properties are initialized}}
@@ -979,7 +979,7 @@ class MyClassTestExample {
 struct AddressOnlyStructWithInit<T, U> {
   let a : T?
   let b : U?   // expected-note {{'self.b' not initialized}}
-  
+
   init(a : T) {
     self.a = a
   }     // expected-error {{return from initializer without initializing all stored properties}}
@@ -987,7 +987,7 @@ struct AddressOnlyStructWithInit<T, U> {
 
 enum AddressOnlyEnumWithInit<T> {
   case X(T), Y
-  
+
   init() {
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
@@ -1111,7 +1111,7 @@ extension PMI {
 
 class WS: PMI {
   final let x: String  // expected-note {{'self.x' not initialized}}
-  
+
   init() {
     getg()   // expected-error {{'self' used in method call 'getg' before all stored properties are initialized}}
     self.x = "foo"
@@ -1122,7 +1122,7 @@ class WS: PMI {
 class r23013334 {
   var B: Int   // expected-note {{'self.B' not initialized}}
   var A: String
-  
+
   init(A: String) throws {
     self.A = A
     self.A.withCString { cString -> () in  // expected-error {{'self' captured by a closure before all members were initialized}}
@@ -1130,24 +1130,24 @@ class r23013334 {
       print(self.A)
       return ()
     }
-    
+
     self.B = 0
   }
-  
+
 }
 
 class r23013334Derived : rdar16119509_Base {
   var B: Int   // expected-note {{'self.B' not initialized}}
   var A: String
-  
+
   init(A: String) throws {
     self.A = A
     self.A.withCString { cString -> () in  // expected-error {{'self' captured by a closure before all members were initialized}}
-      
+
       print(self.A)
       return ()
     }
-    
+
     self.B = 0
   }
 
@@ -1158,7 +1158,7 @@ class r23013334Derived : rdar16119509_Base {
 struct S1_44078 {
   let a: Int
   let b: Int // expected-note {{'self.b' not initialized}}
-  
+
   init?(x: Int, y: Int) {
     self.a = x
     if y == 42 {
@@ -1172,7 +1172,7 @@ struct S1_44078 {
 struct S2_44078 {
   let a: Int
   let b: Int // expected-note {{'self.b' not initialized}}
-  
+
   init?(x: Int, y: Int) {
     self.a = x
     return // expected-error {{return from initializer without initializing all stored properties}}
@@ -1182,7 +1182,7 @@ struct S2_44078 {
 struct S3_44078 {
   let a: Int
   let b: Int // expected-note {{'self.b' not initialized}}
-  
+
   init?(x: Int, y: Int) {
     self.a = x
     if y == 42 {
@@ -1194,7 +1194,7 @@ struct S3_44078 {
 
 enum E1_44078 {
   case A, B
-  
+
   init?(x: Int) {
     if x == 42 {
       return
@@ -1206,14 +1206,14 @@ enum E1_44078 {
 
 enum E2_44078 {
   case A, B
-  
+
   init?() {
     return
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 enum E3_44078 {
   case A, B
-  
+
   init?(x: Int) {
     if x == 42 {
       self = .A

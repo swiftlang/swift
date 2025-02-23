@@ -93,5 +93,5 @@ func testPublicClassAsync(_ c: PublicBase) async {
 
     await runAllTestsAsync()
   }
-}  
+}
 

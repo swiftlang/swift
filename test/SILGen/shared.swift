@@ -41,15 +41,15 @@ func shared_argument_capture(trivial : __shared Int, value : __shared ValueAggre
   _ = {
     return shared_arguments(trivial: trivial, value: value, ref: ref)
   }()
-  
+
   // CHECK: [[CLO_2:%[0-9]+]] = function_ref @$s6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU0_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   // CHECK: {{%.*}} = apply [[CLO_2]]([[TRIVIAL_VAL]], [[VALUE_VAL]], [[REF_VAL]]) : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   _ = {
     return owned_arguments(trivial: trivial, value: value, ref: ref)
   }()
-  
+
   // CHECK: } // end sil function '$s6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtF'
-  
+
   // ======== FIRST CLOSURE ==========
 
   // CHECK-LABEL: sil private @$s6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
@@ -57,9 +57,9 @@ func shared_argument_capture(trivial : __shared Int, value : __shared ValueAggre
   // CHECK: [[SHARED_CALL:%[0-9]+]] = function_ref @$s6shared0A10_arguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefG0ChtF : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   // CHECK: {{%.*}} = apply [[SHARED_CALL]]([[TRIVIAL_VAL]], [[VALUE_VAL]], [[REF_VAL]]) : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()
   // CHECK: } // end sil function '$s6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU_'
-  
+
   // ======== SECOND CLOSURE ==========
-  
+
   // CHECK-LABEL:  sil private @$s6shared0A17_argument_capture7trivial5value3refySih_AA14ValueAggregateVhAA03RefH0ChtFyyXEfU0_ : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> () {
   // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate):
   // CHECK: [[COPY_BORROW_VALUE_VAL:%[0-9]+]] = copy_value [[VALUE_VAL]] : $ValueAggregate
@@ -82,16 +82,16 @@ func shared_to_owned_conversion(_ f : (__shared Int, __shared ValueAggregate, __
   // CHECK: {{%.*}} = apply [[RECUR_FN]]([[CONVERT]]) : $@convention(thin) (@noescape @callee_guaranteed (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate) -> ()) -> ()
   // CHECK-NOT: destroy_value [[UNUSED_FUNC]]
   // CHECK: } // end sil function '$s6shared0A20_to_owned_conversionyyySih_AA14ValueAggregateVhAA03RefF0ChtXEF'
-  
+
   // ======== REABSTRACTION THUNK =========
-  
+
   // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] @$sSi6shared14ValueAggregateVAA03RefC0CIgyxx_SiAcEIegygg_TR : $@convention(thin) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate, @noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
   // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate, [[FUNC:%[0-9]+]] : $@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()):
   // CHECK: [[COPY_VALUE_VAL:%[0-9]+]] = copy_value [[VALUE_VAL]] : $ValueAggregate
   // CHECK: [[COPY_REF_VAL:%[0-9]+]] = copy_value [[REF_VAL]] : $RefAggregate
   // CHECK: {{%.*}} = apply [[FUNC]]([[TRIVIAL_VAL]], [[COPY_VALUE_VAL]], [[COPY_REF_VAL]]) : $@noescape @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()
   // CHECK: } // end sil function '$sSi6shared14ValueAggregateVAA03RefC0CIgyxx_SiAcEIegygg_TR'
-  
+
   return shared_to_owned_conversion { (trivial : Int, val : ValueAggregate, ref : RefAggregate) in }
 }
 
@@ -121,7 +121,7 @@ func owned_to_shared_conversion(_ f : (Int, ValueAggregate, RefAggregate) -> Voi
   // CHECK: destroy_value [[REF_VAL]] : $RefAggregate
   // CHECK: destroy_value [[VALUE_VAL]] : $ValueAggregate
   // CHECK: } // end sil function '$sSi6shared14ValueAggregateVAA03RefC0CIgygg_SiAcEIegyxx_TR'
-  
+
   return owned_to_shared_conversion { (trivial : __shared Int, val : __shared ValueAggregate, ref : __shared RefAggregate) in }
 }
 

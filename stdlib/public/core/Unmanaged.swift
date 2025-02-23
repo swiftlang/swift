@@ -35,7 +35,7 @@ public struct Unmanaged<Instance: AnyObject> {
   public static func fromOpaque(
     @_nonEphemeral _ value: UnsafeRawPointer
   ) -> Unmanaged {
-    // NOTE: `value` is allowed to represent a dangling reference, so 
+    // NOTE: `value` is allowed to represent a dangling reference, so
     // this function must not ever try to dereference it. For
     // example, this function must NOT use the init(_private:) initializer
     // because doing so requires materializing a strong reference to 'Instance'.

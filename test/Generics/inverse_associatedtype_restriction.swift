@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift 
+// RUN: %target-typecheck-verify-swift
 
 
 // The restriction is that we don't permit suppression requirements on

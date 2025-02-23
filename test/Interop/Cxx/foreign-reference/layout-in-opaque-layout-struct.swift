@@ -5,7 +5,7 @@
 // RUN: %target-build-swift %t/struct.swift -emit-module -emit-library -static -module-name OpaqueStruct -emit-module-path %t/Inputs/OpaqueStruct.swiftmodule -enable-library-evolution
 
 // RUN: %target-swift-emit-irgen %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop -disable-availability-checking | %FileCheck %s
- 
+
 //--- Inputs/module.modulemap
 module CxxModule {
     header "header.h"

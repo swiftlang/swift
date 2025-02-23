@@ -10,7 +10,7 @@ func useStructWithUnion(_ vec: GLKVector4) {
   _ = vec.v.3
 
   vec.v = (0, 0, 0, 0)
-  
+
 }
 
 func useUnionIndirectFields(_ vec: GLKVector4) -> GLKVector4 {

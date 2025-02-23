@@ -11,7 +11,7 @@ struct ViewBuilder {
 
 struct QStack<Content> {
   init(@ViewBuilder content: () -> Content) {}
-  
+
   func qheet<Content>(@ViewBuilder content: @escaping () -> Content) -> some View {
     MyView()
   }

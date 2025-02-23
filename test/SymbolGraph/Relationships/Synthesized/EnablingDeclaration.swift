@@ -2,7 +2,7 @@
 // RUN: %target-build-swift %S/Inputs/RemoteP.swift -module-name RemoteP -emit-module -emit-module-path %t/
 // RUN: %target-build-swift %s -module-name EnablingDeclaration -emit-module -emit-module-path %t/ -I %t
 // RUN: %target-swift-symbolgraph-extract -module-name EnablingDeclaration -I %t -pretty-print -output-dir %t
-// RUN: %FileCheck %s --input-file %t/EnablingDeclaration@RemoteP.symbols.json --check-prefix=SYNTH 
+// RUN: %FileCheck %s --input-file %t/EnablingDeclaration@RemoteP.symbols.json --check-prefix=SYNTH
 // RUN: %FileCheck %s --input-file %t/EnablingDeclaration@RemoteP.symbols.json --check-prefix=NOSYNTH
 import RemoteP
 

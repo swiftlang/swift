@@ -39,7 +39,7 @@
 // CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK-WMO: return
 
-// Check that initializers do not contain a code to initialize fileprivate properties, 
+// Check that initializers do not contain a code to initialize fileprivate properties,
 // because their values are propagated into their uses and they cannot be accessed
 // from other modules. Therefore the initialization code could be removed.
 // Specifically, the initialization code for Prop2 can be removed.
@@ -63,7 +63,7 @@ public class Foo {
   let Prop1: Int32 = 1 + 4/2 + 8
   fileprivate let Prop2: Int32 = 3*7
   internal let Prop3: Int32  = 4*8
-  public init(i:Int32) {}  
+  public init(i:Int32) {}
   public init(i:Int64) {}
 }
 
@@ -87,7 +87,7 @@ public class Foo1 {
 // the -O pipeline.
 public struct Boo {
   public let Prop0: Int32 = 1
-  let Prop1: Int32 = 1 + 4/2 + 8  
+  let Prop1: Int32 = 1 + 4/2 + 8
   fileprivate let Prop2: Int32 = 3*7
   internal let Prop3: Int32 = 4*8
   public init(i:Int32) {}
@@ -114,7 +114,7 @@ public class C {}
 // will be easier to do when access markers are guaranteed complete in
 // the -O pipeline.
 struct Boo3 {
-  //public 
+  //public
   let Prop0: Int32
   let Prop1: Int32
   fileprivate let Prop2: Int32
@@ -200,7 +200,7 @@ public struct StructWithPublicAndInternalAndPrivateLetProperties {
 
 // CHECK-LABEL: sil @$s19let_properties_opts13testClassLet1ys5Int32VAA4Foo1CF : $@convention(thin) (@guaranteed Foo1) -> Int32
 // bb0
-// CHECK: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop1 
+// CHECK: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop1
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop3
 // CHECK: return
@@ -213,7 +213,7 @@ public func testClassLet1(_ f: Foo1) -> Int32 {
 
 // CHECK-LABEL: sil @$s19let_properties_opts13testClassLet1ys5Int32VAA4Foo1CzF : $@convention(thin) (@inout Foo1) -> Int32
 // bb0
-// CHECK: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop1 
+// CHECK: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop1
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop2
 // CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo1, #Foo1.Prop3
 // CHECK: return
@@ -414,7 +414,7 @@ public func useInitializers() -> StructWithPublicAndInternalAndPrivateLetPropert
 
 struct RACStruct {
     private let end = 27
-    
+
     var startIndex: Int { return 0 }
 
 
@@ -429,7 +429,7 @@ struct RACStruct {
     // CHECK: struct_extract %0 : $RACStruct, #RACStruct.end
     // CHECK-LABEL: } // end sil function '${{.*}}9RACStructV8endIndexSivg'
     var endIndex: Int { return end }
-    
+
     subscript(_ bitIndex: Int) -> Bool {
         get { return false }
         set { }

@@ -48,10 +48,10 @@ var i = Int?(42)
 func testInvalidUseOfParameterAttr() {
   var bad_io : (Int) -> (inout Int, Int)  // expected-error {{'inout' may only be used on parameters}}
   func bad_io2(_ a: (inout Int, Int)) {}    // expected-error {{'inout' may only be used on parameters}}
-  
+
   var bad_is : (Int) -> (__shared Int, Int)  // expected-error {{'__shared' may only be used on parameters}}
   func bad_is2(_ a: (__shared Int, Int)) {}    // expected-error {{'__shared' may only be used on parameters}}
-  
+
   var bad_iow : (Int) -> (__owned Int, Int)  // expected-error {{'__owned' may only be used on parameters}}
   func bad_iow2(_ a: (__owned Int, Int)) {}  // expected-error {{'__owned' may only be used on parameters}}
 }
@@ -125,18 +125,18 @@ var z15 = Gen<Gen<Gen<Int?>>?>()
 var z16 = Gen<Gen<Gen<Int?>?>>()
 var z17 = Gen<Gen<Gen<Int?>?>>?()
 
-y0  = z0 
-y1  = z1 
-y2  = z2 
-y3  = z3 
+y0  = z0
+y1  = z1
+y2  = z2
+y3  = z3
 y3a = z3a
 y3b = z3b
-y4  = z4 
-y5  = z5 
-y7  = z7 
-y8  = z8 
+y4  = z4
+y5  = z5
+y7  = z7
+y8  = z8
 y8a = z8a
-y9  = z9 
+y9  = z9
 y10 = z10
 y11 = z11
 y12 = z12

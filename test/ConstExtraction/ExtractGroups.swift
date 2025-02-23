@@ -291,7 +291,7 @@ extension String: Foo {}
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "tuple1",
 // CHECK-NEXT:        "type": "(Swift.String, ExtractGroups.Bar)",
-// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",        
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
@@ -316,7 +316,7 @@ extension String: Foo {}
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "tuple2",
 // CHECK-NEXT:        "type": "(lat: Swift.Float, lng: Swift.Float)",
-// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",        
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",

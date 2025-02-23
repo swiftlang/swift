@@ -33,7 +33,7 @@ import TestModule
  // CHECK-NEXT:      "linkLibraries": [
  // CHECK:           "details": {
  // CHECK-NEXT:        "swift": {
- // CHECK-NEXT:          "moduleInterfacePath": 
+ // CHECK-NEXT:          "moduleInterfacePath":
  // CHECK-NEXT:          "compiledModuleCandidates": [
  // CHECK-NEXT:            TestModule.swiftmodule
  // CHECK-NEXT:          ],

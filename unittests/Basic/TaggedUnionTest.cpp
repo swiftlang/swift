@@ -197,7 +197,7 @@ TEST(TaggedUnion, nontrivial_basics) {
   EXPECT_FALSE(u1.isa<ValueVector>());
   EXPECT_FALSE(u1.isa<ValueVector>());
   EXPECT_TRUE(u1.isa<Value>());
-  EXPECT_TRUE(u1.dyn_cast<Value>() != nullptr);  
+  EXPECT_TRUE(u1.dyn_cast<Value>() != nullptr);
   EXPECT_EQ(Value(), u1.get<Value>());
   EXPECT_EQ(Value(), *u1.dyn_cast<Value>());
 

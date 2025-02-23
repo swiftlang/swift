@@ -7,7 +7,7 @@
 
 
 // CHECK: @"$s4main9Ancestor1[[UNIQUE_ID_1:[A-Za-z_0-9]+]]CySiGMf" =
-//              CHECK: @"$s4main5Value[[UNIQUE_ID_1]]CySSGMf" = linkonce_odr hidden 
+//              CHECK: @"$s4main5Value[[UNIQUE_ID_1]]CySSGMf" = linkonce_odr hidden
 //   CHECK-apple-SAME: global
 // CHECK-unknown-SAME: constant
 //         CHECK-SAME: <{

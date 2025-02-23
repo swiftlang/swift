@@ -35,7 +35,7 @@ func g() {
   takeLoggersByPointer(logger, &logger, &loggerPtr)
   takeLoggersByPointer(logger, loggerPtr, loggerPtrPtr)
   takeLoggersByPointer(nil, nil, nil)
-  
+
   takeLoggersByReference(logger!, &logger, &loggerPtr)
   takeLoggersByReference(logger!, &loggerPtr!.pointee, &loggerPtrPtr!.pointee)
 }

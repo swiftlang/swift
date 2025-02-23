@@ -12,7 +12,7 @@ public struct MyStruct<T> {
 }
 
 public class MyBase<U> {
-  public typealias AliasU = U 
+  public typealias AliasU = U
   public typealias AliasInt = Int
 }
 

@@ -119,7 +119,7 @@ public:
 
   /// Construct a new layout-constraint requirement.
   ///
-  /// \param Subject The type that must conform to the given layout 
+  /// \param Subject The type that must conform to the given layout
   /// requirement.
   /// \param ColonLoc The location of the ':', or an invalid location if
   /// this requirement was implied.
@@ -238,11 +238,11 @@ class GenericParamList final :
                    SourceLoc WhereLoc,
                    MutableArrayRef<RequirementRepr> Requirements,
                    SourceLoc RAngleLoc);
-  
+
   // Don't copy.
   GenericParamList(const GenericParamList &) = delete;
   GenericParamList &operator=(const GenericParamList &) = delete;
-  
+
 public:
   /// create - Create a new generic parameter list within the given AST context.
   ///
@@ -312,7 +312,7 @@ public:
   /// implicitly-generated requirements, and may be non-empty even if no
   /// 'where' keyword is present.
   ArrayRef<RequirementRepr> getRequirements() const { return Requirements; }
-  
+
   /// Retrieve the outer generic parameter list.
   ///
   /// This is used for extensions of nested types, and in SIL mode, where a
@@ -361,7 +361,7 @@ public:
   void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &PO) const;
 };
-  
+
 /// A trailing where clause.
 class alignas(RequirementRepr) TrailingWhereClause final :
     private llvm::TrailingObjects<TrailingWhereClause, RequirementRepr> {

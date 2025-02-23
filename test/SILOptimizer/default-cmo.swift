@@ -1,5 +1,5 @@
 
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -O -wmo -Xfrontend -enable-default-cmo -parse-as-library -emit-module -emit-module-path=%t/Submodule.swiftmodule -module-name=Submodule -package-name Pkg %S/Inputs/cross-module/default-submodule.swift -c -o %t/submodule.o
 // RUN: %target-build-swift -O -wmo -Xfrontend -enable-default-cmo -parse-as-library -emit-module -emit-module-path=%t/Module.swiftmodule -module-name=Module -package-name Pkg -I%t -I%S/Inputs/cross-module %S/Inputs/cross-module/default-module.swift -c -o %t/module.o
@@ -42,8 +42,8 @@ public func usePrivateCVarInModule() -> Int {
 }
 
 // CHECK-LABEL: sil @$s4Main11doIncrementyS2iF
-// CHECK-NOT:     function_ref 
-// CHECK-NOT:     apply 
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main11doIncrementyS2iF'
 public func doIncrement(_ x: Int) -> Int {
   return Module.incrementByThree(x)
@@ -57,8 +57,8 @@ public func doIncrementWithCall(_ x: Int) -> Int {
 }
 
 // CHECK-LABEL: sil @$s4Main14doIncrementTBDyS2iF
-// CHECK-NOT:     function_ref 
-// CHECK-NOT:     apply 
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main14doIncrementTBDyS2iF'
 public func doIncrementTBD(_ x: Int) -> Int {
   return ModuleTBD.incrementByThree(x)
@@ -72,32 +72,32 @@ public func doIncrementTBDWithCall(_ x: Int) -> Int {
 }
 
 // CHECK-LABEL: sil @$s4Main23getSubmoduleKlassMemberSiyF
-// CHECK-NOT:     function_ref 
-// CHECK-NOT:     apply 
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main23getSubmoduleKlassMemberSiyF'
 public func getSubmoduleKlassMember() -> Int {
   return Module.submoduleKlassMember()
 }
 
 // CHECK-LABEL: sil @$s4Main26getSubmoduleKlassMemberTBDSiyF
-// CHECK-NOT:     function_ref 
-// CHECK-NOT:     apply 
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main26getSubmoduleKlassMemberTBDSiyF'
 public func getSubmoduleKlassMemberTBD() -> Int {
   return ModuleTBD.submoduleKlassMember()
 }
 
 // CHECK-LABEL: sil @$s4Main20getModuleKlassMemberSiyF
-// CHECK-NOT:     function_ref 
-// CHECK-NOT:     apply 
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main20getModuleKlassMemberSiyF'
 public func getModuleKlassMember() -> Int {
   return Module.moduleKlassMember()
 }
 
 // CHECK-LABEL: sil @$s4Main23getModuleKlassMemberTBDSiyF
-// CHECK-NOT:     function_ref 
-// CHECK-NOT:     apply 
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main23getModuleKlassMemberTBDSiyF'
 public func getModuleKlassMemberTBD() -> Int {
   return ModuleTBD.moduleKlassMember()

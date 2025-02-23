@@ -30,7 +30,7 @@ public struct TupleBuilder {
 
 public protocol ProtocolWithBuilderProperty {
   associatedtype Assoc
-  
+
   // CHECK: @TupleBuilder var myVar: Self.Assoc { get }
   @TupleBuilder var myVar: Assoc { get }
 }

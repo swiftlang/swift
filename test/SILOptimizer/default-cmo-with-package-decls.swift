@@ -76,8 +76,8 @@ public func usePrivateCVarInModule() -> Int {
 }
 
 // CHECK-LABEL: sil @$s4Main11doIncrementyS2iF
-// CHECK-NOT:     function_ref 
-// CHECK-NOT:     apply 
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main11doIncrementyS2iF'
 public func doIncrement(_ x: Int) -> Int {
   return Module.incrementByThree(x)
@@ -111,8 +111,8 @@ package func callPkgFuncNoCMO(_ x: Int) -> Int {
 }
 
 // CHECK-LABEL: sil @$s4Main14doIncrementTBDyS2iF
-// CHECK-NOT:     function_ref 
-// CHECK-NOT:     apply 
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main14doIncrementTBDyS2iF'
 public func doIncrementTBD(_ x: Int) -> Int {
   return ModuleTBD.incrementByThree(x)
@@ -145,8 +145,8 @@ package func callPkgFuncNoCMOTBD(_ x: Int) -> Int {
 }
 
 // CHECK-LABEL: sil @$s4Main23getSubmoduleKlassMemberSiyF
-// CHECK-NOT:     function_ref 
-// CHECK-NOT:     apply 
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main23getSubmoduleKlassMemberSiyF'
 public func getSubmoduleKlassMember() -> Int {
   return Module.submoduleKlassMember()
@@ -163,8 +163,8 @@ package func getPkgSubmoduleKlassMember() -> Int {
 }
 
 // CHECK-LABEL: sil @$s4Main26getSubmoduleKlassMemberTBDSiyF
-// CHECK-NOT:     function_ref 
-// CHECK-NOT:     apply 
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main26getSubmoduleKlassMemberTBDSiyF'
 public func getSubmoduleKlassMemberTBD() -> Int {
   return ModuleTBD.submoduleKlassMember()
@@ -182,8 +182,8 @@ package func getPkgSubmoduleKlassMemberTBD() -> Int {
 }
 
 // CHECK-LABEL: sil @$s4Main20getModuleKlassMemberSiyF
-// CHECK-NOT:     function_ref 
-// CHECK-NOT:     apply 
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main20getModuleKlassMemberSiyF'
 public func getModuleKlassMember() -> Int {
   return Module.moduleKlassMember()
@@ -200,8 +200,8 @@ package func getPkgModuleKlassMember() -> Int {
 }
 
 // CHECK-LABEL: sil @$s4Main23getModuleKlassMemberTBDSiyF
-// CHECK-NOT:     function_ref 
-// CHECK-NOT:     apply 
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s4Main23getModuleKlassMemberTBDSiyF'
 public func getModuleKlassMemberTBD() -> Int {
   return ModuleTBD.moduleKlassMember()

@@ -23,7 +23,7 @@ struct Baz: ~Copyable {
 // CHECK-LABEL: sil {{.*}} @${{.*}}4test1x
 func test(x: borrowing Foo) {
     // The materialization of x.bar into a temporary to invoke the subscript
-    // addressor needs to cover the entire formal evaluation scope of the 
+    // addressor needs to cover the entire formal evaluation scope of the
     // projection, since the pointer may depend on the materialized
     // representation
 

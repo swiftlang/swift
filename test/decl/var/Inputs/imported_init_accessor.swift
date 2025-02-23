@@ -9,7 +9,7 @@ struct S {
       return _x
     }
   }
-  
+
   public var xMutablePublic: Int {
     @storageRestrictions(initializes: _x)
     init {
@@ -22,7 +22,7 @@ struct S {
       _x = newValue
     }
   }
-  
+
   internal var xImmutableInternal: Int {
     @storageRestrictions(initializes: _x)
     init {
@@ -32,7 +32,7 @@ struct S {
       return _x
     }
   }
-  
+
   internal var xMutableInternal: Int {
     @storageRestrictions(initializes: _x)
     init {

@@ -96,7 +96,7 @@ struct UseWrapperWithAutoclosure {
     wrapped = 27 // expected-error{{'self' used before all stored properties are initialized}}
     // expected-note@-1{{'self.wrapped' not initialized}}
   } // expected-error{{return from initializer without initializing all stored properties}}
-  // expected-note@-1{{'self.wrapped' not initialized}}  
+  // expected-note@-1{{'self.wrapped' not initialized}}
 }
 
 @propertyWrapper

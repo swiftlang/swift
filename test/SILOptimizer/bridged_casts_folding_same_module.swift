@@ -5,7 +5,7 @@
 open class NSSet {
     public init(_ set: AnyHashable) {
         if let item = set as? NSObject {
-            print("yay, has object!")    
+            print("yay, has object!")
         }
     }
 }

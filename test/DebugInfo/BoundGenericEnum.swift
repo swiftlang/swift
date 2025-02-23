@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -emit-ir -g -o %t.ll -module-name a 
+// RUN: %target-swift-frontend %s -O -emit-ir -g -o %t.ll -module-name a
 // RUN: cat %t.ll | %FileCheck %s --check-prefix=CASE_0
 // RUN: cat %t.ll | %FileCheck %s --check-prefix=CASE_1
 // RUN: cat %t.ll | %FileCheck %s --check-prefix=CASE_2
@@ -31,13 +31,13 @@ extension Result where Value : SomeClass {
   public func f() -> Self {
     use(self)
     return map({ $0 })
-  }  
+  }
 }
 
 extension Result {
   public func g() {
     use(self)
-  }  
+  }
 }
 
 let x : Result<SomeClass> = .success(SomeClass())
@@ -65,13 +65,13 @@ y.g()
 // CASE_0-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "$s1a6ResultOyxGD", {{.*}}DIFlagFwdDecl
 
 // (1)
-// CASE_1-DAG: ![[F:[0-9]+]] = distinct !DISubprogram(name: "f", 
+// CASE_1-DAG: ![[F:[0-9]+]] = distinct !DISubprogram(name: "f",
 // CASE_1-DAG: !DILocalVariable(name: "self", arg: 1, scope: ![[F]],{{.*}} line: 31,{{.*}} type: ![[C_CLASS:[0-9]+]]
 // CASE_1-DAG: ![[C_CLASS]] = !DIDerivedType(tag: DW_TAG_const_type,{{.*}} baseType: ![[CLASS:[0-9]+]])
 // CASE_1-DAG: ![[CLASS]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}} size: {{40|72}}
 
 // (2)
-// CASE_2-DAG: ![[G:[0-9]+]] = distinct !DISubprogram(name: "g", 
+// CASE_2-DAG: ![[G:[0-9]+]] = distinct !DISubprogram(name: "g",
 // CASE_2-DAG: !DILocalVariable(name: "self", arg: 1, scope: ![[G]],{{.*}} line: 38,{{.*}} type: ![[C_TUP:[0-9]+]]
 // CASE_2-DAG: ![[C_TUP]] = !DIDerivedType(tag: DW_TAG_const_type,{{.*}} baseType: ![[TUP:[0-9]+]])
 // CASE_2-DAG: ![[TUP]] = !DICompositeType(tag: DW_TAG_structure_type,{{.*}} size: {{264|512}},

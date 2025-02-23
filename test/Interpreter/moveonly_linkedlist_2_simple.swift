@@ -20,9 +20,9 @@
 // CHECK: bye end
 @main struct App { static func main() {
   let l: List<Int> = .more(
-    2, 
+    2,
     Box(
-      .more(3, 
+      .more(3,
         Box(
           .end
         )
@@ -35,13 +35,13 @@
 
 struct Box<Wrapped: ~Copyable & Dumpable>: ~Copyable {
   let ptr: MyLittlePointer<Wrapped>
-  
+
   init(_ wrapped: consuming Wrapped) {
     wrapped.dump(prefix: "hi")
     ptr = .allocate(capacity: 1)
     ptr.initialize(to: wrapped)
   }
-      
+
   deinit {
     ptr.move().dump(prefix: "bye")
     ptr.deallocate()

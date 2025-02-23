@@ -112,7 +112,7 @@ extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
     var g = SystemRandomNumberGenerator()
     return Self.random(in: range, using: &g)
   }
-  
+
   /// Returns a random value within the specified range, using the given
   /// generator as a source for randomness.
   ///
@@ -182,7 +182,7 @@ extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
     let randFloat = delta * unitRandom + range.lowerBound
     return randFloat
   }
-  
+
   /// Returns a random value within the specified range.
   ///
   /// Use this method to generate a floating-point value within a specific

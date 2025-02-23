@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-print-types -emit-sil >%t/output.sil
 // RUN: %FileCheck %s < %t/output.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output.sil
@@ -20,7 +20,7 @@ struct GenStruct<T : P> : P {
   var computed: Int { get { st.computed } set { st.computed = newValue } }
 
   var computedGeneric: T { get { st} set { st = newValue} }
-  
+
   init(_ st: T) { self.st = st }
 
   mutating func modifyIt() {
@@ -33,7 +33,7 @@ var numGenClassObjs = 0
 final class GenClass<T : P> : P {
   var ct: T
   var computed: Int { get { ct.computed } set { ct.computed = newValue } }
-  
+
   var gs: GenStruct<T>
 
   init(_ ct: T) {
@@ -64,12 +64,12 @@ final class DerivedClass2 : DerivedClass<Int> {
 final class SimpleClass : P {
   var i: Int
   static var numObjs = 0
-  
+
   var tuple = (0, 1)
-  
+
   struct Nested {
     var i: Int = 0
-    
+
     @inline(never)
     var computedGenClass: GenClass<SimpleStruct> { GenClass(SimpleStruct(i: i)) }
   }
@@ -88,31 +88,31 @@ final class SimpleClass : P {
   func modifyIt() {
     i += 10
   }
-  
+
   var computed: Int { get { i + 1 } set { i = newValue - 1} }
 }
 
 struct SimpleStruct: P {
   var tuple = (0, 1)
-  
+
   struct Nested {
     var i: Int
   }
   var opt: Nested?
-  
+
   struct Nested2 {
     var opt: Nested?
   }
   var opt2: Nested2?
-  
+
   var i = 0
-  
+
   init(i: Int = 0) { self.i = i }
 
   mutating func modifyIt() {
     i += 10
   }
-  
+
   var computed: Int { get { i + 1 } set { i = newValue - 1} }
 }
 
@@ -644,47 +644,47 @@ func testit() {
   var s2 = GenStruct(GenClass(GenClass(SimpleClass(34))))
   testNestedModify(&s2)
   print("NestedModify: \(s2.st.ct.ct.i)")
-  
+
   // CHECK-OUTPUT: Getter: 51
   var s3 = GenStruct(SimpleClass(50))
   print("Getter: \(testGetter(s3))")
   // CHECK-OUTPUT: ClassMemberGetter: 52
   var c3 = GenClass(SimpleClass(51))
   print("ClassMemberGetter: \(testClassMemberGetter(c3))")
-  
+
   // CHECK-OUTPUT: ComputedModify: 61
   testComputedModify(&s3)
   print("ComputedModify: \(s3.computed)")
   // CHECK-OUTPUT: ClassComputedModify: 62
   testClassMemberComputedModify(&c3)
   print("ClassComputedModify: \(c3.computed)")
-  
+
   var s4 = SimpleStruct()
   // CHECK-OUTPUT: Tuple: 1
   testTuple(&s4)
   print("Tuple: \(s4.tuple.0)")
-  
+
   var c4 = SimpleClass(0)
-  
+
   // CHECK-OUTPUT: OptionalChain1: nil
   print("OptionalChain1: \(String(describing: testOptionalChain(s4)))")
   // CHECK-OUTPUT: ClassOptionalChain1: nil
   print("ClassOptionalChain1: \(String(describing: testOptionalChainClass(c4)))")
-  
+
   // CHECK-OUTPUT: OptionalChain2: Optional(70)
   s4.opt = .init(i: 70)
   print("OptionalChain2: \(String(describing: testOptionalChain(s4)))")
   // CHECK-OUTPUT: ClassOptionalChain2: Optional(71)
   c4.opt = .init(i: 71)
   print("ClassOptionalChain2: \(String(describing: testOptionalChainClass(c4)))")
-  
+
   // CHECK-OUTPUT: OptionalForce: 80
   testModifyOptionalForce(&s4)
   print("OptionalForce: \(testGetOptionalForce(s4))")
   // CHECK-OUTPUT: ClassOptionalForce: 81
   testModifyOptionalForceClass(&c4)
   print("ClassOptionalForce: \(testGetOptionalForceClass(c4))")
-  
+
   // CHECK-OUTPUT: NestedOptionalChain1: nil
   print("NestedOptionalChain1: \(String(describing: testNestedOptionalChain(s4)))")
   // CHECK-OUTPUT: NestedOptionalChain2: nil
@@ -693,10 +693,10 @@ func testit() {
   // CHECK-OUTPUT: NestedOptionalChain3: Optional(90)
   s4.opt2!.opt = .init(i: 90)
   print("NestedOptionalChain3: \(String(describing: testNestedOptionalChain(s4)))")
-  
+
   // CHECK-OUTPUT: testGetComplex: 1
   print("testGetComplex: \(testGetComplex(c4))")
-  
+
   // CHECK-OUTPUT: testGenericResult: 2
   var s5 = GenStruct(SimpleStruct(i: 1))
   testGenericResult(&s5)

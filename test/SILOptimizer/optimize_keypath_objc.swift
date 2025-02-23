@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -primary-file %s -O -sil-verify-all -emit-sil >%t/output.sil
 // RUN: %FileCheck %s < %t/output.sil
 

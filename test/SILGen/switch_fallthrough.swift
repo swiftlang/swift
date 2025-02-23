@@ -151,7 +151,7 @@ func test5() {
     // CHECK:   cond_br {{%.*}}, [[YES_SECOND_CONDITION:bb[0-9]+]], {{bb[0-9]+}}
     // CHECK: [[YES_SECOND_CONDITION]]:
     // CHECK:   br [[CASE2]]([[SECOND_N:%.*]] : $Int)
-    
+
     // CHECK: [[CASE2]]([[INCOMING_N:%.*]] : $Int):
     // CHECK:   debug_value [[INCOMING_N]] : $Int, let, name "n"
     // CHECK:   [[Z:%.*]] = function_ref @$s18switch_fallthrough1zyySiF

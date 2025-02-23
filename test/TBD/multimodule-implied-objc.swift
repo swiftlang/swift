@@ -23,7 +23,7 @@
 // RUN:   %t/Client.swift -emit-ir -o/dev/null -parse-as-library \
 // RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -module-name client -validate-tbd-against-ir=missing \
-// RUN:   -tbd-install_name client -emit-tbd -emit-tbd-path %t/client.tbd 
+// RUN:   -tbd-install_name client -emit-tbd -emit-tbd-path %t/client.tbd
 
 // RUN: %validate-json %t/client.tbd | %FileCheck %s
 
@@ -45,7 +45,7 @@ module IndirectMixedDependency {
 @_exported import IndirectMixedDependency
 
 //--- SwiftDependency.swift
-import IndirectMixedDependency 
+import IndirectMixedDependency
 open class Rectangle : IndirectMixedDependency.Shape {}
 
 

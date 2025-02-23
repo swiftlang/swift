@@ -18,7 +18,7 @@ public struct Location: Equatable, CustomStringConvertible {
   public var description: String {
     return String(taking: bridged.getDebugDescription())
   }
-  
+
   public var sourceLoc: SourceLoc? {
     return SourceLoc(bridged: bridged.getSourceLocation())
   }

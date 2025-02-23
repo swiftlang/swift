@@ -29,7 +29,7 @@ protocol P {
 
   subscript(x: #^PROTOCOL_SUBSCRIPT_PARAMTYPE?check=GENERICPARAM^#) -> Int { get }
   subscript(y: Int) -> #^PROTOCOL_SUBSCRIPT_RESULTTYPE?check=GENERICPARAM^# { get }
-  
+
   var x: #^PROTOCOL_VAR_TYPE?check=GENERICPARAM^#
 }
 extension P {
@@ -39,7 +39,7 @@ extension P {
 
   subscript(x: #^PROTOEXT_SUBSCRIPT_PARAMTYPE?check=GENERICPARAM^#) -> Int { }
   subscript(y: Int) -> #^PROTOEXT_SUBSCRIPT_RESULTTYPE?check=GENERICPARAM^# { }
-  
+
   var x: #^PROTOEXT_VAR_TYPE?check=GENERICPARAM^# { }
 
   func bodyTest() {
@@ -58,7 +58,7 @@ struct S {
 
   subscript(x: #^STRUCT_SUBSCRIPT_PARAMTYPE?check=STATICSELF^#) -> Int { get }
   subscript(y: Int) -> #^STRUCT_SUBSCRIPT_RESULTTYPE?check=STATICSELF^# { get }
-  
+
   var x: #^STRUCT_VAR_TYPE?check=STATICSELF^#
 
   func bodyTest() {
@@ -76,7 +76,7 @@ extension S {
 
   subscript(x: #^STRUCTEXT_SUBSCRIPT_PARAMTYPE?check=STATICSELF^#) -> Int { get }
   subscript(y: Int) -> #^STRUCTEXT_SUBSCRIPT_RESULTTYPE?check=STATICSELF^# { get }
-  
+
   var x: #^STRUCTEXT_VAR_TYPE?check=STATICSELF^#
 
   func bodyTest() {
@@ -95,7 +95,7 @@ class C {
 
   subscript(x: #^CLASS_SUBSCRIPT_PARAMTYPE?check=NOSELF^#) -> Int { get }
   subscript(y: Int) -> #^CLASS_SUBSCRIPT_RESULTTYPE?check=DYNAMICSELF^# { get }
-  
+
   var x: #^CLASS_VAR_TYPE?check=DYNAMICSELF^#
 
   func bodyTest() {
@@ -114,7 +114,7 @@ extension CC {
 
   subscript(x: #^CLASSEXT_SUBSCRIPT_PARAMTYPE?check=NOSELF^#) -> Int { get }
   subscript(y: Int) -> #^CLASSEXT_SUBSCRIPT_RESULTTYPE?check=DYNAMICSELF^# { get }
-  
+
   var x: #^CLASSEXT_VAR_TYPE?check=DYNAMICSELF^#
 
   func bodyTest() {

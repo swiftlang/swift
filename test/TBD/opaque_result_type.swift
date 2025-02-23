@@ -1,4 +1,4 @@
-// REQUIRES: VENDOR=apple 
+// REQUIRES: VENDOR=apple
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -disable-availability-checking -emit-ir -o /dev/null -module-name opaque_result_type -emit-tbd -emit-tbd-path %t/opaque_result_type.tbd %s -validate-tbd-against-ir=missing -tbd-install_name opaque_result_type
 

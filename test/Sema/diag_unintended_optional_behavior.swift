@@ -199,7 +199,7 @@ extension DefaultStringInterpolation {
 func warnOptionalInStringInterpolationSegment(_ o : Int?) {
   print("Always some, Always some, Always some: \(o)")
   // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
-  // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{52-52=)}} 
+  // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{52-52=)}}
   // expected-note@-3 {{provide a default value to avoid this warning}} {{52-52= ?? <#default value#>}}
   var i: Int? = o
   print("Always some, Always some, Always some: \(i)")
@@ -209,20 +209,20 @@ func warnOptionalInStringInterpolationSegment(_ o : Int?) {
   i = nil
   print("Always some, Always some, Always some: \(o.map { $0 + 1 })")
   // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
-  // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{67-67=)}} 
+  // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{67-67=)}}
   // expected-note@-3 {{provide a default value to avoid this warning}} {{67-67= ?? <#default value#>}}
 
   print("Always some, Always some, Always some: \(o as Int?)") // No warning
   print("Always some, Always some, Always some: \(o.debugDescription)") // No warning.
-  
+
   let oST = Optional(SpecialType())
   let ooST = Optional(oST)
   print("Always some, Always some, Always some: \(oST)") // No warning.
-  
+
   print("Always some, Always some, Always some: \(ooST)")
   // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
-  // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{55-55=)}} 
-  // expected-note@-3 {{provide a default value to avoid this warning}} {{55-55= ?? <#default value#>}}  
+  // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{55-55=)}}
+  // expected-note@-3 {{provide a default value to avoid this warning}} {{55-55= ?? <#default value#>}}
 }
 
 // Make sure we don't double diagnose

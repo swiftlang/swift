@@ -11,12 +11,12 @@ NamespacesTestSuite.test("Basic classes") {
   var basicStructInst = ClassesNS1.BasicStruct()
   let basicMemberCString = basicStructInst.basicMember()
   expectEqual(String(cString: basicMemberCString!), "ClassesNS1::BasicStruct::basicMember")
-  
+
   var nestedBasicStructInst = ClassesNS1.ClassesNS2.BasicStruct()
   let nestedBasicMemberCString = nestedBasicStructInst.basicMember()
   expectEqual(String(cString: nestedBasicMemberCString!),
               "ClassesNS1::ClassesNS2::BasicStruct::basicMember")
-  
+
   var siblingBasicStruct = ClassesNS3.BasicStruct()
   let siblingMemberCString = siblingBasicStruct.basicMember()
   expectEqual(String(cString: siblingMemberCString!), "ClassesNS3::BasicStruct::basicMember")

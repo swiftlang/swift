@@ -183,7 +183,7 @@ class FooerAsync {
     return do_foo_async {
       // At this point, strongSelf is keeping the object alive.
       weakSelf?.foo1()
-      // By this point, strongSelf has been nil'd.  However, self in the 
+      // By this point, strongSelf has been nil'd.  However, self in the
       // enclosing foo() may still be keeping the object alive, depending on how
       // the closure was scheduled.
       weakSelf?.foo2()

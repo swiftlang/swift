@@ -43,7 +43,7 @@ struct BufferView : ~Escapable {
   init?(_ ptr: UnsafeRawBufferPointer, _ i: Int) {
     if (i % 2 == 0) {
       return nil
-    } 
+    }
     self.ptr = ptr
   }
   @lifetime(borrow ptr)
@@ -82,7 +82,7 @@ func testBasic() {
     let view = BufferView($0)
     let derivedView = derive(view)
     let newView = consumeAndCreate(derivedView)
-    use(newView)    
+    use(newView)
   }
 }
 

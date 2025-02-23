@@ -164,7 +164,7 @@ class C5 {
   // Propagation via class annotation
   c3.method1() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'method1()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
   c3.method2() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'method2()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
-  
+
   _ = c3.method1
   _ = c3.method2
 
@@ -333,7 +333,7 @@ struct WrapperOnActor<Wrapped: Sendable> {
 @propertyWrapper
 public struct WrapperOnMainActor<Wrapped> {
   // Make sure inference of @MainActor on wrappedValue doesn't crash.
-  
+
   // expected-note@+1 {{mutation of this property is only permitted within the actor}}
   public var wrappedValue: Wrapped
 
@@ -491,7 +491,7 @@ func testInferredFromWrapper(x: InferredFromPropertyWrapper) { // expected-note{
   _ = x.test() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'test()' in a synchronous nonisolated context}}
 }
 
-@propertyWrapper 
+@propertyWrapper
 struct SimplePropertyWrapper {
   var wrappedValue: Int { .zero }
   var projectedValue: Int { .max }
@@ -499,7 +499,7 @@ struct SimplePropertyWrapper {
 
 @MainActor
 class WrappedContainsNonisolatedAttr {
-  @SimplePropertyWrapper nonisolated var value 
+  @SimplePropertyWrapper nonisolated var value
   // expected-error@-1 {{'nonisolated' is not supported on properties with property wrappers}}
   // expected-note@-2 {{property declared here}}
 

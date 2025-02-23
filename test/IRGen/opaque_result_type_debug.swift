@@ -5,7 +5,7 @@
 #if LIBRARY
 
 public protocol P {}
-extension Int: P {} 
+extension Int: P {}
 
 public func foo() -> some P {
   return 0

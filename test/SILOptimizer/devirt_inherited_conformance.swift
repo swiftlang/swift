@@ -121,7 +121,7 @@ public class C: Equatable, Comparable, Simple {
   public func compare(_ c1:C, _ c2:C) -> Bool {
     return c1 == c2
   }
-  
+
   public func foo(_ c:C) -> Bool {
     return true
   }
@@ -194,7 +194,7 @@ public func testCompareComparable() -> Bool {
 }
 
 public func BooCall<T:Simple>(_ x:T, _ y:T) -> Bool {
-  return x.boo(y, y) 
+  return x.boo(y, y)
 }
 
 // Check that a call of inherited Simple.boo can be devirtualized.

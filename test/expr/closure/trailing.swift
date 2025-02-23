@@ -226,58 +226,58 @@ func any<T>(fn: () -> T) -> Any { return fn() }
 
 func test_51245() {
   if !id { true } { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if id { true } == true { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if true == id { true } { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if id { true } ? true : false { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if true ? id { true } : false { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if true ? true : id { false } { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if id { [false,true] }[0] { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if id { { true } } () { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if any { true } as! Bool { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if let _ = any { "test" } as? Int { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if any { "test" } is Int { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if let _ = id { [] as [Int]? }?.first { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if id { true as Bool? }! { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if case id { 1 } = 1 { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if case 1 = id { 1 } { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if case 1 = id { 1 } /*comment*/ { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
-  
+
   if case (id { 1 }) = 1 { return } // OK
-  
+
   if case 1 = (id { 1 }) { return } // OK
-  
+
   if [id { true }].count == 0 { return } // OK
-  
+
   if [id { true } : "test"].keys.count == 0 { return } // OK
-  
+
   if "\(id { true })" == "foo" { return } // OK
-  
+
   if (id { true }) { return } // OK
-  
+
   if (id { true }) { }
   [1, 2, 3].count // expected-warning {{expression of type 'Int' is unused}}
-  
+
   if true { }
   () // OK
-  
+
   if true
   {
-    
+
   }
   () // OK
 }

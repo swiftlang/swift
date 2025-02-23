@@ -33,7 +33,7 @@ struct Record {
 
   func copy() -> Record {
     let copiedNSObject = NSObject()
-        
+
     fake_apply(self.storage) { (key, value) -> Bool in
       let x = copiedNSObject
       return true

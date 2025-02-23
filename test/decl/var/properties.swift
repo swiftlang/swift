@@ -915,7 +915,7 @@ func double(_ val: inout Int) {
 
 class ObservingPropertiesNotMutableInWillSet {
   var anotherObj : ObservingPropertiesNotMutableInWillSet
-  
+
   init() {}
   var property: Int = 42 {
     willSet {
@@ -1004,7 +1004,7 @@ class Base16375910 {
   var x : Int {   // expected-note {{attempt to override property here}}
     return 42
   }
-  
+
   var y : Int {          // expected-note {{attempt to override property here}}
     get { return 4 }
     set {}
@@ -1304,7 +1304,7 @@ class C_53385 {
     let doubleOptionalNever = makeDoubleOptionalNever() // expected-warning {{constant 'doubleOptionalNever' inferred to have type 'Never??', which may be unexpected}}
     // expected-note@-1 {{add an explicit type annotation to silence this warning}} {{28-28=: Never??}}
     // expected-warning@-2 {{initialization of immutable value 'doubleOptionalNever' was never used; consider replacing with assignment to '_' or removing it}}
-    let singleOptionalNever = makeSingleOptionalNever() // expected-warning {{constant 'singleOptionalNever' inferred to have type 'Never?', which may be unexpected}} 
+    let singleOptionalNever = makeSingleOptionalNever() // expected-warning {{constant 'singleOptionalNever' inferred to have type 'Never?', which may be unexpected}}
     // expected-note@-1 {{add an explicit type annotation to silence this warning}} {{28-28=: Never?}}
     // expected-warning@-2 {{initialization of immutable value 'singleOptionalNever' was never used; consider replacing with assignment to '_' or removing it}}
   }

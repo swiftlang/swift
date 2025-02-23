@@ -27,7 +27,7 @@ struct S0 {
   static func +(lhs: S0, rhs: S0) -> S0 { return lhs }
 }
 
-func useS0(lhs: S0, rhs: S0) { 
+func useS0(lhs: S0, rhs: S0) {
   _ = lhs + rhs
 }
 
@@ -130,7 +130,7 @@ protocol P3 { }
 extension P3 {
   static func ==(lhs: Self, rhs: Self) -> Bool {
     return true
-  }  
+  }
 }
 
 struct S3 : P3, Equatable { }

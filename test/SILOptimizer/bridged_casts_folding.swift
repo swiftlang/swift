@@ -2,14 +2,14 @@
 
 // REQUIRES: objc_interop
 
-// Check that casts between bridged types are replaced by more 
+// Check that casts between bridged types are replaced by more
 // efficient code sequences.
-// 
+//
 // In particular, checked_cast_* and unconditional_checked_* instructions,
 // which are pretty expensive at run-time (e.g. because they use
 // runtime _dynamicCast calls and check conformances at run-time),
 // should be replaced by invocations of specialized bridging functions,
-// which make use of statically known compile-time conformances and 
+// which make use of statically known compile-time conformances and
 // do not perform any conformance checks at run-time.
 
 import Foundation
@@ -663,119 +663,119 @@ public func testCondCastToGeneric<T>(_ x: T) -> T? {
 
 func testit() {
   //// ObjC -> Swift
-  
+
   // Arrays
   print("NS to Swift arrays: Start")
   print(testForcedCastNStoSwiftArrayInt())
   print(testCondCastNStoSwiftArrayInt())
-  
+
   print(testForcedCastNStoSwiftArrayDouble())
   print(testCondCastNStoSwiftArrayDouble())
-  
+
   print(testForcedCastNStoSwiftArrayString())
   print(testCondCastNStoSwiftArrayString())
   print("NS to Swift arrays: End")
-  
+
   // Dicts
   print("NS to Swift dictionaries: Start")
   print(testForcedCastNStoSwiftDictInt())
   print(testCondCastNStoSwiftDictInt())
-  
+
   print(testForcedCastNStoSwiftDictDouble())
   print(testCondCastNStoSwiftDictDouble())
-  
+
   print(testForcedCastNStoSwiftDictString())
   print(testCondCastNStoSwiftDictString())
   print(testCondCastNSDictStringtoSwiftDictInt())
   // This line should crash at run-time
   //print(testForcedCastNSDictStringtoSwiftDictInt())
   print("NS to Swift dictionaries: End")
-  
+
   // Sets
   print("NS to Swift sets: Start")
   print(testForcedCastNStoSwiftSetInt())
   print(testCondCastNStoSwiftSetInt())
-  
+
   print(testForcedCastNStoSwiftSetDouble())
   print(testCondCastNStoSwiftSetDouble())
-  
+
   print(testForcedCastNStoSwiftSetString())
   print(testCondCastNStoSwiftSetString())
   print("NS to Swift sets: End")
-  
-  
+
+
   // Basic types
-  
+
   print("NS to Swift basic types: Start")
   print(testForcedCastNSNumberToSwiftInt())
   print(testCondCastNSNumberToSwiftInt())
-  
+
   print(testForcedCastNSNumberToSwiftDouble())
   print(testCondCastNSNumberToSwiftDouble())
-  
+
   print(testForcedCastNSIntNumberToSwiftDouble())
   print(testCondCastNSIntNumberToSwiftDouble())
-  
+
   print(testForcedCastNStoSwiftString())
   print(testCondCastNStoSwiftString())
   print("NS to Swift basic types: End")
-  
+
   //// Swift -> ObjC
-  
+
   // Basic types
-  
+
   print("Swift to NS basic types: Start")
   print(testForcedCastSwiftIntToNSNumber())
   print(testCondCastSwiftIntToNSNumber())
-  
+
   print(testForcedCastSwiftDoubleToNSNumber())
   print(testCondCastSwiftDoubleToNSNumber())
-  
+
   print(testForcedCastSwiftToNSString())
   print(testCondCastSwiftToNSString())
   print("Swift to NS basic types: End")
-  
+
   // Arrays
   print("Swift to NS arrays: Start")
-  
+
   print(testForcedCastSwiftToNSArrayInt())
   print(testCondCastSwiftToNSArrayInt())
-  
+
   print(testForcedCastSwiftToNSArrayDouble())
   print(testCondCastSwiftToNSArrayDouble())
-  
+
   print(testForcedCastSwiftToNSArrayString())
   print(testCondCastSwiftToNSArrayString())
-  
+
   print("Swift to NS arrays: End")
-  
-  
+
+
   // Dicts
   print("Swift to NS dictionaries: Start")
-  
+
   print(testForcedCastSwiftToNSDictInt())
   print(testCondCastSwiftToNSDictInt())
-  
+
   print(testForcedCastSwiftToNSDictDouble())
   print(testCondCastSwiftToNSDictDouble())
-  
+
   print(testForcedCastSwiftToNSDictString())
   print(testCondCastSwiftToNSDictString())
-  
+
   print("Swift to NS dictionaries: End")
-  
+
   // Sets
   print("Swift to NS sets: Start")
-  
+
   print(testForcedCastSwiftToNSSetInt())
   print(testCondCastSwiftToNSSetInt())
-  
+
   print(testForcedCastSwiftToNSSetDouble())
   print(testCondCastSwiftToNSSetDouble())
-  
+
   print(testForcedCastSwiftToNSSetString())
   print(testCondCastSwiftToNSSetString())
-  
+
   print("Swift to NS sets: End")
 }
 
@@ -922,17 +922,17 @@ public func testUncondCastSwiftToSubclass() -> NSObjectSubclass {
 
 class MyThing: Hashable {
     let name: String
-    
+
     init(name: String) {
         self.name = name
     }
-    
+
     deinit {
         Swift.print("Deinit \(name)")
     }
 
     func hash(into hasher: inout Hasher) {}
-    
+
     static func ==(lhs: MyThing, rhs: MyThing) -> Bool {
         return false
     }

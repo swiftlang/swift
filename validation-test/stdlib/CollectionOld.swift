@@ -55,7 +55,7 @@ print("")
 let i = foobar.indices
 let r = i.lazy.reversed()
 for a in PermutationGenerator(elements: foobar, indices: r) {
-  
+
   print(a, terminator: "")
 }
 print("")
@@ -208,7 +208,7 @@ testUnderestimatedCount()
 CollectionTests.test("isEmptyFirstLast") {
   expectTrue((10..<10).isEmpty)
   expectFalse((10...10).isEmpty)
-  
+
   expectEqual(10, (10..<100).first)
   expectEqual(10, (10...100).first)
   expectEqual(99, (10..<100).last)

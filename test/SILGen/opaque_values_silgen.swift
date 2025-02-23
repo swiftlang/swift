@@ -253,7 +253,7 @@ extension Dictionary {
     set(newValue) {
     }
   }
-  
+
   public mutating func inoutAccessOfSubscript(key: Value) {
     func increment(x: inout Value) { }
 
@@ -398,7 +398,7 @@ func anon_read_only_capture(_ x: Int) -> Int {
 
 
 // CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen22testEmptyReturnClosureyyFyycyKXEfu_yycfU_ : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <()> {
-// CHECK-NOT: bb1 
+// CHECK-NOT: bb1
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen22testEmptyReturnClosureyyFyycyKXEfu_yycfU_'
 func testEmptyReturnClosure() {
   func bar() {}
@@ -504,9 +504,9 @@ public enum EnumWithTwoSameAddressOnlyPayloads<T> {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
 // CHECK:         [[RESULT_STORAGE:%[^,]+]] = alloc_stack $T
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
-// CHECK:         switch_enum [[COPY]] : $EnumWithTwoSameAddressOnlyPayloads<T>, 
-// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.nope!enumelt: {{bb[0-9]+}}, 
-// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.yes!enumelt: [[YES_BLOCK:bb[0-9]+]], 
+// CHECK:         switch_enum [[COPY]] : $EnumWithTwoSameAddressOnlyPayloads<T>,
+// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.nope!enumelt: {{bb[0-9]+}},
+// CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.yes!enumelt: [[YES_BLOCK:bb[0-9]+]],
 // CHECK-SAME:      case #EnumWithTwoSameAddressOnlyPayloads.and!enumelt: [[AND_BLOCK:bb[0-9]+]]
 // CHECK:       [[YES_BLOCK]]([[YES_VALUE:%[^,]+]] :
 // CHECK:         [[YES_LIFETIME:%[^,]+]] = move_value [lexical] [var_decl] [[YES_VALUE]]
@@ -532,7 +532,7 @@ public enum EnumWithTwoSameAddressOnlyPayloads<T> {
 
 
 // Verify exit block arguments are ordered correctly.
-// 
+//
 // CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int49condition5valueSi_S2ix_xttSb_xtlFSi_S2ix_xttyXEfU_ : {{.*}} {
 // CHECK:         br [[EPILOG:bb[0-9]+]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
 // CHECK:         br [[EPILOG]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
@@ -559,17 +559,17 @@ func duplicate_with_int4<Value>(condition: Bool, value: Value) -> (Int, Int, Int
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10duplicate15valuex_xtx_tlFx_xtyXEfU_'
 @_silgen_name("duplicate1")
 func duplicate1<Value>(value: Value) -> (Value, Value) {
-  doit { 
+  doit {
       (value, value)
   }
 }
 // CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_ : {{.*}} {
-// CHECK:         [[RETVAL:%[^,]+]] = tuple $(one: Value, two: Value) ({{%[^,]+}}, {{%[^,]+}})   
-// CHECK:         return [[RETVAL]] : $(one: Value, two: Value)           
+// CHECK:         [[RETVAL:%[^,]+]] = tuple $(one: Value, two: Value) ({{%[^,]+}}, {{%[^,]+}})
+// CHECK:         return [[RETVAL]] : $(one: Value, two: Value)
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_'
 @_silgen_name("duplicate2")
 func duplicate2<Value>(value: Value) -> (one: Value, two: Value) {
-  doit { 
+  doit {
       (one: value, two: value)
   }
 }
@@ -585,8 +585,8 @@ func duplicate_with_int1<Value>(value: Value) -> (Value, Value, Int) {
 }
 
 // CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int25valuex_xt_Sitx_tlFx_xt_SityXEfU_ : {{.*}} {
-// CHECK:         [[INNER:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value)           
-// CHECK:         [[RETVAL:%[^,]+]] = tuple ([[INNER]] : $(Value, Value), {{%[^,]+}} : $Int)    
+// CHECK:         [[INNER:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ([[INNER]] : $(Value, Value), {{%[^,]+}} : $Int)
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int25valuex_xt_Sitx_tlFx_xt_SityXEfU_'
 @_silgen_name("duplicate_with_int2")
@@ -596,11 +596,11 @@ func duplicate_with_int2<Value>(value: Value) -> ((Value, Value), Int) {
   }
 }
 // CHECK-LABEL: sil private [ossa] @$s20opaque_values_silgen19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_ : {{.*}} {
-// CHECK:         [[INNERMOST:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Int)           
-// CHECK:         [[INNERMIDDLE:%[^,]+]] = tuple ({{%[^,]+}} : $Value, [[INNERMOST]] : $(Value, Int), {{%[^,]+}} : $Value) 
-// CHECK:         [[INNERLEAST:%[^,]+]] = tuple ({{%[^,]+}} : $Value, [[INNERMIDDLE]] : $(Value, (Value, Int), Value)) 
-// CHECK:         [[RETVAL:%[^,]+]] = tuple ({{%[^,]+}} : $Int, [[INNERLEAST]] : $(Value, (Value, (Value, Int), Value)), {{%[^,]+}} : $Int) 
-// CHECK:         return [[RETVAL]] : $(Int, (Value, (Value, (Value, Int), Value)), Int) 
+// CHECK:         [[INNERMOST:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Int)
+// CHECK:         [[INNERMIDDLE:%[^,]+]] = tuple ({{%[^,]+}} : $Value, [[INNERMOST]] : $(Value, Int), {{%[^,]+}} : $Value)
+// CHECK:         [[INNERLEAST:%[^,]+]] = tuple ({{%[^,]+}} : $Value, [[INNERMIDDLE]] : $(Value, (Value, Int), Value))
+// CHECK:         [[RETVAL:%[^,]+]] = tuple ({{%[^,]+}} : $Int, [[INNERLEAST]] : $(Value, (Value, (Value, Int), Value)), {{%[^,]+}} : $Int)
+// CHECK:         return [[RETVAL]] : $(Int, (Value, (Value, (Value, Int), Value)), Int)
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_'
 @_silgen_name("duplicate_with_int3")
 func duplicate_with_int3<Value>(value: Value) -> (Int, (Value, (Value, (Value, Int), Value)), Int) {
@@ -638,7 +638,7 @@ indirect enum StructWithAReadableStringProperty {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[COPY]]
-// CHECK:         [[FN:%[^,]+]] = function_ref @$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvg : $@convention(method) (@guaranteed StructWithAReadableStringProperty) -> @owned String 
+// CHECK:         [[FN:%[^,]+]] = function_ref @$s20opaque_values_silgen33StructWithAReadableStringPropertyO1sSSvg : $@convention(method) (@guaranteed StructWithAReadableStringProperty) -> @owned String
 // CHECK:         [[RESULT:%[^,]+]] = apply [[FN]]([[LIFETIME]])
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         destroy_value [[COPY]]
@@ -698,7 +698,7 @@ func FormClassKeyPath() {
 
 // CHECK-LABEL: sil {{.*}}[ossa] @UseGetterOnInout : {{.*}} {
 // CHECK:       bb0([[CONTAINER_ADDR:%[^,]+]] :
-// CHECK:         [[KEYPATH:%[^,]+]] = keypath $WritableKeyPath<MyInt, Int>, (root $MyInt; stored_property #MyInt.int : $Int) 
+// CHECK:         [[KEYPATH:%[^,]+]] = keypath $WritableKeyPath<MyInt, Int>, (root $MyInt; stored_property #MyInt.int : $Int)
 // CHECK:         [[CONTAINER_ACCESS:%[^,]+]] = begin_access [read] [unknown] [[CONTAINER_ADDR]]
 // CHECK:         [[KEYPATH_UP:%[^,]+]] = upcast [[KEYPATH]]
 // CHECK:         [[CONTAINER:%[^,]+]] = load [trivial] [[CONTAINER_ACCESS]]
@@ -706,7 +706,7 @@ func FormClassKeyPath() {
 // CHECK:         [[VALUE:%[^,]+]] = apply [[GETTER]]<MyInt, Int>([[CONTAINER]], [[KEYPATH_UP]])
 // CHECK:         end_access [[CONTAINER_ACCESS]]
 // CHECK:         destroy_value [[KEYPATH_UP]]
-// CHECK:         return [[VALUE]] : $Int                                
+// CHECK:         return [[VALUE]] : $Int
 // CHECK-LABEL: } // end sil function 'UseGetterOnInout'
 @_silgen_name("UseGetterOnInout")
 func getInout(_ i: inout MyInt) -> Int {
@@ -836,8 +836,8 @@ struct Twople<T> {
   var storage: (T, T)
 
 // CHECK-LABEL: sil {{.*}}[ossa] @Twople_init_from_t1_t2 : {{.*}} {
-// CHECK:       bb0([[T1:%[^,]+]] : 
-// CHECK-SAME:      [[T2:%[^,]+]] : 
+// CHECK:       bb0([[T1:%[^,]+]] :
+// CHECK-SAME:      [[T2:%[^,]+]] :
 // CHECK-SAME:  ):
 // CHECK:         [[VAR:%[^,]+]] = alloc_box
 // CHECK:         [[VAR_UNINIT:%[^,]+]] = mark_uninitialized [rootself] [[VAR]]

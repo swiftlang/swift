@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // RUN: %empty-directory(%t)
-// 
+//
 // RUN: %target-clang %S/Inputs/SwiftNativeNSBase/SwiftNativeNSBase.m -c -o %t/SwiftNativeNSBase.o -g
 // RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
 // RUN: echo '#sourceLocation(file: "%s", line: 1)' > "%t/main.swift" && cat "%s" >> "%t/main.swift" && chmod -w "%t/main.swift"
@@ -30,9 +30,9 @@
 import Foundation
 import StdlibUnittest
 
-@_silgen_name("TestSwiftNativeNSBase_UnwantedCdtors") 
+@_silgen_name("TestSwiftNativeNSBase_UnwantedCdtors")
 func TestSwiftNativeNSBase_UnwantedCdtors() -> Bool
-@_silgen_name("TestSwiftNativeNSBase_RetainCount") 
+@_silgen_name("TestSwiftNativeNSBase_RetainCount")
 func TestSwiftNativeNSBase_RetainCount(_: UnsafeMutableRawPointer) -> Bool
 
 func classChain(of cls: AnyClass) -> [String] {

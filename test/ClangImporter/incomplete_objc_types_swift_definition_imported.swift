@@ -17,7 +17,7 @@ takeAFoo(foo)
 // CHECK:      incomplete_objc_types_swift_definition_imported.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'takeAFoo' in scope
 // CHECK-NEXT: takeAFoo(foo)
 // CHECK-NEXT: ^~~~~~~~
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'takeAFoo' unavailable (cannot import) 
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'takeAFoo' unavailable (cannot import)
 // CHECK-NEXT: void takeAFoo(Foo *foo);
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: parameter 'foo' unavailable (cannot import)
@@ -57,7 +57,7 @@ takeABaz(bar)
 // CHECK:      incomplete_objc_types_swift_definition_imported.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'takeABaz' in scope
 // CHECK-NEXT: takeABaz(bar)
 // CHECK-NEXT: ^~~~~~~~
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'takeABaz' unavailable (cannot import) 
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'takeABaz' unavailable (cannot import)
 // CHECK-NEXT: void takeABaz(Baz *baz);
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: parameter 'baz' unavailable (cannot import)
@@ -77,7 +77,7 @@ _ = returnABaz()
 // CHECK:     incomplete_objc_types_swift_definition_imported.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'returnABaz' in scope
 // CHECK-NEXT: _ = returnABaz()
 // CHECK-NEXT:     ^~~~~~~~~~
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnABaz' unavailable (cannot import) 
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnABaz' unavailable (cannot import)
 // CHECK-NEXT: Baz *returnABaz();
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: return type unavailable (cannot import)
@@ -97,7 +97,7 @@ takeASubscript(corge)
 // CHECK:      incomplete_objc_types_swift_definition_imported.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'takeASubscript' in scope
 // CHECK-NEXT: takeASubscript(corge)
 // CHECK-NEXT: ^~~~~~~~~~~~~~
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'takeASubscript' unavailable (cannot import) 
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'takeASubscript' unavailable (cannot import)
 // CHECK-NEXT: void takeASubscript(subscript *param);
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: parameter 'param' unavailable (cannot import)
@@ -117,7 +117,7 @@ _ = returnASubscript()
 // CHECK:     incomplete_objc_types_swift_definition_imported.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'returnASubscript' in scope
 // CHECK-NEXT: _ = returnASubscript()
 // CHECK-NEXT:     ^~~~~~~~~~~~~~~~
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnASubscript' unavailable (cannot import) 
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnASubscript' unavailable (cannot import)
 // CHECK-NEXT: subscript* returnASubscript();
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: return type unavailable (cannot import)
@@ -137,7 +137,7 @@ _ = returnAProtocolFoo()
 // CHECK:     incomplete_objc_types_swift_definition_imported.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'returnAProtocolFoo' in scope
 // CHECK-NEXT: _ = returnAProtocolFoo()
 // CHECK-NEXT:     ^~~~~~~~~~~~~~~~~~
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnAProtocolFoo' unavailable (cannot import) 
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnAProtocolFoo' unavailable (cannot import)
 // CHECK-NEXT: id<ProtocolFoo> returnAProtocolFoo();
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: return type unavailable (cannot import)
@@ -157,7 +157,7 @@ _ = returnAProtocolBaz()
 // CHECK:     incomplete_objc_types_swift_definition_imported.swift:{{[0-9]+}}:{{[0-9]+}}: error: cannot find 'returnAProtocolBaz' in scope
 // CHECK-NEXT: _ = returnAProtocolBaz()
 // CHECK-NEXT:     ^~~~~~~~~~~~~~~~~~
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnAProtocolBaz' unavailable (cannot import) 
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: function 'returnAProtocolBaz' unavailable (cannot import)
 // CHECK-NEXT: id<ProtocolBaz> returnAProtocolBaz();
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: return type unavailable (cannot import)

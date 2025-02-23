@@ -25,7 +25,7 @@ func test_onone() -> Int  { return 5}
 @inlinable
 @_optimize(speed)
 func test_ospeed() -> Int  { return 5}
- 
+
 //CHECK-DAG: @_optimize(size) func test_osize()
 @inlinable
 @_optimize(size)

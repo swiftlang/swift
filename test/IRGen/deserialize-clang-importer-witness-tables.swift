@@ -12,5 +12,5 @@ public func foo(line: String) {
   // CHECK-LABEL: define {{.*}} void @"$sSo26NSRegularExpressionOptionsVs10SetAlgebraSCsACPxycfCTW"
   // CHECK-LABEL: define {{.*}} ptr @"$sSo26NSRegularExpressionOptionsVABSQSCWl"()
   let versionRegex = try! RegEx(pattern: "Apple")
-  _ = versionRegex.firstMatch(in: line)  
+  _ = versionRegex.firstMatch(in: line)
 }

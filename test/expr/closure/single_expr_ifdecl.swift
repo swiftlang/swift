@@ -8,14 +8,14 @@ func simple() {
   takeIntToInt({
     #if true
     $0 + 1
-    #else 
+    #else
     $0 + 2
     #endif
   })
   takeIntIntToInt({
     #if true
     $0 + $1 + 1
-    #else 
+    #else
     $0 + $1 + 2
     #endif
   })
@@ -224,11 +224,11 @@ var intOrStringClosure_false = {
 }
 
 func testMultiType() {
-  
+
   let a = intOrStringClosure_true()
   _ = a as Int
   _ = a as String // expected-error {{cannot convert value of type 'Int' to type 'String'}}
-  
+
   let b = intOrStringClosure_false()
   _ = b as Int // expected-error {{cannot convert value of type 'String' to type 'Int'}}
   _ = b as String

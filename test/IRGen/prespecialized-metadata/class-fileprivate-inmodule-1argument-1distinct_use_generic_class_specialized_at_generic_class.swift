@@ -30,7 +30,7 @@
 //         CHECK-SAME:   ptr,
 //         CHECK-SAME:   ptr,
 //         CHECK-SAME:   [[INT]],
-//         CHECK-SAME:   ptr 
+//         CHECK-SAME:   ptr
 //         CHECK-SAME: }> <{
 //         CHECK-SAME:   ptr
 //         CHECK-SAME:   $s4main5Value[[UNIQUE_ID_1]]LLCfD

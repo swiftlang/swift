@@ -721,7 +721,7 @@ extension _StringGuts {
 }
 
 extension String.UTF16View {
-  
+
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
   @inline(__always)
   internal func _utf16Length<U: SIMD, S: SIMD>(
@@ -731,12 +731,12 @@ extension String.UTF16View {
     signedSIMDType: S.Type
   ) -> Int where U.Scalar == UInt8, S.Scalar == Int8 {
     var utf16Count = 0
-    
+
     while readPtr + MemoryLayout<U>.stride < endPtr {
       //Find the number of continuations (0b10xxxxxx)
       let sValue = readPtr.loadUnaligned(as: S.self)
       let continuations = S.zero.replacing(with: S.one, where: sValue .< -65 + 1)
-            
+
       //Find the number of 4 byte code points (0b11110xxx)
       let uValue = readPtr.loadUnaligned(as: U.self)
       let fourBytes = S.zero.replacing(
@@ -746,30 +746,30 @@ extension String.UTF16View {
           to: SIMDMask<S.MaskStorage>.self
         )
       )
-      
+
       utf16Count &+= U.scalarCount + Int((fourBytes &- continuations).wrappedSum())
-            
+
       readPtr += MemoryLayout<U>.stride
     }
-    
+
     return utf16Count
   }
 #endif
 
   internal func _utf16Distance(from start: Index, to end: Index) -> Int {
     _internalInvariant(end.transcodedOffset == 0 || end.transcodedOffset == 1)
-        
+
     return (end.transcodedOffset - start.transcodedOffset) + _guts.withFastUTF8(
       range: start._encodedOffset ..< end._encodedOffset
     ) { utf8 in
       let rawBuffer = UnsafeRawBufferPointer(utf8)
       guard rawBuffer.count > 0 else { return 0 }
-      
+
       var utf16Count = 0
       var readPtr = rawBuffer.baseAddress.unsafelyUnwrapped
       let initialReadPtr = readPtr
       let endPtr = readPtr + rawBuffer.count
-      
+
       //eat leading continuations
       while readPtr < endPtr {
         let byte = readPtr.load(as: UInt8.self)
@@ -782,23 +782,23 @@ extension String.UTF16View {
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
       // TODO: Currently, using SIMD sizes above SIMD8 is slower
       // Once that's fixed we should go up to SIMD64 here
-      
+
       utf16Count &+= _utf16Length(
         readPtr: &readPtr,
         endPtr: endPtr,
         unsignedSIMDType: SIMD8<UInt8>.self,
         signedSIMDType: SIMD8<Int8>.self
       )
-   
+
       //TO CONSIDER: SIMD widths <8 here
-      
+
       //back up to the start of the current scalar if we may have a trailing
       //incomplete scalar
       if utf16Count > 0 && UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
         while readPtr > initialReadPtr && UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
           readPtr -= 1
         }
-        
+
         //The trailing scalar may be incomplete, subtract it out and check below
         let byte = readPtr.load(as: UInt8.self)
         let len = _utf8ScalarLength(byte)

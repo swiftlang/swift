@@ -311,7 +311,7 @@ func objcMethodDispatch() {
 func dynamicMethodDispatch() {
   // CHECK: function_ref @$s7dynamic3{{[_0-9a-zA-Z]*}}fC
   let c = Foo(dynamic: 0)
-  // CHECK: objc_method {{%.*}} : $Foo, #Foo.dynamicMethod!foreign 
+  // CHECK: objc_method {{%.*}} : $Foo, #Foo.dynamicMethod!foreign
   c.dynamicMethod()
   // CHECK: objc_method {{%.*}} : $Foo, #Foo.dynamicProp!getter.foreign
   let x = c.dynamicProp
@@ -325,7 +325,7 @@ func dynamicMethodDispatch() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s7dynamic15managedDispatchyyAA3FooCF
 func managedDispatch(_ c: Foo) {
-  // CHECK: objc_method {{%.*}} : $Foo, #Foo.managedProp!getter.foreign 
+  // CHECK: objc_method {{%.*}} : $Foo, #Foo.managedProp!getter.foreign
   let x = c.managedProp
   // CHECK: objc_method {{%.*}} : $Foo, #Foo.managedProp!setter.foreign
   c.managedProp = x

@@ -100,7 +100,7 @@ struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
     }
     return dest;
   }
-  
+
   template <class Container, class... A>
   static Container *initializeWithTake(Container *dest, Container *src,
                                        A... args) {
@@ -314,7 +314,7 @@ struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBox
     void copyTypeInto(Container *dest) const {
       this->Header.copyTypeInto(&dest->Header, NumWitnessTables);
     }
-    
+
     static size_t getContainerStride() {
       return sizeof(Container);
     }
@@ -375,7 +375,7 @@ struct SWIFT_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
     static size_t getStride(unsigned numWitnessTables) {
       return getSize(numWitnessTables);
     }
-    
+
     static size_t getContainerStride(const Metadata *self) {
       return getStride(getNumWitnessTables(self));
     }
@@ -384,7 +384,7 @@ struct SWIFT_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
   using type = Container;
   static constexpr unsigned numExtraInhabitants =
     swift_getHeapObjectExtraInhabitantCount();
-  
+
   static void storeExtraInhabitantTag(Container *dest, unsigned tag) {
     swift_storeHeapObjectExtraInhabitant(
                             (HeapObject**)(uintptr_t)&dest->Header.Type, tag - 1);
@@ -407,7 +407,7 @@ struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBoxBase
   static void destroy(Container *value, A... args) {
     swift_unknownObjectRelease(*value->getValueSlot());
   }
-  
+
   template <class Container, class... A>
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
@@ -415,7 +415,7 @@ struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBoxBase
     auto newValue = *src->getValueSlot();
     *dest->getValueSlot() = newValue;
     swift_unknownObjectRetain(newValue);
-    return dest;  
+    return dest;
   }
 
   template <class Container, class... A>
@@ -476,7 +476,7 @@ struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBox : ClassExistentialBoxBase {
     }
     void **getValueSlot() { return &Header.Value; }
     void * const *getValueSlot() const { return &Header.Value; }
-    
+
     static size_t getContainerStride() { return sizeof(Container); }
   };
 
@@ -497,7 +497,7 @@ struct SWIFT_LIBRARY_VISIBILITY NonFixedClassExistentialBox
     ClassExistentialContainer Header;
 
     static unsigned getNumWitnessTables(const Metadata *self) {
-      auto castSelf = static_cast<const ExistentialTypeMetadata*>(self); 
+      auto castSelf = static_cast<const ExistentialTypeMetadata*>(self);
       return castSelf->Flags.getNumWitnessTables();
     }
 
@@ -536,13 +536,13 @@ struct SWIFT_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
   template <class Container, class... A>
   static void destroy(Container *value, A... args) {
   }
-  
+
   template <class Container, class... A>
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
     src->copyTypeInto(dest, args...);
     *dest->getValueSlot() = *src->getValueSlot();
-    return dest;  
+    return dest;
   }
 
   template <class Container, class... A>
@@ -599,7 +599,7 @@ struct SWIFT_LIBRARY_VISIBILITY ExistentialMetatypeBox
     }
     const Metadata **getValueSlot() { return &Header.Value; }
     const Metadata * const *getValueSlot() const { return &Header.Value; }
-    
+
     static size_t getContainerStride() { return sizeof(Container); }
   };
 
@@ -620,7 +620,7 @@ struct SWIFT_LIBRARY_VISIBILITY NonFixedExistentialMetatypeBox
     ExistentialMetatypeContainer Header;
 
     static unsigned getNumWitnessTables(const Metadata *self) {
-      auto castSelf = static_cast<const ExistentialMetatypeMetadata*>(self); 
+      auto castSelf = static_cast<const ExistentialMetatypeMetadata*>(self);
       return castSelf->Flags.getNumWitnessTables();
     }
 

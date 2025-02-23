@@ -219,14 +219,14 @@ struct RefCountBitsInt<RefCountNotInline, 4> {
 template <>
 struct RefCountBitsInt<RefCountIsInline, 4> {
   typedef uint32_t Type;
-  typedef int32_t SignedType;  
+  typedef int32_t SignedType;
 };
 
 
 // Layout of refcount bits.
 // field value = (bits & mask) >> shift
 // FIXME: redo this abstraction more cleanly
-  
+
 # define maskForField(name) (((uint64_t(1)<<name##BitCount)-1) << name##Shift)
 # define shiftAfterField(name) (name##Shift + name##BitCount)
 
@@ -241,11 +241,11 @@ struct RefCountBitOffsets<8> {
   /*
    The bottom 32 bits (on 64 bit architectures, fewer on 32 bit) of the refcount
    field are effectively a union of two different configurations:
-   
+
    ---Normal case---
    Bit 0: Does this object need to call out to the ObjC runtime for deallocation
    Bits 1-31: Unowned refcount
-   
+
    ---Immortal case---
    All bits set, the object does not deallocate or have a refcount
    */
@@ -268,7 +268,7 @@ struct RefCountBitOffsets<8> {
   static const size_t StrongExtraRefCountShift = shiftAfterField(IsDeiniting);
   static const size_t StrongExtraRefCountBitCount = 30;
   static const uint64_t StrongExtraRefCountMask = maskForField(StrongExtraRefCount);
-  
+
   static const size_t UseSlowRCShift = shiftAfterField(StrongExtraRefCount);
   static const size_t UseSlowRCBitCount = 1;
   static const uint64_t UseSlowRCMask = maskForField(UseSlowRC);
@@ -289,7 +289,7 @@ struct RefCountBitOffsets<4> {
   static const size_t PureSwiftDeallocShift = 0;
   static const size_t PureSwiftDeallocBitCount = 1;
   static const uint32_t PureSwiftDeallocMask = maskForField(PureSwiftDealloc);
-  
+
   static const size_t UnownedRefCountShift = shiftAfterField(PureSwiftDealloc);
   static const size_t UnownedRefCountBitCount = 7;
   static const uint32_t UnownedRefCountMask = maskForField(UnownedRefCount);
@@ -301,11 +301,11 @@ struct RefCountBitOffsets<4> {
   static const size_t IsDeinitingShift = shiftAfterField(UnownedRefCount);
   static const size_t IsDeinitingBitCount = 1;
   static const uint32_t IsDeinitingMask = maskForField(IsDeiniting);
-  
+
   static const size_t StrongExtraRefCountShift = shiftAfterField(IsDeiniting);
   static const size_t StrongExtraRefCountBitCount = 22;
   static const uint32_t StrongExtraRefCountMask = maskForField(StrongExtraRefCount);
-  
+
   static const size_t UseSlowRCShift = shiftAfterField(StrongExtraRefCount);
   static const size_t UseSlowRCBitCount = 1;
   static const uint32_t UseSlowRCMask = maskForField(UseSlowRC);
@@ -343,7 +343,7 @@ class RefCountBitsT {
 
   friend class RefCountBitsT<RefCountIsInline>;
   friend class RefCountBitsT<RefCountNotInline>;
-  
+
   static const RefCountInlinedness Inlinedness = refcountIsInline;
 
   typedef typename RefCountBitsInt<refcountIsInline, sizeof(void*)>::Type
@@ -362,16 +362,16 @@ class RefCountBitsT {
 # define setFieldIn(bits, offsets, name, val)                           \
     bits = ((bits & ~offsets::name##Mask) |                             \
             (((BitsType(val) << offsets::name##Shift) & offsets::name##Mask)))
-  
+
 # define getField(name) getFieldIn(bits, Offsets, name)
-# define setField(name, val) setFieldIn(bits, Offsets, name, val)  
+# define setField(name, val) setFieldIn(bits, Offsets, name, val)
 # define copyFieldFrom(src, name)                                       \
     setFieldIn(bits, Offsets, name,                                     \
                getFieldIn(src.bits, decltype(src)::Offsets, name))
 
   // RefCountBits uses always_inline everywhere
   // to improve performance of debug builds.
-  
+
   private:
     SWIFT_ALWAYS_INLINE
     bool getUseSlowRC() const { return bool(getField(UseSlowRC)); }
@@ -380,7 +380,7 @@ class RefCountBitsT {
     void setUseSlowRC(bool value) { setField(UseSlowRC, value); }
 
   public:
-  
+
   enum Immortal_t { Immortal };
 
   SWIFT_ALWAYS_INLINE
@@ -456,7 +456,7 @@ class RefCountBitsT {
 
     assert(newbitsPtr && "expected non null newbits");
     RefCountBitsT<RefCountIsInline> newbits = *newbitsPtr;
-    
+
     if (refcountIsInline || sizeof(newbits) == sizeof(*this)) {
       // this and newbits are both inline
       // OR this is out-of-line but the same layout as inline.
@@ -486,7 +486,7 @@ class RefCountBitsT {
     // Side table refcount must not point to another side table.
     assert((refcountIsInline || !hasSide)  &&
            "side table refcount must not have a side table entry of its own");
-    
+
     return hasSide;
   }
 
@@ -551,7 +551,7 @@ class RefCountBitsT {
     assert(!hasSideTable());
     setField(StrongExtraRefCount, value);
   }
-  
+
 
   // Returns true if the increment is a fast-path result.
   // Returns false if the increment should fall back to some slow path
@@ -736,7 +736,7 @@ class RefCounts {
   // destruction overhead at runtime. Use RefCounts(Initialized)
   // to produce an initialized instance.
   RefCounts() = default;
-  
+
   // Refcount of a new object is 1.
   constexpr RefCounts(Initialized_t)
     : refCounts(RefCountBits(0, 1)) {}
@@ -744,7 +744,7 @@ class RefCounts {
   // Refcount of an immortal object has top and bottom bits set
   constexpr RefCounts(Immortal_t)
   : refCounts(RefCountBits(RefCountBits::Immortal)) {}
-  
+
   void init() {
     refCounts.store(RefCountBits(0, 1), std::memory_order_relaxed);
   }
@@ -756,12 +756,12 @@ class RefCounts {
   void initForNotFreeing() {
     refCounts.store(RefCountBits(0, 2), std::memory_order_relaxed);
   }
-  
+
   // Initialize for an object which will never deallocate.
   void initImmortal() {
     refCounts.store(RefCountBits(RefCountBits::Immortal), std::memory_order_relaxed);
   }
-  
+
   void setIsImmortal(bool immortal) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (oldbits.isImmortal(true)) {
@@ -774,7 +774,7 @@ class RefCounts {
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
   }
-  
+
   void setPureSwiftDeallocation(bool nonobjc) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
 
@@ -797,12 +797,12 @@ class RefCounts {
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
   }
-  
+
   bool getPureSwiftDeallocation() {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     return bits.pureSwiftDeallocation();
   }
-  
+
   // Initialize from another refcount bits.
   // Only inline -> out-of-line is allowed (used for new side table entries).
   void init(InlineRefCountBits newBits) {
@@ -817,13 +817,13 @@ class RefCounts {
   SWIFT_ALWAYS_INLINE
   HeapObject *increment(uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
-    
+
     // Constant propagation will remove this in swift_retain, it should only
     // be present in swift_retain_n.
     if (inc != 1 && oldbits.isImmortal(true)) {
       return getHeapObject();
     }
-    
+
     RefCountBits newbits;
     do {
       newbits = oldbits;
@@ -841,13 +841,13 @@ class RefCounts {
   SWIFT_ALWAYS_INLINE
   void incrementNonAtomic(uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
-    
+
     // Constant propagation will remove this in swift_retain, it should only
     // be present in swift_retain_n.
     if (inc != 1 && oldbits.isImmortal(true)) {
       return;
     }
-    
+
     auto newbits = oldbits;
     bool fast = newbits.incrementStrongExtraRefCount(inc);
     if (SWIFT_UNLIKELY(!fast)) {
@@ -930,7 +930,7 @@ class RefCounts {
     }
     if (bits.hasSideTable())
       return bits.getSideTable()->decrementFromOneNonAtomic();
-    
+
     assert(!bits.getIsDeiniting());
     assert(bits.getStrongExtraRefCount() == 0 && "Expect a refcount of 1");
     bits.setStrongExtraRefCount(0);
@@ -944,7 +944,7 @@ class RefCounts {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable())
       return bits.getSideTable()->getCount();
-    
+
     return bits.getStrongExtraRefCount() + 1;
   }
 
@@ -954,7 +954,7 @@ class RefCounts {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable())
       return bits.getSideTable()->isUniquelyReferenced();
-    
+
     assert(!bits.getIsDeiniting());
     return bits.isUniquelyReferenced();
   }
@@ -983,7 +983,7 @@ class RefCounts {
   /// Return true if the object can be freed directly right now.
   /// (transition DEINITING -> DEAD)
   /// This is used in swift_deallocObject().
-  /// Can be freed now means:  
+  /// Can be freed now means:
   ///   no side table
   ///   unowned reference count is 1
   /// The object is assumed to be deiniting with no strong references already.
@@ -1012,17 +1012,17 @@ class RefCounts {
   template <PerformDeinit performDeinit>
   bool doDecrementSlow(RefCountBits oldbits, uint32_t dec) {
     RefCountBits newbits;
-    
+
     // Constant propagation will remove this in swift_release, it should only
     // be present in swift_release_n.
     if (dec != 1 && oldbits.isImmortal(true)) {
       return false;
     }
-    
+
     bool deinitNow;
     do {
       newbits = oldbits;
-      
+
       bool fast =
         newbits.decrementStrongExtraRefCount(dec);
       if (fast) {
@@ -1061,7 +1061,7 @@ class RefCounts {
   bool doDecrementNonAtomicSlow(RefCountBits oldbits, uint32_t dec) {
     bool deinitNow;
     auto newbits = oldbits;
-    
+
     // Constant propagation will remove this in swift_release, it should only
     // be present in swift_release_n.
     if (dec != 1 && oldbits.isImmortal(true)) {
@@ -1097,25 +1097,25 @@ class RefCounts {
 
     return deinitNow;
   }
-  
+
   public:  // FIXME: access control hack
 
   // Fast path of atomic strong decrement.
-  // 
-  // Deinit is optionally handled directly instead of always deferring to 
+  //
+  // Deinit is optionally handled directly instead of always deferring to
   // the caller because the compiler can optimize this arrangement better.
   template <PerformDeinit performDeinit>
   SWIFT_ALWAYS_INLINE
   bool doDecrement(uint32_t dec) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
-    
+
     // Constant propagation will remove this in swift_release, it should only
     // be present in swift_release_n.
     if (dec != 1 && oldbits.isImmortal(true)) {
       return false;
     }
-    
+
     do {
       newbits = oldbits;
       bool fast =
@@ -1140,7 +1140,7 @@ class RefCounts {
 
 
   // UNOWNED
-  
+
   public:
   // Increment the unowned reference count.
   void incrementUnowned(uint32_t inc) {
@@ -1189,7 +1189,7 @@ class RefCounts {
     if (oldbits.isImmortal(true))
       return false;
     RefCountBits newbits;
-    
+
     bool performFree;
     do {
       if (oldbits.hasSideTable())
@@ -1242,13 +1242,13 @@ class RefCounts {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (bits.hasSideTable())
       return bits.getSideTable()->getUnownedCount();
-    else 
+    else
       return bits.getUnownedRefCount();
   }
 
 
   // WEAK
-  
+
   public:
   // Returns the object's side table entry (creating it if necessary) with
   // its weak ref count incremented.
@@ -1264,13 +1264,13 @@ class RefCounts {
       newbits = oldbits;
       assert(newbits.getWeakRefCount() != 0);
       newbits.incrementWeakRefCount();
-      
+
       if (newbits.getWeakRefCount() < oldbits.getWeakRefCount())
         swift_abortWeakRetainOverflow();
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
   }
-  
+
   bool decrementWeakShouldCleanUp() {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
@@ -1294,7 +1294,7 @@ class RefCounts {
 
     return performFree;
   }
-  
+
   // Return weak reference count.
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getWeakCount() const;
@@ -1316,7 +1316,7 @@ class RefCounts {
 
   private:
   HeapObject *getHeapObject();
-  
+
   HeapObjectSideTableEntry* allocateSideTable(bool failIfDeiniting);
 };
 
@@ -1343,7 +1343,7 @@ class HeapObjectSideTableEntry {
 
   public:
   HeapObjectSideTableEntry(HeapObject *newObject)
-    : object(newObject), 
+    : object(newObject),
 #if __arm__ || __powerpc__ // https://github.com/apple/swift/issues/48416
    refCounts(SideTableRefCounts::Initialized)
 #else
@@ -1377,7 +1377,7 @@ class HeapObjectSideTableEntry {
   }
 
   // STRONG
-  
+
   void incrementStrong(uint32_t inc) {
     refCounts.increment(inc);
   }
@@ -1395,7 +1395,7 @@ class HeapObjectSideTableEntry {
   void decrementFromOneNonAtomic() {
     decrementNonAtomicStrong<DontPerformDeinit>(1);
   }
-  
+
   bool isDeiniting() const {
     return refCounts.isDeiniting();
   }
@@ -1454,7 +1454,7 @@ class HeapObjectSideTableEntry {
     return refCounts.getUnownedCount();
   }
 
-  
+
   // WEAK
 
   SWIFT_NODISCARD
@@ -1499,16 +1499,16 @@ class HeapObjectSideTableEntry {
   uint32_t getWeakCount() const {
     return refCounts.getWeakCount();
   }
-  
+
   void *getSideTable() {
     return refCounts.getSideTable();
   }
-  
+
 #ifndef NDEBUG
   bool isImmutableCOWBuffer() const {
     return immutableCOWBuffer;
   }
-  
+
   void setIsImmutableCOWBuffer(bool immutable) {
     immutableCOWBuffer = immutable;
   }
@@ -1528,7 +1528,7 @@ SWIFT_ALWAYS_INLINE inline bool
 RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
 
   // We can get away without atomicity here.
-  // The caller claims that there are no other threads with strong references 
+  // The caller claims that there are no other threads with strong references
   // to this object.
   // We can non-atomically check that there are no outstanding unowned or
   // weak references, and if nobody else has a strong reference then
@@ -1541,7 +1541,7 @@ RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
   // Use slow path if we can't guarantee atomicity.
   if (oldbits.hasSideTable() || oldbits.getUnownedRefCount() != 1)
     return doDecrementNonAtomicSlow<performDeinit>(oldbits, dec);
-    
+
   if (oldbits.isImmortal(true)) {
     return false;
   }
@@ -1557,7 +1557,7 @@ RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
 }
 
 // Out-of-line version of non-atomic strong decrement.
-// This version needs to be atomic because of the 
+// This version needs to be atomic because of the
 // threat of concurrent read of a weak reference.
 template <>
 template <PerformDeinit performDeinit>

@@ -8,7 +8,7 @@ protocol Q: class, P {}
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $any Q):
 func partialApply(_ q: Q) -> () -> () {
   // CHECK: [[OPENED:%.*]] = open_existential_ref [[ARG]]
-  // CHECK: [[TMP:%.*]] = alloc_stack 
+  // CHECK: [[TMP:%.*]] = alloc_stack
   // CHECK: [[SB:%.*]] = store_borrow [[OPENED]] to [[TMP:%.*]] :
   // CHECK: apply {{%.*}}<{{.*}}>([[SB]])
   // CHECK: end_borrow

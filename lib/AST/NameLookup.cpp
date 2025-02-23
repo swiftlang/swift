@@ -3633,7 +3633,7 @@ CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
 
       if (!Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
         return Action::Continue();
-      
+
       if (isa<ExistentialTypeRepr>(repr)) {
         return Action::SkipNode();
       } else if (auto composition = dyn_cast<CompositionTypeRepr>(repr)) {
@@ -3669,7 +3669,7 @@ CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
 static SmallVector<GenericTypeParamDecl *, 2>
 createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamList *parsedGenericParams) {
   ASTContext &ctx = genericContext->getASTContext();
-    
+
   auto value = dyn_cast_or_null<ValueDecl>(genericContext->getAsDecl());
   if (!value)
     return { };
@@ -3697,7 +3697,7 @@ createOpaqueParameterGenericParams(GenericContext *genericContext, GenericParamL
     typeReprs = collectOpaqueTypeReprs(typeRepr, ctx, dc);
 
     for (auto repr : typeReprs) {
-   
+
       // Allocate a new generic parameter to represent this opaque type.
       //
       // Note: Opaque parameters are always treated as

@@ -84,7 +84,7 @@ let _: () -> Any = {
   return 0
 }
 
-let _: () -> Int = { 
+let _: () -> Int = {
   () -> String in  // expected-error {{declared closure result 'String' is incompatible with contextual type 'Int'}}
   return ""
 }
@@ -103,7 +103,7 @@ protocol P : Initable {
   func bar(_ x: Int)
   mutating func mut(_ x: Int)
   static func tum()
-  
+
   typealias E = Int
   typealias F = Self.E
   typealias G = Array

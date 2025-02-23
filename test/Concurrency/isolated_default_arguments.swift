@@ -248,7 +248,7 @@ class MultipleVarsInvalid {
   @MainActor var (x, y) = (requiresMainActor(), requiresMainActor())
 }
 
-@propertyWrapper 
+@propertyWrapper
 @preconcurrency @MainActor
 struct RequiresMain<Value>  {
   var wrappedValue: Value

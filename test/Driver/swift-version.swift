@@ -36,7 +36,7 @@ jkl
 #endif
 
 #if swift(>=4)
-asdf 
+asdf
 // ERROR_4: [[@LINE-1]]:1: error: {{cannot find 'asdf' in scope}}
 // ERROR_5: [[@LINE-2]]:1: error: {{cannot find 'asdf' in scope}}
 // ERROR_6: [[@LINE-3]]:1: error: {{cannot find 'asdf' in scope}}

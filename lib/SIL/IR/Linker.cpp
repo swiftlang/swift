@@ -91,7 +91,7 @@ void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
 
   ASSERT(!F->isAnySerialized() == Mod.isSerialized() &&
          "the de-serializer did set the wrong serialized flag");
-  
+
   F->setBare(IsBare);
   toVerify.push_back(F);
   Worklist.push_back(F);
@@ -161,7 +161,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
   // So try deserializing HiddenExternal functions too.
   if (linkage == SILLinkage::HiddenExternal)
     return deserializeAndPushToWorklist(F);
-  
+
   // Update the linkage of the function in case it's different in the serialized
   // SIL than derived from the AST. This can be the case with cross-module-
   // optimizations.
@@ -211,7 +211,7 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
         impl->hasValidLinkageForFragileRef(Vtbl->getSerializedKind())) {
       // Deserialize and recursively walk any vtable entries that do not have
       // bodies yet.
-      maybeAddFunctionToWorklist(impl, 
+      maybeAddFunctionToWorklist(impl,
                                  Vtbl->getSerializedKind());
     }
   }
@@ -276,14 +276,14 @@ void SILLinkerVisitor::visitProtocolConformance(
   // If an abstract protocol conformance was passed in, do nothing.
   if (ref.isAbstract())
     return;
-  
+
   bool isEmbedded = Mod.getOptions().EmbeddedSwift;
   bool mustDeserialize = (isEmbedded && referencedFromInitExistential) ||
                          mustDeserializeProtocolConformance(Mod, ref);
 
   // Otherwise try and lookup a witness table for C.
   ProtocolConformance *C = ref.getConcrete();
-  
+
   if (!VisitedConformances.insert(C).second)
     return;
 
@@ -306,7 +306,7 @@ void SILLinkerVisitor::visitProtocolConformance(
     // of definitions to make them incompatible with canonical serialized SIL.
     if (Mod.getStage() == SILStage::Lowered)
       return;
-  
+
     WT = Mod.getSILLoader()->lookupWitnessTable(WT);
   }
 
@@ -345,7 +345,7 @@ void SILLinkerVisitor::visitProtocolConformance(
     if (mustDeserializeProtocolConformance(Mod, c))
       visitProtocolConformance(c, referencedFromInitExistential);
   };
-  
+
   // For each entry in the witness table...
   for (auto &E : WT->getEntries()) {
     switch (E.getKind()) {
@@ -362,7 +362,7 @@ void SILLinkerVisitor::visitProtocolConformance(
          IsSerialized : WT->getSerializedKind()));
       break;
     }
-    
+
     // If the entry is a related witness table, see whether we need to
     // eagerly deserialize it.
     case SILWitnessTable::WitnessKind::BaseProtocol: {
@@ -375,7 +375,7 @@ void SILLinkerVisitor::visitProtocolConformance(
       maybeVisitRelatedConformance(assocConformance);
       break;
     }
-    
+
     case SILWitnessTable::WitnessKind::AssociatedType:
     case SILWitnessTable::WitnessKind::Invalid:
       break;

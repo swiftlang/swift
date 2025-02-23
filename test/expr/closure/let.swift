@@ -12,7 +12,7 @@ func foo() {
   _ = { frob(x: x); x = 0 }() // expected-error {{'x' is a 'let'}}
 }
 
-let a: Int 
+let a: Int
 { 1 } // expected-error{{'let' declarations cannot be computed properties}}
 
 let b: Int = 1

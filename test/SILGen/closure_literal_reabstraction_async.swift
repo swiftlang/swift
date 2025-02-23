@@ -2,7 +2,7 @@
 // REQUIRES: concurrency
 
 @_silgen_name("takeThrowingAsyncClosure")
-func takeThrowingAsyncClosure<T>(_: () async throws -> T) 
+func takeThrowingAsyncClosure<T>(_: () async throws -> T)
 
 // CHECK-LABEL: sil {{.*}} @{{.*}}34passNonthrowingAsyncClosureLiteral
 func passNonthrowingAsyncClosureLiteral() {

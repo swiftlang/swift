@@ -58,7 +58,7 @@ TypeNameTests.test("Prints") {
     _typeName(GE<Model>.self))
   expectEqual("main.GC2<main.Model, main.Model2>",
     _typeName(GC2<Model, Model2>.self))
-  
+
   expectEqual("main.P", _typeName(P.self))
   typealias PP2 = P & P2
   expectEqual("main.P & main.P2",
@@ -87,7 +87,7 @@ TypeNameTests.test("Prints") {
     _typeName((() -> P & P2 & P3).self))
   expectEqual("(main.P & main.P2) -> main.P & main.P3",
     _typeName(((P & P2) -> P3 & P).self))
- 
+
   #if _runtime(_ObjC)
   typealias B = @convention(block) () -> ()
   typealias B2 = () -> @convention(block) () -> ()

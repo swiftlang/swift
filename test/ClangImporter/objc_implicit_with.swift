@@ -22,7 +22,7 @@ func testInitWith(_ url: String) {
 
 func testInstanceTypeFactoryMethod(_ queen: Bee) {
   _ = Hive(queen: queen)
-  
+
   _ = NSObjectFactory() // okay, prefers init method
   _ = NSObjectFactory(integer: 1)
   _ = NSObjectFactory(double: 314159)

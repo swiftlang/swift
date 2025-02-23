@@ -12,7 +12,7 @@
 
 /// A collection that supports efficient random-access index traversal.
 ///
-/// Random-access collections can move indices any distance and 
+/// Random-access collections can move indices any distance and
 /// measure the distance between indices in O(1) time. Therefore, the
 /// fundamental difference between random-access and bidirectional collections
 /// is that operations that depend on index movement or distance measurement
@@ -347,7 +347,7 @@ where Index: Strideable,
       result, bounds: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
     return result
   }
-  
+
   /// Returns the distance between two indices.
   ///
   /// - Parameters:

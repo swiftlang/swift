@@ -123,12 +123,12 @@ class NonContiguousNSString : NSString {
     fatalError("don't call this initializer")
   }
   required init(itemProviderData data: Data, typeIdentifier: String) throws {
-    fatalError("don't call this initializer")    
+    fatalError("don't call this initializer")
   }
 
-  override init() { 
+  override init() {
     _value = []
-    super.init() 
+    super.init()
   }
 
   init(_ value: [UInt16]) {

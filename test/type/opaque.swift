@@ -585,7 +585,7 @@ func f62787() -> Optional<some Collection<Int>> {
 func f62787_1(x: Bool) -> Optional<some Collection<Int>> {
   if x {
     return nil // expected-error{{underlying type for opaque result type 'Optional<some Collection<Int>>' could not be inferred from return expression}}
-  } 
+  }
   return nil // expected-error{{underlying type for opaque result type 'Optional<some Collection<Int>>' could not be inferred from return expression}}
 }
 

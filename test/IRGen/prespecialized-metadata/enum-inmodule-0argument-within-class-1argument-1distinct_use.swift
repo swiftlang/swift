@@ -12,9 +12,9 @@
 // CHECK-SAME:    ptr,
 // CHECK-SAME: }> <{
 //                ptr getelementptr inbounds (
-//                  %swift.enum_vwtable, 
-//                  ptr @"$s4main9NamespaceC5ValueOySi_GWV", 
-//                  i32 0, 
+//                  %swift.enum_vwtable,
+//                  ptr @"$s4main9NamespaceC5ValueOySi_GWV",
+//                  i32 0,
 //                  i32 0
 //                ),
 // CHECK-SAME:    [[INT]] 513,
@@ -38,11 +38,11 @@ func consume<T>(_ t: T) {
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     ptr noalias %{{[0-9]+}}, 
+// CHECK-SAME:     ptr noalias %{{[0-9]+}},
 // CHECK-SAME:     ptr getelementptr inbounds (
-// CHECK-SAME:       %swift.full_type, 
+// CHECK-SAME:       %swift.full_type,
 // CHECK-SAME:       $s4main9NamespaceC5ValueOySi_GMf
-// CHECK-SAME:       i32 0, 
+// CHECK-SAME:       i32 0,
 // CHECK-SAME:       i32 2
 // CHECK-SAME:     )
 // CHECK-SAME:   )
@@ -55,10 +55,10 @@ doit()
 // CHECK: ; Function Attrs: noinline nounwind memory(none)
 // CHECK: define hidden swiftcc %swift.metadata_response @"$s4main9NamespaceC5ValueOMa"([[INT]] %0, ptr %1) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK:      call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
-// CHECK-SAME:     [[INT]] %0, 
-// CHECK-SAME:     ptr %1, 
-// CHECK-SAME:     ptr undef, 
-// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     [[INT]] %0,
+// CHECK-SAME:     ptr %1,
+// CHECK-SAME:     ptr undef,
+// CHECK-SAME:     ptr undef,
 // CHECK-SAME:     $s4main9NamespaceC5ValueOMn
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

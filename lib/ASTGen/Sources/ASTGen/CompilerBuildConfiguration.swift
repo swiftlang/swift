@@ -33,21 +33,21 @@ struct CompilerBuildConfiguration: BuildConfiguration {
       ctx.langOptsCustomConditionSet(nameRef)
     }
   }
-  
+
   func hasFeature(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
       ctx.langOptsHasFeatureNamed(nameRef)
     }
   }
-  
+
   func hasAttribute(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
       ctx.langOptsHasAttributeNamed(nameRef)
     }
   }
-  
+
   func canImport(
     importPath: [(TokenSyntax, String)],
     version: CanImportVersion
@@ -85,28 +85,28 @@ struct CompilerBuildConfiguration: BuildConfiguration {
       }
     }
   }
-  
+
   func isActiveTargetOS(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
       ctx.langOptsIsActiveTargetOS(nameRef)
     }
   }
-  
+
   func isActiveTargetArchitecture(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
       ctx.langOptsIsActiveTargetArchitecture(nameRef)
     }
   }
-  
+
   func isActiveTargetEnvironment(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
       ctx.langOptsIsActiveTargetEnvironment(nameRef)
     }
   }
-  
+
   func isActiveTargetRuntime(name: String) throws -> Bool {
     var name = name
 
@@ -120,14 +120,14 @@ struct CompilerBuildConfiguration: BuildConfiguration {
       ctx.langOptsIsActiveTargetRuntime(nameRef)
     }
   }
-  
+
   func isActiveTargetPointerAuthentication(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
       ctx.langOptsIsActiveTargetPtrAuth(nameRef)
     }
   }
-  
+
   var targetPointerBitWidth: Int {
     Int(ctx.langOptsTargetPointerBitWidth)
   }
@@ -147,7 +147,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     }
   }
 
-  var languageVersion: VersionTuple { 
+  var languageVersion: VersionTuple {
     var componentsBuf: UnsafeMutablePointer<SwiftInt>? = nil
     let count = ctx.langOptsGetLanguageVersion(&componentsBuf)
     let version = VersionTuple(
@@ -157,7 +157,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     return version
   }
 
-  var compilerVersion: VersionTuple { 
+  var compilerVersion: VersionTuple {
     var componentsBuf: UnsafeMutablePointer<SwiftInt>? = nil
     let count = ctx.langOptsGetCompilerVersion(&componentsBuf)
     let version = VersionTuple(

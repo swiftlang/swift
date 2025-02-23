@@ -5,7 +5,7 @@ import _Differentiation
 
 @differentiable(reverse)
 @_silgen_name("test_f")
-// Check that (differentiable) closure apply is optimized out 
+// Check that (differentiable) closure apply is optimized out
 // CHECK-LABEL: test_f : $@convention(thin) (@guaranteed Array<Double>) -> Double
 // CHECK-NOT: differentiable_function [parameters 0] [results 0]
 func f(array: [Double]) -> Double {
@@ -17,7 +17,7 @@ func f(array: [Double]) -> Double {
       element *= initialElement
     }
   )
-  
+
   return 0.0
 }
 

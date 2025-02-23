@@ -93,10 +93,10 @@ struct S {
 
     (then) // expected-warning {{property is accessed but result is unused}}
 
-    then is Int 
+    then is Int
     // expected-warning@-1 {{'is' test is always true}}
     // expected-warning@-2 {{expression of type 'Bool' is unused}}
-    then as Int 
+    then as Int
     // expected-warning@-1 {{expression of type 'Int' is unused}}
     then as? Int
     // expected-warning@-1 {{conditional cast from 'Int' to 'Int' always succeeds}}

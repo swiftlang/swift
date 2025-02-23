@@ -3,7 +3,7 @@
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_RawLayout
 
-// Test that when targeting older OSes 
+// Test that when targeting older OSes
 
 @_rawLayout(like: T)
 struct Cell<T>: ~Copyable {}

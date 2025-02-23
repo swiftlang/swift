@@ -20,31 +20,31 @@
     [[[NSString alloc] init] release]; //Make sure NSString is initialized
     Class tagClass = objc_lookUpClass("NSTaggedPointerString");
     Class ourClass = [NSSlowTaggedLocalizedString class];
-    
+
     Method fastCString = class_getInstanceMethod(ourClass, @selector(_fastCStringContents:));
     class_replaceMethod(tagClass, @selector(_fastCStringContents:), method_getImplementation(fastCString), method_getTypeEncoding(fastCString));
-    
+
     Method length = class_getInstanceMethod(ourClass, @selector(length));
     class_replaceMethod(tagClass, @selector(length), method_getImplementation(length), method_getTypeEncoding(length));
-    
+
     Method charIndex = class_getInstanceMethod(ourClass, @selector(characterAtIndex:));
     class_replaceMethod(tagClass, @selector(characterAtIndex:), method_getImplementation(charIndex), method_getTypeEncoding(charIndex));
-    
+
     Method fastChars = class_getInstanceMethod(ourClass, @selector(_fastCharacterContents));
     class_replaceMethod(tagClass, @selector(_fastCharacterContents), method_getImplementation(fastChars), method_getTypeEncoding(fastChars));
-    
+
     Method retain = class_getInstanceMethod(ourClass, @selector(retain));
     class_replaceMethod(tagClass, @selector(retain), method_getImplementation(retain), method_getTypeEncoding(retain));
-    
+
     Method release = class_getInstanceMethod(ourClass, @selector(release));
     class_replaceMethod(tagClass, @selector(release), method_getImplementation(release), method_getTypeEncoding(release));
-    
+
     Method typeID = class_getInstanceMethod(ourClass, @selector(_cfTypeID));
     class_replaceMethod(tagClass, @selector(_cfTypeID), method_getImplementation(typeID), method_getTypeEncoding(typeID));
-    
+
     Method description = class_getInstanceMethod(ourClass, @selector(description));
     class_replaceMethod(tagClass, @selector(description), method_getImplementation(description), method_getTypeEncoding(description));
-    
+
     Method getBytes = class_getInstanceMethod(ourClass, @selector(getBytes:maxLength:usedLength:encoding:options:range:remainingRange:));
     class_replaceMethod(tagClass, @selector(getBytes:maxLength:usedLength:encoding:options:range:remainingRange:), method_getImplementation(getBytes), method_getTypeEncoding(getBytes));
   });

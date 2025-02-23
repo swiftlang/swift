@@ -23,7 +23,7 @@ extension X: P {
   @objc func e() { print("X.e()") }
 }
 
-class Y { 
+class Y {
   init() {}
   @objc class func g() { print("Y.g()") }
 }
@@ -33,7 +33,7 @@ class Z {
    init() {}
 }
 
-extension Z { 
+extension Z {
   @objc func f() { print("Z.f()") }
 }
 

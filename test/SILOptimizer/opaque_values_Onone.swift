@@ -84,7 +84,7 @@ func doit<T>(_ f: () -> T) -> T {
 // CHECK-LABEL: } // end sil function '$s19opaque_values_Onone10duplicate15valuex_xtx_tlFx_xtyXEfU_'
 @_silgen_name("duplicate1")
 func duplicate1<Value>(value: Value) -> (Value, Value) {
-  doit { 
+  doit {
       (value, value)
   }
 }
@@ -106,7 +106,7 @@ func duplicate1<Value>(value: Value) -> (Value, Value) {
 // CHECK-LABEL: } // end sil function '$s19opaque_values_Onone10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_'
 @_silgen_name("duplicate2")
 func duplicate2<Value>(value: Value) -> (one: Value, two: Value) {
-  doit { 
+  doit {
       (one: value, two: value)
   }
 }

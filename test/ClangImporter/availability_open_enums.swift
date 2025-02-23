@@ -16,6 +16,6 @@ func exhaustiveSwitch(e: NSEnumAddedCasesIn2017) {
   case .existingCaseTwo:
     return
   case .existingCaseThree:
-    return    
+    return
   }
 }

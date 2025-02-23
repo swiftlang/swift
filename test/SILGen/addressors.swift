@@ -52,7 +52,7 @@ func test0() {
 // CHECK: [[A:%.*]] = alloc_stack [var_decl] $A
 // CHECK: [[T1:%.*]] = metatype $@thin A.Type
 // CHECK: [[T0:%.*]] = function_ref @$s10addressors1AV{{[_0-9a-zA-Z]*}}fC
-// CHECK: [[AVAL:%.*]] = apply [[T0]]([[T1]]) 
+// CHECK: [[AVAL:%.*]] = apply [[T0]]([[T1]])
 // CHECK: store [[AVAL]] to [[A]]
   var a = A()
 

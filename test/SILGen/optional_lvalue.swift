@@ -4,10 +4,10 @@
 // CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue07assign_a1_B0yySiSgz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Int>
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "
-// CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
-// CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
-// CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
-// CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word,
+// CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1,
+// CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word,
+// CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word,
 // CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:         [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
@@ -20,10 +20,10 @@ func assign_optional_lvalue(_ x: inout Int?, _ y: Int) {
 // CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue011assign_iuo_B0yySiSgz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<Int>
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "
-// CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
-// CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
-// CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
-// CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word,
+// CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1,
+// CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word,
+// CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word,
 // CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK:         [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
@@ -45,10 +45,10 @@ struct S {
 // CHECK-LABEL: sil hidden [ossa] @$s15optional_lvalue011assign_iuo_B9_implicityyAA1SVSgz_SitF
 // CHECK:         [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*Optional<S>
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "
-// CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
-// CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
-// CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
-// CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word,
+// CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1,
+// CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word,
+// CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word,
 // CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:         [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])

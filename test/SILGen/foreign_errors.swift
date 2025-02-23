@@ -52,7 +52,7 @@ func test0() throws {
   //   Normal path: fall out and return.
   // CHECK: [[NORMAL_BB]]:
   // CHECK: return
-  
+
   //   Error path: fall out and rethrow.
   // CHECK: [[ERROR_BB]]:
   // CHECK: [[T0:%.*]] = load [take] [[ERR_TEMP0]]
@@ -113,7 +113,7 @@ extension NSObject {
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[BORROWED_RESULT]])
 // CHECK:   end_borrow [[BORROWED_RESULT]]
 // CHECK:   [[T2:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[T1]] : $NSString
-// CHECK:   destroy_value [[RESULT]]  
+// CHECK:   destroy_value [[RESULT]]
 // CHECK:   br bb6([[T2]] : $Optional<NSString>)
 //
 // CHECK: [[ERROR_BB]]([[ERR:%.*]] : @owned $any Error):

@@ -1,7 +1,7 @@
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name statements -Xllvm -sil-full-demangle -parse-as-library -verify %s | %FileCheck %s
 
-class MyClass { 
+class MyClass {
   func foo() { }
 }
 
@@ -151,7 +151,7 @@ func do_loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s10statements21do_loop_with_continue{{[_0-9a-zA-Z]*}}F 
+// CHECK-LABEL: sil hidden [ossa] @$s10statements21do_loop_with_continue{{[_0-9a-zA-Z]*}}F
 
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}for_loops1
@@ -174,7 +174,7 @@ func for_loops2() {
     obj.foo()
   }
 
-  return 
+  return
 }
 
 func void_return() {
@@ -229,8 +229,8 @@ func for_each_loop(_ x: [C]) {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}test_break
 func test_break(_ i : Int) {
   switch i {
-  case (let x) where x != 17: 
-    if x == 42 { break } 
+  case (let x) where x != 17:
+    if x == 42 { break }
     markUsed(x)
   default:
     break
@@ -364,7 +364,7 @@ func test_do() {
     // CHECK: [[OBJMOVE:%.*]] = move_value [lexical] [var_decl] [[OBJ]]
     let obj = MyClass()
     _ = obj
-    
+
     // CHECK: integer_literal $Builtin.IntLiteral, 1
     // CHECK: [[BAR:%.*]] = function_ref @$s10statements3baryySiF
     // CHECK: apply [[BAR]](
@@ -451,7 +451,7 @@ func defer_test1() {
   defer { callee1() }
   defer { callee2() }
   callee3()
-  
+
   // CHECK: [[C3:%.*]] = function_ref @$s10statements7callee3yyF
   // CHECK: apply [[C3]]
   // CHECK: [[C2:%.*]] = function_ref @$s10statements11defer_test1yyF6
@@ -470,7 +470,7 @@ func defer_test2(_ cond : Bool) {
   // CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3yyF
   // CHECK: apply [[C3]]
   callee3()
-  
+
 // test the condition.
 // CHECK:  [[CONDTRUE:%.*]] = struct_extract {{.*}}
 // CHECK: cond_br [[CONDTRUE]], [[BODY:bb[0-9]+]], [[EXIT:bb[0-9]+]]
@@ -486,7 +486,7 @@ func defer_test2(_ cond : Bool) {
     callee2()
     break
   }
-  
+
 // CHECK: [[EXIT]]:
 // CHECK: br [[RETURN]]
 

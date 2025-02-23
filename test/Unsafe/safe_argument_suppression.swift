@@ -14,7 +14,7 @@ class NotSafe {
   @safe subscript(ns: NotSafe) -> Int { 5 }
 
   @safe static func doStatically(_: NotSafe.Type) { }
-  
+
   @safe static subscript(ns: NotSafe) -> Int { 5 }
 
   @safe init(_: NotSafe) { }

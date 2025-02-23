@@ -9,11 +9,11 @@ import Foundation
 // are correctly synthesized.
 class LastWords {
   var text: String
-  
+
   init(text: String) {
     self.text = text
   }
-  
+
   deinit {
     print(text, "It's better to burn out than to fade away.")
   }

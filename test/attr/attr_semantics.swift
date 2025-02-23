@@ -5,7 +5,7 @@
 func duplicatesemantics() {}
 
 func func_with_nested_semantics_1() {
-   @_semantics("exit") 
+   @_semantics("exit")
    func exit(_ code : UInt32) -> Void
    exit(0)
 }
@@ -15,7 +15,7 @@ func func_with_nested_semantics_1() {
 func somethingThatShouldParseFine() {}
 
 func func_with_nested_semantics_2() {
-   @_semantics("exit") 
+   @_semantics("exit")
    func exit(_ code : UInt32) -> Void
    exit(0)
 }
@@ -47,7 +47,7 @@ func varDeclLocalVars() {
   var localVarWithSemantics : Int = 5
   localVarWithSemantics = 6
   let _ = localVarWithSemantics
-  
+
   @_semantics("localLet1")
   @_semantics("localLet2")
   let localLetWithSemantics : Int = 5
@@ -58,7 +58,7 @@ struct IVarTest {
   @_semantics("localVar1")
   @_semantics("localVar2")
   var localVarWithSemantics : Int = 5
-  
+
   @_semantics("localLet1")
   @_semantics("localLet2")
   let localLetWithSemantics : Int = 5

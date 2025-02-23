@@ -46,7 +46,7 @@ class Func: public BaseClass<T>
 {
    Fp x;
 public:
-    
+
     inline explicit Func(Fp x) : x(x) {}
 };
 

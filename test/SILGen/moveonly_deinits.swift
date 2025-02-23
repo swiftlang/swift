@@ -68,11 +68,11 @@ var value: Bool { false }
 // SILGEN:   store [[ARG]] to [init] [[MARK]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
 // SILGEN:   [[L_ADDR:%[^,]+]] = struct_element_addr [[DD]]
-// SILGEN-SAME: #KlassPairWithDeinit.lhs 
+// SILGEN-SAME: #KlassPairWithDeinit.lhs
 // SILGEN:   [[L_ACCESS:%[^,]+]] = begin_access [deinit] [static] [[L_ADDR]]
 // SILGEN:   destroy_addr [[L_ACCESS]]
 // SILGEN:   [[R_ADDR:%[^,]+]] = struct_element_addr [[DD]]
-// SILGEN-SAME: #KlassPairWithDeinit.rhs 
+// SILGEN-SAME: #KlassPairWithDeinit.rhs
 // SILGEN:   [[R_ACCESS:%[^,]+]] = begin_access [deinit] [static] [[R_ADDR]]
 // SILGEN:   destroy_addr [[R_ACCESS]]
 // SILGEN: } // end sil function '$s16moveonly_deinits19KlassPairWithDeinitVfD'
@@ -174,7 +174,7 @@ public func testIntPairWithoutDeinit() {
 // SIL:   br bb3
 //
 // SIL: bb2:
-// SIL:   destroy_addr [[STACK]] : $*IntPairWithDeinit 
+// SIL:   destroy_addr [[STACK]] : $*IntPairWithDeinit
 // SIL:   br bb3
 //
 // SIL: bb3:

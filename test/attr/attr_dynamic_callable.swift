@@ -490,10 +490,10 @@ do {
 
 // https://github.com/apple/swift/issues/54456
 
-@dynamicCallable 
+@dynamicCallable
 struct S_54456 {
   func dynamicallyCall<T: StringProtocol>(withArguments: [T]) { // expected-note {{where 'T' = 'Int'}}
-    print("hi")	
+    print("hi")
   }
 }
 

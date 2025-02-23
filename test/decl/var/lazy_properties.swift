@@ -68,7 +68,7 @@ struct StructTest {
   mutating func f1() -> Int {
     return p1
   }
-  
+
   // expected-note @+1 {{mark method 'mutating' to make 'self' mutable}} {{3-3=mutating }}
   func f2() -> Int {
     return p1  // expected-error {{cannot use mutating getter on immutable value: 'self' is immutable}}
@@ -205,7 +205,7 @@ class LazyVarContainer {
 }
 
 // Make sure we can still access a synthesized variable with the same name as a lazy storage variable
-// i.e. $__lazy_storage_$_{property_name} when using property wrapper where the property name is 
+// i.e. $__lazy_storage_$_{property_name} when using property wrapper where the property name is
 // '__lazy_storage_$_{property_name}'.
 @propertyWrapper
 struct Wrapper {

@@ -111,7 +111,7 @@ public:
   LTOKind LTOVariant = LTOKind::None;
 
   std::string LibLTOPath;
-  
+
   /// Describes if and how the output of compile actions should be
   /// linked together.
   LinkKind LinkAction = LinkKind::None;
@@ -144,7 +144,7 @@ public:
 
   /// Returns true if multi-threading is enabled.
   bool isMultiThreading() const { return numThreads > 0; }
-  
+
   /// The name of the module which we are building.
   std::string ModuleName;
 
@@ -240,7 +240,7 @@ public:
   }
 
   DriverKind getDriverKind() const { return driverKind; }
-  
+
   ArrayRef<const char *> getArgsWithoutProgramNameAndDriverMode(
                                             ArrayRef<const char *> Args) const;
 

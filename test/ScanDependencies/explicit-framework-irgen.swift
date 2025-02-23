@@ -55,7 +55,7 @@
 // RUN: %target-swift-frontend -emit-object -emit-module -disable-implicit-swift-modules -explicit-swift-module-map-file %t/inputs/map.json -o %t/explicit-framework-irgen.o %s
 import Foo
 
-// This test is to verify autolinking behavior so it is macOS-specific. 
+// This test is to verify autolinking behavior so it is macOS-specific.
 // REQUIRES: OS=macosx
 
 // RUN: otool -l %t/explicit-framework-irgen.o | %FileCheck %s

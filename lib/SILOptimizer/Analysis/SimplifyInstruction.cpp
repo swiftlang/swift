@@ -179,9 +179,9 @@ static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
   auto *UEDI = dyn_cast<UncheckedEnumDataInst>(EI->getOperand());
   if (!UEDI || UEDI->getElement() != EI->getElement())
     return SILValue();
-  
+
   SILValue EnumOp = UEDI->getOperand();
-  
+
   // Same enum elements don't necessarily imply same enum types.
   // Enum types may be different if the enum is generic, e.g.
   // E<Int>.Case and E<Double>.Case.
@@ -190,7 +190,7 @@ static SILValue simplifyEnumFromUncheckedEnumData(EnumInst *EI) {
 
   if (OriginalEnum != NewEnum)
     return SILValue();
-  
+
   return EnumOp;
 }
 

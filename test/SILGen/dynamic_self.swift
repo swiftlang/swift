@@ -39,7 +39,7 @@ class X : P, CP {
   class func factory(i: Int) -> Self { return self.init(int: i) }
 }
 
-class Y : X { 
+class Y : X {
   required init(int i: Int) {
     super.init(int: i)
   }
@@ -438,7 +438,7 @@ class Generic<T> {
   }
 
   func t3() -> Self {
-    // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7GenericC2t3ACyxGXDyFAEXDycfU_ : $@convention(thin) <T> (@guaranteed @sil_unowned Generic<T>, @thick @dynamic_self Generic<T>.Type) -> @owned Generic<T> 
+    // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7GenericC2t3ACyxGXDyFAEXDycfU_ : $@convention(thin) <T> (@guaranteed @sil_unowned Generic<T>, @thick @dynamic_self Generic<T>.Type) -> @owned Generic<T>
     _ = {[unowned self] in self }
     return self
   }

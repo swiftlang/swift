@@ -35,7 +35,7 @@ package struct PkgStruct {
 // CHECK:   load [trivial] [[F1]] : $*Int
 // CHECK:   [[F2:%.*]] = struct_element_addr [[PKG_STACK]] : $*PkgStruct, #PkgStruct.field2
 // CHECK:   load [trivial] [[F2]] : $*Int
- 
+
 /// AFTER perf inlining pass; body of `@$s3Lib9PkgStructVyACSi_SitcfC` gets inlined.
 // CHECK: *** SIL function after {{.*}} EarlyPerfInliner (early-inline)
 // CHECK: sil package [ossa] @$s3Lib3fooyS2iF : $@convention(thin) (Int) -> Int {

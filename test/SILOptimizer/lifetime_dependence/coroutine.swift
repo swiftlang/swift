@@ -80,7 +80,7 @@ func use(_ o : borrowing View) {}
 // CHECK:   store %0 to [[NC]]
 //       let wrapper = nc.wrapper
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [static] [[NC]]
-// CHECK:   [[NCVAL:%.*]] = load [[ACCESS]] 
+// CHECK:   [[NCVAL:%.*]] = load [[ACCESS]]
 // CHECK:   ([[YIELD1:%.*]], [[TOKEN1:%.*]]) = begin_apply %{{.*}}([[NCVAL]]) : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
 // CHECK:   [[WRAPPER:%.*]] = mark_dependence [nonescaping] [[YIELD1]] on [[TOKEN1]]
 // CHECK:   retain_value [[WRAPPER]]

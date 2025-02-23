@@ -11,7 +11,7 @@ func function() {
 
   // Ensure that the local b and its weak copy are distinct local variables.
   // CHECK: #dbg_{{.*}}(ptr [[B:.*]],
-  // CHECK: #dbg_{{.*}}(ptr 
+  // CHECK: #dbg_{{.*}}(ptr
   // CHECK-NOT: [[B]]
   // CHECK: call
     A(handler: { [weak b] in

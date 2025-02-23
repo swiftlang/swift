@@ -138,7 +138,7 @@ private struct VIPPrivateSetProp : VeryImportantProto {
 private class VIPPrivateSetBase {
   private var value: Int = 0
 }
-private class VIPPrivateSetSub : VIPPrivateSetBase, VeryImportantProto { 
+private class VIPPrivateSetSub : VIPPrivateSetBase, VeryImportantProto {
   // expected-error@-1 {{type 'VIPPrivateSetSub' does not conform to protocol 'VeryImportantProto'}}
   // expected-note@-2 {{add stubs for conformance}}
   typealias Assoc = Int
@@ -168,7 +168,7 @@ extension Container {
   }
 }
 
-// All of these are errors in Swift 4, but didn't have the correct behavior in 
+// All of these are errors in Swift 4, but didn't have the correct behavior in
 // Swift 3.0GM.
 extension Container {
   private struct VeryPrivateStruct { // expected-note * {{type declared here}}
@@ -195,8 +195,8 @@ extension Container {
   fileprivate typealias PrivateAlias = VeryPrivateStruct // expected-error {{type alias cannot be declared fileprivate because its underlying type uses a private type}} {{none}}
   fileprivate subscript(_: VeryPrivateStruct) -> Void { return () } // expected-error {{subscript cannot be declared fileprivate because its index uses a private type}} {{none}}
   fileprivate func privateMethod(_: VeryPrivateStruct) -> Void {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}} {{none}}
-  fileprivate enum PrivateRawValue: VeryPrivateStruct {} 
-  // expected-error@-1 {{enum cannot be declared fileprivate because its raw type uses a private type}} {{none}} 
+  fileprivate enum PrivateRawValue: VeryPrivateStruct {}
+  // expected-error@-1 {{enum cannot be declared fileprivate because its raw type uses a private type}} {{none}}
   // expected-error@-2 {{raw type 'Container.VeryPrivateStruct' is not expressible by a string, integer, or floating-point literal}}
   // expected-error@-3 {{'Container.PrivateRawValue' declares raw type 'Container.VeryPrivateStruct', but does not conform to RawRepresentable and conformance could not be synthesized}}
   // expected-error@-4 {{RawRepresentable conformance cannot be synthesized because raw type 'Container.VeryPrivateStruct' is not Equatable}}

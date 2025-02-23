@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t) 
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -wmo -O -enable-library-evolution %S/Inputs/specialization_and_resilience_module.swift -DMODULE -parse-as-library -emit-module -emit-module-path=%t/Test.swiftmodule -module-name=Test -c -o %t/module.o
 // RUN: %target-build-swift -wmo -O %s -I%t -module-name=Main -c -o %t/main.o
 // RUN: %target-build-swift %t/main.o %t/module.o -o %t/a.out

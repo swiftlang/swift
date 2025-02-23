@@ -85,7 +85,7 @@ class Counter : IteratorProtocol {
     self.n = n
     self.end = end
   }
-  
+
   var n: Int
   var end: Int
 }
@@ -95,7 +95,7 @@ struct IntRange : Sequence {
   func makeIterator() -> Counter {
     return Counter(start, end)
   }
-  
+
   var start: Int
   var end: Int
 }
