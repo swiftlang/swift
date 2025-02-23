@@ -441,6 +441,7 @@ extension MutableCollection where Self: BidirectionalCollection {
       swapAt(lo, hi)
       formIndex(after: &lo)
     }
+    fatalError()
   }
 }
 

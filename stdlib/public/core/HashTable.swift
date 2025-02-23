@@ -386,6 +386,7 @@ extension _HashTable {
         return Bucket(word: word, bit: bit)
       }
     }
+    fatalError()
   }
 
   @inlinable
@@ -413,6 +414,7 @@ extension _HashTable {
         return Bucket(word: word, bit: bit)
       }
     }
+    fatalError()
   }
 }
 
