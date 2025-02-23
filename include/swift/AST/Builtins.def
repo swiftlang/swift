@@ -954,8 +954,7 @@ BUILTIN_MISC_OPERATION(UnprotectedAddressOfBorrowOpaque, "unprotectedAddressOfBo
 /// createTask<T>(flags: Int,
 ///               initialSerialExecutor: (Builtin.Executor)? = nil,
 ///               taskGroup: Builtin.RawPointer? = nil,
-///               initialTaskExecutorDeprecated: (Builtin.Executor)? = nil,
-///               initialTaskExecutorOwned: (any TaskExecutor)? = nil,
+///               initialTaskExecutor: (Builtin.Executor)? = nil,
 ///               operation: sending @escaping () async throws -> T)
 ///  -> Builtin.NativeObject, Builtin.RawPointer)
 ///

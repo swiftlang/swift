@@ -182,9 +182,7 @@ inline void actor_note_job_queue(HeapObject *actor, Job *first,
 inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
                         AsyncLet *asyncLet, uint8_t jobPriority,
                         bool isChildTask, bool isFuture, bool isGroupChildTask,
-                        bool isAsyncLetTask, bool isDiscardingTask,
-                        bool hasInitialTaskExecutorPreference,
-                        const char* taskName) {
+                        bool isAsyncLetTask) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   auto parentID = parent ? parent->getTaskId() : 0;
@@ -193,12 +191,10 @@ inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
       "task=%" PRIx64
       " resumefn=%p jobPriority=%u isChildTask=%{bool}d, isFuture=%{bool}d "
       "isGroupChildTask=%{bool}d isAsyncLetTask=%{bool}d parent=%" PRIx64
-      " group=%p asyncLet=%p "
-      "isDiscardingTask=%{bool}d hasInitialTaskExecutorPreference=%{bool}d "
-      "taskName=%{public}s",
+      " group=%p asyncLet=%p",
       task->getTaskId(), task->getResumeFunctionForLogging(true), jobPriority,
       isChildTask, isFuture, isGroupChildTask, isAsyncLetTask, parentID, group,
-      asyncLet, isDiscardingTask, hasInitialTaskExecutorPreference, taskName);
+      asyncLet);
 }
 
 inline void task_destroy(AsyncTask *task) {

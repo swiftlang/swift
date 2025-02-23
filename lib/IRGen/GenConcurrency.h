@@ -106,7 +106,6 @@ emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
                OptionalExplosion &taskGroup,
                OptionalExplosion &taskExecutorUnowned,
                OptionalExplosion &taskExecutorExistential,
-               OptionalExplosion &taskName,
                Explosion &taskFunction,
                SubstitutionMap subs);
 

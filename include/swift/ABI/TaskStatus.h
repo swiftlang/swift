@@ -325,22 +325,6 @@ public:
   }
 };
 
-class TaskNameStatusRecord : public TaskStatusRecord {
-private:
-  const char *Name;
-
-public:
-  TaskNameStatusRecord(const char *name)
-      : TaskStatusRecord(TaskStatusRecordKind::TaskName),
-        Name(name) {}
-
-  const char *getName() { return Name; }
-
-  static bool classof(const TaskStatusRecord *record) {
-    return record->getKind() == TaskStatusRecordKind::TaskName;
-  }
-};
-
 // This record is allocated for a task to record what it is dependent on before
 // the task can make progress again.
 class TaskDependencyStatusRecord : public TaskStatusRecord {
