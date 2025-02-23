@@ -269,13 +269,13 @@ static SourceRange getAvailabilityConditionVersionSourceRange(
     const PoundAvailableInfo *PAI, const DeclContext *ReferenceDC,
     AvailabilityDomain Domain, const llvm::VersionTuple &Version) {
   SourceRange Range;
-  for (auto *Spec : PAI->getQueries()) {
-    if (Spec->getDomain() == Domain && Spec->getVersion() == Version) {
+  for (auto Spec : PAI->getSemanticAvailabilitySpecs(ReferenceDC)) {
+    if (Spec.getDomain() == Domain && Spec.getVersion() == Version) {
       // More than one: return invalid range, no unique choice.
       if (Range.isValid())
         return SourceRange();
       else
-        Range = Spec->getVersionSrcRange();
+        Range = Spec.getParsedSpec()->getVersionSrcRange();
     }
   }
   return Range;

@@ -1052,11 +1052,12 @@ getConditionalMemberFromIfStmt(const IfStmt *ifStmt,
   }
   for (auto elt : ifStmt->getCond()) {
     if (elt.getKind() == StmtConditionElement::CK_Availability) {
-      for (auto *Q : elt.getAvailability()->getQueries()) {
-        if (Q->getPlatform() != PlatformKind::none) {
-          auto spec = BuilderValue::ConditionalMember::AvailabilitySpec(
-              *Q->getDomain(), Q->getVersion());
-          AvailabilitySpecs.push_back(spec);
+      for (auto spec :
+           elt.getAvailability()->getSemanticAvailabilitySpecs(declContext)) {
+        if (spec.getDomain().isPlatform()) {
+          AvailabilitySpecs.push_back(
+              BuilderValue::ConditionalMember::AvailabilitySpec(
+                  spec.getDomain(), spec.getVersion()));
         }
       }
       memberKind = BuilderValue::LimitedAvailability;

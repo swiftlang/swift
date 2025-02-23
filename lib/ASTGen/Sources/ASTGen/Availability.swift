@@ -85,7 +85,7 @@ extension ASTGenVisitor {
         kind: .default,
         message: BridgedStringRef(),
         renamed: BridgedStringRef(),
-        introduced: spec.version,
+        introduced: spec.rawVersion,
         introducedRange: spec.versionRange,
         deprecated: BridgedVersionTuple(),
         deprecatedRange: BridgedSourceRange(),
@@ -392,7 +392,7 @@ extension ASTGenVisitor {
             guard platform != .none else {
               continue
             }
-            result.append((platform: platform, version: spec.version))
+            result.append((platform: platform, version: spec.rawVersion))
           }
         }
         continue

@@ -804,7 +804,7 @@ bool Parser::parseAvailability(
                         AvailableAttr::Kind::Default,
                         /*Message=*/StringRef(),
                         /*Rename=*/StringRef(),
-                        /*Introduced=*/Spec->getVersion(),
+                        /*Introduced=*/Spec->getRawVersion(),
                         /*IntroducedRange=*/Spec->getVersionSrcRange(),
                         /*Deprecated=*/llvm::VersionTuple(),
                         /*DeprecatedRange=*/SourceRange(),
@@ -1888,7 +1888,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
       // macros, we only expect platform specific constraints here.
       DEBUG_ASSERT(Platform != PlatformKind::none);
 
-      auto Version = Spec->getVersion();
+      auto Version = Spec->getRawVersion();
       if (Version.getSubminor().has_value() || Version.getBuild().has_value()) {
         diagnose(Spec->getVersionSrcRange().Start,
                  diag::attr_availability_platform_version_major_minor_only,

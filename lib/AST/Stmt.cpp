@@ -619,6 +619,11 @@ PoundAvailableInfo::create(ASTContext &ctx, SourceLoc PoundLoc,
                                            RParenLoc, isUnavailability);
 }
 
+SemanticAvailabilitySpecs PoundAvailableInfo::getSemanticAvailabilitySpecs(
+    const DeclContext *declContext) const {
+  return SemanticAvailabilitySpecs(getQueries(), declContext);
+}
+
 SourceLoc PoundAvailableInfo::getEndLoc() const {
   if (RParenLoc.isInvalid()) {
     if (NumQueries == 0) {
