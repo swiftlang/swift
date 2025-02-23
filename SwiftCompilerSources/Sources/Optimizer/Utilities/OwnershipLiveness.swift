@@ -199,13 +199,13 @@ struct InteriorLivenessResult: CustomDebugStringConvertible {
 ///
 /// The top-level entry points are:
 /// - `classify(operand:)`
-/// - `visitUsesOfOuter(value:)`
+/// - `visitAllUses(of:)`
 ///
 /// The implementation may recursively call back to the top-level
 /// entry points. Additionally, the implementation may recurse into inner
 /// borrow scopes, skipping over the uses within inner scopes using:
-/// - `visitInnerBorrowUses(of:)`
-/// - `visitUsesOfInner(value:)`
+/// - `visitInnerBorrowUses(of: BorrowingInstruction)`
+/// - `visitInnerScopeUses(of: Value)`
 ///
 /// Visitors implement:
 ///
@@ -225,7 +225,7 @@ struct InteriorLivenessResult: CustomDebugStringConvertible {
 /// `isInnerlifetime` indicates whether the value being used is
 /// defined by the "outer" OSSA lifetime or an inner borrow scope.
 /// When the OwnershipUseVisitor is invoked on an outer value
-/// (visitUsesOfOuter(value:)), it visits all the uses of that value
+/// (visitAllUses(of:)), it visits all the uses of that value
 /// and also visits the lifetime-ending uses of any inner borrow
 /// scopes. This provides a complete set of liveness "use points":
 ///
@@ -285,14 +285,14 @@ protocol OwnershipUseVisitor {
 
   /// A use that is scoped to an inner borrow scope.
   ///
-  /// Call `visitInnerBorrowUses(of:)` to recursively classify any
+  /// Call `visitInnerScopeUses(of:)` to recursively classify any
   /// scope-ending uses and forwarded dependent values.
   mutating func borrowingUse(of operand: Operand,
                              by borrowInst: BorrowingInstruction) -> WalkResult
 
   /// A reborrow operand.
   ///
-  /// Call `visitUsesOfInner()` to recursively classify scope-ending
+  /// Call `visitInnerScopeUses()` to recursively classify scope-ending
   /// uses (reborrow and end_borrow).
   mutating func reborrowingUse(of operand: Operand, isInnerLifetime: Bool)
     -> WalkResult
@@ -320,7 +320,7 @@ extension OwnershipUseVisitor {
   /// adjacent phis and treat them like inner borrows.
   ///
   /// This is only called for uses in the outer lifetime.
-  mutating func visitUsesOfOuter(value: Value) -> WalkResult {
+  mutating func visitAllUses(of: Value) -> WalkResult {
     switch value.ownership {
     case .owned:
       return value.uses.ignoreTypeDependence.walk { classifyOwned(operand: $0) }
@@ -338,7 +338,7 @@ extension OwnershipUseVisitor {
   /// lifetime, including: begin_borrow, reborrow, partial_apply,
   /// mark_dependence, or an inner adjacent phi (where original SSA
   /// def is a phi in the same block).
-  mutating func visitUsesOfInner(value: Value) -> WalkResult {
+  mutating func visitInnerScopeUses(of: Value) -> WalkResult {
     if let beginBorrow = BeginBorrowValue(value) {
       return beginBorrow.scopeEndingOperands.walk {
         switch $0.ownership {
@@ -370,11 +370,11 @@ extension OwnershipUseVisitor {
 
   // Visit uses of borrowing instruction (operandOwnerhip == .borrow),
   // skipping uses within the borrow scope.
-  mutating func visitInnerBorrowUses(of borrowInst: BorrowingInstruction)
+  mutating func visitInnerScopeUses(of borrowInst: BorrowingInstruction)
     -> WalkResult {
     // If a borrowed value is introduced, then handle the inner scope.
     if let beginBorrow = BeginBorrowValue(resultOf: borrowInst) {
-      return visitUsesOfInner(value: beginBorrow.value)
+      return visitInnerScopeUses(of: beginBorrow.value)
     }
     // Otherwise, directly visit the scope ending uses.
     //
@@ -578,17 +578,17 @@ struct InteriorUseWalker {
           if handleInner(borrowed: innerPhi.value) == .abortWalk {
             return .abortWalk
           }
-          return visitUsesOfInner(value: innerPhi.value)
+          return visitInnerScopeUses(of: innerPhi.value)
         } else {
           // Inner adjacent guaranteed phis are uses of the outer borrow.
-          return visitUsesOfOuter(value: innerPhi.value)
+          return visitAllUses(of: innerPhi.value)
         }
       }
       if result == .abortWalk {
         return .abortWalk
       }
     }
-    return visitUsesOfOuter(value: definingValue)
+    return visitAllUses(of: definingValue)
   }
 }
 
@@ -636,7 +636,7 @@ extension InteriorUseWalker: OwnershipUseVisitor {
   // Handle partial_apply [on_stack] and mark_dependence [nonescaping].
   //
   // TODO: Rather than walking down the owned uses, this could call
-  // visitInnerBorrowUses, but we need to ensure all dependent values
+  // visitInnerScopeUses, but we need to ensure all dependent values
   // are complete first:
   //
   //   if let svi = borrowInst as! SingleValueInstruction,
@@ -644,7 +644,7 @@ extension InteriorUseWalker: OwnershipUseVisitor {
   //     if handleInner(borrowed: beginBorrow.value) == .abortWalk {
   //       return .abortWalk
   //     }
-  //     return visitInnerBorrowUses(of: borrowInst)
+  //     return visitInnerScopeUses(of: borrowInst)
   //   }
   mutating func dependentUse(of operand: Operand, into value: Value)
     -> WalkResult {
@@ -667,18 +667,16 @@ extension InteriorUseWalker: OwnershipUseVisitor {
   }
 
   // Call the innerScopeHandler before visiting the scope-ending uses.
-  mutating func borrowingUse(of operand: Operand,
-                             by borrowInst: BorrowingInstruction)
-    -> WalkResult {
+  mutating func borrowingUse(of operand: Operand, by borrowInst: BorrowingInstruction) -> WalkResult {
     if let beginBorrow = BeginBorrowValue(resultOf: borrowInst) {
       if handleInner(borrowed: beginBorrow.value) == .abortWalk {
         return .abortWalk
       }
       if visitInnerUses {
-        return visitUsesOfOuter(value: beginBorrow.value)
+        return visitAllUses(of: beginBorrow.value)
       }
     }
-    return visitInnerBorrowUses(of: borrowInst)
+    return visitInnerScopeUses(of: borrowInst)
   }
 
   // Visit a reborrow operand. This ends an outer lifetime and extends
@@ -824,9 +822,9 @@ extension InteriorUseWalker {
     }
     switch value.ownership {
     case .owned:
-      return visitUsesOfInner(value: value)
+      return visitInnerScopeUses(of: value)
     case .guaranteed:
-      return visitUsesOfOuter(value: value)
+      return visitAllUses(of: value)
     default:
       fatalError("ownership requires a lifetime")
     }
@@ -899,9 +897,9 @@ extension InteriorUseWalker {
     // Since definingValue dominates guaranteedPhi, this is a well-formed linear
     // lifetime, and liveness can proceed.
     if guaranteedPhi.isReborrow {
-      return visitUsesOfInner(value: guaranteedPhi.value)
+      return visitInnerScopeUses(of: guaranteedPhi.value)
     } else {
-      return visitUsesOfOuter(value: guaranteedPhi.value)
+      return visitAllUses(of: guaranteedPhi.value)
     }
   }
 }
