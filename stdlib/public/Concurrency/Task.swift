@@ -766,7 +766,7 @@ extension Task where Failure == Never {
 
     var task: Builtin.NativeObject?
     #if $BuiltinCreateAsyncTaskName
-    if var name {
+    if let name {
       task =
         name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
@@ -935,27 +935,27 @@ self._task = task
 
   var task: Builtin.NativeObject?
   #if $BuiltinCreateAsyncTaskName
-if var name {
-  task =
-    name.utf8CString.withUnsafeBufferPointer { nameBytes in
-      Builtin.createTask(
-        flags: flags,
-        initialSerialExecutor: builtinSerialExecutor,
-        taskName: nameBytes.baseAddress!._rawValue,
-        operation: operation).0
-    }
-}
+  if let name {
+    task =
+      name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        Builtin.createTask(
+          flags: flags,
+          initialSerialExecutor: builtinSerialExecutor,
+          taskName: nameBytes.baseAddress!._rawValue,
+          operation: operation).0
+      }
+  }
   #endif
-if task == nil {
-  // either no task name was set, or names are unsupported
-  task = Builtin.createTask(
-  flags: flags,
-  initialSerialExecutor: builtinSerialExecutor,
-  operation: operation).0
-}
+  if task == nil {
+    // either no task name was set, or names are unsupported
+    task = Builtin.createTask(
+      flags: flags,
+      initialSerialExecutor: builtinSerialExecutor,
+      operation: operation).0
+  }
 
-self._task = task!
-}
+  self._task = task!
+  }
   #endif
 }
 
@@ -1076,7 +1076,7 @@ extension Task where Failure == Never {
 
     var task: Builtin.NativeObject?
     #if $BuiltinCreateAsyncTaskName
-    if var name {
+    if let name {
       task =
         name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
@@ -1218,7 +1218,7 @@ extension Task where Failure == Error {
 
     var task: Builtin.NativeObject?
     #if $BuiltinCreateAsyncTaskName
-    if var name {
+    if let name {
       task =
         name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(

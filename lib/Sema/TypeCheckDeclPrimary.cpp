@@ -1364,7 +1364,6 @@ Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
 DefaultArgumentInitializer *
 DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
                                             ParamDecl *param) const {
-  auto &ctx = param->getASTContext();
   auto *parentDC = param->getDeclContext();
   auto *paramList = getParameterList(cast<ValueDecl>(parentDC->getAsDecl()));
 
