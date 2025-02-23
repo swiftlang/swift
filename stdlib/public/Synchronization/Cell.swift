@@ -21,7 +21,7 @@ internal struct _Cell<Value: ~Copyable>: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal var _address: UnsafeMutablePointer<Value> {
-    UnsafeMutablePointer<Value>(_rawAddress)
+    unsafe UnsafeMutablePointer<Value>(_rawAddress)
   }
 
   @available(SwiftStdlib 6.0, *)
@@ -35,13 +35,13 @@ internal struct _Cell<Value: ~Copyable>: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal init(_ initialValue: consuming Value) {
-    _address.initialize(to: initialValue)
+    unsafe _address.initialize(to: initialValue)
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   deinit {
-    _address.deinitialize(count: 1)
+    unsafe _address.deinitialize(count: 1)
   }
 }
