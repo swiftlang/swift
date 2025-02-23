@@ -155,7 +155,7 @@ func errorRecovery() {
   var d: (Int,Int,Int) = (1,2) // expected-error {{'(Int, Int)' is not convertible to '(Int, Int, Int)', tuples have a different number of elements}}
   var e: (Int,Int) = (1, 2, 3) // expected-error {{'(Int, Int, Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
   var f: (Int,Int) = (1, 2, f : 3) // expected-error {{'(Int, Int, f: Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
-  
+
   // <rdar://problem/22426860> CrashTracer: [USER] swift at …mous_namespace::ConstraintGenerator::getTypeForPattern + 698
   var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(Int, Int, _)', tuples have a different number of elements}}
   var (h1, h2) = (1, 2, 3) // expected-error {{'(Int, Int, Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
@@ -255,7 +255,7 @@ func test_lambda() {
     if (n < 2) {
       return n
     }
-    
+
     return fib(n-1)+fib(n-2)
   }
 }
@@ -358,7 +358,7 @@ func int_literals() {
   // Overly large integer.
   // FIXME: Should warn about it. <rdar://problem/14070127>
   _ = 123912312312312312312
-  
+
 }
 
 // <rdar://problem/12830375>
@@ -474,7 +474,7 @@ func stringliterals(_ d: [String: Int]) {
   // rdar://11385385
   let x = 4
   "Hello \(x+1) world"  // expected-warning {{string literal is unused}}
-  
+
   // expected-error @+1 {{unterminated string literal}}
   "Error: \(x+1"; // expected-error {{cannot find ')' to match opening '(' in string interpolation}}
 
@@ -588,7 +588,7 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_s2: SpecialPi = getPi() // no-warning
-  
+
   var float = Float.self
   var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_f4 = float.init(pi_f)
@@ -632,11 +632,11 @@ func unaryOps(_ i8: inout Int8, i64: inout Int64) {
   i8 -= 1
 
   Int64(5) += 1 // expected-error{{left side of mutating operator has immutable type 'Int64'}}
-  
+
   // <rdar://problem/17691565> attempt to modify a 'let' variable with ++ results in typecheck error not being able to apply ++ to Float
   let a = i8 // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   a += 1 // expected-error {{left side of mutating operator isn't mutable: 'a' is a 'let' constant}}
-  
+
   var b : Int { get { }}
   b += 1  // expected-error {{left side of mutating operator isn't mutable: 'b' is a get-only property}}
 }
@@ -796,8 +796,8 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
   let r1 = r ?? (0...42) // ok
   let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'ClosedRange<Int>?' and 'Int'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
-  
-  
+
+
   // <rdar://problem/27457457> [Type checker] Diagnose unsavory optional injections
   // Accidental optional injection for ??.
   let i = 42
@@ -811,7 +811,7 @@ func testOptionalTypeParsing(_ a : AnyObject) -> String {
 
 func testParenExprInTheWay() {
   let x = 42
-  
+
   if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
   // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
   if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
@@ -846,7 +846,7 @@ func inoutTests(_ arr: inout Int) {
 
   inoutTests((&x)) // expected-error {{'&' may only be used to pass an argument to inout parameter}} {{15-16=(}} {{14-15=&}}
   inoutTests(&x)
-  
+
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
   &x += y  // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 

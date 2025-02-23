@@ -72,10 +72,10 @@ struct BlockObserver {
 func testBlockObserverExample() {
   // This was valid under the backwards scan rule in Swift 5 but is no longer valid in Swift 6
   _ = BlockObserver { _, _, _ in } // expected-error {{contextual closure type '(Any) -> Void' expects 1 argument, but 3 were used in closure body}}
-  
+
   _ = BlockObserver { _ in } produceHandler: { _, _ in }
   _ = BlockObserver { _ in } finishHandler: { _, _, _ in }
-  
+
   _ = BlockObserver { _ in }
     produceHandler: { _, _ in }
     finishHandler: { _, _, _ in }

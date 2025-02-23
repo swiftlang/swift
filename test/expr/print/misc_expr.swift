@@ -74,7 +74,7 @@ enum Role {
   case admin
   case member
   case guest
-  
+
   var permissions: [Permission] {
     switch self {
     case .admin:

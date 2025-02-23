@@ -26,7 +26,7 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
                                                       bool requireResultType) {
   // TODO: Native keypaths
   assert(expr->isObjC() && "native keypaths not type-checked this way");
-  
+
   // If there is already a semantic expression, do nothing.
   if (expr->getObjCStringLiteralExpr() && !requireResultType)
     return std::nullopt;
@@ -56,7 +56,7 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     ResolvingSet,
     ResolvingDictionary,
   } state = Beginning;
-  
+
   /// Determine whether we are currently resolving a property.
   auto isResolvingProperty = [&] {
     switch (state) {
@@ -160,7 +160,7 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     state = ResolvingProperty;
     currentType = newType;
   };
-  
+
   // Local function to perform name lookup for the current index.
   auto performLookup = [&](DeclNameRef componentName,
                            SourceLoc componentNameLoc,
@@ -197,10 +197,10 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
   bool isInvalid = false;
   SmallVector<KeyPathExpr::Component, 4> resolvedComponents;
-  
+
   for (auto &component : expr->getComponents()) {
     auto componentNameLoc = component.getLoc();
-    
+
     // ObjC keypaths only support named segments.
     // TODO: Perhaps we can map subscript components to dictionary keys.
     switch (auto kind = component.getKind()) {
@@ -225,7 +225,7 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     case KeyPathExpr::Component::Kind::DictionaryKey:
       llvm_unreachable("already resolved!");
     }
-    
+
     auto componentName = component.getUnresolvedDeclName();
     if (!componentName.isSimpleName()) {
       diags.diagnose(componentNameLoc,

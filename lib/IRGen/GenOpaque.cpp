@@ -89,7 +89,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     llvm::Type *args[] = { ptrTy, ptrTy, IGM.TypeMetadataPtrTy };
     return llvm::FunctionType::get(ptrTy, args, /*isVarArg*/ false);
   }
-      
+
   /// unsigned (*getEnumTag)(T *obj, M *self);
   case ValueWitness::GetEnumTag: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
@@ -485,7 +485,7 @@ llvm::Value *IRGenFunction::emitValueWitnessValue(SILType type,
   if (auto witness = tryGetLocalTypeDataForLayout(type, key)) {
     return witness;
   }
-  
+
   auto vwtable = emitValueWitnessTableRef(type);
   auto witness = emitLoadOfValueWitnessValue(*this, vwtable, index);
   setScopedLocalTypeDataForLayout(type, key, witness);
@@ -513,7 +513,7 @@ IRGenFunction::emitValueWitnessFunctionRef(SILType type,
     return FunctionPointer::createSigned(FunctionPointer::Kind::Function,
                                          witness, authInfo, signature);
   }
-  
+
   auto vwtable = emitValueWitnessTableRef(type, &metadataSlot);
   auto witness = emitLoadOfValueWitnessFunction(*this, vwtable, index);
   setScopedLocalTypeDataForLayout(type, key, witness.getRawPointer());

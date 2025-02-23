@@ -341,7 +341,7 @@ public:
     // A guaranteed use can never be outside this borrow scope
     if (use->get()->getOwnershipKind() == OwnershipKind::Guaranteed)
       return true;
-    
+
     auto *user = use->getUser();
     if (!isUserInLiveOutBlock(user)) {
       useInsts.insert(user);

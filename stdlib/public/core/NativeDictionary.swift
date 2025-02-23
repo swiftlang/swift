@@ -611,7 +611,7 @@ extension _NativeDictionary {
     (_values + a.offset).moveInitialize(from: _values + b.offset, count: 1)
     (_values + b.offset).initialize(to: value)
   }
-  
+
   @_alwaysEmitIntoClient
   internal func extractDictionary(
     using bitset: _UnsafeBitset, 

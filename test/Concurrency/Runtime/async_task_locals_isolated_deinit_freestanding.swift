@@ -52,7 +52,7 @@ actor ActorNoOp {
 class Probe {
   var probeExpectedExecutor: UnownedSerialExecutor!
   let probeExpectedNumber: Int
-  
+
   init(expectedNumber: Int) {
     self.probeExpectedExecutor = nil
     self.probeExpectedNumber = expectedNumber

@@ -47,11 +47,11 @@ struct Bytes<T>: Collection {
         self.storage.initialize(repeating: initialValue)
         self.size = size
     }
-    
+
     func index(after i: Int) -> Int {
         return i + 1
     }
-    
+
     subscript(position: Int) -> T {
         get {
             return storage[position]
@@ -60,20 +60,20 @@ struct Bytes<T>: Collection {
             storage[position] = newValue
         }
     }
-    
+
     public subscript(bounds: Range<Index>) -> SubSequence {
         get { fatalError() }
         set { fatalError() }
     }
-    
+
     var startIndex: Int { return 0 }
-    
+
     var endIndex: Int { return size }
-    
+
     typealias Element = T
-    
+
     typealias Index = Int
-    
+
     typealias SubSequence = Bytes
 }
 

@@ -29,7 +29,7 @@ struct ContentView: View {
     var sampleButton1: Button<some View> {
         Button("Tap Here")
     }
-    
+
     var sampleButton2: Button<some View> {
         Button("And Here")
     }

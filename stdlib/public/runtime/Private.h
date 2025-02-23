@@ -138,7 +138,7 @@ public:
 #if SWIFT_OBJC_INTEROP
   bool objectConformsToObjCProtocol(const void *theObject,
                                     ProtocolDescriptorRef protocol);
-  
+
   bool classConformsToObjCProtocol(const void *theClass,
                                    ProtocolDescriptorRef protocol);
 #endif
@@ -272,7 +272,7 @@ public:
   bool
   _contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                     Demangle::NodePointer node);
-  
+
   const ContextDescriptor *
   _searchConformancesByMangledTypeName(Demangle::NodePointer node);
 
@@ -634,7 +634,7 @@ public:
   _buildDemanglingForContext(const ContextDescriptor *context,
                              llvm::ArrayRef<NodePointer> demangledGenerics,
                              Demangle::Demangler &Dem);
-  
+
   /// Symbolic reference resolver that produces the demangling tree for the
   /// referenced context.
   class ResolveToDemanglingForContext {
@@ -642,7 +642,7 @@ public:
   public:
     explicit ResolveToDemanglingForContext(Demangle::Demangler &Dem)
       : Dem(Dem) {}
-    
+
     Demangle::NodePointer operator()(Demangle::SymbolicReferenceKind kind,
                                      Demangle::Directness isIndirect,
                                      int32_t offset,
@@ -656,13 +656,13 @@ public:
   public:
     explicit ResolveAsSymbolicReference(Demangle::Demangler &Dem)
       : Dem(Dem) {}
-    
+
     Demangle::NodePointer operator()(Demangle::SymbolicReferenceKind kind,
                                      Demangle::Directness isIndirect,
                                      int32_t offset,
                                      const void *base);
   };
-  
+
   /// Demangler resolver that turns resolved symbolic references into their
   /// demangling trees.
   class ExpandResolvedSymbolicReferences {
@@ -670,7 +670,7 @@ public:
   public:
     explicit ExpandResolvedSymbolicReferences(Demangle::Demangler &Dem)
       : Dem(Dem) {}
-    
+
     Demangle::NodePointer operator()(Demangle::SymbolicReferenceKind kind,
                                      const void *resolvedReference);
   };

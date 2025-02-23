@@ -39,7 +39,7 @@ public struct Struct {
 }
 
 public func passStruct(_ x : Struct) {
-    
+
 }
 
 // CHECK: class SWIFT_SYMBOL("s:8UseCxxTy6StructV") Struct final {

@@ -69,7 +69,7 @@ class SILEpilogueRetainReleaseMatcherDumper : public SILModuleTransform {
   }
 
 };
-        
+
 } // end anonymous namespace
 
 SILTransform *swift::createEpilogueRetainReleaseMatcherDumper() {

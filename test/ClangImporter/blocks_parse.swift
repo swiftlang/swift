@@ -19,7 +19,7 @@ func testNoEscape(f: @convention(block) () -> Void, nsStr: NSString,
                   fStr: (String?) -> Void) {
   accepts_noescape_block(f)
   accepts_noescape_block(f)
-  
+
   // Please see related tests in PrintAsObjC/imported-block-typedefs.swift.
 
   // rdar://problem/19818617

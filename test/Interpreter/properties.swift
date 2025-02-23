@@ -65,7 +65,7 @@ class WillSetDidSetClass {
 
 class DynamicPropertiesBase {
   var x: String { return "base" }
-  
+
   var y : String {
     get {
       return "base"
@@ -118,7 +118,7 @@ func test() {
   Bar.staticStoredBar = 654321
   // CHECK: 654321
   print(Bar.staticStoredBar)
-  
+
 
   func increment(_ x: inout Int) {
     x += 1
@@ -130,7 +130,7 @@ func test() {
   print("now is \(ds.x)")
   increment(&ds.x)
   print("now is \(ds.x)")
-  
+
   // CHECK: start is 0
   // CHECK: from 0 to 42
   // CHECK: got 42
@@ -145,7 +145,7 @@ func test() {
   print("now is \(dsc.x)")
   increment(&dsc.x)
   print("now is \(dsc.x)")
-  
+
   // CHECK: start is 0
   // CHECK: from 0 to 42
   // CHECK: got 42
@@ -158,7 +158,7 @@ func test() {
   // Properties should be dynamically dispatched.
   var dpd = DynamicPropertiesDerived()
   print("dpd.x is \(dpd.x)")  // CHECK: dpd.x is derived
-  
+
   var dpb : DynamicPropertiesBase = dpd
   print("dpb.x is \(dpb.x)")  // CHECK: dpb.x is derived
 

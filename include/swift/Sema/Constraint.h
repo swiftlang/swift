@@ -362,7 +362,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// Whether the choice of this disjunction should be recorded in the
   /// solver state.
   unsigned RememberChoice : 1;
-  
+
   /// Whether or not this constraint is 'favored' in the sense that, if
   /// successfully applied, it should be preferred over any other constraints
   /// in its disjunction.

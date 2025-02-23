@@ -69,7 +69,7 @@ extension ProtoRefinesClass {
     // CHECK:      [[SELF:%.*]] = copy_value %3 : $Self
     // CHECK-NEXT: [[EXISTENTIAL:%.*]] = init_existential_ref [[SELF]] : $Self : $Self, $any Generic<Int> & BaseProto
     let _: BaseProto & Generic<Int> = self
-    
+
     // CHECK:      [[SELF:%.*]] = copy_value %3 : $Self
     // CHECK-NEXT: [[EXISTENTIAL:%.*]] = init_existential_ref [[SELF]] : $Self : $Self, $any Concrete & BaseProto
     let _: BaseProto & Concrete = self

@@ -46,7 +46,7 @@ static void _initializeBridgingFunctionsImpl(void *ctxt) {
     dlsym(RTLD_DEFAULT, "CFStringGetTypeID");
   assert(getStringTypeID);
   _CFStringTypeID = getStringTypeID();
-  
+
   _CFGetTypeID = (CFTypeID(*)(CFTypeRef obj))dlsym(RTLD_DEFAULT, "CFGetTypeID");
   _CFStringHashNSString = (CFHashCode(*)(id))dlsym(RTLD_DEFAULT,
                                                    "CFStringHashNSString");
@@ -101,7 +101,7 @@ _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
                                              unsigned long);
   SEL sel = @selector(getCString:maxLength:encoding:);
   getCStringImplPtr imp = (getCStringImplPtr)class_getMethodImplementation([obj superclass], sel);
-  
+
   return imp(obj, sel, buffer, maxLength, encoding);
 
 }

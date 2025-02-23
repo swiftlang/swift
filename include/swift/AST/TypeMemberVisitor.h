@@ -21,7 +21,7 @@
 #include "swift/AST/ASTVisitor.h"
 
 namespace swift {
-  
+
 /// TypeMemberVisitor - This is a convenience adapter of DeclVisitor
 /// which filters out a few common declaration kinds that are never
 /// members of nominal types.
@@ -67,7 +67,7 @@ public:
     for (Decl *member : D->getImplementationContext()->getAllMembers()) {
       asImpl().visit(member);
     }
-    
+
     // If this is a main-interface @_objcImplementation extension and the class
     // has a synthesized destructor, visit it now.
     if (auto cd = dyn_cast_or_null<ClassDecl>(D)) {
@@ -96,5 +96,5 @@ public:
 #undef BAD_MEMBER
 
 } // end namespace swift
-  
+
 #endif

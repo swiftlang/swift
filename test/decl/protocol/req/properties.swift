@@ -7,7 +7,7 @@
 protocol PropertyGet {
   var x : Int { get }   // expected-note {{protocol requires property 'x' with type 'Int'}}
 }
-  
+
 class PropertyGet_Stored : PropertyGet {
   var x : Int = 0  // ok
 }
@@ -36,7 +36,7 @@ struct PropertyGet_StaticVar : PropertyGet {  // expected-error {{type 'Property
 protocol PropertyGetSet {
   var x : Int { get set }  // expected-note 2{{protocol requires property 'x' with type 'Int'}}
 }
-  
+
 class PropertyGetSet_Stored : PropertyGetSet {
   var x : Int = 0  // ok
 }

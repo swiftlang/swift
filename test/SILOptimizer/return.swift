@@ -210,7 +210,7 @@ func f_56150() {
   let _ : () -> Int = {
     var x : Int = 0 // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
     var _ : Int = 0
-    
+
     x // expected-error{{missing return in closure expected to return 'Int'}}
     // expected-note@-1 {{did you mean to return the last expression?}}{{5-5=return }}
     //expected-warning@-2{{variable is unused}}

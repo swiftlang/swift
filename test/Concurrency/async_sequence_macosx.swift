@@ -3,7 +3,7 @@
 // REQUIRES: concurrency, OS=macosx
 
 func acceptClosure(_: () async throws -> Void) { }
-  
+
 @available(macOS 13.0, *)
 func f<S: AsyncSequence>(s: S) async throws {
   acceptClosure {

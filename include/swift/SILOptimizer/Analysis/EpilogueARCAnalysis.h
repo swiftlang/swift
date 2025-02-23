@@ -274,7 +274,7 @@ class EpilogueARCAnalysis : public FunctionAnalysisBase<EpilogueARCFunctionInfo>
   PostOrderAnalysis *PO = nullptr;
   /// Current RC Identity analysis we are using.
   RCIdentityAnalysis *RC = nullptr;
-  
+
 public:
   EpilogueARCAnalysis(SILModule *)
       : FunctionAnalysisBase<EpilogueARCFunctionInfo>(
@@ -288,7 +288,7 @@ public:
   }
 
   virtual void initialize(SILPassManager *PM) override;
-  
+
   virtual std::unique_ptr<EpilogueARCFunctionInfo>
   newFunctionAnalysis(SILFunction *F) override;
 

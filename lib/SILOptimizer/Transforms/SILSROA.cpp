@@ -179,7 +179,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
       // We can ignore the dealloc_stack.
       continue;
     }
-    
+
     // Otherwise we do not understand this instruction, so bail.
     LLVM_DEBUG(llvm::dbgs() <<"        Found unknown user, pointer escapes!\n");
     ++NumEscapingAllocas;
@@ -380,7 +380,7 @@ namespace {
 class SILSROA : public SILFunctionTransform {
 
   bool splitSemanticTypes;
-  
+
 public:
   SILSROA(bool splitSemanticTypes) : splitSemanticTypes(splitSemanticTypes) { }
 

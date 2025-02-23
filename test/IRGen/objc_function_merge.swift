@@ -17,17 +17,17 @@ class Base: NSObject, NSSecureCoding {
   @objc public class var supportsSecureCoding: Bool {
     return true
   }
-  
+
   @objc let s: String
-  
+
   func encode(with coder: NSCoder) {
     coder.encode(s, forKey:  #keyPath(s))
   }
-  
+
   init(s: String) {
     self.s = s
   }
-  
+
   required init?(coder: NSCoder) {
     self.s = coder.value(forKey: #keyPath(s)) as! String
   }

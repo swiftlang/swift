@@ -147,7 +147,7 @@ let x = 4
 
 func f(a : () -> Int) {
   42  // expected-warning {{integer literal is unused}}
-  
+
   4 + 5 // expected-warning {{result of operator '+' is unused}}
   a() // expected-warning {{result of call to function returning 'Int' is unused}}
 }
@@ -212,7 +212,7 @@ extension FooProtocol {
 
 class Foo {
   var myOptionalFooProtocol: FooProtocol.Type?
-  
+
   func doSomething() {
     myOptionalFooProtocol?.returnSomething() // okay
   }

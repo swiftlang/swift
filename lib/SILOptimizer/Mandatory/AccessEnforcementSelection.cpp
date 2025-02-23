@@ -260,7 +260,7 @@ void SelectEnforcement::analyzeUsesOfBox(SingleValueInstruction *source) {
       analyzeProjection(projection);
       continue;
     }
-      
+
     // Ignore certain other uses that do not capture the value.
     if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user) ||
         isa<DestroyValueInst>(user) || isa<DeallocBoxInst>(user) ||

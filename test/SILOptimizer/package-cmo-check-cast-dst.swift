@@ -62,16 +62,16 @@ public struct Text: Equatable, Sendable {
   package enum Modifier: Equatable {
     case font
     case anyTextModifier(AnyTextModifier)
-    
+
     @usableFromInline
     package static func ==(lhs: Modifier, rhs: Modifier) -> Bool {
       return true
     }
   }
-  
+
   @usableFromInline
   package var modifiers = [Modifier]()
-  
+
 }
 
 extension Text {

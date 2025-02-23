@@ -265,7 +265,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext
 
   template<class A, class B, class C>
   friend struct ::llvm::CastInfo;
-  
+
   // See swift/AST/Decl.h
   static DeclContext *castDeclToDeclContext(const Decl *D);
 
@@ -393,7 +393,7 @@ public:
   /// - Generic types return a bound generic type using archetypes.
   /// - Non-type contexts return a null type.
   Type getDeclaredTypeInContext() const;
-  
+
   /// Gets the type being declared by this context.
   ///
   /// - Generic types return a bound generic type using interface types.
@@ -729,7 +729,7 @@ public:
   SWIFT_DEBUG_DUMPER(dumpContext());
   unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
                         bool onlyAPartialLine = false) const;
-  
+
   // Some Decls are DeclContexts, but not all. See swift/AST/Decl.h
   static bool classof(const Decl *D);
 };

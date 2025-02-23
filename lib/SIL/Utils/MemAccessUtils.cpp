@@ -2653,7 +2653,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       // SIL address.
       // visitor(&builtin->getAllOperands()[0]);
       return;
-      
+
     // zeroInitializer with an address operand zeroes the address.
     case BuiltinValueKind::ZeroInitializer:
       if (builtin->getAllOperands().size() > 0) {

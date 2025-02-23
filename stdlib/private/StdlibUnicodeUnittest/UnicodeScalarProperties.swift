@@ -128,10 +128,10 @@ func parseBinaryProperties(
 
     let info = line.split(separator: "#")
     let components = info[0].split(separator: ";")
-    
+
     // Get the property first because we may not care about it.
     let filteredProperty = components[1].filter { !$0.isWhitespace }
-    
+
     guard availableBinaryProperties.contains(filteredProperty) else {
       continue
     }
@@ -187,12 +187,12 @@ func parseNumericTypes(
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     let info = line.split(separator: "#")
     let components = info[0].split(separator: ";")
-    
+
     let filteredProperty = components[1].filter { !$0.isWhitespace }
-    
+
     let numericType: Unicode.NumericType
 
     switch filteredProperty {
@@ -205,9 +205,9 @@ func parseNumericTypes(
     default:
       continue
     }
-    
+
     let filteredScalars = components[0].filter { !$0.isWhitespace }
-    
+
     let scalars = parseScalars(String(filteredScalars))
 
     for scalar in scalars {
@@ -225,12 +225,12 @@ func parseNumericValues(
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     let info = line.split(separator: "#")
     let components = info[0].split(separator: ";")
-    
+
     let filteredProperty = components[3].filter { !$0.isWhitespace }
-    
+
     let value: Double
 
     // If we have a division, split the numerator and denominator and perform
@@ -247,7 +247,7 @@ func parseNumericValues(
     }
 
     let filteredScalars = components[0].filter { !$0.isWhitespace }
-    
+
     let scalars = parseScalars(String(filteredScalars))
 
     for scalar in scalars {
@@ -286,7 +286,7 @@ func parseMappings(
 ) {
   for line in data.split(separator: "\n") {
     let components = line.split(separator: ";", omittingEmptySubsequences: false)
-    
+
     let scalarStr = components[0]
     guard let scalar = Unicode.Scalar(UInt32(scalarStr, radix: 16)!) else {
       continue
@@ -303,7 +303,7 @@ func parseMappings(
 
       result[scalar, default: [:]]["lower"] = mapping
     }
-    
+
     if let title = UInt32(components[14], radix: 16) {
       let mapping = String(Unicode.Scalar(title)!)
 
@@ -320,27 +320,27 @@ func parseSpecialMappings(
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     let components = line.split(separator: ";", omittingEmptySubsequences: false)
-    
+
     // Conditional mappings have an extra component with the conditional name.
     // Ignore those.
     guard components.count == 5 else {
       continue
     }
-    
+
     guard let scalar = Unicode.Scalar(UInt32(components[0], radix: 16)!) else {
       continue
     }
-    
+
     let lower = components[1].split(separator: " ").map {
       Character(Unicode.Scalar(UInt32($0, radix: 16)!)!)
     }
-    
+
     let title = components[2].split(separator: " ").map {
       Character(Unicode.Scalar(UInt32($0, radix: 16)!)!)
     }
-    
+
     let upper = components[3].split(separator: " ").map {
       Character(Unicode.Scalar(UInt32($0, radix: 16)!)!)
     }
@@ -369,7 +369,7 @@ public let mappings: [Unicode.Scalar: [String: String]] = {
   #else
   let unicodeData = readInputFile("UnicodeData.txt")
   #endif
-  
+
   let specialCasing = readInputFile("SpecialCasing.txt")
 
   parseMappings(unicodeData, into: &result)
@@ -651,22 +651,22 @@ func parseCaseFoldings(
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     let components = line.split(separator: ";")
-    
+
     let status = components[1].filter { !$0.isWhitespace }
-    
+
     // We only care about Common and Full case mappings.
     guard status == "C" || status == "F" else {
       continue
     }
-    
+
     let scalar = Unicode.Scalar(parseScalars(String(components[0])).lowerBound)!
-    
+
     let mapping = components[2].split(separator: " ").map {
       Unicode.Scalar(UInt32($0, radix: 16)!)!
     }
-    
+
     var mappingString = ""
 
     for scalar in mapping {

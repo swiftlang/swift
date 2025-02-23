@@ -20,11 +20,11 @@ var constant = "Send Message to different Team"
 var shortNonTagged = "Don\u{2019}t Save"
 
 func runEqualLongTagged() {
-  
+
   if MemoryLayout<AnyObject>.size != 8 {
     return //no tagged pointers
   }
-  
+
   let native = constant.withUTF8 { String(decoding: $0, as: UTF8.self) }
   let longTagged = NSSlowTaggedLocalizedString.createTest()!
   constant.withCString {
@@ -48,7 +48,7 @@ longTaggedTests.test("EqualNonASCIISubsetSmall") {
     if MemoryLayout<AnyObject>.size != 8 {
       return //no tagged pointers
     }
-    
+
     var native = shortNonTagged.withUTF8 { String(decoding: $0, as: UTF8.self) }
     native.reserveCapacity(30) //force into non-small form so we can reverse bridge below
     let longTagged = NSSlowTaggedLocalizedString.createTest()!

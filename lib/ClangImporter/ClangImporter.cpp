@@ -8352,18 +8352,18 @@ static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
     // Function pointers are okay.
     if (pointeeType->isFunctionType())
       return false;
-    
+
     // Pointers to record types are okay if they come in as foreign reference
     // types.
     if (auto recordDecl = pointeeType->getAsRecordDecl()) {
       if (hasImportAsRefAttr(recordDecl))
         return false;
     }
-    
+
     // All other pointers are considered unsafe.
     return true;
   }
-  
+
   // Handle records recursively.
   if (auto recordDecl = clangType->getAsTagDecl()) {
     auto safety =
@@ -8372,13 +8372,13 @@ static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
     switch (safety) {
       case ExplicitSafety::Unsafe:
         return true;
-        
+
       case ExplicitSafety::Safe:
       case ExplicitSafety::Unspecified:
         return false;        
     }
   }
-    
+
   // Everything else is safe.
   return false;
 }
@@ -8390,20 +8390,20 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
   // FIXME: Somewhat duplicative with importAsUnsafe.
   // FIXME: Also similar to hasPointerInSubobjects
   // FIXME: should probably also subsume IsSafeUseOfCxxDecl
-  
+
   // Explicitly unsafe.
   auto decl = desc.decl;
   if (hasUnsafeAPIAttr(decl) || hasSwiftAttribute(decl, "unsafe"))
     return ExplicitSafety::Unsafe;
-  
+
   // Explicitly safe.
   if (hasSwiftAttribute(decl, "safe"))
     return ExplicitSafety::Safe;
-  
+
   // Enums are always safe.
   if (isa<clang::EnumDecl>(decl))
     return ExplicitSafety::Safe;
-  
+
   // If it's not a record, leave it unspecified.
   auto recordDecl = dyn_cast<clang::RecordDecl>(decl);
   if (!recordDecl)
@@ -8416,12 +8416,12 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
           ClangTypeEscapability({recordDecl->getTypeForDecl(), nullptr}),
           CxxEscapability::Unknown) != CxxEscapability::Unknown)
     return ExplicitSafety::Safe;
-  
+
   // If we don't have a definition, leave it unspecified.
   recordDecl = recordDecl->getDefinition();
   if (!recordDecl)
     return ExplicitSafety::Unspecified;
-  
+
   // If this is a C++ class, check its bases.
   if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
     for (auto base : cxxRecordDecl->bases()) {
@@ -8429,13 +8429,13 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
         return ExplicitSafety::Unsafe;
     }
   }
-  
+
   // Check the fields.
   for (auto field : recordDecl->fields()) {
     if (hasUnsafeType(evaluator, field->getType()))
       return ExplicitSafety::Unsafe;
   }
-  
+
   // Okay, call it safe.
   return ExplicitSafety::Safe;
 }

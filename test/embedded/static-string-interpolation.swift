@@ -8,15 +8,15 @@
 public struct MyInterpolation : StringInterpolationProtocol {
     public typealias StringLiteralType = StaticString
     public init(literalCapacity: Int, interpolationCount: Int) {}
-    
+
     var literalCount = 0
     var interpolationCount = 0
-    
+
     public mutating func appendLiteral(_ literal: StaticString) {
         print("appendLiteral")
         literalCount += 1
     }
-    
+
     public mutating func appendInterpolation<T>(_ value: @autoclosure @escaping () -> T) {
         print("appendInterpolation<T>")
         interpolationCount += 1
@@ -26,11 +26,11 @@ public struct MyInterpolation : StringInterpolationProtocol {
 public struct MyMessage : ExpressibleByStringInterpolation {
     public typealias StringInterpolation = MyInterpolation
     var interpolation: MyInterpolation
-    
+
     public init(stringInterpolation: MyInterpolation) {
         self.interpolation = stringInterpolation
     }
-    
+
     public init(stringLiteral value: StaticString) {
         self.interpolation = MyInterpolation(literalCapacity: 0, interpolationCount: 0)
         self.interpolation.appendLiteral(value)

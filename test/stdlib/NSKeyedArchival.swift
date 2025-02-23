@@ -77,7 +77,7 @@ struct ThrowingCodable : Codable {
 @available(OSX 10.11, iOS 9.0, *)
 func test_simpleCodableSupport() {
   let s = Simple()
-  
+
   var data: Data? = nil
   expectNoError {
     data = try archive { archiver in
@@ -85,7 +85,7 @@ func test_simpleCodableSupport() {
       try archiver.encodeEncodable(s, forKey: "wrong-type")
     }
   }
-  
+
   unarchive(data!) { unarchiver in
     // confirm we can roundtrip our data
     let roundtrip = unarchiver.decodeDecodable(Simple.self, forKey: "valid")
@@ -93,12 +93,12 @@ func test_simpleCodableSupport() {
     if let rt = roundtrip {
         expectEqual(rt, s)
     } 
-  
+
     // also ask for something that is not there
     let notThere = unarchiver.decodeDecodable(Simple.self, forKey: "not-there")
     expectNil(notThere)
     expectNil(unarchiver.error)
-  
+
     // String != Simple so this should fail at the type level
     let wrongType = unarchiver.decodeDecodable(String.self, forKey: "wrong-type")
     expectNil(wrongType)
@@ -221,7 +221,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
     tests["NSKeyedArchival.unarchiveObjectOfClass"] = test_unarchiveObjectOfClass
     tests["NSKeyedArchival.unarchiveObjectOfClasses"] = test_unarchiveObjectOfClasses
   }
-  
+
   for (name, test) in tests {
     NSKeyedArchiverTest.test(name) { test() }
   }

@@ -123,7 +123,7 @@ let issue63750 = {
     // expected-note@-2 {{'x' previously declared here}}
     ()
   }
-  
+
   func bar(_ x: Int) -> Int { x }
   if case (bar(let x), let x) = (0,0) {}
   // expected-error@-1 {{'let' binding pattern cannot appear in an expression}}

@@ -55,13 +55,13 @@
     implProperty2 = NSObject()
     super.init()
   }
-  
+
   @objc var implProperty: Int32 {
     didSet { print(implProperty) }
   }
-  
+
   final var implProperty2: NSObject?
-  
+
   @objc func mainMethod(_: Int32) { print(implProperty) }
   @objc func asyncMethod() async {}
   @objc func extensionMethod(_: Int32) {}
@@ -73,7 +73,7 @@
     copy.implProperty2 = implProperty2
     return copy
   }
-  
+
   @objc(mutableCopyWithZone:)
   func mutableCopy(with zone: NSZone?) -> Any? {
     return copy(with: zone)

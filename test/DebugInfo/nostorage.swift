@@ -32,7 +32,7 @@ public func app() {
   // CHECK2-SAME:                      ![[AT:.*]], !DIExpression
   // CHECK2: ![[AT]] = !DILocalVariable(name: "at",{{.*}}line: [[@LINE+1]]
   var at = AStruct()
-  
+
   used(at)
 }
 

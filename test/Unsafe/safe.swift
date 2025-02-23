@@ -33,7 +33,7 @@ func rethrowing(body: (UnsafeType) throws -> Void) rethrows { }
 class HasStatics {
   static internal func f(_: UnsafeType) { }
 
-  
+
 }
 
 @unsafe

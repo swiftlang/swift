@@ -25,7 +25,7 @@ extension Pair: Collection where A == B {
         default: fatalError("Index out of bounds.")
         }
     }
-    
+
     func index(after i: Int) -> Int {
         precondition(i < endIndex, "Can't advance beyond endIndex")
         return i + 1

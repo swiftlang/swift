@@ -217,7 +217,7 @@ public struct TerminatorResult {
     var preds = value.parentBlock.predecessors
     return preds.next()!.terminator
   }
-  
+
   public var predecessor: BasicBlock {
     return terminator.parentBlock
   }

@@ -129,7 +129,7 @@ public:
     entry.AssociatedTypeEntry = {ty.getAssociation()};
     return entry;
   }
-  
+
   bool isAssociatedType() const {
     return Kind == WitnessKind::AssociatedTypeKind;
   }

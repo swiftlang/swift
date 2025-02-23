@@ -505,7 +505,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
    guard let unwrapped = from else { return nil }
    self.init(unwrapped)
   }
-     
+
   /// Explicit construction from a UnsafePointer.
   ///
   /// This is inherently unsafe because UnsafePointers do not imply
@@ -695,12 +695,12 @@ protocol _NSSwiftValue: AnyObject {
 internal class __SwiftValue {
   @usableFromInline
   let value: Any
-  
+
   @usableFromInline
   init(_ value: Any) {
     self.value = value
   }
-  
+
   @usableFromInline
   static let null = __SwiftValue(Optional<Any>.none as Any)
 }
@@ -718,7 +718,7 @@ public func swift_unboxFromSwiftValueWithType<T>(
       return true
     }
   }
-    
+
   if let box = source as? __SwiftValue {
     if let value = box.value as? T {
       result.initialize(to: value)
@@ -730,7 +730,7 @@ public func swift_unboxFromSwiftValueWithType<T>(
       return true
     }
   }
-  
+
   return false
 }
 
@@ -797,21 +797,21 @@ func _makeSwiftValue(_ value: Any) -> AnyObject {
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   var done = false
   var result: AnyObject!
-  
+
   let source: Any = x
-  
+
   if let dynamicSource = _extractDynamicValue(x) {
     result = dynamicSource as AnyObject
     done = true 
   }
-  
+
   if !done, let wrapper = source as? _Unwrappable {
     if let value = wrapper._unwrap() {
       result = value as AnyObject
     } else {
       result = _nullPlaceholder
     }
-    
+
     done = true
   }
 
@@ -824,7 +824,7 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
       result = _makeSwiftValue(source)
     }
   }
-  
+
   return result
 }
 

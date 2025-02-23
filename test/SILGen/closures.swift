@@ -375,7 +375,7 @@ class ClassWithIntProperty { final var x = 42 }
 func closeOverLetLValue() {
   let a : ClassWithIntProperty
   a = ClassWithIntProperty()
-  
+
   takeClosure { a.x }
 }
 

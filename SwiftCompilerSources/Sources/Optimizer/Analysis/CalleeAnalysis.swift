@@ -89,7 +89,7 @@ struct CalleeAnalysis {
     guard let callees = getCallees(callee: apply.callee) else {
       return .worstEffects.restrictedTo(argument: argument, withConvention: convention)
     }
-  
+
     for callee in callees {
       let calleeEffects = callee.getSideEffects(forArgument: argument,
                                                 atIndex: calleeArgIdx,

@@ -193,7 +193,7 @@ extension User {
 // https://github.com/swiftlang/swift/issues/79361
 do {
   @preconcurrency var d = Dictionary<String, any Sendable>()
-  
+
   func test(_ dict: inout Dictionary<String, Any>) {}
   test(&d) // Ok
 

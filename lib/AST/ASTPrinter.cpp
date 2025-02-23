@@ -850,7 +850,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       return;
     if (D->getDeclContext()->isLocalContext())
       return;
-    
+
     if (Options.SuppressIsolatedDeinit &&
         D->getFormalAccess() == AccessLevel::Open &&
         usesFeatureIsolatedDeinit(D)) {
@@ -1085,7 +1085,7 @@ private:
   void printFunctionParameters(AbstractFunctionDecl *AFD);
 
   void printArgument(const Argument &arg);
-  
+
   void printArgumentList(ArgumentList *args, bool forSubscript = false);
 
   void printStmtCondition(StmtCondition stmt);
@@ -1388,7 +1388,7 @@ void PrintAST::printAttributes(const Decl *D) {
       Options.ExcludeCustomAttrList.push_back(globalActor->first);
     }
   }
-  
+
   attrs.print(Printer, Options, D);
 
 
@@ -3198,7 +3198,7 @@ namespace {
 struct ExcludeAttrRAII {
   std::vector<AnyAttrKind> &ExcludeAttrList;
   unsigned OriginalExcludeAttrCount;
-  
+
   ExcludeAttrRAII(std::vector<AnyAttrKind> &ExcludeAttrList,
                   DeclAttrKind excluded)
     : ExcludeAttrList(ExcludeAttrList),
@@ -3206,7 +3206,7 @@ struct ExcludeAttrRAII {
   {
     ExcludeAttrList.push_back(excluded);
   }
-  
+
   ~ExcludeAttrRAII() {
     ExcludeAttrList.resize(OriginalExcludeAttrCount);
   }
@@ -3879,7 +3879,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   if (decl->getKind() == DeclKind::Var || Options.PrintParameterSpecifiers) {
     // Map all non-let specifiers to 'var'.  This is not correct, but
     // SourceKit relies on this for info about parameter decls.
-    
+
     Printer.printIntroducerKeyword(
       decl->getIntroducer() == VarDecl::Introducer::Let ? "let" : "var",
       Options, " ");
@@ -4620,7 +4620,7 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
 }
 
 void PrintAST::visitModuleDecl(ModuleDecl *decl) {
-  
+
 }
 
 void PrintAST::visitMissingDecl(MissingDecl *missing) {
@@ -4797,7 +4797,7 @@ void PrintAST::visitIsExpr(IsExpr *expr) {
 }
 
 void PrintAST::visitTapExpr(TapExpr *expr) {
-  
+
 }
 
 void PrintAST::visitTryExpr(TryExpr *expr) {
@@ -4970,7 +4970,7 @@ void PrintAST::visitCoerceExpr(CoerceExpr *expr) {
 }
 
 void PrintAST::printClosure(AbstractClosureExpr *closure, CaptureListExpr *captureList) {
-  
+
 }
 
 void PrintAST::visitClosureExpr(ClosureExpr *expr) {
@@ -5013,7 +5013,7 @@ void PrintAST::visitErasureExpr(ErasureExpr *expr) {
 
 void PrintAST::printKeyPathComponents(KeyPathExpr *expr, ArrayRef<KeyPathExpr::Component> components) {
   using ComponentKind = KeyPathExpr::Component::Kind;
-  
+
   if (!components.empty()) {
     for (auto &component: components) {
       auto kind = component.getKind();
@@ -5634,7 +5634,7 @@ void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
   // FIXME: print container
   if (auto *seq = stmt->getTypeCheckedSequence()) {
     // Look through the call to '.makeIterator()'
-    
+
     if (auto *CE = dyn_cast<CallExpr>(seq)) {
       if (auto *SAE = dyn_cast<SelfApplyExpr>(CE->getFn()))
         seq = SAE->getBase();
@@ -6957,7 +6957,7 @@ public:
     if (T->getLayout()->capturesGenericEnvironment()) {
       Printer << "@captures_generics ";
     }
-    
+
     {
       // A box layout has its own independent generic environment. Don't try
       // to print it with the environment's generic params.

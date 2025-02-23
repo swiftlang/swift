@@ -59,7 +59,7 @@ func functionBodies1(a: Int, b: Int?) {
   let f2 = f(_:)
   struct S7 { }
   typealias S7Alias = S7
-  
+
   if let b1 = b, let b2 = b {
     let c1 = b
   } else {
@@ -151,7 +151,7 @@ func funcWithComputedProperties(i: Int) {
   var alsoComputed: Int {
     return 17
   }
-    
+
   do { }
 }
 

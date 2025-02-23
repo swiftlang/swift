@@ -411,7 +411,7 @@ extension Slice: RangeReplaceableCollection
 
 extension Slice
   where Base: RangeReplaceableCollection, Base: BidirectionalCollection {
-  
+
   @inlinable // generic-performance
   public mutating func replaceSubrange<C>(
     _ subRange: Range<Index>, with newElements: C

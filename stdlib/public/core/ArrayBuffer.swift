@@ -67,7 +67,7 @@ internal struct _ArrayBuffer<Element>: _ArrayBufferProtocol {
   ) -> _ArrayBuffer<U> {
     _internalInvariant(_isClassOrObjCExistential(Element.self))
     _internalInvariant(_isClassOrObjCExistential(U.self))
-    
+
     // FIXME: can't check that U is derived from Element pending
     // <rdar://problem/20028320> generic metatype casting doesn't work
     // _internalInvariant(U.self is Element.Type)
@@ -109,7 +109,7 @@ extension _ArrayBuffer {
     }
     return _storage.isUniquelyReferencedNative()
    }
-  
+
   /// Returns `true` and puts the buffer in a mutable state if the buffer's
   /// storage is uniquely-referenced; otherwise performs no action and
   /// returns `false`.
@@ -135,7 +135,7 @@ extension _ArrayBuffer {
 #endif
     return isUnique
   }
-  
+
   /// Puts the buffer in an immutable state.
   ///
   /// - Precondition: The buffer must be mutable or the empty array singleton.
@@ -194,7 +194,7 @@ extension _ArrayBuffer {
                                          growForAppend: growForAppend)
     let c = count
     _internalInvariant(newCapacity >= c)
-    
+
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: c, minimumCapacity: newCapacity)
 
@@ -388,7 +388,7 @@ extension _ArrayBuffer {
       _native.count = newValue
     }
   }
-  
+
   /// The number of elements of the buffer.
   ///
   /// - Precondition: The buffer must be immutable.
@@ -484,7 +484,7 @@ extension _ArrayBuffer {
   internal var immutableCapacity: Int {
     return _fastPath(_isNative) ? _native.immutableCapacity : _nonNative.count
   }
-  
+
   /// The number of elements the buffer can store without reallocation.
   ///
   /// - Precondition: The buffer must be mutable.
@@ -517,7 +517,7 @@ extension _ArrayBuffer {
       // checking for the native un-typechecked case.  Therefore we
       // have to do it here.
       _native._checkValidSubscript(i)
-      
+
       element = cast(toBufferOf: AnyObject.self)._native[i]
       guard element is Element else {
         _assertionFailure(
@@ -552,7 +552,7 @@ extension _ArrayBuffer {
     get {
       return getElement(i, wasNativeTypeChecked: _isNativeTypeChecked)
     }
-    
+
     nonmutating set {
       if _fastPath(_isNative) {
         _native[i] = newValue
@@ -572,7 +572,7 @@ extension _ArrayBuffer {
     //We never dereference this, we just need an address to use as a unique key
     UnsafeRawPointer(Builtin.addressof(&_swiftEmptyArrayStorage))
   }
-  
+
   @inlinable @_alwaysEmitIntoClient
   internal func getAssociatedBuffer() -> _ContiguousArrayBuffer<Element>? {
     let getter = unsafeBitCast(
@@ -592,7 +592,7 @@ extension _ArrayBuffer {
     }
     return nil
   }
-  
+
   @inlinable @_alwaysEmitIntoClient
   internal func setAssociatedBuffer(_ buffer: _ContiguousArrayBuffer<Element>) {
     let setter = unsafeBitCast(getSetAssociatedObjectPtr(), to: (@convention(c)(
@@ -608,7 +608,7 @@ extension _ArrayBuffer {
       1 //OBJC_ASSOCIATION_RETAIN_NONATOMIC
     )
   }
-  
+
   @_alwaysEmitIntoClient @inline(never)
   internal func withUnsafeBufferPointer_nonNative<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
@@ -640,7 +640,7 @@ extension _ArrayBuffer {
       )
     )
   }
-  
+
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
@@ -700,13 +700,13 @@ extension _ArrayBuffer {
     return try body(UnsafeMutableBufferPointer(
       start: firstElementAddressIfContiguous, count: count))
   }
-  
+
   /// An object that keeps the elements stored in this buffer alive.
   @inlinable
   internal var owner: AnyObject {
     return _fastPath(_isNative) ? _native._storage : _nonNative.buffer
   }
-  
+
   /// An object that keeps the elements stored in this buffer alive.
   ///
   /// - Precondition: This buffer is backed by a `_ContiguousArrayBuffer`.
@@ -729,7 +729,7 @@ extension _ArrayBuffer {
         Unmanaged.passUnretained(_nonNative.buffer).toOpaque())
     }
   }
-  
+
   //===--- Collection conformance -------------------------------------===//
   /// The position of the first element in a non-empty collection.
   ///

@@ -132,7 +132,7 @@ open class OpenSubClass : OpenSuperClass {
   open override func publicMethod() {}
   open override var publicProperty: Int { return 0 }
   open override subscript(index: MarkerForNonOpenSubscripts) -> Int { return 0 }
-  
+
 }
 
 class InvalidOpenExtensionClass { }

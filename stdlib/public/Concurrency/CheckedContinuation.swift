@@ -125,7 +125,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
 @available(SwiftStdlib 5.1, *)
 public struct CheckedContinuation<T, E: Error>: Sendable {
   private let canary: CheckedContinuationCanary
-  
+
   /// Creates a checked continuation from an unsafe continuation.
   ///
   /// Instead of calling this initializer,
@@ -148,7 +148,7 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
       continuation: continuation,
       function: function)
   }
-  
+
   /// Resume the task awaiting the continuation by having it return normally
   /// from its suspension point.
   ///
@@ -172,7 +172,7 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
       #endif
     }
   }
-  
+
   /// Resume the task awaiting the continuation by having it throw an error
   /// from its suspension point.
   ///

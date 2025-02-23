@@ -1491,7 +1491,7 @@ actor DunkTracker {
   deinit {
     // expected-warning@+1 {{actor-isolated property 'curry' can not be referenced from a nonisolated autoclosure; this is an error in the Swift 6 language mode}}
     if lebron != nil || curry != nil {
-      
+
     }
   }
 }

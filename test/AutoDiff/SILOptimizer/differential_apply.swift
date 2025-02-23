@@ -17,7 +17,7 @@ func f(array: [Double]) -> Double {
       element *= initialElement
     }
   )
-  
+
   return 0.0
 }
 

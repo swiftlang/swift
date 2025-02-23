@@ -637,7 +637,7 @@ extension Dictionary {
 
 extension Dictionary: Collection {
   public typealias SubSequence = Slice<Dictionary>
-  
+
   /// The position of the first element in a nonempty dictionary.
   ///
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
@@ -1703,7 +1703,7 @@ extension Collection {
     if self.isEmpty {
       return "[:]"
     }
-    
+
     var result = "["
     var first = true
     for (k, v) in self {

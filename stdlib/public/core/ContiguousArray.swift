@@ -852,7 +852,7 @@ extension ContiguousArray: RangeReplaceableCollection {
                 count: _buffer.mutableCapacity - oldCount)
 
     var (remainder,writtenUpTo) = buf.initialize(from: newElements)
-    
+
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
     _precondition(newElementsCount <= writtenCount, 
@@ -1009,7 +1009,7 @@ extension ContiguousArray: RangeReplaceableCollection {
       return try body(&bufferPointer)
     }
   }
-  
+
   @inlinable
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R

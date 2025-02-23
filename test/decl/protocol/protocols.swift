@@ -37,7 +37,7 @@ protocol Test2 {
 func test1() {
   var v1: Test
   var s: String 
-  
+
   v1.setTitle(s)
   v1.creator = "Me"                   // expected-error {{cannot assign to property: 'creator' is a get-only property}}
 }
@@ -434,7 +434,7 @@ struct X4 : P1 {
 protocol ShouldntCrash {
   // rdar://16109996
   let fullName: String { get }  // expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
-  
+
   // <rdar://problem/17200672> Let in protocol causes unclear errors and crashes
   let fullName2: String  // expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}} {{3-6=var}} {{24-24= { get \}}}
 

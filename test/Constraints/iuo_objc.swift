@@ -38,7 +38,7 @@ func iuo_error(prop: IUOProperty) {
   // expected-error@-1 {{value of optional type '(() -> Coat?)?' must be unwrapped}}
   // expected-note@-2{{coalesce}}
   // expected-note@-3{{force-unwrap}}
-  
+
   let _: Coat = prop.iuo!.optional()!
   // expected-error@-1 {{value of optional type '(() -> Coat?)?' must be unwrapped to a value of type '() -> Coat?'}}
   // expected-note@-2{{coalesce}}

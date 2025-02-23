@@ -35,7 +35,7 @@ DlopenRaceTests.test("race") {
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
   let objc_addLoadImageFunc = dlsym(RTLD_DEFAULT, "objc_addLoadImageFunc");
   if objc_addLoadImageFunc == nil { return }
-  
+
   register_func_for_add_image({ header, slide in
     // The protocol conformance check in the print call is enough to trigger
     // ObjC class initialization in the newly opened image if Swift has
@@ -45,9 +45,9 @@ DlopenRaceTests.test("race") {
     print(header, slide)
     add_image_count += 1
   })
-  
+
   let dylibPath = CommandLine.arguments.last!
-  
+
   let beforeCount = add_image_count
   let handle = dlopen(dylibPath, RTLD_LAZY)
   expectNotNil(handle, String(cString: dlerror()))

@@ -20,7 +20,7 @@ let space = CGColorSpace(indexedBaseSpace: CGColorSpaceCreateDeviceRGB(),
 //===----------------------------------------------------------------------===//
 
 func testCGContext(context: CGContext, image: CGImage, glyph: CGGlyph) {
-  
+
   context.setLineDash(phase: 0.5, lengths: [0.1, 0.2]) 
 
   context.move(to: CGPoint.zero) 
@@ -40,14 +40,14 @@ func testCGContext(context: CGContext, image: CGImage, glyph: CGGlyph) {
   context.addArc(tangent1End: CGPoint(x: 1, y: 1), tangent2End: CGPoint(x: 0.5, y: 0.5), radius: 0.5) 
 
   context.fill([CGRect(x: 0, y: 0, width: 100, height: 100)])
-  
+
   context.fillPath()
   context.fillPath(using: .evenOdd)
 
   context.strokeLineSegments(between: [CGPoint(x: 0.5, y: 0.5), CGPoint(x: 0, y: 0.5)]) 
 
   context.clip(to: [CGRect(x: 0, y: 0, width: 100, height: 100)]) 
-  
+
   context.clip()
   context.clip(using: .evenOdd)
 
@@ -87,14 +87,14 @@ func testDrawLayer(in context: CGContext) {
 }
 
 func testCGPath(path: CGPath) {
-  
+
   let dashed = path.copy(dashingWithPhase: 1, lengths: [0.2, 0.3, 0.5])
-  
+
   let stroked = path.copy(strokingWithWidth: 1, lineCap: .butt,
    lineJoin: .miter, miterLimit: 0.1)
 
   let mutable = stroked.mutableCopy()!
-  
+
   // test inferred transform parameter for all below
   print(path.contains(CGPoint(x: 0.5, y: 0.5)))
   print(path.contains(CGPoint(x: 0.5, y: 0.5), using: .evenOdd))
@@ -113,14 +113,14 @@ func testCGPath(path: CGPath) {
   mutable.addLines(between: [CGPoint(x: 0.5, y: 0.5)]) 
 
   mutable.addEllipse(in: CGRect(x: 0, y: 0, width: 50, height: 70))
-  
+
   mutable.addArc(center: CGPoint(x: 0.5, y: 0.5), radius: 1, startAngle: 0, endAngle: .pi, clockwise: false) 
 
   mutable.addArc(tangent1End: CGPoint(x: 1, y: 1), tangent2End: CGPoint(x: 0.5, y: 0.5), radius: 0.5) 
 
   mutable.addRelativeArc(center: CGPoint(x: 1, y: 1), radius: 0.5,
    startAngle: .pi, delta: .pi/2)
-  
+
   mutable.addPath(dashed)
-  
+
 }

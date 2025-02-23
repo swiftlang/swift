@@ -32,7 +32,7 @@ import Dispatch
       await Task.sleep(100_000_000)
       expectEqual(await task.get(), "Hello, Swift!")
     }
-    
+
     await runAllTestsAsync()
   }
 }

@@ -35,7 +35,7 @@ public:
 };
 
 inline void test33(const HasThrowingConstructor<int> x) {
-    
+
 }
 
 using HasThrowingConstructorInt = HasThrowingConstructor<int>;

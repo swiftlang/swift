@@ -50,7 +50,7 @@ class ARCEntryPointBuilder {
   using AttributeList = llvm::AttributeList;
   using Attribute = llvm::Attribute;
   using APInt = llvm::APInt;
-  
+
   // The builder which we are wrapping.
   IRBuilder B;
 
@@ -135,11 +135,11 @@ public:
     return CI;
   }
 
-  
+
   CallInst *createCheckUnowned(Value *V, CallInst *OrigI) {
     // Cast just to make sure that we have the right type.
     V = B.CreatePointerCast(V, getObjectPtrTy());
-    
+
     CallInst *CI = CreateCall(getCheckUnowned(OrigI), V);
     return CI;
   }
@@ -249,7 +249,7 @@ private:
   Constant *getCheckUnowned(CallInst *OrigI) {
     if (CheckUnowned)
       return CheckUnowned.get();
-    
+
     auto *ObjectPtrTy = getObjectPtrTy();
     auto &M = getModule();
     auto AttrList = AttributeList::get(M.getContext(), 1, Attribute::NoCapture);

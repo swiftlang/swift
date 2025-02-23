@@ -21,7 +21,7 @@ func test1(i: Int) {
   switch i {
   case 0:  // CHECK-NOT: [[LOC]]:[[@LINE]]
     nop1()
-           
+
   case 1:  // CHECK-NOT: [[LOC]]:[[@LINE]]
     nop1()
 

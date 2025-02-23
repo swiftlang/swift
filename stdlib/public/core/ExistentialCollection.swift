@@ -155,13 +155,13 @@ internal final class _IteratorBox<Base: IteratorProtocol>
 
   @inlinable
   internal init(_ base: Base) { self._base = base }
-  
+
   @inlinable // FIXME(sil-serialize-all)
   deinit {}
-  
+
   @inlinable
   internal override func next() -> Base.Element? { return _base.next() }
-  
+
   @usableFromInline
   internal var _base: Base
 }
@@ -1263,7 +1263,7 @@ extension _ClosureBasedSequence: Sequence {
 public struct AnySequence<Element> {
   @usableFromInline
   internal let _box: _AnySequenceBox<Element>
-  
+
   /// Creates a sequence whose `makeIterator()` method forwards to
   /// `makeUnderlyingIterator`.
   @inlinable

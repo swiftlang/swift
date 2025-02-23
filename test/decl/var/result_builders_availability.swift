@@ -19,7 +19,7 @@ struct TupleBuilder {
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
-  
+
   static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
       -> (T1, T2, T3) {
     return (t1, t2, t3)
@@ -43,7 +43,7 @@ struct TupleBuilder {
   static func buildDo<T1, T2>(_ t1: T1, _ t2: T2) -> Do<(T1, T2)> {
     .init(value: (t1, t2))
   }
-  
+
   static func buildDo<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
       -> Do<(T1, T2, T3)> {
     .init(value: (t1, t2, t3))

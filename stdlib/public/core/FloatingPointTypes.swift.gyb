@@ -610,7 +610,7 @@ extension ${Self}: BinaryFloatingPoint {
     }
     self = result
   }
-  
+
   /// Creates a NaN ("not a number") value with the specified payload.
   ///
   /// NaN values compare not equal to every value, including themselves. Most
@@ -720,7 +720,7 @@ extension ${Self}: BinaryFloatingPoint {
     #endif
     }
   }
-  
+
   // Slow path for new cases that might have been inlined into an old
   // ABI-stable version of round(_:) called from a newer version. If this is
   // the case, this non-inlinable function will call into the _newer_ version
@@ -1120,7 +1120,7 @@ extension ${Self} {
       self = value_
     }
   }
-  
+
 % for src_type in all_floating_point_types():
 %   srcBits = src_type.bits
 %   That = src_type.stdlib_name

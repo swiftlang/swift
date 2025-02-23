@@ -136,7 +136,7 @@ extension Span {
   public func distance(from start: Index, to end: Index) -> Int {
     start.distance(to: end)
   }
- 
+
   public subscript(position: Index) -> Element {
     get {
       if _isPOD(Element.self) {
@@ -147,7 +147,7 @@ extension Span {
       }
     }
   }
- 
+
 // CHECK-LABEL: sil @$s025lifetime_dependence_span_A5_attr4SpanVyACyxGAA9FakeRangeVyAA0E5IndexVyxGGcig : $@convention(method) <Element> (FakeRange<SpanIndex<Element>>, @guaranteed Span<Element>) -> @lifetime(copy 1) @owned Span<Element> {
   public subscript(bounds: FakeRange<SpanIndex<Element>>) -> Self {
   @lifetime(self)

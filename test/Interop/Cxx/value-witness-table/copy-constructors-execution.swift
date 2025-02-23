@@ -21,7 +21,7 @@ CXXCopyConstructorTestSuite.test("Basic object with custom copy constructor") {
     let userCC = HasUserProvidedCopyConstructor(0)
     return (userCC, userCC)
   }
-  
+
   let result = createHasUserProvidedCopyConstructor()
   expectTrue(result.0.numCopies + result.1.numCopies > 0)
 }
@@ -43,7 +43,7 @@ CXXCopyConstructorTestSuite.test("Default copy constructor, member with user-def
     let def = HasNonTrivialDefaultCopyConstructor()
     return (def, def)
   }
-  
+
   let result = createTypeWithNonTrivialDefaultCopyConstructor()
   expectTrue(result.0.box.numCopies + result.1.box.numCopies > 0)
 }

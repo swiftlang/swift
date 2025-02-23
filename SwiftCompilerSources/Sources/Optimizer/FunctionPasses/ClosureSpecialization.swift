@@ -126,7 +126,7 @@ let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-special
         function.blocks.singleElement != nil else {
     return
   }
-  
+
   var remainingSpecializationRounds = 5
   var callerModified = false
 
@@ -405,7 +405,7 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
       possibleMarkDependenceBases.insert(arg)
     }
   }
-  
+
   while let use = rootClosureConversionsAndReabstractions.pop() {
     switch use.instruction {
     case let cfi as ConvertFunctionInst:
@@ -447,7 +447,7 @@ private func handleNonApplies(for rootClosure: SingleValueInstruction,
         rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: mdi.uses)
         rootClosurePossibleLiveRange.insert(use.instruction)
       }
-    
+
     case is CopyValueInst,
          is DestroyValueInst,
          is RetainValueInst,
@@ -485,7 +485,7 @@ private func handleApplies(for rootClosure: SingleValueInstruction, callSiteMap:
                            _ context: FunctionPassContext) -> [IntermediateClosureArgDescriptorDatum] 
 {
   var intermediateClosureArgDescriptorData: [IntermediateClosureArgDescriptorDatum] = []
-  
+
   while let use = rootClosureApplies.pop() {
     rootClosurePossibleLiveRange.insert(use.instruction)
 
@@ -590,7 +590,7 @@ private func handleApplies(for rootClosure: SingleValueInstruction, callSiteMap:
       markConvertedAndReabstractedClosuresAsUsed(rootClosure: rootClosure, convertedAndReabstractedClosure: use.value, 
                                                  convertedAndReabstractedClosures: &convertedAndReabstractedClosures)
     }
-    
+
     if callSiteMap[pai] == nil {
       callSiteMap.insert(key: pai, value: CallSite(applySite: pai))
     }
@@ -797,7 +797,7 @@ private extension SpecializationCloner {
     let clonedEntryBlock = self.entryBlock
 
     let capturedArgRangeStart = clonedEntryBlock.arguments.count
-      
+
     for arg in closureArgDesc.arguments {
       let capturedArg = clonedEntryBlock.addFunctionArgument(type: arg.type.getLoweredType(in: clonedFunction), 
                                                               self.context)
@@ -826,7 +826,7 @@ private extension SpecializationCloner {
       {
         for exitBlock in callSite.reachableExitBBsInCallee {
           let clonedExitBlock = self.getClonedBlock(for: exitBlock)
-          
+
           let terminator = clonedExitBlock.terminator is UnreachableInst
                            ? clonedExitBlock.terminator.previous!
                            : clonedExitBlock.terminator
@@ -944,7 +944,7 @@ private extension Builder {
         case let reabstractedClosure where reabstractedClosure == rootClosure:
           origToClonedValueMap[reabstractedClosure] = clonedRootClosure
           return clonedRootClosure
-        
+
         case let cvt as ConvertFunctionInst:
           let toBeReabstracted = inner(rootClosure, clonedRootClosure, cvt.fromFunction, 
                                        &releasableClonedReabstractedClosures, &origToClonedValueMap)
@@ -952,7 +952,7 @@ private extension Builder {
                                                         withoutActuallyEscaping: cvt.withoutActuallyEscaping)
           origToClonedValueMap[cvt] = reabstracted
           return reabstracted
-        
+
         case let cvt as ConvertEscapeToNoEscapeInst:
           let toBeReabstracted = inner(rootClosure, clonedRootClosure, cvt.fromFunction, 
                                        &releasableClonedReabstractedClosures, &origToClonedValueMap)
@@ -964,7 +964,7 @@ private extension Builder {
         case let pai as PartialApplyInst:
           let toBeReabstracted = inner(rootClosure, clonedRootClosure, pai.arguments[0], 
                                        &releasableClonedReabstractedClosures, &origToClonedValueMap)
-          
+
           guard let function = pai.referencedFunction else {
             log("Parent function of callSite: \(rootClosure.parentFunction)")
             log("Root closure: \(rootClosure)")
@@ -981,7 +981,7 @@ private extension Builder {
           releasableClonedReabstractedClosures.append(reabstracted)
           origToClonedValueMap[pai] = reabstracted
           return reabstracted
-        
+
         case let mdi as MarkDependenceInst:
           let toBeReabstracted = inner(rootClosure, clonedRootClosure, mdi.value, &releasableClonedReabstractedClosures, 
                                        &origToClonedValueMap)
@@ -989,7 +989,7 @@ private extension Builder {
           let reabstracted = self.createMarkDependence(value: toBeReabstracted, base: base, kind: .Escaping)
           origToClonedValueMap[mdi] = reabstracted
           return reabstracted
-        
+
         default:
           log("Parent function of callSite: \(rootClosure.parentFunction)")
           log("Root closure: \(rootClosure)")
@@ -1132,7 +1132,7 @@ private extension PartialApplyInst {
     {
       return true
     }
-    
+
     return false
   }
 

@@ -46,7 +46,7 @@ public func createTemplatedConstructor() {
   // MICROSOFT_X64: [[IVAL:%.*]] = load i32, ptr
   // MICROSOFT_X64: call ptr @"??$?0UArgType@@@TemplatedConstructor@@QEAA@UArgType@@@Z"(ptr [[OBJ]], i32 [[IVAL]])
   // MICROSOFT_X64: ret void
-  
+
   // MICROSOFT_X64-LABEL: define {{.*}}ptr @"??$?0UArgType@@@TemplatedConstructor@@QEAA@UArgType@@@Z"(ptr {{.*}}, i32 {{.*}})
   let templated = TemplatedConstructor(ArgType())
 }

@@ -84,7 +84,7 @@ func search() -> Shop & Cafe { } // expected-error {{function declares an opaque
 protocol Basket {
   associatedtype Fruit
   associatedtype MiniBasket: Basket where MiniBasket.Fruit == Fruit
-  
+
   var fruit: [Fruit] { get set }
   var minifruitbasket: [MiniBasket] { get set }
 }

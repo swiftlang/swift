@@ -1758,7 +1758,7 @@ public func closureCaptureClassUseAfterConsume(_ x: borrowing NonTrivialStruct) 
     let x2 = x // expected-note {{consumed here}}
     // expected-error @-1 {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
     // expected-error @-2 {{noncopyable 'x2' cannot be consumed when captured by an escaping closure}}
-    
+
     let f = {
         borrowVal(x2)
         consumeVal(x2) // expected-note {{consumed here}}

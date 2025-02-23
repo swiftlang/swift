@@ -11,13 +11,13 @@ import StdlibCollectionUnittest
 /// A simple collection that attempts to use an Int16 IndexDistance
 struct MyCollection<Element>: Collection {
   var _elements: [Element]
-  
+
   typealias IndexDistance = Int16
   typealias Index = Int16
-  
+
   var startIndex: Index { return 0 }
   var endIndex: Index { return numericCast(_elements.count) }
-  
+
   subscript(i: Index) -> Element { return _elements[Int(i)] }
 
   func index(after: Index) -> Index { return after+1 }
@@ -27,12 +27,12 @@ struct MyCollection<Element>: Collection {
 /// A simple collection that doesn't declare an IndexDistance
 struct MyBidiCollection<Element>: BidirectionalCollection {
   var _elements: [Element]
-  
+
   typealias Index = Int64
-  
+
   var startIndex: Index { return 0 }
   var endIndex: Index { return numericCast(_elements.count) }
-  
+
   subscript(i: Index) -> Element { return _elements[Int(i)] }
 
   func index(after: Index) -> Index { return after+1 }

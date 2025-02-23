@@ -6,14 +6,14 @@ class A {
 
 class B {
   init() {}
-    
+
   convenience init(x: ()) {
     class C: A {
       override init() { // No error
         super.init()
       }
     }
-      
+
     class D: A {
       convenience init(x: ()) {
         class DI : A {
@@ -38,7 +38,7 @@ class B {
     struct E {
       init() {} // No error
     }
- 
+
     self.init()
   }
 }

@@ -1250,7 +1250,7 @@ do {
 
   s.requirement(3.0)
   s.requirement((3.0))
- 
+
   s.requirementLabeled(x: 3.0)
   s.requirementLabeled(x: (3.0))
 

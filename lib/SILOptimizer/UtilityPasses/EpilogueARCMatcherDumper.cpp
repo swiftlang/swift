@@ -71,7 +71,7 @@ class SILEpilogueARCMatcherDumper : public SILModuleTransform {
   }
 
 };
-        
+
 } // end anonymous namespace
 
 SILTransform *swift::createEpilogueARCMatcherDumper() {

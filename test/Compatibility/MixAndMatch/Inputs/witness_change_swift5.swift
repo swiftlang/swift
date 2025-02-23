@@ -33,7 +33,7 @@ public func testMixAndMatch(bridged: RuncibleSpoon, unbridged: NSRuncibleSpoon) 
   let swiftClassAsProtocol: SomeObjCProtocol.Type = SomeSwift4Class.self
   let swiftInstanceViaProtocol
     = swiftClassAsProtocol.init(someObjCInitRequirement: bridged)
-  
+
   let objcPropertyViaClass = swiftInstanceViaClass.someObjCPropertyRequirement
   unbridgedSink = objcPropertyViaClass
   let objcPropertyViaProtocol = swiftInstanceViaProtocol.someObjCPropertyRequirement

@@ -1181,7 +1181,7 @@ bool CopyForwarding::backwardPropagateCopy() {
 
   for (auto *DVAI : DebugValueInstsToDelete)
     DVAI->eraseFromParent();
-  
+
   // Convert a reinitialization of this address into a destroy, followed by an
   // initialization. Replacing a copy with a destroy+init is not by itself
   // profitable. However, it does allow us to eliminate the later copy, and the

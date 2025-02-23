@@ -153,7 +153,7 @@ func someAsyncFunc() async {
   let _ = await a.deposit(deposit1)
   let afterXfer = await a.transferAll(from: b)
   let reportedBal = await a.balance()
-  
+
   // check on account A
   guard afterXfer == (deposit1 + deposit2) && afterXfer == reportedBal else {
     print("BUG 1!")
@@ -362,7 +362,7 @@ actor Calculator {
   let _ = await (await bananaAdd(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
 
   let calc = Calculator()
-  
+
   let _ = (await calc.addCurried(1))(2)
   let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
 

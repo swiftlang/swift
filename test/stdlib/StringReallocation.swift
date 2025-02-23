@@ -25,7 +25,7 @@ func testReallocation() {
       story += s
       if lastBase != story.bufferID {
         reallocations += 1
-        
+
         // To avoid dumping a vast string here, just write the first
         // part of the story out each time there's a reallocation.
         var intro = story._split(separator: ":")[0]

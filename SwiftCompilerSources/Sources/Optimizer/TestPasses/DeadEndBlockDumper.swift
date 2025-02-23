@@ -16,7 +16,7 @@ let deadEndBlockDumper = FunctionPass(name: "dump-deadendblocks") {
   (function: Function, context: FunctionPassContext) in
 
   print("Function \(function.name)")
-  
+
   var deadEndBlocks = DeadEndBlocks(function: function, context)
   print(deadEndBlocks)
   defer { deadEndBlocks.deinitialize() }

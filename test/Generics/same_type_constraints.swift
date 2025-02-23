@@ -52,14 +52,14 @@ public struct GeneratorOf<T> : IteratorProtocol, Sequence {
   public init(_ nextElement: @escaping () -> T?) {
     self._next = nextElement
   }
-  
+
   /// Construct an instance whose `next()` method pulls its results
   /// from `base`.
   public init<I : IteratorProtocol>(_ base: I) where I.Element == T {
     var base = base
     self._next = { base.next() }
   }
-  
+
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///

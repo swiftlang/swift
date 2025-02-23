@@ -28,7 +28,7 @@ func equalsUnordered<T : Comparable>(_ lhs: [T], _ rhs: [T]) -> Bool {
 
 // A COW wrapper type that holds an Int.
 struct TestValueCOWTy {
-  
+
   class Base {
     var value: Int
     init(_ value: Int) { self.value = value }

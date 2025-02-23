@@ -224,7 +224,7 @@ static AnyReturn copyFieldContents(OpaqueValue *fieldData,
 struct ReflectionMirrorImpl {
   const Metadata *type;
   OpaqueValue *value;
-  
+
   virtual char displayStyle() = 0;
   virtual intptr_t count() = 0;
   virtual intptr_t childOffset(intptr_t index) = 0;
@@ -238,7 +238,7 @@ struct ReflectionMirrorImpl {
 #if SWIFT_OBJC_INTEROP
   virtual id quickLookObject() { return nil; }
 #endif
-  
+
   // For class types, traverse through superclasses when providing field
   // information. The base implementations call through to their local-only
   // counterparts.
@@ -264,12 +264,12 @@ struct TupleImpl : ReflectionMirrorImpl {
   char displayStyle() override {
     return 't';
   }
-  
+
   intptr_t count() override {
     auto *Tuple = static_cast<const TupleTypeMetadata *>(type);
     return Tuple->NumElements;
   }
-  
+
   intptr_t childOffset(intptr_t i) override {
     auto *Tuple = static_cast<const TupleTypeMetadata *>(type);
 
@@ -315,7 +315,7 @@ struct TupleImpl : ReflectionMirrorImpl {
       swift_asprintf(&str, ".%" PRIdPTR, i);
       *outName = str;
     }
-    
+
     *outFreeFunc = [](const char *str) { free(const_cast<char *>(str)); };
 
     // Get the nth element.
@@ -345,7 +345,7 @@ struct TupleImpl : ReflectionMirrorImpl {
     return AnyReturn(result);
   }
 };
-  
+
 struct swift_closure {
   void *fptr;
   HeapObject *context;
@@ -387,20 +387,20 @@ SWIFT_FORMAT(1, 2)
 missing_reflection_metadata_warning(const char *fmt, ...) {
   bool shouldWarn =
     SWIFT_LAZY_CONSTANT(_shouldReportMissingReflectionMetadataWarnings());
-  
+
   if (!shouldWarn)
     return;
-  
+
   va_list args;
   va_start(args, fmt);
-  
+
   warningv(0, fmt, args);
 }
 
 static std::pair<StringRef /*name*/, FieldType /*fieldInfo*/>
 getFieldAt(const Metadata *base, unsigned index) {
   using namespace reflection;
-  
+
   // If we failed to find the field descriptor metadata for the type, fall
   // back to returning an empty tuple as a standin.
   auto failedToFindMetadata = [&]() -> std::pair<StringRef, FieldType> {
@@ -420,7 +420,7 @@ getFieldAt(const Metadata *base, unsigned index) {
   auto *fields = baseDesc->Fields.get();
   if (!fields)
     return failedToFindMetadata();
-  
+
   auto &field = fields->getFields()[index];
   // Bounds are always valid as the offset is constant.
   auto name = field.getFieldName();
@@ -479,7 +479,7 @@ struct StructImpl : ReflectionMirrorImpl {
   char displayStyle() override {
     return 's';
   }
-  
+
   intptr_t count() override {
     if (!isReflectable()) {
       return 0;
@@ -505,10 +505,10 @@ struct StructImpl : ReflectionMirrorImpl {
     FieldType fieldInfo;
     std::tie(name, fieldInfo) = getFieldAt(type, i);
     assert(!fieldInfo.isIndirect() && "indirect struct fields not implemented");
-    
+
     *outName = name.data();
     *outFreeFunc = nullptr;
-    
+
     return fieldInfo;
   }
 
@@ -560,7 +560,7 @@ struct EnumImpl : ReflectionMirrorImpl {
     const auto &Description = Enum->getDescription();
     return Description->isReflectable();
   }
-  
+
   const char *getInfo(unsigned *tagPtr = nullptr,
                       const Metadata **payloadTypePtr = nullptr,
                       bool *indirectPtr = nullptr) {
@@ -579,19 +579,19 @@ struct EnumImpl : ReflectionMirrorImpl {
       *payloadTypePtr = payloadType;
     if (indirectPtr)
       *indirectPtr = indirect;
-    
+
     return name.data();
   }
 
   char displayStyle() override {
     return 'e';
   }
-  
+
   intptr_t count() override {
     if (!isReflectable()) {
       return 0;
     }
-    
+
     // No fields if reflecting the enumeration type instead of a case
     if (!value) {
       return 0;
@@ -633,7 +633,7 @@ struct EnumImpl : ReflectionMirrorImpl {
     type->vw_destructiveProjectEnumData(enumCopyContainer);
     boxType->vw_initializeWithTake(pair.buffer, enumCopyContainer);
     type->deallocateBoxForExistentialIn(&enumCopy.Buffer);
-    
+
     value = pair.buffer;
 
     // If the payload is indirect, we need to jump through the box to get it.
@@ -641,10 +641,10 @@ struct EnumImpl : ReflectionMirrorImpl {
       const HeapObject *owner = *reinterpret_cast<HeapObject * const *>(value);
       value = swift_projectBox(const_cast<HeapObject *>(owner));
     }
-    
+
     *outName = caseName;
     *outFreeFunc = nullptr;
-    
+
     Any result;
 
     result.Type = payloadType;
@@ -655,12 +655,12 @@ struct EnumImpl : ReflectionMirrorImpl {
     swift_release(pair.object);
     return AnyReturn(result);
   }
-  
+
   const char *enumCaseName() override {
     if (!isReflectable()) {
       return nullptr;
     }
-    
+
     return getInfo();
   }
 };
@@ -677,7 +677,7 @@ struct ClassImpl : ReflectionMirrorImpl {
   char displayStyle() override {
     return 'c';
   }
-  
+
   bool hasSuperclassMirror() {
     auto *Clazz = static_cast<const ClassMetadata*>(type);
     auto description = Clazz->getDescription();
@@ -854,7 +854,7 @@ struct MetatypeImpl : ReflectionMirrorImpl {
   char displayStyle() override {
     return '\0';
   }
-  
+
   intptr_t count() override {
     return 0;
   }
@@ -880,11 +880,11 @@ struct OpaqueImpl : ReflectionMirrorImpl {
   char displayStyle() override {
     return '\0';
   }
-  
+
   intptr_t count() override {
     return 0;
   }
-  
+
   intptr_t childOffset(intptr_t i) override {
     swift::crash("Opaque types have no children.");
   }
@@ -908,18 +908,18 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
   const Metadata *type;
   OpaqueValue *value;
   std::tie(type, value) = unwrapExistential(T, passedValue);
-  
+
   if (passedType != nullptr) {
     type = passedType;
   }
-  
+
   auto call = [&](ReflectionMirrorImpl *impl) {
     impl->type = type;
     impl->value = value;
     auto result = f(impl);
     return result;
   };
-  
+
   auto callClass = [&] {
     if (passedType == nullptr) {
       // Get the runtime type of the object.
@@ -947,7 +947,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
     ClassImpl impl;
     return call(&impl);
   };
-  
+
   switch (type->getKind()) {
     case MetadataKind::Tuple: {
       TupleImpl impl;
@@ -963,14 +963,14 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
       StructImpl impl;
       return call(&impl);
     }
-    
+
 
     case MetadataKind::Enum:
     case MetadataKind::Optional: {
       EnumImpl impl;
       return call(&impl);
     }
-      
+
     case MetadataKind::ObjCClassWrapper:
     case MetadataKind::ForeignClass:
     case MetadataKind::Class: {

@@ -200,7 +200,7 @@ import _Concurrency
 public protocol DistributedActor: AnyObject, Sendable, Identifiable, Hashable
   where ID == ActorSystem.ActorID,
         SerializationRequirement == ActorSystem.SerializationRequirement {
-  
+
   /// The type of transport used to communicate with actors of this type.
   associatedtype ActorSystem: DistributedActorSystem
 

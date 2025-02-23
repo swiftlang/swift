@@ -124,15 +124,15 @@ public struct SourceLocStack {
 }
 
 fileprivate struct AtomicBool {
-    
+
     private var _value: _stdlib_AtomicInt
-    
+
     init(_ b: Bool) { self._value = _stdlib_AtomicInt(b ? 1 : 0) }
-    
+
     func store(_ b: Bool) { _value.store(b ? 1 : 0) }
-    
+
     func load() -> Bool { return _value.load() != 0 }
-    
+
     @discardableResult
     func orAndFetch(_ b: Bool) -> Bool {
         return _value.orAndFetch(b ? 1 : 0) != 0

@@ -144,7 +144,7 @@ enum K {
 enum A<K>: Error {
   case left(a: K, b: K)
   case right(a: K, b: K)
-  
+
   var valueLet: [K] {
     do {
       throw self
@@ -155,7 +155,7 @@ enum A<K>: Error {
     expectUnreachable()
     return []
   }
-  
+
   var valueVar: [K] {
     do {
       throw self

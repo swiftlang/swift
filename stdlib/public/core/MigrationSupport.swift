@@ -359,7 +359,7 @@ extension UnsafeMutablePointer {
   public func deinitialize() -> UnsafeMutableRawPointer {
     return deinitialize(count: 1)
   }
-  
+
   @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
   public func deallocate(capacity _: Int) { 
     self.deallocate()
@@ -473,7 +473,7 @@ extension UnsafeMutableRawPointer {
   ) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer.allocate(byteCount: size, alignment: alignment)
   }
-  
+
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "deallocate()", message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
   public func deallocate(bytes _: Int, alignedTo _: Int) { 
     self.deallocate()

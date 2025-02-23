@@ -64,7 +64,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   /// The string contents accumulated by this instance.
   @usableFromInline
   internal var _storage: String
-  
+
   /// Creates a string interpolation with storage pre-sized for a literal
   /// with the indicated attributes.
   /// 
@@ -77,7 +77,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
       interpolationCount * capacityPerInterpolation
     _storage = String._createEmpty(withInitialCapacity: initialCapacity)
   }
-  
+
   /// Appends a literal segment of a string interpolation.
   /// 
   /// Do not call this method directly. It is used by the compiler when
@@ -86,7 +86,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   public mutating func appendLiteral(_ literal: String) {
     literal.write(to: &self)
   }
-  
+
   /// Interpolates the given value's textual representation into the
   /// string literal being created.
   /// 
@@ -110,7 +110,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   {
     value.write(to: &self)
   }
-  
+
   /// Interpolates the given value's textual representation into the
   /// string literal being created.
   /// 
@@ -132,7 +132,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   {
     value.write(to: &self)
   }
-  
+
   /// Interpolates the given value's textual representation into the
   /// string literal being created.
   /// 
@@ -156,7 +156,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   {
     value.description.write(to: &self)
   }
-  
+
   /// Interpolates the given value's textual representation into the
   /// string literal being created.
   /// 
@@ -209,7 +209,7 @@ extension DefaultStringInterpolation: TextOutputStream {
   public mutating func write(_ string: String) {
     _storage.append(string)
   }
-  
+
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
     _storage._guts.append(_StringGuts(buffer, isASCII: true))
   }

@@ -130,7 +130,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         // conformance.
       case KnownDerivableProtocolKind::Equatable:
         return canDeriveEquatable(DC, Nominal);
-      
+
       case KnownDerivableProtocolKind::Comparable:
         return !enumDecl->hasPotentiallyUnavailableCaseValue()
             && canDeriveComparable(DC, enumDecl); 
@@ -202,7 +202,7 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
   auto knownProtocol = protocol->getKnownProtocolKind();
   if (!knownProtocol)
     return;
-  
+
   if (*knownProtocol == KnownProtocolKind::Equatable) {
     tryDiagnoseFailedEquatableDerivation(DC, nominal);
   }
@@ -361,7 +361,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
     if (func->isOperator() && name.getBaseName() == "<")
       return getRequirement(KnownProtocolKind::Comparable);
-    
+
     if (func->isOperator() && name.getBaseName() == "==")
       return getRequirement(KnownProtocolKind::Equatable);
 

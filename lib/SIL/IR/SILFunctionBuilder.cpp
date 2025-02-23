@@ -379,12 +379,12 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       // Add attributes for e.g. computed properties.
       addFunctionAttributes(F, storage->getAttrs(), mod,
                             getOrCreateDeclaration);
-                            
+
       auto *varDecl = dyn_cast<VarDecl>(storage);
       if (varDecl && varDecl->getAttrs().hasAttribute<LazyAttr>() &&
           accessor->getAccessorKind() == AccessorKind::Get) {
         F->setSpecialPurpose(SILFunction::Purpose::LazyPropertyGetter);
-        
+
         // Lazy property getters should not get inlined because they are usually
         // non-trivial functions (otherwise the user would not implement it as
         // lazy property). Inlining such getters would most likely not benefit

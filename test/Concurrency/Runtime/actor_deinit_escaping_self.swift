@@ -16,11 +16,11 @@ func formatAddr(_ obj: AnyObject) -> String {
 
 actor EscapeLocked {
   var k: Int = 1
-  
+
   func increment() {
     k += 1
   }
-  
+
   isolated deinit {
     let g = DispatchGroup()
     g.enter()

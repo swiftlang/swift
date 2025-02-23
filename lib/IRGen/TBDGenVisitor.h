@@ -117,7 +117,7 @@ class TBDGenVisitor : public IRSymbolVisitor {
                  EncodeKind kind = EncodeKind::GlobalSymbol);
 
   void addSymbol(LinkEntity entity);
-  
+
   bool addClassMetadata(ClassDecl *CD);
 
 public:

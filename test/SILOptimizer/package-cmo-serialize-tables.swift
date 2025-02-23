@@ -30,7 +30,7 @@ import Lib
 runPub([PubStruct(rawValue: 2), PubKlassZ(rawValue: 3)])
 runPkg([PkgStruct(rawValue: 2), PkgKlassZ(rawValue: 3)])
 
- 
+
 //--- Lib.swift
 
 public class ParentPubKlass {

@@ -46,7 +46,7 @@ public func createTemplatedConstructor() {
   // ITANIUM_ARM: [[IVAL:%.*]] = load i64, ptr
   // ITANIUM_ARM: call void @_ZN20TemplatedConstructorC2I7ArgTypeEET_(ptr [[OBJ]], i64 [[IVAL]])
   // ITANIUM_ARM: ret void
-  
+
   // ITANIUM_ARM-LABEL: define {{.*}}void @_ZN20TemplatedConstructorC2I7ArgTypeEET_(ptr {{.*}}, i64 {{.*}})
   let templated = TemplatedConstructor(ArgType())
 }

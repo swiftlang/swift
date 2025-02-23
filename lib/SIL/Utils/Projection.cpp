@@ -746,11 +746,11 @@ bool ProjectionPath::hasUncoveredNonTrivials(SILType B, const SILFunction &F,
   do {
     // Get the next level projections based on current projection's type.
     ProjectionPath PP = Worklist.pop_back_val();
- 
+
     // If this path is part of the covered path, then continue.
     if (CPaths.find(PP) != CPaths.end())
       continue;
-      
+
     // Get the current type to process.
     SILType Ty = PP.getMostDerivedType(Mod, F.getTypeExpansionContext());
 

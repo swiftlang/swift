@@ -38,7 +38,7 @@ class Super<T, U> {}
 extension Super: P2 where T: P2, U: P2 {
     typealias A = T
     typealias B = T
-  
+
     func foo() -> Int { fatalError() }
 }
 

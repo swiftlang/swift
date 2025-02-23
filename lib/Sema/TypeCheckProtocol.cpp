@@ -4385,7 +4385,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       auto behavior = sendFrom.diagnosticBehavior(nominal);
       if (behavior != DiagnosticBehavior::Ignore) {
         bool isError = behavior < DiagnosticBehavior::Warning;
-        
+
         // Avoid relying on the lifetime of 'this'.
         const DeclContext *DC = this->DC;
         getASTContext().addDelayedConformanceDiag(Conformance, isError,
@@ -5679,7 +5679,7 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto) {
   // statically.
   if (type->is<ArchetypeType>())
     return true;
-  
+
   // A non-final class might have a subclass that conforms to the protocol.
   if (auto *classDecl = type->getClassOrBoundGenericClass()) {
     if (!classDecl->isSemanticallyFinal())
@@ -6190,10 +6190,10 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
       AccessControl,
       Static,
     };
-    
+
     FuncDecl *method;
     Reason reason;
-    
+
     InvalidMethod(FuncDecl *method, Reason reason)
       : method(method), reason(reason) {}
 
@@ -6218,25 +6218,25 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
           invalid.emplace_back(method, Reason::Static);
           continue;
         }
-        
+
         if (!method->getResultInterfaceType()->isVoid() &&
             !method->getAttrs().hasAttribute<DiscardableResultAttr>()) {
           invalid.emplace_back(method, Reason::ReturnType);
           continue;
         }
-        
+
         if (method->getFormalAccess() < typeDecl->getFormalAccess()) {
           invalid.emplace_back(method, Reason::AccessControl);
           continue;
         }
-        
+
         return true;
       }
 
       return false;
     }
   };
-  
+
   SmallVector<InvalidMethod, 4> invalidMethods;
 
   if (InvalidMethod::hasValidMethod(typeDecl, invalidMethods))
@@ -6253,7 +6253,7 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
                       diag::append_interpolation_static)
             .fixItRemove(invalidMethod.method->getStaticLoc());
         break;
-        
+
       case InvalidMethod::Reason::ReturnType:
         if (auto *const repr = invalidMethod.method->getResultTypeRepr()) {
           C.Diags
@@ -6263,7 +6263,7 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
                            "@discardableResult ");
         }
         break;
-        
+
       case InvalidMethod::Reason::AccessControl:
         C.Diags.diagnose(invalidMethod.method,
                          diag::append_interpolation_access_control,
@@ -6340,7 +6340,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     }
 
     auto proto = conformance->getProtocol();
-    
+
     if (auto kp = proto->getKnownProtocolKind()) {
       switch (*kp) {
       case KnownProtocolKind::StringInterpolationProtocol: {
@@ -6875,7 +6875,7 @@ ValueWitnessRequest::evaluate(Evaluator &eval,
 
 namespace {
   class DefaultWitnessChecker : public WitnessChecker {
-    
+
   public:
     DefaultWitnessChecker(ProtocolDecl *proto)
         : WitnessChecker(proto->getASTContext(), proto,

@@ -134,7 +134,7 @@ extension Task where Success == Never, Failure == Never {
   ) async throws {
     try await clock.sleep(until: deadline, tolerance: tolerance)
   }
-  
+
   /// Suspends the current task for the given duration.
   ///
   /// If the task is cancelled before the time ends, this function throws 

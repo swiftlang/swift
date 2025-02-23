@@ -6,13 +6,13 @@
 module Test {
     header "test.h"
     requires cplusplus
-    
+
     module sub {
         header "subtest.h"
 
         export *
     }
-    
+
     export *
 }
 

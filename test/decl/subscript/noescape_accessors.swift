@@ -54,7 +54,7 @@ struct Subscripts {
       global = value
     }
   }
-  
+
   subscript(nonescapingIndexWithAddressor fn: () -> Void) -> Int {
     get {
       return 0

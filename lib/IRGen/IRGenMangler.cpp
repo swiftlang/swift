@@ -108,7 +108,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
                type->getName().str(), AllowConcurrencyStandardSubstitutions)) {
         return false;
       }
-      
+
       // TODO: We could assign a symbolic reference discriminator to refer
       // to objc protocol refs.
       if (auto proto = dyn_cast<ProtocolDecl>(type)) {
@@ -147,9 +147,9 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
   };
 
   SymbolicReferences.clear();
-  
+
   body();
-  
+
   return {finalize(), std::move(SymbolicReferences)};
 }
 
@@ -389,7 +389,7 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
     }
     llvm_unreachable("unhandled referent");
   }
-  
+
   return finalize();
 }
 

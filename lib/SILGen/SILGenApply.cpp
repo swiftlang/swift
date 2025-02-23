@@ -188,12 +188,12 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
 
   if (funcDecl->isFinal())
     return true;
-  
+
   // Native initializing entry points are always statically dispatched.
   if (constant.kind == SILDeclRef::Kind::Initializer
       && !constant.isForeign)
     return true;
-  
+
   // Extension methods currently must be statically dispatched, unless they're
   // @objc or dynamic.
   if (isa<ExtensionDecl>(funcDecl->getDeclContext()) && !constant.isForeign)
@@ -560,13 +560,13 @@ public:
   void setCaptures(SmallVectorImpl<ManagedValue> &&captures) {
     Captures = std::move(captures);
   }
-  
+
   ArrayRef<ManagedValue> getCaptures() const {
     if (Captures)
       return *Captures;
     return {};
   }
-  
+
   bool hasCaptures() const {
     return Captures.has_value();
   }
@@ -1023,7 +1023,7 @@ public:
         loc, selfMeta.getValue(),
         SILType::getPrimitiveObjectType(destMetatype));
       break;
-    
+
     case metatypeRepPair(MetatypeRepresentation::ObjC,
                          MetatypeRepresentation::Thick):
       convertedValue = SGF.B.emitObjCToThickMetatype(
@@ -1243,7 +1243,7 @@ public:
     SILDeclRef constant = getDeclRefForStaticDispatchApply(e);
     auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
     SGF.SGM.Types.setCaptureTypeExpansionContext(constant, SGF.SGM.M);
-    
+
     subs = SGF.SGM.Types.getSubstitutionMapWithCapturedEnvironments(
         constant, captureInfo, subs);
 
@@ -1286,7 +1286,7 @@ public:
       applyCallee->setCaptures(std::move(captures));
     }
   }
-  
+
   void visitMemberRefExpr(MemberRefExpr *e) {
     assert(isa<VarDecl>(e->getMember().getDecl()));
 
@@ -1306,7 +1306,7 @@ public:
 
     setCallee(Callee::forIndirect(fn, origType, substType, e));
   }
-  
+
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
     SILDeclRef constant(e);
 
@@ -1326,7 +1326,7 @@ public:
         = SGF.SGM.Types.getForwardingSubstitutionsForLowering(constant);
 
     setCallee(Callee::forDirect(SGF, constant, subs, e));
-    
+
     // If the closure requires captures, emit them.
     if (SGF.SGM.Types.hasLoweredLocalCaptures(constant)) {
       SmallVector<ManagedValue, 4> captures;
@@ -1335,7 +1335,7 @@ public:
       applyCallee->setCaptures(std::move(captures));
     }
   }
-  
+
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {
     auto subs = e->getDeclRef().getSubstitutions();
 
@@ -1482,7 +1482,7 @@ public:
     }
     assert(isa<DeclRefExpr>(selfArg) &&
            "unexpected expr kind in self argument of initializer delegation");
-  
+
     // If the 'self' value is a metatype, update the target type
     // accordingly.
     SILType loweredResultTy;
@@ -1493,7 +1493,7 @@ public:
     } else {
       loweredResultTy = SGF.getLoweredLoadableType(resultTy);
     }
-    
+
     if (loweredResultTy != selfValue.getType()) {
       // Introduce dynamic Self if necessary. A class initializer receives
       // a metatype argument that's formally the non-dynamic base class type
@@ -2313,7 +2313,7 @@ public:
   Expr *getExpr() const { return ExprAndIsIndirect.getPointer(); }
   bool isIndirect() const { return ExprAndIsIndirect.getInt(); }
 };
-  
+
 /// A possibly-discontiguous slice of function parameters claimed by a
 /// function application.
 class ClaimedParamsRef {
@@ -2321,10 +2321,10 @@ public:
   static constexpr const unsigned NoSkip = (unsigned)-1;
 private:
   ArrayRef<SILParameterInfo> Params;
-  
+
   // The index of the param excluded from this range, if any, or ~0.
   unsigned SkipParamIndex;
-  
+
   void checkParams() {
     // The parameters should already have been substituted into the caller's
     // context, and had the SILFunctionType substitutions applied, before we
@@ -2336,7 +2336,7 @@ private:
     }
 #endif
   }
-  
+
   friend struct ParamLowering;
   explicit ClaimedParamsRef(ArrayRef<SILParameterInfo> params,
                             unsigned skip)
@@ -2350,7 +2350,7 @@ private:
     }
     assert(!hasSkip() || SkipParamIndex < Params.size());
   }
-  
+
   bool hasSkip() const {
     return SkipParamIndex != (unsigned)NoSkip;
   }
@@ -2361,7 +2361,7 @@ public:
   {
     checkParams();
   }
-  
+
   struct iterator {
     using iterator_category = std::random_access_iterator_tag;
     using value_type = SILParameterInfo;
@@ -2371,12 +2371,12 @@ public:
 
     const SILParameterInfo *Base;
     unsigned I, SkipParamIndex;
-    
+
     iterator(const SILParameterInfo *Base,
              unsigned I, unsigned SkipParamIndex)
       : Base(Base), I(I), SkipParamIndex(SkipParamIndex)
     {}
-    
+
     iterator &operator++() {
       ++I;
       if (I == SkipParamIndex)
@@ -2399,23 +2399,23 @@ public:
       --*this;
       return old;
     }
-    
+
     const SILParameterInfo &operator*() const {
       return Base[I];
     }
     const SILParameterInfo *operator->() const {
       return Base + I;
     }
-    
+
     bool operator==(iterator other) const {
       return Base == other.Base && I == other.I
           && SkipParamIndex == other.SkipParamIndex;
     }
-    
+
     bool operator!=(iterator other) const {
       return !(*this == other);
     }
-    
+
     iterator operator+(std::ptrdiff_t distance) const {
       if (distance > 0)
         return goForward(distance);
@@ -2438,7 +2438,7 @@ public:
         return baseDistance - 1;
       return baseDistance;
     }
-    
+
     iterator goBackward(unsigned distance) const {
       auto result = *this;
       if (I > SkipParamIndex && I <= SkipParamIndex + distance)
@@ -2446,7 +2446,7 @@ public:
       result.I -= distance;
       return result;
     }
-    
+
     iterator goForward(unsigned distance) const {
       auto result = *this;
       if (I < SkipParamIndex && I + distance >= SkipParamIndex)
@@ -2455,23 +2455,23 @@ public:
       return result;
     }
   };
-  
+
   iterator begin() const {
     return iterator{Params.data(), 0, SkipParamIndex};
   }
-  
+
   iterator end() const {
     return iterator{Params.data(), (unsigned)Params.size(), SkipParamIndex};
   }
-  
+
   unsigned size() const {
     return Params.size() - (hasSkip() ? 1 : 0);
   }
-  
+
   bool empty() const { return size() == 0; }
-  
+
   SILParameterInfo front() const { return *begin(); }
-  
+
   ClaimedParamsRef slice(unsigned start) const {
     if (start >= SkipParamIndex)
       return ClaimedParamsRef(Params.slice(start + 1), NoSkip);
@@ -2484,7 +2484,7 @@ public:
     unsigned newSkip = SkipParamIndex;
     if (hasSkip())
       newSkip -= start;
-    
+
     if (newSkip < count)
       return ClaimedParamsRef(Params.slice(start, count+1), newSkip);
     return ClaimedParamsRef(Params.slice(start, count), NoSkip);
@@ -2628,7 +2628,7 @@ private:
 
   using PointerAccessInfo = SILGenFunction::PointerAccessInfo;
   using ArrayAccessInfo = SILGenFunction::ArrayAccessInfo;
-  
+
   using ExtraMembers =
     ExternalUnionMembers<void,
                          ArrayAccessInfo,
@@ -2829,7 +2829,7 @@ private:
 
     return value;
   }
-  
+
   void emitDefaultArgument(SILGenFunction &SGF,
                            const DefaultArgumentStorage &info,
                            SmallVectorImpl<ManagedValue> &args,
@@ -3033,7 +3033,7 @@ static void emitDelayedArguments(SILGenFunction &SGF,
     // NB: siteArgs.size() may change during iteration
     for (size_t i = 0; i < siteArgs.size(); ) {
       auto &siteArg = siteArgs[i];
-      
+
       if (siteArg) {
         ++i;
         continue;
@@ -3250,7 +3250,7 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     forceUnwrap = fu;
     argExpr = fu->getSubExpr();
   }
-  
+
   // If there's a load around the outer part of this arg expr, look past it.
   bool sawLoad = false;
   if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
@@ -3275,7 +3275,7 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     if (auto *declRef = dyn_cast<DeclRefExpr>(argExpr)) {
       assert(!declRef->getType()->is<LValueType>() &&
              "Shouldn't ever have an lvalue type here!");
-             
+
       // Proceed if the storage reference is a force unwrap.
       if (!forceUnwrap) {
         // Proceed if the storage references a global or static let.
@@ -3287,7 +3287,7 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
         if (auto vd = dyn_cast<VarDecl>(declRef->getDecl())) {
           isGlobal = vd->isGlobalStorage();
         }
-        
+
         if (!isGlobal) {
           return nullptr;
         }
@@ -3327,7 +3327,7 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   auto strategy = storage->getAccessStrategy(accessSemantics,
          AccessKind::Read, SGM.M.getSwiftModule(), F.getResilienceExpansion(),
          /* old abi*/ false);
-  
+
   switch (strategy.getKind()) {
   case AccessStrategy::Storage:
     // Storage can benefit from direct borrowing/consumption.
@@ -3345,7 +3345,7 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     case AccessorKind::Modify2:
       // Accessors that produce a borrow/inout value can be borrowed.
       break;
-    
+
     case AccessorKind::Get:
     case AccessorKind::Set:
     case AccessorKind::DistributedGet:
@@ -3356,7 +3356,7 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
       return nullptr;
     }
     break;
-  
+
   case AccessStrategy::MaterializeToTemporary:
   case AccessStrategy::DispatchToDistributedThunk:
     return nullptr;
@@ -3373,7 +3373,7 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   }
   if (!isMoveOnly)
     return nullptr;
-    
+
   if (forceUnwrap) {
     return forceUnwrap;
   }
@@ -3429,7 +3429,7 @@ ArgumentSource::findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) && {
   if (lvExpr) {
     (void)std::move(*this).asKnownExpr();
   }
-  
+
   return lvExpr;
 }
 
@@ -3457,7 +3457,7 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
   if (arg.isExpr()) {
     auto origExpr = std::move(arg).asKnownExpr();
     auto expr = origExpr;
-    
+
     if (auto le = dyn_cast<LoadExpr>(expr)) {
       expr = le->getSubExpr();
     }
@@ -3588,7 +3588,7 @@ private:
         return;
       }
     }
-            
+
     if (!arg.hasLValueType()) {
       // If the unsubstituted function type has a parameter of tuple type,
       // explode the tuple value.
@@ -3799,7 +3799,7 @@ private:
         return SGF.emitLValue(e->getSubExpr(), SGFAccessKind::ReadWrite);
       }
     }();
-    
+
     if (loweredSubstParamType.hasAbstractionDifference(Rep,
                                                        loweredSubstArgType)) {
       lv.addSubstToOrigComponent(origType, loweredSubstParamType);
@@ -4271,7 +4271,7 @@ private:
     if (auto stringToPointer = dyn_cast<StringToPointerExpr>(expr)) {
       return emitDelayedConversion(stringToPointer, original);
     }
-    
+
     // Delay function conversions involving the opened Self type of an
     // existential whose opening is itself delayed.
     //
@@ -4295,7 +4295,7 @@ private:
     if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
       auto destTy = funcConv->getType()->castTo<AnyFunctionType>();
       auto srcTy = funcConv->getSubExpr()->getType()->castTo<AnyFunctionType>();
-      
+
       if (destTy->hasOpenedExistential()
           && !srcTy->hasOpenedExistential()
           && destTy->getRepresentation() == srcTy->getRepresentation()) {
@@ -4383,7 +4383,7 @@ private:
     Args.push_back(ManagedValue());
     return true;
   }
-  
+
   bool emitDelayedConversion(FunctionConversionExpr *funcConv,
                              OriginalArgument original) {
     auto rvalueExpr = lookThroughBindOptionals(funcConv->getSubExpr());
@@ -4424,7 +4424,7 @@ private:
 
     return scope.popPreservingValue(result);
   }
-  
+
   void maybeEmitForeignArgument() {
     bool keepGoing = true;
     while (keepGoing) {
@@ -4521,7 +4521,7 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                         info.origResultType,
                         /*addressable*/ false);
   assert(delayedArgs.empty());
-  
+
   // Splice the emitted default argument into the argument list.
   if (loweredArgs.size() == 1) {
     args[argIndex++] = loweredArgs.front();
@@ -5097,7 +5097,7 @@ public:
                            SILType::getEmptyTupleType(SGF.getASTContext()));
     }
   }
-  
+
   void dump(SILGenFunction &SGF) const override {
 #ifndef NDEBUG
     llvm::errs() << "EndCoroutineApply "
@@ -5210,7 +5210,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
       yields.push_back(ManagedValue::forRValueWithoutOwnership(value));
     }
   }
-  
+
   if (!borrowedMoveOnlyValues.empty()) {
     auto &endApply = static_cast<EndCoroutineApply &>(Cleanups.getCleanup(endApplyHandle));
     endApply.setBorrowedMoveOnlyValues(borrowedMoveOnlyValues);
@@ -5529,7 +5529,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     // Collect the arguments to the uncurried call.
     if (selfArg.has_value()) {
       args.push_back({});
-      
+
       // Claim the foreign "self" with the self param.
       auto siteForeign = ForeignInfo{foreign.self, {}, {}};
       std::move(*selfArg).emit(SGF, origFormalType, substFnType, paramLowering,
@@ -6219,7 +6219,7 @@ void SILGenFunction::emitRawYield(SILLocation loc,
         value = B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, value);
       }
     }
-    
+
     yieldValues.push_back(value);
   }
 
@@ -6716,7 +6716,7 @@ RValue SILGenFunction::emitApplyOfPropertyWrapperBackingInitializer(
   PreparedArguments args(substFnType->getAs<AnyFunctionType>()->getParams());
   args.add(loc, std::move(originalValue));
   emission.addCallSite(loc, std::move(args));
-  
+
   return emission.apply(C);
 }
 
@@ -6801,7 +6801,7 @@ ManagedValue SILGenFunction::emitUninitializedArrayFinalization(SILLocation loc,
                                                       ManagedValue array) {
   auto &Ctx = getASTContext();
   FuncDecl *finalize = Ctx.getFinalizeUninitializedArray();
-  
+
   // The _finalizeUninitializedArray function only needs to be called if the
   // library contains it.
   // The Array implementation in the stdlib <= 5.3 does not use SIL COW
@@ -6946,7 +6946,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &SGF,
   Callee callee = getBaseAccessorFunctionRef(SGF, loc, constant, selfValue,
                                              isSuper, isDirectUse,
                                              substitutions, isOnSelfParameter);
-  
+
   // Collect captures if the accessor has them.
   if (SGF.SGM.M.Types.hasLoweredLocalCaptures(constant)) {
     assert(!selfValue && "local property has self param?!");
@@ -7108,7 +7108,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
     // itself).
     assert(!selfParam.isIndirectMutating() &&
            "passing unmaterialized r-value as inout argument");
-           
+
     // Avoid copying the base if it's move-only. It should be OK to do in this
     // case since the move-only base will be accessed in a formal access scope
     // as well. This isn't always true for copyable bases so be less aggressive
@@ -7490,7 +7490,7 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
   AbstractionPattern origParam(
       startBuiltin->getGenericSignature().getCanonicalSignature(),
       origParamType);
-  
+
   auto conversion = Conversion::getSubstToOrig(origParam, substParamType,
                                      getLoweredType(asyncLetEntryPoint->getType()),
                                      getLoweredType(origParam, substParamType));
@@ -7544,7 +7544,7 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
                 loweredOpaquePatternType.getAddressType(),
                 /*strict*/ true,
                 /*invariant*/ true);
-  
+
   // Project the address of the variable within the pattern binding result.
   struct ProjectResultVisitor: public PatternVisitor<ProjectResultVisitor>
   {
@@ -7553,7 +7553,7 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
     VarDecl *var;
     SILValue resultAddr, varAddr;
     SmallVector<unsigned, 4> path;
-    
+
     ProjectResultVisitor(SILGenFunction &SGF,
                          SILLocation loc,
                          VarDecl *var,
@@ -7587,7 +7587,7 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
     void visitNamedPattern(NamedPattern *P) {
       if (P->getDecl() != var)
         return;
-      
+
       assert(!varAddr && "var appears in pattern more than once?");
       varAddr = resultAddr;
       for (unsigned component : path) {
@@ -7608,7 +7608,7 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
   ProjectResultVisitor visitor(*this, loc, var, resultAddr);
   visitor.visit(pattern);
   assert(visitor.varAddr && "didn't find var in pattern?");
-  
+
   // Load and reabstract the value if needed.
   auto substVarTy = var->getTypeInContext()->getCanonicalType();
   return emitLoad(loc, visitor.varAddr,

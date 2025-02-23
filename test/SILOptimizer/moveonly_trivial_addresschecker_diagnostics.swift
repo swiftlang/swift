@@ -938,7 +938,7 @@ public func enumAssignToVar1() {
 public func enumAssignToVar1Arg(_ x2: inout EnumTy) {
     // expected-error @-1 {{missing reinitialization of inout parameter 'x2' after consume}}
     // expected-error @-2 {{'x2' consumed more than once}} 
-                                                            
+
     var x3 = x2 // expected-note {{consumed here}}
     x3 = x2 // expected-note {{consumed here}}
     // expected-note @-1 {{consumed again here}}
@@ -972,7 +972,7 @@ public func enumAssignToVar3() {
 }
 
 public func enumAssignToVar3Arg(_ x2: inout EnumTy) { // expected-error {{missing reinitialization of inout parameter 'x2' after consume}}
-                                                            
+
     var x3 = x2 // expected-note {{consumed here}}
     x3 = EnumTy.klass(NonTrivialStruct())
     consumeVal(x3)
@@ -1005,7 +1005,7 @@ public func enumAssignToVar5() {
 }
 
 public func enumAssignToVar5Arg(_ x2: inout EnumTy) { // expected-error {{'x2' used after consume}}
-                                                            
+
     var x3 = x2 // expected-note {{consumed here}}
     borrowVal(x2) // expected-note {{used here}}
     x3 = EnumTy.klass(NonTrivialStruct())

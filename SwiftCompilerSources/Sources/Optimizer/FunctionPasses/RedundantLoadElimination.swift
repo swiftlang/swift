@@ -366,7 +366,7 @@ private func insertMarkDependencies(for load: LoadInst, _ context: FunctionPassC
 private struct MarkDependenceInserter : AddressUseDefWalker {
   let load: LoadInst
   let context: FunctionPassContext
-  
+
   mutating func walkUp(address: Value, path: UnusedWalkingPath) -> WalkResult {
     if let mdi = address as? MarkDependenceInst {
       let builder = Builder(after: load, context)
@@ -375,7 +375,7 @@ private struct MarkDependenceInserter : AddressUseDefWalker {
     }
     return walkUpDefault(address: address, path: path)
   }
-  
+
   mutating func rootDef(address: Value, path: UnusedWalkingPath) -> WalkResult {
     return .continueWalk
   }

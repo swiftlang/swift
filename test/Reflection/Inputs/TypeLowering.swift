@@ -118,7 +118,7 @@ public struct ExistentialStruct {
 
   public let anyClassBoundProtoComposition2: P1 & CP2
   public let optionalAnyClassBoundProtoComposition2: (P1 & CP2)?
-  
+
   public let classConstrainedP1: C & P1
 }
 

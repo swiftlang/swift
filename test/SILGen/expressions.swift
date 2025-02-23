@@ -480,7 +480,7 @@ func ternary_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
 // it isn't affected as this testcase slides up and down the file over time.
 func magic_identifier_expansion(_ a: Int = #column) {
   // CHECK-LABEL: sil hidden [ossa] @{{.*}}magic_identifier_expansion
-  
+
   // This should expand to the column number of the first _.
   var tmp = #column
   // CHECK: integer_literal $Builtin.IntLiteral, 13

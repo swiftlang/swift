@@ -39,7 +39,7 @@ extension Unicode.ASCII: Unicode.Encoding {
     return Unicode.Scalar(_unchecked: UInt32(
         source.first._unsafelyUnwrappedUnchecked))
   }
-  
+
   @inline(__always)
   @inlinable
   public static func encode(
@@ -73,7 +73,7 @@ extension Unicode.ASCII: Unicode.Encoding {
     @inlinable
     public init() { }
   }
-  
+
   public typealias ForwardParser = Parser
   public typealias ReverseParser = Parser
 }

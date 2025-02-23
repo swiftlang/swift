@@ -166,12 +166,12 @@ class WeakReference {
     if (oldSide)
       oldSide->decrementWeak();
   }
-  
+
   HeapObject *nativeLoadStrongFromBits(WeakReferenceBits bits) {
     auto side = bits.getNativeOrNull();
     return side ? side->tryRetain() : nullptr;
   }
-  
+
   HeapObject *nativeTakeStrongFromBits(WeakReferenceBits bits) {
     auto side = bits.getNativeOrNull();
     if (side) {
@@ -182,7 +182,7 @@ class WeakReference {
       return nullptr;
     }
   }
-  
+
   void nativeCopyInitFromBits(WeakReferenceBits srcBits) {
     auto side = srcBits.getNativeOrNull();
     if (side)
@@ -192,7 +192,7 @@ class WeakReference {
   }
 
  public:
-  
+
   WeakReference() : nativeValue() {}
 
   WeakReference(std::nullptr_t)
@@ -205,7 +205,7 @@ class WeakReference {
     auto side = object ? object->refCounts.formWeakReference() : nullptr;
     nativeValue.store(WeakReferenceBits(side), std::memory_order_relaxed);
   }
-  
+
   void nativeDestroy() {
     auto oldBits = nativeValue.load(std::memory_order_relaxed);
     nativeValue.store(nullptr, std::memory_order_relaxed);
@@ -217,7 +217,7 @@ class WeakReference {
       assert(objectUsesNativeSwiftReferenceCounting(newObject) &&
              "weak assign native with non-native new object");
     }
-    
+
     auto newSide =
       newObject ? newObject->refCounts.formWeakReference() : nullptr;
     auto newBits = WeakReferenceBits(newSide);
@@ -281,7 +281,7 @@ class WeakReference {
   void nonnativeDestroy() {
     objc_destroyWeak(&nonnativeValue);
   }
-  
+
   void destroyWithNativeness(bool isNative) {
     if (isNative)
       nativeDestroy();
@@ -290,7 +290,7 @@ class WeakReference {
   }
 
  public:
-  
+
   void unknownInit(void *object) {
     if (isObjCTaggedPointerOrNull(object)) {
       nonnativeValue = static_cast<id>(object);
@@ -314,7 +314,7 @@ class WeakReference {
     }
 
     bool newIsNative = objectUsesNativeSwiftReferenceCounting(newObject);
-    
+
     auto oldBits = nativeValue.load(std::memory_order_relaxed);
     bool oldIsNative = oldBits.isNativeOrNull();
 

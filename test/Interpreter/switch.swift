@@ -40,14 +40,14 @@ enum K {
 enum A<K> {
   case left(a: K, b: K)
   case right(a: K, b: K)
-  
+
   var valueLet: [K] {
     switch self {
     case let .left(a, b), let .right(a, b):
       return [a, b]
     }
   }
-  
+
   var valueVar: [K] {
     switch self {
     case var .left(a, b), var .right(a, b):

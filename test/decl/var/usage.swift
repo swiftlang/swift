@@ -28,10 +28,10 @@ struct X {
 func testStruct() {
   let a = X()
   a.f()
-  
+
   var b = X()
   b.g()
-  
+
   var c = X()  // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   c.f()
 }
@@ -41,7 +41,7 @@ func takeClosure(_ fn : () -> ()) {}
 class TestClass {
 
   func f() {
-   
+
     takeClosure { [weak self] in  // self is mutable but never mutated.  Ok because it is weak
       self?.f()
     }
@@ -66,19 +66,19 @@ func testEnum() -> Int {
 
 func nestedFunction() -> Int {
   var x = 42  // No warning about being never-set.
-  
+
   func g() {
     x = 97
     var q = 27  // expected-warning {{variable 'q' was never used}} {{5-10=_}}
   }
   g()
-  
+
   return x
 }
 
 func neverRead() {
   var x = 42  // expected-warning {{variable 'x' was written to, but never read}}
-  
+
   x = 97
   x = 123
 }
@@ -184,17 +184,17 @@ func testSubscriptNeverMutated() -> [Int] {
 func testTuple(_ x : Int) -> Int {
   var x = x
   var y : Int  // Ok, stored by a tuple
-  
+
   (x, y) = (1,2)
   _ = x
   _ = y
   return y
 }
-  
+
 
 
  struct TestComputedPropertyStruct {
-  
+
   var x : Int {
     get {}
     nonmutating set {}
@@ -204,7 +204,7 @@ func testTuple(_ x : Int) -> Int {
 func test() {
   let v = TestComputedPropertyStruct()
   v.x = 42
-  
+
   var v2 = TestComputedPropertyStruct()  // expected-warning {{variable 'v2' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   v2.x = 42
 }
@@ -308,7 +308,7 @@ func testFixitsInStatementsWithPatterns(_ a : Int?) {
     _ = b
     _ = b2
   }
-  
+
   for var b in [42] { // expected-warning {{variable 'b' was never mutated; consider removing 'var' to make it constant}} {{7-11=}}
     _ = b
   }
@@ -338,7 +338,7 @@ func test(_ a : Int?, b : Any) {
 
   // General case, need to insert parentheses.
   if let x = a ?? a {}  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=(}} {{20-20=) != nil}}
-  
+
   // Special case, we can turn this into an 'is' test.
   if let x = b as? Int {  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=}} {{16-19=is}}
   }
@@ -368,7 +368,7 @@ func test(_ a : Int?, b : Any) {
   } catch { }
   if let aaa = try? throwingAA() as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{6-16=(}} {{41-41=) != nil}}
   if let aaa = (try? throwingAA()) as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{36-39=is}}
-  
+
   func throwingBB() throws -> Any { return 1 }
   do { 
     if let bbb = try! throwingBB() as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{36-39=is}}

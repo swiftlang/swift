@@ -40,7 +40,7 @@ class Foo: Fooable {
 
 class ObjcDestructible: NSObject {
   var object: NSObject
-  
+
   init(object: NSObject) {
     self.object = object
   }

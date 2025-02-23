@@ -1603,7 +1603,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *attr = cast<RawLayoutAttr>(this);
     Printer.printAttrName("@_rawLayout");
     Printer << "(";
-    
+
     if (auto sizeAndAlign = attr->getSizeAndAlignment()) {
       Printer << "size: " << sizeAndAlign->first
               << ", alignment: " << sizeAndAlign->second;
@@ -2483,7 +2483,7 @@ DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
                            IndexSubset *parameterIndices,
                            GenericSignature derivativeGenSig) {
   auto &ctx = original->getASTContext();
-  
+
   size_t size = totalSizeToAlloc<ParsedAutoDiffParameter>(0); 
   void *mem = ctx.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,

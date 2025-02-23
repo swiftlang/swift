@@ -12,7 +12,7 @@ public protocol Frob {
 public struct Nicate {
   public var frob: any Frob
   public var isInitializing: Bool
- 
+
   // CHECK-LABEL: sil @$s31closure_lifetime_fixup_copyelim6NicateV4slowyS2iF :
   // CHECK-NOT: copy_addr 
   // CHECK-LABEL: } // end sil function '$s31closure_lifetime_fixup_copyelim6NicateV4slowyS2iF'

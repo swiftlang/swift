@@ -37,7 +37,7 @@ internal final class __EmptyArrayStorage
   internal init(_doNotCallMe: ()) {
     _internalInvariantFailure("creating instance of __EmptyArrayStorage")
   }
-  
+
 #if _runtime(_ObjC)
   override internal func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
@@ -139,7 +139,7 @@ internal final class _ContiguousArrayStorage<
   }
 
 #if _runtime(_ObjC)
-  
+
   internal final override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
@@ -150,7 +150,7 @@ internal final class _ContiguousArrayStorage<
     defer { _fixLifetime(self) }
     return try body(UnsafeBufferPointer(start: elements, count: count))
   }
-  
+
   @objc(countByEnumeratingWithState:objects:count:)
   @_effects(releasenone)
   internal final override func countByEnumerating(
@@ -158,11 +158,11 @@ internal final class _ContiguousArrayStorage<
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int {
     var enumerationState = state.pointee
-    
+
     if enumerationState.state != 0 {
       return 0
     }
-    
+
     return withUnsafeBufferOfObjects {
       objects in
       enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
@@ -173,7 +173,7 @@ internal final class _ContiguousArrayStorage<
       return objects.count
     }
   }
-  
+
   @inline(__always)
   @_effects(readonly)
   @nonobjc private func _objectAt(_ index: Int) -> Unmanaged<AnyObject> {
@@ -185,19 +185,19 @@ internal final class _ContiguousArrayStorage<
       return Unmanaged.passUnretained(objects[index])
     }
   }
-  
+
   @objc(objectAtIndexedSubscript:)
   @_effects(readonly)
   final override internal func objectAtSubscript(_ index: Int) -> Unmanaged<AnyObject> {
     return _objectAt(index)
   }
-  
+
   @objc(objectAtIndex:)
   @_effects(readonly)
   final override internal func objectAt(_ index: Int) -> Unmanaged<AnyObject> {
     return _objectAt(index)
   }
-  
+
   @objc internal override final var count: Int {
     @_effects(readonly) get {
       return withUnsafeBufferOfObjects { $0.count }
@@ -229,7 +229,7 @@ internal final class _ContiguousArrayStorage<
         byteCount: range.length * MemoryLayout<AnyObject>.stride)
     }
   }
-  
+
   /// If the `Element` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
@@ -598,7 +598,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       }
     }
   }
-  
+
   @_alwaysEmitIntoClient
   internal var isMutable: Bool {
     if (_COWChecksEnabled()) {
@@ -649,7 +649,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       mutableStorage.countAndCapacity.count = newValue
     }
   }
-  
+
   /// The number of elements of the buffer.
   ///
   /// - Precondition: The buffer must be immutable.
@@ -867,7 +867,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
                                          growForAppend: growForAppend)
     let c = count
     _internalInvariant(newCapacity >= c)
-    
+
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: c, minimumCapacity: newCapacity)
 
@@ -887,7 +887,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   }
 
 #if _runtime(_ObjC)
-  
+
   /// Convert to an NSArray.
   ///
   /// - Precondition: `Element` is bridged to Objective-C.
@@ -906,7 +906,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     //   return _storage
     // }
     // return __SwiftDeferredNSArray(_nativeStorage: _storage)
-    
+
     _connectOrphanedFoundationSubclassesIfNeeded()
     if count == 0 {
       return _emptyArrayStorage
@@ -957,7 +957,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   internal var identity: UnsafeRawPointer {
     return UnsafeRawPointer(firstElementAddress)
   }
-  
+
   /// Returns `true` if we have storage for elements of the given
   /// `proposedElementType`.  If not, we'll be treated as immutable.
   @inlinable
@@ -1002,7 +1002,7 @@ internal func += <Element, C: Collection>(
   let newCount = oldCount + rhs.count
 
   let buf: UnsafeMutableBufferPointer<Element>
-  
+
   if _fastPath(newCount <= lhs.capacity) {
     buf = UnsafeMutableBufferPointer(
       start: lhs.firstElementAddress + oldCount,

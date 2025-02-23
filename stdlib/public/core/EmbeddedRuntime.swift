@@ -246,7 +246,7 @@ func isValidPointerForNativeRetain(object: Builtin.RawPointer) -> Bool {
   #if _pointerBitWidth(_64)
   if (objectBits & HeapObject.immortalObjectPointerBit) != 0 { return false }
   #endif
-  
+
   return true
 }
 

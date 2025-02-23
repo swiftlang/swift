@@ -128,7 +128,7 @@ func checkIndirect() {
 // CHECK-NEXT: [[O1_REF:%.*]] = function_ref @$s27stored_property_default_arg1OV1p1qACyxGx_x_SittcfC : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in τ_0_0, @in τ_0_0, Int, @thin O<τ_0_0>.Type) -> @out O<τ_0_0>
 // CHECK-NEXT: [[O1:%.*]] = apply [[O1_REF]]<Int>({{.*}}, {{.*}}, {{.*}}, {{.*}}, {{.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in τ_0_0, @in τ_0_0, Int, @thin O<τ_0_0>.Type) -> @out O<τ_0_0>
   let r = O(q: (128, 316))
-  
+
 // CHECK: function_ref default argument 1 of O.init(p:q:)
 // CHECK-NEXT: [[Q1_REF:%.*]] = function_ref @$s27stored_property_default_arg1OV1p1qACyxGx_x_SittcfcfA0_ : $@convention(thin) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> () -> (@out τ_0_0, Int)
 // CHECK-NEXT: [[TMP2:%.*]] = alloc_stack $Int

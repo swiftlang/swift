@@ -58,7 +58,7 @@ struct X4 {
 
 struct X5 {
   static var stored : Int = 1
-  
+
   static subscript (i : Int) -> Int {
     get {
       return stored + i
@@ -71,7 +71,7 @@ struct X5 {
 
 class X6 {
   static var stored : Int = 1
-  
+
   class subscript (i : Int) -> Int {
     get {
       return stored + i
@@ -118,7 +118,7 @@ class Y3 {
 
 class Y4 {
   var x = X()
-  
+
   static subscript(idx: Int) -> X {
     get { return x } // expected-error {{instance member 'x' cannot be used on type 'Y4'}}
     set {}
@@ -127,7 +127,7 @@ class Y4 {
 
 class Y5 {
   static var x = X()
-  
+
   subscript(idx: Int) -> X {
     get { return x } // expected-error {{static member 'x' cannot be used on instance of type 'Y5'}}
     set {}
@@ -259,7 +259,7 @@ func test_subscript(_ x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubs
 
   value = ret[i]
   ret[i] = value
-  
+
   X5[i] = value
   value = X5[i]
 }
@@ -271,13 +271,13 @@ func test_proto_static<XP1Type: XP1>(
                                      ) {
   existential[i] = value
   value = existential[i]
-  
+
   type(of: existential)[i] = value
   value = type(of: existential)[i]
 
   generic[i] = value
   value = generic[i]
-  
+
   XP1Type[i] = value
   value = XP1Type[i]
 }
@@ -432,7 +432,7 @@ class Foo {
         get { a } // expected-error {{cannot find 'a' in scope}}
         set { b } // expected-error {{cannot find 'b' in scope}}
     }
-    
+
     subscript(key: String) -> String { // expected-error {{invalid redeclaration of 'subscript(_:)'}}
         get { _ = 0; a } // expected-error {{cannot find 'a' in scope}}
         set { b } // expected-error {{cannot find 'b' in scope}}

@@ -180,7 +180,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
       return nil
     }
   }
-  
+
   var instruction: Instruction {
     switch self {
     case .beginBorrow(let bbi):
@@ -308,7 +308,7 @@ enum BeginBorrowValue {
       return nil
     }
   }
-  
+
   var value: Value {
     switch self {
     case .beginBorrow(let bbi): return bbi

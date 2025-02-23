@@ -1307,4 +1307,4 @@ typedef struct
 test_a_big_struct_2;
 
 void test_a_print(test_a_big_struct_1 *big_struct_1, test_a_big_struct_2 *big_struct_2);
-  
+

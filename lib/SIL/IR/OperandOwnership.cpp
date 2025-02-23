@@ -581,13 +581,13 @@ OperandOwnershipClassifier::visitPartialApplyInst(PartialApplyInst *i) {
     if (operandTy.isTrivial(*i->getFunction())) {
       return OperandOwnership::TrivialUse;
     }
-    
+
     // Borrowing of address operands is ultimately handled by the move-only
     // address checker and/or exclusivity checker rather than by value ownership.
     if (operandTy.isAddress()) {
       return OperandOwnership::TrivialUse;
     }
-  
+
     return OperandOwnership::Borrow;
   }
   // All non-trivial types should be captured.
@@ -722,7 +722,7 @@ namespace {
 struct OperandOwnershipBuiltinClassifier
     : SILBuiltinVisitor<OperandOwnershipBuiltinClassifier, OperandOwnership> {
   using Map = OperandOwnership;
-      
+
   const Operand &op;
   OperandOwnershipBuiltinClassifier(const Operand &op) : op(op) {}
 
@@ -952,7 +952,7 @@ OperandOwnershipBuiltinClassifier
     // The result buffer pointer is a trivial use.
     return OperandOwnership::TrivialUse;
   }
-  
+
   // The closure is borrowed while the async let task is executing.
   return OperandOwnership::Borrow;
 }

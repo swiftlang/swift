@@ -60,13 +60,13 @@ private func testForeignContiguous(slowString: NSSlowString, string: String) {
   var slowString = NSSlowString(string: string) as String
   expectFalse(slowString.isFastUTF8)
   expectEqualSequence(string.utf8, slowString.utf8)
-  
+
   // They become fast when mutated
   slowString.makeNative()
   expectTrue(slowString.isFastUTF8)
   expectEqualSequence(
     string.utf8, slowString.withFastUTF8IfAvailable(Array.init)!)
-  
+
   // Contiguous ASCII CFStrings provide access, even if lazily bridged
   if string.isASCII {
     let cfString = string.withCString {

@@ -305,11 +305,11 @@ ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
     requirement->diagnose(diag::broken_comparable_requirement);
     return nullptr;
   }
-  
+
   // Build the necessary decl.
   auto enumeration = dyn_cast<EnumDecl>(this->Nominal);
   assert(enumeration);
-  
+
   std::pair<BraceStmt *, bool> (*synthesizer)(AbstractFunctionDecl *, void *);
   if (enumeration->hasCases()) {
     if (enumeration->hasOnlyCasesWithoutAssociatedValues()) {

@@ -26,7 +26,7 @@ public class Outer {
       let i : Int64
       init(_ val : Int64) { i = val }
     }
-    
+
     init(val : Int64) { member = InA(val) }
     fileprivate let member : InA
     // CHECK: !DISubprogram(name: "getMember"

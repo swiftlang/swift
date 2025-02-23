@@ -53,12 +53,12 @@ struct HasForwardDeclaredNestedType {
 
 struct HasForwardDeclaredTemplateChild {
   template <class T> struct ForwardDeclaredClassTemplate;
-  
+
   struct DeclaresForwardDeclaredClassTemplateFriend {
     template <class T>
     friend struct HasForwardDeclaredTemplateChild::ForwardDeclaredClassTemplate;
   };
-  
+
   template <class T> struct ForwardDeclaredClassTemplate { };
 };
 

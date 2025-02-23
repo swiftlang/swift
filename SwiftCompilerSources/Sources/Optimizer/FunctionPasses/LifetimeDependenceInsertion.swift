@@ -95,7 +95,7 @@ extension LifetimeDependentApply {
     case yield
     case yieldAddress
   }
-  
+
   /// A lifetime argument that either inherits or creates a new scope for the lifetime of the argument value.
   struct LifetimeSource {
     let targetKind: TargetKind
@@ -411,7 +411,7 @@ struct VariableIntroducerUseDefWalker : ForwardingUseDefWalker {
   mutating func deinitialize() {
     visitedValues.deinitialize()
   }
- 
+
   mutating func needWalk(for value: Value, _ owner: Value?) -> Bool {
     visitedValues.insert(value)
   }

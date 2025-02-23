@@ -23,7 +23,7 @@ struct SpecializationCloner {
     self.bridged = BridgedSpecializationCloner(emptySpecializedFunction.bridged)
     self.context = context
   }
-  
+
   var cloned: Function {
     bridged.getCloned().function
   }

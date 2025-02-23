@@ -164,11 +164,11 @@ final class FakeActorSystem: @unchecked Sendable, DistributedActorSystem {
 
   var n = 0
   let group: DispatchGroup
-  
+
   init(group: DispatchGroup) {
     self.group = group
   }
-  
+
   deinit {
     print("Deinit ActorSystem: mainExecutor=\(isMainExecutor()) mainThread=\(isMainThread())")
     group.leave()
@@ -322,7 +322,7 @@ func test() {
   // CHECK: Deinitializing ActorAddress(address: "[[ADDR3]]") remote:false isolated:false mainThread:true
   // CHECK-NEXT: resign address:ActorAddress(address: "[[ADDR3]]")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
-  
+
   // resign must happen as the _last thing_ after user-deinit completed
   check {
     DA_userDefined_isolated(system: DefaultDistributedActorSystem(group: group))
@@ -342,7 +342,7 @@ func test() {
   // CHECK: Deinitializing ActorAddress(address: "[[ADDR5]]") name=Foo age=37 remote:false isolated:false mainThread:true
   // CHECK-NEXT: resign address:ActorAddress(address: "[[ADDR5]]")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
-  
+
   // resign must happen as the _last thing_ after user-deinit completed
   check {
     DA_state_isolated(name: "Bar", age:42, system: DefaultDistributedActorSystem(group: group))
@@ -352,7 +352,7 @@ func test() {
   // CHECK: Deinitializing ActorAddress(address: "[[ADDR6]]") name=Bar age=42 remote:false isolated:true mainThread:true
   // CHECK-NEXT: resign address:ActorAddress(address: "[[ADDR6]]")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=false mainThread=true
-  
+
   // resign must happen as the _last thing_ after user-deinit completed
   check {
     DA_state_isolated_on_another(name: "Baz", age:57, system: DefaultDistributedActorSystem(group: group))
@@ -372,7 +372,7 @@ func test() {
   // MUST NOT run deinit body for a remote distributed actor
   // CHECK-NOT: Deinitializing ActorAddress(address: "remote-1")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
-  
+
   // a remote actor should not resign it's address, it was never "assigned" it
   check {
     let address = ActorAddress(parse: "remote-2")
@@ -382,7 +382,7 @@ func test() {
   // MUST NOT run deinit body for a remote distributed actor
   // CHECK-NOT: Deinitializing ActorAddress(address: "remote-2")
   // CHECK-NEXT: Deinit ActorSystem: mainExecutor=true mainThread=true
-  
+
   // a remote actor should not resign it's address, it was never "assigned" it
   check {
     let address = ActorAddress(parse: "remote-3")

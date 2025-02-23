@@ -19,9 +19,9 @@
 
   open class Dishwasher {
     public init() {}
-    
+
     var wicket = SpimsterWicket()
-    
+
     open var modelName: String { "Dishwasher" }
   }
 

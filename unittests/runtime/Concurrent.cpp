@@ -19,7 +19,7 @@ using namespace swift;
 
 TEST(ConcurrentReadableArrayTest, SingleThreaded) {
   ConcurrentReadableArray<size_t> array;
-  
+
   auto add = [&](size_t limit) {
     for (size_t i = array.snapshot().count(); i < limit; i++)
       array.push_back(i);
@@ -31,7 +31,7 @@ TEST(ConcurrentReadableArrayTest, SingleThreaded) {
       i++;
     }
   };
-  
+
   check();
   add(1);
   check();

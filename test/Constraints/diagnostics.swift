@@ -268,7 +268,7 @@ class r21447318 {
 
 func test21447318(_ a : r21447318, b : () -> r21447318) {
   a.doThing.doThing()  // expected-error {{method 'doThing' was used as a property; add () to call it}} {{12-12=()}}
-  
+
   b.doThing() // expected-error {{function 'b' was used as a property; add () to call it}} {{4-4=()}}
 }
 
@@ -289,7 +289,7 @@ func r18800223(_ i : Int) {
   // 19648528
   _ = true ? [i] : i // expected-error {{result values in '? :' expression have mismatching types '[Int]' and 'Int'}}
 
-  
+
   var buttonTextColor: String?
   _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
 }
@@ -396,12 +396,12 @@ enum Color {
   case Unknown(description: String)
 
   static func rainbow() -> Color {}
-  
+
   static func overload(a : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(a:)')}}
   // expected-note@-1 {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
   static func overload(b : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(b:)')}}
   // expected-note@-1 {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
-  
+
   static func frob(_ a : Int, b : inout Int) -> Color {}
   static var svar: Color { return .Red }
 }
@@ -527,7 +527,7 @@ typealias MyClosure = ([Int]) -> Bool
 func r21684487() {
   var closures = Array<MyClosure>()
   let testClosure = {(list: [Int]) -> Bool in return true}
-  
+
   let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot check reference equality of functions;}}
 }
 
@@ -537,10 +537,10 @@ func r18397777(_ d : r21447318?) {
 
   if c != nil { // expected-warning {{comparing non-optional value of type 'r21447318' to 'nil' always returns true}}
   }
-  
+
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
   }
-  
+
   if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{8-8= == nil)}}
 
   }
@@ -614,7 +614,7 @@ extension Array {
   func g() -> String {
     return "foo".unavail([""])  // expected-error {{'unavail' is unavailable: calling this is unwise}}
   }
-  
+
   func h() -> String {
     return "foo".unavail([0])  // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
   }
@@ -694,7 +694,7 @@ func test17875634() {
   var match: [(Int, Int)] = []
   var row = 1
   var col = 2
-  
+
   match.append(row, col)  // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
 }
 
@@ -763,7 +763,7 @@ func nilComparison(i: Int, o: AnyObject) {
   _ = Optional.none == i // expected-warning {{comparing non-optional value of type 'Int' to 'Optional.none' always returns false}}
   _ = i != Optional.none // expected-warning {{comparing non-optional value of type 'Int' to 'Optional.none' always returns true}}
   _ = Optional.none != i // expected-warning {{comparing non-optional value of type 'Int' to 'Optional.none' always returns true}}
-  
+
   // FIXME(integers): uncomment these tests once the < is no longer ambiguous
   // _ = i < nil  // _xpected-error {{type 'Int' is not optional, value can never be nil}}
   // _ = nil < i  // _xpected-error {{type 'Int' is not optional, value can never be nil}}

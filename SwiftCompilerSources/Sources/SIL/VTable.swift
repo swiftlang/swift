@@ -68,7 +68,7 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
   public struct EntryArray : BridgedRandomAccessCollection {
     fileprivate let bridgedTable: BridgedVTable
     public let count: Int
-    
+
     init(vTable: VTable) {
       self.bridgedTable = vTable.bridged
       self.count = vTable.bridged.getNumEntries()
@@ -76,7 +76,7 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
 
     public var startIndex: Int { return 0 }
     public var endIndex: Int { return count }
-    
+
     public subscript(_ index: Int) -> Entry {
       assert(index >= startIndex && index < endIndex)
       return Entry(bridged: bridgedTable.getEntry(index))

@@ -87,10 +87,10 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     let result = _ContiguousArrayBuffer<AnyObject>(
       _uninitializedCount: boundsCount,
       minimumCapacity: 0)
-    
+
     let base = UnsafeMutableRawPointer(result.firstElementAddress)
       .assumingMemoryBound(to: AnyObject.self)
-      
+
     for idx in 0..<boundsCount {
       (base + idx).initialize(to: core.objectAt(idx + bounds.lowerBound))
     }

@@ -1315,7 +1315,7 @@ extension BinaryInteger {
     -> (quotient: Self, remainder: Self) {
     return (self / rhs, self % rhs)
   }
-  
+
   @inlinable
   public func isMultiple(of other: Self) -> Bool {
     // Nothing but zero is a multiple of zero.
@@ -2128,7 +2128,7 @@ where Magnitude: FixedWidthInteger & UnsignedInteger,
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
   static func &<<=(lhs: inout Self, rhs: Self)
-  
+
   /// Returns the product of the two given values, wrapping the result in case
   /// of any overflow.
   ///
@@ -2201,7 +2201,7 @@ extension FixedWidthInteger {
     return byteSwapped
 #endif
   }
-  
+
   // Default implementation of multipliedFullWidth.
   //
   // This implementation is mainly intended for [U]Int64 on 32b platforms. It
@@ -2486,7 +2486,7 @@ extension FixedWidthInteger {
       generator.next(upperBound: delta)
     )
   }
-  
+
   /// Returns a random value within the specified range.
   ///
   /// Use this method to generate an integer within a specific range. This
@@ -2559,7 +2559,7 @@ extension FixedWidthInteger {
       generator.next(upperBound: delta)
     )
   }
-  
+
   /// Returns a random value within the specified range.
   ///
   /// Use this method to generate an integer within a specific range. This
@@ -3083,7 +3083,7 @@ extension UnsignedInteger where Self: FixedWidthInteger {
   /// For unsigned integer types, this value is always `0`.
   @_transparent
   public static var min: Self { return 0 }
-  
+
   @_alwaysEmitIntoClient
   public func dividingFullWidth(
     _ dividend: (high: Self, low: Magnitude)
@@ -3100,7 +3100,7 @@ extension UnsignedInteger where Self: FixedWidthInteger {
     // somehow manages not to in a way that would break this conversion then
     // a default implementation of this method never could have worked anyway.
     let low = Self(dividend.low)
-    
+
     // The basic algorithm is taken from Knuth (TAoCP, Vol 2, §4.3.1), using
     // words that are half the size of Self (so the dividend has four words
     // and the divisor has two). The fact that the denominator has exactly
@@ -3114,7 +3114,7 @@ extension UnsignedInteger where Self: FixedWidthInteger {
     // We begin by counting the leading zeros so we know how many bits we
     // have to shift to normalize.
     let lz = leadingZeroBitCount
-    
+
     // If the divisor is actually a power of two, division is just a shift,
     // which we can handle much more efficiently. So we do a check for that
     // case and early-out if possible.
@@ -3124,7 +3124,7 @@ extension UnsignedInteger where Self: FixedWidthInteger {
       let r = low & (self &- 1)
       return (q, r)
     }
-    
+
     // Shift the divisor left by lz bits to normalize it. We shift the
     // dividend left by the same amount so that we get the quotient is
     // preserved (we will have to shift right to recover the remainder).
@@ -3133,7 +3133,7 @@ extension UnsignedInteger where Self: FixedWidthInteger {
     let v = self &<< lz
     let uh = dividend.high &<< lz | low >> (Self.bitWidth - lz)
     let ul = low &<< lz
-    
+
     // Now we have a normalized dividend (uh:ul) and divisor (v). Split
     // v into half-words (vh:vl) so that we can use the "normal" division
     // on Self as a word / halfword -> halfword division get one halfword
@@ -3142,14 +3142,14 @@ extension UnsignedInteger where Self: FixedWidthInteger {
     let mask = Self(1) &<< n_2 &- 1
     let vh = v &>> n_2
     let vl = v & mask
-    
+
     // For the (fairly-common) special case where vl is zero, we can simplify
     // the arithmetic quite a bit:
     if vl == .zero {
       let qh = uh / vh
       let residual = (uh &- qh &* vh) &<< n_2 | ul &>> n_2
       let ql = residual / vh
-      
+
       return (
         // Assemble quotient from half-word digits
         quotient: qh &<< n_2 | ql,
@@ -3157,7 +3157,7 @@ extension UnsignedInteger where Self: FixedWidthInteger {
         remainder: ((residual &- ql &* vh) &<< n_2 | ul & mask) &>> lz
       )
     }
-    
+
     // Helper function: performs a (1½ word)/word division to produce a
     // half quotient word q. We'll need to use this twice to generate the
     // full quotient.
@@ -3184,14 +3184,14 @@ extension UnsignedInteger where Self: FixedWidthInteger {
       }
       return q̂
     }
-    
+
     // Generate the first quotient digit, subtract off its product with the
     // divisor to generate the residual, then compute the second quotient
     // digit from that.
     let qh = generateHalfDigit(high: uh, low: ul &>> n_2)
     let residual = (uh &<< n_2 | ul &>> n_2) &- (qh &* v)
     let ql = generateHalfDigit(high: residual, low: ul & mask)
-    
+
     return (
       // Assemble quotient from half-word digits
       quotient: qh &<< n_2 | ql,
@@ -3218,7 +3218,7 @@ public protocol SignedInteger: BinaryInteger, SignedNumeric {
   // when compiled with Swift 5.5 and earlier.
   @available(*, deprecated, message: "Use &+ instead.")
   static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self
-  
+
   @available(*, deprecated, message: "Use &- instead.")
   static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self
 }
@@ -3304,7 +3304,7 @@ extension SignedInteger where Self: FixedWidthInteger {
   public static var min: Self {
     return (-1 as Self) &<< Self._highBitIndex
   }
-  
+
   @inlinable
   public func isMultiple(of other: Self) -> Bool {
     // Nothing but zero is a multiple of zero.
@@ -3314,7 +3314,7 @@ extension SignedInteger where Self: FixedWidthInteger {
     // Having handled those special cases, this is safe.
     return self % other == 0
   }
-  
+
   @_alwaysEmitIntoClient
   public func dividingFullWidth(
     _ dividend: (high: Self, low: Magnitude)
@@ -3371,7 +3371,7 @@ extension SignedInteger {
   public static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self {
     fatalError("Should be overridden in a more specific type")
   }
-  
+
   @available(*, deprecated, message: "Use &- instead.")
   public static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self {
     fatalError("Should be overridden in a more specific type")
@@ -3385,7 +3385,7 @@ extension SignedInteger where Self: FixedWidthInteger {
   public static func &+(lhs: Self, rhs: Self) -> Self {
     lhs.addingReportingOverflow(rhs).partialValue
   }
-  
+
   // This may be called in rare situations by binaries compiled with
   // Swift 5.5 and earlier, so we need to keep it around for compatibility.
   // We can't mark it unavailable, because then the concrete signed integer
@@ -3399,7 +3399,7 @@ extension SignedInteger where Self: FixedWidthInteger {
   public static func &-(lhs: Self, rhs: Self) -> Self {
     lhs.subtractingReportingOverflow(rhs).partialValue
   }
-  
+
   // This may be called in rare situations by binaries compiled with
   // Swift 5.5 and earlier, so we need to keep it around for compatibility.
   // We can't mark it unavailable, because then the concrete signed integer

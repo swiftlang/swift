@@ -11,24 +11,24 @@ func callUnavailableObjC() {
       // expected-note@-1 5{{add @available attribute to enclosing global function}}
   _ = NSAvailableOn51() // expected-error {{'NSAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-  
-  
+
+
   if #available(OSX 51, *) {
     let o = NSAvailableOn51()!
-    
+
     // Properties
     _ = o.propertyOn52 // expected-error {{'propertyOn52' is only available in macOS 52 or newer}}
         // expected-note@-1 {{add 'if #available' version check}}
 
     o.propertyOn52 = 22 // expected-error {{'propertyOn52' is only available in macOS 52 or newer}}
         // expected-note@-1 {{add 'if #available' version check}}
-    
+
     // Methods
     o.methodAvailableOn52() // expected-error {{'methodAvailableOn52()' is only available in macOS 52 or newer}}
         // expected-note@-1 {{add 'if #available' version check}}
-    
+
     // Initializers
-    
+
     _ = NSAvailableOn51(stringOn52:"Hi") // expected-error {{'init(stringOn52:)' is only available in macOS 52 or newer}}
         // expected-note@-1 {{add 'if #available' version check}}
   }

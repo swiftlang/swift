@@ -21,10 +21,10 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info") {
   (function: Function, context: FunctionPassContext) in
 
   print("Escape information for \(function.name):")
-  
+
   struct Visitor : EscapeVisitorWithResult {
     var result: Set<String> =  Set()
-    
+
     mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
       if operand.instruction is ReturnInst {
         result.insert("return[\(path.projectionPath)]")
@@ -32,7 +32,7 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info") {
       }
       return .continueWalk
     }
-    
+
     mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
       guard let arg = def as? FunctionArgument else {
         return .continueWalkUp
@@ -41,11 +41,11 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info") {
       return .walkDown
     }
   }
-  
-  
+
+
   for inst in function.instructions {
     if let allocRef = inst as? AllocRefInst {
-      
+
       let resultStr: String
       if let result = allocRef.visit(using: Visitor(), context) {
         if result.isEmpty {
@@ -75,7 +75,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
 
   var valuesToCheck = [Value]()
   var applies = [Instruction]()
-  
+
   for inst in function.instructions {
     switch inst {
       case let fli as FixLifetimeInst:
@@ -86,7 +86,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
         break
     }
   }
-  
+
   struct Visitor : EscapeVisitor {
     let apply: Instruction
     mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
@@ -116,7 +116,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
       }
     }
   }
-  
+
   // test `canReferenceSameField` for each pair of `fix_lifetime`.
   if !valuesToCheck.isEmpty {
     for lhsIdx in 0..<(valuesToCheck.count - 1) {
@@ -154,6 +154,6 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
       }
     }
   }
-  
+
   print("End function \(function.name)\n")
 }

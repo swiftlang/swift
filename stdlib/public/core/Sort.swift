@@ -273,7 +273,7 @@ extension MutableCollection where Self: BidirectionalCollection {
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows {
     var sortedEnd = sortedEnd
-    
+
     // Continue sorting until the sorted elements cover the whole sequence.
     while sortedEnd != range.upperBound {
       var i = sortedEnd
@@ -281,21 +281,21 @@ extension MutableCollection where Self: BidirectionalCollection {
       // moving each element forward to make room.
       repeat {
         let j = index(before: i)
-        
+
         // If `self[i]` doesn't belong before `self[j]`, we've found
         // its position.
         if try !areInIncreasingOrder(self[i], self[j]) {
           break
         }
-        
+
         swapAt(i, j)
         i = j
       } while i != range.lowerBound
-      
+
       formIndex(after: &sortedEnd)
     }
   }
-  
+
   /// Sorts `self[range]` according to `areInIncreasingOrder`. Stable.
   @inlinable
   public // @testable
@@ -306,14 +306,14 @@ extension MutableCollection where Self: BidirectionalCollection {
     if range.isEmpty {
       return
     }
-    
+
     // One element is trivially already-sorted, so the actual sort can
     // start on the second element.
     let sortedEnd = index(after: range.lowerBound)
     try _insertionSort(
       within: range, sortedEnd: sortedEnd, by: areInIncreasingOrder)
   }
-  
+
   /// Reverses the elements in the given range.
   @inlinable
   internal mutating func _reverse(
@@ -353,7 +353,7 @@ internal func _merge<Element>(
 ) rethrows -> Bool {
   let lowCount = mid - low
   let highCount = high - mid
-  
+
   var destLow = low         // Lower bound of uninitialized storage
   var bufferLow = buffer    // Lower bound of the initialized buffer
   var bufferHigh = buffer   // Upper bound of the initialized buffer
@@ -365,7 +365,7 @@ internal func _merge<Element>(
   defer {
     destLow.moveInitialize(from: bufferLow, count: bufferHigh - bufferLow)
   }
-  
+
   if lowCount < highCount {
     // Move the lower group of elements into the buffer, then traverse from
     // low to high in both the buffer and the higher group of elements.
@@ -382,7 +382,7 @@ internal func _merge<Element>(
     //        bufferLow     bufferHigh
     buffer.moveInitialize(from: low, count: lowCount)
     bufferHigh = bufferLow + lowCount
-    
+
     var srcLow = mid
 
     // Each iteration moves the element that compares lower into `destLow`,
@@ -415,7 +415,7 @@ internal func _merge<Element>(
     //                          bufferLow         bufferHigh
     buffer.moveInitialize(from: mid, count: highCount)
     bufferHigh = bufferLow + highCount
-    
+
     var destHigh = high
     var srcHigh = mid
     destLow = mid
@@ -434,7 +434,7 @@ internal func _merge<Element>(
       ) {
         srcHigh -= 1
         destHigh.moveInitialize(from: srcHigh, count: 1)
-        
+
         // Moved an element from the lower initialized portion to the upper,
         // sorted, initialized portion, so `destLow` moves down one.
         destLow -= 1
@@ -464,7 +464,7 @@ internal func _merge<Element>(
 internal func _minimumMergeRunLength(_ c: Int) -> Int {
   // Max out at `2^6 == 64` elements
   let bitsToUse = 6
-  
+
   if c < 1 << bitsToUse {
     return c
   }
@@ -498,7 +498,7 @@ internal func _findNextRun<C: RandomAccessCollection>(
   // descending run will be reversed, it must be strictly descending.
   let isDescending =
     try areInIncreasingOrder(elements[current], elements[previous])
-  
+
   // Advance `current` until there's a break in the ascending / descending
   // pattern.
   repeat {
@@ -506,7 +506,7 @@ internal func _findNextRun<C: RandomAccessCollection>(
     elements.formIndex(after: &current)
   } while try current < elements.endIndex &&
     isDescending == areInIncreasingOrder(elements[current], elements[previous])
-    
+
   return(current, isDescending)
 }
 
@@ -534,14 +534,14 @@ extension UnsafeMutableBufferPointer {
     let low = runs[i - 1].lowerBound
     let middle = runs[i].lowerBound
     let high = runs[i].upperBound
-    
+
     try _merge(
       low: baseAddress! + low,
       mid: baseAddress! + middle,
       high: baseAddress! + high,
       buffer: buffer,
       by: areInIncreasingOrder)
-    
+
     runs[i - 1] = low..<high
     runs.remove(at: i)
 
@@ -586,11 +586,11 @@ extension UnsafeMutableBufferPointer {
     //
     // If W > X + Y, X > Y + Z, and Y > Z, then the invariants are satisfied
     // for the entirety of `runs`.
-    
+
     // The invariant is always in place for a single element.
     while runs.count > 1 {
       var lastIndex = runs.count - 1
-      
+
       // Check for the three invariant-breaking conditions, and break out of
       // the while loop if none are met.
       if lastIndex >= 3 &&
@@ -618,7 +618,7 @@ extension UnsafeMutableBufferPointer {
         // All invariants satisfied!
         break
       }
-      
+
       // Merge the runs at `i` and `i - 1`.
       try _mergeRuns(
         &runs, at: lastIndex, buffer: buffer, by: areInIncreasingOrder)
@@ -652,7 +652,7 @@ extension UnsafeMutableBufferPointer {
 
     return true
   }
-  
+
   /// Sorts the elements of this buffer according to `areInIncreasingOrder`,
   /// using a stable, adaptive merge sort.
   ///
@@ -678,7 +678,7 @@ extension UnsafeMutableBufferPointer {
     _ = try Array<Element>(_unsafeUninitializedCapacity: count / 2) {
       buffer, _ in
       var runs: [Range<Index>] = []
-      
+
       var start = startIndex
       while start < endIndex {
         // Find the next consecutive run, reversing it if necessary.
@@ -687,7 +687,7 @@ extension UnsafeMutableBufferPointer {
         if descending {
           _reverse(within: start..<end)
         }
-        
+
         // If the current run is shorter than the minimum length, use the
         // insertion sort to extend it.
         if end < endIndex && end - start < minimumRunLength {
@@ -696,7 +696,7 @@ extension UnsafeMutableBufferPointer {
             within: start..<newEnd, sortedEnd: end, by: areInIncreasingOrder)
           end = newEnd
         }
-        
+
         // Append this run and merge down as needed to maintain the `runs`
         // invariants.
         runs.append(start..<end)
@@ -704,7 +704,7 @@ extension UnsafeMutableBufferPointer {
           &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
         start = end
       }
-      
+
       try _finalizeRuns(
         &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
       _internalInvariant(runs.count == 1, "Didn't complete final merge")

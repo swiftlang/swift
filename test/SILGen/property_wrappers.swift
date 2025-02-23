@@ -362,7 +362,7 @@ struct WrapperWithDefaultInit<T> {
   init() {
     self.storage = nil
   }
-  
+
   init(wrappedValue initialValue: T) {
     self.storage = initialValue
   }

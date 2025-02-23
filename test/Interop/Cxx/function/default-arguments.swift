@@ -61,7 +61,7 @@ DefaultArgTestSuite.test("func with mutating integer argument") {
 DefaultArgTestSuite.test("func with non-trailing argument") {
   let t0 = nonTrailing()
   expectEqual(3, t0)
-  
+
   let t1 = nonTrailing(5, 6)
   expectEqual(11, t1)
 }

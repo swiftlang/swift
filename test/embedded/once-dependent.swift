@@ -9,7 +9,7 @@
 
 public struct MyStructA {
   static var singleton = MyStructA()
-  
+
   init() {
     print("MyStructA.init")
     _ = MyStructB.singleton
@@ -19,7 +19,7 @@ public struct MyStructA {
 
 public struct MyStructB {
   static var singleton = MyStructB()
-  
+
   init() {
     print("MyStructB.init")
     _ = MyStructC.singleton
@@ -29,7 +29,7 @@ public struct MyStructB {
 
 public struct MyStructC {
   static var singleton = MyStructC()
-  
+
   init() {
     print("MyStructC.init")
     print("MyStructC.init done")

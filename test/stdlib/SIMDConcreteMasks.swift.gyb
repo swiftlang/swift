@@ -81,7 +81,7 @@ ${Scalar}x${n}Mask_TestSuite.test("comparisons") {
   expectFalse(any(a .!= a))
   expectFalse(any(a .== .!a))
 }
-  
+
 ${Scalar}x${n}Mask_TestSuite.test("replacing") {
   let a = SIMDMask<${Vector}>.random()
   let b = SIMDMask<${Vector}>.random()

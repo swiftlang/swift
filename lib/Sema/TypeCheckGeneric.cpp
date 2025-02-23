@@ -165,9 +165,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       auto *paramType = GenericTypeParamType::getType(opaqueSignatureDepth, i,
                                                       ctx);
       genericParamTypes.push_back(paramType);
-    
+
       TypeRepr *constraint = currentRepr;
-      
+
       if (auto opaqueReturn = dyn_cast<OpaqueReturnTypeRepr>(currentRepr)){
         constraint = opaqueReturn->getConstraint();
       }

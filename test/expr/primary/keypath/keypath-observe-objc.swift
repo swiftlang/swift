@@ -16,26 +16,26 @@ class Foo: NSObject {
 
 class Bar: NSObject {
   @objc dynamic let foo: Foo
-  
+
   init(foo: Foo) {
     self.foo = foo
     super.init()
-    
+
     _ = observe(\.foo.number1, options: [.new]) { _, change in
       // expected-warning@-1 {{passing reference to non-'@objc dynamic' property 'number1' to KVO method 'observe(_:options:changeHandler:)' may lead to unexpected behavior or runtime trap}}
       print("observer1")
     }
-    
+
     _ = observe(\.foo.number2, options: [.new]) { _, change in
       // expected-warning@-1 {{passing reference to non-'@objc dynamic' property 'number2' to KVO method 'observe(_:options:changeHandler:)' may lead to unexpected behavior or runtime trap}}
       print("observer2")
     }
-    
+
     _ = observe(\.foo.number3, options: [.new]) { _, change in
       // expected-warning@-1 {{passing reference to non-'@objc dynamic' property 'number3' to KVO method 'observe(_:options:changeHandler:)' may lead to unexpected behavior or runtime trap}}
       print("observer3")
     }
-    
+
     _ = observe(\.foo.number4, options: [.new]) { _, change in // Okay
       print("observer4")
     }

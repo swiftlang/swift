@@ -113,7 +113,7 @@ extension Duration {
   public var attoseconds: Int128 {
     Int128(_low: _low, _high: _high)
   }
-  
+
   /// Construct a `Duration` from the given number of attoseconds.
   ///
   /// This directly constructs a `Duration` from the given number of attoseconds.
@@ -146,7 +146,7 @@ extension Duration {
     let highScaled = high * 1_000_000_000_000_000_000
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
-  
+
   /// Construct a `Duration` given a duration and scale, taking care so that
   /// exact integer durations are preserved exactly.
   internal init(_ duration: Double, scale: UInt64) {

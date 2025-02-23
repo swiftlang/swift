@@ -24,7 +24,7 @@ struct S : Sendable {
 
 enum E : Sendable {
   case a, b, c
-  
+
   func f() {}
 }
 
@@ -43,7 +43,7 @@ struct InferredSendableS: P {
 enum InferredSendableE: P {
   case a, b
   case c(Int)
-  
+
   func f() { }
 }
 

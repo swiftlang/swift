@@ -262,7 +262,7 @@ struct IsolationError {
   SourceLoc loc;
 
   bool preconcurrency;
-  
+
   Diagnostic diag;
 
 public:

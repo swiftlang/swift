@@ -37,7 +37,7 @@ enum class PlatformKind: uint8_t {
 /// Returns the short string representing the platform, suitable for
 /// use in availability specifications (e.g., "OSX").
 StringRef platformString(PlatformKind platform);
-  
+
 /// Returns the platform kind corresponding to the passed-in short platform name
 /// or None if such a platform kind does not exist.
 std::optional<PlatformKind> platformFromString(StringRef Name);

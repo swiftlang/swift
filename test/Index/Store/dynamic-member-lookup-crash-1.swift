@@ -6,7 +6,7 @@
 @dynamicMemberLookup
 public protocol Foo {
   associatedtype Value
-  
+
   var value: Value { get }
   subscript<U>(dynamicMember keyPath: KeyPath<Value, U>) -> U { get }
 }

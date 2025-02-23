@@ -104,10 +104,10 @@ class Cat : FakeNSObject {
     // CHECK:      store [[ARG2]] to [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: [[COND:%.+]] = struct_extract [[ARG0]] : $Bool, #Bool._value
     // CHECK-NEXT: cond_br [[COND]], bb1, bb2
-  
+
   // CHECK: bb1:
     // CHECK-NEXT: br [[ERROR_BRANCH:bb[0-9]+]]
-      
+
   // CHECK: bb{{[0-9]+}}:
     // CHECK: [[RELOAD_SELF:%.*]] = load [[SELF_BOX]]
     // CHECK: [[SELF_INIT:%.+]] = objc_method [[RELOAD_SELF]] : $Cat, #Cat.init!initializer.foreign : (Cat.Type) -> (Int, Bool) -> Cat?

@@ -151,7 +151,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   if (ExpectedCallType && ExpectedCallType->hasUnresolvedType()) {
     ExpectedCallType = Type();
   }
-  
+
   auto *CallLocator = CS.getConstraintLocator(ParentCall);
   auto *CalleeLocator = S.getCalleeLocator(CallLocator);
 

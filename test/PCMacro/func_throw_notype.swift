@@ -16,7 +16,7 @@ import PlaygroundSupport
 
 #sourceLocation(file: "main.swift", line: 31)
 func function3(_ x: Int) throws {
-  
+
 }
 _ = try! function3(0)
 // this test is XFAIL-ed due to the range not including throws

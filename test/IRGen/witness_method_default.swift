@@ -9,7 +9,7 @@ public protocol SIMDStorageStub {
 public protocol SIMDScalarStub {
  associatedtype SIMD2Storage : SIMDStorageStub
    where SIMD2Storage.Scalar == Self
- 
+
  func abs() -> Self
 }
 

@@ -230,7 +230,7 @@ public:
 
   /// Does this pattern have any mutable 'var' bindings?
   bool hasAnyMutableBindings() const;
-  
+
   /// Get the ownership behavior of this pattern on the value being matched
   /// against it.
   ///
@@ -420,7 +420,7 @@ public:
   /// "async let _: Type = <expr>" or simply just an \c AnyPattern in 
   /// "async let _ = <expr>" case.
   bool isAsyncLet() const { return bool(Bits.AnyPattern.IsAsyncLet); }
-  
+
   void setIsAsyncLet() {
     Bits.AnyPattern.IsAsyncLet = static_cast<uint64_t>(true);
   }

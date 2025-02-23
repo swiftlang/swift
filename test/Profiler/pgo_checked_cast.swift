@@ -58,7 +58,7 @@ func main() {
   var sum : Int32 = 0
 
   sum += check1("The answer to the life, the universe, and everything", answer)
-  
+
   sum += check2(B())
   sum += check2(C())
   sum += check2(C())

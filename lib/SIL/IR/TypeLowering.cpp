@@ -94,13 +94,13 @@ namespace {
     bool visitPackElementType(CanPackElementType type) {
       return false;
     }
-    
+
     /// Archetype metatypes have non-trivial representation in case
     /// they instantiate to a class metatype.
     bool visitArchetypeType(CanArchetypeType type) {
       return false;
     }
-    
+
     /// All levels of class metatypes support subtyping.
     bool visitMetatypeType(CanMetatypeType type) {
       return visit(type.getInstanceType());
@@ -369,13 +369,13 @@ namespace {
                                          IsTypeExpansionSensitive_t isSensitive){
       llvm_unreachable("not a real type");
     }
-    
+
     RecursiveProperties getBuiltinFixedArrayProperties(
                                       CanBuiltinFixedArrayType type,
                                       AbstractionPattern origType,
                                       IsTypeExpansionSensitive_t isSensitive) {
       RecursiveProperties props;
-      
+
       // We get most of the type properties from the element type.
       AbstractionPattern origElementType = AbstractionPattern::getOpaque();
       if (auto bfaOrigTy = origType.getAs<BuiltinFixedArrayType>()) {
@@ -383,17 +383,17 @@ namespace {
           origType.getGenericSignatureOrNull(),
           bfaOrigTy->getElementType());
       }
-      
+
       props.addSubobject(classifyType(origElementType, type->getElementType(),
                                       TC, Expansion));
-      
+
       props = mergeIsTypeExpansionSensitive(isSensitive, props);
-      
+
       // Fixed array regions are implied to be addressable-for-dependencies,
       // since the developer probably wants to be able to form Spans etc.
       // over them.
       props.setAddressableForDependencies();
-      
+
       // If the size isn't a known literal, then the layout is also dependent,
       // so make it address-only. If the size is massive, also treat it as
       // address-only since there's little practical benefit to passing around
@@ -406,7 +406,7 @@ namespace {
       }
       return props;
     }
-    
+
     RetTy visitBuiltinFixedArrayType(CanBuiltinFixedArrayType type,
                                      AbstractionPattern origType,
                                      IsTypeExpansionSensitive_t isSensitive) {
@@ -505,7 +505,7 @@ namespace {
       }
       llvm_unreachable("bad function representation");
     }
-    
+
     RetTy visitSILFunctionType(CanSILFunctionType type,
                                AbstractionPattern origType,
                                IsTypeExpansionSensitive_t isSensitive) {
@@ -540,7 +540,7 @@ namespace {
         return asImpl().handleReference(
             type, getReferenceRecursiveProperties(isSensitive));
       }
-      
+
       // Contextless function references are trivial types.
       return asImpl().handleTrivial(type,
                                     getTrivialRecursiveProperties(isSensitive));
@@ -885,7 +885,7 @@ namespace {
                                IsTypeExpansionSensitive_t isSensitive) {
       return this->visit(type.getSelfType(), origType, isSensitive);
     }
-    
+
     RetTy visitSILBlockStorageType(CanSILBlockStorageType type,
                                    AbstractionPattern origType,
                                    IsTypeExpansionSensitive_t isSensitive) {
@@ -1280,11 +1280,11 @@ namespace {
 
     // A reference to the lazily-allocated children vector.
     mutable ArrayRef<Child> Children = {};
-    
+
   protected:
     virtual void lowerChildren(TypeConverter &TC, SmallVectorImpl<Child> &children)
       const = 0;
-    
+
   public:
     LoadableAggTypeLowering(CanType type, RecursiveProperties properties,
                             TypeExpansionContext forExpansion)
@@ -1424,7 +1424,7 @@ namespace {
       forEachNonTrivialChild(B, loc, aggValue, Fn);
     }
   };
-  
+
   /// A lowering for loadable but non-trivial tuple types.
   class LoadableTupleTypeLowering final
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
@@ -1471,7 +1471,7 @@ namespace {
                               ArrayRef<SILValue> values) const override {
       return B.createTuple(loc, getLoweredType(), values);
     }
-  
+
   private:
     void lowerChildren(TypeConverter &TC, SmallVectorImpl<Child> &children)
     const override {
@@ -1531,14 +1531,14 @@ namespace {
                               ArrayRef<SILValue> values) const override {
       return B.createStruct(loc, getLoweredType(), values);
     }
-        
+
   private:
     void lowerChildren(TypeConverter &TC, SmallVectorImpl<Child> &children)
     const override {
       auto silTy = getLoweredType();
       auto structDecl = silTy.getStructOrBoundGenericStruct();
       assert(structDecl);
-      
+
       for (auto prop : structDecl->getStoredProperties()) {
         SILType propTy = silTy.getFieldType(prop, TC, getExpansionContext());
         auto &propTL = TC.getTypeLowering(propTy, getExpansionContext());
@@ -2344,7 +2344,7 @@ namespace {
                                  : SILValueCategory::Object);
       return new (TC) OpaqueValueTypeLowering(silType, properties, Expansion);
     }
-    
+
     TypeLowering *handleInfinite(CanType type,
                                  RecursiveProperties properties) {
       // Infinite types cannot actually be instantiated, so treat them as
@@ -2445,11 +2445,11 @@ namespace {
       return handleAggregateByProperties<LoadableTupleTypeLowering>(tupleType,
                                                                     properties);
     }
-    
+
     TypeLowering *visitBuiltinFixedArrayType(CanBuiltinFixedArrayType faType,
                                        AbstractionPattern origType,
                                        IsTypeExpansionSensitive_t isSensitive) {
-      
+
       return handleAggregateByProperties<MiscNontrivialTypeLowering>(faType,
                  getBuiltinFixedArrayProperties(faType, origType, isSensitive));
     }
@@ -2496,7 +2496,7 @@ namespace {
 
       return handleReference(classType, properties);
     }
-    
+
     // WARNING: when the specification of trivial types changes, also update
     // the isValueTrivial() API used by SILCombine.
     TypeLowering *visitAnyStructType(CanType structType,
@@ -2560,7 +2560,7 @@ namespace {
         properties.setLexical(IsLexical);
         return handleAddressOnly(structType, properties);
       }
-      
+
       if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
         properties.setAddressableForDependencies();
       }
@@ -2576,7 +2576,7 @@ namespace {
         auto substFieldType =
           field->getInterfaceType().subst(subMap)
                ->getCanonicalType();
-        
+
         // We are determining the recursive properties of the struct here,
         // not the lowered types of the fields, so instead of lowering the
         // field type against the declaration's interface type as we normally
@@ -2587,7 +2587,7 @@ namespace {
         auto origFieldType = origType.unsafeGetSubstFieldType(field,
                                                               interfaceTy,
                                                               subMap);
-        
+
         properties.addSubobject(classifyType(origFieldType, substFieldType,
                                              TC, Expansion));
         properties =
@@ -2682,11 +2682,11 @@ namespace {
               applyLifetimeAnnotation(elt->getLifetimeAnnotation(), properties);
           continue;
         }
-        
+
         auto substEltType =
           elt->getPayloadInterfaceType().subst(subMap)
              ->getCanonicalType();
-        
+
         auto origEltType = origType.unsafeGetSubstFieldType(elt,
                               elt->getPayloadInterfaceType()
                                  ->getReducedType(D->getGenericSignature()),
@@ -4174,7 +4174,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
                                    funcTy.getResult(),
                                    funcTy->getExtInfo());
   }
-  
+
   case SILDeclRef::Kind::Allocator: {
     auto *cd = cast<ConstructorDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
@@ -4366,7 +4366,7 @@ TypeConverter::getProtocolDispatchStrategy(ProtocolDecl *P) {
   // use witness tables.
   if (P->isObjC())
     return ProtocolDispatchStrategy::ObjC;
-  
+
   return ProtocolDispatchStrategy::Swift;
 }
 
@@ -4410,7 +4410,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   auto found = LoweredCaptures.find(fn);
   if (found != LoweredCaptures.end())
     return found->second;
-  
+
   // Recursively collect transitive captures from captured local functions.
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
 
@@ -4661,7 +4661,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     if (curFn.isDefaultArgGenerator()) {
       PrettyStackTraceSILLocation stack("lowering local captures",
                                         fn.getAsRegularLocation(), Context);
-      
+
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(curFn.getDecl())) {
         auto *param = getParameterAt(static_cast<ValueDecl *>(afd),
                                      curFn.defaultArgIndex);
@@ -4739,9 +4739,9 @@ TypeConverter::checkForABIDifferences(SILModule &M,
     // Forcing IUOs always requires a thunk.
     if (type1WasOptional && !type2WasOptional)
       return ABIDifference::NeedsThunk;
-  
+
     // Except for the above case, we should not be making a value less optional.
-    
+
     // If we're introducing a level of optionality, only certain types are
     // ABI-compatible -- check below.
     optionalityChange = (!type1WasOptional && type2WasOptional);
@@ -4756,7 +4756,7 @@ TypeConverter::checkForABIDifferences(SILModule &M,
   // we're done.
   if (type1 == type2 && !optionalityChange)
     return ABIDifference::CompatibleRepresentation;
-  
+
   // Classes, class-constrained archetypes, and pure-ObjC existential types
   // all have single retainable pointer representation; optionality change
   // is allowed.
@@ -4787,7 +4787,7 @@ TypeConverter::checkForABIDifferences(SILModule &M,
       return checkFunctionForABIDifferences(M, fnTy1, fnTy2);
     }
   }
-  
+
   // Metatypes are ABI-compatible if they have the same representation.
   if (auto meta1 = type1.getAs<MetatypeType>()) {
     if (auto meta2 = type2.getAs<MetatypeType>()) {
@@ -4797,7 +4797,7 @@ TypeConverter::checkForABIDifferences(SILModule &M,
         return ABIDifference::CompatibleRepresentation;
     }
   }
-  
+
   // Existential metatypes which are not identical are only ABI-compatible
   // in @objc representation.
   //
@@ -4817,7 +4817,7 @@ TypeConverter::checkForABIDifferences(SILModule &M,
       if (auto tuple2 = type2.getAs<TupleType>()) {
         if (tuple1->getNumElements() != tuple2->getNumElements())
           return ABIDifference::NeedsThunk;
-        
+
         for (unsigned i = 0, e = tuple1->getNumElements(); i < e; i++) {
           if (checkForABIDifferences(M,
                                      type1.getTupleElementType(i),
@@ -4910,11 +4910,11 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   // substituted function types, to avoid bloating
   // IR for platforms that don't differentiate function type representations.
   bool DifferentFunctionTypesHaveDifferentRepresentation = true;
-  
+
   // TODO: For C language types we should consider the attached Clang types.
   if (fnTy1->getLanguage() == SILFunctionLanguage::C)
     DifferentFunctionTypesHaveDifferentRepresentation = false;
-  
+
   // Fast path -- if both functions were unwrapped from a CanSILFunctionType,
   // we might have pointer equality here.
   if (fnTy1 == fnTy2)
@@ -5008,7 +5008,7 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
 
   for (unsigned i = 0, e = fnTy1->getParameters().size(); i < e; ++i) {
     auto param1 = fnTy1->getParameters()[i], param2 = fnTy2->getParameters()[i];
-    
+
     if (param1.getConvention() != param2.getConvention())
       return ABIDifference::NeedsThunk;
 
@@ -5074,7 +5074,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   auto &C = M.getASTContext();
   auto baseGenericSig = getCanonicalSignatureOrNull(
       captured->getDeclContext()->getGenericSignatureOfContext());
-  
+
   SmallSetVector<GenericEnvironment *, 2> boxCapturedEnvs;
   findCapturedEnvironments(loweredContextType, boxCapturedEnvs);
 
@@ -5139,7 +5139,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   auto boxGenericSig = buildGenericSignatureWithCapturedEnvironments(
       M.getASTContext(), baseGenericSig,
       boxCapturedEnvs.getArrayRef()).getCanonicalSignature();
-  
+
   // Otherwise, the layout needs to capture the generic environment of its
   // originating scope.
   // TODO: We could conceivably minimize the captured generic environment to
@@ -5266,7 +5266,7 @@ void TypeConverter::setCaptureTypeExpansionContext(SILDeclRef constant,
   if (!hasLoweredLocalCaptures(constant)) {
     return;
   }
-  
+
   TypeExpansionContext context = constant.isSerialized()
     ? TypeExpansionContext::minimal()
     : TypeExpansionContext::maximal(constant.getAnyFunctionRef()->getAsDeclContext(),

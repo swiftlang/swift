@@ -38,7 +38,7 @@ final class FlattenDistanceFromToTests {
 //===----------------------------------------------------------------------===//
 
 extension FlattenDistanceFromToTests {
-  
+
   /// Performs one `action` per lane size case through `limits`.
   ///
   ///     limits: [0,1,2,3]
@@ -61,17 +61,17 @@ extension FlattenDistanceFromToTests {
     var index = array.startIndex
     while index < limits.endIndex {
       action(array)
-      
+
       if array[index].count < limits[index] {
         array[index].append(index)
       } else {
         while index < limits.endIndex, array[index].count == limits[index] {
           array.formIndex(after: &index)
         }
-        
+
         if index < limits.endIndex {
           array[index].append(index)
-          
+
           while index > array.startIndex {
             array.formIndex(before: &index)
             array[index].removeAll(keepingCapacity: true)
@@ -80,7 +80,7 @@ extension FlattenDistanceFromToTests {
       }
     }
   }
-  
+
   /// Performs one `action` per offset-index pair in `collection`.
   ///
   ///     collection: [[0],[1,2]].joined()
@@ -97,16 +97,16 @@ extension FlattenDistanceFromToTests {
     var state = (offset: 0, index: collection.startIndex)
     while true {
       action(state)
-      
+
       if state.index == collection.endIndex {
         return
       }
-      
+
       state.offset += 1
       collection.formIndex(after: &state.index)
     }
   }
-  
+
   /// Checks the distance between each index pair in various cases.
   ///
   /// You need three lanes to exercise the first, the middle, the last region.
@@ -115,19 +115,19 @@ extension FlattenDistanceFromToTests {
   ///
   func testEachIndexPair() {
     var invocations = 0 as Int
-    
+
     for lanes in 0 ... 3 {
       let limits = Array(repeating: 3, count: lanes)
-      
+
       forEachLaneSizeCase(through: limits) { base in
         let collection: FlattenSequence = base.joined()
-        
+
         forEachEnumeratedIndexIncludingEndIndex(in: collection) { start in
           forEachEnumeratedIndexIncludingEndIndex(in: collection) { end in
             let pair = (from: start.offset, to: end.offset)
-            
+
             invocations += 1
-            
+
             expectEqual(
               collection.distance(from: start.index, to: end.index),
               end.offset - start.offset,
@@ -139,7 +139,7 @@ extension FlattenDistanceFromToTests {
         }
       }
     }
-    
+
     expectEqual(invocations, 2502, "unexpected workload")
   }
 }
@@ -149,7 +149,7 @@ extension FlattenDistanceFromToTests {
 //===----------------------------------------------------------------------===//
 
 extension FlattenDistanceFromToTests {
-  
+
   /// Checks some `Int.min` and `Int.max` distances with random access.
   ///
   /// It needs Swift 6.0+ because prior versions find the distance by
@@ -160,19 +160,19 @@ extension FlattenDistanceFromToTests {
   @available(SwiftStdlib 6.0, *)
   func testMinMaxRandomAccess() {
     for s: FlattenSequence in [
-      
+
       [-1..<Int.max/1],
       [00..<Int.max/1, 00..<000000001],
       [00..<000000001, 01..<Int.max/1, 00..<000000001],
       [00..<000000001, 00..<Int.max/2, 00..<Int.max/2, 00..<000000001]
-      
+
     ].map({ $0.joined() }) {
-      
+
       let a = s.startIndex, b = s.endIndex
-      
+
       expectEqual(Int.min, s.distance(from: b, to: s.index(a, offsetBy: 00)))
       expectEqual(Int.max, s.distance(from: s.index(a, offsetBy: 01), to: b))
-      
+
       expectEqual(Int.min, s.distance(from: s.index(b, offsetBy: 00), to: a))
       expectEqual(Int.max, s.distance(from: a, to: s.index(b, offsetBy: -1)))
     }

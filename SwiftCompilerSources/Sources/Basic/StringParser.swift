@@ -14,7 +14,7 @@
 public struct StringParser {
   private var s: Substring
   private let originalLength: Int
-  
+
   private mutating func consumeWhitespace() {
     s = s.drop { $0.isWhitespace }
   }
@@ -23,7 +23,7 @@ public struct StringParser {
     s = Substring(string)
     originalLength = string.count
   }
-  
+
   public mutating func isEmpty() -> Bool {
     consumeWhitespace()
     return s.isEmpty
@@ -50,7 +50,7 @@ public struct StringParser {
     }
     return Int(intStr)
   }
-  
+
   public mutating func consumeIdentifier() -> String? {
     consumeWhitespace()
     var name = ""
@@ -63,7 +63,7 @@ public struct StringParser {
     }
     return name.isEmpty ? nil : name
   }
-  
+
   public func throwError(_ message: StaticString) throws -> Never {
     throw ParsingError(message: message, position: originalLength - s.count)
   }

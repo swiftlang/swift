@@ -11,7 +11,7 @@ func foo() {
 
 struct B {
   static let propertyName = A.propertyName
-  
+
   struct Nest {
     static let propertyName = A.propertyName
   }

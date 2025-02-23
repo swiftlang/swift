@@ -119,26 +119,26 @@ case TypeKind::Id:
 
     case TypeKind::BuiltinFixedArray: {
       auto bfaTy = cast<BuiltinFixedArrayType>(base);
-      
+
       Type transSize = doIt(bfaTy->getSize(),
                             TypePosition::Invariant);
       if (!transSize) {
         return Type();
       }
-      
+
       Type transElement = doIt(bfaTy->getElementType(),
                                TypePosition::Invariant);
       if (!transElement) {
         return Type();
       }
-      
+
       CanType canTransSize = transSize->getCanonicalType();
       CanType canTransElement = transElement->getCanonicalType();
       if (canTransSize != bfaTy->getSize()
           || canTransElement != bfaTy->getElementType()) {
         return BuiltinFixedArrayType::get(canTransSize, canTransElement);
       }
-      
+
       return bfaTy;
     }
 

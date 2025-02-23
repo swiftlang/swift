@@ -50,11 +50,11 @@ struct No<NT> : MyIteratorProtocol {
 
 class X<XT> : Q {
   typealias Iterator = No<XT>
-  
+
   func f<SX : MySequence>(_ x: SX)
     where SX.Iterator.Element == X.Iterator.Element {
   }
-  
+
   func makeIterator() -> No<XT> {
     return No<XT>()
   }

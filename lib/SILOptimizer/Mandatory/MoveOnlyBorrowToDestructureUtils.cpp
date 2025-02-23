@@ -405,7 +405,7 @@ bool Implementation::gatherUses(SILValue value) {
         instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
         continue;
       }
-    
+
       // Look through guaranteed forwarding if we have at least one non-trivial
       // value. If we have all non-trivial values, treat this as a liveness use.
       SmallVector<SILValue, 8> forwardedValues;
@@ -1124,7 +1124,7 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
     SILBuilderWithScope endBuilder(nextInst);
     endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
   }
-  
+
 }
 
 void Implementation::rewriteUses(InstructionDeleter *deleter) {
@@ -1268,7 +1268,7 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 borrowBuilder.createGuaranteedMoveOnlyWrapperToCopyableValue(
                     getSafeLoc(inst), innerValue);
           }
-          
+
           insertEndBorrowsForNonConsumingUse(&operand, borrow);
 
           // NOTE: This needs to be /after/ the interior pointer operand usage
@@ -1362,7 +1362,7 @@ update_operand:
           // We update the operand after placing end_borrows, since we might
           // need the original operand's lifetime to correctly delineate the
           // new lifetime, such as if there is an InteriorPointerOperand.
-          
+
           // NOTE: oldInst may be nullptr if our operand is a SILArgument
           // which can happen with switch_enum.
           auto *oldInst = operand.get()->getDefiningInstruction();

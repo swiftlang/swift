@@ -699,9 +699,9 @@ protocol P5<A>{
   associatedtype A
   associatedtype B : GenericClass<A>
   associatedtype C : GenericSubClass<A>
-  
+
   func returnAssocTypeB() -> B
-  
+
   func returnAssocTypeC() -> C
 }
 

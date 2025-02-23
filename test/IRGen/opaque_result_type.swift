@@ -220,7 +220,7 @@ protocol R {
 
 struct Wrapper<T: R>: R {
   var wrapped: T
-  
+
   func getA() -> some R {
     return wrapped.getA()
   }

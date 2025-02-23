@@ -113,7 +113,7 @@ public struct Builder {
     let literal = bridged.createIntegerLiteral(type.bridged, value)
     return notifyNew(literal.getAs(IntegerLiteralInst.self))
   }
-    
+
   public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false,
                              tailAllocatedTypes: TypeArray, tailAllocatedCounts: [Value]) -> AllocRefInst {
     return tailAllocatedCounts.withBridgedValues { countsRef in
@@ -305,7 +305,7 @@ public struct Builder {
     }
     return notifyNew(apply.getAs(ApplyInst.self))
   }
-  
+
   @discardableResult
   public func createTryApply(
     function: Value,
@@ -323,7 +323,7 @@ public struct Builder {
     }
     return notifyNew(apply.getAs(TryApplyInst.self))
   }
-  
+
   @discardableResult
   public func createReturn(of value: Value) -> ReturnInst {
     return notifyNew(bridged.createReturn(value.bridged).getAs(ReturnInst.self))
@@ -381,7 +381,7 @@ public struct Builder {
     }
     return notifyNew(se.getAs(SwitchEnumInst.self))
   }
-  
+
   @discardableResult
   public func createSwitchEnumAddr(enumAddress: Value,
                                    cases: [(Int, BasicBlock)],
@@ -511,7 +511,7 @@ public struct Builder {
                                                       BridgedInstruction.MarkDependenceKind(rawValue: kind.rawValue)!)
     return notifyNew(markDependence.getAs(MarkDependenceInst.self))
   }
-    
+
   @discardableResult
   public func createEndAccess(beginAccess: BeginAccessInst) -> EndAccessInst {
       let endAccess = bridged.createEndAccess(beginAccess.bridged)

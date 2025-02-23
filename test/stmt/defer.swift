@@ -4,10 +4,10 @@ func voidReturn1() {}
 func breakContinue(_: Int) -> Int {}
 
 func testDefer(_ a : Int) {
-  
+
   defer { voidReturn1() }
   defer { breakContinue(1)+42 } // expected-warning {{result of operator '+' is unused}}
-  
+
   // Ok:
   defer { while false { break } }
 
@@ -20,7 +20,7 @@ func testDefer(_ a : Int) {
 
 class SomeTestClass {
   var x = 42
- 
+
   func method() {
     defer { x = 97 }  // self. not required here!
     // expected-warning@-1 {{'defer' statement at end of scope always executes immediately}}{{5-10=do}}

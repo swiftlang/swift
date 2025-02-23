@@ -119,7 +119,7 @@ public class PublicNothing {}
 public class PublicInit {
     public init() {}
     public init(public_: Int, default_: Int = 0) {}
-    
+
     internal init(internal_: Int, default_: Int = 0) {}
 
     deinit {}

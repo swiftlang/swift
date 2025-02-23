@@ -95,7 +95,7 @@ UnsafeRawBufferPointerTestSuite.test("nonmutating_subscript_setter") {
   var rightBytes = buffer[2..<4]
   buffer[2..<4] = leftBytes
   expectEqualSequence(leftBytes, rightBytes)
-  
+
   // Subscript assign into a `var` mutable slice.
   buffer.copyBytes(from: [0, 1, 2, 3] as [UInt8])
   rightBytes[2..<4] = leftBytes
@@ -518,7 +518,7 @@ UnsafeRawBufferPointerTestSuite.test("copyBytes.sequence.overflow") {
     alignment: MemoryLayout<UInt>.alignment
   )
   defer { buffer.deallocate() }
-  
+
   let bytes = buffer[0..<2]
 
   if _isDebugAssertConfiguration() {

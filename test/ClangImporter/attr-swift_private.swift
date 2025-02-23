@@ -28,7 +28,7 @@ public func testProperty(_ foo: Foo) {
   // CHECK: @"\01L_selector(setPrivClassValue:)"
   _ = Foo.__privClassValue
   Foo.__privClassValue = foo
-  
+
 #if !IRGEN
   _ = foo.privValue // expected-error {{value of type 'Foo' has no member 'privValue'}}
 #endif

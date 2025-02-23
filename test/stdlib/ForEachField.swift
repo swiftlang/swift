@@ -80,7 +80,7 @@ class OwnershipTestClass: BaseClass {
   weak var test1: TestClass?
   unowned var test2: TestClass
   unowned(unsafe) var test3: TestClass
-  
+
   init(_ t: TestClass) {
     self.test1 = t
     self.test2 = t
@@ -252,7 +252,7 @@ func _withTypeEncodingCallback(encoding: inout String, name: UnsafePointer<CChar
     encoding += "d"
     return true
   }
-  
+
   switch kind {
   case .struct:
     encoding += "{"
@@ -369,7 +369,7 @@ if #available(SwiftStdlib 5.2, *) {
 
   func checkGenericStruct<T>(_: T.Type) {
     let firstOffset = max(MemoryLayout<Int>.stride, MemoryLayout<T>.alignment)
-    
+
     checkFields(
       of: GenericStruct<T>.self,
       fields: [
@@ -489,7 +489,7 @@ if #available(SwiftStdlib 5.2, *) {
   tests.test("withTypeEncoding") {
     expectEqual("{@}", getTypeEncoding(ContainsObject.self))
     expectEqual("{{dd}{dd}}", getTypeEncoding(SimilarToNSRect.self))
-    
+
     let testEncoding = getTypeEncoding(TestStruct.self)
     expectTrue("{qdB}" == testEncoding || "{ldB}" == testEncoding)
   }

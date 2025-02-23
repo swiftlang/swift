@@ -276,7 +276,7 @@ class PolarBear : Bear {
     } catch {
       return nil
     }
-    
+
     self.y = LifetimeTracked(0)
     do {
       try super.init(n: maybeThrow(during))
@@ -601,7 +601,7 @@ class AtObjCPolarBear : AtObjCBear {
     } catch {
       return nil
     }
-    
+
     self.y = LifetimeTracked(0)
     do {
       try super.init(n: maybeThrow(during))

@@ -115,7 +115,7 @@ class VJPCloner::Implementation final
   void emitLinearMapContextInitializationIfNeeded() {
     if (!pullbackInfo.hasHeapAllocatedContext())
       return;
- 
+
     // Get linear map struct size.
     auto *returnBB = &*original->findReturnBB();
     auto pullbackTupleType =

@@ -490,7 +490,7 @@ void NodeFactory::freeSlabs(AllocatedSlab *slab) {
     slab = prev;
   }
 }
-  
+
 void NodeFactory::clear() {
   assert(!isBorrowed);
   if (CurrentSlab) {
@@ -499,7 +499,7 @@ void NodeFactory::clear() {
 #endif
 
     freeSlabs(CurrentSlab->Previous);
-    
+
     // Recycle the last allocated slab.
     // Note that the size of the last slab is at least as big as all previous
     // slabs combined. Therefore it's not worth the effort of reusing all slabs.
@@ -916,7 +916,7 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind) {
   int32_t value;
   memcpy(&value, at, 4);
   Pos += 4;
-  
+
   // Map the encoded kind to a specific kind and directness.
   SymbolicReferenceKind kind;
   Directness direct;
@@ -955,7 +955,7 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind) {
   default:
     return nullptr;
   }
-  
+
   // Use the resolver, if any, to produce the demangling tree the symbolic
   // reference represents.
   NodePointer resolved = nullptr;
@@ -965,7 +965,7 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind) {
   // With no resolver, or a resolver that failed, refuse to demangle further.
   if (!resolved)
     return nullptr;
-  
+
   // Types register as substitutions even when symbolically referenced.
   // OOPS: Except for opaque type references!
   if ((kind == SymbolicReferenceKind::Context ||
@@ -1629,7 +1629,7 @@ NodePointer Demangler::demanglePlainFunction() {
   NodePointer result = LabelList
     ? createWithChildren(Node::Kind::Function, Ctx, Name, LabelList, Type)
     : createWithChildren(Node::Kind::Function, Ctx, Name, Type);
-    
+
   result = setParentForOpaqueReturnTypeNodes(*this, result, Type, Flavor);
   return result;
 }
@@ -1900,7 +1900,7 @@ NodePointer Demangler::popTypeList() {
         return nullptr;
       Root->addChild(Ty, *this);
     } while (!firstElem);
-    
+
     Root->reverseChildren();
   }
   return Root;
@@ -1916,7 +1916,7 @@ NodePointer Demangler::popProtocol() {
 
     return Type;
   }
-  
+
   if (NodePointer SymbolicRef = popNode(Node::Kind::ProtocolSymbolicReference)){
     return SymbolicRef;
   } else if (NodePointer SymbolicRef =
@@ -2076,7 +2076,7 @@ NodePointer Demangler::popRetroactiveConformances() {
 bool Demangler::demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                                       NodePointer &RetroactiveConformances) {
   RetroactiveConformances = popRetroactiveConformances();
-  
+
   for (;;) {
     NodePointer TList = createNode(Node::Kind::TypeList);
     TypeListList.push_back(TList, *this);
@@ -2084,7 +2084,7 @@ bool Demangler::demangleBoundGenerics(Vector<NodePointer> &TypeListList,
       TList->addChild(Ty, *this);
     }
     TList->reverseChildren();
-    
+
     if (popNode(Node::Kind::EmptyList))
       break;
     if (!popNode(Node::Kind::FirstElementMarker))
@@ -2096,7 +2096,7 @@ bool Demangler::demangleBoundGenerics(Vector<NodePointer> &TypeListList,
 NodePointer Demangler::demangleBoundGenericType() {
   NodePointer RetroactiveConformances;
   Vector<NodePointer> TypeListList(*this, 4);
-  
+
   if (!demangleBoundGenerics(TypeListList, RetroactiveConformances))
     return nullptr;
 
@@ -2135,7 +2135,7 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
   // TODO: This would be a lot easier if we represented bound generic args
   // flatly in the demangling tree, since that's how they're mangled and also
   // how the runtime generally wants to consume them.
-  
+
   if (!Nominal)
     return nullptr;
 
@@ -2341,7 +2341,7 @@ NodePointer Demangler::demangleImplFunctionType() {
       subsNode->addChild(SubstitutionRetroConformances, *this);
     type->addChild(subsNode, *this);
   }
-  
+
   NodePointer GenSig = popNode(Node::Kind::DependentGenericSignature);
   if (GenSig && nextIf('P'))
     GenSig = changeKind(GenSig, Node::Kind::DependentPseudogenericSignature);
@@ -2578,7 +2578,7 @@ NodePointer Demangler::demangleMetatype() {
       return nullptr;
   }
 }
-  
+
 NodePointer Demangler::demanglePrivateContextDescriptor() {
   switch (nextChar()) {
   case 'E': {
@@ -2600,7 +2600,7 @@ NodePointer Demangler::demanglePrivateContextDescriptor() {
     auto Context = popContext();
     if (!Context)
       return nullptr;
-    
+
     auto node = createNode(Node::Kind::AnonymousDescriptor);
     node->addChild(Context, *this);
     node->addChild(Discriminator, *this);
@@ -2658,7 +2658,7 @@ NodePointer Demangler::demangleArchetype() {
     opaque->addChild(boundGenerics, *this);
     if (retroactiveConformances)
       opaque->addChild(retroactiveConformances, *this);
-    
+
     auto opaqueTy = createType(opaque);
     addSubstitution(opaqueTy);
     return opaqueTy;
@@ -2679,7 +2679,7 @@ NodePointer Demangler::demangleArchetype() {
     addSubstitution(T);
     return T;
   }
-      
+
   case 'X': {
     NodePointer T = demangleAssociatedTypeCompound(nullptr);
     addSubstitution(T);
@@ -2759,7 +2759,7 @@ NodePointer Demangler::demangleAssociatedTypeCompound(NodePointer Base) {
       return nullptr;
     AssocTyNames.push_back(AssocTyName, *this);
   } while (!firstElem);
-    
+
   NodePointer BaseTy;
   if (Base)
     BaseTy = createType(Base);
@@ -2790,7 +2790,7 @@ NodePointer Demangler::popAssocTypeName() {
   addChild(AssocTy, Proto);
   return AssocTy;
 }
-  
+
 NodePointer Demangler::popAssocTypePath() {
   NodePointer AssocTypePath = createNode(Node::Kind::AssocTypePath);
   bool firstElem = false;
@@ -2981,7 +2981,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
         types.push_back(node);
         node = popNode();
       } while (node && node->getKind() == Node::Kind::Type);
-      
+
       NodePointer result;
       if (node) {
         if (node->getKind() == Node::Kind::DependentGenericSignature) {
@@ -3052,7 +3052,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
 
       NodePointer genericSig = nullptr;
       std::vector<NodePointer> types;
-      
+
       auto node = popNode();
       if (node) {
         if (node->getKind() == Node::Kind::DependentGenericSignature) {
@@ -3065,14 +3065,14 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       } else {
         return nullptr;
       }
-      
+
       while (auto node = popNode()) {
         if (node->getKind() != Node::Kind::Type) {
           return nullptr;
         }
         types.push_back(node);
       }
-      
+
       NodePointer result = createNode(nodeKind);
       for (auto i = types.rbegin(), e = types.rend(); i != e; ++i) {
         result->addChild(*i, *this);
@@ -3104,11 +3104,11 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       auto globalActor = popNode(Node::Kind::Type);
       if (!globalActor)
         return nullptr;
-      
+
       auto reabstraction = popNode();
       if (!reabstraction)
         return nullptr;
-      
+
       auto node = createNode(Node::Kind::ReabstractionThunkHelperWithGlobalActor);
       node->addChild(reabstraction, *this);
       node->addChild(globalActor, *this);
@@ -3758,7 +3758,7 @@ NodePointer Demangler::demangleWitness() {
       for (auto i = vars.rbegin(); i != vars.rend(); ++i) {
         declList->addChild(*i, *this);
       }
-      
+
       auto context = popContext();
       if (!context)
         return nullptr;
@@ -3866,7 +3866,7 @@ NodePointer Demangler::demangleSpecialType() {
         if (!genericArgs)
           return nullptr;
       }
-      
+
       auto fieldTypes = popTypeList();
       if (!fieldTypes)
         return nullptr;
@@ -4130,7 +4130,7 @@ NodePointer Demangler::demangleEntity(Node::Kind Kind) {
   NodePointer Context = popContext();
   auto result = LabelList ? createWithChildren(Kind, Context, Name, LabelList, Type)
                           : createWithChildren(Kind, Context, Name, Type);
-                          
+
   result = setParentForOpaqueReturnTypeNodes(*this, result, Type, Flavor);
   return result;
 }
@@ -4154,7 +4154,7 @@ NodePointer Demangler::demangleSubscript() {
   addChild(Subscript, LabelList);
   Subscript = addChild(Subscript, Type);
   addChild(Subscript, PrivateName);
-  
+
   Subscript = setParentForOpaqueReturnTypeNodes(*this, Subscript, Type, Flavor);
 
   return demangleAccessor(Subscript);

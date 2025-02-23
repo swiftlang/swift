@@ -5,7 +5,7 @@
 @propertyWrapper
 struct SomeLongFooName<Holder, T> {
   var wrappedValue: T
-  
+
   init(wrappedValue: T) {
     self.wrappedValue = wrappedValue
   }
@@ -14,6 +14,6 @@ struct SomeLongFooName<Holder, T> {
 
 struct Bar {
   typealias Foo<T> = SomeLongFooName<Self, T>
-  
+
   @Foo var baz: Bool = false
 }

@@ -144,7 +144,7 @@ ProtocolReorderRequirementsTest.test("ReorderProtocolRequirements") {
   let adult2 = Adult<GrumpyBaby>()
   let exclamation2 = adoreIfYouCan(adult2)
   expectEqual(exclamation2, "bah humbug")
-  
+
 }
 
 runAllTests()

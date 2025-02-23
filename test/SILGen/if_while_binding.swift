@@ -215,7 +215,7 @@ func if_multi_else() {
   // CHECK:   [[BL:%[0-9]+]] = begin_borrow [var_decl] [[B]]
   // CHECK:   [[PB:%[0-9]+]] = project_box [[BL]]
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt: [[IF_BODY:bb.*]], case #Optional.none!enumelt: [[IF_EXIT1a:bb[0-9]+]]
-  
+
     // CHECK: [[IF_EXIT1a]]:
     // CHECK:   dealloc_box {{.*}} ${ var String }
     // CHECK:   destroy_value [[MOVED_A]]
@@ -282,7 +282,7 @@ func if_multi_where() {
 // CHECK-LABEL: sil hidden [ossa] @$s16if_while_binding0A16_leading_booleanyySiF
 func if_leading_boolean(_ a : Int) {
   // Test the boolean condition.
-  
+
   // CHECK: debug_value %0 : $Int, let, name "a"
   // CHECK: [[EQRESULT:%[0-9]+]] = apply {{.*}}(%0, %0{{.*}}) : $@convention({{.*}}) (Int, Int{{.*}}) -> Bool
 
@@ -292,7 +292,7 @@ func if_leading_boolean(_ a : Int) {
   // Call Foo and test for the optional being present.
 // CHECK: [[CHECKFOO]]:
   // CHECK: [[OPTRESULT:%[0-9]+]] = apply {{.*}}() : $@convention(thin) () -> @owned Optional<String>
-  
+
   // CHECK:   switch_enum [[OPTRESULT]] : $Optional<String>, case #Optional.some!enumelt: [[SUCCESS:bb.*]], case #Optional.none!enumelt: [[IFDONE:bb[0-9]+]]
 
 // CHECK: [[SUCCESS]]([[B:%[0-9]+]] : @owned $String):
@@ -351,7 +351,7 @@ func testAsPatternInIfLet(_ a : BaseClass?) {
   // => SEMANTIC SIL TODO: This is benign, but scoping wise, this end borrow should be after derived val.
   // CHECK:   destroy_value [[MOVED_DERIVED_VAL]] : $DerivedClass
   // CHECK:   br [[EXITBB]]
-  
+
   // CHECK: [[EXITBB]]:
   // CHECK:   tuple ()
   // CHECK:   return

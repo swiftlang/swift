@@ -725,7 +725,7 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
     decls_block::SILLayoutLayout::readRecord(scratch, rawGenericSig,
                                              capturesGenerics,
                                              numFields, types);
-    
+
     SmallVector<SILField, 4> fields;
     for (auto fieldInfo : types.slice(0, numFields)) {
       bool isMutable = fieldInfo & 0x80000000U;
@@ -734,7 +734,7 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
         SILField(getType(typeId)->getCanonicalType(),
                  isMutable));
     }
-    
+
     CanGenericSignature canSig;
     if (auto sig = getGenericSignature(rawGenericSig))
       canSig = sig.getCanonicalSignature();
@@ -2102,15 +2102,15 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     }
     break;
   }
-      
+
   case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
     IdentifierID DefiningDeclNameID;
-    
+
     XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, DefiningDeclNameID);
-    
+
     auto name = getIdentifier(DefiningDeclNameID);
     pathTrace.addOpaqueReturnType(name);
-    
+
     if (auto opaque = baseModule->lookupOpaqueResultType(name.str())) {
       values.push_back(opaque);
     }
@@ -2202,7 +2202,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         IdentifierID IID;
         XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, IID);
         auto mangledName = getIdentifier(IID);
-        
+
         SmallString<64> buf;
         {
           llvm::raw_svector_ostream os(buf);
@@ -2210,7 +2210,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
           os << mangledName.str();
           os << ">>";
         }
-        
+
         result = getContext().getIdentifier(buf);
         break;
       }
@@ -2466,7 +2466,7 @@ giveUpFastPath:
         ctorInit = getActualCtorInitializerKind(kind);
         break;
       }
-        
+
       default:
         fatal(llvm::make_error<InvalidRecordKindError>(recordID,
                                                        "Unhandled path piece"));
@@ -2682,16 +2682,16 @@ giveUpFastPath:
 
       break;
     }
-        
+
     case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
       values.clear();
       IdentifierID DefiningDeclNameID;
-      
+
       XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, DefiningDeclNameID);
-      
+
       auto name = getIdentifier(DefiningDeclNameID);
       pathTrace.addOpaqueReturnType(name);
-    
+
       auto lookupModule = M ? M : baseModule;
       if (auto opaqueTy = lookupModule->lookupOpaqueResultType(name.str())) {
         values.push_back(opaqueTy);
@@ -4484,7 +4484,7 @@ public:
                                               underlyingTypeSubsID,
                                               rawAccessLevel,
                                               exportUnderlyingType);
-    
+
     DeclContext *declContext;
     UNWRAP(MF.getDeclContextChecked(contextID), declContext);
 
@@ -4785,7 +4785,7 @@ public:
     ctx.evaluator.cacheOutput(
         OperatorPrecedenceGroupRequest{result},
         std::move(cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get())));
-    
+
     declOrOffset = result;
     return result;
   }
@@ -4995,7 +4995,7 @@ public:
     if (isObjC) {
       theEnum->setHasFixedRawValues();
     }
-    
+
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setIsObjC(isObjC);
@@ -5173,7 +5173,7 @@ public:
     UNWRAP(MF.maybeReadGenericParams(parent), genericParams);
     if (declOrOffset.isComplete())
       return declOrOffset;
-    
+
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
     if (!staticSpelling.has_value())
       return MF.diagnoseFatal();
@@ -5468,7 +5468,7 @@ public:
       case 2:
         builtinKind = BuiltinMacroKind::IsolationMacro;
         break;
-          
+
       default:
         break;
       }
@@ -6430,7 +6430,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         serialization::decls_block::RawLayoutDeclAttrLayout::
           readRecord(scratch, isImplicit, typeID, countID, rawSize, rawAlign,
                      movesAsLike);
-        
+
         if (typeID) {
           auto type = MF.getTypeChecked(typeID);
           if (!type) {
@@ -6456,7 +6456,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             break;
           }
         }
-        
+
         Attr = new (ctx) RawLayoutAttr(rawSize, rawAlign,
                                        SourceLoc(), SourceRange());
         break;
@@ -6652,7 +6652,7 @@ DeclDeserializer::getDeclCheckedImpl(
     declOrOffset = resolved.get();
     break;
   }
-  
+
   default:
     // We don't know how to deserialize this kind of decl.
     MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
@@ -6919,20 +6919,20 @@ DESERIALIZE_TYPE(BUILTIN_FIXED_ARRAY_TYPE)(
   TypeID elementTypeID;
   decls_block::BuiltinFixedArrayTypeLayout::readRecord(scratch, sizeID,
                                                        elementTypeID);
-                                                       
-  
+
+
   auto sizeOrError = MF.getTypeChecked(sizeID);
   if (!sizeOrError) {
     return sizeOrError.takeError();
   }
   auto size = sizeOrError.get()->getCanonicalType();
-  
+
   auto elementTypeOrError = MF.getTypeChecked(elementTypeID);
   if (!elementTypeOrError) {
     return elementTypeOrError.takeError();
   }
   auto elementType = elementTypeOrError.get()->getCanonicalType();
-  
+
   return BuiltinFixedArrayType::get(size, elementType);
 }
 
@@ -8062,7 +8062,7 @@ Expected<Type> DESERIALIZE_TYPE(INTEGER_TYPE)(ModuleFile &MF,
                                               StringRef blobData) {
   auto &ctx = MF.getContext();
   bool isNegative;
-  
+
   decls_block::IntegerTypeLayout::readRecord(scratch, isNegative);
 
   return IntegerType::get(blobData, isNegative, ctx);
@@ -8765,12 +8765,12 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   bool needToFillInOpaqueValueWitnesses = false;
   while (valueCount--) {
     ValueDecl *req;
-    
+
     auto trySetWitness = [&](Witness w) {
       if (req)
         conformance->setWitness(req, w);
     };
-    
+
     auto deserializedReq = getDeclChecked(*rawIDIter++);
     if (deserializedReq) {
       req = cast_or_null<ValueDecl>(*deserializedReq);
@@ -8781,7 +8781,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     } else {
       fatal(deserializedReq.takeError());
     }
-    
+
     bool isOpaque = false;
     ValueDecl *witness;
     auto deserializedWitness = getDeclChecked(*rawIDIter++);
@@ -8850,7 +8850,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
           witness, witnessSubstitutions.get(), enterIsolation));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
-  
+
   // Fill in opaque value witnesses if we need to.
   if (needToFillInOpaqueValueWitnesses) {
     for (auto member : proto->getMembers()) {
@@ -8859,7 +8859,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       if (!valueMember || !valueMember->isProtocolRequirement()
           || isa<AssociatedTypeDecl>(valueMember))
         continue;
-      
+
       if (!conformance->hasWitness(valueMember))
         conformance->setWitness(valueMember, Witness::forOpaque(valueMember));
     }

@@ -61,12 +61,12 @@ if #available(SwiftStdlib 5.3, *) {
       }
       expectEqual(expected, actual)
     }
-        
+
     let validUTF8: [UInt8] = [0x43, 0x61, 0x66, 0xC3, 0xA9]
     let invalidUTF8: [UInt8] = [0x43, 0x61, 0x66, 0xC3]
     let longerValidUTF8: [UInt8] = [0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x43, 0x61, 0x66, 0xC3, 0xA9]
     let longerInvalidUTF8: [UInt8] = [0x21, 0x21, 0x43, 0x61, 0x66, 0xC3, 0x43, 0x61, 0x66, 0xC3, 0x43, 0x61, 0x66, 0xC3]
-    
+
     func test(bufferSize: Int, input: [UInt8], expected: String) {
       let strs = (0..<100).map { _ in
         String(unsafeUninitializedCapacity: bufferSize) { buffer in
@@ -81,7 +81,7 @@ if #available(SwiftStdlib 5.3, *) {
         expectEqual(expected, str)
       }
     }
-    
+
     test(bufferSize: validUTF8.count, input: validUTF8, expected: "Café")
     test(bufferSize: invalidUTF8.count, input: invalidUTF8, expected: "Caf�")
     // Force non-smol strings by using a larger capacity

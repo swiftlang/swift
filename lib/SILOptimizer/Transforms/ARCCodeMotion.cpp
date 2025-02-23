@@ -306,7 +306,7 @@ public:
     // MultiIteration is true.
     BBSetOut.resize(size, MultiIteration);
     BBMaxSet.resize(size, !IsEntry && MultiIteration);
-  
+
     // Genset and Killset are initially empty.
     BBGenSet.resize(size, false);
     BBKillSet.resize(size, false);
@@ -570,7 +570,7 @@ bool RetainCodeMotionContext::processBBWithGenKillSet(SILBasicBlock *BB) {
   // Compute the BBSetIn at the beginning of the basic block.
   State.BBSetIn.reset(State.BBKillSet);
   State.BBSetIn |= State.BBGenSet;
- 
+
   // If BBSetIn changes, then keep iterating until reached a fixed point.
   return State.updateBBSetOut(State.BBSetIn);
 }
@@ -674,7 +674,7 @@ public:
     BBSetIn.resize(size, InitOptimistic);
     BBSetOut.resize(size, false);
     BBMaxSet.resize(size, InitOptimistic);
-  
+
     // Genset and Killset are initially empty.
     BBGenSet.resize(size, false);
     BBKillSet.resize(size, false);
@@ -807,7 +807,7 @@ void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
   BasicBlockSet BlocksInitOptimistically(BlockStates.getFunction());
 
   llvm::SmallVector<SILBasicBlock *, 32> Worklist;
-  
+
   // Find all the RC roots in the function.
   for (auto &BB : *F) {
     for (auto &II : BB) {
@@ -994,7 +994,7 @@ bool ReleaseCodeMotionContext::processBBWithGenKillSet(SILBasicBlock *BB) {
   // Compute the BBSetIn at the beginning of the basic block.
   State.BBSetOut.reset(State.BBKillSet);
   State.BBSetOut |= State.BBGenSet;
- 
+
   // If BBSetIn changes, then keep iterating until reached a fixed point.
   return State.updateBBSetIn(State.BBSetOut);
 }
@@ -1103,7 +1103,7 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
       InsertPoints[RCRootVault[i]].push_back(&*BB->begin());
       S.BBSetOut.reset(i);
     }
-   
+
     // Lastly update the BBSetIn, only necessary when we are running a single
     // iteration dataflow.
     if (!MultiIteration) {

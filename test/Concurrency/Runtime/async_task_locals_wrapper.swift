@@ -38,7 +38,7 @@ func printTaskLocal<V>(
 @available(SwiftStdlib 5.1, *)
 func async_let_nested() async {
   print("TL: \(TL.$number)")
-  
+
   _ = printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
   async let x1: () = TL.$number.withValue(2) {
     async let x2 = printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2)

@@ -25,13 +25,13 @@ struct S {
   func test() -> Void {
     f({x in x}, 2) // expected-error {{cannot infer type of closure parameter 'x' without a type annotation}}
   }
-  
+
   func g<T>(_ a: T, _ b: Int) -> Void {}
   func g(_ a: String) -> Void {}
   func test2() -> Void {
     g(.notAThing, 7) // expected-error {{cannot infer contextual base in reference to member 'notAThing'}}
   }
-  
+
   func h(_ a: Int, _ b: Int) -> Void {}
   func h(_ a: String) -> Void {}
   func test3() -> Void {

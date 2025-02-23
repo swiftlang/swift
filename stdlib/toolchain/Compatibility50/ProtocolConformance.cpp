@@ -104,6 +104,6 @@ swift::swift50override_conformsToProtocol(const Metadata *type,
     if (result)
       return result;
   } while ((type = _swiftoverride_class_getSuperclass(type)));
-  
+
   return nullptr;
 }

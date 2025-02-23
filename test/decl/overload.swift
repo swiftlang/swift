@@ -453,7 +453,7 @@ protocol r21783216a {
   // expected-error @+2 {{type member must not be named 'Type', since it would conflict with the 'foo.Type' expression}}
   // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}} {{18-22=`Type`}}
   associatedtype Type
-  
+
   // expected-error @+2 {{type member must not be named 'Protocol', since it would conflict with the 'foo.Protocol' expression}}
   // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}} {{18-26=`Protocol`}}
   associatedtype Protocol
@@ -512,7 +512,7 @@ struct S_52486 {
 
 enum E_52486 {
   case foo(S_52486) // expected-note {{'foo' previously declared here}}
-    
+
   static func foo(_ name: String) -> E_52486 { // Okay
     return .foo(S_52486(name: name))
   }

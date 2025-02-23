@@ -67,7 +67,7 @@ let _ : Tuple2<Int, String> = ("bar",  // expected-error {{cannot convert value 
 func f() {
   typealias Tuple2b<T1, T2> = (T1, T2)
   let _ : Tuple2b = (1, "foo")
-  
+
 }
 
 

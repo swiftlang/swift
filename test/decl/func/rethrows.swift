@@ -491,11 +491,11 @@ func testThrowsInCatchInThrows() throws {
 class B24221830 {}
 class r24221830 : B24221830 {
   var B: Int
-  
+
   init(A: String) throws {
     self.B = 0
   }
-  
+
 }
 
 // rdar://problem/30618853

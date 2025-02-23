@@ -2,7 +2,7 @@
 // RUN: %target-swift-emit-sil %s -o /dev/null -verify -enable-actor-data-race-checks
 
 //===--- Function declaration with uninhabited parameter type
-                                   
+
 func foo(baz: Never) -> Int { // expected-note {{'baz' is of type 'Never' which cannot be constructed because it is an enum with no cases}}
   print("I can't be called!") // expected-warning{{will never be executed}}
   return 0

@@ -65,11 +65,11 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
       header.count = LifetimeTracked(newValue)
     }
   }
-  
+
   var myCapacity: Int {
     return header.capacity
   }
-  
+
   deinit {
     teardown()
   }
@@ -78,7 +78,7 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
   // deinit.
   func teardown() {
     let count = self.count
-    
+
     withUnsafeMutablePointerToElements {
       (x: UnsafeMutablePointer<T>) -> () in
       for i in stride(from: 0, to: count, by: 2) {
@@ -86,11 +86,11 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
       }
     }
   }
-  
+
   func append(_ x: T) {
     let count = self.count
     precondition(count + 2 <= myCapacity)
-    
+
     withUnsafeMutablePointerToElements {
       (p: UnsafeMutablePointer<T>) -> () in
       (p + count).initialize(to: x)
@@ -126,14 +126,14 @@ tests.test("basic") {
       expectEqual(1, LifetimeTracked.instances)
     }
   }
-  
+
   expectEqual(0, LifetimeTracked.instances)
   do {
     let s = TestManagedBuffer<LifetimeTracked>.create(10)
     expectEqual(0, s.count)
     expectLE(10, s.myCapacity)
     expectGE(13, s.myCapacity)  // allow some over-allocation but not too much
-    
+
     expectEqual(1, LifetimeTracked.instances)
     for i in 1..<6 {
       s.append(LifetimeTracked(i))
@@ -190,28 +190,28 @@ tests.test("ManagedBufferPointer") {
     let buf = mgr.buffer as? TestManagedBuffer<LifetimeTracked>
     expectTrue(buf != nil)
     expectFalse(mgr.isUniqueReference())
-    
+
     let s = buf!
     expectEqual(0, s.count)
     expectLE(10, s.capacity)
-    
+
     expectEqual(s.count, mgr.header.count.value)
     expectEqual(s.capacity, mgr.header.capacity)
 
     expectEqual(
       mgr.withUnsafeMutablePointerToHeader { $0 },
       s.withUnsafeMutablePointerToHeader { $0 })
-    
+
     expectEqual(
       mgr.withUnsafeMutablePointerToElements { $0 },
       s.withUnsafeMutablePointerToElements { $0 })
-    
+
     for i in 1..<6 {
       s.append(LifetimeTracked(i))
       expectEqual(i * 2, s.count)
       expectEqual(s.count, mgr.header.count.value)
     }
-    
+
     mgr = Manager(
       bufferClass:  MyBuffer<LifetimeTracked>.self,
       minimumCapacity: 0

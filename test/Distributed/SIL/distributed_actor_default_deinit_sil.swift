@@ -143,7 +143,7 @@ distributed actor MyDistActorIsolated {
     self.actorSystem = system
     self.localOnlyField = SomeClass()
   }
-    
+
   deinit {
     doIt()
   }

@@ -368,7 +368,7 @@ public:
         Async, true, ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
         HasSendingResult);
   }
-  
+
   ImplFunctionTypeFlags
   withPseudogeneric() const {
     return ImplFunctionTypeFlags(
@@ -1531,7 +1531,7 @@ protected:
         genericArgs.emplace_back(genericArgsBuf.data() + start,
                                  end - start);
       }
-      
+
       return Builder.resolveOpaqueType(descriptor, genericArgs, ordinal);
     }
 
@@ -1629,7 +1629,7 @@ private:
 
     if (node->getNumChildren() != 2)
       return true;
-    
+
     if (node->getChild(0)->getKind() != Node::Kind::ImplConvention ||
         node->getChild(1)->getKind() != Node::Kind::Type)
       return true;

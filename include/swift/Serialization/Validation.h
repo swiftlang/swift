@@ -253,7 +253,7 @@ public:
   void setStrictMemorySafety(bool val = true) {
     Bits.StrictMemorySafety = val;
   }
-  
+
   bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }
   void setHasCxxInteroperability(bool val) {
     Bits.HasCxxInteroperability = val;

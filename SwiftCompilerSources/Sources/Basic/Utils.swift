@@ -110,7 +110,7 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
       return lhsBuffer.elementsEqual(rhsBuffer, by: ==)
     }
   }
-  
+
   public static func !=(lhs: StringRef, rhs: StaticString) -> Bool { !(lhs == rhs) }
   public static func !=(lhs: StringRef, rhs: StringRef) -> Bool { !(lhs == rhs) }
 

@@ -168,7 +168,7 @@ extension ArraySlice {
       _buffer = _Buffer(copying: _buffer)
     }
   }
-  
+
   /// Marks the end of a mutation.
   ///
   /// After a call to `_endMutation` the buffer must not be mutated until a call
@@ -958,7 +958,7 @@ extension ArraySlice: RangeReplaceableCollection {
                 count: self.capacity - oldCount)
 
     let (remainder,writtenUpTo) = buf.initialize(from: newElements)
-    
+
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
     _precondition(newElementsCount <= writtenCount,
@@ -1008,7 +1008,7 @@ extension ArraySlice: RangeReplaceableCollection {
     self.replaceSubrange((i &- 1)..<i, with: EmptyCollection())
     return result
   }
-  
+
   /// Removes and returns the element at the specified position.
   ///
   /// All the elements following the specified position are moved up to

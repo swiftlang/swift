@@ -811,7 +811,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     case ParameterConvention::Pack_Owned:
     case ParameterConvention::Pack_Guaranteed:
       break;
-      
+
     case ParameterConvention::Direct_Owned:
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Direct_Guaranteed: {
@@ -839,14 +839,14 @@ getReturnTypeCategory(const SILResultInfo &RI,
 
   if (!TL.isLoadable())
     return NotLoadable;
-    
+
   if (RI.getReturnValueType(getModule(), SubstitutedType, typeExpansion)
         ->isVoid())
     return NotLoadable;
 
   if (!shouldExpand(getModule(), ResultTy))
     return NotLoadable;
-  
+
   return TL.isTrivial() ? LoadableAndTrivial : Loadable;
 }
 
@@ -860,7 +860,7 @@ getParamTypeCategory(const SILParameterInfo &PI,
 
   if (!TL.isLoadable())
     return NotLoadable;
-    
+
   return TL.isTrivial() ? LoadableAndTrivial : Loadable;
 }
 
@@ -3415,7 +3415,7 @@ void swift::trySpecializeApplyOfGeneric(
     // same as its SerializedKind.
     SpecializedF->setSerializedKind(F->getSerializedKind());
     assert(SpecializedF->canBeInlinedIntoCaller(F->getSerializedKind()));
-    
+
     // ... including all referenced shared functions.
     FuncBuilder.getModule().linkFunction(SpecializedF.getFunction(),
                                          SILModule::LinkingMode::LinkAll);

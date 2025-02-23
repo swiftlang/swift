@@ -150,7 +150,7 @@ class NinjaParserTests: XCTestCase {
     let files: [AbsolutePath: String] = [
       "/tmp/build.ninja": """
         include path/to/sub.ninja
-        
+
         build foo.swiftmodule : SWIFTC foo.swift
         """,
       "/tmp/path/to/sub.ninja": """

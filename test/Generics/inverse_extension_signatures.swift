@@ -43,7 +43,7 @@
 
 // CHECK-LABEL: ExtensionDecl {{.*}} base=Outer.InnerVariation2
 // CHECK: Generic signature: <A, D where A : Escapable, D : Copyable>
-  
+
 public struct Outer<A: ~Copyable> {
   public func innerFn<B: ~Copyable>(_ b: borrowing B) {}
   public struct InnerStruct<C: ~Copyable> {

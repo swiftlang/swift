@@ -192,7 +192,7 @@ struct OptionalValue : Value {
     self.isSome = Bool.random(using: &generator)
     self.payload = generator.createValue(depth: depth)
   }
-  
+
 
   func getType() -> String {
     payload.getType() + "?"
@@ -238,7 +238,7 @@ struct Struct : Value {
     self.a = generator.createValue(depth: depth)
     self.b = generator.createValue(depth: depth)
   }
-  
+
 
   func getType() -> String {
     "S<\(a.getType()), \(b.getType())>"
@@ -262,11 +262,11 @@ struct Struct : Value {
 
 struct Enum : Value {
   let caseIdx: Int
-  
+
   init(generator: inout RandomGenerator, depth: Int) {
     self.caseIdx = Int.random(in: 0..<3, using: &generator)
   }
-  
+
 
   func getType() -> String {
     "E"
@@ -300,11 +300,11 @@ struct Enum : Value {
 
 struct SinglePayloadSingleCaseEnum : Value {
   let payload: any Value
-  
+
   init(generator: inout RandomGenerator, depth: Int) {
     self.payload = generator.createValue(depth: depth)
   }
-  
+
   func getType() -> String {
     "SPSCE<\(payload.getType())>"
   }
@@ -327,10 +327,10 @@ struct SinglePayloadSingleCaseEnum : Value {
 }
 
 struct SingleCaseEnumWithoutPayload : Value {
-  
+
   init(generator: inout RandomGenerator, depth: Int) {
   }
-  
+
   func getType() -> String {
     "SCEWP"
   }
@@ -356,12 +356,12 @@ struct SingleCaseEnumWithoutPayload : Value {
 struct SinglePayloadEnum : Value {
   let payload: any Value
   let caseIdx: Int
-  
+
   init(generator: inout RandomGenerator, depth: Int) {
     self.caseIdx = Int.random(in: 0..<2, using: &generator)
     self.payload = generator.createValue(depth: depth)
   }
-  
+
   func getType() -> String {
     "SPE<\(payload.getType())>"
   }
@@ -395,13 +395,13 @@ struct MultiPayloadEnum : Value {
   let payloadA: any Value
   let payloadB: any Value
   let caseIdx: Int
-  
+
   init(generator: inout RandomGenerator, depth: Int) {
     self.caseIdx = Int.random(in: 0..<3, using: &generator)
     self.payloadA = generator.createValue(depth: depth)
     self.payloadB = generator.createValue(depth: depth)
   }
-  
+
   func getType() -> String {
     "MPE<\(payloadA.getType()), \(payloadB.getType())>"
   }
@@ -435,11 +435,11 @@ struct MultiPayloadEnum : Value {
 
 struct Size24Enum : Value {
   let caseIdx: Int
-  
+
   init(generator: inout RandomGenerator, depth: Int) {
     self.caseIdx = Int.random(in: 0..<2, using: &generator)
   }
-  
+
   func getType() -> String {
     "E24"
   }

@@ -55,7 +55,7 @@ namespace  {
 
 struct OverrideSection {
   uintptr_t version;
-  
+
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
 #include "../../stdlib/public/CompatibilityOverride/CompatibilityOverrideRuntime.def"
@@ -81,7 +81,7 @@ protected:
     EnableOverride = true;
     Ran = false;
   }
-  
+
   virtual void TearDown() {
     EnableOverride = false;
     ASSERT_TRUE(Ran);
