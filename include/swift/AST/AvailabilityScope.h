@@ -264,10 +264,8 @@ public:
   /// condition that introduced the availability scope for a given platform
   /// version; if zero or multiple such responsible attributes or statements
   /// exist, returns an invalid SourceRange.
-  SourceRange
-  getAvailabilityConditionVersionSourceRange(
-      PlatformKind Platform,
-      const llvm::VersionTuple &Version) const;
+  SourceRange getAvailabilityConditionVersionSourceRange(
+      AvailabilityDomain Domain, const llvm::VersionTuple &Version) const;
 
   /// Returns the availability version range that was explicitly written in
   /// source, if applicable. Otherwise, returns null.

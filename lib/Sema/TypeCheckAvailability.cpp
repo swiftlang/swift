@@ -2026,7 +2026,7 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
       return false;
 
     auto FixRange = scope->getAvailabilityConditionVersionSourceRange(
-        Platform, RunningVers);
+        AvailabilityDomain::forPlatform(Platform), RunningVers);
     if (!FixRange.isValid())
       return false;
     // Have found a nontrivial availability scope-introducer to narrow.
