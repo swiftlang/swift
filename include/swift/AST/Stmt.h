@@ -44,6 +44,7 @@ class FuncDecl;
 class AbstractFunctionDecl;
 class Pattern;
 class PatternBindingDecl;
+class SemanticAvailabilitySpecs;
 class VarDecl;
 class CaseStmt;
 class DoCatchStmt;
@@ -516,7 +517,11 @@ public:
   ArrayRef<AvailabilitySpec *> getQueries() const {
     return llvm::ArrayRef(getTrailingObjects<AvailabilitySpec *>(), NumQueries);
   }
-  
+
+  /// Returns an iterator for the statement's type-checked availability specs.
+  SemanticAvailabilitySpecs
+  getSemanticAvailabilitySpecs(const DeclContext *declContext) const;
+
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
 

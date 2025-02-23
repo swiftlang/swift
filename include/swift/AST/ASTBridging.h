@@ -732,9 +732,9 @@ SWIFT_NAME("getter:BridgedAvailabilitySpec.platform(self:)")
 BridgedPlatformKind
 BridgedAvailabilitySpec_getPlatform(BridgedAvailabilitySpec spec);
 
-SWIFT_NAME("getter:BridgedAvailabilitySpec.version(self:)")
+SWIFT_NAME("getter:BridgedAvailabilitySpec.rawVersion(self:)")
 BridgedVersionTuple
-BridgedAvailabilitySpec_getVersion(BridgedAvailabilitySpec spec);
+BridgedAvailabilitySpec_getRawVersion(BridgedAvailabilitySpec spec);
 
 SWIFT_NAME("getter:BridgedAvailabilitySpec.versionRange(self:)")
 BridgedSourceRange

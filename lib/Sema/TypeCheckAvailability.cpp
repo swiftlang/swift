@@ -1231,7 +1231,7 @@ private:
       if (!Query->isUnavailability() && Query->getQueries().empty())
         continue;
 
-      AvailabilitySpec *Spec = bestActiveSpecForQuery(Query);
+      auto Spec = bestActiveSpecForQuery(Query);
       if (!Spec) {
         // We couldn't find an appropriate spec for the current platform,
         // so rather than refining, emit a diagnostic and just use the current
@@ -1243,8 +1243,9 @@ private:
         continue;
       }
 
-      AvailabilityRange NewConstraint = contextForSpec(Spec, false);
-      Query->setAvailableRange(contextForSpec(Spec, true).getRawVersionRange());
+      AvailabilityRange NewConstraint = contextForSpec(*Spec, false);
+      Query->setAvailableRange(
+          contextForSpec(*Spec, true).getRawVersionRange());
 
       // When compiling zippered for macCatalyst, we need to collect both
       // a macOS version (the target version) and an iOS/macCatalyst version
@@ -1252,11 +1253,13 @@ private:
       // entrypoint that will check either the macOS version or the iOS
       // version depending on the kind of process this code is loaded into.
       if (Context.LangOpts.TargetVariant) {
-        AvailabilitySpec *VariantSpec =
+        auto VariantSpec =
             bestActiveSpecForQuery(Query, /*ForTargetVariant*/ true);
-        VersionRange VariantRange =
-            contextForSpec(VariantSpec, true).getRawVersionRange();
-        Query->setVariantAvailableRange(VariantRange);
+        if (VariantSpec) {
+          VersionRange VariantRange =
+              contextForSpec(*VariantSpec, true).getRawVersionRange();
+          Query->setVariantAvailableRange(VariantRange);
+        }
       }
 
       if (Spec->isWildcard()) {
@@ -1284,12 +1287,13 @@ private:
         if (CurrentScope->getReason() != AvailabilityScope::Reason::Root) {
           PlatformKind BestPlatform = targetPlatform(Context.LangOpts);
 
+          auto Domain = Spec->getDomain();
           // If possible, try to report the diagnostic in terms for the
           // platform the user uttered in the '#available()'. For a platform
           // that inherits availability from another platform it may be
           // different from the platform specified in the target triple.
-          if (Spec->getPlatform() != PlatformKind::none)
-            BestPlatform = Spec->getPlatform();
+          if (Domain.getPlatformKind() != PlatformKind::none)
+            BestPlatform = Domain.getPlatformKind();
           Diags.diagnose(Query->getLoc(),
                          diag::availability_query_useless_enclosing_scope,
                          platformString(BestPlatform));
@@ -1362,29 +1366,34 @@ private:
 
   /// Return the best active spec for the target platform or nullptr if no
   /// such spec exists.
-  AvailabilitySpec *bestActiveSpecForQuery(PoundAvailableInfo *available,
-                                           bool forTargetVariant = false) {
-    AvailabilitySpec *FoundWildcardSpec = nullptr;
-    AvailabilitySpec *BestSpec = nullptr;
+  std::optional<SemanticAvailabilitySpec>
+  bestActiveSpecForQuery(PoundAvailableInfo *available,
+                         bool forTargetVariant = false) {
+    std::optional<SemanticAvailabilitySpec> FoundWildcardSpec;
+    std::optional<SemanticAvailabilitySpec> BestSpec;
 
-    for (auto *Spec : available->getQueries()) {
-      if (Spec->isWildcard()) {
+    for (auto Spec :
+         available->getSemanticAvailabilitySpecs(getCurrentDeclContext())) {
+      if (Spec.isWildcard()) {
         FoundWildcardSpec = Spec;
         continue;
       }
 
-      auto Domain = Spec->getDomain();
-      if (!Domain || !Domain->isPlatform())
+      auto Domain = Spec.getDomain();
+      if (!Domain.isPlatform())
         continue;
 
       // FIXME: This is not quite right: we want to handle AppExtensions
       // properly. For example, on the OSXApplicationExtension platform
       // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
-      if (isPlatformActive(Spec->getPlatform(), Context.LangOpts,
-                           forTargetVariant, /* ForRuntimeQuery */ true)) {
-        if (!BestSpec || inheritsAvailabilityFromPlatform(
-                             Spec->getPlatform(), BestSpec->getPlatform())) {
+      auto Platform = Domain.getPlatformKind();
+      if (isPlatformActive(Platform, Context.LangOpts, forTargetVariant,
+                           /* ForRuntimeQuery */ true)) {
+
+        if (!BestSpec ||
+            inheritsAvailabilityFromPlatform(
+                Platform, BestSpec->getDomain().getPlatformKind())) {
           BestSpec = Spec;
         }
       }
@@ -1402,19 +1411,19 @@ private:
       SourceLoc Loc = available->getRParenLoc();
       return AvailabilitySpec::createWildcard(Context, Loc);
     } else {
-      return nullptr;
+      return std::nullopt;
     }
   }
 
   /// Return the availability context for the given spec.
-  AvailabilityRange contextForSpec(AvailabilitySpec *Spec,
+  AvailabilityRange contextForSpec(SemanticAvailabilitySpec Spec,
                                    bool GetRuntimeContext) {
-    if (Spec->isWildcard()) {
+    if (Spec.isWildcard()) {
       return AvailabilityRange::alwaysAvailable();
     }
 
     llvm::VersionTuple Version =
-        (GetRuntimeContext ? Spec->getRuntimeVersion() : Spec->getVersion());
+        (GetRuntimeContext ? Spec.getRuntimeVersion() : Spec.getVersion());
 
     return AvailabilityRange(VersionRange::allGTE(Version));
   }
@@ -2026,7 +2035,7 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
       return false;
 
     auto FixRange = scope->getAvailabilityConditionVersionSourceRange(
-        Platform, RunningVers);
+        AvailabilityDomain::forPlatform(Platform), RunningVers);
     if (!FixRange.isValid())
       return false;
     // Have found a nontrivial availability scope-introducer to narrow.

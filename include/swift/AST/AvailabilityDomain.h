@@ -280,14 +280,22 @@ public:
 /// Represents either a resolved availability domain or an identifier written
 /// in source that has not yet been resolved to a domain.
 class AvailabilityDomainOrIdentifier {
+  friend struct llvm::PointerLikeTypeTraits<AvailabilityDomainOrIdentifier>;
+
   using Storage = llvm::PointerUnion<AvailabilityDomain, Identifier>;
   Storage storage;
+
+  AvailabilityDomainOrIdentifier(Storage storage) : storage(storage) {}
 
 public:
   AvailabilityDomainOrIdentifier(Identifier identifier)
       : storage(identifier) {};
   AvailabilityDomainOrIdentifier(AvailabilityDomain domain)
       : storage(domain) {};
+
+  static AvailabilityDomainOrIdentifier fromOpaque(void *opaque) {
+    return AvailabilityDomainOrIdentifier(Storage::getFromOpaqueValue(opaque));
+  }
 
   bool isDomain() const { return storage.is<AvailabilityDomain>(); }
   bool isIdentifier() const { return storage.is<Identifier>(); }
@@ -315,6 +323,7 @@ public:
 
 namespace llvm {
 using swift::AvailabilityDomain;
+using swift::AvailabilityDomainOrIdentifier;
 
 // An AvailabilityDomain is "pointer like".
 template <typename T>
@@ -350,6 +359,25 @@ struct DenseMapInfo<AvailabilityDomain> {
                       const AvailabilityDomain RHS) {
     return LHS == RHS;
   }
+};
+
+// An AvailabilityDomainOrIdentifier is "pointer like".
+template <typename T>
+struct PointerLikeTypeTraits;
+template <>
+struct PointerLikeTypeTraits<swift::AvailabilityDomainOrIdentifier> {
+public:
+  static inline void *getAsVoidPointer(AvailabilityDomainOrIdentifier value) {
+    return value.storage.getOpaqueValue();
+  }
+  static inline swift::AvailabilityDomainOrIdentifier
+  getFromVoidPointer(void *P) {
+    return AvailabilityDomainOrIdentifier::fromOpaque(P);
+  }
+  enum {
+    NumLowBitsAvailable = PointerLikeTypeTraits<
+        AvailabilityDomainOrIdentifier::Storage>::NumLowBitsAvailable
+  };
 };
 
 } // end namespace llvm

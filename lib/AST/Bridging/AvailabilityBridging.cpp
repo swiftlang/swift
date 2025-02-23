@@ -144,8 +144,8 @@ BridgedAvailabilitySpec_getPlatform(BridgedAvailabilitySpec spec) {
 }
 
 BridgedVersionTuple
-BridgedAvailabilitySpec_getVersion(BridgedAvailabilitySpec spec) {
-  return spec.unbridged()->getVersion();
+BridgedAvailabilitySpec_getRawVersion(BridgedAvailabilitySpec spec) {
+  return spec.unbridged()->getRawVersion();
 }
 
 BridgedSourceRange
