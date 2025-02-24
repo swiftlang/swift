@@ -59,7 +59,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
   @usableFromInline
   internal subscript(i: Int) -> AnyObject {
     @_effects(releasenone) get {
-      core.objectAt(i)
+      core.objectAt(i).takeUnretainedValue()
     }
   }
 
@@ -92,7 +92,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
       .assumingMemoryBound(to: AnyObject.self)
       
     for idx in 0..<boundsCount {
-      (base + idx).initialize(to: core.objectAt(idx + bounds.lowerBound))
+      (base + idx).initialize(to: core.objectAt(idx + bounds.lowerBound).takeUnretainedValue())
     }
 
     return _SliceBuffer(_buffer: result, shiftedToStartIndex: bounds.lowerBound)

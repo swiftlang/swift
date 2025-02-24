@@ -61,7 +61,7 @@ internal protocol _NSCopying: _ShadowProtocol {
 internal protocol _NSArrayCore: _NSCopying, _NSFastEnumeration {
 
   @objc(objectAtIndex:)
-  func objectAt(_ index: Int) -> AnyObject
+  func objectAt(_ index: Int) -> Unmanaged<AnyObject>
 
   func getObjects(_: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
 
