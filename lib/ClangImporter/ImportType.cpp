@@ -223,7 +223,6 @@ namespace {
     Bridgeability Bridging;
     const clang::FunctionType *CompletionHandlerType;
     std::optional<unsigned> CompletionHandlerErrorParamIndex;
-    bool isBoundsAnnotated = false;
 
   public:
     SwiftTypeConverter(ClangImporter::Implementation &impl,
@@ -245,8 +244,6 @@ namespace {
       auto IR = Visit(type.getTypePtr());
       return IR;
     }
-
-    bool hasBoundsAnnotation() { return isBoundsAnnotated; }
 
     ImportResult VisitType(const Type*) = delete;
 
@@ -420,9 +417,8 @@ namespace {
       return Type();
     }
 
-    ImportResult VisitCountAttributedType(
-        const clang::CountAttributedType *type) {
-      isBoundsAnnotated = true;
+    ImportResult
+    VisitCountAttributedType(const clang::CountAttributedType *type) {
       return Visit(type->desugar());
     }
 
@@ -492,8 +488,7 @@ namespace {
       Type pointeeType = Impl.importTypeIgnoreIUO(
           pointeeQualType, ImportTypeKind::Value, addImportDiagnostic,
           AllowNSUIntegerAsInt, Bridgeability::None, ImportTypeAttrs(),
-          OTK_ImplicitlyUnwrappedOptional, /*resugarNSErrorPointer=*/true,
-          &isBoundsAnnotated);
+          OTK_ImplicitlyUnwrappedOptional, /*resugarNSErrorPointer=*/true);
 
       // If this is imported as a reference type, ignore the innermost pointer.
       // (`T *` becomes `T`, but `T **` becomes `UnsafeMutablePointer<T>`.)
@@ -1738,8 +1733,7 @@ ImportedType ClangImporter::Implementation::importType(
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
     bool allowNSUIntegerAsInt, Bridgeability bridging, ImportTypeAttrs attrs,
     OptionalTypeKind optionality, bool resugarNSErrorPointer,
-    std::optional<unsigned> completionHandlerErrorParamIndex,
-    bool *isBoundsAnnotated) {
+    std::optional<unsigned> completionHandlerErrorParamIndex) {
   if (type.isNull())
     return {Type(), false};
 
@@ -1801,8 +1795,6 @@ ImportedType ClangImporter::Implementation::importType(
       *this, addImportDiagnosticFn, allowNSUIntegerAsInt, bridging,
       completionHandlerType, completionHandlerErrorParamIndex);
   auto importResult = converter.Visit(type);
-  if (isBoundsAnnotated)
-    *isBoundsAnnotated |= converter.hasBoundsAnnotation();
 
   // Now fix up the type based on how we're concretely using it.
   auto adjustedType = adjustTypeForConcreteImport(
@@ -1817,13 +1809,11 @@ Type ClangImporter::Implementation::importTypeIgnoreIUO(
     clang::QualType type, ImportTypeKind importKind,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn,
     bool allowNSUIntegerAsInt, Bridgeability bridging, ImportTypeAttrs attrs,
-    OptionalTypeKind optionality, bool resugarNSErrorPointer,
-    bool *isBoundsAnnotated) {
+    OptionalTypeKind optionality, bool resugarNSErrorPointer) {
 
-  auto importedType =
-      importType(type, importKind, addImportDiagnosticFn, allowNSUIntegerAsInt,
-                 bridging, attrs, optionality, resugarNSErrorPointer,
-                 std::nullopt, isBoundsAnnotated);
+  auto importedType = importType(
+      type, importKind, addImportDiagnosticFn, allowNSUIntegerAsInt, bridging,
+      attrs, optionality, resugarNSErrorPointer, std::nullopt);
 
   return importedType.getType();
 }
@@ -2208,7 +2198,7 @@ applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
 
 ImportedType ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
-    bool allowNSUIntegerAsInt, bool *isBoundsAnnotated) {
+    bool allowNSUIntegerAsInt) {
 
   // Hardcode handling of certain result types for builtins.
   if (auto builtinID = clangDecl->getBuiltinID()) {
@@ -2333,7 +2323,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
                        : ImportTypeKind::Result),
       ImportDiagnosticAdder(*this, clangDecl, clangDecl->getLocation()),
       allowNSUIntegerAsInt, Bridgeability::Full, getImportTypeAttrs(clangDecl),
-      OptionalityOfReturn, true, std::nullopt, isBoundsAnnotated);
+      OptionalityOfReturn, true, std::nullopt);
 }
 
 static Type
@@ -2368,7 +2358,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
     bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
-    ArrayRef<GenericTypeParamDecl *> genericParams, bool *hasBoundsAnnotation) {
+    ArrayRef<GenericTypeParamDecl *> genericParams) {
 
   bool allowNSUIntegerAsInt =
       shouldAllowNSUIntegerAsInt(isFromSystemModule, clangDecl);
@@ -2428,8 +2418,8 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
     // If importedType is already initialized, it means we found the enum that
     // was supposed to be used (instead of the typedef type).
     if (!importedType) {
-      importedType = importFunctionReturnType(
-          dc, clangDecl, allowNSUIntegerAsInt, hasBoundsAnnotation);
+      importedType =
+          importFunctionReturnType(dc, clangDecl, allowNSUIntegerAsInt);
       if (!importedType) {
         addDiag(Diagnostic(diag::return_type_not_imported));
         return {Type(), false};
@@ -2439,9 +2429,9 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
 
   Type swiftResultTy = importedType.getType();
   ArrayRef<Identifier> argNames = name.getArgumentNames();
-  parameterList = importFunctionParameterList(
-      dc, clangDecl, params, isVariadic, allowNSUIntegerAsInt, argNames,
-      genericParams, swiftResultTy, hasBoundsAnnotation);
+  parameterList = importFunctionParameterList(dc, clangDecl, params, isVariadic,
+                                              allowNSUIntegerAsInt, argNames,
+                                              genericParams, swiftResultTy);
   if (!parameterList)
     return {Type(), false};
 
@@ -2584,7 +2574,6 @@ ClangImporter::Implementation::importParameterType(
     }
   }
 
-  bool isBoundsAnnotated = false;
   if (!swiftParamTy) {
     // If this is the throws error parameter, we don't need to convert any
     // NSError** arguments to the sugared NSErrorPointer typealias form,
@@ -2594,11 +2583,11 @@ ClangImporter::Implementation::importParameterType(
     // for the specific case when the throws conversion works, but is not
     // sufficient if it fails. (The correct, overarching fix is ClangImporter
     // being lazier.)
-    auto importedType = importType(
-        paramTy, importKind, addImportDiagnosticFn, allowNSUIntegerAsInt,
-        Bridgeability::Full, attrs, optionalityOfParam,
-        /*resugarNSErrorPointer=*/!paramIsError,
-        completionHandlerErrorParamIndex, &isBoundsAnnotated);
+    auto importedType = importType(paramTy, importKind, addImportDiagnosticFn,
+                                   allowNSUIntegerAsInt, Bridgeability::Full,
+                                   attrs, optionalityOfParam,
+                                   /*resugarNSErrorPointer=*/!paramIsError,
+                                   completionHandlerErrorParamIndex);
     if (!importedType)
       return std::nullopt;
 
@@ -2616,7 +2605,7 @@ ClangImporter::Implementation::importParameterType(
     isInOut = false;
 
   return ImportParameterTypeResult{swiftParamTy, isInOut, isConsuming,
-                                   isParamTypeImplicitlyUnwrapped, isBoundsAnnotated};
+                                   isParamTypeImplicitlyUnwrapped};
 }
 
 bool ClangImporter::Implementation::isDefaultArgSafeToImport(
@@ -2741,8 +2730,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
     bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
-    ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType,
-    bool *hasBoundsAnnotatedParam) {
+    ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType) {
   // Import the parameters.
   SmallVector<ParamDecl *, 4> parameters;
   unsigned index = 0;
@@ -2783,8 +2771,6 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     bool isConsuming = swiftParamTyOpt->isConsuming;
     bool isParamTypeImplicitlyUnwrapped =
         swiftParamTyOpt->isParamTypeImplicitlyUnwrapped;
-    if (swiftParamTyOpt->isBoundsAnnotated && hasBoundsAnnotatedParam)
-      *hasBoundsAnnotatedParam = true;
 
     // Retrieve the argument name.
     Identifier name;

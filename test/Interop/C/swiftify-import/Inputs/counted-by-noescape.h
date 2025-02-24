@@ -2,6 +2,7 @@
 
 #define __counted_by(x) __attribute__((__counted_by__(x)))
 #define __noescape __attribute__((noescape))
+#define __lifetimebound __attribute__((lifetimebound))
 
 void simple(int len, int * __counted_by(len) __noescape p);
 
@@ -20,3 +21,4 @@ void nonnull(int len, int * __counted_by(len) _Nonnull __noescape p);
 
 int * __counted_by(len) __noescape returnPointer(int len);
 
+int * __counted_by(len1) returnLifetimeBound(int len1, int len2, int * __counted_by(len2) p __lifetimebound);

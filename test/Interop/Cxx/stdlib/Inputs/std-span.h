@@ -6,6 +6,14 @@
 #include <string>
 #include <vector>
 
+#ifndef __counted_by // cstddef already imports ptrcheck.h on apple platforms
+#if defined(__has_feature) && __has_feature(bounds_safety_attributes)
+  #define __counted_by(x) __attribute__((__counted_by__(x)))
+#else
+  #define __counted_by(x)
+#endif
+#endif
+
 using ConstSpanOfInt = std::span<const int>;
 using SpanOfInt = std::span<int>;
 using ConstSpanOfString = std::span<const std::string>;
@@ -84,5 +92,33 @@ inline ConstSpanOfInt funcWithSafeWrapper3(const VecOfInt &v
 struct X {
   inline void methodWithSafeWrapper(ConstSpanOfInt s [[clang::noescape]]) {}
 };
+
+inline ConstSpanOfInt mixedFuncWithSafeWrapper1(const int * __counted_by(len) p
+                                           [[clang::lifetimebound]], int len) {
+  return ConstSpanOfInt(p, len);
+}
+
+inline const int * __counted_by(len) mixedFuncWithSafeWrapper2(const VecOfInt &v
+                                           [[clang::lifetimebound]], int len) {
+  if (v.size() <= len)
+    return v.data();
+  return nullptr;
+}
+
+inline void mixedFuncWithSafeWrapper3(ConstSpanOfInt s [[clang::noescape]],
+                                      int * __counted_by(len) p, int len) {}
+
+inline void mixedFuncWithSafeWrapper4(ConstSpanOfInt s [[clang::noescape]],
+                                      const int * __counted_by(len) p [[clang::noescape]], int len) {}
+
+inline void mixedFuncWithSafeWrapper5(ConstSpanOfInt s,
+                                      const int * __counted_by(len) p [[clang::noescape]], int len) {}
+
+inline void mixedFuncWithSafeWrapper6(ConstSpanOfInt s,
+                                      int * __counted_by(len) p, int len) {}
+
+inline ConstSpanOfInt mixedFuncWithSafeWrapper7(const int * __counted_by(len) p, int len) {
+  return ConstSpanOfInt(p, len);
+}
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H
