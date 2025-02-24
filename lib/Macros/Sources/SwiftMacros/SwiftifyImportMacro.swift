@@ -700,6 +700,443 @@ func getParameterIndexForDeclRef(
   return try getParameterIndexForParamName((parameterList), ref.baseName)
 }
 
+func parseEnumName(_ expr: ExprSyntax) throws -> String {
+  var exprLocal = expr
+  if let callExpr = expr.as(FunctionCallExprSyntax.self) {
+    exprLocal = callExpr.calledExpression
+  }
+  guard let dotExpr = exprLocal.as(MemberAccessExprSyntax.self)
+  else {
+    throw DiagnosticError(
+      "expected enum literal as argument, got '\(expr)'",
+      node: expr)
+  }
+  return dotExpr.declName.baseName.text
+}
+
+func parseEnumArgs(_ expr: ExprSyntax) throws -> LabeledExprListSyntax {
+  guard let callExpr = expr.as(FunctionCallExprSyntax.self)
+  else {
+    throw DiagnosticError(
+      "expected call to enum constructor, got '\(expr)'",
+      node: expr)
+  }
+  return callExpr.arguments
+}
+
+func getIntLiteralValue(_ expr: ExprSyntax) throws -> Int {
+  guard let intLiteral = expr.as(IntegerLiteralExprSyntax.self) else {
+    throw DiagnosticError("expected integer literal, got '\(expr)'", node: expr)
+  }
+  guard let res = intLiteral.representedLiteralValue else {
+    throw DiagnosticError("expected integer literal, got '\(expr)'", node: expr)
+  }
+  return res
+}
+
+func getBoolLiteralValue(_ expr: ExprSyntax) throws -> Bool {
+  guard let boolLiteral = expr.as(BooleanLiteralExprSyntax.self) else {
+    throw DiagnosticError("expected boolean literal, got '\(expr)'", node: expr)
+  }
+  switch boolLiteral.literal.tokenKind {
+  case .keyword(.true):
+    return true
+  case .keyword(.false):
+    return false
+  default:
+    throw DiagnosticError("expected bool literal, got '\(expr)'", node: expr)
+  }
+}
+
+func parseSwiftifyExpr(_ expr: ExprSyntax) throws -> SwiftifyExpr {
+  let enumName = try parseEnumName(expr)
+  switch enumName {
+  case "param":
+    let argumentList = try parseEnumArgs(expr)
+    if argumentList.count != 1 {
+      throw DiagnosticError(
+        "expected single argument to _SwiftifyExpr.param, got \(argumentList.count) arguments",
+        node: expr)
+    }
+    let pointerParamIndexArg = argumentList[argumentList.startIndex]
+    let pointerParamIndex: Int = try getIntLiteralValue(pointerParamIndexArg.expression)
+    return .param(pointerParamIndex)
+  case "return": return .return
+  case "self": return .`self`
+  default:
+    throw DiagnosticError(
+      "expected 'param', 'return', or 'self', got '\(enumName)'",
+      node: expr)
+  }
+}
+
+func parseCountedByEnum(
+  _ enumConstructorExpr: FunctionCallExprSyntax, _ signature: FunctionSignatureSyntax
+) throws -> ParamInfo {
+  let argumentList = enumConstructorExpr.arguments
+  let pointerExprArg = try getArgumentByName(argumentList, "pointer")
+  let pointerExpr: SwiftifyExpr = try parseSwiftifyExpr(pointerExprArg)
+  let countExprArg = try getArgumentByName(argumentList, "count")
+  guard let countExprStringLit = countExprArg.as(StringLiteralExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected string literal for 'count' parameter, got \(countExprArg)", node: countExprArg)
+  }
+  let unwrappedCountExpr = ExprSyntax(stringLiteral: countExprStringLit.representedLiteralValue!)
+  if let countVar = unwrappedCountExpr.as(DeclReferenceExprSyntax.self) {
+    // Perform this lookup here so we can override the position to point to the string literal
+    // instead of line 1, column 1
+    do {
+      _ = try getParameterIndexForDeclRef(signature.parameterClause.parameters, countVar)
+    } catch let error as DiagnosticError {
+      throw DiagnosticError(error.description, node: countExprStringLit, notes: error.notes)
+    }
+  }
+  return CountedBy(
+    pointerIndex: pointerExpr, count: unwrappedCountExpr, sizedBy: false,
+    nonescaping: false, dependencies: [], original: ExprSyntax(enumConstructorExpr))
+}
+
+func parseSizedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> ParamInfo {
+  let argumentList = enumConstructorExpr.arguments
+  let pointerExprArg = try getArgumentByName(argumentList, "pointer")
+  let pointerExpr: SwiftifyExpr = try parseSwiftifyExpr(pointerExprArg)
+  let sizeExprArg = try getArgumentByName(argumentList, "size")
+  guard let sizeExprStringLit = sizeExprArg.as(StringLiteralExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected string literal for 'size' parameter, got \(sizeExprArg)", node: sizeExprArg)
+  }
+  let unwrappedCountExpr = ExprSyntax(stringLiteral: sizeExprStringLit.representedLiteralValue!)
+  return CountedBy(
+    pointerIndex: pointerExpr, count: unwrappedCountExpr, sizedBy: true, nonescaping: false,
+    dependencies: [], original: ExprSyntax(enumConstructorExpr))
+}
+
+func parseEndedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> ParamInfo {
+  let argumentList = enumConstructorExpr.arguments
+  let startPointerExprArg = try getArgumentByName(argumentList, "start")
+  let _: SwiftifyExpr = try parseSwiftifyExpr(startPointerExprArg)
+  let endPointerExprArg = try getArgumentByName(argumentList, "end")
+  let _: SwiftifyExpr = try parseSwiftifyExpr(endPointerExprArg)
+  throw RuntimeError("endedBy support not yet implemented")
+}
+
+func parseNonEscaping(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> Int {
+  let argumentList = enumConstructorExpr.arguments
+  let pointerExprArg = try getArgumentByName(argumentList, "pointer")
+  let pointerExpr: SwiftifyExpr = try parseSwiftifyExpr(pointerExprArg)
+  let pointerParamIndex: Int = paramOrReturnIndex(pointerExpr)
+  return pointerParamIndex
+}
+
+func parseLifetimeDependence(_ enumConstructorExpr: FunctionCallExprSyntax)
+  throws -> (SwiftifyExpr, LifetimeDependence) {
+  let argumentList = enumConstructorExpr.arguments
+  let pointer: SwiftifyExpr = try parseSwiftifyExpr(try getArgumentByName(argumentList, "pointer"))
+  let dependsOnArg = try getArgumentByName(argumentList, "dependsOn")
+  let dependsOn: SwiftifyExpr = try parseSwiftifyExpr(dependsOnArg)
+  if dependsOn == .`return` {
+      throw DiagnosticError("lifetime cannot depend on the return value", node: dependsOnArg)
+  }
+  let type = try getArgumentByName(argumentList, "type")
+  let depType: DependenceType
+  switch try parseEnumName(type) {
+  case "borrow":
+    depType = DependenceType.borrow
+  case "copy":
+    depType = DependenceType.copy
+  default:
+    throw DiagnosticError("expected '.copy' or '.borrow', got '\(type)'", node: type)
+  }
+  let dependence = LifetimeDependence(dependsOn: dependsOn, type: depType)
+  return (pointer, dependence)
+}
+
+func parseTypeMappingParam(_ paramAST: LabeledExprSyntax?) throws -> [String: String]? {
+  guard let unwrappedParamAST = paramAST else {
+    return nil
+  }
+  let paramExpr = unwrappedParamAST.expression
+  guard let dictExpr = paramExpr.as(DictionaryExprSyntax.self) else {
+    return nil
+  }
+  var dict : [String: String] = [:]
+  switch dictExpr.content {
+    case .colon(_):
+      return dict
+    case .elements(let types):
+      for element in types {
+        guard let key = element.key.as(StringLiteralExprSyntax.self) else {
+          throw DiagnosticError("expected a string literal, got '\(element.key)'", node: element.key)
+        }
+        guard let value = element.value.as(StringLiteralExprSyntax.self) else {
+          throw DiagnosticError("expected a string literal, got '\(element.value)'", node: element.value)
+        }
+        dict[key.representedLiteralValue!] = value.representedLiteralValue!
+      }
+    @unknown default:
+      throw DiagnosticError("unknown dictionary literal", node: dictExpr)
+  }
+  return dict
+}
+
+func parseCxxSpansInSignature(
+  _ signature: FunctionSignatureSyntax,
+  _ typeMappings: [String: String]?
+) throws -> [ParamInfo] {
+  guard let typeMappings else {
+    return []
+  }
+  var result : [ParamInfo] = []
+  let process = { type, expr, orig in
+    let typeName = try getTypeName(type).text;
+    if let desugaredType = typeMappings[typeName] {
+      if let unqualifiedDesugaredType = getUnqualifiedStdName(desugaredType) {
+        if unqualifiedDesugaredType.starts(with: "span<") {
+          result.append(CxxSpan(pointerIndex: expr, nonescaping: false,
+            dependencies: [], typeMappings: typeMappings, original: orig))
+        }
+      }
+    }
+  }
+  for (idx, param) in signature.parameterClause.parameters.enumerated() {
+    try process(param.type, .param(idx + 1), param)
+  }
+  if let retClause = signature.returnClause {
+    try process(retClause.type, .`return`, retClause)
+  }
+  return result
+}
+
+func parseMacroParam(
+  _ paramExpr: ExprSyntax, _ signature: FunctionSignatureSyntax,
+  nonescapingPointers: inout Set<Int>,
+  lifetimeDependencies: inout [SwiftifyExpr: [LifetimeDependence]]
+) throws -> ParamInfo? {
+  guard let enumConstructorExpr = paramExpr.as(FunctionCallExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected _SwiftifyInfo enum literal as argument, got '\(paramExpr)'", node: paramExpr)
+  }
+  let enumName = try parseEnumName(paramExpr)
+  switch enumName {
+  case "countedBy": return try parseCountedByEnum(enumConstructorExpr, signature)
+  case "sizedBy": return try parseSizedByEnum(enumConstructorExpr)
+  case "endedBy": return try parseEndedByEnum(enumConstructorExpr)
+  case "nonescaping":
+    let index = try parseNonEscaping(enumConstructorExpr)
+    nonescapingPointers.insert(index)
+    return nil
+  case "lifetimeDependence":
+    let (expr, dependence) = try parseLifetimeDependence(enumConstructorExpr)
+    lifetimeDependencies[expr, default: []].append(dependence)
+    // We assume pointers annotated with lifetimebound do not escape.
+    let fromIdx = paramOrReturnIndex(dependence.dependsOn)
+    if dependence.type == DependenceType.copy && fromIdx != 0 {
+      nonescapingPointers.insert(fromIdx)
+    }
+    // The escaping is controlled when a parameter is the target of a lifetimebound.
+    // So we want to do the transformation to Swift's Span.
+    let idx = paramOrReturnIndex(expr)
+    if idx != -1 {
+      nonescapingPointers.insert(idx)
+    }
+    return nil
+  default:
+    throw DiagnosticError(
+      "expected 'countedBy', 'sizedBy', 'endedBy', 'nonescaping' or 'lifetimeDependence', got '\(enumName)'",
+      node: enumConstructorExpr)
+  }
+}
+
+func hasTrivialCountVariants(_ parsedArgs: [ParamInfo]) -> Bool {
+  let countExprs = parsedArgs.compactMap {
+    switch $0 {
+    case let c as CountedBy: return c.count
+    default: return nil
+    }
+  }
+  let trivialCounts = countExprs.filter {
+    $0.is(DeclReferenceExprSyntax.self) || $0.is(IntegerLiteralExprSyntax.self)
+  }
+  // don't generate trivial count variants if there are any non-trivial counts
+  if trivialCounts.count < countExprs.count {
+    return false
+  }
+  let countVars = trivialCounts.filter { $0.is(DeclReferenceExprSyntax.self) }
+  let distinctCountVars = Set(
+    countVars.map {
+      return $0.as(DeclReferenceExprSyntax.self)!.baseName.text
+    })
+  // don't generate trivial count variants if two count expressions refer to the same parameter
+  return countVars.count == distinctCountVars.count
+}
+
+func checkArgs(_ args: [ParamInfo], _ funcDecl: FunctionDeclSyntax) throws {
+  var argByIndex: [Int: ParamInfo] = [:]
+  var ret: ParamInfo? = nil
+  let paramCount = funcDecl.signature.parameterClause.parameters.count
+  try args.forEach { pointerInfo in
+    switch pointerInfo.pointerIndex {
+    case .param(let i):
+    if i < 1 || i > paramCount {
+      let noteMessage =
+        paramCount > 0
+        ? "function \(funcDecl.name) has parameter indices 1..\(paramCount)"
+        : "function \(funcDecl.name) has no parameters"
+      throw DiagnosticError(
+        "pointer index out of bounds", node: pointerInfo.original,
+        notes: [
+          Note(node: Syntax(funcDecl.name), message: MacroExpansionNoteMessage(noteMessage))
+        ])
+    }
+    if argByIndex[i] != nil {
+      throw DiagnosticError(
+        "multiple _SwiftifyInfos referring to parameter with index "
+          + "\(i): \(pointerInfo) and \(argByIndex[i]!)", node: pointerInfo.original)
+    }
+    argByIndex[i] = pointerInfo
+    case .return:
+    if ret != nil {
+      throw DiagnosticError(
+        "multiple _SwiftifyInfos referring to return value: \(pointerInfo) and \(ret!)", node: pointerInfo.original)
+    }
+    ret = pointerInfo
+    case .self:
+      throw DiagnosticError("do not annotate self", node: pointerInfo.original)
+    }
+  }
+}
+
+func paramOrReturnIndex(_ expr: SwiftifyExpr) -> Int {
+  switch expr {
+  case .param(let i): return i
+  case .`self`: return 0
+  case .return: return -1
+  }
+}
+
+func setNonescapingPointers(_ args: inout [ParamInfo], _ nonescapingPointers: Set<Int>) {
+  if args.isEmpty {
+    return
+  }
+  for i in 0...args.count - 1 where nonescapingPointers.contains(paramOrReturnIndex(args[i].pointerIndex)) {
+    args[i].nonescaping = true
+  }
+}
+
+func setLifetimeDependencies(_ args: inout [ParamInfo], _ lifetimeDependencies: [SwiftifyExpr: [LifetimeDependence]]) {
+  if args.isEmpty {
+    return
+  }
+  for i in 0...args.count - 1 where lifetimeDependencies.keys.contains(args[i].pointerIndex) {
+    args[i].dependencies = lifetimeDependencies[args[i].pointerIndex]!
+  }
+}
+
+func lifetimeAttributes(_ funcDecl: FunctionDeclSyntax,
+                        _ dependencies: [SwiftifyExpr: [LifetimeDependence]]) -> [AttributeListSyntax.Element] {
+  let returnDependencies = dependencies[.`return`, default: []]
+  if returnDependencies.isEmpty {
+    return []
+  }
+  var args : [LabeledExprSyntax] = []
+  for dependence in returnDependencies {
+    if (dependence.type == .borrow) {
+      args.append(LabeledExprSyntax(expression:
+        DeclReferenceExprSyntax(baseName: TokenSyntax("borrow"))))
+    }
+    args.append(LabeledExprSyntax(expression:
+      DeclReferenceExprSyntax(baseName: TokenSyntax(tryGetParamName(funcDecl, dependence.dependsOn))!),
+      trailingComma: .commaToken()))
+  }
+  args[args.count - 1] = args[args.count - 1].with(\.trailingComma, nil)
+  return [.attribute(AttributeSyntax(
+            atSign: .atSignToken(),
+            attributeName: IdentifierTypeSyntax(name: "lifetime"),
+            leftParen: .leftParenToken(),
+            arguments: .argumentList(LabeledExprListSyntax(args)),
+            rightParen: .rightParenToken()))]
+}
+
+func constructOverloadFunction(forDecl funcDecl: FunctionDeclSyntax,
+                               args arguments: [ExprSyntax],
+                               typeMappings: [String: String]?) throws -> DeclSyntax {
+  var nonescapingPointers = Set<Int>()
+  var lifetimeDependencies : [SwiftifyExpr: [LifetimeDependence]] = [:]
+  var parsedArgs = try arguments.compactMap {
+    try parseMacroParam($0, funcDecl.signature, nonescapingPointers: &nonescapingPointers,
+      lifetimeDependencies: &lifetimeDependencies)
+  }
+  parsedArgs.append(contentsOf: try parseCxxSpansInSignature(funcDecl.signature, typeMappings))
+  setNonescapingPointers(&parsedArgs, nonescapingPointers)
+  setLifetimeDependencies(&parsedArgs, lifetimeDependencies)
+  // We only transform non-escaping spans.
+  parsedArgs = parsedArgs.filter {
+    if let cxxSpanArg = $0 as? CxxSpan {
+      return cxxSpanArg.nonescaping || cxxSpanArg.pointerIndex == .return
+    } else {
+      return true
+    }
+  }
+  try checkArgs(parsedArgs, funcDecl)
+  let baseBuilder = FunctionCallBuilder(funcDecl)
+
+  let skipTrivialCount = hasTrivialCountVariants(parsedArgs)
+
+  let builder: BoundsCheckedThunkBuilder = parsedArgs.reduce(
+    baseBuilder,
+    { (prev, parsedArg) in
+      parsedArg.getBoundsCheckedThunkBuilder(prev, funcDecl, skipTrivialCount)
+    })
+  let (newSignature, onlyReturnTypeChanged) = try builder.buildFunctionSignature([:], nil)
+  let checks =
+    skipTrivialCount
+    ? [] as [CodeBlockItemSyntax]
+    : try builder.buildBoundsChecks().map { e in
+      CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
+    }
+  let call = CodeBlockItemSyntax(
+    item: CodeBlockItemSyntax.Item(
+      ReturnStmtSyntax(
+        returnKeyword: .keyword(.return, trailingTrivia: " "),
+        expression: try builder.buildFunctionCall([:]))))
+  let body = CodeBlockSyntax(statements: CodeBlockItemListSyntax(checks + [call]))
+  let lifetimeAttrs = lifetimeAttributes(funcDecl, lifetimeDependencies)
+  let disfavoredOverload: [AttributeListSyntax.Element] = (onlyReturnTypeChanged ? [
+    .attribute(
+      AttributeSyntax(
+        atSign: .atSignToken(),
+        attributeName: IdentifierTypeSyntax(name: "_disfavoredOverload")))
+  ] : [])
+  let hasVisibilityModifier = funcDecl.modifiers.contains { modifier in
+    let modName = modifier.name.trimmed.text
+    return modName == "public" || modName == "internal" || modName == "open" || modName == "private" || modName == "filePrivate"
+  }
+  let newFunc =
+    funcDecl
+    .with(\.signature, newSignature)
+    .with(\.body, body)
+    .with(
+      \.attributes,
+      funcDecl.attributes.filter { e in
+        switch e {
+        case .attribute(let attr):
+          // don't apply this macro recursively, and avoid dupe _alwaysEmitIntoClient
+          let name = attr.attributeName.as(IdentifierTypeSyntax.self)?.name.text
+          return name == nil || (name != "_SwiftifyImport" && name != "_alwaysEmitIntoClient")
+        default: return true
+        }
+      } + [
+        .attribute(
+          AttributeSyntax(
+            atSign: .atSignToken(),
+            attributeName: IdentifierTypeSyntax(name: "_alwaysEmitIntoClient")))
+      ]
+      + lifetimeAttrs
+      + disfavoredOverload)
+    .with(\.modifiers, funcDecl.modifiers + (hasVisibilityModifier ? [] : [DeclModifierSyntax(name: .identifier("public"))]))
+  return DeclSyntax(newFunc)
+}
+
 /// A macro that adds safe(r) wrappers for functions with unsafe pointer types.
 /// Depends on bounds, escapability and lifetime information for each pointer.
 /// Intended to map to C attributes like __counted_by, __ended_by and __no_escape,
@@ -707,363 +1144,6 @@ func getParameterIndexForDeclRef(
 /// appropriately. Moreover, it can wrap C++ APIs using unsafe C++ types like
 /// std::span with APIs that use their safer Swift equivalents.
 public struct SwiftifyImportMacro: PeerMacro {
-  static func parseEnumName(_ expr: ExprSyntax) throws -> String {
-    var exprLocal = expr
-    if let callExpr = expr.as(FunctionCallExprSyntax.self) {
-      exprLocal = callExpr.calledExpression
-    }
-    guard let dotExpr = exprLocal.as(MemberAccessExprSyntax.self)
-    else {
-      throw DiagnosticError(
-        "expected enum literal as argument, got '\(expr)'",
-        node: expr)
-    }
-    return dotExpr.declName.baseName.text
-  }
-
-  static func parseEnumArgs(_ expr: ExprSyntax) throws -> LabeledExprListSyntax {
-    guard let callExpr = expr.as(FunctionCallExprSyntax.self)
-    else {
-      throw DiagnosticError(
-        "expected call to enum constructor, got '\(expr)'",
-        node: expr)
-    }
-    return callExpr.arguments
-  }
-
-  static func getIntLiteralValue(_ expr: ExprSyntax) throws -> Int {
-    guard let intLiteral = expr.as(IntegerLiteralExprSyntax.self) else {
-      throw DiagnosticError("expected integer literal, got '\(expr)'", node: expr)
-    }
-    guard let res = intLiteral.representedLiteralValue else {
-      throw DiagnosticError("expected integer literal, got '\(expr)'", node: expr)
-    }
-    return res
-  }
-
-  static func getBoolLiteralValue(_ expr: ExprSyntax) throws -> Bool {
-    guard let boolLiteral = expr.as(BooleanLiteralExprSyntax.self) else {
-      throw DiagnosticError("expected boolean literal, got '\(expr)'", node: expr)
-    }
-    switch boolLiteral.literal.tokenKind {
-    case .keyword(.true):
-      return true
-    case .keyword(.false):
-      return false
-    default:
-      throw DiagnosticError("expected bool literal, got '\(expr)'", node: expr)
-    }
-  }
-
-  static func parseSwiftifyExpr(_ expr: ExprSyntax) throws -> SwiftifyExpr {
-    let enumName = try parseEnumName(expr)
-    switch enumName {
-    case "param":
-      let argumentList = try parseEnumArgs(expr)
-      if argumentList.count != 1 {
-        throw DiagnosticError(
-          "expected single argument to _SwiftifyExpr.param, got \(argumentList.count) arguments",
-          node: expr)
-      }
-      let pointerParamIndexArg = argumentList[argumentList.startIndex]
-      let pointerParamIndex: Int = try getIntLiteralValue(pointerParamIndexArg.expression)
-      return .param(pointerParamIndex)
-    case "return": return .return
-    case "self": return .`self`
-    default:
-      throw DiagnosticError(
-        "expected 'param', 'return', or 'self', got '\(enumName)'",
-        node: expr)
-    }
-  }
-
-  static func parseCountedByEnum(
-    _ enumConstructorExpr: FunctionCallExprSyntax, _ signature: FunctionSignatureSyntax
-  ) throws -> ParamInfo {
-    let argumentList = enumConstructorExpr.arguments
-    let pointerExprArg = try getArgumentByName(argumentList, "pointer")
-    let pointerExpr: SwiftifyExpr = try parseSwiftifyExpr(pointerExprArg)
-    let countExprArg = try getArgumentByName(argumentList, "count")
-    guard let countExprStringLit = countExprArg.as(StringLiteralExprSyntax.self) else {
-      throw DiagnosticError(
-        "expected string literal for 'count' parameter, got \(countExprArg)", node: countExprArg)
-    }
-    let unwrappedCountExpr = ExprSyntax(stringLiteral: countExprStringLit.representedLiteralValue!)
-    if let countVar = unwrappedCountExpr.as(DeclReferenceExprSyntax.self) {
-      // Perform this lookup here so we can override the position to point to the string literal
-      // instead of line 1, column 1
-      do {
-        _ = try getParameterIndexForDeclRef(signature.parameterClause.parameters, countVar)
-      } catch let error as DiagnosticError {
-        throw DiagnosticError(error.description, node: countExprStringLit, notes: error.notes)
-      }
-    }
-    return CountedBy(
-      pointerIndex: pointerExpr, count: unwrappedCountExpr, sizedBy: false,
-      nonescaping: false, dependencies: [], original: ExprSyntax(enumConstructorExpr))
-  }
-
-  static func parseSizedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> ParamInfo {
-    let argumentList = enumConstructorExpr.arguments
-    let pointerExprArg = try getArgumentByName(argumentList, "pointer")
-    let pointerExpr: SwiftifyExpr = try parseSwiftifyExpr(pointerExprArg)
-    let sizeExprArg = try getArgumentByName(argumentList, "size")
-    guard let sizeExprStringLit = sizeExprArg.as(StringLiteralExprSyntax.self) else {
-      throw DiagnosticError(
-        "expected string literal for 'size' parameter, got \(sizeExprArg)", node: sizeExprArg)
-    }
-    let unwrappedCountExpr = ExprSyntax(stringLiteral: sizeExprStringLit.representedLiteralValue!)
-    return CountedBy(
-      pointerIndex: pointerExpr, count: unwrappedCountExpr, sizedBy: true, nonescaping: false,
-      dependencies: [], original: ExprSyntax(enumConstructorExpr))
-  }
-
-  static func parseEndedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> ParamInfo {
-    let argumentList = enumConstructorExpr.arguments
-    let startPointerExprArg = try getArgumentByName(argumentList, "start")
-    let _: SwiftifyExpr = try parseSwiftifyExpr(startPointerExprArg)
-    let endPointerExprArg = try getArgumentByName(argumentList, "end")
-    let _: SwiftifyExpr = try parseSwiftifyExpr(endPointerExprArg)
-    throw RuntimeError("endedBy support not yet implemented")
-  }
-
-  static func parseNonEscaping(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> Int {
-    let argumentList = enumConstructorExpr.arguments
-    let pointerExprArg = try getArgumentByName(argumentList, "pointer")
-    let pointerExpr: SwiftifyExpr = try parseSwiftifyExpr(pointerExprArg)
-    let pointerParamIndex: Int = paramOrReturnIndex(pointerExpr)
-    return pointerParamIndex
-  }
-
-  static func parseLifetimeDependence(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> (SwiftifyExpr, LifetimeDependence) {
-    let argumentList = enumConstructorExpr.arguments
-    let pointer: SwiftifyExpr = try parseSwiftifyExpr(try getArgumentByName(argumentList, "pointer"))
-    let dependsOnArg = try getArgumentByName(argumentList, "dependsOn")
-    let dependsOn: SwiftifyExpr = try parseSwiftifyExpr(dependsOnArg)
-    if dependsOn == .`return` {
-        throw DiagnosticError("lifetime cannot depend on the return value", node: dependsOnArg)
-    }
-    let type = try getArgumentByName(argumentList, "type") 
-    let depType: DependenceType
-    switch try parseEnumName(type) {
-      case "borrow":
-        depType = DependenceType.borrow
-      case "copy":
-        depType = DependenceType.copy
-      default:
-        throw DiagnosticError("expected '.copy' or '.borrow', got '\(type)'", node: type)
-    }
-    let dependence = LifetimeDependence(dependsOn: dependsOn, type: depType)
-    return (pointer, dependence)
-  }
-
-  static func parseTypeMappingParam(_ paramAST: LabeledExprSyntax?) throws -> [String: String]? {
-    guard let unwrappedParamAST = paramAST else {
-      return nil
-    }
-    let paramExpr = unwrappedParamAST.expression
-    guard let dictExpr = paramExpr.as(DictionaryExprSyntax.self) else {
-      return nil
-    }
-    var dict : [String: String] = [:]
-    switch dictExpr.content {
-      case .colon(_):
-        return dict
-      case .elements(let types):
-        for element in types {
-          guard let key = element.key.as(StringLiteralExprSyntax.self) else {
-            throw DiagnosticError("expected a string literal, got '\(element.key)'", node: element.key)
-          }
-          guard let value = element.value.as(StringLiteralExprSyntax.self) else {
-            throw DiagnosticError("expected a string literal, got '\(element.value)'", node: element.value)
-          }
-          dict[key.representedLiteralValue!] = value.representedLiteralValue!
-        }
-      @unknown default:
-        throw DiagnosticError("unknown dictionary literal", node: dictExpr)
-    }
-    return dict
-  }
-
-  static func parseCxxSpansInSignature(
-    _ signature: FunctionSignatureSyntax,
-    _ typeMappings: [String: String]?
-  ) throws -> [ParamInfo] {
-    guard let typeMappings else {
-      return []
-    }
-    var result : [ParamInfo] = []
-    let process = { type, expr, orig in
-      let typeName = try getTypeName(type).text;
-      if let desugaredType = typeMappings[typeName] {
-        if let unqualifiedDesugaredType = getUnqualifiedStdName(desugaredType) {
-          if unqualifiedDesugaredType.starts(with: "span<") {
-            result.append(CxxSpan(pointerIndex: expr, nonescaping: false,
-              dependencies: [], typeMappings: typeMappings, original: orig))
-          }
-        }
-      }
-    }
-    for (idx, param) in signature.parameterClause.parameters.enumerated() {
-      try process(param.type, .param(idx + 1), param)
-    }
-    if let retClause = signature.returnClause {
-      try process(retClause.type, .`return`, retClause)
-    }
-    return result
-  }
-
-  static func parseMacroParam(
-    _ paramAST: LabeledExprSyntax, _ signature: FunctionSignatureSyntax,
-    nonescapingPointers: inout Set<Int>,
-    lifetimeDependencies: inout [SwiftifyExpr: [LifetimeDependence]]
-  ) throws -> ParamInfo? {
-    let paramExpr = paramAST.expression
-    guard let enumConstructorExpr = paramExpr.as(FunctionCallExprSyntax.self) else {
-      throw DiagnosticError(
-        "expected _SwiftifyInfo enum literal as argument, got '\(paramExpr)'", node: paramExpr)
-    }
-    let enumName = try parseEnumName(paramExpr)
-    switch enumName {
-    case "countedBy": return try parseCountedByEnum(enumConstructorExpr, signature)
-    case "sizedBy": return try parseSizedByEnum(enumConstructorExpr)
-    case "endedBy": return try parseEndedByEnum(enumConstructorExpr)
-    case "nonescaping":
-      let index = try parseNonEscaping(enumConstructorExpr)
-      nonescapingPointers.insert(index)
-      return nil
-    case "lifetimeDependence":
-      let (expr, dependence) = try parseLifetimeDependence(enumConstructorExpr)
-      lifetimeDependencies[expr, default: []].append(dependence)
-      // We assume pointers annotated with lifetimebound do not escape.
-      let fromIdx = paramOrReturnIndex(dependence.dependsOn)
-      if dependence.type == DependenceType.copy && fromIdx != 0 {
-        nonescapingPointers.insert(fromIdx)
-      }
-      // The escaping is controlled when a parameter is the target of a lifetimebound.
-      // So we want to do the transformation to Swift's Span.
-      let idx = paramOrReturnIndex(expr)
-      if idx != -1 {
-        nonescapingPointers.insert(idx)
-      }
-      return nil
-    default:
-      throw DiagnosticError(
-        "expected 'countedBy', 'sizedBy', 'endedBy', 'nonescaping' or 'lifetimeDependence', got '\(enumName)'",
-        node: enumConstructorExpr)
-    }
-  }
-
-  static func hasTrivialCountVariants(_ parsedArgs: [ParamInfo]) -> Bool {
-    let countExprs = parsedArgs.compactMap {
-      switch $0 {
-      case let c as CountedBy: return c.count
-      default: return nil
-      }
-    }
-    let trivialCounts = countExprs.filter {
-      $0.is(DeclReferenceExprSyntax.self) || $0.is(IntegerLiteralExprSyntax.self)
-    }
-    // don't generate trivial count variants if there are any non-trivial counts
-    if trivialCounts.count < countExprs.count {
-      return false
-    }
-    let countVars = trivialCounts.filter { $0.is(DeclReferenceExprSyntax.self) }
-    let distinctCountVars = Set(
-      countVars.map {
-        return $0.as(DeclReferenceExprSyntax.self)!.baseName.text
-      })
-    // don't generate trivial count variants if two count expressions refer to the same parameter
-    return countVars.count == distinctCountVars.count
-  }
-
-  static func checkArgs(_ args: [ParamInfo], _ funcDecl: FunctionDeclSyntax) throws {
-    var argByIndex: [Int: ParamInfo] = [:]
-    var ret: ParamInfo? = nil
-    let paramCount = funcDecl.signature.parameterClause.parameters.count
-    try args.forEach { pointerInfo in
-      switch pointerInfo.pointerIndex {
-      case .param(let i):
-      if i < 1 || i > paramCount {
-        let noteMessage =
-          paramCount > 0
-          ? "function \(funcDecl.name) has parameter indices 1..\(paramCount)"
-          : "function \(funcDecl.name) has no parameters"
-        throw DiagnosticError(
-          "pointer index out of bounds", node: pointerInfo.original,
-          notes: [
-            Note(node: Syntax(funcDecl.name), message: MacroExpansionNoteMessage(noteMessage))
-          ])
-      }
-      if argByIndex[i] != nil {
-        throw DiagnosticError(
-          "multiple _SwiftifyInfos referring to parameter with index "
-            + "\(i): \(pointerInfo) and \(argByIndex[i]!)", node: pointerInfo.original)
-      }
-      argByIndex[i] = pointerInfo
-      case .return:
-      if ret != nil {
-        throw DiagnosticError(
-          "multiple _SwiftifyInfos referring to return value: \(pointerInfo) and \(ret!)", node: pointerInfo.original)
-      }
-      ret = pointerInfo
-      case .self:
-        throw DiagnosticError("do not annotate self", node: pointerInfo.original)
-      }
-    }
-  }
-
-  static func paramOrReturnIndex(_ expr: SwiftifyExpr) -> Int {
-    switch expr {
-    case .param(let i): return i
-    case .`self`: return 0
-    case .return: return -1
-    }
-  }
-
-  static func setNonescapingPointers(_ args: inout [ParamInfo], _ nonescapingPointers: Set<Int>) {
-    if args.isEmpty {
-      return
-    }
-    for i in 0...args.count - 1 where nonescapingPointers.contains(paramOrReturnIndex(args[i].pointerIndex)) {
-      args[i].nonescaping = true
-    }
-  }
-
-  static func setLifetimeDependencies(_ args: inout [ParamInfo], _ lifetimeDependencies: [SwiftifyExpr: [LifetimeDependence]]) {
-    if args.isEmpty {
-      return
-    }
-    for i in 0...args.count - 1 where lifetimeDependencies.keys.contains(args[i].pointerIndex) {
-      args[i].dependencies = lifetimeDependencies[args[i].pointerIndex]!
-    }
-  }
-
-  static func lifetimeAttributes(_ funcDecl: FunctionDeclSyntax,
-    _ dependencies: [SwiftifyExpr: [LifetimeDependence]]) -> [AttributeListSyntax.Element] {
-    let returnDependencies = dependencies[.`return`, default: []]
-    if returnDependencies.isEmpty {
-      return []
-    }
-    var args : [LabeledExprSyntax] = []
-    for dependence in returnDependencies {
-      if (dependence.type == .borrow) {
-        args.append(LabeledExprSyntax(expression: 
-          DeclReferenceExprSyntax(baseName: TokenSyntax("borrow"))))
-      }
-      args.append(LabeledExprSyntax(expression: 
-        DeclReferenceExprSyntax(baseName: TokenSyntax(tryGetParamName(funcDecl, dependence.dependsOn))!),
-        trailingComma: .commaToken()))
-    }
-    args[args.count - 1] = args[args.count - 1].with(\.trailingComma, nil)
-    return [.attribute(AttributeSyntax(
-              atSign: .atSignToken(),
-              attributeName: IdentifierTypeSyntax(name: "lifetime"),
-              leftParen: .leftParenToken(),
-              arguments: .argumentList(LabeledExprListSyntax(args)),
-              rightParen: .rightParenToken()))]
-  }
-
   public static func expansion(
     of node: AttributeSyntax,
     providingPeersOf declaration: some DeclSyntaxProtocol,
@@ -1080,76 +1160,89 @@ public struct SwiftifyImportMacro: PeerMacro {
       if typeMappings != nil {
         arguments = arguments.dropLast()
       }
-      var nonescapingPointers = Set<Int>()
-      var lifetimeDependencies : [SwiftifyExpr: [LifetimeDependence]] = [:]
-      var parsedArgs = try arguments.compactMap {
-        try parseMacroParam($0, funcDecl.signature, nonescapingPointers: &nonescapingPointers,
-          lifetimeDependencies: &lifetimeDependencies)
-      }
-      parsedArgs.append(contentsOf: try parseCxxSpansInSignature(funcDecl.signature, typeMappings))
-      setNonescapingPointers(&parsedArgs, nonescapingPointers)
-      setLifetimeDependencies(&parsedArgs, lifetimeDependencies)
-      // We only transform non-escaping spans.
-      parsedArgs = parsedArgs.filter {
-        if let cxxSpanArg = $0 as? CxxSpan {
-          return cxxSpanArg.nonescaping || cxxSpanArg.pointerIndex == .return
-        } else {
-          return true
-        }
-      }
-      try checkArgs(parsedArgs, funcDecl)
-      let baseBuilder = FunctionCallBuilder(funcDecl)
+      let args = arguments.map { $0.expression }
+      return [try constructOverloadFunction(forDecl: funcDecl, args: args, typeMappings: typeMappings)]
+    } catch let error as DiagnosticError {
+      context.diagnose(
+        Diagnostic(
+          node: error.node, message: MacroExpansionErrorMessage(error.description),
+          notes: error.notes))
+      return []
+    }
+  }
+}
 
-      let skipTrivialCount = hasTrivialCountVariants(parsedArgs)
+func parseProtocolMacroParam(
+  _ paramAST: LabeledExprSyntax,
+  methods: [String: FunctionDeclSyntax]
+) throws -> (FunctionDeclSyntax, [ExprSyntax]) {
+  let paramExpr = paramAST.expression
+  guard let enumConstructorExpr = paramExpr.as(FunctionCallExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected _SwiftifyProtocolMethodInfo enum literal as argument, got '\(paramExpr)'", node: paramExpr)
+  }
+  let enumName = try parseEnumName(paramExpr)
+  if enumName != "method" {
+    throw DiagnosticError(
+      "expected 'method', got '\(enumName)'",
+      node: enumConstructorExpr)
+  }
+  let argumentList = enumConstructorExpr.arguments
+  let methodNameArg = try getArgumentByName(argumentList, "name")
+  guard let methodNameStringLit = methodNameArg.as(StringLiteralExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected string literal for 'name' parameter, got \(methodNameArg)", node: methodNameArg)
+  }
+  let methodName = methodNameStringLit.representedLiteralValue!
+  guard let methodSyntax = methods[methodName] else {
+    throw DiagnosticError("method with name \(methodName) not found in protocol", node: methodNameArg)
+  }
+  let paramInfoArg = try getArgumentByName(argumentList, "paramInfo")
+  guard let paramInfoArgList = paramInfoArg.as(ArrayExprSyntax.self) else {
+    throw DiagnosticError("expected array literal for 'paramInfo' parameter, got \(paramInfoArg)", node: paramInfoArg)
+  }
+  return (methodSyntax, paramInfoArgList.elements.map { ExprSyntax($0.expression) })
+}
 
-      let builder: BoundsCheckedThunkBuilder = parsedArgs.reduce(
-        baseBuilder,
-        { (prev, parsedArg) in
-          parsedArg.getBoundsCheckedThunkBuilder(prev, funcDecl, skipTrivialCount)
-        })
-      let (newSignature, onlyReturnTypeChanged) = try builder.buildFunctionSignature([:], nil)
-      let checks =
-        skipTrivialCount
-        ? [] as [CodeBlockItemSyntax]
-        : try builder.buildBoundsChecks().map { e in
-          CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
+/// Similar to SwiftifyImportMacro, but for providing overloads to methods in
+/// protocols using an extension, rather than in the same scope as the original.
+public struct SwiftifyImportProtocolMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    do {
+      guard let protocolDecl = declaration.as(ProtocolDeclSyntax.self) else {
+        throw DiagnosticError("@_SwiftifyImportProtocol only works on protocols", node: declaration)
+      }
+      let argumentList = node.arguments!.as(LabeledExprListSyntax.self)!
+      var arguments = [LabeledExprSyntax](argumentList)
+      let typeMappings = try parseTypeMappingParam(arguments.last)
+      if typeMappings != nil {
+        arguments = arguments.dropLast()
+      }
+
+      var methods: [String: FunctionDeclSyntax] = [:]
+      for member in protocolDecl.memberBlock.members {
+        guard let methodDecl = member.decl.as(FunctionDeclSyntax.self) else {
+          continue
         }
-      let call = CodeBlockItemSyntax(
-        item: CodeBlockItemSyntax.Item(
-          ReturnStmtSyntax(
-            returnKeyword: .keyword(.return, trailingTrivia: " "),
-            expression: try builder.buildFunctionCall([:]))))
-      let body = CodeBlockSyntax(statements: CodeBlockItemListSyntax(checks + [call]))
-      let lifetimeAttrs = lifetimeAttributes(funcDecl, lifetimeDependencies)
-      let disfavoredOverload : [AttributeListSyntax.Element] = (onlyReturnTypeChanged ? [
-        .attribute(
-          AttributeSyntax(
-            atSign: .atSignToken(),
-            attributeName: IdentifierTypeSyntax(name: "_disfavoredOverload")))
-      ] : [])
-      let newFunc =
-        funcDecl
-        .with(\.signature, newSignature)
-        .with(\.body, body)
-        .with(
-          \.attributes,
-          funcDecl.attributes.filter { e in
-            switch e {
-            case .attribute(let attr):
-              // don't apply this macro recursively, and avoid dupe _alwaysEmitIntoClient
-              let name = attr.attributeName.as(IdentifierTypeSyntax.self)?.name.text
-              return name == nil || (name != "_SwiftifyImport" && name != "_alwaysEmitIntoClient")
-            default: return true
-            }
-          } + [
-            .attribute(
-              AttributeSyntax(
-                atSign: .atSignToken(),
-                attributeName: IdentifierTypeSyntax(name: "_alwaysEmitIntoClient")))
-          ]
-          + lifetimeAttrs
-          + disfavoredOverload)
-      return [DeclSyntax(newFunc)]
+        methods[methodDecl.name.trimmed.text] = methodDecl
+      }
+      let overloads = try arguments.map {
+        let (method, args) = try parseProtocolMacroParam($0, methods: methods)
+        let function = try constructOverloadFunction(forDecl: method, args: args, typeMappings: typeMappings)
+        return MemberBlockItemSyntax(decl: function)
+      }
+
+      return [ExtensionDeclSyntax(extensionKeyword: .identifier("extension"), extendedType: type,
+                                  memberBlock: MemberBlockSyntax(leftBrace: .leftBraceToken(),
+                                                                 members: MemberBlockItemListSyntax(overloads),
+                                                                 rightBrace: .rightBraceToken())
+      )]
     } catch let error as DiagnosticError {
       context.diagnose(
         Diagnostic(

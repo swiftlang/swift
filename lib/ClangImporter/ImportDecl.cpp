@@ -5593,6 +5593,8 @@ namespace {
 
       result->setMemberLoader(&Impl, 0);
 
+      Impl.importProtocolBoundsAttributes(result);
+
       return result;
     }
 
@@ -8827,13 +8829,15 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
 
 namespace {
 class SwiftifyInfoPrinter {
-public:
+protected:
   clang::ASTContext &ctx;
   llvm::raw_ostream &out;
   bool firstParam = true;
+
+public:
   SwiftifyInfoPrinter(clang::ASTContext &ctx, llvm::raw_ostream &out)
       : ctx(ctx), out(out) {
-    out << "@_SwiftifyImport(";
+    out << "(";
   }
   ~SwiftifyInfoPrinter() { out << ")"; }
 
@@ -8890,14 +8894,6 @@ public:
   }
 
 private:
-  void printSeparator() {
-    if (!firstParam) {
-      out << ", ";
-    } else {
-      firstParam = false;
-    }
-  }
-
   void printParamOrReturn(ssize_t pointerIndex) {
     if (pointerIndex == -2)
       out << ".self";
@@ -8905,6 +8901,41 @@ private:
       out << ".return";
     else
       out << ".param(" << pointerIndex + 1 << ")";
+  }
+
+protected:
+  void printSeparator() {
+    if (!firstParam) {
+      out << ", ";
+    } else {
+      firstParam = false;
+    }
+  }
+};
+
+class SwiftifyProtocolInfoPrinter : SwiftifyInfoPrinter {
+public:
+  SwiftifyProtocolInfoPrinter(clang::ASTContext &ctx, llvm::raw_ostream &out)
+      : SwiftifyInfoPrinter(ctx, out) {}
+
+  bool printMethod(const FuncDecl *Method,
+                   bool (*importFunctionBoundsAttributes)(
+                       SwiftifyInfoPrinter &, const clang::ObjCMethodDecl *)) {
+    const auto *ClangDecl =
+        dyn_cast_or_null<clang::ObjCMethodDecl>(Method->getClangDecl());
+    if (!ClangDecl)
+      return false;
+
+    printSeparator();
+    out << ".method(name: \"" << Method->getName().getBaseIdentifier()
+        << "\", paramInfo: [";
+    // reset firstParam inside paramInfo array. At this point firstParam will
+    // always be false, so no need to save the current value.
+    firstParam = true;
+    bool hadAttributes = importFunctionBoundsAttributes(*this, ClangDecl);
+    firstParam = false;
+    out << "])";
+    return hadAttributes;
   }
 };
 } // namespace
@@ -8921,6 +8952,7 @@ void ClangImporter::Implementation::importSpanAttributes(FuncDecl *MappedDecl) {
   bool attachMacro = false;
   {
     llvm::raw_svector_ostream out(MacroString);
+    out << "@_SwiftifyImport";
     llvm::StringMap<std::string> typeMapping;
 
     auto registerSwiftifyMacro =
@@ -8976,6 +9008,54 @@ void ClangImporter::Implementation::importSpanAttributes(FuncDecl *MappedDecl) {
     importNontrivialAttribute(MappedDecl, MacroString);
 }
 
+template <class FuncType>
+bool importFuncBoundsAttrs(SwiftifyInfoPrinter &printer, FuncType *ClangDecl) {
+  bool hadBoundsAttribute = false;
+  for (auto [index, param] : llvm::enumerate(ClangDecl->parameters())) {
+    if (auto CAT =
+            param->getType()->template getAs<clang::CountAttributedType>()) {
+      printer.printCountedBy(CAT, index);
+      if (param->template hasAttr<clang::NoEscapeAttr>()) {
+        printer.printNonEscaping(index);
+      }
+      hadBoundsAttribute = true;
+    }
+  }
+  if (auto CAT = ClangDecl->getReturnType()
+                     ->template getAs<clang::CountAttributedType>()) {
+    printer.printCountedBy(CAT, -1);
+    hadBoundsAttribute = true;
+  }
+  return hadBoundsAttribute;
+}
+
+void ClangImporter::Implementation::importProtocolBoundsAttributes(
+    ProtocolDecl *MappedDecl) {
+  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
+    return;
+
+  llvm::SmallString<128> MacroString;
+  {
+    llvm::raw_svector_ostream out(MacroString);
+    out << "@_SwiftifyImportProtocol";
+
+    bool hasBoundsAttributes = false;
+    SwiftifyProtocolInfoPrinter printer(getClangASTContext(), out);
+    for (Decl *SwiftMember : MappedDecl->getAllMembers()) {
+      FuncDecl *SwiftDecl = dyn_cast<FuncDecl>(SwiftMember);
+      if (!SwiftDecl)
+        continue;
+      hasBoundsAttributes |=
+          printer.printMethod(SwiftDecl, importFuncBoundsAttrs);
+    }
+
+    if (!hasBoundsAttributes)
+      return;
+  }
+
+  importNontrivialAttribute(MappedDecl, MacroString);
+}
+
 void ClangImporter::Implementation::importBoundsAttributes(
     FuncDecl *MappedDecl) {
   assert(SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers));
@@ -8989,20 +9069,11 @@ void ClangImporter::Implementation::importBoundsAttributes(
   llvm::SmallString<128> MacroString;
   {
     llvm::raw_svector_ostream out(MacroString);
+    out << "@_SwiftifyImport";
 
     SwiftifyInfoPrinter printer(getClangASTContext(), out);
-    for (auto [index, param] : llvm::enumerate(ClangDecl->parameters())) {
-      if (auto CAT = param->getType()->getAs<clang::CountAttributedType>()) {
-        printer.printCountedBy(CAT, index);
-        if (param->hasAttr<clang::NoEscapeAttr>()) {
-          printer.printNonEscaping(index);
-        }
-      }
-    }
-    if (auto CAT =
-            ClangDecl->getReturnType()->getAs<clang::CountAttributedType>()) {
-      printer.printCountedBy(CAT, -1);
-    }
+    if (!importFuncBoundsAttrs(printer, ClangDecl))
+      return;
   }
 
   importNontrivialAttribute(MappedDecl, MacroString);

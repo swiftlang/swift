@@ -1749,6 +1749,7 @@ public:
   }
 
   void importSwiftAttrAttributes(Decl *decl);
+  void importProtocolBoundsAttributes(ProtocolDecl *MappedDecl);
   void importBoundsAttributes(FuncDecl *MappedDecl);
   void importSpanAttributes(FuncDecl *MappedDecl);
 
