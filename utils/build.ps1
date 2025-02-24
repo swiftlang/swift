@@ -2047,6 +2047,7 @@ function Build-Runtime([Platform]$Platform, $Arch, [switch]$Test = $false) {
     $PlatformDefines += @{
       SWIFT_INCLUDE_TESTS = "YES";
       SWIFT_BUILD_TEST_SUPPORT_MODULES = "YES";
+      LLVM_LIT_ARGS = "-vv";
     }
   }
 
