@@ -119,9 +119,8 @@ installed libraries instead, enable
 This will reflect the performance of the Swift standard library
 installed on the device, not the one included in the Swift root.
 
-If build fails due with the error like `cannot find X in scope` it my be because default toolchains don't give access to stdlib SPI.
-Try using dev toolchain built locally or dev snapshot from [swift.org](https://www.swift.org/install/).
-
+If a build fails with an error like `cannot find X in scope`, it may be because default toolchains don't give access to stdlib SPI.
+Try using a dev toolchain built locally or a dev snapshot from [Swift.org](https://www.swift.org/install/).
 ### build-script using SwiftPM+LLBuild
 
 To build the benchmarks using build-script/swiftpm, one must build both
