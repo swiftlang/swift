@@ -330,6 +330,7 @@ extension ASTGenVisitor {
       forLoc: self.generateSourceLoc(node.forKeyword),
       tryLoc: self.generateSourceLoc(node.tryKeyword),
       awaitLoc: self.generateSourceLoc(node.awaitKeyword),
+      unsafeLoc: self.generateSourceLoc(node.unsafeKeyword),
       // NOTE: The pattern can be either a refutable pattern after `case` or a
       // normal binding pattern. ASTGen doesn't care because it should be handled
       // by the parser.

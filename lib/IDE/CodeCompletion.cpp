@@ -302,7 +302,8 @@ public:
   void completeGenericRequirement() override;
   void completeAfterIfStmtElse() override;
   void completeStmtLabel(StmtKind ParentKind) override;
-  void completeForEachPatternBeginning(bool hasTry, bool hasAwait) override;
+  void completeForEachPatternBeginning(
+      bool hasTry, bool hasAwait, bool hasUnsafe) override;
   void completeTypeAttrBeginning() override;
   void completeTypeAttrInheritanceBeginning() override;
   void completeOptionalBinding() override;
@@ -636,7 +637,7 @@ void CodeCompletionCallbacksImpl::completeStmtLabel(StmtKind ParentKind) {
 }
 
 void CodeCompletionCallbacksImpl::completeForEachPatternBeginning(
-    bool hasTry, bool hasAwait) {
+    bool hasTry, bool hasAwait, bool hasUnsafe) {
   CurDeclContext = P.CurDeclContext;
   Kind = CompletionKind::ForEachPatternBeginning;
   ParsedKeywords.clear();
@@ -644,6 +645,8 @@ void CodeCompletionCallbacksImpl::completeForEachPatternBeginning(
     ParsedKeywords.emplace_back("try");
   if (hasAwait)
     ParsedKeywords.emplace_back("await");
+  if (hasUnsafe)
+    ParsedKeywords.emplace_back("unsafe");
 }
 
 void CodeCompletionCallbacksImpl::completeOptionalBinding() {
