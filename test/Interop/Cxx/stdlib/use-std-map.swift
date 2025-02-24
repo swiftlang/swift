@@ -427,6 +427,24 @@ StdMapTestSuite.test("UnorderedMap.merge(map)") {
   expectEqual(m[3], 3)
 }
 
+StdMapTestSuite.test("Map.merge(CxxDictionary)") {
+  var m = initEmptyMap()
+  m.merge(initUnorderedMap()) { _, v1 in v1 }
+
+  expectEqual(m[1], 3)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+}
+
+StdMapTestSuite.test("UnorderedMap.merge(CxxDictionary)") {
+  var m = initEmptyUnorderedMap()
+  m.merge(initMap()) { _, v1 in v1 }
+
+  expectEqual(m[1], 3)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+}
+
 // `merging` is implemented by calling `merge`, so we can skip this test
 
 runAllTests()
