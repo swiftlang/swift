@@ -119,8 +119,9 @@ installed libraries instead, enable
 This will reflect the performance of the Swift standard library
 installed on the device, not the one included in the Swift root.
 
-If a build fails with an error like `cannot find X in scope`, it may be because default toolchains don't give access to stdlib SPI.
-Try using a dev toolchain built locally or a dev snapshot from [Swift.org](https://www.swift.org/install/).
+If a build fails with an error like `cannot find X in scope`, it may be because
+default toolchains don't give access to stdlib SPI. Try using a dev toolchain
+built locally or a dev snapshot from [Swift.org](https://www.swift.org/install/).
 ### build-script using SwiftPM+LLBuild
 
 To build the benchmarks using build-script/swiftpm, one must build both
@@ -152,8 +153,12 @@ swift-source/swift/benchmark$ .build/release/SwiftBench
 
 ### Troubleshooting
 
-- To check what libraries benchmark is linked against, set the `DYLD_PRINT_SEARCHING` environment variable. E.g. `export DYLD_PRINT_SEARCHING=1`.
-- To force linking with a locally built stdlib, use the `DYLD_LIBRARY_PATH` environment variable. E.g. `export DYLD_LIBRARY_PATH=<path_to_build_folder>/Ninja-ReleaseAssert/swift-macosx-x86_64/lib/swift/macosx/x86_64`.
+* To check what libraries benchmark is linked against, set the
+  `DYLD_PRINT_SEARCHING` environment variable. E.g.
+  `export DYLD_PRINT_SEARCHING=1`.
+* To force linking with a locally built stdlib, use the `DYLD_LIBRARY_PATH`
+  environment variable. E.g.
+  `export DYLD_LIBRARY_PATH=<path_to_build_folder>/Ninja-ReleaseAssert/swift-macosx-x86_64/lib/swift/macosx/x86_64`.
 
 ## Editing in Xcode
 
