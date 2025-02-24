@@ -1514,6 +1514,11 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedOperatorFixity {
   BridgedOperatorFixityPostfix,
 };
 
+SWIFT_NAME("BridgedMissingDecl.create(_:declContext:loc:)")
+BridgedMissingDecl BridgedMissingDecl_create(BridgedASTContext cContext,
+                                             BridgedDeclContext cDeclContext,
+                                             BridgedSourceLoc cLoc);
+
 SWIFT_NAME("BridgedOperatorDecl.createParsed(_:declContext:fixity:"
            "operatorKeywordLoc:name:nameLoc:colonLoc:precedenceGroupName:"
            "precedenceGroupLoc:)")

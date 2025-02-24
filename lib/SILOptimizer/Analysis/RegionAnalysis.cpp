@@ -1553,8 +1553,13 @@ enum class TranslationSemantics {
   Ignored,
 
   /// An instruction whose result produces a completely new region. E.x.:
-  /// alloc_box, alloc_pack, key_path. This results in the translator
-  /// producing a partition op that introduces the new region.
+  /// alloc_box, alloc_pack, key_path, a function without any parameters. This
+  /// results in the translator producing a partition op that introduces the new
+  /// region.
+  ///
+  /// NOTE: This just introduces a new value and must always occur before a
+  /// value is actually used. The isolation of the value is actually determined
+  /// by invoking tryToTrackValue and SILIsolationInfo::get().
   AssignFresh,
 
   /// An instruction that merges together all of its operands regions and

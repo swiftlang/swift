@@ -14,7 +14,7 @@ import ASTBridging
 import BasicBridging
 import SwiftIfConfig
 // Needed to use BumpPtrAllocator
-@_spi(BumpPtrAllocator) @_spi(RawSyntax) import SwiftSyntax
+@_spi(BumpPtrAllocator) @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
 import struct SwiftDiagnostics.Diagnostic
 
@@ -422,6 +422,7 @@ public func buildTopLevelASTNodes(
   diagEngine: BridgedDiagnosticEngine,
   sourceFilePtr: UnsafeMutableRawPointer,
   dc: BridgedDeclContext,
+  attachedDecl: BridgedNullableDecl,
   ctx: BridgedASTContext,
   outputContext: UnsafeMutableRawPointer,
   callback: @convention(c) (BridgedASTNode, UnsafeMutableRawPointer) -> Void
@@ -440,10 +441,28 @@ public func buildTopLevelASTNodes(
     for elem in visitor.generate(sourceFile: node) {
       callback(elem, outputContext)
     }
-  case .memberBlockItemList(let node):
-    for elem in visitor.generate(memberBlockItemList: node) {
+
+  case .memberBlockItemListFile(let node):
+    for elem in visitor.generate(memberBlockItemList: node.members) {
       callback(.decl(elem), outputContext)
     }
+
+  case .codeBlockFile(let node):
+    let block = visitor.generate(codeBlock: node.body)
+    callback(.stmt(block.asStmt), outputContext)
+
+  case .attributeClauseFile(let node):
+    let decl = visitor.generate(generatedAttributeClauseFile: node)
+    callback(.decl(decl), outputContext)
+
+  case .accessorBlockFile(let node):
+    // For 'accessor' macro, 'attachedDecl' must be a 'AbstractStorageDecl'.
+    let storage = BridgedAbstractStorageDecl(raw: attachedDecl.raw!)
+
+    for elem in visitor.generate(accessorBlockFile: node, for: storage) {
+      callback(.decl(elem.asDecl), outputContext)
+    }
+
   default:
     fatalError("invalid syntax for a source file")
   }
