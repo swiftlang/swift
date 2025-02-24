@@ -2696,7 +2696,8 @@ namespace {
         // type variable and a one-way constraint to assign it to either the
         // deduced type or the externally-imposed type.
         Type oneWayVarType;
-        if (bindPatternVarsOneWay) {
+        if (CS.getASTContext().TypeCheckerOpts.DisableOptimizedRestrictions &&
+            bindPatternVarsOneWay) {
           oneWayVarType = CS.createTypeVariable(
               CS.getConstraintLocator(locator), TVO_CanBindToNoEscape);
 

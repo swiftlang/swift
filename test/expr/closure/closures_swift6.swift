@@ -501,14 +501,18 @@ class TestGithubIssue70089 {
       }
 
       doVoidStuff { [weak self] in
-        doVoidStuff { [self] in
-          x += 1 // expected-error {{explicit use of 'self' is required when 'self' is optional, to make control flow explicit}} expected-note{{reference 'self?.' explicitly}}
+        doVoidStuff { [self] in // expected-error {{value of optional type 'TestGithubIssue70089?' must be unwrapped to a value of type 'TestGithubIssue70089'}}
+          // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+          // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+          x += 1
         }
       }
 
       doVoidStuff { [weak self] in
-        doVoidStuff { [self] in
-          self.x += 1 // expected-error {{value of optional type 'TestGithubIssue70089?' must be unwrapped to refer to member 'x' of wrapped base type 'TestGithubIssue70089'}} expected-note {{chain the optional using '?' to access member 'x' only for non-'nil' base values}} expected-note{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} 
+        doVoidStuff { [self] in // expected-error {{value of optional type 'TestGithubIssue70089?' must be unwrapped to a value of type 'TestGithubIssue70089'}}
+          // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+          // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+          self.x += 1
         }
       }
 
