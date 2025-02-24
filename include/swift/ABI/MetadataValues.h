@@ -1872,9 +1872,10 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Meaningful for all type-descriptor kinds.
     HasImportInfo = 2,
 
-    /// Set if the type descriptor has a pointer to a list of canonical
-    /// prespecializations.
-    HasCanonicalMetadataPrespecializations = 3,
+    /// Set if the generic type descriptor has a pointer to a list of canonical
+    /// prespecializations, or the non-generic type descriptor has a pointer to
+    /// its singleton metadata.
+    HasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer = 3,
 
     /// Set if the metadata contains a pointer to a layout string
     HasLayoutString = 4,
@@ -1959,7 +1960,10 @@ public:
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasImportInfo, hasImportInfo, setHasImportInfo)
 
-  FLAGSET_DEFINE_FLAG_ACCESSORS(HasCanonicalMetadataPrespecializations, hasCanonicalMetadataPrespecializations, setHasCanonicalMetadataPrespecializations)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(
+      HasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer,
+      hasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer,
+      setHasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasLayoutString,
                                 hasLayoutString,
