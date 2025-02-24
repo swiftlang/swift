@@ -3991,7 +3991,7 @@ public:
       return;
     }
 
-    // Record a dependency from TypeCheckSourceFileRequest to
+    // Record a dependency from TypeCheckPrimaryFileRequest to
     // ExtendedNominalRequest, since the call to getExtendedNominal()
     // above doesn't record a dependency when reading a cached value.
     ED->computeExtendedNominal();
