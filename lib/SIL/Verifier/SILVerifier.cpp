@@ -2427,8 +2427,8 @@ public:
     if (builtinKind == BuiltinValueKind::CreateAsyncTask) {
       requireType(BI->getType(), _object(_tuple(_nativeObject, _rawPointer)),
                   "result of createAsyncTask");
-      require(arguments.size() == 7,
-              "createAsyncTask expects seven arguments");
+      require(arguments.size() == 6,
+              "createAsyncTask expects six arguments");
       requireType(arguments[0]->getType(), _object(_swiftInt),
                   "first argument of createAsyncTask");
       requireType(arguments[1]->getType(), _object(_optional(_executor)),
@@ -2448,9 +2448,7 @@ public:
                     _object(_optional(_executor)),
                     "fifth argument of createAsyncTask");
       }
-      requireType(arguments[5]->getType(), _object(_optional(_rawPointer)),
-                  "sixth argument of createAsyncTask");
-      auto fnType = requireObjectType(SILFunctionType, arguments[6],
+      auto fnType = requireObjectType(SILFunctionType, arguments[5],
                                       "result of createAsyncTask");
       bool haveSending =
           F.getASTContext().LangOpts.hasFeature(Feature::SendingArgsAndResults);

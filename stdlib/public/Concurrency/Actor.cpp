@@ -314,18 +314,6 @@ JobPriority swift::swift_task_getCurrentThreadPriority() {
 #endif
 }
 
-const char *swift_task_getTaskName(AsyncTask *task) {
-  if (!task) {
-    return nullptr;
-  }
-  return task->getTaskName();
-}
-
-const char *swift::swift_task_getCurrentTaskName() {
-  auto task = swift_task_getCurrent();
-  return swift_task_getTaskName(task);
-}
-
 // Implemented in Swift to avoid some annoying hard-coding about
 // SerialExecutor's protocol witness table.  We could inline this
 // with effort, though.

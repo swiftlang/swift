@@ -421,28 +421,6 @@ public:
   /// Checking this is, of course, inherently race-prone on its own.
   bool isCancelled() const;
 
-  // ==== INITIAL TASK RECORDS =================================================
-  // A task may have a number of "initial" records set, they MUST be set in the
-  // following order to make the task-local allocation/deallocation's stack
-  // discipline easy to work out at the tasks destruction:
-  //
-  // - Initial TaskName
-  // - Initial ExecutorPreference
-
-  // ==== Task Naming ----------------------------------------------------------
-
-  /// At task creation a task may be assigned a name.
-  void pushInitialTaskName(const char* taskName);
-  void dropInitialTaskNameRecord();
-
-  /// Get the initial task name that was given to this task during creation,
-  /// or nullptr if the task has no name
-  const char* getTaskName();
-
-  bool hasInitialTaskNameRecord() const {
-    return Flags.task_hasInitialTaskName();
-  }
-
   // ==== Task Executor Preference ---------------------------------------------
 
   /// Get the preferred task executor reference if there is one set for this
