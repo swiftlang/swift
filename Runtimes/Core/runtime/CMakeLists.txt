@@ -110,6 +110,7 @@ target_include_directories(swiftRuntime PRIVATE
 
 target_link_libraries(swiftRuntime PRIVATE
   $<$<PLATFORM_ID:Windows>:User32>
+  $<$<PLATFORM_ID:Windows>:ShLwApi>
   swiftShims
   swiftDemangling)
 
