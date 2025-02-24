@@ -78,16 +78,10 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, swift::ObjCSelector S) {
   return OS;
 }
 
-bool Identifier::isOperatorSlow() const {
-  StringRef data = str();
-  auto *s = reinterpret_cast<llvm::UTF8 const *>(data.begin()),
-  *end = reinterpret_cast<llvm::UTF8 const *>(data.end());
-  llvm::UTF32 codePoint;
-  llvm::ConversionResult res =
-    llvm::convertUTF8Sequence(&s, end, &codePoint, llvm::strictConversion);
-  assert(res == llvm::conversionOK && "invalid UTF-8 in identifier?!");
-  (void)res;
-  return !empty() && isOperatorStartCodePoint(codePoint);
+bool Identifier::isOperatorSlow() const { return Lexer::isOperator(str()); }
+
+bool Identifier::mustAlwaysBeEscaped() const {
+  return Lexer::identifierMustAlwaysBeEscaped(str());
 }
 
 int Identifier::compare(Identifier other) const {
