@@ -2368,6 +2368,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   auto StartOfControl = Tok.getLoc();
   SourceLoc AwaitLoc;
   SourceLoc TryLoc;
+  SourceLoc UnsafeLoc;
 
   if (Tok.isContextualKeyword("await")) {
     AwaitLoc = consumeToken();
@@ -2378,10 +2379,15 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     }
   }
 
+  if (Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
+      Tok.isContextualKeyword("unsafe")) {
+    UnsafeLoc = consumeToken();
+  }
+  
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletionCallbacks) {
       CodeCompletionCallbacks->completeForEachPatternBeginning(
-          TryLoc.isValid(), AwaitLoc.isValid());
+          TryLoc.isValid(), AwaitLoc.isValid(), UnsafeLoc.isValid());
     }
     consumeToken(tok::code_complete);
     // Since 'completeForeachPatternBeginning' is a keyword only completion,
@@ -2495,7 +2501,8 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
 
   return makeParserResult(
       Status,
-      new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, pattern.get(), InLoc,
+      new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc,
+                                pattern.get(), InLoc,
                                 Container.get(), WhereLoc, Where.getPtrOrNull(),
                                 Body.get()));
 }

@@ -2290,11 +2290,12 @@ BridgedFallthroughStmt_createParsed(BridgedSourceLoc cLoc,
                                     BridgedDeclContext cDC);
 
 SWIFT_NAME("BridgedForEachStmt.createParsed(_:labelInfo:forLoc:tryLoc:awaitLoc:"
-           "pattern:inLoc:sequence:whereLoc:whereExpr:body:)")
+           "unsafeLoc:pattern:inLoc:sequence:whereLoc:whereExpr:body:)")
 BridgedForEachStmt BridgedForEachStmt_createParsed(
     BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
     BridgedSourceLoc cForLoc, BridgedSourceLoc cTryLoc,
-    BridgedSourceLoc cAwaitLoc, BridgedPattern cPat, BridgedSourceLoc cInLoc,
+    BridgedSourceLoc cAwaitLoc, BridgedSourceLoc cUnsafeLoc,
+    BridgedPattern cPat, BridgedSourceLoc cInLoc,
     BridgedExpr cSequence, BridgedSourceLoc cWhereLoc,
     BridgedNullableExpr cWhereExpr, BridgedBraceStmt cBody);
 

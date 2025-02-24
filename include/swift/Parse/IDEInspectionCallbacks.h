@@ -287,7 +287,8 @@ public:
   virtual void completeStmtLabel(StmtKind ParentKind) {};
 
   virtual
-  void completeForEachPatternBeginning(bool hasTry, bool hasAwait) {};
+  void completeForEachPatternBeginning(
+      bool hasTry, bool hasAwait, bool hasUnsafe) {};
 
   virtual void completeTypeAttrBeginning() {};
 
