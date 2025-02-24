@@ -2994,7 +2994,7 @@ func callImplAsync_i5(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
 // CHECK: [[SUCCESS]]:
 // CHECK:   ret { float, float, i64 } { float 1.000000e+00, float 2.000000e+00, i64 undef }
 // CHECK: [[FAIL]]:
-// CHECK:   [[ERROR_RES0:%.*]] = load i64, ptr %.x1._value, align 8
+// CHECK:   [[ERROR_RES0:%.*]] = call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
 // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
 // CHECK:   [[ERROR_RES:%.*]] = insertvalue { float, float, i64 } undef, i64 [[ERROR_RES0]], 2
 // CHECK:   ret { float, float, i64 } [[ERROR_RES]]
@@ -3049,7 +3049,7 @@ func callNonMatching_f0(_ b: Bool) -> (Int, Float, Float) {
 // CHECK: [[SUCCESS]]:
 // CHECK:   ret { float, i64, float } { float 1.000000e+00, i64 1, float 2.000000e+00 }
 // CHECK: [[FAIL]]:
-// CHECK:   [[ERROR_RES0:%.*]] = load i64, ptr %.x1._value, align 8
+// CHECK:   [[ERROR_RES0:%.*]] = call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
 // CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %2, align 8
 // CHECK:   [[ERROR_RES:%.*]] = insertvalue { float, i64, float } undef, i64 [[ERROR_RES0]], 1
 // CHECK:   ret { float, i64, float } [[ERROR_RES]]
@@ -3108,7 +3108,7 @@ func callNonMatching_f1(_ b: Bool) -> (Int, Float, Bool, Float) {
 // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi20nonMatching_f0_asyncySf_SftSbYaAA7OneWordVYKF{{.*}}", ptr {{%.*}}, ptr {{%.*}}, float 1.000000e+00, float 2.000000e+00, i64 undef, ptr null)
 // CHECK:   unreachable
 // CHECK: 18:
-// CHECK:   [[ERROR_X:%.*]] = load i64, ptr %.x1._value, align 8
+// CHECK:   [[ERROR_X:%.*]] = call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
 // CHECK:   [[ERROR_RET:%.*]] = insertvalue { float, float, i64 } undef, i64 [[ERROR_X]], 2
 // CHECK:   [[ERROR_RET0:%.*]] = extractvalue { float, float, i64 } [[ERROR_RET]], 0
 // CHECK:   [[ERROR_RET1:%.*]] = extractvalue { float, float, i64 } [[ERROR_RET]], 1
@@ -3168,7 +3168,7 @@ func callNonMatching_f0_async(_ b: Bool) async -> (Int, Float, Float) {
 // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi20nonMatching_f1_asyncySf_SbSftSbYaAA7OneWordVYKF{{.*}}", ptr {{%.*}}, ptr {{%.*}}, float 1.000000e+00, i64 1, float 2.000000e+00, ptr null)
 // CHECK:   unreachable
 // CHECK: [[ERROR]]:
-// CHECK:   [[ERROR_X:%.*]] = load i64, ptr %.x1._value, align 8
+// CHECK:   [[ERROR_X:%.*]] = call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
 // CHECK:   [[ERROR_RET:%.*]] = insertvalue { float, i64, float } undef, i64 [[ERROR_X]], 1
 // CHECK:   [[ERROR_RET0:%.*]] = extractvalue { float, i64, float } [[ERROR_RET]], 0
 // CHECK:   [[ERROR_RET1:%.*]] = extractvalue { float, i64, float } [[ERROR_RET]], 1

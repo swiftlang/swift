@@ -287,17 +287,33 @@ void ConstraintGraphNode::removeReferencedBy(TypeVariableType *typeVar) {
   }
 }
 
-void ConstraintGraphNode::updateFixedType(
-    Type fixedType,
-    llvm::function_ref<void (ConstraintGraphNode &,
-                             Constraint *)> notification) const {
+void ConstraintGraphNode::retractFromInference() {
+  auto &cs = CG.getConstraintSystem();
+
+  // Notify all of the type variables that reference this one.
+  //
+  // Since this type variable is going to be replaced with a fixed type
+  // all of the concrete types that reference it are going to change,
+  // which means that all of the not-yet-attempted bindings should
+  // change as well.
+  return notifyReferencingVars(
+      [&cs](ConstraintGraphNode &node, Constraint *constraint) {
+        node.getPotentialBindings().retract(cs, node.getTypeVariable(), constraint);
+      });
+}
+
+void ConstraintGraphNode::introduceToInference(Type fixedType) {
+  auto &cs = CG.getConstraintSystem();
+  
   // Notify all of the type variables that reference this one.
   //
   // Since this type variable has been replaced with a fixed type
   // all of the concrete types that reference it are going to change,
   // which means that all of the not-yet-attempted bindings should
   // change as well.
-  notifyReferencingVars(notification);
+  notifyReferencingVars([&cs](ConstraintGraphNode &node, Constraint *constraint) {
+    node.getPotentialBindings().infer(cs, node.getTypeVariable(), constraint);
+  });
 
   if (!fixedType->hasTypeVariable())
     return;
@@ -317,27 +333,9 @@ void ConstraintGraphNode::updateFixedType(
     // all of the constraints that reference bound type variable.
     for (auto *constraint : getConstraints()) {
       if (isUsefulForReferencedVars(constraint))
-        notification(node, constraint);
+        node.getPotentialBindings().infer(cs, node.getTypeVariable(), constraint);
     }
   }
-}
-
-void ConstraintGraphNode::retractFromInference(Type fixedType) {
-  auto &cs = CG.getConstraintSystem();
-  return updateFixedType(
-      fixedType,
-      [&cs](ConstraintGraphNode &node, Constraint *constraint) {
-        node.getPotentialBindings().retract(cs, node.getTypeVariable(), constraint);
-      });
-}
-
-void ConstraintGraphNode::introduceToInference(Type fixedType) {
-  auto &cs = CG.getConstraintSystem();
-  return updateFixedType(
-      fixedType,
-      [&cs](ConstraintGraphNode &node, Constraint *constraint) {
-        node.getPotentialBindings().infer(cs, node.getTypeVariable(), constraint);
-      });
 }
 
 #pragma mark Graph mutation
@@ -523,8 +521,8 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   }
 }
 
-void ConstraintGraph::retractFromInference(TypeVariableType *typeVar, Type fixed) {
-  (*this)[typeVar].retractFromInference(fixed);
+void ConstraintGraph::retractFromInference(TypeVariableType *typeVar) {
+  (*this)[typeVar].retractFromInference();
 }
 
 void ConstraintGraph::introduceToInference(TypeVariableType *typeVar, Type fixed) {

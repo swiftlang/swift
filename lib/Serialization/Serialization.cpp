@@ -904,6 +904,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, SUBSTITUTION_MAP_OFFSETS);
   BLOCK_RECORD(index_block, CLANG_TYPE_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
+  BLOCK_RECORD(index_block, OPAQUE_RETURN_TYPE_DECLS);
   BLOCK_RECORD(index_block, PROTOCOL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, PACK_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
@@ -1506,14 +1507,15 @@ void Serializer::writeInputBlock() {
     }
   }
 
-  if (!Options.ModuleLinkName.empty()) {
+  if (!Options.ModuleLinkName.empty())
     LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
-                     Options.AutolinkForceLoad, Options.ModuleLinkName);
-  }
-  for (auto dependentLib : Options.PublicDependentLibraries) {
+                     Options.StaticLibrary, Options.AutolinkForceLoad,
+                     Options.ModuleLinkName);
+
+  for (auto dependency : Options.PublicDependentLibraries)
     LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
-                     Options.AutolinkForceLoad, dependentLib);
-  }
+                     std::get<1>(dependency), Options.AutolinkForceLoad,
+                     std::get<0>(dependency));
 }
 
 /// Translate AST default argument kind to the Serialization enum values, which
@@ -1554,9 +1556,8 @@ getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
   CASE(Unspecified)
   CASE(ActorInstance)
   CASE(Nonisolated)
+  CASE(CallerIsolationInheriting)
   CASE(NonisolatedUnsafe)
-  CASE(Concurrent)
-  CASE(ConcurrentUnsafe)
   CASE(GlobalActor)
   CASE(Erased)
 #undef CASE
@@ -2694,7 +2695,9 @@ void Serializer::writeLifetimeDependencies(
     LifetimeDependenceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, info.getTargetIndex(), info.isImmortal(),
         info.hasInheritLifetimeParamIndices(),
-        info.hasScopeLifetimeParamIndices(), paramIndices);
+        info.hasScopeLifetimeParamIndices(),
+        info.hasAddressableParamIndices(),
+        paramIndices);
     paramIndices.clear();
   }
 }
@@ -5780,6 +5783,8 @@ public:
     switch (isolation.getKind()) {
     case swift::FunctionTypeIsolation::Kind::NonIsolated:
       return unsigned(FunctionTypeIsolation::NonIsolated);
+    case swift::FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      return unsigned(FunctionTypeIsolation::NonIsolatedCaller);
     case swift::FunctionTypeIsolation::Kind::Parameter:
       return unsigned(FunctionTypeIsolation::Parameter);
     case swift::FunctionTypeIsolation::Kind::Erased:

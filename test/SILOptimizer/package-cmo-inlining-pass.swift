@@ -45,7 +45,7 @@ package struct PkgStruct {
 // CHECK:   store {{.*}} to [trivial] [[FIELD1_IVAR]] : $*Int
 // CHECK:   [[FIELD2_IVAR:%.*]] = struct_element_addr [[PKG_INIT]] : $*PkgStruct, #PkgStruct.field2
 // CHECK:   store {{.*}} to [trivial] [[FIELD2_IVAR]] : $*Int
-// CHECK:   [[PKG_STR:%.*]] = struct $PkgStruct
+// CHECK:   [[PKG_STR:%.*]] = load [trivial] [[PKG_INIT]]
 // CHECK:   store [[PKG_STR]] to [trivial] [[PKG_ALLOC]] : $*PkgStruct
 // CHECK:   [[FIELD1:%.*]] = struct_element_addr [[PKG_ALLOC]] : $*PkgStruct, #PkgStruct.field1
 // CHECK:   load [trivial] [[FIELD1]] : $*Int

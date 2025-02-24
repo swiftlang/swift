@@ -144,26 +144,85 @@ extension X: P {}
 // Test platform inheritance for iOS unavailability.
 // rdar://68597591
 
-@available(iOS, unavailable)
-public struct UnavailableOniOS { } // expected-note 2 {{'UnavailableOniOS' has been explicitly marked unavailable here}}
+func takesAnything<T>(_ t: T) { }
+
+@available(macCatalyst, unavailable)
+struct UnavailableOnMacCatalyst { } // expected-note * {{'UnavailableOnMacCatalyst' has been explicitly marked unavailable here}}
 
 @available(iOS, unavailable)
-func unavailableOniOS(_ p: UnavailableOniOS) { } // ok
-
-func functionUsingAnUnavailableType(_ p: UnavailableOniOS) { } // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
-
-public extension UnavailableOniOS { } // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+struct UnavailableOniOS { } // expected-note * {{'UnavailableOniOS' has been explicitly marked unavailable here}}
 
 @available(iOS, unavailable)
-public extension UnavailableOniOS { // ok
-  func someMethod(_ p: UnavailableOniOS) { }
+@available(macCatalyst, introduced: 13.0)
+struct AvailableOnMacCatalystButUnavailableOniOS { }
+
+extension UnavailableOnMacCatalyst { } // expected-error {{'UnavailableOnMacCatalyst' is unavailable in Mac Catalyst}}
+extension UnavailableOniOS { } // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+extension AvailableOnMacCatalystButUnavailableOniOS { } // ok
+
+@available(macCatalyst, unavailable)
+extension UnavailableOnMacCatalyst {
+  func extensionMethod() {
+    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
+
+  @available(iOS, unavailable)
+  func extensionMethodUnavailableOniOS() {
+    takesAnything(UnavailableOniOS())
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
+
+  @available(iOS, introduced: 15)
+  func extensionMethodIntroducedOniOS() {
+    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
+
+}
+
+@available(iOS, unavailable)
+extension UnavailableOniOS {
+  func extensionMethod() {
+    takesAnything(UnavailableOniOS())
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
+
+  @available(macCatalyst, unavailable)
+  func extensionMethodUnavailableOnMacCatalyst() {
+    takesAnything(UnavailableOniOS())
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
+
+  @available(macCatalyst, introduced: 13.0)
+  func extensionMethodMacCatalystIntroduced() {
+    takesAnything(UnavailableOniOS())
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
 }
 
 @available(iOS, unavailable)
 @available(macCatalyst, introduced: 13.0)
-public struct AvailableOnMacCatalyst { }
+extension AvailableOnMacCatalystButUnavailableOniOS {
+  func extensionMethod() {
+    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+    takesAnything(UnavailableOnMacCatalyst()) // expected-error {{'UnavailableOnMacCatalyst' is unavailable in Mac Catalyst}}
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
 
-public extension AvailableOnMacCatalyst { } // ok
+  @available(macCatalyst, unavailable)
+  func extensionMethodUnavailableOnMacCatalyst() {
+    takesAnything(UnavailableOniOS()) // expected-error {{'UnavailableOniOS' is unavailable in iOS}}
+    takesAnything(UnavailableOnMacCatalyst())
+    takesAnything(AvailableOnMacCatalystButUnavailableOniOS())
+  }
+}
 
 @available(iOS, introduced: 14.0)
 @available(macCatalyst, introduced: 14.5)

@@ -348,7 +348,7 @@ unsigned DiagnosticSerializer::getFileIDFromBufferID(SourceManager &SM,
 
   Files.emplace_back(std::move(File));
   Allocated.insert({Idx, ++CurrentFileID});
-
+  unsigned NewFileID = CurrentFileID;
 
   auto Info = SM.getGeneratedSourceInfo(Idx);
   auto convertGeneratedFileInfo =
@@ -364,7 +364,7 @@ unsigned DiagnosticSerializer::getFileIDFromBufferID(SourceManager &SM,
     GeneratedFileInfo.emplace_back(std::move(GI));
   }
 
-  return CurrentFileID;
+  return NewFileID;
 }
 
 SerializedSourceLoc

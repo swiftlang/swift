@@ -88,6 +88,7 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/MapVector.h"
@@ -633,7 +634,7 @@ void AccessConflictAndMergeAnalysis::propagateAccessSetsBottomUp(
           }
           // FIXME: Treat may-release conservatively in the analysis itself by
           // adding a mayRelease flag, in addition to the unidentified flag.
-          accessResult.analyzeInstruction(&instr);
+          accessResult.analyzeInstruction(&instr, ASA->getDestructorAnalysis());
         }
       }
     }
@@ -838,7 +839,8 @@ void AccessConflictAndMergeAnalysis::localDataFlowInBlock(RegionState &state,
       visitFullApply(fullApply, state);
       continue;
     }
-    if (instr.mayRelease()) {
+    if (instr.mayRelease() &&
+        !isDestructorSideEffectFree(&instr, ASA->getDestructorAnalysis())) {
       visitMayRelease(&instr, state);
     }
   }

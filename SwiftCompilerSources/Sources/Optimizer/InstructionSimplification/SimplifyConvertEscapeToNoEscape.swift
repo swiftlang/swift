@@ -12,7 +12,7 @@
 
 import SIL
 
-extension ConvertEscapeToNoEscapeInst : OnoneSimplifyable {
+extension ConvertEscapeToNoEscapeInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     tryCombineWithThinToThickOperand(context)
   }

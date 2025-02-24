@@ -178,6 +178,9 @@ public:
     if (F->getExtFlags().hasSendingResult()) {
       printField("", "sending-result");
     }
+    if (F->getExtFlags().isNonIsolatedCaller()) {
+      printField("execution", "caller");
+    }
 
     stream << "\n";
     Indent += 2;
@@ -803,6 +806,9 @@ public:
       funcNode->addChild(node, Dem);
     } else if (F->getExtFlags().isIsolatedAny()) {
       auto node = Dem.createNode(Node::Kind::IsolatedAnyFunctionType);
+      funcNode->addChild(node, Dem);
+    } else if (F->getExtFlags().isNonIsolatedCaller()) {
+      auto node = Dem.createNode(Node::Kind::NonIsolatedCallerFunctionType);
       funcNode->addChild(node, Dem);
     }
 

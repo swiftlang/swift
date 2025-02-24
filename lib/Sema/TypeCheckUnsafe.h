@@ -70,6 +70,9 @@ bool isUnsafeInConformance(const ValueDecl *requirement,
 void diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
                         llvm::function_ref<void(Type)> diagnose);
 
+/// Check for unsafe storage within this nominal type declaration.
+void checkUnsafeStorage(NominalTypeDecl *nominal);
+
 }
 
 #endif // SWIFT_SEMA_TYPE_CHECK_UNSAFE_H

@@ -21,6 +21,7 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
@@ -102,7 +103,7 @@ private:
 
   AvailabilityDomain(Kind kind)
       : storage(InlineDomain(kind, PlatformKind::none).asInteger()) {
-    assert(kind != Kind::Platform);
+    DEBUG_ASSERT(kind != Kind::Platform);
   };
 
   AvailabilityDomain(PlatformKind platform)
@@ -120,7 +121,7 @@ private:
   }
 
   CustomAvailabilityDomain *getCustomDomain() const {
-    assert(isCustom());
+    ASSERT(isCustom());
     return storage.get<CustomAvailabilityDomain *>();
   }
 
@@ -132,6 +133,8 @@ public:
   }
 
   static AvailabilityDomain forPlatform(PlatformKind platformKind) {
+    bool isPlatform = platformKind != PlatformKind::none;
+    ASSERT(isPlatform);
     return AvailabilityDomain(platformKind);
   }
 
@@ -150,6 +153,16 @@ public:
   static AvailabilityDomain forCustom(CustomAvailabilityDomain *domain) {
     return AvailabilityDomain(domain);
   }
+
+  /// Returns the most specific platform domain for the target of the
+  /// compilation context.
+  static std::optional<AvailabilityDomain>
+  forTargetPlatform(const ASTContext &ctx);
+
+  /// Returns the most specific platform domain for the target variant of the
+  /// compilation context.
+  static std::optional<AvailabilityDomain>
+  forTargetVariantPlatform(const ASTContext &ctx);
 
   /// Returns the built-in availability domain identified by the given string.
   static std::optional<AvailabilityDomain>
@@ -213,12 +226,22 @@ public:
   /// universal domain (`*`) is the bottom element.
   bool contains(const AvailabilityDomain &other) const;
 
+  /// Returns the root availability domain that this domain must be compatible
+  /// with. For example, macCatalyst and visionOS must both be ABI compatible
+  /// with iOS. The compatible domain must contain this domain.
+  AvailabilityDomain getABICompatibilityDomain() const;
+
   bool operator==(const AvailabilityDomain &other) const {
     return storage.getOpaqueValue() == other.storage.getOpaqueValue();
   }
 
   bool operator!=(const AvailabilityDomain &other) const {
     return !(*this == other);
+  }
+
+  friend bool operator<(const AvailabilityDomain &lhs,
+                        const AvailabilityDomain &rhs) {
+    return lhs.storage.getOpaqueValue() < rhs.storage.getOpaqueValue();
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
@@ -254,10 +277,53 @@ public:
   ModuleDecl *getModule() const { return mod; }
 };
 
+/// Represents either a resolved availability domain or an identifier written
+/// in source that has not yet been resolved to a domain.
+class AvailabilityDomainOrIdentifier {
+  friend struct llvm::PointerLikeTypeTraits<AvailabilityDomainOrIdentifier>;
+
+  using Storage = llvm::PointerUnion<AvailabilityDomain, Identifier>;
+  Storage storage;
+
+  AvailabilityDomainOrIdentifier(Storage storage) : storage(storage) {}
+
+public:
+  AvailabilityDomainOrIdentifier(Identifier identifier)
+      : storage(identifier) {};
+  AvailabilityDomainOrIdentifier(AvailabilityDomain domain)
+      : storage(domain) {};
+
+  static AvailabilityDomainOrIdentifier fromOpaque(void *opaque) {
+    return AvailabilityDomainOrIdentifier(Storage::getFromOpaqueValue(opaque));
+  }
+
+  bool isDomain() const { return storage.is<AvailabilityDomain>(); }
+  bool isIdentifier() const { return storage.is<Identifier>(); }
+
+  /// Overwrites the existing domain or identifier with the given domain.
+  void setDomain(AvailabilityDomain domain) { storage = Storage(domain); }
+
+  /// Returns the resolved domain, or `std::nullopt` if there isn't one.
+  std::optional<AvailabilityDomain> getAsDomain() const {
+    if (isDomain())
+      return storage.get<AvailabilityDomain>();
+    return std::nullopt;
+  }
+
+  /// Returns the unresolved identifier, or `std::nullopt` if the domain has
+  /// been resolved.
+  std::optional<Identifier> getAsIdentifier() const {
+    if (isIdentifier())
+      return storage.get<Identifier>();
+    return std::nullopt;
+  }
+};
+
 } // end namespace swift
 
 namespace llvm {
 using swift::AvailabilityDomain;
+using swift::AvailabilityDomainOrIdentifier;
 
 // An AvailabilityDomain is "pointer like".
 template <typename T>
@@ -293,6 +359,25 @@ struct DenseMapInfo<AvailabilityDomain> {
                       const AvailabilityDomain RHS) {
     return LHS == RHS;
   }
+};
+
+// An AvailabilityDomainOrIdentifier is "pointer like".
+template <typename T>
+struct PointerLikeTypeTraits;
+template <>
+struct PointerLikeTypeTraits<swift::AvailabilityDomainOrIdentifier> {
+public:
+  static inline void *getAsVoidPointer(AvailabilityDomainOrIdentifier value) {
+    return value.storage.getOpaqueValue();
+  }
+  static inline swift::AvailabilityDomainOrIdentifier
+  getFromVoidPointer(void *P) {
+    return AvailabilityDomainOrIdentifier::fromOpaque(P);
+  }
+  enum {
+    NumLowBitsAvailable = PointerLikeTypeTraits<
+        AvailabilityDomainOrIdentifier::Storage>::NumLowBitsAvailable
+  };
 };
 
 } // end namespace llvm

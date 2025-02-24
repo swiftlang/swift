@@ -94,11 +94,11 @@ func test_topLevelEvaluation(topLevelArgument: Int) {
   var topLevelVar = 1 // expected-warning {{never mutated}}
   #assert(topLevelVar == 1)
 
-  // expected-note @+1 {{cannot evaluate top-level value as constant here}}
   var topLevelVarConditionallyMutated = 1
-  if topLevelVarConditionallyMutated < 0 {
+  if topLevelArgument < 0 {
     topLevelVarConditionallyMutated += 1
   }
+  // expected-note @+2 {{cannot evaluate expression as constant here}}
   // expected-error @+1 {{#assert condition not constant}}
   #assert(topLevelVarConditionallyMutated == 1)
 

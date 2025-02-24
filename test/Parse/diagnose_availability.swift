@@ -64,6 +64,12 @@ func swiftDeprecatedObsoleted() {}
 // expected-warning@-1 {{expected 'introduced', 'deprecated', or 'obsoleted' in 'available' attribute for platform 'swift'}}
 func swiftMessage() {}
 
+@available(swift 5, deprecated: 6)
+// expected-error@-1 {{'deprecated' can't be combined with shorthand specification 'swift 5'}}
+// expected-note@-2 {{did you mean to specify an introduction version?}} {{17-17=, introduced:}}
+// expected-error@-3 {{expected declaration}}
+func swiftShorthandFollowedByDeprecated() {}
+
 @available(*, unavailable, message: "\("message")")
 // expected-error@-1{{'message' cannot be an interpolated string literal}}
 func interpolatedMessage() {}

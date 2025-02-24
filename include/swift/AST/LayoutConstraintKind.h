@@ -19,6 +19,7 @@
 #ifndef SWIFT_LAYOUT_CONSTRAINTKIND_H
 #define SWIFT_LAYOUT_CONSTRAINTKIND_H
 
+namespace swift {
 /// Describes a layout constraint information.
 enum class LayoutConstraintKind : uint8_t {
   // It is not a known layout constraint.
@@ -45,5 +46,6 @@ enum class LayoutConstraintKind : uint8_t {
   TrivialStride,
   LastLayout = TrivialStride,
 };
+} // namespace swift
 
-#endif
+#endif // SWIFT_LAYOUT_CONSTRAINTKIND_H

@@ -18,6 +18,7 @@ module SwiftShims {
   header "SwiftStddef.h"
   header "SwiftStdint.h"
   header "System.h"
+  header "Target.h"
   header "ThreadLocalStorage.h"
   header "UnicodeData.h"
   header "Visibility.h"

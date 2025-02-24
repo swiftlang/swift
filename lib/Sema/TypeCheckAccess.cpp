@@ -1332,7 +1332,7 @@ public:
       if (macroDecl) {
         diagnoseDeclAvailability(
             macroDecl, customAttr->getTypeRepr()->getSourceRange(), nullptr,
-            ExportContext::forDeclSignature(const_cast<Decl *>(D), nullptr),
+            ExportContext::forDeclSignature(const_cast<Decl *>(D)),
             std::nullopt);
       }
     }
@@ -2678,35 +2678,9 @@ void swift::checkAccessControl(Decl *D) {
   if (isa<AccessorDecl>(D))
     return;
 
-  // If we need to gather all unsafe uses from the declaration signature,
-  // do so now.
-  llvm::SmallVector<UnsafeUse, 2> unsafeUsesVec;
-  llvm::SmallVectorImpl<UnsafeUse> *unsafeUses = nullptr;
-  if (D->getASTContext().LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      !D->isImplicit() &&
-      D->getExplicitSafety() == ExplicitSafety::Unspecified) {
-    unsafeUses = &unsafeUsesVec;
-  }
-
-  auto where = ExportContext::forDeclSignature(D, unsafeUses);
+  auto where = ExportContext::forDeclSignature(D);
   if (where.isImplicit())
     return;
 
   DeclAvailabilityChecker(where).visit(D);
-
-  // If there were any unsafe uses, this declaration needs "@unsafe".
-  if (!unsafeUsesVec.empty()) {
-    D->diagnose(diag::decl_signature_involves_unsafe, D);
-
-    ASTContext &ctx = D->getASTContext();
-    auto insertLoc = D->getAttributeInsertionLoc(/*forModifier=*/false);
-
-    ctx.Diags.diagnose(insertLoc, diag::decl_signature_mark_unsafe)
-      .fixItInsert(insertLoc, "@unsafe ");
-    ctx.Diags.diagnose(insertLoc, diag::decl_signature_mark_safe)
-      .fixItInsert(insertLoc, "@safe ");
-
-    std::for_each(unsafeUsesVec.begin(), unsafeUsesVec.end(),
-                  diagnoseUnsafeUse);
-  }
 }

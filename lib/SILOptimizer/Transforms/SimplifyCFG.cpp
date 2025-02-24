@@ -1293,9 +1293,9 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
       if (auto *bfi = getBorrowedFromUser(arg)) {
         bfi->replaceAllUsesWith(Val);
         bfi->eraseFromParent();
-      } else {
-        arg->replaceAllUsesWith(Val);
       }
+      arg->replaceAllUsesWith(Val);
+
       if (!isVeryLargeFunction) {
         if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
           // Replacing operands may trigger constant folding which then could

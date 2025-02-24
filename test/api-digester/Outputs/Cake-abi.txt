@@ -111,6 +111,7 @@ cake: Class C7 has added a conformance to an existing protocol P1
 cake: Class SuperClassChange has added a conformance to an existing protocol P1
 cake: Enum IceKind has removed conformance to BitwiseCopyable
 cake: Enum IceKind has removed conformance to Sendable
+cake: Enum IceKind has removed conformance to SendableMetatype
 cake: Protocol P3 has added inherited protocol P4
 cake: Protocol P3 has removed inherited protocol P2
 cake: Struct fixedLayoutStruct has added a conformance to an existing protocol P2

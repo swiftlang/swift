@@ -131,6 +131,23 @@ extension ASTGenDiagnostic {
   }
 }
 
+/// Decl diagnostics
+extension ASTGenDiagnostic {
+  static func illegalTopLevelStmt(_ stmt: some SyntaxProtocol) -> Self {
+    Self(
+      node: stmt,
+      message: "statements are not allowed at the top level"
+    )
+  }
+
+  static func illegalTopLevelExpr(_ expr: some SyntaxProtocol) -> Self {
+    Self(
+      node: expr,
+      message: "expressions are not allowed at the top level"
+    )
+  }
+}
+
 /// DeclAttributes diagnostics
 extension ASTGenDiagnostic {
   static func expectedArgumentsInAttribute(_ attribute: AttributeSyntax) -> Self {

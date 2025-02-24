@@ -61,6 +61,16 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   /// A map of modules whose types were extended by the main module of interest `M`.
   llvm::StringMap<SymbolGraph *> ExtendedModuleGraphs;
 
+  /// A temporary pointer to a base decl when crawling symbols to synthesize.
+  const ValueDecl *BaseDecl = nullptr;
+
+  /// A temporary pointer to the top-level decl being crawled when synthesizing
+  /// child symbols.
+  const Decl *SynthesizedChildrenBaseDecl = nullptr;
+
+  /// Maps any internal symbol with a public type alias of that symbol.
+  llvm::DenseMap<const ValueDecl *, const ValueDecl *> PublicPrivateTypeAliases;
+
   // MARK: - Initialization
 
   SymbolGraphASTWalker(
@@ -104,6 +114,10 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   virtual bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
     
   // MARK: - Utilities
+
+  /// Walk the given decl and add its children as synthesized children of the
+  /// given base decl.
+  bool synthesizeChildSymbols(Decl *D, const ValueDecl *BaseDecl);
 
   /// Returns whether the given declaration was itself imported via an `@_exported import`
   /// statement, or if it is an extension or child symbol of something else that was.

@@ -1707,16 +1707,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Attr == 0 ? OpenedExistentialAccess::Immutable
                   : OpenedExistentialAccess::Mutable);
     break;
-  case SILInstructionKind::AllocVectorInst:
-    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
-           "Layout should be OneTypeOneOperand.");
-    ResultInst = Builder.createAllocVector(
-        Loc,
-        getLocalValue(
-            Builder.maybeGetFunction(), ValID,
-            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
-        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
-    break;
   case SILInstructionKind::DynamicPackIndexInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");

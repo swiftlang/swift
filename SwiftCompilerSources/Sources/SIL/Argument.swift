@@ -591,6 +591,19 @@ public enum ArgumentConvention : CustomStringConvertible {
   }
 }
 
+extension BeginAccessInst.AccessKind {
+  public func isCompatible(with convention: ArgumentConvention) -> Bool {
+    switch self {
+    case .`init`, .deinit:
+      return false
+    case .read:
+      return convention.isIndirectIn
+    case .modify:
+      return convention.isInout
+    }
+  }
+}
+
 // Bridging utilities
 
 extension BridgedArgument {

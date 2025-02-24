@@ -1583,13 +1583,31 @@ ModuleFileSharedCore::ModuleFileSharedCore(
         }
         case input_block::LINK_LIBRARY: {
           uint8_t rawKind;
+          bool isStaticLibrary;
           bool shouldForceLink;
           input_block::LinkLibraryLayout::readRecord(scratch, rawKind,
-                                                     shouldForceLink);
-          if (Bits.IsStaticLibrary)
-            shouldForceLink = false;
+                                                     isStaticLibrary, shouldForceLink);
+
+          // FIXME: the propagation of the static library is a problem as it
+          // causes over-linkage of the dependencies and hinders DCE. This
+          // results in significant code size increase on Windows.
+          //
+          // We propogate it on Darwin as ld64 has special handling for
+          // preserving the Swift conformances. The `_swift_FORCE_LOAD_$_`
+          // symbols will force the static library to be scanned for inclusion.
+          // The other platforms do not have this special handling and so this
+          // will only slow down the linker and not guarantee any conformances
+          // to be preserved. The same behaviour is better achieved with `-(`,
+          // `-)` to preserve the whole archive.
+          //
+          // When using dynamic libraries, the force load symbol will force the
+          // shared library to be loaded and register the conformances.
+          bool EmitForceLinkSymbol = shouldForceLink;
+          if (!llvm::Triple(TargetTriple).isOSDarwin())
+            EmitForceLinkSymbol = !isStaticLibrary && shouldForceLink;
           if (auto libKind = getActualLibraryKind(rawKind))
-            LinkLibraries.push_back({blobData, *libKind, shouldForceLink});
+            LinkLibraries.emplace_back(blobData, *libKind, isStaticLibrary,
+                                       EmitForceLinkSymbol);
           // else ignore the dependency...it'll show up as a linker error.
           break;
         }

@@ -45,21 +45,25 @@ if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND BOOTSTRAPP
 endif()
 
 if(SWIFT_BUILD_SWIFT_SYNTAX)
+  # Ensure that we can find the shared swift-syntax libraries.
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-    # Ensure that we can find the shared swift-syntax libraries.
     set_property(
       TARGET libSwiftScan
       APPEND PROPERTY INSTALL_RPATH "@loader_path/swift/host/compiler")
     set_property(
       TARGET libSwiftScan
-      APPEND PROPERTY INSTALL_RPATH "@loader_path/../host/compiler")
+      APPEND PROPERTY INSTALL_RPATH "@loader_path")
   elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
     set_property(
       TARGET libSwiftScan
       APPEND PROPERTY INSTALL_RPATH "$ORIGIN/swift/host/compiler")
     set_property(
       TARGET libSwiftScan
-      APPEND PROPERTY INSTALL_RPATH "$ORIGIN/../host/compiler")
+      APPEND PROPERTY INSTALL_RPATH "$ORIGIN")
+    # $ORIGIN can be the parent of the symbolic link inside swift/host on Linux
+    set_property(
+      TARGET libSwiftScan
+      APPEND PROPERTY INSTALL_RPATH "$ORIGIN/compiler")
   endif()
 endif()
 
@@ -77,28 +81,25 @@ swift_install_in_component(TARGETS libSwiftScan
   LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" COMPONENT compiler
   RUNTIME DESTINATION "bin" COMPONENT compiler)
 else()
-  # On other platforms, instead install the library into 'lib/swift/host' and symlink to it from 'lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}'
+  # On other platforms, instead install the library into 'lib/swift/host/compiler' and symlink to it from its legacy location 'lib/swift/host'
   swift_install_in_component(TARGETS libSwiftScan
-    ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host" COMPONENT compiler
-    LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host" COMPONENT compiler
+    ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler
+    LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler
     RUNTIME DESTINATION "bin" COMPONENT compiler)
 
-  # Create a symlink to previously-used path of 'lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}'
-  # to the new location under 'lib/swift/host' for clients of the legacy path.
   if(EXISTS ${LLVM_CMAKE_DIR}/LLVMInstallSymlink.cmake)
     set(INSTALL_SYMLINK ${LLVM_CMAKE_DIR}/LLVMInstallSymlink.cmake)
   endif()
   precondition(INSTALL_SYMLINK
                MESSAGE "LLVMInstallSymlink script must be available.")
-  file(RELATIVE_PATH target_install_relative_path
-       ${CMAKE_INSTALL_PREFIX}/lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}
-       ${CMAKE_INSTALL_PREFIX}/lib${LLVM_LIBDIR_SUFFIX}/swift/host/lib${SWIFT_SCAN_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX})
-  message(STATUS "Installing symlink (${target_install_relative_path}) to lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/lib${SWIFT_SCAN_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
 
+  # 'lib/swift/host' -> 'lib/swift/host/compiler'
+  set(FULL_LIB_NAME "lib${SWIFT_SCAN_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+  message(STATUS "Installing symlink (compiler/${FULL_LIB_NAME}) to lib${LLVM_LIBDIR_SUFFIX}/swift/host/${FULL_LIB_NAME}")
   install(SCRIPT ${INSTALL_SYMLINK}
-          CODE "install_symlink(lib${SWIFT_SCAN_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}
-                                ${target_install_relative_path}
-                                lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}
+          CODE "install_symlink(${FULL_LIB_NAME}
+                                compiler/${FULL_LIB_NAME}
+                                lib${LLVM_LIBDIR_SUFFIX}/swift/host
                                 ${SWIFT_COPY_OR_SYMLINK})"
           COMPONENT compiler)
 endif()

@@ -266,9 +266,10 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
 
     std::vector<LinkLibrary> LinkLibraries;
     for (const auto &ll : clangModuleDep.LinkLibraries)
-      LinkLibraries.push_back(
-        {ll.Library,
-         ll.IsFramework ? LibraryKind::Framework : LibraryKind::Library});
+      LinkLibraries.emplace_back(
+          ll.Library,
+          ll.IsFramework ? LibraryKind::Framework : LibraryKind::Library,
+          /*static=*/false);
 
     // Module-level dependencies.
     llvm::StringSet<> alreadyAddedModules;

@@ -812,7 +812,7 @@ bb0(%0 : $*Klass, %1 : $*Klass, %2 : @owned $Klass):
 // CHECK: load
 // CHECK-NOT: load
 // CHECK-LABEL: } // end sil function 'redundant_load_mark_dependence'
-sil [ossa] @redundant_load_mark_dependence : $@convention(thin) (@inout Klass, @guaranteed Builtin.NativeObject) -> @owned (Klass, Klass) {
+sil [ossa] @redundant_load_mark_dependence : $@convention(thin) (@in Klass, @guaranteed Builtin.NativeObject) -> @owned (Klass, Klass) {
 bb0(%0 : $*Klass, %1 : @guaranteed $Builtin.NativeObject):
   %2 = mark_dependence %0 : $*Klass on %1 : $Builtin.NativeObject
   %4 = load [copy] %2 : $*Klass

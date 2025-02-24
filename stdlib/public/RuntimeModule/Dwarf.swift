@@ -502,7 +502,7 @@ protocol DwarfSource {
 
 }
 
-struct DwarfReader<S: DwarfSource> {
+struct DwarfReader<S: DwarfSource & AnyObject> {
 
   typealias Source = S
   typealias Address = UInt64
@@ -513,7 +513,7 @@ struct DwarfReader<S: DwarfSource> {
     var end: Address { return base + size }
   }
 
-  var source: Source
+  unowned var source: Source
 
   struct AbbrevInfo {
     var tag: Dwarf_Tag

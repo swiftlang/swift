@@ -63,21 +63,33 @@ import SIL
 ///
 let redundantLoadElimination = FunctionPass(name: "redundant-load-elimination") {
     (function: Function, context: FunctionPassContext) in
-  eliminateRedundantLoads(in: function, ignoreArrays: false, context)
+  _ = eliminateRedundantLoads(in: function, variant: .regular, context)
 }
 
 // Early RLE does not touch loads from Arrays. This is important because later array optimizations,
 // like ABCOpt, get confused if an array load in a loop is converted to a pattern with a phi argument.
 let earlyRedundantLoadElimination = FunctionPass(name: "early-redundant-load-elimination") {
     (function: Function, context: FunctionPassContext) in
-  eliminateRedundantLoads(in: function, ignoreArrays: true, context)
+  _ = eliminateRedundantLoads(in: function, variant: .early, context)
 }
 
-private func eliminateRedundantLoads(in function: Function, ignoreArrays: Bool, _ context: FunctionPassContext) {
+let mandatoryRedundantLoadElimination = FunctionPass(name: "mandatory-redundant-load-elimination") {
+    (function: Function, context: FunctionPassContext) in
+  _ = eliminateRedundantLoads(in: function, variant: .mandatory, context)
+}
 
+enum RedundantLoadEliminationVariant {
+  case mandatory, mandatoryInGlobalInit, early, regular
+}
+
+func eliminateRedundantLoads(in function: Function,
+                             variant: RedundantLoadEliminationVariant,
+                             _ context: FunctionPassContext) -> Bool
+{
   // Avoid quadratic complexity by limiting the number of visited instructions.
   // This limit is sufficient for most "real-world" functions, by far.
   var complexityBudget = 50_000
+  var changed = false
 
   for block in function.blocks.reversed() {
 
@@ -89,49 +101,75 @@ private func eliminateRedundantLoads(in function: Function, ignoreArrays: Bool, 
 
       if let load = inst as? LoadInst {
         if !context.continueWithNextSubpassRun(for: load) {
-          return
+          return changed
         }
-        if ignoreArrays,
-           let nominal = load.type.nominal,
-           nominal == context.swiftArrayDecl
-        {
-          continue
+        if complexityBudget < 20 {
+          complexityBudget = 20
         }
-        // Check if the type can be expanded without a significant increase to
-        // code size.
-        // We block redundant load elimination because it might increase
-        // register pressure for large values. Furthermore, this pass also
-        // splits values into its projections (e.g
-        // shrinkMemoryLifetimeAndSplit).
-        if !load.type.shouldExpand(context) {
-           continue
+        if !load.isEligibleForElimination(in: variant, context) {
+          continue;
         }
-        tryEliminate(load: load, complexityBudget: &complexityBudget, context)
+        changed = tryEliminate(load: load, complexityBudget: &complexityBudget, context) || changed
       }
     }
   }
+  return changed
 }
 
-private func tryEliminate(load: LoadInst, complexityBudget: inout Int, _ context: FunctionPassContext) {
+private func tryEliminate(load: LoadInst, complexityBudget: inout Int, _ context: FunctionPassContext) -> Bool {
   switch load.isRedundant(complexityBudget: &complexityBudget, context) {
   case .notRedundant:
-    break
+    return false
   case .redundant(let availableValues):
     replace(load: load, with: availableValues, context)
+    return true
   case .maybePartiallyRedundant(let subPath):
     // Check if the a partial load would really be redundant to avoid unnecessary splitting.
     switch load.isRedundant(at: subPath, complexityBudget: &complexityBudget, context) {
       case .notRedundant, .maybePartiallyRedundant:
-        break
+        return false
       case .redundant:
         // The new individual loads are inserted right before the current load and
         // will be optimized in the following loop iterations.
-        load.trySplit(context)
+        return load.trySplit(context)
     }
   }
 }
 
 private extension LoadInst {
+
+  func isEligibleForElimination(in variant: RedundantLoadEliminationVariant, _ context: FunctionPassContext) -> Bool {
+    switch variant {
+    case .mandatory, .mandatoryInGlobalInit:
+      if loadOwnership == .take {
+        // load [take] would require to shrinkMemoryLifetime. But we don't want to do this in the mandatory
+        // pipeline to not shrink or remove an alloc_stack which is relevant for debug info.
+        return false
+      }
+      switch address.accessBase {
+      case .box, .stack:
+        break
+      default:
+        return false
+      }
+    case .early:
+      // See the comment of `earlyRedundantLoadElimination`.
+      if let nominal = self.type.nominal, nominal == context.swiftArrayDecl {
+        return false
+      }
+    case .regular:
+      break
+    }
+    // Check if the type can be expanded without a significant increase to code size.
+    // We block redundant load elimination because it might increase register pressure for large values.
+    // Furthermore, this pass also splits values into its projections (e.g shrinkMemoryLifetimeAndSplit).
+    // But: it is required to remove loads, even of large structs, in global init functions to ensure
+    // that globals (containing large structs) can be statically initialized.
+    if variant != .mandatoryInGlobalInit, !self.type.shouldExpand(context) {
+       return false
+    }
+    return true
+  }
 
   enum DataflowResult {
     case notRedundant
@@ -251,7 +289,7 @@ private func replace(load: LoadInst, with availableValues: [AvailableValue], _ c
   var ssaUpdater = SSAUpdater(function: load.parentFunction,
                               type: load.type, ownership: load.ownership, context)
 
-  for availableValue in availableValues {
+  for availableValue in availableValues.replaceCopyAddrsWithLoadsAndStores(context) {
     let block = availableValue.instruction.parentBlock
     let availableValue = provideValue(for: load, from: availableValue, context)
     ssaUpdater.addAvailableValue(availableValue, in: block)
@@ -279,6 +317,10 @@ private func replace(load: LoadInst, with availableValues: [AvailableValue], _ c
     //
     newValue = ssaUpdater.getValue(inMiddleOf: load.parentBlock)
   }
+
+  // Make sure to keep dependencies valid after replacing the load
+  insertMarkDependencies(for: load, context)
+
   load.replace(with: newValue, context)
 }
 
@@ -303,6 +345,39 @@ private func provideValue(
     } else {
       return shrinkMemoryLifetimeAndSplit(from: load, to: availableValue, projectionPath: projectionPath, context)
     }
+  }
+}
+
+/// If the memory location depends on something, insert a dependency for the loaded value:
+///
+///     %2 = mark_dependence %1 on %0
+///     %3 = load %2
+/// ->
+///     %2 = mark_dependence %1 on %0 // not needed anymore, can be removed eventually
+///     %3 = load %2
+///     %4 = mark_dependence %3 on %0
+///     // replace %3 with %4
+///
+private func insertMarkDependencies(for load: LoadInst, _ context: FunctionPassContext) {
+  var inserter = MarkDependenceInserter(load: load, context: context)
+  _ = inserter.walkUp(address: load.address, path: UnusedWalkingPath())
+}
+
+private struct MarkDependenceInserter : AddressUseDefWalker {
+  let load: LoadInst
+  let context: FunctionPassContext
+  
+  mutating func walkUp(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    if let mdi = address as? MarkDependenceInst {
+      let builder = Builder(after: load, context)
+      let newMdi = builder.createMarkDependence(value: load, base: mdi.base, kind: mdi.dependenceKind)
+      load.uses.ignore(user: newMdi).replaceAll(with: newMdi, context)
+    }
+    return walkUpDefault(address: address, path: path)
+  }
+  
+  mutating func rootDef(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    return .continueWalk
   }
 }
 
@@ -342,6 +417,8 @@ private func shrinkMemoryLifetime(from load: LoadInst, to availableValue: Availa
       fatalError("unqualified store in ossa function?")
     }
     return valueToAdd
+  case .viaCopyAddr:
+    fatalError("copy_addr must be lowered before shrinking lifetime")
   }
 }
 
@@ -380,6 +457,8 @@ private func shrinkMemoryLifetimeAndSplit(from load: LoadInst, to availableValue
     let valueToAdd = builder.createLoad(fromAddress: addr, ownership: .take)
     availableStore.trySplit(context)
     return valueToAdd
+  case .viaCopyAddr:
+    fatalError("copy_addr must be lowered before shrinking lifetime")
   }
 }
 
@@ -387,25 +466,29 @@ private func shrinkMemoryLifetimeAndSplit(from load: LoadInst, to availableValue
 private enum AvailableValue {
   case viaLoad(LoadInst)
   case viaStore(StoreInst)
+  case viaCopyAddr(CopyAddrInst)
 
   var value: Value {
     switch self {
     case .viaLoad(let load):   return load
     case .viaStore(let store): return store.source
+    case .viaCopyAddr:         fatalError("copy_addr must be lowered")
     }
   }
 
   var address: Value {
     switch self {
-    case .viaLoad(let load):   return load.address
-    case .viaStore(let store): return store.destination
+    case .viaLoad(let load):         return load.address
+    case .viaStore(let store):       return store.destination
+    case .viaCopyAddr(let copyAddr): return copyAddr.destination
     }
   }
 
   var instruction: Instruction {
     switch self {
-    case .viaLoad(let load):   return load
-    case .viaStore(let store): return store
+    case .viaLoad(let load):         return load
+    case .viaStore(let store):       return store
+    case .viaCopyAddr(let copyAddr): return copyAddr
     }
   }
 
@@ -413,6 +496,19 @@ private enum AvailableValue {
     switch self {
     case .viaLoad(let load):   return Builder(after: load, context)
     case .viaStore(let store): return Builder(before: store, context)
+    case .viaCopyAddr:         fatalError("copy_addr must be lowered")
+    }
+  }
+}
+
+private extension Array where Element == AvailableValue {
+  func replaceCopyAddrsWithLoadsAndStores(_ context: FunctionPassContext) -> [AvailableValue] {
+    return map {
+      if case .viaCopyAddr(let copyAddr) = $0 {
+        return .viaStore(copyAddr.replaceWithLoadAndStore(context))
+      } else {
+        return $0
+      }
     }
   }
 }
@@ -479,7 +575,7 @@ private struct InstructionScanner {
 
   private mutating func visit(instruction: Instruction) -> ScanResult {
     switch instruction {
-    case is FixLifetimeInst, is EndAccessInst, is EndBorrowInst:
+    case is FixLifetimeInst, is BeginAccessInst, is EndAccessInst, is EndBorrowInst:
       // Those scope-ending instructions are only irrelevant if the preceding load is not changed.
       // If it is changed from `load [copy]` -> `load [take]` the memory effects of those scope-ending
       // instructions prevent that the `load [take]` will illegally mutate memory which is protected
@@ -518,6 +614,16 @@ private struct InstructionScanner {
       if accessPath.getMaterializableProjection(to: precedingStorePath) != nil,
          potentiallyRedundantSubpath == nil {
         potentiallyRedundantSubpath = precedingStorePath
+      }
+
+    case let preceedingCopy as CopyAddrInst where preceedingCopy.canProvideValue:
+      let copyPath = preceedingCopy.destination.constantAccessPath
+      if copyPath.getMaterializableProjection(to: accessPath) != nil {
+        availableValues.append(.viaCopyAddr(preceedingCopy))
+        return .available
+      }
+      if accessPath.getMaterializableProjection(to: copyPath) != nil, potentiallyRedundantSubpath == nil {
+        potentiallyRedundantSubpath = copyPath
       }
 
     default:
@@ -604,5 +710,22 @@ private struct Liverange {
       }
     }
     return false
+  }
+}
+
+private extension CopyAddrInst {
+  var canProvideValue: Bool {
+    if !source.type.isLoadable(in: parentFunction) {
+      // Although the original load's type is loadable (obviously), it can be projected-out 
+      // from the copy_addr's type which might be not loadable.
+      return false
+    }
+    if !parentFunction.hasOwnership {
+      if !isTakeOfSrc || !isInitializationOfDest {
+        // For simplicity, bail if we would have to insert compensating retains and releases.
+        return false
+      }
+    }
+    return true
   }
 }

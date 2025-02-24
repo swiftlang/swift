@@ -13,7 +13,6 @@ add_swift_host_library(swiftSema STATIC
   CSStep.cpp
   CSTrail.cpp
   CSFix.cpp
-  CSOptimizer.cpp
   CSDiagnostics.cpp
   CodeSynthesis.cpp
   CodeSynthesisDistributedActor.cpp

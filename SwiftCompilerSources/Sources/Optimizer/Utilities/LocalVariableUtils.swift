@@ -363,6 +363,9 @@ extension LocalVariableAccessWalker : ForwardingDefUseWalker {
       visit(LocalVariableAccess(.store, operand))
     case is DeallocBoxInst:
       break
+    case let markDep as MarkDependenceInst:
+      assert(markDep.baseOperand == operand)
+      visit(LocalVariableAccess(.dependence, operand))
     default:
       visit(LocalVariableAccess(.escape, operand))
     }

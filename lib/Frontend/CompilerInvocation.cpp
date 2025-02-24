@@ -525,9 +525,6 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
       Opts.setInterfaceMode(PrintOptions::InterfaceMode::Private);
     }
   }
-  for (auto val: Args.getAllArgValues(OPT_skip_import_in_public_interface)) {
-    Opts.ModulesToSkipInPublicInterface.push_back(val);
-  }
 }
 
 /// Checks if an arg is generally allowed to be included
@@ -796,7 +793,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     if (!seenFeatures.insert(*feature).second)
       continue;
 
-    // If the the current language mode enables the feature by default then
+    // If the current language mode enables the feature by default then
     // diagnose and skip it.
     if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
       if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
@@ -1349,7 +1346,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.SkipDeserializationChecksForPackageCMO = Args.hasArg(OPT_ExperimentalSkipDeserializationChecksForPackageCMO);
+  Opts.AbortOnDeserializationFailForPackageCMO = Args.hasArg(OPT_ExperimentalPackageCMOAbortOnDeserializationFail);
   Opts.AllowNonResilientAccess =
       Args.hasArg(OPT_experimental_allow_non_resilient_access) ||
       Args.hasArg(OPT_allow_non_resilient_access) ||
@@ -1858,6 +1855,9 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   for (auto A : Args.getAllArgValues(OPT_debug_forbid_typecheck_prefix)) {
     Opts.DebugForbidTypecheckPrefixes.push_back(A);
   }
+
+  if (Args.getLastArg(OPT_solver_disable_shrink))
+    Opts.SolverDisableShrink = true;
 
   if (Args.getLastArg(OPT_solver_disable_splitter))
     Opts.SolverDisableSplitter = true;
@@ -3215,7 +3215,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       llvm_unreachable("Unknown LinkLibrary option kind");
     }
 
-    Opts.LinkLibraries.push_back(LinkLibrary(A->getValue(), Kind));
+    Opts.LinkLibraries.emplace_back(
+        A->getValue(), Kind, /*static=*/false);
   }
 
   if (auto valueNames = Args.getLastArg(OPT_disable_llvm_value_names,
@@ -3445,11 +3446,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))
-    Opts.LinkLibraries.push_back(LinkLibrary(Lib, LibraryKind::Library));
+    Opts.LinkLibraries.emplace_back(
+        Lib, LibraryKind::Library, /*static=*/false);
 
-  for (const auto &Lib : Args.getAllArgValues(options::OPT_public_autolink_library)) {
-    Opts.PublicLinkLibraries.push_back(Lib);
-  }
+  for (const auto &Lib : Args.getAllArgValues(options::OPT_public_autolink_library))
+    Opts.PublicLinkLibraries.push_back(std::make_tuple(Lib, /*static=*/false));
 
   if (const Arg *A = Args.getLastArg(OPT_type_info_dump_filter_EQ)) {
     StringRef mode(A->getValue());
@@ -3555,6 +3556,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.InternalizeSymbols = FrontendOpts.Static;
 
+  if (Args.hasArg(OPT_mergeable_symbols)) {
+    Opts.MergeableSymbols = true;
+  }
+
   if (Args.hasArg(OPT_disable_preallocated_instantiation_caches)) {
     Opts.NoPreallocatedInstantiationCaches = true;
   }
@@ -3625,6 +3630,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_async_frame_push_pop_metadata,
                  OPT_disable_async_frame_push_pop_metadata,
                  Opts.EmitAsyncFramePushPopMetadata);
+  Opts.EmitTypeMallocForCoroFrame =
+  Args.hasFlag(OPT_enable_emit_type_malloc_for_coro_frame,
+              OPT_disable_emit_type_malloc_for_coro_frame,
+              Opts.EmitTypeMallocForCoroFrame);
   Opts.AsyncFramePointerAll = Args.hasFlag(OPT_enable_async_frame_pointer_all,
                                            OPT_disable_async_frame_pointer_all,
                                            Opts.AsyncFramePointerAll);

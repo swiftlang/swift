@@ -191,11 +191,19 @@ SolverTrail::Change::RecordedOpenedPackExpansionType(PackExpansionType *expansio
   return result;
 }
 
-SolverTrail::Change
-SolverTrail::Change::RecordedPackEnvironment(PackElementExpr *packElement) {
+SolverTrail::Change SolverTrail::Change::RecordedPackElementExpansion(
+    PackElementExpr *packElement) {
   Change result;
-  result.Kind = ChangeKind::RecordedPackEnvironment;
+  result.Kind = ChangeKind::RecordedPackElementExpansion;
   result.TheElement = packElement;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::RecordedPackExpansionEnvironment(PackExpansionExpr *expr) {
+  Change result;
+  result.Kind = ChangeKind::RecordedPackExpansionEnvironment;
+  result.TheExpansionExpr = expr;
   return result;
 }
 
@@ -426,8 +434,12 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cs.removeOpenedPackExpansionType(TheExpansion);
     break;
 
-  case ChangeKind::RecordedPackEnvironment:
-    cs.removePackEnvironment(TheElement);
+  case ChangeKind::RecordedPackElementExpansion:
+    cs.removePackElementExpansion(TheElement);
+    break;
+
+  case ChangeKind::RecordedPackExpansionEnvironment:
+    cs.removePackExpansionEnvironment(TheExpansionExpr);
     break;
 
   case ChangeKind::RecordedNodeType:
@@ -570,6 +582,8 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   out.indent(indent);
 
+  auto &ctx = cs.getASTContext();
+  auto &SM = ctx.SourceMgr;
   switch (Kind) {
 
 #define LOCATOR_CHANGE(Name, _) \
@@ -694,11 +708,16 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << ")\n";
     break;
 
-  case ChangeKind::RecordedPackEnvironment:
-    // FIXME: Print short form of PackExpansionExpr
-    out << "(RecordedPackEnvironment ";
-    simple_display(out, TheElement);
-    out << "\n";
+  case ChangeKind::RecordedPackElementExpansion:
+    out << "(RecordedPackElementExpansion ";
+    dumpAnchor(TheElement, &SM, out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedPackExpansionEnvironment:
+    out << "(RecordedPackExpansionEnvironment ";
+    dumpAnchor(TheExpansionExpr, &SM, out);
+    out << ")\n";
     break;
 
   case ChangeKind::RecordedNodeType:
@@ -730,8 +749,9 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::RecordedContextualInfo:
-    // FIXME: Print short form of ASTNode
-    out << "(RecordedContextualInfo)\n";
+    out << "(RecordedContextualInfo ";
+    dumpAnchor(Node.Node, &SM, out);
+    out << ")\n";
     break;
 
   case ChangeKind::RecordedTarget:
@@ -741,8 +761,9 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::RecordedCaseLabelItemInfo:
-    // FIXME: Print something here
-    out << "(RecordedCaseLabelItemInfo)\n";
+    out << "(RecordedCaseLabelItemInfo ";
+    dumpAnchor(TheItem, &SM, out);
+    out << ")\n";
     break;
 
   case ChangeKind::RecordedPotentialThrowSite:

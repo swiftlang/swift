@@ -23,6 +23,8 @@
 
 namespace swift {
 
+class DeclAvailabilityConstraints;
+
 /// Summarizes availability the constraints contained by an AvailabilityContext.
 class AvailabilityContext::Info {
 public:
@@ -41,9 +43,11 @@ public:
   /// of adding this constraint.
   bool constrainWith(const Info &other);
 
-  /// Updates each field to reflect the availability of `decl`, if that
-  /// availability is more restrictive. Returns true if any field was updated.
-  bool constrainWith(const Decl *decl);
+  /// Constrains each field using the given constraints if they are more
+  /// restrictive than the current values. Returns true if any field was
+  /// updated.
+  bool constrainWith(const DeclAvailabilityConstraints &constraints,
+                     ASTContext &ctx);
 
   bool constrainUnavailability(std::optional<AvailabilityDomain> domain);
 

@@ -73,18 +73,19 @@ setExpectedExecutorForParameterIsolation(SILGenFunction &SGF,
 
   // If we have caller isolation inheriting... just grab from our isolated
   // argument.
-  if (actorIsolation.isNonisolated()) {
-    if (auto *isolatedArg = SGF.F.maybeGetIsolatedArgument()) {
-      ManagedValue isolatedMV;
-      if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
-        isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
-      } else {
-        isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
-      }
-
-      SGF.ExpectedExecutor.set(SGF.emitLoadActorExecutor(loc, isolatedMV));
-      return;
+  if (actorIsolation.getKind() == ActorIsolation::CallerIsolationInheriting) {
+    auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
+    assert(isolatedArg &&
+           "Caller Isolation Inheriting without isolated parameter");
+    ManagedValue isolatedMV;
+    if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
+    } else {
+      isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
     }
+
+    SGF.ExpectedExecutor.set(SGF.emitLoadActorExecutor(loc, isolatedMV));
+    return;
   }
 
   llvm_unreachable("Unhandled case?!");
@@ -106,11 +107,10 @@ void SILGenFunction::emitExpectedExecutorProlog() {
           // the instance properties of the class.
           return false;
 
-        case ActorIsolation::Concurrent:
-        case ActorIsolation::ConcurrentUnsafe:
         case ActorIsolation::Nonisolated:
         case ActorIsolation::NonisolatedUnsafe:
         case ActorIsolation::Unspecified:
+        case ActorIsolation::CallerIsolationInheriting:
           return false;
 
         case ActorIsolation::Erased:
@@ -164,8 +164,8 @@ void SILGenFunction::emitExpectedExecutorProlog() {
     auto actorIsolation = getActorIsolation(funcDecl);
     switch (actorIsolation.getKind()) {
     case ActorIsolation::Unspecified:
-    case ActorIsolation::Concurrent:
-    case ActorIsolation::ConcurrentUnsafe:
+    case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       break;
 
     case ActorIsolation::Erased:
@@ -188,8 +188,7 @@ void SILGenFunction::emitExpectedExecutorProlog() {
       break;
     }
 
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
+    case ActorIsolation::CallerIsolationInheriting:
       assert(F.isAsync());
       setExpectedExecutorForParameterIsolation(*this, actorIsolation);
       break;
@@ -207,9 +206,8 @@ void SILGenFunction::emitExpectedExecutorProlog() {
     switch (actorIsolation.getKind()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::Concurrent:
-    case ActorIsolation::ConcurrentUnsafe:
       break;
 
     case ActorIsolation::Erased:
@@ -566,6 +564,7 @@ SILGenFunction::emitFunctionTypeIsolation(SILLocation loc,
 
   // Emit nonisolated by simply emitting Optional.none in the result type.
   case FunctionTypeIsolation::Kind::NonIsolated:
+  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
     return emitNonIsolatedIsolation(loc);
 
   // Emit global actor isolation by loading .shared from the global actor,
@@ -636,9 +635,8 @@ SILGenFunction::emitClosureIsolation(SILLocation loc, SILDeclRef constant,
   switch (isolation) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
-  case ActorIsolation::Concurrent:
-  case ActorIsolation::ConcurrentUnsafe:
     return emitNonIsolatedIsolation(loc);
 
   case ActorIsolation::Erased:
@@ -689,9 +687,8 @@ SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
   switch (isolation.getKind()) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
-  case ActorIsolation::Concurrent:
-  case ActorIsolation::ConcurrentUnsafe:
     return std::nullopt;
 
   case ActorIsolation::Erased:
@@ -721,8 +718,6 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
       });
   if (isolation != ActorIsolation::Nonisolated &&
       isolation != ActorIsolation::NonisolatedUnsafe &&
-      isolation != ActorIsolation::Concurrent &&
-      isolation != ActorIsolation::ConcurrentUnsafe &&
       isolation != ActorIsolation::Unspecified) {
     // TODO: Explicit hop with no hop-back should only be allowed in nonisolated
     // async functions. But it needs work for any closure passed to

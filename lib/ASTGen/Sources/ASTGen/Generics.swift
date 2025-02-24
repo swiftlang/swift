@@ -61,26 +61,76 @@ extension ASTGenVisitor {
     )
   }
 
+  func generate(layoutRequirement node: LayoutRequirementSyntax) -> BridgedLayoutConstraint {
+    let id = self.ctx.getIdentifier(node.layoutSpecifier.rawText.bridged)
+    let constraint = BridgedLayoutConstraint.getLayoutConstraint(self.ctx, id: id)
+
+    if constraint.isNull || !constraint.isKnownLayout {
+      fatalError("(compiler bug) invalid layout requirement")
+    }
+
+    if !constraint.isTrivial {
+      guard node.size == nil, node.alignment == nil else {
+        // TODO: Diagnostics.
+        fatalError("(compiler bug) non-trivial layout constraint with arguments")
+      }
+      return constraint
+    }
+
+    guard let sizeToken = node.size else {
+      guard node.alignment == nil else {
+        // TODO: Diagnostics.
+        fatalError("(compiler bug) size is nil, but alignment is not nil?")
+      }
+      return constraint
+    }
+
+    let size: Int
+    guard let parsed = Int(sizeToken.text, radix: 10) else {
+      fatalError("(compiler bug) invalid size integer literal for a layout constraint")
+    }
+    size = parsed
+
+    let alignment: Int?
+    if let alignmentToken = node.alignment {
+      guard let parsed = Int(alignmentToken.text, radix: 10) else {
+        fatalError("(compiler bug) invalid alignment integer literal for a layout constraint")
+      }
+      alignment = parsed
+    } else {
+      alignment = nil
+    }
+
+    return .getLayoutConstraint(
+      self.ctx,
+      kind: constraint.kind,
+      size: size,
+      alignment: alignment ?? 0
+    )
+  }
+
   func generate(genericWhereClause node: GenericWhereClauseSyntax) -> BridgedTrailingWhereClause {
-    let requirements = node.requirements.lazy.map {
-      switch $0.requirement {
+    let requirements  = node.requirements.lazy.map { elem -> BridgedRequirementRepr in
+      switch elem.requirement {
       case .conformanceRequirement(let conformance):
-        return BridgedRequirementRepr(
-          SeparatorLoc: self.generateSourceLoc(conformance.colon),
-          Kind: .typeConstraint,
-          FirstType: self.generate(type: conformance.leftType),
-          SecondType: self.generate(type: conformance.rightType)
+        return .createTypeConstraint(
+          subject: self.generate(type: conformance.leftType),
+          colonLoc: self.generateSourceLoc(conformance.colon),
+          constraint: self.generate(type: conformance.rightType)
         )
       case .sameTypeRequirement(let sameType):
-        return BridgedRequirementRepr(
-          SeparatorLoc: self.generateSourceLoc(sameType.equal),
-          Kind: .sameType,
-          FirstType: self.generate(sameTypeLeftType: sameType.leftType),
-          SecondType: self.generate(sameTypeRightType: sameType.rightType)
+        return .createSameType(
+          firstType: self.generate(sameTypeLeftType: sameType.leftType),
+          equalLoc: self.generateSourceLoc(sameType.equal),
+          secondType: self.generate(sameTypeRightType: sameType.rightType)
         )
-      case .layoutRequirement(_):
-        // FIXME: Implement layout requirement translation.
-        fatalError("Translation of layout requirements not implemented!")
+      case .layoutRequirement(let layout):
+        return .createLayoutConstraint(
+          subject: self.generate(type: layout.type),
+          colonLoc: self.generateSourceLoc(layout.colon),
+          layout: self.generate(layoutRequirement: layout),
+          layoutLoc: self.generateSourceLoc(layout.layoutSpecifier)
+        )
       }
     }
 

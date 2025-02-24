@@ -297,25 +297,6 @@ DeallocStackInst *AllocStackInst::getSingleDeallocStack() const {
   return Dealloc;
 }
 
-AllocVectorInst *AllocVectorInst::create(SILDebugLocation Loc, SILValue capacity,
-                                        SILType elementType, SILFunction &F) {
-  SmallVector<SILValue, 8> typeDependentOperands;
-  collectTypeDependentOperands(typeDependentOperands, F, elementType.getASTType());
-  auto size = totalSizeToAlloc<swift::Operand>(1 + typeDependentOperands.size());
-  auto buffer = F.getModule().allocateInst(size, alignof(AllocVectorInst));
-  return ::new (buffer) AllocVectorInst(Loc, capacity, elementType.getAddressType(),
-                                        typeDependentOperands);
-}
-
-AllocVectorInst *AllocVectorInst::createInInitializer(SILDebugLocation Loc,
-                                                      SILValue capacity,
-                                                      SILType elementType,
-                                                      SILModule &M) {
-  auto size = totalSizeToAlloc<swift::Operand>(1);
-  auto buffer = M.allocateInst(size, alignof(AllocVectorInst));
-  return ::new (buffer) AllocVectorInst(Loc, capacity, elementType, {});
-}
-
 AllocPackInst *AllocPackInst::create(SILDebugLocation loc,
                                      SILType packType,
                                      SILFunction &F) {

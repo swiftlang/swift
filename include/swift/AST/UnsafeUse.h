@@ -45,6 +45,8 @@ public:
     NonisolatedUnsafe,
     /// A reference to an unsafe declaration.
     ReferenceToUnsafe,
+    /// A reference to an unsafe storage.
+    ReferenceToUnsafeStorage,
     /// A reference to a typealias that is not itself unsafe, but has
     /// an unsafe underlying type.
     ReferenceToUnsafeThroughTypealias,
@@ -113,6 +115,7 @@ private:
            kind == ExclusivityUnchecked ||
            kind == NonisolatedUnsafe ||
            kind == ReferenceToUnsafe ||
+           kind == ReferenceToUnsafeStorage ||
            kind == ReferenceToUnsafeThroughTypealias ||
            kind == CallToUnsafe);
 
@@ -179,6 +182,12 @@ public:
                         decl, type, location);
   }
 
+  static UnsafeUse forReferenceToUnsafeStorage(const Decl *decl,
+                                               Type type,
+                                               SourceLoc location) {
+    return forReference(ReferenceToUnsafeStorage, decl, type, location);
+  }
+
   static UnsafeUse forReferenceToUnsafeThroughTypealias(const Decl *decl,
                                         Type type,
                                         SourceLoc location) {
@@ -215,6 +224,7 @@ public:
     case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return SourceLoc(
@@ -246,6 +256,7 @@ public:
     case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       storage.entity.location = loc.getOpaquePointerValue();
@@ -266,6 +277,7 @@ public:
     case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return storage.entity.decl;
@@ -299,6 +311,7 @@ public:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
     case ReferenceToUnsafeThroughTypealias:
+    case ReferenceToUnsafeStorage:
     case CallToUnsafe:
     case UnsafeConformance:
     case PreconcurrencyImport:
@@ -324,6 +337,7 @@ public:
     case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return storage.entity.type;
@@ -348,6 +362,7 @@ public:
     case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
     case PreconcurrencyImport:

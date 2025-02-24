@@ -173,7 +173,9 @@ void printHelp(const char *extra) {
 // Initialization code.
 swift::once_t swift::runtime::environment::initializeToken;
 
-#if SWIFT_STDLIB_HAS_ENVIRON && (defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__))
+#if SWIFT_STDLIB_HAS_ENVIRON
+
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__)
 extern "C" char **environ;
 #define ENVIRON environ
 #elif defined(_WIN32)
@@ -213,11 +215,11 @@ static void platformInitialize(void *context) {
 }
 #endif
 
-#if !SWIFT_STDLIB_HAS_ENVIRON
-void swift::runtime::environment::initialize(void *context) {
-  platformInitialize(context);
-}
-#elif defined(ENVIRON)
+#endif
+
+#if SWIFT_STDLIB_HAS_ENVIRON
+
+#if defined(ENVIRON)
 void swift::runtime::environment::initialize(void *context) {
   // On platforms where we have an environment variable array available, scan it
   // directly. This optimizes for the common case where no variables are set,
@@ -292,6 +294,11 @@ void swift::runtime::environment::initialize(void *context) {
   if (parse_bool("SWIFT_DEBUG_HELP", getenv("SWIFT_DEBUG_HELP"), false))
     printHelp("Using getenv to read variables. Unknown SWIFT_DEBUG_ variables "
               "will not be flagged.");
+}
+#endif
+
+#else
+void swift::runtime::environment::initialize(void *context) {
 }
 #endif
 

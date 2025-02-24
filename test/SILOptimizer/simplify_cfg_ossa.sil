@@ -59,6 +59,11 @@ struct NonTrivial {
   var object: AnyObject
 }
 
+struct S {
+  var a: Int
+  var b: NonTrivial
+}
+
 ///////////
 // Tests //
 ///////////
@@ -1971,3 +1976,48 @@ bb6(%15: @guaranteed $E, %16 : @reborrow $B):
   %r = tuple()
   return %r
 }
+
+// CHECK-LABEL: sil [ossa] @dont_crash_when_merging_blocks_with_borrowed_from :
+// CHECK:       } // end sil function 'dont_crash_when_merging_blocks_with_borrowed_from'
+sil [ossa] @dont_crash_when_merging_blocks_with_borrowed_from : $@convention(thin) (@owned Optional<S>) -> () {
+bb0(%0 : @owned $Optional<S>):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = integer_literal $Builtin.Int1, -1
+  br bb3(%2)
+
+bb2:
+  %4 = integer_literal $Builtin.Int1, 0
+  br bb3(%4)
+
+bb3(%6 : $Builtin.Int1):
+  %7 = begin_borrow %0
+  cond_br %6, bb4, bb5
+
+bb4:
+  switch_enum %7, case #Optional.some!enumelt: bb6, case #Optional.none!enumelt: bb7
+
+bb5:
+  br bb9
+
+bb6(%11 : @guaranteed $S):
+  (%12, %13) = destructure_struct %11
+  %14 = enum $Optional<NonTrivial>, #Optional.some!enumelt, %13
+  br bb8(%14)
+
+bb7:
+  %16 = enum $Optional<NonTrivial>, #Optional.none!enumelt
+  br bb8(%16)
+
+bb8(%18 : @guaranteed $Optional<NonTrivial>):
+  %19 = borrowed %18 from (%7)
+  br bb9
+
+bb9:
+  end_borrow %7
+  destroy_value %0
+  %23 = tuple ()
+  return %23
+}
+

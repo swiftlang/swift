@@ -17,16 +17,16 @@ import SIL
 //===--------------------------------------------------------------------===//
 
 /// Instructions which can be simplified at all optimization levels
-protocol Simplifyable : Instruction {
+protocol Simplifiable : Instruction {
   func simplify(_ context: SimplifyContext)
 }
 
 /// Instructions which can be simplified at -Onone
-protocol OnoneSimplifyable : Simplifyable {
+protocol OnoneSimplifiable : Simplifiable {
 }
 
 /// Instructions which can only be simplified at the end of the -Onone pipeline
-protocol LateOnoneSimplifyable : Instruction {
+protocol LateOnoneSimplifiable : Instruction {
   func simplifyLate(_ context: SimplifyContext)
 }
 
@@ -38,7 +38,7 @@ let ononeSimplificationPass = FunctionPass(name: "onone-simplification") {
   (function: Function, context: FunctionPassContext) in
 
   runSimplification(on: function, context, preserveDebugInfo: true) {
-    if let i = $0 as? OnoneSimplifyable {
+    if let i = $0 as? OnoneSimplifiable {
       i.simplify($1)
     }
   }
@@ -48,7 +48,7 @@ let simplificationPass = FunctionPass(name: "simplification") {
   (function: Function, context: FunctionPassContext) in
 
   runSimplification(on: function, context, preserveDebugInfo: false) {
-    if let i = $0 as? Simplifyable {
+    if let i = $0 as? Simplifiable {
       i.simplify($1)
     }
   }
@@ -58,9 +58,9 @@ let lateOnoneSimplificationPass = FunctionPass(name: "late-onone-simplification"
   (function: Function, context: FunctionPassContext) in
 
   runSimplification(on: function, context, preserveDebugInfo: true) {
-    if let i = $0 as? LateOnoneSimplifyable {
+    if let i = $0 as? LateOnoneSimplifiable {
       i.simplifyLate($1)
-    } else if let i = $0 as? OnoneSimplifyable {
+    } else if let i = $0 as? OnoneSimplifiable {
       i.simplify($1)
     }
   }

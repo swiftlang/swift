@@ -181,10 +181,10 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
   }
   case SILInstructionKind::MarkDependenceInst: {
     auto mdi = cast<MarkDependenceInst>(user);
-    // If the user is the base operand of the MarkDependenceInst we can return
-    // true, because this would be the end of this dataflow chain
     if (mdi->getBase() == address) {
-      return true;
+      // We want to keep the original lifetime of the base. If we would eliminate
+      // the base alloc_stack, we risk to insert a destroy_addr too early.
+      return false;
     }
     // If the user is the value operand of the MarkDependenceInst we have to
     // transitively explore its uses until we reach a load or return false

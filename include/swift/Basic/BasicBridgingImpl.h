@@ -141,6 +141,14 @@ BridgedSwiftVersion::BridgedSwiftVersion(SwiftInt major, SwiftInt minor)
   ASSERT(major == Major && minor == Minor);
 }
 
+extern "C" void
+swift_ASTGen_bridgedSwiftClosureCall_1(const void *_Nonnull closure,
+                                       const void *_Nullable arg1);
+
+void BridgedSwiftClosure::operator()(const void *_Nullable arg1) {
+  swift_ASTGen_bridgedSwiftClosureCall_1(closure, arg1);
+}
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif // SWIFT_BASIC_BASICBRIDGINGIMPL_H

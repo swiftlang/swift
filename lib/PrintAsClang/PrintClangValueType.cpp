@@ -641,6 +641,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
               typeDecl, typeMetadataFuncName, typeMetadataFuncRequirements);
         });
   }
+  bool addPointer = typeDecl->isObjC();
 
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
@@ -649,6 +650,8 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     os << "template<>\n";
     os << "inline const constexpr bool isUsableInGenericContext<";
     printer.printClangTypeReference(typeDecl->getClangDecl());
+    if (addPointer)
+      os << "*";
     os << "> = true;\n";
   }
   if (!NTD || printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(NTD))
@@ -658,6 +661,8 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << " TypeMetadataTrait<";
   if (typeDecl->hasClangNode()) {
     printer.printClangTypeReference(typeDecl->getClangDecl());
+    if (addPointer)
+      os << "*";
   } else {
     assert(NTD);
     printer.printNominalTypeReference(NTD,
@@ -682,7 +687,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
 
   os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << "{\n";
 
-  if (typeDecl->hasClangNode()) {
+  if (typeDecl->hasClangNode() && !typeDecl->isObjC()) {
     os << "template<>\n";
     os << "inline const constexpr bool isSwiftBridgedCxxRecord<";
     printer.printClangTypeReference(typeDecl->getClangDecl());

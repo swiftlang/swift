@@ -67,7 +67,7 @@ extension ASTGenVisitor {
     }()
 
     // 'stmts' is a list of body elements of 'TapExpr' aka "appendingExpr" for the 'InterpolatedStringLiteralExpr'.
-    var stmts: [ASTNode] = []
+    var stmts: [BridgedASTNode] = []
 
     // The first element is a 'VarDecl'.
     let interpolationVar = BridgedVarDecl.createImplicitStringInterpolationVar(self.declContext)
@@ -199,7 +199,7 @@ extension ASTGenVisitor {
     let body = BridgedBraceStmt.createParsed(
       self.ctx,
       lBraceLoc: nil,
-      elements: stmts.lazy.map({ $0.bridged }).bridgedArray(in: self),
+      elements: stmts.lazy.bridgedArray(in: self),
       rBraceLoc: nil
     )
     let appendingExpr = BridgedTapExpr.create(

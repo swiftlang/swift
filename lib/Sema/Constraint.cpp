@@ -47,6 +47,10 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
                           getTypeVariablesBuffer().begin());
 }
 
+static bool isAdmissibleType(Type type) {
+  return !type->hasUnboundGenericType() && !type->hasTypeParameter();
+}
+
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
                        ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
@@ -55,6 +59,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
       IsFavored(false), IsIsolated(false),
       NumTypeVariables(typeVars.size()), Types{First, Second, Type()},
       Locator(locator) {
+  ASSERT(isAdmissibleType(First));
+  ASSERT(isAdmissibleType(Second));
+
   switch (Kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -84,14 +91,10 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
   case ConstraintKind::LValueObject:
-    assert(!First.isNull());
-    assert(!Second.isNull());
     break;
-  case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
-    assert(First->is<FunctionType>()
+    ASSERT(First->is<FunctionType>()
            && "The left-hand side type should be a function type");
-    trailingClosureMatching = 0;
     break;
 
   case ConstraintKind::ValueMember:
@@ -101,8 +104,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::Defaultable:
   case ConstraintKind::FallbackType:
-    assert(!First.isNull());
-    assert(!Second.isNull());
     break;
 
   case ConstraintKind::BindOverload:
@@ -120,6 +121,10 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::SyntacticElement:
     llvm_unreachable("Syntactic element constraint should use create()");
+
+  case ConstraintKind::ApplicableFunction:
+    llvm_unreachable(
+        "Application constraint should use create()");
   }
 
   std::uninitialized_copy(typeVars.begin(), typeVars.end(),
@@ -134,6 +139,10 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
       IsFavored(false), IsIsolated(false),
       NumTypeVariables(typeVars.size()), Types{First, Second, Third},
       Locator(locator) {
+  ASSERT(isAdmissibleType(First));
+  ASSERT(isAdmissibleType(Second));
+  ASSERT(isAdmissibleType(Third));
+
   switch (Kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -178,9 +187,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
 
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
-    assert(!First.isNull());
-    assert(!Second.isNull());
-    assert(!Third.isNull());
     break;
   }
 
@@ -254,8 +260,8 @@ Constraint::Constraint(ConstraintKind kind,
       RememberChoice(false), IsFavored(false), IsIsolated(false),
       NumTypeVariables(typeVars.size()), Types{first, second, Type()},
       Locator(locator) {
-  assert(!first.isNull());
-  assert(!second.isNull());
+  ASSERT(isAdmissibleType(first));
+  ASSERT(isAdmissibleType(second));
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
@@ -267,8 +273,8 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
       IsFavored(false), IsIsolated(false),
       NumTypeVariables(typeVars.size()), Types{first, second, Type()},
       Locator(locator) {
-  assert(!first.isNull());
-  assert(!second.isNull());
+  ASSERT(isAdmissibleType(first));
+  ASSERT(isAdmissibleType(second));
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
   if (fix)
     *getTrailingObjects<ConstraintFix *>() = fix;
@@ -284,6 +290,27 @@ Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
       NumTypeVariables(typeVars.size()), SyntacticElement{node, context,
                                                           isDiscarded},
       Locator(locator) {
+  std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
+}
+
+Constraint::Constraint(FunctionType *appliedFn, Type calleeType,
+                       unsigned trailingClosureMatching, DeclContext *useDC,
+                       ConstraintLocator *locator,
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
+    : Kind(ConstraintKind::ApplicableFunction), HasFix(false),
+      HasRestriction(false), IsActive(false), IsDisabled(false),
+      IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
+      IsIsolated(false), NumTypeVariables(typeVars.size()), Locator(locator) {
+  ASSERT(isAdmissibleType(appliedFn));
+  ASSERT(isAdmissibleType(calleeType));
+  assert(trailingClosureMatching >= 0 && trailingClosureMatching <= 2);
+  assert(useDC);
+
+  Apply.AppliedFn = appliedFn;
+  Apply.Callee = calleeType;
+  Apply.TrailingClosureMatching = trailingClosureMatching;
+  Apply.UseDC = useDC;
+
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
@@ -703,6 +730,17 @@ gatherReferencedTypeVars(Constraint *constraint,
   }
 }
 
+unsigned Constraint::countResolvedArgumentTypes(ConstraintSystem &cs) const {
+  auto *argumentFuncType = cs.getAppliedDisjunctionArgumentFunction(this);
+  if (!argumentFuncType)
+    return 0;
+
+  return llvm::count_if(argumentFuncType->getParams(), [&](const AnyFunctionType::Param arg) {
+    auto argType = cs.getFixedTypeRecursive(arg.getPlainType(), /*wantRValue=*/true);
+    return !argType->isTypeVariableOrMember();
+  });
+}
+
 bool Constraint::isExplicitConversion() const {
   assert(Kind == ConstraintKind::Disjunction);
 
@@ -986,9 +1024,9 @@ Constraint *Constraint::createConjunction(
 }
 
 Constraint *Constraint::createApplicableFunction(
-    ConstraintSystem &cs, Type argumentFnType, Type calleeType,
+    ConstraintSystem &cs, FunctionType *argumentFnType, Type calleeType,
     std::optional<TrailingClosureMatching> trailingClosureMatching,
-    ConstraintLocator *locator) {
+    DeclContext *useDC, ConstraintLocator *locator) {
   // Collect type variables.
   SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (argumentFnType->hasTypeVariable())
@@ -996,29 +1034,28 @@ Constraint *Constraint::createApplicableFunction(
   if (calleeType->hasTypeVariable())
     calleeType->getTypeVariables(typeVars);
 
-  // Create the constraint.
+  // Encode the trailing closure matching.
+  unsigned rawTrailingClosureMatching = 0;
+  if (trailingClosureMatching) {
+    switch (*trailingClosureMatching) {
+      case TrailingClosureMatching::Forward:
+        rawTrailingClosureMatching = 1;
+        break;
+
+      case TrailingClosureMatching::Backward:
+        rawTrailingClosureMatching = 2;
+        break;
+    }
+  }
+
+    // Create the constraint.
   auto size =
     totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  auto constraint = new (mem) Constraint(
-      ConstraintKind::ApplicableFunction, argumentFnType, calleeType, locator,
-      typeVars);
-
-  // Encode the trailing closure matching.
-  if (trailingClosureMatching) {
-    switch (*trailingClosureMatching) {
-      case TrailingClosureMatching::Forward:
-        constraint->trailingClosureMatching = 1;
-        break;
-
-      case TrailingClosureMatching::Backward:
-        constraint->trailingClosureMatching = 2;
-        break;
-    }
-  } else {
-    constraint->trailingClosureMatching = 0;
-  }
+  auto constraint = new (mem)
+      Constraint(argumentFnType, calleeType, rawTrailingClosureMatching, useDC,
+                 locator, typeVars);
 
   return constraint;
 }
@@ -1051,7 +1088,7 @@ Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
 std::optional<TrailingClosureMatching>
 Constraint::getTrailingClosureMatching() const {
   assert(Kind == ConstraintKind::ApplicableFunction);
-  switch (trailingClosureMatching) {
+  switch (Apply.TrailingClosureMatching) {
   case 0:
     return std::nullopt;
   case 1: return TrailingClosureMatching::Forward;

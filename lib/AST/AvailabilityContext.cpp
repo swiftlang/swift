@@ -12,6 +12,7 @@
 
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
@@ -63,16 +64,27 @@ bool AvailabilityContext::Info::constrainWith(const Info &other) {
   return isConstrained;
 }
 
-bool AvailabilityContext::Info::constrainWith(const Decl *decl) {
+bool AvailabilityContext::Info::constrainWith(
+    const DeclAvailabilityConstraints &constraints, ASTContext &ctx) {
   bool isConstrained = false;
 
-  if (auto range = AvailabilityInference::annotatedAvailableRange(decl))
-    isConstrained |= constrainRange(Range, *range);
-
-  if (auto attr = decl->getUnavailableAttr())
-    isConstrained |= constrainUnavailability(attr->getDomain());
-
-  isConstrained |= CONSTRAIN_BOOL(IsDeprecated, decl->isDeprecated());
+  for (auto constraint : constraints) {
+    auto attr = constraint.getAttr();
+    auto domain = attr.getDomain();
+    switch (constraint.getReason()) {
+    case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+    case AvailabilityConstraint::Reason::Obsoleted:
+    case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
+      isConstrained |= constrainUnavailability(domain);
+      break;
+    case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
+      // FIXME: [availability] Support versioning for other kinds of domains.
+      DEBUG_ASSERT(domain.isPlatform());
+      if (domain.isPlatform())
+        isConstrained |= constrainRange(Range, attr.getIntroducedRange(ctx));
+      break;
+    }
+  }
 
   return isConstrained;
 }
@@ -133,9 +145,16 @@ AvailabilityRange AvailabilityContext::getPlatformRange() const {
   return storage->info.Range;
 }
 
-std::optional<AvailabilityDomain>
-AvailabilityContext::getUnavailableDomain() const {
-  return storage->info.UnavailableDomain;
+bool AvailabilityContext::isUnavailable() const {
+  return storage->info.UnavailableDomain.has_value();
+}
+
+bool AvailabilityContext::containsUnavailableDomain(
+    AvailabilityDomain domain) const {
+  if (auto unavailableDomain = storage->info.UnavailableDomain)
+    return unavailableDomain->contains(domain);
+
+  return false;
 }
 
 bool AvailabilityContext::isDeprecated() const {
@@ -155,10 +174,6 @@ void AvailabilityContext::constrainWithContext(const AvailabilityContext &other,
   storage = Storage::get(info, ctx);
 }
 
-void AvailabilityContext::constrainWithDecl(const Decl *decl) {
-  constrainWithDeclAndPlatformRange(decl, AvailabilityRange::alwaysAvailable());
-}
-
 void AvailabilityContext::constrainWithPlatformRange(
     const AvailabilityRange &platformRange, ASTContext &ctx) {
 
@@ -169,12 +184,30 @@ void AvailabilityContext::constrainWithPlatformRange(
   storage = Storage::get(info, ctx);
 }
 
+void AvailabilityContext::constrainWithUnavailableDomain(
+    AvailabilityDomain domain, ASTContext &ctx) {
+  Info info{storage->info};
+  if (!info.constrainUnavailability(domain))
+    return;
+
+  storage = Storage::get(info, ctx);
+}
+
+void AvailabilityContext::constrainWithDecl(const Decl *decl) {
+  constrainWithDeclAndPlatformRange(decl, AvailabilityRange::alwaysAvailable());
+}
+
 void AvailabilityContext::constrainWithDeclAndPlatformRange(
     const Decl *decl, const AvailabilityRange &platformRange) {
   bool isConstrained = false;
 
   Info info{storage->info};
-  isConstrained |= info.constrainWith(decl);
+  AvailabilityConstraintFlags flags =
+      AvailabilityConstraintFlag::SkipEnclosingExtension;
+  auto constraints =
+      swift::getAvailabilityConstraintsForDecl(decl, *this, flags);
+  isConstrained |= info.constrainWith(constraints, decl->getASTContext());
+  isConstrained |= CONSTRAIN_BOOL(info.IsDeprecated, decl->isDeprecated());
   isConstrained |= constrainRange(info.Range, platformRange);
 
   if (!isConstrained)
@@ -203,7 +236,7 @@ stringForAvailability(const AvailabilityRange &availability) {
 void AvailabilityContext::print(llvm::raw_ostream &os) const {
   os << "version=" << stringForAvailability(getPlatformRange());
 
-  if (auto unavailableDomain = getUnavailableDomain())
+  if (auto unavailableDomain = storage->info.UnavailableDomain)
     os << " unavailable=" << unavailableDomain->getNameForAttributePrinting();
 
   if (isDeprecated())

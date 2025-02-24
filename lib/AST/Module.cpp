@@ -3783,6 +3783,29 @@ ArrayRef<TypeDecl *> SourceFile::getLocalTypeDecls() const {
                            LocalTypeDeclsRequest{mutableThis}, {});
 }
 
+std::optional<SourceFile::FileIDStr>
+SourceFile::FileIDStr::parse(StringRef fileID) {
+  auto names = fileID.split('/');
+  auto moduleName = names.first;
+  auto fileName = names.second;
+
+  if (moduleName.empty() || fileName.empty() || !fileName.ends_with(".swift") ||
+      fileName.contains('/'))
+    return {};
+
+  return {SourceFile::FileIDStr{/*.moduleName=*/moduleName,
+                                /*.fileName=*/fileName}};
+}
+
+bool SourceFile::FileIDStr::matches(const SourceFile *file) const {
+  // Never match with SourceFiles that do not correpond to a file on disk
+  if (file->getFilename().empty())
+    return false;
+
+  return moduleName == file->getParentModule()->getNameStr() &&
+         fileName == llvm::sys::path::filename(file->getFilename());
+}
+
 namespace {
 class LocalTypeDeclCollector : public ASTWalker {
   SmallVectorImpl<TypeDecl *> &results;

@@ -124,20 +124,20 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
 
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
-#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case MagicIdentifierLiteralExpr::NAME: \
-      return TypeChecker::getProtocol( \
-          Context, expr->getLoc(), \
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING)                                  \
+    case MagicIdentifierLiteralExpr::NAME:                                     \
+      return TypeChecker::getProtocol(                                         \
+          Context, expr->getLoc(),                                             \
           KnownProtocolKind::ExpressibleByStringLiteral);
 
-#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case MagicIdentifierLiteralExpr::NAME: \
-      return TypeChecker::getProtocol( \
-          Context, expr->getLoc(), \
+#define MAGIC_INT_IDENTIFIER(NAME, STRING)                                     \
+    case MagicIdentifierLiteralExpr::NAME:                                     \
+      return TypeChecker::getProtocol(                                         \
+          Context, expr->getLoc(),                                             \
           KnownProtocolKind::ExpressibleByIntegerLiteral);
 
-#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case MagicIdentifierLiteralExpr::NAME: \
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING)                                 \
+    case MagicIdentifierLiteralExpr::NAME:                                     \
       return nullptr;
 
 #include "swift/AST/MagicIdentifierKinds.def"

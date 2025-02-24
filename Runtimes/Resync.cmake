@@ -78,15 +78,13 @@ set(CoreLibs
   CompatibilityOverride
   stubs
   CommandLineSupport
-  core)
+  core
+  SwiftOnoneSupport
+  Concurrency
+  Concurrency/InternalShims)
 
   # Add these as we get them building
-  # core
-  # Concurrency
-  # SwiftOnoneSUpport
-  # CommandLineSupport
   # Demangling
-  # runtime)
 
 foreach(library ${CoreLibs})
   copy_library_sources(${library} "public" "Core")

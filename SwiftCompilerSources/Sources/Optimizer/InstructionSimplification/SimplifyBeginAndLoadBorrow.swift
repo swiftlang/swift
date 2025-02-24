@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BeginBorrowInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension BeginBorrowInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if borrowedValue.ownership == .owned,
        // We need to keep lexical lifetimes in place.
@@ -27,7 +27,7 @@ extension BeginBorrowInst : OnoneSimplifyable, SILCombineSimplifyable {
   }
 }
 
-extension LoadBorrowInst : Simplifyable, SILCombineSimplifyable {
+extension LoadBorrowInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if uses.ignoreDebugUses.ignoreUsers(ofType: EndBorrowInst.self).isEmpty {
       context.erase(instructionIncludingAllUsers: self)

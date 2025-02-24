@@ -81,7 +81,7 @@ import SwiftShims
 /// including the line and column numbers where the error occurred:
 ///
 ///     struct XMLParsingError: Error {
-///         enum ErrorKind {
+///         enum Kind {
 ///             case invalidCharacter
 ///             case mismatchedTag
 ///             case internalError
@@ -89,7 +89,7 @@ import SwiftShims
 ///
 ///         let line: Int
 ///         let column: Int
-///         let kind: ErrorKind
+///         let kind: Kind
 ///     }
 ///
 ///     func parse(_ source: String) throws -> XMLDoc {

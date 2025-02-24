@@ -1581,32 +1581,35 @@ swift::irgen::encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
 }
 
 llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
-                                                      StringRef library) {
+                                                      LinkLibrary library) {
   llvm::SmallString<32> buffer;
+  StringRef name = library.getName();
 
   if (T.isWindowsMSVCEnvironment() || T.isWindowsItaniumEnvironment()) {
-    bool quote = library.contains(' ');
+    bool quote = name.contains(' ');
 
     buffer += "/DEFAULTLIB:";
     if (quote)
       buffer += '"';
-    buffer += library;
-    if (!library.ends_with_insensitive(".lib"))
+    if (library.isStaticLibrary() && !name.starts_with_insensitive("lib"))
+      buffer += "lib";
+    buffer += name;
+    if (!name.ends_with_insensitive(".lib"))
       buffer += ".lib";
     if (quote)
       buffer += '"';
   } else if (T.isPS4()) {
-    bool quote = library.contains(' ');
+    bool quote = name.contains(' ');
 
     buffer += "\01";
     if (quote)
       buffer += '"';
-    buffer += library;
+    buffer += name;
     if (quote)
       buffer += '"';
   } else {
     buffer += "-l";
-    buffer += library;
+    buffer += name;
   }
 
   return buffer;
@@ -1686,7 +1689,8 @@ void IRGenModule::addLinkLibraries() {
     });
 
   if (ObjCInterop)
-    registerLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
+    registerLinkLibrary(
+        LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
 
   // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
   // Also link with C++ bridging utility module (Cxx) and C++ stdlib overlay
@@ -1817,7 +1821,7 @@ void AutolinkKind::collectEntriesFromLibraries(
       switch (linkLib.getKind()) {
       case LibraryKind::Library: {
         llvm::SmallString<32> opt =
-            getTargetDependentLibraryOption(IGM.Triple, linkLib.getName());
+            getTargetDependentLibraryOption(IGM.Triple, linkLib);
         Entries.insert(llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
         continue;
       }
@@ -1838,7 +1842,7 @@ void AutolinkKind::collectEntriesFromLibraries(
       switch (linkLib.getKind()) {
       case LibraryKind::Library: {
         llvm::SmallString<32> opt =
-            getTargetDependentLibraryOption(IGM.Triple, linkLib.getName());
+            getTargetDependentLibraryOption(IGM.Triple, linkLib);
         Entries.insert(llvm::MDNode::get(ctx, llvm::MDString::get(ctx, opt)));
         continue;
       }

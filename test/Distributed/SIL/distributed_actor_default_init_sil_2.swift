@@ -37,7 +37,7 @@ distributed actor MyDistActor {
 // CHECK:   store [[SYS_PARAM]] to [[SYS_FIELD]] : $*FakeActorSystem
 
 // CHECK:   [[ID_FIELD:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
-// CHECK:   store {{%[0-9]+}} to [[ID_FIELD]] : $*ActorAddress
+// CHECK:   copy_addr {{.*}} to [init] [[ID_FIELD]] : $*ActorAddress
 
 // CHECK:   [[RAW_BOOL:%[0-9]+]] = struct_extract [[COND]] : $Bool, #Bool._value
 // CHECK:   cond_br [[RAW_BOOL]], [[SUCCESS_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]

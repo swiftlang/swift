@@ -628,7 +628,22 @@ struct SwiftInterfaceInfo {
   std::optional<version::Version> CompilerToolsVersion;
 };
 
-struct InterfaceSubContextDelegateImpl: InterfaceSubContextDelegate {
+namespace SwiftInterfaceModuleOutputPathResolution {
+struct ResultTy {
+  llvm::SmallString<256> outputPath;
+
+  // Hash points to a segment of outputPath.
+  StringRef hash;
+};
+
+using ArgListTy = std::vector<std::string>;
+
+void setOutputPath(ResultTy &outputPath, const StringRef &moduleName,
+                   const StringRef &interfacePath, const StringRef &sdkPath,
+                   const CompilerInvocation &CI, const ArgListTy &extraArgs);
+} // namespace SwiftInterfaceModuleOutputPathResolution
+
+struct InterfaceSubContextDelegateImpl : InterfaceSubContextDelegate {
 private:
   SourceManager &SM;
 public:
@@ -702,14 +717,12 @@ public:
 
   ~InterfaceSubContextDelegateImpl() = default;
 
-  /// includes a hash of relevant key data.
-  StringRef computeCachedOutputPath(StringRef moduleName,
-                                    StringRef UseInterfacePath,
-                                    StringRef sdkPath,
-                                    llvm::SmallString<256> &OutPath,
-                                    StringRef &CacheHash);
-  std::string getCacheHash(StringRef useInterfacePath, StringRef sdkPath);
+  /// resolvedOutputPath includes a hash of relevant key data.
+  void getCachedOutputPath(
+      SwiftInterfaceModuleOutputPathResolution::ResultTy &resolvedOutputPath,
+      StringRef moduleName, StringRef interfacePath, StringRef sdkPath);
 };
-}
+
+} // namespace swift
 
 #endif

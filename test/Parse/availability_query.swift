@@ -47,6 +47,7 @@ if #available(OSX 51 { // expected-error {{expected ')'}} expected-note {{to mat
 
 if #available(iDishwasherOS 51) { // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
 // expected-error@-1 {{must handle potential future platforms with '*'}}
+// expected-error@-2 {{condition required for target platform}}
 }
 
 if #available(iDishwasherOS 51, *) { // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
@@ -125,4 +126,7 @@ if let _ = Optional(42), #available(iOS 8.0, *) {}
 if #available(macOS 51, *) {
 }
 
+// FIXME: This is weird, but it's already accepted. It should probably be diagnosed.
+if #available(*, macOS 51) {
+}
 

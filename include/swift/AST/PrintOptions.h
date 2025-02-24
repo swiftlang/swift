@@ -397,6 +397,9 @@ struct PrintOptions {
   /// Suppress modify/read accessors.
   bool SuppressCoroutineAccessors = false;
 
+  /// Suppress the @execution attribute
+  bool SuppressExecutionAttribute = false;
+
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
       DeclAttrKind::Transparent, DeclAttrKind::Effects,

@@ -130,7 +130,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         SugaredGenericSig(Info.SugaredGenericSig),
         FixedBinaryOrder(Info.FixedBinaryOrder),
         introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
-                       Info.IntrowatchOS, Info.Introswift}),
+                       Info.IntrowatchOS, Info.IntrovisionOS, Info.Introswift}),
         ObjCName(Info.ObjCName) {}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
@@ -1468,6 +1468,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
+      IntrovisionOS(Ctx.getPlatformIntroVersion(D, PlatformKind::visionOS)),
       Introswift(Ctx.getLanguageIntroVersion(D)),
       ObjCName(Ctx.getObjcName(D)),
       InitKind(Ctx.getInitKind(D)),

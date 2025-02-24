@@ -441,7 +441,7 @@ public enum VariableScopeInstruction {
   }
 
   public var endOperands: LazyFilterSequence<UseList> {
-    return scopeBegin.uses.endingLifetime
+    scopeBegin.uses.lazy.filter { $0.endsLifetime || $0.instruction is ExtendLifetimeInst }
   }
 
   // TODO: with SIL verification, we might be able to make varDecl non-Optional.
@@ -1273,10 +1273,6 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
   public var deallocations: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
     uses.users(ofType: DeallocStackInst.self)
   }
-}
-
-final public class AllocVectorInst : SingleValueInstruction, Allocation, UnaryInstruction {
-  public var capacity: Value { operand.value }
 }
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {

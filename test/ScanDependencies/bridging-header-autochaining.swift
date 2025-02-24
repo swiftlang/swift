@@ -43,18 +43,18 @@
 // RUN: %target-swift-frontend -module-name Test -O @%t/MyApp.cmd %t/test.swift \
 // RUN:   -emit-module -o %t/Test.swiftmodule
 
-/// Importing binary module with bridging header built from CAS from a regluar build.
+/// Importing binary module with bridging header from a module that also has bridging header using implicit build method.
 /// This should succeed even it is also importing a bridging header that shares same header dependencies (with proper header guard).
 // RUN: %target-swift-frontend -typecheck -module-name User \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap \
 // RUN:   -I %t %t/user2.swift -import-objc-header %t/Bridging2.h
 
-/// Importing binary module with bridging header built from CAS from a cached build. This should work without additional bridging header deps.
+/// Importing binary module with bridging header from a module that has no bridging header.
 // RUN: %target-swift-frontend -scan-dependencies -module-name User -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/user.swift -o %t/deps2.json -auto-bridging-header-chaining -scanner-output-dir %t -scanner-debug-write-output \
-// RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t
+// RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t -enable-library-evolution
 
 // RUN: %swift-scan-test -action get_chained_bridging_header -- %target-swift-frontend -emit-module \
 // RUN:   -module-name User -module-cache-path %t/clang-module-cache -O \
@@ -74,12 +74,15 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -disable-implicit-swift-modules \
 // RUN:   -import-pch %t/bridging1.pch \
 // RUN:   -explicit-swift-module-map-file %t/map2.json @%t/User.cmd %t/user.swift \
-// RUN:   -emit-module -o %t/User.swiftmodule
+// RUN:   -emit-module -o %t/User.swiftmodule -emit-module-interface-path %t/User.swiftinterface -enable-library-evolution
 
+/// Make sure the emitted content is compatible with original. The embedded header path needs to be original header and no bridging header module leaking into interface.
 // RUN: llvm-bcanalyzer -dump %t/User.swiftmodule | %FileCheck %s --check-prefix CHECK-NO-HEADER
 // CHECK-NO-HEADER-NOT: <IMPORTED_HEADER
+// RUN: %FileCheck %s --check-prefix NO-OBJC-LEAKING --input-file=%t/User.swiftinterface
+// NO-OBJC-LEAKING-NOT: import __ObjC
 
-/// Importing binary module with bridging header for a cached build while also importing a bridging header.
+/// Importing binary module with bridging header from a module with bridging header using explicit build method with header chaining.
 // RUN: %target-swift-frontend -scan-dependencies -module-name User -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap \

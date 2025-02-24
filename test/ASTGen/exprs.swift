@@ -1,11 +1,8 @@
-
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only > %t/cpp-parser.ast.raw
-
-// Filter out any addresses in the dump, since they can differ.
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/astgen.ast.raw > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only -enable-experimental-feature ParserASTGen \
+// RUN:   | %sanitize-address > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only \
+// RUN:   | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
@@ -28,8 +25,8 @@ func test1(x: Int, fn: (Int) -> Int) async throws -> Int {
     true
 
   let arlit = [0]
-  let tuple = (0, 1)
-  let diclit = [0: 1, 2: 3]
+  let tuple = (0, -21.4)
+  let diclit = [0: 1, 2: -3]
 
   return fn(x)
 }
@@ -97,6 +94,7 @@ func acceptClosures(x: () -> Void) {}
 func acceptClosures(x: () -> Void, y: () -> Int) {}
 func acceptClosures(x: () -> Void, y: () -> Int, _ z: () -> Void) {}
 func acceptClosures(x: (Int, String) -> Void) {}
+func acceptClosures(x: (Int, String, inout String) -> Void) {}
 func testTrailingClsure() {
   acceptClosures {}
   acceptClosures() {}
@@ -108,6 +106,30 @@ func testTrailingClsure() {
   acceptClosures { (x, y: String) -> Void in  }
   acceptClosures { x, y in  }
   acceptClosures { @Sendable x, y in  }
+
+  acceptClosures { $1.count == $0.bitWidth }
+  acceptClosures { $1.count }
+  acceptClosures {
+    _ = $1
+    acceptClosures { $2 = $1 }
+  }
+}
+class TestClosure {
+  func testCaptureList() {
+    var val = self
+    var str = "t"
+    acceptClosures { [self] in _ = self }
+    acceptClosures { [self] in _ = $1 }
+    acceptClosures { [foo = self] in }
+    acceptClosures { [self = self] in }
+    acceptClosures { [weak self] in }
+    acceptClosures { [unowned self] in }
+    acceptClosures { [unowned(safe) self] in }
+    acceptClosures { [unowned(unsafe) self] in }
+    acceptClosures { [unowned(unsafe) self = val] in }
+    acceptClosures { [val = self] in }
+    acceptClosures { [val = self, str, self = val] in }
+  }
 }
 
 func testInOut() {

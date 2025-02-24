@@ -230,8 +230,8 @@ public:
     return ClangImporterOpts.ExtraArgs;
   }
 
-  void addLinkLibrary(StringRef name, LibraryKind kind) {
-    IRGenOpts.LinkLibraries.push_back({name, kind});
+  void addLinkLibrary(StringRef name, LibraryKind kind, bool isStaticLibrary) {
+    IRGenOpts.LinkLibraries.emplace_back(name, kind, isStaticLibrary);
   }
 
   ArrayRef<LinkLibrary> getLinkLibraries() const {

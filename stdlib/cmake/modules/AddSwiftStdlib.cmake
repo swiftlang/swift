@@ -926,25 +926,6 @@ function(add_swift_target_library_single target name)
     endif()
   endif()
 
-  if(XCODE)
-    string(REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
-    list(GET split_path -1 dir)
-    file(GLOB_RECURSE SWIFTLIB_SINGLE_HEADERS
-      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.h
-      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.def
-      ${CMAKE_CURRENT_SOURCE_DIR}/*.def)
-
-    file(GLOB_RECURSE SWIFTLIB_SINGLE_TDS
-      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.td)
-
-    set_source_files_properties(${SWIFTLIB_SINGLE_HEADERS} ${SWIFTLIB_SINGLE_TDS}
-      PROPERTIES
-      HEADER_FILE_ONLY true)
-    source_group("TableGen descriptions" FILES ${SWIFTLIB_SINGLE_TDS})
-
-    set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES} ${SWIFTLIB_SINGLE_HEADERS} ${SWIFTLIB_SINGLE_TDS})
-  endif()
-
   # FIXME: swiftDarwin currently trips an assertion in SymbolGraphGen
   if (SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS AND NOT ${name} STREQUAL "swiftDarwin")
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend;-emit-symbol-graph")
@@ -1122,14 +1103,6 @@ function(add_swift_target_library_single target name)
         $<TARGET_OBJECTS:${object_library}${VARIANT_SUFFIX}>)
   endforeach()
 
-  set(SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES)
-  if(XCODE)
-    set(SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES
-        # Note: the dummy.cpp source file provides no definitions. However,
-        # it forces Xcode to properly link the static library.
-        ${SWIFT_SOURCE_DIR}/cmake/dummy.cpp)
-  endif()
-
   set(INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS})
   if(libkind STREQUAL "SHARED")
     list(APPEND INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS
@@ -1148,8 +1121,7 @@ function(add_swift_target_library_single target name)
   add_library("${target}" ${libkind}
               ${SWIFTLIB_SINGLE_SOURCES}
               ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
-              ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
-              ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
+              ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS})
   if (NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY AND TARGET "${install_in_component}")
     add_dependencies("${install_in_component}" "${target}")
   endif()
@@ -1249,10 +1221,9 @@ function(add_swift_target_library_single target name)
 
   foreach(config ${CMAKE_CONFIGURATION_TYPES})
     string(TOUPPER ${config} config_upper)
-    escape_path_for_xcode("${config}" "${swiftlib_prefix}" config_lib_dir)
     set_target_properties(${target} PROPERTIES
-      LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${output_sub_dir}
-      ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${output_sub_dir})
+      LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${swiftlib_prefix}/${output_sub_dir}
+      ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${swiftlib_prefix}/${output_sub_dir})
   endforeach()
 
   if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -1331,8 +1302,7 @@ function(add_swift_target_library_single target name)
       # library.
       add_library(${target_static} STATIC
         ${SWIFTLIB_SINGLE_SOURCES}
-        ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
-        ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
+        ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS})
 
       set_output_directory(${target_static}
         BINARY_DIR ${out_bin_dir}
@@ -1346,11 +1316,9 @@ function(add_swift_target_library_single target name)
 
       foreach(config ${CMAKE_CONFIGURATION_TYPES})
         string(TOUPPER ${config} config_upper)
-        escape_path_for_xcode(
-          "${config}" "${swift_lib_dir}" config_lib_dir)
         set_target_properties(${target_static} PROPERTIES
-          LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${output_sub_dir}
-          ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${output_sub_dir})
+          LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${swift_lib_dir}/${output_sub_dir}
+          ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${swift_lib_dir}/${output_sub_dir})
       endforeach()
 
       set_target_properties(${target_static} PROPERTIES

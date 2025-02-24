@@ -180,7 +180,7 @@ private:
   /// The available pool of workers for filesystem module search
   unsigned NumThreads;
   std::list<std::unique_ptr<ModuleDependencyScanningWorker>> Workers;
-  llvm::StdThreadPool ScanningThreadPool;
+  llvm::DefaultThreadPool ScanningThreadPool;
   /// Protect worker access.
   std::mutex WorkersLock;
   /// Count of filesystem queries performed

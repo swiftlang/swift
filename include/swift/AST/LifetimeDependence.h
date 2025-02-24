@@ -47,15 +47,16 @@ enum class LifetimeDependenceKind : uint8_t { Inherit = 0, Scope };
 struct LifetimeDescriptor {
   union Value {
     struct {
-      StringRef name;
+      Identifier name;
     } Named;
     struct {
       unsigned index;
+      bool isAddress;
     } Ordered;
     struct {
     } Self;
-    Value(StringRef name) : Named({name}) {}
-    Value(unsigned index) : Ordered({index}) {}
+    Value(Identifier name) : Named({name}) {}
+    Value(unsigned index, bool isAddress) : Ordered({index, isAddress}) {}
     Value() : Self() {}
   } value;
 
@@ -66,15 +67,15 @@ struct LifetimeDescriptor {
   SourceLoc loc;
 
 private:
-  LifetimeDescriptor(StringRef name,
+  LifetimeDescriptor(Identifier name,
                      ParsedLifetimeDependenceKind parsedLifetimeDependenceKind,
                      SourceLoc loc)
       : value{name}, kind(DescriptorKind::Named),
         parsedLifetimeDependenceKind(parsedLifetimeDependenceKind), loc(loc) {}
-  LifetimeDescriptor(unsigned index,
+  LifetimeDescriptor(unsigned index, bool isAddress,
                      ParsedLifetimeDependenceKind parsedLifetimeDependenceKind,
                      SourceLoc loc)
-      : value{index}, kind(DescriptorKind::Ordered),
+      : value{index, isAddress}, kind(DescriptorKind::Ordered),
         parsedLifetimeDependenceKind(parsedLifetimeDependenceKind), loc(loc) {}
   LifetimeDescriptor(ParsedLifetimeDependenceKind parsedLifetimeDependenceKind,
                      SourceLoc loc)
@@ -83,7 +84,7 @@ private:
 
 public:
   static LifetimeDescriptor
-  forNamed(StringRef name,
+  forNamed(Identifier name,
            ParsedLifetimeDependenceKind parsedLifetimeDependenceKind,
            SourceLoc loc) {
     return {name, parsedLifetimeDependenceKind, loc};
@@ -91,8 +92,9 @@ public:
   static LifetimeDescriptor
   forOrdered(unsigned index,
              ParsedLifetimeDependenceKind parsedLifetimeDependenceKind,
-             SourceLoc loc) {
-    return {index, parsedLifetimeDependenceKind, loc};
+             SourceLoc loc,
+             bool isAddress = false) {
+    return {index, isAddress, parsedLifetimeDependenceKind, loc};
   }
   static LifetimeDescriptor
   forSelf(ParsedLifetimeDependenceKind parsedLifetimeDependenceKind,
@@ -104,7 +106,7 @@ public:
     return parsedLifetimeDependenceKind;
   }
 
-  StringRef getName() const {
+  Identifier getName() const {
     assert(kind == DescriptorKind::Named);
     return value.Named.name;
   }
@@ -112,6 +114,12 @@ public:
   unsigned getIndex() const {
     assert(kind == DescriptorKind::Ordered);
     return value.Ordered.index;
+  }
+  
+  bool isAddressable() const {
+    return kind == DescriptorKind::Ordered
+      ? value.Ordered.isAddress
+      : false;
   }
 
   DescriptorKind getDescriptorKind() const { return kind; }
@@ -122,13 +130,13 @@ public:
     if (getDescriptorKind() != LifetimeDescriptor::DescriptorKind::Named) {
       return false;
     }
-    return getName() == "immortal";
+    return getName().str() == "immortal";
   }
 
   std::string getString() const {
     switch (kind) {
     case DescriptorKind::Named:
-      return getName().str();
+      return getName().str().str();
     case DescriptorKind::Ordered:
       return std::to_string(getIndex());
     case DescriptorKind::Self:
@@ -206,8 +214,9 @@ public:
 class LifetimeDependenceInfo {
   IndexSubset *inheritLifetimeParamIndices;
   IndexSubset *scopeLifetimeParamIndices;
+  llvm::PointerIntPair<IndexSubset *, 1, bool>
+    addressableParamIndicesAndImmortal;
   unsigned targetIndex;
-  bool immortal;
 
   static LifetimeDependenceInfo getForIndex(AbstractFunctionDecl *afd,
                                             unsigned targetIndex,
@@ -238,11 +247,14 @@ class LifetimeDependenceInfo {
 public:
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
-                         unsigned targetIndex, bool isImmortal)
+                         unsigned targetIndex, bool isImmortal,
+                         // set during SIL type lowering
+                         IndexSubset *addressableParamIndices = nullptr)
       : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
         scopeLifetimeParamIndices(scopeLifetimeParamIndices),
-        targetIndex(targetIndex), immortal(isImmortal) {
-    assert(isImmortal || inheritLifetimeParamIndices ||
+        addressableParamIndicesAndImmortal(addressableParamIndices, isImmortal),
+        targetIndex(targetIndex) {
+    assert(this->isImmortal() || inheritLifetimeParamIndices ||
            scopeLifetimeParamIndices);
     assert(!inheritLifetimeParamIndices ||
            !inheritLifetimeParamIndices->isEmpty());
@@ -252,11 +264,11 @@ public:
   operator bool() const { return !empty(); }
 
   bool empty() const {
-    return !immortal && inheritLifetimeParamIndices == nullptr &&
+    return !isImmortal() && inheritLifetimeParamIndices == nullptr &&
            scopeLifetimeParamIndices == nullptr;
   }
 
-  bool isImmortal() const { return immortal; }
+  bool isImmortal() const { return addressableParamIndicesAndImmortal.getInt(); }
 
   unsigned getTargetIndex() const { return targetIndex; }
 
@@ -266,10 +278,17 @@ public:
   bool hasScopeLifetimeParamIndices() const {
     return scopeLifetimeParamIndices != nullptr;
   }
+  bool hasAddressableParamIndices() const {
+    return addressableParamIndicesAndImmortal.getPointer() != nullptr;
+  }
 
   IndexSubset *getInheritIndices() const { return inheritLifetimeParamIndices; }
 
   IndexSubset *getScopeIndices() const { return scopeLifetimeParamIndices; }
+
+  IndexSubset *getAddressableIndices() const {
+    return addressableParamIndicesAndImmortal.getPointer();
+  }
 
   bool checkInherit(int index) const {
     return inheritLifetimeParamIndices
@@ -300,15 +319,15 @@ public:
     return this->isImmortal() == other.isImmortal() &&
            this->getTargetIndex() == other.getTargetIndex() &&
            this->getInheritIndices() == other.getInheritIndices() &&
+           this->getAddressableIndices() == other.getAddressableIndices() &&
            this->getScopeIndices() == other.getScopeIndices();
   }
 
   bool operator!=(const LifetimeDependenceInfo &other) const {
-    return this->isImmortal() != other.isImmortal() &&
-           this->getTargetIndex() != other.getTargetIndex() &&
-           this->getInheritIndices() != other.getInheritIndices() &&
-           this->getScopeIndices() != other.getScopeIndices();
+    return !(*this == other);
   }
+  
+  SWIFT_DEBUG_DUMPER(dump());
 };
 
 std::optional<LifetimeDependenceInfo>

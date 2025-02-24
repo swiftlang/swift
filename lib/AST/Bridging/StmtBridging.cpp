@@ -52,37 +52,43 @@ BridgedStmtConditionElement BridgedStmtConditionElement_createPatternBinding(
       cInitializer.unbridged()));
 }
 
+BridgedStmtConditionElement BridgedStmtConditionElement_createPoundAvailable(
+    BridgedPoundAvailableInfo info) {
+  return StmtConditionElement(info.unbridged());
+}
+
+BridgedPoundAvailableInfo BridgedPoundAvailableInfo_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedSourceLoc cLParenLoc, BridgedArrayRef cSpecs,
+    BridgedSourceLoc cRParenLoc, bool isUnavailability) {
+  SmallVector<AvailabilitySpec *, 4> specs;
+  for (auto cSpec : cSpecs.unbridged<BridgedAvailabilitySpec>())
+    specs.push_back(cSpec.unbridged());
+  return PoundAvailableInfo::create(cContext.unbridged(), cPoundLoc.unbridged(),
+                                    cLParenLoc.unbridged(), specs,
+                                    cRParenLoc.unbridged(), isUnavailability);
+}
+
 BridgedBraceStmt BridgedBraceStmt_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cLBLoc,
                                                BridgedArrayRef elements,
                                                BridgedSourceLoc cRBLoc) {
-  llvm::SmallVector<ASTNode, 6> nodes;
-  for (auto node : elements.unbridged<BridgedASTNode>()) {
-    if (node.Kind == ASTNodeKindExpr) {
-      auto expr = (Expr *)node.Raw;
-      nodes.push_back(expr);
-    } else if (node.Kind == ASTNodeKindStmt) {
-      auto stmt = (Stmt *)node.Raw;
-      nodes.push_back(stmt);
-    } else {
-      assert(node.Kind == ASTNodeKindDecl);
-      auto decl = (Decl *)node.Raw;
-      nodes.push_back(decl);
-
-      // Variable declarations are part of the list on par with pattern binding
-      // declarations per the legacy parser.
-      if (auto *bindingDecl = dyn_cast<PatternBindingDecl>(decl)) {
-        for (auto i : range(bindingDecl->getNumPatternEntries())) {
-          bindingDecl->getPattern(i)->forEachVariable(
-              [&nodes](VarDecl *variable) { nodes.push_back(variable); });
-        }
-      }
-    }
-  }
+  llvm::SmallVector<ASTNode, 16> nodes;
+  for (auto node : elements.unbridged<BridgedASTNode>())
+    nodes.push_back(node.unbridged());
 
   ASTContext &context = cContext.unbridged();
   return BraceStmt::create(context, cLBLoc.unbridged(), nodes,
                            cRBLoc.unbridged());
+}
+
+BridgedBraceStmt BridgedBraceStmt_createImplicit(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cLBLoc,
+                                                 BridgedASTNode element,
+                                                 BridgedSourceLoc cRBLoc) {
+  return BraceStmt::create(cContext.unbridged(), cLBLoc.unbridged(),
+                           {element.unbridged()}, cRBLoc.unbridged(),
+                           /*Implicit=*/true);
 }
 
 BridgedBreakStmt BridgedBreakStmt_createParsed(BridgedDeclContext cDeclContext,

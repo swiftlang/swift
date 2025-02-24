@@ -439,6 +439,18 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
   }
 }
 
+bool OwnershipRAUWHelper::mayIntroduceUnoptimizableCopies() {
+  if (oldValue->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return false;
+  }
+
+  if (areUsesWithinValueLifetime(newValue, ctx->guaranteedUsePoints,
+                                 &ctx->deBlocks)) {
+    return false;
+  }
+  return true;
+}
+
 bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
                                               ArrayRef<Operand *> uses) {
   assert(value->isLexical());

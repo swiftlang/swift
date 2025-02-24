@@ -20,6 +20,7 @@
 
 #include <set>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace swift {
@@ -150,7 +151,7 @@ public:
     uint64_t getSize() const { return Size; }
   };
   ArrayRef<FileDependency> Dependencies;
-  ArrayRef<std::string> PublicDependentLibraries;
+  ArrayRef<std::tuple<std::string, bool>> PublicDependentLibraries;
 
   bool AutolinkForceLoad = false;
   bool SerializeAllSIL = false;

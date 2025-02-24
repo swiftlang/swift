@@ -917,7 +917,7 @@ public:
 
   ArrayRef<TupleTypeReprElement> getElements() const {
     return { getTrailingObjects<TupleTypeReprElement>(),
-             Bits.TupleTypeRepr.NumElements };
+             static_cast<size_t>(Bits.TupleTypeRepr.NumElements) };
   }
 
   void getElementTypes(SmallVectorImpl<TypeRepr *> &Types) const {
@@ -1003,7 +1003,7 @@ class CompositionTypeRepr final : public TypeRepr,
 
 public:
   ArrayRef<TypeRepr *> getTypes() const {
-    return {getTrailingObjects<TypeRepr*>(), Bits.CompositionTypeRepr.NumTypes};
+    return {getTrailingObjects<TypeRepr*>(), static_cast<size_t>(Bits.CompositionTypeRepr.NumTypes)};
   }
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }
@@ -1494,7 +1494,7 @@ public:
   
   ArrayRef<Field> getFields() const {
     return {getTrailingObjects<Field>(),
-            Bits.SILBoxTypeRepr.NumFields};
+            static_cast<size_t>(Bits.SILBoxTypeRepr.NumFields)};
   }
   ArrayRef<TypeRepr *> getGenericArguments() const {
     return {getTrailingObjects<TypeRepr*>(),

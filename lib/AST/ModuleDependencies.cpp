@@ -465,6 +465,21 @@ void ModuleDependencyInfo::addSourceFile(StringRef sourceFile) {
   }
 }
 
+void ModuleDependencyInfo::setOutputPathAndHash(StringRef outputPath,
+                                                StringRef hash) {
+  switch (getKind()) {
+  case swift::ModuleDependencyKind::SwiftInterface: {
+    auto swiftInterfaceStorage =
+        cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+    swiftInterfaceStorage->moduleOutputPath = outputPath.str();
+    swiftInterfaceStorage->contextHash = hash.str();
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
+  }
+}
+
 SwiftDependencyScanningService::SwiftDependencyScanningService() {
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
@@ -503,24 +518,33 @@ swift::dependencies::checkImportNotTautological(const ImportPath::Module moduleP
   return false;
 }
 
-void
-swift::dependencies::registerCxxInteropLibraries(
-    const llvm::Triple &Target,
-    StringRef mainModuleName,
-    bool hasStaticCxx, bool hasStaticCxxStdlib, CXXStdlibKind cxxStdlibKind,
-    std::function<void(const LinkLibrary&)> RegistrationCallback) {
-  if (cxxStdlibKind == CXXStdlibKind::Libcxx)
-    RegistrationCallback(LinkLibrary("c++", LibraryKind::Library));
-  else if (cxxStdlibKind == CXXStdlibKind::Libstdcxx)
-    RegistrationCallback(LinkLibrary("stdc++", LibraryKind::Library));
+void swift::dependencies::registerCxxInteropLibraries(
+    const llvm::Triple &Target, StringRef mainModuleName, bool hasStaticCxx,
+    bool hasStaticCxxStdlib, CXXStdlibKind cxxStdlibKind,
+    std::function<void(const LinkLibrary &)> RegistrationCallback) {
+
+  switch (cxxStdlibKind) {
+  case CXXStdlibKind::Libcxx:
+    RegistrationCallback(
+        LinkLibrary{"c++", LibraryKind::Library, /*static=*/false});
+    break;
+  case CXXStdlibKind::Libstdcxx:
+    RegistrationCallback(
+        LinkLibrary{"stdc++", LibraryKind::Library, /*static=*/false});
+    break;
+  case CXXStdlibKind::Msvcprt:
+    // FIXME: should we be explicitly linking in msvcprt or will the module do
+    // so?
+    break;
+  case CXXStdlibKind::Unknown:
+    // FIXME: we should probably emit a warning or a note here.
+    break;
+  }
 
   // Do not try to link Cxx with itself.
-  if (mainModuleName != CXX_MODULE_NAME) {
-    RegistrationCallback(LinkLibrary(Target.isOSWindows() && hasStaticCxx
-                                        ? "libswiftCxx"
-                                        : "swiftCxx",
-                                     LibraryKind::Library));
-  }
+  if (mainModuleName != CXX_MODULE_NAME)
+    RegistrationCallback(
+        LinkLibrary{"swiftCxx", LibraryKind::Library, hasStaticCxx});
 
   // Do not try to link CxxStdlib with the C++ standard library, Cxx or
   // itself.
@@ -529,19 +553,9 @@ swift::dependencies::registerCxxInteropLibraries(
                       return mainModuleName == Name;
                     })) {
     // Only link with CxxStdlib on platforms where the overlay is available.
-    switch (Target.getOS()) {
-    case llvm::Triple::Win32: {
-      RegistrationCallback(
-          LinkLibrary(hasStaticCxxStdlib ? "libswiftCxxStdlib" : "swiftCxxStdlib",
-                      LibraryKind::Library));
-      break;
-    }
-    default:
-      if (Target.isOSDarwin() || Target.isOSLinux())
-        RegistrationCallback(LinkLibrary("swiftCxxStdlib",
-                                         LibraryKind::Library));
-      break;
-    }
+    if (Target.isOSDarwin() || Target.isOSLinux() || Target.isOSWindows())
+      RegistrationCallback(LinkLibrary{"swiftCxxStdlib", LibraryKind::Library,
+                                       hasStaticCxxStdlib});
   }
 }
 
@@ -569,7 +583,8 @@ swift::dependencies::registerBackDeployLibraries(
     if (*compatibilityVersion > version)
       return;
 
-    RegistrationCallback({libraryName, LibraryKind::Library, forceLoad});
+    RegistrationCallback(
+        {libraryName, LibraryKind::Library, /*static=*/true, forceLoad});
   };
 
 #define BACK_DEPLOYMENT_LIB(Version, Filter, LibraryName, ForceLoad) \

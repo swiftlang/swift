@@ -73,6 +73,19 @@ extension Value {
   }
 }
 
+extension Value {
+  public func isForwarded(from: Value) -> Bool {
+    if self == from {
+      return true
+    }
+    if let forward = self.forwardingInstruction,
+       let singleOp = forward.singleForwardedOperand {
+      return singleOp.value.isForwarded(from: from)
+    }
+    return false
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                      singleForwardedOperand
 //===----------------------------------------------------------------------===//

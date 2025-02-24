@@ -4532,23 +4532,30 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
   extractScalarResults(IGF, result->getType(), result, nativeExplosion);
   auto values = nativeExplosion.claimAll();
 
-  Explosion errorExplosion;
-  if (!errorSchema.empty()) {
-    if (auto *structTy =
-            dyn_cast<llvm::StructType>(errorSchema.getExpandedType(IGF.IGM))) {
+  auto convertIntoExplosion = [](IRGenFunction &IGF,
+                                 const NativeConventionSchema &schema,
+                                 llvm::ArrayRef<llvm::Value *> values,
+                                 Explosion &explosion,
+                                 std::function<unsigned(unsigned)> mapIndex) {
+    auto *expandedType = schema.getExpandedType(IGF.IGM);
+    if (auto *structTy = dyn_cast<llvm::StructType>(expandedType)) {
       for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
-        llvm::Value *elt = values[combined.errorValueMapping[i]];
+        llvm::Value *elt = values[mapIndex(i)];
         auto *nativeTy = structTy->getElementType(i);
         elt = convertForDirectError(IGF, elt, nativeTy, /*forExtraction*/ true);
-        errorExplosion.add(elt);
+        explosion.add(elt);
       }
     } else {
-      auto *converted =
-          convertForDirectError(IGF, values[combined.errorValueMapping[0]],
-                                combined.combinedTy, /*forExtraction*/ true);
-      errorExplosion.add(converted);
+      auto *converted = convertForDirectError(
+          IGF, values[mapIndex(0)], expandedType, /*forExtraction*/ true);
+      explosion.add(converted);
     }
+  };
 
+  Explosion errorExplosion;
+  if (!errorSchema.empty()) {
+    convertIntoExplosion(IGF, errorSchema, values, errorExplosion,
+                         [&](auto i) { return combined.errorValueMapping[i]; });
     typedErrorExplosion =
         errorSchema.mapFromNative(IGF.IGM, IGF, errorExplosion, errorType);
   } else {
@@ -4558,19 +4565,8 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
   // If the regular result type is void, there is nothing to explode
   if (!nativeSchema.empty()) {
     Explosion resultExplosion;
-    if (auto *structTy =
-            dyn_cast<llvm::StructType>(nativeSchema.getExpandedType(IGF.IGM))) {
-      for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
-        auto *nativeTy = structTy->getElementType(i);
-        auto *converted = convertForDirectError(IGF, values[i], nativeTy,
-                                                /*forExtraction*/ true);
-        resultExplosion.add(converted);
-      }
-    } else {
-      auto *converted = convertForDirectError(
-          IGF, values[0], combined.combinedTy, /*forExtraction*/ true);
-      resultExplosion.add(converted);
-    }
+    convertIntoExplosion(IGF, nativeSchema, values, resultExplosion,
+                         [](auto i) { return i; });
     out = nativeSchema.mapFromNative(IGF.IGM, IGF, resultExplosion, resultType);
   }
 }
@@ -4822,20 +4818,41 @@ emitRetconCoroutineEntry(IRGenFunction &IGF, CanSILFunctionType fnType,
   auto prototype =
     IGF.IGM.getOpaquePtr(IGF.IGM.getAddrOfContinuationPrototype(fnType));
 
-  // Use malloc and free as our allocator.
-  auto allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
+  
+
+  // Use free as our deallocator.
   auto deallocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getFreeFn());
 
   // Call the right 'llvm.coro.id.retcon' variant.
   llvm::Value *buffer = emission.getCoroutineBuffer();
-  llvm::Value *id = IGF.Builder.CreateIntrinsicCall(idIntrinsic, {
-    llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferSize.getValue()),
-    llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferAlignment.getValue()),
-    buffer,
-    prototype,
-    allocFn,
-    deallocFn
-  });
+
+  llvm::Value *id;
+  if (IGF.getOptions().EmitTypeMallocForCoroFrame) {
+    // Use swift_coroFrameAlloc as our allocator.
+    auto coroAllocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getCoroFrameAllocFn());
+    auto mallocTypeId = IGF.getMallocTypeId();
+    id = IGF.Builder.CreateIntrinsicCall(idIntrinsic, {
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferSize.getValue()),
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferAlignment.getValue()),
+      buffer,
+      prototype,
+      coroAllocFn,
+      deallocFn,
+      mallocTypeId
+    });
+  } else {
+    // Use mallocas our allocator.
+   auto allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
+    id = IGF.Builder.CreateIntrinsicCall(idIntrinsic, {
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferSize.getValue()),
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferAlignment.getValue()),
+      buffer,
+      prototype,
+      allocFn,
+      deallocFn
+    });
+  }
+  
 
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
   // This serves as a handle that we can pass around to other intrinsics.

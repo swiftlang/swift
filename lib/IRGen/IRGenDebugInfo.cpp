@@ -458,11 +458,15 @@ private:
 
   /// Strdup S using the bump pointer.
   StringRef BumpAllocatedString(std::string S) {
+    if (S.empty())
+      return {};
     return BumpAllocatedString(S.c_str(), S.length());
   }
 
   /// Strdup StringRef S using the bump pointer.
   StringRef BumpAllocatedString(StringRef S) {
+    if (S.empty())
+      return {};
     return BumpAllocatedString(S.data(), S.size());
   }
 
@@ -980,10 +984,14 @@ private:
     return SizeInBits;
   }
 
-  StringRef getMangledName(DebugTypeInfo DbgTy) {
+  struct MangledNames {
+    StringRef Sugared, Canonical;
+  };
+  MangledNames getMangledName(DebugTypeInfo DbgTy) {
     if (DbgTy.isMetadataType())
-      return MetadataTypeDeclCache.find(DbgTy.getDecl()->getName().str())
-          ->getKey();
+      return {{},
+              MetadataTypeDeclCache.find(DbgTy.getDecl()->getName().str())
+                  ->getKey()};
 
     // This is a bit of a hack. We need a generic signature to use for mangling.
     // If we started with an interface type, just use IGM.getCurGenericContext(),
@@ -1032,7 +1040,15 @@ private:
         IGM.getSILModule());
 
     Mangle::ASTMangler Mangler(IGM.Context);
-    std::string Result = Mangler.mangleTypeForDebugger(Ty, Sig);
+    std::string SugaredName, CanonicalName;
+    SugaredName = Mangler.mangleTypeForDebugger(Ty, Sig);
+
+    CanType CanTy = Ty->getCanonicalType();
+    if (CanTy.getPointer() != Ty.getPointer()) {
+      CanonicalName = Mangler.mangleTypeForDebugger(CanTy, Sig);
+      if (SugaredName == CanonicalName)
+        CanonicalName.clear();
+    }
 
     bool IsTypeOriginallyDefinedIn =
         containsOriginallyDefinedIn(DbgTy.getType());
@@ -1042,9 +1058,10 @@ private:
         !Ty->getASTContext().LangOpts.EnableCXXInterop && !IsTypeOriginallyDefinedIn) {
       // Make sure we can reconstruct mangled types for the debugger.
       auto &Ctx = Ty->getASTContext();
-      Type Reconstructed = Demangle::getTypeForMangling(Ctx, Result, Sig);
+      Type Reconstructed = Demangle::getTypeForMangling(Ctx, SugaredName, Sig);
       if (!Reconstructed) {
-        llvm::errs() << "Failed to reconstruct type for " << Result << "\n";
+        llvm::errs() << "Failed to reconstruct type for " << SugaredName
+                     << "\n";
         llvm::errs() << "Original type:\n";
         Ty->dump(llvm::errs());
         if (Sig)
@@ -1059,7 +1076,8 @@ private:
                  !equalWithoutExistentialTypes(Reconstructed, Ty) &&
                  !EqualUpToClangTypes().check(Reconstructed, Ty)) {
         // [FIXME: Include-Clang-type-in-mangling] Remove second check
-        llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
+        llvm::errs() << "Incorrect reconstructed type for " << SugaredName
+                     << "\n";
         llvm::errs() << "Original type:\n";
         Ty->dump(llvm::errs());
         llvm::errs() << "Reconstructed type:\n";
@@ -1073,7 +1091,12 @@ private:
       }
     }
 
-    return BumpAllocatedString(Result);
+    // Only return a dedicated sugared name if it's different from the canonical
+    // one.
+    if (CanonicalName.empty())
+      std::swap(SugaredName, CanonicalName);
+    return {BumpAllocatedString(SugaredName),
+            BumpAllocatedString(CanonicalName)};
   }
 
   llvm::DIDerivedType *createMemberType(DebugTypeInfo DbgTy, StringRef Name,
@@ -1119,24 +1142,22 @@ private:
     return FwdDecl;
   }
 
-  llvm::DICompositeType *
-  createStructType(DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type BaseTy,
-                   llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
-                   unsigned SizeInBits, unsigned AlignInBits,
-                   llvm::DINode::DIFlags Flags, llvm::DIType *DerivedFrom,
-                   unsigned RuntimeLang, StringRef UniqueID) {
+  llvm::DICompositeType *createStructType(
+      NominalOrBoundGenericNominalType *Type, NominalTypeDecl *Decl,
+      llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
+      unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
+      StringRef MangledName, llvm::DIType *SpecificationOf = nullptr) {
     StringRef Name = Decl->getName().str();
     auto FwdDecl = createTemporaryReplaceableForwardDecl(
-        DbgTy.getType(), Scope, File, Line, SizeInBits, AlignInBits, Flags,
-        UniqueID, Name);
+        Type, Scope, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
+        Name);
     // Collect the members.
     SmallVector<llvm::Metadata *, 16> Elements;
     unsigned OffsetInBits = 0;
     for (VarDecl *VD : Decl->getStoredProperties()) {
-      auto memberTy = BaseTy->getTypeOfMember(VD);
-
+      auto memberTy = Type->getTypeOfMember(VD);
       if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
-              VD->getInterfaceType(),
+              memberTy,
               IGM.getTypeInfoForUnlowered(
                   IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
               IGM))
@@ -1145,24 +1166,25 @@ private:
       else
         // Without complete type info we can only create a forward decl.
         return DBuilder.createForwardDecl(
-            llvm::dwarf::DW_TAG_structure_type, UniqueID, Scope, File, Line,
+            llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
             llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
     }
 
-    auto DITy = DBuilder.createStructType(
-        Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
-        DBuilder.getOrCreateArray(Elements), RuntimeLang, nullptr, UniqueID);
+    llvm::DINodeArray BoundParams = collectGenericParams(Type);
+    auto DITy = createStruct(
+        Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
+        DBuilder.getOrCreateArray(Elements), BoundParams, SpecificationOf);
     DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
     return DITy;
   }
 
   /// Creates debug info for a generic struct or class with archetypes (e.g.:
   /// Pair<τ_0_0, τ_0_1>). For types with unsubstituted generic type parameters,
-  /// debug info generation doesn't attempt to emit the size and aligment of
-  /// the type, as in the general case those are all dependent on substituting
-  /// the type parameters in (some exceptions exist, like generic types that are
-  /// class constrained). It also doesn't attempt to emit the offset of the
-  /// members for the same reason.
+  /// debug info generation doesn't attempt to emit the size and aligment of the
+  /// type, as in the general case those are all dependent on substituting the
+  /// type parameters in (some exceptions exist, like generic types that are
+  /// class constrained). It also doesn't attempt to emit the members for the
+  /// same reason.
   llvm::DICompositeType *createUnsubstitutedGenericStructOrClassType(
       DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type UnsubstitutedType,
       llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
@@ -1267,6 +1289,8 @@ private:
     auto *Decl = Type->getNominalOrBoundGenericNominal();
     if (!Decl)
       return nullptr;
+
+    // This temporary forward decl seems to be redundant. Can it be removed?
     StringRef Name = Decl->getName().str();
     auto FwdDecl = createTemporaryReplaceableForwardDecl(
         Type, Scope, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
@@ -1298,11 +1322,10 @@ private:
       }
     }
 
+    // Create the substituted type.
     auto *OpaqueType =
-        createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : "", File, Line,
-                           SizeInBits, AlignInBits, Flags, MangledName,
-                           collectGenericParams(Type), UnsubstitutedDITy);
-    DBuilder.replaceTemporary(std::move(FwdDecl), OpaqueType);
+        createStructType(Type, Decl, Scope, File, Line, SizeInBits, AlignInBits,
+                         Flags, MangledName, UnsubstitutedDITy);
     return OpaqueType;
   }
 
@@ -1712,21 +1735,30 @@ private:
   }
 
   llvm::DICompositeType *
+  createStruct(llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File,
+               unsigned Line, unsigned SizeInBits, unsigned AlignInBits,
+               llvm::DINode::DIFlags Flags, StringRef MangledName,
+               llvm::DINodeArray Elements, llvm::DINodeArray BoundParams,
+               llvm::DIType *SpecificationOf) {
+
+    auto StructType = DBuilder.createStructType(
+        Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
+        /* DerivedFrom */ nullptr, Elements, llvm::dwarf::DW_LANG_Swift,
+        nullptr, MangledName, SpecificationOf);
+
+    if (BoundParams)
+      DBuilder.replaceArrays(StructType, nullptr, BoundParams);
+    return StructType;
+  }
+
+  llvm::DICompositeType *
   createOpaqueStruct(llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File,
                      unsigned Line, unsigned SizeInBits, unsigned AlignInBits,
                      llvm::DINode::DIFlags Flags, StringRef MangledName,
                      llvm::DINodeArray BoundParams = {},
                      llvm::DIType *SpecificationOf = nullptr) {
-
-    auto StructType = DBuilder.createStructType(
-        Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
-        /* DerivedFrom */ nullptr,
-        DBuilder.getOrCreateArray(ArrayRef<llvm::Metadata *>()),
-        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName, SpecificationOf);
-
-    if (BoundParams)
-      DBuilder.replaceArrays(StructType, nullptr, BoundParams);
-    return StructType;
+    return createStruct(Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
+                        MangledName, {}, BoundParams, SpecificationOf);
   }
 
   bool shouldCacheDIType(llvm::DIType *DITy, DebugTypeInfo &DbgTy) {
@@ -1794,7 +1826,20 @@ private:
       llvm_unreachable("not a real type");
 
     case TypeKind::BuiltinFixedArray: {
-      // TODO: provide proper array debug info
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
+        auto *FixedArray = llvm::cast<swift::BuiltinFixedArrayType>(BaseTy);
+        llvm::DIType *ElementTy = getOrCreateType(FixedArray->getElementType());
+        llvm::SmallVector<llvm::Metadata *, 2> Subscripts;
+        if (auto NumElts = FixedArray->getFixedInhabitedSize()) {
+          auto *NumEltsNode = llvm::ConstantAsMetadata::get(
+              llvm::ConstantInt::get(IGM.Int64Ty, *NumElts));
+          Subscripts.push_back(DBuilder.getOrCreateSubrange(
+              NumEltsNode /*count*/, nullptr /*lowerBound*/,
+              nullptr /*upperBound*/, nullptr /*stride*/));
+        }
+        return DBuilder.createArrayType(SizeInBits, AlignInBits, ElementTy,
+                                        DBuilder.getOrCreateArray(Subscripts));
+      }
       unsigned FwdDeclLine = 0;
       return createOpaqueStruct(Scope, "Builtin.FixedArray", MainFile,
                                 FwdDeclLine, SizeInBits, AlignInBits, Flags,
@@ -1876,9 +1921,8 @@ private:
           return createSpecializedStructOrClassType(
               StructTy, Scope, L.File, L.Line, SizeInBits, AlignInBits,
               Flags, MangledName);
-        return createStructType(DbgTy, Decl, StructTy, Scope, L.File, L.Line,
-                                SizeInBits, AlignInBits, Flags, nullptr,
-                                llvm::dwarf::DW_LANG_Swift, MangledName);
+        return createStructType(StructTy, Decl, Scope, L.File, L.Line,
+                                SizeInBits, AlignInBits, Flags, MangledName);
       }
       StringRef Name = Decl->getName().str();
       if (!SizeInBitsOrNull)
@@ -1910,9 +1954,9 @@ private:
               ClassTy, Scope, L.File, L.Line, SizeInBits, AlignInBits,
               Flags, MangledName);
 
-        auto *DIType = createStructType(
-            DbgTy, Decl, ClassTy, Scope, File, L.Line, SizeInBits, AlignInBits,
-            Flags, nullptr, llvm::dwarf::DW_LANG_Swift, MangledName);
+        auto *DIType =
+            createStructType(ClassTy, Decl, Scope, File, L.Line, SizeInBits,
+                             AlignInBits, Flags, MangledName);
         assert(DIType && "Unexpected null DIType!");
         assert(DIType && "createStructType should never return null!");
         auto SuperClassTy = ClassTy->getSuperclass();
@@ -2276,7 +2320,8 @@ private:
     if (!isa<llvm::DICompositeType>(CachedType))
       return true;
     bool IsUnsubstituted =
-        getUnsubstituedType(DbgTy.getType(), getMangledName(DbgTy)).first;
+        getUnsubstituedType(DbgTy.getType(), getMangledName(DbgTy).Canonical)
+            .first;
     std::optional<uint64_t> SizeInBits;
     if (!IsUnsubstituted)
       if (auto CompletedDbgTy = completeType(DbgTy))
@@ -2419,40 +2464,13 @@ private:
     OriginallyDefinedInTypes.insert(MangledName);
   }
 
-  llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy,
-                                llvm::DIScope *Scope = nullptr) {
-    // Is this an empty type?
-    if (DbgTy.isNull())
-      // We can't use the empty type as an index into DenseMap.
-      return createType(DbgTy, "", TheCU, MainFile);
-
-    // Look in the cache first.
-    if (auto *DITy = getTypeOrNull(DbgTy.getType())) {
-      assert(sanityCheckCachedType(DbgTy, DITy));
-      return DITy;
-    }
-
-    // Second line of defense: Look up the mangled name. TypeBase*'s are
-    // not necessarily unique, but name mangling is too expensive to do
-    // every time.
-    StringRef MangledName;
-    llvm::MDString *UID = nullptr;
-    if (canMangle(DbgTy.getType())) {
-      MangledName = getMangledName(DbgTy);
-      UID = llvm::MDString::get(IGM.getLLVMContext(), MangledName);
-      if (llvm::Metadata *CachedTy = DIRefMap.lookup(UID)) {
-        auto DITy = cast<llvm::DIType>(CachedTy);
-        assert(sanityCheckCachedType(DbgTy, DITy));
-        return DITy;
-      }
-    }
-
-    // Retrieve the context of the type, as opposed to the DeclContext
-    // of the variable.
-    //
-    // FIXME: Builtin and qualified types in LLVM have no parent
-    // scope. TODO: This can be fixed by extending DIBuilder.
-    // Make sure to retrieve the context of the type alias, not the pointee.
+  /// Retrieve the context of the type, as opposed to the DeclContext
+  /// of the variable.
+  ///
+  /// FIXME: Builtin and qualified types in LLVM have no parent
+  /// scope. TODO: This can be fixed by extending DIBuilder.
+  /// Make sure to retrieve the context of the type alias, not the pointee.
+  llvm::DIScope *updateScope(llvm::DIScope *Scope, DebugTypeInfo DbgTy) {
     DeclContext *Context = nullptr;
     const Decl *TypeDecl = nullptr;
     const clang::Decl *ClangDecl = nullptr;
@@ -2504,12 +2522,70 @@ private:
 
     // Scope outermost fileprivate decls in an inline private discriminator
     // namespace.
-    StringRef Name = MangledName;
-    if (auto *Decl = DbgTy.getDecl()) {
-      Name = Decl->getName().str();
+    if (auto *Decl = DbgTy.getDecl())
       if (Decl->isOutermostPrivateOrFilePrivateScope())
         Scope = getFilePrivateScope(Scope, Decl);
+
+    return Scope;
+  }
+
+  llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy,
+                                llvm::DIScope *Scope = nullptr) {
+    // Is this an empty type?
+    if (DbgTy.isNull())
+      // We can't use the empty type as an index into DenseMap.
+      return createType(DbgTy, "", TheCU, MainFile);
+
+    // Look in the cache first.
+    if (auto *DITy = getTypeOrNull(DbgTy.getType())) {
+      assert(sanityCheckCachedType(DbgTy, DITy));
+      return DITy;
     }
+
+    // Second line of defense: Look up the mangled name. TypeBase*'s are
+    // not necessarily unique, but name mangling is too expensive to do
+    // every time.
+    MangledNames Mangled;
+    llvm::MDString *UID = nullptr;
+    if (canMangle(DbgTy.getType())) {
+      Mangled = getMangledName(DbgTy);
+      if (!Mangled.Sugared.empty()) {
+        UID = llvm::MDString::get(IGM.getLLVMContext(), Mangled.Sugared);
+        if (llvm::Metadata *CachedTy = DIRefMap.lookup(UID))
+          return cast<llvm::DIType>(CachedTy);
+
+        if (DbgTy.getType()->getKind() != swift::TypeKind::TypeAlias) {
+          // A type with the same canonical type already exists, emit a typedef.
+          // This extra step is necessary to break out of loops: We don't
+          // canoncialize types before mangling to preserver sugared types. But
+          // some types can also have different equivalent non-canonical
+          // representations with no sugar involved, for example a type
+          // recursively that appears iniside itself. To deal with the latter we
+          // directly emit a type alias to the canonical type.
+          UID = llvm::MDString::get(IGM.getLLVMContext(), Mangled.Canonical);
+          if (llvm::Metadata *CachedTy = DIRefMap.lookup(UID)) {
+            Scope = updateScope(Scope, DbgTy);
+            llvm::DIType *DITy = cast<llvm::DIType>(CachedTy);
+            llvm::DIType *TypeDef = DBuilder.createTypedef(
+                DITy, Mangled.Sugared, MainFile, 0, Scope);
+            return TypeDef;
+          }
+          UID = llvm::MDString::get(IGM.getLLVMContext(), Mangled.Sugared);
+        }
+        // Fall through and create the sugared type.
+      } else if (llvm::Metadata *CachedTy = DIRefMap.lookup(UID)) {
+        auto *DITy = cast<llvm::DIType>(CachedTy);
+        assert(sanityCheckCachedType(DbgTy, DITy));
+        return DITy;
+      }
+    }
+
+    Scope = updateScope(Scope, DbgTy);
+    StringRef MangledName =
+        !Mangled.Sugared.empty() ? Mangled.Sugared : Mangled.Canonical;
+    StringRef Name = MangledName;
+    if (auto *Decl = DbgTy.getDecl())
+      Name = Decl->getName().str();
 
     // If this is a forward decl, create one for this mangled name and don't
     // cache it.
@@ -3326,6 +3402,9 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (!DInstLine || (ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
 
+  if (VarInfo.Name == "index")
+    llvm::errs();
+
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
@@ -3382,10 +3461,10 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   auto appendDIExpression =
       [&VarInfo, this](llvm::DIExpression *DIExpr,
-                       llvm::DIExpression::FragmentInfo PieceFragment)
-      -> llvm::DIExpression * {
+                       llvm::DIExpression::FragmentInfo PieceFragment,
+                       bool IsFirstAndOnlyPiece) -> llvm::DIExpression * {
     if (!VarInfo.DIExpr) {
-      if (!PieceFragment.SizeInBits)
+      if (!PieceFragment.SizeInBits || IsFirstAndOnlyPiece)
         return DIExpr;
 
       return llvm::DIExpression::createFragmentExpression(
@@ -3402,7 +3481,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
       DIExpr = llvm::DIExpression::append(DIExpr, Operands);
 
     // Add the fragment of the SIL variable.
-    if (VarFragment.SizeInBits)
+    if (VarFragment.SizeInBits && !IsFirstAndOnlyPiece)
       DIExpr = llvm::DIExpression::createFragmentExpression(
                    DIExpr, VarFragment.OffsetInBits, VarFragment.SizeInBits)
                    .value_or(nullptr);
@@ -3452,8 +3531,14 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
       Fragment.OffsetInBits = OffsetInBits;
       Fragment.SizeInBits = SizeInBits;
     }
+    // LLVM complains if a single fragment covers the entire variable. This can
+    // happen if, e.g., the optimizer takes the _value out of an Int
+    // struct. Detect this case and don't emit a fragment.
+    bool IsFirstAndOnlyPiece =
+        !IsPiece && Fragment.OffsetInBits == 0 &&
+        Fragment.SizeInBits == getSizeInBits(Var->getType());
     llvm::DIExpression *DIExpr = DBuilder.createExpression(Operands);
-    DIExpr = appendDIExpression(DIExpr, Fragment);
+    DIExpr = appendDIExpression(DIExpr, Fragment, IsFirstAndOnlyPiece);
     if (DIExpr)
       emitDbgIntrinsic(
           Builder, Piece, Var, DIExpr, DInstLine, DInstLoc.Column, Scope, DS,
@@ -3465,7 +3550,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (Storage.empty()) {
     llvm::DIExpression::FragmentInfo NoFragment = {0, 0};
     if (auto *DIExpr =
-            appendDIExpression(DBuilder.createExpression(), NoFragment))
+            appendDIExpression(DBuilder.createExpression(), NoFragment, false))
       emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
                        DIExpr, DInstLine, DInstLoc.Column, Scope, DS,
                        Indirection == CoroDirectValue ||

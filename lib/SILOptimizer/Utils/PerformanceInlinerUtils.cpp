@@ -632,7 +632,6 @@ SemanticFunctionLevel swift::getSemanticFunctionLevel(SILFunction *function) {
   // transient and should be inlined away immediately.
   case ArrayCallKind::kArrayUninitializedIntrinsic:
   case ArrayCallKind::kArrayFinalizeIntrinsic:
-  case ArrayCallKind::kCopyIntoVector:
     return SemanticFunctionLevel::Transient;
 
   } // end switch

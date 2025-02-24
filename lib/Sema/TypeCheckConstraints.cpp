@@ -204,14 +204,6 @@ bool TypeVariableType::Implementation::isCollectionLiteralType() const {
                      locator->directlyAt<DictionaryExpr>());
 }
 
-bool TypeVariableType::Implementation::isNumberLiteralType() const {
-  return locator && locator->directlyAt<NumberLiteralExpr>();
-}
-
-bool TypeVariableType::Implementation::isFunctionResult() const {
-  return locator && locator->isLastElement<LocatorPathElt::FunctionResult>();
-}
-
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
@@ -458,6 +450,10 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
     // diagnostics and is a hint for various performance optimizations.
     cs.setContextualInfo(expr, target.getExprContextualTypeInfo());
 
+    // Try to shrink the system by reducing disjunction domains. This
+    // goes through every sub-expression and generate its own sub-system, to
+    // try to reduce the domains of those subexpressions.
+    cs.shrink(expr);
     target.setExpr(expr);
   }
 
@@ -1636,11 +1632,11 @@ void ConstraintSystem::print(raw_ostream &out) const {
 
   if (!PackExpansionEnvironments.empty()) {
     out.indent(indent) << "Pack Expansion Environments:\n";
-    for (const auto &env : PackExpansionEnvironments) {
+    for (const auto &[packExpansion, env] : PackExpansionEnvironments) {
       out.indent(indent + 2);
-      env.first->dump(&getASTContext().SourceMgr, out);
-      out << " = (" << env.second.first << ", "
-          << env.second.second->getString(PO) << ")" << '\n';
+      dumpAnchor(packExpansion, &getASTContext().SourceMgr, out);
+      out << " = (" << env->getOpenedElementShapeClass() << ", "
+      << env->getOpenedElementUUID() << ")" << '\n';
     }
   }
 

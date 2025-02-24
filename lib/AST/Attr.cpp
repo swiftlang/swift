@@ -303,6 +303,26 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
+void ExecutionTypeAttr::printImpl(ASTPrinter &printer,
+                                  const PrintOptions &options) const {
+  if (options.SuppressExecutionAttribute)
+    return;
+
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@execution");
+  printer << "(";
+  switch (getBehavior()) {
+  case ExecutionKind::Concurrent:
+    printer << "concurrent";
+    break;
+  case ExecutionKind::Caller:
+    printer << "caller";
+    break;
+  }
+  printer << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
 /// Given a name like "inline", return the decl attribute ID that corresponds
 /// to it.  Note that this is a many-to-one mapping, and that the identifier
 /// passed in may only be the first portion of the attribute (e.g. in the case
@@ -2109,36 +2129,23 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
 }
 
 AvailableAttr::AvailableAttr(
-    SourceLoc AtLoc, SourceRange Range, AvailabilityDomain Domain,
-    SourceLoc DomainLoc, Kind Kind, StringRef Message, StringRef Rename,
+    SourceLoc AtLoc, SourceRange Range,
+    AvailabilityDomainOrIdentifier DomainOrIdentifier, SourceLoc DomainLoc,
+    Kind Kind, StringRef Message, StringRef Rename,
     const llvm::VersionTuple &Introduced, SourceRange IntroducedRange,
     const llvm::VersionTuple &Deprecated, SourceRange DeprecatedRange,
     const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
     bool Implicit, bool IsSPI)
     : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
-      Domain(Domain), DomainLoc(DomainLoc), Message(Message), Rename(Rename),
-      Introduced(Introduced), IntroducedRange(IntroducedRange),
-      Deprecated(Deprecated), DeprecatedRange(DeprecatedRange),
-      Obsoleted(Obsoleted), ObsoletedRange(ObsoletedRange) {
-  Bits.AvailableAttr.Kind = static_cast<uint8_t>(Kind);
-  Bits.AvailableAttr.HasDomain = true;
-  Bits.AvailableAttr.IsSPI = IsSPI;
-}
-
-AvailableAttr::AvailableAttr(
-    SourceLoc AtLoc, SourceRange Range, StringRef DomainString,
-    SourceLoc DomainLoc, Kind Kind, StringRef Message, StringRef Rename,
-    const llvm::VersionTuple &Introduced, SourceRange IntroducedRange,
-    const llvm::VersionTuple &Deprecated, SourceRange DeprecatedRange,
-    const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
-    bool Implicit, bool IsSPI)
-    : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
-      DomainString(DomainString), DomainLoc(DomainLoc), Message(Message),
-      Rename(Rename), Introduced(Introduced), IntroducedRange(IntroducedRange),
-      Deprecated(Deprecated), DeprecatedRange(DeprecatedRange),
-      Obsoleted(Obsoleted), ObsoletedRange(ObsoletedRange) {
+      DomainOrIdentifier(DomainOrIdentifier), DomainLoc(DomainLoc),
+      Message(Message), Rename(Rename), Introduced(Introduced),
+      IntroducedRange(IntroducedRange), Deprecated(Deprecated),
+      DeprecatedRange(DeprecatedRange), Obsoleted(Obsoleted),
+      ObsoletedRange(ObsoletedRange) {
   Bits.AvailableAttr.Kind = static_cast<uint8_t>(Kind);
   Bits.AvailableAttr.IsSPI = IsSPI;
+  Bits.AvailableAttr.IsFollowedByGroupedAvailableAttr = false;
+  Bits.AvailableAttr.IsFollowedByWildcard = false;
 }
 
 AvailableAttr *AvailableAttr::createUniversallyUnavailable(ASTContext &C,
@@ -2208,9 +2215,9 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
   return new (C) AvailableAttr(
       implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
-      Domain, implicit ? SourceLoc() : DomainLoc, getKind(), Message, Rename,
-      Introduced, implicit ? SourceRange() : IntroducedRange, Deprecated,
-      implicit ? SourceRange() : DeprecatedRange, Obsoleted,
+      DomainOrIdentifier, implicit ? SourceLoc() : DomainLoc, getKind(),
+      Message, Rename, Introduced, implicit ? SourceRange() : IntroducedRange,
+      Deprecated, implicit ? SourceRange() : DeprecatedRange, Obsoleted,
       implicit ? SourceRange() : ObsoletedRange, implicit, isSPI());
 }
 
@@ -2290,50 +2297,6 @@ SemanticAvailableAttr::getActiveVersion(const ASTContext &ctx) const {
   } else {
     return ctx.LangOpts.getMinPlatformVersion();
   }
-}
-
-AvailableVersionComparison
-SemanticAvailableAttr::getVersionAvailability(const ASTContext &ctx) const {
-
-  // Unconditional unavailability.
-  if (attr->isUnconditionallyUnavailable())
-    return AvailableVersionComparison::Unavailable;
-
-  llvm::VersionTuple queryVersion = getActiveVersion(ctx);
-  std::optional<llvm::VersionTuple> ObsoletedVersion = getObsoleted();
-
-  StringRef ObsoletedPlatform;
-  llvm::VersionTuple RemappedObsoletedVersion;
-  if (AvailabilityInference::updateObsoletedPlatformForFallback(
-          *this, ctx, ObsoletedPlatform, RemappedObsoletedVersion))
-    ObsoletedVersion = RemappedObsoletedVersion;
-
-  // If this entity was obsoleted before or at the query platform version,
-  // consider it obsolete.
-  if (ObsoletedVersion && *ObsoletedVersion <= queryVersion)
-    return AvailableVersionComparison::Obsoleted;
-
-  std::optional<llvm::VersionTuple> IntroducedVersion = getIntroduced();
-  StringRef IntroducedPlatform;
-  llvm::VersionTuple RemappedIntroducedVersion;
-  if (AvailabilityInference::updateIntroducedPlatformForFallback(
-          *this, ctx, IntroducedPlatform, RemappedIntroducedVersion))
-    IntroducedVersion = RemappedIntroducedVersion;
-
-  // If this entity was introduced after the query version and we're doing a
-  // platform comparison, true availability can only be determined dynamically;
-  // if we're doing a _language_ version check, the query version is a
-  // static requirement, so we treat "introduced later" as just plain
-  // unavailable.
-  if (IntroducedVersion && *IntroducedVersion > queryVersion) {
-    if (isSwiftLanguageModeSpecific() || isPackageDescriptionVersionSpecific())
-      return AvailableVersionComparison::Unavailable;
-    else
-      return AvailableVersionComparison::PotentiallyUnavailable;
-  }
-
-  // The entity is available.
-  return AvailableVersionComparison::Available;
 }
 
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,

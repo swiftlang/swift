@@ -18,7 +18,7 @@ do {
     // Diagnosed only with the feature enabled, as a protocol without
     // "HasSelfOrAssociatedTypeRequirements" should.
     let _: P2
-    // expected-explicit-any-error@-1 {{use of protocol 'P2' as a type must be written 'any P2'}}
+    // expected-explicit-any-warning@-1 {{use of protocol 'P2' as a type must be written 'any P2'}}
   }
   do {
     protocol P0 { associatedtype A }
@@ -30,6 +30,6 @@ do {
     // expected-explicit-any-error@-2 1 {{protocol 'P2' refines itself}}
 
     let _: P2
-    // expected-error@-1 {{use of protocol 'P2' as a type must be written 'any P2'}}
+    // expected-warning@-1 {{use of protocol 'P2' as a type must be written 'any P2'}}
   }
 }

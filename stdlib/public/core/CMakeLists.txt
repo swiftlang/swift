@@ -92,6 +92,7 @@ split_embedded_sources(
   EMBEDDED HashTable.swift
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
+  EMBEDDED InlineArray.swift
   EMBEDDED InputStream.swift
   EMBEDDED IntegerParsing.swift
   EMBEDDED Integers.swift
@@ -151,7 +152,6 @@ split_embedded_sources(
   EMBEDDED SetVariant.swift
   EMBEDDED ShadowProtocols.swift
     NORMAL Shims.swift
-  EMBEDDED Slab.swift
   EMBEDDED Slice.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift

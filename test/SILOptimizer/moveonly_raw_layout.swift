@@ -30,7 +30,7 @@ struct Lock: ~Copyable {
     }
 
     // CHECK-LABEL: // Lock.deinit
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     // CHECK-NEXT: sil{{.*}} @[[DEINIT:\$.*4LockV.*fD]] :
     deinit {
         // CHECK-NOT: destroy_addr

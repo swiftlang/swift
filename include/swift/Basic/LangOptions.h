@@ -603,12 +603,11 @@ namespace swift {
     /// from source.
     bool AllowNonResilientAccess = false;
 
-    /// When Package CMO is enabled, deserialization checks are done to
-    /// ensure that the members of a decl are correctly deserialized to maintain
-    /// proper layout. This ensures that bypassing resilience is safe. Accessing
-    /// an incorrectly laid-out decl directly can lead to runtime crashes. This flag
-    /// should only be used temporarily during migration to enable Package CMO.
-    bool SkipDeserializationChecksForPackageCMO = false;
+    /// When Package CMO is enabled, deserialization checks ensure that a decl's
+    /// members are correctly deserialized to maintain the proper layout—a prerequisite
+    /// for bypassing resilience when accessing the decl. By default, a warning is issued
+    /// if a deserialization failure is found; this flag causes the build to fail fast instead.
+    bool AbortOnDeserializationFailForPackageCMO = false;
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
@@ -905,6 +904,9 @@ namespace swift {
     /// or an identifier reference with any of the provided prefix names. This
     /// is for testing purposes.
     std::vector<std::string> DebugForbidTypecheckPrefixes;
+
+    /// Disable the shrink phase of the expression type checker.
+    bool SolverDisableShrink = false;
 
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;

@@ -1360,6 +1360,34 @@ CaptureListEntry::CaptureListEntry(PatternBindingDecl *PBD) : PBD(PBD) {
          "Capture lists only support single-var patterns");
 }
 
+CaptureListEntry CaptureListEntry::createParsed(
+    ASTContext &Ctx, ReferenceOwnership ownershipKind,
+    SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
+    SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
+
+  auto introducer =
+      (ownershipKind != ReferenceOwnership::Weak ? VarDecl::Introducer::Let
+                                                 : VarDecl::Introducer::Var);
+  auto *VD =
+      new (Ctx) VarDecl(/*isStatic==*/false, introducer, nameLoc, name, DC);
+
+  if (ownershipKind != ReferenceOwnership::Strong)
+    VD->getAttrs().add(
+        new (Ctx) ReferenceOwnershipAttr(ownershipRange, ownershipKind));
+
+  auto *pattern = NamedPattern::createImplicit(Ctx, VD);
+
+  auto *PBD = PatternBindingDecl::create(Ctx, /*StaticLoc=*/SourceLoc(),
+                                         StaticSpellingKind::None, nameLoc,
+                                         pattern, equalLoc, initializer, DC);
+  CaptureListEntry CLE(PBD);
+
+  if (CLE.isSimpleSelfCapture())
+    VD->setIsSelfParamCapture();
+
+  return CLE;
+}
+
 VarDecl *CaptureListEntry::getVar() const {
   return PBD->getSingleVar();
 }
@@ -1934,6 +1962,12 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   evaluateOrDefault(
       ctx.evaluator, LocalDiscriminatorsRequest{getParent()}, 0);
 
+#if NDEBUG
+  static constexpr bool useFallbackDiscriminator = true;
+#else
+  static constexpr bool useFallbackDiscriminator = false;
+#endif
+
   // If we don't have a discriminator, and either
   //   1. We have ill-formed code and we're able to assign a discriminator, or
   //   2. We are in a macro expansion buffer
@@ -1943,7 +1977,8 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   if (getRawDiscriminator() == InvalidDiscriminator &&
       (ctx.Diags.hadAnyError() ||
        getParentSourceFile()->getFulfilledMacroRole() != std::nullopt ||
-       getParent()->isModuleScopeContext())) {
+       getParent()->isModuleScopeContext() ||
+       useFallbackDiscriminator)) {
     auto discriminator = ctx.getNextDiscriminator(getParent());
     ctx.setMaxAssignedDiscriminator(getParent(), discriminator + 1);
     const_cast<AbstractClosureExpr *>(this)->

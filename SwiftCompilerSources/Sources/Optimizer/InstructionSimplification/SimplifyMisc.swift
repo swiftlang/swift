@@ -12,7 +12,7 @@
 
 import SIL
 
-extension TypeValueInst: OnoneSimplifyable, SILCombineSimplifyable {
+extension TypeValueInst: OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     // If our parameter is not known statically, then bail.
     guard paramType.isInteger else {

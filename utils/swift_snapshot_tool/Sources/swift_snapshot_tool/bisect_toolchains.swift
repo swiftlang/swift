@@ -89,7 +89,7 @@ struct BisectToolchains: AsyncParsableCommand {
     }
 
     // Load our tags from swift's github repo
-    let tags = try! await getTagsFromSwiftRepo(branch: branch, dryRun: true)
+    let tags = try! await getTagsFromSwiftRepo(branch: branch)
 
     // Newest is first. So 0 maps to the newest tag. We do this so someone can
     // just say 50 toolchains ago. To get a few weeks worth. This is easier than

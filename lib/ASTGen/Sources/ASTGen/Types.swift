@@ -330,12 +330,13 @@ extension ASTGenVisitor {
     }
 
     // Handle type attributes.
-    if let typeAttributes = self.generateTypeAttributes(node) {
+    let typeAttributes = self.generateTypeAttributes(node)
+    if !typeAttributes.isEmpty {
       type =
         BridgedAttributedTypeRepr.createParsed(
           self.ctx,
           base: type,
-          consumingAttributes: typeAttributes
+          attributes: typeAttributes.lazy.bridgedArray(in: self)
         ).asTypeRepr
     }
 

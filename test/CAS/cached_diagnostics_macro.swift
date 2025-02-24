@@ -49,12 +49,23 @@ public struct CallDeprecatedMacro: ExpressionMacro {
   }
 }
 
+public struct ToMyWarningMacro: ExpressionMacro {
+   public static func expansion(
+     of macro: some FreestandingMacroExpansionSyntax,
+     in context: some MacroExpansionContext
+   ) throws -> ExprSyntax {
+     return "#myWarning(\"\")"
+  }
+}
+
 //--- main.swift
 @freestanding(expression) macro myWarning(_ message: String) = #externalMacro(module: "MacroDefinition", type: "CallDeprecatedMacro")
+@freestanding(expression) macro toMyWarning(_ message: String) = #externalMacro(module: "MacroDefinition", type: "ToMyWarningMacro")
 
 @available(*, deprecated)
 func testDeprecated() {}
 
 func testDiscardableStringify(x: Int) {
+  #toMyWarning("this is a warning")
   #myWarning("this is a warning")
 }

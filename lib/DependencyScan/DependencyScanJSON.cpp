@@ -199,6 +199,10 @@ void writeLinkLibraries(llvm::raw_ostream &out,
     writeJSONValue(out, llInfo.name, indentLevel);
     out << ",\n";
     out.indent(entryIndentLevel);
+    out << "\"isStatic\": ";
+    writeJSONValue(out, llInfo.isStatic, entryIndentLevel);
+    out << ",\n";
+    out.indent(entryIndentLevel);
     out << "\"isFramework\": ";
     writeJSONValue(out, llInfo.isFramework, entryIndentLevel);
     out << ",\n";

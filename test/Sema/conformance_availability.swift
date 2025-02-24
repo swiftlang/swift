@@ -466,6 +466,14 @@ extension Bike : Vehicle {
   func move() {}
 }
 
+@available(macOS, introduced: 100)
+struct Wagon {}
+
+@available(macOS, introduced: 100)
+extension Wagon : Vehicle {
+  func move() {}
+}
+
 class Car {}
 class ClownCar : Car {}
 
@@ -477,6 +485,63 @@ extension Car {
 @available(macOS 100, *)
 extension ClownCar : Vehicle {}
 // expected-error@-1 {{protocol 'Vehicle' requires 'move()' to be available in macOS 100 and newer}}
+
+@available(macOS, unavailable)
+struct Truck : Vehicle {
+  func move() {}
+}
+
+struct Scooter {}
+
+@available(macOS, unavailable)
+extension Scooter : Vehicle {
+  func move() {}
+}
+
+struct Motorcycle {}
+
+@available(macOS, unavailable)
+extension Motorcycle : Vehicle {
+  @available(macOS, introduced: 100)
+  func move() {}
+}
+
+@available(macOS, unavailable)
+struct AircraftCarrier {
+  struct Jet : Vehicle {
+    @available(macOS, introduced: 100)
+    func move() {}
+  }
+}
+
+struct Unicycle {
+  @available(macOS, introduced: 100)
+  func move() {}
+}
+
+@available(macOS, unavailable)
+extension Unicycle : Vehicle {}
+
+@available(macOS, unavailable, introduced: 100)
+struct Train : Vehicle {
+  func move() {}
+}
+
+struct Blimp {}
+
+@available(macOS, unavailable, introduced: 100)
+extension Blimp : Vehicle {
+  func move() {}
+}
+
+@available(macOS, unavailable, introduced: 100)
+struct Spaceship {
+}
+
+@available(macOS, unavailable, introduced: 100)
+extension Spaceship : Vehicle {
+  func move() {}
+}
 
 // rdar://problem/75430966 - Allow using unavailable conformances from unavailable contexts.
 @available(*, unavailable)

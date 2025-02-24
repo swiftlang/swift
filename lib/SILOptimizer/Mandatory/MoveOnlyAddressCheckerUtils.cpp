@@ -2979,7 +2979,7 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
             LLVM_DEBUG(llvm::dbgs() << "    Also a def block; skipping!\n");
             continue;
           }
-          [[clang::fallthrough]];
+          LLVM_FALLTHROUGH;
         }
         case IsLive::LiveWithin:
           if (isLive == IsLive::LiveWithin)

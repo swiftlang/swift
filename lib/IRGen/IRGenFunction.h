@@ -142,6 +142,8 @@ public:
   Address getCalleeTypedErrorResultSlot(SILType errorType);
   void setCalleeTypedErrorResultSlot(Address addr);
 
+  llvm::ConstantInt* getMallocTypeId();
+
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
     return CoroutineHandle != nullptr;
@@ -436,6 +438,8 @@ public:
 
   void recordStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
   void eraseStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
+
+  void withLocalStackPackAllocs(llvm::function_ref<void()> fn);
 
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);

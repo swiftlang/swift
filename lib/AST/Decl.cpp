@@ -636,6 +636,39 @@ bool Decl::hasBackDeployedAttr() const {
   return false;
 }
 
+void Decl::forEachDeclToHoist(llvm::function_ref<void(Decl *)> callback) const {
+  switch (getKind()) {
+  case DeclKind::TopLevelCode: {
+    auto *TLCD = cast<TopLevelCodeDecl>(this);
+    if (TLCD->getBody()) {
+      for (auto node : TLCD->getBody()->getElements())
+        if (auto *d = node.dyn_cast<Decl *>())
+          d->forEachDeclToHoist(callback);
+    }
+    break;
+  }
+  case DeclKind::PatternBinding: {
+    auto *PBD = cast<PatternBindingDecl>(this);
+    // Variable declarations are part of the list on par with pattern binding
+    // declarations.
+    for (auto i : range(PBD->getNumPatternEntries())) {
+      PBD->getPattern(i)->forEachVariable([&](VarDecl *VD) { callback(VD); });
+    }
+    break;
+  }
+  case DeclKind::EnumCase: {
+    auto *ECD = cast<EnumCaseDecl>(this);
+    // Each enum case element is part of the members list.
+    for (auto *EED : ECD->getElements()) {
+      callback(EED);
+    }
+    break;
+  }
+  default:
+    break;
+  }
+}
+
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
                                      StaticSpellingKind SSK) {
   switch (SSK) {
@@ -1117,6 +1150,14 @@ ExplicitSafety Decl::getExplicitSafety() const {
   if (auto safety = getExplicitSafetyFromAttrs(this))
     return *safety;
 
+  // If this declaration is from C, ask the Clang importer.
+  if (auto clangDecl = getClangDecl()) {
+    ASTContext &ctx = getASTContext();
+    return evaluateOrDefault(ctx.evaluator,
+                             ClangDeclExplicitSafety({clangDecl}),
+                             ExplicitSafety::Unspecified);
+  }
+  
   // Inference: Check the enclosing context.
   if (auto enclosingDC = getDeclContext()) {
     // Is this an extension with @safe or @unsafe on it?
@@ -2757,7 +2798,6 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
         switch (isolation) {
           case ActorIsolation::Unspecified:
           case ActorIsolation::NonisolatedUnsafe:
-          case ActorIsolation::ConcurrentUnsafe:
             break;
 
           case ActorIsolation::GlobalActor:
@@ -2766,9 +2806,9 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
 
             return true;
 
+          case ActorIsolation::CallerIsolationInheriting:
           case ActorIsolation::ActorInstance:
           case ActorIsolation::Nonisolated:
-          case ActorIsolation::Concurrent:
           case ActorIsolation::Erased: // really can't happen
             return true;
         }
@@ -3962,8 +4002,6 @@ TypeRepr *ValueDecl::getResultTypeRepr() const {
     returnRepr = SD->getElementTypeRepr();
   } else if (auto *MD = dyn_cast<MacroDecl>(this)) {
     returnRepr = MD->resultType.getTypeRepr();
-  } else if (auto *CD = dyn_cast<ConstructorDecl>(this)) {
-    returnRepr = CD->getResultTypeRepr();
   }
 
   return returnRepr;
@@ -4811,20 +4849,10 @@ bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
   if (declModule->isResilient() &&
       declModule->allowNonResilientAccess() &&
       declModule->serializePackageEnabled()) {
-    // Fail and diagnose if there is a member deserialization error,
-    // with an option to skip for temporary/migration purposes.
-    if (!getASTContext().LangOpts.SkipDeserializationChecksForPackageCMO) {
-      // Since we're checking for deserialization errors, make sure the
-      // accessing module is different from this decl's module.
-      if (accessingModule &&
-          accessingModule != declModule) {
-        if (auto IDC = dyn_cast<IterableDeclContext>(this)) {
-          // Recursively check if members and their members have failing
-          // deserialization, and emit a diagnostic.
-          // FIXME: It throws a warning for now; need to upgrade to an error.
-          IDC->checkDeserializeMemberErrorInPackage(accessingModule);
-        }
-      }
+    if (auto IDC = dyn_cast<IterableDeclContext>(this)) {
+      // Recursively check if this decl's members and their members have
+      // been deserialized correctly, and emit a diagnostic if not.
+      IDC->checkDeserializeMemberErrorInPackage(accessingModule);
     }
     return true;
   }
@@ -6580,9 +6608,11 @@ bool ClassDecl::isForeignReferenceType() const {
   if (!clangRecordDecl)
     return false;
 
+  // `importerImpl` is set to nullptr here to avoid diagnostics during this
+  // CxxRecordSemantics evaluation.
   CxxRecordSemanticsKind kind = evaluateOrDefault(
       getASTContext().evaluator,
-      CxxRecordSemantics({clangRecordDecl, getASTContext()}), {});
+      CxxRecordSemantics({clangRecordDecl, getASTContext(), nullptr}), {});
   return kind == CxxRecordSemanticsKind::Reference;
 }
 
@@ -6643,12 +6673,9 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   bool hasAssociatedValues = false;
 
   for (auto elt : getAllElements()) {
-    for (auto Attr : elt->getAttrs()) {
-      if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-        if (!AvAttr->isInvalid())
-          hasAnyUnavailableValues = true;
-      }
-    }
+    // FIXME: [availability] Deprecation doesn't make an element unavailable
+    if (!elt->getSemanticAvailableAttrs().empty())
+      hasAnyUnavailableValues = true;
 
     if (!elt->isAvailableDuringLowering())
       hasAnyUnavailableDuringLoweringValues = true;
@@ -6956,13 +6983,6 @@ bool ProtocolDecl::hasSelfOrAssociatedTypeRequirements() const {
                            HasSelfOrAssociatedTypeRequirementsRequest{
                                const_cast<ProtocolDecl *>(this)},
                            resultForCycle);
-}
-
-bool ProtocolDecl::existentialRequiresAny() const {
-  if (getASTContext().LangOpts.hasFeature(Feature::ExistentialAny))
-    return true;
-
-  return hasSelfOrAssociatedTypeRequirements();
 }
 
 ArrayRef<AssociatedTypeDecl *>
@@ -8658,7 +8678,7 @@ static DefaultArgumentKind computeDefaultArgumentKind(DeclContext *dc,
     return DefaultArgumentKind::Normal;
 
   switch (magic->getKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case MagicIdentifierLiteralExpr::NAME:                                       \
     return DefaultArgumentKind::NAME;
 #include "swift/AST/MagicIdentifierKinds.def"
@@ -8667,28 +8687,72 @@ static DefaultArgumentKind computeDefaultArgumentKind(DeclContext *dc,
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
-ParamDecl *ParamDecl::createParsed(ASTContext &Context, SourceLoc specifierLoc,
-                                   SourceLoc argumentNameLoc,
-                                   Identifier argumentName,
-                                   SourceLoc parameterNameLoc,
-                                   Identifier parameterName, Expr *defaultValue,
-                                   DeclContext *dc) {
+ParamDecl *ParamDecl::createParsed(
+    ASTContext &Context, SourceLoc specifierLoc, SourceLoc argumentNameLoc,
+    Identifier argumentName, SourceLoc parameterNameLoc,
+    Identifier parameterName, Expr *defaultValue,
+    DefaultArgumentInitializer *defaultValueInitContext, DeclContext *dc) {
   auto *decl =
       new (Context) ParamDecl(specifierLoc, argumentNameLoc, argumentName,
                               parameterNameLoc, parameterName, dc);
 
-  const auto kind = computeDefaultArgumentKind(dc, defaultValue);
-  if (kind == DefaultArgumentKind::Inherited) {
-    // The 'super' in inherited default arguments is a specifier rather than an
-    // expression.
-    // TODO: However, we may want to retain its location for diagnostics.
-    defaultValue = nullptr;
+  if (defaultValue) {
+    const auto kind = computeDefaultArgumentKind(dc, defaultValue);
+    if (kind == DefaultArgumentKind::Inherited) {
+      // The 'super' in inherited default arguments is a specifier rather than
+      // an expression.
+      // TODO: However, we may want to retain its location for diagnostics.
+      defaultValue = nullptr;
+    }
+    ASSERT(defaultValueInitContext);
+    decl->setDefaultExpr(defaultValue);
+    decl->setDefaultArgumentKind(kind);
+    if (defaultValue)
+      decl->setDefaultArgumentInitContext(defaultValueInitContext);
   }
 
-  decl->setDefaultExpr(defaultValue);
-  decl->setDefaultArgumentKind(kind);
-
   return decl;
+}
+
+void ParamDecl::setTypeRepr(TypeRepr *repr) {
+  ASSERT(!getTypeRepr() && "TypeRepr already set");
+
+  TyReprAndFlags.setPointer(repr);
+
+  // Dig through the type to find any attributes or modifiers that are
+  // associated with the type but should also be reflected on the
+  // declaration.
+  {
+    auto unwrappedType = repr;
+    while (true) {
+      if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
+        // At this point we actually don't know if that's valid to mark
+        // this parameter declaration as `autoclosure` because type has
+        // not been resolved yet - it should either be a function type
+        // or typealias with underlying function type.
+        if (ATR->has(TypeAttrKind::Autoclosure))
+          setAutoClosure(true);
+        if (ATR->has(TypeAttrKind::Addressable))
+          setAddressable(true);
+
+        unwrappedType = ATR->getTypeRepr();
+        continue;
+      }
+
+      if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
+        if (isa<IsolatedTypeRepr>(STR))
+          setIsolated(true);
+        else if (isa<CompileTimeConstTypeRepr>(STR))
+          setCompileTimeConst(true);
+        else if (isa<SendingTypeRepr>(STR))
+          setSending(true);
+        unwrappedType = STR->getBase();
+        continue;
+      }
+
+      break;
+    }
+  }
 }
 
 void ParamDecl::setDefaultArgumentKind(DefaultArgumentKind K) {
@@ -8851,7 +8915,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
-std::optional<Initializer *>
+std::optional<DefaultArgumentInitializer *>
 ParamDecl::getCachedDefaultArgumentInitContext() const {
   if (auto *defaultInfo = DefaultValueAndFlags.getPointer())
     if (auto *init = defaultInfo->InitContextAndIsTypeChecked.getPointer())
@@ -8878,7 +8942,7 @@ bool ParamDecl::hasDefaultExpr() const {
   case DefaultArgumentKind::StoredProperty:
     return false;
   case DefaultArgumentKind::Normal:
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::ExpressionMacro:
@@ -8899,7 +8963,7 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::StoredProperty:
   case DefaultArgumentKind::Normal:
     return false;
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::NilLiteral:
@@ -9024,7 +9088,8 @@ CustomAttr *ValueDecl::getAttachedResultBuilder() const {
                            nullptr);
 }
 
-void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
+void ParamDecl::setDefaultArgumentInitContext(
+    DefaultArgumentInitializer *initContext) {
   auto oldContext = getCachedDefaultArgumentInitContext();
   assert((!oldContext || oldContext == initContext) &&
          "Cannot change init context after setting");
@@ -9201,7 +9266,7 @@ ParamDecl::getDefaultValueStringRepresentation(
     return extractInlinableText(getASTContext(), init, scratch);
   }
   case DefaultArgumentKind::Inherited: return "super";
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME: return STRING;
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::NilLiteral: return "nil";
@@ -9227,15 +9292,9 @@ ParamDecl::setDefaultValueStringRepresentation(StringRef stringRepresentation) {
       stringRepresentation;
 }
 
-void DefaultArgumentInitializer::changeFunction(
-    DeclContext *parent, ParameterList *paramList) {
-  if (parent->isLocalContext()) {
-    setParent(parent);
-  }
-
-  auto param = paramList->get(getIndex());
-  if (param->hasDefaultExpr() || param->getStoredProperty())
-    param->setDefaultArgumentInitContext(this);
+void DefaultArgumentInitializer::changeFunction(DeclContext *parent) {
+  ASSERT(parent->isLocalContext());
+  setParent(parent);
 }
 
 /// Determine whether the given Swift type is an integral type, i.e.,
@@ -9950,13 +10009,30 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  auto paramList = getParameters();
+  SourceLoc endLoc;
 
-  auto endLoc = paramList->getSourceRange().End;
-  if (endLoc.isValid())
-    return SourceRange(getNameLoc(), endLoc);
+  // name(parameter list...) async throws(E)
+  if (auto *typeRepr = getThrownTypeRepr())
+    endLoc = typeRepr->getSourceRange().End;
+  if (endLoc.isInvalid())
+    endLoc = getThrowsLoc();
+  if (endLoc.isInvalid())
+    endLoc = getAsyncLoc();
 
-  return getNameLoc();
+  if (endLoc.isInvalid())
+    return getParameterListSourceRange();
+  return SourceRange(getNameLoc(), endLoc);
+}
+
+SourceRange AbstractFunctionDecl::getParameterListSourceRange() const {
+  if (isImplicit())
+    return SourceRange();
+
+  auto endLoc = getParameters()->getSourceRange().End;
+  if (endLoc.isInvalid())
+    return getNameLoc();
+
+  return SourceRange(getNameLoc(), endLoc);
 }
 
 std::optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
@@ -10468,10 +10544,6 @@ void FuncDecl::setResultInterfaceType(Type type) {
                                         std::move(type));
 }
 
-void FuncDecl::setDeserializedResultTypeLoc(TypeLoc ResultTyR) {
-  FnRetType = ResultTyR;
-}
-
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,
@@ -10909,7 +10981,7 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  TypeLoc ThrownType,
                                  ParameterList *BodyParams,
                                  GenericParamList *GenericParams,
-                                 DeclContext *Parent, TypeRepr *ResultTyR)
+                                 DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name, ConstructorLoc,
                          Async, AsyncLoc, Throws, ThrowsLoc, ThrownType,
                          /*HasImplicitSelfDecl=*/true,
@@ -10920,7 +10992,6 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   if (BodyParams)
     setParameters(BodyParams);
 
-  InitRetType = TypeLoc(ResultTyR);
   Bits.ConstructorDecl.HasStubImplementation = 0;
   Bits.ConstructorDecl.Failable = Failable;
 
@@ -10941,14 +11012,9 @@ ConstructorDecl *ConstructorDecl::createImported(
                       failable, failabilityLoc, 
                       async, asyncLoc,
                       throws, throwsLoc, TypeLoc::withoutLoc(thrownType),
-                      bodyParams, genericParams, parent,
-                      /*LifetimeDependenceTypeRepr*/ nullptr);
+                      bodyParams, genericParams, parent);
   ctor->setClangNode(clangNode);
   return ctor;
-}
-
-void ConstructorDecl::setDeserializedResultTypeLoc(TypeLoc ResultTyR) {
-  InitRetType = ResultTyR;
 }
 
 bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
@@ -10993,43 +11059,32 @@ DestructorDecl *DestructorDecl::getSuperDeinit() const {
 }
 
 SourceRange FuncDecl::getSourceRange() const {
-  SourceLoc StartLoc = getStartLoc();
+  SourceLoc startLoc = getStartLoc();
 
-  if (StartLoc.isInvalid())
+  if (startLoc.isInvalid())
     return SourceRange();
 
   if (getBodyKind() == BodyKind::Unparsed)
-    return { StartLoc, BodyRange.End };
+    return { startLoc, BodyRange.End };
 
-  SourceLoc RBraceLoc = getOriginalBodySourceRange().End;
-  if (RBraceLoc.isValid()) {
-    return { StartLoc, RBraceLoc };
+  SourceLoc endLoc = getOriginalBodySourceRange().End;
+  if (endLoc.isInvalid()) {
+    if (isa<AccessorDecl>(this))
+      return startLoc;
+
+    if (getBodyKind() == BodyKind::Synthesize)
+      return SourceRange();
+
+    endLoc = getGenericTrailingWhereClauseSourceRange().End;
   }
+  if (endLoc.isInvalid())
+    endLoc = getResultTypeSourceRange().End;
+  if (endLoc.isInvalid())
+    endLoc = getSignatureSourceRange().End;
+  if (endLoc.isInvalid())
+    endLoc = startLoc;
 
-  if (isa<AccessorDecl>(this))
-    return StartLoc;
-
-  if (getBodyKind() == BodyKind::Synthesize)
-    return SourceRange();
-
-  auto TrailingWhereClauseSourceRange = getGenericTrailingWhereClauseSourceRange();
-  if (TrailingWhereClauseSourceRange.isValid())
-    return { StartLoc, TrailingWhereClauseSourceRange.End };
-
-  const auto ResultTyEndLoc = getResultTypeSourceRange().End;
-  if (ResultTyEndLoc.isValid())
-    return { StartLoc, ResultTyEndLoc };
-
-  if (hasThrows())
-    return { StartLoc, getThrowsLoc() };
-
-  if (hasAsync())
-    return { StartLoc, getAsyncLoc() };
-
-  auto LastParamListEndLoc = getParameters()->getSourceRange().End;
-  if (LastParamListEndLoc.isValid())
-    return { StartLoc, LastParamListEndLoc };
-  return StartLoc;
+  return { startLoc, endLoc };
 }
 
 EnumElementDecl::EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
@@ -11133,8 +11188,6 @@ SourceRange ConstructorDecl::getSourceRange() const {
   SourceLoc End = getOriginalBodySourceRange().End;
   if (End.isInvalid())
     End = getGenericTrailingWhereClauseSourceRange().End;
-  if (End.isInvalid())
-    End = getThrowsLoc();
   if (End.isInvalid())
     End = getSignatureSourceRange().End;
 
@@ -11462,10 +11515,9 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
-      case ActorIsolation::Concurrent:
-      case ActorIsolation::ConcurrentUnsafe:
       case ActorIsolation::GlobalActor:
       case ActorIsolation::Erased:
+      case ActorIsolation::CallerIsolationInheriting:
         return false;
 
       case ActorIsolation::ActorInstance:

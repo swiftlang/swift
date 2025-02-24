@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 2930,
+  key.length: 3126,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -1669,6 +1669,17 @@
           ]
         }
       ]
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "testPostfixIfConfig()",
+      key.offset: 2931,
+      key.length: 194,
+      key.nameoffset: 2936,
+      key.namelength: 21,
+      key.bodyoffset: 2959,
+      key.bodylength: 165
     }
   ],
   key.diagnostics: [

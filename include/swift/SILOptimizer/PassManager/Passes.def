@@ -252,6 +252,8 @@ PASS(ARCSequenceOpts, "arc-sequence-opts",
      "ARC Sequence Optimization")
 PASS(ARCLoopOpts, "arc-loop-opts",
      "ARC Loop Optimization")
+SWIFT_FUNCTION_PASS(MandatoryRedundantLoadElimination, "mandatory-redundant-load-elimination",
+     "Mandatory Redundant Load Elimination")
 SWIFT_FUNCTION_PASS(EarlyRedundantLoadElimination, "early-redundant-load-elimination",
      "Early Redundant Load Elimination")
 SWIFT_FUNCTION_PASS(RedundantLoadElimination, "redundant-load-elimination",
@@ -351,8 +353,6 @@ PASS(PerformanceConstantPropagation, "performance-constant-propagation",
      "Constant Propagation for Performance without Diagnostics")
 PASS(PerformanceDiagnostics, "performance-diagnostics",
      "Constant Propagation for Performance without Diagnostics")
-PASS(PredictableMemoryAccessOptimizations, "predictable-memaccess-opts",
-     "Predictable Memory Access Optimizations for Diagnostics")
 PASS(PredictableDeadAllocationElimination, "predictable-deadalloc-elim",
      "Eliminate dead temporary allocations after diagnostics")
 PASS(RedundantPhiElimination, "redundant-phi-elimination",
@@ -429,8 +429,6 @@ SWIFT_FUNCTION_PASS(NamedReturnValueOptimization, "named-return-value-optimizati
     "Optimize copies to an indirect return value")
 SWIFT_FUNCTION_PASS(StripObjectHeaders, "strip-object-headers",
     "Sets the bare flag on objects which don't need their headers")
-SWIFT_FUNCTION_PASS(AllocVectorLowering, "alloc-vector-lowering",
-     "lowering of allocVector builtins")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 PASS(SimplifyCFG, "simplify-cfg",

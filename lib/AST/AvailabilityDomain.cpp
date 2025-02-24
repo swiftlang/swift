@@ -19,6 +19,24 @@
 using namespace swift;
 
 std::optional<AvailabilityDomain>
+AvailabilityDomain::forTargetPlatform(const ASTContext &ctx) {
+  auto platform = swift::targetPlatform(ctx.LangOpts);
+  if (platform == PlatformKind::none)
+    return std::nullopt;
+
+  return forPlatform(platform);
+}
+
+std::optional<AvailabilityDomain>
+AvailabilityDomain::forTargetVariantPlatform(const ASTContext &ctx) {
+  auto platform = swift::targetVariantPlatform(ctx.LangOpts);
+  if (platform == PlatformKind::none)
+    return std::nullopt;
+
+  return forPlatform(platform);
+}
+
+std::optional<AvailabilityDomain>
 AvailabilityDomain::builtinDomainForString(StringRef string,
                                            const DeclContext *declContext) {
   // This parameter is used in downstream forks, do not remove.
@@ -134,6 +152,20 @@ bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
   case Kind::Custom:
     return getCustomDomain() == other.getCustomDomain();
   }
+}
+
+AvailabilityDomain AvailabilityDomain::getABICompatibilityDomain() const {
+  if (!isPlatform())
+    return *this;
+
+  auto iOSDomain = AvailabilityDomain::forPlatform(PlatformKind::iOS);
+  if (iOSDomain.contains(*this))
+    return iOSDomain;
+
+  if (auto basePlatform = basePlatformForExtensionPlatform(getPlatformKind()))
+    return AvailabilityDomain::forPlatform(*basePlatform);
+
+  return *this;
 }
 
 CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name,

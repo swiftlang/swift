@@ -1825,6 +1825,10 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
     return computeCallResult(apply);
 
   if (isa<StoreInst>(inst) || isa<StoreBorrowInst>(inst)) {
+    if (auto *sb = dyn_cast<StoreBorrowInst>(inst)) {
+      auto addr = getConstantValue(inst->getOperand(1));
+      setValue(sb, addr);
+    }
     auto stored = getConstantValue(inst->getOperand(0));
     if (!stored.isConstant())
       return stored;

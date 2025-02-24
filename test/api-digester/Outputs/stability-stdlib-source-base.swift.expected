@@ -360,3 +360,6 @@ Func ContiguousArray.withUnsafeBufferPointer(_:) is now without rethrows
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without rethrows
+
+Protocol CodingKey has added inherited protocol SendableMetatype
+Protocol Error has added inherited protocol SendableMetatype

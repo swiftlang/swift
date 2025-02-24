@@ -232,8 +232,14 @@ REMARK(remark_scanner_invalidate_upstream, none,
        "Incremental module scan: Dependency info for module '%0' invalidated due to an out-of-date"
        " dependency.", (StringRef))
 
-REMARK(remark_cache_reuse_disabled_with_cas, none,
-       "Incremental module scan: Re-using serialized module scanning dependency cache disabled in Caching build", ())
+REMARK(remark_scanner_invalidate_configuration, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to wrong configuration.", (StringRef))
+
+REMARK(remark_scanner_invalidate_cas_error, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to cas error: %1", (StringRef, StringRef))
+
+REMARK(remark_scanner_invalidate_missing_cas, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to missing CAS input '%1'.", (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: custom attribute diagnostics

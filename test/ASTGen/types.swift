@@ -1,3 +1,12 @@
+// RUN: %empty-directory(%t)
+
+// RUN: %target-swift-frontend-dump-parse -enable-experimental-feature ParserASTGen \
+// RUN:   | %sanitize-address > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse \
+// RUN:   | %sanitize-address > %t/cpp-parser.ast
+
+// RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
+
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen
 
 // REQUIRES: swift_feature_ParserASTGen
@@ -52,3 +61,10 @@ struct FileDescriptor: ~Copyable {
 
 // FIXME: warning for 'class'
 protocol ClassOnly: class {}
+
+actor SomeActor { }
+@globalActor
+struct SomeGlobalActor {
+  static let shared = SomeActor()
+}
+typealias SomeGlobalActorIsolated = @SomeGlobalActor () -> Void

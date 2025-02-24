@@ -13,8 +13,8 @@
 import ASTBridging
 import SwiftDiagnostics
 @_spi(Compiler) import SwiftIfConfig
-import SwiftParser
-import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) import SwiftParser
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
 /// A build configuration that uses the compiler's ASTContext to answer
 /// queries.
@@ -517,7 +517,11 @@ public func extractInlinableText(
   sourceText: BridgedStringRef
 ) -> BridgedStringRef {
   let textBuffer = UnsafeBufferPointer<UInt8>(start: sourceText.data, count: sourceText.count)
-  var parser = Parser(textBuffer)
+  var parser = Parser(
+    textBuffer,
+    swiftVersion: Parser.SwiftVersion(from: astContext),
+    experimentalFeatures: Parser.ExperimentalFeatures(from: astContext)
+  )
   let syntax = SourceFileSyntax.parse(from: &parser)
 
   let configuration = CompilerBuildConfiguration(
@@ -531,6 +535,24 @@ public func extractInlinableText(
     retainFeatureCheckIfConfigs: true
   ).result
 
+  // Remove "unsafe" expressions.
+  let inlineableSyntax = syntaxWithoutInactive.withoutUnsafeExpressions
+
   // Remove comments and return the result.
-  return allocateBridgedString(syntaxWithoutInactive.descriptionWithoutCommentsAndSourceLocations)
+  return allocateBridgedString(inlineableSyntax.descriptionWithoutCommentsAndSourceLocations)
+}
+
+/// Used by withoutUnsafeExpressions to remove "unsafe" expressions from
+/// a syntax tree.
+fileprivate class RemoveUnsafeExprSyntaxRewriter: SyntaxRewriter {
+  override func visit(_ node: UnsafeExprSyntax) -> ExprSyntax {
+    return node.expression.with(\.leadingTrivia, node.leadingTrivia)
+  }
+}
+
+extension SyntaxProtocol {
+  /// Return a new syntax tree with all "unsafe" expressions removed.
+  var withoutUnsafeExpressions: Syntax {
+    RemoveUnsafeExprSyntaxRewriter().rewrite(self)
+  }
 }

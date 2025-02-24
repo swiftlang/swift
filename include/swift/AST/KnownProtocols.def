@@ -107,6 +107,7 @@ PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 
 PROTOCOL(Sendable)
+PROTOCOL(SendableMetatype)
 PROTOCOL(UnsafeSendable)
 
 PROTOCOL_(ObjectiveCBridgeable)

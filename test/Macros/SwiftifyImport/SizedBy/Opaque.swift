@@ -1,7 +1,6 @@
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift_feature_Span
 
-// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -enable-experimental-feature Span -verify 2>&1 | %FileCheck --match-full-lines %s
+// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -verify 2>&1 | %FileCheck --match-full-lines %s
 
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
 func nonnullUnsafeRawBufferPointer(_ ptr: OpaquePointer, _ size: CInt) {

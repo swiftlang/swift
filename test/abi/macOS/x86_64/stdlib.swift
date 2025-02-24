@@ -771,6 +771,21 @@ Added: _$ss7UnicodeO5ASCIIO27encodedReplacementCharacters15CollectionOfOneVys5UI
 Added: _$ss7UnicodeO5UTF16O20_replacementCodeUnits6UInt16VvpZMV
 Added: _$ss7UnicodeO5UTF16O27encodedReplacementCharacters11_UIntBufferVys6UInt16VGvpZMV
 Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UInt32VGvpZMV
+Added: _$sSBsE5radixSivpZMV
+Added: _$sSFsE8ulpOfOnexvpZMV
+Added: _$sSUsE8isSignedSbvpZMV
+Added: _$sSUss17FixedWidthIntegerRzrlE3maxxvpZMV
+Added: _$sSUss17FixedWidthIntegerRzrlE3minxvpZMV
+Added: _$sSZsE8isSignedSbvpZMV
+Added: _$sSZss17FixedWidthIntegerRzrlE3maxxvpZMV
+Added: _$sSZss17FixedWidthIntegerRzrlE3minxvpZMV
+Added: _$ss11SIMDStoragePsE11scalarCountSivpZMV
+Added: _$ss17FixedWidthIntegerPsE13_highBitIndexxvpZMV
+Added: _$ss18AdditiveArithmeticPss27ExpressibleByIntegerLiteralRzrlE4zeroxvpZMV
+Added: _$ss4SIMDPsSF6ScalarRpzrlE3onexvpZMV
+Added: _$ss4SIMDPsSF6ScalarRpzrlE4zeroxvpZMV
+Added: _$ss4SIMDPss17FixedWidthInteger6ScalarRpzrlE3onexvpZMV
+Added: _$ss4SIMDPss17FixedWidthInteger6ScalarRpzrlE4zeroxvpZMV
 
 // SE-0445 Improving printed descriptions of String.Index
 Added: _$sSS5IndexV16debugDescriptionSSvpMV
@@ -833,17 +848,17 @@ Added: _$ss15_DependenceTypeOSQsWP
 // Eager-lazy Array bridging
 Added: _$ss12_ArrayBufferV14associationKeySVvpZMV
 
-// Slab metadata accessor
-Added: _$ss4SlabVMa
+// InlineArray metadata accessor
+Added: _$ss11InlineArrayVMa
 
-// Slab nominal type descriptor
-Added: _$ss4SlabVMn
+// InlineArray nominal type descriptor
+Added: _$ss11InlineArrayVMn
 
-// Slab.count property descriptor
-Added: _$ss4SlabVsRi__rlE5countSivpZMV
+// InlineArray.count property descriptor
+Added: _$ss11InlineArrayVsRi__rlE5countSivpZMV
 
-// Slab._storage _read accessor
-Added: _$ss4SlabVsRi__rlE8_storagexq_BVvr
+// InlineArray._storage _read accessor
+Added: _$ss11InlineArrayVsRi__rlE8_storagexq_BVvr
 
 // Shared string creation for Foundation
 Added: _$ss40_SwiftCreateImmortalString_ForFoundation6buffer7isASCIISSSgSRys5UInt8VG_SbtF
@@ -877,3 +892,6 @@ Added: _swift_cvw_destroyMultiPayloadEnumFN
 Added: _swift_cvw_initWithCopyMultiPayloadEnumFN
 Added: _swift_cvw_initWithTakeMultiPayloadEnumFN
 Added: _swift_cvw_initializeBufferWithCopyOfBufferMultiPayloadEnumFN
+
+// SE-0457 Expose attosecond representation of Duration
+Added: _$ss8DurationV11attosecondss6Int128VvpMV

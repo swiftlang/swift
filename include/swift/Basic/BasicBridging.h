@@ -512,6 +512,18 @@ struct BridgedVersionTuple {
   llvm::VersionTuple unbridged() const;
 };
 
+//===----------------------------------------------------------------------===//
+// MARK: BridgedSwiftClosure
+//===----------------------------------------------------------------------===//
+
+/// Wrapping a pointer to a Swift closure `(UnsafeRawPointer?) -> Void`
+/// See 'withBridgedSwiftClosure(closure:call:)' in ASTGen.
+struct BridgedSwiftClosure {
+  const void *_Nonnull closure;
+
+  BRIDGED_INLINE void operator()(const void *_Nullable);
+};
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #ifndef PURE_BRIDGING_MODE

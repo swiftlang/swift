@@ -1963,13 +1963,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                  open.getOperand());
     break;
   }
-  case SILInstructionKind::AllocVectorInst: {
-    auto &avi = cast<AllocVectorInst>(SI);
-    assert(avi.getNumOperands() - avi.getTypeDependentOperands().size() == 1);
-    writeOneTypeOneOperandLayout(avi.getKind(), /*attrs*/ 0, avi.getType(),
-                                 avi.getOperand());
-    break;
-  }
   case SILInstructionKind::DynamicPackIndexInst: {
     auto &dpii = cast<DynamicPackIndexInst>(SI);
     writeOneTypeOneOperandLayout(dpii.getKind(), 0,

@@ -1933,3 +1933,14 @@ func testIndirectAndDirectSendingResultsWithGlobalActor() async {
     _ = ns2
   }
 }
+
+// We used to not check if bodies were not empty when emitting the error for
+// using result in the throwing task group. Make sure we do not crash.
+func testFunctionIsNotEmpty(input: SendableKlass) async throws {
+  var result: [SendableKlass] = []
+  try await withThrowingTaskGroup(of: Void.self) { taskGroup in // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+    taskGroup.addTask { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      result.append(input) // expected-tns-note {{closure captures reference to mutable var 'result' which is accessible to code in the current task}}
+    }
+  }
+}

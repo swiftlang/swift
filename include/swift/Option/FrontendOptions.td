@@ -766,6 +766,10 @@ def conditional_runtime_records : Flag<["-"], "conditional-runtime-records">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allow removal of runtime metadata records (public types, protocol conformances) based on whether they're used or unused">;
 
+def mergeable_symbols : Flag<["-"], "mergeable-symbols">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Emit symbol definitions as mergeable (linkonce_odr)">;
+
 def disable_preallocated_instantiation_caches : Flag<["-"], "disable-preallocated-instantiation-caches">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Avoid preallocating metadata instantiation caches in globals">;
@@ -831,6 +835,10 @@ def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">,
 
 def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">,
   HelpText<"Expression type checking trail change limit">;
+
+def solver_disable_shrink :
+  Flag<["-"], "solver-disable-shrink">,
+  HelpText<"Disable the shrink phase of expression type checking">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
@@ -1239,11 +1247,6 @@ def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
   HelpText<"Path of the new driver to be used">;
 
-def skip_import_in_public_interface:
-  Separate<["-"], "skip-import-in-public-interface">,
-  HelpText<"Skip the import statement corresponding to a module name "
-           "when printing the public interface.">;
-
 def disable_fine_module_tracing:
   Flag<["-"], "disable-fine-module-tracing">,
   HelpText<"Skip the emission of fine grained module tracing file.">;
@@ -1341,6 +1344,13 @@ def enable_async_frame_push_pop_metadata :
 def disable_async_frame_push_pop_metadata :
   Flag<["-"], "disable-async-frame-push-pop-metadata">,
   HelpText<"Disable async frame push pop metadata">;
+
+def enable_emit_type_malloc_for_coro_frame :
+  Flag<["-"], "enable-emit-type-malloc-for-coro-frame">,
+  HelpText<"Enable emitting typed malloc for coroutine frame allocation">;
+def disable_emit_type_malloc_for_coro_frame :
+  Flag<["-"], "disable-emit-type-malloc-for-coro-frame">,
+  HelpText<"Disable emitting typed malloc for coroutine frame allocation">;
 
 def enable_async_frame_pointer_all :
   Flag<["-"], "enable-async-frame-pointer-all">,

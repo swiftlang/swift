@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxx -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -disable-availability-checking
+// RUN: %target-swift-frontend %t/use-cxx-types.swift -module-name UseCxx -typecheck -verify -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -disable-availability-checking
 
 // RUN: %target-interop-build-clangxx -std=c++20 -c %t/use-swift-cxx-types.cpp -I %t -o %t/swift-cxx-execution.o
 // RUN: %target-interop-build-swift %t/use-cxx-types.swift -o %t/swift-cxx-execution -Xlinker %t/swift-cxx-execution.o -module-name UseCxx -Xfrontend -entry-point-function-name -Xfrontend swiftMain -I %t -O -Xfrontend -disable-availability-checking
@@ -137,8 +137,8 @@ int main() {
   }
 // CHECK: create NonTrivialTemplate
 // CHECK-NEXT: copy NonTrivialTemplate
-// CHECK-NEXT: x and y: 1, 2
 // CHECK-NEXT: ~NonTrivialTemplate
+// CHECK-NEXT: x and y: 1, 2
 // CHECK-NEXT: DoneCall
 // CHECK-NEXT: ~NonTrivialTemplate
   {

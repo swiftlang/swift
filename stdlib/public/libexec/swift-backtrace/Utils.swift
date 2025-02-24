@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #if canImport(Darwin)
-import Darwin.C
+import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)
@@ -151,6 +151,22 @@ internal func spawn(_ path: String, args: [String]) throws {
 
 #endif // os(macOS)
 
+internal func isDir(_ path: String) -> Bool {
+  var st = stat()
+  guard stat(path, &st) == 0 else {
+    return false
+  }
+  return (st.st_mode & S_IFMT) == S_IFDIR
+}
+
+internal func exists(_ path: String) -> Bool {
+  var st = stat()
+  guard stat(path, &st) == 0 else {
+    return false
+  }
+  return true
+}
+
 extension Sequence {
   /// Return the first element in a Sequence.
   ///
@@ -172,6 +188,10 @@ struct CFileStream: TextOutputStream {
 
   public func flush() {
     fflush(fp)
+  }
+
+  public func close() {
+    fclose(fp)
   }
 }
 

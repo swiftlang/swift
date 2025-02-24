@@ -735,7 +735,7 @@ static ActorIsolation getActorIsolationForFunction(SILFunction &fn) {
     if (constant.kind == SILDeclRef::Kind::Deallocator) {
       // Deallocating destructor is always nonisolated. Isolation of the deinit
       // applies only to isolated deallocator and destroyer.
-      return ActorIsolation::forConcurrent(false);
+      return ActorIsolation::forNonisolated(false);
     }
 
     // If we have actor isolation for our constant, put the isolation onto the
@@ -1719,7 +1719,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
     break;
 
   case DefaultArgumentKind::Inherited:
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::NilLiteral:

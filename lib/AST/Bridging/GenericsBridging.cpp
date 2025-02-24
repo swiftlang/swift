@@ -81,24 +81,8 @@ BridgedTrailingWhereClause_createParsed(BridgedASTContext cContext,
                                         BridgedSourceLoc cWhereKeywordLoc,
                                         BridgedArrayRef cRequirements) {
   SmallVector<RequirementRepr> requirements;
-  for (auto &cReq : cRequirements.unbridged<BridgedRequirementRepr>()) {
-    switch (cReq.Kind) {
-    case BridgedRequirementReprKindTypeConstraint:
-      requirements.push_back(RequirementRepr::getTypeConstraint(
-          cReq.FirstType.unbridged(), cReq.SeparatorLoc.unbridged(),
-          cReq.SecondType.unbridged(),
-          /*isExpansionPattern*/ false));
-      break;
-    case BridgedRequirementReprKindSameType:
-      requirements.push_back(RequirementRepr::getSameType(
-          cReq.FirstType.unbridged(), cReq.SeparatorLoc.unbridged(),
-          cReq.SecondType.unbridged(),
-          /*isExpansionPattern*/ false));
-      break;
-    case BridgedRequirementReprKindLayoutConstraint:
-      llvm_unreachable("cannot handle layout constraints!");
-    }
-  }
+  for (auto &cReq : cRequirements.unbridged<BridgedRequirementRepr>())
+    requirements.push_back(cReq.unbridged());
 
   SourceLoc whereKeywordLoc = cWhereKeywordLoc.unbridged();
   SourceLoc endLoc;
@@ -110,4 +94,132 @@ BridgedTrailingWhereClause_createParsed(BridgedASTContext cContext,
 
   return TrailingWhereClause::create(cContext.unbridged(), whereKeywordLoc,
                                      endLoc, requirements);
+}
+
+RequirementRepr BridgedRequirementRepr::unbridged() const {
+  switch (Kind) {
+  case BridgedRequirementReprKindTypeConstraint:
+    return RequirementRepr::getTypeConstraint(
+        FirstType.unbridged(), SeparatorLoc.unbridged(), SecondType.unbridged(),
+        /*IsExpansionPattern=*/false);
+  case BridgedRequirementReprKindSameType:
+    return RequirementRepr::getSameType(
+        FirstType.unbridged(), SeparatorLoc.unbridged(), SecondType.unbridged(),
+        /*IsExpansionPattern=*/false);
+  case BridgedRequirementReprKindLayoutConstraint:
+    return RequirementRepr::getLayoutConstraint(
+        FirstType.unbridged(), SeparatorLoc.unbridged(),
+        {LayoutConstraint.unbridged(), LayoutConstraintLoc.unbridged()},
+        /*IsExpansionPattern=*/false);
+  }
+}
+
+BridgedRequirementRepr
+BridgedRequirementRepr_createTypeConstraint(BridgedTypeRepr cSubject,
+                                            BridgedSourceLoc cColonLoc,
+                                            BridgedTypeRepr cConstraint) {
+  return {
+      /*SeparatorLoc=*/cColonLoc,
+      /*Kind=*/BridgedRequirementReprKindTypeConstraint,
+      /*FirstType=*/cSubject,
+      /*SecondType=*/cConstraint.unbridged(),
+      /*LayoutConstraint=*/{},
+      /*LayoutConstraintLoc=*/{},
+  };
+}
+
+BridgedRequirementRepr
+BridgedRequirementRepr_createSameType(BridgedTypeRepr cFirstType,
+                                      BridgedSourceLoc cEqualLoc,
+                                      BridgedTypeRepr cSecondType) {
+  return {
+      /*SeparatorLoc=*/cEqualLoc,
+      /*Kind=*/BridgedRequirementReprKindSameType,
+      /*FirstType=*/cFirstType,
+      /*SecondType=*/cSecondType.unbridged(),
+      /*LayoutConstraint=*/{},
+      /*LayoutConstraintLoc=*/{},
+  };
+}
+
+BridgedRequirementRepr BridgedRequirementRepr_createLayoutConstraint(
+    BridgedTypeRepr cSubject, BridgedSourceLoc cColonLoc,
+    BridgedLayoutConstraint cLayout, BridgedSourceLoc cLayoutLoc) {
+  return {
+      /*SeparatorLoc=*/cColonLoc,
+      /*Kind=*/BridgedRequirementReprKindLayoutConstraint,
+      /*FirstType=*/cSubject,
+      /*SecondType=*/nullptr,
+      /*LayoutConstraint=*/cLayout,
+      /*LayoutConstraintLoc=*/cLayoutLoc,
+  };
+}
+
+static swift::LayoutConstraintKind
+unbridged(BridgedLayoutConstraintKind cKind) {
+  switch (cKind) {
+#define CASE(Kind)                                                             \
+  case BridgedLayoutConstraintKind##Kind:                                      \
+    return swift::LayoutConstraintKind::Kind;
+    CASE(UnknownLayout)
+    CASE(TrivialOfExactSize)
+    CASE(TrivialOfAtMostSize)
+    CASE(Trivial)
+    CASE(Class)
+    CASE(NativeClass)
+    CASE(RefCountedObject)
+    CASE(NativeRefCountedObject)
+    CASE(BridgeObject)
+    CASE(TrivialStride)
+#undef CASE
+  }
+}
+
+static BridgedLayoutConstraintKind bridge(swift::LayoutConstraintKind kind) {
+  switch (kind) {
+#define CASE(Kind)                                                             \
+  case swift::LayoutConstraintKind::Kind:                                      \
+    return BridgedLayoutConstraintKind##Kind;
+    CASE(UnknownLayout)
+    CASE(TrivialOfExactSize)
+    CASE(TrivialOfAtMostSize)
+    CASE(Trivial)
+    CASE(Class)
+    CASE(NativeClass)
+    CASE(RefCountedObject)
+    CASE(NativeRefCountedObject)
+    CASE(BridgeObject)
+    CASE(TrivialStride)
+#undef CASE
+  }
+}
+
+BridgedLayoutConstraint
+BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
+                                            BridgedIdentifier cID) {
+  return swift::getLayoutConstraint(cID.unbridged(), cContext.unbridged());
+}
+
+BridgedLayoutConstraint
+BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
+                                            BridgedLayoutConstraintKind cKind) {
+  return LayoutConstraint::getLayoutConstraint(unbridged(cKind),
+                                               cContext.unbridged());
+}
+
+BridgedLayoutConstraint
+BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
+                                            BridgedLayoutConstraintKind cKind,
+                                            size_t size, size_t alignment) {
+  return LayoutConstraint::getLayoutConstraint(unbridged(cKind), size,
+                                               alignment, cContext.unbridged());
+}
+
+BridgedLayoutConstraint BridgedLayoutConstraint_getUnknownLayout() {
+  return LayoutConstraint::getUnknownLayout();
+}
+
+BridgedLayoutConstraintKind
+BridgedLayoutConstraint_getKind(BridgedLayoutConstraint cConstraint) {
+  return bridge(cConstraint.unbridged()->getKind());
 }

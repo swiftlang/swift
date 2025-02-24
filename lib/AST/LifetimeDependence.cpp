@@ -48,7 +48,9 @@ getLifetimeDependenceFor(ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
 
 std::string LifetimeDependenceInfo::getString() const {
   std::string lifetimeDependenceString = "@lifetime(";
-  auto getSourceString = [](IndexSubset *bitvector, StringRef kind) {
+  auto addressable = getAddressableIndices();
+  
+  auto getSourceString = [&](IndexSubset *bitvector, StringRef kind) {
     std::string result;
     bool isFirstSetBit = true;
     for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
@@ -57,6 +59,9 @@ std::string LifetimeDependenceInfo::getString() const {
           result += ", ";
         }
         result += kind;
+        if (addressable && addressable->contains(i)) {
+          result += "address ";
+        }
         result += std::to_string(i);
         isFirstSetBit = false;
       }
@@ -84,6 +89,8 @@ std::string LifetimeDependenceInfo::getString() const {
 }
 
 void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
+  ID.AddBoolean(addressableParamIndicesAndImmortal.getInt());
+  ID.AddInteger(targetIndex);
   if (inheritLifetimeParamIndices) {
     ID.AddInteger((uint8_t)LifetimeDependenceKind::Inherit);
     inheritLifetimeParamIndices->Profile(ID);
@@ -91,6 +98,12 @@ void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
   if (scopeLifetimeParamIndices) {
     ID.AddInteger((uint8_t)LifetimeDependenceKind::Scope);
     scopeLifetimeParamIndices->Profile(ID);
+  }
+  if (addressableParamIndicesAndImmortal.getPointer()) {
+    ID.AddBoolean(true);
+    addressableParamIndicesAndImmortal.getPointer()->Profile(ID);
+  } else {
+    ID.AddBoolean(false);  
   }
 }
 
@@ -196,6 +209,9 @@ void LifetimeDependenceInfo::getConcatenatedData(
   if (hasScopeLifetimeParamIndices()) {
     pushData(scopeLifetimeParamIndices);
   }
+  if (hasAddressableParamIndices()) {
+    pushData(addressableParamIndicesAndImmortal.getPointer());  
+  }
 }
 
 static Type getResultOrYield(AbstractFunctionDecl *afd) {
@@ -271,7 +287,7 @@ getParamDeclFromDescriptor(AbstractFunctionDecl *afd,
     unsigned paramIndex = 0;
     ParamDecl *candidateParam = nullptr;
     for (auto *param : *afd->getParameters()) {
-      if (param->getParameterName().str() == descriptor.getName()) {
+      if (param->getParameterName() == descriptor.getName()) {
         candidateParam = param;
         break;
       }
@@ -434,6 +450,7 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromDependsOn(
 
   SmallBitVector inheritLifetimeParamIndices(capacity);
   SmallBitVector scopeLifetimeParamIndices(capacity);
+  SmallBitVector addressableLifetimeParamIndices(capacity);
 
   auto updateLifetimeDependenceInfo = [&](LifetimeDescriptor descriptor,
                                           unsigned paramIndexToSet,
@@ -476,6 +493,9 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromDependsOn(
       if (updateLifetimeDependenceInfo(source, index, paramConvention)) {
         return std::nullopt;
       }
+      if (source.isAddressable()) {
+        addressableLifetimeParamIndices.set(index);
+      }
       break;
     }
     case LifetimeDescriptor::DescriptorKind::Named: {
@@ -499,7 +519,10 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromDependsOn(
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
           : nullptr,
       targetIndex,
-      /*isImmortal*/ false);
+      /*isImmortal*/ false,
+      addressableLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, addressableLifetimeParamIndices)
+          : nullptr);
 }
 
 std::optional<LifetimeDependenceInfo>
@@ -743,6 +766,25 @@ LifetimeDependenceInfo::get(FunctionTypeRepr *funcRepr,
   }
 
   return dc->getASTContext().AllocateCopy(lifetimeDependencies);
+}
+
+void LifetimeDependenceInfo::dump() const {
+  llvm::errs() << "target: " << getTargetIndex() << '\n';
+  if (isImmortal()) {
+    llvm::errs() << "  immortal\n";
+  }
+  if (auto scoped = getScopeIndices()) {
+    llvm::errs() << "  scoped: ";
+    scoped->dump();
+  }
+  if (auto inherited = getInheritIndices()) {
+    llvm::errs() << "  inherited: ";
+    inherited->dump();
+  }
+  if (auto addressable = getAddressableIndices()) {
+    llvm::errs() << "  addressable: ";
+    addressable->dump();
+  }
 }
 
 } // namespace swift

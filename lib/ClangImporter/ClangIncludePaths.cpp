@@ -560,15 +560,26 @@ void GetWindowsFileMappings(
       fileMapping.redirectedFiles.emplace_back(std::string(VCToolsInjection),
                                                AuxiliaryFile);
 
-    // __msvc_bit_utils.hpp was added in a recent VS 2022 version. It has to be
-    // referenced from the modulemap directly to avoid modularization errors.
-    // Older VS versions might not have it. Let's inject an empty header file if
-    // it isn't available.
-    llvm::sys::path::remove_filename(VCToolsInjection);
-    llvm::sys::path::append(VCToolsInjection, "__msvc_bit_utils.hpp");
-    if (!llvm::sys::fs::exists(VCToolsInjection))
-      fileMapping.overridenFiles.emplace_back(std::string(VCToolsInjection),
-                                              "");
+    // Because we wish to be backwards compatible with older Visual Studio
+    // releases, we inject empty headers which allow us to have definitions for
+    // modules referencing headers which may not exist. We stub out the headers
+    // with empty files to allow a single module definition to work across
+    // different MSVC STL releases.
+    //
+    // __msvc_bit_utils.hpp was introduced in VS 2022 STL release 17.8.
+    // __msvc_string_view.hpp was introduced in VS 2022 STL release 17.11.
+    static const char * const kInjectedHeaders[] = {
+      "__msvc_bit_utils.hpp",
+      "__msvc_string_view.hpp",
+    };
+
+    for (const char * const header : kInjectedHeaders) {
+      llvm::sys::path::remove_filename(VCToolsInjection);
+      llvm::sys::path::append(VCToolsInjection, header);
+      if (!llvm::sys::fs::exists(VCToolsInjection))
+        fileMapping.overridenFiles.emplace_back(std::string{VCToolsInjection},
+                                                "");
+    }
   }
 }
 } // namespace

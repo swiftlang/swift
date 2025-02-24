@@ -321,7 +321,6 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kGetElement:
   case ArrayCallKind::kGetElementAddress:
   case ArrayCallKind::kEndMutation:
-  case ArrayCallKind::kCopyIntoVector:
     return true;
   case ArrayCallKind::kMakeMutable:
   case ArrayCallKind::kMutateUnknown:

@@ -82,6 +82,13 @@ if #available(OSX 51, *) {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
+// FIXME: This is weird, but it's already accepted. It should probably be diagnosed.
+if #available(*, OSX 51) {
+  let _: Int = globalFuncAvailableOn51()
+  let _: Int = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+      // expected-note@-1 {{add 'if #available' version check}}
+}
+
 if #available(OSX 51, *) {
   let _: Int = globalFuncAvailableOn51()
   let _: Int = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
@@ -1799,8 +1806,16 @@ func funcWithMultipleShortFormAnnotationsForTheSamePlatform() {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
+// FIXME: This is weird, but it's already accepted. It should probably be diagnosed.
+@available(iOS 14, *, OSX 51)
+func funcWithWeirdShortFormAvailableOn51() {
+  let _ = ClassWithShortFormAvailableOn51()
+  let _ = ClassWithShortFormAvailableOn54() // expected-error {{'ClassWithShortFormAvailableOn54' is only available in macOS 54 or newer}}
+  // expected-note@-1 {{add 'if #available' version check}}
+}
+
 func useShortFormAvailable() {
-  // expected-note@-1 4{{add @available attribute to enclosing global function}}
+  // expected-note@-1 5{{add @available attribute to enclosing global function}}
 
   funcWithShortFormAvailableOn10_9()
 
@@ -1817,6 +1832,9 @@ func useShortFormAvailable() {
 
   funcWithMultipleShortFormAnnotationsForTheSamePlatform() // expected-error {{'funcWithMultipleShortFormAnnotationsForTheSamePlatform()' is only available in macOS 53 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
+
+  funcWithWeirdShortFormAvailableOn51() // expected-error {{'funcWithWeirdShortFormAvailableOn51()' is only available in macOS 51 or newer}}
+  // expected-note@-1 {{add 'if #available' version check}}
 }
 
 // Unavailability takes precedence over availability and is inherited

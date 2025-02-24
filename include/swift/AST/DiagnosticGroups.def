@@ -27,6 +27,7 @@ GROUP(Unsafe, "Unsafe.md")
 GROUP(UnknownWarningGroup, "UnknownWarningGroup.md")
 GROUP(PreconcurrencyImport, "PreconcurrencyImport.md")
 GROUP(StrictLanguageFeatures, "StrictLanguageFeatures.md")
+GROUP(ExistentialAny, "ExistentialAny.md")
 
 #define UNDEFINE_DIAGNOSTIC_GROUPS_MACROS
 #include "swift/AST/DefineDiagnosticGroupsMacros.h"

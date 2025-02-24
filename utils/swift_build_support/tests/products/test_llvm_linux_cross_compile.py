@@ -40,7 +40,8 @@ class LLVMLinuxCrossCompileTestCase(unittest.TestCase):
             clang_compiler_version=None,
             clang_user_visible_version=None,
             cross_compile_hosts='linux-aarch64',
-            cross_compile_deps_path='sysroot'
+            cross_compile_deps_path='sysroot',
+            use_linker=None
         )
 
         # Setup shell

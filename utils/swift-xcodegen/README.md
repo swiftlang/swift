@@ -1,11 +1,6 @@
 # swift-xcodegen
 
-A script for generating an Xcode project for the Swift repo, that sits on top of an existing Ninja build. This has a few advantages over CMake's Xcode generator (using `build-script --xcode`):
-
-- Fast to regenerate (less than a second)
-- Native Swift targets for ASTGen/SwiftCompilerSources + Standard Library
-- Better file organization (by path rather than by target)
-- Much fewer targets, easier to manage
+A script for generating an Xcode project for the Swift repo, that sits on top of an existing Ninja build.
 
 This script is primarily focussed on providing a good editor experience for working on the Swift project; it is not designed to produce compiled products or run tests, that should be done with `ninja` and `build-script`. It can however be used to [debug executables produced by the Ninja build](#debugging).
 
@@ -80,7 +75,7 @@ PROJECT CONFIGURATION:
                           disabled by default.
 
                           A development snapshot is necessary to avoid spurious build/live issues
-                          due to the fact that the the stdlib is built using the just-built Swift
+                          due to the fact that the stdlib is built using the just-built Swift
                           compiler, which may support features not yet supported by the Swift
                           compiler in Xcode's toolchain. (default: --no-stdlib-swift)
   --test-folders/--no-test-folders

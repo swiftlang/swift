@@ -4524,6 +4524,9 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getClangImporterOptions().BridgingHeader =
     options::ImportObjCHeader;
+  if (!options::ImportObjCHeader.empty())
+    InitInvok.getFrontendOptions().ModuleHasBridgingHeader = true;
+
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
   InitInvok.getLangOptions().EnableDeserializationSafety =

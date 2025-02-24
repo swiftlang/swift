@@ -130,6 +130,13 @@ struct F {
 
 }
 
+protocol P {}
+
+struct ExistentialIntPair {
+  var p: P
+  var x: Int
+}
+
 sil_global @total : $Int32
 
 sil @use : $@convention(thin) (Builtin.Int32) -> ()
@@ -1264,6 +1271,39 @@ bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
   return %6 : $(Builtin.Int64, Builtin.Int64)
 }
 
+// CHECK-LABEL: sil [ossa] @insert_mark_dependence :
+// CHECK:         mark_dependence
+// CHECK:         [[MD:%.*]] = mark_dependence %0 : $B on %1
+// CHECK:         return [[MD]]
+// CHECK-LABEL: } // end sil function 'insert_mark_dependence'
+sil [ossa] @insert_mark_dependence : $@convention(thin) (@owned B, @guaranteed B) -> @owned B {
+bb0(%0 : @owned $B, %1 : @guaranteed $B):
+  %2 = alloc_stack $B
+  store %0 to [init] %2
+  %4 = mark_dependence %2 on %1
+  %5 = load [take] %4
+  dealloc_stack %2
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @insert_two_mark_dependences :
+// CHECK:         mark_dependence
+// CHECK:         mark_dependence
+// CHECK:         [[MD1:%.*]] = mark_dependence %0 : $B on %1
+// CHECK:         [[MD2:%.*]] = mark_dependence [[MD1]] : $B on %2
+// CHECK:         return [[MD2]]
+// CHECK-LABEL: } // end sil function 'insert_two_mark_dependences'
+sil [ossa] @insert_two_mark_dependences : $@convention(thin) (@owned B, @guaranteed B, @guaranteed B) -> @owned B {
+bb0(%0 : @owned $B, %1 : @guaranteed $B, %2 : @guaranteed $B):
+  %3 = alloc_stack $B
+  store %0 to [init] %3
+  %5 = mark_dependence %3 on %1
+  %6 = mark_dependence %5 on %2
+  %7 = load [take] %6
+  dealloc_stack %3
+  return %7
+}
+
 // CHECK-LABEL: sil [ossa] @dont_crash_on_index_addr_projection :
 // CHECK-LABEL: } // end sil function 'dont_crash_on_index_addr_projection'
 sil [ossa] @dont_crash_on_index_addr_projection : $@convention(thin) (Builtin.RawPointer) -> (Int, Int, Int, Int) {
@@ -1394,6 +1434,24 @@ bb0:
   dealloc_ref %6 : $AX
   dealloc_stack_ref %1 : $AX
   return %5 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @ignore_begin_access :
+// CHECK:         return %0
+// CHECK-LABEL: } // end sil function 'ignore_begin_access'
+sil [ossa] @ignore_begin_access : $@convention(thin) (Int, Int, @inout TwoField) -> Int {
+bb0(%0 : $Int, %1 : $Int, %2 : $*TwoField):
+  %3 = begin_access [modify] [static] %2
+  %4 = struct_element_addr %3, #TwoField.a
+  store %0 to [trivial] %4
+  end_access %3
+  %7 = begin_access [modify] [static] %2
+  %8 = struct_element_addr %7, #TwoField.b
+  store %0 to [trivial] %8
+  end_access %7
+  %11 = struct_element_addr %2, #TwoField.a
+  %12 = load [trivial] %11
+  return %12
 }
 
 // CHECK: sil @tbaa_class_alias_nonclass
@@ -1529,5 +1587,119 @@ bb0(%0 : $*B):
   %7 = apply %3(%6) : $@convention(thin) (@owned B) -> ()
   %8 = tuple ()
   return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_copy_init :
+// CHECK:         [[LD:%.*]] = load [copy] %0
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[LD]]
+// CHECK-NEXT:    store [[LD]] to [init] %1
+// CHECK:         return [[C]]
+// CHECK-LABEL: } // end sil function 'copy_addr_copy_init'
+sil [ossa] @copy_addr_copy_init : $@convention(thin) (@in_guaranteed B, @inout B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  destroy_addr %1
+  copy_addr %0 to [init] %1
+  %3 = load [copy] %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_copy_assign :
+// CHECK:         [[LD:%.*]] = load [copy] %0
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[LD]]
+// CHECK-NEXT:    store [[LD]] to [assign] %1
+// CHECK:         return [[C]]
+// CHECK-LABEL: } // end sil function 'copy_addr_copy_assign'
+sil [ossa] @copy_addr_copy_assign : $@convention(thin) (@in_guaranteed B, @inout B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  copy_addr %0 to %1
+  %3 = load [copy] %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_take_init :
+// CHECK:         [[LD:%.*]] = load [take] %0
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[LD]]
+// CHECK-NEXT:    store [[LD]] to [init] %1
+// CHECK:         return [[C]]
+// CHECK-LABEL: } // end sil function 'copy_addr_take_init'
+sil [ossa] @copy_addr_take_init : $@convention(thin) (@in B, @inout B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  destroy_addr %1
+  copy_addr [take] %0 to [init] %1
+  %3 = load [copy] %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_take_assign :
+// CHECK:         [[LD:%.*]] = load [take] %0
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[LD]]
+// CHECK-NEXT:    store [[LD]] to [assign] %1
+// CHECK:         return [[C]]
+// CHECK-LABEL: } // end sil function 'copy_addr_take_assign'
+sil [ossa] @copy_addr_take_assign : $@convention(thin) (@in B, @inout B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  copy_addr [take] %0 to %1
+  %3 = load [copy] %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_load_take :
+// CHECK:         [[LD:%.*]] = load [copy]
+// CHECK-NOT:     copy_addr
+// CHECK:         return [[LD]]
+// CHECK-LABEL: } // end sil function 'copy_addr_load_take'
+sil [ossa] @copy_addr_load_take : $@convention(thin) (@in_guaranteed B) -> @owned B {
+bb0(%0 : $*B):
+  %1 = alloc_stack $B
+  copy_addr %0 to [init] %1
+  %3 = load [take] %1
+  dealloc_stack %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_projection :
+// CHECK:         [[LD:%.*]] = load [trivial] %0
+// CHECK-NEXT:    [[A:%.*]] = struct_extract [[LD]]
+// CHECK-NEXT:    store [[LD]] to [trivial] %1
+// CHECK:         return [[A]]
+// CHECK-LABEL: } // end sil function 'copy_addr_projection'
+sil [ossa] @copy_addr_projection : $@convention(thin) (@in_guaranteed TwoField, @inout TwoField) -> Int {
+bb0(%0 : $*TwoField, %1 : $*TwoField):
+  copy_addr %0 to %1
+  %3 = struct_element_addr %1, #TwoField.a
+  %4 = load [trivial] %3
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_aggregate :
+// CHECK:         [[A_ADDR:%.*]] = struct_element_addr %2 : $*TwoField, #TwoField.a
+// CHECK:         [[A:%.*]] = load [trivial] %0
+// CHECK:         store [[A]] to [trivial] [[A_ADDR]]
+// CHECK:         [[B_ADDR:%.*]] = struct_element_addr %2 : $*TwoField, #TwoField.b
+// CHECK:         [[B:%.*]] = load [trivial] %1
+// CHECK:         store [[B]] to [trivial] [[B_ADDR]]
+// CHECK:         [[R:%.*]] = struct $TwoField ([[A]] : $Int, [[B]] : $Int)
+// CHECK:         return [[R]]
+// CHECK-LABEL: } // end sil function 'copy_addr_aggregate'
+sil [ossa] @copy_addr_aggregate : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int, @inout TwoField) -> TwoField {
+bb0(%0 : $*Int, %1 : $*Int, %2 : $*TwoField):
+  %3 = struct_element_addr %2, #TwoField.a
+  copy_addr %0 to %3
+  %5 = struct_element_addr %2, #TwoField.b
+  copy_addr %1 to %5
+  %4 = load [trivial] %2
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_not_loadable :
+// CHECK:         copy_addr
+// CHECK:         load
+// CHECK-LABEL: } // end sil function 'copy_addr_not_loadable'
+sil [ossa] @copy_addr_not_loadable : $@convention(thin) (@in_guaranteed ExistentialIntPair, @inout ExistentialIntPair) -> Int {
+bb0(%0 : $*ExistentialIntPair, %1 : $*ExistentialIntPair):
+  copy_addr %0 to %1
+  %3 = struct_element_addr %1, #ExistentialIntPair.x
+  %4 = load [trivial] %3
+  return %4
 }
 

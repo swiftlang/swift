@@ -756,6 +756,9 @@ Types
     function-isolation ::= type 'YA'         // @isolated(any) on function type
     sending-result ::= 'YT'                  // -> sending T
   #endif
+  #if SWIFT_RUNTIME_VERSION >= 6.2
+    function-isolation :== 'YC'              // @execution(caller) on function type
+  #endif
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
   differentiable ::= 'Yjd'                   // @differentiable on function type

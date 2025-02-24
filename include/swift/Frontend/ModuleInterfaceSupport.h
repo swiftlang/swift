@@ -71,9 +71,6 @@ struct ModuleInterfaceOptions {
   /// Intentionally print invalid syntax into the file.
   bool DebugPrintInvalidSyntax = false;
 
-  /// A list of modules we shouldn't import in the public interfaces.
-  std::vector<std::string> ModulesToSkipInPublicInterface;
-
   /// A mode which decides whether the printed interface contains package, SPIs, or public/inlinable declarations.
   PrintOptions::InterfaceMode InterfaceContentMode = PrintOptions::InterfaceMode::Public;
   bool printPublicInterface() const {

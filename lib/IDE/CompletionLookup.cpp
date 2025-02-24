@@ -827,9 +827,8 @@ void CompletionLookup::analyzeActorIsolation(
     break;
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
-  case ActorIsolation::Concurrent:
-  case ActorIsolation::ConcurrentUnsafe:
     return;
   }
 }
@@ -1000,7 +999,7 @@ bool CompletionLookup::hasInterestingDefaultValue(const ParamDecl *param) {
     return true;
 
   case DefaultArgumentKind::None:
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::ExpressionMacro:

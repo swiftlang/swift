@@ -2945,8 +2945,12 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
 
   SubstGenericParametersFromMetadata substFn(genericEnv, genericArguments);
 
-  DecodedMetadataBuilder builder(
-      demangler,
+  auto request = MetadataRequest(MetadataState::Complete);
+
+  NodePointer nodePointer = resultType->getFirstChild();
+  auto typeInfoOrErr = swift_getTypeByMangledNode(
+      request, demangler, nodePointer,
+      /*arguments=*/genericArguments,
       /*substGenericParam=*/
       [&substFn](unsigned depth, unsigned index) {
         return substFn.getMetadata(depth, index).Ptr;
@@ -2956,9 +2960,12 @@ swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
         return substFn.getWitnessTable(type, index);
       });
 
-  TypeDecoder<DecodedMetadataBuilder> decoder(builder);
+  if (typeInfoOrErr.isError()) {
+    return nullptr;
+  }
 
-  return decodeType(decoder, resultType->getFirstChild());
+  auto typeInfo = typeInfoOrErr.getType();
+  return typeInfo.getMetadata();
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI

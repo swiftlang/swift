@@ -12,7 +12,7 @@
 
 import SIL
 
-extension PointerToAddressInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension PointerToAddressInst : OnoneSimplifiable, SILCombineSimplifiable {
 
   func simplify(_ context: SimplifyContext) {
     if removeAddressToPointerToAddressPair(of: self, context) {

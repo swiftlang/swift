@@ -1,0 +1,3 @@
+add_library(swiftConcurrencyInternalShims INTERFACE)
+target_include_directories(swiftConcurrencyInternalShims INTERFACE
+  ${CMAKE_CURRENT_SOURCE_DIR})

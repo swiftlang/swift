@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
@@ -31,16 +32,10 @@
 
 using namespace swift;
 
-void Parser::DefaultArgumentInfo::setFunctionContext(
-    DeclContext *DC, ParameterList *paramList){
-  for (auto context : ParsedContexts) {
-    context->changeFunction(DC, paramList);
-  }
-}
-
 static ParserStatus
 parseDefaultArgument(Parser &P, Parser::DefaultArgumentInfo *defaultArgs,
                      unsigned argIndex, Expr *&init,
+                     DefaultArgumentInitializer *&initContext,
                      Parser::ParameterContextKind paramContext) {
   assert(P.Tok.is(tok::equal) ||
        (P.Tok.isBinaryOperator() && P.Tok.getText() == "=="));
@@ -49,17 +44,10 @@ parseDefaultArgument(Parser &P, Parser::DefaultArgumentInfo *defaultArgs,
   // Enter a fresh default-argument context with a meaningless parent.
   // We'll change the parent to the function later after we've created
   // that declaration.
-  auto initDC = new (P.Context) DefaultArgumentInitializer(P.CurDeclContext,
-                                                           argIndex);
-  Parser::ParseFunctionBody initScope(P, initDC);
+  initContext = DefaultArgumentInitializer::create(P.CurDeclContext, argIndex);
+  Parser::ParseFunctionBody initScope(P, initContext);
 
   ParserResult<Expr> initR = P.parseExpr(diag::expected_init_value);
-
-  // Record the default-argument context if we're supposed to accept default
-  // arguments here.
-  if (defaultArgs) {
-    defaultArgs->ParsedContexts.push_back(initDC);
-  }
 
   Diag<> diagID = { DiagID() };
   switch (paramContext) {
@@ -506,7 +494,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
 
       status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
-                                     param.DefaultArg, paramContext);
+                                     param.DefaultArg,
+                                     param.DefaultArgInitContext, paramContext);
     }
 
     // If we haven't made progress, don't add the parameter.
@@ -564,13 +553,13 @@ mapParsedParameters(Parser &parser,
   auto &ctx = parser.Context;
 
   // Local function to create a pattern for a single parameter.
-  auto createParam = [&](Parser::ParsedParameter &paramInfo,
-                         Identifier argName, SourceLoc argNameLoc,
-                         Identifier paramName, SourceLoc paramNameLoc)
-  -> ParamDecl * {
+  auto createParam = [&](Parser::ParsedParameter &paramInfo, Identifier argName,
+                         SourceLoc argNameLoc, Identifier paramName,
+                         SourceLoc paramNameLoc) -> ParamDecl * {
     auto param = ParamDecl::createParsed(
         ctx, paramInfo.SpecifierLoc, argNameLoc, argName, paramNameLoc,
-        paramName, paramInfo.DefaultArg, parser.CurDeclContext);
+        paramName, paramInfo.DefaultArg, paramInfo.DefaultArgInitContext,
+        parser.CurDeclContext);
     param->attachParsedAttrs(paramInfo.Attrs);
 
     bool parsingEnumElt
@@ -618,40 +607,6 @@ mapParsedParameters(Parser &parser,
 
       param->setTypeRepr(type);
 
-      // Dig through the type to find any attributes or modifiers that are
-      // associated with the type but should also be reflected on the
-      // declaration.
-      {
-        auto unwrappedType = type;
-        while (true) {
-          if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
-            // At this point we actually don't know if that's valid to mark
-            // this parameter declaration as `autoclosure` because type has
-            // not been resolved yet - it should either be a function type
-            // or typealias with underlying function type.
-            if (ATR->has(TypeAttrKind::Autoclosure))
-              param->setAutoClosure(true);
-            if (ATR->has(TypeAttrKind::Addressable))
-              param->setAddressable(true);
-
-            unwrappedType = ATR->getTypeRepr();
-            continue;
-          }
-
-          if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
-            if (isa<IsolatedTypeRepr>(STR))
-              param->setIsolated(true);
-            else if (isa<CompileTimeConstTypeRepr>(STR))
-              param->setCompileTimeConst(true);
-            else if (isa<SendingTypeRepr>(STR))
-              param->setSending(true);
-            unwrappedType = STR->getBase();
-            continue;
-          }
-
-          break;
-        }
-      }
     } else if (paramInfo.SpecifierLoc.isValid()) {
       llvm::SmallString<16> specifier;
       {
@@ -664,10 +619,6 @@ mapParsedParameters(Parser &parser,
                       specifier);
       paramInfo.SpecifierLoc = SourceLoc();
       paramInfo.SpecifierKind = ParamDecl::Specifier::Default;
-
-      param->setSpecifier(ParamSpecifier::Default);
-    } else {
-      param->setSpecifier(ParamSpecifier::Default);
     }
 
     return param;

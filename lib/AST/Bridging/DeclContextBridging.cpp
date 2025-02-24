@@ -31,6 +31,17 @@ BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
   return cInit.unbridged();
 }
 
+BridgedDefaultArgumentInitializer
+BridgedDefaultArgumentInitializer_create(BridgedDeclContext cDeclContext,
+                                         size_t index) {
+  return DefaultArgumentInitializer::create(cDeclContext.unbridged(), index);
+}
+
+BridgedDeclContext DefaultArgumentInitializer_asDeclContext(
+    BridgedDefaultArgumentInitializer cInit) {
+  return cInit.unbridged();
+}
+
 BridgedCustomAttributeInitializer
 BridgedCustomAttributeInitializer_create(BridgedDeclContext cDeclContext) {
   return CustomAttributeInitializer::create(cDeclContext.unbridged());

@@ -1883,7 +1883,14 @@ void LoadableStorageAllocation::replaceLoad(LoadInst *load) {
 
 static void allocateAndSet(StructLoweringState &pass,
                            LoadableStorageAllocation &allocator,
-                           SILValue operand, SILInstruction *user) {
+                           SILValue operand, SILInstruction *user,
+                           Operand &opd) {
+  if (isa<SILUndef>(operand)) {
+    auto alloc = allocate(pass, operand->getType());
+    opd.set(alloc);
+    return;
+  }
+
   auto inst = operand->getDefiningInstruction();
   if (!inst) {
     allocateAndSetForArgument(pass, cast<SILArgument>(operand), user);
@@ -1909,7 +1916,7 @@ static void allocateAndSetAll(StructLoweringState &pass,
     SILType silType = value->getType();
     if (pass.isLargeLoadableType(pass.F->getLoweredFunctionType(),
                                  silType)) {
-      allocateAndSet(pass, allocator, value, user);
+      allocateAndSet(pass, allocator, value, user, operand);
     }
   }
 }

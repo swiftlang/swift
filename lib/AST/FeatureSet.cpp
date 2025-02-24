@@ -121,7 +121,7 @@ UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
-UNINTERESTING_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext)
+UNINTERESTING_FEATURE(AsyncCallerExecution)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
@@ -193,12 +193,10 @@ static bool usesFeatureNonescapableTypes(Decl *decl) {
 
 UNINTERESTING_FEATURE(StaticExclusiveOnly)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
-UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
 UNINTERESTING_FEATURE(GenerateForceToMainActorThunks)
-UNINTERESTING_FEATURE(Span)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
@@ -270,6 +268,7 @@ UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)
 UNINTERESTING_FEATURE(Extern)
 UNINTERESTING_FEATURE(ConsumeSelfInDeinit)
+UNINTERESTING_FEATURE(StrictSendableMetatypes)
 
 static bool usesFeatureBitwiseCopyable2(Decl *decl) {
   if (!decl->getModuleContext()->isStdlibModule()) {
@@ -349,7 +348,6 @@ static bool usesFeatureABIAttribute(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(WarnUnsafe)
-UNINTERESTING_FEATURE(SafeInterop)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
@@ -410,6 +408,50 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 static bool usesFeatureCustomAvailability(Decl *decl) {
   // FIXME: [availability] Check whether @available attributes for custom
   // domains are attached to the decl.
+  return false;
+}
+
+static bool usesFeatureBuiltinEmplaceTypedThrows(Decl *decl) {
+  // Callers of 'Builtin.emplace' should explicitly guard the usage with #if.
+  return false;
+}
+
+static bool usesFeatureExecutionAttribute(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<ExecutionAttr>())
+    return true;
+
+  auto VD = dyn_cast<ValueDecl>(decl);
+  if (!VD)
+    return false;
+
+  auto hasExecutionAttr = [](TypeRepr *R) {
+    if (!R)
+      return false;
+
+    return R->findIf([](TypeRepr *repr) {
+      if (auto *AT = dyn_cast<AttributedTypeRepr>(repr)) {
+        return llvm::any_of(AT->getAttrs(), [](TypeOrCustomAttr attr) {
+          if (auto *TA = attr.dyn_cast<TypeAttribute *>()) {
+            return isa<ExecutionTypeAttr>(TA);
+          }
+          return false;
+        });
+      }
+      return false;
+    });
+  };
+
+  // Check if any parameters that have `@execution` attribute.
+  if (auto *PL = getParameterList(VD)) {
+    for (auto *P : *PL) {
+      if (hasExecutionAttr(P->getTypeRepr()))
+        return true;
+    }
+  }
+
+  if (hasExecutionAttr(VD->getResultTypeRepr()))
+    return true;
+
   return false;
 }
 

@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift -swift-version 6 -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext -parse-as-library
+// RUN: %target-typecheck-verify-swift -swift-version 6 -enable-experimental-feature AsyncCallerExecution -parse-as-library
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+// REQUIRES: swift_feature_AsyncCallerExecution
 
 class NonSendable {} // expected-note {{}}
 

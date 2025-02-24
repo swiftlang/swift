@@ -12,7 +12,7 @@
 
 import SIL
 
-extension CheckedCastAddrBranchInst : OnoneSimplifyable {
+extension CheckedCastAddrBranchInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     guard let castWillSucceed = self.dynamicCastResult else {
       return

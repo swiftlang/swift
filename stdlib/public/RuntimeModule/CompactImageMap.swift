@@ -244,7 +244,7 @@ public enum CompactImageMapFormat {
           if (byte & 0x40) == 0 {
             code = Int(byte & 0x3f)
           } else {
-            let byteCount = Int(byte & 0x3f)
+            let byteCount = Int(byte & 0x3f) + 1
             code = 0
             for _ in 0..<byteCount {
               guard let byte = iterator.next() else {
@@ -252,6 +252,7 @@ public enum CompactImageMapFormat {
               }
               code = (code << 8) | Int(byte)
             }
+            code += 64
           }
 
           #if DEBUG_COMPACT_IMAGE_MAP

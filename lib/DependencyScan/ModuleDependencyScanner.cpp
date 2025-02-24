@@ -36,6 +36,7 @@
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/MemoryBufferRef.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/VersionTuple.h"
@@ -1063,6 +1064,42 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
   if (!isTextualModuleWithABridgingHeader && !isBinaryModuleWithHeaderInput)
     return;
 
+
+  std::optional<std::string> headerPath;
+  std::unique_ptr<llvm::MemoryBuffer> sourceBuffer;
+  std::optional<llvm::MemoryBufferRef> sourceBufferRef;
+
+  auto extractHeaderContent =
+      [&](const SwiftBinaryModuleDependencyStorage &binaryMod)
+      -> std::unique_ptr<llvm::MemoryBuffer> {
+    auto header = binaryMod.headerImport;
+    // Check to see if the header input exists on disk.
+    auto FS = ScanASTContext.SourceMgr.getFileSystem();
+    if (FS->exists(header))
+      return nullptr;
+
+    auto moduleBuf = FS->getBufferForFile(binaryMod.compiledModulePath);
+    if (!moduleBuf)
+      return nullptr;
+
+    auto content = extractEmbeddedBridgingHeaderContent(std::move(*moduleBuf),
+                                                        ScanASTContext);
+    if (content.empty())
+      return nullptr;
+
+    return llvm::MemoryBuffer::getMemBufferCopy(content, header);
+  };
+
+  if (isBinaryModuleWithHeaderInput) {
+    auto &binaryMod = *moduleDependencyInfo.getAsSwiftBinaryModule();
+    if (auto embeddedHeader = extractHeaderContent(binaryMod)) {
+      sourceBuffer = std::move(embeddedHeader);
+      sourceBufferRef = sourceBuffer->getMemBufferRef();
+    } else
+      headerPath = binaryMod.headerImport;
+  } else
+    headerPath = *moduleDependencyInfo.getBridgingHeader();
+
   withDependencyScanningWorker(
       [&](ModuleDependencyScanningWorker *ScanningWorker) {
         auto clangImporter = static_cast<ClangImporter *>(
@@ -1072,12 +1109,9 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
         std::optional<std::string> includeTreeID;
         std::vector<std::string> bridgingHeaderCommandLine;
         auto headerScan = clangImporter->getHeaderDependencies(
-            moduleID,
-            isTextualModuleWithABridgingHeader
-                ? *moduleDependencyInfo.getBridgingHeader()
-                : moduleDependencyInfo.getAsSwiftBinaryModule()->headerImport,
-            /*sourceBuffer=*/std::nullopt, ScanningWorker->clangScanningTool,
-            cache, headerClangModuleDependencies, headerFileInputs,
+            moduleID, headerPath, sourceBufferRef,
+            ScanningWorker->clangScanningTool, cache,
+            headerClangModuleDependencies, headerFileInputs,
             bridgingHeaderCommandLine, includeTreeID);
         if (!headerScan) {
           // Record direct header Clang dependencies

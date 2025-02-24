@@ -143,14 +143,22 @@ BridgedPackExpansionTypeRepr_createParsed(BridgedASTContext cContext,
 BridgedAttributedTypeRepr
 BridgedAttributedTypeRepr_createParsed(BridgedASTContext cContext,
                                        BridgedTypeRepr base,
-                                       BridgedTypeAttributes cAttributes) {
-  TypeAttributes *typeAttributes = cAttributes.unbridged();
-  assert(!typeAttributes->attrs.empty());
+                                       BridgedArrayRef cAttributes) {
+  SmallVector<TypeOrCustomAttr, 2> attrs;
+  for (auto elem : cAttributes.unbridged<BridgedTypeOrCustomAttr>()) {
+    switch (elem.getKind()) {
+    case BridgedTypeOrCustomAttr::TypeAttr:
+      attrs.push_back(elem.castToTypeAttr().unbridged());
+      break;
+    case BridgedTypeOrCustomAttr::CustomAttr:
+      attrs.push_back(elem.castToCustomAttr().unbridged());
+      break;
+    }
+  }
+  assert(!attrs.empty());
 
-  auto attributedType = AttributedTypeRepr::create(
-      cContext.unbridged(), typeAttributes->attrs, base.unbridged());
-  delete typeAttributes;
-  return attributedType;
+  return AttributedTypeRepr::create(cContext.unbridged(), attrs,
+                                    base.unbridged());
 }
 
 BridgedSpecifierTypeRepr BridgedSpecifierTypeRepr_createParsed(

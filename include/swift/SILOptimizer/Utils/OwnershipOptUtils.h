@@ -279,6 +279,8 @@ public:
     return ctx->extraAddressFixupInfo.base;
   }
 
+  bool mayIntroduceUnoptimizableCopies();
+
   /// Perform OSSA fixup on newValue and return a fixed-up value based that can
   /// be used to replace all uses of oldValue.
   ///

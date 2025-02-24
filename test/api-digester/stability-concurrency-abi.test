@@ -75,6 +75,9 @@ Protocol GlobalActor has added inherited protocol Escapable
 Protocol SerialExecutor has added inherited protocol Copyable
 Protocol SerialExecutor has added inherited protocol Escapable
 Protocol AsyncSequence is now without @rethrows
+Protocol Actor has added inherited protocol SendableMetatype
+Protocol Executor has added inherited protocol SendableMetatype
+Protocol SerialExecutor has added inherited protocol SendableMetatype
 
 // #isolated adoption in with...Continuation
 // api-digester is not aware of silgen_name trickery we do to keep this ABI compatible

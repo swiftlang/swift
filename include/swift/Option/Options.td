@@ -1139,9 +1139,9 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
-def ExperimentalSkipDeserializationChecksForPackageCMO : Flag<["-"], "experimental-skip-deserialization-checks-for-package-cmo">,
+def ExperimentalPackageCMOAbortOnDeserializationFail : Flag<["-"], "experimental-package-cmo-abort-on-deserialization-fail">,
   Flags<[FrontendOption]>,
-  HelpText<"Skip deserialization checks for package-cmo; use only for experimental purposes">;
+  HelpText<"Abort if a deserialization error is found while package optimization is enabled">;
 
 def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
   Flags<[FrontendOption]>,
@@ -2116,7 +2116,7 @@ def digester_mode:
 def nostartfiles:
   Flag<["-"], "nostartfiles">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, NoInteractiveOption,
-         HelpHidden, NewDriverOnlyOption]>,
+         HelpHidden]>,
   HelpText<"Do not link in the Swift language startup routines">;
 
 def gcc_toolchain: Separate<["-"], "gcc-toolchain">,

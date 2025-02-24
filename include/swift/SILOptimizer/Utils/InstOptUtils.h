@@ -35,6 +35,7 @@ namespace swift {
 class DominanceInfo;
 class DeadEndBlocks;
 class BasicCalleeAnalysis;
+class DestructorAnalysis;
 template <class T> class NullablePtr;
 
 /// Transform a Use Range (Operand*) into a User Range (SILInstruction *)
@@ -590,11 +591,6 @@ bool tryEliminateOnlyOwnershipUsedForwardingInst(
 IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
                                                   SILBuilder &builder);
 
-/// Performs "predictable" memory access optimizations.
-///
-/// See the PredictableMemoryAccessOptimizations pass.
-bool optimizeMemoryAccesses(SILFunction *fn);
-
 /// Performs "predictable" dead allocation optimizations.
 ///
 /// See the PredictableDeadAllocationElimination pass.
@@ -625,6 +621,9 @@ bool findUnreferenceableStorage(StructDecl *decl, SILType structType,
                                 SILFunction *func);
 
 SILValue getInitOfTemporaryAllocStack(AllocStackInst *asi);
+
+bool isDestructorSideEffectFree(SILInstruction *mayRelease,
+                                DestructorAnalysis *DA);
 
 } // end namespace swift
 

@@ -35,7 +35,7 @@ func isolatedFunc() {} // expected-note 15{{calls to global function 'isolatedFu
 // CHECK-SYMB-NOT: ProbeImplicit_RoundtripNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test34ProbeImplicit_RoundtripNonisolatedCfZ
 // CHECK-SYMB: // ProbeImplicit_RoundtripNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test34ProbeImplicit_RoundtripNonisolatedCfD : $@convention(method) (@owned ProbeImplicit_RoundtripNonisolated) -> () {
 class ProbeImplicit_RoundtripNonisolated: RoundtripNonisolated {}
 
@@ -45,7 +45,7 @@ class ProbeImplicit_RoundtripNonisolated: RoundtripNonisolated {}
 // CHECK-SYMB-NOT: ProbeDefault_RoundtripNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test33ProbeDefault_RoundtripNonisolatedCfZ
 // CHECK-SYMB: // ProbeDefault_RoundtripNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test33ProbeDefault_RoundtripNonisolatedCfD : $@convention(method) (@owned ProbeDefault_RoundtripNonisolated) -> () {
 class ProbeDefault_RoundtripNonisolated: RoundtripNonisolated {
     deinit {
@@ -70,7 +70,7 @@ class ProbeIsolated_RoundtripNonisolated: RoundtripNonisolated {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: AnotherActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test32ProbeGlobal_RoundtripNonisolatedCfZ : $@convention(thin) (@owned ProbeGlobal_RoundtripNonisolated) -> () {
 // CHECK-SYMB: // ProbeGlobal_RoundtripNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test32ProbeGlobal_RoundtripNonisolatedCfD : $@convention(method) (@owned ProbeGlobal_RoundtripNonisolated) -> () {
 class ProbeGlobal_RoundtripNonisolated: RoundtripNonisolated {
     @AnotherActor deinit {
@@ -90,7 +90,7 @@ class ProbeGlobal_RoundtripNonisolated: RoundtripNonisolated {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test31ProbeImplicit_RoundtripIsolatedCfZ : $@convention(thin) (@owned ProbeImplicit_RoundtripIsolated) -> () {
 // CHECK-SYMB: // ProbeImplicit_RoundtripIsolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test31ProbeImplicit_RoundtripIsolatedCfD : $@convention(method) (@owned ProbeImplicit_RoundtripIsolated) -> () {
 class ProbeImplicit_RoundtripIsolated: RoundtripIsolated {}
 
@@ -115,7 +115,7 @@ class ProbeIsolated_RoundtripIsolated: RoundtripIsolated {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test29ProbeGlobal_RoundtripIsolatedCfZ : $@convention(thin) (@owned ProbeGlobal_RoundtripIsolated) -> () {
 // CHECK-SYMB: // ProbeGlobal_RoundtripIsolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test29ProbeGlobal_RoundtripIsolatedCfD : $@convention(method) (@owned ProbeGlobal_RoundtripIsolated) -> () {
 class ProbeGlobal_RoundtripIsolated: RoundtripIsolated {
 #if !SILGEN
@@ -133,7 +133,7 @@ class ProbeGlobal_RoundtripIsolated: RoundtripIsolated {
 // CHECK-SYMB-NOT: ProbeImplicit_BaseNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test29ProbeImplicit_BaseNonisolatedCfZ
 // CHECK-SYMB: // ProbeImplicit_BaseNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test29ProbeImplicit_BaseNonisolatedCfD : $@convention(method) (@owned ProbeImplicit_BaseNonisolated) -> () {
 class ProbeImplicit_BaseNonisolated: BaseNonisolated {}
 
@@ -143,7 +143,7 @@ class ProbeImplicit_BaseNonisolated: BaseNonisolated {}
 // CHECK-SYMB-NOT: ProbeDefault_BaseNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test28ProbeDefault_BaseNonisolatedCfZ
 // CHECK-SYMB: // ProbeDefault_BaseNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test28ProbeDefault_BaseNonisolatedCfD : $@convention(method) (@owned ProbeDefault_BaseNonisolated) -> () {
 class ProbeDefault_BaseNonisolated: BaseNonisolated {
     deinit {
@@ -168,7 +168,7 @@ class ProbeIsolated_BaseNonisolated: BaseNonisolated {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: AnotherActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test27ProbeGlobal_BaseNonisolatedCfZ : $@convention(thin) (@owned ProbeGlobal_BaseNonisolated) -> () {
 // CHECK-SYMB: // ProbeGlobal_BaseNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test27ProbeGlobal_BaseNonisolatedCfD : $@convention(method) (@owned ProbeGlobal_BaseNonisolated) -> () {
 class ProbeGlobal_BaseNonisolated: BaseNonisolated {
     @AnotherActor deinit {
@@ -186,7 +186,7 @@ class ProbeGlobal_BaseNonisolated: BaseNonisolated {
 // CHECK-SYMB-NOT: ProbeImplicit_DerivedNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test32ProbeImplicit_DerivedNonisolatedCfZ
 // CHECK-SYMB: // ProbeImplicit_DerivedNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test32ProbeImplicit_DerivedNonisolatedCfD : $@convention(method) (@owned ProbeImplicit_DerivedNonisolated) -> () {
 class ProbeImplicit_DerivedNonisolated: DerivedNonisolated {}
 
@@ -196,7 +196,7 @@ class ProbeImplicit_DerivedNonisolated: DerivedNonisolated {}
 // CHECK-SYMB-NOT: ProbeDefault_DerivedNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test31ProbeDefault_DerivedNonisolatedCfZ
 // CHECK-SYMB: // ProbeDefault_DerivedNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test31ProbeDefault_DerivedNonisolatedCfD : $@convention(method) (@owned ProbeDefault_DerivedNonisolated) -> () {
 class ProbeDefault_DerivedNonisolated: DerivedNonisolated {
     deinit {
@@ -221,7 +221,7 @@ class ProbeIsolated_DerivedNonisolated: DerivedNonisolated {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: AnotherActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test30ProbeGlobal_DerivedNonisolatedCfZ : $@convention(thin) (@owned ProbeGlobal_DerivedNonisolated) -> () {
 // CHECK-SYMB: // ProbeGlobal_DerivedNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test30ProbeGlobal_DerivedNonisolatedCfD : $@convention(method) (@owned ProbeGlobal_DerivedNonisolated) -> () {
 class ProbeGlobal_DerivedNonisolated: DerivedNonisolated {
     @AnotherActor deinit {
@@ -239,7 +239,7 @@ class ProbeGlobal_DerivedNonisolated: DerivedNonisolated {
 // CHECK-SYMB-NOT: ProbeImplicit_BaseIsolatedClass.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test31ProbeImplicit_BaseIsolatedClassCfZ
 // CHECK-SYMB: // ProbeImplicit_BaseIsolatedClass.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test31ProbeImplicit_BaseIsolatedClassCfD : $@convention(method) (@owned ProbeImplicit_BaseIsolatedClass) -> () {
 class ProbeImplicit_BaseIsolatedClass: BaseIsolatedClass {}
 
@@ -249,7 +249,7 @@ class ProbeImplicit_BaseIsolatedClass: BaseIsolatedClass {}
 // CHECK-SYMB-NOT: ProbeDefault_BaseIsolatedClass.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test30ProbeDefault_BaseIsolatedClassCfZ
 // CHECK-SYMB: // ProbeDefault_BaseIsolatedClass.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test30ProbeDefault_BaseIsolatedClassCfD : $@convention(method) (@owned ProbeDefault_BaseIsolatedClass) -> () {
 class ProbeDefault_BaseIsolatedClass: BaseIsolatedClass {
     deinit {
@@ -266,7 +266,7 @@ class ProbeDefault_BaseIsolatedClass: BaseIsolatedClass {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test018ProbeIsolated_BaseC5ClassCfZ : $@convention(thin) (@owned ProbeIsolated_BaseIsolatedClass) -> () {
 // CHECK-SYMB: // ProbeIsolated_BaseIsolatedClass.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test018ProbeIsolated_BaseC5ClassCfD : $@convention(method) (@owned ProbeIsolated_BaseIsolatedClass) -> () {
 class ProbeIsolated_BaseIsolatedClass: BaseIsolatedClass {
     isolated deinit {
@@ -281,7 +281,7 @@ class ProbeIsolated_BaseIsolatedClass: BaseIsolatedClass {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: AnotherActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test29ProbeGlobal_BaseIsolatedClassCfZ : $@convention(thin) (@owned ProbeGlobal_BaseIsolatedClass) -> () {
 // CHECK-SYMB: // ProbeGlobal_BaseIsolatedClass.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test29ProbeGlobal_BaseIsolatedClassCfD : $@convention(method) (@owned ProbeGlobal_BaseIsolatedClass) -> () {
 class ProbeGlobal_BaseIsolatedClass: BaseIsolatedClass {
     @AnotherActor deinit {
@@ -299,7 +299,7 @@ class ProbeGlobal_BaseIsolatedClass: BaseIsolatedClass {
 // CHECK-SYMB-NOT: ProbeImplicit_DerivedIsolatedClass.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test34ProbeImplicit_DerivedIsolatedClassCfZ
 // CHECK-SYMB: // ProbeImplicit_DerivedIsolatedClass.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test34ProbeImplicit_DerivedIsolatedClassCfD : $@convention(method) (@owned ProbeImplicit_DerivedIsolatedClass) -> () {
 class ProbeImplicit_DerivedIsolatedClass: DerivedIsolatedClass {}
 
@@ -309,7 +309,7 @@ class ProbeImplicit_DerivedIsolatedClass: DerivedIsolatedClass {}
 // CHECK-SYMB-NOT: ProbeDefault_DerivedIsolatedClass.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test33ProbeDefault_DerivedIsolatedClassCfZ
 // CHECK-SYMB: // ProbeDefault_DerivedIsolatedClass.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test33ProbeDefault_DerivedIsolatedClassCfD : $@convention(method) (@owned ProbeDefault_DerivedIsolatedClass) -> () {
 class ProbeDefault_DerivedIsolatedClass: DerivedIsolatedClass {
     deinit {
@@ -326,7 +326,7 @@ class ProbeDefault_DerivedIsolatedClass: DerivedIsolatedClass {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test021ProbeIsolated_DerivedC5ClassCfZ : $@convention(thin) (@owned ProbeIsolated_DerivedIsolatedClass) -> () {
 // CHECK-SYMB: // ProbeIsolated_DerivedIsolatedClass.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test021ProbeIsolated_DerivedC5ClassCfD : $@convention(method) (@owned ProbeIsolated_DerivedIsolatedClass) -> () {
 class ProbeIsolated_DerivedIsolatedClass: DerivedIsolatedClass {
     isolated deinit {
@@ -341,7 +341,7 @@ class ProbeIsolated_DerivedIsolatedClass: DerivedIsolatedClass {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: AnotherActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test32ProbeGlobal_DerivedIsolatedClassCfZ : $@convention(thin) (@owned ProbeGlobal_DerivedIsolatedClass) -> () {
 // CHECK-SYMB: // ProbeGlobal_DerivedIsolatedClass.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test32ProbeGlobal_DerivedIsolatedClassCfD : $@convention(method) (@owned ProbeGlobal_DerivedIsolatedClass) -> () {
 class ProbeGlobal_DerivedIsolatedClass: DerivedIsolatedClass {
     @AnotherActor deinit {
@@ -363,7 +363,7 @@ class ProbeGlobal_DerivedIsolatedClass: DerivedIsolatedClass {
 // CHECK-SYMB-NOT: ProbeImplicit_BaseIsolatedDealloc.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test33ProbeImplicit_BaseIsolatedDeallocCfZ
 // CHECK-SYMB: // ProbeImplicit_BaseIsolatedDealloc.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test33ProbeImplicit_BaseIsolatedDeallocCfD : $@convention(method) (@owned ProbeImplicit_BaseIsolatedDealloc) -> () {
 class ProbeImplicit_BaseIsolatedDealloc: BaseIsolatedDealloc {}
 
@@ -389,7 +389,7 @@ class ProbeIsolated_BaseIsolatedDealloc: BaseIsolatedDealloc {
 // CHECK-SYMB-NOT: ProbeGlobal_BaseIsolatedDealloc.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test31ProbeGlobal_BaseIsolatedDeallocCfZ
 // CHECK-SYMB: // ProbeGlobal_BaseIsolatedDealloc.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test31ProbeGlobal_BaseIsolatedDeallocCfD : $@convention(method) (@owned ProbeGlobal_BaseIsolatedDealloc) -> () {
 class ProbeGlobal_BaseIsolatedDealloc: BaseIsolatedDealloc {
 #if !SILGEN
@@ -408,7 +408,7 @@ class ProbeGlobal_BaseIsolatedDealloc: BaseIsolatedDealloc {
 // CHECK-SYMB-NOT: ProbeImplicit_DerivedIsolatedDealloc.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test36ProbeImplicit_DerivedIsolatedDeallocCfZ
 // CHECK-SYMB: // ProbeImplicit_DerivedIsolatedDealloc.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test36ProbeImplicit_DerivedIsolatedDeallocCfD : $@convention(method) (@owned ProbeImplicit_DerivedIsolatedDealloc) -> () {
 class ProbeImplicit_DerivedIsolatedDealloc: DerivedIsolatedDealloc {}
 
@@ -434,7 +434,7 @@ class ProbeIsolated_DerivedIsolatedDealloc: DerivedIsolatedDealloc {
 // CHECK-SYMB-NOT: ProbeGlobal_DerivedIsolatedDealloc.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test34ProbeGlobal_DerivedIsolatedDeallocCfZ
 // CHECK-SYMB: // ProbeGlobal_DerivedIsolatedDealloc.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test34ProbeGlobal_DerivedIsolatedDeallocCfD : $@convention(method) (@owned ProbeGlobal_DerivedIsolatedDealloc) -> () {
 class ProbeGlobal_DerivedIsolatedDealloc: DerivedIsolatedDealloc {
 #if !SILGEN
@@ -452,7 +452,7 @@ class ProbeGlobal_DerivedIsolatedDealloc: DerivedIsolatedDealloc {
 // CHECK-SYMB-NOT: ProbeImplicit_DeallocIsolatedFromProtocol.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test41ProbeImplicit_DeallocIsolatedFromProtocolCfZ
 // CHECK-SYMB: // ProbeImplicit_DeallocIsolatedFromProtocol.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test41ProbeImplicit_DeallocIsolatedFromProtocolCfD : $@convention(method) (@owned ProbeImplicit_DeallocIsolatedFromProtocol) -> () {
 class ProbeImplicit_DeallocIsolatedFromProtocol: DeallocIsolatedFromProtocol {}
 
@@ -466,7 +466,7 @@ class ProbeGlobal_DeallocIsolatedFromProtocol: DeallocIsolatedFromProtocol {
 // CHECK-SYMB-NOT: ProbeImplicit_DeallocIsolatedFromCategory.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test41ProbeImplicit_DeallocIsolatedFromCategoryCfZ
 // CHECK-SYMB: // ProbeImplicit_DeallocIsolatedFromCategory.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test41ProbeImplicit_DeallocIsolatedFromCategoryCfD : $@convention(method) (@owned ProbeImplicit_DeallocIsolatedFromCategory) -> () {
 class ProbeImplicit_DeallocIsolatedFromCategory: DeallocIsolatedFromCategory {}
 
@@ -480,7 +480,7 @@ class ProbeGlobal_DeallocIsolatedFromCategory: DeallocIsolatedFromCategory {
 // CHECK-SYMB-NOT: ProbeImplicit_DeallocIsolatedFromExtension.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test42ProbeImplicit_DeallocIsolatedFromExtensionCfZ
 // CHECK-SYMB: // ProbeImplicit_DeallocIsolatedFromExtension.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: concurrent
+// CHECK-SYMB-NEXT: // Isolation: nonisolated
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s4test42ProbeImplicit_DeallocIsolatedFromExtensionCfD : $@convention(method) (@owned ProbeImplicit_DeallocIsolatedFromExtension) -> () {
 class ProbeImplicit_DeallocIsolatedFromExtension: DeallocIsolatedFromExtension {}
 

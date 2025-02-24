@@ -1127,11 +1127,6 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
                                               /*packElementOpener*/ nullptr)
           .resolveType(underlyingTypeRepr);
 
-  // Don't build a generic siganture for a protocol extension, because this
-  // request might be evaluated while building a protocol requirement signature.
-  if (parentDC->getSelfProtocolDecl())
-    return result;
-
   Type parent;
   if (parentDC->isTypeContext())
     parent = parentDC->getSelfInterfaceType();

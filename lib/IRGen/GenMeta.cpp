@@ -6985,6 +6985,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Copyable:
   case KnownProtocolKind::Escapable:
   case KnownProtocolKind::BitwiseCopyable:
+  case KnownProtocolKind::SendableMetatype:
     return SpecialProtocol::None;
   }
 

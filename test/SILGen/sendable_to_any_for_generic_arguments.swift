@@ -261,3 +261,24 @@ func test_subscript_computed_property_and_mutating_access(u: User) {
   // CHECK-NEXT: assign [[COPIED_SENDABLE_DICT]] to [[DICT]]
   u.dict.testMutating()
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s37sendable_to_any_for_generic_arguments15test_inout_usesyyF
+// CHECK: [[SENDABLE_ARR_REF:%.*]] = begin_access [modify] [unknown] %2
+// CHECK-NEXT:  [[ANY_ARR:%.*]] = alloc_stack $Array<Any>
+// CHECK-NEXT:  [[SENDABLE_ARR:%.*]] = load [copy] [[SENDABLE_ARR_REF]]
+// CHECK-NEXT:  [[ANY_ARR_CAST:%.*]] = unchecked_bitwise_cast [[SENDABLE_ARR]] to $Array<Any>
+// CHECK-NEXT:  [[ANY_ARR_COPY:%.*]] = copy_value [[ANY_ARR_CAST]]
+// CHECK-NEXT:  store [[ANY_ARR_COPY]] to [init] [[ANY_ARR]]
+// CHECK: [[INOUT_FUNC:%.*]] = function_ref @$s37sendable_to_any_for_generic_arguments15test_inout_usesyyF0G0L_yySayypGzF : $@convention(thin) (@inout Array<Any>) -> ()
+// CHECK-NEXT:  {{.*}} = apply [[INOUT_FUNC]]([[ANY_ARR]]) : $@convention(thin) (@inout Array<Any>) -> ()
+// CHECK-NEXT: [[ANY_ARR_VALUE:%.*]] = load [take] [[ANY_ARR]]
+// CHECK-NEXT: [[SENDABLE_ARR_VALUE:%.*]] = unchecked_bitwise_cast [[ANY_ARR_VALUE]] to $Array<any Sendable>
+// CHECK-NEXT: [[SENDABLE_ARR_VALUE_COPY:%.*]] = copy_value [[SENDABLE_ARR_VALUE]]
+// CHECK-NEXT: assign [[SENDABLE_ARR_VALUE_COPY]] to [[SENDABLE_ARR_REF]]
+func test_inout_uses() {
+  func test(_ arr: inout [Any]) {
+  }
+
+  @preconcurrency var arr: [any Sendable] = []
+  test(&arr)
+}

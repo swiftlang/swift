@@ -231,7 +231,8 @@ static void addMergedLibraries(SmallVectorImpl<LinkLibrary> &AllLinkLibraries,
   }
 
   for (StringRef NewLib : NewLibs)
-    AllLinkLibraries.push_back(LinkLibrary(NewLib, LibraryKind::Library));
+    AllLinkLibraries.emplace_back(
+        NewLib, LibraryKind::Library, /*static=*/false);
 }
 
 bool swift::immediate::autolinkImportedModules(ModuleDecl *M,

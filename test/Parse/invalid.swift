@@ -140,5 +140,5 @@ class C_50734<@NSApplicationMain T: AnyObject> {} // expected-error {{@NSApplica
 func f6_50734<@discardableResult T>(x: T) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
 enum E_50734<@indirect T> {} // expected-error {{'indirect' is a declaration modifier, not an attribute}} expected-error {{'indirect' modifier cannot be applied to this declaration}}
 protocol P {
-  @available(swift, introduced: 4) associatedtype Assoc
+  @available(macOS, introduced: 10.9) associatedtype Assoc
 }

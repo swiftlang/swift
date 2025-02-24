@@ -18,6 +18,15 @@ internal func unsafeBitCast<T: ~Escapable, U>(
   Builtin.reinterpretCast(x)
 }
 
+/// Used by SwiftifyImport to work around a compiler diagnostic. It should be removed once the
+/// workaround is no longer needed.
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+public func _unsafeRemoveLifetime<T: ~Copyable & ~Escapable>(_ dependent: consuming T) -> T {
+  dependent
+}
+
 /// Unsafely discard any lifetime dependency on the `dependent` argument. Return
 /// a value identical to `dependent` with a lifetime dependency on the caller's
 /// borrow scope of the `source` argument.
@@ -81,7 +90,7 @@ extension CxxSpan {
 extension Span {
   @_alwaysEmitIntoClient
   @unsafe
-  @lifetime(borrow span)
+  @_unsafeNonescapableResult
   public init<T: CxxSpan<Element>>(
     _unsafeCxxSpan span: borrowing T,
   ) {

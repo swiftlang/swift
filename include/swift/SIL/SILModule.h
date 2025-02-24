@@ -1056,6 +1056,10 @@ public:
   /// See scheduledForDeletion for details.
   void flushDeletedInsts();
 
+  bool hasInstructionsScheduledForDeletion() const {
+    return !scheduledForDeletion.empty();
+  }
+
   /// Looks up the llvm intrinsic ID and type for the builtin function.
   ///
   /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an

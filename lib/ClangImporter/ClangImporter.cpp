@@ -1266,6 +1266,9 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
   }
   CI->getFrontendOpts().ModuleMapFiles = FilteredModuleMapFiles;
 
+  // Clear clang debug flags.
+  CI->getCodeGenOpts().DwarfDebugFlags.clear();
+
   return CI->getCC1CommandLine();
 }
 
@@ -1403,10 +1406,10 @@ ClangImporter::create(ASTContext &ctx,
   // Install a Clang module file extension to build Swift name lookup tables.
   importer->Impl.Invocation->getFrontendOpts().ModuleFileExtensions.push_back(
       std::make_shared<SwiftNameLookupExtension>(
-          importer->Impl.BridgingHeaderLookupTable,
-          importer->Impl.LookupTables, importer->Impl.SwiftContext,
+          importer->Impl.BridgingHeaderLookupTable, importer->Impl.LookupTables,
+          importer->Impl.SwiftContext,
           importer->Impl.getBufferImporterForDiagnostics(),
-          importer->Impl.platformAvailability));
+          importer->Impl.platformAvailability, &importer->Impl));
 
   // Create a compiler instance.
   {
@@ -1554,7 +1557,7 @@ ClangImporter::create(ASTContext &ctx,
 
   importer->Impl.nameImporter.reset(new NameImporter(
       importer->Impl.SwiftContext, importer->Impl.platformAvailability,
-      importer->Impl.getClangSema()));
+      importer->Impl.getClangSema(), &importer->Impl));
 
   // FIXME: These decls are not being parsed correctly since (a) some of the
   // callbacks are still being added, and (b) the logic to parse them has
@@ -4102,15 +4105,11 @@ void ClangModuleUnit::collectLinkLibraries(
   if (clangModule->UseExportAsModuleLinkName)
     return;
 
-  for (auto clangLinkLib : clangModule->LinkLibraries) {
-    LibraryKind kind;
-    if (clangLinkLib.IsFramework)
-      kind = LibraryKind::Framework;
-    else
-      kind = LibraryKind::Library;
-
-    callback(LinkLibrary(clangLinkLib.Library, kind));
-  }
+  for (auto clangLinkLib : clangModule->LinkLibraries)
+    callback(LinkLibrary{clangLinkLib.Library,
+                         clangLinkLib.IsFramework ? LibraryKind::Framework
+                                                  : LibraryKind::Library,
+                         /*static=*/false});
 }
 
 StringRef ClangModuleUnit::getFilename() const {
@@ -5214,9 +5213,10 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
           } else
             nonPackArgs.push_back(arg);
           for (auto nonPackArg : nonPackArgs) {
-            if (nonPackArg.getKind() != clang::TemplateArgument::Type) {
-              desc.impl.diagnose(loc, diag::type_template_parameter_expected,
-                                 argToCheck.second);
+            if (nonPackArg.getKind() != clang::TemplateArgument::Type &&
+                desc.impl) {
+              desc.impl->diagnose(loc, diag::type_template_parameter_expected,
+                                  argToCheck.second);
               return CxxEscapability::Unknown;
             }
 
@@ -5237,8 +5237,9 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         }
       }
 
-      for (auto name : conditionalParams)
-        desc.impl.diagnose(loc, diag::unknown_template_parameter, name);
+      if (desc.impl)
+        for (auto name : conditionalParams)
+          desc.impl->diagnose(loc, diag::unknown_template_parameter, name);
 
       return hadUnknown ? CxxEscapability::Unknown : CxxEscapability::Escapable;
     }
@@ -7679,7 +7680,146 @@ bool importer::isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType 
          !hasImmortalAtts(pointeeType->getDecl());
 }
 
+static bool hasDiamondInheritanceRefType(const clang::CXXRecordDecl *decl) {
+  if (!decl->hasDefinition() || decl->isDependentType())
+    return false;
+
+  llvm::DenseSet<const clang::CXXRecordDecl *> seenBases;
+  bool hasRefDiamond = false;
+
+  decl->forallBases([&](const clang::CXXRecordDecl *Base) {
+    if (hasImportAsRefAttr(Base) && !seenBases.insert(Base).second &&
+        !decl->isVirtuallyDerivedFrom(Base))
+      hasRefDiamond = true;
+    return true;
+  });
+
+  return hasRefDiamond;
+}
+
+// Returns the given declaration along with all its parent declarations that are
+// reference types.
+static llvm::SmallVector<const clang::RecordDecl *, 4>
+getRefParentDecls(const clang::RecordDecl *decl, ASTContext &ctx,
+                  ClangImporter::Implementation *importerImpl) {
+  assert(decl && "decl is null inside getRefParentDecls");
+
+  llvm::SmallVector<const clang::RecordDecl *, 4> matchingDecls;
+
+  if (hasImportAsRefAttr(decl))
+    matchingDecls.push_back(decl);
+
+  if (const auto *cxxRecordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
+    if (!cxxRecordDecl->hasDefinition())
+      return matchingDecls;
+    if (hasDiamondInheritanceRefType(cxxRecordDecl)) {
+      if (importerImpl) {
+        if (!importerImpl->DiagnosedCxxRefDecls.count(decl)) {
+          HeaderLoc loc(decl->getLocation());
+          importerImpl->diagnose(loc, diag::cant_infer_frt_in_cxx_inheritance,
+                                 decl);
+          importerImpl->DiagnosedCxxRefDecls.insert(decl);
+        }
+      } else {
+        ctx.Diags.diagnose({}, diag::cant_infer_frt_in_cxx_inheritance, decl);
+        assert(false && "nullpointer passeed for importerImpl when calling "
+                        "getRefParentOrDiag");
+      }
+      return matchingDecls;
+    }
+    cxxRecordDecl->forallBases([&](const clang::CXXRecordDecl *baseDecl) {
+      if (hasImportAsRefAttr(baseDecl))
+        matchingDecls.push_back(baseDecl);
+      return true;
+    });
+  }
+
+  return matchingDecls;
+}
+
+static llvm::SmallVector<ValueDecl *, 1>
+getValueDeclsForName(const clang::Decl *decl, ASTContext &ctx, StringRef name) {
+  llvm::SmallVector<ValueDecl *, 1> results;
+  auto *clangMod = decl->getOwningModule();
+  if (clangMod && clangMod->isSubModule())
+    clangMod = clangMod->getTopLevelModule();
+  if (clangMod) {
+    auto parentModule =
+        ctx.getClangModuleLoader()->getWrapperForModule(clangMod);
+    ctx.lookupInModule(parentModule, name, results);
+  } else {
+    // There is no Clang module for this declaration, so perform lookup from
+    // the main module. This will find declarations from the bridging header.
+    namelookup::lookupInModule(
+        ctx.MainModule, ctx.getIdentifier(name), results,
+        NLKind::UnqualifiedLookup, namelookup::ResolutionKind::Overloadable,
+        ctx.MainModule, SourceLoc(), NL_UnqualifiedDefault);
+
+    // Filter out any declarations that didn't come from Clang.
+    auto newEnd =
+        std::remove_if(results.begin(), results.end(),
+                       [&](ValueDecl *decl) { return !decl->getClangDecl(); });
+    results.erase(newEnd, results.end());
+  }
+  return results;
+}
+
+static const clang::RecordDecl *
+getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
+                   ClangImporter::Implementation *importerImpl) {
+  auto refParentDecls = getRefParentDecls(decl, ctx, importerImpl);
+  if (refParentDecls.empty())
+    return nullptr;
+
+  std::unordered_set<ValueDecl *> uniqueRetainDecls{}, uniqueReleaseDecls{};
+  constexpr StringRef retainPrefix = "retain:";
+  constexpr StringRef releasePrefix = "release:";
+
+  for (const auto *refParentDecl : refParentDecls) {
+    assert(refParentDecl && "refParentDecl is null inside getRefParentOrDiag");
+    for (const auto *attr : refParentDecl->getAttrs()) {
+      if (const auto swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
+        const auto &attribute = swiftAttr->getAttribute();
+        llvm::SmallVector<ValueDecl *, 1> valueDecls;
+        if (attribute.starts_with(retainPrefix)) {
+          auto name = attribute.drop_front(retainPrefix.size()).str();
+          valueDecls = getValueDeclsForName(decl, ctx, name);
+          uniqueRetainDecls.insert(valueDecls.begin(), valueDecls.end());
+        } else if (attribute.starts_with(releasePrefix)) {
+          auto name = attribute.drop_front(releasePrefix.size()).str();
+          valueDecls = getValueDeclsForName(decl, ctx, name);
+          uniqueReleaseDecls.insert(valueDecls.begin(), valueDecls.end());
+        }
+      }
+    }
+  }
+
+  // Ensure that exactly one unique retain function and one unique release
+  // function are found.
+  if (uniqueRetainDecls.size() != 1 || uniqueReleaseDecls.size() != 1) {
+    if (importerImpl) {
+      if (!importerImpl->DiagnosedCxxRefDecls.count(decl)) {
+        HeaderLoc loc(decl->getLocation());
+        importerImpl->diagnose(loc, diag::cant_infer_frt_in_cxx_inheritance,
+                               decl);
+        importerImpl->DiagnosedCxxRefDecls.insert(decl);
+      }
+    } else {
+      ctx.Diags.diagnose({}, diag::cant_infer_frt_in_cxx_inheritance, decl);
+      assert(false && "nullpointer passed for importerImpl when calling "
+                      "getRefParentOrDiag");
+    }
+    return nullptr;
+  }
+
+  return refParentDecls.front();
+}
+
 // Is this a pointer to a foreign reference type.
+// TODO: We need to review functions like this to ensure that
+// CxxRecordSemantics::evaluate is consistently invoked wherever we need to
+// determine whether a C++ type qualifies as a foreign reference type
+// rdar://145184659
 static bool isForeignReferenceType(const clang::QualType type) {
   if (!type->isPointerType())
     return false;
@@ -7928,10 +8068,10 @@ CxxRecordSemanticsKind
 CxxRecordSemantics::evaluate(Evaluator &evaluator,
                              CxxRecordSemanticsDescriptor desc) const {
   const auto *decl = desc.decl;
-
-  if (hasImportAsRefAttr(decl)) {
+  ClangImporter::Implementation *importerImpl = desc.importerImpl;
+  if (hasImportAsRefAttr(decl) ||
+      getRefParentOrDiag(decl, desc.ctx, importerImpl))
     return CxxRecordSemanticsKind::Reference;
-  }
 
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl);
   if (!cxxDecl) {
@@ -7944,15 +8084,16 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   if (!hasDestroyTypeOperations(cxxDecl) ||
       (!hasCopyTypeOperations(cxxDecl) && !hasMoveTypeOperations(cxxDecl))) {
     if (desc.shouldDiagnoseLifetimeOperations) {
+      HeaderLoc loc(decl->getLocation());
       if (hasUnsafeAPIAttr(cxxDecl))
-        desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
-                                "import_unsafe", decl->getNameAsString());
+        importerImpl->diagnose(loc, diag::api_pattern_attr_ignored,
+                               "import_unsafe", decl->getNameAsString());
       if (hasOwnedValueAttr(cxxDecl))
-        desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
-                                "import_owned", decl->getNameAsString());
+        importerImpl->diagnose(loc, diag::api_pattern_attr_ignored,
+                               "import_owned", decl->getNameAsString());
       if (hasIteratorAPIAttr(cxxDecl))
-        desc.ctx.Diags.diagnose({}, diag::api_pattern_attr_ignored,
-                                "import_iterator", decl->getNameAsString());
+        importerImpl->diagnose(loc, diag::api_pattern_attr_ignored,
+                               "import_iterator", decl->getNameAsString());
     }
 
     return CxxRecordSemanticsKind::MissingLifetimeOperation;
@@ -8159,6 +8300,12 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
                                  : "release:";
 
   auto decl = cast<clang::RecordDecl>(swiftDecl->getClangDecl());
+
+  if (!hasImportAsRefAttr(decl)) {
+    if (auto parentRefDecl = getRefParentOrDiag(decl, ctx, nullptr))
+      decl = parentRefDecl;
+  }
+
   if (!decl->hasAttrs())
     return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
 
@@ -8185,27 +8332,8 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   if (name == "immortal")
     return {CustomRefCountingOperationResult::immortal, nullptr, name};
 
-  llvm::SmallVector<ValueDecl *, 1> results;
-  auto *clangMod = swiftDecl->getClangDecl()->getOwningModule();
-  if (clangMod && clangMod->isSubModule())
-    clangMod = clangMod->getTopLevelModule();
-  if (clangMod) {
-    auto parentModule = ctx.getClangModuleLoader()->getWrapperForModule(clangMod);
-    ctx.lookupInModule(parentModule, name, results);
-  } else {
-    // There is no Clang module for this declaration, so perform lookup from
-    // the main module. This will find declarations from the bridging header.
-    namelookup::lookupInModule(
-        ctx.MainModule, ctx.getIdentifier(name), results,
-        NLKind::UnqualifiedLookup, namelookup::ResolutionKind::Overloadable,
-        ctx.MainModule, SourceLoc(), NL_UnqualifiedDefault);
-
-    // Filter out any declarations that didn't come from Clang.
-    auto newEnd = std::remove_if(results.begin(), results.end(), [&](ValueDecl *decl) {
-      return !decl->getClangDecl();
-    });
-    results.erase(newEnd, results.end());
-  }
+  llvm::SmallVector<ValueDecl *, 1> results =
+      getValueDeclsForName(swiftDecl->getClangDecl(), ctx, name);
   if (results.size() == 1)
     return {CustomRefCountingOperationResult::foundOperation, results.front(),
             name};
@@ -8214,6 +8342,106 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     return {CustomRefCountingOperationResult::notFound, nullptr, name};
 
   return {CustomRefCountingOperationResult::tooManyFound, nullptr, name};
+}
+
+/// Check whether the given Clang type involves an unsafe type.
+static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
+  // Handle pointers.
+  auto pointeeType = clangType->getPointeeType();
+  if (!pointeeType.isNull()) {
+    // Function pointers are okay.
+    if (pointeeType->isFunctionType())
+      return false;
+    
+    // Pointers to record types are okay if they come in as foreign reference
+    // types.
+    if (auto recordDecl = pointeeType->getAsRecordDecl()) {
+      if (hasImportAsRefAttr(recordDecl))
+        return false;
+    }
+    
+    // All other pointers are considered unsafe.
+    return true;
+  }
+  
+  // Handle records recursively.
+  if (auto recordDecl = clangType->getAsTagDecl()) {
+    auto safety =
+        evaluateOrDefault(evaluator, ClangDeclExplicitSafety({recordDecl}),
+                          ExplicitSafety::Unspecified);
+    switch (safety) {
+      case ExplicitSafety::Unsafe:
+        return true;
+        
+      case ExplicitSafety::Safe:
+      case ExplicitSafety::Unspecified:
+        return false;        
+    }
+  }
+    
+  // Everything else is safe.
+  return false;
+}
+
+ExplicitSafety ClangDeclExplicitSafety::evaluate(
+    Evaluator &evaluator,
+    SafeUseOfCxxDeclDescriptor desc
+) const {
+  // FIXME: Somewhat duplicative with importAsUnsafe.
+  // FIXME: Also similar to hasPointerInSubobjects
+  // FIXME: should probably also subsume IsSafeUseOfCxxDecl
+  
+  // Explicitly unsafe.
+  auto decl = desc.decl;
+  if (hasUnsafeAPIAttr(decl) || hasSwiftAttribute(decl, "unsafe"))
+    return ExplicitSafety::Unsafe;
+  
+  // Explicitly safe.
+  if (hasSwiftAttribute(decl, "safe"))
+    return ExplicitSafety::Safe;
+  
+  // Enums are always safe.
+  if (isa<clang::EnumDecl>(decl))
+    return ExplicitSafety::Safe;
+  
+  // If it's not a record, leave it unspecified.
+  auto recordDecl = dyn_cast<clang::RecordDecl>(decl);
+  if (!recordDecl)
+    return ExplicitSafety::Unspecified;
+
+  // Escapable and non-escapable annotations imply that the declaration is
+  // safe.
+  if (evaluateOrDefault(
+          evaluator,
+          ClangTypeEscapability({recordDecl->getTypeForDecl(), nullptr}),
+          CxxEscapability::Unknown) != CxxEscapability::Unknown)
+    return ExplicitSafety::Safe;
+  
+  // If we don't have a definition, leave it unspecified.
+  recordDecl = recordDecl->getDefinition();
+  if (!recordDecl)
+    return ExplicitSafety::Unspecified;
+  
+  // If this is a C++ class, check its bases.
+  if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
+    for (auto base : cxxRecordDecl->bases()) {
+      if (hasUnsafeType(evaluator, base.getType()))
+        return ExplicitSafety::Unsafe;
+    }
+  }
+  
+  // Check the fields.
+  for (auto field : recordDecl->fields()) {
+    if (hasUnsafeType(evaluator, field->getType()))
+      return ExplicitSafety::Unsafe;
+  }
+  
+  // Okay, call it safe.
+  return ExplicitSafety::Safe;
+}
+
+bool ClangDeclExplicitSafety::isCached() const {
+  return isa<clang::RecordDecl>(std::get<0>(getStorage()).decl);
 }
 
 void ClangImporter::withSymbolicFeatureEnabled(
@@ -8348,4 +8576,22 @@ AccessLevel importer::convertClangAccess(clang::AccessSpecifier access) {
     // about Swift 'public' vs 'open'; see above).
     return AccessLevel::Public;
   }
+}
+
+SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
+importer::getPrivateFileIDAttrs(const clang::Decl *decl) {
+  llvm::SmallVector<std::pair<StringRef, clang::SourceLocation>, 1> files;
+
+  constexpr auto prefix = StringRef("private_fileid:");
+
+  if (decl->hasAttrs()) {
+    for (const auto *attr : decl->getAttrs()) {
+      const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
+      if (swiftAttr && swiftAttr->getAttribute().starts_with(prefix))
+        files.push_back({swiftAttr->getAttribute().drop_front(prefix.size()),
+                         attr->getLocation()});
+    }
+  }
+
+  return files;
 }

@@ -334,3 +334,72 @@ bb0(%0 : @guaranteed $Any, %1 : $*Any):
   %11 = tuple ()
   return %11 : $()
 }
+
+struct TwoFields {
+  var a: Child
+  var b: Child
+}
+
+sil @no_read : $@convention(thin) (@in_guaranteed TwoFields) -> @out Child {
+[%0: write v**]
+[global: ]
+}
+sil @no_reads : $@convention(thin) (@in_guaranteed Child, @in_guaranteed TwoFields) -> () {
+[global: ]
+}
+
+// CHECK-LABEL: sil [ossa] @argument_aliasing :
+// CHECK:         %1 = alloc_stack
+// CHECK:         apply %{{[0-9]+}}(%1, %0)
+// CHECK-LABEL: } // end sil function 'argument_aliasing'
+sil [ossa] @argument_aliasing : $@convention(thin) (@inout TwoFields) -> () {
+bb0(%0 : $*TwoFields):
+  %1 = alloc_stack $Child
+  %2 = function_ref @no_read : $@convention(thin) (@in_guaranteed TwoFields) -> @out Child
+  %3 = apply %2(%1, %0) : $@convention(thin) (@in_guaranteed TwoFields) -> @out Child
+  %4 = struct_element_addr %0, #TwoFields.a
+  copy_addr [take] %1 to %4
+  dealloc_stack %1
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @no_argument_aliasing :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[A:%.*]] = struct_element_addr %0 : $*TwoFields, #TwoFields.a
+// CHECK-NEXT:    destroy_addr [[A]]
+// CHECK:         apply %{{[0-9]+}}([[A]], %1)
+// CHECK-NOT:     copy_addr
+// CHECK-LABEL: } // end sil function 'no_argument_aliasing'
+sil [ossa] @no_argument_aliasing : $@convention(thin) (@inout TwoFields, @inout TwoFields) -> () {
+bb0(%0 : $*TwoFields, %1 : $*TwoFields):
+  %2 = alloc_stack $Child
+  %3 = function_ref @no_read : $@convention(thin) (@in_guaranteed TwoFields) -> @out Child
+  %4 = apply %3(%2, %1) : $@convention(thin) (@in_guaranteed TwoFields) -> @out Child
+  %5 = struct_element_addr %0, #TwoFields.a
+  copy_addr [take] %2 to %5
+  dealloc_stack %2
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @guaranteed_argument_aliasing :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[A:%.*]] = struct_element_addr %0 : $*TwoFields, #TwoFields.a
+// CHECK-NEXT:    destroy_addr [[A]]
+// CHECK:         apply %{{[0-9]+}}([[A]], %0)
+// CHECK-NOT:     copy_addr
+// CHECK-LABEL: } // end sil function 'guaranteed_argument_aliasing'
+sil [ossa] @guaranteed_argument_aliasing : $@convention(thin) (@inout TwoFields, @owned Child) -> () {
+bb0(%0 : $*TwoFields, %1 : @owned $Child):
+  %2 = alloc_stack $Child
+  store %1 to [init] %2
+  %3 = function_ref @no_reads : $@convention(thin) (@in_guaranteed Child, @in_guaranteed TwoFields) -> ()
+  %4 = apply %3(%2, %0) : $@convention(thin) (@in_guaranteed Child, @in_guaranteed TwoFields) -> ()
+  %5 = struct_element_addr %0, #TwoFields.a
+  copy_addr [take] %2 to %5
+  dealloc_stack %2
+  %8 = tuple ()
+  return %8
+}
+

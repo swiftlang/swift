@@ -41,7 +41,7 @@ static EnumElementDecl *extractEnumElement(DeclContext *DC, SourceLoc UseLoc,
   if (auto constraint =
           getUnsatisfiedAvailabilityConstraint(constant, DC, UseLoc)) {
     // Only diagnose explicit unavailability.
-    if (!constraint->isConditionallySatisfiable())
+    if (constraint->isUnavailable())
       diagnoseDeclAvailability(constant, UseLoc, nullptr,
                                ExportContext::forFunctionBody(DC, UseLoc));
   }

@@ -3285,6 +3285,10 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     if (AllowIsolatedAny)
       appendOperator("YA");
     break;
+
+  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    appendOperator("YC");
+    break;
   }
 
   if (isRecursedInto && fn->hasSendingResult()) {
