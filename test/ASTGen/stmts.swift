@@ -116,6 +116,17 @@ func testThen() {
   }
 }
 
+func intOrString() -> Int? { 1 }
+func intOrString() -> String? { "" }
+func testIf() {
+  if
+    let i: Int = intOrString(),
+    case let str? = intOrString() as String?
+  {
+    _ = (i, str)
+  }
+}
+
 struct GenericTypeWithYields<T> {
   var storedProperty: T?
 

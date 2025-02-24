@@ -95,6 +95,11 @@ BridgedDictionaryTypeRepr BridgedDictionaryTypeRepr_createParsed(
                          SourceRange{lSquareLoc, rSquareLoc});
 }
 
+BridgedErrorTypeRepr BridgedErrorTypeRepr_create(BridgedASTContext cContext,
+                                                 BridgedSourceRange cRange) {
+  return ErrorTypeRepr::create(cContext.unbridged(), cRange.unbridged());
+}
+
 BridgedInverseTypeRepr
 BridgedInverseTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceLoc cTildeLoc,

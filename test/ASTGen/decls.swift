@@ -174,6 +174,10 @@ struct TestSubscripts {
     }
     set(x) {}
   }
+
+  subscript<I: Proto3, J: Proto3>(i: I, j: J) -> Int where I.A == J.B {
+    1
+  }
 }
 
 protocol Proto1 {}

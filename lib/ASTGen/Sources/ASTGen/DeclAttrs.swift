@@ -187,6 +187,8 @@ extension ASTGenVisitor {
         fatalError("unimplemented")
       case .unavailableFromAsync:
         return handle(self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute)
+      case .none where attrName == "_unavailableInEmbedded":
+        return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 
       // Simple attributes.
       case .addressableSelf,
@@ -1778,6 +1780,30 @@ extension ASTGenVisitor {
     )
   }
 
+  func generateUnavailableInEmbeddedAttr(attribute node: AttributeSyntax) -> BridgedAvailableAttr? {
+    if ctx.langOptsHasFeature(.Embedded) {
+      return BridgedAvailableAttr.createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        domain: .forEmbedded(),
+        domainLoc: nil,
+        kind: .unavailable,
+        message: "unavailable in embedded Swift",
+        renamed: "",
+        introduced: BridgedVersionTuple(),
+        introducedRange: BridgedSourceRange(),
+        deprecated: BridgedVersionTuple(),
+        deprecatedRange:  BridgedSourceRange(),
+        obsoleted: BridgedVersionTuple(),
+        obsoletedRange: BridgedSourceRange()
+      )
+    } else {
+      // For non-Embedded mode, ignore it.
+      return nil
+    }
+  }
+
   func generateSimpleDeclAttr(attribute node: AttributeSyntax, kind: BridgedDeclAttrKind) -> BridgedDeclAttribute? {
     // TODO: Diagnose extraneous arguments.
     // TODO: Diagnose if `kind` is a modifier.
@@ -2040,17 +2066,18 @@ extension ASTGenVisitor {
       kind = .weak
       guard node.detail == nil else {
         // TODO: Diagnose.
-        return nil
+        fatalError("invalid argument for 'weak' modifier")
       }
     case .unowned:
-      switch node.detail?.detail.keywordKind {
-      case .safe, nil:
+      switch node.detail?.detail.rawText {
+      case "safe", nil:
         kind = .unowned
-      case .unsafe:
+      case "unsafe":
         kind = .unmanaged
-      case _?:
+      case let text?:
         // TODO: Diagnose
-        kind = .unowned
+        _ = text
+        fatalError("invalid argument for 'unowned' modifier")
       }
     default:
       preconditionFailure("ReferenceOwnership modifier must be 'weak' or 'unowned'")

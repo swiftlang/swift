@@ -148,18 +148,25 @@ extension ASTGenVisitor {
       var pat = self.generate(pattern: node.pattern)
       let keywordLoc = self.generateSourceLoc(node.bindingSpecifier)
       let isLet = node.bindingSpecifier.keywordKind == .let
-      pat =
-        BridgedBindingPattern.createParsed(
-          self.ctx,
-          keywordLoc: keywordLoc,
-          isLet: isLet,
-          subPattern: pat
-        ).asPattern
+      pat = BridgedBindingPattern.createParsed(
+        self.ctx,
+        keywordLoc: keywordLoc,
+        isLet: isLet,
+        subPattern: pat
+      ).asPattern
 
       // NOTE: (From the comment in libParse) The let/var pattern is part of the
-      // statement. But since the statement doesn't have the information. But,
-      // I'm not sure this should really be implicit.
+      // statement. But since the statement doesn't have the information, I'm not
+      // sure this should really be implicit.
       pat.setImplicit()
+
+      if let typeAnnotation = node.typeAnnotation {
+        pat = BridgedTypedPattern.createParsed(
+          self.ctx,
+          pattern: pat,
+          type: self.generate(type: typeAnnotation.type)
+        ).asPattern
+      }
 
       let initializer: BridgedExpr
       if let initNode = node.initializer {

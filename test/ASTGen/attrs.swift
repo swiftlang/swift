@@ -227,3 +227,10 @@ func testNonIsolated(actor: MyActor) {
   _ = actor.constFlag
   _ = actor.mutableFlag
 }
+
+struct ReferenceOwnershipModifierTest<X: AnyObject> {
+    weak var weakValue: X?
+    unowned var unownedValue: X
+    unowned(safe) var unownedSafeValue: X
+    unowned(unsafe) var unmanagedValue: X
+}

@@ -9343,6 +9343,11 @@ Type SubscriptDecl::getElementInterfaceType() const {
   return ErrorType::get(ctx);
 }
 
+std::optional<Type> SubscriptDecl::getCachedElementInterfaceType() const {
+  auto mutableThis = const_cast<SubscriptDecl *>(this);
+  return ResultTypeRequest{mutableThis}.getCachedResult();
+}
+
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
   // If the index type is an integral type, we have an indexed
   // subscript.
