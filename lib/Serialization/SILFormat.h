@@ -179,7 +179,9 @@ namespace sil_block {
     SIL_DEBUG_SCOPE,
     SIL_DEBUG_SCOPE_REF,
     SIL_SOURCE_LOC,
-    SIL_SOURCE_LOC_REF
+    SIL_SOURCE_LOC_REF,
+    SIL_DEBUG_VALUE_DELIMITER,
+    SIL_DEBUG_VALUE,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -311,6 +313,22 @@ namespace sil_block {
     TypeIDField,
     SILTypeCategoryField 
   >;
+
+  using SILDebugValueLayout = BCRecordLayout<
+    SIL_DEBUG_VALUE,
+
+    SILTypeCategoryField, /// operand type category
+    SILTypeCategoryField, /// debug var type category
+    BCFixed<11>,          /// poison, movableValueDebuginfo, trace,
+                          /// hasDebugVar, isLet, isDenseMapSingleton(two
+                          /// bits), hasSource, hasLoc, hasExpr
+    BCArray<ValueIDField> /// operand info: operand, type, debug var info:
+                          /// name, argno, optional stuff: typeid
+  >;
+
+  using DebugValueDelimiterLayout = BCRecordLayout<
+    SIL_DEBUG_VALUE_DELIMITER
+    >;
 
   using SourceLocLayout = BCRecordLayout<
     SIL_SOURCE_LOC,
