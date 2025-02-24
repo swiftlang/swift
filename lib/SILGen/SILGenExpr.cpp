@@ -1094,7 +1094,8 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   // We can't load at immediate +0 from the lvalue without deeper analysis,
   // since the access will be immediately ended and might invalidate the value
   // we loaded.
-  return SGF.emitLoadOfLValue(E, std::move(lv), C.withFollowingSideEffects());
+  return SGF.emitLoadOfLValue(E->getSubExpr(), std::move(lv),
+                              C.withFollowingSideEffects());
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
