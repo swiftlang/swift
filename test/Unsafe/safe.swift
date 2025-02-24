@@ -88,9 +88,26 @@ func testUnsafeAsSequenceForEach() {
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
   for _ in uas { } // expected-note{{conformance}}
-  // expected-note@-1{{reference}}
+  // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}{{7-7=unsafe }}
 
-  for _ in unsafe uas { } // okay
+  for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}{{7-7=unsafe }}
+
+  for unsafe _ in unsafe uas { } // okay
+}
+
+struct UnsafeIterator: @unsafe IteratorProtocol {
+  @unsafe mutating func next() -> Int? { nil }
+}
+
+struct SequenceWithUnsafeIterator: Sequence {
+  func makeIterator() -> UnsafeIterator { UnsafeIterator() }
+}
+
+func testUnsafeIteratorForEach() {
+  let swui = SequenceWithUnsafeIterator()
+
+  for _ in swui { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
+  for unsafe _ in swui { } // okay, it's only the iterator that's unsafe
 }
 
 class MyRange {
