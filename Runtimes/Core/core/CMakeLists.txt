@@ -291,10 +291,13 @@ if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-partial-specialization>")
 endif()
 
-target_compile_definitions(swiftCore PRIVATE
-  $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
-  $<$<BOOL:${SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS}>:-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER>
-  $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftCore>)
+target_compile_definitions(swiftCore
+  PRIVATE
+    $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
+    $<$<BOOL:${SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS}>:-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER>
+    $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftCore>
+  INTERFACE
+    $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>)
 target_compile_options(swiftCore PRIVATE
   "$<$<AND:$<BOOL:${BUILD_SHARED_LIBS}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -DswiftCore_EXPORTS>")
 
@@ -303,10 +306,11 @@ target_link_libraries(swiftCore
     swiftRuntime
     swiftLLVMSupport
     swiftDemangling
-    swiftShims
     swiftStdlibStubs
     swiftThreading
-    $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>)
+    $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>
+  PUBLIC
+    swiftShims)
 target_link_options(swiftCore PRIVATE
   -nostartfiles)
 if(NOT POLICY CMP0157)
@@ -324,6 +328,8 @@ if(NOT ANDROID AND NOT APPLE AND NOT LINUX AND NOT WIN32 AND UNIX)
 endif()
 
 install(TARGETS swiftCore
+  EXPORT SwiftCoreTargets
+  COMPONENT SwiftCore_runtime
   ARCHIVE DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

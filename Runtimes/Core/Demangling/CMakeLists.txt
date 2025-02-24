@@ -48,5 +48,7 @@ if(LINUX OR BSD)
 endif()
 
 if(NOT BUILD_SHARED_LIBS)
-  install(TARGETS swiftDemangling)
+  install(TARGETS swiftDemangling
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
 endif()

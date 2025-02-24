@@ -10,6 +10,8 @@ if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
     swiftShims)
 
   if(NOT BUILD_SHARED_LIBS)
-    install(TARGETS swiftCommandLineSupport)
+    install(TARGETS swiftCommandLineSupport
+      EXPORT SwiftCoreTargets
+      COMPONENT SwiftCore_runtime)
   endif()
 endif()

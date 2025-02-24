@@ -118,6 +118,8 @@ set_target_properties(swift_Concurrency PROPERTIES
   Swift_MODULE_NAME _Concurrency)
 
 install(TARGETS swift_Concurrency
+  EXPORT SwiftCoreTargets
+  COMPONENT SwiftCore_runtime
   ARCHIVE DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
