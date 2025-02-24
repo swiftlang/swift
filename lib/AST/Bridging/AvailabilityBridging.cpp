@@ -152,24 +152,3 @@ BridgedSourceRange
 BridgedAvailabilitySpec_getVersionRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getVersionSrcRange();
 }
-
-//===----------------------------------------------------------------------===//
-// MARK: AvailabilityDomain
-//===----------------------------------------------------------------------===//
-
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forUniversal() {
-  return swift::AvailabilityDomain::forUniversal();
-}
-BridgedAvailabilityDomain
-BridgedAvailabilityDomain::forPlatform(BridgedPlatformKind platformKind) {
-  return swift::AvailabilityDomain::forPlatform(unbridge(platformKind));
-}
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forSwiftLanguage() {
-  return swift::AvailabilityDomain::forSwiftLanguage();
-}
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forPackageDescription() {
-  return swift::AvailabilityDomain::forPackageDescription();
-}
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forEmbedded() {
-  return swift::AvailabilityDomain::forEmbedded();
-}
