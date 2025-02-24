@@ -234,7 +234,7 @@ func functionWithShortFormIOSVersionNoPointAvailable() {}
 @available(iOS 8.0, OSX 10.10.3, *)
 func functionWithShortFormIOSOSXAvailable() {}
 
-@available(iOS 8.0 // expected-error {{must handle potential future platforms with '*'}} {{19-19=, *}}
+@available(iOS 8.0
 func shortFormMissingParen() { // expected-error {{expected ')' in 'available' attribute}}
 }
 

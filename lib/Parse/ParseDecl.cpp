@@ -790,10 +790,13 @@ bool Parser::parseAvailability(
     // we will synthesize
     //   @available(_PackageDescription, introduced: 4.2)
 
-    AvailabilitySpec *PrevSpec = nullptr;
+    AvailableAttr *PrevAttr = nullptr;
     for (auto *Spec : Specs) {
-      if (Spec->isWildcard())
+      if (Spec->isWildcard()) {
+        if (PrevAttr)
+          PrevAttr->setIsAdjacentToWildcard();
         continue;
+      }
 
       std::optional<AvailabilityDomain> Domain = Spec->getDomain();
       if (!Domain)
@@ -813,13 +816,11 @@ bool Parser::parseAvailability(
                         /*Implicit=*/false, AttrName == SPI_AVAILABLE_ATTRNAME);
       addAttribute(Attr);
 
-      if (PrevSpec) {
-        if (PrevSpec->isWildcard())
-          Attr->setIsFollowedByWildcard();
-        else
-          Attr->setIsFollowedByGroupedAvailableAttr();
-      }
-      PrevSpec = Spec;
+      Attr->setIsGroupMember();
+      if (!PrevAttr)
+        Attr->setIsGroupTerminator();
+
+      PrevAttr = Attr;
     }
 
     return true;
