@@ -1000,9 +1000,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(S.addTypeRef(Type.getRawASTType()));
 
     if (DebugVar) {
-      attrs |= 1 << 3; // has debug var
+      // Is a DebugVariable being serialized.
+      attrs |= 1 << 3;
       attrs |= DebugVar->isLet() << 4;
-      attrs |= DebugVar->isDenseMapSingleton << 5; // needs two bits
+
+      // isDenseMapSingleton needs two bits.
+      attrs |= DebugVar->isDenseMapSingleton << 5;
 
       ListOfValues.push_back(S.addUniquedStringRef(DebugVar->Name));
       ListOfValues.push_back(DebugVar->ArgNo);
@@ -1031,8 +1034,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
           ListOfValues.push_back(LC.second);
           ListOfValues.push_back(FNameID);
         } else if (RawLoc.isFilenameAndLocation()) {
-          // TODO: this is a workaround until rdar://problem/25225083 is
-          // implemented.
+          // getSourceLoc produces an empty SourceLoc for FilenameAndLocation,
+          // so this needs to be handled separately. rdar://25225083.
           attrs |= 1 << 9;
           auto FNameLoc = RawLoc.getFilenameAndLocation();
           ListOfValues.push_back(FNameLoc->line);
@@ -3290,7 +3293,8 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
     std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
     FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
   } else if (Scope->Loc.isFilenameAndLocation()) {
-    // TODO: this is a workaround until rdar://problem/25225083 is implemented.
+    // getSourceLoc produces an empty SourceLoc for FilenameAndLocation, so
+    // this needs to be handled separately. rdar://25225083.
     auto FNameLoc = Scope->Loc.getFilenameAndLocation();
     Row = FNameLoc->line;
     Column = FNameLoc->column;
