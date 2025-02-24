@@ -4655,7 +4655,8 @@ static void emitConsumedLValueRecursive(SILGenFunction &SGF, SILLocation loc,
 
   // Load if necessary.
   if (value.getType().isAddress()) {
-    if (!param.isIndirectIn() || !SGF.silConv.useLoweredAddresses()) {
+    if ((!param.isIndirectIn() && !param.isIndirectInCXX()) ||
+        !SGF.silConv.useLoweredAddresses()) {
       value = SGF.B.createFormalAccessLoadTake(loc, value);
 
       // If our value is a moveonlywrapped type, unwrap it using owned so that
