@@ -372,6 +372,8 @@ public:
   /// Emit names of struct stored properties and enum cases.
   unsigned EnableReflectionNames : 1;
 
+  unsigned DisableLLVMMergeFunctions : 1;
+
   /// Emit mangled names of anonymous context descriptors.
   unsigned EnableAnonymousContextMangledNames : 1;
 
@@ -577,7 +579,8 @@ public:
         SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
         HasValueNamesSetting(false), ValueNames(false),
         ReflectionMetadata(ReflectionMetadataMode::Runtime),
-        EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
+        EnableReflectionNames(true), DisableLLVMMergeFunctions(false),
+        EnableAnonymousContextMangledNames(false),
         ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false),
         IndirectAsyncFunctionPointer(false),
