@@ -155,7 +155,7 @@ private:
   /// Identify all cross-import overlay modules of the specified
   /// dependency set and apply an action for each.
   void discoverCrossImportOverlayDependencies(
-      StringRef mainModuleName, ArrayRef<ModuleDependencyID> allDependencies,
+      StringRef mainModuleName,
       ModuleDependenciesCache &cache,
       llvm::function_ref<void(ModuleDependencyID)> action);
 
