@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_LifetimeDependence
 
 // RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -enable-experimental-feature LifetimeDependence -dump-macro-expansions 2>&1 | %FileCheck --match-full-lines %s
 
