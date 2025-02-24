@@ -131,26 +131,6 @@ public:
   }
 };
 
-class InitialTaskNameTaskOptionRecord
-    : public TaskOptionRecord {
-
-  const char* TaskName;
-
-public:
-  InitialTaskNameTaskOptionRecord(
-      const char* taskName)
-      : TaskOptionRecord(TaskOptionRecordKind::InitialTaskName),
-        TaskName(taskName) {}
-
-  const char* getTaskName() const {
-    return TaskName;
-  }
-
-  static bool classof(const TaskOptionRecord *record) {
-    return record->getKind() == TaskOptionRecordKind::InitialTaskName;
-  }
-};
-
 /// Task option to specify the initial serial executor for the task.
 class InitialSerialExecutorTaskOptionRecord : public TaskOptionRecord {
   const SerialExecutorRef Executor;

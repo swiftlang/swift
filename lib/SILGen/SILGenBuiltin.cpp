@@ -1636,14 +1636,6 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     }
   }();
 
-  ManagedValue taskName = [&] {
-    if (options & CreateTaskOptions::OptionalEverything) {
-      return nextArg().getAsSingleValue(SGF);
-    } else {
-     return emitOptionalNone(ctx.TheRawPointerType);
-    }
-  }();
-
   auto functionValue = [&] {
     // No reabstraction required.
     if (options & CreateTaskOptions::Discarding) {
@@ -1701,7 +1693,6 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     taskGroup.getUnmanagedValue(),
     taskExecutorDeprecated.getUnmanagedValue(),
     taskExecutorConsuming.forward(SGF),
-    taskName.forward(SGF),
     functionValue.forward(SGF)
   };
 

@@ -790,29 +790,23 @@ struct AsyncTask::PrivateStorage {
   /// Called on the thread that was previously executing the task that we are
   /// now trying to complete.
   void complete(AsyncTask *task) {
-    // If during task creation we created a any Initial* records, destroy them.
-    //
-    // Initial records are task-local allocated, so we must do so specifically
-    // here, before the task-local storage elements are destroyed; in order to
-    // respect stack-discipline of the task-local allocator.
-    {
-      if (task->hasInitialTaskNameRecord()) {
-        task->dropInitialTaskNameRecord();
-      }
-      if (task->hasInitialTaskExecutorPreferenceRecord()) {
-        task->dropInitialTaskExecutorPreferenceRecord();
-      }
+    // If during task creation we created a task preference record;
+    // we must destroy it here; The record is task-local allocated,
+    // so we must do so specifically here, before the task-local storage
+    // elements are destroyed; in order to respect stack-discipline of
+    // the task-local allocator.
+    if (task->hasInitialTaskExecutorPreferenceRecord()) {
+      task->dropInitialTaskExecutorPreferenceRecord();
     }
 
     // Drain unlock the task and remove any overrides on thread as a
     // result of the task
     auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
     while (true) {
-      // Task is completing
-      assert(oldStatus.getInnermostRecord() == NULL &&
-             "Status records should have been removed by this time!");
-      assert(!oldStatus.isStatusRecordLocked() &&
-             "Task is completing, cannot be locked anymore!");
+      // Task is completing, it shouldn't have any records and therefore
+      // cannot be status record locked.
+      assert(oldStatus.getInnermostRecord() == NULL);
+      assert(!oldStatus.isStatusRecordLocked());
 
       assert(oldStatus.isRunning());
 
