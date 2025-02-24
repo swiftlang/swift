@@ -428,6 +428,10 @@ enum class PartitionOpKind : uint8_t {
   Assign,
 
   /// Assign one value to a fresh region, takes one arg.
+  ///
+  /// NOTE: This just produces a new value that is tracked by the dataflow. The
+  /// isolation characteristics of the value are actually decided by
+  /// tryToTrackValue and SILIsolationInfo::get().
   AssignFresh,
 
   /// Merge the regions of two values, takes two args, both must be from
