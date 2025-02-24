@@ -2,6 +2,8 @@
 //
 // REQUIRES: executable_test
 
+// FIXME this test breaks the SIL optimizer in Linux
+
 import CopyConstructors
 import StdlibUnittest
 
@@ -46,6 +48,25 @@ CXXCopyConstructorTestSuite.test("Default copy constructor, member with user-def
   
   let result = createTypeWithNonTrivialDefaultCopyConstructor()
   expectTrue(result.0.box.numCopies + result.1.box.numCopies > 0)
+}
+
+CXXCopyConstructorTestSuite.test("Copy constructor with default arguments") {
+  // When in the presence of a C++ copy constructor with default args, we make the type non-copyable
+  let originalObj = HasCopyConstructorWithDefaultArgs(5)
+  expectEqual(originalObj.value, 5)
+
+  // move originalObj
+  let newObj = originalObj
+  expectEqual(newObj.value, 5)
+}
+
+CXXCopyConstructorTestSuite.test("Copy constructor with one parameter that has a default argument") {
+  // If the C++ copy constructor has exactly one param and it has a default argument, ignore the default argument and import the type as copyable to Swift
+
+  let original = HasCopyConstructorWithOneParameterWithDefaultArg(0)
+  let copy = original
+  expectEqual(original.numCopies, 0)
+  expectEqual(copy.numCopies, 1)
 }
 
 runAllTests()
