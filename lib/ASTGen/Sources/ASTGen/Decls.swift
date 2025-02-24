@@ -13,7 +13,7 @@
 import ASTBridging
 import BasicBridging
 import SwiftDiagnostics
-@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
 // MARK: - TypeDecl
 
@@ -50,8 +50,8 @@ extension ASTGenVisitor {
       return self.generate(macroDecl: node)?.asDecl
     case .macroExpansionDecl(let node):
       return self.generate(macroExpansionDecl: node).asDecl
-    case .missingDecl:
-      fatalError("unimplemented")
+    case .missingDecl(let node):
+      return self.generate(missingDecl: node)?.asDecl
     case .operatorDecl(let node):
       return self.generate(operatorDecl: node)?.asDecl
     case .poundSourceLocation:
@@ -641,6 +641,24 @@ extension ASTGenVisitor {
     }
     return subscriptDecl
   }
+
+  func generate(accessorBlockFile node: AccessorBlockFileSyntax, for storage: BridgedAbstractStorageDecl) -> [BridgedAccessorDecl] {
+    var accessors: [BridgedAccessorDecl] = []
+    for elem in node.accessors {
+      if let accessor = self.generate(accessorDecl: elem, for: storage) {
+        accessors.append(accessor)
+      }
+    }
+    // NOTE: Do not set brace locations even if exist. AST doesn't expect that.
+    let record = BridgedAccessorRecord(
+      lBraceLoc: nil,
+      accessors: accessors.lazy.bridgedArray(in: self),
+      rBraceLoc: nil
+    )
+    // FIXME: The caller should setAccessors() after ASTGen just return parsed accessors.
+    storage.setAccessors(record)
+    return accessors
+  }
 }
 
 // MARK: - AbstractFunctionDecl
@@ -780,6 +798,14 @@ extension ASTGenVisitor {
     }
 
     return decl
+  }
+
+  func generate(missingDecl node: MissingDeclSyntax) -> BridgedMissingDecl? {
+    // Generate the attributes for diagnostics, but discard the result.
+    // There's no use of the attributes in AST at this point.
+    // FIXME:  We probably should place 'swift::MissingDecl' with the attributes attached in AST for better IDE experience in custom attributes.
+    _ = self.generateDeclAttributes(node, allowStatic: true)
+    return nil
   }
 }
 
