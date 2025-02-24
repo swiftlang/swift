@@ -123,7 +123,7 @@ def llvm_install_components():
     platforms.
     """
     components = ['llvm-ar', 'llvm-cov', 'llvm-profdata', 'IndexStore', 'clang',
-                  'clang-resource-headers', 'compiler-rt', 'clangd', 'LTO',
+                  'clang-resource-headers', 'builtins', 'runtimes', 'clangd', 'LTO',
                   'lld']
     if os.sys.platform == 'darwin':
         components.extend(['dsymutil'])
