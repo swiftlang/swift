@@ -1108,9 +1108,9 @@ namespace {
                     ? "*"
                     : Spec->getDomain()->getNameForAttributePrinting();
             printField(domainName, Label::always("domain"));
-            if (!Spec->getVersion().empty())
+            if (!Spec->getRawVersion().empty())
               printFieldRaw(
-                  [&](llvm::raw_ostream &OS) { OS << Spec->getVersion(); },
+                  [&](llvm::raw_ostream &OS) { OS << Spec->getRawVersion(); },
                   Label::always("version"));
             printFoot();
           },

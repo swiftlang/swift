@@ -85,7 +85,7 @@ extension ASTGenVisitor {
         kind: .default,
         message: BridgedStringRef(),
         renamed: BridgedStringRef(),
-        introduced: spec.version,
+        introduced: spec.rawVersion,
         introducedRange: spec.versionRange,
         deprecated: BridgedVersionTuple(),
         deprecatedRange: BridgedSourceRange(),
@@ -254,7 +254,7 @@ extension ASTGenVisitor {
     return map.has(name: name.bridged)
   }
 
-  func generate(availabilityMacroDefinition node: AvailabilityMacroDefinitionSyntax) -> BridgedAvailabilityMacroDefinition {
+  func generate(availabilityMacroDefinition node: AvailabilityMacroDefinitionFileSyntax) -> BridgedAvailabilityMacroDefinition {
 
     let name = allocateBridgedString(node.platformVersion.platform.text)
     let version = self.generate(versionTuple: node.platformVersion.version)
@@ -392,7 +392,7 @@ extension ASTGenVisitor {
             guard platform != .none else {
               continue
             }
-            result.append((platform: platform, version: spec.version))
+            result.append((platform: platform, version: spec.rawVersion))
           }
         }
         continue
@@ -446,7 +446,7 @@ func parseAvailabilityMacroDefinition(
 
   // Parse.
   var parser = Parser(buffer)
-  let parsed = AvailabilityMacroDefinitionSyntax.parse(from: &parser)
+  let parsed = AvailabilityMacroDefinitionFileSyntax.parse(from: &parser)
 
   // Emit diagnostics.
   let diagnostics = ParseDiagnosticsGenerator.diagnostics(for: parsed)

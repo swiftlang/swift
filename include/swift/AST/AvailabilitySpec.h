@@ -21,9 +21,11 @@
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
@@ -44,6 +46,8 @@ enum class AvailabilitySpecKind {
   /// X.Y.Z"
   PackageDescriptionVersionConstraint,
 };
+
+class SemanticAvailabilitySpec;
 
 /// The root class for specifications of API availability in availability
 /// queries.
@@ -109,7 +113,14 @@ public:
 
   AvailabilitySpecKind getKind() const { return Kind; }
 
-  bool isWildcard() { return getKind() == AvailabilitySpecKind::Wildcard; }
+  bool isWildcard() const {
+    return getKind() == AvailabilitySpecKind::Wildcard;
+  }
+
+  /// Returns a type-checked representation of the spec, or `std::nullopt` if
+  /// the spec is invalid.
+  std::optional<SemanticAvailabilitySpec>
+  getSemanticAvailabilitySpec(const DeclContext *declContext) const;
 
   SourceRange getSourceRange() const { return SrcRange; }
   SourceLoc getStartLoc() const { return SrcRange.Start; }
@@ -122,13 +133,8 @@ public:
     return PlatformKind::none;
   }
 
-  // The platform version to compare against.
-  llvm::VersionTuple getVersion() const;
-
-  // The version to be used in codegen for version comparisons at run time.
-  // This is required to support beta versions of macOS Big Sur that
-  // report 10.16 at run time.
-  llvm::VersionTuple getRuntimeVersion() const { return Version; }
+  // The version tuple that was written in source.
+  llvm::VersionTuple getRawVersion() const { return Version; }
 
   SourceRange getVersionSrcRange() const {
     if (!VersionStartLoc)
@@ -139,6 +145,67 @@ public:
   // Location of the macro expanded to create this spec.
   SourceLoc getMacroLoc() const { return MacroLoc; }
   void setMacroLoc(SourceLoc loc) { MacroLoc = loc; }
+};
+
+/// The type-checked representation of `AvailabilitySpec` which guaranatees that
+/// the spec has a valid `AvailabilityDomain`.
+class SemanticAvailabilitySpec {
+  const AvailabilitySpec *spec;
+
+public:
+  SemanticAvailabilitySpec(const AvailabilitySpec *spec) : spec(spec) {
+    // The domain must be resolved in order to wrap it in a semantic spec.
+    ASSERT(spec->isWildcard() || spec->getDomain());
+  }
+
+  const AvailabilitySpec *getParsedSpec() const { return spec; }
+
+  AvailabilityDomain getDomain() const {
+    if (isWildcard())
+      return AvailabilityDomain::forUniversal();
+    return spec->getDomain().value();
+  }
+
+  bool isWildcard() const { return spec->isWildcard(); }
+
+  // The platform version to compare against.
+  llvm::VersionTuple getVersion() const;
+
+  // The version to be used in codegen for version comparisons at run time.
+  // This is required to support beta versions of macOS Big Sur that
+  // report 10.16 at run time.
+  llvm::VersionTuple getRuntimeVersion() const { return spec->getRawVersion(); }
+};
+
+/// Wraps an array of availability specs and provides an iterator for their
+/// semantic representations.
+class SemanticAvailabilitySpecs {
+public:
+  class Filter final {
+    const DeclContext *declContext;
+
+  public:
+    Filter(const DeclContext *declContext) : declContext(declContext) {}
+
+    std::optional<SemanticAvailabilitySpec>
+    operator()(const AvailabilitySpec *spec) const;
+  };
+
+  using Range = OptionalTransformRange<
+      iterator_range<ArrayRef<AvailabilitySpec *>::const_iterator>, Filter>;
+
+private:
+  Range specRange;
+
+public:
+  SemanticAvailabilitySpecs(ArrayRef<AvailabilitySpec *> specs,
+                            const DeclContext *declContext)
+      : specRange(llvm::make_range(specs.begin(), specs.end()),
+                  Filter(declContext)) {}
+
+  Range::iterator begin() const { return specRange.begin(); }
+  Range::iterator end() const { return specRange.end(); }
+  bool empty() const { return specRange.empty(); }
 };
 
 /// Maps of macro name and version to availability specifications.

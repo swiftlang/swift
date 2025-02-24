@@ -65,7 +65,7 @@ AvailabilitySpec *AvailabilitySpec::createPlatformVersioned(
       SourceRange(platformLoc, versionRange.End), version, versionRange.Start);
 }
 
-llvm::VersionTuple AvailabilitySpec::getVersion() const {
+llvm::VersionTuple SemanticAvailabilitySpec::getVersion() const {
   // For macOS Big Sur, we canonicalize 10.16 to 11.0 for compile-time
   // checking since clang canonicalizes availability markup. However, to
   // support Beta versions of macOS Big Sur where the OS
@@ -77,5 +77,22 @@ llvm::VersionTuple AvailabilitySpec::getVersion() const {
   //
   // we need to store the uncanonicalized version for codegen and canonicalize
   // it as necessary for compile-time checks.
-  return canonicalizePlatformVersion(getPlatform(), Version);
+  return canonicalizePlatformVersion(getDomain().getPlatformKind(),
+                                     spec->getRawVersion());
+}
+
+std::optional<SemanticAvailabilitySpec>
+AvailabilitySpec::getSemanticAvailabilitySpec(
+    const DeclContext *declContext) const {
+  if (isWildcard() || getDomain())
+    return SemanticAvailabilitySpec(this);
+  return std::nullopt;
+}
+
+std::optional<SemanticAvailabilitySpec>
+SemanticAvailabilitySpecs::Filter::operator()(
+    const AvailabilitySpec *spec) const {
+  if (auto semanticSpec = spec->getSemanticAvailabilitySpec(declContext))
+    return semanticSpec;
+  return std::nullopt;
 }

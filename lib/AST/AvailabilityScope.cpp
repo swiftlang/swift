@@ -265,31 +265,31 @@ SourceLoc AvailabilityScope::getIntroductionLoc() const {
   llvm_unreachable("Unhandled Reason in switch.");
 }
 
-static SourceRange
-getAvailabilityConditionVersionSourceRange(const PoundAvailableInfo *PAI,
-                                           PlatformKind Platform,
-                                           const llvm::VersionTuple &Version) {
+static SourceRange getAvailabilityConditionVersionSourceRange(
+    const PoundAvailableInfo *PAI, const DeclContext *ReferenceDC,
+    AvailabilityDomain Domain, const llvm::VersionTuple &Version) {
   SourceRange Range;
-  for (auto *Spec : PAI->getQueries()) {
-    if (Spec->getPlatform() == Platform && Spec->getVersion() == Version) {
+  for (auto Spec : PAI->getSemanticAvailabilitySpecs(ReferenceDC)) {
+    if (Spec.getDomain() == Domain && Spec.getVersion() == Version) {
       // More than one: return invalid range, no unique choice.
       if (Range.isValid())
         return SourceRange();
       else
-        Range = Spec->getVersionSrcRange();
+        Range = Spec.getParsedSpec()->getVersionSrcRange();
     }
   }
   return Range;
 }
 
 static SourceRange getAvailabilityConditionVersionSourceRange(
-    const MutableArrayRef<StmtConditionElement> &Conds, PlatformKind Platform,
+    const MutableArrayRef<StmtConditionElement> &Conds,
+    const DeclContext *ReferenceDC, AvailabilityDomain Domain,
     const llvm::VersionTuple &Version) {
   SourceRange Range;
   for (auto const &C : Conds) {
     if (C.getKind() == StmtConditionElement::CK_Availability) {
       SourceRange R = getAvailabilityConditionVersionSourceRange(
-          C.getAvailability(), Platform, Version);
+          C.getAvailability(), ReferenceDC, Domain, Version);
       // More than one: return invalid range.
       if (Range.isValid())
         return SourceRange();
@@ -301,13 +301,13 @@ static SourceRange getAvailabilityConditionVersionSourceRange(
 }
 
 static SourceRange
-getAvailabilityConditionVersionSourceRange(const Decl *D, PlatformKind Platform,
+getAvailabilityConditionVersionSourceRange(const Decl *D,
+                                           AvailabilityDomain Domain,
                                            const llvm::VersionTuple &Version) {
   SourceRange Range;
   for (auto Attr : D->getSemanticAvailableAttrs()) {
     if (Attr.getIntroduced().has_value() &&
-        Attr.getIntroduced().value() == Version &&
-        Attr.getPlatform() == Platform) {
+        Attr.getIntroduced().value() == Version && Attr.getDomain() == Domain) {
 
       // More than one: return invalid range.
       if (Range.isValid())
@@ -320,29 +320,31 @@ getAvailabilityConditionVersionSourceRange(const Decl *D, PlatformKind Platform,
 }
 
 SourceRange AvailabilityScope::getAvailabilityConditionVersionSourceRange(
-    PlatformKind Platform, const llvm::VersionTuple &Version) const {
+    AvailabilityDomain Domain, const llvm::VersionTuple &Version) const {
   switch (getReason()) {
   case Reason::Decl:
     return ::getAvailabilityConditionVersionSourceRange(Node.getAsDecl(),
-                                                        Platform, Version);
+                                                        Domain, Version);
 
   case Reason::IfStmtThenBranch:
   case Reason::IfStmtElseBranch:
     return ::getAvailabilityConditionVersionSourceRange(
-        Node.getAsIfStmt()->getCond(), Platform, Version);
+        Node.getAsIfStmt()->getCond(), Node.getDeclContext(), Domain, Version);
 
   case Reason::ConditionFollowingAvailabilityQuery:
     return ::getAvailabilityConditionVersionSourceRange(
-        Node.getAsPoundAvailableInfo(), Platform, Version);
+        Node.getAsPoundAvailableInfo(), Node.getDeclContext(), Domain, Version);
 
   case Reason::GuardStmtFallthrough:
   case Reason::GuardStmtElseBranch:
     return ::getAvailabilityConditionVersionSourceRange(
-        Node.getAsGuardStmt()->getCond(), Platform, Version);
+        Node.getAsGuardStmt()->getCond(), Node.getDeclContext(), Domain,
+        Version);
 
   case Reason::WhileStmtBody:
     return ::getAvailabilityConditionVersionSourceRange(
-        Node.getAsWhileStmt()->getCond(), Platform, Version);
+        Node.getAsWhileStmt()->getCond(), Node.getDeclContext(), Domain,
+        Version);
 
   case Reason::Root:
   case Reason::DeclImplicit:

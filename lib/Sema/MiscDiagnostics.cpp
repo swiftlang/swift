@@ -5124,29 +5124,32 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
 static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
                                           DeclContext *DC) {
   auto &diags = DC->getASTContext().Diags;
+  StringRef queryName =
+      info->isUnavailability() ? "#unavailable" : "#available";
 
   llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
-  for (auto spec : info->getQueries()) {
-    auto domain = spec->getDomain();
-    if (!domain) {
+  for (auto spec : info->getSemanticAvailabilitySpecs(DC)) {
+    if (spec.isWildcard())
       continue;
-    }
 
-    if (!domain->isPlatform()) {
+    auto parsedSpec = spec.getParsedSpec();
+    auto domain = spec.getDomain();
+
+    if (!domain.isPlatform()) {
       diags.diagnose(
-          spec->getStartLoc(),
-          domain->isSwiftLanguage()
+          parsedSpec->getStartLoc(),
+          domain.isSwiftLanguage()
               ? diag::availability_query_swift_not_allowed
               : diag::availability_query_package_description_not_allowed,
-          info->isUnavailability() ? "#unavailable" : "#available");
+          queryName);
       return true;
     }
 
     // Diagnose duplicate platforms.
-    if (!seenDomains.insert(*domain).second) {
-      diags.diagnose(spec->getStartLoc(),
+    if (!seenDomains.insert(domain).second) {
+      diags.diagnose(parsedSpec->getStartLoc(),
                      diag::availability_query_repeated_platform,
-                     domain->getNameForAttributePrinting());
+                     domain.getNameForAttributePrinting());
       return true;
     }
   }
