@@ -655,3 +655,43 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
                          result.requiresBuiltinHeadersInSystemModules);
   return result;
 }
+
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+swift::createClangInvocationFileMappingVFS(
+    const ClangInvocationFileMapping &fileMapping, ASTContext &ctx,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS) {
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> redirectedVFS =
+      llvm::vfs::RedirectingFileSystem::create(fileMapping.redirectedFiles,
+                                               true, *baseVFS);
+  if (ctx.ClangImporterOpts.DumpClangDiagnostics) {
+    llvm::errs() << "clang importer redirected file mappings:\n";
+    for (const auto &mapping : fileMapping.redirectedFiles) {
+      llvm::errs() << "   mapping real file '" << mapping.second
+                   << "' to virtual file '" << mapping.first << "'\n";
+    }
+    llvm::errs() << "\n";
+  }
+
+  if (fileMapping.overridenFiles.empty())
+    return redirectedVFS;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> overridenVFS =
+      new llvm::vfs::InMemoryFileSystem();
+  for (const auto &file : fileMapping.overridenFiles) {
+    if (ctx.ClangImporterOpts.DumpClangDiagnostics) {
+      llvm::errs() << "clang importer overriding file '" << file.first
+                   << "' with the following contents:\n";
+      llvm::errs() << file.second << "\n";
+    }
+    auto contents = ctx.Allocate<char>(file.second.size() + 1);
+    std::copy(file.second.begin(), file.second.end(), contents.begin());
+    // null terminate the buffer.
+    contents[contents.size() - 1] = '\0';
+    overridenVFS->addFile(file.first, 0,
+                          llvm::MemoryBuffer::getMemBuffer(StringRef(
+                              contents.begin(), contents.size() - 1)));
+  }
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> overlayVFS =
+      new llvm::vfs::OverlayFileSystem(redirectedVFS);
+  overlayVFS->pushOverlay(overridenVFS);
+  return overlayVFS;
+}
