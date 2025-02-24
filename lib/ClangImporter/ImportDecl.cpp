@@ -8820,6 +8820,8 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
 namespace {
 class SwiftifyInfoPrinter {
 public:
+  static const ssize_t SELF_PARAM_INDEX = -2;
+  static const ssize_t RETURN_VALUE_INDEX = -1;
   clang::ASTContext &ctx;
   llvm::raw_ostream &out;
   bool firstParam = true;
@@ -8891,9 +8893,9 @@ private:
   }
 
   void printParamOrReturn(ssize_t pointerIndex) {
-    if (pointerIndex == -2)
+    if (pointerIndex == SELF_PARAM_INDEX)
       out << ".self";
-    else if (pointerIndex == -1)
+    else if (pointerIndex == RETURN_VALUE_INDEX)
       out << ".return";
     else
       out << ".param(" << pointerIndex + 1 << ")";
@@ -8935,16 +8937,17 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
         MappedDecl->getResultInterfaceType(), ClangDecl->getReturnType());
     if (auto CAT =
             ClangDecl->getReturnType()->getAs<clang::CountAttributedType>()) {
-      printer.printCountedBy(CAT, -1);
+      printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
       attachMacro = true;
     }
     bool returnHasLifetimeInfo = false;
-    bool lifetimeDependenceOn = MappedDecl->getASTContext().LangOpts.hasFeature(
-        Feature::LifetimeDependence);
+    bool lifetimeDependenceOn =
+        SwiftContext.LangOpts.hasFeature(Feature::LifetimeDependence);
     if (SwiftDeclConverter::getImplicitObjectParamAnnotation<
             clang::LifetimeBoundAttr>(ClangDecl) &&
         lifetimeDependenceOn) {
-      printer.printLifetimeboundReturn(-2, true);
+      printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
+                                       true);
       returnHasLifetimeInfo = true;
     }
     for (auto [index, clangParam] : llvm::enumerate(ClangDecl->parameters())) {
