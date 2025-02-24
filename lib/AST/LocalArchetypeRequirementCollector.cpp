@@ -183,13 +183,29 @@ Type MapLocalArchetypesOutOfContext::getInterfaceType(
     ++depth;
   }
 
+  // If the environment we have is not for a capture, this must be a generic
+  // environment local to the parent function. For element archetypes, the depth
+  // we have is relative to the parent signature, so we can compute the correct
+  // depth by offsetting it by the number of parent captured environments.
+  if (genericEnv->getKind() == GenericEnvironment::Kind::OpenedElement) {
+    ASSERT(rootParam->getDepth() >= baseGenericSig.getNextDepth());
+    return GenericTypeParamType::getType(
+        rootParam->getDepth() + capturedEnvs.size(), rootParam->getIndex(),
+        rootParam->getASTContext());
+  }
+
+  // For opened archetypes, we have no way of computing the correct depth.
   llvm::errs() << "Fell off the end:\n";
   interfaceTy->dump(llvm::errs());
   abort();
 }
 
 Type MapLocalArchetypesOutOfContext::operator()(SubstitutableType *type) const {
-  auto *archetypeTy = cast<ArchetypeType>(type);
+  // Local archetypes can appear in interface types alongside generic param
+  // types, ignore them here.
+  auto *archetypeTy = dyn_cast<ArchetypeType>(type);
+  if (!archetypeTy)
+    return type;
 
   // Primary archetypes just map out of context.
   if (isa<PrimaryArchetypeType>(archetypeTy) ||
