@@ -152,8 +152,8 @@ swift-source/swift/benchmark$ .build/release/SwiftBench
 
 ### Troubleshooting
 
-- To check what libraries benchmark is linked against set `DYLD_PRINT_SEARCHING` environment variable. E.g. `export DYLD_PRINT_SEARCHING=1`.
-- To force linking with built stdlib use `DYLD_LIBRARY_PATH` environment variable. E.g. `export DYLD_LIBRARY_PATH=<path_to_build_folder>/Ninja-ReleaseAssert/swift-macosx-x86_64/lib/swift/macosx/x86_64`.
+- To check what libraries benchmark is linked against, set the `DYLD_PRINT_SEARCHING` environment variable. E.g. `export DYLD_PRINT_SEARCHING=1`.
+- To force linking with a locally built stdlib, use the `DYLD_LIBRARY_PATH` environment variable. E.g. `export DYLD_LIBRARY_PATH=<path_to_build_folder>/Ninja-ReleaseAssert/swift-macosx-x86_64/lib/swift/macosx/x86_64`.
 
 ## Editing in Xcode
 
