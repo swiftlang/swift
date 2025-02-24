@@ -295,6 +295,9 @@ ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
       "a SWIFT_SHARED_REFERENCE type",
       (const clang::NamedDecl *))
 
+ERROR(redundant_conformance_protocol,none,
+     "redundant conformance of %0 to protocol '%1'", (Type, StringRef))
+
 // TODO: In the next C++ interop version, convert this warning into an error and
 // stop importing unannotated C++ APIs that return SWIFT_SHARED_REFERENCE.
 // rdar://138806722
