@@ -34,7 +34,7 @@ internal func _parseIntegerDigits<Result: FixedWidthInteger>(
   }
   let multiplicand = Result(truncatingIfNeeded: radix)
   var result = 0 as Result
-  for digit in unsafe codeUnits {
+  for unsafe digit in unsafe codeUnits {
     let digitValue: Result
     if _fastPath(digit >= _0 && digit < numericalUpperBound) {
       digitValue = Result(truncatingIfNeeded: digit &- _0)

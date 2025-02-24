@@ -4187,7 +4187,7 @@ internal func _instantiateKeyPathBuffer(
   var isPureStruct = true
   var offset: UInt32? = nil
       
-  for value in walker.isPureStruct {
+  for unsafe value in unsafe walker.isPureStruct {
     isPureStruct = isPureStruct && value
   }
 

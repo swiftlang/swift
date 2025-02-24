@@ -52,7 +52,7 @@ public func print(_ string: String, terminator: StaticString = "\n") {
 public func print(_ object: some CustomStringConvertible, terminator: StaticString = "\n") {
   var string = object.description
   string.withUTF8 { buf in
-    for c in unsafe buf {
+    for unsafe c in unsafe buf {
       putchar(CInt(c))
     }
   }
@@ -64,7 +64,7 @@ public func print(_ object: some CustomStringConvertible, terminator: StaticStri
 }
 
 func printCharacters(_ buf: UnsafeRawBufferPointer) {
-  for c in unsafe buf {
+  for unsafe c in unsafe buf {
     putchar(CInt(c))
   }
 }

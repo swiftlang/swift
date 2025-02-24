@@ -1150,7 +1150,7 @@ extension _StringGutsSlice {
       // of accessing the UTF8 view on String.
       if isNFCQC {
         try unsafe withFastUTF8 {
-          for byte in unsafe $0 {
+          for unsafe byte in unsafe $0 {
             try f(byte)
           }
         }
@@ -1176,7 +1176,7 @@ extension _StringGutsSlice {
 
     for scalar in substring.unicodeScalars._internalNFC {
       try scalar.withUTF8CodeUnits {
-        for byte in unsafe $0 {
+        for unsafe byte in unsafe $0 {
           try f(byte)
         }
       }

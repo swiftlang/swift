@@ -220,7 +220,7 @@ final internal class _SetStorage<Element: Hashable>
     guard unsafe _count > 0 else { return }
     if !_isPOD(Element.self) {
       let elements = unsafe _elements
-      for bucket in unsafe _hashTable {
+      for unsafe bucket in unsafe _hashTable {
         unsafe (elements + bucket.offset).deinitialize(count: 1)
       }
     }

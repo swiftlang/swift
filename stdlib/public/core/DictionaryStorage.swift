@@ -267,13 +267,13 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     guard unsafe _count > 0 else { return }
     if !_isPOD(Key.self) {
       let keys = unsafe self._keys
-      for bucket in unsafe _hashTable {
+      for unsafe bucket in unsafe _hashTable {
         unsafe (keys + bucket.offset).deinitialize(count: 1)
       }
     }
     if !_isPOD(Value.self) {
       let values = unsafe self._values
-      for bucket in unsafe _hashTable {
+      for unsafe bucket in unsafe _hashTable {
         unsafe (values + bucket.offset).deinitialize(count: 1)
       }
     }

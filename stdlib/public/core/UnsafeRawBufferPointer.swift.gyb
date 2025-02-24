@@ -821,7 +821,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     )
 
     _internalInvariant(unsafe _end != nil)
-    for p in unsafe stride(from: base, 
+    for unsafe p in unsafe stride(from: base, 
       // only advance to as far as the last element that will fit
       to: _end._unsafelyUnwrappedUnchecked - elementStride + 1, 
       by: elementStride

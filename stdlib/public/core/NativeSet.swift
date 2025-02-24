@@ -188,7 +188,7 @@ extension _NativeSet { // ensureUnique
         capacity: capacity,
         move: true))
     if count > 0 {
-      for bucket in unsafe hashTable {
+      for unsafe bucket in unsafe hashTable {
         let element = unsafe (self._elements + bucket.offset).move()
         result._unsafeInsertNew(element)
       }
@@ -208,7 +208,7 @@ extension _NativeSet { // ensureUnique
         capacity: capacity,
         move: false))
     if count > 0 {
-      for bucket in unsafe hashTable {
+      for unsafe bucket in unsafe hashTable {
         result._unsafeInsertNew(self.uncheckedElement(at: bucket))
       }
     }
@@ -225,7 +225,7 @@ extension _NativeSet { // ensureUnique
     if count > 0 {
       unsafe result.hashTable.copyContents(of: hashTable)
       unsafe result._storage._count = self.count
-      for bucket in unsafe hashTable {
+      for unsafe bucket in unsafe hashTable {
         let element = uncheckedElement(at: bucket)
         result.uncheckedInitialize(at: bucket, to: element)
       }
@@ -487,7 +487,7 @@ extension _NativeSet {
   @inlinable
   @inline(__always)
   func isEqual(to other: _NativeSet) -> Bool {
-    if self._storage === other._storage { return true }
+    if unsafe self._storage === other._storage { return true }
     if self.count != other.count { return false }
 
     for member in self {
@@ -688,7 +688,7 @@ extension _NativeSet {
     if count == 0 { return _NativeSet() }
     if count == self.count { return self }
     let result = _NativeSet(capacity: count)
-    for offset in unsafe bitset {
+    for unsafe offset in unsafe bitset {
       unsafe result._unsafeInsertNew(self.uncheckedElement(at: Bucket(offset: offset)))
       // The hash table can have set bits after the end of the bitmap.
       // Ignore them.
@@ -746,7 +746,7 @@ extension _NativeSet {
   ) rethrows -> _NativeSet<Element> {
     try unsafe _UnsafeBitset.withTemporaryBitset(capacity: bucketCount) { bitset in
       var count = 0
-      for bucket in unsafe hashTable {
+      for unsafe bucket in unsafe hashTable {
         if try isIncluded(uncheckedElement(at: bucket)) {
           unsafe bitset.uncheckedInsert(bucket.offset)
           count += 1
@@ -778,7 +778,7 @@ extension _NativeSet {
           }
         }
       } else {
-        for bucket in unsafe hashTable {
+        for unsafe bucket in unsafe hashTable {
           if other.find(uncheckedElement(at: bucket)).found {
             unsafe bitset.uncheckedInsert(bucket.offset)
             count += 1

@@ -196,7 +196,7 @@ extension _NativeDictionary { // ensureUnique
       move: moveElements)
     let result = _NativeDictionary(newStorage)
     if count > 0 {
-      for bucket in unsafe hashTable {
+      for unsafe bucket in unsafe hashTable {
         let key: Key
         let value: Value
         if moveElements {
@@ -622,7 +622,7 @@ extension _NativeDictionary {
     if count == 0 { return _NativeDictionary<Key, Value>() }
     if count == self.count { return self }
     let result = _NativeDictionary<Key, Value>(capacity: count)
-    for offset in unsafe bitset {
+    for unsafe offset in unsafe bitset {
       let key = unsafe self.uncheckedKey(at: Bucket(offset: offset))
       let value = unsafe self.uncheckedValue(at: Bucket(offset: offset))
       result._unsafeInsertNew(key: key, value: value)
@@ -639,7 +639,7 @@ extension _NativeDictionary where Value: Equatable {
   @inlinable
   @inline(__always)
   func isEqual(to other: _NativeDictionary) -> Bool {
-    if self._storage === other._storage { return true }
+    if unsafe self._storage === other._storage { return true }
     if self.count != other.count { return false }
 
     for (key, value) in self {
@@ -736,7 +736,7 @@ extension _NativeDictionary { // Deletion
         seed: nil)
       return
     }
-    for bucket in unsafe hashTable {
+    for unsafe bucket in unsafe hashTable {
       unsafe (_keys + bucket.offset).deinitialize(count: 1)
       unsafe (_values + bucket.offset).deinitialize(count: 1)
     }
@@ -757,7 +757,7 @@ extension _NativeDictionary { // High-level operations
     // Because the current and new buffer have the same scale and seed, we can
     // initialize to the same locations in the new buffer, skipping hash value
     // recalculations.
-    for bucket in unsafe hashTable {
+    for unsafe bucket in unsafe hashTable {
       let key = self.uncheckedKey(at: bucket)
       let value = self.uncheckedValue(at: bucket)
       try result._insert(at: bucket, key: key, value: transform(value))
@@ -847,7 +847,7 @@ extension _NativeDictionary { // High-level operations
       capacity: _storage._bucketCount
     ) { bitset in
       var count = 0
-      for bucket in unsafe hashTable {
+      for unsafe bucket in unsafe hashTable {
         if try isIncluded(
           (uncheckedKey(at: bucket), uncheckedValue(at: bucket))
         ) {
