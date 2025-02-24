@@ -16,6 +16,7 @@
 #ifndef SWIFT_CLANG_IMPORTER_H
 #define SWIFT_CLANG_IMPORTER_H
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "clang/Basic/Specifiers.h"
@@ -72,6 +73,7 @@ namespace swift {
 class ASTContext;
 class CompilerInvocation;
 class ClangImporterOptions;
+class ClangInheritanceInfo;
 class ClangModuleUnit;
 class ClangNode;
 class ConcreteDeclRef;
@@ -660,8 +662,8 @@ public:
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
 
-  ValueDecl *importBaseMemberDecl(ValueDecl *decl,
-                                  DeclContext *newContext) override;
+  ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
+                                  ClangInheritanceInfo inheritance) override;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
@@ -778,6 +780,117 @@ ClangInvocationFileMapping getClangInvocationFileMapping(
     ASTContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
     bool suppressDiagnostic = false);
+
+/// Information used to compute the access level of inherited C++ members.
+class ClangInheritanceInfo {
+  /// The cumulative inheritance access specifier, that is used to compute the
+  /// effective access level of a particular inherited member.
+  ///
+  /// When constructing ClangInheritanceInfo for nested inheritance, this field
+  /// gets clamped to the least permissive level between its current value and
+  /// the inheritance access specifier.
+  ///
+  /// If we encounter \e nested private inheritance in the class hierarchy
+  /// (i.e., private inheritance beyond the first level of inheritance), we set
+  /// the access level to nullopt to indicate that none of the members from
+  /// classes beyond that point in the hierarchy should be accessible. This case
+  /// must be treated separately from non-nested private inheritance, where
+  /// inherited members are private but accessible from extensions.
+  ///
+  /// See ClangInheritanceInfo::cumulativeInheritedAccess() for an example.
+  std::optional<clang::AccessSpecifier> access;
+
+public:
+  /// Default constructor for this class that is used as the base case when
+  /// recursively walking up a class inheritance hierarchy.
+  ClangInheritanceInfo() : access(clang::AS_none) {}
+
+  /// Inductive case for this class that is used to accumulate inheritance
+  /// metadata for cases of (nested) inheritance.
+  ClangInheritanceInfo(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base)
+      : access(computeAccess(prev, base)) {}
+
+  /// Whether this info represents a case of nested private inheritance.
+  bool isNestedPrivate() const { return !access.has_value(); }
+
+  /// Whether this info represents a case of C++ inheritance.
+  ///
+  /// Returns \c false for the default instance of this class.
+  bool isInheriting() const {
+    return isNestedPrivate() || *access != clang::AS_none;
+  }
+
+  /// Whether this is info represents a case of C++ inheritance.
+  operator bool() const { return isInheriting(); }
+
+  /// Compute the (Swift) access level for inherited base member \param decl,
+  /// for when its inherited (cloned) member in the derived class.
+  ///
+  /// This access level is determined by whichever is more restrictive: what the
+  /// \param decl was declared with (in its base class), or what it is being
+  /// inherited with (ClangInheritanceInfo::access).
+  ///
+  /// Always returns swift::AccessLevel::Public (i.e., corresponding to
+  /// clang::AS_none) if this ClangInheritanceInfo::isInheriting() is \c false.
+  AccessLevel accessForBaseDecl(const ValueDecl *baseDecl) const;
+
+  /// Marks \param clonedDecl as unavailable (using \c @available) if it
+  /// cannot be accessed from the derived class, either because \param baseDecl
+  /// was declared as private in the base class, or because \param clonedDecl
+  /// was inherited with private inheritance.
+  ///
+  /// Does nothing if this ClangInheritanceInfo::isInheriting() is \c false.
+  void setUnavailableIfNecessary(const ValueDecl *baseDecl,
+                                 ValueDecl *clonedDecl) const;
+
+  friend llvm::hash_code hash_value(const ClangInheritanceInfo &info) {
+    return llvm::hash_combine(info.access);
+  }
+
+private:
+  /// An example of how ClangInheritanceInfo:access is accumulated while
+  /// recursively traversing the class hierarchy starting from \c E:
+  ///
+  /// \code{.cpp}
+  /// struct A { ... };               // access = nullopt (nested private)
+  /// struct B : private   A { ... }; // access = protected
+  /// struct C : public    B { ... }; // access = protected
+  /// struct D : protected C { ... }; // access = public
+  /// struct E : public    D { ... }; // access = none [base case]
+  /// \endcode
+  ///
+  /// Another example, this time with non-nested private inheritance:
+  ///
+  /// \code{.cpp}
+  /// struct A { ... };               // access = nullopt
+  /// struct B : public    A { ... }; // access = nullopt
+  /// struct C : private   B { ... }; // access = private
+  /// struct D : public    C { ... }; // access = private
+  /// struct E : private   D { ... }; // access = none [base case]
+  /// \endcode
+  static std::optional<clang::AccessSpecifier>
+  computeAccess(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base) {
+    auto baseAccess = base.getAccessSpecifier();
+    assert(baseAccess != clang::AS_none &&
+           "this should always be public, protected, or private");
+
+    if (!prev.isInheriting())
+      // This is the first level of inheritance, so we just take the access
+      // specifier from CXXBaseSpecifier. Note that this is the only scenario
+      // where we can have access = private.
+      return {baseAccess};
+
+    if (prev.isNestedPrivate() || baseAccess == clang::AS_private)
+      // This is a case of nested inheritance, and either we encountered nested
+      // private inheritance before, or this is our first time encountering it.
+      return std::nullopt;
+
+    static_assert(clang::AS_private > clang::AS_protected &&
+                  clang::AS_protected > clang::AS_public &&
+                  "using std::max() relies on this ordering");
+    return {std::max(*prev.access, baseAccess)};
+  }
+};
 
 } // end namespace swift
 
