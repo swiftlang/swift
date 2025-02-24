@@ -592,12 +592,16 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
     assert(locator->isLastElement<LocatorPathElt::ContextualType>() ||
            locator->isLastElement<LocatorPathElt::FunctionArgument>());
 
-    auto &cs = solution.getConstraintSystem();
     auto anchor = locator->getAnchor();
-    auto contextualType = cs.getContextualType(anchor, /*forConstraint=*/false);
-    auto exprType = cs.getType(anchor);
-    return std::make_tuple(contextualTypeElt->getPurpose(), exprType,
-                           contextualType);
+    auto contextualInfo = solution.getContextualTypeInfo(anchor);
+    // For some patterns the type could be empty and the entry is
+    // there to indicate the purpose only.
+    if (!contextualInfo || !contextualInfo->getType())
+      return std::nullopt;
+
+    auto exprType = solution.getType(anchor);
+    return std::make_tuple(contextualInfo->purpose, exprType,
+                           contextualInfo->getType());
   } else if (auto argApplyInfo = solution.getFunctionArgApplyInfo(locator)) {
     Type fromType = argApplyInfo->getArgType();
     Type toType = argApplyInfo->getParamType();
@@ -607,9 +611,8 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
       auto fromFnType = fromType->getAs<FunctionType>();
       auto toFnType = toType->getAs<FunctionType>();
       if (fromFnType && toFnType) {
-        auto &cs = solution.getConstraintSystem();
         return std::make_tuple(
-            cs.getContextualTypePurpose(locator->getAnchor()),
+            solution.getContextualTypePurpose(locator->getAnchor()),
             fromFnType->getResult(), toFnType->getResult());
       }
     }
