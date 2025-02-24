@@ -945,6 +945,7 @@ extension String.UTF16View {
 
         readIdx &+= len
       }
+      fatalError()
     }
   }
 

@@ -256,6 +256,7 @@ extension Unicode.UTF16 {
         return (utf16Count, utf16BitUnion < 0x80)
       }
     }
+    fatalError()
   }
 }
 
