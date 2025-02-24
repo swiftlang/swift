@@ -247,3 +247,23 @@ func testVirtualMethods(base: Base, derived: Derived) {
     var frt4 = mutableDerived.VirtualMethodReturningFRTOwned()
     // CHECK: function_ref @{{.*}}VirtualMethodReturningFRTOwned{{.*}} : $@convention(cxx_method) (@inout Derived) -> @owned FRTStruct
 }
+
+func testDefaultOwnershipAnnotation() {
+  let _ = DefaultOwnershipConventionOnCXXForegnRefType.returnRefTypeDefaultRetained()
+  // CHECK: function_ref {{.*}}returnRefTypeDefaultRetained{{.*}} : $@convention(c) () -> @owned DefaultOwnershipConventionOnCXXForegnRefType.RefTypeDefaultRetained
+
+  let _ = DefaultOwnershipConventionOnCXXForegnRefType.returnRefTypeDefaultUnretained()
+  // CHECK: function_ref {{.*}}returnRefTypeDefaultUnretained{{.*}} : $@convention(c) () -> DefaultOwnershipConventionOnCXXForegnRefType.RefTypeDefaultUnretained
+
+  let _ = FunctionAnnotationHasPrecedence.returnRefTypeDefaultUnRetained()
+  // CHECK: function_ref {{.*}}returnRefTypeDefaultUnRetained{{.*}} : $@convention(c) () -> FunctionAnnotationHasPrecedence.RefTypeDefaultUnRetained
+
+  let _ = FunctionAnnotationHasPrecedence.returnRefTypeDefaultUnRetainedAnnotatedRetained()
+  // CHECK: function_ref {{.*}}returnRefTypeDefaultUnRetainedAnnotatedRetained{{.*}} : $@convention(c) () -> @owned FunctionAnnotationHasPrecedence.RefTypeDefaultUnRetained
+
+  let _ = FunctionAnnotationHasPrecedence.returnRefTypeDefaultRetained()
+  // CHECK: function_ref {{.*}}returnRefTypeDefaultRetained{{.*}} : $@convention(c) () -> @owned FunctionAnnotationHasPrecedence.RefTypeDefaultRetained
+
+  let _ = FunctionAnnotationHasPrecedence.returnRefTypeDefaultRetainedAnnotatedUnRetained()
+  // CHECK: function_ref {{.*}}returnRefTypeDefaultRetainedAnnotatedUnRetained{{.*}} : $@convention(c) () -> FunctionAnnotationHasPrecedence.RefTypeDefaultRetained
+}
