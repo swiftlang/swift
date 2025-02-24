@@ -430,7 +430,9 @@ SILDeserializer::readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch) {
   case SILLocation::RegularKind:
     return RegularLocation(FNameLoc, Implicit);
   }
-  llvm_unreachable("Invalid LocationKind");
+
+  // LocationKind was not a recognized SILLocation::LocationKind.
+  return std::nullopt;
 }
 
 llvm::Expected<const SILDebugScope *>
