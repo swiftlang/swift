@@ -106,18 +106,18 @@ extension _NativeDictionary {
     // If the capacity is 0, then our storage is the empty singleton. Those are
     // read only, so we shouldn't attempt to write to them.
     if capacity == 0 {
-      let c = initializer(
+      let c = unsafe initializer(
         UnsafeMutableBufferPointer(start: nil, count: 0), 
         UnsafeMutableBufferPointer(start: nil, count: 0))
       _precondition(c == 0)
       return
     }
 
-    let initializedCount = initializer(
+    let initializedCount = unsafe initializer(
       UnsafeMutableBufferPointer(start: _keys, count: capacity),
       UnsafeMutableBufferPointer(start: _values, count: capacity))
     _precondition(initializedCount >= 0 && initializedCount <= capacity)
-    _storage._count = initializedCount
+    unsafe _storage._count = initializedCount
 
     // Hash initialized elements and move each of them into their correct
     // buckets.
@@ -136,42 +136,42 @@ extension _NativeDictionary {
     // Each iteration of the loop below processes an unprocessed element, and/or
     // reduces the size of the unprocessed region, while ensuring the above
     // invariants.
-    var bucket = _HashTable.Bucket(offset: initializedCount - 1)
-    while bucket.offset >= 0 {
-      if hashTable._isOccupied(bucket) {
+    var bucket = unsafe _HashTable.Bucket(offset: initializedCount - 1)
+    while unsafe bucket.offset >= 0 {
+      if unsafe hashTable._isOccupied(bucket) {
         // We've moved an element here in a previous iteration.
-        bucket.offset -= 1
+        unsafe bucket.offset -= 1
         continue
       }
       // Find the target bucket for this entry and mark it as in use.
       let target: Bucket
       if _isDebugAssertConfiguration() || allowingDuplicates {
-        let (b, found) = find(_keys[bucket.offset])
+        let (b, found) = unsafe find(_keys[bucket.offset])
         if found {
-          _internalInvariant(b != bucket)
+          unsafe _internalInvariant(b != bucket)
           _precondition(allowingDuplicates, "Duplicate keys found")
           // Discard duplicate entry.
           uncheckedDestroy(at: bucket)
-          _storage._count -= 1
-          bucket.offset -= 1
+          unsafe _storage._count -= 1
+          unsafe bucket.offset -= 1
           continue
         }
-        hashTable.insert(b)
-        target = b
+        unsafe hashTable.insert(b)
+        unsafe target = unsafe b
       } else {
-        let hashValue = self.hashValue(for: _keys[bucket.offset])
-        target = hashTable.insertNew(hashValue: hashValue)
+        let hashValue = unsafe self.hashValue(for: _keys[bucket.offset])
+        unsafe target = unsafe hashTable.insertNew(hashValue: hashValue)
       }
 
-      if target > bucket {
+      if unsafe target > bucket {
         // The target is outside the unprocessed region.  We can simply move the
         // entry, leaving behind an uninitialized bucket.
         moveEntry(from: bucket, to: target)
         // Restore invariants by lowering the region boundary.
-        bucket.offset -= 1
-      } else if target == bucket {
+        unsafe bucket.offset -= 1
+      } else if unsafe target == bucket {
         // Already in place.
-        bucket.offset -= 1
+        unsafe bucket.offset -= 1
       } else {
         // The target bucket is also in the unprocessed region. Swap the current
         // item into place, then try again with the swapped-in value, so that we

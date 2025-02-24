@@ -424,9 +424,9 @@ extension String {
     C: Collection
   >(_ input: C) -> (result: String, repairsMade: Bool) {
     _internalInvariant(C.Element.self == UInt8.self)
-    return Array(input).withUnsafeBufferPointer {
-      UnsafeRawBufferPointer($0).withMemoryRebound(to: UInt8.self) {
-        String._fromUTF8Repairing($0)
+    return unsafe Array(input).withUnsafeBufferPointer {
+      unsafe UnsafeRawBufferPointer($0).withMemoryRebound(to: UInt8.self) {
+        unsafe String._fromUTF8Repairing($0)
       }
     }
   }
@@ -460,7 +460,7 @@ extension String {
       (buffer: UnsafeBufferPointer<C.Element>) -> String in
       Builtin.onFastPath() // encourage SIL Optimizer to inline this closure :-(
       let rawBufPtr = UnsafeRawBufferPointer(buffer)
-      return String._fromUTF8Repairing(
+      return unsafe String._fromUTF8Repairing(
         UnsafeBufferPointer(
           start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
           count: rawBufPtr.count)).0
@@ -476,7 +476,7 @@ extension String {
     {
       self = contigBytes.withUnsafeBytes { rawBufPtr in
         Builtin.onFastPath() // encourage SIL Optimizer to inline this closure
-        return String._fromUTF8Repairing(
+        return unsafe String._fromUTF8Repairing(
           UnsafeBufferPointer(
             start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
             count: rawBufPtr.count)).0
@@ -519,7 +519,7 @@ extension String {
     as encoding: Encoding.Type
   ) {
     let contiguousResult = codeUnits.withContiguousStorageIfAvailable {
-      String._validate($0, as: Encoding.self)
+      unsafe String._validate($0, as: Encoding.self)
     }
     if let validationResult = contiguousResult {
       guard let validatedString = validationResult else {
@@ -545,8 +545,8 @@ extension String {
       }
     )
     if error { return nil }
-    self = transcoded.withUnsafeBufferPointer{
-      String._uncheckedFromUTF8($0, asciiPreScanResult: isASCII)
+    self = unsafe transcoded.withUnsafeBufferPointer{
+      unsafe String._uncheckedFromUTF8($0, asciiPreScanResult: isASCII)
     }
   }
 
@@ -581,8 +581,8 @@ extension String {
     as encoding: Encoding.Type
   ) where Encoding: Unicode.Encoding, Encoding.CodeUnit == UInt8 {
     let contiguousResult = codeUnits.withContiguousStorageIfAvailable {
-      $0.withMemoryRebound(to: UInt8.self) {
-        String._validate($0, as: Encoding.self)
+      unsafe $0.withMemoryRebound(to: UInt8.self) {
+        unsafe String._validate($0, as: Encoding.self)
       }
     }
     if let validationResult = contiguousResult {
@@ -649,7 +649,7 @@ extension String {
       _ buffer: UnsafeMutableBufferPointer<UInt8>
     ) throws -> Int
   ) rethrows {
-    self = try String(
+    self = try unsafe String(
       _uninitializedCapacity: capacity,
       initializingUTF8With: initializer
     )
@@ -663,20 +663,20 @@ extension String {
     ) throws -> Int
   ) rethrows {
     if _fastPath(capacity <= _SmallString.capacity) {
-      let smol = try _SmallString(initializingUTF8With: {
-        try initializer(.init(start: $0.baseAddress, count: capacity))
+      let smol = try unsafe _SmallString(initializingUTF8With: {
+        try unsafe initializer(.init(start: $0.baseAddress, count: capacity))
       })
       // Fast case where we fit in a _SmallString and don't need UTF8 validation
       if _fastPath(smol.isASCII) {
         self = String(_StringGuts(smol))
       } else {
         // We succeeded in making a _SmallString, but may need to repair UTF8
-        self = smol.withUTF8 { String._fromUTF8Repairing($0).result }
+        self = smol.withUTF8 { unsafe String._fromUTF8Repairing($0).result }
       }
       return
     }
 
-    self = try String._fromLargeUTF8Repairing(
+    self = try unsafe String._fromLargeUTF8Repairing(
       uninitializedCapacity: capacity,
       initializingWith: initializer)
   }
@@ -698,7 +698,7 @@ extension String {
   public func withCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
-    return try _guts.withCString(body)
+    return try unsafe _guts.withCString(body)
   }
 
   /// Calls the given closure with a pointer to the contents of the string,
@@ -724,15 +724,15 @@ extension String {
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
     if targetEncoding == UTF8.self {
-      return try self.withCString {
+      return try unsafe self.withCString {
         (cPtr: UnsafePointer<CChar>) -> Result  in
         _internalInvariant(UInt8.self == TargetEncoding.CodeUnit.self)
-        let ptr = UnsafeRawPointer(cPtr).assumingMemoryBound(
+        let ptr = unsafe UnsafeRawPointer(cPtr).assumingMemoryBound(
           to: TargetEncoding.CodeUnit.self)
-        return try body(ptr)
+        return try unsafe body(ptr)
       }
     }
-    return try _slowWithCString(encodedAs: targetEncoding, body)
+    return try unsafe _slowWithCString(encodedAs: targetEncoding, body)
   }
 
   @usableFromInline @inline(never) // slow-path
@@ -745,7 +745,7 @@ extension String {
     return try copy.withUTF8 { utf8 in
       var arg = Array<TargetEncoding.CodeUnit>()
       arg.reserveCapacity(1 &+ self._guts.count / 4)
-      let repaired = transcode(
+      let repaired = unsafe transcode(
         utf8.makeIterator(),
         from: UTF8.self,
         to: targetEncoding,
@@ -753,7 +753,7 @@ extension String {
         into: { arg.append($0) })
       arg.append(TargetEncoding.CodeUnit(0))
       _internalInvariant(!repaired)
-      return try body(arg)
+      return try unsafe body(arg)
     }
   }
 }
@@ -767,7 +767,7 @@ extension String: _ExpressibleByBuiltinUnicodeScalarLiteral {
 
   @inlinable @inline(__always)
   public init(_ scalar: Unicode.Scalar) {
-    self = scalar.withUTF8CodeUnits { String._uncheckedFromUTF8($0) }
+    self = scalar.withUTF8CodeUnits { unsafe String._uncheckedFromUTF8($0) }
   }
 }
 
@@ -794,14 +794,14 @@ extension String: _ExpressibleByBuiltinStringLiteral {
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
     ) {
-    let bufPtr = UnsafeBufferPointer(
+    let bufPtr = unsafe UnsafeBufferPointer(
       start: UnsafeRawPointer(start).assumingMemoryBound(to: UInt8.self),
       count: Int(utf8CodeUnitCount))
-    if let smol = _SmallString(bufPtr) {
+    if let smol = unsafe _SmallString(bufPtr) {
       self = String(_StringGuts(smol))
       return
     }
-    self.init(_StringGuts(bufPtr, isASCII: Bool(isASCII)))
+    unsafe self.init(_StringGuts(bufPtr, isASCII: Bool(isASCII)))
   }
 }
 
@@ -1025,10 +1025,10 @@ extension String {
   @_effects(releasenone)
   public func lowercased() -> String {
     if _fastPath(_guts.isFastASCII) {
-      return _guts.withFastUTF8 { utf8 in
-        return String(_uninitializedCapacity: utf8.count) { buffer in
+      return unsafe _guts.withFastUTF8 { utf8 in
+        return unsafe String(_uninitializedCapacity: utf8.count) { buffer in
           for i in 0 ..< utf8.count {
-            buffer[i] = _lowercaseASCII(utf8[i])
+            unsafe buffer[i] = unsafe _lowercaseASCII(utf8[i])
           }
           return utf8.count
         }
@@ -1059,10 +1059,10 @@ extension String {
   @_effects(releasenone)
   public func uppercased() -> String {
     if _fastPath(_guts.isFastASCII) {
-      return _guts.withFastUTF8 { utf8 in
-        return String(_uninitializedCapacity: utf8.count) { buffer in
+      return unsafe _guts.withFastUTF8 { utf8 in
+        return unsafe String(_uninitializedCapacity: utf8.count) { buffer in
           for i in 0 ..< utf8.count {
-            buffer[i] = _uppercaseASCII(utf8[i])
+            unsafe buffer[i] = unsafe _uppercaseASCII(utf8[i])
           }
           return utf8.count
         }
@@ -1149,8 +1149,8 @@ extension _StringGutsSlice {
       // Because we have access to the fastUTF8, we can go through that instead
       // of accessing the UTF8 view on String.
       if isNFCQC {
-        try withFastUTF8 {
-          for byte in $0 {
+        try unsafe withFastUTF8 {
+          for unsafe byte in unsafe $0 {
             try f(byte)
           }
         }
@@ -1176,7 +1176,7 @@ extension _StringGutsSlice {
 
     for scalar in substring.unicodeScalars._internalNFC {
       try scalar.withUTF8CodeUnits {
-        for byte in $0 {
+        for unsafe byte in unsafe $0 {
           try f(byte)
         }
       }
@@ -1184,16 +1184,16 @@ extension _StringGutsSlice {
   }
 
   internal func _fastNFCCheck(_ isNFCQC: inout Bool, _ prevCCC: inout UInt8) {
-    withFastUTF8 { utf8 in
+    unsafe withFastUTF8 { utf8 in
       var position = 0
 
       while position < utf8.count {
         // If our first byte is less than 0xCC, then it means we're under the
         // 0x300 scalar value and everything up to 0x300 is NFC already.
-        if utf8[position] < 0xCC {
+        if unsafe utf8[position] < 0xCC {
           // If our first byte is less than 0xC0, then it means it is ASCII
           // and only takes up a single byte.
-          if utf8[position] < 0xC0 {
+          if unsafe utf8[position] < 0xC0 {
             position &+= 1
           } else {
             // Otherwise, this is a 2 byte < 0x300 sequence.
@@ -1205,7 +1205,7 @@ extension _StringGutsSlice {
           continue
         }
 
-        let (scalar, len) = _decodeScalar(utf8, startingAt: position)
+        let (scalar, len) = unsafe _decodeScalar(utf8, startingAt: position)
 
         if !_isScalarNFCQC(scalar, &prevCCC) {
           isNFCQC = false

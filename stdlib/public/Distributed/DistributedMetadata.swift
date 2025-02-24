@@ -20,7 +20,7 @@ public // SPI Distributed
 func _getParameterCount(mangledMethodName name: String) -> Int32 {
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { nameUTF8 in
-    return __getParameterCount(
+    return unsafe __getParameterCount(
         nameUTF8.baseAddress!, UInt(nameUTF8.endIndex))
   }
 }
@@ -48,7 +48,7 @@ func _getParameterTypeInfo(
 ) -> Int32 {
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { nameUTF8 in
-    return __getParameterTypeInfo(
+    return unsafe __getParameterTypeInfo(
         nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
         genericEnv, genericArguments, typesBuffer, typesLength)
   }
@@ -76,7 +76,7 @@ func _getReturnTypeInfo(
 ) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { nameUTF8 in
-    return __getReturnTypeInfo(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
+    return unsafe __getReturnTypeInfo(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
                                genericEnv, genericArguments)
   }
 }

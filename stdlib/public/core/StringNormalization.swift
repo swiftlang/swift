@@ -35,12 +35,12 @@ extension UnsafeBufferPointer where Element == UInt8 {
     if offset == 0 || offset == count {
       return true
     }
-    _internalInvariant(!UTF8.isContinuation(self[_unchecked: offset]))
+    unsafe _internalInvariant(!UTF8.isContinuation(self[_unchecked: offset]))
 
     // Sub-300 latiny fast-path
-    if self[_unchecked: offset] < 0xCC { return true }
+    if unsafe self[_unchecked: offset] < 0xCC { return true }
 
-    let cu = _decodeScalar(self, startingAt: offset).0
+    let cu = unsafe _decodeScalar(self, startingAt: offset).0
     return cu._isNFCStarter
   }
 
@@ -49,6 +49,6 @@ extension UnsafeBufferPointer where Element == UInt8 {
       _internalInvariant(offset == count)
       return true
     }
-    return !UTF8.isContinuation(self[offset])
+    return unsafe !UTF8.isContinuation(self[offset])
   }
 }

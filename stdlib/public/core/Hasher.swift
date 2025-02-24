@@ -24,25 +24,25 @@ internal func _loadPartialUnalignedUInt64LE(
   var result: UInt64 = 0
   switch byteCount {
   case 7:
-    result |= UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) &<< 48
+    unsafe result |= UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) &<< 48
     fallthrough
   case 6:
-    result |= UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) &<< 40
+    unsafe result |= UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) &<< 40
     fallthrough
   case 5:
-    result |= UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) &<< 32
+    unsafe result |= UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) &<< 32
     fallthrough
   case 4:
-    result |= UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) &<< 24
+    unsafe result |= UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) &<< 24
     fallthrough
   case 3:
-    result |= UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) &<< 16
+    unsafe result |= UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) &<< 16
     fallthrough
   case 2:
-    result |= UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) &<< 8
+    unsafe result |= UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) &<< 8
     fallthrough
   case 1:
-    result |= UInt64(p.load(fromByteOffset: 0, as: UInt8.self))
+    unsafe result |= UInt64(p.load(fromByteOffset: 0, as: UInt8.self))
     fallthrough
   case 0:
     return result
@@ -217,31 +217,31 @@ extension Hasher {
 
       // Load first unaligned partial word of data
       do {
-        let start = UInt(bitPattern: data)
+        let start = unsafe UInt(bitPattern: data)
         let end = _roundUp(start, toAlignment: MemoryLayout<UInt64>.alignment)
         let c = min(remaining, Int(end - start))
         if c > 0 {
-          let chunk = _loadPartialUnalignedUInt64LE(data, byteCount: c)
+          let chunk = unsafe _loadPartialUnalignedUInt64LE(data, byteCount: c)
           combine(bytes: chunk, count: c)
-          data += c
+          unsafe data += c
           remaining -= c
         }
       }
-      _internalInvariant(
+      unsafe _internalInvariant(
         remaining == 0 ||
         Int(bitPattern: data) & (MemoryLayout<UInt64>.alignment - 1) == 0)
 
       // Load as many aligned words as there are in the input buffer
       while remaining >= MemoryLayout<UInt64>.size {
-        combine(UInt64(littleEndian: data.load(as: UInt64.self)))
-        data += MemoryLayout<UInt64>.size
+        unsafe combine(UInt64(littleEndian: data.load(as: UInt64.self)))
+        unsafe data += MemoryLayout<UInt64>.size
         remaining -= MemoryLayout<UInt64>.size
       }
 
       // Load last partial word of data
       _internalInvariant(remaining >= 0 && remaining < 8)
       if remaining > 0 {
-        let chunk = _loadPartialUnalignedUInt64LE(data, byteCount: remaining)
+        let chunk = unsafe _loadPartialUnalignedUInt64LE(data, byteCount: remaining)
         combine(bytes: chunk, count: remaining)
       }
     }
@@ -257,8 +257,8 @@ extension Hasher {
 @usableFromInline
 var _swift_stdlib_Hashing_parameters: _SwiftHashingParameters = {
   var seed0: UInt64 = 0, seed1: UInt64 = 0
-  swift_stdlib_random(&seed0, MemoryLayout<UInt64>.size)
-  swift_stdlib_random(&seed1, MemoryLayout<UInt64>.size)
+  unsafe swift_stdlib_random(&seed0, MemoryLayout<UInt64>.size)
+  unsafe swift_stdlib_random(&seed1, MemoryLayout<UInt64>.size)
   return .init(seed0: seed0, seed1: seed1, deterministic: false)
 }()
 #endif
@@ -396,7 +396,7 @@ public struct Hasher {
   /// - Parameter bytes: A raw memory buffer.
   @_effects(releasenone)
   public mutating func combine(bytes: UnsafeRawBufferPointer) {
-    _core.combine(bytes: bytes)
+    unsafe _core.combine(bytes: bytes)
   }
 
   /// Finalize the hasher state and return the hash value.
@@ -470,7 +470,7 @@ public struct Hasher {
     seed: Int,
     bytes: UnsafeRawBufferPointer) -> Int {
     var core = _Core(seed: seed)
-    core.combine(bytes: bytes)
+    unsafe core.combine(bytes: bytes)
     return Int(truncatingIfNeeded: core.finalize())
   }
 }

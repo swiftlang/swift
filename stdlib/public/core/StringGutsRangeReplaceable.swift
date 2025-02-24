@@ -124,8 +124,8 @@ extension _StringGuts {
     // strings or foreign strings that provide contiguous UTF-8 access.
     if _fastPath(isFastUTF8) {
       let isASCII = self.isASCII
-      let storage = self.withFastUTF8 {
-        __StringStorage.create(
+      let storage = unsafe self.withFastUTF8 {
+        unsafe __StringStorage.create(
           initializingFrom: $0,
           codeUnitCapacity: growthTarget,
           isASCII: isASCII)
@@ -140,8 +140,8 @@ extension _StringGuts {
 
   @inline(never) // slow-path
   private mutating func _foreignGrow(_ n: Int) {
-    let newString = String(_uninitializedCapacity: n) { buffer in
-      guard let count = _foreignCopyUTF8(into: buffer) else {
+    let newString = unsafe String(_uninitializedCapacity: n) { buffer in
+      guard let count = unsafe _foreignCopyUTF8(into: buffer) else {
        fatalError("String capacity was smaller than required")
       }
       return count
@@ -204,8 +204,8 @@ extension _StringGuts {
   @inline(never)
   @_effects(readonly)
   private func _foreignConvertedToSmall() -> _SmallString {
-    let smol = String(_uninitializedCapacity: _SmallString.capacity) { buffer in
-      guard let count = _foreignCopyUTF8(into: buffer) else {
+    let smol = unsafe String(_uninitializedCapacity: _SmallString.capacity) { buffer in
+      guard let count = unsafe _foreignCopyUTF8(into: buffer) else {
         fatalError("String capacity was smaller than required")
       }
       return count
@@ -220,7 +220,7 @@ extension _StringGuts {
       return asSmall
     }
     if isFastUTF8 {
-      return withFastUTF8 { _SmallString($0)! }
+      return unsafe withFastUTF8 { unsafe _SmallString($0)! }
     }
     return _foreignConvertedToSmall()
   }
@@ -271,8 +271,8 @@ extension _StringGuts {
 
     if slicedOther.isFastUTF8 {
       let otherIsASCII = slicedOther.isASCII
-      slicedOther.withFastUTF8 { otherUTF8 in
-        self.appendInPlace(otherUTF8, isASCII: otherIsASCII)
+      unsafe slicedOther.withFastUTF8 { otherUTF8 in
+        unsafe self.appendInPlace(otherUTF8, isASCII: otherIsASCII)
       }
       return
     }
@@ -283,7 +283,7 @@ extension _StringGuts {
   internal mutating func appendInPlace(
     _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) {
-    updateNativeStorage { $0.appendInPlace(other, isASCII: isASCII) }
+    updateNativeStorage { unsafe $0.appendInPlace(other, isASCII: isASCII) }
   }
 
   @inline(never) // slow-path
@@ -337,15 +337,15 @@ extension _StringGuts {
     if isUniqueNative {
       if let repl = newElements as? String {
         if repl._guts.isFastUTF8 {
-          return repl._guts.withFastUTF8 {
-            uniqueNativeReplaceSubrange(
+          return unsafe repl._guts.withFastUTF8 {
+            unsafe uniqueNativeReplaceSubrange(
               bounds, with: $0, isASCII: repl._guts.isASCII)
           }
         }
       } else if let repl = newElements as? Substring {
         if repl._wholeGuts.isFastUTF8 {
-          return repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
-            uniqueNativeReplaceSubrange(
+          return unsafe repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
+            unsafe uniqueNativeReplaceSubrange(
               bounds, with: $0, isASCII: repl._wholeGuts.isASCII)
           }
         }
@@ -380,15 +380,15 @@ extension _StringGuts {
     if isUniqueNative {
       if let repl = newElements as? String.UnicodeScalarView {
         if repl._guts.isFastUTF8 {
-          return repl._guts.withFastUTF8 {
-            uniqueNativeReplaceSubrange(
+          return unsafe repl._guts.withFastUTF8 {
+            unsafe uniqueNativeReplaceSubrange(
               bounds, with: $0, isASCII: repl._guts.isASCII)
           }
         }
       } else if let repl = newElements as? Substring.UnicodeScalarView {
         if repl._wholeGuts.isFastUTF8 {
-          return repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
-            uniqueNativeReplaceSubrange(
+          return unsafe repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
+            unsafe uniqueNativeReplaceSubrange(
               bounds, with: $0, isASCII: repl._wholeGuts.isASCII)
           }
         }
@@ -402,7 +402,7 @@ extension _StringGuts {
         var utf8: [UInt8] = []
         utf8.reserveCapacity(c)
         utf8 = newElements.reduce(into: utf8) { utf8, next in
-          next.withUTF8CodeUnits { utf8.append(contentsOf: $0) }
+          next.withUTF8CodeUnits { unsafe utf8.append(contentsOf: $0) }
         }
         return uniqueNativeReplaceSubrange(bounds, with: utf8)
       }
@@ -441,7 +441,7 @@ extension _StringGuts {
     let start = bounds.lowerBound._encodedOffset
     let end = bounds.upperBound._encodedOffset
     updateNativeStorage {
-      $0.replace(from: start, to: end, with: codeUnits)
+      unsafe $0.replace(from: start, to: end, with: codeUnits)
     }
     return Range(_uncheckedBounds: (start, start + codeUnits.count))
   }

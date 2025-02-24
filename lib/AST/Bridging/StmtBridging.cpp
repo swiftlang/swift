@@ -191,14 +191,15 @@ BridgedFallthroughStmt_createParsed(BridgedSourceLoc cLoc,
 BridgedForEachStmt BridgedForEachStmt_createParsed(
     BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
     BridgedSourceLoc cForLoc, BridgedSourceLoc cTryLoc,
-    BridgedSourceLoc cAwaitLoc, BridgedPattern cPat, BridgedSourceLoc cInLoc,
+    BridgedSourceLoc cAwaitLoc, BridgedSourceLoc cUnsafeLoc,
+    BridgedPattern cPat, BridgedSourceLoc cInLoc,
     BridgedExpr cSequence, BridgedSourceLoc cWhereLoc,
     BridgedNullableExpr cWhereExpr, BridgedBraceStmt cBody) {
   return new (cContext.unbridged()) ForEachStmt(
       cLabelInfo.unbridged(), cForLoc.unbridged(), cTryLoc.unbridged(),
-      cAwaitLoc.unbridged(), cPat.unbridged(), cInLoc.unbridged(),
-      cSequence.unbridged(), cWhereLoc.unbridged(), cWhereExpr.unbridged(),
-      cBody.unbridged());
+      cAwaitLoc.unbridged(), cUnsafeLoc.unbridged(), cPat.unbridged(),
+      cInLoc.unbridged(), cSequence.unbridged(), cWhereLoc.unbridged(),
+      cWhereExpr.unbridged(), cBody.unbridged());
 }
 
 BridgedGuardStmt BridgedGuardStmt_createParsed(BridgedASTContext cContext,

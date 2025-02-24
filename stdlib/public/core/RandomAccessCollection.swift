@@ -293,7 +293,7 @@ where Index: Strideable,
   @inlinable
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests for the trap.
-    _failEarlyRangeCheck(
+    unsafe _failEarlyRangeCheck(
       i, bounds: Range(uncheckedBounds: (startIndex, endIndex)))
     return i.advanced(by: 1)
   }
@@ -307,7 +307,7 @@ where Index: Strideable,
   public func index(before i: Index) -> Index {
     let result = i.advanced(by: -1)
     // FIXME: swift-3-indexing-model: tests for the trap.
-    _failEarlyRangeCheck(
+    unsafe _failEarlyRangeCheck(
       result, bounds: Range(uncheckedBounds: (startIndex, endIndex)))
     return result
   }
@@ -343,7 +343,7 @@ where Index: Strideable,
     // compute those bounds, which is probably too slow in the general
     // case.
     // FIXME: swift-3-indexing-model: tests for the trap.
-    _failEarlyRangeCheck(
+    unsafe _failEarlyRangeCheck(
       result, bounds: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
     return result
   }
@@ -360,9 +360,9 @@ where Index: Strideable,
   @inlinable
   public func distance(from start: Index, to end: Index) -> Index.Stride {
     // FIXME: swift-3-indexing-model: tests for traps.
-    _failEarlyRangeCheck(
+    unsafe _failEarlyRangeCheck(
       start, bounds: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
-    _failEarlyRangeCheck(
+    unsafe _failEarlyRangeCheck(
       end, bounds: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
     return start.distance(to: end)
   }

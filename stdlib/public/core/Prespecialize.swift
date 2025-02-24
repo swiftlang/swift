@@ -103,7 +103,7 @@ internal func _prespecialize() {
   consume(Optional<Set<String>>.self)
   consume(Optional<TextOutputStreamable>.self)
   consume(Optional<UInt8>.self)
-  consume(Optional<UnsafeBufferPointer<AnyObject>>.self)
+  unsafe consume(Optional<UnsafeBufferPointer<AnyObject>>.self)
   consume(PartialRangeFrom<Int>.self)
   consume(Range<String.Index>.self)
   consume(ReversedCollection<Range<Int>>.self)
@@ -112,10 +112,10 @@ internal func _prespecialize() {
   consume(Set<String>.self)
   consume(Set<String>.Iterator.self)
   consume(Set<String>.self)
-  consume(Unmanaged<AnyObject>.self)
-  consume(UnsafeBufferPointer<AnyObject>.self)
-  consume(UnsafeBufferPointer<Int8>.self)
-  consume(UnsafePointer<Int8>.self)
+  unsafe consume(Unmanaged<AnyObject>.self)
+  unsafe consume(UnsafeBufferPointer<AnyObject>.self)
+  unsafe consume(UnsafeBufferPointer<Int8>.self)
+  unsafe consume(UnsafePointer<Int8>.self)
 }
 
 @_specializeExtension

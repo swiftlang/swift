@@ -62,7 +62,7 @@ public func _setUpCast<DerivedValue, BaseValue>(
 internal func _setDownCastIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Set<SourceValue>>,
   _ target: UnsafeMutablePointer<Set<TargetValue>>) {
-  target.initialize(to: _setDownCast(source.pointee))
+  unsafe target.initialize(to: _setDownCast(source.pointee))
 }
 
 /// Implements a forced downcast.  This operation should have O(1) complexity.
@@ -107,8 +107,8 @@ internal func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Set<SourceValue>>,
   _ target: UnsafeMutablePointer<Set<TargetValue>>
 ) -> Bool {
-  if let result: Set<TargetValue> = _setDownCastConditional(source.pointee) {
-    target.initialize(to: result)
+  if let result: Set<TargetValue> = unsafe _setDownCastConditional(source.pointee) {
+    unsafe target.initialize(to: result)
     return true
   }
   return false
