@@ -14,7 +14,6 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -487,8 +486,8 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
                                                         nomDecl)
           .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
 
-    if (auto isolation = swift::getActorIsolation(nomDecl)) {
-      assert(isolation.isGlobalActor());
+    if (auto isolation = swift::getActorIsolation(nomDecl);
+        isolation && isolation.isGlobalActor()) {
       return SILIsolationInfo::getGlobalActorIsolated(
                  rei, isolation.getGlobalActor())
           .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());

@@ -31,6 +31,10 @@ class NonSendableKlass { // expected-complete-note 53{{}}
   func getSendableGenericStructAsync() async -> SendableGenericStruct { fatalError() }
 }
 
+nonisolated final class NonIsolatedFinalKlass {
+  var ns = NonSendableKlass()
+}
+
 class SendableKlass : @unchecked Sendable {}
 
 actor MyActor {
@@ -1942,5 +1946,14 @@ func testFunctionIsNotEmpty(input: SendableKlass) async throws {
     taskGroup.addTask { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
       result.append(input) // expected-tns-note {{closure captures reference to mutable var 'result' which is accessible to code in the current task}}
     }
+  }
+}
+
+extension NonIsolatedFinalKlass {
+  // We used to crash while computing the isolation of the ref_element_addr
+  // here. Make sure we do not crash.
+  func testGetIsolationInfoOfField() async {
+    await transferToMain(ns) // expected-tns-warning {{sending 'self.ns' risks causing data races}}
+    // expected-tns-note @-1 {{sending task-isolated 'self.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
   }
 }
