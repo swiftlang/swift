@@ -2837,22 +2837,6 @@ bool ContextualFailure::diagnoseAsError() {
     break;
   }
 
-  case ConstraintLocator::OptionalPayload: {
-    // If this is an attempt at a Double <-> CGFloat conversion
-    // through optional chaining, let's produce a tailored diagnostic.
-    if (isExpr<OptionalEvaluationExpr>(getAnchor())) {
-      if ((fromType->isDouble() || fromType->isCGFloat()) &&
-          (toType->isDouble() || toType->isCGFloat())) {
-        fromType = OptionalType::get(fromType);
-        toType = OptionalType::get(toType);
-        diagnostic = diag::cannot_implicitly_convert_in_optional_context;
-        break;
-      }
-    }
-
-    return false;
-  }
-
   case ConstraintLocator::EnumPatternImplicitCastMatch: {
     // In this case, the types are reversed, as we are checking whether we
     // can convert the pattern type to the context type.
