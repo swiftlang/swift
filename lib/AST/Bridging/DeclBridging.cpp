@@ -615,12 +615,15 @@ BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(
     BridgedSourceLoc cSubscriptKeywordLoc,
     BridgedNullableGenericParamList cGenericParamList,
     BridgedParameterList cParamList, BridgedSourceLoc cArrowLoc,
-    BridgedTypeRepr returnType) {
-  return SubscriptDecl::createParsed(
+    BridgedTypeRepr returnType,
+    BridgedNullableTrailingWhereClause genericWhereClause) {
+  auto *decl = SubscriptDecl::createParsed(
       cContext.unbridged(), cStaticLoc.unbridged(), unbridged(cStaticSpelling),
       cSubscriptKeywordLoc.unbridged(), cParamList.unbridged(),
       cArrowLoc.unbridged(), returnType.unbridged(), cDeclContext.unbridged(),
       cGenericParamList.unbridged());
+  decl->setTrailingWhereClause(genericWhereClause.unbridged());
+  return decl;
 }
 
 BridgedTopLevelCodeDecl

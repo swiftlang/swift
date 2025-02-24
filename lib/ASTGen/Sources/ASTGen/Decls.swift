@@ -630,7 +630,8 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: self.generate(functionParameterClause: node.parameterClause, for: .subscript),
       arrowLoc: self.generateSourceLoc(node.returnClause.arrow),
-      returnType: self.generate(type: node.returnClause.type)
+      returnType: self.generate(type: node.returnClause.type),
+      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
     subscriptDecl.asDecl.attachParsedAttrs(attrs.attributes)
 
