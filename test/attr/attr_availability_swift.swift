@@ -4,8 +4,20 @@
 func foo() {
 }
 
-@available(swift 3.0, iOS 10, *) // expected-error {{version-availability must be specified alone}}
+@available(swift 3.0, *) // expected-error {{'swift' version-availability must be specified alone}}
+func foo2() {
+}
+
+@available(swift 3.0, iOS 10, *) // expected-error {{'swift' version-availability must be specified alone}}
 func bar() {
+}
+
+@available(iOS 10, swift 3.0, *) // expected-error {{'swift' version-availability must be specified alone}}
+func bar2() {
+}
+
+@available(iOS 10, *, swift 3.0) // expected-error {{'swift' version-availability must be specified alone}}
+func bar3() {
 }
 
 func baz() {

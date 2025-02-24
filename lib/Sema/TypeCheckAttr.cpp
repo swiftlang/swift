@@ -4942,7 +4942,7 @@ getAvailableAttrGroups(ArrayRef<AvailableAttr *> attrs) {
 
   // Find each attribute that belongs to a group.
   for (auto attr : attrs) {
-    if (attr->getNextGroupedAvailableAttr())
+    if (attr->isGroupMember())
       heads.insert(attr);
   }
 
@@ -4973,9 +4973,18 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   for (const AvailableAttr *groupHead : attrGroups) {
     llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
 
+    SourceLoc groupEndLoc;
+    bool requiresWildcard = false;
+    bool foundWildcard = false;
+    int groupAttrCount = 0;
     for (auto *groupedAttr = groupHead; groupedAttr != nullptr;
          groupedAttr = groupedAttr->getNextGroupedAvailableAttr()) {
+      groupAttrCount++;
       auto loc = groupedAttr->getLocation();
+      groupEndLoc = groupedAttr->getEndLoc();
+      if (groupedAttr->isAdjacentToWildcard())
+        foundWildcard = true;
+
       auto attr = D->getSemanticAvailableAttr(groupedAttr);
 
       // If the attribute cannot be resolved, it may have had an unrecognized
@@ -4984,12 +4993,19 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
       if (!attr)
         continue;
 
-      // Only platform availability is allowed to be written in short form.
       auto domain = attr->getDomain();
-      if (!domain.isPlatform()) {
-        diagnose(loc, diag::availability_must_occur_alone,
-                 domain.getNameForAttributePrinting());
-        continue;
+      if (domain.isPlatform())
+        requiresWildcard = true;
+
+      if (groupAttrCount > 1 || groupedAttr->isAdjacentToWildcard() ||
+          !groupedAttr->isGroupTerminator()) {
+        // Only platform availability is allowed to be written groups with more
+        // than one member.
+        if (!domain.isPlatform()) {
+          diagnose(loc, diag::availability_must_occur_alone,
+                   domain.getNameForAttributePrinting());
+          continue;
+        }
       }
 
       // Diagnose duplicate platforms.
@@ -4997,6 +5013,11 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
         diagnose(loc, diag::availability_query_repeated_platform,
                  domain.getNameForAttributePrinting());
       }
+    }
+
+    if (requiresWildcard && !foundWildcard) {
+      diagnose(groupEndLoc, diag::availability_query_wildcard_required)
+          .fixItInsert(groupEndLoc, ", *");
     }
   }
 

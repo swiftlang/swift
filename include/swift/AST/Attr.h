@@ -151,7 +151,7 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1+1+1,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1+1+1+1,
       /// An `AvailableAttr::Kind` value.
       Kind : 4,
 
@@ -165,13 +165,14 @@ protected:
       /// Whether this attribute was spelled `@_spi_available`.
       IsSPI : 1,
 
-      /// Whether this attribute is an interior attribute of a group of
-      /// `@available` attributes that were written in source using short form
-      /// syntax (`@available(macOS 15, ...)`).
-      IsFollowedByGroupedAvailableAttr : 1,
+      /// Whether this attribute belongs to a chain of adjacent `@available` attributes that were generated from a single attribute written in source using short form syntax e.g. (`@available(macOS 15, iOS 18, *)`).
+      IsGroupMember : 1,
 
-      /// Whether this attribute was followed by `, *` when parsed from source.
-      IsFollowedByWildcard : 1
+      /// Whether this attribute is the final one in its group.
+      IsGroupTerminator : 1,
+
+      /// Whether this attribute's specification was followed by `, *` in source.
+      IsAdjacentToWildcard : 1
     );
 
     SWIFT_INLINE_BITFIELD(ClangImporterSynthesizedTypeAttr, DeclAttribute, 1,
@@ -829,26 +830,30 @@ public:
   /// Whether this attribute was spelled `@_spi_available`.
   bool isSPI() const { return Bits.AvailableAttr.IsSPI; }
 
-  /// Returns the following `@available` if this was generated from an
-  /// attribute that was written in source using short form syntax, e.g.
-  /// `@available(macOS 15, iOS 18, *)`.
+  /// Returns the next attribute in the chain of adjacent `@available`
+  /// attributes that were generated from a single attribute written in source
+  /// using short form syntax e.g. (`@available(macOS 15, iOS 18, *)`).
   const AvailableAttr *getNextGroupedAvailableAttr() const {
-    if (Bits.AvailableAttr.IsFollowedByGroupedAvailableAttr)
+    if (Bits.AvailableAttr.IsGroupMember && !isGroupTerminator())
       return dyn_cast_or_null<AvailableAttr>(Next);
     return nullptr;
   }
 
-  void setIsFollowedByGroupedAvailableAttr() {
-    Bits.AvailableAttr.IsFollowedByGroupedAvailableAttr = true;
-  }
+  bool isGroupMember() const { return Bits.AvailableAttr.IsGroupMember; }
+  void setIsGroupMember() { Bits.AvailableAttr.IsGroupMember = true; }
 
-  /// Whether this attribute was followed by `, *` when parsed from source.
-  bool isFollowedByWildcard() const {
-    return Bits.AvailableAttr.IsFollowedByWildcard;
+  /// Whether this attribute is the final one in its group.
+  bool isGroupTerminator() const {
+    return Bits.AvailableAttr.IsGroupTerminator;
   }
+  void setIsGroupTerminator() { Bits.AvailableAttr.IsGroupTerminator = true; }
 
-  void setIsFollowedByWildcard() {
-    Bits.AvailableAttr.IsFollowedByWildcard = true;
+  /// Whether this attribute's specification was followed by `, *` in source.
+  bool isAdjacentToWildcard() const {
+    return Bits.AvailableAttr.IsAdjacentToWildcard;
+  }
+  void setIsAdjacentToWildcard() {
+    Bits.AvailableAttr.IsAdjacentToWildcard = true;
   }
 
   /// Returns the kind of availability the attribute specifies.

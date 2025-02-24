@@ -42,7 +42,7 @@ if #available(OSX 0) { // expected-warning {{expected version number; this is an
 if #available(OSX 0.0) { // expected-warning {{expected version number; this is an error in the Swift 6 language mode}}
 }
 
-if #available(OSX 51 { // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-error {{must handle potential future platforms with '*'}} {{21-21=, *}}
+if #available(OSX 51 { // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 
 if #available(iDishwasherOS 51) { // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
