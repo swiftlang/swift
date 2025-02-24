@@ -628,6 +628,7 @@ extension Substring: LosslessStringConvertible {
 
 extension Substring {
   @frozen
+  @_addressableForDependencies
   public struct UTF8View: Sendable {
     @usableFromInline
     internal var _slice: Slice<String.UTF8View>
