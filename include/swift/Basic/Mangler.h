@@ -114,6 +114,13 @@ public:
     print(llvm::dbgs());
   }
 
+  /// Appends the given raw identifier to the buffer in the form required to
+  /// mangle it. This handles the transformations needed for such identifiers
+  /// to retain compatibility with older runtimes.
+  static void
+  appendRawIdentifierForRuntime(StringRef ident,
+                                llvm::SmallVectorImpl<char> &buffer);
+
 protected:
   /// Removes the last characters of the buffer by setting it's size to a
   /// smaller value.
@@ -143,7 +150,7 @@ protected:
   SWIFT_DEBUG_DUMP;
 
   /// Appends a mangled identifier string.
-  void appendIdentifier(StringRef ident);
+  void appendIdentifier(StringRef ident, bool allowRawIdentifiers = true);
 
   // NOTE: the addSubstitution functions perform the value computation before
   // the assignment because there is no sequence point synchronising the

@@ -318,10 +318,11 @@ class ExplicitModuleMapParser {
 public:
   ExplicitModuleMapParser(llvm::BumpPtrAllocator &Allocator) : Saver(Allocator) {}
 
-  std::error_code
-  parseSwiftExplicitModuleMap(llvm::MemoryBufferRef BufferRef,
-                              llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
-                              llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap) {
+  std::error_code parseSwiftExplicitModuleMap(
+      llvm::MemoryBufferRef BufferRef,
+      llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
+      llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap,
+      llvm::StringMap<std::string> &moduleAliases) {
     using namespace llvm::yaml;
     // Use a new source manager instead of the one from ASTContext because we
     // don't want the JSON file to be persistent.
@@ -331,7 +332,8 @@ public:
       assert(DI != Stream.end() && "Failed to read a document");
       if (auto *MN = dyn_cast_or_null<SequenceNode>(DI->getRoot())) {
         for (auto &entry : *MN) {
-          if (parseSingleModuleEntry(entry, swiftModuleMap, clangModuleMap)) {
+          if (parseSingleModuleEntry(entry, swiftModuleMap, clangModuleMap,
+                                     moduleAliases)) {
             return std::make_error_code(std::errc::invalid_argument);
           }
         }
@@ -359,16 +361,19 @@ private:
       llvm_unreachable("Unexpected JSON value for isFramework");
   }
 
-  bool parseSingleModuleEntry(llvm::yaml::Node &node,
-                              llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
-                              llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap) {
+  bool parseSingleModuleEntry(
+      llvm::yaml::Node &node,
+      llvm::StringMap<ExplicitSwiftModuleInputInfo> &swiftModuleMap,
+      llvm::StringMap<ExplicitClangModuleInputInfo> &clangModuleMap,
+      llvm::StringMap<std::string> &moduleAliases) {
     using namespace llvm::yaml;
     auto *mapNode = dyn_cast<MappingNode>(&node);
     if (!mapNode)
       return true;
     StringRef moduleName;
     std::optional<std::string> swiftModulePath, swiftModuleDocPath,
-        swiftModuleSourceInfoPath, swiftModuleCacheKey, clangModuleCacheKey;
+        swiftModuleSourceInfoPath, swiftModuleCacheKey, clangModuleCacheKey,
+        moduleAlias;
     std::optional<std::vector<std::string>> headerDependencyPaths;
     std::string clangModuleMapPath = "", clangModulePath = "";
     bool isFramework = false, isSystem = false,
@@ -405,6 +410,8 @@ private:
           clangModuleCacheKey = val.str();
         } else if (key == "isBridgingHeaderDependency") {
           isBridgingHeaderDependency = parseBoolValue(val);
+        } else if (key == "moduleAlias") {
+          moduleAlias = val.str();
         } else {
           // Being forgiving for future fields.
           continue;
@@ -438,6 +445,9 @@ private:
                                          isBridgingHeaderDependency,
                                          clangModuleCacheKey);
       didInsert = clangModuleMap.try_emplace(moduleName, std::move(entry)).second;
+    }
+    if (didInsert && moduleAlias.has_value()) {
+      moduleAliases[*moduleAlias] = moduleName;
     }
     // Prevent duplicate module names.
     return !didInsert;
