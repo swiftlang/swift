@@ -150,7 +150,9 @@ class ExtendedValidationInfo {
     unsigned AllowNonResilientAccess: 1;
     unsigned SerializePackageEnabled: 1;
     unsigned StrictMemorySafety: 1;
+    unsigned SupportsExtensibleEnums : 1;
   } Bits;
+
 public:
   ExtendedValidationInfo() : Bits() {}
 
@@ -269,6 +271,11 @@ public:
     if (auto genericVersion = VersionParser::parseVersionString(
             version, SourceLoc(), /*Diags=*/nullptr))
       SwiftInterfaceCompilerVersion = genericVersion.value();
+  }
+
+  bool supportsExtensibleEnums() const { return Bits.SupportsExtensibleEnums; }
+  void setSupportsExtensibleEnums(bool val) {
+    Bits.SupportsExtensibleEnums = val;
   }
 };
 

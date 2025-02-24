@@ -707,6 +707,11 @@ public:
   /// \c true if this module was built with strict memory safety.
   bool strictMemorySafety() const { return Core->strictMemorySafety(); }
 
+  /// \c true if this module was built with `ExtensibleEnums` feature enabled.
+  bool supportsExtensibleEnums() const {
+    return Core->supportsExtensibleEnums();
+  }
+
   /// Associates this module file with the AST node representing it.
   ///
   /// Checks that the file is compatible with the AST module it's being loaded
