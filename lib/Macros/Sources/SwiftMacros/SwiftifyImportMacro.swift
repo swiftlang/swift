@@ -88,6 +88,9 @@ struct CxxSpan: ParamInfo {
       return CxxSpanThunkBuilder(base: base, index: i - 1, signature: funcDecl.signature,
         typeMappings: typeMappings, node: original, nonescaping: nonescaping)
     case .return:
+      if dependencies.isEmpty {
+        return base
+      }
       return CxxSpanReturnThunkBuilder(base: base, signature: funcDecl.signature,
         typeMappings: typeMappings, node: original)
     case .self:
@@ -125,7 +128,7 @@ struct CountedBy: ParamInfo {
       return CountedOrSizedReturnPointerThunkBuilder(
         base: base, countExpr: count,
         signature: funcDecl.signature,
-        nonescaping: nonescaping, isSizedBy: sizedBy)
+        nonescaping: nonescaping, isSizedBy: sizedBy, dependencies: dependencies)
     case .self:
       return base
     }
@@ -184,11 +187,13 @@ func getTypeName(_ type: TypeSyntax) throws -> TokenSyntax {
   }
 }
 
-func replaceTypeName(_ type: TypeSyntax, _ name: TokenSyntax) -> TypeSyntax {
+func replaceTypeName(_ type: TypeSyntax, _ name: TokenSyntax) throws -> TypeSyntax {
   if let memberType = type.as(MemberTypeSyntax.self) {
     return TypeSyntax(memberType.with(\.name, name))
   }
-  let idType = type.as(IdentifierTypeSyntax.self)!
+  guard let idType = type.as(IdentifierTypeSyntax.self) else {
+    throw DiagnosticError("unexpected type \(type) with kind \(type.kind)", node: type)
+  }
   return TypeSyntax(idType.with(\.name, name))
 }
 
@@ -264,6 +269,10 @@ func transformType(_ prev: TypeSyntax, _ generateSpan: Bool, _ isSizedBy: Bool) 
   if let impOptType = prev.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
     return try transformType(impOptType.wrappedType, generateSpan, isSizedBy)
   }
+  if let attrType = prev.as(AttributedTypeSyntax.self) {
+    return TypeSyntax(
+      attrType.with(\.baseType, try transformType(attrType.baseType, generateSpan, isSizedBy)))
+  }
   let name = try getTypeName(prev)
   let text = name.text
   let isRaw = isRawPointerType(text: text)
@@ -283,7 +292,7 @@ func transformType(_ prev: TypeSyntax, _ generateSpan: Bool, _ isSizedBy: Bool) 
   if isSizedBy {
     return TypeSyntax(IdentifierTypeSyntax(name: token))
   }
-  return replaceTypeName(prev, token)
+  return try replaceTypeName(prev, token)
 }
 
 protocol BoundsCheckedThunkBuilder {
@@ -485,8 +494,9 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   public let signature: FunctionSignatureSyntax
   public let nonescaping: Bool
   public let isSizedBy: Bool
+  public let dependencies: [LifetimeDependence]
 
-  var generateSpan: Bool = false // needs more lifetime information
+  var generateSpan: Bool { !dependencies.isEmpty }
 
   var oldType: TypeSyntax {
     return signature.returnClause!.type
@@ -504,9 +514,14 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
     let call = try base.buildFunctionCall(pointerArgs)
+    let startLabel = if generateSpan {
+      "_unsafeStart"
+    } else {
+      "start"
+    }
     return
       """
-      \(raw: try newType)(start: \(call), count: Int(\(countExpr)))
+      \(raw: try newType)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
       """
   }
 }
@@ -894,14 +909,18 @@ public struct SwiftifyImportMacro: PeerMacro {
     }
     var result : [ParamInfo] = []
     let process = { type, expr, orig in
-      let typeName = try getTypeName(type).text;
-      if let desugaredType = typeMappings[typeName] {
-        if let unqualifiedDesugaredType = getUnqualifiedStdName(desugaredType) {
-          if unqualifiedDesugaredType.starts(with: "span<") {
-            result.append(CxxSpan(pointerIndex: expr, nonescaping: false,
-              dependencies: [], typeMappings: typeMappings, original: orig))
+      do {
+        let typeName = try getTypeName(type).text
+        if let desugaredType = typeMappings[typeName] {
+          if let unqualifiedDesugaredType = getUnqualifiedStdName(desugaredType) {
+            if unqualifiedDesugaredType.starts(with: "span<") {
+              result.append(CxxSpan(pointerIndex: expr, nonescaping: false,
+                dependencies: [], typeMappings: typeMappings, original: orig))
+            }
           }
         }
+      } catch is DiagnosticError {
+        // type doesn't match expected pattern
       }
     }
     for (idx, param) in signature.parameterClause.parameters.enumerated() {
@@ -1098,6 +1117,11 @@ public struct SwiftifyImportMacro: PeerMacro {
         }
       }
       try checkArgs(parsedArgs, funcDecl)
+      parsedArgs.sort { a, b in
+        // make sure return value cast to Span happens last so that withUnsafeBufferPointer
+        // doesn't return a ~Escapable type
+        (a.pointerIndex != .return && b.pointerIndex == .return) || paramOrReturnIndex(a.pointerIndex) < paramOrReturnIndex(b.pointerIndex)
+      }
       let baseBuilder = FunctionCallBuilder(funcDecl)
 
       let skipTrivialCount = hasTrivialCountVariants(parsedArgs)
