@@ -1992,12 +1992,6 @@ NOTE(avail_query_meant_introduced,PointsToFirstBadToken,
 ERROR(avail_query_version_comparison_not_needed,
       none,"version comparison not needed", ())
 
-ERROR(availability_query_wildcard_required, none,
-      "must handle potential future platforms with '*'", ())
-
-ERROR(unavailability_query_wildcard_not_required, none,
-      "platform wildcard '*' is always implicit in #unavailable", ())
-
 ERROR(availability_cannot_be_mixed,none,
       "#available and #unavailable cannot be in the same statement", ())
 

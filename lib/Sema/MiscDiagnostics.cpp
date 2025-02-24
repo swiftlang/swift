@@ -5123,16 +5123,22 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
 /// was emitted.
 static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
                                           DeclContext *DC) {
+  if (info->isInvalid())
+    return false;
+
   auto &diags = DC->getASTContext().Diags;
   StringRef queryName =
       info->isUnavailability() ? "#unavailable" : "#available";
 
+  std::optional<SourceLoc> wildcardLoc;
   llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
   for (auto spec : info->getSemanticAvailabilitySpecs(DC)) {
-    if (spec.isWildcard())
-      continue;
-
     auto parsedSpec = spec.getParsedSpec();
+    if (spec.isWildcard()) {
+      wildcardLoc = parsedSpec->getStartLoc();
+      continue;
+    }
+
     auto domain = spec.getDomain();
 
     if (!domain.isPlatform()) {
@@ -5151,6 +5157,21 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
                      diag::availability_query_repeated_platform,
                      domain.getNameForAttributePrinting());
       return true;
+    }
+  }
+
+  if (info->isUnavailability()) {
+    if (wildcardLoc) {
+      diags
+          .diagnose(*wildcardLoc,
+                    diag::unavailability_query_wildcard_not_required)
+          .fixItRemove(*wildcardLoc);
+    }
+  } else if (!wildcardLoc) {
+    if (info->getQueries().size() > 0) {
+      auto insertLoc = info->getQueries().back()->getSourceRange().End;
+      diags.diagnose(insertLoc, diag::availability_query_wildcard_required)
+          .fixItInsertAfter(insertLoc, ", *");
     }
   }
 
@@ -5260,7 +5281,8 @@ static void checkLabeledStmtConditions(ASTContext &ctx,
       break;
     case StmtConditionElement::CK_Availability: {
       auto info = elt.getAvailability();
-      (void)diagnoseAvailabilityCondition(info, DC);
+      if (diagnoseAvailabilityCondition(info, DC))
+        info->setInvalid();
       break;
     }
     case StmtConditionElement::CK_HasSymbol: {
