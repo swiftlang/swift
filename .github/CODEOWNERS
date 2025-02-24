@@ -52,6 +52,11 @@
 /cmake/**/*Windows*                       @compnerd
 
 # docs
+/docs/ABI/                                @rjmccall
+/docs/ABI/*Mangling*                      @eeckstein
+/docs/ABI/GenericSignature.md             @slavapestov
+/docs/ABI/KeyPaths.md                     @jckarter
+/docs/ABI/RegisterUsage.md                @al45tair
 /docs/CrossCompilationModel.md            @MaxDesiatov
 /docs/Generics                            @slavapestov
 /docs/HowToGuides/                        @AnthonyLatsis @LucianoPAlmeida @xedin
