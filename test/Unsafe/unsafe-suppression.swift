@@ -147,7 +147,7 @@ struct UnsafeSequence: @unsafe IteratorProtocol, @unsafe Sequence {
 func forEachLoop(us: UnsafeSequence) {
   for _ in us { } // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}{{12-12=unsafe }}
   // expected-note@-1{{@unsafe conformance of 'UnsafeSequence' to protocol 'Sequence' involves unsafe code}}
-  // expected-note@-2{{reference to unsafe instance method 'next()'}}
-
+  // expected-warning@-2{{for-in loop uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}
   for _ in unsafe us { }
+  // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}
 }
