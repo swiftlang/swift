@@ -131,24 +131,31 @@ public func parseSourceFile(
       .codeItemMacroExpansion,
       .peerMacroExpansion:
     if let dc, dc.isTypeContext {
-      parsed = Syntax(MemberBlockItemListSyntax.parse(from: &parser))
+      parsed = Syntax(MemberBlockItemListFileSyntax.parse(from: &parser))
     } else {
       parsed = Syntax(SourceFileSyntax.parse(from: &parser))
     }
 
   case .memberMacroExpansion:
-    parsed = Syntax(MemberBlockItemListSyntax.parse(from: &parser))
+    parsed = Syntax(MemberBlockItemListFileSyntax.parse(from: &parser))
 
   case .accessorMacroExpansion:
-    // FIXME: Implement specialized parsing.
-    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
-  case .memberAttributeMacroExpansion,
-      .attribute:
-    // FIXME: Implement specialized parsing.
-    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+    parsed = Syntax(AccessorBlockFileSyntax.parse(from: &parser))
+
+  case .memberAttributeMacroExpansion:
+    var attrs = AttributeClauseFileSyntax.parse(from: &parser)
+    if !attrs.modifiers.isEmpty {
+      // 'memberAttribute' macro doesn't allow modifiers. Move to "unexpected" if any.
+      attrs.unexpectedBetweenAttributesAndModifiers = [Syntax(attrs.modifiers)]
+      attrs.modifiers = []
+    }
+    parsed = Syntax(attrs)
+
+  case .attributeFromClang:
+    parsed = Syntax(AttributeClauseFileSyntax.parse(from: &parser))
+
   case .bodyMacroExpansion:
-    // FIXME: Implement specialized parsing.
-    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+    parsed = Syntax(CodeBlockFileSyntax.parse(from: &parser))
   }
 
   let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)

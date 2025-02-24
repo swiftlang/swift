@@ -67,3 +67,46 @@ class D: C { }
 
 @DefaultInit
 struct E { }
+
+
+@attached(memberAttribute)
+@attached(member, names: named(_storage))
+macro myTypeWrapper() = #externalMacro(module: "MacroDefinition", type: "TypeWrapperMacro")
+@attached(accessor)
+macro accessViaStorage() = #externalMacro(module: "MacroDefinition", type: "AccessViaStorageMacro")
+
+struct _Storage {
+  var x: Int = 0 {
+    willSet { print("setting \(newValue)") }
+  }
+  var y: Int = 0 {
+    willSet { print("setting \(newValue)") }
+  }
+}
+
+@myTypeWrapper
+struct S {
+  var x: Int
+  var y: Int
+}
+
+
+@attached(body)
+macro Remote() = #externalMacro(module: "MacroDefinition", type: "RemoteBodyMacro")
+
+protocol ConjureRemoteValue {
+  static func conjureValue() -> Self
+}
+extension String: ConjureRemoteValue {
+  static func conjureValue() -> String { "" }
+}
+func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String: Any]) async throws -> Result {
+  let printedArgs = arguments.keys.sorted().map { key in
+    "\(key): \(arguments[key]!)"
+  }.joined(separator: ", ")
+  print("Remote call \(function)(\(printedArgs))")
+  return Result.conjureValue()
+}
+
+@Remote
+func f(a: Int, b: String) async throws -> String

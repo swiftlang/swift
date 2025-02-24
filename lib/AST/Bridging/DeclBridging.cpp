@@ -519,6 +519,13 @@ BridgedMacroExpansionDecl BridgedMacroExpansionDecl_createParsed(
       cRightAngleLoc.unbridged(), cArgList.unbridged());
 }
 
+BridgedMissingDecl BridgedMissingDecl_create(BridgedASTContext cContext,
+                                             BridgedDeclContext cDeclContext,
+                                             BridgedSourceLoc cLoc) {
+  return MissingDecl::create(cContext.unbridged(), cDeclContext.unbridged(),
+                             cLoc.unbridged());
+}
+
 BridgedOperatorDecl BridgedOperatorDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedOperatorFixity cFixity, BridgedSourceLoc cOperatorKeywordLoc,
