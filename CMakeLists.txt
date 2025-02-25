@@ -1632,7 +1632,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DSwiftCore_PLATFORM_SUBDIR=${SWIFT_SDK_${sdk}_LIB_SUBDIR}
-          -DSwiftCore_ARCH_SUBDIR=${arch})
+          -DSwiftCore_ARCH_SUBDIR=${arch}
+          -DSwiftCore_ENABLE_CONCURRENCY=YES)
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}" swift-frontend)
       endif()
