@@ -785,6 +785,10 @@ extension InteriorUseWalker {
     }
     switch value.ownership {
     case .owned:
+      // Each owned lifetime is an inner scope.
+      if handleInner(borrowed: value) == .abortWalk {
+        return .abortWalk
+      }
       return visitInnerScopeUses(of: value)
     case .guaranteed:
       return visitAllUses(of: value)
@@ -928,6 +932,11 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
     return .continueWalk
   }
   defer { visitor.deinitialize() }
+
+  visitor.innerScopeHandler = {
+    print("Inner scope: \($0)")
+    return .continueWalk
+  }
 
   let success = visitor.visitUses()
 
