@@ -72,49 +72,16 @@ func computeLinearLiveness(for definingValue: Value, _ context: Context)
   return range
 }
 
-typealias InnerScopeHandler = (Value) -> WalkResult
-
-/// Compute liveness and return a range, which the caller must deinitialize.
-///
-/// An OSSA lifetime begins with a single "defining" value, which must be owned, or must begin a borrow scope. A
-/// complete OSSA lifetime has a linear lifetime, meaning that it has a lifetime-ending use on all paths. Interior
-/// liveness computes liveness without assuming the lifetime is complete. To do this, it must find all "use points" and
-/// prove that the defining value is never propagated beyond those points. This is used to initially complete OSSA
-/// lifetimes and fix them after transformations that's don't preserve OSSA.
-///
-/// The caller must check that `definingValue` has no pointer escape before calling this.
-///
-/// Invariants:
-///
-/// - The definition dominates all use points.
-///
-/// - Liveness does not extend beyond lifetime-ending operations
-/// (a.k.a. affine lifetimes).
-///
-/// - All inner scopes are complete. (Use `innerScopeHandler` to complete them or bail-out).
-func computeInteriorLiveness(for definingValue: Value, _ context: FunctionPassContext,
-                             innerScopeHandler: InnerScopeHandler? = nil) -> InstructionRange {
-  let result = InteriorLivenessResult.compute(for: definingValue, ignoreEscape: false, visitInnerUses: false, context)
-  switch result.pointerStatus {
-  case .nonescaping:
-    break
-  case let .escaping(operands):
-    fatalError("""
-                 check findPointerEscape() before computing interior liveness.
-                 Pointer escape: \(operands[0].instruction)
-                 """)
-  case let .unknown(operand):
-    fatalError("Unrecognized SIL address user \(operand.instruction)")
-  }
-  return result.range
-}
-
 /// Compute known liveness and return a range, which the caller must deinitialize.
 ///
 /// This computes a minimal liveness, ignoring pointer escaping uses.
-func computeKnownLiveness(for definingValue: Value, visitInnerUses: Bool = false, _ context: FunctionPassContext) -> InstructionRange {
+///
+/// The caller must call deinitialize() on the result.
+func computeKnownLiveness(for definingValue: Value, visitInnerUses: Bool = false, _ context: FunctionPassContext)
+  -> InstructionRange {
+  // Ignore pointer escapes and other failures.
   return InteriorLivenessResult.compute(for: definingValue, ignoreEscape: true,
-                                        visitInnerUses: visitInnerUses, context).range
+                                        visitInnerUses: visitInnerUses, context).acquireRange
 }
 
 /// If any interior pointer may escape, then record the first instance here. If 'ignoseEscape' is true, this
@@ -156,11 +123,32 @@ enum InteriorPointerStatus: CustomDebugStringConvertible {
   }
 }
 
+typealias InnerScopeHandler = (Value) -> WalkResult
+
+/// An OSSA lifetime begins with a single "defining" value, which must be owned, or must begin a borrow scope. A
+/// complete OSSA lifetime has a linear lifetime, meaning that it has a lifetime-ending use on all paths. Interior
+/// liveness computes liveness without assuming the lifetime is complete. To do this, it must find all "use points" and
+/// prove that the defining value is never propagated beyond those points. This is used to initially complete OSSA
+/// lifetimes and fix them after transformations that's don't preserve OSSA.
+///
+/// Invariants:
+///
+/// - The definition dominates all use points (hence the result is a single InstructionRange).
+///
+/// - Liveness does not extend beyond lifetime-ending operations (a.k.a. affine lifetimes).
+///
+/// - All inner scopes are complete. (Use `innerScopeHandler` to either complete them or to recursively compute their
+/// liveness and either bail-out on or propagate inner pointer escapes outward).
 struct InteriorLivenessResult: CustomDebugStringConvertible {
+  // 'success' may only be set to .abortWalk if pointerStatus != .nonescaping or visitInnerUses returned false.
+  // The client can therefore ensure success if it has already checked for pointer escapes.
   let success: WalkResult
-  let range: InstructionRange
+  var range: InstructionRange
   let pointerStatus: InteriorPointerStatus
 
+  /// Compute liveness for a single OSSA value without assuming a complete lifetime.
+  ///
+  /// The caller must call acquireRange or deinitialize() on the result.
   static func compute(for definingValue: Value, ignoreEscape: Bool = false, visitInnerUses: Bool,
                       _ context: FunctionPassContext,
                       innerScopeHandler: InnerScopeHandler? = nil) -> InteriorLivenessResult {
@@ -182,6 +170,13 @@ struct InteriorLivenessResult: CustomDebugStringConvertible {
     let result = InteriorLivenessResult(success: success, range: range, pointerStatus: visitor.pointerStatus)
     log("Interior liveness for: \(definingValue)\n\(result)")
     return result
+  }
+
+  /// Client must call deinitialize() on the result.
+  var acquireRange: InstructionRange { consuming get { range } }
+
+  mutating func deinitialize() {
+    range.deinitialize()
   }
 
   var debugDescription: String {
