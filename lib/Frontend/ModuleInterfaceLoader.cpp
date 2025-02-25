@@ -237,6 +237,7 @@ struct ModuleRebuildInfo {
   enum class ReasonIgnored {
     NotIgnored,
     PublicFramework,
+    PublicLibrary,
     InterfacePreferred,
     CompilerHostModule,
     Blocklisted,
@@ -762,6 +763,28 @@ class ModuleInterfaceLoaderImpl {
     return pathStartsWith(frameworksPath, path);
   }
 
+  bool isInSystemSubFrameworks(StringRef path) {
+    StringRef sdkPath = ctx.SearchPathOpts.getSDKPath();
+    if (sdkPath.empty()) return false;
+
+    SmallString<128> frameworksPath;
+    llvm::sys::path::append(frameworksPath,
+                            sdkPath, "System", "Library", "SubFrameworks");
+
+    return pathStartsWith(frameworksPath, path);
+  }
+
+  bool isInSystemLibraries(StringRef path) {
+    StringRef sdkPath = ctx.SearchPathOpts.getSDKPath();
+    if (sdkPath.empty()) return false;
+
+    SmallString<128> frameworksPath;
+    llvm::sys::path::append(frameworksPath,
+                            sdkPath, "usr", "lib", "swift");
+
+    return pathStartsWith(frameworksPath, path);
+  }
+
   std::pair<std::string, std::string> getCompiledModuleCandidates() {
     using ReasonIgnored = ModuleRebuildInfo::ReasonIgnored;
     using ReasonModuleInterfaceIgnored =
@@ -813,10 +836,15 @@ class ModuleInterfaceLoaderImpl {
 
       // Don't use the adjacent swiftmodule for frameworks from the public
       // Frameworks folder of the SDK.
-      if (isInSystemFrameworks(modulePath, /*publicFramework*/true)) {
+      if (isInSystemFrameworks(modulePath, /*publicFramework*/true) ||
+          isInSystemSubFrameworks(modulePath)) {
         shouldLoadAdjacentModule = false;
         rebuildInfo.addIgnoredModule(modulePath,
                                      ReasonIgnored::PublicFramework);
+      } else if (isInSystemLibraries(modulePath) && moduleName != STDLIB_NAME) {
+        shouldLoadAdjacentModule = false;
+        rebuildInfo.addIgnoredModule(modulePath,
+                                     ReasonIgnored::PublicLibrary);
       } else if (isInResourceHostDir(modulePath)) {
         shouldLoadAdjacentModule = false;
         rebuildInfo.addIgnoredModule(modulePath,
