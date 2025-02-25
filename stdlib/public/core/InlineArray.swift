@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,6 +14,7 @@
 @available(SwiftStdlib 6.2, *)
 @frozen
 @safe
+@_addressableForDependencies
 public struct InlineArray<let count: Int, Element: ~Copyable>: ~Copyable {
   @usableFromInline
   internal let _storage: Builtin.FixedArray<count, Element>
@@ -393,6 +394,26 @@ extension InlineArray where Element: ~Copyable {
     let jthElement = unsafe _mutableBuffer.moveElement(from: j)
     unsafe _mutableBuffer.initializeElement(at: i, to: jthElement)
     unsafe _mutableBuffer.initializeElement(at: j, to: ithElement)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Span
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 6.2, *)
+extension InlineArray where Element: ~Copyable {
+
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    @_addressableSelf
+    @_alwaysEmitIntoClient
+    borrowing get {
+      let pointer = _address
+      let span = Span(_unsafeStart: pointer, count: count)
+      return _overrideLifetime(span, borrowing: self)
+    }
   }
 }
 
