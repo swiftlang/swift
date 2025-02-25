@@ -260,6 +260,14 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
   auto addInheritedConformance = [&](ConformanceEntry *entry) {
     auto protocol = entry->getProtocol();
 
+    // Don't add unavailable conformances.
+    if (auto dc = entry->Source.getDeclContext()) {
+      if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+        if (AvailableAttr::isUnavailable(ext))
+          return;
+      }
+    }
+
     // Don't add redundant conformances here. This is merely an
     // optimization; resolveConformances() would zap the duplicates
     // anyway.
@@ -621,14 +629,6 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
 
       // Allow replacement of an explicit conformance to a marker protocol.
       // (This permits redundant explicit declarations of `Sendable`.)
-      //
-      // FIXME: We need to warn on attempts to make an unavailable Sendable
-      // conformance available, which does not work.
-      //
-      // We probably also want to warn if there is an existing, explicit
-      // conformance, so clients are prompted to remove retroactive unchecked
-      // Sendable conformances when the proper Sendable conformance is added
-      // in the original module.
       return (kind == ConformanceEntryKind::Explicit
               && entry->getProtocol()->isMarkerProtocol());
     };
@@ -880,6 +880,8 @@ DeclContext *ConformanceLookupTable::getConformingContext(
           return nullptr;
         auto inheritedConformance = swift::lookupConformance(
             superclassTy, protocol, /*allowMissing=*/false);
+        if (inheritedConformance.hasUnavailableConformance())
+          inheritedConformance = ProtocolConformanceRef::forInvalid();
         if (inheritedConformance)
           return superclassDecl;
       } while ((superclassDecl = superclassDecl->getSuperclassDecl()));
