@@ -3,8 +3,8 @@
 // code, but in the embedded Swift's runtime that's somewhat reasonable thing
 // to do (but is to be avoided because of this).
 
-// RUN: %target-swift-frontend -target armv7-apple-none-macho -assert-config Debug -Osize -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
-// RUN: %target-swift-frontend -target arm64-apple-none-macho -assert-config Debug -Osize -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
+// RUN: %swift_frontend_plain -target armv7-apple-none-macho -assert-config Debug -Osize -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
+// RUN: %swift_frontend_plain -target arm64-apple-none-macho -assert-config Debug -Osize -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
 // UNSUPPORTED: CPU=wasm32
 // REQUIRES: swift_in_compiler
@@ -12,9 +12,6 @@
 // REQUIRES: CODEGENERATOR=ARM
 // REQUIRES: embedded_stdlib_cross_compiling
 // REQUIRES: swift_feature_Embedded
-
-// https://github.com/apple/swift/issues/73249
-// UNSUPPORTED: OS=windows-msvc
 
 public func test() {}
 test()
