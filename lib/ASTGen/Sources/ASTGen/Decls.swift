@@ -378,7 +378,7 @@ extension ASTGenVisitor {
 // MARK: - AbstractStorageDecl
 
 extension ASTGenVisitor {
-  private func generate(accessorSpecifier specifier: TokenSyntax) -> BridgedAccessorKind? {
+  func generate(accessorSpecifier specifier: TokenSyntax) -> BridgedAccessorKind? {
     switch specifier.keywordKind {
     case .get:
       return .get
