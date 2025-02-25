@@ -34,7 +34,7 @@ using namespace swift;
 
 LangOptions::LangOptions() {
   // Add all promoted language features
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
   Features.insert(Feature::FeatureName);
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
@@ -303,7 +303,7 @@ bool LangOptions::hasFeature(Feature feature) const {
 
 bool LangOptions::hasFeature(llvm::StringRef featureName) const {
   auto feature = llvm::StringSwitch<std::optional<Feature>>(featureName)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
   .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
                      .Default(std::nullopt);

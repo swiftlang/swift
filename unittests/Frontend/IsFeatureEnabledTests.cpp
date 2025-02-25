@@ -34,23 +34,27 @@ TEST_F(IsFeatureEnabledTest, VerifyTestedFeatures) {
   {
     ASSERT_FALSE(getUpcomingFeature(feature.name));
     ASSERT_FALSE(getExperimentalFeature(feature.name));
+    ASSERT_FALSE(isFeatureAdoptable(feature));
   }
 
   feature = upcomingF;
   {
     ASSERT_TRUE(getUpcomingFeature(feature.name));
+    ASSERT_FALSE(isFeatureAdoptable(feature));
     ASSERT_LT(defaultLangMode, feature.langMode);
   }
 
   feature = strictConcurrencyF;
   {
     ASSERT_TRUE(getUpcomingFeature(feature.name));
+    ASSERT_FALSE(isFeatureAdoptable(feature));
     ASSERT_LT(defaultLangMode, feature.langMode);
   }
 
   feature = experimentalF;
   {
     ASSERT_TRUE(getExperimentalFeature(feature.name));
+    ASSERT_FALSE(isFeatureAdoptable(feature));
   }
 }
 
