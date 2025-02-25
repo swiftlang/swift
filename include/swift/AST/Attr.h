@@ -165,14 +165,20 @@ protected:
       /// Whether this attribute was spelled `@_spi_available`.
       IsSPI : 1,
 
-      /// Whether this attribute belongs to a chain of adjacent `@available` attributes that were generated from a single attribute written in source using short form syntax e.g. (`@available(macOS 15, iOS 18, *)`).
+      /// Whether this attribute belongs to a chain of adjacent `@available`
+      /// attributes that were generated from a single attribute written in
+      /// source using short form syntax, e.g.
+      ///
+      ///     @available(macOS 15, iOS 18, *)
+      ///
       IsGroupMember : 1,
 
       /// Whether this attribute is the final one in its group.
       IsGroupTerminator : 1,
 
-      /// Whether this attribute's specification was followed by `, *` in source.
-      IsAdjacentToWildcard : 1
+      /// Whether any members of the group were written as a wildcard
+      /// specification (`*`) in source.
+      IsGroupedWithWildcard : 1
     );
 
     SWIFT_INLINE_BITFIELD(ClangImporterSynthesizedTypeAttr, DeclAttribute, 1,
@@ -848,12 +854,13 @@ public:
   }
   void setIsGroupTerminator() { Bits.AvailableAttr.IsGroupTerminator = true; }
 
-  /// Whether this attribute's specification was followed by `, *` in source.
-  bool isAdjacentToWildcard() const {
-    return Bits.AvailableAttr.IsAdjacentToWildcard;
+  /// Whether any members of the group were written as a wildcard specification
+  /// (`*`) in source.
+  bool isGroupedWithWildcard() const {
+    return Bits.AvailableAttr.IsGroupedWithWildcard;
   }
-  void setIsAdjacentToWildcard() {
-    Bits.AvailableAttr.IsAdjacentToWildcard = true;
+  void setIsGroupedWithWildcard() {
+    Bits.AvailableAttr.IsGroupedWithWildcard = true;
   }
 
   /// Returns the kind of availability the attribute specifies.
