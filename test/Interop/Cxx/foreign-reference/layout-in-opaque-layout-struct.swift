@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 
 
-// RUN: %target-build-swift %t/struct.swift -emit-module -emit-library -static -module-name OpaqueStruct -emit-module-path %t/Inputs/OpaqueStruct.swiftmodule -enable-library-evolution
+// RUN: %target-build-swift %t/struct.swift -emit-module -emit-library -static -use-ld=%target-ld -module-name OpaqueStruct -emit-module-path %t/Inputs/OpaqueStruct.swiftmodule -enable-library-evolution
 
 // RUN: %target-swift-emit-irgen %t/test.swift -I %t/Inputs -enable-experimental-cxx-interop -disable-availability-checking | %FileCheck %s
  
