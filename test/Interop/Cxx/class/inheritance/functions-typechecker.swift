@@ -2,8 +2,8 @@
 
 import Functions
 
-PrivatelyInherited().constInBase() // expected-error {{value of type 'PrivatelyInherited' has no member 'constInBase'}}
-ProtectedInherited().constInBase() // expected-error {{value of type 'ProtectedInherited' has no member 'constInBase'}}
+PrivatelyInherited().constInBase() // expected-error {{'constInBase' is inaccessible due to 'private' protection level}}
+ProtectedInherited().constInBase() // expected-error {{'constInBase' is inaccessible due to 'private' protection level}}
 
 
 extension Base {

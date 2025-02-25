@@ -1,13 +1,3 @@
-module AccessInversion {
-  header "access-inversion.h"
-  requires cplusplus
-}
-
-module AccessSpecifiers {
-  header "access-specifiers.h"
-  requires cplusplus
-}
-
 module TypeClassification {
   header "type-classification.h"
   requires cplusplus

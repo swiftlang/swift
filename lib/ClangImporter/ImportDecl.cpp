@@ -4590,30 +4590,31 @@ namespace {
       }
       if (auto targetMethod =
               dyn_cast<clang::CXXMethodDecl>(decl->getTargetDecl())) {
-        auto dc = dyn_cast<clang::CXXRecordDecl>(decl->getDeclContext());
-
-        auto targetDC = targetMethod->getDeclContext();
-        auto targetRecord = dyn_cast<clang::CXXRecordDecl>(targetDC);
-        if (!targetRecord)
+        auto *derivedRecord =
+            dyn_cast_or_null<clang::CXXRecordDecl>(decl->getDeclContext());
+        auto *baseRecord = dyn_cast_or_null<clang::CXXRecordDecl>(
+            targetMethod->getDeclContext());
+        if (!derivedRecord || !baseRecord ||
+            !derivedRecord->isDerivedFrom(baseRecord))
           return nullptr;
 
-        // If this struct is not inherited from the struct where the method is
-        // defined, bail.
-        if (!dc->isDerivedFrom(targetRecord))
-          return nullptr;
+        // TODO: If the derived class already has a member with the same name,
+        // parameter list, and qualifications, the derived class member should
+        // hide or override (rather than conflict with) the member that is
+        // introduced from the base class. Need to check this.
 
         auto importedBaseMethod = dyn_cast_or_null<FuncDecl>(
             Impl.importDecl(targetMethod, getActiveSwiftVersion()));
-        // This will be nullptr for a protected method of base class that is
-        // made public with a using declaration in a derived class. This is
-        // valid in C++ but we do not import such using declarations now.
-        // TODO: make this work for protected base methods.
         if (!importedBaseMethod)
           return nullptr;
-        auto clonedMethod = dyn_cast_or_null<FuncDecl>(
-            Impl.importBaseMemberDecl(importedBaseMethod, importedDC));
+
+        auto clonedMethod =
+            dyn_cast_or_null<FuncDecl>(Impl.importBaseMemberDecl(
+                importedBaseMethod, importedDC, ClangInheritanceInfo()));
         if (!clonedMethod)
           return nullptr;
+        clonedMethod->overwriteAccess(
+            importer::convertClangAccess(decl->getAccess()));
 
         bool success = processSpecialImportedFunc(
             clonedMethod, importedName, targetMethod->getOverloadedOperator());
@@ -9957,7 +9958,8 @@ static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
 }
 
 void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
-    NominalTypeDecl *swiftDecl, const clang::RecordDecl *clangRecord) {
+    NominalTypeDecl *swiftDecl, const clang::RecordDecl *clangRecord,
+    ClangInheritanceInfo inheritance) {
   // Import all of the members.
   llvm::SmallVector<Decl *, 16> members;
   for (const clang::Decl *m : clangRecord->decls()) {
@@ -9984,21 +9986,20 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   }
 
   // Add the members here.
-  for (auto member: members) {
-    // This means we found a member in a C++ record's base class.
-    if (swiftDecl->getClangDecl() != clangRecord) {
-      auto namedMember = cast<ValueDecl>(member);
-      if (namedMember->getFormalAccess() < AccessLevel::Public)
-        continue;
+  for (auto member : members) {
+    if (inheritance) {
+      // This means we found a member in a C++ record's base class.
+      assert(swiftDecl->getClangDecl() != clangRecord);
+      auto baseMember = cast<ValueDecl>(member);
+
       // Do not clone the base member into the derived class
       // when the derived class already has a member of such
       // name and arity.
-      auto memberArity =
-          getImportedBaseMemberDeclArity(namedMember);
+      auto memberArity = getImportedBaseMemberDeclArity(baseMember);
       bool shouldAddBaseMember = true;
       for (const auto *currentMember : swiftDecl->getMembers()) {
         auto vd = dyn_cast<ValueDecl>(currentMember);
-        if (vd->getName() == namedMember->getName()) {
+        if (vd->getName() == baseMember->getName()) {
           if (memberArity == getImportedBaseMemberDeclArity(vd)) {
             shouldAddBaseMember = false;
             break;
@@ -10007,10 +10008,12 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       }
       if (!shouldAddBaseMember)
         continue;
+
       // So we need to clone the member into the derived class.
-      if (auto newDecl = importBaseMemberDecl(namedMember, swiftDecl)) {
-        swiftDecl->addMember(newDecl);
-      }
+      if (auto cloned =
+              importBaseMemberDecl(baseMember, swiftDecl, inheritance))
+        swiftDecl->addMember(cloned);
+
       continue;
     }
 
@@ -10031,9 +10034,6 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   // If this is a C++ record, look through the base classes too.
   if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) {
     for (auto base : cxxRecord->bases()) {
-      if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
-        continue;
-
       clang::QualType baseType = base.getType();
       if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();
@@ -10043,7 +10043,8 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         continue;
 
       auto *baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-      loadAllMembersOfRecordDecl(swiftDecl, baseRecord);
+      auto baseInheritance = ClangInheritanceInfo(inheritance, base);
+      loadAllMembersOfRecordDecl(swiftDecl, baseRecord, baseInheritance);
     }
   }
 }
@@ -10084,7 +10085,8 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
   if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
     loadAllMembersOfRecordDecl(cast<NominalTypeDecl>(D),
-                               cast<clang::RecordDecl>(D->getClangDecl()));
+                               cast<clang::RecordDecl>(D->getClangDecl()),
+                               ClangInheritanceInfo());
     if (IDC) // Set member deserialization status
       IDC->setDeserializedMembers(true);
     return;
