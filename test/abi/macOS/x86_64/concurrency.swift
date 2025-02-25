@@ -384,15 +384,18 @@ Added: _$sScT16escalatePriority_2toyScTyxq_G_ScPtFZ
 Added: _$ss33withTaskPriorityEscalationHandler9operation02onC9Escalated9isolationxxyYaq_YKXE_yScPYbXEScA_pSgYitYaq_YKs5ErrorR_r0_lF
 Added: _$ss33withTaskPriorityEscalationHandler9operation02onC9Escalated9isolationxxyYaq_YKXE_yScPYbXEScA_pSgYitYaq_YKs5ErrorR_r0_lFTu
 
-// Task.DispatchSerialQueue
+// task names
+Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvgZ
+Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvpZMV
+Added: _swift_task_getCurrentTaskName
+
 Added: _swift_task_startSynchronously
 // static (extension in Swift):Swift.Task< where B == Swift.Error>.startSynchronously(priority: Swift.TaskPriority?, _: __owned () async throws -> A) -> Swift.Task<A, Swift.Error>
-Added: _$sScTss5Error_pRs_rlE18startSynchronously8priority_ScTyxsAA_pGScPSg_xyYaKcntFZ
+Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvgZ
 // static (extension in Swift):Swift.Task< where B == Swift.Never>.startSynchronously(priority: Swift.TaskPriority?, _: __owned () async throws -> A) -> Swift.Task<A, Swift.Never>
-Added: _$sScTss5NeverORs_rlE18startSynchronously8priority_ScTyxABGScPSg_xyYaKcntFZ
+Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvpZMV
 // Swift.TaskGroup.startTaskSynchronously(priority: Swift.TaskPriority?, operation: __owned () async -> A) -> ()
-Added: _$sScG22startTaskSynchronously8priority9operationyScPSg_xyYacntF
-// Swift.TaskGroup.startTaskSynchronouslyUnlessCancelled(priority: Swift.TaskPriority?, operation: __owned () async -> A) -> ()
+Added: _swift_task_getCurrentTaskName// Swift.TaskGroup.startTaskSynchronouslyUnlessCancelled(priority: Swift.TaskPriority?, operation: __owned () async -> A) -> ()
 Added: _$sScG37startTaskSynchronouslyUnlessCancelled8priority9operationyScPSg_xyYacntF
 // Swift.ThrowingTaskGroup.startTaskSynchronously(priority: Swift.TaskPriority?, operation: __owned () async -> A) -> ()
 Added: _$sScg22startTaskSynchronously8priority9operationyScPSg_xyYacntF

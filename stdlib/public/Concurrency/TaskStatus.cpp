@@ -741,7 +741,7 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
   SWIFT_TASK_DEBUG_LOG("[InitialTaskExecutorPreference] Drop initial task "
                        "preference record from task:%p",
                        this);
-  assert(this->hasInitialTaskExecutorPreferenceRecord());
+  assert(hasInitialTaskExecutorPreferenceRecord());
 
   HeapObject *executorIdentityToRelease = nullptr;
   withStatusRecordLock(this, [&](ActiveTaskStatus status) {
@@ -779,6 +779,89 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
   // swift_release), because a dispatch_queue_t conforms to TaskExecutor,
   // and may be passed in here; in which case swift_releasing it would be incorrect.
   swift_unknownObjectRelease(executorIdentityToRelease);
+}
+
+/******************************************************************************/
+/************************** TASK NAMING ***************************************/
+/******************************************************************************/
+
+void AsyncTask::pushInitialTaskName(const char* _taskName) {
+  assert(_taskName && "Task name must not be null!");
+  assert(hasInitialTaskNameRecord() && "Attempted pushing name but task has no initial task name flag!");
+
+  void *allocation = _swift_task_alloc_specific(
+      this, sizeof(class TaskNameStatusRecord));
+
+  // TODO: Copy the string maybe into the same allocation at an offset or retain the swift string?
+  char* taskNameCopy = reinterpret_cast<char*>(
+      _swift_task_alloc_specific(this, strlen(_taskName) + 1/*null terminator*/));
+  (void) strcpy(/*dst=*/taskNameCopy, /*src=*/_taskName);
+
+  auto record =
+      ::new (allocation) TaskNameStatusRecord(taskNameCopy);
+  SWIFT_TASK_DEBUG_LOG("[TaskName] Create initial task name record %p "
+                       "for task:%p, name:%s", record, this, taskNameCopy);
+
+  addStatusRecord(this, record,
+                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    return true; // always add the record
+                  });
+}
+
+void AsyncTask::dropInitialTaskNameRecord() {
+  if (!hasInitialTaskNameRecord()) {
+    return;
+  }
+
+  SWIFT_TASK_DEBUG_LOG("[TaskName] Drop initial task name record for task:%p", this);
+  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
+    for (auto cur : status.records()) {
+      if (cur->getKind() == TaskStatusRecordKind::TaskName) {
+        auto record = cast<TaskNameStatusRecord>(cur);
+
+        SWIFT_TASK_DEBUG_LOG("[TaskName] Drop initial task name record %p "
+                             "for task:%p", record, this);
+
+        removeStatusRecordLocked(status, record);
+        // Since we first allocated the record, and then the string copy
+        char *name = const_cast<char*>(record->getName());
+        _swift_task_dealloc_specific(this, name);
+        _swift_task_dealloc_specific(this, record);
+        return;
+      }
+    }
+
+    // This drop mirrors the push "initial" name during task creation;
+    // so it must always reliably always have a preference to drop.
+    assert(false && "dropInitialTaskNameRecord must be guaranteed to drop "
+                    "the initial task name record if it was present");
+  });
+}
+
+const char*
+AsyncTask::getTaskName() {
+  // We first check the executor preference status flag, in order to avoid
+  // having to scan through the records of the task checking if there was
+  // such record.
+  //
+  // This is an optimization in order to make the enqueue/run
+  // path of a task avoid excessive work if a task had many records.
+  if (!hasInitialTaskNameRecord()) {
+    return nullptr;
+  }
+
+  const char *data = nullptr;
+  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
+    for (auto record : status.records()) {
+      if (record->getKind() == TaskStatusRecordKind::TaskName) {
+        auto nameRecord = cast<TaskNameStatusRecord>(record);
+        data = nameRecord->getName();
+        return;
+      }
+    }
+  });
+
+  return data;
 }
 
 /**************************************************************************/
@@ -906,6 +989,10 @@ static void performCancellationAction(TaskStatusRecord *record) {
   // Cancellation has no impact on executor preference.
   case TaskStatusRecordKind::TaskExecutorPreference:
     break;
+
+  // Cancellation has no impact on task names.
+  case TaskStatusRecordKind::TaskName:
+    break;
   }
 
   // Other cases can fall through here and be ignored.
@@ -974,14 +1061,6 @@ static void performEscalationAction(TaskStatusRecord *record,
     return;
   }
 
-  // Cancellation notifications can be ignore.
-  case TaskStatusRecordKind::CancellationNotification:
-    return;
-
-  /// Executor preference we can ignore.
-  case TaskStatusRecordKind::TaskExecutorPreference:
-    return;
-
   // Escalation notifications need to be called.
   case TaskStatusRecordKind::EscalationNotification:  {
     auto notification =
@@ -1001,6 +1080,15 @@ static void performEscalationAction(TaskStatusRecord *record,
   // Record locks shouldn't be found this way, but they don't have
   // anything to do anyway.
   case TaskStatusRecordKind::Private_RecordLock:
+    return;
+  // Cancellation notifications can be ignore.
+  case TaskStatusRecordKind::CancellationNotification:
+    return;
+  /// Executor preference we can ignore.
+  case TaskStatusRecordKind::TaskExecutorPreference:
+    return;
+  /// Task names don't matter to priority escalation.
+  case TaskStatusRecordKind::TaskName:
     return;
   }
 
