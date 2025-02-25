@@ -3006,11 +3006,14 @@ void CompletionLookup::getGenericRequirementCompletions(
                            /*includeDerivedRequirements*/ false,
                            /*includeProtocolExtensionMembers*/ true);
   // We not only allow referencing nested types/typealiases directly, but also
-  // qualified by the current type. Thus also suggest current self type so the
+  // qualified by the current type, as long as it's a top-level type (nested
+  // types need to be qualified). Thus also suggest current self type so the
   // user can do a memberwise lookup on it.
-  if (auto SelfType = typeContext->getSelfNominalTypeDecl()) {
-    addNominalTypeRef(SelfType, DeclVisibilityKind::LocalDecl,
-                      DynamicLookupInfo());
+  if (auto *NTD = typeContext->getSelfNominalTypeDecl()) {
+    if (!NTD->getDeclContext()->isTypeContext()) {
+      addNominalTypeRef(NTD, DeclVisibilityKind::LocalDecl,
+                        DynamicLookupInfo());
+    }
   }
 
   // Self is also valid in all cases in which it can be used in function
