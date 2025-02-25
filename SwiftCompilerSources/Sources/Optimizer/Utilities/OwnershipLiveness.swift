@@ -204,7 +204,7 @@ struct InteriorLivenessResult: CustomDebugStringConvertible {
 /// The implementation may recursively call back to the top-level
 /// entry points. Additionally, the implementation may recurse into inner
 /// borrow scopes, skipping over the uses within inner scopes using:
-/// - `visitInnerBorrowUses(of: BorrowingInstruction)`
+/// - `visitInnerBorrowUses(of: BorrowingInstruction, operand:)`
 /// - `visitInnerScopeUses(of: Value)`
 ///
 /// Visitors implement:
@@ -251,8 +251,7 @@ protocol OwnershipUseVisitor {
   /// `isInnerLifetime` indicates whether `operand` uses the original
   /// OSSA lifetime. This use ends the original lifetime if
   /// (!isInnerLifetime && use.endsLifetime).
-  mutating func ownershipLeafUse(of operand: Operand, isInnerLifetime: Bool)
-    -> WalkResult
+  mutating func ownershipLeafUse(of operand: Operand, isInnerLifetime: Bool) -> WalkResult
 
   /// A forwarding operand.
   ///
@@ -260,12 +259,10 @@ protocol OwnershipUseVisitor {
   /// downstream uses.
   ///
   /// If `isInnerLifetime` is true, then the value depends on an inner borrow.
-  mutating func forwardingUse(of operand: Operand, isInnerLifetime: Bool)
-    -> WalkResult
+  mutating func forwardingUse(of operand: Operand, isInnerLifetime: Bool) -> WalkResult
 
   /// A use that projects an address.
-  mutating func interiorPointerUse(of: Operand, into address: Value)
-    -> WalkResult
+  mutating func interiorPointerUse(of: Operand, into address: Value) -> WalkResult
 
   /// A use that escapes information from its operand's value.
   ///
@@ -280,22 +277,19 @@ protocol OwnershipUseVisitor {
   /// there are no explicit scope-ending operations. Instead
   /// BorrowingInstruction.scopeEndingOperands will return the final
   /// consumes in the dependent value's forwarding chain.
-  mutating func dependentUse(of operand: Operand, into value: Value)
-    -> WalkResult
+  mutating func dependentUse(of operand: Operand, into value: Value) -> WalkResult
 
   /// A use that is scoped to an inner borrow scope.
   ///
   /// Call `visitInnerScopeUses(of:)` to recursively classify any
   /// scope-ending uses and forwarded dependent values.
-  mutating func borrowingUse(of operand: Operand,
-                             by borrowInst: BorrowingInstruction) -> WalkResult
+  mutating func borrowingUse(of operand: Operand, by borrowInst: BorrowingInstruction) -> WalkResult
 
   /// A reborrow operand.
   ///
-  /// Call `visitInnerScopeUses()` to recursively classify scope-ending
-  /// uses (reborrow and end_borrow).
-  mutating func reborrowingUse(of operand: Operand, isInnerLifetime: Bool)
-    -> WalkResult
+  /// Call `visitInnerBorrowUses(of:)` or `visitInnerScopeUses(of:)` to recursively classify scope-ending uses (such as
+  /// reborrow and end_borrow).
+  mutating func reborrowingUse(of operand: Operand, isInnerLifetime: Bool) -> WalkResult
 }
 
 extension OwnershipUseVisitor {
@@ -320,7 +314,7 @@ extension OwnershipUseVisitor {
   /// adjacent phis and treat them like inner borrows.
   ///
   /// This is only called for uses in the outer lifetime.
-  mutating func visitAllUses(of: Value) -> WalkResult {
+  mutating func visitAllUses(of value: Value) -> WalkResult {
     switch value.ownership {
     case .owned:
       return value.uses.ignoreTypeDependence.walk { classifyOwned(operand: $0) }
@@ -351,11 +345,9 @@ extension OwnershipUseVisitor {
         }
       }
     }
-    // When a borrow introduces an owned value, each OSSA lifetime is
-    // effectively a separate borrow scope. A destroy ends the borrow
-    // scope, while a forwarding consume effectively "reborrows".
-    assert(value.ownership == .owned,
-      "inner value must be a reborrow or owned forward")
+    // When a borrow introduces an owned value, each OSSA lifetime is effectively a separate borrow scope. A destroy
+    // ends the borrow scope, while a forwarding consume effectively "reborrows".
+    assert(value.ownership == .owned, "inner value must be a reborrow or owned forward")
     return value.uses.endingLifetime.walk {
       switch $0.ownership {
       case .forwardingConsume:
@@ -370,16 +362,14 @@ extension OwnershipUseVisitor {
 
   // Visit uses of borrowing instruction (operandOwnerhip == .borrow),
   // skipping uses within the borrow scope.
-  mutating func visitInnerScopeUses(of borrowInst: BorrowingInstruction)
-    -> WalkResult {
-    // If a borrowed value is introduced, then handle the inner scope.
+  mutating func visitInnerBorrowUses(of borrowInst: BorrowingInstruction, operand: Operand) -> WalkResult {
+    // Delegate begin_borrow to visitInnerScopeUses, because it dispatches to reborrowingUse.
     if let beginBorrow = BeginBorrowValue(resultOf: borrowInst) {
       return visitInnerScopeUses(of: beginBorrow.value)
     }
-    // Otherwise, directly visit the scope ending uses.
+    // Otherwise, directly visit the scope ending uses as leaf uses.
     //
-    // TODO: remove this stack by changign visitScopeEndingOperands to
-    // take a non-escaping closure that can call ownershipLeafUse.
+    // TODO: remove this stack by changing visitScopeEndingOperands to take a non-escaping closure.
     var stack = Stack<Operand>(context)
     defer { stack.deinitialize() }
     _ = borrowInst.visitScopeEndingOperands(context) {
@@ -406,8 +396,7 @@ extension OwnershipUseVisitor {
     case .pointerEscape:
       return pointerEscapingUse(of: operand)
 
-    case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse,
-      .bitwiseEscape:
+    case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse, .bitwiseEscape:
       return ownershipLeafUse(of: operand, isInnerLifetime: false)
 
     case .borrow:
@@ -436,8 +425,7 @@ extension OwnershipUseVisitor {
       }
       return pointerEscapingUse(of: operand)
 
-    case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse,
-         .bitwiseEscape, .endBorrow:
+    case .instantaneousUse, .forwardingUnowned, .unownedInstantaneousUse, .bitwiseEscape, .endBorrow:
       return ownershipLeafUse(of: operand, isInnerLifetime: false)
 
     case .reborrow:
@@ -457,8 +445,7 @@ extension OwnershipUseVisitor {
     }
   }
 
-  private mutating func visitBorrowingUse(of operand: Operand)
-    -> WalkResult {
+  private mutating func visitBorrowingUse(of operand: Operand) -> WalkResult {
     switch operand.instruction {
     case let pai as PartialApplyInst:
       assert(!pai.mayEscape)
@@ -472,8 +459,7 @@ extension OwnershipUseVisitor {
     }
   }
 
-  private mutating func visitInteriorPointerUse(of operand: Operand)
-    -> WalkResult {
+  private mutating func visitInteriorPointerUse(of operand: Operand) -> WalkResult {
     switch operand.instruction {
     case is RefTailAddrInst, is RefElementAddrInst, is ProjectBoxInst,
          is OpenExistentialBoxInst:

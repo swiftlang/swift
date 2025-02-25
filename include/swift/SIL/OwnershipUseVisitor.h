@@ -326,7 +326,7 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrowScopeEnd(Operand *borrowEnd) {
     // partial_apply [on_stack] and mark_dependence [nonescaping] can introduce
     // borrowing operand and can have destroy_value, return, or store consumes.
     //
-    // TODO: When we have a C++ ForwardingUseDefWalker, walk the def-use
+    // TODO: When we have a C++ ForwardingUseDefWalker, walk the use-def
     // chain to ensure we have a partial_apply [on_stack] or mark_dependence
     // [nonescaping] def.
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);

@@ -134,14 +134,11 @@ import SIL
 
 /// A scoped instruction that borrows one or more operands.
 ///
-/// If this instruction produces a borrowed value, then
-/// BeginBorrowValue(resultOf: self) != nil.
+/// If this instruction produces a borrowed value, then BeginBorrowValue(resultOf: self) != nil.
 ///
-/// This does not include instructions like `apply` and `try_apply` that
-/// instantaneously borrow a value from the caller.
+/// This does not include instructions like `apply` and `try_apply` that instantaneously borrow a value from the caller.
 ///
-/// This does not include `load_borrow` because it borrows a memory
-/// location, not the value of its operand.
+/// This does not include `load_borrow` because it borrows a memory location, not the value of its operand.
 ///
 /// Note: This must handle all instructions with a .borrow operand ownership.
 ///
