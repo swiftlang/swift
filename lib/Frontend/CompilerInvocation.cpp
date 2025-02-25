@@ -2352,6 +2352,7 @@ static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModule
 
 static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags,
+                                const llvm::Triple &Triple,
                                 const CASOptions &CASOpts,
                                 const FrontendOptions &FrontendOpts,
                                 StringRef workingDirectory) {
@@ -2486,6 +2487,18 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();
+  else if (!Triple.isOSDarwin() && Args.hasArg(OPT_sdk)) {
+    llvm::SmallString<128> SDKResourcePath(Opts.getSDKPath());
+    llvm::sys::path::append(
+        SDKResourcePath, "usr", "lib",
+        FrontendOpts.UseSharedResourceFolder ? "swift" : "swift_static");
+    // Check for eg <sdkRoot>/usr/lib/swift/
+    if (llvm::sys::fs::exists(SDKResourcePath))
+      Opts.RuntimeResourcePath = SDKResourcePath.str();
+    else
+      Diags.diagnose(SourceLoc(), diag::warning_no_resource_dir_in_sdk,
+                     Opts.RuntimeResourcePath);
+  }
 
   Opts.SkipAllImplicitImportPaths |= Args.hasArg(OPT_nostdimport);
   Opts.SkipSDKImportPaths |= Args.hasArg(OPT_nostdlibimport);
@@ -4215,7 +4228,7 @@ bool CompilerInvocation::parseArgs(
 
   ParseSymbolGraphArgs(SymbolGraphOpts, ParsedArgs, Diags, LangOpts);
 
-  if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags,
+  if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags, LangOpts.Target,
                           CASOpts, FrontendOpts, workingDirectory)) {
     return true;
   }

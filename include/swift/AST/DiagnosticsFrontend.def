@@ -24,6 +24,13 @@
 WARNING(warning_no_such_sdk,none,
         "no such SDK: '%0'", (StringRef))
 
+WARNING(warning_no_resource_dir_in_sdk, none,
+      "You passed in an external -sdk without a Swift runtime.\n"
+      "Either specify a directory containing the runtime libraries with\n"
+      "the -resource-dir flag, or use -sysroot instead to point at a C/C++\n"
+      "sysroot alone. Falling back to this path for the Swift runtime modules\n"
+      "and libraries:\n"
+      "%0", (StringRef))
 ERROR(error_no_frontend_args, none,
       "no arguments provided to '-frontend'", ())
 
