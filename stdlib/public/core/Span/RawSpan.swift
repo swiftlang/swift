@@ -294,7 +294,8 @@ extension RawSpan {
     let pointer = span._pointer
     let rawSpan = RawSpan(
       _unchecked: pointer,
-      byteCount: span.count &* MemoryLayout<Element>.stride
+      byteCount: span.count == 1 ? MemoryLayout<Element>.size
+                 : span.count &* MemoryLayout<Element>.stride
     )
     self = _overrideLifetime(rawSpan, copying: span)
   }
