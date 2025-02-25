@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,6 +22,7 @@
 ///     let b = a + CollectionOfOne(toAdd)
 ///     // b == [1, 2, 3, 4, 100]
 @frozen // trivial-implementation
+@_addressableForDependencies
 public struct CollectionOfOne<Element> {
   @usableFromInline // trivial-implementation
   internal var _element: Element
@@ -155,6 +156,20 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   @inlinable // trivial-implementation
   public var count: Int {
     return 1
+  }
+}
+
+extension CollectionOfOne {
+
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    get {
+      let pointer = UnsafePointer<Element>(Builtin.addressOfBorrow(self))
+      let span = Span(_unsafeStart: pointer, count: 1)
+      return _overrideLifetime(span, borrowing: self)
+    }
   }
 }
 
