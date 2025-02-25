@@ -32,6 +32,7 @@ class SourceLocation;
 
 namespace swift {
 
+class ClangInheritanceInfo;
 class ConcreteDeclRef;
 class Decl;
 class FuncDecl;
@@ -202,10 +203,17 @@ public:
   /// Imports a clang decl directly, rather than looking up its name.
   virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
 
-  /// Imports a clang decl from a base class, cloning it for \param newContext
-  /// if it wasn't cloned for this specific context before.
+  /// Clones an imported \param decl from its base class to its derived class
+  /// \param newContext where it is inherited. Its access level is determined
+  /// with respect to \param inheritance, which signifies whether \param decl
+  /// was inherited via C++ public/protected/private inheritance.
+  ///
+  /// This function uses a cache so that it is idempotent; successive
+  /// invocations will only generate one cloned ValueDecl (and all return
+  /// a pointer to it). Returns a NULL pointer upon failure.
   virtual ValueDecl *importBaseMemberDecl(ValueDecl *decl,
-                                          DeclContext *newContext) = 0;
+                                          DeclContext *newContext,
+                                          ClangInheritanceInfo inheritance) = 0;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
