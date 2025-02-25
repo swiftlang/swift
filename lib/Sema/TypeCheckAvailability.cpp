@@ -464,7 +464,7 @@ class AvailabilityScopeBuilder : private ASTWalker {
   }
 
   const char *stackTraceAction() const {
-    return "building availabiilty scope for";
+    return "building availabilty scope for";
   }
 
   friend class swift::ExpandChildAvailabilityScopesRequest;

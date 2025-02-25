@@ -247,6 +247,11 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddPointer(getOpaqueValue());
   }
+
+private:
+  friend class AvailabilityDomainOrIdentifier;
+
+  AvailabilityDomain copy(ASTContext &ctx) const;
 };
 
 /// Represents an availability domain that has been defined in a module.
@@ -317,6 +322,11 @@ public:
       return storage.get<Identifier>();
     return std::nullopt;
   }
+
+  /// Creates a new `AvailabilityDomainOrIdentifier`, defensively copying
+  /// members of the original into the given `ASTContext` in case it is
+  /// different than the context that the original was created for.
+  AvailabilityDomainOrIdentifier copy(ASTContext &ctx) const;
 };
 
 } // end namespace swift
