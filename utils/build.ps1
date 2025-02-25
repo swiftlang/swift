@@ -1657,7 +1657,7 @@ function Build-CMakeProject {
           # Disable EnC as that introduces padding in the conformance tables
           $SwiftFlags += @("-Xlinker", "/INCREMENTAL:NO")
           # Swift requires COMDAT folding and de-duplication
-          $SwiftFlags += @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF")
+          $SwiftFlags += @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF", "-v")
 
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftFlags
           # Workaround CMake 3.26+ enabling `-wmo` by default on release builds
@@ -2958,7 +2958,8 @@ function Build-Dispatch([Hashtable] $Platform) {
     -Defines @{
       ENABLE_SWIFT = "YES";
       dispatch_INSTALL_ARCH_SUBDIR = "YES";
-    }
+      BUILT_FIRST_SDK = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "NO" } else { "YES" };
+  }
 }
 
 function Test-Dispatch {
@@ -3005,6 +3006,7 @@ function Build-Foundation([Hashtable] $Platform) {
       _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
       _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
       SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
+      BUILT_FIRST_SDK = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "NO" } else { "YES" };
     }
 }
 
@@ -3763,7 +3765,7 @@ function Test-SourceKitLSP {
     "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform SourceKitLSP)\lib\CSourcekitd.lib",
     "-Xswiftc", "-I$SourceCache\sourcekit-lsp\Sources\CCompletionScoring\include",
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform SourceKitLSP)\swift",
-    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform SourceKitLSP)\lib"
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform SourceKitLSP)\lib", "-v"
   )
 
   Invoke-IsolatingEnvVars {
