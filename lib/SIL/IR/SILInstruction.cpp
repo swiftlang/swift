@@ -301,6 +301,14 @@ Operand *BeginBorrowInst::getSingleNonEndingUse() const {
   return singleUse;
 }
 
+bool BorrowedFromInst::isReborrow() const {
+  // The forwarded operand is either a phi or undef.
+  if (auto *phi = dyn_cast<SILPhiArgument>(getBorrowedValue())) {
+    return phi->isReborrow();
+  }
+  return false;
+}
+
 namespace {
 class InstructionDestroyer
     : public SILInstructionVisitor<InstructionDestroyer> {

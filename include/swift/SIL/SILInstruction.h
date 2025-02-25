@@ -4782,6 +4782,8 @@ public:
   OperandValueArrayRef getEnclosingValues() const {
     return OperandValueArrayRef(getEnclosingValueOperands());
   }
+
+  bool isReborrow() const;
 };
 
 inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
