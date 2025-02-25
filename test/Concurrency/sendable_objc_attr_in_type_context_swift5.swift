@@ -74,6 +74,10 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 -(void)updateWithCompletionHandler: (void (^_Nullable)(void)) handler;
 @end
 
+@protocol TestWitnesses
+-(void)willSendDataWithCompletion: (void (^)(void)) completion;
+@end
+
 #pragma clang assume_nonnull end
 
 //--- main.swift
@@ -174,5 +178,14 @@ class TestConformanceWithoutStripping : InnerSendableTypes {
   func testCompute() {
     self.compute { } // Ok - no ambiguity
     self.update { }  // Ok - no ambiguity
+  }
+}
+
+@objc
+class ImplicitShadowing : NSObject, TestWitnesses {
+  func willSendData(completion: @escaping () -> Void) {}
+
+  func test() {
+    (self as AnyObject).willSendData { } // Ok
   }
 }
