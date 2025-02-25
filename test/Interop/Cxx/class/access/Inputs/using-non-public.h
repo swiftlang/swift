@@ -11,18 +11,17 @@ enum class Return {
 };
 
 class Base {
+protected:
+  Return omitUsingProt(void) const { return Return::omitUsingProt; }
+  Return protUsingProt(void) const { return Return::protUsingProt; }
+  Return publUsingProt(void) const { return Return::publUsingProt; }
 public:
-  Return publUsingPubl(void) const { return Return::publUsingPubl; }
+  Return omitUsingPubl(void) const { return Return::omitUsingPubl; }
   //     ^^^^     ^^^^
   //        |         ` access level of base method
   //         ` access level of using statement
   Return protUsingPubl(void) const { return Return::protUsingPubl; }
-  Return omitUsingPubl(void) const { return Return::omitUsingPubl; }
-
-protected:
-  Return publUsingProt(void) const { return Return::publUsingProt; }
-  Return protUsingProt(void) const { return Return::protUsingProt; }
-  Return omitUsingProt(void) const { return Return::omitUsingProt; }
+  Return publUsingPubl(void) const { return Return::publUsingPubl; }
 
   // N.B. private members should never be visible through inheritance, so having
   // `using Base::privateMethod` in a derived class should be a C++ error.
