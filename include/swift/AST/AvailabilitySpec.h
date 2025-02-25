@@ -30,32 +30,13 @@
 
 namespace swift {
 class ASTContext;
-
-enum class AvailabilitySpecKind {
-  /// A platform-version constraint of the form "PlatformName X.Y.Z"
-  PlatformVersionConstraint,
-
-  /// A wildcard constraint, spelled '*', that is equivalent
-  /// to CurrentPlatformName >= MinimumDeploymentTargetVersion
-  Wildcard,
-
-  /// A language-version constraint of the form "swift X.Y.Z"
-  LanguageVersionConstraint,
-
-  /// A PackageDescription version constraint of the form "_PackageDescription
-  /// X.Y.Z"
-  PackageDescriptionVersionConstraint,
-};
-
 class SemanticAvailabilitySpec;
 
 /// The root class for specifications of API availability in availability
 /// queries.
 class AvailabilitySpec : public ASTAllocated<AvailabilitySpec> {
-protected:
-  AvailabilitySpecKind Kind;
-
-  std::optional<AvailabilityDomain> Domain;
+  using DomainStorage = llvm::PointerIntPair<AvailabilityDomainOrIdentifier, 1>;
+  DomainStorage Storage;
 
   /// The range of the entire spec, including the version if there is one.
   SourceRange SrcRange;
@@ -70,12 +51,14 @@ protected:
   // Location of the availability macro expanded to create this spec.
   SourceLoc MacroLoc;
 
-  AvailabilitySpec(AvailabilitySpecKind Kind,
-                   std::optional<AvailabilityDomain> Domain,
-                   SourceRange SrcRange, llvm::VersionTuple Version,
-                   SourceLoc VersionStartLoc)
-      : Kind(Kind), Domain(Domain), SrcRange(SrcRange), Version(Version),
+  AvailabilitySpec(DomainStorage Storage, SourceRange SrcRange,
+                   llvm::VersionTuple Version, SourceLoc VersionStartLoc)
+      : Storage(Storage), SrcRange(SrcRange), Version(Version),
         VersionStartLoc(VersionStartLoc) {}
+
+  AvailabilityDomainOrIdentifier getDomainOrIdentifier() const {
+    return Storage.getPointer();
+  }
 
 public:
   /// Creates a wildcard availability specification that guards execution
@@ -89,33 +72,20 @@ public:
   /// compiler will still catch references to potentially unavailable symbols.
   static AvailabilitySpec *createWildcard(ASTContext &ctx, SourceLoc starLoc);
 
-  /// Creates an availability specification that guards execution based on the
-  /// compile-time platform agnostic version, e.g., swift >= 3.0.1,
-  /// package-description >= 4.0.
-  static AvailabilitySpec *createPlatformAgnostic(ASTContext &ctx,
-                                                  AvailabilitySpecKind kind,
-                                                  SourceLoc nameLoc,
+  /// Creates an availability specification that requires a minimum version of
+  /// some availability domain, e.g., macOS >= 10.10 or swift >= 3.0.1.
+  static AvailabilitySpec *
+  createForDomain(ASTContext &ctx, AvailabilityDomain domain, SourceLoc loc,
+                  llvm::VersionTuple version, SourceRange versionRange);
+
+  /// Creates an availability specification for an unknown availability domain.
+  static AvailabilitySpec *createForUnknownDomain(ASTContext &ctx,
+                                                  Identifier domainIdentifier,
+                                                  SourceLoc loc,
                                                   llvm::VersionTuple version,
                                                   SourceRange versionRange);
 
-  /// Creates an availability specification that guards execution based on the
-  /// run-time platform and version, e.g., macOS >= 10.10.
-  static AvailabilitySpec *createPlatformVersioned(ASTContext &ctx,
-                                                   PlatformKind platform,
-                                                   SourceLoc platformLoc,
-                                                   llvm::VersionTuple version,
-                                                   SourceRange versionRange);
-
-  AvailabilitySpec *clone(ASTContext &ctx) const {
-    return new (ctx)
-        AvailabilitySpec(Kind, Domain, SrcRange, Version, VersionStartLoc);
-  }
-
-  AvailabilitySpecKind getKind() const { return Kind; }
-
-  bool isWildcard() const {
-    return getKind() == AvailabilitySpecKind::Wildcard;
-  }
+  AvailabilitySpec *clone(ASTContext &ctx) const;
 
   /// Returns a type-checked representation of the spec, or `std::nullopt` if
   /// the spec is invalid.
@@ -125,7 +95,15 @@ public:
   SourceRange getSourceRange() const { return SrcRange; }
   SourceLoc getStartLoc() const { return SrcRange.Start; }
 
-  std::optional<AvailabilityDomain> getDomain() const { return Domain; }
+  bool isWildcard() const {
+    if (auto domain = getDomain())
+      return domain->isUniversal();
+    return false;
+  }
+
+  std::optional<AvailabilityDomain> getDomain() const {
+    return getDomainOrIdentifier().getAsDomain();
+  }
 
   PlatformKind getPlatform() const {
     if (auto domain = getDomain())

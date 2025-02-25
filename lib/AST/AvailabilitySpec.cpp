@@ -24,45 +24,34 @@ using namespace swift;
 AvailabilitySpec *AvailabilitySpec::createWildcard(ASTContext &ctx,
                                                    SourceLoc starLoc) {
   return new (ctx)
-      AvailabilitySpec(AvailabilitySpecKind::Wildcard, std::nullopt, starLoc,
+      AvailabilitySpec({AvailabilityDomain::forUniversal(), true}, starLoc,
                        /*Version=*/{},
                        /*VersionStartLoc=*/{});
 }
 
-static AvailabilityDomain getDomainForSpecKind(AvailabilitySpecKind Kind) {
-  switch (Kind) {
-  case AvailabilitySpecKind::PlatformVersionConstraint:
-  case AvailabilitySpecKind::Wildcard:
-    llvm_unreachable("unexpected spec kind");
-  case AvailabilitySpecKind::LanguageVersionConstraint:
-    return AvailabilityDomain::forSwiftLanguage();
-  case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-    return AvailabilityDomain::forPackageDescription();
-  }
+AvailabilitySpec *AvailabilitySpec::createForDomain(ASTContext &ctx,
+                                                    AvailabilityDomain domain,
+                                                    SourceLoc loc,
+                                                    llvm::VersionTuple version,
+                                                    SourceRange versionRange) {
+  DEBUG_ASSERT(!version.empty());
+  return new (ctx)
+      AvailabilitySpec({domain, true}, SourceRange(loc, versionRange.End),
+                       version, versionRange.Start);
 }
 
-AvailabilitySpec *AvailabilitySpec::createPlatformAgnostic(
-    ASTContext &ctx, AvailabilitySpecKind kind, SourceLoc nameLoc,
+AvailabilitySpec *AvailabilitySpec::createForUnknownDomain(
+    ASTContext &ctx, Identifier domainIdentifier, SourceLoc loc,
     llvm::VersionTuple version, SourceRange versionRange) {
-  return new (ctx) AvailabilitySpec(kind, getDomainForSpecKind(kind),
-                                    SourceRange(nameLoc, versionRange.End),
-                                    version, versionRange.Start);
+  return new (ctx) AvailabilitySpec({domainIdentifier, true},
+                                    SourceRange(loc, versionRange.End), version,
+                                    versionRange.Start);
 }
 
-static std::optional<AvailabilityDomain>
-getDomainForPlatform(PlatformKind Platform) {
-  if (Platform != PlatformKind::none)
-    return AvailabilityDomain::forPlatform(Platform);
-  return std::nullopt;
-}
-
-AvailabilitySpec *AvailabilitySpec::createPlatformVersioned(
-    ASTContext &ctx, PlatformKind platform, SourceLoc platformLoc,
-    llvm::VersionTuple version, SourceRange versionRange) {
-  return new (ctx) AvailabilitySpec(
-      AvailabilitySpecKind::PlatformVersionConstraint,
-      getDomainForPlatform(platform),
-      SourceRange(platformLoc, versionRange.End), version, versionRange.Start);
+AvailabilitySpec *AvailabilitySpec::clone(ASTContext &ctx) const {
+  return new (ctx)
+      AvailabilitySpec({getDomainOrIdentifier().copy(ctx), true},
+                       SrcRange, Version, VersionStartLoc);
 }
 
 llvm::VersionTuple SemanticAvailabilitySpec::getVersion() const {

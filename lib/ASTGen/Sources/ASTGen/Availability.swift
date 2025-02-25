@@ -72,6 +72,9 @@ extension ASTGenVisitor {
 
     var result: [BridgedAvailableAttr] = []
     for spec in specs {
+      guard !spec.isWildcard else {
+        continue
+      }
       let domain = spec.domain
       guard !domain.isNull() else {
         continue
@@ -287,13 +290,13 @@ extension ASTGenVisitor {
 
       switch domainNode.rawText {
       case "swift", "_PackageVersion":
-        let kind: BridgedAvailabilitySpecKind = domainNode.rawText == "swift"
-          ? .languageVersionConstraint
-          : .packageDescriptionVersionConstraint
+        let domain: BridgedAvailabilityDomain = domainNode.rawText == "swift"
+          ? .forSwiftLanguage()
+          : .forPackageDescription()
 
-        let spec = BridgedAvailabilitySpec.createPlatformAgnostic(
+        let spec = BridgedAvailabilitySpec.create(
           self.ctx,
-          kind: kind,
+          domain: domain,
           nameLoc: nameLoc,
           version: version?.bridged ?? BridgedVersionTuple(),
           versionRange: versionRange
@@ -329,10 +332,10 @@ extension ASTGenVisitor {
             // TODO: Diagnostics.
             fatalError("expected version")
           }
-          let spec = BridgedAvailabilitySpec.createPlatformVersioned(
+          let spec = BridgedAvailabilitySpec.create(
             self.ctx,
-            platform: platform,
-            platformLoc: nameLoc,
+            domain: BridgedAvailabilityDomain.forPlatform(platform),
+            nameLoc: nameLoc,
             version: version.bridged,
             versionRange: versionRange
           )
