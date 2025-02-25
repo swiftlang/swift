@@ -448,6 +448,8 @@ extension OwnershipUseVisitor {
     case let mdi as MarkDependenceInst:
       assert(operand == mdi.baseOperand && mdi.isNonEscaping)
       return dependentUse(of: operand, into: mdi)
+    case let bfi as BorrowedFromInst where !bfi.borrowedPhi.isReborrow:
+      return dependentUse(of: operand, into: bfi)
     default:
       return borrowingUse(of: operand,
                           by: BorrowingInstruction(operand.instruction)!)
