@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature ValueGenerics)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ValueGenerics
 
 import StdlibUnittest
 
@@ -67,4 +68,21 @@ suite.test("CollectionOfOne.span stride test")
   let span = c.span
   let bytes = span.bytes
   expectEqual(bytes.byteCount, MemoryLayout.size(ofValue: c))
+}
+
+suite.test("InlineArray.span property")
+.skip(.custom(
+  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
+  reason: "Requires Swift 6.2's standard library"
+))
+.code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var s = InlineArray<5, Int>(repeating: 0)
+  s[3] = .random(in: 0..<1000)
+  let span = s.span
+  expectEqual(span.count, s.count)
+  for i in s.indices {
+    expectEqual(span[i], s[i])
+  }
 }
