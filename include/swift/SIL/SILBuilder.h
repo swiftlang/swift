@@ -1065,7 +1065,7 @@ public:
       SILLocation Loc, SILValue src, SILDebugVariable Var,
       PoisonRefs_t poisonRefs = DontPoisonRefs,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
-      bool trace = false);
+      bool trace = false, bool overrideLoc = true);
   DebugValueInst *createDebugValueAddr(
       SILLocation Loc, SILValue src, SILDebugVariable Var,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,

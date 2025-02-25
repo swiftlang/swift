@@ -486,7 +486,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   // If we have a body, we might have a generic environment.
   GenericSignatureID genericSigID = 0;
-  if (!NoBody || OnlyReferencedByDebugInfo)
+  // Generic environment information is needed while serializing debug scopes.
+  // Otherwise, the generic specializer fails to remap references to functions
+  // in debug scopes to their specialized versions which breaks IRGen.
+  // TODO: add an assertion in IRGen when the specializer fails to remap.
+  if (!NoBody || SerializeDebugInfoSIL)
     if (auto *genericEnv = F.getGenericEnvironment())
       genericSigID = S.addGenericSignatureRef(genericEnv->getGenericSignature());
 
@@ -694,7 +698,7 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
   unsigned abbrCode = SILAbbrCodes[SILBasicBlockLayout::Code];
   SILBasicBlockLayout::emitRecord(Out, ScratchRecord, abbrCode, Args);
 
-  const SILDebugScope *Prev = BB.getParent()->getDebugScope();
+  const SILDebugScope *Prev = nullptr;
   auto &SM = BB.getParent()->getModule().getSourceManager();
   for (const SILInstruction &SI : BB) {
     if (SerializeDebugInfoSIL) {
@@ -974,7 +978,111 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
 
-  case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::DebugValueInst: {
+    if (!SerializeDebugInfoSIL)
+     return;
+    auto DVI = cast<DebugValueInst>(&SI);
+    unsigned attrs = unsigned(DVI->poisonRefs() & 0x1);
+    attrs |= unsigned(DVI->usesMoveableValueDebugInfo()) << 1;
+    attrs |= unsigned(DVI->hasTrace()) << 2;
+
+    auto Operand = DVI->getOperand();
+    auto Type = Operand->getType();
+
+    unsigned DebugVarTypeCategory = 0;
+    auto DebugVar = DVI->getVarInfo();
+    const SILDebugScope *ScopeToWrite = nullptr;
+
+    auto &SM = SI.getFunction()->getModule().getSourceManager();
+
+    SmallVector<uint64_t, 8> ListOfValues;
+    ListOfValues.push_back(addValueRef(Operand));
+    ListOfValues.push_back(S.addTypeRef(Type.getRawASTType()));
+
+    if (DebugVar) {
+      // Is a DebugVariable being serialized.
+      attrs |= 1 << 3;
+      attrs |= DebugVar->isLet() << 4;
+
+      // isDenseMapSingleton needs two bits.
+      attrs |= DebugVar->isDenseMapSingleton << 5;
+
+      ListOfValues.push_back(S.addUniquedStringRef(DebugVar->Name));
+      ListOfValues.push_back(DebugVar->ArgNo);
+
+      if (DebugVar->Type.has_value()) {
+        attrs |= 1 << 7;
+        ListOfValues.push_back(S.addTypeRef(DebugVar->Type->getRawASTType()));
+        DebugVarTypeCategory = (unsigned)DebugVar->Type->getCategory();
+      }
+
+      if (DebugVar->Scope) {
+        attrs |= 1 << 8;
+        ScopeToWrite = DebugVar->Scope;
+      }
+
+      if (DebugVar->Loc) {
+        auto RawLoc = DebugVar->Loc.value();
+        SourceLoc Loc = RawLoc.getSourceLoc();
+        if (Loc.isValid()) {
+          attrs |= 1 << 9;
+          auto LC = SM.getPresumedLineAndColumnForLoc(Loc);
+          auto FName = SM.getDisplayNameForLoc(Loc);
+          auto FNameID = S.addUniquedStringRef(FName);
+
+          ListOfValues.push_back(LC.first);
+          ListOfValues.push_back(LC.second);
+          ListOfValues.push_back(FNameID);
+        } else if (RawLoc.isFilenameAndLocation()) {
+          // getSourceLoc produces an empty SourceLoc for FilenameAndLocation,
+          // so this needs to be handled separately. rdar://25225083.
+          attrs |= 1 << 9;
+          auto FNameLoc = RawLoc.getFilenameAndLocation();
+          ListOfValues.push_back(FNameLoc->line);
+          ListOfValues.push_back(FNameLoc->column);
+          ListOfValues.push_back(S.addUniquedStringRef(FNameLoc->filename));
+        }
+      }
+
+      for (auto &Expr : DebugVar->DIExpr.elements()) {
+        attrs |= 1 << 10;
+        ListOfValues.push_back(Expr.getKind());
+        switch (Expr.getKind()) {
+        case SILDIExprElement::Kind::OperatorKind:
+          ListOfValues.push_back((unsigned)Expr.getAsOperator());
+          break;
+        case SILDIExprElement::Kind::DeclKind:
+          ListOfValues.push_back(S.addDeclRef(Expr.getAsDecl()));
+          break;
+        case SILDIExprElement::Kind::ConstIntKind: {
+          llvm::SmallString<10> Str;
+          APInt(64, Expr.getAsConstInt().value()).toStringUnsigned(Str);
+          ListOfValues.push_back(S.addUniquedStringRef(Str));
+          break;
+        }
+        case SILDIExprElement::Kind::TypeKind:
+          ListOfValues.push_back(S.addTypeRef(Expr.getAsType()));
+        }
+      }
+    }
+    SILDebugValueLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILDebugValueLayout::Code],
+        (unsigned)Type.getCategory(), DebugVarTypeCategory, attrs,
+    ListOfValues);
+
+    if (ScopeToWrite) {
+      assert(DebugVar->Scope->getInlinedFunction() == DVI->getDebugScope()->getInlinedFunction());
+      writeDebugScopes(ScopeToWrite, SM);
+      // Add a delimiter record since debug scope records are read by the
+      // deserializer in a loop until the first non debug scope record is
+      // found. As a result, the deserializer might read debug scopes of
+      // subsequent instructions while deserializing scopes for the current
+      // DebugValue instruction.
+      // TODO: Maybe add a bit to the debug scope layout to mark the ending.
+      DebugValueDelimiterLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[DebugValueDelimiterLayout::Code]);
+    }
+    break;
+  }
   case SILInstructionKind::DebugStepInst:
     // Currently we don't serialize debug info, so it doesn't make
     // sense to write those instructions at all.
@@ -3185,7 +3293,8 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
     std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
     FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
   } else if (Scope->Loc.isFilenameAndLocation()) {
-    // TODO: this is a workaround until rdar://problem/25225083 is implemented.
+    // getSourceLoc produces an empty SourceLoc for FilenameAndLocation, so
+    // this needs to be handled separately. rdar://25225083.
     auto FNameLoc = Scope->Loc.getFilenameAndLocation();
     Row = FNameLoc->line;
     Column = FNameLoc->column;
@@ -3443,10 +3552,12 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
   registerSILAbbr<PropertyLayout>();
   registerSILAbbr<DifferentiabilityWitnessLayout>();
+  registerSILAbbr<SILDebugValueLayout>();
   registerSILAbbr<SILDebugScopeLayout>();
   registerSILAbbr<SILDebugScopeRefLayout>();
   registerSILAbbr<SourceLocLayout>();
   registerSILAbbr<SourceLocRefLayout>();
+  registerSILAbbr<DebugValueDelimiterLayout>();
 
   // Write out VTables first because it may require serializations of
   // non-transparent SILFunctions (body is not needed).
