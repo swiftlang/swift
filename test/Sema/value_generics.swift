@@ -42,6 +42,12 @@ extension A where N: P {} // expected-error {{value generic type 'N' cannot conf
 
 extension A where N == Int {} // expected-error {{cannot constrain value parameter 'N' to be type 'Int'}}
 
+extension A where N == 123 {
+  func thing() -> Int {
+    N // OK (this used to crash the compiler in a concrete case 'where N == 123')
+  }
+}
+
 func b(with a: A<123>) {} // OK
 func c<let M: Int>(with a: A<M>) {} // OK
 func d<T>(with a: A<T>) {} // expected-error {{cannot pass type 'T' as a value for generic value 'N'}}

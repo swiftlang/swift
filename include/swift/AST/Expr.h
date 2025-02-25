@@ -1434,39 +1434,39 @@ public:
 };
 
 class TypeValueExpr : public Expr {
-  TypeLoc paramTypeLoc;
+  GenericTypeParamDecl *paramDecl;
+  DeclNameLoc loc;
+  Type paramType;
+
+  /// Create a \c TypeValueExpr from a given generic value param decl.
+  TypeValueExpr(DeclNameLoc loc, GenericTypeParamDecl *paramDecl) :
+      Expr(ExprKind::TypeValue, /*implicit*/ false), paramDecl(paramDecl),
+      loc(loc), paramType(nullptr) {}
 
 public:
-  /// Create a \c TypeValueExpr from an underlying parameter \c TypeRepr.
-  TypeValueExpr(TypeRepr *paramRepr) :
-      Expr(ExprKind::TypeValue, /*implicit*/ false), paramTypeLoc(paramRepr) {}
-
-  /// Create a \c TypeValueExpr for a given \c TypeDecl at the specified
-  /// location.
+  /// Create a \c TypeValueExpr for a given \c GenericTypeParamDecl.
   ///
-  /// The given location must be valid. If it is not, you must use
-  /// \c TypeExpr::createImplicitForDecl instead.
-  static TypeValueExpr *createForDecl(DeclNameLoc Loc, TypeDecl *D,
-                                      DeclContext *DC);
+  /// The given location must be valid.
+  static TypeValueExpr *createForDecl(DeclNameLoc Loc, GenericTypeParamDecl *D);
 
-  TypeRepr *getParamTypeRepr() const {
-    return paramTypeLoc.getTypeRepr();
+  GenericTypeParamDecl *getParamDecl() const {
+    return paramDecl;
   }
 
   /// Retrieves the corresponding parameter type of the value referenced by this
   /// expression.
-  ArchetypeType *getParamType() const {
-    return paramTypeLoc.getType()->castTo<ArchetypeType>();
+  Type getParamType() const {
+    return paramType;
   }
 
   /// Sets the corresponding parameter type of the value referenced by this
   /// expression.
   void setParamType(Type paramType) {
-    paramTypeLoc.setType(paramType);
+    this->paramType = paramType;
   }
 
   SourceRange getSourceRange() const {
-    return paramTypeLoc.getSourceRange();
+    return loc.getSourceRange();
   }
 
   static bool classof(const Expr *E) {
