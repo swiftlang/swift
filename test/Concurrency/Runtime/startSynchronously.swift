@@ -76,7 +76,7 @@ func syncOnMyGlobalActor() -> [Task<Void, Never>] {
 
   print("before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
   let outerTID = getCurrentThreadID()
-  let tt = Task.startSynchronously { @MyGlobalActor in
+  let tt = Task.Task._startSynchronously { @MyGlobalActor in
     let innerTID = getCurrentThreadID()
     print("inside startSynchronously, outer thread = \(outerTID)")
     print("inside startSynchronously, inner thread = \(innerTID)")
@@ -102,7 +102,7 @@ func syncOnNonTaskThread(synchronousTask behavior: SynchronousTaskBehavior) {
     print("before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
 
     let outerTID = getCurrentThreadID()
-    let tt = Task.startSynchronously { @MyGlobalActor in
+    let tt = Task._startSynchronously { @MyGlobalActor in
       let innerTID = getCurrentThreadID()
       if compareThreadIDs(outerTID, .notEqual, innerTID) {
         print("inside startSynchronously, outer thread = \(outerTID)")
@@ -217,7 +217,7 @@ func callActorFromStartSynchronousTask() {
 
   queue.async {
     let outerTID = getCurrentThreadID()
-    let tt = Task.startSynchronously {
+    let tt = Task._startSynchronously {
       let innerTID = getCurrentThreadID()
       precondition(compareThreadIDs(outerTID, .equal, innerTID), "Outer Thread ID must be equal Thread ID inside runSynchronously synchronous part!")
       print("inside startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")

@@ -325,7 +325,7 @@ extension Task where Failure == Never {
 extension Task where Failure == Never {
   @available(SwiftStdlib 5.9, *)
   @discardableResult
-  public static func startSynchronously(
+  public static func _startSynchronously(
     name: String? = nil,
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
