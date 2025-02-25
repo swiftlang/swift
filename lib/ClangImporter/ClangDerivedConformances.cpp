@@ -680,24 +680,17 @@ void swift::conformToCxxOptionalIfNeeded(
   if (!cxxOptionalProto)
     return;
 
-  // HACK: this loop is necessary for MSVC's std::optional, which uses:
-  //
-  // public:
-  //   using _Mybase::operator*;
-  //
-  // This causes SwiftDeclConverter::VisitUsingShadowDecl to (unintentionally)
-  // import two pointee members, one public and one private.
-  for (auto *pointee :
-       lookupDirectWithoutExtensions(decl, ctx.getIdentifier("pointee"))) {
-    if (!isa<VarDecl>(pointee) ||
-        pointee->getFormalAccess() < AccessLevel::Public)
-      // Try next "pointee" member
-      continue;
-    Type pointeeTy = pointee->getInterfaceType();
-    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"), pointeeTy);
-    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxOptional});
+  auto pointeeId = ctx.getIdentifier("pointee");
+  auto pointees = lookupDirectWithoutExtensions(decl, pointeeId);
+  if (pointees.size() != 1)
     return;
-  }
+  auto pointee = dyn_cast<VarDecl>(pointees.front());
+  if (!pointee)
+    return;
+  auto pointeeTy = pointee->getInterfaceType();
+
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"), pointeeTy);
+  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxOptional});
 }
 
 void swift::conformToCxxSequenceIfNeeded(
