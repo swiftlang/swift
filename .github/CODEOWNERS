@@ -32,8 +32,8 @@
 # TODO: /README.md
 
 # Runtimes
-/Runtimes/**/CMakeLists.txt                @etcwilde @compnerd @edymtt @justice-adams-apple
 /Runtimes/**/*.cmake                       @etcwilde @compnerd @edymtt @justice-adams-apple
+/Runtimes/**/CMakeLists.txt                @etcwilde @compnerd @edymtt @justice-adams-apple
 /Runtimes/Core/cmake/caches/Vendors/Apple/ @etcwilde @shahmishal @edymtt @justice-adams-apple
 
 # SwiftCompilerSources
@@ -52,6 +52,11 @@
 /cmake/**/*Windows*                       @compnerd
 
 # docs
+/docs/ABI/                                @rjmccall
+/docs/ABI/*Mangling*                      @eeckstein
+/docs/ABI/GenericSignature.md             @slavapestov
+/docs/ABI/KeyPaths.md                     @jckarter
+/docs/ABI/RegisterUsage.md                @al45tair
 /docs/CrossCompilationModel.md            @MaxDesiatov
 /docs/Generics                            @slavapestov
 /docs/HowToGuides/                        @AnthonyLatsis @LucianoPAlmeida @xedin
@@ -190,11 +195,11 @@
 /stdlib/private/*Runtime*/                @rjmccall
 /stdlib/private/SwiftReflectionTest/      @slavapestov
 /stdlib/public/*Demangl*/                 @rjmccall
-/stdlib/public/RuntimeModule/             @al45tair @mikeash
 /stdlib/public/Concurrency/               @ktoso
 /stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan @Xazax-hun @j-hui @fahadnayyar
 /stdlib/public/Distributed/               @ktoso
 /stdlib/public/Observation/               @phausler
+/stdlib/public/RuntimeModule/             @al45tair @mikeash
 /stdlib/public/SwiftRemoteMirror/         @slavapestov
 /stdlib/public/Threading/                 @al45tair
 /stdlib/public/Windows/                   @compnerd
@@ -279,12 +284,12 @@
 /utils/generate-xcode                                         @hamishknight
 /utils/gyb_sourcekit_support/                                 @ahoppen @bnbarham @hamishknight @rintaro
 /utils/sourcekit_fuzzer/                                      @ahoppen @bnbarham @hamishknight @rintaro
+/utils/swift-xcodegen/                                        @hamishknight
 /utils/swift_build_support/products/earlyswiftsyntax.py       @ahoppen @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/skstresstester.py         @ahoppen @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/sourcekitlsp.py           @ahoppen @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/swiftformat.py            @ahoppen @allevato @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/swiftsyntax.py            @ahoppen @bnbarham @hamishknight @rintaro
-/utils/swift-xcodegen/                                        @hamishknight
 /utils/update-checkout*                                       @shahmishal
 /utils/update_checkout/                                       @shahmishal
 /utils/vim/                                                   @compnerd
