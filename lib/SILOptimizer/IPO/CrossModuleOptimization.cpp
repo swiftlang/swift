@@ -651,6 +651,21 @@ bool CrossModuleOptimization::canSerializeFieldsByInstructionKind(
             canUse = methodScope.isPublicOrPackage();
           }
         });
+    auto pattern = KPI->getPattern();
+    for (auto &component : pattern->getComponents()) {
+      if (!canUse) {
+        break;
+      }
+      switch (component.getKind()) {
+      case KeyPathPatternComponent::Kind::StoredProperty: {
+        auto property = component.getStoredPropertyDecl();
+        canUse = isPackageOrPublic(property->getEffectiveAccess());
+        break;
+      }
+      default:
+        break;
+      }
+    }
     return canUse;
   }
   if (auto *MI = dyn_cast<MethodInst>(inst)) {
