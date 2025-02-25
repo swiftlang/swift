@@ -602,32 +602,24 @@ extension InteriorUseWalker: OwnershipUseVisitor {
       return .abortWalk
     }
     return walkDownAddressUses(of: address)
-  }  
+  }
 
   // Handle partial_apply [on_stack] and mark_dependence [nonescaping].
-  //
-  // TODO: Rather than walking down the owned uses, this could call
-  // visitInnerScopeUses, but we need to ensure all dependent values
-  // are complete first:
-  //
-  //   if let svi = borrowInst as! SingleValueInstruction,
-  //          svi.ownership == .owned {
-  //     if handleInner(borrowed: beginBorrow.value) == .abortWalk {
-  //       return .abortWalk
-  //     }
-  //     return visitInnerScopeUses(of: borrowInst)
-  //   }
-  mutating func dependentUse(of operand: Operand, into value: Value)
-    -> WalkResult {
+  mutating func dependentUse(of operand: Operand, into value: Value) -> WalkResult {
     // OSSA lifetime ignores trivial types.
-    if operand.value.type.isTrivial(in: function) {
+    if value.type.isTrivial(in: function) {
       return .continueWalk
+    }
+    guard value.type.isEscapable(in: function) else {
+      // Non-escapable dependent values can be lifetime-extended by copying, which is not handled by
+      // InteriorUseWalker. LifetimeDependenceDefUseWalker does this.
+      return pointerEscapingUse(of: operand)
     }
     if useVisitor(operand) == .abortWalk {
       return .abortWalk
     }
     return walkDownUses(of: value)
-  }  
+  }
 
   mutating func pointerEscapingUse(of operand: Operand) -> WalkResult {
     if useVisitor(operand) == .abortWalk {
