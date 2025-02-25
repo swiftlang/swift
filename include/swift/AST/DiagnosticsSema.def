@@ -3176,9 +3176,6 @@ GROUPED_WARNING(
     "protocol %1%select{|: %2}2",
     (const ValueDecl *, Identifier, StringRef))
 
-WARNING(unavailable_conformance,none,
-        "conformance of %0 to protocol %1 is already unavailable",
-        (Type, Identifier))
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, Identifier))
 ERROR(redundant_conformance_conditional,none,
