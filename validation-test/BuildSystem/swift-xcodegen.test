@@ -3,6 +3,7 @@
 # RUN: %empty-directory(%t/out)
 # RUN: export PATH="%original_path_env"
 # RUN: export SWIFTCI_USE_LOCAL_DEPS=1
+# RUN: export SWIFT_BACKTRACE=
 
 # REQUIRES: OS=macosx
 # REQUIRES: standalone_build
