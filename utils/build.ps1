@@ -139,7 +139,7 @@ param
   [string] $PinnedToolchainVariant = "Asserts",
   [string] $PythonVersion = "3.9.10",
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
-  [string] $AndroidNDKVersion = "r26b",
+  [string] $AndroidNDKVersion = "r27c",
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
   [switch] $Android = $false,
@@ -346,13 +346,32 @@ $BuildArch = switch ($BuildArchName) {
   default { throw "Unsupported processor architecture" }
 }
 
+$KnownNDKs = @{
+  r26b = @{
+    URL = "https://dl.google.com/android/repository/android-ndk-r26b-windows.zip"
+    SHA256 = "A478D43D4A45D0D345CDA6BE50D79642B92FB175868D9DC0DFC86181D80F691E"
+    ClangVersion = 17
+  }
+  r27c = @{
+    URL = "https://dl.google.com/android/repository/android-ndk-r27c-windows.zip"
+    SHA256 = "27E49F11E0CEE5800983D8AF8F4ACD5BF09987AA6F790D4439DDA9F3643D2494"
+    ClangVersion = 18
+  }
+}
+
+
 $IsCrossCompiling = $HostArchName -ne $BuildArchName
 
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
 
+function Get-AndroidNDK {
+  $NDK = $KnownNDKs[$AndroidNDKVersion]
+  if ($NDK -eq $null) { throw "Unsupported Android NDK version" }
+  return $NDK
+}
+
 function Get-AndroidNDKPath {
-  $androidNDKPath = Join-Path -Path $BinaryCache -ChildPath "android-ndk-$AndroidNDKVersion"
-  return $androidNDKPath
+  return Join-Path -Path $BinaryCache -ChildPath "android-ndk-$AndroidNDKVersion"
 }
 
 function Get-FlexExecutable {
@@ -859,14 +878,8 @@ function Fetch-Dependencies {
   Install-PythonModules
 
   if ($Android) {
-    # Only a specific NDK version is supported right now.
-    if ($AndroidNDKVersion -ne "r26b") {
-      throw "Unsupported Android NDK version"
-    }
-    $NDKURL = "https://dl.google.com/android/repository/android-ndk-r26b-windows.zip"
-    $NDKHash = "A478D43D4A45D0D345CDA6BE50D79642B92FB175868D9DC0DFC86181D80F691E"
-    DownloadAndVerify $NDKURL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDKHash
-
+    $NDK = Get-AndroidNDK
+    DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
     Extract-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
   }
 
@@ -1104,9 +1117,6 @@ function Build-CMakeProject {
       TryAdd-KeyValue $Defines SWIFT_ANDROID_NDK_PATH "$androidNDKPath"
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER_WORKS YES
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_WORKS YES
-      # The current Android NDK ships with Clang 17,
-      # which doesn't provide the _Builtin_float module.
-      TryAdd-KeyValue $Defines SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT YES
     }
 
     TryAdd-KeyValue $Defines CMAKE_BUILD_TYPE Release
@@ -1256,7 +1266,7 @@ function Build-CMakeProject {
               "-Xclang-linker", "--sysroot",
               "-Xclang-linker", "$androidNDKPath\toolchains\llvm\prebuilt\windows-x86_64\sysroot",
               "-Xclang-linker", "-resource-dir",
-              "-Xclang-linker", "$androidNDKPath\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\17"
+              "-Xclang-linker", "$androidNDKPath\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\$($(Get-AndroidNDK).ClangVersion)"
             )
           }
         }
@@ -2064,15 +2074,16 @@ function Build-CURL([Platform]$Platform, $Arch) {
 
 function Build-Runtime([Platform]$Platform, $Arch) {
   $PlatformDefines = @{}
-  if ($Platform -eq "Android") {
+  if ($Platform -eq [Platform]::Android) {
     $PlatformDefines += @{
       LLVM_ENABLE_LIBCXX = "YES";
       SWIFT_USE_LINKER = "lld";
       SWIFT_INCLUDE_TESTS = "NO";
       SWIFT_INCLUDE_TEST_BINARIES = "NO";
+      # Clang[<18] doesn't provide the _Builtin_float module.
+      SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT = "YES";
     }
   }
-
 
   Isolate-EnvVars {
     $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$(Get-PinnedToolchainRuntime);${env:Path}"
