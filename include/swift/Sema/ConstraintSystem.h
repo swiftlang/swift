@@ -1797,17 +1797,31 @@ public:
   /// "resolved" concrete type.
   Type getResolvedType(ASTNode node) const;
 
-  Type getContextualType(ASTNode anchor) const {
+  std::optional<ContextualTypeInfo>
+  getContextualTypeInfo(ASTNode anchor) const {
     for (const auto &entry : contextualTypes) {
-      if (entry.first == anchor) {
-        // The contextual information record could contain the purpose
-        // without a type i.e. when the context is an optional-some or
-        // an invalid pattern binding.
-        if (auto contextualTy = entry.second.getType())
+      if (entry.first == anchor)
+        return entry.second;
+    }
+    return std::nullopt;
+  }
+
+  Type getContextualType(ASTNode anchor) const {
+    if (auto info = getContextualTypeInfo(anchor)) {
+      // The contextual information record could contain the purpose
+      // without a type i.e. when the context is an optional-some or
+      // an invalid pattern binding.
+      if (auto contextualTy = info->getType())
           return simplifyType(contextualTy);
-      }
     }
     return Type();
+  }
+
+  ContextualTypePurpose getContextualTypePurpose(ASTNode anchor) const {
+    if (auto info = getContextualTypeInfo(anchor)) {
+      return info->purpose;
+    }
+    return CTP_Unused;
   }
 
   /// Retrieve the generic environment for the opened element of a given pack

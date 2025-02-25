@@ -440,7 +440,8 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
     limitBehavior(limit);
   }
 
-  if (majorVersion == 6) {
+  // Record all of the diagnostics that are going to be emitted.
+  if (majorVersion == 6 && limit != DiagnosticBehavior::Ignore) {
     if (auto stats = Engine->statsReporter) {
       ++stats->getFrontendCounters().NumSwift6Errors;
     }

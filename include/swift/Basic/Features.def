@@ -450,6 +450,11 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// Be strict about the Sendable conformance of metatypes.
 EXPERIMENTAL_FEATURE(StrictSendableMetatypes, true)
 
+/// Allow public enumerations to be extensible by default
+/// regardless of whether the module they are declared in
+/// is resilient or not.
+EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

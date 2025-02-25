@@ -840,6 +840,14 @@ public:
     Bits.ModuleDecl.ObjCNameLookupCachePopulated = value;
   }
 
+  bool supportsExtensibleEnums() const {
+    return Bits.ModuleDecl.ExtensibleEnums;
+  }
+
+  void setSupportsExtensibleEnums(bool value = true) {
+    Bits.ModuleDecl.ExtensibleEnums = value;
+  }
+
   /// For the main module, retrieves the list of primary source files being
   /// compiled, that is, the files we're generating code for.
   ArrayRef<SourceFile *> getPrimarySourceFiles() const;
