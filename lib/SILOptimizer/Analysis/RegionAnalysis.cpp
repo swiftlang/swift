@@ -320,6 +320,8 @@ static bool isLookThroughIfOperandAndResultNonSendable(SILInstruction *inst) {
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+  case SILInstructionKind::ConvertFunctionInst:
     return true;
   }
 }
@@ -2985,8 +2987,6 @@ CONSTANT_TRANSLATION(LoadUnownedInst, Assign)
 // getUnderlyingTrackedObject.
 CONSTANT_TRANSLATION(AddressToPointerInst, Assign)
 CONSTANT_TRANSLATION(BaseAddrForOffsetInst, Assign)
-CONSTANT_TRANSLATION(ConvertEscapeToNoEscapeInst, Assign)
-CONSTANT_TRANSLATION(ConvertFunctionInst, Assign)
 CONSTANT_TRANSLATION(ThunkInst, Assign)
 CONSTANT_TRANSLATION(CopyBlockInst, Assign)
 CONSTANT_TRANSLATION(CopyBlockWithoutEscapingInst, Assign)
@@ -3314,6 +3314,8 @@ LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedValueCastInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(TupleElementAddrInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(StructElementAddrInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTakeEnumDataAddrInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(ConvertEscapeToNoEscapeInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(ConvertFunctionInst)
 
 #undef LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND
 

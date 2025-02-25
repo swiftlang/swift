@@ -1323,12 +1323,16 @@ public:
           if (auto value = instance.maybeGetValue()) {
             if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
               if (fArg->getArgumentConvention().isIndirectOutParameter()) {
+                auto staticRegionIsolation =
+                    getIsolationRegionInfo(op.getOpArgs()[1]);
                 Region srcRegion = p.getRegion(op.getOpArgs()[1]);
                 auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
+
                 // We can unconditionally getValue here since we can never
                 // assign an actor introducing inst.
                 auto rep = getRepresentativeValue(op.getOpArgs()[1]).getValue();
-                if (!dynamicRegionIsolation.isDisconnected()) {
+                if (!dynamicRegionIsolation.isDisconnected() &&
+                    !staticRegionIsolation.isUnsafeNonIsolated()) {
                   handleError(AssignNeverSendableIntoSendingResultError(
                       op, op.getOpArgs()[0], fArg, op.getOpArgs()[1], rep,
                       dynamicRegionIsolation));
@@ -1451,12 +1455,15 @@ public:
           if (auto value = instance.maybeGetValue()) {
             if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
               if (fArg->getArgumentConvention().isIndirectOutParameter()) {
+                auto staticRegionIsolation =
+                    getIsolationRegionInfo(op.getOpArgs()[1]);
                 Region srcRegion = p.getRegion(op.getOpArgs()[1]);
                 auto dynamicRegionIsolation = getIsolationRegionInfo(srcRegion);
                 // We can unconditionally getValue here since we can never
                 // assign an actor introducing inst.
                 auto rep = getRepresentativeValue(op.getOpArgs()[1]).getValue();
-                if (!dynamicRegionIsolation.isDisconnected()) {
+                if (!dynamicRegionIsolation.isDisconnected() &&
+                    !staticRegionIsolation.isUnsafeNonIsolated()) {
                   handleError(AssignNeverSendableIntoSendingResultError(
                       op, op.getOpArgs()[0], fArg, op.getOpArgs()[1], rep,
                       dynamicRegionIsolation));

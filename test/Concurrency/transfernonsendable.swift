@@ -1944,3 +1944,14 @@ func testFunctionIsNotEmpty(input: SendableKlass) async throws {
     }
   }
 }
+
+func unsafeNonIsolatedAppliesToAssignToOutParam(ns: NonSendableKlass) -> sending NonSendableKlass {
+  func withUnsafeValue<T>(_ block: (NonSendableKlass) throws -> sending T) rethrows -> sending T {
+    fatalError()
+  }
+
+  return withUnsafeValue {
+    nonisolated(unsafe) let obj = $0
+    return obj
+  }
+}
