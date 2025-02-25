@@ -25,6 +25,7 @@
 // DEP: _putchar
 // DEP: _puts
 // DEP: _strlen
+// DEP: _strcpy
 // DEP: _vprintf
 // DEP: _vsnprintf
 
