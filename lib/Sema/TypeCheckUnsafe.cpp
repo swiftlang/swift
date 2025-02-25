@@ -296,6 +296,13 @@ bool swift::enumerateUnsafeUses(ArrayRef<ProtocolConformanceRef> conformances,
                                 SourceLoc loc,
                                 llvm::function_ref<bool(UnsafeUse)> fn) {
   for (auto conformance : conformances) {
+    if (conformance.isInvalid())
+      continue;
+
+    ASTContext &ctx = conformance.getRequirement()->getASTContext();
+    if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
+      return false;
+
     if (!conformance.hasEffect(EffectKind::Unsafe))
       continue;
 
