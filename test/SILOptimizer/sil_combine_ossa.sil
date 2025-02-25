@@ -4932,16 +4932,14 @@ bb0(%0 : @guaranteed $_ContiguousArrayBuffer<Element>):
 }
 
 // CHECK-LABEL: sil [ossa] @cowbuffer_reading_no_lookthrough_reborrow : $@convention(method) <Element> (@guaranteed _ContiguousArrayBuffer<Element>) -> MyInt {
-// CHECK-NOT: ref_element_addr [immutable]
-// CHECK-NOT: ref_tail_addr [immutable]
+//
+// After updating with borrowed-from instructions, the ref_element_addr's can all be promoted without looking through
+// reborrows because they are reachable from the borrowed-from.
+//
 // CHECK-NOT: builtin "COWBufferForReading"
-// CHECK: ref_element_addr %
-// CHECK-NOT: ref_element_addr [immutable]
-// CHECK-NOT: ref_tail_addr [immutable]
+// CHECK: ref_element_addr [immutable]
 // CHECK-NOT: builtin "COWBufferForReading"
-// CHECK: ref_tail_addr %
-// CHECK-NOT: ref_element_addr [immutable]
-// CHECK-NOT: ref_tail_addr [immutable]
+// CHECK: ref_tail_addr [immutable] %
 // CHECK-NOT: builtin "COWBufferForReading"
 // CHECK: } // end sil function 'cowbuffer_reading_no_lookthrough_reborrow'
 sil [ossa] @cowbuffer_reading_no_lookthrough_reborrow : $@convention(method) <Element> (@guaranteed _ContiguousArrayBuffer<Element>) -> MyInt {
