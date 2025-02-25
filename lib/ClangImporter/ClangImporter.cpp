@@ -6196,11 +6196,12 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   // _Mybase is _Optional_construct_base). The root cause seems to be the
   // cloned member cache's inability to manage special decls synthesized from
   // operators.
-  if (auto *decl = dyn_cast_or_null<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
+  if (auto *decl =
+          dyn_cast_or_null<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
     if (decl->isInStdNamespace() && decl->getIdentifier() &&
         decl->getName() == "_Optional_construct_base" &&
         desc.name.getBaseName() == "pointee")
-    return {};
+      return {};
   }
 
   auto &ctx = recordDecl->getASTContext();
