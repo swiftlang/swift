@@ -19,6 +19,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceAttributes.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
@@ -3962,23 +3963,19 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: This is a hack. We need cooperation from
   // InheritedDeclsReferencedRequest to make this work.
   SourceLoc loc;
-  SourceLoc uncheckedLoc;
-  SourceLoc preconcurrencyLoc;
-  SourceLoc unsafeLoc;
+  ConformanceAttributes attributes;
   auto inheritedTypes = InheritedTypes(decl);
   bool isSuppressed = inheritedTypes.getEntry(i).isSuppressed();
   if (TypeRepr *typeRepr = inheritedTypes.getTypeRepr(i)) {
     loc = typeRepr->getLoc();
-    uncheckedLoc = typeRepr->findAttrLoc(TypeAttrKind::Unchecked);
-    preconcurrencyLoc = typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency);
-    unsafeLoc = typeRepr->findAttrLoc(TypeAttrKind::Unsafe);
+    attributes.uncheckedLoc = typeRepr->findAttrLoc(TypeAttrKind::Unchecked);
+    attributes.preconcurrencyLoc = typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency);
+    attributes.unsafeLoc = typeRepr->findAttrLoc(TypeAttrKind::Unsafe);
   }
 
   // Form the result.
   for (auto nominal : nominalTypes) {
-    result.push_back(
-        {nominal, loc, uncheckedLoc, preconcurrencyLoc, unsafeLoc,
-          isSuppressed});
+    result.push_back({nominal, loc, attributes, isSuppressed});
   }
 }
 
@@ -4008,10 +4005,11 @@ swift::getDirectlyInheritedNominalTypeDecls(
   for (auto attr :
        protoDecl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     auto loc = attr->getLocation();
+    ConformanceAttributes attributes;
+    if (attr->isUnchecked())
+      attributes.uncheckedLoc = loc;
     result.push_back(
-        {attr->getProtocol(), loc, attr->isUnchecked() ? loc : SourceLoc(),
-         /*preconcurrencyLoc=*/SourceLoc(), SourceLoc(),
-          /*isSuppressed=*/false});
+        {attr->getProtocol(), loc, attributes, /*isSuppressed=*/false});
   }
 
   // Else we have access to this information on the where clause.
@@ -4022,8 +4020,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
   // the source location.
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, SourceLoc(), SourceLoc(),
-                        SourceLoc(), SourceLoc(),  /*isSuppressed=*/false);
+    result.emplace_back(inheritedNominal, SourceLoc(), ConformanceAttributes(),
+                        /*isSuppressed=*/false);
 
   return result;
 }
