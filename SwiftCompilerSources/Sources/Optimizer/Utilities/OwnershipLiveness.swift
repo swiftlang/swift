@@ -552,25 +552,6 @@ struct InteriorUseWalker {
   }
 
   mutating func visitUses() -> WalkResult {
-    // If the outer value is an owned phi or reborrow, consider inner
-    // adjacent phis part of its lifetime.
-    if let phi = Phi(definingValue), phi.endsLifetime {
-      let result = phi.innerAdjacentPhis.walk { innerPhi in
-        if innerPhi.isReborrow {
-          // Inner adjacent reborrows are considered inner borrow scopes.
-          if handleInner(borrowed: innerPhi.value) == .abortWalk {
-            return .abortWalk
-          }
-          return visitInnerScopeUses(of: innerPhi.value)
-        } else {
-          // Inner adjacent guaranteed phis are uses of the outer borrow.
-          return visitAllUses(of: innerPhi.value)
-        }
-      }
-      if result == .abortWalk {
-        return .abortWalk
-      }
-    }
     return visitAllUses(of: definingValue)
   }
 }
