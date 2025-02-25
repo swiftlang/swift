@@ -13,12 +13,7 @@ extension NonSendableClass: @retroactive @unchecked Sendable {}
 // expected-warning@-1 {{conformance of 'NonSendableClass' to protocol 'Sendable' was already stated in the type's module 'SendableConformances'}}
 
 typealias CheckNonSendableClass = RequireSendable<NonSendableClass>
+// expected-error@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
 
 extension SendableStruct: @retroactive @unchecked Sendable {}
 // expected-warning@-1 {{conformance of 'SendableStruct' to protocol 'Sendable' was already stated in the type's module 'SendableConformances'}}
-
-@available(*, unavailable)
-extension AnotherSendableStruct: @retroactive @unchecked Sendable {}
-// expected-warning@-1 {{conformance of 'AnotherSendableStruct' to protocol 'Sendable' was already stated in the type's module 'SendableConformances'}}
-
-typealias CheckAnotherSendableStruct = RequireSendable<AnotherSendableStruct>
