@@ -2,7 +2,7 @@
 // RUN: mkdir -p %t/include
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// RUN: %target-swift-frontend -target armv7em-none-none-eabi -emit-ir %t/Main.swift -enable-experimental-feature Embedded -module-cache-path %t/ModuleCache -Xcc -I%t/include
+// RUN: %swift_frontend_plain -target armv7em-none-none-eabi -emit-ir %t/Main.swift -enable-experimental-feature Embedded -module-cache-path %t/ModuleCache -Xcc -I%t/include
 
 // UNSUPPORTED: CPU=wasm32
 // REQUIRES: swift_in_compiler
