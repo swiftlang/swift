@@ -765,18 +765,15 @@ public:
   /// has been resolved successfully.
   bool hasCachedDomain() const { return DomainOrIdentifier.isDomain(); }
 
+  AvailabilityDomainOrIdentifier getDomainOrIdentifier() const {
+    return DomainOrIdentifier;
+  }
+
   /// Returns the `AvailabilityDomain` associated with the attribute, or
   /// `std::nullopt` if it has either not yet been resolved or could not be
   /// resolved successfully.
   std::optional<AvailabilityDomain> getCachedDomain() const {
     return DomainOrIdentifier.getAsDomain();
-  }
-
-  /// If the attribute does not already have a cached `AvailabilityDomain`, this
-  /// returns the domain identifier that was written in source, from which an
-  /// `AvailabilityDomain` can be resolved.
-  std::optional<Identifier> getDomainIdentifier() const {
-    return DomainOrIdentifier.getAsIdentifier();
   }
 
   SourceLoc getDomainLoc() const { return DomainLoc; }

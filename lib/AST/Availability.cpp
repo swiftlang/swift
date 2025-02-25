@@ -828,7 +828,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   auto domain = attr->getCachedDomain();
 
   if (!domain) {
-    auto domainIdentifier = attr->getDomainIdentifier();
+    auto domainIdentifier = attr->getDomainOrIdentifier().getAsIdentifier();
     ASSERT(domainIdentifier);
 
     // Attempt to resolve the domain specified for the attribute and diagnose

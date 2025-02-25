@@ -248,11 +248,18 @@ public:
     ID.AddPointer(getOpaqueValue());
   }
 
+  void print(llvm::raw_ostream &os) const;
+
 private:
   friend class AvailabilityDomainOrIdentifier;
 
   AvailabilityDomain copy(ASTContext &ctx) const;
 };
+
+inline void simple_display(llvm::raw_ostream &os,
+                           const AvailabilityDomain &domain) {
+  domain.print(os);
+}
 
 /// Represents an availability domain that has been defined in a module.
 class CustomAvailabilityDomain : public ASTAllocated<CustomAvailabilityDomain> {
@@ -327,6 +334,8 @@ public:
   /// members of the original into the given `ASTContext` in case it is
   /// different than the context that the original was created for.
   AvailabilityDomainOrIdentifier copy(ASTContext &ctx) const;
+
+  void print(llvm::raw_ostream &os) const;
 };
 
 } // end namespace swift

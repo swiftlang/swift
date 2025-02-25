@@ -168,6 +168,10 @@ AvailabilityDomain AvailabilityDomain::getABICompatibilityDomain() const {
   return *this;
 }
 
+void AvailabilityDomain::print(llvm::raw_ostream &os) const {
+  os << getNameForAttributePrinting();
+}
+
 AvailabilityDomain AvailabilityDomain::copy(ASTContext &ctx) const {
   switch (getKind()) {
   case Kind::Universal:
@@ -204,4 +208,11 @@ AvailabilityDomainOrIdentifier::copy(ASTContext &ctx) const {
 
   DEBUG_ASSERT(isDomain());
   return getAsDomain()->copy(ctx);
+}
+
+void AvailabilityDomainOrIdentifier::print(llvm::raw_ostream &os) const {
+  if (auto identifier = getAsIdentifier())
+    os << identifier->str();
+  else
+    getAsDomain()->print(os);
 }

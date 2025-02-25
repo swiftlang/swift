@@ -54,6 +54,13 @@ AvailabilitySpec *AvailabilitySpec::clone(ASTContext &ctx) const {
                        SrcRange, Version, VersionStartLoc);
 }
 
+void AvailabilitySpec::print(llvm::raw_ostream &os) const {
+  getDomainOrIdentifier().print(os);
+
+  if (!getRawVersion().empty())
+    os << " " << getRawVersion().getAsString();
+}
+
 llvm::VersionTuple SemanticAvailabilitySpec::getVersion() const {
   // For macOS Big Sur, we canonicalize 10.16 to 11.0 for compile-time
   // checking since clang canonicalizes availability markup. However, to
