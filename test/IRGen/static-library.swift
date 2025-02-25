@@ -1,5 +1,7 @@
+// UNSUPPORTED: linker_overridden
+
 // RUN: %empty-directory(%t)
-// RUN: %target-swiftc_driver_plain -DLIBRARY -module-name Library -emit-library -static -autolink-force-load -module-link-name Library %s -o %t/library.lib -emit-module-path %t
+// RUN: %target-swiftc_driver_plain -DLIBRARY -module-name Library -emit-library -static -autolink-force-load -module-link-name Library %s -use-ld=%target-ld -o %t/library.lib -emit-module-path %t
 // RUN: %target-swiftc_driver_plain -DLIBRARY -module-name Library -emit-library -static -autolink-force-load -module-link-name Library %s -S -emit-ir -o - | %FileCheck -check-prefix CHECK-LIBRARY %s
 // RUN: %target-swiftc_driver_plain -I %t -emit-library -S -emit-ir -o - %s | %FileCheck -check-prefix CHECK-EMBEDDING %s
 
