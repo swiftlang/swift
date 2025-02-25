@@ -662,8 +662,12 @@ bool BorrowingOperand::visitScopeEndingUses(
   switch (kind) {
   case BorrowingOperandKind::Invalid:
     llvm_unreachable("Using invalid case");
-  case BorrowingOperandKind::BeginBorrow:
-  case BorrowingOperandKind::BorrowedFrom: {
+  case BorrowingOperandKind::BorrowedFrom:
+    if (!cast<BorrowedFromInst>(op->getUser())->isReborrow()) {
+      return visitUnknownUse(op);
+    }
+    LLVM_FALLTHROUGH;
+  case BorrowingOperandKind::BeginBorrow: {
     bool deadBorrow = true;
     for (auto *use : cast<SingleValueInstruction>(op->getUser())->getUses()) {
       if (use->isLifetimeEnding()) {
@@ -713,10 +717,16 @@ bool BorrowingOperand::visitScopeEndingUses(
     return user->visitOnStackLifetimeEnds(visitScopeEnd);
   }
   case BorrowingOperandKind::MarkDependenceNonEscaping: {
-    auto *user = cast<MarkDependenceInst>(op->getUser());
-    assert(user->isNonEscaping() && "escaping dependencies don't borrow");
-    assert(user->getType().isObject() && "borrows only exist for values");
-    return user->visitNonEscapingLifetimeEnds(visitScopeEnd, visitUnknownUse);
+    auto *mdi = cast<MarkDependenceInst>(op->getUser());
+    assert(mdi->isNonEscaping() && "escaping dependencies don't borrow");
+    // MarkDependenceInst::visitNonEscapingLifetimeEnds only makes sense for
+    // owned, escapable, non-address values.
+    if (mdi->getOwnershipKind() == OwnershipKind::Owned
+        && mdi->getType().isObject()
+        && mdi->getType().isEscapable(*mdi->getFunction())) {
+      return mdi->visitNonEscapingLifetimeEnds(visitScopeEnd, visitUnknownUse);
+    }
+    return visitUnknownUse(op);
   }
   case BorrowingOperandKind::BeginAsyncLet: {
     auto user = cast<BuiltinInst>(op->getUser());

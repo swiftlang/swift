@@ -8815,10 +8815,14 @@ public:
       uint8_t(MarkDependenceKind::Escaping);
   }
 
-  /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
+  /// Visit the instructions that end the lifetime the dependent value.
+  ///
+  /// Preconditions:
+  /// - isNonEscaping()
+  /// - Produces an owned, Escapable, non-address value
   bool visitNonEscapingLifetimeEnds(
     llvm::function_ref<bool (Operand*)> visitScopeEnd,
-    llvm::function_ref<bool (Operand*)> visitUnknownUse) const;
+    llvm::function_ref<bool (Operand*)> visitUnknownUse);
 };
 
 /// Promote an Objective-C block that is on the stack to the heap, or simply

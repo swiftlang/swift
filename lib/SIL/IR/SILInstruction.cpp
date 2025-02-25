@@ -2022,10 +2022,13 @@ visitRecursivelyLifetimeEndingUses(
 // the dependent value.
 bool MarkDependenceInst::visitNonEscapingLifetimeEnds(
   llvm::function_ref<bool (Operand *)> visitScopeEnd,
-  llvm::function_ref<bool (Operand *)> visitUnknownUse) const {
+  llvm::function_ref<bool (Operand *)> visitUnknownUse) {
   assert(getFunction()->hasOwnership() && isNonEscaping()
          && "only meaningful for nonescaping dependencies");
   assert(getType().isObject() && "lifetime ends only exist for values");
+  assert(getOwnershipKind() == OwnershipKind::Owned
+         && getType().isEscapable(*getFunction())
+         && "only correct for owned escapable values");
   bool noUsers = true;
   if (!visitRecursivelyLifetimeEndingUses(this, noUsers, visitScopeEnd,
                                           visitUnknownUse)) {
