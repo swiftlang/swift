@@ -115,10 +115,10 @@ do {
   // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Indices[#DefaultIndices<Dictionary<Key, Value>>#]; name=Indices
   // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Key[#Key#]; name=Key
   // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Value[#Value#]; name=Value
-  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Keys[#Dictionary.Keys#]; name=Keys
-  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Values[#Dictionary.Values#]; name=Values
-  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Index[#Dictionary.Index#]; name=Index
-  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Iterator[#Dictionary.Iterator#]; name=Iterator
+  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Keys[#Dictionary<Key, Value>.Keys#]; name=Keys
+  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Values[#Dictionary<Key, Value>.Values#]; name=Values
+  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Index[#Dictionary<Key, Value>.Index#]; name=Index
+  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Iterator[#Dictionary<Key, Value>.Iterator#]; name=Iterator
   // DICTIONARY-NEXT: Decl[TypeAlias]/Super/NotRecommended/IsSystem: IndexDistance[#Int#]; name=IndexDistance; diagnostics=warning
   // DICTIONARY-NEXT: Keyword/None: Type[#{{Dictionary<Int, Int>|\[Int : Int\]}}.Type#]; name=Type
 }

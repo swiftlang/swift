@@ -89,11 +89,11 @@ static Type defaultTypeLiteralKind(CodeCompletionLiteralKind kind,
   case CodeCompletionLiteralKind::ArrayLiteral:
     if (!Ctx.getArrayDecl())
       return Type();
-    return Ctx.getArrayDecl()->getDeclaredType();
+    return Ctx.getArrayDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::DictionaryLiteral:
     if (!Ctx.getDictionaryDecl())
       return Type();
-    return Ctx.getDictionaryDecl()->getDeclaredType();
+    return Ctx.getDictionaryDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::NilLiteral:
   case CodeCompletionLiteralKind::ColorLiteral:
   case CodeCompletionLiteralKind::ImageLiteral:
@@ -1715,7 +1715,7 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
   if (!customAttributeAnnotation.empty()) {
     Builder.addTypeAnnotation(customAttributeAnnotation);
   } else {
-    addTypeAnnotation(Builder, NTD->getDeclaredType());
+    addTypeAnnotation(Builder, NTD->getDeclaredInterfaceType());
   }
 
   // Override the type relation for NominalTypes. Use the better relation
@@ -1741,11 +1741,7 @@ void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
   Builder.addBaseName(TAD->getName().str());
   if (auto underlyingType = TAD->getUnderlyingType()) {
     if (underlyingType->hasError()) {
-      addTypeAnnotation(Builder,
-                        TAD->isGeneric()
-                        ? TAD->getUnboundGenericType()
-                        : TAD->getDeclaredInterfaceType());
-
+      addTypeAnnotation(Builder, TAD->getDeclaredInterfaceType());
     } else {
       addTypeAnnotation(Builder, underlyingType);
     }

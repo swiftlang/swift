@@ -395,8 +395,7 @@ static TypeRelation calculateTypeRelation(Type Ty, Type ExpectedTy,
 
   // Equality/Conversion of GenericTypeParameterType won't account for
   // requirements – ignore them
-  if (!Ty->hasTypeParameter() && !ExpectedTy->hasTypeParameter() &&
-      !Ty->hasUnboundGenericType() && !ExpectedTy->hasUnboundGenericType()) {
+  if (!Ty->hasTypeParameter() && !ExpectedTy->hasTypeParameter()) {
     if (Ty->isEqual(ExpectedTy))
       return TypeRelation::Convertible;
     bool isAny = false;
