@@ -460,12 +460,6 @@ struct BorrowingOperand {
   /// Return the borrowing operand's value.
   SILValue getScopeIntroducingUserResult();
 
-  /// Compute the implicit uses that this borrowing operand "injects" into the
-  /// set of its operands uses.
-  ///
-  /// E.x.: end_apply uses.
-  void getImplicitUses(SmallVectorImpl<Operand *> &foundUses) const;
-
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 

@@ -828,20 +828,6 @@ SILValue BorrowingOperand::getScopeIntroducingUserResult() {
   llvm_unreachable("covered switch");
 }
 
-void BorrowingOperand::getImplicitUses(
-    SmallVectorImpl<Operand *> &foundUses) const {
-  // FIXME: this visitScopeEndingUses should never return false once dead
-  // borrows are disallowed.
-  auto handleUse = [&](Operand *endOp) {
-    foundUses.push_back(endOp);
-    return true;
-  };
-  if (!visitScopeEndingUses(handleUse, handleUse)) {
-    // Special-case for dead borrows.
-    foundUses.push_back(op);
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                             Borrow Introducers
 //===----------------------------------------------------------------------===//
