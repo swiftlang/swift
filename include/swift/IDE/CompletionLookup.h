@@ -185,6 +185,11 @@ private:
   /// \p selfTy must be a \c Self type of the context.
   static bool canBeUsedAsRequirementFirstType(Type selfTy, TypeAliasDecl *TAD);
 
+  /// Retrieve the type to use as the base for a member completion.
+  Type getMemberBaseType() const {
+    return BaseType ? BaseType : ExprType;
+  }
+
 public:
   struct RequestedResultsTy {
     const ModuleDecl *TheModule;

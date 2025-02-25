@@ -763,9 +763,7 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
 }
 
 Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
-  Type BaseTy = BaseType;
-  if (!BaseTy)
-    BaseTy = ExprType;
+  Type BaseTy = getMemberBaseType();
   if (!BaseTy && CurrDeclContext)
     BaseTy =
         CurrDeclContext->getInnermostTypeContext()->getDeclaredTypeInContext();
