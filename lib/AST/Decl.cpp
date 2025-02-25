@@ -6696,8 +6696,22 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
 }
 
 bool EnumDecl::treatAsExhaustiveForDiags(const DeclContext *useDC) const {
-  return isFormallyExhaustive(useDC) ||
-         (useDC && getModuleContext()->inSamePackage(useDC->getParentModule()));
+  if (useDC) {
+    auto *enumModule = getModuleContext();
+    if (enumModule->inSamePackage(useDC->getParentModule()))
+      return true;
+
+    // If the module where enum is declared supports extensible enumerations
+    // and this enum is not explicitly marked as "@frozen", cross-module
+    // access cannot be exhaustive and requires `@unknown default:`.
+    if (enumModule->supportsExtensibleEnums() &&
+        !getAttrs().hasAttribute<FrozenAttr>()) {
+      if (useDC != enumModule->getDeclContext())
+        return false;
+    }
+  }
+
+  return isFormallyExhaustive(useDC);
 }
 
 bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {

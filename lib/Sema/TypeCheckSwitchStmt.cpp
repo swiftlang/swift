@@ -1154,13 +1154,19 @@ namespace {
         assert(defaultReason == RequiresDefault::No);
         Type subjectType = Switch->getSubjectExpr()->getType();
         bool shouldIncludeFutureVersionComment = false;
+        bool shouldDowngradeToWarning = true;
         if (auto *theEnum = subjectType->getEnumOrBoundGenericEnum()) {
+          auto *enumModule = theEnum->getParentModule();
           shouldIncludeFutureVersionComment =
-              theEnum->getParentModule()->isSystemModule();
+              enumModule->isSystemModule() ||
+              enumModule->supportsExtensibleEnums();
+          // Since the module enabled `ExtensibleEnums` feature they
+          // opted-in all of their clients into exhaustivity errors.
+          shouldDowngradeToWarning = !enumModule->supportsExtensibleEnums();
         }
         DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
                     subjectType, shouldIncludeFutureVersionComment)
-          .warnUntilSwiftVersion(6);
+          .warnUntilSwiftVersionIf(shouldDowngradeToWarning, 6);
         mainDiagType = std::nullopt;
       }
         break;
