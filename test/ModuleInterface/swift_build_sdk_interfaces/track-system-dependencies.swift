@@ -1,5 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/system-dependencies-sdk %t/sdk
+// RUN: %empty-directory(%t/sdk/usr/lib/swift/%target-sdk-name)
+// RUN: cp -r %platform-module-dir/{_Concurrency,_StringProcessing,Swift,SwiftOnoneSupport}.swiftmodule %t/sdk/usr/lib/swift/%target-sdk-name/
+// RUN: cp -r %test-resource-dir/shims %t/sdk/usr/lib/swift
 // RUN: echo 'import Platform; public func usesCStruct(_: SomeCStruct?) {}' | %target-swift-frontend - -emit-module-interface-path %t/sdk/usr/lib/swift/Swifty.swiftmodule/%target-swiftinterface-name -emit-module -o /dev/null -module-name Swifty -sdk %t/sdk
 
 // RUN: %swift_build_sdk_interfaces -sdk %t/sdk -v -o %t/prebuilt
@@ -7,7 +10,7 @@
 // CHECK: Swifty.swiftmodule
 
 // RUN: %target-typecheck-verify-swift -sdk %t/sdk -I %t/sdk/usr/lib/swift/ -module-cache-path %t/MCP -prebuilt-module-cache-path %t/prebuilt
-// RUN: %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/*.swiftmodule
+// RUN: %{python} %S/../ModuleCache/Inputs/check-is-forwarding-module.py %t/MCP/Swifty-*.swiftmodule
 
 // Touch a file in the SDK (to make it look like it changed) and try again.
 // This should still be able to use the prebuilt modules because they track
