@@ -115,6 +115,39 @@ import Swift
 %          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
 %        ],
 %      ),
+%      (
+%        'SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY',
+%        [
+%          'TaskGroup',
+%          'ThrowingTaskGroup',
+%        ],
+%        [
+%          '@available(SwiftStdlib 5.1, *)',
+%          '@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")',
+%        ],
+%        ['addTask', 'addTaskUnlessCancelled'],
+%        [
+%          'priority: TaskPriority? = nil',
+%          # throws and ChildTaskResult will be adjusted per task group type
+%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
+%        ],
+%      ),
+%      (
+%        '',
+%        [
+%          'DiscardingTaskGroup',
+%          'ThrowingDiscardingTaskGroup',
+%        ],
+%        [
+%          '@available(SwiftStdlib 5.9, *)',
+%        ],
+%        ['addTask', 'addTaskUnlessCancelled'],
+%        [
+%          'priority: TaskPriority? = nil',
+%          # throws and ChildTaskResult will be adjusted per task group type
+%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
+%        ],
+%      ),
 % ]:
 %
 % for TYPE in TYPES:
@@ -181,7 +214,7 @@ extension ${TYPE} {
   ///   - taskExecutor:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///      Explicitly passing `nil` as the executor preference is equivalent to
-  ///      calling the `addTask` method without a preference, and effectively
+  ///      calling the `${METHOD_NAME}` method without a preference, and effectively
   ///      means to inherit the outer context's executor preference.
   ///      You can also pass the ``globalConcurrentExecutor`` global executor explicitly.
   % end
@@ -196,9 +229,9 @@ extension ${TYPE} {
   /// - Returns: `true` if the child task was added to the group;
   ///   otherwise `false`.
   % end
-  ${"\n  ".join(ALL_AVAILABILITY)}
   @_alwaysEmitIntoClient
-  public mutating func ${METHOD_NAME}(
+  ${"\n  ".join(ALL_AVAILABILITY)}
+  public mutating func ${METHOD_NAME}( // ${TYPE}/${METHOD_NAME}
     ${",\n    ".join(adjust_params_for_group_kind(PARAMS))}
   ) ${ARROW_RETURN_TYPE}{
     % if IS_IMPL_UNAVAILABLE:
