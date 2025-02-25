@@ -365,6 +365,10 @@ struct BorrowingOperand {
   /// For an instantaneous borrow, such as apply, this visits no uses. For
   /// begin_apply it visits the end_apply uses. For borrow introducers, it
   /// visits the end of the introduced borrow scope.
+  ///
+  /// For borrows that don't introduce a separate borrow scope, this calls
+  /// visitUnknownUse on the current operand. The client may need to check each
+  /// unknown operand to avoid infinite recursion.
   bool visitScopeEndingUses(function_ref<bool(Operand *)> visitScopeEnd,
                             function_ref<bool(Operand *)> visitUnknownUse
                             = [](Operand *){ return false; })

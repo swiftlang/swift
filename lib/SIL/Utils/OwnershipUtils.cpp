@@ -297,23 +297,19 @@ bool swift::findInnerTransitiveGuaranteedUses(
       //
       // FIXME: visit[Extended]ScopeEndingUses can't return false here once dead
       // borrows are disallowed.
-      if (!BorrowingOperand(use).visitScopeEndingUses(
-            [&](Operand *endUse) {
-              if (endUse->getOperandOwnership() == OperandOwnership::Reborrow) {
-                foundPointerEscape = true;
-              }
-              leafUse(endUse);
-              return true;
-            },
-            [&](Operand *unknownUse) {
-              foundPointerEscape = true;
-              leafUse(unknownUse);
-              return true;
-            })) {
-        // Special case for dead borrows. This is dangerous because clients
-        // don't expect a begin_borrow to be in the use list.
-        leafUse(use);
-      }
+      BorrowingOperand(use).visitScopeEndingUses(
+        [&](Operand *endUse) {
+          if (endUse->getOperandOwnership() == OperandOwnership::Reborrow) {
+            foundPointerEscape = true;
+          }
+          leafUse(endUse);
+          return true;
+        },
+        [&](Operand *unknownUse) {
+          foundPointerEscape = true;
+          leafUse(unknownUse);
+          return true;
+        });
       break;
     }
   }
@@ -676,10 +672,12 @@ bool BorrowingOperand::visitScopeEndingUses(
           return false;
       }
     }
-    // FIXME: special case for dead borrows. This is dangerous because clients
-    // only expect visitScopeEndingUses to return false if the visitor returned
-    // false.
-    return !deadBorrow;
+    // Note: special case for dead borrows. This is dangerous because it could
+    // cause unsuspecting clients to infinitely recurse.
+    if (deadBorrow) {
+      return visitUnknownUse(op);
+    }
+    return true;
   }
   case BorrowingOperandKind::StoreBorrow: {
     bool deadBorrow = true;
@@ -690,10 +688,12 @@ bool BorrowingOperand::visitScopeEndingUses(
           return false;
       }
     }
-    // FIXME: special case for dead borrows. This is dangerous because clients
-    // only expect visitScopeEndingUses to return false if the visitor returned
-    // false.
-    return !deadBorrow;
+    // Note: special case for dead borrows. This is dangerous because it could
+    // cause unsuspecting clients to infinitely recurse.
+    if (deadBorrow) {
+      return visitUnknownUse(op);
+    }
+    return true;
   }
   case BorrowingOperandKind::BeginApply: {
     bool deadApply = true;
@@ -733,7 +733,10 @@ bool BorrowingOperand::visitScopeEndingUses(
         return false;
       }
     }
-    return !dead;
+    if (dead) {
+      return visitUnknownUse(op);
+    }
+    return true;
   }
   // These are instantaneous borrow scopes so there aren't any special end
   // scope instructions.
@@ -751,7 +754,10 @@ bool BorrowingOperand::visitScopeEndingUses(
           return false;
       }
     }
-    return !deadBranch;
+    if (deadBranch) {
+      return visitUnknownUse(op);
+    }
+    return true;
   }
   }
   llvm_unreachable("Covered switch isn't covered");

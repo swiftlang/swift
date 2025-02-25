@@ -778,7 +778,7 @@ extension LifetimeDependenceDefUseWalker {
     case .beginApply:
       // Skip the borrow scope; the type system enforces non-escapable
       // arguments.
-      return visitInnerBorrowUses(of: borrowInst)
+      return visitInnerBorrowUses(of: borrowInst, operand: operand)
     case .partialApply, .markDependence:
       fatalError("OwnershipUseVisitor should bypass partial_apply [on_stack] "
                  + "and mark_dependence [nonescaping]")

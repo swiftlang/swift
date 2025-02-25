@@ -321,13 +321,16 @@ extension OwnershipUseVisitor {
     }
   }
 
-  /// Visit only those uses of a value within an inner borrow scope
-  /// that may affect the outer lifetime. An inner borrow scope is one
-  /// in which the borrowing operand is itself a use of the outer
-  /// lifetime, including: begin_borrow, reborrow, partial_apply,
-  /// mark_dependence, or an inner adjacent phi (where original SSA
-  /// def is a phi in the same block).
-  mutating func visitInnerScopeUses(of: Value) -> WalkResult {
+  /// Visit only those uses of a value within an inner borrow scope that may affect the outer lifetime. An inner borrow
+  /// scope is one in which the borrowing operand is itself a use of the outer lifetime, including: begin_borrow,
+  /// reborrow, borrowed_from, partial_apply, mark_dependence, or an inner adjacent phi (where original SSA def is a phi
+  /// in the same block).
+  ///
+  /// An owned lifetime may also be considered an inner borrow scope if it depends on a borrowed operand, such as a
+  /// closure capture or owned mark_dependence.
+  ///
+  /// Precondition: BeginBorrowValue(value) != nil || value.ownership == .owned
+  mutating func visitInnerScopeUses(of value: Value) -> WalkResult {
     if let beginBorrow = BeginBorrowValue(value) {
       return beginBorrow.scopeEndingOperands.walk {
         switch $0.ownership {
@@ -367,9 +370,13 @@ extension OwnershipUseVisitor {
     // TODO: remove this stack by changing visitScopeEndingOperands to take a non-escaping closure.
     var stack = Stack<Operand>(context)
     defer { stack.deinitialize() }
-    _ = borrowInst.visitScopeEndingOperands(context) {
+    let result = borrowInst.visitScopeEndingOperands(context) {
       stack.push($0)
       return .continueWalk
+    }
+    guard result == .continueWalk else {
+      // If the dependent value is not scoped then consider it a pointer escape.
+      return pointerEscapingUse(of: operand)
     }
     return stack.walk { ownershipLeafUse(of: $0, isInnerLifetime: true) }
   }
@@ -640,7 +647,7 @@ extension InteriorUseWalker: OwnershipUseVisitor {
         return visitAllUses(of: beginBorrow.value)
       }
     }
-    return visitInnerScopeUses(of: borrowInst)
+    return visitInnerBorrowUses(of: borrowInst, operand: operand)
   }
 
   // Visit a reborrow operand. This ends an outer lifetime and extends
