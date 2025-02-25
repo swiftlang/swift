@@ -428,7 +428,7 @@ struct BorrowingOperand {
   /// cannot be reborrowed.
   ///
   /// If true, getBorrowIntroducingUserResult() can be called to acquire the
-  /// BorrowedValue that introduces a new borrow scope.
+  /// SILValue that introduces a new borrow scope.
   bool hasBorrowIntroducingUser() const {
     // TODO: Can we derive this by running a borrow introducer check ourselves?
     switch (kind) {
@@ -451,9 +451,11 @@ struct BorrowingOperand {
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
-  /// If this operand's user has a borrowed value result return a valid
-  /// BorrowedValue instance.
-  BorrowedValue getBorrowIntroducingUserResult() const;
+  /// If this operand's user has a single result that introduces the borrow
+  /// scope, return the result value. If the result is scoped (begin_borrow)
+  /// then it can be used to initialize a BorrowedValue. Some results, like
+  /// guaranteed forwarding phis, are not scoped.
+  SILValue getBorrowIntroducingUserResult() const;
 
   /// Return the borrowing operand's value.
   SILValue getScopeIntroducingUserResult();

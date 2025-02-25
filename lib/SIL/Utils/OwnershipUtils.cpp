@@ -60,8 +60,8 @@ bool swift::findPointerEscape(SILValue original) {
       }
       case OperandOwnership::Borrow: {
         auto borrowOp = BorrowingOperand(use);
-        if (auto borrowValue = borrowOp.getBorrowIntroducingUserResult()) {
-          worklist.pushIfNotVisited(borrowValue.value);
+        if (auto result = borrowOp.getBorrowIntroducingUserResult()) {
+          worklist.pushIfNotVisited(result);
         }
         break;
       }
@@ -548,7 +548,7 @@ findExtendedTransitiveGuaranteedUses(SILValue guaranteedValue,
     usePoints.pop_back();
     auto borrowedPhi =
       BorrowingOperand(reborrow).getBorrowIntroducingUserResult();
-    reborrows.insert(borrowedPhi.value);
+    reborrows.insert(borrowedPhi);
   };
   if (!findTransitiveGuaranteedUses(guaranteedValue, usePoints, visitReborrow))
     return false;
@@ -768,13 +768,15 @@ bool BorrowingOperand::visitExtendedScopeEndingUses(
   function_ref<bool(Operand *)> visitUnknownUse) const {
 
   if (hasBorrowIntroducingUser()) {
-    auto borrowedValue = getBorrowIntroducingUserResult();
-    return borrowedValue.visitExtendedScopeEndingUses(visitor);
+    auto result = getBorrowIntroducingUserResult();
+    if (auto borrowedValue = BorrowedValue(result)) {
+      return borrowedValue.visitExtendedScopeEndingUses(visitor);
+    }
   }
   return visitScopeEndingUses(visitor, visitUnknownUse);
 }
 
-BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() const {
+SILValue BorrowingOperand::getBorrowIntroducingUserResult() const {
   switch (kind) {
   case BorrowingOperandKind::Invalid:
   case BorrowingOperandKind::Apply:
@@ -785,20 +787,15 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() const {
   case BorrowingOperandKind::MarkDependenceNonEscaping:
   case BorrowingOperandKind::BeginAsyncLet:
   case BorrowingOperandKind::StoreBorrow:
-    return BorrowedValue();
+    return SILValue();
 
   case BorrowingOperandKind::BeginBorrow:
   case BorrowingOperandKind::BorrowedFrom: {
-    auto value = BorrowedValue(cast<SingleValueInstruction>(op->getUser()));
-    assert(value);
-    return value;
+    return cast<SingleValueInstruction>(op->getUser());
   }
   case BorrowingOperandKind::Branch: {
     auto *bi = cast<BranchInst>(op->getUser());
-    auto value =
-        BorrowedValue(bi->getDestBB()->getArgument(op->getOperandNumber()));
-    assert(value && "guaranteed-to-unowned conversion not allowed on branches");
-    return value;
+    return bi->getDestBB()->getArgument(op->getOperandNumber());
   }
   }
   llvm_unreachable("covered switch");
@@ -970,9 +967,9 @@ bool BorrowedValue::visitExtendedScopeEndingUses(
 
   auto visitEnd = [&](Operand *scopeEndingUse) {
     if (scopeEndingUse->getOperandOwnership() == OperandOwnership::Reborrow) {
-      auto borrowedValue =
+      auto result =
           BorrowingOperand(scopeEndingUse).getBorrowIntroducingUserResult();
-      reborrows.insert(borrowedValue.value);
+      reborrows.insert(result);
       return true;
     }
     return visitor(scopeEndingUse);
@@ -997,9 +994,9 @@ bool BorrowedValue::visitTransitiveLifetimeEndingUses(
 
   auto visitEnd = [&](Operand *scopeEndingUse) {
     if (scopeEndingUse->getOperandOwnership() == OperandOwnership::Reborrow) {
-      auto borrowedValue =
+      auto result =
           BorrowingOperand(scopeEndingUse).getBorrowIntroducingUserResult();
-      reborrows.insert(borrowedValue.value);
+      reborrows.insert(result);
       // visitor on the reborrow
       return visitor(scopeEndingUse);
     }
@@ -1050,8 +1047,8 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
         break;
       }
 
-      auto bv = borrowingOperand.getBorrowIntroducingUserResult();
-      for (auto *use : bv->getUses()) {
+      auto result = borrowingOperand.getBorrowIntroducingUserResult();
+      for (auto *use : result->getUses()) {
         if (auto intPtrOperand = InteriorPointerOperand(use)) {
           func(intPtrOperand);
           continue;

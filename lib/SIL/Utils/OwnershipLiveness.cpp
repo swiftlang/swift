@@ -159,8 +159,7 @@ struct InteriorLivenessVisitor :
   /// Handles begin_borrow, load_borrow, store_borrow, begin_apply.
   bool handleInnerBorrow(BorrowingOperand borrowingOperand) {
     if (handleInnerScopeCallback) {
-      auto value = borrowingOperand.getScopeIntroducingUserResult();
-      if (value) {
+      if (auto value = borrowingOperand.getScopeIntroducingUserResult()) {
         handleInnerScopeCallback(value);
       }
     }

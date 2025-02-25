@@ -4769,7 +4769,7 @@ class BorrowedFromInst final : public InstructionBaseWithTrailingOperands<
 
 public:
 
-  SILValue getBorrowedValue() {
+  SILValue getBorrowedValue() const {
     return getAllOperands()[0].get();
   }
 
