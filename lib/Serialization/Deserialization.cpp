@@ -179,6 +179,8 @@ const char ModularizationError::ID = '\0';
 void ModularizationError::anchor() {}
 const char InvalidEnumValueError::ID = '\0';
 void InvalidEnumValueError::anchor() {}
+const char ConformanceXRefError::ID = '\0';
+void ConformanceXRefError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -402,6 +404,16 @@ ModuleFile::diagnoseModularizationError(llvm::Error error,
         });
 
   return outError;
+}
+
+void
+ConformanceXRefError::diagnose(const ModuleFile *MF,
+                               DiagnosticBehavior limit) const {
+  auto &diags = MF->getContext().Diags;
+  diags.diagnose(MF->getSourceLoc(),
+                 diag::modularization_issue_conformance_xref_error,
+                 name, protoName, expectedModule->getName())
+    .limitBehavior(limit);
 }
 
 llvm::Error ModuleFile::diagnoseFatal(llvm::Error error) const {
@@ -860,7 +872,8 @@ ProtocolConformanceDeserializer::readSpecializedProtocolConformance(
     return subMapOrError.takeError();
   auto subMap = subMapOrError.get();
 
-  auto genericConformance = MF.getConformance(conformanceID);
+  ProtocolConformanceRef genericConformance;
+  UNWRAP(MF.getConformanceChecked(conformanceID), genericConformance);
 
   PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
   ++NumNormalProtocolConformancesLoaded;
@@ -892,8 +905,8 @@ ProtocolConformanceDeserializer::readInheritedProtocolConformance(
   PrettyStackTraceType trace(ctx, "reading inherited conformance for",
                              conformingType);
 
-  ProtocolConformanceRef inheritedConformance =
-    MF.getConformance(conformanceID);
+  ProtocolConformanceRef inheritedConformance;
+  UNWRAP(MF.getConformanceChecked(conformanceID), inheritedConformance);
   PrettyStackTraceDecl traceTo("... to",
                                inheritedConformance.getRequirement());
 
@@ -943,14 +956,16 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
   ProtocolConformanceXrefLayout::readRecord(scratch, protoID, nominalID,
                                             moduleID);
 
-  auto maybeNominal = MF.getDeclChecked(nominalID);
-  if (!maybeNominal)
-    return maybeNominal.takeError();
-
-  auto nominal = cast<NominalTypeDecl>(maybeNominal.get());
+  Decl *maybeNominal;
+  UNWRAP(MF.getDeclChecked(nominalID), maybeNominal);
+  auto nominal = cast<NominalTypeDecl>(maybeNominal);
   PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
-  auto proto = cast<ProtocolDecl>(MF.getDecl(protoID));
+
+  Decl *maybeProto;
+  UNWRAP(MF.getDeclChecked(protoID), maybeProto);
+  auto proto = cast<ProtocolDecl>(maybeProto);
   PrettyStackTraceDecl traceTo("... to", proto);
+
   auto module = MF.getModule(moduleID);
 
   // FIXME: If the module hasn't been loaded, we probably don't want to fall
@@ -971,16 +986,26 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
   // TODO: Sink Sendable derivation into the conformance lookup table
   if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     auto conformanceRef = lookupConformance(nominal->getDeclaredInterfaceType(), proto);
-    if (!conformanceRef.isConcrete())
-      abort();
-    return conformanceRef.getConcrete();
+    if (conformanceRef.isConcrete())
+      return conformanceRef.getConcrete();
   } else {
     SmallVector<ProtocolConformance *, 2> conformances;
     nominal->lookupConformance(proto, conformances);
-    if (conformances.empty())
-      abort();
-    return conformances.front();
+    if (!conformances.empty())
+      return conformances.front();
   }
+
+  auto error = llvm::make_error<ConformanceXRefError>(
+                 nominal->getName(), proto->getName(), module);
+
+  if (!MF.enableExtendedDeserializationRecovery()) {
+    error = llvm::handleErrors(std::move(error),
+      [&](const ConformanceXRefError &error) -> llvm::Error {
+        error.diagnose(&MF);
+        return llvm::make_error<ConformanceXRefError>(std::move(error));
+      });
+  }
+  return error;
 }
 
 Expected<ProtocolConformance *>
@@ -7863,7 +7888,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   ProtocolConformanceRef witnessMethodConformance;
   if (*representation == swift::SILFunctionTypeRepresentation::WitnessMethod) {
     auto conformanceID = variableData[nextVariableDataIndex++];
-    witnessMethodConformance = MF.getConformance(conformanceID);
+    UNWRAP(MF.getConformanceChecked(conformanceID), witnessMethodConformance);
   }
 
   GenericSignature invocationSig =
@@ -8643,6 +8668,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       scratch, protoID, contextID, typeCount, valueCount, conformanceCount,
       rawOptions, rawIDs);
 
+  const ProtocolDecl *proto = conformance->getProtocol();
+
   // Read requirement signature conformances.
   SmallVector<ProtocolConformanceRef, 4> reqConformances;
   for (auto conformanceID : rawIDs.slice(0, conformanceCount)) {
@@ -8650,14 +8677,28 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     if (maybeConformance) {
       reqConformances.push_back(maybeConformance.get());
     } else if (getContext().LangOpts.EnableDeserializationRecovery) {
-      diagnoseAndConsumeError(maybeConformance.takeError());
+      llvm::Error error = maybeConformance.takeError();
+      if (error.isA<ConformanceXRefError>() &&
+          !enableExtendedDeserializationRecovery()) {
+
+        std::string typeStr = conformance->getType()->getString();
+        auto &diags = getContext().Diags;
+        diags.diagnose(getSourceLoc(),
+                       diag::modularization_issue_conformance_xref_note,
+                       typeStr, proto->getName());
+
+        consumeError(std::move(error));
+        conformance->setInvalid();
+        return;
+      }
+
+      diagnoseAndConsumeError(std::move(error));
       reqConformances.push_back(ProtocolConformanceRef::forInvalid());
     } else {
       fatal(maybeConformance.takeError());
     }
   }
 
-  const ProtocolDecl *proto = conformance->getProtocol();
   if (proto->isObjC() && getContext().LangOpts.EnableDeserializationRecovery) {
     // Don't crash if inherited protocols are added or removed.
     // This is limited to Objective-C protocols because we know their only

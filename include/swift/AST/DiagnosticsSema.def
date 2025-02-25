@@ -1037,6 +1037,12 @@ NOTE(modularization_issue_worked_around,none,
      "-experimental-force-workaround-broken-modules",
      ())
 
+ERROR(modularization_issue_conformance_xref_error,none,
+      "Conformance of %0 to %1 not found in referenced module %2",
+      (DeclName, DeclName, DeclName))
+NOTE(modularization_issue_conformance_xref_note,none,
+     "Breaks conformances of '%0' to %1",
+     (StringRef, DeclName))
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (const ValueDecl *, StringRef))
