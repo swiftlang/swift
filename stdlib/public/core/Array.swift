@@ -1428,25 +1428,6 @@ extension Array: RangeReplaceableCollection {
     }
   }
   
-  @available(SwiftStdlib 6.2, *)
-  public var span: Span<Element> {
-    @lifetime(borrow self)
-    @_alwaysEmitIntoClient
-    borrowing get {
-#if _runtime(_ObjC)
-      if _slowPath(!_buffer._isNative) {
-        let buffer = _buffer.getOrAllocateAssociatedObjectBuffer()
-        let (pointer, count) = unsafe (buffer.firstElementAddress, buffer.count)
-        let span = unsafe Span(_unsafeStart: pointer, count: count)
-        return unsafe _overrideLifetime(span, borrowing: self)
-      }
-#endif
-      let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
-      let span = unsafe Span(_unsafeStart: pointer, count: count)
-      return unsafe _overrideLifetime(span, borrowing: self)
-    }
-  }
-
   @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
@@ -1628,6 +1609,27 @@ extension Array {
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     return try unsafe _buffer.withUnsafeBufferPointer(body)
+  }
+
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    borrowing get {
+#if _runtime(_ObjC)
+      if _slowPath(!_buffer._isNative) {
+        let buffer = _buffer.getOrAllocateAssociatedObjectBuffer()
+        let pointer = unsafe buffer.firstElementAddress
+        let count = buffer.immutableCount
+        let span = unsafe Span(_unsafeStart: pointer, count: count)
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+#endif
+      let pointer = unsafe _buffer.firstElementAddress
+      let count = _buffer.immutableCount
+      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
   }
 
   // Superseded by the typed-throws version of this function, but retained
