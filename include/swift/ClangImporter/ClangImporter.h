@@ -688,6 +688,8 @@ public:
       llvm::cas::ObjectStore &CAS, llvm::cas::ObjectRef ChainedPCHIncludeTree);
 
   SourceLoc importSourceLocation(clang::SourceLocation loc) override;
+
+  SourceRange importSourceRange(clang::SourceRange range) override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
