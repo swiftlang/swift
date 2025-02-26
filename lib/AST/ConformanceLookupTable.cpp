@@ -16,6 +16,7 @@
 
 #include "ConformanceLookupTable.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceAttributes.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -148,23 +149,13 @@ void ConformanceLookupTable::destroy() {
 
 namespace {
   struct ConformanceConstructionInfo : public Located<ProtocolDecl *> {
-    /// The location of the "unchecked" attribute, if present.
-    const SourceLoc uncheckedLoc;
-
-    /// The location of the "preconcurrency" attribute if present.
-    const SourceLoc preconcurrencyLoc;
-
-    /// The location of the "unsafe" attribute if present.
-    const SourceLoc unsafeLoc;
+    ConformanceAttributes attributes;
 
     ConformanceConstructionInfo() { }
 
     ConformanceConstructionInfo(ProtocolDecl *item, SourceLoc loc,
-                                SourceLoc uncheckedLoc,
-                                SourceLoc preconcurrencyLoc,
-                                SourceLoc unsafeLoc)
-        : Located(item, loc), uncheckedLoc(uncheckedLoc),
-          preconcurrencyLoc(preconcurrencyLoc), unsafeLoc(unsafeLoc) {}
+                                ConformanceAttributes attributes)
+        : Located(item, loc), attributes(attributes) {}
   };
 }
 
@@ -220,7 +211,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       registerProtocolConformances(next, conformances);
       for (auto conf : conformances) {
         protocols.push_back(
-            {conf->getProtocol(), SourceLoc(), SourceLoc(), SourceLoc(), SourceLoc()});
+            {conf->getProtocol(), SourceLoc(), ConformanceAttributes()});
       }
     } else if (next->getParentSourceFile() ||
                next->getParentModule()->isBuiltinModule()) {
@@ -229,9 +220,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       for (const auto &found :
                getDirectlyInheritedNominalTypeDecls(next, inverses, anyObject)) {
         if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
-          protocols.push_back(
-              {proto, found.Loc, found.uncheckedLoc,
-               found.preconcurrencyLoc, found.unsafeLoc});
+          protocols.push_back({proto, found.Loc, found.attributes});
       }
     }
 
@@ -318,10 +307,8 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
                   kp.has_value() &&
                       "suppressed conformance for non-known protocol!?");
             if (!found.isSuppressed) {
-              addProtocol(proto, found.Loc,
-                          source.withUncheckedLoc(found.uncheckedLoc)
-                                .withPreconcurrencyLoc(found.preconcurrencyLoc)
-                                .withUnsafeLoc(found.unsafeLoc));
+              addProtocol(
+                  proto, found.Loc, source.withAttributes(found.attributes));
             }
           }
 
@@ -335,9 +322,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           for (auto locAndProto : protos)
             addProtocol(
                 locAndProto.Item, locAndProto.Loc,
-                source.withUncheckedLoc(locAndProto.uncheckedLoc)
-                      .withPreconcurrencyLoc(locAndProto.preconcurrencyLoc)
-                      .withUnsafeLoc(locAndProto.unsafeLoc));
+                source.withAttributes(locAndProto.attributes));
         });
     break;
 
