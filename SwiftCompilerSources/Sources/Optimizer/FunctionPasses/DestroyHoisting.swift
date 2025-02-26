@@ -180,7 +180,7 @@ private extension InstructionRange {
   init(withLiverangeOf initialDef: Value, ignoring ignoreDestroys: InstructionSet, _ context: FunctionPassContext)
   {
     var liverange = InstructionRange(for: initialDef, context)
-    var visitor = InteriorUseWalker(definingValue: initialDef, ignoreEscape: true, visitInnerUses: false, context) {
+    var visitor = InteriorUseWalker(definingValue: initialDef, ignoreEscape: true, visitInnerUses: true, context) {
       if !ignoreDestroys.contains($0.instruction) {
         liverange.insert($0.instruction)
       }
