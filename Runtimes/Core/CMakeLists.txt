@@ -144,7 +144,6 @@ add_compile_definitions(
   $<$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>:-DSWIFT_OBJC_INTEROP>
   $<$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>:-DSWIFT_LIBRARY_EVOLUTION>
   $<$<BOOL:${SwiftCore_ENABLE_CRASH_REPORTER_CLIENT}>:-DSWIFT_HAVE_CRASHREPORTERCLIENT>
-  $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>
   $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
   $<$<BOOL:${SwiftCore_ENABLE_RUNTIME_FUNCTION_COUNTERS}>:-DSWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS>
   $<$<BOOL:${SwiftCore_ENABLE_STDIN}>:-DSWIFT_STDLIB_HAS_STDIN> # core + stubs
@@ -226,3 +225,22 @@ endif()
 if(SwiftCore_ENABLE_CONCURRENCY)
   add_subdirectory(Concurrency)
 endif()
+
+# Inter-project install info
+export(EXPORT SwiftCoreTargets
+  FILE "cmake/SwiftCore/SwiftCoreTargets.cmake")
+install(EXPORT SwiftCoreTargets
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftCore"
+  FILE "SwiftCoreTargets.cmake"
+  COMPONENT SwiftCore_cmake)
+include(CMakePackageConfigHelpers)
+configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/interface/SwiftCoreConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCoreConfig.cmake"
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftCore")
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCoreConfigVersion.cmake"
+  VERSION "${PROJECT_VERSION}"
+  COMPATIBILITY ExactVersion)
+install(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCoreConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftCoreConfigVersion.cmake"
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftCore")
