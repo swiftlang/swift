@@ -150,6 +150,8 @@ struct InteriorLivenessVisitor :
 
   bool handlePointerEscape(Operand *use) {
     interiorLiveness.addressUseKind = AddressUseKind::PointerEscape;
+    if (!handleUsePoint(use, UseLifetimeConstraint::NonLifetimeEnding))
+      return false;
 
     return true;
   }
