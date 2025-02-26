@@ -3323,11 +3323,11 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     SmallVector<LocatorPathElt, 4> path;
     locator.getLocatorParts(path);
 
-    // Find the last path element, skipping OptionalPayload elements
+    // Find the last path element, skipping OptionalInjection elements
     // so that we allow this exception in cases of optional injection.
     auto last = std::find_if(
         path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
-          return elt.getKind() != ConstraintLocator::OptionalPayload;
+          return elt.getKind() != ConstraintLocator::OptionalInjection;
         });
 
     auto &ctx = getASTContext();
@@ -3431,12 +3431,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
     // Find the last path element, skipping GenericArgument elements
     // so that we allow this exception in cases of optional types, and
-    // skipping OptionalPayload elements so that we allow this
+    // skipping OptionalInjection elements so that we allow this
     // exception in cases of optional injection.
     auto last = std::find_if(
         path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
           return elt.getKind() != ConstraintLocator::GenericArgument &&
-                 elt.getKind() != ConstraintLocator::OptionalPayload;
+                 elt.getKind() != ConstraintLocator::OptionalInjection;
         });
 
     if (last != path.rend()) {
@@ -3484,7 +3484,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       //
       // func foo(_: ((Int, Int) -> Void)?) {}
       // _ = foo { _ in } <- missing second closure parameter.
-      if (loc->isLastElement<LocatorPathElt::OptionalPayload>()) {
+      if (loc->isLastElement<LocatorPathElt::OptionalInjection>()) {
         auto path = loc->getPath();
         loc = getConstraintLocator(loc->getAnchor(), path.drop_back());
       }
@@ -4144,7 +4144,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               // `value-to-optional` or `optional-to-optional` conversion
               // associated with them (expected argument is `AnyObject?`).
               if (!path.empty() &&
-                  (path.back().is<LocatorPathElt::OptionalPayload>() ||
+                  (path.back().is<LocatorPathElt::OptionalInjection>() ||
                    path.back().is<LocatorPathElt::GenericArgument>()))
                 path.pop_back();
 
@@ -4200,7 +4200,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         // If the path ends at `optional payload` it means that this
         // check is part of an implicit value-to-optional conversion,
         // and it could be safely dropped.
-        if (!path.empty() && path.back().is<LocatorPathElt::OptionalPayload>())
+        if (!path.empty() && path.back().is<LocatorPathElt::OptionalInjection>())
           path.pop_back();
 
         // Determine whether this conformance mismatch is
@@ -6495,7 +6495,7 @@ bool ConstraintSystem::repairFailures(
     // If the mismatch is a part of either optional-to-optional or
     // value-to-optional conversions, let's allow fix refer to a complete
     // top level type and not just a part of it.
-    if (tupleLocator->findLast<LocatorPathElt::OptionalPayload>())
+    if (tupleLocator->findLast<LocatorPathElt::OptionalInjection>())
       break;
 
     if (tupleLocator->isForContextualType()) {
@@ -6636,7 +6636,7 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
-  case ConstraintLocator::OptionalPayload: {
+  case ConstraintLocator::OptionalInjection: {
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
@@ -7446,7 +7446,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Look through all value-to-optional promotions to allow
         // conversions like Double -> CGFloat?? and vice versa.
         // T -> Optional<T>
-        if (location.endsWith<LocatorPathElt::OptionalPayload>() ||
+        if (location.endsWith<LocatorPathElt::OptionalInjection>() ||
             location.endsWith<LocatorPathElt::GenericArgument>()) {
           SmallVector<LocatorPathElt, 4> path;
           auto anchor = location.getLocatorParts(path);
@@ -7456,7 +7456,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           path.erase(llvm::remove_if(
                          path,
                          [](const LocatorPathElt &elt) {
-                           return elt.is<LocatorPathElt::OptionalPayload>() ||
+                           return elt.is<LocatorPathElt::OptionalInjection>() ||
                                   elt.is<LocatorPathElt::GenericArgument>();
                          }),
                      path.end());
@@ -14608,7 +14608,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       if (generic2->getDecl()->isOptionalDecl()) {
         auto result = matchTypes(
             type1, generic2->getGenericArgs()[0], matchKind, subflags,
-            locator.withPathElement(ConstraintLocator::OptionalPayload));
+            locator.withPathElement(ConstraintLocator::OptionalInjection));
 
         if (!(shouldAttemptFixes() && result.isFailure()))
           return result;

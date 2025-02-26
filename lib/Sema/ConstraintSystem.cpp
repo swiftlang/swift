@@ -644,7 +644,7 @@ ConstraintLocator *ConstraintSystem::getImplicitValueConversionLocator(
     // Drop any value-to-optional conversions that were applied along the
     // way to reach this one.
     while (!path.empty()) {
-      if (path.back().is<LocatorPathElt::OptionalPayload>()) {
+      if (path.back().is<LocatorPathElt::OptionalInjection>()) {
         path.pop_back();
         continue;
       }
@@ -3772,7 +3772,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::Witness:
     case ConstraintLocator::WrappedValue:
-    case ConstraintLocator::OptionalPayload:
+    case ConstraintLocator::OptionalInjection:
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
     case ConstraintLocator::FallbackType:
     case ConstraintLocator::KeyPathSubscriptIndex:
@@ -4068,7 +4068,7 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // Look for the apply-arg-to-param element in the locator's path. We may
   // have to look through other elements that are generated from an argument
   // conversion such as GenericArgument for an optional-to-optional conversion,
-  // and OptionalPayload for a value-to-optional conversion.
+  // and OptionalInjection for a value-to-optional conversion.
   auto iter = path.rbegin();
   auto applyArgElt = locator->findLast<LocatorPathElt::ApplyArgToParam>(iter);
   if (!applyArgElt)
@@ -4343,7 +4343,7 @@ bool ConstraintSystem::isArgumentOfImportedDecl(
     // locator elements at the end of the path, they came from
     // either value-to-optional promotion or optional-to-optional
     // conversion.
-    if (last.is<LocatorPathElt::OptionalPayload>() ||
+    if (last.is<LocatorPathElt::OptionalInjection>() ||
         last.is<LocatorPathElt::GenericArgument>()) {
       path.pop_back();
       continue;

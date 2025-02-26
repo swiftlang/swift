@@ -3300,9 +3300,9 @@ public:
   void cacheResult(evaluator::SideEffect value) const;
 };
 
-class TypeCheckSourceFileRequest
+class TypeCheckPrimaryFileRequest
     : public SimpleRequest<
-          TypeCheckSourceFileRequest, evaluator::SideEffect(SourceFile *),
+          TypeCheckPrimaryFileRequest, evaluator::SideEffect(SourceFile *),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
