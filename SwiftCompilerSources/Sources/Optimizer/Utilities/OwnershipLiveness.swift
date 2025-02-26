@@ -610,6 +610,10 @@ extension InteriorUseWalker: OwnershipUseVisitor {
     if useVisitor(operand) == .abortWalk {
       return .abortWalk
     }
+    return setPointerEscape(of: operand)
+  }
+
+  mutating func setPointerEscape(of operand: Operand) -> WalkResult {
     pointerStatus.setEscaping(operand: operand)
     return ignoreEscape ? .continueWalk : .abortWalk
   }
@@ -621,7 +625,13 @@ extension InteriorUseWalker: OwnershipUseVisitor {
         return .abortWalk
       }
     }
-    if visitInnerUses, let innerValue = borrowInst.innerValue {
+    if useVisitor(operand) == .abortWalk {
+      return .abortWalk
+    }
+    if visitInnerUses {
+      guard let innerValue = borrowInst.innerValue else {
+        return setPointerEscape(of: operand)
+      }
       return visitAllUses(of: innerValue)
     }
     return visitInnerBorrowUses(of: borrowInst, operand: operand)
