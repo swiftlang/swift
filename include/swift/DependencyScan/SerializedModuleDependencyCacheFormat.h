@@ -60,6 +60,8 @@ using IsStaticField = BCFixed<1>;
 using IsForceLoadField = BCFixed<1>;
 /// A bit taht indicates whether or not an import statement is optional
 using IsOptionalImport = BCFixed<1>;
+/// A bit taht indicates whether or not an import statement is @_exported
+using IsExportedImport = BCFixed<1>;
 
 /// Source location fields
 using LineNumberField = BCFixed<32>;
@@ -176,7 +178,8 @@ using ImportStatementLayout =
                    IdentifierIDField,            // bufferIdentifier
                    LineNumberField,              // lineNumber
                    ColumnNumberField,            // columnNumber
-                   IsOptionalImport              // isOptional
+                   IsOptionalImport,             // isOptional
+                   IsExportedImport              // isExported
                    >;
 using ImportStatementArrayLayout =
     BCRecordLayout<IMPORT_STATEMENT_ARRAY_NODE, IdentifierIDArryField>;

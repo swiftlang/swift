@@ -240,10 +240,12 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
        &macroDependencies](ModuleDependencyInfo &moduleDep) {
         // Add imports of this module
         for (const auto &moduleName : currentModuleImports)
-          moduleDep.addModuleImport(moduleName.importIdentifier);
+          moduleDep.addModuleImport(moduleName.importIdentifier,
+                                    moduleName.isExported);
         // Add optional imports of this module
         for (const auto &moduleName : currentOptionalModuleImports)
-          moduleDep.addOptionalModuleImport(moduleName.importIdentifier);
+          moduleDep.addOptionalModuleImport(moduleName.importIdentifier,
+                                            moduleName.isExported);
 
         // Add qualified dependencies of this module
         moduleDep.setImportedClangDependencies(importedClangDependenciesIDs);
@@ -408,10 +410,10 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
     case IMPORT_STATEMENT_NODE: {
       unsigned importIdentifierID, bufferIdentifierID;
       unsigned lineNumber, columnNumber;
-      bool isOptional;
+      bool isOptional, isExported;
       ImportStatementLayout::readRecord(Scratch, importIdentifierID,
                                         bufferIdentifierID, lineNumber,
-                                        columnNumber, isOptional);
+                                        columnNumber, isOptional, isExported);
       auto importIdentifier = getIdentifier(importIdentifierID);
       if (!importIdentifier)
         llvm::report_fatal_error("Bad import statement info: no import name");
@@ -421,7 +423,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
         llvm::report_fatal_error(
             "Bad import statement info: no buffer identifier");
       ImportStatements.push_back(ScannerImportStatementInfo(
-          importIdentifier.value(),
+          importIdentifier.value(), isExported,
           ScannerImportStatementInfo::ImportDiagnosticLocationInfo(
               bufferIdentifier.value(), lineNumber, columnNumber)));
       break;
@@ -1443,7 +1445,7 @@ unsigned ModuleDependenciesCacheSerializer::writeImportStatementInfos(
           Out, ScratchRecord, AbbrCodes[ImportStatementLayout::Code],
           getIdentifier(importInfo.importIdentifier),
           getIdentifier(importLoc.bufferIdentifier), importLoc.lineNumber,
-          importLoc.columnNumber, isOptional);
+          importLoc.columnNumber, isOptional, importInfo.isExported);
       count++;
     }
   };
