@@ -3219,7 +3219,7 @@ namespace {
 
     Expr *visitTypeValueExpr(TypeValueExpr *expr) {
       auto toType = simplifyType(cs.getType(expr));
-      assert(toType->isEqual(expr->getParamType()->getValueType()));
+      assert(toType->isEqual(expr->getParamDecl()->getValueType()));
       cs.setType(expr, toType);
       return expr;
     }

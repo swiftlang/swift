@@ -1681,18 +1681,10 @@ namespace {
     }
 
     Type visitTypeValueExpr(TypeValueExpr *E) {
-      auto locator = CS.getConstraintLocator(E);
-      auto type = resolveTypeReferenceInExpression(E->getParamTypeRepr(),
-                                              TypeResolverContext::InExpression,
-                                                  locator);
-
-      if (!type || type->hasError()) {
-        return Type();
-      }
-
-      auto archetype = type->castTo<ArchetypeType>();
-      E->setParamType(archetype);
-      return archetype->getValueType();
+      auto ty = E->getParamDecl()->getDeclaredInterfaceType();
+      auto paramType = CS.DC->mapTypeIntoContext(ty);
+      E->setParamType(paramType);
+      return E->getParamDecl()->getValueType();
     }
 
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {

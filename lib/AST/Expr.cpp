@@ -2399,13 +2399,11 @@ bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
   return false;
 }
 
-TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
-                                            DeclContext *DC) {
-  ASTContext &C = Decl->getASTContext();
-  assert(Loc.isValid());
-  auto *Repr = UnqualifiedIdentTypeRepr::create(C, Loc, Decl->createNameRef());
-  Repr->setValue(Decl, DC);
-  return new (C) TypeValueExpr(Repr);
+TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc loc, 
+                                            GenericTypeParamDecl *paramDecl) {
+  auto &ctx = paramDecl->getASTContext();
+  ASSERT(loc.isValid());
+  return new (ctx) TypeValueExpr(loc, paramDecl);
 }
 
 OpenedArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
