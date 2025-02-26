@@ -77,7 +77,9 @@ class SerialExecutorRef {
     /// Executor that may need to participate in complex "same context" checks,
     /// by invoking `isSameExclusiveExecutionContext` when comparing execution contexts.
     ComplexEquality = 0b01,
-    ///
+    /// Mark this executor as the one used by `Task.startSynchronously`,
+    /// It cannot participate in switching.
+    // TODO: Perhaps make this a generic "cannot switch" rather than start synchronously specific.
     StartSynchronously = 0b10,
   };
 

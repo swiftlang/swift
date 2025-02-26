@@ -319,7 +319,7 @@ func callActorFromStartSynchronousTask(recipient rec: TargetActorToCall) {
 
 print("\n\n==== ------------------------------------------------------------------")
 print("callActorFromStartSynchronousTask() - actor in custom executor with its own queue")
-let actorQueue = DispatchSerialQueue(label: "recipient-actor-queue")
+let actorQueue = DispatchQueue(label: "recipient-actor-queue")
 callActorFromStartSynchronousTask(recipient: .recipientOnQueue(RecipientOnQueue(queue: actorQueue)))
 
 // CHECK-LABEL: callActorFromStartSynchronousTask() - actor in custom executor with its own queue
@@ -367,7 +367,7 @@ actor RecipientOnQueue {
   let executor: NaiveQueueExecutor
   nonisolated let unownedExecutor: UnownedSerialExecutor
 
-  init(queue: DispatchSerialQueue) {
+  init(queue: DispatchQueue) {
     self.executor = NaiveQueueExecutor(queue: queue)
     self.unownedExecutor = executor.asUnownedSerialExecutor()
   }

@@ -134,8 +134,6 @@ class ExecutorTrackingInfo {
   /// is `generic`.
   TaskExecutorRef TaskExecutor = TaskExecutorRef::undefined();
 
-  bool StartedSynchronouslySkipSwitchOnce = false;
-
   /// Whether this context allows switching.  Some contexts do not;
   /// for example, we do not allow switching from swift_job_run
   /// unless the passed-in executor is generic.
@@ -179,23 +177,13 @@ public:
   }
 
   bool allowsSwitching() const {
-    return AllowsSwitching && !StartedSynchronouslySkipSwitchOnce;
+    return AllowsSwitching;
   }
 
   /// Disallow switching in this tracking context.  This should only
   /// be set on a new tracking info, before any jobs are run in it.
   void disallowSwitching() {
     AllowsSwitching = false;
-  }
-
-  void markSynchronousStart() {
-    StartedSynchronouslySkipSwitchOnce = true;
-  }
-  bool isSynchronousStart() const {
-    return StartedSynchronouslySkipSwitchOnce;
-  }
-  void withoutStartSynchronously() {
-    StartedSynchronouslySkipSwitchOnce = false;
   }
 
   static ExecutorTrackingInfo *current() {
@@ -2170,10 +2158,6 @@ static bool canGiveUpThreadForSwitch(ExecutorTrackingInfo *trackingInfo,
   // We can certainly "give up" a generic executor to try to run
   // a task for an actor.
   if (currentExecutor.isGeneric()) {
-    if (trackingInfo->isSynchronousStart()) {
-      return false;
-    }
-
     if (currentExecutor.isForSynchronousStart()) {
       return false;
     }
