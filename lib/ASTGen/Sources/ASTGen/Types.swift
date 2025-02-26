@@ -301,43 +301,82 @@ extension ASTGenVisitor {
 
 // MARK: - SpecifierTypeRepr/AttributedTypeRepr
 
-extension BridgedAttributedTypeSpecifier {
-  fileprivate init?(from keyword: Keyword?) {
-    switch keyword {
-    case .inout: self = .inOut
-    case .borrowing: self = .borrowing
-    case .consuming: self = .consuming
-    case .__shared: self = .legacyShared
-    case .__owned: self = .legacyOwned
-    case ._const: self = .const
-    case .isolated: self = .isolated
-    default: return nil
+extension ASTGenVisitor {
+  func generateLifetimeDescriptor(lifetimeSpecifierArgument node: LifetimeSpecifierArgumentSyntax) -> BridgedLifetimeDescriptor? {
+    switch node.parameter.rawTokenKind {
+    case .identifier, .keyword:
+      return self.generateLifetimeDescriptor(
+        nameToken: node.parameter,
+        lifetimeDependenceKind: .default
+      )
+    case .integerLiteral:
+      guard let index = Int(node.parameter.text) else {
+        // TODO: Diagnose.
+        fatalError("(compiler bug) invalid integer literal")
+      }
+      return.forOrdered(
+        index,
+        dependenceKind: .default,
+        loc: self.generateSourceLoc(node.parameter)
+      )
+    default:
+      // TODO: Diagnose.
+      fatalError("expected identifier, 'self', or integer in @lifetime")
     }
   }
-}
 
-extension ASTGenVisitor {
   func generate(attributedType node: AttributedTypeSyntax) -> BridgedTypeRepr {
     var type = generate(type: node.baseType)
 
-    // Handle specifiers.
-    if case .simpleTypeSpecifier(let simpleSpecifier) = node.specifiers.first {
-      let specifier = simpleSpecifier.specifier
-      if let kind = BridgedAttributedTypeSpecifier(from: specifier.keywordKind) {
-        type =
-          BridgedSpecifierTypeRepr.createParsed(
-            self.ctx,
-            base: type,
-            specifier: kind,
-            specifierLoc: self.generateSourceLoc(specifier)
-          ).asTypeRepr
-      } else {
-        self.diagnose(.unexpectedTokenKind(token: specifier))
+    // Specifiers
+    var ownership: BridgedParamSpecifier = .default
+    var ownershipLoc: BridgedSourceLoc = nil
+    var isolatedLoc: BridgedSourceLoc = nil
+    var constLoc: BridgedSourceLoc = nil
+    var sendingLoc: BridgedSourceLoc = nil
+    var lifetimeEntry: BridgedLifetimeEntry? = nil
+
+    // TODO: Diagnostics for duplicated specifiers, and ordering.
+    for node in node.specifiers {
+      let loc = self.generateSourceLoc(node)
+      switch node {
+      case .simpleTypeSpecifier(let node):
+        switch node.specifier.keywordKind {
+        case .inout:
+          (ownership, ownershipLoc) = (.inOut, loc)
+        case .__shared:
+          (ownership, ownershipLoc) = (.legacyShared, loc)
+        case .__owned:
+          (ownership, ownershipLoc) = (.legacyOwned, loc)
+        case .borrowing:
+          (ownership, ownershipLoc) = (.borrowing, loc)
+        case .consuming:
+          (ownership, ownershipLoc) = (.consuming, loc)
+        case .isolated:
+          isolatedLoc = loc
+        case ._const:
+          constLoc = loc
+        case .sending:
+          sendingLoc = loc
+        default:
+          // TODO: Diagnostics.
+          fatalError("(compiler bug) unrecognized type specifier")
+        }
+      case .lifetimeTypeSpecifier(let node):
+        lifetimeEntry = .createParsed(
+          self.ctx,
+          range: self.generateSourceRange(
+            start: node.dependsOnKeyword,
+            end: node.rightParen
+          ),
+          sources: node.arguments.lazy.compactMap(self.generateLifetimeDescriptor(lifetimeSpecifierArgument:)).bridgedArray(in: self)
+        )
       }
     }
 
-    // Handle type attributes.
+    // Attributes.
     let typeAttributes = self.generateTypeAttributes(node)
+
     if !typeAttributes.isEmpty {
       type =
         BridgedAttributedTypeRepr.createParsed(
@@ -345,6 +384,47 @@ extension ASTGenVisitor {
           base: type,
           attributes: typeAttributes.lazy.bridgedArray(in: self)
         ).asTypeRepr
+    }
+
+    if ownershipLoc.isValid && ownership != .default {
+      type = BridgedOwnershipTypeRepr.createParsed(
+        self.ctx,
+        base: type,
+        specifier: ownership,
+        specifierLoc: ownershipLoc
+      ).asTypeRepr
+    }
+
+    if isolatedLoc.isValid {
+      type = BridgedIsolatedTypeRepr.createParsed(
+        self.ctx,
+        base: type,
+        specifierLoc: isolatedLoc
+      ).asTypeRepr
+    }
+
+    if constLoc.isValid {
+      type = BridgedCompileTimeConstTypeRepr.createParsed(
+        self.ctx,
+        base: type,
+        specifierLoc: constLoc
+      ).asTypeRepr
+    }
+
+    if sendingLoc.isValid {
+      type = BridgedSendingTypeRepr.createParsed(
+        self.ctx,
+        base: type,
+        specifierLoc: constLoc
+      ).asTypeRepr
+    }
+
+    if let lifetimeEntry {
+      type = BridgedLifetimeDependentTypeRepr.createParsed(
+        self.ctx,
+        base: type,
+        entry: lifetimeEntry
+      ).asTypeRepr
     }
 
     return type
