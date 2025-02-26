@@ -16,7 +16,7 @@
 
 import StdlibUnittest
 
-var suite = TestSuite("ArrayStorageProperty")
+var suite = TestSuite("Array-Backed Span Properties")
 defer { runAllTests() }
 
 suite.test("Array.span property")

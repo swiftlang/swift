@@ -17,7 +17,7 @@
 
 import StdlibUnittest
 
-var suite = TestSuite("InlineTypesStorageProperty")
+var suite = TestSuite("Span properties backed by inline storage")
 defer { runAllTests() }
 
 suite.test("CollectionOfOne.span property")
