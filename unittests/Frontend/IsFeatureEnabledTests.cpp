@@ -19,6 +19,7 @@ namespace {
 
 static const FeatureWrapper baselineF(Feature::AsyncAwait);
 static const FeatureWrapper upcomingF(Feature::DynamicActorIsolation);
+static const FeatureWrapper adoptableUpcomingF(Feature::ExistentialAny);
 static const FeatureWrapper experimentalF(Feature::NamedOpaqueTypes);
 static const FeatureWrapper strictConcurrencyF(Feature::StrictConcurrency);
 
@@ -44,6 +45,13 @@ TEST_F(IsFeatureEnabledTest, VerifyTestedFeatures) {
   {
     ASSERT_TRUE(getUpcomingFeature(feature.name));
     ASSERT_FALSE(isFeatureAdoptable(feature));
+    ASSERT_LT(defaultLangMode, feature.langMode);
+  }
+
+  feature = adoptableUpcomingF;
+  {
+    ASSERT_TRUE(getUpcomingFeature(feature.name));
+    ASSERT_TRUE(isFeatureAdoptable(feature));
     ASSERT_LT(defaultLangMode, feature.langMode);
   }
 
@@ -82,6 +90,7 @@ static const IsFeatureEnabledTestCase defaultStateTestCases[] = {
       {}, {
         {baselineF, FeatureState::Enabled},
         {upcomingF, FeatureState::Off},
+        {adoptableUpcomingF, FeatureState::Off},
         {strictConcurrencyF, FeatureState::Off},
         {experimentalF, FeatureState::Off},
       }),
@@ -118,6 +127,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
   IsFeatureEnabledTestCase(
       {"-enable-experimental-feature", baselineF.name + ":adoption"},
       {{baselineF, FeatureState::Enabled}}),
+
   IsFeatureEnabledTestCase(
       {"-enable-upcoming-feature", upcomingF.name},
       {{upcomingF, FeatureState::Enabled}}),
@@ -136,6 +146,43 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
   IsFeatureEnabledTestCase(
       {"-enable-experimental-feature", upcomingF.name + ":adoption"},
       {{upcomingF, FeatureState::Off}}),
+
+  IsFeatureEnabledTestCase(
+      {"-enable-upcoming-feature", adoptableUpcomingF.name},
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-upcoming-feature", adoptableUpcomingF.name + ":undef"},
+      {{adoptableUpcomingF, FeatureState::Off}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption"},
+      {{adoptableUpcomingF, FeatureState::EnabledForAdoption}}),
+// Swift 7 is asserts-only.
+#ifndef NDEBUG
+  // Requesting adoption mode in target language mode has no effect.
+  IsFeatureEnabledTestCase({
+        "-swift-version", adoptableUpcomingF.langMode,
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption",
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+#endif
+  IsFeatureEnabledTestCase(
+      {"-enable-experimental-feature", adoptableUpcomingF.name},
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-experimental-feature", adoptableUpcomingF.name + ":undef"},
+      {{adoptableUpcomingF, FeatureState::Off}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-experimental-feature", adoptableUpcomingF.name + ":adoption"},
+      {{adoptableUpcomingF, FeatureState::EnabledForAdoption}}),
+// Swift 7 is asserts-only.
+#ifndef NDEBUG
+  // Requesting adoption mode in target language mode has no effect.
+  IsFeatureEnabledTestCase({
+        "-swift-version", adoptableUpcomingF.langMode,
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":adoption",
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+#endif
   IsFeatureEnabledTestCase(
       {"-enable-upcoming-feature", strictConcurrencyF.name},
       {{strictConcurrencyF, FeatureState::Enabled}}),
@@ -154,6 +201,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
   IsFeatureEnabledTestCase(
       {"-enable-experimental-feature", strictConcurrencyF.name + ":adoption"},
       {{strictConcurrencyF, FeatureState::Off}}),
+
   IsFeatureEnabledTestCase(
       {"-enable-upcoming-feature", experimentalF.name},
       {{experimentalF, FeatureState::Off}}),
@@ -240,6 +288,9 @@ INSTANTIATE_TEST_SUITE_P(SingleDisable, IsFeatureEnabledTest,
 
 // clang-format off
 static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
+
+  // MARK: Non-adoptable & upcoming
+
   IsFeatureEnabledTestCase({
         "-enable-upcoming-feature", upcomingF.name + ":undef",
         "-enable-upcoming-feature", upcomingF.name,
@@ -320,6 +371,92 @@ static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
         "-enable-experimental-feature", upcomingF.name + ":adoption",
       },
       {{upcomingF, FeatureState::Enabled}}),
+
+  // MARK: Adoptable & upcoming
+
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":undef",
+        "-enable-upcoming-feature", adoptableUpcomingF.name,
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-upcoming-feature", adoptableUpcomingF.name,
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", adoptableUpcomingF.name,
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":undef",
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", adoptableUpcomingF.name,
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption",
+      },
+      {{adoptableUpcomingF, FeatureState::EnabledForAdoption}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":undef",
+        "-enable-experimental-feature", adoptableUpcomingF.name,
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-experimental-feature", adoptableUpcomingF.name,
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", adoptableUpcomingF.name,
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":undef",
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", adoptableUpcomingF.name,
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":adoption",
+      },
+      {{adoptableUpcomingF, FeatureState::EnabledForAdoption}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":undef",
+        "-enable-upcoming-feature", adoptableUpcomingF.name,
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-upcoming-feature", adoptableUpcomingF.name,
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", adoptableUpcomingF.name,
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":undef",
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", adoptableUpcomingF.name,
+        "-enable-upcoming-feature", adoptableUpcomingF.name + ":adoption",
+      },
+      {{adoptableUpcomingF, FeatureState::EnabledForAdoption}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":undef",
+        "-enable-experimental-feature", adoptableUpcomingF.name,
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":adoption",
+        "-enable-experimental-feature", adoptableUpcomingF.name,
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", adoptableUpcomingF.name,
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":undef",
+      },
+      {{adoptableUpcomingF, FeatureState::Enabled}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", adoptableUpcomingF.name,
+        "-enable-experimental-feature", adoptableUpcomingF.name + ":adoption",
+      },
+      {{adoptableUpcomingF, FeatureState::EnabledForAdoption}}),
+
+  // MARK: Experimental
+
   IsFeatureEnabledTestCase({
         "-enable-experimental-feature", experimentalF.name + ":undef",
         "-enable-experimental-feature", experimentalF.name,
