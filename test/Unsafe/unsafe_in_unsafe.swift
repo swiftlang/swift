@@ -1,7 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -print-diagnostic-groups
-
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-
+// RUN: %target-typecheck-verify-swift -print-diagnostic-groups
 
 protocol P { }
 

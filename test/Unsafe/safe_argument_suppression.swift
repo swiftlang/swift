@@ -1,7 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -print-diagnostic-groups
-
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-// REQUIRES: swift_feature_WarnUnsafe
+// RUN: %target-typecheck-verify-swift -strict-memory-safety -print-diagnostic-groups
 
 @unsafe
 class NotSafe {

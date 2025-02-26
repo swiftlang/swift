@@ -77,7 +77,6 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.CoroutineAccessors, to: .coroutineAccessors)
     mapFeature(.ValueGenerics, to: .valueGenerics)
     mapFeature(.ABIAttribute, to: .abiAttribute)
-    mapFeature(.WarnUnsafe, to: .unsafeExpression)
   }
 }
 

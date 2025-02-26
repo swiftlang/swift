@@ -300,7 +300,7 @@ bool swift::enumerateUnsafeUses(ArrayRef<ProtocolConformanceRef> conformances,
       continue;
 
     ASTContext &ctx = conformance.getRequirement()->getASTContext();
-    if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
+    if (!ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
       return false;
 
     if (!conformance.hasEffect(EffectKind::Unsafe))
@@ -365,7 +365,7 @@ bool swift::isUnsafeInConformance(const ValueDecl *requirement,
 
 void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
                                llvm::function_ref<void(Type)> diagnose) {
-  if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
+  if (!ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
     return;
 
   if (!type->isUnsafe() && !type->getCanonicalType()->isUnsafe())

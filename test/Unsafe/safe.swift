@@ -1,7 +1,10 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -print-diagnostic-groups
+// RUN: %target-typecheck-verify-swift -strict-memory-safety -print-diagnostic-groups
 
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-// REQUIRES: swift_feature_WarnUnsafe
+// The feature flag should be enabled.
+#if !hasFeature(StrictMemorySafety)
+#error("Strict memory safety is not enabled!")
+#endif
+
 
 @unsafe
 func unsafeFunction() { }

@@ -1,10 +1,7 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature WarnUnsafe
+// RUN: %target-typecheck-verify-swift -strict-memory-safety
 
 // Make sure everything compiles without error when unsafe code is allowed.
-// RUN: %target-swift-frontend -typecheck -enable-experimental-feature AllowUnsafeAttribute -warnings-as-errors %s
-
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-// REQUIRES: swift_feature_WarnUnsafe
+// RUN: %target-swift-frontend -typecheck -warnings-as-errors %s
 
 func test(
   x: OpaquePointer,

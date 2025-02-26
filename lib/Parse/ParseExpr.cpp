@@ -436,8 +436,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     return sub;
   }
 
-  if (Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      Tok.isContextualKeyword("unsafe")) {
+  if (Tok.isContextualKeyword("unsafe")) {
     Tok.setKind(tok::contextual_keyword);
     SourceLoc unsafeLoc = consumeToken();
     ParserResult<Expr> sub =

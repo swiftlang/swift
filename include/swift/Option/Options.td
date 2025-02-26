@@ -1005,6 +1005,11 @@ def disable_upcoming_feature : Separate<["-"], "disable-upcoming-feature">,
   HelpText<"Disable a feature that will be introduced in an upcoming language "
            "version">;
 
+def strict_memory_safety : Flag<["-"], "strict-memory-safety">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Enable strict memory safety checking">;
+
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
   HelpText<"Report performed transformations by optimization passes whose "

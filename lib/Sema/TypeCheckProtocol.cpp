@@ -2641,7 +2641,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   // If we're enforcing strict memory safety and this conformance hasn't
   // opted out, look for safe/unsafe witness mismatches.
   if (conformance->getExplicitSafety() == ExplicitSafety::Unspecified &&
-      Context.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+      Context.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
     // Collect all of the unsafe uses for this conformance.
     SmallVector<UnsafeUse, 2> unsafeUses;
     for (auto requirement: Proto->getMembers()) {

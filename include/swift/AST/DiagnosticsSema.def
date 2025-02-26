@@ -8165,9 +8165,6 @@ NOTE(sending_function_result_with_sending_param_note, none,
 //------------------------------------------------------------------------------
 // MARK: Strict Safety Diagnostics
 //------------------------------------------------------------------------------
-ERROR(unsafe_attr_disabled,none,
-      "attribute requires '-enable-experimental-feature AllowUnsafeAttribute'", ())
-
 NOTE(note_reference_to_unsafe_decl,none,
       "%select{reference|call}0 to unsafe %kind1",
       (bool, const ValueDecl *))
