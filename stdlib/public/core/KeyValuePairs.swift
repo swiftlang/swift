@@ -128,11 +128,15 @@ extension KeyValuePairs: RandomAccessCollection {
 extension KeyValuePairs {
   
   @available(SwiftStdlib 6.2, *)
-  public var span: Span<(Key, Value)> {
+  public var span: Span<Element> {
     @lifetime(borrow self)
     @_alwaysEmitIntoClient
     get {
-      let span = _elements.span
+      let pointer = UnsafeRawPointer(_elements._buffer.firstElementAddress)
+      let span = Span(
+        _unsafeStart: pointer.assumingMemoryBound(to: Element.self),
+        count: _elements.count
+      )
       return _overrideLifetime(span, borrowing: self)
     }
   }
