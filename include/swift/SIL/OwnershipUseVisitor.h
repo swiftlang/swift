@@ -261,17 +261,36 @@ bool OwnershipUseVisitor<Impl>::visitOuterBorrowScopeEnd(Operand *borrowEnd) {
 /// (begin_borrow, load_borrow, or begin_apply).
 template <typename Impl>
 bool OwnershipUseVisitor<Impl>::visitInnerBorrow(Operand *borrowingOperand) {
-  if (!asImpl().handleInnerBorrow(borrowingOperand))
-    return false;
+  auto bo = BorrowingOperand(borrowingOperand);
+  assert(bo && "unexpected Borrow operand ownership");
+  if (bo.getScopeIntroducingUserResult()) {
+    if (!asImpl().handleInnerBorrow(borrowingOperand))
+      return false;
 
-  return BorrowingOperand(borrowingOperand)
-    .visitScopeEndingUses(
+    return bo.visitScopeEndingUses(
       [&](Operand *borrowEnd) {
         return visitInnerBorrowScopeEnd(borrowEnd);
       },
       [&](Operand *unknownUse) {
         return asImpl().handlePointerEscape(unknownUse);
       });
+  }
+  if (auto dependentValue = bo.getDependentUserResult()) {
+    switch (dependentValue->getOwnershipKind()) {
+    case OwnershipKind::Guaranteed:
+      if (!handleUsePoint(borrowingOperand,
+                          UseLifetimeConstraint::NonLifetimeEnding)) {
+        return false;
+      }
+      return visitGuaranteedUses(dependentValue);
+    case OwnershipKind::Any:
+    case OwnershipKind::None:
+    case OwnershipKind::Owned: // non-escapable
+    case OwnershipKind::Unowned:
+      break;
+    }
+  }
+  return asImpl().handlePointerEscape(borrowingOperand);
 }
 
 /// Note: borrowEnd->get() may be a borrow introducer for an inner scope, or a

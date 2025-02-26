@@ -786,6 +786,7 @@ bool BorrowingOperand::visitExtendedScopeEndingUses(
   return visitScopeEndingUses(visitor, visitUnknownUse);
 }
 
+// This should be equivalent to SwiftCompilerSources, BorrowedValue.
 SILValue BorrowingOperand::getBorrowIntroducingUserResult() const {
   switch (kind) {
   case BorrowingOperandKind::Invalid:
@@ -800,8 +801,16 @@ SILValue BorrowingOperand::getBorrowIntroducingUserResult() const {
     return SILValue();
 
   case BorrowingOperandKind::BeginBorrow:
-  case BorrowingOperandKind::BorrowedFrom: {
     return cast<SingleValueInstruction>(op->getUser());
+
+  case BorrowingOperandKind::BorrowedFrom: {
+    // A reborrow introduces a new borrow scope, a guaranteed forwarding phi
+    // does not.
+    auto *bfi = cast<BorrowedFromInst>(op->getUser());
+    if (bfi->isReborrow()) {
+      return bfi->getBorrowedValue();
+    }
+    return SILValue();
   }
   case BorrowingOperandKind::Branch: {
     auto *bi = cast<BranchInst>(op->getUser());
@@ -811,29 +820,57 @@ SILValue BorrowingOperand::getBorrowIntroducingUserResult() const {
   llvm_unreachable("covered switch");
 }
 
-SILValue BorrowingOperand::getScopeIntroducingUserResult() {
+SILValue BorrowingOperand::getScopeIntroducingUserResult() const {
   switch (kind) {
-  case BorrowingOperandKind::Invalid:
-  case BorrowingOperandKind::Yield:
-  case BorrowingOperandKind::Apply:
-  case BorrowingOperandKind::TryApply:
-    return SILValue();
-
   case BorrowingOperandKind::BeginAsyncLet:
   case BorrowingOperandKind::PartialApplyStack:
-  case BorrowingOperandKind::MarkDependenceNonEscaping:
-  case BorrowingOperandKind::BeginBorrow:
-  case BorrowingOperandKind::BorrowedFrom:
   case BorrowingOperandKind::StoreBorrow:
     return cast<SingleValueInstruction>(op->getUser());
+
+  case BorrowingOperandKind::MarkDependenceNonEscaping:
+    if (auto *mdi = cast<MarkDependenceInst>(op->getUser())) {
+      if (mdi->hasScopedLifetime())
+        return mdi;
+    }
+    return SILValue();
 
   case BorrowingOperandKind::BeginApply:
     return cast<BeginApplyInst>(op->getUser())->getTokenResult();
 
-  case BorrowingOperandKind::Branch: {
-    PhiOperand phiOp(op);
-    return phiOp.getValue();
+  default:
+    return getBorrowIntroducingUserResult();
   }
+  llvm_unreachable("covered switch");
+}
+
+SILValue BorrowingOperand::getDependentUserResult() const {
+  switch (kind) {
+  case BorrowingOperandKind::BorrowedFrom: {
+    auto *bfi = cast<BorrowedFromInst>(op->getUser());
+    if (!bfi->isReborrow())
+      return bfi;
+    
+    return SILValue();
+  }
+  case BorrowingOperandKind::MarkDependenceNonEscaping: {
+    auto *mdi = cast<MarkDependenceInst>(op->getUser());
+    assert(mdi->isNonEscaping() && "escaping dependencies don't borrow");
+    if (!mdi->hasScopedLifetime())
+      return mdi;
+    
+    return SILValue();
+  }
+  case BorrowingOperandKind::Invalid:
+  case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::StoreBorrow:
+  case BorrowingOperandKind::BeginApply:
+  case BorrowingOperandKind::Branch:
+  case BorrowingOperandKind::Apply:
+  case BorrowingOperandKind::TryApply:
+  case BorrowingOperandKind::Yield:
+  case BorrowingOperandKind::PartialApplyStack:
+  case BorrowingOperandKind::BeginAsyncLet:
+    return SILValue();
   }
   llvm_unreachable("covered switch");
 }
@@ -1044,6 +1081,9 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
       }
 
       auto result = borrowingOperand.getBorrowIntroducingUserResult();
+      if (!result) {
+        result = borrowingOperand.getDependentUserResult();
+      }
       for (auto *use : result->getUses()) {
         if (auto intPtrOperand = InteriorPointerOperand(use)) {
           func(intPtrOperand);
@@ -1070,11 +1110,12 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
       continue;
     }
 
-    // Look through object.
+    // Look through object. SingleValueInstruction is overly restrictive but
+    // rules out any interesting corner cases.
     if (auto *svi = dyn_cast<SingleValueInstruction>(user)) {
-      if (Projection::isObjectProjection(svi)) {
-        for (SILValue result : user->getResults()) {
-          llvm::copy(result->getUses(), std::back_inserter(worklist));
+      if (ForwardingInstruction::isa(user)) {
+        for (auto *use : svi->getUses()) {
+          worklist.push_back(use);
         }
         continue;
       }
