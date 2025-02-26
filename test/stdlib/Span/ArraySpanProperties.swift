@@ -1,4 +1,4 @@
-//===--- ArrayStorage.swift ---- test span properties for Array types -----===//
+//===--- ArraySpanProperties.swift ----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
