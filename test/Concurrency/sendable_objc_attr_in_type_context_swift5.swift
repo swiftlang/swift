@@ -78,6 +78,10 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 -(void)willSendDataWithCompletion: (void (^)(void)) completion;
 @end
 
+@interface DataHandler : NSObject
++(void)sendDataWithCompletion: (void (^)(MyValue *)) completion;
+@end
+
 #pragma clang assume_nonnull end
 
 //--- main.swift
@@ -188,4 +192,14 @@ class ImplicitShadowing : NSObject, TestWitnesses {
   func test() {
     (self as AnyObject).willSendData { } // Ok
   }
+}
+
+protocol CompletionWithoutSendable {
+  associatedtype T
+  static func sendData(completion: @escaping (T) -> Void) // expected-note {{expected sendability to match requirement here}}
+}
+
+extension DataHandler : CompletionWithoutSendable {
+  // expected-warning@-1 {{sendability of function types in class method 'sendData(completion:)' does not match requirement in protocol 'CompletionWithoutSendable'}}
+  // It should be possible to infer `T` from method that mismatches on @Sendable in Swift 5 mode
 }
