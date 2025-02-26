@@ -217,7 +217,7 @@ public struct DiscardingTaskGroup {
 
     // Create the task in this group.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createDiscardingTask(flags: flags,
                                      initialSerialExecutor: builtinSerialExecutor,
@@ -264,7 +264,7 @@ public struct DiscardingTaskGroup {
 
     // Create the task in this group.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createDiscardingTask(flags: flags,
                                      initialSerialExecutor: builtinSerialExecutor,
@@ -286,7 +286,7 @@ public struct DiscardingTaskGroup {
 
     // Create the task in this group.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createDiscardingTask(flags: flags,
                                      initialSerialExecutor: builtinSerialExecutor,
@@ -322,7 +322,7 @@ public struct DiscardingTaskGroup {
 
     // Create the task in this group.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createDiscardingTask(flags: flags,
                                      initialSerialExecutor: builtinSerialExecutor,
@@ -640,7 +640,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
 
     // Create the task in this group.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createDiscardingTask(flags: flags,
                                      initialSerialExecutor: builtinSerialExecutor,
@@ -671,7 +671,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
 
     // Create the task in this group.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createDiscardingTask(flags: flags,
                                      initialSerialExecutor: builtinSerialExecutor,
