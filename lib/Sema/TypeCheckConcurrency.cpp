@@ -4819,13 +4819,12 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
         SourceFile *file = decl->getDeclContext()->getParentSourceFile();
         bool inSwiftinterface =
             file && file->Kind == SourceFileKind::Interface;
-        ctx.Diags.diagnose(
-            attr->getLocation(),
-            diag::unsafe_global_actor)
-          .fixItRemove(attr->getArgs()->getSourceRange())
-          .fixItInsert(attr->getLocation(), "@preconcurrency ")
-          .warnUntilSwiftVersion(6)
-          .limitBehaviorIf(inSwiftinterface, DiagnosticBehavior::Ignore);
+        if (!inSwiftinterface) {
+          ctx.Diags.diagnose(attr->getLocation(), diag::unsafe_global_actor)
+              .fixItRemove(attr->getArgs()->getSourceRange())
+              .fixItInsert(attr->getLocation(), "@preconcurrency ")
+              .warnUntilSwiftVersion(6);
+        }
       } else {
         ctx.Diags.diagnose(
             attr->getLocation(),
@@ -6383,11 +6382,14 @@ static bool checkSendableInstanceStorage(
               return true;
             }
 
-            property->diagnose(diag::non_concurrent_type_member,
-                               propertyType, false, property->getName(),
-                               nominal)
-                .limitBehaviorUntilSwiftVersion(behavior, 6)
-                .limitBehaviorIf(preconcurrency);
+            if (preconcurrency)
+              behavior = preconcurrency.value();
+
+            property
+                ->diagnose(diag::non_concurrent_type_member, propertyType,
+                           false, property->getName(), nominal)
+                .limitBehaviorWithPreconcurrency(behavior,
+                                                 preconcurrency.has_value());
             return false;
           });
 
@@ -6425,10 +6427,14 @@ static bool checkSendableInstanceStorage(
               return true;
             }
 
-            element->diagnose(diag::non_concurrent_type_member, type,
-                              true, element->getName(), nominal)
-                .limitBehaviorUntilSwiftVersion(behavior, 6)
-                .limitBehaviorIf(preconcurrency);
+            if (preconcurrency)
+              behavior = preconcurrency.value();
+
+            element
+                ->diagnose(diag::non_concurrent_type_member, type, true,
+                           element->getName(), nominal)
+                .limitBehaviorWithPreconcurrency(behavior,
+                                                 preconcurrency.has_value());
             return false;
           });
 
