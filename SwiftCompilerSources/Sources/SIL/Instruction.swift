@@ -1087,6 +1087,10 @@ class MarkDependenceInst : SingleValueInstruction {
   public func settleToEscaping() {
     bridged.MarkDependenceInst_settleToEscaping()
   }
+
+  public var hasScopedLifetime: Bool {
+    return isNonEscaping && type.isObject && ownership == .owned && type.isEscapable(in: parentFunction)
+  }
 }
 
 final public class RefToBridgeObjectInst : SingleValueInstruction {
