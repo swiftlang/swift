@@ -102,6 +102,7 @@ target_compile_definitions(swiftRuntime
     $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_LIB_SUBDIR="${SwiftCore_PLATFORM_SUBDIR}">
     $<$<BOOL:${SwiftCore_ENABLE_FATALERROR_BACKTRACE}>:-DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING>
   PUBLIC
+    $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>
     $<$<BOOL:${SwiftCore_ENABLE_OS_TRACE_LAZY_INIT}>:-DSWIFT_USE_OS_TRACE_LAZY_INIT>)
 
 target_include_directories(swiftRuntime PRIVATE
@@ -143,6 +144,12 @@ if(SwiftCore_ENABLE_OBJC_INTEROP)
     ObjCRuntimeGetImageNameFromClass.mm)
 endif()
 
+if(NOT BUILD_SHARED_LIBS)
+  install(TARGETS swiftRuntime
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
+endif()
+
 string(TOLOWER "${SwiftCore_OBJECT_FORMAT}x" SwiftCore_OBJECT_FORMAT)
 if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
   add_library(swiftrt OBJECT SwiftRT-ELF-WASM.cpp)
@@ -155,6 +162,7 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
   # The driver requires that swifrt.o is under `usr/lib/swift/<platform>/<arch>`
   # Regardless of settings
   install(FILES $<TARGET_OBJECTS:swiftrt>
+    COMPONENT SwiftCore_runtime
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.o)
 elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
@@ -169,6 +177,7 @@ elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
   add_library(swiftrt OBJECT SwiftRT-COFF.cpp)
   target_link_libraries(swiftrt PRIVATE swiftShims)
   install(FILES $<TARGET_OBJECTS:swiftrt>
+    COMPONENT SwiftCore_runtime
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.obj)
 elseif(NOT "${SwiftCore_OBJECT_FORMAT}" STREQUAL "x")
