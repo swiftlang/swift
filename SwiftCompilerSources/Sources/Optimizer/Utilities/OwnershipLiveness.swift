@@ -759,20 +759,8 @@ extension InteriorUseWalker {
     if let inst = operand.instruction as? ForwardingInstruction {
       return inst.forwardedResults.walk { walkDownUses(of: $0) }
     }
-    if let phi = Phi(using: operand) {
-      if phi.value.ownership == .guaranteed {
-        return walkDown(guaranteedPhi: phi)
-      }
-      // This is a phi of a dependent value. partial_apply [on_stack]
-      // and mark_dependence [nonescaping] cannot be cloned, so all
-      // dependent phis must be dominated.
-      assert(definingValue.parentBlock.dominates(phi.successor,
-                                                 functionContext.dominatorTree),
-             "on-stack partial apply cannot be cloned")
-      return walkDownUses(of: phi.value)
-    }
-    // TODO: verify that ForwardInstruction handles all .forward
-    // operand ownership and change this to a fatalError.
+    // TODO: verify that ForwardInstruction handles all .forward operand ownership and assert that only phis can be
+    // reached: assert(Phi(using: operand) != nil)
     return .continueWalk
   }
 
@@ -794,79 +782,6 @@ extension InteriorUseWalker {
       return visitAllUses(of: value)
     default:
       fatalError("ownership requires a lifetime")
-    }
-  }
-
-  // Dominating definingValue example: walkDown must continue visiting
-  // uses of a reborrow in the inner borrow scope:
-  //
-  // bb0:
-  //  d1 = ...
-  //  cond_br bb1, bb2
-  // bb1:
-  //   b1 = borrow d1
-  //   br bb3(b1)
-  // bb2:
-  //   b2 = borrow d1
-  //   br bb3(b2)
-  // bb3(reborrow):
-  //   u1 = d1
-  //   u2 = reborrow
-  //   // can't move destroy above u2
-  //   destroy_value d1
-  //
-  // Dominating definingValue example: walkDown must continue visiting
-  // uses of a guaranteed phi in the outer lifetime:
-  //
-  // bb0:
-  //  b1 = borrow d1
-  //  cond_br bb1, bb2
-  // bb1:
-  //   p1 = projection b1
-  //   br bb3(p1)
-  // bb2:
-  //   p1 = projection b1
-  //   br bb3(p2)
-  // bb3(forwardingPhi):
-  //   u1 = b1
-  //   u2 = forwardingPhi
-  //   // can't move end_borrow above u2
-  //   end_borrow b1
-  private mutating func walkDown(guaranteedPhi: Phi) -> WalkResult {
-    guard visited.insert(guaranteedPhi.value) else {
-      return .continueWalk
-    }
-    let phiValue = guaranteedPhi.value.lookThroughBorrowedFromUser
-    guard phiValue.getEnclosingValues(functionContext).contains(definingValue) else {
-      // Since definingValue is not an enclosing value, it must be
-      // consumed or reborrowed by some outer adjacent phi in this
-      // block. An outer adjacent phi's uses do not contribute to the
-      // outer liveness. Instead, guaranteedPhi will be recorded as a
-      // regular lifetime-ending use by the visitor.
-      return .continueWalk
-    }
-    // definingValue is not consumed or reborrowed by an outer
-    // adjacent phi in guaranteedPhi's block. Therefore this
-    // guaranteedPhi's uses contribute to the liveness of
-    // definingValue.
-    //
-    // TODO: instead of relying on Dominance, we can reformulate
-    // this algorithm to detect redundant phis, similar to the
-    // SSAUpdater.
-    if !definingValue.parentBlock.dominates(guaranteedPhi.successor,
-      functionContext.dominatorTree) {
-      // definingValue does not dominate guaranteedPhi. Record this
-      // unenclosed phi so the liveness client can insert the missing
-      // outer adjacent phi.
-      unenclosedPhis.append(guaranteedPhi);
-      return .continueWalk
-    }
-    // Since definingValue dominates guaranteedPhi, this is a well-formed linear
-    // lifetime, and liveness can proceed.
-    if guaranteedPhi.isReborrow {
-      return visitInnerScopeUses(of: guaranteedPhi.value)
-    } else {
-      return visitAllUses(of: guaranteedPhi.value)
     }
   }
 }
@@ -954,9 +869,6 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
     print("Incomplete liveness")
   }
   print(range)
-  print("Unenclosed phis {")
-  visitor.unenclosedPhis.forEach { print("  \($0)") } 
-  print("}")
 
   var boundary = LivenessBoundary(value: value, range: range, context)
   defer { boundary.deinitialize() }
