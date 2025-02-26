@@ -1753,6 +1753,13 @@ Expr *CallExpr::getDirectCallee() const {
       continue;
     }
 
+    // Explicit specializations are currently invalid for function calls, but
+    // look through them for better recovery.
+    if (auto *spec = dyn_cast<UnresolvedSpecializeExpr>(fn)) {
+      fn = spec->getSubExpr();
+      continue;
+    }
+
     return fn;
   }
 }
