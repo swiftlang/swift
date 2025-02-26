@@ -376,13 +376,14 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
       break;
 
     case ImplicitStdlibKind::Stdlib:
-      mainDependencies.addModuleImport("Swift", &alreadyAddedModules);
+      mainDependencies.addModuleImport("Swift", false, &alreadyAddedModules);
       break;
     }
 
     // Add any implicit module names.
     for (const auto &import : importInfo.AdditionalUnloadedImports) {
       mainDependencies.addModuleImport(import.module.getModulePath(),
+                                       import.options.contains(ImportFlags::Exported),
                                        &alreadyAddedModules,
                                        &ScanASTContext.SourceMgr);
     }
@@ -391,6 +392,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
     for (const auto &import : importInfo.AdditionalImports) {
       mainDependencies.addModuleImport(
           import.module.importedModule->getNameStr(),
+          import.options.contains(ImportFlags::Exported),
           &alreadyAddedModules);
     }
 
@@ -403,6 +405,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
     // add a dependency with the same name to trigger the search.
     if (importInfo.ShouldImportUnderlyingModule) {
       mainDependencies.addModuleImport(mainModule->getName().str(),
+                                       /* isExported */ true,
                                        &alreadyAddedModules);
     }
 
@@ -412,6 +415,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
     for (const auto &tbdSymbolModule :
          ScanCompilerInvocation.getTBDGenOptions().embedSymbolsFromModules) {
       mainDependencies.addModuleImport(tbdSymbolModule,
+                                       /* isExported */ false,
                                        &alreadyAddedModules);
     }
   }
@@ -1278,7 +1282,8 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
       ModuleDependencyInfo::forSwiftSourceModule({}, {}, {}, {});
   std::for_each(newOverlays.begin(), newOverlays.end(),
                 [&](Identifier modName) {
-                  dummyMainDependencies.addModuleImport(modName.str());
+                  dummyMainDependencies.addModuleImport(modName.str(),
+                                                        /* isExported */ false);
                 });
 
   // Record the dummy main module's direct dependencies. The dummy main module

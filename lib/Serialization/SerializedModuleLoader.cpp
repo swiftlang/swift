@@ -304,7 +304,7 @@ SerializedModuleLoaderBase::getModuleName(ASTContext &Ctx, StringRef modulePath,
   return ModuleFile::getModuleName(Ctx, modulePath, Name);
 }
 
-llvm::ErrorOr<llvm::StringSet<>>
+llvm::ErrorOr<std::vector<ScannerImportStatementInfo>>
 SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
     Twine modulePath, bool isFramework, bool isRequiredOSSAModules,
     StringRef SDKName, StringRef packageName, llvm::vfs::FileSystem *fileSystem,
@@ -313,7 +313,7 @@ SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
   if (!moduleBuf)
     return moduleBuf.getError();
 
-  llvm::StringSet<> importedModuleNames;
+  std::vector<ScannerImportStatementInfo> importedModuleNames;
   // Load the module file without validation.
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
@@ -336,7 +336,7 @@ SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
     if (dotPos != std::string::npos)
       moduleName = moduleName.slice(0, dotPos);
 
-    importedModuleNames.insert(moduleName);
+    importedModuleNames.push_back({moduleName.str(), dependency.isExported()});
   }
 
   return importedModuleNames;
@@ -442,6 +442,7 @@ SerializedModuleLoaderBase::getImportsOfModule(
     ModuleLoadingBehavior transitiveBehavior, StringRef packageName,
     bool isTestableImport) {
   llvm::StringSet<> importedModuleNames;
+  llvm::StringSet<> importedExportedModuleNames;
   std::string importedHeader = "";
   for (const auto &dependency : loadedModuleFile.getDependencies()) {
     if (dependency.isHeader()) {
@@ -476,9 +477,12 @@ SerializedModuleLoaderBase::getImportsOfModule(
       moduleName = "std";
 
     importedModuleNames.insert(moduleName);
+    if (dependency.isExported())
+      importedExportedModuleNames.insert(moduleName);
   }
 
   return SerializedModuleLoaderBase::BinaryModuleImports{importedModuleNames,
+                                                         importedExportedModuleNames,
                                                          importedHeader};
 }
 
@@ -553,17 +557,23 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
   auto importedModuleSet = binaryModuleImports->moduleImports;
   std::vector<ScannerImportStatementInfo> moduleImports;
   moduleImports.reserve(importedModuleSet.size());
-  llvm::transform(
-      importedModuleSet.keys(), std::back_inserter(moduleImports),
-      [](llvm::StringRef N) { return ScannerImportStatementInfo(N.str()); });
+  llvm::transform(importedModuleSet.keys(), std::back_inserter(moduleImports),
+                  [&binaryModuleImports](llvm::StringRef N) {
+                    return ScannerImportStatementInfo(
+                        N.str(),
+                        binaryModuleImports->exportedModules.contains(N));
+                  });
 
   auto importedHeader = binaryModuleImports->headerImport;
   auto &importedOptionalModuleSet = binaryModuleOptionalImports->moduleImports;
+  auto &importedExportedOptionalModuleSet =
+      binaryModuleOptionalImports->exportedModules;
   std::vector<ScannerImportStatementInfo> optionalModuleImports;
   for (const auto optionalImportedModule : importedOptionalModuleSet.keys())
     if (!importedModuleSet.contains(optionalImportedModule))
       optionalModuleImports.push_back(
-          ScannerImportStatementInfo(optionalImportedModule.str()));
+          {optionalImportedModule.str(),
+           importedExportedOptionalModuleSet.contains(optionalImportedModule)});
 
   std::vector<LinkLibrary> linkLibraries;
   {

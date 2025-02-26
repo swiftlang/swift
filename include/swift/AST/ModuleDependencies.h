@@ -152,12 +152,14 @@ struct ScannerImportStatementInfo {
     uint32_t columnNumber;
   };
 
-  ScannerImportStatementInfo(std::string importIdentifier)
-      : importLocations(), importIdentifier(importIdentifier) {}
+  ScannerImportStatementInfo(std::string importIdentifier, bool isExported)
+      : importLocations(), importIdentifier(importIdentifier),
+        isExported(isExported) {}
 
-  ScannerImportStatementInfo(std::string importIdentifier,
+  ScannerImportStatementInfo(std::string importIdentifier, bool isExported,
                              ImportDiagnosticLocationInfo location)
-      : importLocations({location}), importIdentifier(importIdentifier) {}
+      : importLocations({location}), importIdentifier(importIdentifier),
+        isExported(isExported) {}
 
   void addImportLocation(ImportDiagnosticLocationInfo location) {
     importLocations.push_back(location);
@@ -167,6 +169,8 @@ struct ScannerImportStatementInfo {
   SmallVector<ImportDiagnosticLocationInfo, 4> importLocations;
   /// Imported module string. e.g. "Foo.Bar" in 'import Foo.Bar'
   std::string importIdentifier;
+  /// Is this an @_exported import
+  bool isExported;
 };
 
 /// Base class for the variant storage of ModuleDependencyInfo.
@@ -909,7 +913,7 @@ public:
 
   /// Add a dependency on the given module, if it was not already in the set.
   void
-  addOptionalModuleImport(StringRef module,
+  addOptionalModuleImport(StringRef module, bool isExported,
                           llvm::StringSet<> *alreadyAddedModules = nullptr);
 
   /// Add all of the module imports in the given source
@@ -919,13 +923,13 @@ public:
                         const SourceManager *sourceManager);
 
   /// Add a dependency on the given module, if it was not already in the set.
-  void addModuleImport(ImportPath::Module module,
+  void addModuleImport(ImportPath::Module module, bool isExported,
                        llvm::StringSet<> *alreadyAddedModules = nullptr,
                        const SourceManager *sourceManager = nullptr,
                        SourceLoc sourceLocation = SourceLoc());
 
   /// Add a dependency on the given module, if it was not already in the set.
-  void addModuleImport(StringRef module,
+  void addModuleImport(StringRef module, bool isExported,
                        llvm::StringSet<> *alreadyAddedModules = nullptr,
                        const SourceManager *sourceManager = nullptr,
                        SourceLoc sourceLocation = SourceLoc());
