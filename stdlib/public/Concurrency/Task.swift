@@ -273,81 +273,6 @@ extension Task: Equatable {
   }
 }
 
-// ==== Starting tasks synchronously -------------------------------------------
-
-#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
-@available(SwiftStdlib 5.9, *)
-extension Task where Failure == Error {
-    @_spi(MainActorUtilities)
-    @MainActor
-    @available(SwiftStdlib 5.9, *)
-    @discardableResult
-    public static func startOnMainActor(
-        priority: TaskPriority? = nil,
-        @_inheritActorContext @_implicitSelfCapture _ operation: __owned @Sendable @escaping @MainActor() async throws -> Success
-    ) -> Task<Success, Error> {
-        let flags = taskCreateFlags(priority: priority, isChildTask: false,
-                                    copyTaskLocals: true, inheritContext: true,
-                                    enqueueJob: false,
-                                    addPendingGroupTaskUnconditionally: false,
-                                    isDiscardingTask: false, isSynchronousStart: false)
-        let (task, _) = Builtin.createAsyncTask(flags, operation)
-        _startTaskOnMainActor(task)
-        return Task<Success, Error>(task)
-    }
-}
-#endif
-
-#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
-@available(SwiftStdlib 5.9, *)
-extension Task where Failure == Never {
-    @_spi(MainActorUtilities)
-    @MainActor
-    @available(SwiftStdlib 5.9, *)
-    @discardableResult
-    public static func startOnMainActor(
-        priority: TaskPriority? = nil,
-        @_inheritActorContext @_implicitSelfCapture _ operation: __owned @Sendable @escaping @MainActor() async -> Success
-    ) -> Task<Success, Never> {
-        let flags = taskCreateFlags(priority: priority, isChildTask: false,
-                                    copyTaskLocals: true, inheritContext: true,
-                                    enqueueJob: false,
-                                    addPendingGroupTaskUnconditionally: false,
-                                    isDiscardingTask: false, isSynchronousStart: false)
-        let (task, _) = Builtin.createAsyncTask(flags, operation)
-        _startTaskOnMainActor(task)
-        return Task(task)
-    }
-}
-#endif
-
-@available(SwiftStdlib 5.9, *)
-extension Task where Failure == Never {
-  @available(SwiftStdlib 5.9, *)
-  @discardableResult
-  public static func _startSynchronously(
-    name: String? = nil,
-    priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
-  ) -> Task<Success, Never> {
-    let flags = taskCreateFlags(
-      priority: priority,
-      isChildTask: false,
-      copyTaskLocals: true,
-      inheritContext: true,
-      enqueueJob: false, // don't enqueue, we'll run it manually
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false,
-      isSynchronousStart: true
-    )
-
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-    _startTaskSynchronously(task)
-    return Task<Success, Never>(task)
-  }
-}
-
-
 // ==== Task Priority ----------------------------------------------------------
 
 /// The priority of a task.
@@ -1450,12 +1375,6 @@ extension UnsafeCurrentTask: Equatable {
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getCurrent")
 public func _getCurrentAsyncTask() -> Builtin.NativeObject?
-
-@_silgen_name("swift_task_startOnMainActor")
-fileprivate func _startTaskOnMainActor(_ task: Builtin.NativeObject)
-
-@_silgen_name("swift_task_startSynchronously")
-fileprivate func _startTaskSynchronously(_ task: Builtin.NativeObject)
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getJobFlags")

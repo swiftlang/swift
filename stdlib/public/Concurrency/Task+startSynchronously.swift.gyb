@@ -1,0 +1,118 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2020-2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import Swift
+@_implementationOnly import SwiftConcurrencyInternalShims
+
+% METHOD_VARIANTS = [
+%   'THROWING',
+%   'NON_THROWING',
+% ]
+% OPERATION_PARAM = '@_inheritActorContext @_implicitSelfCapture _ operation: __owned @Sendable @escaping @MainActor () async throws -> Success'
+% for METHOD_VARIANT in METHOD_VARIANTS:
+
+% IS_THROWING = METHOD_VARIANT == 'THROWING'
+% if IS_THROWING:
+%   FAILURE_TYPE = 'Error'
+% else:
+%   FAILURE_TYPE = 'Never'
+% end
+
+// ==== Task.startSynchronously ------------------------------------------------
+
+@available(SwiftStdlib 6.2, *)
+extension Task where Failure == ${FAILURE_TYPE} {
+
+  /// Create and immediately start running a new task in the context of the calling thread/task.
+  ///
+  /// This function _starts_ the created task on the calling context.
+  /// The task will continue executing on the caller's context until it suspends,
+  /// and after suspension will resume on the adequate executor. For a nonisolated
+  /// operation this means running on the global concurrent pool, and on an isolated
+  /// operation it means the appropriate executor of that isolation context.
+  ///
+  /// As indicated by the lack of `async` on this method, this method does _not_
+  /// suspend, and instead takes over the calling task's (thread's) execution in
+  /// a synchronous manner.
+  ///
+  /// Other than the execution semantics discussed above, the created task
+  /// is semantically equivalent to its basic version which can be
+  /// created using ``Task/init``.
+  ///
+  /// - Parameters:
+  ///   - priority: The priority of the task.
+  ///     Pass `nil` to use the ``Task/basePriority`` of the current task (if there is one).
+  ///   - operation: the operation to be run immediately upon entering the task.
+  /// - Returns:
+  @available(SwiftStdlib 6.2, *)
+  @discardableResult
+  public static func _startSynchronously(
+    priority: TaskPriority? = nil,
+    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
+  ) -> Task<Success, ${FAILURE_TYPE}> {
+    let flags = taskCreateFlags(
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: true,
+      inheritContext: true,
+      enqueueJob: false, // don't enqueue, we'll run it manually
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: true
+    )
+
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
+    _startTaskSynchronously(task)
+    return Task<Success, ${FAILURE_TYPE}>(task)
+  }
+}
+
+// ==== Legacy SPI -------------------------------------------------------------
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
+@available(SwiftStdlib 5.9, *)
+extension Task where Failure == ${FAILURE_TYPE} {
+
+  @_spi(MainActorUtilities)
+  @MainActor
+  @available(SwiftStdlib 5.9, *)
+  @discardableResult
+  public static func startOnMainActor(
+    priority: TaskPriority? = nil,
+    ${OPERATION_PARAM if IS_THROWING else OPERATION_PARAM.replace("throws", "")}
+  ) -> Task<Success, ${FAILURE_TYPE}> {
+    let flags = taskCreateFlags(
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: true,
+      inheritContext: true,
+      enqueueJob: false,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: false
+    )
+
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
+    _startTaskOnMainActor(task)
+
+    return Task<Success, ${FAILURE_TYPE}>(task)
+  }
+}
+#endif
+% end
+
+// Internal Runtime Functions --------------------------------------------------
+
+@_silgen_name("swift_task_startOnMainActor")
+fileprivate func _startTaskOnMainActor(_ task: Builtin.NativeObject)
+
+@_silgen_name("swift_task_startSynchronously")
+fileprivate func _startTaskSynchronously(_ task: Builtin.NativeObject)

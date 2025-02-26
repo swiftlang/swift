@@ -13,10 +13,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
 
-@_spi(MainActorUtilities) import _Concurrency
-#if canImport(Darwin)
+import _Concurrency
 import Dispatch
-#endif
 
 enum CompareHow {
   case equal
@@ -95,7 +93,6 @@ func syncOnMyGlobalActor() -> [Task<Void, Never>] {
   return [t1, tt]
 }
 
-#if canImport(Darwin) // because Dispatch
 func syncOnNonTaskThread(synchronousTask behavior: SynchronousTaskBehavior) {
   let sem1 = DispatchSemaphore(value: 0)
   let sem2 = DispatchSemaphore(value: 0)
@@ -138,7 +135,6 @@ func syncOnNonTaskThread(synchronousTask behavior: SynchronousTaskBehavior) {
 
   sem2.wait()
 }
-#endif // Darwin
 
 enum SynchronousTaskBehavior {
   case suspend
@@ -165,7 +161,6 @@ await Task { @MyGlobalActor in
 // resume on some other thread
 // CHECK: after sleep, inside startSynchronously
 
-#if canImport(Darwin) // because Dispatch
 print("\n\n==== ------------------------------------------------------------------")
 var behavior: SynchronousTaskBehavior = .suspend
 print("syncOnNonTaskThread(synchronousTask: \(behavior))")
@@ -179,9 +174,7 @@ syncOnNonTaskThread(synchronousTask: behavior)
 // CHECK-NEXT: inside startSynchronously, before sleep [thread:[[CALLING_THREAD2]]]
 // CHECK-NEXT: after startSynchronously, outside; cancel (wakeup) the synchronous task!  [thread:[[CALLING_THREAD2]]]
 // CHECK-NEXT: inside startSynchronously, after sleep
-#endif
 
-#if canImport(Darwin) // because Dispatch
 print("\n\n==== ------------------------------------------------------------------")
 behavior = .dontSuspend
 print("syncOnNonTaskThread(synchronousTask: \(behavior))")
@@ -193,9 +186,7 @@ syncOnNonTaskThread(synchronousTask: behavior)
 // CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD3]]]
 // CHECK: inside startSynchronously, done [thread:[[CALLING_THREAD3]]]
 // CHECK: after startSynchronously, outside; cancel (wakeup) the synchronous task!  [thread:[[CALLING_THREAD3]]]
-#endif
 
-#if canImport(Darwin) // because Dispatch
 print("\n\n==== ------------------------------------------------------------------")
 print("callActorFromStartSynchronousTask()")
 callActorFromStartSynchronousTask(recipient: .recipient(Recipient()))
@@ -325,9 +316,7 @@ func callActorFromStartSynchronousTask(recipient rec: TargetActorToCall) {
   sem1.wait()
   sem2.wait()
 }
-#endif
 
-#if canImport(Darwin) // because Dispatch
 print("\n\n==== ------------------------------------------------------------------")
 print("callActorFromStartSynchronousTask() - actor in custom executor with its own queue")
 let actorQueue = DispatchSerialQueue(label: "recipient-actor-queue")
@@ -410,4 +399,3 @@ actor RecipientOnQueue {
     }.value
   }
 }
-#endif

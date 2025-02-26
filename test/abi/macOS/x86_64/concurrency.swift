@@ -388,3 +388,5 @@ Added: _$ss33withTaskPriorityEscalationHandler9operation02onC9Escalated9isolatio
 Added: _swift_task_startSynchronously
 // static (extension in Swift):Swift.Task< where B == Swift.Never>._startSynchronously(name: Swift.String?, priority: Swift.TaskPriority?, operation: __owned @Sendable () async -> A) -> Swift.Task<A, Swift.Never>
 Added: _$sScTss5NeverORs_rlE19_startSynchronously4name8priority9operationScTyxABGSSSg_ScPSgxyYaYbcntFZ
+// static (extension in Swift):Swift.Task< where B == Swift.Error>._startSynchronously(name: Swift.String?, priority: Swift.TaskPriority?, operation: __owned @Sendable () async -> A) -> Swift.Task<A, Swift.Error>
+Added: _$sScTss5Error_pRs_rlE19_startSynchronously4name8priority9operationScTyxsAA_pGSSSg_ScPSgxyYaYbcntFZ
