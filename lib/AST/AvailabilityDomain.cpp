@@ -13,7 +13,6 @@
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -234,11 +233,11 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
     auto domainString = identifier.str();
     if (auto suggestion = closestCorrectedPlatformString(domainString)) {
       diags
-          .diagnose(loc, diag::avail_query_suggest_platform_name, identifier,
+          .diagnose(loc, diag::availability_suggest_platform_name, identifier,
                     *suggestion)
           .fixItReplace(SourceRange(loc), *suggestion);
     } else {
-      diags.diagnose(loc, diag::avail_query_unrecognized_platform_name,
+      diags.diagnose(loc, diag::availability_unrecognized_platform_name,
                      identifier);
     }
     return std::nullopt;

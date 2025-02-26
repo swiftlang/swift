@@ -252,6 +252,11 @@ func shortFormWithUnrecognizedPlatform() {
 func shortFormWithTwoUnrecognizedPlatforms() {
 }
 
+@available(macOS 10.9, iOS 7.0, watchOS 2.0, tvOS 9.0, iDishwasherOS 22.0, visionOS 1.0, *)
+// expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
+func shortFormWithInteriorUnrecognizedPlatform() {
+}
+
 @available(ios 8.0, macos 10.12, *)
 // expected-warning@-1 {{unrecognized platform name 'ios'; did you mean 'iOS'?}}
 // expected-warning@-2 {{unrecognized platform name 'macos'; did you mean 'macOS'?}}
