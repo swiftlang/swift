@@ -134,6 +134,8 @@ class ExecutorTrackingInfo {
   /// is `generic`.
   TaskExecutorRef TaskExecutor = TaskExecutorRef::undefined();
 
+  bool StartedSynchronouslySkipSwitchOnce = false;
+
   /// Whether this context allows switching.  Some contexts do not;
   /// for example, we do not allow switching from swift_job_run
   /// unless the passed-in executor is generic.
@@ -177,13 +179,23 @@ public:
   }
 
   bool allowsSwitching() const {
-    return AllowsSwitching;
+    return AllowsSwitching && !StartedSynchronouslySkipSwitchOnce;
   }
 
   /// Disallow switching in this tracking context.  This should only
   /// be set on a new tracking info, before any jobs are run in it.
   void disallowSwitching() {
     AllowsSwitching = false;
+  }
+
+  void markSynchronousStart() {
+    StartedSynchronouslySkipSwitchOnce = true;
+  }
+  bool isSynchronousStart() const {
+    return StartedSynchronouslySkipSwitchOnce;
+  }
+  void withoutStartSynchronously() {
+    StartedSynchronouslySkipSwitchOnce = false;
   }
 
   static ExecutorTrackingInfo *current() {
@@ -2151,13 +2163,23 @@ static bool canGiveUpThreadForSwitch(ExecutorTrackingInfo *trackingInfo,
   assert(trackingInfo || currentExecutor.isGeneric());
 
   // Some contexts don't allow switching at all.
-  if (trackingInfo && !trackingInfo->allowsSwitching())
+  if (trackingInfo && !trackingInfo->allowsSwitching()) {
     return false;
+  }
 
   // We can certainly "give up" a generic executor to try to run
   // a task for an actor.
-  if (currentExecutor.isGeneric())
+  if (currentExecutor.isGeneric()) {
+    if (trackingInfo->isSynchronousStart()) {
+      return false;
+    }
+
+    if (currentExecutor.isForSynchronousStart()) {
+      return false;
+    }
+
     return true;
+  }
 
   // If the current executor is a default actor, we know how to make
   // it give up its thread.
@@ -2278,7 +2300,8 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
                                            : TaskExecutorRef::undefined());
   auto newTaskExecutor = task->getPreferredTaskExecutor();
   SWIFT_TASK_DEBUG_LOG("Task %p trying to switch executors: executor %p%s to "
-                       "new serial executor: %p%s; task executor: from %p%s to %p%s",
+                       "new serial executor: %p%s; task executor: from %p%s to %p%s"
+                       "%s",
                        task,
                        currentExecutor.getIdentity(),
                        currentExecutor.getIdentityDebugName(),
@@ -2287,13 +2310,15 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
                        currentTaskExecutor.getIdentity(),
                        currentTaskExecutor.isDefined() ? "" : " (undefined)",
                        newTaskExecutor.getIdentity(),
-                       newTaskExecutor.isDefined() ? "" : " (undefined)");
+                       newTaskExecutor.isDefined() ? "" : " (undefined)",
+                       trackingInfo->isSynchronousStart() ? "[synchronous start]" : "[NOT SYNC START]");
 
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function
   // we were passed in.
   if (!mustSwitchToRun(currentExecutor, newExecutor, currentTaskExecutor,
                        newTaskExecutor)) {
+    SWIFT_TASK_DEBUG_LOG("Task %p run inline", task);
     return resumeFunction(resumeContext); // 'return' forces tail call
   }
 
@@ -2305,6 +2330,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   // If the current executor can give up its thread, and the new executor
   // can take over a thread, try to do so; but don't do this if we've
   // been asked to yield the thread.
+  SWIFT_TASK_DEBUG_LOG("Task %p can give up thread?", task);
   if (currentTaskExecutor.isUndefined() &&
       canGiveUpThreadForSwitch(trackingInfo, currentExecutor) &&
       !shouldYieldThread() &&
@@ -2339,8 +2365,11 @@ static void swift_task_startSynchronouslyImpl(AsyncTask* task) {
     swift_job_run(task, currentExecutor);
     _swift_task_setCurrent(originalTask);
   } else {
-    // FIXME: this is not correct; we'll keep reusing this thread when we should not have been. See tests with actors.
-    SerialExecutorRef executor = SerialExecutorRef::generic(); // _task_task_getRunSynchronouslyExecutor();
+    SerialExecutorRef executor = SerialExecutorRef::forSynchronousStart();
+
+    ExecutorTrackingInfo trackingInfo;
+//    trackingInfo.markSynchronousStart();
+
     auto originalTask = ActiveTask::swap(task);
     assert(!originalTask);
 

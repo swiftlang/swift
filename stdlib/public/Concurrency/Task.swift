@@ -290,7 +290,7 @@ extension Task where Failure == Error {
                                     copyTaskLocals: true, inheritContext: true,
                                     enqueueJob: false,
                                     addPendingGroupTaskUnconditionally: false,
-                                    isDiscardingTask: false)
+                                    isDiscardingTask: false, isSynchronousStart: false)
         let (task, _) = Builtin.createAsyncTask(flags, operation)
         _startTaskOnMainActor(task)
         return Task<Success, Error>(task)
@@ -313,7 +313,7 @@ extension Task where Failure == Never {
                                     copyTaskLocals: true, inheritContext: true,
                                     enqueueJob: false,
                                     addPendingGroupTaskUnconditionally: false,
-                                    isDiscardingTask: false)
+                                    isDiscardingTask: false, isSynchronousStart: false)
         let (task, _) = Builtin.createAsyncTask(flags, operation)
         _startTaskOnMainActor(task)
         return Task(task)
@@ -337,7 +337,8 @@ extension Task where Failure == Never {
       inheritContext: true,
       enqueueJob: false, // don't enqueue, we'll run it manually
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false
+      isDiscardingTask: false,
+      isSynchronousStart: true
     )
 
     let (task, _) = Builtin.createAsyncTask(flags, operation)
@@ -624,7 +625,8 @@ func taskCreateFlags(
   priority: TaskPriority?, isChildTask: Bool, copyTaskLocals: Bool,
   inheritContext: Bool, enqueueJob: Bool,
   addPendingGroupTaskUnconditionally: Bool,
-  isDiscardingTask: Bool
+  isDiscardingTask: Bool,
+  isSynchronousStart: Bool
 ) -> Int {
   var bits = 0
   bits |= (bits & ~0xFF) | Int(priority?.rawValue ?? 0)
@@ -645,6 +647,10 @@ func taskCreateFlags(
   }
   if isDiscardingTask {
     bits |= 1 << 14
+  }
+  // 15 is used by 'IsTaskFunctionConsumed'
+  if isSynchronousStart {
+    bits |= 1 << 16
   }
   return bits
 }
@@ -698,7 +704,7 @@ extension Task where Failure == Never {
       priority: priority, isChildTask: false, copyTaskLocals: true,
       inheritContext: true, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the asynchronous task.
     let builtinSerialExecutor =
@@ -742,7 +748,7 @@ extension Task where Failure == Never {
       priority: priority, isChildTask: false, copyTaskLocals: true,
       inheritContext: true, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the asynchronous task.
     let (task, _) = Builtin.createAsyncTask(flags, operation)
@@ -787,7 +793,7 @@ extension Task where Failure == Never {
       priority: priority, isChildTask: false, copyTaskLocals: true,
       inheritContext: true, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the asynchronous task.
     let builtinSerialExecutor =
@@ -866,7 +872,7 @@ extension Task where Failure == Error {
       priority: priority, isChildTask: false, copyTaskLocals: true,
       inheritContext: true, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the asynchronous task future.
     let builtinSerialExecutor =
@@ -911,7 +917,7 @@ extension Task where Failure == Error {
     priority: priority, isChildTask: false, copyTaskLocals: true,
     inheritContext: true, enqueueJob: true,
     addPendingGroupTaskUnconditionally: false,
-    isDiscardingTask: false)
+    isDiscardingTask: false, isSynchronousStart: false)
 
   // Create the asynchronous task.
   let (task, _) = Builtin.createAsyncTask(flags, operation)
@@ -956,7 +962,7 @@ self._task = task
     priority: priority, isChildTask: false, copyTaskLocals: true,
     inheritContext: true, enqueueJob: true,
     addPendingGroupTaskUnconditionally: false,
-    isDiscardingTask: false)
+    isDiscardingTask: false, isSynchronousStart: false)
 
   // Create the asynchronous task.
   let builtinSerialExecutor =
@@ -1034,7 +1040,7 @@ extension Task where Failure == Never {
       priority: priority, isChildTask: false, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the asynchronous task future.
     let builtinSerialExecutor =
@@ -1097,7 +1103,7 @@ extension Task where Failure == Never {
       priority: priority, isChildTask: false, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the asynchronous task.
     let builtinSerialExecutor =
@@ -1175,7 +1181,7 @@ extension Task where Failure == Error {
       priority: priority, isChildTask: false, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the asynchronous task future.
     let builtinSerialExecutor =
@@ -1239,7 +1245,7 @@ extension Task where Failure == Error {
       priority: priority, isChildTask: false, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the asynchronous task future.
     let builtinSerialExecutor =

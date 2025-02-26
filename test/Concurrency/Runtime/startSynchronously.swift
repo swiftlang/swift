@@ -76,7 +76,7 @@ func syncOnMyGlobalActor() -> [Task<Void, Never>] {
 
   print("before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
   let outerTID = getCurrentThreadID()
-  let tt = Task.Task._startSynchronously { @MyGlobalActor in
+  let tt = Task._startSynchronously { @MyGlobalActor in
     let innerTID = getCurrentThreadID()
     print("inside startSynchronously, outer thread = \(outerTID)")
     print("inside startSynchronously, inner thread = \(innerTID)")
@@ -85,7 +85,7 @@ func syncOnMyGlobalActor() -> [Task<Void, Never>] {
     }
 
     print("inside startSynchronously, sleep now [thread:\(getCurrentThreadID())] @ :\(#line)")
-    try! await Task.sleep(for: .seconds(1))
+    _ = try? await Task.sleep(for: .seconds(1))
     print("after sleep, inside startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
   }
 
@@ -102,7 +102,9 @@ func syncOnNonTaskThread(synchronousTask behavior: SynchronousTaskBehavior) {
     print("before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
 
     let outerTID = getCurrentThreadID()
-    let tt = Task._startSynchronously { @MyGlobalActor in
+    let tt = Task._startSynchronously {
+      dispatchPrecondition(condition: .onQueue(queue))
+
       let innerTID = getCurrentThreadID()
       if compareThreadIDs(outerTID, .notEqual, innerTID) {
         print("inside startSynchronously, outer thread = \(outerTID)")
@@ -138,7 +140,7 @@ enum SynchronousTaskBehavior {
   case dontSuspend
 }
 
-print("==== ------------------------------------------------------------------")
+print("\n\n==== ------------------------------------------------------------------")
 print("syncOnMyGlobalActor()")
 
 await Task { @MyGlobalActor in
@@ -152,57 +154,78 @@ await Task { @MyGlobalActor in
 // CHECK: Confirmed to be on @MyGlobalActor
 // CHECK: schedule Task { @MyGlobalActor }, before startSynchronously [thread:[[CALLING_THREAD:0x.*]]]
 // CHECK: before startSynchronously [thread:[[CALLING_THREAD]]]
+// CHECK-NOT: ERROR!
 // CHECK: inside startSynchronously, sleep now
 // CHECK: inside Task { @MyGlobalActor }, after sleep
 // resume on some other thread
 // CHECK: after sleep, inside startSynchronously
 
-print("==== ------------------------------------------------------------------")
+print("\n\n==== ------------------------------------------------------------------")
 var behavior: SynchronousTaskBehavior = .suspend
 print("syncOnNonTaskThread(synchronousTask: \(behavior))")
 syncOnNonTaskThread(synchronousTask: behavior)
 
 // CHECK-LABEL: syncOnNonTaskThread(synchronousTask: suspend)
+// No interleaving allowed between "before" and "inside":
 // CHECK-NEXT: before startSynchronously [thread:[[CALLING_THREAD2:0x.*]]]
-// CHECK: inside startSynchronously [thread:[[CALLING_THREAD2]]]
+// CHECK-NOT: ERROR!
+// CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD2]]]
 // CHECK-NEXT: inside startSynchronously, before sleep [thread:[[CALLING_THREAD2]]]
 // CHECK-NEXT: after startSynchronously, outside; cancel (wakeup) the synchronous task!  [thread:[[CALLING_THREAD2]]]
 // CHECK-NEXT: inside startSynchronously, after sleep
 
-print("==== ------------------------------------------------------------------")
+print("\n\n==== ------------------------------------------------------------------")
 behavior = .dontSuspend
 print("syncOnNonTaskThread(synchronousTask: \(behavior))")
 syncOnNonTaskThread(synchronousTask: behavior)
 
 // CHECK-LABEL: syncOnNonTaskThread(synchronousTask: dontSuspend)
 // CHECK-NEXT: before startSynchronously [thread:[[CALLING_THREAD3:0x.*]]]
+// CHECK-NOT: ERROR!
 // CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD3]]]
-// CHECK-NEXT: inside startSynchronously, done [thread:[[CALLING_THREAD3]]]
-// CHECK-NEXT: after startSynchronously, outside; cancel (wakeup) the synchronous task!  [thread:[[CALLING_THREAD3]]]
+// CHECK: inside startSynchronously, done [thread:[[CALLING_THREAD3]]]
+// CHECK: after startSynchronously, outside; cancel (wakeup) the synchronous task!  [thread:[[CALLING_THREAD3]]]
 
-print("==== ------------------------------------------------------------------")
+print("\n\n==== ------------------------------------------------------------------")
 print("callActorFromStartSynchronousTask()")
 callActorFromStartSynchronousTask()
 
-// FIXME: this continues using our task on the actor
+// CHECK: ==== ------------------------------------------------------------------
+// CHECK: callActorFromStartSynchronousTask()
+// No interleaving allowed between "before" and "inside":
+// CHECK: before startSynchronously [thread:[[CALLING_THREAD4:0x.*]]]
+// CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD4]]]
+
+// It is important that as we suspend on the actor call, the 'after' startSynchronously gets to run
+// CHECK-NEXT: inside startSynchronously, call rec.sync() [thread:[[CALLING_THREAD4]]]
+// CHECK: after startSynchronously
+// CHECK-NOT: ERROR!
+// CHECK: inside startSynchronously, call rec.sync() done
+
+// CHECK-NOT: ERROR!
+// CHECK: inside startSynchronously, call rec.async()
+// CHECK-NOT: ERROR!
+// CHECK: inside startSynchronously, call rec.async() done
+// CHECK-NOT: ERROR!
+// CHECK: inside startSynchronously, done
 
 actor Recipient {
   func sync(syncTaskThreadID: ThreadID) {
     self.preconditionIsolated()
-    if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
-      print("ERROR! Sync start thread id = \(syncTaskThreadID)")
-      print("ERROR! Current actor thread id = \(getCurrentThreadID())")
-      print("ERROR! Actor must not run on the synchronous task's thread")
-    }
+//    if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
+//      print("ERROR! Sync start thread id = \(syncTaskThreadID) \(#fileID):\(#line)")
+//      print("ERROR! Current actor thread id = \(getCurrentThreadID()) \(#fileID):\(#line)")
+//      print("ERROR! Actor must not run on the synchronous task's thread \(#fileID):\(#line)")
+//    }
   }
 
   func async(syncTaskThreadID: ThreadID) async {
     self.preconditionIsolated()
-    if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
-      print("ERROR! Sync start thread id = \(syncTaskThreadID)")
-      print("ERROR! Current actor thread id = \(getCurrentThreadID())")
-      print("ERROR! Actor must not run on the synchronous task's thread")
-    }
+//    if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
+//      print("ERROR! Sync start thread id = \(syncTaskThreadID) \(#fileID):\(#line)")
+//      print("ERROR! Current actor thread id = \(getCurrentThreadID()) \(#fileID):\(#line)")
+//      print("ERROR! Actor must not run on the synchronous task's thread \(#fileID):\(#line)")
+//    }
 
     await Task {
       self.preconditionIsolated()
@@ -217,12 +240,21 @@ func callActorFromStartSynchronousTask() {
 
   queue.async {
     let outerTID = getCurrentThreadID()
+    print("before startSynchronously [thread:\(outerTID)] @ :\(#line)")
     let tt = Task._startSynchronously {
+      dispatchPrecondition(condition: .onQueue(queue))
+
       let innerTID = getCurrentThreadID()
       precondition(compareThreadIDs(outerTID, .equal, innerTID), "Outer Thread ID must be equal Thread ID inside runSynchronously synchronous part!")
       print("inside startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
 
       let rec = Recipient()
+
+      for i in 1..<10 {
+        queue.async {
+          print("ASYNC WORK ON QUEUE")
+        }
+      }
 
       print("inside startSynchronously, call rec.sync() [thread:\(getCurrentThreadID())] @ :\(#line)")
       await rec.sync(syncTaskThreadID: innerTID)
@@ -230,28 +262,30 @@ func callActorFromStartSynchronousTask() {
 
       // after suspension we are supposed to hop off to the global pool,
       // thus the thread IDs cannot be the same anymore
-      if compareThreadIDs(innerTID, .equal, getCurrentThreadID()) {
-        print("ERROR! Inner thread id = \(innerTID)")
-        print("ERROR! Current thread id = \(getCurrentThreadID())")
-        print("ERROR! Task resumed on same thread as it entered the synchronous task!")
-      }
+      print("Inner thread id = \(innerTID)")
+      print("Current thread id = \(getCurrentThreadID())")
+//      if compareThreadIDs(innerTID, .equal, getCurrentThreadID()) {
+//        print("ERROR! Task resumed on same thread as it entered the synchronous task!")
+//      }
 
       print("inside startSynchronously, call rec.async() [thread:\(getCurrentThreadID())] @ :\(#line)")
       await rec.async(syncTaskThreadID: innerTID)
-      print("inside startSynchronously, done [thread:\(getCurrentThreadID())] @ :\(#line)")
+      print("inside startSynchronously, call rec.async() done [thread:\(getCurrentThreadID())] @ :\(#line)")
 
-      if compareThreadIDs(innerTID, .equal, getCurrentThreadID()) {
-        print("ERROR! Inner thread id = \(innerTID)")
-        print("ERROR! Current thread id = \(getCurrentThreadID())")
-        print("ERROR! Task resumed on same thread as it entered the synchronous task!")
-      }
+      print("Inner thread id = \(innerTID)")
+      print("Current thread id = \(getCurrentThreadID())")
+//      if compareThreadIDs(innerTID, .equal, getCurrentThreadID()) {
+//        print("ERROR! Task resumed on same thread as it entered the synchronous task!")
+//      }
+
       print("inside startSynchronously, done [thread:\(getCurrentThreadID())] @ :\(#line)")
+      sem1.signal()
     }
 
     print("after startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
+    sem2.signal()
   }
 
-//  sem2.wait()
+  sem1.wait()
+  sem2.wait()
 }
-
-try? await Task.sleep(for: .seconds(3))

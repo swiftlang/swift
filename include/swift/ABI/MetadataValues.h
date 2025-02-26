@@ -2668,13 +2668,13 @@ public:
     Task_EnqueueJob                               = 12,
     Task_AddPendingGroupTaskUnconditionally       = 13,
     Task_IsDiscardingTask                         = 14,
-
     /// The task function is consumed by calling it (@callee_owned).
     /// The context pointer should be treated as opaque and non-copyable;
     /// in particular, it should not be retained or released.
     ///
     /// Supported starting in Swift 6.1.
-    Task_IsTaskFunctionConsumed                       = 15,
+    Task_IsTaskFunctionConsumed                   = 15,
+    Task_IsStartSynchronouslyTask                 = 16,
   };
 
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
@@ -2707,6 +2707,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsTaskFunctionConsumed,
                                 isTaskFunctionConsumed,
                                 setIsTaskFunctionConsumed)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsStartSynchronouslyTask,
+                                isSynchronousStartTask,
+                                setIsSYnchronousStartTask)
 };
 
 /// Flags for schedulable jobs.

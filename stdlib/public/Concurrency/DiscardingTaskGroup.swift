@@ -205,13 +205,15 @@ public struct DiscardingTaskGroup {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 #else
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 #endif
 
@@ -252,13 +254,15 @@ public struct DiscardingTaskGroup {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 #else
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 #endif
 
@@ -281,7 +285,8 @@ public struct DiscardingTaskGroup {
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     // Create the task in this group.
@@ -317,7 +322,8 @@ public struct DiscardingTaskGroup {
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     // Create the task in this group.
@@ -635,7 +641,8 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     // Create the task in this group.
@@ -666,7 +673,8 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     // Create the task in this group.
