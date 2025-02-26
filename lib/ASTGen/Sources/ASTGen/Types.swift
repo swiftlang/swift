@@ -460,3 +460,101 @@ extension ASTGenVisitor {
     }.bridgedArray(in: self)
   }
 }
+
+extension ASTGenVisitor {
+  struct GeneratedGenericArguments {
+    var arguments: BridgedArrayRef = .init()
+    var range: BridgedSourceRange = .init()
+  }
+
+  /// Generate 'TypeRepr' from a expression, because 'conformances' arguments in
+  /// macro role attributes are parsed as normal expressions.
+  func generateTypeRepr(
+    expr node: ExprSyntax,
+    genericArgs: GeneratedGenericArguments = GeneratedGenericArguments()
+  ) -> BridgedTypeRepr? {
+    if !genericArgs.arguments.isEmpty {
+      guard node.is(MemberAccessExprSyntax.self) || node.is(DeclReferenceExprSyntax.self) else {
+        // TODO: Diagnose.
+        fatalError("generic arguments cannot be applied")
+      }
+    }
+
+    switch node.as(ExprSyntaxEnum.self) {
+
+    case .typeExpr(let node):
+      return self.generate(type: node.type)
+
+    case .declReferenceExpr(let node):
+      guard node.argumentNames == nil else {
+        // 'Foo.bar(_:baz:)'
+        break
+      }
+      let name = self.generateIdentifierAndSourceLoc(node.baseName)
+      return BridgedUnqualifiedIdentTypeRepr .createParsed(
+        self.ctx,
+        name: name.identifier,
+        nameLoc: name.sourceLoc,
+        genericArgs: genericArgs.arguments,
+        leftAngleLoc: genericArgs.range.start,
+        rightAngleLoc: genericArgs.range.end
+      ).asTypeRepr
+
+    case .memberAccessExpr(let node):
+      guard let parsedBase = node.base else {
+        // Implicit member expressions. E.g. '.Foo'
+        break
+      }
+      guard let base = self.generateTypeRepr(expr: parsedBase) else {
+        // Unsupported base expr. E.g. 'foo().bar'
+        return nil
+      }
+      guard node.declName.argumentNames == nil else {
+        // Function name. E.g. 'Foo.bar(_:baz:)'
+        break
+      }
+      let name = self.generateIdentifierAndSourceLoc(node.declName.baseName)
+      return BridgedDeclRefTypeRepr.createParsed(
+        self.ctx,
+        base: base,
+        name: name.identifier,
+        nameLoc: name.sourceLoc,
+        genericArguments: genericArgs.arguments,
+        angleRange: genericArgs.range
+      ).asTypeRepr
+
+    case .genericSpecializationExpr(let node):
+      let args = node.genericArgumentClause.arguments.lazy.map {
+        self.generate(genericArgument: $0.argument)
+      }
+      return self.generateTypeRepr(
+        expr: node.expression,
+        genericArgs: GeneratedGenericArguments(
+          arguments: args.bridgedArray(in: self),
+          range: self.generateSourceRange(node.genericArgumentClause)
+        )
+      )
+
+    case .sequenceExpr(let node):
+      // TODO: Support composition type?
+      _ = node
+      break
+
+    case .tupleExpr(let node):
+      // TODO: Support tuple type?
+      _ = node
+      break
+
+    case .arrowExpr(let node):
+      // TODO: Support function type?
+      _ = node
+      break
+
+    default:
+      break
+    }
+
+    // TODO: Diagnose
+    fatalError("invalid/unimplemented expression for type")
+  }
+}
