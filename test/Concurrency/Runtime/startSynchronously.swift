@@ -14,7 +14,9 @@
 // UNSUPPORTED: freestanding
 
 @_spi(MainActorUtilities) import _Concurrency
+#if canImport(Darwin)
 import Dispatch
+#endif
 
 enum CompareHow {
   case equal
@@ -63,6 +65,7 @@ actor MyGlobalActor {
   static let shared: MyGlobalActor = MyGlobalActor()
 }
 
+// Test on all platforms
 func syncOnMyGlobalActor() -> [Task<Void, Never>] {
   MyGlobalActor.shared.preconditionIsolated("Should be executing on the global actor here")
   print("Confirmed to be on @MyGlobalActor")
@@ -92,6 +95,7 @@ func syncOnMyGlobalActor() -> [Task<Void, Never>] {
   return [t1, tt]
 }
 
+#if canImport(Darwin) // because Dispatch
 func syncOnNonTaskThread(synchronousTask behavior: SynchronousTaskBehavior) {
   let sem1 = DispatchSemaphore(value: 0)
   let sem2 = DispatchSemaphore(value: 0)
@@ -134,6 +138,7 @@ func syncOnNonTaskThread(synchronousTask behavior: SynchronousTaskBehavior) {
 
   sem2.wait()
 }
+#endif // Darwin
 
 enum SynchronousTaskBehavior {
   case suspend
@@ -160,6 +165,7 @@ await Task { @MyGlobalActor in
 // resume on some other thread
 // CHECK: after sleep, inside startSynchronously
 
+#if canImport(Darwin) // because Dispatch
 print("\n\n==== ------------------------------------------------------------------")
 var behavior: SynchronousTaskBehavior = .suspend
 print("syncOnNonTaskThread(synchronousTask: \(behavior))")
@@ -173,7 +179,9 @@ syncOnNonTaskThread(synchronousTask: behavior)
 // CHECK-NEXT: inside startSynchronously, before sleep [thread:[[CALLING_THREAD2]]]
 // CHECK-NEXT: after startSynchronously, outside; cancel (wakeup) the synchronous task!  [thread:[[CALLING_THREAD2]]]
 // CHECK-NEXT: inside startSynchronously, after sleep
+#endif
 
+#if canImport(Darwin) // because Dispatch
 print("\n\n==== ------------------------------------------------------------------")
 behavior = .dontSuspend
 print("syncOnNonTaskThread(synchronousTask: \(behavior))")
@@ -185,12 +193,13 @@ syncOnNonTaskThread(synchronousTask: behavior)
 // CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD3]]]
 // CHECK: inside startSynchronously, done [thread:[[CALLING_THREAD3]]]
 // CHECK: after startSynchronously, outside; cancel (wakeup) the synchronous task!  [thread:[[CALLING_THREAD3]]]
+#endif
 
+#if canImport(Darwin) // because Dispatch
 print("\n\n==== ------------------------------------------------------------------")
 print("callActorFromStartSynchronousTask()")
-callActorFromStartSynchronousTask()
+callActorFromStartSynchronousTask(recipient: .recipient(Recipient()))
 
-// CHECK: ==== ------------------------------------------------------------------
 // CHECK: callActorFromStartSynchronousTask()
 // No interleaving allowed between "before" and "inside":
 // CHECK: before startSynchronously [thread:[[CALLING_THREAD4:0x.*]]]
@@ -206,12 +215,27 @@ callActorFromStartSynchronousTask()
 // CHECK: inside startSynchronously, call rec.async()
 // CHECK-NOT: ERROR!
 // CHECK: inside startSynchronously, call rec.async() done
+
 // CHECK-NOT: ERROR!
 // CHECK: inside startSynchronously, done
 
+/// Don't want to involve protocol calls to not confuse the test with additional details,
+/// so we use concrete types here.
+enum TargetActorToCall {
+  case recipient(Recipient)
+  case recipientOnQueue(RecipientOnQueue)
+}
+
+protocol RecipientProtocol where Self: Actor {
+  func sync(syncTaskThreadID: ThreadID) async
+  func async(syncTaskThreadID: ThreadID) async
+}
+
+// default actor, must not declare an 'unownedExecutor'
 actor Recipient {
   func sync(syncTaskThreadID: ThreadID) {
     self.preconditionIsolated()
+
     print("\(Recipient.self)/\(#function) Current actor thread id = \(getCurrentThreadID()) @ :\(#line)")
     if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
       print("NOTICE: Actor must not run on the synchronous task's thread :\(#line)")
@@ -220,6 +244,7 @@ actor Recipient {
 
   func async(syncTaskThreadID: ThreadID) async {
     self.preconditionIsolated()
+
     // Dispatch may end up reusing the thread used to service the queue so we
     // cannot truly assert exact thread identity in such tests.
     // Usually this will be on a different thread by now though.
@@ -234,7 +259,7 @@ actor Recipient {
   }
 }
 
-func callActorFromStartSynchronousTask() {
+func callActorFromStartSynchronousTask(recipient rec: TargetActorToCall) {
   let sem1 = DispatchSemaphore(value: 0)
   let sem2 = DispatchSemaphore(value: 0)
   let queue = DispatchQueue(label: "CustomQueue")
@@ -249,8 +274,6 @@ func callActorFromStartSynchronousTask() {
       precondition(compareThreadIDs(outerTID, .equal, innerTID), "Outer Thread ID must be equal Thread ID inside runSynchronously synchronous part!")
       print("inside startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
 
-      let rec = Recipient()
-
       for i in 1..<10 {
         queue.async {
           print("- async work on queue")
@@ -258,7 +281,10 @@ func callActorFromStartSynchronousTask() {
       }
 
       print("inside startSynchronously, call rec.sync() [thread:\(getCurrentThreadID())] @ :\(#line)")
-      await rec.sync(syncTaskThreadID: innerTID)
+      switch rec {
+      case .recipient(let recipient): await recipient.sync(syncTaskThreadID: innerTID)
+      case .recipientOnQueue(let recipient): await recipient.sync(syncTaskThreadID: innerTID)
+      }
       print("inside startSynchronously, call rec.sync() done [thread:\(getCurrentThreadID())] @ :\(#line)")
 
       // after suspension we are supposed to hop off to the global pool,
@@ -273,7 +299,10 @@ func callActorFromStartSynchronousTask() {
       }
 
       print("inside startSynchronously, call rec.async() [thread:\(getCurrentThreadID())] @ :\(#line)")
-      await rec.async(syncTaskThreadID: innerTID)
+      switch rec {
+      case .recipient(let recipient): await recipient.async(syncTaskThreadID: innerTID)
+      case .recipientOnQueue(let recipient): await recipient.async(syncTaskThreadID: innerTID)
+      }
       print("inside startSynchronously, call rec.async() done [thread:\(getCurrentThreadID())] @ :\(#line)")
 
       print("Inner thread id = \(innerTID)")
@@ -296,3 +325,89 @@ func callActorFromStartSynchronousTask() {
   sem1.wait()
   sem2.wait()
 }
+#endif
+
+#if canImport(Darwin) // because Dispatch
+print("\n\n==== ------------------------------------------------------------------")
+print("callActorFromStartSynchronousTask() - actor in custom executor with its own queue")
+let actorQueue = DispatchSerialQueue(label: "recipient-actor-queue")
+callActorFromStartSynchronousTask(recipient: .recipientOnQueue(RecipientOnQueue(queue: actorQueue)))
+
+// CHECK-LABEL: callActorFromStartSynchronousTask() - actor in custom executor with its own queue
+// No interleaving allowed between "before" and "inside":
+// CHECK: before startSynchronously [thread:[[CALLING_THREAD4:0x.*]]]
+// CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD4]]]
+
+// As we call into an actor, we must enqueue to its custom executor;
+// Make sure the enqueue happens as expected and only then do we give up the calling thread
+// allowing the 'after startSynchronously' to run.
+//
+// CHECK-NEXT: inside startSynchronously, call rec.sync() [thread:[[CALLING_THREAD4]]]
+// CHECK: NaiveQueueExecutor(recipient-actor-queue).enqueue
+// CHECK: after startSynchronously
+// CHECK-NOT: ERROR!
+// CHECK: inside startSynchronously, call rec.sync() done
+
+// CHECK-NOT: ERROR!
+// CHECK: inside startSynchronously, call rec.async()
+// CHECK: NaiveQueueExecutor(recipient-actor-queue).enqueue
+// CHECK-NOT: ERROR!
+// CHECK: inside startSynchronously, call rec.async() done
+
+// CHECK-NOT: ERROR!
+// CHECK: inside startSynchronously, done
+
+final class NaiveQueueExecutor: SerialExecutor {
+  let queue: DispatchQueue
+
+  init(queue: DispatchQueue) {
+    self.queue = queue
+  }
+
+  public func enqueue(_ job: consuming ExecutorJob) {
+    let unowned = UnownedJob(job)
+    print("NaiveQueueExecutor(\(self.queue.label)).enqueue... [thread:\(getCurrentThreadID())]")
+    queue.async {
+    print("NaiveQueueExecutor(\(self.queue.label)).enqueue: run [thread:\(getCurrentThreadID())]")
+      unowned.runSynchronously(on: self.asUnownedSerialExecutor())
+    }
+  }
+}
+
+actor RecipientOnQueue {
+  let executor: NaiveQueueExecutor
+  nonisolated let unownedExecutor: UnownedSerialExecutor
+
+  init(queue: DispatchSerialQueue) {
+    self.executor = NaiveQueueExecutor(queue: queue)
+    self.unownedExecutor = executor.asUnownedSerialExecutor()
+  }
+
+  func sync(syncTaskThreadID: ThreadID) {
+    self.preconditionIsolated()
+    dispatchPrecondition(condition: .onQueue(self.executor.queue))
+
+    print("\(Recipient.self)/\(#function) Current actor thread id = \(getCurrentThreadID()) @ :\(#line)")
+    if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
+      print("NOTICE: Actor must not run on the synchronous task's thread :\(#line)")
+    }
+  }
+
+  func async(syncTaskThreadID: ThreadID) async {
+    self.preconditionIsolated()
+    dispatchPrecondition(condition: .onQueue(self.executor.queue))
+
+    // Dispatch may end up reusing the thread used to service the queue so we
+    // cannot truly assert exact thread identity in such tests.
+    // Usually this will be on a different thread by now though.
+    print("\(Recipient.self)/\(#function) Current actor thread id = \(getCurrentThreadID()) @ :\(#line)")
+    if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
+      print("NOTICE: Actor must not run on the synchronous task's thread :\(#line)")
+    }
+
+    await Task {
+      self.preconditionIsolated()
+    }.value
+  }
+}
+#endif

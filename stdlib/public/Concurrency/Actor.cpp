@@ -2365,14 +2365,10 @@ static void swift_task_startSynchronouslyImpl(AsyncTask* task) {
     swift_job_run(task, currentExecutor);
     _swift_task_setCurrent(originalTask);
   } else {
-    SerialExecutorRef executor = SerialExecutorRef::forSynchronousStart();
-
-    ExecutorTrackingInfo trackingInfo;
-//    trackingInfo.markSynchronousStart();
-
     auto originalTask = ActiveTask::swap(task);
     assert(!originalTask);
 
+    SerialExecutorRef executor = SerialExecutorRef::forSynchronousStart();
      swift_job_run(task, executor);
     _swift_task_setCurrent(originalTask);
   }
