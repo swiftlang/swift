@@ -2725,7 +2725,7 @@ SemanticAvailableAttrRequest::getCachedResult() const {
   if (!attr->hasComputedSemanticAttr())
     return std::nullopt;
 
-  if (!attr->hasCachedDomain()) {
+  if (!attr->getDomainOrIdentifier().isDomain()) {
     return std::optional<SemanticAvailableAttr>{};
   }
 

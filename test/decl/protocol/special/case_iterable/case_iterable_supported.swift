@@ -40,6 +40,6 @@ extension FromOtherFile: CaseIterable {
 
 enum InvalidAvailableAttribute: CaseIterable {
   case a
-  @available(deprecated, renamed: "a") // expected-warning {{unknown platform 'deprecated' for attribute 'available'}}
+  @available(deprecated, renamed: "a") // expected-warning {{unrecognized platform name 'deprecated'}}
   case b
 }

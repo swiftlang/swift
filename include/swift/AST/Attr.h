@@ -746,6 +746,7 @@ public:
 
 private:
   friend class SemanticAvailableAttr;
+  friend class SemanticAvailableAttrRequest;
 
   AvailabilityDomainOrIdentifier DomainOrIdentifier;
   const SourceLoc DomainLoc;
@@ -767,13 +768,6 @@ public:
 
   AvailabilityDomainOrIdentifier getDomainOrIdentifier() const {
     return DomainOrIdentifier;
-  }
-
-  /// Returns the `AvailabilityDomain` associated with the attribute, or
-  /// `std::nullopt` if it has either not yet been resolved or could not be
-  /// resolved successfully.
-  std::optional<AvailabilityDomain> getCachedDomain() const {
-    return DomainOrIdentifier.getAsDomain();
   }
 
   SourceLoc getDomainLoc() const { return DomainLoc; }
@@ -917,11 +911,6 @@ private:
 
 private:
   friend class SemanticAvailableAttrRequest;
-
-  void setCachedDomain(AvailabilityDomain domain) {
-    assert(!DomainOrIdentifier.isDomain());
-    DomainOrIdentifier.setDomain(domain);
-  }
 
   bool hasComputedSemanticAttr() const {
     return Bits.AvailableAttr.HasComputedSemanticAttr;
@@ -3305,12 +3294,13 @@ class SemanticAvailableAttr final {
 public:
   SemanticAvailableAttr(const AvailableAttr *attr) : attr(attr) {
     assert(attr);
-    assert(attr->hasCachedDomain());
+    bool hasDomain = attr->getDomainOrIdentifier().isDomain();
+    assert(hasDomain);
   }
 
   const AvailableAttr *getParsedAttr() const { return attr; }
   const AvailabilityDomain getDomain() const {
-    return attr->getCachedDomain().value();
+    return attr->getDomainOrIdentifier().getAsDomain().value();
   }
 
   /// The version tuple for the `introduced:` component.

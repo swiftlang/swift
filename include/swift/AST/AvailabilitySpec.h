@@ -35,8 +35,7 @@ class SemanticAvailabilitySpec;
 /// The root class for specifications of API availability in availability
 /// queries.
 class AvailabilitySpec : public ASTAllocated<AvailabilitySpec> {
-  using DomainStorage = llvm::PointerIntPair<AvailabilityDomainOrIdentifier, 1>;
-  DomainStorage Storage;
+  AvailabilityDomainOrIdentifier DomainOrIdentifier;
 
   /// The range of the entire spec, including the version if there is one.
   SourceRange SrcRange;
@@ -51,11 +50,11 @@ class AvailabilitySpec : public ASTAllocated<AvailabilitySpec> {
   // Location of the availability macro expanded to create this spec.
   SourceLoc MacroLoc;
 
-  AvailabilitySpec(DomainStorage Storage, SourceRange SrcRange,
-                   llvm::VersionTuple Version, SourceLoc VersionStartLoc)
-      : Storage(Storage), SrcRange(SrcRange), Version(Version),
-        VersionStartLoc(VersionStartLoc) {}
-
+  AvailabilitySpec(AvailabilityDomainOrIdentifier DomainOrIdentifier,
+                   SourceRange SrcRange, llvm::VersionTuple Version,
+                   SourceLoc VersionStartLoc)
+      : DomainOrIdentifier(DomainOrIdentifier), SrcRange(SrcRange),
+        Version(Version), VersionStartLoc(VersionStartLoc) {}
 
 public:
   /// Creates a wildcard availability specification that guards execution
@@ -99,7 +98,7 @@ public:
   }
 
   AvailabilityDomainOrIdentifier getDomainOrIdentifier() const {
-    return Storage.getPointer();
+    return DomainOrIdentifier;
   }
 
   std::optional<AvailabilityDomain> getDomain() const {
