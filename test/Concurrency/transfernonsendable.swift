@@ -31,6 +31,10 @@ class NonSendableKlass { // expected-complete-note 53{{}}
   func getSendableGenericStructAsync() async -> SendableGenericStruct { fatalError() }
 }
 
+nonisolated final class NonIsolatedFinalKlass {
+  var ns = NonSendableKlass()
+}
+
 class SendableKlass : @unchecked Sendable {}
 
 actor MyActor {
@@ -1953,5 +1957,14 @@ func unsafeNonIsolatedAppliesToAssignToOutParam(ns: NonSendableKlass) -> sending
   return withUnsafeValue {
     nonisolated(unsafe) let obj = $0
     return obj
+  }
+}
+
+extension NonIsolatedFinalKlass {
+  // We used to crash while computing the isolation of the ref_element_addr
+  // here. Make sure we do not crash.
+  func testGetIsolationInfoOfField() async {
+    await transferToMain(ns) // expected-tns-warning {{sending 'self.ns' risks causing data races}}
+    // expected-tns-note @-1 {{sending task-isolated 'self.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
   }
 }
