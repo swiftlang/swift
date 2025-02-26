@@ -165,7 +165,6 @@ private:
       ForEachStmt *stmt;
       DeclContext *dc;
       Pattern *pattern;
-      GenericEnvironment *packElementEnv;
       ForEachStmtInfo info;
     } forEachPreamble;
 
@@ -244,12 +243,10 @@ public:
     uninitializedVar.type = patternTy;
   }
 
-  SyntacticElementTarget(ForEachStmt *stmt, DeclContext *dc,
-                         GenericEnvironment *packElementEnv)
+  SyntacticElementTarget(ForEachStmt *stmt, DeclContext *dc)
       : kind(Kind::forEachPreamble) {
     forEachPreamble.stmt = stmt;
     forEachPreamble.dc = dc;
-    forEachPreamble.packElementEnv = packElementEnv;
   }
 
   /// Form a target for the initialization of a pattern from an expression.
@@ -271,8 +268,9 @@ public:
   /// Form a target for the preamble of a for-in loop, excluding its where
   /// clause and body.
   static SyntacticElementTarget
-  forForEachPreamble(ForEachStmt *stmt, DeclContext *dc,
-                     GenericEnvironment *packElementEnv = nullptr);
+  forForEachPreamble(ForEachStmt *stmt, DeclContext *dc) {
+    return {stmt, dc};
+  }
 
   /// Form a target for a property with an attached property wrapper that is
   /// initialized out-of-line.
@@ -548,11 +546,6 @@ public:
   unsigned getInitializationPatternBindingIndex() const {
     assert(isForInitialization());
     return expression.initialization.patternBindingIndex;
-  }
-
-  GenericEnvironment *getPackElementEnv() const {
-    assert(isForEachPreamble());
-    return forEachPreamble.packElementEnv;
   }
 
   const ForEachStmtInfo &getForEachStmtInfo() const {
