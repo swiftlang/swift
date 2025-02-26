@@ -579,10 +579,6 @@ extension InteriorUseWalker: OwnershipUseVisitor {
 
   mutating func interiorPointerUse(of operand: Operand, into address: Value)
     -> WalkResult {
-    // OSSA lifetime ignores trivial types.
-    if operand.value.type.isTrivial(in: function) {
-      return .continueWalk
-    }
     if useVisitor(operand) == .abortWalk {
       return .abortWalk
     }
