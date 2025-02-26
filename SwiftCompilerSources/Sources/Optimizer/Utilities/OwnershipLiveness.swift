@@ -365,6 +365,12 @@ extension OwnershipUseVisitor {
     if let beginBorrow = BeginBorrowValue(resultOf: borrowInst) {
       return visitInnerScopeUses(of: beginBorrow.value)
     }
+    if let dependent = borrowInst.dependentValue {
+      if dependent.ownership == .guaranteed {
+        return visitAllUses(of: dependent)
+      }
+      return pointerEscapingUse(of: operand)
+    }
     // Otherwise, directly visit the scope ending uses as leaf uses.
     //
     // TODO: remove this stack by changing visitScopeEndingOperands to take a non-escaping closure.
