@@ -608,9 +608,9 @@ extension InteriorUseWalker: OwnershipUseVisitor {
       if handleInner(borrowed: beginBorrow.value) == .abortWalk {
         return .abortWalk
       }
-      if visitInnerUses {
-        return visitAllUses(of: beginBorrow.value)
-      }
+    }
+    if visitInnerUses, let innerValue = borrowInst.innerValue {
+      return visitAllUses(of: innerValue)
     }
     return visitInnerBorrowUses(of: borrowInst, operand: operand)
   }
