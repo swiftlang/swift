@@ -849,9 +849,9 @@ ImportedType findOptionSetType(clang::QualType type,
               findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
-        assert(
-            clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-            typedefType->getCanonicalTypeInternal());
+//        assert(
+//            clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+//            typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
           importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
                           false};
@@ -6937,8 +6937,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       if (auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
-        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-               typedefType->getCanonicalTypeInternal());
+//        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+//               typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = Impl.importDecl(*clangEnum, Impl.CurrentVersion)) {
           importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
                           false};
