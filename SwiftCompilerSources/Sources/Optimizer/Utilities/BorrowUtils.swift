@@ -204,6 +204,50 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
     }
   }
 
+  var dependentValue: Value? {
+    switch self {
+    case .borrowedFrom(let bfi):
+      let phi = bfi.borrowedPhi
+      if phi.isReborrow {
+        return nil
+      }
+      return phi.value
+    case .markDependence(let mdi):
+      if mdi.hasScopedLifetime {
+        return nil
+      }
+      return mdi
+    case .beginBorrow, .storeBorrow, .beginApply, .partialApply, .startAsyncLet:
+      return nil
+    }
+  }
+
+  /// If this is valid, then visitScopeEndingOperands succeeds.
+  var scopedValue: Value? {
+    switch self {
+    case .beginBorrow, .storeBorrow:
+      return instruction as! SingleValueInstruction
+    case let .borrowedFrom(bfi):
+      let phi = bfi.borrowedPhi
+      guard phi.isReborrow else {
+        return nil
+      }
+      return phi.value
+    case .beginApply(let bai):
+      return bai.token
+    case .partialApply(let pai):
+      // We currently assume that closure lifetimes are always complete (destroyed on all paths).
+      return pai
+    case .markDependence(let mdi):
+      guard mdi.hasScopedLifetime else {
+        return nil
+      }
+      return mdi
+    case .startAsyncLet(let builtin):
+      return builtin
+    }
+  }
+
   /// Visit the operands that end the local borrow scope.
   ///
   /// Returns .abortWalk if the borrow scope cannot be determined from lifetime-ending uses. For example:
@@ -218,26 +262,23 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
   /// TODO: For instructions that are not a BeginBorrowValue, verify that scope ending instructions exist on all
   /// paths. These instructions should be complete after SILGen and never cloned to produce phis.
   func visitScopeEndingOperands(_ context: Context, visitor: @escaping (Operand) -> WalkResult) -> WalkResult {
+    guard let val = scopedValue else {
+      return .abortWalk
+    }
     switch self {
     case .beginBorrow, .storeBorrow:
-      return visitEndBorrows(value: instruction as! SingleValueInstruction, context, visitor)
-    case let .borrowedFrom(bfi):
-      guard bfi.borrowedPhi.isReborrow else {
-        return .abortWalk
-      }
-      return visitEndBorrows(value: instruction as! SingleValueInstruction, context, visitor)
-    case .beginApply(let bai):
-      return bai.token.uses.walk { return visitor($0) }
-    case .partialApply(let pai):
+      return visitEndBorrows(value: val, context, visitor)
+    case .borrowedFrom:
+      return visitEndBorrows(value: val, context, visitor)
+    case .beginApply:
+      return val.uses.walk { return visitor($0) }
+    case .partialApply:
       // We currently assume that closure lifetimes are always complete (destroyed on all paths).
-      return visitOwnedDependent(value: pai, context, visitor)
-    case .markDependence(let mdi):
-      guard mdi.ownership == .owned, mdi.type.isEscapable(in: mdi.parentFunction) else {
-        return .abortWalk
-      }
-      return visitOwnedDependent(value: mdi, context, visitor)
-    case .startAsyncLet(let builtin):
-      return builtin.uses.walk {
+      return visitOwnedDependent(value: val, context, visitor)
+    case .markDependence:
+      return visitOwnedDependent(value: val, context, visitor)
+    case .startAsyncLet:
+      return val.uses.walk {
         if let builtinUser = $0.instruction as? BuiltinInst,
           builtinUser.id == .EndAsyncLetLifetime {
           return visitor($0)
