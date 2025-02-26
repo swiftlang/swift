@@ -204,6 +204,13 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
     }
   }
 
+  var innerValue: Value? {
+    if let dependent = dependentValue {
+      return dependent
+    }
+    return scopedValue
+  }
+
   var dependentValue: Value? {
     switch self {
     case .borrowedFrom(let bfi):
