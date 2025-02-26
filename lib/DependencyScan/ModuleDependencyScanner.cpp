@@ -561,42 +561,141 @@ ModuleDependencyScanner::getNamedSwiftModuleDependencyInfo(
   return cache.findDependency(moduleName);
 }
 
+/// For the dependency set of the main module, discover all
+/// cross-import overlays and their corresponding '.swiftcrossimport'
+/// files. Cross-import overlay dependencies are required when
+/// the two constituent modules are imported *from the same source file*,
+/// directly or indirectly.
+///
+/// Given a complete module dependency graph in this stage of the scan,
+/// the algorithm for discovering cross-import overlays is:
+/// 1. For each source file of the module under scan construct a
+///    set of module dependnecies only reachable from this source file.
+/// 2. For each module set constructed in (1), perform pair-wise lookup
+///    of cross import files for each pair of modules in the set.
+///
+/// Notably, if for some pair of modules 'A' and 'B' there exists
+/// a cross-import overlay '_A_B', and these two modules are not reachable
+/// from any single source file via direct or indirect imports, then
+/// the cross-import overlay module is not required for compilation.
 static void discoverCrossImportOverlayFiles(
-    StringRef mainModuleName, ArrayRef<ModuleDependencyID> allDependencies,
-    ModuleDependenciesCache &cache, ASTContext &scanASTContext,
-    llvm::SetVector<Identifier> &newOverlays,
+    StringRef mainModuleName, ModuleDependenciesCache &cache,
+    ASTContext &scanASTContext, llvm::SetVector<Identifier> &newOverlays,
     std::vector<std::pair<std::string, std::string>> &overlayFiles) {
-  for (auto moduleID : allDependencies) {
-    auto moduleName = moduleID.ModuleName;
-    // Do not look for overlays of main module under scan
-    if (moduleName == mainModuleName)
-      continue;
+  auto mainModuleInfo = cache.findKnownDependency(ModuleDependencyID{
+      mainModuleName.str(), ModuleDependencyKind::SwiftSource});
 
-    auto dependencies = cache.findDependency(moduleName, moduleID.Kind).value();
-    // Collect a map from secondary module name to cross-import overlay names.
-    auto overlayMap = dependencies->collectCrossImportOverlayNames(
-        scanASTContext, moduleName, overlayFiles);
-    if (overlayMap.empty())
-      continue;
-    for (const auto &dependencyId : allDependencies) {
-      auto moduleName = dependencyId.ModuleName;
-      // Do not look for overlays of main module under scan
-      if (moduleName == mainModuleName)
-        continue;
-      // check if any explicitly imported modules can serve as a
-      // secondary module, and add the overlay names to the
-      // dependencies list.
-      for (auto overlayName : overlayMap[moduleName]) {
-        if (overlayName.str() != mainModuleName &&
-            std::find_if(allDependencies.begin(), allDependencies.end(),
-                         [&](ModuleDependencyID Id) {
-                           return moduleName == overlayName.str();
-                         }) == allDependencies.end()) {
-          newOverlays.insert(overlayName);
+  llvm::StringMap<ModuleDependencyIDSet> perSourceFileDependencies;
+  const ModuleDependencyIDSet directSwiftDepsSet{
+      mainModuleInfo.getImportedSwiftDependencies().begin(),
+      mainModuleInfo.getImportedSwiftDependencies().end()};
+  const ModuleDependencyIDSet directClangDepsSet{
+      mainModuleInfo.getImportedClangDependencies().begin(),
+      mainModuleInfo.getImportedClangDependencies().end()};
+
+  // A utility to map an import identifier to one of the
+  // known resolved module dependencies
+  auto getModuleIDForImportIdentifier =
+      [directSwiftDepsSet, directClangDepsSet](
+          const std::string &importIdentifierStr) -> ModuleDependencyID {
+    if (auto textualDepIt = directSwiftDepsSet.find(
+            {importIdentifierStr, ModuleDependencyKind::SwiftInterface});
+        textualDepIt != directSwiftDepsSet.end())
+      return *textualDepIt;
+    else if (auto binaryDepIt = directSwiftDepsSet.find(
+                 {importIdentifierStr, ModuleDependencyKind::SwiftBinary});
+             binaryDepIt != directSwiftDepsSet.end())
+      return *binaryDepIt;
+    else if (auto clangDepIt = directClangDepsSet.find(
+                 {importIdentifierStr, ModuleDependencyKind::Clang});
+             clangDepIt != directClangDepsSet.end())
+      return *clangDepIt;
+    llvm_unreachable(
+        "Unresolved import during cross-import overlay resolution");
+  };
+
+  // Collect the set of directly-imported module dependencies
+  // for each source file in the source module under scan.
+  for (const auto &import : mainModuleInfo.getModuleImports()) {
+    auto importResolvedModuleID =
+        getModuleIDForImportIdentifier(import.importIdentifier);
+    for (const auto &importLocation : import.importLocations)
+      perSourceFileDependencies[importLocation.bufferIdentifier].insert(
+          importResolvedModuleID);
+  }
+
+  // For each source-file, build a set of module dependencies of the
+  // module under scan corresponding to a sub-graph of modules only reachable
+  // from this source file's direct imports.
+  for (auto &keyValPair : perSourceFileDependencies) {
+    const auto &bufferIdentifier = keyValPair.getKey();
+    auto &directDependencyIDs = keyValPair.second;
+    SmallVector<ModuleDependencyID, 8> worklist{directDependencyIDs.begin(),
+                                                directDependencyIDs.end()};
+    while (!worklist.empty()) {
+      auto moduleID = worklist.pop_back_val();
+      perSourceFileDependencies[bufferIdentifier].insert(moduleID);
+      if (isSwiftDependencyKind(moduleID.Kind)) {
+        for (const auto &directSwiftDepID :
+             cache.getImportedSwiftDependencies(moduleID)) {
+          if (perSourceFileDependencies[bufferIdentifier].count(directSwiftDepID))
+            continue;
+          worklist.push_back(directSwiftDepID);
         }
+      }
+      for (const auto &directClangDepID :
+           cache.getImportedClangDependencies(moduleID)) {
+        if (perSourceFileDependencies[bufferIdentifier].count(directClangDepID))
+          continue;
+        worklist.push_back(directClangDepID);
       }
     }
   }
+
+  // Within a provided set of module dependencies reachable via
+  // direct imports from a given file, determine the available and required
+  // cross-import overlays.
+  auto discoverCrossImportOverlayFilesForModuleSet =
+      [&mainModuleName, &cache, &scanASTContext, &newOverlays,
+       &overlayFiles](const ModuleDependencyIDSet &inputDependencies) {
+        for (auto moduleID : inputDependencies) {
+          auto moduleName = moduleID.ModuleName;
+          // Do not look for overlays of main module under scan
+          if (moduleName == mainModuleName)
+            continue;
+
+          auto dependencies =
+              cache.findDependency(moduleName, moduleID.Kind).value();
+          // Collect a map from secondary module name to cross-import overlay
+          // names.
+          auto overlayMap = dependencies->collectCrossImportOverlayNames(
+              scanASTContext, moduleName, overlayFiles);
+          if (overlayMap.empty())
+            continue;
+          for (const auto &dependencyId : inputDependencies) {
+            auto moduleName = dependencyId.ModuleName;
+            // Do not look for overlays of main module under scan
+            if (moduleName == mainModuleName)
+              continue;
+            // check if any explicitly imported modules can serve as a
+            // secondary module, and add the overlay names to the
+            // dependencies list.
+            for (auto overlayName : overlayMap[moduleName]) {
+              if (overlayName.str() != mainModuleName &&
+                  std::find_if(inputDependencies.begin(),
+                               inputDependencies.end(),
+                               [&](ModuleDependencyID Id) {
+                                 return moduleName == overlayName.str();
+                               }) == inputDependencies.end()) {
+                newOverlays.insert(overlayName);
+              }
+            }
+          }
+        }
+      };
+
+  for (const auto &keyValPair : perSourceFileDependencies)
+    discoverCrossImportOverlayFilesForModuleSet(keyValPair.second);
 }
 
 std::vector<ModuleDependencyID>
@@ -627,8 +726,8 @@ ModuleDependencyScanner::performDependencyScan(
   // binary Swift modules already encode their dependencies on cross-import overlays
   // with explicit imports.
   if (ScanCompilerInvocation.getLangOptions().EnableCrossImportOverlays)
-    discoverCrossImportOverlayDependencies(
-        rootModuleID.ModuleName, allModules.getArrayRef().slice(1), cache,
+    resolveCrossImportOverlayDependencies(
+        rootModuleID.ModuleName, cache,
         [&](ModuleDependencyID id) { allModules.insert(id); });
 
   if (ScanCompilerInvocation.getSearchPathOptions().BridgingHeaderChaining) {
@@ -1230,15 +1329,15 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
   cache.setSwiftOverlayDependencies(moduleID, swiftOverlayDependencies.getArrayRef());
 }
 
-void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
-    StringRef mainModuleName, ArrayRef<ModuleDependencyID> allDependencies,
+void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
+    StringRef mainModuleName,
     ModuleDependenciesCache &cache,
     llvm::function_ref<void(ModuleDependencyID)> action) {
   // Modules explicitly imported. Only these can be secondary module.
   llvm::SetVector<Identifier> newOverlays;
   std::vector<std::pair<std::string, std::string>> overlayFiles;
-  discoverCrossImportOverlayFiles(mainModuleName, allDependencies, cache,
-                                  ScanASTContext, newOverlays, overlayFiles);
+  discoverCrossImportOverlayFiles(mainModuleName, cache, ScanASTContext,
+                                  newOverlays, overlayFiles);
 
   // No new cross-import overlays are found, return.
   if (newOverlays.empty())
@@ -1260,11 +1359,10 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
 
   // Record the dummy main module's direct dependencies. The dummy main module
   // only directly depend on these newly discovered overlay modules.
-  if (cache.findDependency(dummyMainName, ModuleDependencyKind::SwiftSource)) {
+  if (cache.findDependency(dummyMainID))
     cache.updateDependency(dummyMainID, dummyMainDependencies);
-  } else {
+  else
     cache.recordDependency(dummyMainName, dummyMainDependencies);
-  }
 
   ModuleDependencyIDSetVector allModules =
     resolveImportedModuleDependencies(dummyMainID, cache);

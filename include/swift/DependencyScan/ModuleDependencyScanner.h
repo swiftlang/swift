@@ -112,35 +112,33 @@ private:
   /// closure for the given module.
   /// 1. Swift modules imported directly or via another Swift dependency
   /// 2. Clang modules imported directly or via a Swift dependency
-  /// 3. Clang modules imported via textual header inputs to Swift modules (bridging headers)
-  /// 4. Swift overlay modules of all of the transitively imported Clang modules that have one
+  /// 3. Clang modules imported via textual header inputs to Swift modules
+  /// (bridging headers)
+  /// 4. Swift overlay modules of all of the transitively imported Clang modules
+  /// that have one
   ModuleDependencyIDSetVector
   resolveImportedModuleDependencies(const ModuleDependencyID &rootModuleID,
                                     ModuleDependenciesCache &cache);
-  void
-  resolveSwiftModuleDependencies(const ModuleDependencyID &rootModuleID,
-                                 ModuleDependenciesCache &cache,
-                                 ModuleDependencyIDSetVector &discoveredSwiftModules);
-  void
-  resolveAllClangModuleDependencies(ArrayRef<ModuleDependencyID> swiftModules,
-                                    ModuleDependenciesCache &cache,
-                                    ModuleDependencyIDSetVector &discoveredClangModules);
+  void resolveSwiftModuleDependencies(
+      const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
+      ModuleDependencyIDSetVector &discoveredSwiftModules);
+  void resolveAllClangModuleDependencies(
+      ArrayRef<ModuleDependencyID> swiftModules, ModuleDependenciesCache &cache,
+      ModuleDependencyIDSetVector &discoveredClangModules);
   void resolveHeaderDependencies(
       ArrayRef<ModuleDependencyID> swiftModules, ModuleDependenciesCache &cache,
       ModuleDependencyIDSetVector &discoveredHeaderDependencyClangModules);
-  void
-  resolveSwiftOverlayDependencies(ArrayRef<ModuleDependencyID> swiftModules,
-                                  ModuleDependenciesCache &cache,
-                                  ModuleDependencyIDSetVector &discoveredDependencies);
+  void resolveSwiftOverlayDependencies(
+      ArrayRef<ModuleDependencyID> swiftModules, ModuleDependenciesCache &cache,
+      ModuleDependencyIDSetVector &discoveredDependencies);
 
   /// Resolve all of a given module's imports to a Swift module, if one exists.
-  void
-  resolveSwiftImportsForModule(const ModuleDependencyID &moduleID,
-                               ModuleDependenciesCache &cache,
-                               ModuleDependencyIDSetVector &importedSwiftDependencies);
+  void resolveSwiftImportsForModule(
+      const ModuleDependencyID &moduleID, ModuleDependenciesCache &cache,
+      ModuleDependencyIDSetVector &importedSwiftDependencies);
 
-  /// If a module has a bridging header or other header inputs, execute a dependency scan
-  /// on it and record the dependencies.
+  /// If a module has a bridging header or other header inputs, execute a
+  /// dependency scan on it and record the dependencies.
   void resolveHeaderDependenciesForModule(
       const ModuleDependencyID &moduleID, ModuleDependenciesCache &cache,
       ModuleDependencyIDSetVector &headerClangModuleDependencies);
@@ -148,15 +146,13 @@ private:
   /// Resolve all module dependencies comprised of Swift overlays
   /// of this module's Clang module dependencies.
   void resolveSwiftOverlayDependenciesForModule(
-      const ModuleDependencyID &moduleID,
-      ModuleDependenciesCache &cache,
+      const ModuleDependencyID &moduleID, ModuleDependenciesCache &cache,
       ModuleDependencyIDSetVector &swiftOverlayDependencies);
 
-  /// Identify all cross-import overlay modules of the specified
-  /// dependency set and apply an action for each.
-  void discoverCrossImportOverlayDependencies(
-      StringRef mainModuleName, ArrayRef<ModuleDependencyID> allDependencies,
-      ModuleDependenciesCache &cache,
+  /// Identify all cross-import overlay module dependencies of the
+  /// source module under scan and apply an action for each.
+  void resolveCrossImportOverlayDependencies(
+      StringRef mainModuleName, ModuleDependenciesCache &cache,
       llvm::function_ref<void(ModuleDependencyID)> action);
 
   /// Performance BridgingHeader Chaining.
