@@ -194,7 +194,7 @@ struct InteriorLivenessResult: CustomDebugStringConvertible {
 ///
 /// The top-level entry points are:
 /// - `classify(operand:)`
-/// - `visitAllUses(of:)`
+/// - `visitOwnershipUses(of:)`
 ///
 /// The implementation may recursively call back to the top-level
 /// entry points. Additionally, the implementation may recurse into inner
@@ -217,7 +217,7 @@ struct InteriorLivenessResult: CustomDebugStringConvertible {
 /// `isInnerlifetime` indicates whether the value being used is
 /// defined by the "outer" OSSA lifetime or an inner borrow scope.
 /// When the OwnershipUseVisitor is invoked on an outer value
-/// (visitAllUses(of:)), it visits all the uses of that value
+/// (visitOwnershipUses(of:)), it visits all the uses of that value
 /// and also visits the lifetime-ending uses of any inner borrow
 /// scopes. This provides a complete set of liveness "use points":
 ///
@@ -297,7 +297,7 @@ extension OwnershipUseVisitor {
   /// adjacent phis and treat them like inner borrows.
   ///
   /// This is only called for uses in the outer lifetime.
-  mutating func visitAllUses(of value: Value) -> WalkResult {
+  mutating func visitOwnershipUses(of value: Value) -> WalkResult {
     switch value.ownership {
     case .owned:
       return value.uses.ignoreTypeDependence.walk { classifyOwned(operand: $0) }
@@ -349,7 +349,7 @@ extension OwnershipUseVisitor {
   mutating func visitInnerBorrowUses(of borrowInst: BorrowingInstruction, operand: Operand) -> WalkResult {
     if let dependent = borrowInst.dependentValue {
       if dependent.ownership == .guaranteed {
-        return visitAllUses(of: dependent)
+        return visitOwnershipUses(of: dependent)
       }
       return pointerEscapingUse(of: operand)
     }
@@ -544,7 +544,7 @@ struct InteriorUseWalker {
   }
 
   mutating func visitUses() -> WalkResult {
-    return visitAllUses(of: definingValue)
+    return visitOwnershipUses(of: definingValue)
   }
 }
 
@@ -624,13 +624,21 @@ extension InteriorUseWalker: OwnershipUseVisitor {
     if useVisitor(operand) == .abortWalk {
       return .abortWalk
     }
-    if visitInnerUses {
-      guard let innerValue = borrowInst.innerValue else {
-        return setPointerEscape(of: operand)
-      }
-      return visitAllUses(of: innerValue)
+    if visitInnerBorrowUses(of: borrowInst, operand: operand) == .abortWalk {
+      return .abortWalk
     }
-    return visitInnerBorrowUses(of: borrowInst, operand: operand)
+    if !visitInnerUses {
+      return .continueWalk
+    }
+    guard let innerValue = borrowInst.innerValue else {
+      return setPointerEscape(of: operand)
+    }
+    // Call visitInnerBorrowUses before visitOwnershipUses because it will visit uses of tokens, such as
+    // the begin_apply token, which don't have ownership.
+    if innerValue.type.isAddress {
+      return interiorPointerUse(of: operand, into: innerValue)
+    }
+    return visitOwnershipUses(of: innerValue)
   }
 }
 
@@ -764,7 +772,7 @@ extension InteriorUseWalker {
       return visitOwnedDependentUses(of: value)
     case .guaranteed:
       // Handle a forwarded guaranteed value exactly like the outer borrow.
-      return visitAllUses(of: value)
+      return visitOwnershipUses(of: value)
     default:
       fatalError("ownership requires a lifetime")
     }
