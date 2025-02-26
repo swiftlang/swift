@@ -442,6 +442,10 @@ function Get-TargetProjectBinaryCache($Arch, [TargetComponent]$Project) {
   return "$BinaryCache\$($Arch.LLVMTarget)\$Project"
 }
 
+function Get-TargetProjectCMakeModules($Arch, [TargetComponent]$Project) {
+  return "$Binarycache\$($Arch.LLVMTarget)\$Project\cmake\modules"
+}
+
 enum HostComponent {
   Compilers
   FoundationMacros
@@ -2333,74 +2337,63 @@ function Build-FoundationMacros() {
     }
 }
 
-function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
-  $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
-  $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch DynamicFoundation
-  $XCTestBinaryCache = Get-TargetProjectBinaryCache $Arch XCTest
-
-  Isolate-EnvVars {
-    if ($Test) {
-      $TestingDefines = @{
-        ENABLE_TESTING = "YES";
-        LLVM_DIR = "$(Get-TargetProjectBinaryCache $Arch LLVM)/lib/cmake/llvm";
-        XCTEST_PATH_TO_LIBDISPATCH_BUILD = $DispatchBinaryCache;
-        XCTEST_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
-        XCTEST_PATH_TO_FOUNDATION_BUILD = $FoundationBinaryCache;
-      }
-      $Targets = @("default", "check-xctest")
-      $InstallPath = ""
-      $env:Path = "$XCTestBinaryCache;$FoundationBinaryCache\bin;$DispatchBinaryCache;$(Get-TargetProjectBinaryCache $Arch Runtime)\bin;$env:Path;$UnixToolsBinDir"
-    } else {
-      $TestingDefines = @{ ENABLE_TESTING = "NO" }
-      $Targets = @("install")
-      $InstallPath = "$($Arch.XCTestInstallRoot)\usr"
+function Build-XCTest([Platform]$Platform, $Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-corelibs-xctest `
+    -Bin $(Get-TargetProjectBinaryCache $Arch XCTest) `
+    -InstallTo "$($Arch.XCTestInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers Swift `
+    -Defines @{
+      CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
+      ENABLE_TESTING = "NO";
+      dispatch_DIR = $(Get-TargetProjectCMakeModules $Arch Dispatch);
+      Foundation_DIR = $(Get-TargetProjectCMakeModules $Arch DynamicFoundation);
     }
+}
+
+function Test-XCTest {
+  Isolate-EnvVars {
+    $env:Path = "$(Get-TargetProjectBinaryCache $BuildArch XCTest);$(Get-TargetProjectBinaryCache $BuildArch DynamicFoundation)\bin;$(Get-TargetProjectBinaryCache $BuildArch Dispatch);$(Get-TargetProjectBinaryCache $BuildArch Runtime)\bin;${env:Path};$UnixToolsBinDir"
 
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-xctest `
-      -Bin $XCTestBinaryCache `
-      -InstallTo $InstallPath `
-      -Arch $Arch `
-      -Platform $Platform `
+      -Bin (Get-TargetProjectBinaryCache $BuildArch XCTest) `
+      -Arch $BuildArch `
+      -Platform Windows `
       -UseBuiltCompilers Swift `
-      -BuildTargets $Targets `
-      -Defines (@{
+      -BuildTargets default,check-xctest `
+      -Defines @{
         CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
-        dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
-        Foundation_DIR = "$FoundationBinaryCache\cmake\modules";
-      } + $TestingDefines)
+        ENABLE_TESTING = "YES";
+        dispatch_DIR = $(Get-TargetProjectCMakeModules $BuildArch Dispatch);
+        Foundation_DIR = $(Get-TargetProjectCMakeModules $BuildArch DynamicFoundation);
+        LLVM_DIR = "$(Get-TargetProjectBinaryCache $BuildArch LLVM)\lib\cmake\llvm";
+        XCTEST_PATH_TO_FOUNDATION_BUILD = $(Get-TargetProjectBinaryCache $BuildArch DynamicFoundation);
+        XCTEST_PATH_TO_LIBDISPATCH_BUILD = $(Get-TargetProjectBinaryCache $BuildArch Dispatch);
+        XCTEST_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
+      }
   }
 }
 
-function Build-Testing([Platform]$Platform, $Arch, [switch]$Test = $false) {
-  $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
-  $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch DynamicFoundation
-  $SwiftTestingBinaryCache = Get-TargetProjectBinaryCache $Arch Testing
-
-  Isolate-EnvVars {
-    if ($Test) {
-      # TODO: Test
-      return
-    } else {
-      $InstallPath = "$($Arch.SwiftTestingInstallRoot)\usr"
+function Build-Testing([Platform]$Platform, $Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-testing `
+    -Bin (Get-TargetProjectBinaryCache $Arch Testing) `
+    -InstallTo "$($Arch.SwiftTestingInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX,Swift `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
+      dispatch_DIR = (Get-TargetProjectCMakeModules $Arch Dispatch);
+      Foundation_DIR = (Get-TargetProjectCMakeModules $Arch DynamicFoundation);
+      # TODO: ensure that host and target platform match
+      SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
+      SwiftTesting_MACRO = "$(Get-BuildProjectBinaryCache TestingMacros)\TestingMacros.dll";
     }
-
-    Build-CMakeProject `
-      -Src $SourceCache\swift-testing `
-      -Bin $SwiftTestingBinaryCache `
-      -InstallTo $InstallPath `
-      -Arch $Arch `
-      -Platform $Platform `
-      -UseBuiltCompilers C,CXX,Swift `
-      -Defines (@{
-        BUILD_SHARED_LIBS = "YES";
-        CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
-        dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
-        Foundation_DIR = "$FoundationBinaryCache\cmake\modules";
-        SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
-        SwiftTesting_MACRO = "$(Get-BuildProjectBinaryCache TestingMacros)\TestingMacros.dll";
-      })
-  }
 }
 
 function Write-PlatformInfoPlist([Platform] $Platform) {
@@ -3300,7 +3293,7 @@ if (-not $IsCrossCompiling) {
     Build-Foundation Windows $HostArch -Test
   }
   if ($Test -contains "xctest") {
-    Build-XCTest Windows $HostArch -Test
+    Test-XCTest
   }
   if ($Test -contains "testing") {
     Build-Testing Windows $HostArch -Test
