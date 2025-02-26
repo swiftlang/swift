@@ -8815,6 +8815,14 @@ public:
       uint8_t(MarkDependenceKind::Escaping);
   }
 
+  // True if the dependence is limited to the scope of an OSSA lifetime. Only
+  // for nonescaping dependencies with owned escapable values.
+  bool hasScopedLifetime() const {
+    return isNonEscaping() && getType().isObject()
+      && getOwnershipKind() == OwnershipKind::Owned
+      && getType().isEscapable(*getFunction());
+  }
+
   /// Visit the instructions that end the lifetime the dependent value.
   ///
   /// Preconditions:
