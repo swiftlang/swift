@@ -359,11 +359,15 @@ private enum InactiveCodeChecker {
       // match.
       switch self {
       case .name(let name):
-        guard let identifier = token.identifier, identifier.name == name else {
-          continue
+        if let identifier = token.identifier, identifier.name == name {
+          break
         }
 
-        break
+        if case .keyword = token.tokenKind, token.text == name {
+          break
+        }
+
+        continue
 
       case .tryOrThrow:
         guard let keywordKind = token.keywordKind,

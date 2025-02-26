@@ -563,3 +563,16 @@ func testUselessCastWithInvalidParam(foo: Any?) -> Int {
   if let bar = foo as? Foo { return 42 } // expected-warning {{value 'bar' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{20-23=is}}
   else { return 54 }
 }
+
+// https://github.com/swiftlang/swift/issues/79555
+final class A {
+  var x: () -> Void {
+    { [weak self] in // Used to warn: variable 'self' was written to, but never read
+      #if NOT_PROCESSED
+      self?.f()
+      #endif
+    }
+  }
+
+ func f() {}
+}
