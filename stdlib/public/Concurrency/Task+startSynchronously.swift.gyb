@@ -52,7 +52,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   ///   - priority: The priority of the task.
   ///     Pass `nil` to use the ``Task/basePriority`` of the current task (if there is one).
   ///   - operation: the operation to be run immediately upon entering the task.
-  /// - Returns:
+  /// - Returns: A reference to the unstructured task which may be awaited on.
   @available(SwiftStdlib 6.2, *)
   @discardableResult
   public static func _startSynchronously(

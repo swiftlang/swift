@@ -2311,7 +2311,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
                        currentTaskExecutor.isDefined() ? "" : " (undefined)",
                        newTaskExecutor.getIdentity(),
                        newTaskExecutor.isDefined() ? "" : " (undefined)",
-                       trackingInfo->isSynchronousStart() ? "[synchronous start]" : "[NOT SYNC START]");
+                       trackingInfo->isSynchronousStart() ? "[synchronous start]" : "");
 
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function
