@@ -632,6 +632,33 @@ BridgedRawDocCommentAttr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged()) RawDocCommentAttr(cRange.unbridged());
 }
 
+BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, size_t size, size_t alignment) {
+  return new (cContext.unbridged())
+      RawLayoutAttr(size, alignment, cAtLoc.unbridged(), cRange.unbridged());
+}
+
+SWIFT_NAME("BridgedRawLayoutAttr.createParsed(_:atLoc:range:like:moveAsLike:)")
+BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedTypeRepr cLikeType, bool moveAsLike) {
+  return new (cContext.unbridged())
+      RawLayoutAttr(cLikeType.unbridged(), moveAsLike, cAtLoc.unbridged(),
+                    cRange.unbridged());
+}
+
+SWIFT_NAME("BridgedRawLayoutAttr.createParsed(_:atLoc:range:likeArrayOf:count:"
+           "moveAsLike:)")
+BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedTypeRepr cLikeType,
+    BridgedTypeRepr cCountType, bool moveAsLike) {
+  return new (cContext.unbridged())
+      RawLayoutAttr(cLikeType.unbridged(), cCountType.unbridged(), moveAsLike,
+                    cAtLoc.unbridged(), cRange.unbridged());
+}
+
 ReferenceOwnership unbridged(BridgedReferenceOwnership kind) {
   switch (kind) {
   case BridgedReferenceOwnershipStrong:

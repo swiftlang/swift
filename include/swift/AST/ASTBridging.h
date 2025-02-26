@@ -1194,6 +1194,23 @@ BridgedRawDocCommentAttr
 BridgedRawDocCommentAttr_createParsed(BridgedASTContext cContext,
                                       BridgedCharSourceRange cRange);
 
+SWIFT_NAME("BridgedRawLayoutAttr.createParsed(_:atLoc:range:size:alignment:)")
+BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, size_t size, size_t alignment);
+
+SWIFT_NAME("BridgedRawLayoutAttr.createParsed(_:atLoc:range:like:moveAsLike:)")
+BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedTypeRepr cLikeType, bool moveAsLike);
+
+SWIFT_NAME("BridgedRawLayoutAttr.createParsed(_:atLoc:range:likeArrayOf:count:"
+           "moveAsLike:)")
+BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedTypeRepr cLikeType,
+    BridgedTypeRepr cCountType, bool moveAsLike);
+
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedReferenceOwnership {
   BridgedReferenceOwnershipStrong,
   BridgedReferenceOwnershipWeak,
