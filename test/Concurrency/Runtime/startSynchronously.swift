@@ -153,7 +153,7 @@ await Task { @MyGlobalActor in
 
 // CHECK-LABEL: syncOnMyGlobalActor()
 // CHECK: Confirmed to be on @MyGlobalActor
-// CHECK: schedule Task { @MyGlobalActor }, before startSynchronously [thread:[[CALLING_THREAD:0x.*]]]
+// CHECK: schedule Task { @MyGlobalActor }, before startSynchronously [thread:[[CALLING_THREAD:.*]]]
 // CHECK: before startSynchronously [thread:[[CALLING_THREAD]]]
 // CHECK-NOT: ERROR!
 // CHECK: inside startSynchronously, sleep now
@@ -168,7 +168,7 @@ syncOnNonTaskThread(synchronousTask: behavior)
 
 // CHECK-LABEL: syncOnNonTaskThread(synchronousTask: suspend)
 // No interleaving allowed between "before" and "inside":
-// CHECK-NEXT: before startSynchronously [thread:[[CALLING_THREAD2:0x.*]]]
+// CHECK-NEXT: before startSynchronously [thread:[[CALLING_THREAD2:.*]]]
 // CHECK-NOT: ERROR!
 // CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD2]]]
 // CHECK-NEXT: inside startSynchronously, before sleep [thread:[[CALLING_THREAD2]]]
@@ -181,7 +181,7 @@ print("syncOnNonTaskThread(synchronousTask: \(behavior))")
 syncOnNonTaskThread(synchronousTask: behavior)
 
 // CHECK-LABEL: syncOnNonTaskThread(synchronousTask: dontSuspend)
-// CHECK-NEXT: before startSynchronously [thread:[[CALLING_THREAD3:0x.*]]]
+// CHECK-NEXT: before startSynchronously [thread:[[CALLING_THREAD3:.*]]]
 // CHECK-NOT: ERROR!
 // CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD3]]]
 // CHECK: inside startSynchronously, done [thread:[[CALLING_THREAD3]]]
@@ -193,7 +193,7 @@ callActorFromStartSynchronousTask(recipient: .recipient(Recipient()))
 
 // CHECK: callActorFromStartSynchronousTask()
 // No interleaving allowed between "before" and "inside":
-// CHECK: before startSynchronously [thread:[[CALLING_THREAD4:0x.*]]]
+// CHECK: before startSynchronously [thread:[[CALLING_THREAD4:.*]]]
 // CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD4]]]
 
 // It is important that as we suspend on the actor call, the 'after' startSynchronously gets to run
@@ -324,7 +324,7 @@ callActorFromStartSynchronousTask(recipient: .recipientOnQueue(RecipientOnQueue(
 
 // CHECK-LABEL: callActorFromStartSynchronousTask() - actor in custom executor with its own queue
 // No interleaving allowed between "before" and "inside":
-// CHECK: before startSynchronously [thread:[[CALLING_THREAD4:0x.*]]]
+// CHECK: before startSynchronously [thread:[[CALLING_THREAD4:.*]]]
 // CHECK-NEXT: inside startSynchronously [thread:[[CALLING_THREAD4]]]
 
 // As we call into an actor, we must enqueue to its custom executor;
