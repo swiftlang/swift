@@ -2146,7 +2146,7 @@ AvailableAttr::AvailableAttr(
   Bits.AvailableAttr.IsSPI = IsSPI;
   Bits.AvailableAttr.IsGroupMember = false;
   Bits.AvailableAttr.IsGroupTerminator = false;
-  Bits.AvailableAttr.IsAdjacentToWildcard = false;
+  Bits.AvailableAttr.IsGroupedWithWildcard = false;
 }
 
 AvailableAttr *AvailableAttr::createUniversallyUnavailable(ASTContext &C,

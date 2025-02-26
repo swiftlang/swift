@@ -29,7 +29,7 @@ func deprecatedInRedefinedDomain() { }
 @available(DynamicDomain)
 func availableInDynamicDomain() { }
 
-@available(UnknownDomain) // expected-warning {{unknown platform 'UnknownDomain' for attribute 'available'}}
+@available(UnknownDomain) // expected-warning {{unrecognized platform name 'UnknownDomain'}}
 func availableInUnknownDomain() { }
 
 func test() {

@@ -13,6 +13,9 @@
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/StringSwitch.h"
 
@@ -168,6 +171,10 @@ AvailabilityDomain AvailabilityDomain::getABICompatibilityDomain() const {
   return *this;
 }
 
+void AvailabilityDomain::print(llvm::raw_ostream &os) const {
+  os << getNameForAttributePrinting();
+}
+
 AvailabilityDomain AvailabilityDomain::copy(ASTContext &ctx) const {
   switch (getKind()) {
   case Kind::Universal:
@@ -197,6 +204,57 @@ CustomAvailabilityDomain::create(const ASTContext &ctx, StringRef name,
   return new (ctx) CustomAvailabilityDomain(ctx.getIdentifier(name), mod, kind);
 }
 
+static std::optional<AvailabilityDomain>
+getAvailabilityDomainForName(Identifier identifier,
+                             const DeclContext *declContext) {
+  if (auto builtinDomain = AvailabilityDomain::builtinDomainForString(
+          identifier.str(), declContext))
+    return builtinDomain;
+
+  auto &ctx = declContext->getASTContext();
+  if (auto customDomain =
+          ctx.MainModule->getAvailabilityDomainForIdentifier(identifier))
+    return customDomain;
+
+  return std::nullopt;
+}
+
+std::optional<AvailabilityDomain>
+AvailabilityDomainOrIdentifier::lookUpInDeclContext(
+    SourceLoc loc, const DeclContext *declContext) const {
+  DEBUG_ASSERT(isIdentifier());
+
+  auto &ctx = declContext->getASTContext();
+  auto &diags = ctx.Diags;
+  std::optional<AvailabilityDomain> domain;
+  auto identifier = getAsIdentifier().value();
+  domain = getAvailabilityDomainForName(identifier, declContext);
+
+  if (!domain) {
+    auto domainString = identifier.str();
+    if (auto suggestion = closestCorrectedPlatformString(domainString)) {
+      diags
+          .diagnose(loc, diag::avail_query_suggest_platform_name, identifier,
+                    *suggestion)
+          .fixItReplace(SourceRange(loc), *suggestion);
+    } else {
+      diags.diagnose(loc, diag::avail_query_unrecognized_platform_name,
+                     identifier);
+    }
+    return std::nullopt;
+  }
+
+  if (domain->isCustom() &&
+      !ctx.LangOpts.hasFeature(Feature::CustomAvailability) &&
+      !declContext->isInSwiftinterface()) {
+    diags.diagnose(loc, diag::attr_availability_requires_custom_availability,
+                   identifier);
+    return std::nullopt;
+  }
+
+  return domain;
+}
+
 AvailabilityDomainOrIdentifier
 AvailabilityDomainOrIdentifier::copy(ASTContext &ctx) const {
   if (auto identifier = getAsIdentifier())
@@ -204,4 +262,11 @@ AvailabilityDomainOrIdentifier::copy(ASTContext &ctx) const {
 
   DEBUG_ASSERT(isDomain());
   return getAsDomain()->copy(ctx);
+}
+
+void AvailabilityDomainOrIdentifier::print(llvm::raw_ostream &os) const {
+  if (auto identifier = getAsIdentifier())
+    os << identifier->str();
+  else
+    getAsDomain()->print(os);
 }

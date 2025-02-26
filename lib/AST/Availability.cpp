@@ -797,26 +797,11 @@ bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
   return false;
 }
 
-static std::optional<AvailabilityDomain>
-getAvailabilityDomainForName(Identifier identifier,
-                             const DeclContext *declContext) {
-  if (auto builtinDomain = AvailabilityDomain::builtinDomainForString(
-          identifier.str(), declContext))
-    return builtinDomain;
-
-  auto &ctx = declContext->getASTContext();
-  if (auto customDomain =
-          ctx.MainModule->getAvailabilityDomainForIdentifier(identifier))
-    return customDomain;
-
-  return std::nullopt;
-}
-
 std::optional<SemanticAvailableAttr>
 SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
                                        const AvailableAttr *attr,
                                        const Decl *decl) const {
-  if (attr->hasCachedDomain())
+  if (attr->getDomainOrIdentifier().isDomain())
     return SemanticAvailableAttr(attr);
 
   auto &ctx = decl->getASTContext();
@@ -824,42 +809,13 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   auto attrLoc = attr->getLocation();
   auto attrName = attr->getAttrName();
   auto domainLoc = attr->getDomainLoc();
+  auto declContext = decl->getInnermostDeclContext();
   auto mutableAttr = const_cast<AvailableAttr *>(attr);
-  auto domain = attr->getCachedDomain();
+  auto domain = mutableAttr->DomainOrIdentifier.resolveInDeclContext(
+      domainLoc, declContext);
 
-  if (!domain) {
-    auto domainIdentifier = attr->getDomainIdentifier();
-    ASSERT(domainIdentifier);
-
-    // Attempt to resolve the domain specified for the attribute and diagnose
-    // if no domain is found.
-    auto declContext = decl->getInnermostDeclContext();
-    domain = getAvailabilityDomainForName(*domainIdentifier, declContext);
-    if (!domain) {
-      auto domainString = domainIdentifier->str();
-      if (auto suggestion = closestCorrectedPlatformString(domainString)) {
-        diags
-            .diagnose(domainLoc, diag::attr_availability_suggest_platform,
-                      domainString, attrName, *suggestion)
-            .fixItReplace(SourceRange(domainLoc), *suggestion);
-      } else {
-        diags.diagnose(attrLoc, diag::attr_availability_unknown_platform,
-                       domainString, attrName);
-      }
-      return std::nullopt;
-    }
-
-    if (domain->isCustom() &&
-        !ctx.LangOpts.hasFeature(Feature::CustomAvailability) &&
-        !declContext->isInSwiftinterface()) {
-      diags.diagnose(domainLoc,
-                     diag::attr_availability_requires_custom_availability,
-                     domain->getNameForAttributePrinting(), attr);
-      return std::nullopt;
-    }
-
-    mutableAttr->setCachedDomain(*domain);
-  }
+  if (!domain)
+    return std::nullopt;
 
   auto domainName = domain->getNameForAttributePrinting();
   auto semanticAttr = SemanticAvailableAttr(attr);

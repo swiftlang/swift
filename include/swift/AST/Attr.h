@@ -165,14 +165,20 @@ protected:
       /// Whether this attribute was spelled `@_spi_available`.
       IsSPI : 1,
 
-      /// Whether this attribute belongs to a chain of adjacent `@available` attributes that were generated from a single attribute written in source using short form syntax e.g. (`@available(macOS 15, iOS 18, *)`).
+      /// Whether this attribute belongs to a chain of adjacent `@available`
+      /// attributes that were generated from a single attribute written in
+      /// source using short form syntax, e.g.
+      ///
+      ///     @available(macOS 15, iOS 18, *)
+      ///
       IsGroupMember : 1,
 
       /// Whether this attribute is the final one in its group.
       IsGroupTerminator : 1,
 
-      /// Whether this attribute's specification was followed by `, *` in source.
-      IsAdjacentToWildcard : 1
+      /// Whether any members of the group were written as a wildcard
+      /// specification (`*`) in source.
+      IsGroupedWithWildcard : 1
     );
 
     SWIFT_INLINE_BITFIELD(ClangImporterSynthesizedTypeAttr, DeclAttribute, 1,
@@ -740,6 +746,7 @@ public:
 
 private:
   friend class SemanticAvailableAttr;
+  friend class SemanticAvailableAttrRequest;
 
   AvailabilityDomainOrIdentifier DomainOrIdentifier;
   const SourceLoc DomainLoc;
@@ -759,18 +766,8 @@ public:
   /// has been resolved successfully.
   bool hasCachedDomain() const { return DomainOrIdentifier.isDomain(); }
 
-  /// Returns the `AvailabilityDomain` associated with the attribute, or
-  /// `std::nullopt` if it has either not yet been resolved or could not be
-  /// resolved successfully.
-  std::optional<AvailabilityDomain> getCachedDomain() const {
-    return DomainOrIdentifier.getAsDomain();
-  }
-
-  /// If the attribute does not already have a cached `AvailabilityDomain`, this
-  /// returns the domain identifier that was written in source, from which an
-  /// `AvailabilityDomain` can be resolved.
-  std::optional<Identifier> getDomainIdentifier() const {
-    return DomainOrIdentifier.getAsIdentifier();
+  AvailabilityDomainOrIdentifier getDomainOrIdentifier() const {
+    return DomainOrIdentifier;
   }
 
   SourceLoc getDomainLoc() const { return DomainLoc; }
@@ -848,12 +845,13 @@ public:
   }
   void setIsGroupTerminator() { Bits.AvailableAttr.IsGroupTerminator = true; }
 
-  /// Whether this attribute's specification was followed by `, *` in source.
-  bool isAdjacentToWildcard() const {
-    return Bits.AvailableAttr.IsAdjacentToWildcard;
+  /// Whether any members of the group were written as a wildcard specification
+  /// (`*`) in source.
+  bool isGroupedWithWildcard() const {
+    return Bits.AvailableAttr.IsGroupedWithWildcard;
   }
-  void setIsAdjacentToWildcard() {
-    Bits.AvailableAttr.IsAdjacentToWildcard = true;
+  void setIsGroupedWithWildcard() {
+    Bits.AvailableAttr.IsGroupedWithWildcard = true;
   }
 
   /// Returns the kind of availability the attribute specifies.
@@ -913,11 +911,6 @@ private:
 
 private:
   friend class SemanticAvailableAttrRequest;
-
-  void setCachedDomain(AvailabilityDomain domain) {
-    assert(!DomainOrIdentifier.isDomain());
-    DomainOrIdentifier.setDomain(domain);
-  }
 
   bool hasComputedSemanticAttr() const {
     return Bits.AvailableAttr.HasComputedSemanticAttr;
@@ -3301,12 +3294,13 @@ class SemanticAvailableAttr final {
 public:
   SemanticAvailableAttr(const AvailableAttr *attr) : attr(attr) {
     assert(attr);
-    assert(attr->hasCachedDomain());
+    bool hasDomain = attr->getDomainOrIdentifier().isDomain();
+    assert(hasDomain);
   }
 
   const AvailableAttr *getParsedAttr() const { return attr; }
   const AvailabilityDomain getDomain() const {
-    return attr->getCachedDomain().value();
+    return attr->getDomainOrIdentifier().getAsDomain().value();
   }
 
   /// The version tuple for the `introduced:` component.
