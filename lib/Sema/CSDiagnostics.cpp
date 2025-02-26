@@ -940,7 +940,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
 
   while (!path.empty()) {
     auto last = path.back();
-    if (last.is<LocatorPathElt::OptionalPayload>() ||
+    if (last.is<LocatorPathElt::OptionalInjection>() ||
         last.is<LocatorPathElt::GenericType>() ||
         last.is<LocatorPathElt::GenericArgument>()) {
       path = path.drop_back();
@@ -2835,22 +2835,6 @@ bool ContextualFailure::diagnoseAsError() {
   case ConstraintLocator::ResultBuilderBodyResult: {
     diagnostic = *getDiagnosticFor(CTP_Initialization, toType);
     break;
-  }
-
-  case ConstraintLocator::OptionalPayload: {
-    // If this is an attempt at a Double <-> CGFloat conversion
-    // through optional chaining, let's produce a tailored diagnostic.
-    if (isExpr<OptionalEvaluationExpr>(getAnchor())) {
-      if ((fromType->isDouble() || fromType->isCGFloat()) &&
-          (toType->isDouble() || toType->isCGFloat())) {
-        fromType = OptionalType::get(fromType);
-        toType = OptionalType::get(toType);
-        diagnostic = diag::cannot_implicitly_convert_in_optional_context;
-        break;
-      }
-    }
-
-    return false;
   }
 
   case ConstraintLocator::EnumPatternImplicitCastMatch: {

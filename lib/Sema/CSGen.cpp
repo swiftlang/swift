@@ -4673,7 +4673,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   // Add a conversion constraint between the element type of the sequence
   // and the type of the element pattern.
   auto *elementTypeLoc = cs.getConstraintLocator(
-      elementLocator, ConstraintLocator::OptionalPayload);
+      elementLocator, ConstraintLocator::OptionalInjection);
   auto elementType = cs.createTypeVariable(elementTypeLoc,
                                            /*flags=*/0);
   {

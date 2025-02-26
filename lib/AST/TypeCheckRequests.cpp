@@ -1655,16 +1655,16 @@ void RenamedDeclRequest::cacheResult(ValueDecl *value) const {
 }
 
 //----------------------------------------------------------------------------//
-// TypeCheckSourceFileRequest computation.
+// TypeCheckPrimaryFileRequest computation.
 //----------------------------------------------------------------------------//
 
-evaluator::DependencySource TypeCheckSourceFileRequest::readDependencySource(
+evaluator::DependencySource TypeCheckPrimaryFileRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
   return std::get<0>(getStorage());
 }
 
 std::optional<evaluator::SideEffect>
-TypeCheckSourceFileRequest::getCachedResult() const {
+TypeCheckPrimaryFileRequest::getCachedResult() const {
   auto *SF = std::get<0>(getStorage());
   if (SF->ASTStage == SourceFile::TypeChecked)
     return std::make_tuple<>();
@@ -1672,7 +1672,7 @@ TypeCheckSourceFileRequest::getCachedResult() const {
   return std::nullopt;
 }
 
-void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
+void TypeCheckPrimaryFileRequest::cacheResult(evaluator::SideEffect) const {
   auto *SF = std::get<0>(getStorage());
 
   // Verify that we've checked types correctly.
