@@ -52,3 +52,8 @@ check_compiler_flag(CXX "-mcx16" HAVE_CXX_MCX16)
 if(HAVE_CXX_MCX16)
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-mcx16>)
 endif()
+
+check_compiler_flag(Swift "-Wwarning StrictLanguageFeatures" HAVE_SWIFT_STRICT_LANGUAGE_WARNING)
+if(HAVE_SWIFT_STRICT_LANGUAGE_WARNING)
+  add_compile_options($<$<COMPILE_LANGUAGE:Swift>:SHELL:-Wwarning$<SEMICOLON>StrictLanguageFeatures>)
+endif()
