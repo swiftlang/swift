@@ -2379,7 +2379,8 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     }
   }
 
-  if (Tok.isContextualKeyword("unsafe")) {
+  if (Tok.isContextualKeyword("unsafe") &&
+      !peekToken().isAny(tok::colon, tok::kw_in)) {
     UnsafeLoc = consumeToken();
   }
   

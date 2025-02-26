@@ -98,6 +98,15 @@ func testUnsafeAsSequenceForEach() {
   for unsafe _ in unsafe uas { } // okay
 }
 
+func testForInUnsafeAmbiguity(_ integers: [Int]) {
+  for unsafe in integers {
+    _ = unsafe
+  }
+  for unsafe: Int in integers {
+    _ = unsafe
+  }
+}
+
 struct UnsafeIterator: @unsafe IteratorProtocol {
   @unsafe mutating func next() -> Int? { nil }
 }
