@@ -1110,11 +1110,12 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
       continue;
     }
 
-    // Look through object.
+    // Look through object. SingleValueInstruction is overly restrictive but
+    // rules out any interesting corner cases.
     if (auto *svi = dyn_cast<SingleValueInstruction>(user)) {
-      if (Projection::isObjectProjection(svi)) {
-        for (SILValue result : user->getResults()) {
-          llvm::copy(result->getUses(), std::back_inserter(worklist));
+      if (ForwardingInstruction::isa(user)) {
+        for (auto *use : svi->getUses()) {
+          worklist.push_back(use);
         }
         continue;
       }
