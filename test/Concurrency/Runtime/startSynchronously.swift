@@ -77,7 +77,7 @@ func syncOnMyGlobalActor() -> [Task<Void, Never>] {
 
   print("before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
   let outerTID = getCurrentThreadID()
-  let tt = Task._startSynchronously { @MyGlobalActor in
+  let tt = Task.startSynchronously { @MyGlobalActor in
     let innerTID = getCurrentThreadID()
     print("inside startSynchronously, outer thread = \(outerTID)")
     print("inside startSynchronously, inner thread = \(innerTID)")
@@ -103,7 +103,7 @@ func syncOnNonTaskThread(synchronousTask behavior: SynchronousTaskBehavior) {
     print("before startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
 
     let outerTID = getCurrentThreadID()
-    let tt = Task._startSynchronously {
+    let tt = Task.startSynchronously {
       dispatchPrecondition(condition: .onQueue(queue))
 
       let innerTID = getCurrentThreadID()
@@ -258,7 +258,7 @@ func callActorFromStartSynchronousTask(recipient rec: TargetActorToCall) {
   queue.async {
     let outerTID = getCurrentThreadID()
     print("before startSynchronously [thread:\(outerTID)] @ :\(#line)")
-    let tt = Task._startSynchronously {
+    let tt = Task.startSynchronously {
       dispatchPrecondition(condition: .onQueue(queue))
 
       let innerTID = getCurrentThreadID()
@@ -332,14 +332,14 @@ callActorFromStartSynchronousTask(recipient: .recipientOnQueue(RecipientOnQueue(
 // allowing the 'after startSynchronously' to run.
 //
 // CHECK-NEXT: inside startSynchronously, call rec.sync() [thread:[[CALLING_THREAD4]]]
-// CHECK: NaiveQueueExecutor(recipient-actor-queue).enqueue
+// CHECK: NaiveQueueExecutor(recipient-actor-queue) enqueue
 // CHECK: after startSynchronously
 // CHECK-NOT: ERROR!
 // CHECK: inside startSynchronously, call rec.sync() done
 
 // CHECK-NOT: ERROR!
 // CHECK: inside startSynchronously, call rec.async()
-// CHECK: NaiveQueueExecutor(recipient-actor-queue).enqueue
+// CHECK: NaiveQueueExecutor(recipient-actor-queue) enqueue
 // CHECK-NOT: ERROR!
 // CHECK: inside startSynchronously, call rec.async() done
 
@@ -355,9 +355,9 @@ final class NaiveQueueExecutor: SerialExecutor {
 
   public func enqueue(_ job: consuming ExecutorJob) {
     let unowned = UnownedJob(job)
-    print("NaiveQueueExecutor(\(self.queue.label)).enqueue... [thread:\(getCurrentThreadID())]")
+    print("NaiveQueueExecutor(\(self.queue.label)) enqueue... [thread:\(getCurrentThreadID())]")
     queue.async {
-    print("NaiveQueueExecutor(\(self.queue.label)).enqueue: run [thread:\(getCurrentThreadID())]")
+    print("NaiveQueueExecutor(\(self.queue.label)) enqueue: run [thread:\(getCurrentThreadID())]")
       unowned.runSynchronously(on: self.asUnownedSerialExecutor())
     }
   }
