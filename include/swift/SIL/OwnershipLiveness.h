@@ -242,10 +242,6 @@ public:
   // Summarize address uses
   AddressUseKind addressUseKind = AddressUseKind::Unknown;
 
-  // Record any guaranteed phi uses that are not already enclosed by an outer
-  // adjacent phi.
-  SmallVector<SILValue, 8> unenclosedPhis;
-
 public:
   InteriorLiveness(SILValue def): OSSALiveness(def) {}
 
@@ -258,8 +254,6 @@ public:
   }
 
   AddressUseKind getAddressUseKind() const { return addressUseKind; }
-
-  ArrayRef<SILValue> getUnenclosedPhis() const { return unenclosedPhis; }
 
   void print(llvm::raw_ostream &OS) const;
   void dump() const;
