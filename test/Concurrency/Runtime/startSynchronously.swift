@@ -212,20 +212,21 @@ callActorFromStartSynchronousTask()
 actor Recipient {
   func sync(syncTaskThreadID: ThreadID) {
     self.preconditionIsolated()
-//    if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
-//      print("ERROR! Sync start thread id = \(syncTaskThreadID) \(#fileID):\(#line)")
-//      print("ERROR! Current actor thread id = \(getCurrentThreadID()) \(#fileID):\(#line)")
-//      print("ERROR! Actor must not run on the synchronous task's thread \(#fileID):\(#line)")
-//    }
+    print("\(Recipient.self)/\(#function) Current actor thread id = \(getCurrentThreadID()) @ :\(#line)")
+    if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
+      print("NOTICE: Actor must not run on the synchronous task's thread :\(#line)")
+    }
   }
 
   func async(syncTaskThreadID: ThreadID) async {
     self.preconditionIsolated()
-//    if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
-//      print("ERROR! Sync start thread id = \(syncTaskThreadID) \(#fileID):\(#line)")
-//      print("ERROR! Current actor thread id = \(getCurrentThreadID()) \(#fileID):\(#line)")
-//      print("ERROR! Actor must not run on the synchronous task's thread \(#fileID):\(#line)")
-//    }
+    // Dispatch may end up reusing the thread used to service the queue so we
+    // cannot truly assert exact thread identity in such tests.
+    // Usually this will be on a different thread by now though.
+    print("\(Recipient.self)/\(#function) Current actor thread id = \(getCurrentThreadID()) @ :\(#line)")
+    if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
+      print("NOTICE: Actor must not run on the synchronous task's thread :\(#line)")
+    }
 
     await Task {
       self.preconditionIsolated()
@@ -252,7 +253,7 @@ func callActorFromStartSynchronousTask() {
 
       for i in 1..<10 {
         queue.async {
-          print("ASYNC WORK ON QUEUE")
+          print("- async work on queue")
         }
       }
 
@@ -264,9 +265,12 @@ func callActorFromStartSynchronousTask() {
       // thus the thread IDs cannot be the same anymore
       print("Inner thread id = \(innerTID)")
       print("Current thread id = \(getCurrentThreadID())")
-//      if compareThreadIDs(innerTID, .equal, getCurrentThreadID()) {
-//        print("ERROR! Task resumed on same thread as it entered the synchronous task!")
-//      }
+      // Dispatch may end up reusing the thread used to service the queue so we
+      // cannot truly assert exact thread identity in such tests.
+      // Usually this will be on a different thread by now though.
+      if compareThreadIDs(innerTID, .equal, getCurrentThreadID()) {
+        print("NOTICE: Task resumed on same thread as it entered the synchronous task!")
+      }
 
       print("inside startSynchronously, call rec.async() [thread:\(getCurrentThreadID())] @ :\(#line)")
       await rec.async(syncTaskThreadID: innerTID)
@@ -274,9 +278,12 @@ func callActorFromStartSynchronousTask() {
 
       print("Inner thread id = \(innerTID)")
       print("Current thread id = \(getCurrentThreadID())")
-//      if compareThreadIDs(innerTID, .equal, getCurrentThreadID()) {
-//        print("ERROR! Task resumed on same thread as it entered the synchronous task!")
-//      }
+      // Dispatch may end up reusing the thread used to service the queue so we
+      // cannot truly assert exact thread identity in such tests.
+      // Usually this will be on a different thread by now though.
+      if compareThreadIDs(innerTID, .equal, getCurrentThreadID()) {
+        print("NOTICE: Task resumed on same thread as it entered the synchronous task!")
+      }
 
       print("inside startSynchronously, done [thread:\(getCurrentThreadID())] @ :\(#line)")
       sem1.signal()
