@@ -5207,6 +5207,8 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   if (where.isImplicit())
     return;
 
+  bool diagnosedIsolatedConformanceIssue = false;
+
   conformance->forEachAssociatedConformance(
     [&](Type depTy, ProtocolDecl *proto, unsigned index) {
       auto assocConf = conformance->getAssociatedConformance(depTy, proto);
@@ -5228,6 +5230,50 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
         diagnoseConformanceAvailability(
             conformance->getLoc(), assocConf,
             where.withRefinedAvailability(availability), depTy, replacementTy);
+      }
+
+      if (!diagnosedIsolatedConformanceIssue) {
+        bool foundIssue = forEachIsolatedConformance(
+            ProtocolConformanceRef(assocConf),
+            [&](ProtocolConformance *isolatedConformance) {
+              // If the conformance we're checking isn't isolated at all, it
+              // needs "isolated".
+              if (!conformance->isIsolated()) {
+                ctx.Diags.diagnose(
+                    conformance->getLoc(),
+                    diag::nonisolated_conformance_depends_on_isolated_conformance,
+                    typeInContext, conformance->getProtocol()->getName(),
+                    getConformanceIsolation(isolatedConformance),
+                    isolatedConformance->getType(),
+                    isolatedConformance->getProtocol()->getName()
+               ).fixItInsert(conformance->getProtocolNameLoc(), "isolated ");
+
+                return true;
+              }
+
+              // The conformance is isolated, but we need it to have the same
+              // isolation as the other isolated conformance we found.
+              auto outerIsolation = getConformanceIsolation(conformance);
+              auto innerIsolation = getConformanceIsolation(isolatedConformance);
+              if (outerIsolation != innerIsolation) {
+                ctx.Diags.diagnose(
+                    conformance->getLoc(),
+                    diag::isolated_conformance_mismatch_with_associated_isolation,
+                    outerIsolation,
+                    typeInContext, conformance->getProtocol()->getName(),
+                    innerIsolation,
+                    isolatedConformance->getType(),
+                    isolatedConformance->getProtocol()->getName()
+                );
+
+                return true;
+              }
+
+              return false;
+            }
+        );
+
+        diagnosedIsolatedConformanceIssue = foundIssue;
       }
 
       return false;

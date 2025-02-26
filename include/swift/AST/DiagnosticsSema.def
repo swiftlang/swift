@@ -2733,6 +2733,12 @@ ERROR(isolated_conformance_not_global_actor_isolated,none,
 ERROR(isolated_conformance_experimental_feature,none,
       "isolated conformances require experimental feature "
       " 'IsolatedConformances'", ())
+ERROR(nonisolated_conformance_depends_on_isolated_conformance,none,
+      "conformance of %0 to %1 depends on %2 conformance of %3 to %4; mark it as 'isolated'",
+      (Type, DeclName, ActorIsolation, Type, DeclName))
+ERROR(isolated_conformance_mismatch_with_associated_isolation,none,
+      "%0 conformance of %1 to %2 cannot depend on %3 conformance of %4 to %5",
+      (ActorIsolation, Type, DeclName, ActorIsolation, Type, DeclName))
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",
         (Identifier))

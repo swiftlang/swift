@@ -40,3 +40,41 @@ class CMismatchedIsolation: isolated P {
 class C: isolated P {
   func f() { } // okay
 }
+
+// Associated conformances with isolation
+
+protocol Q {
+  associatedtype A: P
+}
+
+// expected-error@+2{{conformance of 'SMissingIsolation' to 'Q' depends on main actor-isolated conformance of 'C' to 'P'; mark it as 'isolated'}}{{27-27=isolated }}
+@MainActor
+struct SMissingIsolation: Q {
+  typealias A = C
+}
+
+struct PWrapper<T: P>: P {
+  func f() { }
+}
+
+// expected-error@+2{{conformance of 'SMissingIsolationViaWrapper' to 'Q' depends on main actor-isolated conformance of 'C' to 'P'; mark it as 'isolated'}}
+@MainActor
+struct SMissingIsolationViaWrapper: Q {
+  typealias A = PWrapper<C>
+}
+
+@SomeGlobalActor
+class C2: isolated P {
+  func f() { }
+}
+
+@MainActor
+struct S: isolated Q {
+  typealias A = C
+}
+
+// expected-error@+2{{main actor-isolated conformance of 'SMismatchedActors' to 'Q' cannot depend on global actor 'SomeGlobalActor'-isolated conformance of 'C2' to 'P'}}
+@MainActor
+struct SMismatchedActors: isolated Q {
+  typealias A = C2
+}
