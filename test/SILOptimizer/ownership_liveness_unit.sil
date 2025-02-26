@@ -606,7 +606,8 @@ bb1(%reborrow : @guaranteed $C):
 // CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
 // CHECK-NEXT: ends:       br bb1(%{{.*}} : $C, %{{.*}} : $D)
 // CHECK-NEXT: exits:
-// CHECK-NEXT: interiors:  %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: interiors:  %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
 // CHECK-NEXT: last user:   br bb1(%{{.*}} : $C, %{{.*}} : $D)
 // CHECK-NEXT: testInteriorNondominatedReborrow: interior_liveness_swift with: %borrow1
 sil [ossa] @testInteriorNondominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
@@ -647,7 +648,8 @@ bb3(%reborrow1 : @guaranteed $C, %reborrow2 : @guaranteed $D):
 // CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
 // CHECK-NEXT: exits:
 // CHECK-NEXT: interiors:  end_borrow %{{.*}} : $D
-// CHECK-NEXT:             br bb1(%{{.*}} : $D)
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = begin_borrow %{{.*}} : $D
 // CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
 // CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
 // CHECK-NEXT: testInteriorDominatedReborrow: interior_liveness_swift with: %borrow1
@@ -777,7 +779,8 @@ bb3(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
 // CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
 // CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
 // CHECK-NEXT: exits:
-// CHECK-NEXT: interiors:  br bb1(%{{.*}} : $C)
+// CHECK-NEXT: interiors:  %{{.*}} = borrowed %{{.*}} : $C from (%0 : $C)
+// CHECK-NEXT:             %{{.*}} = begin_borrow %0 : $C
 // CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
 // CHECK-NEXT: testInnerDominatedReborrow: interior_liveness_swift with: @argument[0]
 sil [ossa] @testInnerDominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
@@ -815,7 +818,8 @@ bb1(%reborrow : @guaranteed $C):
 // CHECK-NEXT: ends:       destroy_value %{{.*}} : $C
 // CHECK-NEXT: exits:
 // CHECK-NEXT: interiors:  end_borrow %{{.*}} : $C
-// CHECK-NEXT:             br bb3(%{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $C from (%{{.*}} : $C, %{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = begin_borrow %{{.*}} : $C
 // CHECK-NEXT: last user:   destroy_value %{{.*}} : $C
 // CHECK-NEXT: testInnerDominatedReborrow2: interior_liveness_swift with: %copy0a
 sil [ossa] @testInnerDominatedReborrow2 : $@convention(thin) (@guaranteed C) -> () {
@@ -902,7 +906,8 @@ bb3(%outer : @guaranteed $D, %inner : @guaranteed $D):
 // CHECK-NEXT: begin:      %{{.*}} = borrowed %{{.*}} : $D from
 // CHECK-NEXT: ends:       end_borrow
 // CHECK-NEXT: exits:
-// CHECK-NEXT: interiors:  br bb4(
+// CHECK-NEXT: interiors:  %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $D, %0 : $D)
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%0 : $D, %{{.*}} : $D)
 // CHECK-NEXT: last user:   end_borrow
 // CHECK-NEXT: testInnerAdjacentReborrow1: interior_liveness_swift with: %outer3
 sil [ossa] @testInnerAdjacentReborrow1 : $@convention(thin) (@guaranteed D) -> () {
@@ -950,7 +955,8 @@ bb4(%inner4 : @guaranteed $D):
 // CHECK-NEXT: begin:      {{.*}} borrowed {{.*}} from
 // CHECK-NEXT: ends:       end_borrow %{{.*}} : $D
 // CHECK-NEXT: exits:
-// CHECK-NEXT: interiors:  br bb4(%{{.*}} : $D)
+// CHECK-NEXT: interiors:  %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $D, %0 : $D)
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%0 : $D, %{{.*}} : $D)
 // CHECK-NEXT: last user:   end_borrow %{{.*}} : $D
 // CHECK-NEXT: testInnerAdjacentReborrow2: interior_liveness_swift with: %outer3
 sil [ossa] @testInnerAdjacentReborrow2 : $@convention(thin) (@guaranteed D) -> () {
@@ -1227,7 +1233,8 @@ bb0(%0 : @guaranteed $D):
 // CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
 // CHECK-NEXT: exits:
 // CHECK-NEXT: interiors:  end_borrow %{{.*}} : $D
-// CHECK-NEXT:             br bb1(%{{.*}} : $D)
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = begin_borrow %{{.*}} : $D
 // CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
 // CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
 // CHECK-NEXT: testInteriorDominatedReborrowedFrom: interior_liveness_swift with: %borrow1
@@ -1464,10 +1471,11 @@ bb1(%reborrow1 : @reborrow $C, %phi : @guaranteed $D):
 // CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $D
 // CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
 // CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
-// CHECK-NEXT: ends:       br bb1(%{{.*}} : $D)
-// CHECK-NEXT: exits:
-// CHECK-NEXT: interiors:  %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
-// CHECK-NEXT: last user:   br bb1(%{{.*}} : $D)
+// CHECK-NEXT: ends:       %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
 // CHECK-NEXT: testInteriorDominatedReborrowedFromDeadEnd: interior_liveness_swift with: %borrow1
 
 // CHECK-LABEL: testInteriorDominatedReborrowedFromDeadEnd: interior_liveness with: %reborrow2
@@ -1532,13 +1540,13 @@ bb1(%reborrow2 : @reborrow $D):
 // CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
 // CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
 // CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
-// CHECK-NEXT: ends:       br bb3(%{{.*}} : $D, %{{.*}} : $C)
-// CHECK-NEXT:             br bb3(%{{.*}} : $D, %{{.*}} : $C)
-// CHECK-NEXT: exits:
-// CHECK-NEXT: interiors:  %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: ends:       %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  %{{.*}} = begin_borrow %{{.*}} : $D
 // CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
-// CHECK-NEXT: last user:   br bb3(%{{.*}} : $D, %{{.*}} : $C)
-// CHECK-NEXT: last user:   br bb3(%{{.*}} : $D, %{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
 // CHECK-NEXT: testInteriorDominatedReborrowedFromDeadEndNested: interior_liveness_swift with: %borrow0
 
 // CHECK-LABEL: testInteriorDominatedReborrowedFromDeadEndNested: interior_liveness with: %reborrow
@@ -1616,13 +1624,13 @@ bb3(%reborrow : @reborrow $D, %arg : @guaranteed $C):
 // CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
 // CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
 // CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
-// CHECK-NEXT: ends:       br bb3(%{{.*}} : $D, %{{.*}} : $C)
-// CHECK-NEXT:             br bb3(%{{.*}} : $D, %{{.*}} : $C)
-// CHECK-NEXT: exits:
-// CHECK-NEXT: interiors:  %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: ends:       %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  %{{.*}} = begin_borrow %{{.*}} : $D
 // CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
-// CHECK-NEXT: last user:   br bb3(%{{.*}} : $D, %{{.*}} : $C)
-// CHECK-NEXT: last user:   br bb3(%{{.*}} : $D, %{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
 // CHECK-NEXT: testInteriorNondominatedPhiBorrowedFromDeadEnd: interior_liveness_swift with: %borrow0
 
 // CHECK-LABEL: testInteriorNondominatedPhiBorrowedFromDeadEnd: interior_liveness with: %reborrow
@@ -1888,7 +1896,8 @@ bb0(%0 : @guaranteed $D, %1 : @owned $C):
 // CHECK-NEXT:             %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
 // CHECK-NEXT:             %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
 // CHECK-NEXT:             %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $D on %{{.*}} : $C
-// CHECK-NEXT:             br bb1(%{{.*}} : $D)
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = begin_borrow %{{.*}} : $D
 // CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
 // CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
 // CHECK-NEXT: testInteriorDominatedReborrowedFromMarkDep: interior_liveness_swift with: %borrow1
