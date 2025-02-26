@@ -1412,6 +1412,7 @@ function Build-SPMProject {
 
     $env:Path = "$RuntimeInstallRoot\usr\bin;$($HostArch.ToolchainInstallRoot)\usr\bin;${env:Path}"
     $env:SDKROOT = $SDKInstallRoot
+    $env:SWIFTCI_USE_LOCAL_DEPS=1
 
     $Arguments = @(
         "--scratch-path", $Bin,
@@ -2213,18 +2214,14 @@ function Build-Foundation {
 
   if ($Test) {
     # Foundation tests build via swiftpm rather than CMake
-    Isolate-EnvVars {
-      $env:SWIFTCI_USE_LOCAL_DEPS=1
-      Build-SPMProject `
-        -Action Test `
-        -Src $SourceCache\swift-foundation `
-        -Bin "$BinaryCache\$($Arch.LLVMTarget)\CoreFoundationTests" `
-        -Arch $HostArch
-    }
+    Build-SPMProject `
+      -Action Test `
+      -Src $SourceCache\swift-foundation `
+      -Bin "$BinaryCache\$($Arch.LLVMTarget)\CoreFoundationTests" `
+      -Arch $HostArch
 
     $ShortArch = $Arch.LLVMName
     Isolate-EnvVars {
-      $env:SWIFTCI_USE_LOCAL_DEPS=1
       $env:DISPATCH_INCLUDE_PATH="$($Arch.SDKInstallRoot)/usr/lib/swift"
       $env:LIBXML_LIBRARY_PATH="$LibraryRoot/libxml2-2.11.5/usr/lib/$Platform/$ShortArch"
       $env:LIBXML_INCLUDE_PATH="$LibraryRoot/libxml2-2.11.5/usr/include/libxml2"
@@ -3047,15 +3044,12 @@ function Build-Inspect([Platform]$Platform, $Arch) {
 }
 
 function Build-DocC() {
-  Isolate-EnvVars {
-    $env:SWIFTCI_USE_LOCAL_DEPS=1
-    Build-SPMProject `
-      -Action Build `
-      -Src $SourceCache\swift-docc `
-      -Bin $(Get-HostProjectBinaryCache DocC) `
-      -Arch $HostArch `
-      --product docc
-  }
+  Build-SPMProject `
+    -Action Build `
+    -Src $SourceCache\swift-docc `
+    -Bin $(Get-HostProjectBinaryCache DocC) `
+    -Arch $HostArch `
+    --product docc
 }
 
 function Test-PackageManager() {
@@ -3065,15 +3059,12 @@ function Test-PackageManager() {
     "$SourceCache\swiftpm"
   }
 
-  Isolate-EnvVars {
-    $env:SWIFTCI_USE_LOCAL_DEPS=1
-    Build-SPMProject `
-      -Action Test `
-      -Src $SrcDir `
-      -Bin "$BinaryCache\$($HostArch.LLVMTarget)\PackageManagerTests" `
-      -Arch $HostArch `
-      -Xcc "-I$LibraryRoot\sqlite-3.46.0\usr\include" -Xlinker "-L$LibraryRoot\sqlite-3.46.0\usr\lib"
-  }
+  Build-SPMProject `
+    -Action Test `
+    -Src $SrcDir `
+    -Bin "$BinaryCache\$($HostArch.LLVMTarget)\PackageManagerTests" `
+    -Arch $HostArch `
+    -Xcc "-I$LibraryRoot\sqlite-3.46.0\usr\include" -Xlinker "-L$LibraryRoot\sqlite-3.46.0\usr\lib"
 }
 
 function Build-Installer($Arch) {
