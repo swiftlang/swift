@@ -125,6 +125,19 @@ extension KeyValuePairs: RandomAccessCollection {
   }
 }
 
+extension KeyValuePairs {
+  
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<(Key, Value)> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    get {
+      let span = _elements.span
+      return _overrideLifetime(span, borrowing: self)
+    }
+  }
+}
+
 @_unavailableInEmbedded
 extension KeyValuePairs: CustomStringConvertible {
   /// A string that represents the contents of the dictionary.
