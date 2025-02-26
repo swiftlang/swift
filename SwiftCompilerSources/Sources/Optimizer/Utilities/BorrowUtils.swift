@@ -142,9 +142,9 @@ import SIL
 ///
 /// Note: This must handle all instructions with a .borrow operand ownership.
 ///
-/// Note: borrowed_from is a BorrowingInstruction because it creates a borrow scope for its base operand. Its result,
-/// however, is only a BeginBorrowValue (.reborrow) if it forwards a reborrow phi. Otherwise, it simply forwards a
-/// guaranteed value and does not introduce a separate borrow scope.
+/// Note: borrowed_from is a BorrowingInstruction because it creates a borrow scope for its enclosing operands. Its
+/// result, however, is only a BeginBorrowValue (.reborrow) if it forwards a reborrow phi. Otherwise, it simply forwards
+/// a guaranteed value and does not introduce a separate borrow scope.
 ///
 /// Note: mark_dependence [nonescaping] is a BorrowingInstruction because it creates a borrow scope for its base
 /// operand. Its result, however, is not a BeginBorrowValue. Instead it is a ForwardingInstruction relative to its value
