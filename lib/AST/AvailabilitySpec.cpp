@@ -23,10 +23,9 @@ using namespace swift;
 
 AvailabilitySpec *AvailabilitySpec::createWildcard(ASTContext &ctx,
                                                    SourceLoc starLoc) {
-  return new (ctx)
-      AvailabilitySpec({AvailabilityDomain::forUniversal(), true}, starLoc,
-                       /*Version=*/{},
-                       /*VersionStartLoc=*/{});
+  return new (ctx) AvailabilitySpec(AvailabilityDomain::forUniversal(), starLoc,
+                                    /*Version=*/{},
+                                    /*VersionStartLoc=*/{});
 }
 
 AvailabilitySpec *AvailabilitySpec::createForDomain(ASTContext &ctx,
@@ -35,23 +34,29 @@ AvailabilitySpec *AvailabilitySpec::createForDomain(ASTContext &ctx,
                                                     llvm::VersionTuple version,
                                                     SourceRange versionRange) {
   DEBUG_ASSERT(!version.empty());
-  return new (ctx)
-      AvailabilitySpec({domain, true}, SourceRange(loc, versionRange.End),
-                       version, versionRange.Start);
+  return new (ctx) AvailabilitySpec(domain, SourceRange(loc, versionRange.End),
+                                    version, versionRange.Start);
 }
 
 AvailabilitySpec *AvailabilitySpec::createForUnknownDomain(
     ASTContext &ctx, Identifier domainIdentifier, SourceLoc loc,
     llvm::VersionTuple version, SourceRange versionRange) {
-  return new (ctx) AvailabilitySpec({domainIdentifier, true},
-                                    SourceRange(loc, versionRange.End), version,
-                                    versionRange.Start);
+  DEBUG_ASSERT(!version.empty());
+  return new (ctx)
+      AvailabilitySpec(domainIdentifier, SourceRange(loc, versionRange.End),
+                       version, versionRange.Start);
 }
 
 AvailabilitySpec *AvailabilitySpec::clone(ASTContext &ctx) const {
-  return new (ctx)
-      AvailabilitySpec({getDomainOrIdentifier().copy(ctx), true},
-                       SrcRange, Version, VersionStartLoc);
+  return new (ctx) AvailabilitySpec(getDomainOrIdentifier().copy(ctx), SrcRange,
+                                    Version, VersionStartLoc);
+}
+
+void AvailabilitySpec::print(llvm::raw_ostream &os) const {
+  getDomainOrIdentifier().print(os);
+
+  if (!getRawVersion().empty())
+    os << " " << getRawVersion().getAsString();
 }
 
 llvm::VersionTuple SemanticAvailabilitySpec::getVersion() const {

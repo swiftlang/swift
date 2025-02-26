@@ -4936,24 +4936,29 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
 /// Find each of the `AvailableAttr`s that represents the first attribute in a
 /// group of attributes what were parsed from a short-form available attribute,
 /// e.g. `@available(macOS , iOS, *)`.
-static llvm::SmallSet<const AvailableAttr *, 8>
-getAvailableAttrGroups(ArrayRef<AvailableAttr *> attrs) {
-  llvm::SmallSet<const AvailableAttr *, 8> heads;
+static llvm::SmallVector<const AvailableAttr *, 4>
+getAvailableAttrGroups(ArrayRef<const AvailableAttr *> attrs) {
+  llvm::SmallSet<const AvailableAttr *, 8> seen;
 
-  // Find each attribute that belongs to a group.
+  // Collect the of the grouped attributes that are reachable starting from any
+  // other attribute.
   for (auto attr : attrs) {
-    if (attr->isGroupMember())
-      heads.insert(attr);
-  }
-
-  // Remove the interior attributes of each group, leaving only the head.
-  for (auto attr : attrs) {
-    if (auto next = attr->getNextGroupedAvailableAttr()) {
-      heads.erase(next);
+    auto next = attr;
+    while ((next = next->getNextGroupedAvailableAttr())) {
+      if (!seen.insert(next).second)
+        break;
     }
   }
 
-  return heads;
+  // The grouped attributes that are _not_ reachable from any other attribute
+  // are the results.
+  llvm::SmallVector<const AvailableAttr *, 4> results;
+  for (auto attr : attrs) {
+    if (attr->isGroupMember() && !seen.contains(attr))
+      results.push_back(attr);
+  }
+
+  return results;
 }
 
 void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
@@ -4982,7 +4987,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
       groupAttrCount++;
       auto loc = groupedAttr->getLocation();
       groupEndLoc = groupedAttr->getEndLoc();
-      if (groupedAttr->isAdjacentToWildcard())
+      if (groupedAttr->isGroupedWithWildcard())
         foundWildcard = true;
 
       auto attr = D->getSemanticAvailableAttr(groupedAttr);
@@ -4997,8 +5002,8 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
       if (domain.isPlatform())
         requiresWildcard = true;
 
-      if (groupAttrCount > 1 || groupedAttr->isAdjacentToWildcard() ||
-          !groupedAttr->isGroupTerminator()) {
+      if (groupAttrCount > 1 || !groupedAttr->isGroupTerminator() ||
+          foundWildcard) {
         // Only platform availability is allowed to be written groups with more
         // than one member.
         if (!domain.isPlatform()) {

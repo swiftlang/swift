@@ -23,6 +23,7 @@
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -248,11 +249,18 @@ public:
     ID.AddPointer(getOpaqueValue());
   }
 
+  void print(llvm::raw_ostream &os) const;
+
 private:
   friend class AvailabilityDomainOrIdentifier;
 
   AvailabilityDomain copy(ASTContext &ctx) const;
 };
+
+inline void simple_display(llvm::raw_ostream &os,
+                           const AvailabilityDomain &domain) {
+  domain.print(os);
+}
 
 /// Represents an availability domain that has been defined in a module.
 class CustomAvailabilityDomain : public ASTAllocated<CustomAvailabilityDomain> {
@@ -287,10 +295,20 @@ public:
 class AvailabilityDomainOrIdentifier {
   friend struct llvm::PointerLikeTypeTraits<AvailabilityDomainOrIdentifier>;
 
-  using Storage = llvm::PointerUnion<AvailabilityDomain, Identifier>;
+  using DomainOrIdentifier = llvm::PointerUnion<AvailabilityDomain, Identifier>;
+
+  /// Stores an extra bit representing whether the domain has been resolved.
+  using Storage = llvm::PointerIntPair<DomainOrIdentifier, 1, bool>;
   Storage storage;
 
   AvailabilityDomainOrIdentifier(Storage storage) : storage(storage) {}
+
+  static AvailabilityDomainOrIdentifier fromOpaque(void *opaque) {
+    return AvailabilityDomainOrIdentifier(Storage::getFromOpaqueValue(opaque));
+  }
+
+  std::optional<AvailabilityDomain>
+  lookUpInDeclContext(SourceLoc loc, const DeclContext *declContext) const;
 
 public:
   AvailabilityDomainOrIdentifier(Identifier identifier)
@@ -298,12 +316,10 @@ public:
   AvailabilityDomainOrIdentifier(AvailabilityDomain domain)
       : storage(domain) {};
 
-  static AvailabilityDomainOrIdentifier fromOpaque(void *opaque) {
-    return AvailabilityDomainOrIdentifier(Storage::getFromOpaqueValue(opaque));
+  bool isDomain() const {
+    return storage.getPointer().is<AvailabilityDomain>();
   }
-
-  bool isDomain() const { return storage.is<AvailabilityDomain>(); }
-  bool isIdentifier() const { return storage.is<Identifier>(); }
+  bool isIdentifier() const { return storage.getPointer().is<Identifier>(); }
 
   /// Overwrites the existing domain or identifier with the given domain.
   void setDomain(AvailabilityDomain domain) { storage = Storage(domain); }
@@ -311,7 +327,7 @@ public:
   /// Returns the resolved domain, or `std::nullopt` if there isn't one.
   std::optional<AvailabilityDomain> getAsDomain() const {
     if (isDomain())
-      return storage.get<AvailabilityDomain>();
+      return storage.getPointer().get<AvailabilityDomain>();
     return std::nullopt;
   }
 
@@ -319,14 +335,31 @@ public:
   /// been resolved.
   std::optional<Identifier> getAsIdentifier() const {
     if (isIdentifier())
-      return storage.get<Identifier>();
+      return storage.getPointer().get<Identifier>();
     return std::nullopt;
+  }
+
+  std::optional<AvailabilityDomain>
+  resolveInDeclContext(SourceLoc loc, const DeclContext *declContext) {
+    // Return the domain directly if already resolved.
+    if (storage.getInt() || isDomain())
+      return getAsDomain();
+
+    // Look up the domain and cache the result.
+    auto result = lookUpInDeclContext(loc, declContext);
+    if (result)
+      storage.setPointer(*result);
+    storage.setInt(true);
+
+    return result;
   }
 
   /// Creates a new `AvailabilityDomainOrIdentifier`, defensively copying
   /// members of the original into the given `ASTContext` in case it is
   /// different than the context that the original was created for.
   AvailabilityDomainOrIdentifier copy(ASTContext &ctx) const;
+
+  void print(llvm::raw_ostream &os) const;
 };
 
 } // end namespace swift

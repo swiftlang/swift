@@ -790,13 +790,13 @@ bool Parser::parseAvailability(
     // we will synthesize
     //   @available(_PackageDescription, introduced: 4.2)
 
+    bool groupContainsWildcard = llvm::any_of(
+        Specs, [](AvailabilitySpec *Spec) { return Spec->isWildcard(); });
+
     AvailableAttr *PrevAttr = nullptr;
     for (auto *Spec : Specs) {
-      if (Spec->isWildcard()) {
-        if (PrevAttr)
-          PrevAttr->setIsAdjacentToWildcard();
+      if (Spec->isWildcard())
         continue;
-      }
 
       std::optional<AvailabilityDomain> Domain = Spec->getDomain();
       if (!Domain)
@@ -817,6 +817,8 @@ bool Parser::parseAvailability(
       addAttribute(Attr);
 
       Attr->setIsGroupMember();
+      if (groupContainsWildcard)
+        Attr->setIsGroupedWithWildcard();
       if (!PrevAttr)
         Attr->setIsGroupTerminator();
 

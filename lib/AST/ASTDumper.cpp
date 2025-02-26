@@ -1103,11 +1103,11 @@ namespace {
       printRecArbitrary(
           [&](Label label) {
             printHead("availability_spec", PatternColor, label);
-            StringRef domainName =
-                Spec->isWildcard()
-                    ? "*"
-                    : Spec->getDomain()->getNameForAttributePrinting();
-            printField(domainName, Label::always("domain"));
+            printFieldRaw(
+                [&](llvm::raw_ostream &OS) {
+                  Spec->getDomainOrIdentifier().print(OS);
+                },
+                Label::always("domain"));
             if (!Spec->getRawVersion().empty())
               printFieldRaw(
                   [&](llvm::raw_ostream &OS) { OS << Spec->getRawVersion(); },
@@ -4944,13 +4944,8 @@ public:
   void visitAvailableAttr(AvailableAttr *Attr, Label label) {
     printCommon(Attr, "available_attr", label);
 
-    if (auto domain = Attr->getCachedDomain()) {
-      printField(domain->getNameForAttributePrinting(),
-                 Label::always("domain"));
-    } else {
-      printField(*Attr->getDomainIdentifier(),
-                 Label::always("domainIdentifier"));
-    }
+    printFieldRaw([&](auto &out) { Attr->getDomainOrIdentifier().print(out); },
+                  Label::always("domain"));
 
     switch (Attr->getKind()) {
     case swift::AvailableAttr::Kind::Default:

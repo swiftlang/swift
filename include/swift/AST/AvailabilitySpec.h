@@ -35,8 +35,7 @@ class SemanticAvailabilitySpec;
 /// The root class for specifications of API availability in availability
 /// queries.
 class AvailabilitySpec : public ASTAllocated<AvailabilitySpec> {
-  using DomainStorage = llvm::PointerIntPair<AvailabilityDomainOrIdentifier, 1>;
-  DomainStorage Storage;
+  AvailabilityDomainOrIdentifier DomainOrIdentifier;
 
   /// The range of the entire spec, including the version if there is one.
   SourceRange SrcRange;
@@ -51,14 +50,11 @@ class AvailabilitySpec : public ASTAllocated<AvailabilitySpec> {
   // Location of the availability macro expanded to create this spec.
   SourceLoc MacroLoc;
 
-  AvailabilitySpec(DomainStorage Storage, SourceRange SrcRange,
-                   llvm::VersionTuple Version, SourceLoc VersionStartLoc)
-      : Storage(Storage), SrcRange(SrcRange), Version(Version),
-        VersionStartLoc(VersionStartLoc) {}
-
-  AvailabilityDomainOrIdentifier getDomainOrIdentifier() const {
-    return Storage.getPointer();
-  }
+  AvailabilitySpec(AvailabilityDomainOrIdentifier DomainOrIdentifier,
+                   SourceRange SrcRange, llvm::VersionTuple Version,
+                   SourceLoc VersionStartLoc)
+      : DomainOrIdentifier(DomainOrIdentifier), SrcRange(SrcRange),
+        Version(Version), VersionStartLoc(VersionStartLoc) {}
 
 public:
   /// Creates a wildcard availability specification that guards execution
@@ -101,6 +97,10 @@ public:
     return false;
   }
 
+  AvailabilityDomainOrIdentifier getDomainOrIdentifier() const {
+    return DomainOrIdentifier;
+  }
+
   std::optional<AvailabilityDomain> getDomain() const {
     return getDomainOrIdentifier().getAsDomain();
   }
@@ -123,7 +123,14 @@ public:
   // Location of the macro expanded to create this spec.
   SourceLoc getMacroLoc() const { return MacroLoc; }
   void setMacroLoc(SourceLoc loc) { MacroLoc = loc; }
+
+  void print(llvm::raw_ostream &os) const;
 };
+
+inline void simple_display(llvm::raw_ostream &os,
+                           const AvailabilitySpec *spec) {
+  spec->print(os);
+}
 
 /// The type-checked representation of `AvailabilitySpec` which guaranatees that
 /// the spec has a valid `AvailabilityDomain`.
@@ -153,6 +160,8 @@ public:
   // This is required to support beta versions of macOS Big Sur that
   // report 10.16 at run time.
   llvm::VersionTuple getRuntimeVersion() const { return spec->getRawVersion(); }
+
+  void print(llvm::raw_ostream &os) const { spec->print(os); }
 };
 
 /// Wraps an array of availability specs and provides an iterator for their
