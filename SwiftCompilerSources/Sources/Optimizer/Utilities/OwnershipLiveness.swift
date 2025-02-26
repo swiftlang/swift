@@ -200,7 +200,7 @@ struct InteriorLivenessResult: CustomDebugStringConvertible {
 /// entry points. Additionally, the implementation may recurse into inner
 /// borrow scopes, skipping over the uses within inner scopes using:
 /// - `visitInnerBorrowUses(of: BorrowingInstruction, operand:)`
-/// - `visitDependentUses(of: Value)`
+/// - `visitOwnedDependentUses(of: Value)`
 ///
 /// Visitors implement:
 ///
@@ -311,13 +311,20 @@ extension OwnershipUseVisitor {
 
   /// Handle an owned dependent value, such as a closure capture or owned mark_dependence.
   ///
+  /// Called by walkDownUses(of:) for owned values.
+  ///
   /// When a borrow introduces an owned value, each OSSA lifetime is effectively a separate borrow scope. A destroy or
   /// consumes ends that borrow scope, while a forwarding consume effectively "reborrows".
+  ///   
+  ///   %dependent = mark_dependence [nonescaping] %owned on %base // borrow 'owned'
+  ///                                                              // visit uses of owned 'dependent' value
+  ///   %forwarded = move_value %dependent
+  ///   destroy_value %forwarded // ends the inner borrow scope
   ///
   /// Preconditions:
   /// - value.ownership == .owned
   /// - value.type.isEscapable
-  mutating func visitDependentUses(of value: Value) -> WalkResult {
+  mutating func visitOwnedDependentUses(of value: Value) -> WalkResult {
     assert(value.ownership == .owned, "inner value must be a reborrow or owned forward")
     assert(value.type.isEscapable(in: value.parentFunction), "cannot handle non-escapable dependent values")
     return value.uses.endingLifetime.walk {
@@ -332,8 +339,13 @@ extension OwnershipUseVisitor {
     }
   }
 
-  // Visit uses of borrowing instruction (operandOwnerhip == .borrow),
-  // skipping uses within the borrow scope.
+  /// Visit uses of borrowing instruction (operandOwnerhip == .borrow),
+  /// skipping uses within the borrow scope.
+  ///
+  ///   %borrow = begin_borrow %def         // visitInnerBorrowUses is called on this BorrowingInstruction
+  ///   %address = ref_element_addr %borrow // ignored
+  ///   end_borrow %borrow                  // visited as a leaf use of as inner lifetime.
+  ///
   mutating func visitInnerBorrowUses(of borrowInst: BorrowingInstruction, operand: Operand) -> WalkResult {
     if let dependent = borrowInst.dependentValue {
       if dependent.ownership == .guaranteed {
@@ -743,8 +755,9 @@ extension InteriorUseWalker {
       if handleInner(borrowed: value) == .abortWalk {
         return .abortWalk
       }
-      return visitDependentUses(of: value)
+      return visitOwnedDependentUses(of: value)
     case .guaranteed:
+      // Handle a forwarded guaranteed value exactly like the outer borrow.
       return visitAllUses(of: value)
     default:
       fatalError("ownership requires a lifetime")
