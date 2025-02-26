@@ -1780,6 +1780,8 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
       setOption(ProtocolConformanceFlags::Unsafe);
     if (typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency).isValid())
       setOption(ProtocolConformanceFlags::Preconcurrency);
+    if (typeRepr->findAttrLoc(TypeAttrKind::Isolated).isValid())
+      setOption(ProtocolConformanceFlags::Isolated);
   }
 }
 

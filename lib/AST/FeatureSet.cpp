@@ -348,6 +348,11 @@ static bool usesFeatureABIAttribute(Decl *decl) {
   return getABIAttr(decl) != nullptr;
 }
 
+static bool usesFeatureIsolatedConformances(Decl *decl) { 
+  // FIXME: Check conformances associated with this decl?
+  return false;
+}
+
 UNINTERESTING_FEATURE(WarnUnsafe)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)

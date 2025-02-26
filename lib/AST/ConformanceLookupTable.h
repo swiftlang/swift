@@ -154,6 +154,8 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
         options |= ProtocolConformanceFlags::Preconcurrency;
       if (getUnsafeLoc().isValid())
         options |= ProtocolConformanceFlags::Unsafe;
+      if (getIsolatedLoc().isValid())
+        options |= ProtocolConformanceFlags::Isolated;
       return options;
     }
 
@@ -207,6 +209,11 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// The location of the @unsafe attribute, if any.
     SourceLoc getUnsafeLoc() const {
       return attributes.unsafeLoc;
+    }
+
+    /// The location of the @isolated attribute, if any.
+    SourceLoc getIsolatedLoc() const {
+      return attributes.isolatedLoc;
     }
 
     /// For an inherited conformance, retrieve the class declaration

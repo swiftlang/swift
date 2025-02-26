@@ -1836,12 +1836,13 @@ public:
   bool isPreconcurrency() const {
     return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
   }
+  bool isIsolated() const {
+    return getOptions().contains(ProtocolConformanceFlags::Isolated);
+  }
 
   ExplicitSafety getExplicitSafety() const {
     if (getOptions().contains(ProtocolConformanceFlags::Unsafe))
       return ExplicitSafety::Unsafe;
-    if (getOptions().contains(ProtocolConformanceFlags::Safe))
-      return ExplicitSafety::Safe;
     return ExplicitSafety::Unspecified;
   }
 
@@ -1852,13 +1853,10 @@ public:
   }
 
   void setOption(ExplicitSafety safety) {
-    RawOptions = (getOptions() - ProtocolConformanceFlags::Unsafe
-                    - ProtocolConformanceFlags::Safe).toRaw();
+    RawOptions = (getOptions() - ProtocolConformanceFlags::Unsafe).toRaw();
     switch (safety) {
     case ExplicitSafety::Unspecified:
-      break;
     case ExplicitSafety::Safe:
-      RawOptions = (getOptions() | ProtocolConformanceFlags::Safe).toRaw();
       break;
     case ExplicitSafety::Unsafe:
       RawOptions = (getOptions() | ProtocolConformanceFlags::Unsafe).toRaw();

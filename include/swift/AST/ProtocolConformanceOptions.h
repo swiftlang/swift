@@ -34,8 +34,8 @@ enum class ProtocolConformanceFlags {
   /// @retroactive conformance
   Retroactive = 0x08,
 
-  /// @safe conformance
-  Safe = 0x10,
+  /// @isolated conformance
+  Isolated = 0x10,
 
   // Note: whenever you add a bit here, update
   // NumProtocolConformanceOptions below.

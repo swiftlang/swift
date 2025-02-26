@@ -2722,8 +2722,17 @@ WARNING(add_predates_concurrency_import,none,
 GROUPED_WARNING(remove_predates_concurrency_import,PreconcurrencyImport,
                 DefaultIgnore,
                 "'@preconcurrency' attribute on module %0 has no effect", (Identifier))
+NOTE(add_isolated_to_conformance,none,
+     "add 'isolated' to the %0 conformance to restrict it to %1 code",
+    (DeclName, ActorIsolation))
 NOTE(add_preconcurrency_to_conformance,none,
      "add '@preconcurrency' to the %0 conformance to defer isolation checking to run time", (DeclName))
+ERROR(isolated_conformance_not_global_actor_isolated,none,
+      "isolated conformance is only permitted on global-actor-isolated types",
+      ())
+ERROR(isolated_conformance_experimental_feature,none,
+      "isolated conformances require experimental feature "
+      " 'IsolatedConformances'", ())
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",
         (Identifier))
