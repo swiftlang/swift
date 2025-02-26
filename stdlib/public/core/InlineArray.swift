@@ -452,7 +452,6 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   public var span: Span<Element> {
     @lifetime(borrow self)
-    @_addressableSelf
     @_alwaysEmitIntoClient
     borrowing get {
       let pointer = _address
