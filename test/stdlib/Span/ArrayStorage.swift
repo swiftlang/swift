@@ -72,3 +72,21 @@ suite.test("ArraySlice.span property")
   let i2 = span1.withUnsafeBufferPointer { Int(bitPattern: $0.baseAddress) }
   expectEqual(i1, i2)
 }
+
+suite.test("KeyValuePairs.span property")
+.skip(.custom(
+  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
+  reason: "Requires Swift 6.2's standard library"
+))
+.code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+  
+  let pairs = [(1, "a"), (2, "b"), (3, "c"), (4, "d")]
+  let kvp: KeyValuePairs =  [1: "a", 2: "b", 3: "c", 4: "d"]
+  
+  let span = kvp.span
+  expectEqual(span.count, kvp.count)
+  for i in span.indices {
+    expectEqual(span[i], pairs[i])
+  }
+}
