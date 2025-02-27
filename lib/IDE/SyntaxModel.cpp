@@ -1170,8 +1170,6 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
         assert(Next.Range.getStart() == D->getRange().Start &&
                "Attribute's TokenNodes already consumed?");
       }
-    } else {
-        assert(0 && "No TokenNodes?");
     }
     if (!passTokenNodesUntil(D->getRange().End,
                              IncludeNodeAtLocation).shouldContinue)

@@ -84,7 +84,7 @@
       key.length: 10
     },
     {
-      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.kind: source.lang.swift.syntaxtype.identifier,
       key.offset: 191,
       key.length: 3
     },
