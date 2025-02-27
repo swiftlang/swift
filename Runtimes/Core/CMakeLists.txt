@@ -178,20 +178,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-runtime-compatibility-version none>"
   "$<$<COMPILE_LANGUAGE:Swift>:-disable-autolinking-runtime-compatibility-dynamic-replacements>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-strict-memory-safety>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature MemberImportVisibility>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature TypedThrows>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Macros>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature FreestandingMacros>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BitwiseCopyable>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Extern>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature ValueGenerics>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableParameters>"
   # TODO: we should reevaluate if it still makes sense to restrict this
   # to Darwin, https://github.com/swiftlang/swift/issues/79279
   "$<$<AND:$<PLATFORM_ID:Darwin>,$<COMPILE_LANGUAGE:Swift>>:-save-optimization-record=bitstream>"
@@ -208,6 +195,8 @@ add_compile_options(
   "$<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+include(ExperimentalFeatures)
 
 include_directories(include)
 
