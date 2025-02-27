@@ -1101,7 +1101,7 @@ public:
     bool considerAsync = !onlyEffect || *onlyEffect == EffectKind::Async;
     bool considerThrows = !onlyEffect || *onlyEffect == EffectKind::Throws;
     bool considerUnsafe = (!onlyEffect || *onlyEffect == EffectKind::Unsafe) &&
-        ctx.LangOpts.hasFeature(Feature::WarnUnsafe);
+        ctx.LangOpts.hasFeature(Feature::StrictMemorySafety);
 
     // If we're tracking "unsafe" effects, compute them here.
     if (considerUnsafe) {

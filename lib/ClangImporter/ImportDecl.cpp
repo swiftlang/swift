@@ -2039,7 +2039,7 @@ namespace {
         fd->getAttrs().add(new (Impl.SwiftContext)
                                UnsafeNonEscapableResultAttr(/*Implicit=*/true));
         if (Impl.SwiftContext.LangOpts.hasFeature(
-                Feature::AllowUnsafeAttribute))
+                Feature::StrictMemorySafety))
           fd->getAttrs().add(new (Impl.SwiftContext)
                                  UnsafeAttr(/*Implicit=*/true));
       }
@@ -2201,7 +2201,7 @@ namespace {
       // We have to do this after populating ImportedDecls to avoid importing
       // the same multiple times.
       if (Impl.SwiftContext.LangOpts.hasFeature(
-              Feature::AllowUnsafeAttribute)) {
+              Feature::StrictMemorySafety)) {
         if (const auto *ctsd =
                 dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
           for (auto arg : ctsd->getTemplateArgs().asArray()) {
@@ -4178,13 +4178,13 @@ namespace {
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
       }
-      if (ASTContext.LangOpts.hasFeature(Feature::AllowUnsafeAttribute)) {
+      if (ASTContext.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
         for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
           if (swiftParams->get(idx)->getInterfaceType()->isEscapable())
             continue;
           if (param->hasAttr<clang::NoEscapeAttr>() || paramHasAnnotation[idx])
             continue;
-          // We have a nonescapabe parameter that does not have its lifetime
+          // We have a nonescapable parameter that does not have its lifetime
           // annotated nor is it marked noescape.
           auto attr = new (ASTContext) UnsafeAttr(/*implicit=*/true);
           result->getAttrs().add(attr);
@@ -8722,8 +8722,6 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       }
 
       if (swiftAttr->getAttribute() == "unsafe") {
-        if (!SwiftContext.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
-          continue;
         seenUnsafe = true;
         continue;
       }

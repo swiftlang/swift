@@ -878,6 +878,9 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.enableFeature(Feature::LayoutPrespecialization);
 
+  if (Args.hasArg(OPT_strict_memory_safety))
+    Opts.enableFeature(Feature::StrictMemorySafety);
+
   return HadError;
 }
 
@@ -3909,7 +3912,7 @@ bool CompilerInvocation::parseArgs(
     }
   }
 
-  if (LangOpts.hasFeature(Feature::WarnUnsafe)) {
+  if (LangOpts.hasFeature(Feature::StrictMemorySafety)) {
     if (SILOpts.RemoveRuntimeAsserts ||
         SILOpts.AssertConfig == SILOptions::Unchecked) {
       Diags.diagnose(SourceLoc(),

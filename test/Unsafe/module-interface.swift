@@ -1,11 +1,8 @@
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name UserModule -enable-experimental-feature AllowUnsafeAttribute  -enable-experimental-feature WarnUnsafe
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name UserModule -strict-memory-safety
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name UserModule
 // RUN: %FileCheck %s < %t.swiftinterface
 
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-// REQUIRES: swift_feature_WarnUnsafe
-
-// CHECK: #if compiler(>=5.3) && $AllowUnsafeAttribute
+// CHECK: #if compiler(>=5.3) && $MemorySafetyAttributes
 // CHECK: @unsafe public func getIntUnsafely() -> Swift.Int
 // CHECK: #else
 // CHECK: public func getIntUnsafely() -> Swift.Int
@@ -25,7 +22,7 @@ public protocol P {
 
 // CHECK: public struct X : @unsafe UserModule.P
 public struct X: @unsafe P {
-// CHECK:  #if compiler(>=5.3) && $AllowUnsafeAttribute
+// CHECK:  #if compiler(>=5.3) && $MemorySafetyAttributes
 // CHECK:  @unsafe public func f()
 // CHECK:  #else
 // CHECK:  public func f()

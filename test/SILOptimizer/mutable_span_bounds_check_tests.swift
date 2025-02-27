@@ -1,11 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/SpanExtras.swiftmodule %S/Inputs/SpanExtras.swift -enable-builtin-module  -enable-experimental-feature LifetimeDependence  -enable-experimental-feature AllowUnsafeAttribute -O
+// RUN: %target-swift-frontend -emit-module-path %t/SpanExtras.swiftmodule %S/Inputs/SpanExtras.swift -enable-builtin-module  -enable-experimental-feature LifetimeDependence -O
 // RUN: %target-swift-frontend -I %t -O -emit-sil %s -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL 
 // RUN: %target-swift-frontend -I %t -O -emit-ir %s -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-IR
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_AllowUnsafeAttribute
 
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 

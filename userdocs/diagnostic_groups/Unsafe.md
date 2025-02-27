@@ -23,3 +23,14 @@ This diagnostic group includes warnings that identify the use of unsafe language
     return Int(bitPattern: malloc(size))
   }
   ```
+
+These warnings can be suppressed using an `unsafe` expression, which acknowledges the presence of memory-unsafe code. For example:
+
+```swift
+func evilMalloc(size: Int) -> Int {
+  return unsafe Int(bitPattern: malloc(size))
+}
+```
+
+The warnings produced by this diagnostic group can be enabled with the compiler
+flag `-strict-memory-safety`.

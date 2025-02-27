@@ -2259,7 +2259,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     diagnoseOverrideForAvailability(override, base);
   }
 
-  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+  if (ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
     // If the override is unsafe but the base declaration is not, then the
     // inheritance itself is unsafe.
     auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);

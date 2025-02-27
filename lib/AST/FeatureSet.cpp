@@ -330,10 +330,6 @@ UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
 UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
 UNINTERESTING_FEATURE(TrailingComma)
 
-static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
-  return decl->getAttrs().hasAttribute<UnsafeAttr>();
-}
-
 static ABIAttr *getABIAttr(Decl *decl) {
   if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
     for (auto i : range(pbd->getNumPatternEntries()))
@@ -348,7 +344,17 @@ static bool usesFeatureABIAttribute(Decl *decl) {
   return getABIAttr(decl) != nullptr;
 }
 
-UNINTERESTING_FEATURE(WarnUnsafe)
+static bool usesFeatureIsolatedConformances(Decl *decl) { 
+  // FIXME: Check conformances associated with this decl?
+  return false;
+}
+
+static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
+  return decl->getAttrs().hasAttribute<SafeAttr>() ||
+      decl->getAttrs().hasAttribute<UnsafeAttr>();
+}
+
+UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)

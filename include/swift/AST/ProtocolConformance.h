@@ -669,6 +669,11 @@ public:
     return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
   }
 
+  /// Whether this is an isolated conformance.
+  bool isIsolated() const {
+    return getOptions().contains(ProtocolConformanceFlags::Isolated);
+  }
+
   /// Retrieve the location of `@preconcurrency`, if there is one and it is
   /// known.
   SourceLoc getPreconcurrencyLoc() const { return PreconcurrencyLoc; }
@@ -678,8 +683,6 @@ public:
   ExplicitSafety getExplicitSafety() const {
     if (getOptions().contains(ProtocolConformanceFlags::Unsafe))
       return ExplicitSafety::Unsafe;
-    if (getOptions().contains(ProtocolConformanceFlags::Safe))
-      return ExplicitSafety::Safe;
     return ExplicitSafety::Unspecified;
   }
 

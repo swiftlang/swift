@@ -30,6 +30,7 @@
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -7668,4 +7669,57 @@ bool swift::diagnoseNonSendableFromDeinit(
                                 refLoc,
                                 diag::non_sendable_from_deinit,
                                 var->getDescriptiveKind(), var->getName());
+}
+
+bool swift::forEachIsolatedConformance(
+    ProtocolConformanceRef conformance,
+    llvm::function_ref<bool(ProtocolConformance*)> body
+) {
+  if (conformance.isInvalid() || conformance.isAbstract())
+    return false;
+
+  if (conformance.isPack()) {
+    auto pack = conformance.getPack()->getPatternConformances();
+    for (auto conformance : pack) {
+      if (forEachIsolatedConformance(conformance, body))
+        return true;
+    }
+
+    return false;
+  }
+
+  // Is this an isolated conformance?
+  auto concrete = conformance.getConcrete();
+  if (auto normal =
+          dyn_cast<NormalProtocolConformance>(concrete->getRootConformance())) {
+    if (normal->isIsolated()) {
+      if (body(concrete))
+        return true;
+    }
+  }
+
+  // Check conformances that are part of this conformance.
+  auto subMap = concrete->getSubstitutionMap();
+  for (auto conformance : subMap.getConformances()) {
+    if (forEachIsolatedConformance(conformance, body))
+      return true;
+  }
+
+  return false;
+}
+
+ActorIsolation swift::getConformanceIsolation(ProtocolConformance *conformance) {
+  auto rootNormal =
+      dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
+  if (!rootNormal)
+    return ActorIsolation::forNonisolated(false);
+
+  if (!rootNormal->isIsolated())
+    return ActorIsolation::forNonisolated(false);
+
+  auto nominal = rootNormal->getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return ActorIsolation::forNonisolated(false);
+
+  return getActorIsolation(nominal);
 }

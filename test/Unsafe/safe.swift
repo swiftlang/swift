@@ -1,7 +1,10 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -print-diagnostic-groups
+// RUN: %target-typecheck-verify-swift -strict-memory-safety -print-diagnostic-groups
 
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-// REQUIRES: swift_feature_WarnUnsafe
+// The feature flag should be enabled.
+#if !hasFeature(StrictMemorySafety)
+#error("Strict memory safety is not enabled!")
+#endif
+
 
 @unsafe
 func unsafeFunction() { }
@@ -93,6 +96,15 @@ func testUnsafeAsSequenceForEach() {
   for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}{{7-7=unsafe }}
 
   for unsafe _ in unsafe uas { } // okay
+}
+
+func testForInUnsafeAmbiguity(_ integers: [Int]) {
+  for unsafe in integers {
+    _ = unsafe
+  }
+  for unsafe: Int in integers {
+    _ = unsafe
+  }
 }
 
 struct UnsafeIterator: @unsafe IteratorProtocol {

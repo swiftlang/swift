@@ -2379,8 +2379,8 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     }
   }
 
-  if (Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      Tok.isContextualKeyword("unsafe")) {
+  if (Tok.isContextualKeyword("unsafe") &&
+      !peekToken().isAny(tok::colon, tok::kw_in)) {
     UnsafeLoc = consumeToken();
   }
   

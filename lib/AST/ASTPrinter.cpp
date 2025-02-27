@@ -3214,9 +3214,10 @@ struct ExcludeAttrRAII {
 }
 
 static void
-suppressingFeatureAllowUnsafeAttribute(PrintOptions &options,
+suppressingFeatureMemorySafetyAttributes(PrintOptions &options,
                                        llvm::function_ref<void()> action) {
   ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::Unsafe);
+  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::Safe);
   action();
 }
 
