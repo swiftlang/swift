@@ -1652,13 +1652,27 @@ SwiftInt BridgedInstruction::TypeValueInst_getValue() const {
 //                     VarDeclInst and DebugVariableInst
 //===----------------------------------------------------------------------===//
 
-static_assert(sizeof(std::optional<swift::SILDebugVariable>) <= sizeof(OptionalBridgedSILDebugVariable));
+static_assert(sizeof(swift::SILDebugVariable) <= sizeof(BridgedSILDebugVariable));
 
-static inline
-OptionalBridgedSILDebugVariable bridge(std::optional<swift::SILDebugVariable> &&debugVariable) {
-  OptionalBridgedSILDebugVariable bridgedVar;
-  *reinterpret_cast<std::optional<swift::SILDebugVariable> *>(&bridgedVar.storage) = debugVariable;
-  return bridgedVar;
+BridgedSILDebugVariable::BridgedSILDebugVariable(const swift::SILDebugVariable &var) {
+  new (&storage) swift::SILDebugVariable(var);
+}
+
+BridgedSILDebugVariable::BridgedSILDebugVariable(const BridgedSILDebugVariable &rhs) {
+  new (&storage) swift::SILDebugVariable(rhs.unbridge());
+}
+
+BridgedSILDebugVariable::~BridgedSILDebugVariable() {
+  reinterpret_cast<swift::SILDebugVariable *>(&storage)->~SILDebugVariable();
+}
+
+BridgedSILDebugVariable &BridgedSILDebugVariable::operator=(const BridgedSILDebugVariable &rhs) {
+  *reinterpret_cast<swift::SILDebugVariable *>(&storage) = rhs.unbridge();
+  return *this;
+}
+
+swift::SILDebugVariable BridgedSILDebugVariable::unbridge() const {
+  return *reinterpret_cast<const swift::SILDebugVariable *>(&storage);
 }
 
 OptionalBridgedDeclObj BridgedInstruction::DebugValue_getDecl() const {
@@ -1681,19 +1695,25 @@ OptionalBridgedDeclObj BridgedInstruction::RefElementAddr_getDecl() const {
   return {getAs<swift::RefElementAddrInst>()->getField()};
 }
 
-OptionalBridgedSILDebugVariable
-BridgedInstruction::DebugValue_getVarInfo() const {
-  return bridge(getAs<swift::DebugValueInst>()->getVarInfo());
+bool BridgedInstruction::DebugValue_hasVarInfo() const {
+  return getAs<swift::DebugValueInst>()->getVarInfo().has_value();
+}
+BridgedSILDebugVariable BridgedInstruction::DebugValue_getVarInfo() const {
+  return BridgedSILDebugVariable(getAs<swift::DebugValueInst>()->getVarInfo().value());
 }
 
-OptionalBridgedSILDebugVariable
-BridgedInstruction::AllocStack_getVarInfo() const {
-  return bridge(getAs<swift::AllocStackInst>()->getVarInfo());
+bool BridgedInstruction::AllocStack_hasVarInfo() const {
+  return getAs<swift::AllocStackInst>()->getVarInfo().has_value();
+}
+BridgedSILDebugVariable BridgedInstruction::AllocStack_getVarInfo() const {
+  return BridgedSILDebugVariable(getAs<swift::AllocStackInst>()->getVarInfo().value());
 }
 
-OptionalBridgedSILDebugVariable
-BridgedInstruction::AllocBox_getVarInfo() const {
-  return bridge(getAs<swift::AllocBoxInst>()->getVarInfo());
+bool BridgedInstruction::AllocBox_hasVarInfo() const {
+  return getAs<swift::AllocBoxInst>()->getVarInfo().has_value();
+}
+BridgedSILDebugVariable BridgedInstruction::AllocBox_getVarInfo() const {
+  return BridgedSILDebugVariable(getAs<swift::AllocBoxInst>()->getVarInfo().value());
 }
 
 //===----------------------------------------------------------------------===//

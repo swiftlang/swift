@@ -484,9 +484,9 @@ extension Instruction {
 }
 
 public protocol DebugVariableInstruction : VarDeclInstruction {
-  typealias DebugVariable = OptionalBridgedSILDebugVariable
+  typealias DebugVariable = BridgedSILDebugVariable
 
-  var debugVariable: DebugVariable { get }
+  var debugVariable: DebugVariable? { get }
 }
 
 /// A meta instruction is an instruction whose location is not interesting as
@@ -503,8 +503,8 @@ final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariable
     bridged.DebugValue_getDecl().getAs(VarDecl.self)
   }
 
-  public var debugVariable: DebugVariable {
-    return bridged.DebugValue_getVarInfo()
+  public var debugVariable: DebugVariable? {
+    return bridged.DebugValue_hasVarInfo() ? bridged.DebugValue_getVarInfo() : nil
   }
 }
 
@@ -1291,8 +1291,8 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
     bridged.AllocStack_getDecl().getAs(VarDecl.self)
   }
 
-  public var debugVariable: DebugVariable {
-    return bridged.AllocStack_getVarInfo()
+  public var debugVariable: DebugVariable? {
+    return bridged.AllocStack_hasVarInfo() ? bridged.AllocStack_getVarInfo() : nil
   }
 
   public var deallocations: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
@@ -1338,8 +1338,8 @@ final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVaria
     bridged.AllocBox_getDecl().getAs(VarDecl.self)
   }
 
-  public var debugVariable: DebugVariable {
-    return bridged.AllocBox_getVarInfo()
+  public var debugVariable: DebugVariable? {
+    return bridged.AllocBox_hasVarInfo() ? bridged.AllocBox_getVarInfo() : nil
   }
 }
 
