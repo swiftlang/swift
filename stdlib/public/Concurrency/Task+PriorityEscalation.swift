@@ -77,7 +77,7 @@ extension UnsafeCurrentTask {
   ///   - newPriority: the new priority the task should continue executing on
   @available(SwiftStdlib 6.2, *)
   public static func escalatePriority(_ task: UnsafeCurrentTask, to newPriority: TaskPriority) {
-    _taskEscalate(task._task, newPriority: newPriority.rawValue)
+    unsafe _taskEscalate(task._task, newPriority: newPriority.rawValue)
   }
 }
 
@@ -116,8 +116,8 @@ public func withTaskPriorityEscalationHandler<T, E>(
   let handler0: (UInt8) -> Void = {
     handler(TaskPriority(rawValue: $0))
   }
-  let record = _taskAddPriorityEscalationHandler(handler: handler0)
-  defer { _taskRemovePriorityEscalationHandler(record: record) }
+  let record = unsafe _taskAddPriorityEscalationHandler(handler: handler0)
+  defer { unsafe _taskRemovePriorityEscalationHandler(record: record) }
 
   return try await operation()
 }

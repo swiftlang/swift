@@ -35,6 +35,7 @@
 /// which `ContiguousArray` shares most properties and methods.
 @frozen
 @_eagerMove
+@safe
 public struct ContiguousArray<Element>: _DestructorSafeContainer {
   @usableFromInline
   internal typealias _Buffer = _ContiguousArrayBuffer<Element>
@@ -112,7 +113,7 @@ extension ContiguousArray {
   @inlinable
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
-    return _buffer.firstElementAddress + index
+    return unsafe _buffer.firstElementAddress + index
   }
 }
 
@@ -163,12 +164,12 @@ extension ContiguousArray: _ArrayProtocol {
   @inlinable
   public var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? {
     @inline(__always) // FIXME(TODO: JIRA): Hack around test failure
-    get { return _buffer.firstElementAddressIfContiguous }
+    get { return unsafe _buffer.firstElementAddressIfContiguous }
   }
 
   @inlinable
   internal var _baseAddress: UnsafeMutablePointer<Element> {
-    return _buffer.firstElementAddress
+    return unsafe _buffer.firstElementAddress
   }
 }
 
@@ -415,9 +416,9 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
     _modify {
       _makeMutableAndUnique()
       _checkSubscript_mutating(index)
-      let address = _buffer.mutableFirstElementAddress + index
+      let address = unsafe _buffer.mutableFirstElementAddress + index
       defer { _endMutation() }
-      yield &address.pointee
+      yield unsafe &address.pointee
     }
   }
 
@@ -457,7 +458,7 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
       _checkIndex(bounds.upperBound)
       // If the replacement buffer has same identity, and the ranges match,
       // then this was a pinned in-place modification, nothing further needed.
-      if self[bounds]._buffer.identity != rhs._buffer.identity
+      if unsafe self[bounds]._buffer.identity != rhs._buffer.identity
       || bounds != rhs.startIndex..<rhs.endIndex {
         self.replaceSubrange(bounds, with: rhs)
       }
@@ -569,10 +570,10 @@ extension ContiguousArray: RangeReplaceableCollection {
   @_semantics("array.init")
   public init(repeating repeatedValue: Element, count: Int) {
     var p: UnsafeMutablePointer<Element>
-    (self, p) = ContiguousArray._allocateUninitialized(count)
+    unsafe (self, p) = ContiguousArray._allocateUninitialized(count)
     for _ in 0..<count {
-      p.initialize(to: repeatedValue)
-      p += 1
+      unsafe p.initialize(to: repeatedValue)
+      unsafe p += 1
     }
     _endMutation()
   }
@@ -613,7 +614,7 @@ extension ContiguousArray: RangeReplaceableCollection {
     _ count: Int
   ) -> (ContiguousArray, UnsafeMutablePointer<Element>) {
     let result = ContiguousArray(_uninitializedCount: count)
-    return (result, result._buffer.firstElementAddress)
+    return unsafe (result, result._buffer.firstElementAddress)
   }
 
   //===--- basic mutations ------------------------------------------------===//
@@ -734,7 +735,7 @@ extension ContiguousArray: RangeReplaceableCollection {
     let newCount = oldCount &+ 1
     var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
       countForNewBuffer: oldCount, minNewCapacity: newCount)
-    _buffer._arrayOutOfPlaceUpdate(
+    unsafe _buffer._arrayOutOfPlaceUpdate(
       &newBuffer, oldCount, 0)
   }
 
@@ -780,7 +781,7 @@ extension ContiguousArray: RangeReplaceableCollection {
     _internalInvariant(_buffer.mutableCapacity >= _buffer.mutableCount &+ 1)
 
     _buffer.mutableCount = oldCount &+ 1
-    (_buffer.mutableFirstElementAddress + oldCount).initialize(to: newElement)
+    unsafe (_buffer.mutableFirstElementAddress + oldCount).initialize(to: newElement)
   }
 
   /// Adds a new element at the end of the array.
@@ -846,15 +847,15 @@ extension ContiguousArray: RangeReplaceableCollection {
                          growForAppend: true)
 
     let oldCount = _buffer.mutableCount
-    let startNewElements = _buffer.mutableFirstElementAddress + oldCount
-    let buf = UnsafeMutableBufferPointer(
+    let startNewElements = unsafe _buffer.mutableFirstElementAddress + oldCount
+    let buf = unsafe UnsafeMutableBufferPointer(
                 start: startNewElements, 
                 count: _buffer.mutableCapacity - oldCount)
 
-    var (remainder,writtenUpTo) = buf.initialize(from: newElements)
+    var (remainder,writtenUpTo) = unsafe buf.initialize(from: newElements)
     
     // trap on underflow from the sequence's underestimate:
-    let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
+    let writtenCount = unsafe buf.distance(from: buf.startIndex, to: writtenUpTo)
     _precondition(newElementsCount <= writtenCount, 
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
@@ -873,11 +874,11 @@ extension ContiguousArray: RangeReplaceableCollection {
         _reserveCapacityAssumingUniqueBuffer(oldCount: newCount)
 
         let currentCapacity = _buffer.mutableCapacity
-        let base = _buffer.mutableFirstElementAddress
+        let base = unsafe _buffer.mutableFirstElementAddress
 
         // fill while there is another item and spare capacity
         while let next = nextItem, newCount < currentCapacity {
-          (base + newCount).initialize(to: next)
+          unsafe (base + newCount).initialize(to: next)
           newCount += 1
           nextItem = remainder.next()
         }
@@ -902,8 +903,8 @@ extension ContiguousArray: RangeReplaceableCollection {
     _makeMutableAndUnique()
     let newCount = _buffer.mutableCount - 1
     _precondition(newCount >= 0, "Can't removeLast from an empty ContiguousArray")
-    let pointer = (_buffer.mutableFirstElementAddress + newCount)
-    let element = pointer.move()
+    let pointer = unsafe (_buffer.mutableFirstElementAddress + newCount)
+    let element = unsafe pointer.move()
     _buffer.mutableCount = newCount
     _endMutation()
     return element
@@ -933,9 +934,9 @@ extension ContiguousArray: RangeReplaceableCollection {
     _precondition(index < currentCount, "Index out of range")
     _precondition(index >= 0, "Index out of range")
     let newCount = currentCount - 1
-    let pointer = (_buffer.mutableFirstElementAddress + index)
-    let result = pointer.move()
-    pointer.moveInitialize(from: pointer + 1, count: newCount - index)
+    let pointer = unsafe (_buffer.mutableFirstElementAddress + index)
+    let result = unsafe pointer.move()
+    unsafe pointer.moveInitialize(from: pointer + 1, count: newCount - index)
     _buffer.mutableCount = newCount
     _endMutation()
     return result
@@ -996,7 +997,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      return try body(&bufferPointer)
+      return try unsafe body(&bufferPointer)
     }
   }
 
@@ -1006,7 +1007,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      return try body(&bufferPointer)
+      return try unsafe body(&bufferPointer)
     }
   }
   
@@ -1016,7 +1017,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   ) rethrows -> R? {
     return try withUnsafeBufferPointer {
       (bufferPointer) -> R in
-      return try body(bufferPointer)
+      return try unsafe body(bufferPointer)
     }
   }
 
@@ -1059,11 +1060,11 @@ extension ContiguousArray {
   @usableFromInline @_transparent
   internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
     let p = _baseAddressIfContiguous
-    if _fastPath(p != nil || isEmpty) {
+    if unsafe _fastPath(p != nil || isEmpty) {
       return (_owner, UnsafeRawPointer(p))
     }
     let n = ContiguousArray(self._buffer)._buffer
-    return (n.owner, UnsafeRawPointer(n.firstElementAddress))
+    return unsafe (n.owner, UnsafeRawPointer(n.firstElementAddress))
   }
 }
 
@@ -1100,7 +1101,7 @@ extension ContiguousArray {
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int) throws -> Void
   ) rethrows {
-    self = try ContiguousArray(Array(
+    self = try unsafe ContiguousArray(Array(
       _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
       initializingWith: initializer))
   }
@@ -1112,7 +1113,7 @@ extension ContiguousArray {
   func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    return try _buffer.withUnsafeBufferPointer(body)
+    return try unsafe _buffer.withUnsafeBufferPointer(body)
   }
 
   /// Calls a closure with a pointer to the array's contiguous storage.
@@ -1148,7 +1149,7 @@ extension ContiguousArray {
   public func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
-    return try _buffer.withUnsafeBufferPointer(body)
+    return try unsafe _buffer.withUnsafeBufferPointer(body)
   }
 
   // Superseded by the typed-throws version of this function, but retained
@@ -1212,12 +1213,12 @@ extension ContiguousArray {
     let count = _buffer.mutableCount
 
     // Create an UnsafeBufferPointer that we can pass to body
-    let pointer = _buffer.mutableFirstElementAddress
-    var inoutBufferPointer = UnsafeMutableBufferPointer(
+    let pointer = unsafe _buffer.mutableFirstElementAddress
+    var inoutBufferPointer = unsafe UnsafeMutableBufferPointer(
       start: pointer, count: count)
 
     defer {
-      _precondition(
+      unsafe _precondition(
         inoutBufferPointer.baseAddress == pointer &&
         inoutBufferPointer.count == count,
         "ContiguousArray withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
@@ -1226,7 +1227,7 @@ extension ContiguousArray {
     }
 
     // Invoke the body.
-    return try body(&inoutBufferPointer)
+    return try unsafe body(&inoutBufferPointer)
   }
 
   @inlinable
@@ -1244,20 +1245,20 @@ extension ContiguousArray {
       "Insufficient space allocated to copy array contents")
 
     if let s = _baseAddressIfContiguous {
-      p.initialize(from: s, count: self.count)
+      unsafe p.initialize(from: s, count: self.count)
       // Need a _fixLifetime bracketing the _baseAddressIfContiguous getter
       // and all uses of the pointer it returns:
       _fixLifetime(self._owner)
     } else {
       for x in self {
-        p.initialize(to: x)
-        p += 1
+        unsafe p.initialize(to: x)
+        unsafe p += 1
       }
     }
 
     var it = IndexingIterator(_elements: self)
     it._position = endIndex
-    return (it,buffer.index(buffer.startIndex, offsetBy: self.count))
+    return (it,unsafe buffer.index(buffer.startIndex, offsetBy: self.count))
   }
 }
 
@@ -1338,7 +1339,7 @@ extension ContiguousArray: Equatable where Element: Equatable {
     }
 
     // Test referential equality.
-    if lhsCount == 0 || lhs._buffer.identity == rhs._buffer.identity {
+    if unsafe lhsCount == 0 || lhs._buffer.identity == rhs._buffer.identity {
       return true
     }
 
@@ -1418,7 +1419,7 @@ extension ContiguousArray {
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
     return try self.withUnsafeMutableBufferPointer {
-      return try body(UnsafeMutableRawBufferPointer($0))
+      return try unsafe body(UnsafeMutableRawBufferPointer($0))
     }
   }
 
@@ -1454,7 +1455,7 @@ extension ContiguousArray {
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
     return try self.withUnsafeBufferPointer {
-      try body(UnsafeRawBufferPointer($0))
+      try unsafe body(UnsafeRawBufferPointer($0))
     }
   }
 }

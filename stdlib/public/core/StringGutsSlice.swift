@@ -82,7 +82,7 @@ internal struct _StringGutsSlice {
   internal func withFastUTF8<R>(
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
-    return try _guts.withFastUTF8(range: _offsetRange, f)
+    return try unsafe _guts.withFastUTF8(range: _offsetRange, f)
   }
 
   @_effects(releasenone)

@@ -500,7 +500,7 @@ internal struct _SetAnyHashableBox<Element: Hashable>: _AnyHashableBox {
     into result: UnsafeMutablePointer<T>
   ) -> Bool {
     guard let value = _value as? T else { return false }
-    result.initialize(to: value)
+    unsafe result.initialize(to: value)
     return true
   }
 }
@@ -1289,6 +1289,7 @@ extension Set {
 
     @frozen
     @usableFromInline
+    @safe
     internal enum _Variant {
       case native(_HashTable.Index)
 #if _runtime(_ObjC)
@@ -1364,7 +1365,7 @@ extension Set.Index {
   internal var _asNative: _HashTable.Index {
     switch _variant {
     case .native(let nativeIndex):
-      return nativeIndex
+      return unsafe nativeIndex
 #if _runtime(_ObjC)
     case .cocoa:
       _preconditionFailure(
@@ -1391,7 +1392,7 @@ extension Set.Index {
         _preconditionFailure(
           "Attempting to access Set elements using an invalid index")
       }
-      let dummy = _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
+      let dummy = unsafe _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
       _variant = .native(dummy)
       defer { _variant = .cocoa(cocoa) }
       yield &cocoa
@@ -1408,7 +1409,7 @@ extension Set.Index: Equatable {
   ) -> Bool {
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
-      return lhsNative == rhsNative
+      return unsafe lhsNative == rhsNative
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
       lhs._cocoaPath()
@@ -1428,7 +1429,7 @@ extension Set.Index: Comparable {
   ) -> Bool {
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
-      return lhsNative < rhsNative
+      return unsafe lhsNative < rhsNative
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
       lhs._cocoaPath()
@@ -1455,9 +1456,9 @@ extension Set.Index: Hashable {
       return
     }
     hasher.combine(0 as UInt8)
-    hasher.combine(_asNative.bucket.offset)
+    unsafe hasher.combine(_asNative.bucket.offset)
 #else
-    hasher.combine(_asNative.bucket.offset)
+    unsafe hasher.combine(_asNative.bucket.offset)
 #endif
   }
 }

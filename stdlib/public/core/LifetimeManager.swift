@@ -103,7 +103,7 @@ public func withUnsafeMutablePointer<
   to value: inout T,
   _ body: (UnsafeMutablePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
-  try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
+  try unsafe body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
@@ -113,7 +113,7 @@ internal func __abi_se0413_withUnsafeMutablePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafeMutablePointer<T>) throws -> Result
 ) throws -> Result {
-  return try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
+  return try unsafe body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
 /// Calls the given closure with a mutable pointer to the given argument.
@@ -129,7 +129,7 @@ public func _withUnprotectedUnsafeMutablePointer<
 ) throws(E) -> Result
 {
 #if $BuiltinUnprotectedAddressOf
-  return try body(UnsafeMutablePointer<T>(Builtin.unprotectedAddressOf(&value)))
+  return try unsafe body(UnsafeMutablePointer<T>(Builtin.unprotectedAddressOf(&value)))
 #else
   return try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 #endif
@@ -161,7 +161,7 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   _ body: (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result
 {
-  return try body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
+  return try unsafe body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
 }
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows, expressed as "throws",
@@ -174,7 +174,7 @@ internal func __abi_withUnsafePointer<T, Result>(
   _ body: (UnsafePointer<T>) throws -> Result
 ) throws -> Result
 {
-  return try body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
+  return try unsafe body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
 }
 
 /// Invokes the given closure with a pointer to the given argument.
@@ -206,7 +206,7 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
-  try body(UnsafePointer<T>(Builtin.addressof(&value)))
+  try unsafe body(UnsafePointer<T>(Builtin.addressof(&value)))
 }
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows,
@@ -218,7 +218,7 @@ internal func __abi_se0413_withUnsafePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws -> Result
 ) throws -> Result {
-  return try body(UnsafePointer<T>(Builtin.addressof(&value)))
+  return try unsafe body(UnsafePointer<T>(Builtin.addressof(&value)))
 }
 
 /// Invokes the given closure with a pointer to the given argument.
@@ -233,7 +233,7 @@ public func _withUnprotectedUnsafePointer<
   _ body: (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
 #if $BuiltinUnprotectedAddressOf
-  return try body(UnsafePointer<T>(Builtin.unprotectedAddressOf(&value)))
+  return try unsafe body(UnsafePointer<T>(Builtin.unprotectedAddressOf(&value)))
 #else
   return try body(UnsafePointer<T>(Builtin.addressof(&value)))
 #endif
@@ -250,7 +250,7 @@ public func _withUnprotectedUnsafePointer<
   to value: borrowing T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
-  return try body(UnsafePointer<T>(Builtin.unprotectedAddressOfBorrow(value)))
+  return try unsafe body(UnsafePointer<T>(Builtin.unprotectedAddressOfBorrow(value)))
 }
 
 @available(*, deprecated, message: "Use the copy operator")

@@ -275,7 +275,7 @@ private func _myers<C,D>(
         y = x &- k
 
         while x < n && y < m {
-          if !cmp(a[x], b[y]) {
+          if unsafe !cmp(a[x], b[y]) {
             break;
           }
           x &+= 1
@@ -324,9 +324,9 @@ private func _myers<C,D>(
 
       _internalInvariant((x == prev_x && y > prev_y) || (y == prev_y && x > prev_x))
       if y != prev_y {
-        changes.append(.insert(offset: prev_y, element: b[prev_y], associatedWith: nil))
+        unsafe changes.append(.insert(offset: prev_y, element: b[prev_y], associatedWith: nil))
       } else {
-        changes.append(.remove(offset: prev_x, element: a[prev_x], associatedWith: nil))
+        unsafe changes.append(.remove(offset: prev_x, element: a[prev_x], associatedWith: nil))
       }
 
       x = prev_x
@@ -358,9 +358,9 @@ private func _myers<C,D>(
     return try array.withUnsafeBufferPointer(body)
   }
 
-  return _withContiguousStorage(for: old) { a in
-    return _withContiguousStorage(for: new) { b in
-      return CollectionDifference(_formChanges(from: a, to: b, using:_descent(from: a, to: b)))!
+  return unsafe _withContiguousStorage(for: old) { a in
+    return unsafe _withContiguousStorage(for: new) { b in
+      return unsafe CollectionDifference(_formChanges(from: a, to: b, using:_descent(from: a, to: b)))!
     }
   }
 }

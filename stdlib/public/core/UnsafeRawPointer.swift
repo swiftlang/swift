@@ -169,16 +169,18 @@
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen
 @unsafe
-public struct UnsafeRawPointer: _Pointer {
+public struct UnsafeRawPointer: @unsafe _Pointer {
 
   public typealias Pointee = UInt8
 
   /// The underlying raw pointer.
   /// Implements conformance to the public protocol `_Pointer`.
+  @safe
   public let _rawValue: Builtin.RawPointer
 
   /// Creates a new raw pointer from a builtin raw pointer.
   @_transparent
+  @safe
   public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
@@ -197,6 +199,7 @@ extension UnsafeRawPointer {
   /// - Parameter other: The typed pointer to convert.
   @_transparent
   @_preInverseGenerics
+  @safe
   public init<T: ~Copyable>(@_nonEphemeral _ other: UnsafePointer<T>) {
     _rawValue = other._rawValue
   }
@@ -211,8 +214,9 @@ extension UnsafeRawPointer {
   ///   result is `nil`.
   @_transparent
   @_preInverseGenerics
+  @safe
   public init?<T: ~Copyable>(@_nonEphemeral _ other: UnsafePointer<T>?) {
-    guard let unwrapped = other else { return nil }
+    guard let unwrapped = unsafe other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 }
@@ -226,6 +230,7 @@ extension UnsafeRawPointer {
   ///
   /// - Parameter other: The mutable raw pointer to convert.
   @_transparent
+  @safe
   public init(@_nonEphemeral _ other: UnsafeMutableRawPointer) {
     _rawValue = other._rawValue
   }
@@ -239,8 +244,9 @@ extension UnsafeRawPointer {
   /// - Parameter other: The mutable raw pointer to convert. If `other` is
   ///   `nil`, the result is `nil`.
   @_transparent
+  @safe
   public init?(@_nonEphemeral _ other: UnsafeMutableRawPointer?) {
-    guard let unwrapped = other else { return nil }
+    guard let unwrapped = unsafe other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 }
@@ -255,6 +261,7 @@ extension UnsafeRawPointer {
   /// - Parameter other: The typed pointer to convert.
   @_transparent
   @_preInverseGenerics
+  @safe
   public init<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
@@ -269,8 +276,9 @@ extension UnsafeRawPointer {
   ///   result is `nil`.
   @_transparent
   @_preInverseGenerics
+  @safe
   public init?<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
-    guard let unwrapped = other else { return nil }
+    guard let unwrapped = unsafe other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 
@@ -331,7 +339,7 @@ extension UnsafeRawPointer {
     to type: T.Type, capacity count: Int
   ) -> UnsafePointer<T> {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
-    return UnsafePointer<T>(_rawValue)
+    return unsafe UnsafePointer<T>(_rawValue)
   }
 
   /// Executes the given closure while temporarily binding memory to
@@ -391,13 +399,13 @@ extension UnsafeRawPointer {
     capacity count: Int,
     _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
-    _debugPrecondition(
+    unsafe _debugPrecondition(
       Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
       "self must be a properly aligned pointer for type T"
     )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
-    return try body(.init(_rawValue))
+    return try unsafe body(.init(_rawValue))
   }
 
   /// Returns a typed pointer to the memory referenced by this pointer,
@@ -416,7 +424,7 @@ extension UnsafeRawPointer {
   public func assumingMemoryBound<T: ~Copyable>(
     to: T.Type
   ) -> UnsafePointer<T> {
-    return UnsafePointer<T>(_rawValue)
+    return unsafe UnsafePointer<T>(_rawValue)
   }
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -438,11 +446,11 @@ extension UnsafeRawPointer {
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
-    _debugPrecondition(0 == (UInt(bitPattern: self + offset)
+    unsafe _debugPrecondition(0 == (UInt(bitPattern: self + offset)
         & (UInt(MemoryLayout<T>.alignment) - 1)),
       "load from misaligned raw pointer")
 
-    let rawPointer = (self + offset)._rawValue
+    let rawPointer = unsafe (self + offset)._rawValue
 
 #if compiler(>=5.5) && $BuiltinAssumeAlignment
     let alignedPointer =
@@ -484,7 +492,7 @@ extension UnsafeRawPointer {
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
-    return Builtin.loadRaw((self + offset)._rawValue)
+    return unsafe Builtin.loadRaw((self + offset)._rawValue)
   }
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -519,20 +527,20 @@ extension UnsafeRawPointer {
       _isPOD(T.self),
       "loadUnaligned only supports loading BitwiseCopyable types."
     )
-    return _withUnprotectedUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
-      let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
-      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+    return unsafe _withUnprotectedUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
+      let temporary = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
+      unsafe Builtin.int_memcpy_RawPointer_RawPointer_Int64(
         temporary._rawValue,
         (self + offset)._rawValue,
         UInt64(MemoryLayout<T>.size)._value,
         /*volatile:*/ false._value
       )
-      return temporary.pointee
+      return unsafe temporary.pointee
     }
   }
 }
 
-extension UnsafeRawPointer: Strideable {
+extension UnsafeRawPointer: @unsafe Strideable {
   // custom version for raw pointers
   @_transparent
   public func advanced(by n: Int) -> UnsafeRawPointer {
@@ -775,16 +783,18 @@ extension UnsafeRawPointer {
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen
 @unsafe
-public struct UnsafeMutableRawPointer: _Pointer {
+public struct UnsafeMutableRawPointer: @unsafe _Pointer {
 
   public typealias Pointee = UInt8
 
   /// The underlying raw pointer.
   /// Implements conformance to the public protocol `_Pointer`.
+  @safe
   public let _rawValue: Builtin.RawPointer
 
   /// Creates a new raw pointer from a builtin raw pointer.
   @_transparent
+  @safe
   public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
@@ -803,6 +813,7 @@ extension UnsafeMutableRawPointer {
   /// - Parameter other: The typed pointer to convert.
   @_transparent
   @_preInverseGenerics
+  @safe
   public init<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
@@ -817,8 +828,9 @@ extension UnsafeMutableRawPointer {
   ///   result is `nil`.
   @_transparent
   @_preInverseGenerics
+  @safe
   public init?<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
-    guard let unwrapped = other else { return nil }
+    guard let unwrapped = unsafe other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 
@@ -844,7 +856,7 @@ extension UnsafeMutableRawPointer {
   ///   `nil`, the result is `nil`.
   @_transparent
   public init?(@_nonEphemeral mutating other: UnsafeRawPointer?) {
-    guard let unwrapped = other else { return nil }
+    guard let unwrapped = unsafe other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 
@@ -866,6 +878,7 @@ extension UnsafeMutableRawPointer {
   /// - Returns: A pointer to a newly allocated region of memory. The memory is
   ///   allocated, but not initialized.
   @inlinable
+  @safe
   public static func allocate(
     byteCount: Int, alignment: Int
   ) -> UnsafeMutableRawPointer {
@@ -945,7 +958,7 @@ extension UnsafeMutableRawPointer {
     to type: T.Type, capacity count: Int
   ) -> UnsafeMutablePointer<T> {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
-    return UnsafeMutablePointer<T>(_rawValue)
+    return unsafe UnsafeMutablePointer<T>(_rawValue)
   }
 
   /// Executes the given closure while temporarily binding memory to
@@ -1003,13 +1016,13 @@ extension UnsafeMutableRawPointer {
     capacity count: Int,
     _ body: (_ pointer: UnsafeMutablePointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
-    _debugPrecondition(
+    unsafe _debugPrecondition(
       Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
       "self must be a properly aligned pointer for type T"
     )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
-    return try body(.init(_rawValue))
+    return try unsafe body(.init(_rawValue))
   }
 
   /// Returns a typed pointer to the memory referenced by this pointer,
@@ -1028,7 +1041,7 @@ extension UnsafeMutableRawPointer {
   public func assumingMemoryBound<T: ~Copyable>(
     to: T.Type
   ) -> UnsafeMutablePointer<T> {
-    return UnsafeMutablePointer<T>(_rawValue)
+    return unsafe UnsafeMutablePointer<T>(_rawValue)
   }
 
   /// Initializes the memory referenced by this pointer with the given value,
@@ -1067,7 +1080,7 @@ extension UnsafeMutableRawPointer {
   ) -> UnsafeMutablePointer<T> {
     Builtin.bindMemory(_rawValue, (1)._builtinWordValue, type)
     Builtin.initialize(consume value, _rawValue)
-    return UnsafeMutablePointer(_rawValue)
+    return unsafe UnsafeMutablePointer(_rawValue)
   }
 
   /// Initializes the memory referenced by this pointer with the given value,
@@ -1113,12 +1126,12 @@ extension UnsafeMutableRawPointer {
       "UnsafeMutableRawPointer.initializeMemory: negative count")
 
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
-    var nextPtr = self
+    var nextPtr = unsafe self
     for _ in 0..<count {
       Builtin.initialize(repeatedValue, nextPtr._rawValue)
-      nextPtr += MemoryLayout<T>.stride
+      unsafe nextPtr += MemoryLayout<T>.stride
     }
-    return UnsafeMutablePointer(_rawValue)
+    return unsafe UnsafeMutablePointer(_rawValue)
   }
 
   /// Initializes the memory referenced by this pointer with the values
@@ -1172,7 +1185,7 @@ extension UnsafeMutableRawPointer {
     _debugPrecondition(
       count >= 0,
       "UnsafeMutableRawPointer.initializeMemory with negative count")
-    _debugPrecondition(
+    unsafe _debugPrecondition(
       (UnsafeRawPointer(self + count * MemoryLayout<T>.stride)
         <= UnsafeRawPointer(source))
       || UnsafeRawPointer(source + count) <= UnsafeRawPointer(self),
@@ -1185,7 +1198,7 @@ extension UnsafeMutableRawPointer {
     // for i in 0..<count {
     //   (self.assumingMemoryBound(to: T.self) + i).initialize(to: source[i])
     // }
-    return UnsafeMutablePointer(_rawValue)
+    return unsafe UnsafeMutablePointer(_rawValue)
   }
 
   /// Initializes the memory referenced by this pointer with the values
@@ -1228,7 +1241,7 @@ extension UnsafeMutableRawPointer {
       "UnsafeMutableRawPointer.moveInitializeMemory with negative count")
 
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
-    if self < UnsafeMutableRawPointer(source)
+    if unsafe self < UnsafeMutableRawPointer(source)
        || self >= UnsafeMutableRawPointer(source + count) {
       // initialize forward from a disjoint or following overlapping range.
       Builtin.takeArrayFrontToBack(
@@ -1250,7 +1263,7 @@ extension UnsafeMutableRawPointer {
       //   (--dst).initialize(to: (--src).move())
       // }
     }
-    return UnsafeMutablePointer(_rawValue)
+    return unsafe UnsafeMutablePointer(_rawValue)
   }
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -1272,11 +1285,11 @@ extension UnsafeMutableRawPointer {
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
-    _debugPrecondition(0 == (UInt(bitPattern: self + offset)
+    unsafe _debugPrecondition(0 == (UInt(bitPattern: self + offset)
         & (UInt(MemoryLayout<T>.alignment) - 1)),
       "load from misaligned raw pointer")
 
-    let rawPointer = (self + offset)._rawValue
+    let rawPointer = unsafe (self + offset)._rawValue
 
 #if compiler(>=5.5) && $BuiltinAssumeAlignment
     let alignedPointer =
@@ -1319,7 +1332,7 @@ extension UnsafeMutableRawPointer {
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
-    return Builtin.loadRaw((self + offset)._rawValue)
+    return unsafe Builtin.loadRaw((self + offset)._rawValue)
   }
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -1354,15 +1367,15 @@ extension UnsafeMutableRawPointer {
       _isPOD(T.self),
       "loadUnaligned only supports loading BitwiseCopyable types."
     )
-    return _withUnprotectedUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
-      let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
-      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+    return unsafe _withUnprotectedUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
+      let temporary = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
+      unsafe Builtin.int_memcpy_RawPointer_RawPointer_Int64(
         temporary._rawValue,
         (self + offset)._rawValue,
         UInt64(MemoryLayout<T>.size)._value,
         /*volatile:*/ false._value
       )
-      return temporary.pointee
+      return unsafe temporary.pointee
     }
   }
 
@@ -1406,7 +1419,7 @@ extension UnsafeMutableRawPointer {
   public func storeBytes<T: BitwiseCopyable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    Builtin.storeRaw(value, (self + offset)._rawValue)
+    unsafe Builtin.storeRaw(value, (self + offset)._rawValue)
   }
 
   /// Stores the given value's bytes into raw memory at the specified offset.
@@ -1456,9 +1469,9 @@ extension UnsafeMutableRawPointer {
       "storeBytes only supports storing the bytes of BitwiseCopyable types."
     )
 
-    withUnsafePointer(to: value) { source in
+    unsafe withUnsafePointer(to: value) { source in
       // FIXME: to be replaced by _memcpy when conversions are implemented.
-      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+      unsafe Builtin.int_memcpy_RawPointer_RawPointer_Int64(
         (self + offset)._rawValue,
         source._rawValue,
         UInt64(MemoryLayout<T>.size)._value,
@@ -1472,10 +1485,11 @@ extension UnsafeMutableRawPointer {
   // any binary compiled against the stdlib binary for Swift 5.6 and older.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @_silgen_name("$sSv10storeBytes2of12toByteOffset2asyx_SixmtlF")
-  @usableFromInline func _legacy_se0349_storeBytes<T>(
+  @usableFromInline
+  func _legacy_se0349_storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    _legacy_se0349_storeBytes_internal(
+    unsafe _legacy_se0349_storeBytes_internal(
       of: value, toByteOffset: offset, as: T.self
     )
   }
@@ -1485,15 +1499,15 @@ extension UnsafeMutableRawPointer {
   internal func _legacy_se0349_storeBytes_internal<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    _debugPrecondition(0 == (UInt(bitPattern: self + offset)
+    unsafe _debugPrecondition(0 == (UInt(bitPattern: self + offset)
         & (UInt(MemoryLayout<T>.alignment) - 1)),
       "storeBytes to misaligned raw pointer")
 
     var temp = value
-    withUnsafeMutablePointer(to: &temp) { source in
+    unsafe withUnsafeMutablePointer(to: &temp) { source in
       let rawSrc = UnsafeMutableRawPointer(source)._rawValue
       // FIXME: to be replaced by _memcpy when conversions are implemented.
-      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+      unsafe Builtin.int_memcpy_RawPointer_RawPointer_Int64(
         (self + offset)._rawValue, rawSrc, UInt64(MemoryLayout<T>.size)._value,
         /*volatile:*/ false._value)
     }
@@ -1525,11 +1539,11 @@ extension UnsafeMutableRawPointer {
     _debugPrecondition(
       byteCount >= 0, "UnsafeMutableRawPointer.copyMemory with negative count")
 
-    _memmove(dest: self, src: source, size: UInt(byteCount))
+    unsafe _memmove(dest: self, src: source, size: UInt(byteCount))
   }
 }
 
-extension UnsafeMutableRawPointer: Strideable {
+extension UnsafeMutableRawPointer: @unsafe Strideable {
   // custom version for raw pointers
   @_transparent
   public func advanced(by n: Int) -> UnsafeMutableRawPointer {
@@ -1622,24 +1636,28 @@ extension UnsafeMutableRawPointer {
 
 extension OpaquePointer {
   @_transparent
+  @safe
   public init(@_nonEphemeral _ from: UnsafeMutableRawPointer) {
-    self._rawValue = from._rawValue
+    unsafe self._rawValue = from._rawValue
   }
 
   @_transparent
+  @safe
   public init?(@_nonEphemeral _ from: UnsafeMutableRawPointer?) {
-    guard let unwrapped = from else { return nil }
-    self._rawValue = unwrapped._rawValue
+    guard let unwrapped = unsafe from else { return nil }
+    unsafe self._rawValue = unwrapped._rawValue
   }
 
   @_transparent
+  @safe
   public init(@_nonEphemeral _ from: UnsafeRawPointer) {
-    self._rawValue = from._rawValue
+    unsafe self._rawValue = from._rawValue
   }
 
   @_transparent
+  @safe
   public init?(@_nonEphemeral _ from: UnsafeRawPointer?) {
-    guard let unwrapped = from else { return nil }
-    self._rawValue = unwrapped._rawValue
+    guard let unwrapped = unsafe from else { return nil }
+    unsafe self._rawValue = unwrapped._rawValue
   }
 }

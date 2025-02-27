@@ -438,8 +438,8 @@ extension DistributedActorSystem {
 
     // Gen the generic environment (if any) associated with the target.
     let genericEnv =
-      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-        _getGenericEnvironmentOfDistributedTarget(
+      unsafe targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+        unsafe _getGenericEnvironmentOfDistributedTarget(
           targetNameUTF8.baseAddress!,
           UInt(targetNameUTF8.endIndex))
       }
@@ -449,11 +449,11 @@ extension DistributedActorSystem {
     var numWitnessTables: Int = 0
 
     defer {
-      substitutionsBuffer?.deallocate()
-      witnessTablesBuffer?.deallocate()
+      unsafe substitutionsBuffer?.deallocate()
+      unsafe witnessTablesBuffer?.deallocate()
     }
 
-    if let genericEnv = genericEnv {
+    if let genericEnv = unsafe genericEnv {
       let subs = try invocationDecoder.decodeGenericSubstitutions()
       if subs.isEmpty {
         throw ExecuteDistributedTargetError(
@@ -461,14 +461,14 @@ extension DistributedActorSystem {
           errorCode: .missingGenericSubstitutions)
       }
 
-      substitutionsBuffer = .allocate(capacity: subs.count)
+      unsafe substitutionsBuffer = .allocate(capacity: subs.count)
 
       for (offset, substitution) in subs.enumerated() {
-        let element = substitutionsBuffer?.advanced(by: offset)
-        element?.initialize(to: substitution)
+        let element = unsafe substitutionsBuffer?.advanced(by: offset)
+        unsafe element?.initialize(to: substitution)
       }
 
-      (witnessTablesBuffer, numWitnessTables) = _getWitnessTablesFor(environment: genericEnv,
+      unsafe (witnessTablesBuffer, numWitnessTables) = unsafe _getWitnessTablesFor(environment: genericEnv,
         genericArguments: substitutionsBuffer!)
       if numWitnessTables < 0 {
         throw ExecuteDistributedTargetError(
@@ -478,8 +478,8 @@ extension DistributedActorSystem {
     }
 
     let paramCount =
-      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-        __getParameterCount(
+      unsafe targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+        unsafe __getParameterCount(
           targetNameUTF8.baseAddress!,
           UInt(targetNameUTF8.endIndex))
       }
@@ -497,12 +497,12 @@ extension DistributedActorSystem {
     // Prepare buffer for the parameter types to be decoded into:
     let argumentTypesBuffer = UnsafeMutableBufferPointer<Any.Type>.allocate(capacity: Int(paramCount))
     defer {
-      argumentTypesBuffer.deallocate()
+      unsafe argumentTypesBuffer.deallocate()
     }
 
     // Demangle and write all parameter types into the prepared buffer
-    let decodedNum = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-      __getParameterTypeInfo(
+    let decodedNum = unsafe targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+      unsafe __getParameterTypeInfo(
         targetNameUTF8.baseAddress!,
         UInt(targetNameUTF8.endIndex),
         genericEnv,
@@ -525,7 +525,7 @@ extension DistributedActorSystem {
     var argumentTypes: [Any.Type] = []
     do {
       argumentTypes.reserveCapacity(Int(decodedNum))
-      for argumentType in argumentTypesBuffer {
+      for unsafe argumentType in unsafe argumentTypesBuffer {
         argumentTypes.append(argumentType)
       }
     }
@@ -536,8 +536,8 @@ extension DistributedActorSystem {
     }
 
     let maybeReturnTypeFromTypeInfo =
-      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-        __getReturnTypeInfo(
+      unsafe targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+        unsafe __getReturnTypeInfo(
           /*targetName:*/targetNameUTF8.baseAddress!,
           /*targetLength:*/UInt(targetNameUTF8.endIndex),
           /*genericEnv:*/genericEnv,
@@ -549,7 +549,7 @@ extension DistributedActorSystem {
         errorCode: .typeDeserializationFailure)
     }
 
-    guard let resultBuffer = _openExistential(returnTypeFromTypeInfo, do: doAllocateReturnTypeBuffer) else {
+    guard let resultBuffer = _openExistential(returnTypeFromTypeInfo, do: unsafe doAllocateReturnTypeBuffer) else {
       throw ExecuteDistributedTargetError(
         message: "Failed to allocate buffer for distributed target return type",
         errorCode: .typeDeserializationFailure)
@@ -560,16 +560,16 @@ extension DistributedActorSystem {
     var executeDistributedTargetHasThrown = true
 
     func doDestroyReturnTypeBuffer<R>(_: R.Type) {
-      let buf = resultBuffer.assumingMemoryBound(to: R.self)
+      let buf = unsafe resultBuffer.assumingMemoryBound(to: R.self)
 
       if !executeDistributedTargetHasThrown {
         // since the _execute function has NOT thrown,
         // there must be a value in the result buffer that we must deinitialize
-        buf.deinitialize(count: 1)
+        unsafe buf.deinitialize(count: 1)
       } // otherwise, the _execute has thrown and not populated the result buffer
 
       // finally, deallocate the buffer
-      buf.deallocate()
+      unsafe buf.deallocate()
     }
 
     defer {
@@ -581,7 +581,7 @@ extension DistributedActorSystem {
       // let errorType = try invocationDecoder.decodeErrorType() // TODO(distributed): decide how to use when typed throws are done
 
       // Execute the target!
-      try await _executeDistributedTarget(
+      try unsafe await _executeDistributedTarget(
         on: actor,
         /*targetNameData:*/targetName,
         /*targetNameLength:*/UInt(targetName.count),
@@ -599,7 +599,7 @@ extension DistributedActorSystem {
       if returnType == Void.self {
         try await handler.onReturnVoid()
       } else {
-        try await self.invokeHandlerOnReturn(
+        try unsafe await self.invokeHandlerOnReturn(
           handler: handler,
           resultBuffer: resultBuffer,
           metatype: returnType

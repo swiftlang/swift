@@ -17,6 +17,7 @@
 @available(SwiftStdlib 6.0, *)
 @frozen
 @_staticExclusiveOnly
+@safe
 public struct AtomicLazyReference<Instance: AnyObject>: ~Copyable {
   @usableFromInline
   let storage: Atomic<Unmanaged<Instance>?>
@@ -24,13 +25,13 @@ public struct AtomicLazyReference<Instance: AnyObject>: ~Copyable {
   @available(SwiftStdlib 6.0, *)
   @inlinable
   public init() {
-    storage = Atomic<Unmanaged<Instance>?>(nil)
+    storage = unsafe Atomic<Unmanaged<Instance>?>(nil)
   }
 
   @inlinable
   deinit {
-    if let unmanaged = storage.load(ordering: .acquiring) {
-      unmanaged.release()
+    if let unmanaged = unsafe storage.load(ordering: .acquiring) {
+      unsafe unmanaged.release()
     }
   }
 }
@@ -68,8 +69,8 @@ extension AtomicLazyReference {
   ///   was passed to this function.
   @available(SwiftStdlib 6.0, *)
   public func storeIfNil(_ desired: consuming Instance) -> Instance {
-    let desiredUnmanaged = Unmanaged.passRetained(desired)
-    let (exchanged, current) = storage.compareExchange(
+    let desiredUnmanaged = unsafe Unmanaged.passRetained(desired)
+    let (exchanged, current) = unsafe storage.compareExchange(
       expected: nil,
       desired: desiredUnmanaged,
       ordering: .acquiringAndReleasing
@@ -78,11 +79,11 @@ extension AtomicLazyReference {
     if !exchanged {
       // The reference has already been initialized. Balance the retain that we
       // performed on 'desired'.
-      desiredUnmanaged.release()
-      return current!.takeUnretainedValue()
+      unsafe desiredUnmanaged.release()
+      return unsafe current!.takeUnretainedValue()
     }
 
-    return desiredUnmanaged.takeUnretainedValue()
+    return unsafe desiredUnmanaged.takeUnretainedValue()
   }
 
   /// Atomically loads and returns the current value of this reference.
@@ -94,8 +95,8 @@ extension AtomicLazyReference {
   ///   `nil` if it has not been written to yet.
   @available(SwiftStdlib 6.0, *)
   public func load() -> Instance? {
-    let value = storage.load(ordering: .acquiring)
-    return value?.takeUnretainedValue()
+    let value = unsafe storage.load(ordering: .acquiring)
+    return unsafe value?.takeUnretainedValue()
   }
 }
 

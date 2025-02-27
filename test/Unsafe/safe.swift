@@ -185,7 +185,8 @@ struct MyArray<Element> {
 }
 
 extension UnsafeBufferPointer {
-  @safe var safeCount: Int { unsafe count }
+  @unsafe var unsafeCount: Int { 17 }
+  @safe var safeCount: Int { unsafe unsafeCount }
 }
 
 func testMyArray(ints: MyArray<Int>) {
@@ -194,6 +195,6 @@ func testMyArray(ints: MyArray<Int>) {
     _ = unsafe bufferCopy
 
     print(buffer.safeCount)
-    unsafe print(buffer.baseAddress!)
+    unsafe print(buffer.unsafeCount)
   }
 }

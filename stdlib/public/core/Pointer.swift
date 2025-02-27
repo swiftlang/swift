@@ -50,7 +50,7 @@ extension _Pointer {
   /// - Parameter from: The opaque pointer to convert to a typed pointer.
   @_transparent
   public init(_ from: OpaquePointer) {
-    self.init(from._rawValue)
+    unsafe self.init(from._rawValue)
   }
 
   /// Creates a new typed pointer from the given opaque pointer.
@@ -59,8 +59,8 @@ extension _Pointer {
   ///   `from` is `nil`, the result of this initializer is `nil`.
   @_transparent
   public init?(_ from: OpaquePointer?) {
-    guard let unwrapped = from else { return nil }
-    self.init(unwrapped)
+    guard let unwrapped = unsafe from else { return nil }
+    unsafe self.init(unwrapped)
   }
 
   /// Creates a new pointer from the given address, specified as a bit
@@ -432,14 +432,14 @@ func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer: _Pointer
 >(_ arr: [FromElement]) -> (AnyObject?, ToPointer) {
-  let (owner, opaquePointer) = arr._cPointerArgs()
+  let (owner, opaquePointer) = unsafe arr._cPointerArgs()
 
   let validPointer: ToPointer
-  if let addr = opaquePointer {
+  if let addr = unsafe opaquePointer {
     validPointer = ToPointer(addr._rawValue)
   } else {
     let lastAlignedValue = ~(MemoryLayout<FromElement>.alignment - 1)
-    let lastAlignedPointer = UnsafeRawPointer(bitPattern: lastAlignedValue)!
+    let lastAlignedPointer = unsafe UnsafeRawPointer(bitPattern: lastAlignedValue)!
     validPointer = ToPointer(lastAlignedPointer._rawValue)
   }
   return (owner, validPointer)
@@ -451,14 +451,14 @@ func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer: _Pointer
 >(_ arr: [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
-  let (owner, opaquePointer) = arr._cPointerArgs()
+  let (owner, opaquePointer) = unsafe arr._cPointerArgs()
 
   let validPointer: ToPointer
-  if let addr = opaquePointer {
+  if let addr = unsafe opaquePointer {
     validPointer = ToPointer(addr._rawValue)
   } else {
     let lastAlignedValue = ~(MemoryLayout<FromElement>.alignment - 1)
-    let lastAlignedPointer = UnsafeRawPointer(bitPattern: lastAlignedValue)!
+    let lastAlignedPointer = unsafe UnsafeRawPointer(bitPattern: lastAlignedValue)!
     validPointer = ToPointer(lastAlignedPointer._rawValue)
   }
   return (owner, validPointer)
@@ -480,7 +480,7 @@ func _convertMutableArrayToPointerArgument<
 
   // Call reserve to force contiguous storage.
   a.reserveCapacity(0)
-  _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
+  unsafe _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
 
   return _convertConstArrayToPointerArgument(a)
 }
@@ -496,7 +496,7 @@ func _convertMutableArrayToPointerArgument<
 
   // Call reserve to force contiguous storage.
   a.reserveCapacity(0)
-  _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
+  _debugPrecondition(unsafe a._baseAddressIfContiguous != nil || a.isEmpty)
 
   return _convertConstArrayToPointerArgument(a)
 }
