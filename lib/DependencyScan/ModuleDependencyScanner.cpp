@@ -590,18 +590,19 @@ static void discoverCrossImportOverlayFiles(
       mainModuleName.str(), ModuleDependencyKind::SwiftSource});
 
   llvm::StringMap<ModuleDependencyIDSet> perSourceFileDependencies;
-  const ModuleDependencyIDSet directSwiftDepsSet{
+  const ModuleDependencyIDSet mainModuleDirectSwiftDepsSet{
       mainModuleInfo.getImportedSwiftDependencies().begin(),
       mainModuleInfo.getImportedSwiftDependencies().end()};
-  const ModuleDependencyIDSet directClangDepsSet{
+  const ModuleDependencyIDSet mainModuleDirectClangDepsSet{
       mainModuleInfo.getImportedClangDependencies().begin(),
       mainModuleInfo.getImportedClangDependencies().end()};
 
   // A utility to map an import identifier to one of the
   // known resolved module dependencies
   auto getModuleIDForImportIdentifier =
-      [directSwiftDepsSet, directClangDepsSet](
-          const std::string &importIdentifierStr) -> ModuleDependencyID {
+      [](const std::string &importIdentifierStr,
+         const ModuleDependencyIDSet &directSwiftDepsSet,
+         const ModuleDependencyIDSet &directClangDepsSet) -> ModuleDependencyID {
     if (auto textualDepIt = directSwiftDepsSet.find(
             {importIdentifierStr, ModuleDependencyKind::SwiftInterface});
         textualDepIt != directSwiftDepsSet.end())
@@ -621,8 +622,9 @@ static void discoverCrossImportOverlayFiles(
   // Collect the set of directly-imported module dependencies
   // for each source file in the source module under scan.
   for (const auto &import : mainModuleInfo.getModuleImports()) {
-    auto importResolvedModuleID =
-        getModuleIDForImportIdentifier(import.importIdentifier);
+    auto importResolvedModuleID = getModuleIDForImportIdentifier(
+        import.importIdentifier, mainModuleDirectSwiftDepsSet,
+        mainModuleDirectClangDepsSet);
     for (const auto &importLocation : import.importLocations)
       perSourceFileDependencies[importLocation.bufferIdentifier].insert(
           importResolvedModuleID);
@@ -640,18 +642,28 @@ static void discoverCrossImportOverlayFiles(
       auto moduleID = worklist.pop_back_val();
       perSourceFileDependencies[bufferIdentifier].insert(moduleID);
       if (isSwiftDependencyKind(moduleID.Kind)) {
-        for (const auto &directSwiftDepID :
-             cache.getImportedSwiftDependencies(moduleID)) {
-          if (perSourceFileDependencies[bufferIdentifier].count(directSwiftDepID))
-            continue;
-          worklist.push_back(directSwiftDepID);
+        auto moduleInfo = cache.findKnownDependency(moduleID);
+        if (llvm::any_of(moduleInfo.getModuleImports(),
+                         [](const ScannerImportStatementInfo &importInfo) {
+                           return importInfo.isExported;
+                         })) {
+          const ModuleDependencyIDSet directSwiftDepsSet{
+              moduleInfo.getImportedSwiftDependencies().begin(),
+              moduleInfo.getImportedSwiftDependencies().end()};
+          const ModuleDependencyIDSet directClangDepsSet{
+              moduleInfo.getImportedClangDependencies().begin(),
+              moduleInfo.getImportedClangDependencies().end()};
+          for (const auto &import : moduleInfo.getModuleImports()) {
+            if (import.isExported) {
+              auto importResolvedDepID = getModuleIDForImportIdentifier(
+                  import.importIdentifier, directSwiftDepsSet,
+                  directClangDepsSet);
+              if (!perSourceFileDependencies[bufferIdentifier].count(
+                      importResolvedDepID))
+                worklist.push_back(importResolvedDepID);
+            }
+          }
         }
-      }
-      for (const auto &directClangDepID :
-           cache.getImportedClangDependencies(moduleID)) {
-        if (perSourceFileDependencies[bufferIdentifier].count(directClangDepID))
-          continue;
-        worklist.push_back(directClangDepID);
       }
     }
   }

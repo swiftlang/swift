@@ -126,7 +126,7 @@ void ModuleDependencyInfo::addModuleImport(
     StringRef module, bool isExported, llvm::StringSet<> *alreadyAddedModules,
     const SourceManager *sourceManager, SourceLoc sourceLocation) {
   auto scannerImportLocToDiagnosticLocInfo =
-      [&sourceManager, isExported](SourceLoc sourceLocation) {
+      [&sourceManager](SourceLoc sourceLocation) {
         auto lineAndColumnNumbers =
             sourceManager->getLineAndColumnInBuffer(sourceLocation);
         return ScannerImportStatementInfo::ImportDiagnosticLocationInfo(
