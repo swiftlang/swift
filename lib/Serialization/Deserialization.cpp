@@ -5468,7 +5468,11 @@ public:
       case 2:
         builtinKind = BuiltinMacroKind::IsolationMacro;
         break;
-          
+
+      case 3:
+        builtinKind = BuiltinMacroKind::SwiftSettingsMacro;
+        break;
+
       default:
         break;
       }

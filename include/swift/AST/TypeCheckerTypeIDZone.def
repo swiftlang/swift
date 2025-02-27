@@ -616,3 +616,6 @@ SWIFT_REQUEST(TypeChecker, SemanticAvailableAttrRequest,
               std::optional<SemanticAvailableAttr>
               (const AvailableAttr *, const Decl *),
               SeparatelyCached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, SourceFileLangOptionsRequest,
+              SourceFileLangOptions (SourceFile *), Cached, NoLocationInfo)
