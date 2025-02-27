@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,7 +18,7 @@
 /// owning the contiguous memory, ensuring temporal safety and avoiding
 /// use-after-free errors. Operations on `RawSpan` are bounds-checked,
 /// ensuring spcial safety and avoiding buffer overflow errors.
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 @frozen
 public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
 
@@ -78,10 +78,10 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension RawSpan: @unchecked Sendable {}
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -286,18 +286,19 @@ extension RawSpan {
   ///   - span: An existing `Span<T>`, which will define both this
   ///           `RawSpan`'s lifetime and the memory it represents.
   @_alwaysEmitIntoClient
-  @lifetime(borrow span)
-  public init<Element: BitwiseCopyable>(
-    _elements span: borrowing Span<Element>
-  ) {
-    self.init(
-      _unchecked: span._pointer,
-      byteCount: span.count &* MemoryLayout<Element>.stride
+  @lifetime(span)
+  public init<Element: BitwiseCopyable>(_elements span: Span<Element>) {
+    let pointer = span._pointer
+    let rawSpan = RawSpan(
+      _unchecked: pointer,
+      byteCount: span.count == 1 ? MemoryLayout<Element>.size
+                 : span.count &* MemoryLayout<Element>.stride
     )
+    self = _overrideLifetime(rawSpan, copying: span)
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension RawSpan {
 
   /// The number of bytes in the span.
@@ -326,7 +327,7 @@ extension RawSpan {
 }
 
 // MARK: extracting sub-spans
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension RawSpan {
 
   /// Constructs a new span over the bytes within the supplied range of
@@ -436,7 +437,7 @@ extension RawSpan {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension RawSpan {
 
   /// Calls the given closure with a pointer to the underlying bytes of
@@ -461,7 +462,7 @@ extension RawSpan {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension RawSpan {
 
   /// View the bytes of this span as type `T`
@@ -493,7 +494,7 @@ extension RawSpan {
 }
 
 // MARK: load
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension RawSpan {
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -607,7 +608,7 @@ extension RawSpan {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension RawSpan {
   /// Returns a Boolean value indicating whether two `RawSpan` instances
   /// refer to the same region in memory.
@@ -639,7 +640,7 @@ extension RawSpan {
 }
 
 // MARK: prefixes and suffixes
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension RawSpan {
 
   /// Returns a span containing the initial bytes of this span,
