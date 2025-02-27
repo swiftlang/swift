@@ -310,6 +310,9 @@ public:
 #define SWIFT_FUNCTION_PASS(ID, TAG, DESCRIPTION)
 #define SWIFT_SILCOMBINE_PASS(INST) \
   SILInstruction *visit##INST(INST *);
+#define SWIFT_SILCOMBINE_PASS_WITH_LEGACY(INST) \
+  SILInstruction *visit##INST(INST *);          \
+  SILInstruction *legacyVisit##INST(INST *);
 #include "swift/SILOptimizer/PassManager/Passes.def"
 
   /// Instruction visitor helpers.
