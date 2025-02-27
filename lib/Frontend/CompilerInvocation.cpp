@@ -815,8 +815,12 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     }
 
     // Enable the feature if requested.
-    if (enableFeature)
+    if (enableFeature) {
       Opts.enableFeature(*feature);
+
+      if (*feature == Feature::ValueGenerics)
+        Opts.enableFeature(Feature::ValueGenerics2);
+    }
   }
 
   // Since pseudo-features don't have a boolean on/off state, process them in
