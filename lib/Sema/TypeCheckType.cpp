@@ -1680,8 +1680,7 @@ static SelfTypeKind getSelfTypeKind(DeclContext *dc,
     return SelfTypeKind::StaticSelf;
 
   // For foreign reference types `Self` is a shorthand for the nominal type.
-  if (typeDC->getSelfClassDecl() &&
-      typeDC->getSelfClassDecl()->isForeignReferenceType())
+  if (typeDC->getSelfClassDecl()->isForeignReferenceType())
     return SelfTypeKind::StaticSelf;
 
   // In class methods, 'Self' is the DynamicSelfType and can only appear in
