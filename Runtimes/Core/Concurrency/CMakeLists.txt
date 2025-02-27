@@ -1,5 +1,7 @@
 add_subdirectory(InternalShims)
 
+gyb_expand(Task+startSynchronously.swift.gyb Task+startSynchronously.swift)
+
 add_library(swift_Concurrency
   Actor.cpp
   AsyncLet.cpp
@@ -80,7 +82,9 @@ add_library(swift_Concurrency
   TaskGroup+TaskExecutor.swift
   TaskLocal.swift
   TaskSleep.swift
-  TaskSleepDuration.swift)
+  TaskSleepDuration.swift
+  "${CMAKE_CURRENT_BINARY_DIR}/Task+startSynchronously.swift")
+
 include(${SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR}.cmake)
 target_compile_definitions(swift_Concurrency PRIVATE
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swift_Concurrency>
