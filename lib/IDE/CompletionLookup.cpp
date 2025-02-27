@@ -89,11 +89,11 @@ static Type defaultTypeLiteralKind(CodeCompletionLiteralKind kind,
   case CodeCompletionLiteralKind::ArrayLiteral:
     if (!Ctx.getArrayDecl())
       return Type();
-    return Ctx.getArrayDecl()->getDeclaredType();
+    return Ctx.getArrayDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::DictionaryLiteral:
     if (!Ctx.getDictionaryDecl())
       return Type();
-    return Ctx.getDictionaryDecl()->getDeclaredType();
+    return Ctx.getDictionaryDecl()->getDeclaredInterfaceType();
   case CodeCompletionLiteralKind::NilLiteral:
   case CodeCompletionLiteralKind::ColorLiteral:
   case CodeCompletionLiteralKind::ImageLiteral:
@@ -603,7 +603,7 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
                                        DynamicLookupInfo dynamicLookupInfo) {
   switch (dynamicLookupInfo.getKind()) {
   case DynamicLookupInfo::None:
-    return getTypeOfMember(VD, this->ExprType);
+    return getTypeOfMember(VD, getMemberBaseType());
   case DynamicLookupInfo::AnyObject:
     return getTypeOfMember(VD, Type());
   case DynamicLookupInfo::KeyPathDynamicMember: {
@@ -676,7 +676,14 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
 }
 
 Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
-  Type T = VD->getInterfaceType();
+  Type T;
+  if (auto *TD = dyn_cast<TypeDecl>(VD)) {
+    // For a type decl we're interested in the declared interface type, i.e
+    // we don't want a metatype.
+    T = TD->getDeclaredInterfaceType();
+  } else {
+    T = VD->getInterfaceType();
+  }
   assert(!T.isNull());
 
   if (ExprType) {
@@ -763,9 +770,7 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
 }
 
 Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
-  Type BaseTy = BaseType;
-  if (!BaseTy)
-    BaseTy = ExprType;
+  Type BaseTy = getMemberBaseType();
   if (!BaseTy && CurrDeclContext)
     BaseTy =
         CurrDeclContext->getInnermostTypeContext()->getDeclaredTypeInContext();
@@ -1709,13 +1714,16 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
   addLeadingDot(Builder);
   Builder.addBaseName(NTD->getName().str());
 
+  // Substitute the base type for a nested type if needed.
+  auto nominalTy = getTypeOfMember(NTD, dynamicLookupInfo);
+
   // "Fake" annotation for custom attribute types.
   SmallVector<char, 0> stash;
   StringRef customAttributeAnnotation = getTypeAnnotationString(NTD, stash);
   if (!customAttributeAnnotation.empty()) {
     Builder.addTypeAnnotation(customAttributeAnnotation);
   } else {
-    addTypeAnnotation(Builder, NTD->getDeclaredType());
+    addTypeAnnotation(Builder, nominalTy);
   }
 
   // Override the type relation for NominalTypes. Use the better relation
@@ -1725,8 +1733,7 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
   //   func receiveMetatype(_: Int.Type) {}
   //
   // We want to suggest 'Int' as 'Identical' for both arguments.
-  Builder.setResultTypes(
-      {NTD->getInterfaceType(), NTD->getDeclaredInterfaceType()});
+  Builder.setResultTypes({MetatypeType::get(nominalTy), nominalTy});
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
 
@@ -1739,17 +1746,18 @@ void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
   Builder.setAssociatedDecl(TAD);
   addLeadingDot(Builder);
   Builder.addBaseName(TAD->getName().str());
-  if (auto underlyingType = TAD->getUnderlyingType()) {
-    if (underlyingType->hasError()) {
-      addTypeAnnotation(Builder,
-                        TAD->isGeneric()
-                        ? TAD->getUnboundGenericType()
-                        : TAD->getDeclaredInterfaceType());
 
-    } else {
-      addTypeAnnotation(Builder, underlyingType);
-    }
+  // Substitute the base type for a nested typealias if needed.
+  auto ty = getTypeOfMember(TAD, dynamicLookupInfo);
+
+  // If the underlying type has an error, prefer to print the full typealias,
+  // otherwise get the underlying type.
+  if (auto *TA = dyn_cast<TypeAliasType>(ty.getPointer())) {
+    auto underlyingTy = TA->getSinglyDesugaredType();
+    if (!underlyingTy->hasError())
+      ty = underlyingTy;
   }
+  addTypeAnnotation(Builder, ty);
 }
 
 void CompletionLookup::addGenericTypeParamRef(
@@ -3010,11 +3018,14 @@ void CompletionLookup::getGenericRequirementCompletions(
                            /*includeDerivedRequirements*/ false,
                            /*includeProtocolExtensionMembers*/ true);
   // We not only allow referencing nested types/typealiases directly, but also
-  // qualified by the current type. Thus also suggest current self type so the
+  // qualified by the current type, as long as it's a top-level type (nested
+  // types need to be qualified). Thus also suggest current self type so the
   // user can do a memberwise lookup on it.
-  if (auto SelfType = typeContext->getSelfNominalTypeDecl()) {
-    addNominalTypeRef(SelfType, DeclVisibilityKind::LocalDecl,
-                      DynamicLookupInfo());
+  if (auto *NTD = typeContext->getSelfNominalTypeDecl()) {
+    if (!NTD->getDeclContext()->isTypeContext()) {
+      addNominalTypeRef(NTD, DeclVisibilityKind::LocalDecl,
+                        DynamicLookupInfo());
+    }
   }
 
   // Self is also valid in all cases in which it can be used in function
