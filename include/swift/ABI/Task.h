@@ -192,6 +192,34 @@ public:
   }
 };
 
+using SwiftNullaryClosure = SWIFT_CC(swift) void (SWIFT_CONTEXT void *);
+
+/// A job that represents synchronously waiting to run a (synchronous) job
+/// on an actor. Only the thread that initiated the synchronous work can
+/// complete this job.
+class SynchronousWaitJob : public Job {
+  SwiftNullaryClosure *closure;
+  void *closureContext;
+  ConditionVariable cond;
+  std::atomic<bool> finished;
+
+public:
+  SynchronousWaitJob(
+      JobPriority priority, SwiftNullaryClosure *closure, void *closureContext
+  ) : Job({JobKind::SynchronousWait, priority}, &process),
+      closure(closure), closureContext(closureContext), finished(false) {}
+
+  SWIFT_CC(swiftasync)
+  static void process(Job *job);
+
+  void waitUntilFinished();
+  void signalFinished();
+
+  static bool classof(const Job *job) {
+    return job->Flags.getKind() == JobKind::SynchronousWait;
+  }
+};
+
 /// Describes type information and offers value methods for an arbitrary concrete
 /// type in a way that's compatible with regular Swift and embedded Swift. In
 /// regular Swift, just holds a Metadata pointer and dispatches to the value
