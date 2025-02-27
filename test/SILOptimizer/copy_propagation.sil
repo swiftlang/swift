@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -mandatory-copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -mandatory-copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK
 
 // REQUIRES: asserts
 
@@ -836,14 +836,16 @@ bb4:
   return %v : $()
 }
 
-// Test a dead begin_borrow (with no scope ending uses). Make sure
-// copy-propagation doesn't end the lifetime before the dead borrow.
+// Test a dead begin_borrow (with no scope ending uses).
+//
+// TODO: with lifetime completion, both copies should be deleted.
 //
 // CHECK-LABEL: sil hidden [ossa] @testDeadBorrow : {{.*}} {
 // CHECK: bb0:
-// CHECK-NOT: copy_value
-// CHECK:   begin_borrow
+// CHECK:   copy_value
 // CHECK:   destroy_value
+// CHECK:   copy_value
+// CHECK:   begin_borrow
 // CHECK:   unreachable
 // CHECK-LABEL: } // end sil function 'testDeadBorrow'
 sil hidden [ossa] @testDeadBorrow : $@convention(thin) () -> () {

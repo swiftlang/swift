@@ -56,10 +56,6 @@ enum class OwnershipUseKind { LifetimeEnding, NonLifetimeEnding };
 ///
 /// - 'bool handleInnerBorrow(BorrowingOperand)' (default true)
 ///
-/// - 'bool handleInnerAdjacentReborrow(SILArgument *reborrow)' (default true)
-///
-/// - 'bool handleInnerReborrow(Operand *use)' (default true)
-///
 /// - 'bool handleScopedAddress(ScopedAddressValue)' (default true)
 ///
 /// These may be overridden with a transformation that adds uses to the use's
@@ -89,6 +85,9 @@ protected:
   /// continue processing extended liveness.
   ///
   /// Return true to continue visiting other uses.
+  ///
+  /// Note: this can lead to infinite recursion if the client does not maintain
+  /// a visited set.
   bool handleOuterReborrow(Operand *phiOper) { return true; }
 
   /// Handle a guaranteed forwarding instruction. After the returns, this will
@@ -109,24 +108,6 @@ protected:
   bool handleInnerBorrow(BorrowingOperand borrowingOperand) {
     return true;
   }
-
-  /// Handles an inner adjacent phi where ownershipDef is a phi in the same
-  /// block.
-  ///
-  /// If this returns true, then handleUsePoint will be called on the
-  /// reborrow's immediate scope ending uses are visited, along with
-  /// handleInnerBorrow for any uses that are also reborrows.
-  bool handleInnerAdjacentReborrow(SILArgument *reborrow) {
-    return true;
-  }
-
-  /// Handle an inner reborrow. Later, the reborrow will itself be visited as a
-  /// use, but its scope's uses will not be transitively visited. The
-  /// implementation may track the reborrow to insert missing reborrows or to
-  /// continue processing extended liveness.
-  ///
-  /// Return true to continue visiting other uses.
-  bool handleInnerReborrow(Operand *phiOper) { return true; }
 
   /// If this returns true, then handleUsePoint will be called on the scope
   /// ending operands.
@@ -173,8 +154,6 @@ protected:
 
   bool visitInnerBorrow(Operand *borrowingOperand);
 
-  bool visitInnerAdjacentReborrow(SILArgument *reborrow);
-  
   bool visitInnerBorrowScopeEnd(Operand *borrowEnd);
 
   bool visitOwnedUse(Operand *use);
@@ -282,29 +261,36 @@ bool OwnershipUseVisitor<Impl>::visitOuterBorrowScopeEnd(Operand *borrowEnd) {
 /// (begin_borrow, load_borrow, or begin_apply).
 template <typename Impl>
 bool OwnershipUseVisitor<Impl>::visitInnerBorrow(Operand *borrowingOperand) {
-  if (!asImpl().handleInnerBorrow(borrowingOperand))
-    return false;
+  auto bo = BorrowingOperand(borrowingOperand);
+  assert(bo && "unexpected Borrow operand ownership");
+  if (bo.getScopeIntroducingUserResult()) {
+    if (!asImpl().handleInnerBorrow(borrowingOperand))
+      return false;
 
-  return BorrowingOperand(borrowingOperand)
-    .visitScopeEndingUses(
+    return bo.visitScopeEndingUses(
       [&](Operand *borrowEnd) {
         return visitInnerBorrowScopeEnd(borrowEnd);
       },
       [&](Operand *unknownUse) {
         return asImpl().handlePointerEscape(unknownUse);
       });
-}
-
-template <typename Impl>
-bool OwnershipUseVisitor<Impl>::
-visitInnerAdjacentReborrow(SILArgument *reborrow) {
-  if (!asImpl().handleInnerAdjacentReborrow(reborrow))
-    return false;
-
-  return
-    BorrowedValue(reborrow).visitLocalScopeEndingUses([&](Operand *borrowEnd) {
-      return visitInnerBorrowScopeEnd(borrowEnd);
-    });
+  }
+  if (auto dependentValue = bo.getDependentUserResult()) {
+    switch (dependentValue->getOwnershipKind()) {
+    case OwnershipKind::Guaranteed:
+      if (!handleUsePoint(borrowingOperand,
+                          UseLifetimeConstraint::NonLifetimeEnding)) {
+        return false;
+      }
+      return visitGuaranteedUses(dependentValue);
+    case OwnershipKind::Any:
+    case OwnershipKind::None:
+    case OwnershipKind::Owned: // non-escapable
+    case OwnershipKind::Unowned:
+      break;
+    }
+  }
+  return asImpl().handlePointerEscape(borrowingOperand);
 }
 
 /// Note: borrowEnd->get() may be a borrow introducer for an inner scope, or a
@@ -313,20 +299,15 @@ template <typename Impl>
 bool OwnershipUseVisitor<Impl>::visitInnerBorrowScopeEnd(Operand *borrowEnd) {
   switch (borrowEnd->getOperandOwnership()) {
   case OperandOwnership::EndBorrow:
+  case OperandOwnership::Reborrow:
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
 
-  case OperandOwnership::Reborrow: {
-    if (!asImpl().handleInnerReborrow(borrowEnd))
-      return false;
-
-    return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
-  }
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::ForwardingConsume: {
     // partial_apply [on_stack] and mark_dependence [nonescaping] can introduce
     // borrowing operand and can have destroy_value, return, or store consumes.
     //
-    // TODO: When we have a C++ ForwardingUseDefWalker, walk the def-use
+    // TODO: When we have a C++ ForwardingUseDefWalker, walk the use-def
     // chain to ensure we have a partial_apply [on_stack] or mark_dependence
     // [nonescaping] def.
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
@@ -353,17 +334,6 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrowScopeEnd(Operand *borrowEnd) {
 /// and treat them like inner borrows.
 template <typename Impl>
 bool OwnershipUseVisitor<Impl>::visitInteriorUses(SILValue ssaDef) {
-  // Inner adjacent reborrows are considered inner borrow scopes.
-  if (auto phi = SILArgument::asPhi(ssaDef)) {
-    if (!visitInnerAdjacentPhis(phi, [&](SILArgument *innerPhi) {
-          if (innerPhi->isGuaranteedForwarding()) {
-            return visitGuaranteedUses(innerPhi);
-          }
-          return visitInnerAdjacentReborrow(innerPhi);
-        })) {
-      return false;
-    }
-  }
   switch (ssaDef->getOwnershipKind()) {
   case OwnershipKind::Owned: {
     for (Operand *use : ssaDef->getUses()) {

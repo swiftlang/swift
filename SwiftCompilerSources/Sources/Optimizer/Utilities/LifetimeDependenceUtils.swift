@@ -771,12 +771,14 @@ extension LifetimeDependenceDefUseWalker {
     switch borrowInst {
     case let .beginBorrow(bbi):
       return walkDownUses(of: bbi, using: operand)
+    case let .borrowedFrom(bfi):
+      return walkDownUses(of: bfi, using: operand)
     case let .storeBorrow(sbi):
       return walkDownAddressUses(of: sbi)
     case .beginApply:
       // Skip the borrow scope; the type system enforces non-escapable
       // arguments.
-      return visitInnerBorrowUses(of: borrowInst)
+      return visitInnerBorrowUses(of: borrowInst, operand: operand)
     case .partialApply, .markDependence:
       fatalError("OwnershipUseVisitor should bypass partial_apply [on_stack] "
                  + "and mark_dependence [nonescaping]")
