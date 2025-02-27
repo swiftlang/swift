@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
+internal import _SwiftConcurrencyShims
+internal import Synchronization
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.7, *)
@@ -24,7 +26,7 @@ extension Task where Success == Never, Failure == Never {
   ) async throws {
     // Create a token which will initially have the value "not started", which
     // means the continuation has neither been created nor completed.
-    let token = UnsafeSleepStateToken()
+    let token = Atomic<SleepState>(.notStarted)
 
     do {
       // Install a cancellation handler to resume the continuation by
@@ -32,12 +34,14 @@ extension Task where Success == Never, Failure == Never {
       try await withTaskCancellationHandler {
         let _: () = try await withUnsafeThrowingContinuation { continuation in
           while true {
-            let state = token.load()
+            let state = token.load(ordering: .relaxed)
             switch state {
             case .notStarted:
               // Try to swap in the continuation word.
               let newState = SleepState.activeContinuation(continuation)
-              if !token.exchange(expected: state, desired: newState) {
+              let (won, _) = token.compareExchange(
+                expected: state, desired: newState, ordering: .acquiring)
+              if !won {
                 // Keep trying!
                 continue
               }
@@ -89,7 +93,7 @@ extension Task where Success == Never, Failure == Never {
 
       // Determine whether we got cancelled before we even started.
       let cancelledBeforeStarted: Bool
-      switch token.load() {
+      switch token.load(ordering: .relaxed) {
       case .notStarted, .activeContinuation, .cancelled:
         fatalError("Invalid state for non-cancelled sleep task")
 
@@ -99,10 +103,6 @@ extension Task where Success == Never, Failure == Never {
       case .finished:
         cancelledBeforeStarted = false
       }
-
-      // We got here without being cancelled, so deallocate the storage for
-      // the flag word and continuation.
-      token.deallocate()
 
       // If we got cancelled before we even started, through the cancellation
       // error now.
