@@ -696,14 +696,30 @@ extension ContiguousArray: RangeReplaceableCollection {
   internal mutating func _reserveCapacityImpl(
     minimumCapacity: Int, growForAppend: Bool
   ) {
+    _ = _reserveCapacityImpl(
+      minimumCapacity: minimumCapacity,
+      growForAppend: growForAppend,
+      rangeToNotCopy: 0..<0
+    )
+  }
+
+  @_alwaysEmitIntoClient
+  internal mutating func _reserveCapacityImpl(
+    minimumCapacity: Int,
+    growForAppend: Bool,
+    rangeToNotCopy: Range<Int>
+  ) -> Bool {
     let isUnique = _buffer.beginCOWMutation()
     if _slowPath(!isUnique || _buffer.mutableCapacity < minimumCapacity) {
-      _createNewBuffer(bufferIsUnique: isUnique,
-                       minimumCapacity: Swift.max(minimumCapacity, _buffer.count),
-                       growForAppend: growForAppend)
+      _createNewBuffer(
+        bufferIsUnique: isUnique,
+        minimumCapacity: Swift.max(minimumCapacity, _buffer.count),
+        growForAppend: growForAppend,
+        rangeToNotCopy: rangeToNotCopy)
     }
     _internalInvariant(_buffer.mutableCapacity >= minimumCapacity)
     _internalInvariant(_buffer.mutableCapacity == 0 || _buffer.isUniquelyReferenced())
+    return !isUnique
   }
 
   /// Creates a new buffer, replacing the current buffer.
@@ -715,14 +731,29 @@ extension ContiguousArray: RangeReplaceableCollection {
   /// If `growForAppend` is true, the new capacity is calculated using
   /// `_growArrayCapacity`.
   @_alwaysEmitIntoClient
-  @inline(never)
   internal mutating func _createNewBuffer(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
+  ) {
+    _createNewBuffer(
+      bufferIsUnique: bufferIsUnique,
+      minimumCapacity: minimumCapacity,
+      growForAppend: growForAppend,
+      rangeToNotCopy: 0..<0
+    )
+  }
+
+  @_alwaysEmitIntoClient
+  internal mutating func _createNewBuffer(
+    bufferIsUnique: Bool,
+    minimumCapacity: Int,
+    growForAppend: Bool,
+    rangeToNotCopy: Range<Int>
   ) {
     _internalInvariant(!bufferIsUnique || _buffer.isUniquelyReferenced())
     _buffer = _buffer._consumeAndCreateNew(bufferIsUnique: bufferIsUnique,
                                            minimumCapacity: minimumCapacity,
-                                           growForAppend: growForAppend)
+                                           growForAppend: growForAppend,
+                                           rangeToNotCopy: rangeToNotCopy)
   }
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
@@ -1313,9 +1344,15 @@ extension ContiguousArray {
     let insertCount = newElements.count
     let growth = insertCount - eraseCount
 
-    _reserveCapacityImpl(minimumCapacity: self.count + growth,
-                         growForAppend: true)
-    _buffer.replaceSubrange(subrange, with: insertCount, elementsOf: newElements)
+    let punchedHole = _reserveCapacityImpl(
+      minimumCapacity: self.count + growth,
+      growForAppend: true,
+      rangeToNotCopy: subrange)
+    _buffer.replaceSubrange(
+      subrange,
+      with: insertCount,
+      elementsOf: newElements,
+      holeAlreadyPunched: punchedHole)
     _endMutation()
   }
 }
