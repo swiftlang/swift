@@ -792,12 +792,6 @@ public:
     return getRecursiveProperties().hasOpaqueArchetype();
   }
 
-  /// Determine whether the type is an opened existential type.
-  ///
-  /// To determine whether there is an opened existential type
-  /// anywhere in the type, use \c hasOpenedExistential.
-  bool isOpenedExistential() const;
-
   /// Determine whether the type is an opened existential type with Error inside
   bool isOpenedExistentialWithError();
 
@@ -7930,14 +7924,6 @@ inline bool TypeBase::isClassExistentialType() {
   if (auto existential = dyn_cast<ExistentialType>(T))
     return existential->requiresClass();
   return false;
-}
-
-inline bool TypeBase::isOpenedExistential() const {
-  if (!hasOpenedExistential())
-    return false;
-
-  CanType T = getCanonicalType();
-  return isa<OpenedArchetypeType>(T);
 }
 
 inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {
