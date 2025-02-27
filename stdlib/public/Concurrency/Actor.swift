@@ -98,6 +98,17 @@ internal func _enqueueOnMain(_ job: UnownedJob)
 @available(SwiftStdlib 5.1, *)
 @freestanding(expression)
 public macro isolation<T>() -> T = Builtin.IsolationMacro
+
+#if $SwiftSettings
+
+@available(SwiftStdlib 9999, *)
+extension SwiftSetting {
+  @available(SwiftStdlib 9999, *)
+  public static func defaultIsolation(_ actor: Actor.Type?) -> SwiftSetting { SwiftSetting() }
+}
+
+#endif
+
 #endif
 
 #if $IsolatedAny
