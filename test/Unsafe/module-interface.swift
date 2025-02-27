@@ -9,10 +9,21 @@
 // CHECK: #endif
 @unsafe public func getIntUnsafely() -> Int { 0 }
 
+public struct UnsafeIterator: @unsafe IteratorProtocol {
+  @unsafe public mutating func next() -> Int? { nil }
+}
+
+public struct SequenceWithUnsafeIterator: Sequence {
+  public init() { }
+  public func makeIterator() -> UnsafeIterator { UnsafeIterator() }
+}
+
 // CHECK: @inlinable public func useUnsafeCode()
 @inlinable public func useUnsafeCode() {
   // CHECK-NOT: unsafe
   print( unsafe getIntUnsafely())
+
+  for unsafe _ in SequenceWithUnsafeIterator() { }
 }
 
 // CHECK: public protocol P
@@ -20,11 +31,12 @@ public protocol P {
   func f()
 }
 
+// CHECK:  #if compiler(>=5.3) && $MemorySafetyAttributes
 // CHECK: public struct X : @unsafe UserModule.P
 public struct X: @unsafe P {
-// CHECK:  #if compiler(>=5.3) && $MemorySafetyAttributes
 // CHECK:  @unsafe public func f()
 // CHECK:  #else
+// CHECK: public struct X : UserModule.P
 // CHECK:  public func f()
 // CHECK:  #endif
   @unsafe public func f() { }

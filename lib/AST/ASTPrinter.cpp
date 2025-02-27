@@ -2901,14 +2901,12 @@ void PrintAST::printInherited(const Decl *decl) {
         Printer << "@preconcurrency ";
       switch (inherited.getExplicitSafety()) {
       case ExplicitSafety::Unspecified:
-        break;
-
       case ExplicitSafety::Safe:
-        Printer << "@safe ";
         break;
 
       case ExplicitSafety::Unsafe:
-        Printer << "@unsafe ";
+        if (!llvm::is_contained(Options.ExcludeAttrList, TypeAttrKind::Unsafe))
+          Printer << "@unsafe ";
         break;
       }
       if (inherited.isSuppressed())
@@ -3218,6 +3216,12 @@ suppressingFeatureMemorySafetyAttributes(PrintOptions &options,
                                        llvm::function_ref<void()> action) {
   ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::Unsafe);
   ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::Safe);
+  options.ExcludeAttrList.push_back(TypeAttrKind::Unsafe);
+  SWIFT_DEFER {
+    assert(options.ExcludeAttrList.back() == TypeAttrKind::Unsafe);
+    options.ExcludeAttrList.pop_back();
+  };
+
   action();
 }
 
