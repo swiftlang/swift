@@ -8,6 +8,7 @@
 
 swift_compiler_sources(Optimizer
   SimplifyAllocRefDynamic.swift
+  SimplifyAllocStack.swift
   SimplifyApply.swift
   SimplifyBeginAndLoadBorrow.swift
   SimplifyBeginCOWMutation.swift

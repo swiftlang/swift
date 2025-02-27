@@ -664,8 +664,7 @@ sil @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControl
 // CHECK: bb0([[ARG:%.*]] : $any ResourceKitProtocol, [[ARG2:%.*]] : $ViewController):
 // CHECK:   [[T1:%.*]] = metatype $@thick SubscriptionViewControllerBuilder.Type
 // CHECK:   [[T2:%.*]] = open_existential_ref [[ARG]] : $any ResourceKitProtocol to $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
-// CHECK:   [[T3:%.*]] = alloc_stack $any SubscriptionViewControllerDelegate
-// CHECK:   [[T4:%.*]] = init_existential_addr [[T3]] : $*any SubscriptionViewControllerDelegate, $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
+// CHECK:   [[T4:%.*]] = alloc_stack $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122"
 // CHECK:   store [[T2]] to [[T4]] : $*@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
 // CHECK:   [[T5:%.*]] = function_ref @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControllerDelegate> (@in τ_0_0, @thick SubscriptionViewControllerBuilder.Type) -> @owned SubscriptionViewControllerBuilder
 // CHECK:   [[T6:%.*]] = alloc_stack $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
