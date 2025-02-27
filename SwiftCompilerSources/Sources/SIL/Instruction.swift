@@ -52,10 +52,15 @@ public class Instruction : CustomStringConvertible, Hashable {
   // All operands defined by the operation.
   // Returns the prefix of `operands` that does not include trailing type dependent operands.
   final public var definedOperands: OperandArray {
-    let operands = bridged.getOperands()
+    let allOperands = operands
     let typeOperands = bridged.getTypeDependentOperands()
-    return OperandArray(base: operands.base,
-      count: operands.count - typeOperands.count)
+    return allOperands[0 ..< (allOperands.count - typeOperands.count)]
+  }
+
+  final public var typeDependentOperands: OperandArray {
+    let allOperands = operands
+    let typeOperands = bridged.getTypeDependentOperands()
+    return allOperands[(allOperands.count - typeOperands.count) ..< allOperands.count]
   }
 
   fileprivate var resultCount: Int { 0 }
