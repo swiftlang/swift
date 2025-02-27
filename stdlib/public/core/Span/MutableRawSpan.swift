@@ -30,10 +30,10 @@ public struct MutableRawSpan: ~Copyable & ~Escapable {
   @lifetime(borrow pointer)
   internal init(
     _unchecked pointer: UnsafeMutableRawPointer?,
-    count: Int
+    byteCount: Int
   ) {
     _pointer = pointer
-    _count = count
+    _count = byteCount
   }
 }
 
@@ -49,7 +49,7 @@ extension MutableRawSpan {
     _unsafeBytes bytes: UnsafeMutableRawBufferPointer
   ) {
     let baseAddress = bytes.baseAddress
-    let span = MutableRawSpan(_unchecked: baseAddress, count: bytes.count)
+    let span = MutableRawSpan(_unchecked: baseAddress, byteCount: bytes.count)
     self = _overrideLifetime(span, borrowing: bytes)
   }
 
@@ -69,8 +69,8 @@ extension MutableRawSpan {
     _unsafeStart pointer: UnsafeMutableRawPointer,
     byteCount: Int
   ) {
-    precondition(byteCount >= 0, "Count must not be negative")
-    self.init(_unchecked: pointer, count: byteCount)
+    _precondition(byteCount >= 0, "Count must not be negative")
+    self.init(_unchecked: pointer, byteCount: byteCount)
   }
 
   @_alwaysEmitIntoClient
@@ -117,7 +117,7 @@ extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
   public var byteOffsets: Range<Int> {
-    .init(uncheckedBounds: (0, byteCount))
+    .init(_uncheckedBounds: (0, byteCount))
   }
 }
 
@@ -216,7 +216,7 @@ extension MutableRawSpan {
   public func unsafeLoad<T>(
     fromByteOffset offset: Int = 0, as: T.Type
   ) -> T {
-    precondition(
+    _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
       MemoryLayout<T>.size <= (_count &- offset),
       "Byte offset range out of bounds"
@@ -271,7 +271,7 @@ extension MutableRawSpan {
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
     fromByteOffset offset: Int = 0, as: T.Type
   ) -> T {
-    precondition(
+    _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
       MemoryLayout<T>.size <= (_count &- offset),
       "Byte offset range out of bounds"
@@ -308,7 +308,7 @@ extension MutableRawSpan {
   public func storeBytes<T: BitwiseCopyable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    precondition(
+    _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
       MemoryLayout<T>.size <= (_count &- offset),
       "Byte offset range out of bounds"
@@ -367,7 +367,7 @@ extension MutableRawSpan {
 
     var elements = source.makeIterator()
     let lastOffset = update(startingAt: byteOffset, from: &elements)
-    precondition(
+    _precondition(
       elements.next() == nil,
       "destination span cannot contain every element from source."
     )

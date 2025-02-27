@@ -58,7 +58,7 @@ extension MutableSpan where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
   ) {
-    precondition(
+    _precondition(
       ((Int(bitPattern: buffer.baseAddress) &
         (MemoryLayout<Element>.alignment&-1)) == 0),
       "baseAddress must be properly aligned to access Element"
@@ -73,7 +73,7 @@ extension MutableSpan where Element: ~Copyable {
     _unsafeStart start: UnsafeMutablePointer<Element>,
     count: Int
   ) {
-    precondition(count >= 0, "Count must not be negative")
+    _precondition(count >= 0, "Count must not be negative")
     let buffer = UnsafeMutableBufferPointer(start: start, count: count)
     let ms = MutableSpan(_unsafeElements: buffer)
     self = _overrideLifetime(ms, borrowing: start)
@@ -102,14 +102,14 @@ extension MutableSpan where Element: BitwiseCopyable {
   public init(
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
   ) {
-    precondition(
+    _precondition(
       ((Int(bitPattern: buffer.baseAddress) &
         (MemoryLayout<Element>.alignment&-1)) == 0),
       "baseAddress must be properly aligned to access Element"
     )
     let (byteCount, stride) = (buffer.count, MemoryLayout<Element>.stride)
     let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
-    precondition(remainder == 0, "Span must contain a whole number of elements")
+    _precondition(remainder == 0, "Span must contain a whole number of elements")
     let elements = UnsafeMutableBufferPointer<Element>(
       start: buffer.baseAddress?.assumingMemoryBound(to: Element.self),
       count: count
@@ -124,7 +124,7 @@ extension MutableSpan where Element: BitwiseCopyable {
     _unsafeStart pointer: UnsafeMutableRawPointer,
     byteCount: Int
   ) {
-    precondition(byteCount >= 0, "Count must not be negative")
+    _precondition(byteCount >= 0, "Count must not be negative")
     let bytes = UnsafeMutableRawBufferPointer(start: pointer, count: byteCount)
     let ms = MutableSpan(_unsafeBytes: bytes)
     self = _overrideLifetime(ms, borrowing: pointer)
@@ -229,7 +229,7 @@ extension MutableSpan where Element: ~Copyable & ~Escapable {
 
   @_alwaysEmitIntoClient
   public var indices: Range<Index> {
-    Range(uncheckedBounds: (0, _count))
+    Range(_uncheckedBounds: (0, _count))
   }
 }
 
@@ -260,11 +260,11 @@ extension MutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
     unsafeAddress {
-      precondition(indices.contains(position), "index out of bounds")
+      _precondition(indices.contains(position), "index out of bounds")
       return UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
     unsafeMutableAddress {
-      precondition(indices.contains(position), "index out of bounds")
+      _precondition(indices.contains(position), "index out of bounds")
        return _unsafeAddressOfElement(unchecked: position)
     }
   }
@@ -303,8 +303,8 @@ extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   public mutating func swapAt(_ i: Index, _ j: Index) {
-    precondition(indices.contains(Index(i)))
-    precondition(indices.contains(Index(j)))
+    _precondition(indices.contains(Index(i)))
+    _precondition(indices.contains(Index(j)))
     swapAt(unchecked: i, unchecked: j)
   }
 
@@ -330,11 +330,11 @@ extension MutableSpan where Element: BitwiseCopyable {
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
     get {
-      precondition(indices.contains(position), "index out of bounds")
+      _precondition(indices.contains(position), "index out of bounds")
       return self[unchecked: position]
     }
     set {
-      precondition(indices.contains(position), "index out of bounds")
+      _precondition(indices.contains(position), "index out of bounds")
       self[unchecked: position] = newValue
     }
   }
@@ -460,7 +460,7 @@ extension MutableSpan {
 
     var iterator = source.makeIterator()
     let index = update(from: &iterator)
-    precondition(
+    _precondition(
       iterator.next() == nil,
       "destination buffer view cannot contain every element from source."
     )
@@ -470,7 +470,7 @@ extension MutableSpan {
   @_alwaysEmitIntoClient
   public mutating func update(fromContentsOf source: Span<Element>) -> Index {
     guard !source.isEmpty else { return 0 }
-    precondition(
+    _precondition(
       source.count <= self.count,
       "destination span cannot contain every element from source."
     )
@@ -498,7 +498,7 @@ extension MutableSpan where Element: ~Copyable {
 //    fromContentsOf source: consuming OutputSpan<Element>
 //  ) -> Index {
 //    guard !source.isEmpty else { return 0 }
-//    precondition(
+//    _precondition(
 //      source.count <= self.count,
 //      "destination span cannot contain every element from source."
 //    )
@@ -586,7 +586,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 
     var iterator = source.makeIterator()
     let index = update(from: &iterator)
-    precondition(
+    _precondition(
       iterator.next() == nil,
       "destination buffer view cannot contain every element from source."
     )
@@ -598,7 +598,7 @@ extension MutableSpan where Element: BitwiseCopyable {
     fromContentsOf source: Span<Element>
   ) -> Index where Element: BitwiseCopyable {
     guard !source.isEmpty else { return 0 }
-    precondition(
+    _precondition(
       source.count <= self.count,
       "destination span cannot contain every element from source."
     )
