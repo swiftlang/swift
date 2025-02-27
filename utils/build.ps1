@@ -657,6 +657,36 @@ function Isolate-EnvVars([scriptblock]$Block) {
   }
 }
 
+function Track-AvgCPU([scriptblock]$Block) {
+  # Background jobs run in a separate process and cannot write to any variables.
+  # We don't know how long the job will run. We have to stop it explicitly, but
+  # then we cannot get a result via Receive-Job. Temporary file seems like the
+  # best workaround.
+  $SamplesFile = New-TemporaryFile
+  $Job = Start-Job -ArgumentList $SamplesFile -ScriptBlock {
+    Start-Sleep -Seconds 0.1
+    while ($true) {
+      $Sample = ((Get-Counter "\Processor(_Total)\% Processor Time").CounterSamples.CookedValue)
+      Add-Content -Path $using:SamplesFile -Value ([math]::Round($Sample))
+    }
+  }
+
+  & $Block
+
+  Stop-Job $Job
+  Remove-Job $job
+
+  $Lines = Get-Content -Path $SamplesFile
+  $Values = $Lines | ForEach-Object { $_ -as [double] } | Where-Object { $_ -ne $null }
+  if ($Values -eq $null -or $Values.Count -eq 0) {
+    $script:AvgCPU = $null
+  }
+
+  # Function return values contain a lot of things including strings from nested
+  # calls to Write-Output.
+  $script:AvgCPU = [math]::Round(($Values | Measure-Object -Average).Average)
+}
+
 function Invoke-VsDevShell($Arch) {
   $DevCmdArguments = "-no_logo -host_arch=$($BuildArch.VSName) -arch=$($Arch.VSName)"
   if ($CustomWinSDKRoot) {
@@ -928,6 +958,7 @@ function Fetch-Dependencies {
       Arch = $BuildArch.LLVMName
       Platform = 'Windows'
       Checkout = 'Fetch-Dependencies'
+      CPU = ""
       "Elapsed Time" = $Stopwatch.Elapsed.ToString()
     })
   }
@@ -1357,22 +1388,26 @@ function Build-CMakeProject {
     }
     Invoke-Program cmake.exe @cmakeGenerateArgs
 
-    # Build all requested targets
-    foreach ($Target in $BuildTargets) {
-      if ($Target -eq "default") {
-        Invoke-Program cmake.exe --build $Bin
-      } else {
-        Invoke-Program cmake.exe --build $Bin --target $Target
+    # Build all requested targets. Measure CPU load for the build phase
+    # specifically. However, this includes install phases as well as nested
+    # CMake configuration phases.
+    Track-AvgCPU {
+      foreach ($Target in $BuildTargets) {
+        if ($Target -eq "default") {
+          Invoke-Program cmake.exe --build $Bin
+        } else {
+          Invoke-Program cmake.exe --build $Bin --target $Target
+        }
       }
-    }
 
-    if ($BuildTargets.Length -eq 0 -and $InstallTo) {
-      Invoke-Program cmake.exe --build $Bin --target install
+      if ($BuildTargets.Length -eq 0 -and $InstallTo) {
+        Invoke-Program cmake.exe --build $Bin --target install
+      }
     }
   }
 
   if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.LLVMName)' in $($Stopwatch.Elapsed)"
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.LLVMName)' in $($Stopwatch.Elapsed) (CPU load $script:AvgCPU%)"
     Write-Host ""
   }
 
@@ -1381,6 +1416,7 @@ function Build-CMakeProject {
       Arch = $Arch.LLVMName
       Platform = $Platform
       Checkout = $Src.Replace($SourceCache, '')
+      CPU = $script:AvgCPU
       "Elapsed Time" = $Stopwatch.Elapsed.ToString()
     })
   }
@@ -1461,11 +1497,13 @@ function Build-SPMProject {
       }
     }
 
-    Invoke-Program "$($HostArch.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
+    Track-AvgCPU {
+      Invoke-Program "$($HostArch.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
+    }
   }
 
   if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.LLVMName)' in $($Stopwatch.Elapsed)"
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.LLVMName)' in $($Stopwatch.Elapsed) (CPU load $script:AvgCPU%)"
     Write-Host ""
   }
 
@@ -1474,6 +1512,7 @@ function Build-SPMProject {
       Arch = $Arch.LLVMName
       Checkout = $Src.Replace($SourceCache, '')
       Platform = "Windows"
+      CPU = $script:AvgCPU
       "Elapsed Time" = $Stopwatch.Elapsed.ToString()
     })
   }
@@ -3367,6 +3406,6 @@ if (-not $IsCrossCompiling) {
   exit 1
 } finally {
   if ($Summary) {
-    $TimingData | Select-Object Platform,Arch,Checkout,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
+    $TimingData | Select-Object Platform,Arch,Checkout,CPU,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
   }
 }
