@@ -26,7 +26,8 @@ using namespace swift;
 
 /// Does the interface of this declaration use a type for which the
 /// given predicate returns true?
-static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
+static bool usesTypeMatching(const Decl *decl,
+                             llvm::function_ref<bool(Type)> fn) {
   if (auto value = dyn_cast<ValueDecl>(decl)) {
     if (Type type = value->getInterfaceType()) {
       return type.findIf(fn);
@@ -393,6 +394,14 @@ UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(CoroutineAccessorsAllocateInCallee)
+
+static bool usesFeatureSwiftSettings(const Decl *decl) {
+  // We just need to guard `#SwiftSettings`.
+  auto *macro = dyn_cast<MacroDecl>(decl);
+  return macro && macro->isStdlibDecl() &&
+         macro->getMacroRoles().contains(MacroRole::Declaration) &&
+         macro->getBaseIdentifier().is("SwiftSettings");
+}
 
 bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   if (auto cd = dyn_cast<ClassDecl>(decl)) {

@@ -39,7 +39,8 @@ class FileUnit : public DeclContext, public ASTAllocated<FileUnit> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
 
-  // The pointer is FileUnit insted of SynthesizedFileUnit to break circularity.
+  /// The pointer is FileUnit insted of SynthesizedFileUnit to break
+  /// circularity.
   llvm::PointerIntPair<FileUnit *, 3, FileUnitKind> SynthesizedFileAndKind;
 
 protected:
