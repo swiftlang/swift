@@ -1,7 +1,6 @@
-// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -sil-combine -enable-experimental-feature ValueGenerics | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_ValueGenerics
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
