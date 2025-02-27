@@ -123,9 +123,31 @@ struct DynamicallyEnforcedAddress {
 };
 
 struct CoroutineState {
-  Address Buffer;
+  struct HeapAllocated {
+    Address address;
+  };
+  struct CalleeAllocated {
+    StackAddress address;
+    llvm::Value *allocator;
+  };
+  using Implementation = TaggedUnion<HeapAllocated, CalleeAllocated>;
+  Implementation Impl;
   llvm::Value *Continuation;
   TemporarySet Temporaries;
+  bool isCalleeAllocated() const { return Impl.isa<CalleeAllocated>(); }
+  StackAddress getCalleeAllocatedFrame() const {
+    assert(isCalleeAllocated());
+    return Impl.get<CalleeAllocated>().address;
+  }
+  Address getBuffer() const {
+    if (isCalleeAllocated()) {
+      return Impl.get<CalleeAllocated>().address.getAddress();
+    }
+    return Impl.get<HeapAllocated>().address;
+  }
+  llvm::Value *getAllocator() const {
+    return Impl.get<CalleeAllocated>().allocator;
+  }
 };
   
 /// Represents a SIL value lowered to IR, in one of these forms:
@@ -370,7 +392,6 @@ public:
   llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
   llvm::DenseMap<SILValue, StackAddress> LoweredPartialApplyAllocations;
   llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
-  llvm::DenseMap<SILValue, llvm::Value *> LoweredSingleYieldFrames;
 
   /// All alloc_ref instructions which allocate the object on the stack.
   llvm::SmallPtrSet<SILInstruction *, 8> StackAllocs;
@@ -1567,6 +1588,42 @@ static AsyncContextLayout getAsyncContextLayout(IRGenSILFunction &IGF) {
   return getAsyncContextLayout(IGF.IGM, IGF.CurSILFn);
 }
 
+Explosion NativeCCEntryPointArgumentEmission::explosionForObject(
+    IRGenFunction &IGF, unsigned index, SILArgument *param, SILType paramTy,
+    const LoadableTypeInfo &loadableParamTI,
+    const LoadableTypeInfo &loadableArgTI,
+    std::function<Explosion(unsigned index, unsigned size)>
+        explosionForArgument) {
+  Explosion paramValues;
+  // If the explosion must be passed indirectly, load the value from the
+  // indirect address.
+  auto &nativeSchema = loadableArgTI.nativeParameterValueSchema(IGF.IGM);
+  if (nativeSchema.requiresIndirect()) {
+    Explosion paramExplosion = explosionForArgument(index, 1);
+    Address paramAddr =
+        loadableParamTI.getAddressForPointer(paramExplosion.claimNext());
+    if (loadableParamTI.getStorageType() != loadableArgTI.getStorageType())
+      paramAddr = loadableArgTI.getAddressForPointer(IGF.Builder.CreateBitCast(
+          paramAddr.getAddress(),
+          loadableArgTI.getStorageType()->getPointerTo()));
+    loadableArgTI.loadAsTake(IGF, paramAddr, paramValues);
+  } else {
+    if (!nativeSchema.empty()) {
+      // Otherwise, we map from the native convention to the type's explosion
+      // schema.
+      Explosion nativeParam;
+      unsigned size = nativeSchema.size();
+      Explosion paramExplosion = explosionForArgument(index, size);
+      paramExplosion.transferInto(nativeParam, size);
+      paramValues = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeParam,
+                                               param->getType());
+    } else {
+      assert(loadableParamTI.getSchema().empty());
+    }
+  }
+  return paramValues;
+}
+
 namespace {
 class SyncEntryPointArgumentEmission
     : public virtual EntryPointArgumentEmission {
@@ -1652,42 +1709,9 @@ public:
   llvm::Value *getCoroutineBuffer() override {
     return allParamValues.claimNext();
   }
-  Explosion
-  explosionForObject(IRGenFunction &IGF, unsigned index, SILArgument *param,
-                     SILType paramTy, const LoadableTypeInfo &loadableParamTI,
-                     const LoadableTypeInfo &loadableArgTI,
-                     std::function<Explosion(unsigned index, unsigned size)>
-                         explosionForArgument) override {
-    Explosion paramValues;
-    // If the explosion must be passed indirectly, load the value from the
-    // indirect address.
-    auto &nativeSchema = loadableArgTI.nativeParameterValueSchema(IGF.IGM);
-    if (nativeSchema.requiresIndirect()) {
-      Explosion paramExplosion = explosionForArgument(index, 1);
-      Address paramAddr =
-          loadableParamTI.getAddressForPointer(paramExplosion.claimNext());
-      if (loadableParamTI.getStorageType() != loadableArgTI.getStorageType())
-        paramAddr =
-            loadableArgTI.getAddressForPointer(IGF.Builder.CreateBitCast(
-                paramAddr.getAddress(),
-                loadableArgTI.getStorageType()->getPointerTo()));
-      loadableArgTI.loadAsTake(IGF, paramAddr, paramValues);
-    } else {
-      if (!nativeSchema.empty()) {
-        // Otherwise, we map from the native convention to the type's explosion
-        // schema.
-        Explosion nativeParam;
-        unsigned size = nativeSchema.size();
-        Explosion paramExplosion = explosionForArgument(index, size);
-        paramExplosion.transferInto(nativeParam, size);
-        paramValues = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeParam,
-                                                 param->getType());
-      } else {
-        assert(loadableParamTI.getSchema().empty());
-      }
-    }
-    return paramValues;
-  };
+  llvm::Value *getCoroutineAllocator() override {
+    return allParamValues.claimNext();
+  }
 
 public:
   using SyncEntryPointArgumentEmission::requiresIndirectResult;
@@ -1767,42 +1791,9 @@ public:
     llvm_unreachable(
         "async functions do not use a fixed size coroutine buffer");
   }
-  Explosion
-  explosionForObject(IRGenFunction &IGF, unsigned index, SILArgument *param,
-                     SILType paramTy, const LoadableTypeInfo &loadableParamTI,
-                     const LoadableTypeInfo &loadableArgTI,
-                     std::function<Explosion(unsigned index, unsigned size)>
-                         explosionForArgument) override {
-    Explosion paramValues;
-    // If the explosion must be passed indirectly, load the value from the
-    // indirect address.
-    auto &nativeSchema = loadableArgTI.nativeParameterValueSchema(IGF.IGM);
-    if (nativeSchema.requiresIndirect()) {
-      Explosion paramExplosion = explosionForArgument(index, 1);
-      Address paramAddr =
-          loadableParamTI.getAddressForPointer(paramExplosion.claimNext());
-      if (loadableParamTI.getStorageType() != loadableArgTI.getStorageType())
-        paramAddr =
-            loadableArgTI.getAddressForPointer(IGF.Builder.CreateBitCast(
-                paramAddr.getAddress(),
-                loadableArgTI.getStorageType()->getPointerTo()));
-      loadableArgTI.loadAsTake(IGF, paramAddr, paramValues);
-    } else {
-      if (!nativeSchema.empty()) {
-        // Otherwise, we map from the native convention to the type's explosion
-        // schema.
-        Explosion nativeParam;
-        unsigned size = nativeSchema.size();
-        Explosion paramExplosion = explosionForArgument(index, size);
-        paramExplosion.transferInto(nativeParam, size);
-        paramValues = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeParam,
-                                                 param->getType());
-      } else {
-        assert(loadableParamTI.getSchema().empty());
-      }
-    }
-    return paramValues;
-  };
+  llvm::Value *getCoroutineAllocator() override {
+    llvm_unreachable("async coroutines aren't supported");
+  }
 };
 
 std::unique_ptr<NativeCCEntryPointArgumentEmission>
@@ -2154,7 +2145,8 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     break;
   case SILCoroutineKind::YieldOnce2:
     if (!IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      emitYieldOnce2CoroutineEntry(IGF, funcTy, *emission);
+      emitYieldOnce2CoroutineEntry(
+          IGF, LinkEntity::forSILFunction(IGF.CurSILFn), funcTy, *emission);
       break;
     }
     LLVM_FALLTHROUGH;
@@ -2624,6 +2616,10 @@ void IRGenSILFunction::emitSILFunction() {
   }
   if (isAsyncFn) {
     IGM.noteSwiftAsyncFunctionDef();
+  }
+  if (funcTy->isCalleeAllocatedCoroutine() &&
+      !IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+    emitCoroFunctionPointer(IGM, CurFn, LinkEntity::forSILFunction(CurSILFn));
   }
 
   if (CurSILFn->isRuntimeAccessible())
@@ -3098,6 +3094,10 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
     return SpecialKind::KeyPathAccessor;
   }
 
+  if (fn->isCalleeAllocatedCoroutine()) {
+    return FunctionPointer::Kind::CoroFunctionPointer;
+  }
+
   return fn->getLoweredFunctionType();
 }
 // Async functions that end up with weak_odr or linkonce_odr linkage may not be
@@ -3160,9 +3160,18 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
     if (!secondaryValue)
       useSignature = true;
 
-  // For ordinary sync functions and special async functions, produce
-  // only the direct address of the function.  The runtime does not
-  // define async FP symbols for the special async functions it defines.
+  } else if (fpKind.isCoroFunctionPointer()) {
+    value = IGM.getAddrOfCoroFunctionPointer(fn);
+    value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
+    secondaryValue = mayDirectlyCallAsync(fn)
+                         ? IGM.getAddrOfSILFunction(fn, NotForDefinition)
+                         : nullptr;
+    if (!secondaryValue)
+      useSignature = true;
+
+    // For ordinary sync functions and special async functions, produce
+    // only the direct address of the function.  The runtime does not
+    // define async FP symbols for the special async functions it defines.
   } else {
     value = fnPtr;
     secondaryValue = nullptr;
@@ -3867,24 +3876,36 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   // Lower the arguments and return value in the callee's generic context.
   GenericContextScope scope(IGM, origCalleeType->getInvocationGenericSignature());
 
+  auto &calleeFP = emission->getCallee().getFunctionPointer();
+
   // Allocate space for the coroutine buffer.
   std::optional<Address> coroutineBuffer;
+  std::optional<CoroutineState::Implementation> coroImpl;
   switch (origCalleeType->getCoroutineKind()) {
   case SILCoroutineKind::None:
     break;
 
   case SILCoroutineKind::YieldOnce2:
-    // @yield_once_2 coroutines allocate in the callee
-    if (!IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce)
+    if (!IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+      assert(calleeFP.getKind().isCoroFunctionPointer());
+      auto frame = emission->getCoroStaticFrame();
+      auto *allocator = emission->getCoroAllocator();
+      llArgs.add(frame.getAddress().getAddress());
+      llArgs.add(allocator);
+      coroImpl = {CoroutineState::CalleeAllocated{frame, allocator}};
+
       break;
+    }
     LLVM_FALLTHROUGH;
 
   case SILCoroutineKind::YieldOnce:
     coroutineBuffer = emitAllocYieldOnceCoroutineBuffer(*this);
+    coroImpl = {CoroutineState::HeapAllocated{*coroutineBuffer}};
     break;
 
   case SILCoroutineKind::YieldMany:
     coroutineBuffer = emitAllocYieldManyCoroutineBuffer(*this);
+    coroImpl = {CoroutineState::HeapAllocated{*coroutineBuffer}};
     break;
   }
   if (coroutineBuffer) {
@@ -3906,8 +3927,6 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     emitApplyArgument(*this, args[index], emission->getParameterType(index),
                       llArgs, site.getInstruction(), index);
   }
-
-  auto &calleeFP = emission->getCallee().getFunctionPointer();
 
   // Pass the generic arguments.
   if (hasPolymorphicParameters(origCalleeType) &&
@@ -3954,7 +3973,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
     setLoweredCoroutine(
         beginApply->getTokenResult(),
-        {*coroutineBuffer, continuation, emission->claimTemporaries()});
+        {*coroImpl, continuation, emission->claimTemporaries()});
 
     setCorrespondingLoweredValues(beginApply->getYieldedValues(), result);
 
@@ -4781,21 +4800,30 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
   auto schemaAndEntity =
     getCoroutineResumeFunctionPointerAuth(IGM, i->getOrigCalleeType());
   auto pointerAuth = PointerAuthInfo::emit(*this, schemaAndEntity.first,
-                                           coroutine.Buffer.getAddress(),
+                                           coroutine.getBuffer().getAddress(),
                                            schemaAndEntity.second);
   auto callee = FunctionPointer::createSigned(i->getOrigCalleeType(),
                                               continuation, pointerAuth, sig);
 
-  auto *call = Builder.CreateCall(callee, {
-      coroutine.Buffer.getAddress(),
-      llvm::ConstantInt::get(IGM.Int1Ty, isAbort)
-    });
+  llvm::CallInst *call = nullptr;
+  if (coroutine.isCalleeAllocated()) {
+    call = Builder.CreateCall(
+        callee, {coroutine.getBuffer().getAddress(), coroutine.getAllocator()});
+  } else {
+    call = Builder.CreateCall(callee,
+                              {coroutine.getBuffer().getAddress(),
+                               llvm::ConstantInt::get(IGM.Int1Ty, isAbort)});
+  }
 
   // Destroy the temporaries before setting the lowered value for `ei`, since
   // `setLoweredExplosion` will insert into the LoweredValues DenseMap and
   // invalidate the `coroutine` reference.
   coroutine.Temporaries.destroyAll(*this);
-  emitDeallocYieldOnceCoroutineBuffer(*this, coroutine.Buffer);
+  if (coroutine.isCalleeAllocated()) {
+    // Callee-allocated frames are deallocated at dealloc_stacks.
+  } else {
+    emitDeallocYieldOnceCoroutineBuffer(*this, coroutine.getBuffer());
+  }
 
   if (!isAbort) {
     auto resultType = call->getType();
@@ -6564,10 +6592,15 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
     return;
   }
   if (isaResultOf<BeginApplyInst>(i->getOperand())) {
+    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+      // This is a no-op when using the classic retcon.once lowering.
+      return;
+    }
     auto *mvi = getAsResultOf<BeginApplyInst>(i->getOperand());
     auto *bai = cast<BeginApplyInst>(mvi->getParent());
-    emitDeallocYieldOnce2CoroutineFrame(
-        *this, LoweredSingleYieldFrames[bai->getCalleeAllocationResult()]);
+    const auto &coroutine = getLoweredCoroutine(bai->getTokenResult());
+    emitDeallocYieldOnce2CoroutineFrame(*this,
+                                        coroutine.getCalleeAllocatedFrame());
     return;
   }
 

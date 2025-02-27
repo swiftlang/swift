@@ -101,6 +101,11 @@ public:
     addLinkEntity(LinkEntity::forClassMetadataBaseOffset(CD));
   }
 
+  void addCoroFunctionPointer(SILDeclRef declRef) override {
+    addLinkEntity(LinkEntity::forCoroFunctionPointer(declRef),
+                  /*ignoreVisibility=*/true);
+  }
+
   void addDispatchThunk(SILDeclRef declRef) override {
     auto entity = LinkEntity::forDispatchThunk(declRef);
 

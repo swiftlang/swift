@@ -3431,6 +3431,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // AsyncFunctionPointer access.
   Opts.IndirectAsyncFunctionPointer = Triple.isOSBinFormatCOFF();
 
+  // PE/COFF cannot deal with the cross-module reference to the
+  // CoroFunctionPointer data block.  Force the use of indirect
+  // CoroFunctionPointer access.
+  Opts.IndirectCoroFunctionPointer = Triple.isOSBinFormatCOFF();
+
   // On some Harvard architectures that allow sliding code and data address space
   // offsets independently, it's impossible to make direct relative reference to
   // code from data because the relative offset between them is not representable.

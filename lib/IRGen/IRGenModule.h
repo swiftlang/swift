@@ -842,6 +842,15 @@ public:
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
   // clang-format on
 
+  llvm::StructType *CoroFunctionPointerTy; // { i32, i32 }
+  llvm::PointerType *CoroFunctionPointerPtrTy;
+  llvm::PointerType *CoroAllocationTy;
+  llvm::FunctionType *CoroAllocateFnTy;
+  llvm::FunctionType *CoroDeallocateFnTy;
+  llvm::IntegerType *CoroAllocatorFlagsTy;
+  llvm::StructType *CoroAllocatorTy;
+  llvm::PointerType *CoroAllocatorPtrTy;
+
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   llvm::Constant *swiftImmortalRefCount = nullptr;
@@ -889,6 +898,7 @@ public:
     return getPointerAlignment();
   }
   Alignment getAsyncContextAlignment() const;
+  Alignment getCoroStaticFrameAlignment() const;
 
   /// Return the offset, relative to the address point, of the start of the
   /// type-specific members of an enum metadata.
@@ -1277,6 +1287,7 @@ private:
                                            
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> IndirectAsyncFunctionPointers;
+  llvm::DenseMap<LinkEntity, llvm::Constant *> IndirectCoroFunctionPointers;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
@@ -1643,6 +1654,11 @@ public:
   llvm::Constant *defineAsyncFunctionPointer(LinkEntity entity,
                                              ConstantInit init);
   SILFunction *getSILFunctionForAsyncFunctionPointer(llvm::Constant *afp);
+
+  llvm::Constant *getAddrOfCoroFunctionPointer(LinkEntity entity);
+  llvm::Constant *getAddrOfCoroFunctionPointer(SILFunction *function);
+  llvm::Constant *defineCoroFunctionPointer(LinkEntity entity,
+                                            ConstantInit init);
 
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
                                          ForDefinition_t forDefinition);

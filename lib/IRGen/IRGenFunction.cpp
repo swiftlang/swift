@@ -558,6 +558,13 @@ void IRGenFunction::emitTaskDealloc(Address address) {
   call->setCallingConv(IGM.SwiftCC);
 }
 
+void IRGenFunction::emitTaskDeallocThrough(Address address) {
+  auto *call = Builder.CreateCall(IGM.getTaskDeallocThroughFunctionPointer(),
+                                  {address.getAddress()});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.SwiftCC);
+}
+
 llvm::Value *IRGenFunction::alignUpToMaximumAlignment(llvm::Type *sizeTy, llvm::Value *val) {
   auto *alignMask = llvm::ConstantInt::get(sizeTy, MaximumAlignment - 1);
   auto *invertedMask = Builder.CreateNot(alignMask);

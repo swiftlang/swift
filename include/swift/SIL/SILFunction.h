@@ -768,6 +768,10 @@ public:
 
   bool isAsync() const { return LoweredType->isAsync(); }
 
+  bool isCalleeAllocatedCoroutine() const {
+    return LoweredType->isCalleeAllocatedCoroutine();
+  }
+
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
     return getLoweredFunctionType()->getRepresentation();
