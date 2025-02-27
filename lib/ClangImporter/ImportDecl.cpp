@@ -74,6 +74,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Path.h"
 
 #include <algorithm>
@@ -2574,11 +2575,11 @@ namespace {
           Impl.addAlternateDecl(subscriptImpl, subscript);
         }
 
-        if (Impl.cxxDereferenceOperators.find(result) !=
-            Impl.cxxDereferenceOperators.end()) {
+        auto getterAndSetterIt = Impl.cxxDereferenceOperators.find(result);
+        if (getterAndSetterIt != Impl.cxxDereferenceOperators.end()) {
           // If this type has a dereference operator, synthesize a computed
           // property called `pointee` for it.
-          auto getterAndSetter = Impl.cxxDereferenceOperators[result];
+          auto getterAndSetter = getterAndSetterIt->second;
 
           VarDecl *pointeeProperty =
               synthesizer.makeDereferencedPointeeProperty(
@@ -5119,10 +5120,9 @@ namespace {
 
       // Check whether there's some special method to import.
       if (!forceClassMethod) {
-        if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext()) &&
-            !Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}])
-          Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}]
-            = result;
+        if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext()))
+          Impl.ImportedDecls.try_emplace(
+              {decl->getCanonicalDecl(), getVersion()}, result);
 
         if (importedName.isSubscriptAccessor()) {
           // If this was a subscript accessor, try to create a
@@ -7780,8 +7780,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 
   // Note that we've created this subscript.
   Impl.Subscripts[{getter, setter}] = subscript;
-  if (setter && !Impl.Subscripts[{getter, nullptr}])
-    Impl.Subscripts[{getter, nullptr}] = subscript;
+  if (setter)
+    Impl.Subscripts.try_emplace({getter, nullptr}, subscript);
 
   // Make the getter/setter methods unavailable.
   if (!getter->isUnavailable())
@@ -8497,11 +8497,12 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
     StringRef attributeText,
     bool cached
 ) {
+  ::TinyPtrVector<SourceFile *> *sourceFiles = nullptr;
   if (cached) {
-    auto &sourceFiles = ClangSwiftAttrSourceFiles[attributeText];
+    sourceFiles = &ClangSwiftAttrSourceFiles[attributeText];
 
     // Check whether we've already created a source file.
-    for (auto sourceFile : sourceFiles) {
+    for (auto sourceFile : *sourceFiles) {
       if (sourceFile->getParentModule() == &module)
         return *sourceFile;
     }
@@ -8527,10 +8528,8 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   auto sourceFile = new (SwiftContext)
       SourceFile(module, SourceFileKind::Library, bufferID);
 
-  if (cached) {
-    auto &sourceFiles = ClangSwiftAttrSourceFiles[attributeText];
-    sourceFiles.push_back(sourceFile);
-  }
+  if (cached)
+    sourceFiles->push_back(sourceFile);
 
   return *sourceFile;
 }
@@ -9880,9 +9879,9 @@ ClangImporter::Implementation::importDeclContextOf(
   // Clang submodule of the declaration.
   const clang::Module *declSubmodule = *getClangSubmoduleForDecl(decl);
   auto extensionKey = std::make_pair(nominal, declSubmodule);
-  auto knownExtension = extensionPoints.find(extensionKey);
-  if (knownExtension != extensionPoints.end())
-    return knownExtension->second;
+  auto [it, inserted] = extensionPoints.try_emplace(extensionKey, nullptr);
+  if (!inserted)
+    return it->getSecond();
 
   // Create a new extension for this nominal type/Clang submodule pair.
   auto ext = ExtensionDecl::create(SwiftContext, SourceLoc(), nullptr, {},
@@ -9895,7 +9894,7 @@ ClangImporter::Implementation::importDeclContextOf(
   // Record this extension so we can find it later. We do this early because
   // once we've set the member loader, we don't know when the compiler will use
   // it and end up back in this method.
-  extensionPoints[extensionKey] = ext;
+  it->getSecond() = ext;
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 
   if (auto protoDecl = ext->getExtendedProtocolDecl()) {
