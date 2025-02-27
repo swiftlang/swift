@@ -4309,7 +4309,8 @@ private:
         Ctx.Diags.diagnose(S->getForLoc(), diag::for_unsafe_without_unsafe)
           .fixItInsert(insertionLoc, "unsafe ");
       }
-    } else if (S->getUnsafeLoc().isValid()) {
+    } else if (S->getUnsafeLoc().isValid() &&
+               Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
       // Extraneous "unsafe" on the sequence.
       Ctx.Diags.diagnose(S->getUnsafeLoc(), diag::no_unsafe_in_unsafe_for)
         .fixItRemove(S->getUnsafeLoc());
@@ -4343,6 +4344,9 @@ private:
   }
 
   void diagnoseRedundantUnsafe(UnsafeExpr *E) const {
+    if (!Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
+      return;
+
     if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E)) {
       // For an if/switch expression, produce a tailored warning.
       Ctx.Diags.diagnose(E->getUnsafeLoc(),
@@ -4351,6 +4355,7 @@ private:
         .highlight(E->getUnsafeLoc());
       return;
     }
+
     Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe);
   }
   
