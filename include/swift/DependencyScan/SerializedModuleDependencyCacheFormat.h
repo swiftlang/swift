@@ -57,7 +57,7 @@ using IsFrameworkField = BCFixed<1>;
 using IsSystemField = BCFixed<1>;
 /// A bit that indicates whether or not a module is that of a static archive
 using IsStaticField = BCFixed<1>;
-/// A bit taht indicates whether or not an import statement is @_exported
+/// A bit that indicates whether or not an import statement is @_exported
 using IsExportedImport = BCFixed<1>;
 
 /// Source location fields
