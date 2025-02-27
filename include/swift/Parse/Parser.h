@@ -2035,8 +2035,6 @@ public:
                                    SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
-  ParserResult<AvailabilitySpec> parsePlatformVersionConstraintSpec();
-  ParserResult<AvailabilitySpec> parsePlatformAgnosticVersionConstraintSpec();
   bool
   parseAvailability(bool parseAsPartOfSpecializeAttr, StringRef AttrName,
                     bool &DiscardAttribute, SourceRange &attrRange,

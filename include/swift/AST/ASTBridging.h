@@ -691,13 +691,6 @@ struct BridgedAvailabilityMacroDefinition {
   BridgedArrayRef specs;
 };
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAvailabilitySpecKind {
-  BridgedAvailabilitySpecKindPlatformVersionConstraint,
-  BridgedAvailabilitySpecKindWildcard,
-  BridgedAvailabilitySpecKindLanguageVersionConstraint,
-  BridgedAvailabilitySpecKindPackageDescriptionVersionConstraint,
-};
-
 struct BridgedAvailabilityDomain;
 
 SWIFT_NAME("BridgedAvailabilitySpec.createWildcard(_:loc:)")

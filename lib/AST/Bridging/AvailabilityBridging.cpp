@@ -111,17 +111,22 @@ bool BridgedAvailabilitySpec_isWildcard(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->isWildcard();
 }
 
+// FIXME: [availability] Remove this (re-implement ASTGen to match ParseDecl)
 BridgedAvailabilityDomain
 BridgedAvailabilitySpec_getDomain(BridgedAvailabilitySpec spec) {
-  auto domain = spec.unbridged()->getDomain();
+  auto domain = spec.unbridged()->getDomainOrIdentifier().getAsDomain();
   if (domain)
     return *domain;
   return BridgedAvailabilityDomain();
 }
 
+// FIXME: [availability] Remove this (re-implement ASTGen to match ParseDecl)
 BridgedPlatformKind
 BridgedAvailabilitySpec_getPlatform(BridgedAvailabilitySpec spec) {
-  return bridge(spec.unbridged()->getPlatform());
+  auto domain = spec.unbridged()->getDomainOrIdentifier().getAsDomain();
+  if (domain)
+    return bridge(domain->getPlatformKind());
+  return bridge(PlatformKind::none);
 }
 
 BridgedVersionTuple
