@@ -17,6 +17,7 @@
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -38,7 +39,7 @@ AvailabilitySpec *AvailabilitySpec::createForDomain(ASTContext &ctx,
                                     version, versionRange.Start);
 }
 
-AvailabilitySpec *AvailabilitySpec::createForUnknownDomain(
+AvailabilitySpec *AvailabilitySpec::createForDomainIdentifier(
     ASTContext &ctx, Identifier domainIdentifier, SourceLoc loc,
     llvm::VersionTuple version, SourceRange versionRange) {
   DEBUG_ASSERT(!version.empty());
@@ -59,6 +60,18 @@ void AvailabilitySpec::print(llvm::raw_ostream &os) const {
     os << " " << getRawVersion().getAsString();
 }
 
+std::optional<SemanticAvailabilitySpec>
+AvailabilitySpec::getSemanticAvailabilitySpec(
+    const DeclContext *declContext) const {
+  AvailabilitySpec *mutableThis = const_cast<AvailabilitySpec *>(this);
+  auto domain = mutableThis->DomainOrIdentifier.resolveInDeclContext(
+      getStartLoc(), declContext);
+
+  if (domain)
+    return SemanticAvailabilitySpec(this);
+  return std::nullopt;
+}
+
 llvm::VersionTuple SemanticAvailabilitySpec::getVersion() const {
   // For macOS Big Sur, we canonicalize 10.16 to 11.0 for compile-time
   // checking since clang canonicalizes availability markup. However, to
@@ -73,14 +86,6 @@ llvm::VersionTuple SemanticAvailabilitySpec::getVersion() const {
   // it as necessary for compile-time checks.
   return canonicalizePlatformVersion(getDomain().getPlatformKind(),
                                      spec->getRawVersion());
-}
-
-std::optional<SemanticAvailabilitySpec>
-AvailabilitySpec::getSemanticAvailabilitySpec(
-    const DeclContext *declContext) const {
-  if (isWildcard() || getDomain())
-    return SemanticAvailabilitySpec(this);
-  return std::nullopt;
 }
 
 std::optional<SemanticAvailabilitySpec>

@@ -13,6 +13,9 @@
 @available(_brokenPlatforms)
 public func brokenPlatforms() {}
 
+@available(_incorrectCase)
+public func incorrectCase() {}
+
 // CHECK: -define-availability argument:1:16: error: expected version number
 // CHECK-NEXT: _brokenParse:a b c d
 
@@ -22,17 +25,17 @@ public func brokenPlatforms() {}
 // CHECK: -define-availability argument:1:11: error: expected ':' after '_justAName' in availability macro definition
 // CHECK-NEXT: _justAName
 
-// CHECK: -define-availability argument:1:18: warning: unrecognized platform name 'spaceOS'
-// CHECK-NEXT: _brokenPlatforms:spaceOS 10.11
-
 // CHECK: -define-availability argument:1:27: error: future platforms identified by '*' cannot be used in an availability macro
 // CHECK-NEXT: _refuseWildcard
 
-// CHECK: -define-availability argument:1:16: warning: unrecognized platform name 'ios'; did you mean 'iOS'?
-// CHECK-NEXT: _incorrectCase
+// CHECK: duplicate definition of availability macro '_duplicateVersion' for version '1.0'
+// CHECK-NEXT: _duplicateVersion
+
+// CHECK: -define-availability argument:1:18: warning: unrecognized platform name 'spaceOS'; did you mean 'macOS'?
+// CHECK-NEXT: _brokenPlatforms:spaceOS 10.11
 
 // CHECK: -define-availability argument:1:26: warning: unrecognized platform name 'macos'; did you mean 'macOS'?
 // CHECK-NEXT: _incorrectCase
 
-// CHECK: duplicate definition of availability macro '_duplicateVersion' for version '1.0'
-// CHECK-NEXT: _duplicateVersion
+// CHECK: -define-availability argument:1:16: warning: unrecognized platform name 'ios'; did you mean 'iOS'?
+// CHECK-NEXT: _incorrectCase

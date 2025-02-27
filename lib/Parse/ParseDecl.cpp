@@ -798,22 +798,27 @@ bool Parser::parseAvailability(
       if (Spec->isWildcard())
         continue;
 
-      std::optional<AvailabilityDomain> Domain = Spec->getDomain();
-      if (!Domain)
+      auto DomainOrIdentifier = Spec->getDomainOrIdentifier();
+
+      // The domain should not be resolved during parsing.
+      DEBUG_ASSERT(!DomainOrIdentifier.isDomain());
+
+      auto DomainIdentifier = DomainOrIdentifier.getAsIdentifier();
+      if (!DomainIdentifier)
         continue;
 
-      auto Attr = new (Context)
-          AvailableAttr(AtLoc, attrRange, *Domain, Spec->getSourceRange().Start,
-                        AvailableAttr::Kind::Default,
-                        /*Message=*/StringRef(),
-                        /*Rename=*/StringRef(),
-                        /*Introduced=*/Spec->getRawVersion(),
-                        /*IntroducedRange=*/Spec->getVersionSrcRange(),
-                        /*Deprecated=*/llvm::VersionTuple(),
-                        /*DeprecatedRange=*/SourceRange(),
-                        /*Obsoleted=*/llvm::VersionTuple(),
-                        /*ObsoletedRange=*/SourceRange(),
-                        /*Implicit=*/false, AttrName == SPI_AVAILABLE_ATTRNAME);
+      auto Attr = new (Context) AvailableAttr(
+          AtLoc, attrRange, *DomainIdentifier, Spec->getSourceRange().Start,
+          AvailableAttr::Kind::Default,
+          /*Message=*/StringRef(),
+          /*Rename=*/StringRef(),
+          /*Introduced=*/Spec->getRawVersion(),
+          /*IntroducedRange=*/Spec->getVersionSrcRange(),
+          /*Deprecated=*/llvm::VersionTuple(),
+          /*DeprecatedRange=*/SourceRange(),
+          /*Obsoleted=*/llvm::VersionTuple(),
+          /*ObsoletedRange=*/SourceRange(),
+          /*Implicit=*/false, AttrName == SPI_AVAILABLE_ATTRNAME);
       addAttribute(Attr);
 
       Attr->setIsGroupMember();
@@ -1875,6 +1880,18 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   return makeParserSuccess();
 }
 
+static PlatformKind getPlatformFromDomainOrIdentifier(
+    const AvailabilityDomainOrIdentifier &domainOrIdentifier) {
+  if (auto domain = domainOrIdentifier.getAsDomain())
+    return domain->getPlatformKind();
+
+  if (auto platform =
+          platformFromString(domainOrIdentifier.getAsIdentifier()->str()))
+    return *platform;
+
+  return PlatformKind::none;
+}
+
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
     llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions,
     bool &ParsedUnrecognizedPlatformName) {
@@ -1886,10 +1903,10 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
       return MacroStatus;
 
     for (auto *Spec : Specs) {
-      auto Platform = Spec->getPlatform();
-      // Since peekAvailabilityMacroName() only matches defined availability
-      // macros, we only expect platform specific constraints here.
-      DEBUG_ASSERT(Platform != PlatformKind::none);
+      auto Platform =
+          getPlatformFromDomainOrIdentifier(Spec->getDomainOrIdentifier());
+      if (Platform == PlatformKind::none)
+        continue;
 
       auto Version = Spec->getRawVersion();
       if (Version.getSubminor().has_value() || Version.getBuild().has_value()) {

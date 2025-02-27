@@ -74,12 +74,12 @@ public:
   createForDomain(ASTContext &ctx, AvailabilityDomain domain, SourceLoc loc,
                   llvm::VersionTuple version, SourceRange versionRange);
 
-  /// Creates an availability specification for an unknown availability domain.
-  static AvailabilitySpec *createForUnknownDomain(ASTContext &ctx,
-                                                  Identifier domainIdentifier,
-                                                  SourceLoc loc,
-                                                  llvm::VersionTuple version,
-                                                  SourceRange versionRange);
+  /// Creates an availability specification that requires a minimum version of
+  /// some availability domain which has not yet been resolved.
+  static AvailabilitySpec *
+  createForDomainIdentifier(ASTContext &ctx, Identifier domainIdentifier,
+                            SourceLoc loc, llvm::VersionTuple version,
+                            SourceRange versionRange);
 
   AvailabilitySpec *clone(ASTContext &ctx) const;
 
@@ -91,24 +91,14 @@ public:
   SourceRange getSourceRange() const { return SrcRange; }
   SourceLoc getStartLoc() const { return SrcRange.Start; }
 
-  bool isWildcard() const {
-    if (auto domain = getDomain())
-      return domain->isUniversal();
-    return false;
-  }
-
   AvailabilityDomainOrIdentifier getDomainOrIdentifier() const {
     return DomainOrIdentifier;
   }
 
-  std::optional<AvailabilityDomain> getDomain() const {
-    return getDomainOrIdentifier().getAsDomain();
-  }
-
-  PlatformKind getPlatform() const {
-    if (auto domain = getDomain())
-      return domain->getPlatformKind();
-    return PlatformKind::none;
+  bool isWildcard() const {
+    if (auto domain = getDomainOrIdentifier().getAsDomain())
+      return domain->isUniversal();
+    return false;
   }
 
   // The version tuple that was written in source.
@@ -140,15 +130,14 @@ class SemanticAvailabilitySpec {
 public:
   SemanticAvailabilitySpec(const AvailabilitySpec *spec) : spec(spec) {
     // The domain must be resolved in order to wrap it in a semantic spec.
-    ASSERT(spec->isWildcard() || spec->getDomain());
+    bool hasDomain = spec->getDomainOrIdentifier().isDomain();
+    ASSERT(hasDomain);
   }
 
   const AvailabilitySpec *getParsedSpec() const { return spec; }
 
   AvailabilityDomain getDomain() const {
-    if (isWildcard())
-      return AvailabilityDomain::forUniversal();
-    return spec->getDomain().value();
+    return spec->getDomainOrIdentifier().getAsDomain().value();
   }
 
   bool isWildcard() const { return spec->isWildcard(); }

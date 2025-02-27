@@ -3675,8 +3675,6 @@ void Parser::validateCollectionElement(ParserResult<Expr> element) {
   }
 }
 
-
-
 /// Parse availability query specification.
 ///
 ///  availability-spec:
@@ -3691,51 +3689,7 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
 
     return makeParserResult(AvailabilitySpec::createWildcard(Context, StarLoc));
   }
-  if (Tok.isIdentifierOrUnderscore() &&
-       (Tok.getText() == "swift" || Tok.getText() == "_PackageDescription"))
-      return parsePlatformAgnosticVersionConstraintSpec();
 
-  return parsePlatformVersionConstraintSpec();
-}
-
-/// Parse platform-agnostic version constraint specification.
-///
-///  language-version-constraint-spec:
-///     "swift" version-tuple
-///  package-description-version-constraint-spec:
-///     "_PackageDescription" version-tuple
-ParserResult<AvailabilitySpec>
-Parser::parsePlatformAgnosticVersionConstraintSpec() {
-  SourceLoc PlatformAgnosticNameLoc;
-  llvm::VersionTuple Version;
-  std::optional<AvailabilityDomain> Domain;
-  SourceRange VersionRange;
-
-  if (Tok.isIdentifierOrUnderscore()) {
-    if (Tok.getText() == "swift")
-      Domain = AvailabilityDomain::forSwiftLanguage();
-    else if (Tok.getText() == "_PackageDescription")
-      Domain = AvailabilityDomain::forPackageDescription();
-  }
-
-  if (!Domain.has_value())
-    return nullptr;
-
-  PlatformAgnosticNameLoc = Tok.getLoc();
-  consumeToken();
-  if (parseVersionTuple(Version, VersionRange,
-                        diag::avail_query_expected_version_number)) {
-    return nullptr;
-  }
-  return makeParserResult(AvailabilitySpec::createForDomain(
-      Context, Domain.value(), PlatformAgnosticNameLoc, Version, VersionRange));
-}
-
-/// Parse platform-version constraint specification.
-///
-///  platform-version-constraint-spec:
-///     identifier version-comparison version-tuple
-ParserResult<AvailabilitySpec> Parser::parsePlatformVersionConstraintSpec() {
   Identifier PlatformIdentifier;
   SourceLoc PlatformLoc;
   if (Tok.is(tok::code_complete)) {
@@ -3766,24 +3720,6 @@ ParserResult<AvailabilitySpec> Parser::parsePlatformVersionConstraintSpec() {
     return nullptr;
   }
 
-  std::optional<PlatformKind> Platform =
-      platformFromString(PlatformIdentifier.str());
-
-  if (!Platform.has_value() || Platform.value() == PlatformKind::none) {
-    if (auto CorrectedPlatform =
-            closestCorrectedPlatformString(PlatformIdentifier.str())) {
-      diagnose(PlatformLoc, diag::avail_query_suggest_platform_name,
-               PlatformIdentifier, *CorrectedPlatform)
-          .fixItReplace(PlatformLoc, *CorrectedPlatform);
-    } else {
-      diagnose(PlatformLoc, diag::avail_query_unrecognized_platform_name,
-               PlatformIdentifier);
-    }
-    return makeParserResult(AvailabilitySpec::createForUnknownDomain(
-        Context, PlatformIdentifier, PlatformLoc, Version, VersionRange));
-  }
-
-  return makeParserResult(AvailabilitySpec::createForDomain(
-      Context, AvailabilityDomain::forPlatform(Platform.value()), PlatformLoc,
-      Version, VersionRange));
+  return makeParserResult(AvailabilitySpec::createForDomainIdentifier(
+      Context, PlatformIdentifier, PlatformLoc, Version, VersionRange));
 }
