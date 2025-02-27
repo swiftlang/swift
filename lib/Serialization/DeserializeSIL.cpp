@@ -2418,6 +2418,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         MarkDependenceKind(Attr));
     break;
   }
+  case SILInstructionKind::MarkDependenceAddrInst: {
+    auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
+    ResultInst = Builder.createMarkDependenceAddr(
+        Loc,
+        getLocalValue(Builder.maybeGetFunction(), ValID,
+                      getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
+        getLocalValue(Builder.maybeGetFunction(), ValID2,
+                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)),
+        MarkDependenceKind(Attr));
+    break;
+  }
   case SILInstructionKind::BeginDeallocRefInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);

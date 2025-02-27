@@ -8750,66 +8750,28 @@ enum class MarkDependenceKind {
 };
 static_assert(2 == SILNode::NumMarkDependenceKindBits, "Size mismatch");
 
-/// Indicates that the validity of the first operand ("the value") depends on
-/// the value of the second operand ("the base").  Operations that would destroy
-/// the base must not be moved before any instructions which depend on the
-/// result of this instruction, exactly as if the address had been obviously
-/// derived from that operand (e.g. using ``ref_element_addr``). The result is
-/// always equal to the first operand and thus forwards ownership through the
-/// first operand. This is a "regular" use of the second operand (i.e. the
-/// second operand must be live at the use point).
-///
-/// Example:
-///
-///   %base = ...
-///   %value = ... @trivial value ...
-///   %value_dependent_on_base = mark_dependence %value on %base
-///   ...
-///   use(%value_dependent_on_base)     (1)
-///   ...
-///   destroy_value %base               (2)
-///
-/// (2) can never move before (1). In English this is a way for the compiler
-/// writer to say to the optimizer: 'This subset of uses of "value" (the uses of
-/// result) have a dependence on "base" being alive. Do not allow for things
-/// that /may/ destroy base to be moved earlier than any of these uses of
-/// "value"'.
-///
-/// The dependent 'value' may be marked 'nonescaping', which guarantees that the
-/// lifetime dependence is statically enforceable. In this case, the compiler
-/// must be able to follow all values forwarded from the dependent 'value', and
-/// recognize all final (non-forwarded, non-escaping) use points. This implies
-/// that `findPointerEscape` is false. A diagnostic pass checks that the
-/// incoming SIL to verify that these use points are all initially within the
-/// 'base' lifetime. Regular 'mark_dependence' semantics ensure that
-/// optimizations cannot violate the lifetime dependence after diagnostics.
-class MarkDependenceInst
-    : public InstructionBase<SILInstructionKind::MarkDependenceInst,
-                             OwnershipForwardingSingleValueInstruction> {
-  friend SILBuilder;
-
+template <SILInstructionKind Kind, typename BaseTy>
+class MarkDependenceInstBase : public InstructionBase<Kind, BaseTy> {
   FixedOperandList<2> Operands;
 
-  USE_SHARED_UINT8;
+  TEMPLATE_USE_SHARED_UINT8(BaseTy);
 
-  MarkDependenceInst(SILDebugLocation DebugLoc, SILValue value, SILValue base,
-                     ValueOwnershipKind forwardingOwnershipKind,
-                     MarkDependenceKind dependenceKind)
-      : InstructionBase(DebugLoc, value->getType(), forwardingOwnershipKind),
-        Operands{this, value, base} {
-    sharedUInt8().MarkDependenceInst.dependenceKind = uint8_t(dependenceKind);
+protected:
+  template <typename... Rest>
+  MarkDependenceInstBase(SILDebugLocation DebugLoc, SILValue value,
+                         SILValue base, MarkDependenceKind dependenceKind,
+                         Rest &&...rest)
+    : InstructionBase<Kind, BaseTy>(DebugLoc, std::forward<Rest>(rest)...),
+      Operands{this, value, base} {
+    sharedUInt8().MarkDependenceInstBase.dependenceKind =
+      uint8_t(dependenceKind);
   }
 
 public:
-  enum { Value, Base };
-
-  SILValue getValue() const { return Operands[Value].get(); }
+  enum { Dependent, Base };
 
   SILValue getBase() const { return Operands[Base].get(); }
 
-  void setValue(SILValue newVal) {
-    Operands[Value].set(newVal);
-  }
   void setBase(SILValue newVal) {
     Operands[Base].set(newVal);
   }
@@ -8818,9 +8780,14 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   MarkDependenceKind dependenceKind() const {
-    return MarkDependenceKind(sharedUInt8().MarkDependenceInst.dependenceKind);
+    return MarkDependenceKind(
+      sharedUInt8().MarkDependenceInstBase.dependenceKind);
   }
 
+  /// True if the lifetime dependence is statically enforceable. If so, the
+  /// compiler can follow all values forwarded from the result, and recognize
+  /// all final (non-forwarded, non-escaping) use points. This implies that
+  /// `findPointerEscape` is false.
   bool isNonEscaping() const {
     return dependenceKind() == MarkDependenceKind::NonEscaping;
   }
@@ -8833,13 +8800,41 @@ public:
   }
 
   void resolveToNonEscaping() {
-    sharedUInt8().MarkDependenceInst.dependenceKind =
+    sharedUInt8().MarkDependenceInstBase.dependenceKind =
       uint8_t(MarkDependenceKind::NonEscaping);
   }
 
   void settleToEscaping() {
-    sharedUInt8().MarkDependenceInst.dependenceKind =
+    sharedUInt8().MarkDependenceInstBase.dependenceKind =
       uint8_t(MarkDependenceKind::Escaping);
+  }  
+};
+  
+/// The result forwards the value of the first operand ('value') and depends on
+/// the second operand ('base').
+///
+/// The 'value' and the forwarded result are both either an object type or an
+/// address type. The semantics are the same in each case.
+///
+/// 'base' may have either object or address type independent from the type of
+/// 'value'. If 'base' is an address, then the dependency is on the current
+/// value stored at the address.
+class MarkDependenceInst
+  : public MarkDependenceInstBase<SILInstructionKind::MarkDependenceInst,
+                                  OwnershipForwardingSingleValueInstruction> {
+  friend SILBuilder;
+
+  MarkDependenceInst(SILDebugLocation DebugLoc, SILValue value, SILValue base,
+                     ValueOwnershipKind forwardingOwnershipKind,
+                     MarkDependenceKind dependenceKind)
+    : MarkDependenceInstBase(DebugLoc, value, base, dependenceKind,
+                             value->getType(), forwardingOwnershipKind) {}
+
+public:
+  SILValue getValue() const { return getAllOperands()[Dependent].get(); }
+
+  void setValue(SILValue newVal) {
+    getAllOperands()[Dependent].set(newVal);
   }
 
   // True if the dependence is limited to the scope of an OSSA lifetime. Only
@@ -8858,6 +8853,97 @@ public:
   bool visitNonEscapingLifetimeEnds(
     llvm::function_ref<bool (Operand*)> visitScopeEnd,
     llvm::function_ref<bool (Operand*)> visitUnknownUse);
+};
+
+/// The in-memory value at the first operand ('address') depends on the value of
+/// the second operand ('base'). This is as if the location at 'address' aliases
+/// 'base' on all paths reachable from this instruction.
+///
+/// 'base' may have either object or address type. If 'base' is an address, then
+/// the dependency is on the current value stored at the address.
+class MarkDependenceAddrInst
+  : public MarkDependenceInstBase<SILInstructionKind::MarkDependenceAddrInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  MarkDependenceAddrInst(SILDebugLocation DebugLoc, SILValue value,
+                         SILValue base, MarkDependenceKind dependenceKind)
+    : MarkDependenceInstBase(DebugLoc, value, base, dependenceKind) {}
+
+public:
+  SILValue getAddress() const { return getAllOperands()[Dependent].get(); }
+
+  void setAddress(SILValue newVal) {
+    getAllOperands()[Dependent].set(newVal);
+  }
+};
+
+/// Shared API for MarkDependenceInst and MarkDependenceAddrInst.
+class MarkDependenceInstruction {
+  const SILInstruction *inst = nullptr;
+
+public:
+  explicit MarkDependenceInstruction(const SILInstruction *inst) {
+    switch (inst->getKind()) {
+    case SILInstructionKind::MarkDependenceInst:
+    case SILInstructionKind::MarkDependenceAddrInst:
+      this->inst = inst;
+      break;
+    default:
+      break;
+    }
+  }
+
+  explicit operator bool() const { return inst != nullptr; }
+    
+  SILValue getBase() const {
+    if (inst) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::MarkDependenceInst:
+        return cast<MarkDependenceInst>(inst)->getBase();
+      case SILInstructionKind::MarkDependenceAddrInst:
+        return cast<MarkDependenceAddrInst>(inst)->getBase();
+      default:
+        break;
+      }
+    }
+    return SILValue();
+  }
+
+  SILValue getDependent() const {
+    if (inst) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::MarkDependenceInst:
+        return cast<MarkDependenceInst>(inst)->getValue();
+      case SILInstructionKind::MarkDependenceAddrInst:
+        return cast<MarkDependenceAddrInst>(inst)->getAddress();
+      default:
+        break;
+      }
+    }
+    return SILValue();
+  }
+
+  SILType getType() const {
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(inst))
+      return mdi->getType();
+
+    return SILType();
+  }
+
+  bool isNonEscaping() const {
+    if (inst) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::MarkDependenceInst:
+        return cast<MarkDependenceInst>(inst)->isNonEscaping();
+      case SILInstructionKind::MarkDependenceAddrInst:
+        return cast<MarkDependenceAddrInst>(inst)->isNonEscaping();
+      default:
+        break;
+      }
+    }
+    return false;
+  }
 };
 
 /// Promote an Objective-C block that is on the stack to the heap, or simply
