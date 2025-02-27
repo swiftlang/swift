@@ -32,6 +32,8 @@ static const uint32_t initial_n = 128;
 
 static const char delimiter = '_';
 
+static const uint32_t replacement_code_point = 0xFFFD;
+
 static char digit_value(int digit) {
   assert(digit < base && "invalid punycode digit");
   if (digit < 26)
@@ -296,12 +298,14 @@ static bool isContinuationByte(uint8_t unit) {
 /// Returns false if \p InputUTF8 contains surrogate code points.
 static bool convertUTF8toUTF32(llvm::StringRef InputUTF8,
                                std::vector<uint32_t> &OutUTF32,
-                               bool mapNonSymbolChars) {
+                               bool mapNonSymbolChars,
+                               bool repairInvalidUTF8) {
   auto ptr = InputUTF8.begin();
   auto end = InputUTF8.end();
   while (ptr < end) {
     uint8_t first = *ptr++;
     uint32_t code_point = 0;
+    bool isInvalid = false;
     if (first < 0x80) {
       if (Mangle::isValidSymbolChar(first) || !mapNonSymbolChars) {
         code_point = first;
@@ -310,46 +314,59 @@ static bool convertUTF8toUTF32(llvm::StringRef InputUTF8,
       }
     } else if (first < 0xC0) {
       // Invalid continuation byte.
-      return false;
+      isInvalid = true;
     } else if (first < 0xE0) {
       // Two-byte sequence.
-      if (ptr == end)
-        return false;
-      uint8_t second = *ptr++;
-      if (!isContinuationByte(second))
-        return false;
-      code_point = ((first & 0x1F) << 6) | (second & 0x3F);
+      if (ptr == end) {
+        isInvalid = true;
+      } else {
+        uint8_t second = *ptr++;
+        if (!isContinuationByte(second))
+          isInvalid = true;
+        code_point = ((first & 0x1F) << 6) | (second & 0x3F);
+      }
     } else if (first < 0xF0) {
       // Three-byte sequence.
-      if (end - ptr < 2)
-        return false;
-      uint8_t second = *ptr++;
-      uint8_t third = *ptr++;
-      if (!isContinuationByte(second) || !isContinuationByte(third))
-        return false;
-      code_point = ((first & 0xF) << 12)
-                 | ((second & 0x3F) << 6)
-                 | ( third  & 0x3F      );
+      if (end - ptr < 2) {
+        isInvalid = true;
+      } else {
+        uint8_t second = *ptr++;
+        uint8_t third = *ptr++;
+        if (!isContinuationByte(second) || !isContinuationByte(third))
+          isInvalid = true;
+        code_point = ((first & 0xF) << 12)
+                   | ((second & 0x3F) << 6)
+                   | ( third  & 0x3F      );
+      }
     } else if (first < 0xF8) {
       // Four-byte sequence.
-      if (end - ptr < 3)
-        return false;
-      uint8_t second = *ptr++;
-      uint8_t third = *ptr++;
-      uint8_t fourth = *ptr++;
-      if (!isContinuationByte(second) || !isContinuationByte(third)
-          || !isContinuationByte(fourth))
-        return false;
-      code_point = ((first & 0x7) << 18)
-                  | ((second & 0x3F) << 12)
-                  | ((third  & 0x3F) <<  6)
-                  | ( fourth & 0x3F       );
+      if (end - ptr < 3) {
+        isInvalid = true;
+      } else {
+        uint8_t second = *ptr++;
+        uint8_t third = *ptr++;
+        uint8_t fourth = *ptr++;
+        if (!isContinuationByte(second) || !isContinuationByte(third)
+            || !isContinuationByte(fourth))
+          isInvalid = true;
+        code_point = ((first & 0x7) << 18)
+                    | ((second & 0x3F) << 12)
+                    | ((third  & 0x3F) <<  6)
+                    | ( fourth & 0x3F       );
+      }
     } else {
       // Unused sequence length.
-      return false;
+      isInvalid = true;
     }
     if (!isValidUnicodeScalar(code_point))
-      return false;
+      isInvalid = true;
+
+    if (isInvalid) {
+      if (repairInvalidUTF8)
+        code_point = replacement_code_point;
+      else
+        return false;
+    }
     OutUTF32.push_back(code_point);
   }
   return true;
@@ -357,13 +374,14 @@ static bool convertUTF8toUTF32(llvm::StringRef InputUTF8,
 
 bool Punycode::encodePunycodeUTF8(StringRef InputUTF8,
                                   std::string &OutPunycode,
-                                  bool mapNonSymbolChars) {
+                                  bool mapNonSymbolChars,
+                                  bool repairInvalidUTF8) {
   std::vector<uint32_t> InputCodePoints;
   InputCodePoints.reserve(InputUTF8.size());
 
-  if (!convertUTF8toUTF32(InputUTF8, InputCodePoints, mapNonSymbolChars))
+  if (!convertUTF8toUTF32(InputUTF8, InputCodePoints, mapNonSymbolChars,
+                          repairInvalidUTF8))
     return false;
 
   return encodePunycode(InputCodePoints, OutPunycode);
 }
-
