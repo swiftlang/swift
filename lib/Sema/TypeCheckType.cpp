@@ -5175,8 +5175,9 @@ NeverNullType
 TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
                                       TypeResolutionOptions options) {
   // isolated is only value for non-EnumCaseDecl parameters.
-  if (!options.is(TypeResolverContext::FunctionInput) ||
-      options.hasBase(TypeResolverContext::EnumElementDecl)) {
+  if ((!options.is(TypeResolverContext::FunctionInput) ||
+       options.hasBase(TypeResolverContext::EnumElementDecl)) &&
+      !options.is(TypeResolverContext::Inherited)) {
     diagnoseInvalid(
         repr, repr->getSpecifierLoc(), diag::attr_only_on_parameters,
         "isolated");
@@ -5197,7 +5198,8 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
     unwrappedType = dynamicSelfType->getSelfType();
   }
 
-  if (inStage(TypeResolutionStage::Interface)) {
+  if (inStage(TypeResolutionStage::Interface) &&
+      !options.is(TypeResolverContext::Inherited)) {
     if (auto *env = resolution.getGenericSignature().getGenericEnvironment())
       unwrappedType = env->mapTypeIntoContext(unwrappedType);
 

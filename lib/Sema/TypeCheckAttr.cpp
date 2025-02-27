@@ -189,6 +189,8 @@ public:
   IGNORED_ATTR(LexicalLifetimes)
   IGNORED_ATTR(AllowFeatureSuppression)
   IGNORED_ATTR(PreInverseGenerics)
+  IGNORED_ATTR(Safe)
+  IGNORED_ATTR(Unsafe)
 #undef IGNORED_ATTR
 
 private:
@@ -564,8 +566,6 @@ public:
   void visitStaticExclusiveOnlyAttr(StaticExclusiveOnlyAttr *attr);
   void visitWeakLinkedAttr(WeakLinkedAttr *attr);
   void visitSILGenNameAttr(SILGenNameAttr *attr);
-  void visitUnsafeAttr(UnsafeAttr *attr);
-  void visitSafeAttr(SafeAttr *attr);
   void visitLifetimeAttr(LifetimeAttr *attr);
   void visitAddressableSelfAttr(AddressableSelfAttr *attr);
   void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
@@ -8128,20 +8128,6 @@ void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
 
   diagnoseAndRemoveAttr(attr, diag::attr_unsupported_on_target,
                         attr->getAttrName(), Ctx.LangOpts.Target.str());
-}
-
-void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
-  if (Ctx.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
-    return;
-
-  diagnoseAndRemoveAttr(attr, diag::unsafe_attr_disabled);
-}
-
-void AttributeChecker::visitSafeAttr(SafeAttr *attr) {
-  if (Ctx.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
-    return;
-
-  diagnoseAndRemoveAttr(attr, diag::unsafe_attr_disabled);
 }
 
 void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {}

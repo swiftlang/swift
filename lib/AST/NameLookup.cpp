@@ -3144,6 +3144,12 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
                                        attributed->getTypeRepr(), dc, options);
   }
 
+  case TypeReprKind::Isolated: {
+    auto isolated = cast<IsolatedTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       isolated->getBase(), dc, options);
+  }
+
   case TypeReprKind::Composition: {
     auto composition = cast<CompositionTypeRepr>(typeRepr);
     for (auto component : composition->getTypes()) {
@@ -3217,7 +3223,6 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::Ownership:
-  case TypeReprKind::Isolated:
   case TypeReprKind::CompileTimeConst:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
@@ -3933,6 +3938,21 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
+/// Find the location of 'isolated' within this type representation.
+static SourceLoc findIsolatedLoc(TypeRepr *typeRepr) {
+  do {
+    if (auto isolatedTypeRepr = dyn_cast<IsolatedTypeRepr>(typeRepr))
+      return isolatedTypeRepr->getLoc();
+
+    if (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+      typeRepr = attrTypeRepr->getTypeRepr();
+      continue;
+    }
+        
+    return SourceLoc();
+  } while (true);
+}
+
 /// Decompose the ith inheritance clause entry to a list of type declarations,
 /// inverses, and optional AnyObject member.
 void swift::getDirectlyInheritedNominalTypeDecls(
@@ -3971,6 +3991,9 @@ void swift::getDirectlyInheritedNominalTypeDecls(
     attributes.uncheckedLoc = typeRepr->findAttrLoc(TypeAttrKind::Unchecked);
     attributes.preconcurrencyLoc = typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency);
     attributes.unsafeLoc = typeRepr->findAttrLoc(TypeAttrKind::Unsafe);
+    
+    // Look for an IsolatedTypeRepr.
+    attributes.isolatedLoc = findIsolatedLoc(typeRepr);
   }
 
   // Form the result.

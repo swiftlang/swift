@@ -27,6 +27,9 @@ struct ConformanceAttributes {
 
   /// The location of the "unsafe" attribute if present.
   SourceLoc unsafeLoc;
+
+  /// The location of the "@isolated" attribute if present.
+  SourceLoc isolatedLoc;
   
   /// Merge other conformance attributes into this set.
   ConformanceAttributes &
@@ -37,6 +40,8 @@ struct ConformanceAttributes {
       preconcurrencyLoc = other.preconcurrencyLoc;
     if (other.unsafeLoc.isValid())
       unsafeLoc = other.unsafeLoc;
+    if (other.isolatedLoc.isValid())
+      isolatedLoc = other.isolatedLoc;
     return *this;
   }
 };

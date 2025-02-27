@@ -31,5 +31,6 @@ def language_feature(feature_name, enabled):
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) language_feature(#FeatureName, True)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) language_feature(#FeatureName, #AvailableInProd == "true")
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description) language_feature(#FeatureName, True)
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description) language_feature(#FeatureName, True)
 
 #include <swift/Basic/Features.def>

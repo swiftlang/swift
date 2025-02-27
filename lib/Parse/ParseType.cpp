@@ -163,7 +163,9 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
-  if (isParameterSpecifier()) {
+  if (isParameterSpecifier() &&
+      !(!Context.LangOpts.hasFeature(Feature::IsolatedConformances) &&
+        Tok.isContextualKeyword("isolated"))) {
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.
     diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());

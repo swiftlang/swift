@@ -1,12 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/unsafe_swift_decls.swiftmodule %S/Inputs/unsafe_swift_decls.swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature AllowUnsafeAttribute
+// RUN: %target-swift-frontend -emit-module-path %t/unsafe_swift_decls.swiftmodule %S/Inputs/unsafe_swift_decls.swift
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature WarnUnsafe -enable-experimental-feature StrictConcurrency -enable-experimental-feature AllowUnsafeAttribute -I %t
+// RUN: %target-typecheck-verify-swift -strict-memory-safety -enable-experimental-feature StrictConcurrency -I %t
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_StrictConcurrency
-// REQUIRES: swift_feature_WarnUnsafe
-// REQUIRES: swift_feature_AllowUnsafeAttribute
 
 @preconcurrency import unsafe_swift_decls // expected-warning{{@preconcurrency import is not memory-safe because it can silently introduce data races}}
 

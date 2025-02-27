@@ -38,6 +38,7 @@ LangOptions::LangOptions() {
   Features.insert(Feature::FeatureName);
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
 
   // Special case: remove macro support if the compiler wasn't built with a
@@ -636,6 +637,8 @@ bool swift::isFeatureAvailableInProduction(Feature feature) {
     return true;
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
   case Feature::FeatureName: return AvailableInProd;
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
+  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
   }
   llvm_unreachable("covered switch");
@@ -655,6 +658,7 @@ std::optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
                    .Case(#FeatureName, Feature::FeatureName)
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
       .Default(std::nullopt);
 }
@@ -664,6 +668,7 @@ std::optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
   case Feature::FeatureName: return Version;
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
   default:
     return std::nullopt;
@@ -677,6 +682,8 @@ bool swift::includeInModuleInterface(Feature feature) {
     return true;
 #define EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(FeatureName, AvailableInProd) \
   case Feature::FeatureName: return false;
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
+  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
   }
   llvm_unreachable("covered switch");

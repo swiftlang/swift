@@ -699,6 +699,19 @@ void introduceUnsafeInheritExecutorReplacements(
 void introduceUnsafeInheritExecutorReplacements(
     const DeclContext *dc, Type base, SourceLoc loc, LookupResult &result);
 
+/// Enumerate all of the isolated conformances in the given conformance.
+/// 
+/// The given `body` will be called on each isolated conformance. If it ever
+/// returns `true`, this function will abort the search and return `true`.
+bool forEachIsolatedConformance(
+    ProtocolConformanceRef conformance, 
+    llvm::function_ref<bool(ProtocolConformance*)> body
+);
+
+/// Determine the isolation of the given conformance. This only applies to
+/// the immediate conformance, not any conformances on which it depends.
+ActorIsolation getConformanceIsolation(ProtocolConformance *conformance);
+
 } // end namespace swift
 
 namespace llvm {

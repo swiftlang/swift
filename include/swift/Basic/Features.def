@@ -48,6 +48,12 @@
 // for features that can be assumed to be available in any Swift compiler that
 // will be used to process the textual interface files produced by this
 // Swift compiler.
+//
+// OPTIONAL_LANGUAGE_FEATURE is the same as LANGUAGE_FEATURE, but describes
+// accepted features that can be enabled independently of language version and
+// are not scheduled to be enabled in some specific language version. Examples
+// of optional language features include strict memory safety checking (SE-0458)
+// and Embedded Swift.
 //===----------------------------------------------------------------------===//
 
 #ifndef LANGUAGE_FEATURE
@@ -86,6 +92,11 @@
 
 #ifndef SUPPRESSIBLE_LANGUAGE_FEATURE
 #  define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
+  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#endif
+
+#ifndef OPTIONAL_LANGUAGE_FEATURE
+#  define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
   LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #endif
 
@@ -203,6 +214,7 @@ LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
 LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
 LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
+SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -225,6 +237,14 @@ UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
+
+// Optional language features / modes
+
+/// Diagnose uses of language constructs and APIs that can violate memory
+/// safety.
+OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory safety")
+
+// Experimental features
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
@@ -396,12 +416,6 @@ EXPERIMENTAL_FEATURE(Extern, true)
 // Enable trailing comma for comma-separated lists.
 EXPERIMENTAL_FEATURE(TrailingComma, false)
 
-/// Allow the @unsafe attribute.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AllowUnsafeAttribute, true)
-
-/// Warn on use of unsafe constructs.
-EXPERIMENTAL_FEATURE(WarnUnsafe, true)
-
 // Import bounds safety and lifetime attributes from interop headers to
 // generate Swift wrappers with safe pointer types.
 EXPERIMENTAL_FEATURE(SafeInteropWrappers, false)
@@ -450,15 +464,20 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// Be strict about the Sendable conformance of metatypes.
 EXPERIMENTAL_FEATURE(StrictSendableMetatypes, true)
 
+
 /// Allow public enumerations to be extensible by default
 /// regardless of whether the module they are declared in
 /// is resilient or not.
 EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
 
+/// Allow isolated conformances.
+EXPERIMENTAL_FEATURE(IsolatedConformances, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef BASELINE_LANGUAGE_FEATURE
+#undef OPTIONAL_LANGUAGE_FEATURE
 #undef CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE
 #undef CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef SUPPRESSIBLE_EXPERIMENTAL_FEATURE

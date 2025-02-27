@@ -1,7 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -I %S/Inputs
-
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-// REQUIRES: swift_feature_WarnUnsafe
+// RUN: %target-typecheck-verify-swift -strict-memory-safety -I %S/Inputs
 
 import unsafe_decls
 

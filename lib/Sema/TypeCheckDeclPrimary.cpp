@@ -2395,7 +2395,7 @@ public:
 
         // If strict memory safety checking is enabled, check the storage
         // of the nominal type.
-        if (Ctx.LangOpts.hasFeature(Feature::WarnUnsafe) &&
+        if (Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety) &&
             !isa<ProtocolDecl>(nominal)) {
           checkUnsafeStorage(nominal);
         }
@@ -2468,7 +2468,7 @@ public:
     // concurrency checking enabled.
     if (ID->preconcurrency() &&
         Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        Ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+        Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
       diagnoseUnsafeUse(UnsafeUse::forPreconcurrencyImport(ID));
     }
   }

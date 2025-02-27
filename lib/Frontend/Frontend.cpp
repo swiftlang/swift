@@ -1455,7 +1455,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setAllowNonResilientAccess();
     if (Invocation.getSILOptions().EnableSerializePackage)
       MainModule->setSerializePackageEnabled();
-    if (Invocation.getLangOptions().hasFeature(Feature::WarnUnsafe))
+    if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
     if (Invocation.getLangOptions().hasFeature(Feature::ExtensibleEnums))
       MainModule->setSupportsExtensibleEnums(true);
