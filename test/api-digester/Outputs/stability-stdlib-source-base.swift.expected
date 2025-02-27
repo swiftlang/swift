@@ -370,3 +370,6 @@ Protocol Error has added inherited protocol SendableMetatype
 Accessor Optional.unsafelyUnwrapped.Get() has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Escapable>
 Accessor UnsafeBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Accessor UnsafeMutableBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
+
+Func type(of:) has generic signature change from <T, Metatype> to <T, Metatype where T : ~Copyable, T : ~Escapable>
+Func type(of:) has parameter 0 changing from Default to Shared

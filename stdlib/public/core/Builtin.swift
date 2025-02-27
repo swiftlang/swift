@@ -940,14 +940,27 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 ///
 /// - Parameter value: The value for which to find the dynamic type.
 /// - Returns: The dynamic type, which is a metatype instance.
-@_transparent
+@_alwaysEmitIntoClient
 @_semantics("typechecker.type(of:)")
-public func type<T, Metatype>(of value: T) -> Metatype {
+public func type<T: ~Copyable & ~Escapable, Metatype>(
+  of value: borrowing T
+) -> Metatype {
   // This implementation is never used, since calls to `Swift.type(of:)` are
   // resolved as a special case by the type checker.
   unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
     ("internal consistency error: 'type(of:)' operation failed to resolve"
      as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss4type2ofq_x_tr0_lF")
+@usableFromInline
+func __abi_type<T, Metatype>(of value: T) -> Metatype {
+  // This is a legacy entry point for the original definition of `type(of:)`
+  // that the stdlib originally exported for no good reason. The current
+  // definition no longer exports a symbol, and nothing is expected to link to
+  // it, but we keep it around anyway.
   Builtin.unreachable()
 }
 
