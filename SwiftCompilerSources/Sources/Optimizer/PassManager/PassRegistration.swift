@@ -120,6 +120,8 @@ private func registerSwiftPasses() {
   registerForSILCombine(PointerToAddressInst.self,  { run(PointerToAddressInst.self, $0) })
   registerForSILCombine(UncheckedEnumDataInst.self, { run(UncheckedEnumDataInst.self, $0) })
   registerForSILCombine(UnconditionalCheckedCastInst.self, { run(UnconditionalCheckedCastInst.self, $0) })
+  registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })
+  registerForSILCombine(TryApplyInst.self,          { run(TryApplyInst.self, $0) })
 
   // Test passes
   registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })
