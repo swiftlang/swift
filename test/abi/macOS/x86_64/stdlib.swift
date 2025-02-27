@@ -815,6 +815,20 @@ Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
+// MutableSpan and MutableRawSpan
+Added: _$ss11MutableSpanVMa
+Added: _$ss11MutableSpanVMn
+Added: _$ss11MutableSpanVsRi_zRi0_zrlE10_unchecked5countAByxGSvSg_SitcfC
+Added: _$ss11MutableSpanVsRi_zRi0_zrlE6_countSivg
+Added: _$ss11MutableSpanVsRi_zRi0_zrlE8_pointerSvSgvg
+Added: _$ss11MutableSpanVsRi_zrlE10_uncheckedAByxGSryxG_tcfC
+Added: _$ss14MutableRawSpanV10_unchecked5countABSvSg_SitcfC
+Added: _$ss14MutableRawSpanV6_countSivg
+Added: _$ss14MutableRawSpanV8_pointerSvSgvg
+Added: _$ss14MutableRawSpanVMa
+Added: _$ss14MutableRawSpanVMn
+Added: _$ss14MutableRawSpanVN
+
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
 Added: _$ss13_SwiftifyExprO6returnyA2BmFWC
