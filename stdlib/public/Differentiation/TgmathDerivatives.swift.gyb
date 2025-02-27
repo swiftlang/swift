@@ -22,7 +22,7 @@ import Swift
   #endif
 #elseif canImport(Musl)
   import Musl
-#elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(PS4) || os(Cygwin) || os(Haiku)
+#elseif os(Linux) || os(OpenBSD) || os(PS4) || os(Cygwin) || os(Haiku)
   import Glibc
 #elseif os(WASI)
   import WASILibc
@@ -30,6 +30,8 @@ import Swift
   import CRT
 #elseif canImport(Android)
   import Android
+#elseif canImport(FreeBSD)
+  import FreeBSD
 #else
 #error("Unsupported platform")
 #endif
