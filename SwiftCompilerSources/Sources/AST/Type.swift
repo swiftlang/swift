@@ -15,8 +15,22 @@ import ASTBridging
 
 /// A Swift type.
 /// It is not necessarily canoncial, e.g. typealiases are not resolved.
-public struct Type: CustomStringConvertible, NoReflectionChildren {
+public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildren {
+  public enum TraitResult {
+    case isNot
+    case canBe
+    case `is`
+  }
+
+  public enum MetatypeRepresentation {
+    case thin
+    case thick
+    case objC
+  };
+
   public let bridged: BridgedASTType
+
+  public var type: Type { self }
 
   public init?(bridgedOrNil: BridgedASTType) {
     if bridgedOrNil.type == nil {
@@ -30,27 +44,67 @@ public struct Type: CustomStringConvertible, NoReflectionChildren {
   }
 
   public var canonical: CanonicalType { CanonicalType(bridged: bridged.getCanonicalType()) }
-  public var description: String { String(taking: bridged.getDebugDescription()) }
 
-  public var hasTypeParameter: Bool { bridged.hasTypeParameter() }
-  public var hasOpenedExistential: Bool { bridged.hasOpenedExistential() }
-  public var isOpenedExistentialWithError: Bool { bridged.isOpenedExistentialWithError() }
-  public var isEscapable: Bool { bridged.isEscapable() }
-  public var isNoEscape: Bool { bridged.isNoEscape() }
-  public var isInteger: Bool { bridged.isInteger() }
-  public var isMetatypeType: Bool { bridged.isMetatypeType() }
-  public var isExistentialMetatypeType: Bool { bridged.isExistentialMetatypeType() }
-
-  public var anyNominal: NominalTypeDecl? { bridged.getAnyNominal().getAs(NominalTypeDecl.self) }
   public var instanceTypeOfMetatype: Type { Type(bridged: bridged.getInstanceTypeOfMetatype()) }
-  
+
   public func subst(with substitutionMap: SubstitutionMap) -> Type {
     return Type(bridged: bridged.subst(substitutionMap.bridged))
   }
+
+  public func subst(type: Type, with targetType: Type) -> Type {
+    return Type(bridged: bridged.subst(type.bridged, targetType.bridged))
+  }
+}
+
+/// A Type that is statically known to be canonical.
+/// For example, typealiases are resolved.
+public struct CanonicalType: TypeProperties, CustomStringConvertible, NoReflectionChildren {
+  public let bridged: BridgedCanType
+
+  public init(bridged: BridgedCanType) { self.bridged = bridged }
+
+  public var type: Type { Type(bridged: bridged.getType()) }
+
+  public var instanceTypeOfMetatype: CanonicalType { type.instanceTypeOfMetatype.canonical }
   
+  public func subst(with substitutionMap: SubstitutionMap) -> CanonicalType {
+    return type.subst(with: substitutionMap).canonical
+  }
+
+  public func subst(type: CanonicalType, with targetType: CanonicalType) -> CanonicalType {
+    return self.type.subst(type: type.type, with: targetType.type).canonical
+  }
+}
+
+/// Contains common properties of AST.Type and AST.CanonicalType
+public protocol TypeProperties {
+  var type: Type { get }
+}
+
+extension TypeProperties {
+  public var description: String { String(taking: type.bridged.getDebugDescription()) }
+
+  public var hasTypeParameter: Bool { type.bridged.hasTypeParameter() }
+  public var hasLocalArchetype: Bool { type.bridged.hasLocalArchetype() }
+  public var isExistentialArchetype: Bool { type.bridged.isExistentialArchetype() }
+  public var isExistentialArchetypeWithError: Bool { type.bridged.isExistentialArchetypeWithError() }
+  public var isExistential: Bool { type.bridged.isExistential() }
+  public var isEscapable: Bool { type.bridged.isEscapable() }
+  public var isNoEscape: Bool { type.bridged.isNoEscape() }
+  public var isInteger: Bool { type.bridged.isInteger() }
+  public var isMetatypeType: Bool { type.bridged.isMetatypeType() }
+  public var isExistentialMetatypeType: Bool { type.bridged.isExistentialMetatypeType() }
+  public var representationOfMetatype: AST.`Type`.MetatypeRepresentation {
+    type.bridged.getRepresentationOfMetatype().representation
+  }
+
+  public var canBeClass: Type.TraitResult { type.bridged.canBeClass().result }
+
+  public var anyNominal: NominalTypeDecl? { type.bridged.getAnyNominal().getAs(NominalTypeDecl.self) }
+
   /// Performas a global conformance lookup for this type for `protocol`.
   /// It checks conditional requirements.
-  /// 
+  ///
   /// This type must be a contextualized type. It must not contain type parameters.
   ///
   /// The resulting conformance reference does not include "missing" conformances, which are synthesized for
@@ -59,49 +113,8 @@ public struct Type: CustomStringConvertible, NoReflectionChildren {
   /// Returns an invalid conformance if the search failed, otherwise an
   /// abstract, concrete or pack conformance, depending on the lookup type.
   public func checkConformance(to protocol: ProtocolDecl) -> Conformance {
-    return Conformance(bridged: bridged.checkConformance(`protocol`.bridged))
+    return Conformance(bridged: type.bridged.checkConformance(`protocol`.bridged))
   }
-}
-
-/// A Type that is statically known to be canonical.
-/// For example, typealiases are resolved.
-public struct CanonicalType: CustomStringConvertible, NoReflectionChildren {
-  public enum TraitResult {
-    case isNot
-    case canBe
-    case `is`
-  }
-
-  public let bridged: BridgedCanType
-
-  public init(bridged: BridgedCanType) { self.bridged = bridged }
-
-  public var type: Type { Type(bridged: bridged.getType()) }
-
-  public var description: String { type.description }
-
-  public var hasTypeParameter: Bool { type.hasTypeParameter }
-  public var hasOpenedExistential: Bool { type.hasOpenedExistential }
-  public var isOpenedExistentialWithError: Bool { type.isOpenedExistentialWithError }
-  public var isEscapable: Bool { type.isEscapable }
-  public var isNoEscape: Bool { type.isNoEscape }
-  public var isInteger: Bool { type.isInteger }
-  public var isMetatypeType: Bool { type.isMetatypeType }
-  public var isExistentialMetatypeType: Bool { type.isExistentialMetatypeType }
-
-  public var anyNominal: NominalTypeDecl? { type.anyNominal }
-  public var instanceTypeOfMetatype: CanonicalType { type.instanceTypeOfMetatype.canonical }
-  
-  public func subst(with substitutionMap: SubstitutionMap) -> CanonicalType {
-    return type.subst(with: substitutionMap).canonical
-  }
-
-  // See `type.checkConformance` 
-  public func checkConformance(to proto: ProtocolDecl) -> Conformance {
-    return type.checkConformance(to: proto)
-  }
-  
-  public var canBeClass: TraitResult { bridged.canBeClass().result }
 }
 
 public struct TypeArray : RandomAccessCollection, CustomReflectable {
@@ -124,14 +137,26 @@ public struct TypeArray : RandomAccessCollection, CustomReflectable {
   }
 }
 
-extension BridgedCanType.TraitResult {
-  var result: CanonicalType.TraitResult {
+extension BridgedASTType.TraitResult {
+  var result: Type.TraitResult {
     switch self {
     case .IsNot: return .isNot
     case .CanBe: return .canBe
     case .Is:    return .is
     default:
       fatalError("wrong type TraitResult enum case")
+    }
+  }
+}
+
+extension BridgedASTType.MetatypeRepresentation {
+  var representation: Type.MetatypeRepresentation {
+    switch self {
+    case .Thin:  return .thin
+    case .Thick: return .thick
+    case .ObjC:  return .objC
+    default:
+      fatalError("wrong type MetatypeRepresentation enum case")
     }
   }
 }

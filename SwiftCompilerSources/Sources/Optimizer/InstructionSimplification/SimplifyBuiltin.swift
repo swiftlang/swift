@@ -193,13 +193,13 @@ private extension BuiltinInst {
       return
     }
 
-    guard type.representationOfMetatype(in: parentFunction) == .Thick else {
+    guard type.astType.representationOfMetatype == .thick else {
       return
     }
     
-    let instanceType = type.loweredInstanceTypeOfMetatype(in: parentFunction)
     let builder = Builder(before: self, context)
-    let newMetatype = builder.createMetatype(of: instanceType, representation: .Thin)
+    let newMetatype = builder.createMetatype(ofInstanceType: type.astType.instanceTypeOfMetatype,
+                                             representation: .thin)
     operands[argument].set(to: newMetatype, context)
   }
 

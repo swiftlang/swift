@@ -68,7 +68,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isThickFunction: Bool { bridged.isThickFunction() }
   public var isAsyncFunction: Bool { bridged.isAsyncFunction() }
 
-  public var canBeClass: CanonicalType.TraitResult { astType.canBeClass }
+  public var canBeClass: AST.`Type`.TraitResult { astType.canBeClass }
 
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
 
@@ -148,18 +148,12 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     return EnumCases(enumType: self, function: function)
   }
 
-  public typealias MetatypeRepresentation = BridgedType.MetatypeRepresentation
-
   public func loweredInstanceTypeOfMetatype(in function: Function) -> Type {
     bridged.getLoweredInstanceTypeOfMetatype(function.bridged).type
   }
 
   public var isDynamicSelfMetatype: Bool {
     bridged.isDynamicSelfMetatype()
-  }
-
-  public func representationOfMetatype(in function: Function) -> MetatypeRepresentation {
-    bridged.getRepresentationOfMetatype(function.bridged)
   }
 
   public var isCalleeConsumedFunction: Bool { bridged.isCalleeConsumedFunction() }

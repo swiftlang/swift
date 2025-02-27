@@ -224,12 +224,6 @@ SILFunctionType_getLifetimeDependencies(BridgedCanType);
 struct BridgedType {
   void * _Nullable opaqueValue;
 
-  enum class MetatypeRepresentation {
-    Thin,
-    Thick,
-    ObjC
-  };
-
   struct EnumElementIterator {
     uint64_t storage[4];
 
@@ -285,7 +279,6 @@ struct BridgedType {
   BRIDGED_INLINE bool isExactSuperclassOf(BridgedType t) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getLoweredInstanceTypeOfMetatype(BridgedFunction f) const;
   BRIDGED_INLINE bool isDynamicSelfMetatype() const;
-  BRIDGED_INLINE MetatypeRepresentation getRepresentationOfMetatype(BridgedFunction f) const;
   BRIDGED_INLINE bool isCalleeConsumedFunction() const;
   BRIDGED_INLINE bool isMarkedAsImmortal() const;
   BRIDGED_INLINE SwiftInt getCaseIdxOfEnumType(BridgedStringRef name) const;
@@ -1242,8 +1235,8 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createInitExistentialMetatype(BridgedValue metatype,
                                           BridgedType existentialType,
                                           BridgedConformanceArray conformances) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMetatype(BridgedType type,
-                                          BridgedType::MetatypeRepresentation representation) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMetatype(BridgedCanType instanceType,
+                                          BridgedASTType::MetatypeRepresentation representation) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutation(BridgedValue instance,
                                                                              bool keepUnique) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkDependence(

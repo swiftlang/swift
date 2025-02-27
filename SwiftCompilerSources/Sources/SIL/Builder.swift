@@ -549,8 +549,17 @@ public struct Builder {
     return notifyNew(initExistential.getAs(InitExistentialMetatypeInst.self))
   }
 
-  public func createMetatype(of type: Type, representation: Type.MetatypeRepresentation) -> MetatypeInst {
-    let metatype = bridged.createMetatype(type.bridged, representation)
+  public func createMetatype(
+    ofInstanceType instanceType: CanonicalType,
+    representation: AST.`Type`.MetatypeRepresentation
+  ) -> MetatypeInst {
+    let bridgedRep: BridgedASTType.MetatypeRepresentation
+    switch representation {
+    case .thin:  bridgedRep = .Thin
+    case .thick: bridgedRep = .Thick
+    case .objC:  bridgedRep = .ObjC
+    }
+    let metatype = bridged.createMetatype(instanceType.bridged, bridgedRep)
     return notifyNew(metatype.getAs(MetatypeInst.self))
   }
 
