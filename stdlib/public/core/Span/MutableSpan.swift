@@ -27,9 +27,9 @@ public struct MutableSpan<Element: ~Copyable & ~Escapable>
     _pointer.unsafelyUnwrapped
   }
 
-  @usableFromInline @inline(__always)
+  @_alwaysEmitIntoClient
   @lifetime(borrow start)
-  init(
+  internal init(
     _unchecked start: UnsafeMutableRawPointer?,
     count: Int
   ) {
