@@ -43,6 +43,7 @@ struct BridgedDeclRef;
 namespace swift {
 class ValueBase;
 class Operand;
+struct SILDebugVariable;
 class ForwardingInstruction;
 class SILType;
 class SILFunction;
@@ -624,8 +625,14 @@ struct BridgedGenericSpecializationInformation {
   const swift::GenericSpecializationInformation * _Nullable data = nullptr;
 };
 
-struct OptionalBridgedSILDebugVariable {
+struct BridgedSILDebugVariable {
   uint64_t storage[16];
+
+  BRIDGED_INLINE BridgedSILDebugVariable(const swift::SILDebugVariable &var);
+  BRIDGED_INLINE BridgedSILDebugVariable(const BridgedSILDebugVariable &rhs);
+  BRIDGED_INLINE ~BridgedSILDebugVariable();
+  BRIDGED_INLINE BridgedSILDebugVariable &operator=(const BridgedSILDebugVariable &rhs);
+  BRIDGED_INLINE swift::SILDebugVariable unbridge() const;
 };
 
 struct BridgedInstruction {
@@ -857,11 +864,14 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj
   RefElementAddr_getDecl() const;
 
-  BRIDGED_INLINE OptionalBridgedSILDebugVariable DebugValue_getVarInfo() const;
+  BRIDGED_INLINE bool DebugValue_hasVarInfo() const;
+  BRIDGED_INLINE BridgedSILDebugVariable DebugValue_getVarInfo() const;
 
-  BRIDGED_INLINE OptionalBridgedSILDebugVariable AllocStack_getVarInfo() const;
+  BRIDGED_INLINE bool AllocStack_hasVarInfo() const;
+  BRIDGED_INLINE BridgedSILDebugVariable AllocStack_getVarInfo() const;
 
-  BRIDGED_INLINE OptionalBridgedSILDebugVariable AllocBox_getVarInfo() const;
+  BRIDGED_INLINE bool AllocBox_hasVarInfo() const;
+  BRIDGED_INLINE BridgedSILDebugVariable AllocBox_getVarInfo() const;
 };
 
 struct OptionalBridgedInstruction {
