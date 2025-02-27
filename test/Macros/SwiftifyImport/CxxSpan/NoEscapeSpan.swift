@@ -12,5 +12,5 @@ func myFunc(_ span: SpanOfInt, _ secondSpan: SpanOfInt) {
 
 // CHECK:      @_alwaysEmitIntoClient
 // CHECK-NEXT: func myFunc(_ span: Span<CInt>, _ secondSpan: SpanOfInt) {
-// CHECK-NEXT:     return myFunc(SpanOfInt(span), secondSpan)
+// CHECK-NEXT:     return unsafe myFunc(SpanOfInt(span), secondSpan)
 // CHECK-NEXT: }

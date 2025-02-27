@@ -12,12 +12,12 @@ func bar(_ ptr: Swift.UnsafePointer<Swift.CInt>, _ len: Swift.Int) -> () {
 
 // CHECK:      @_alwaysEmitIntoClient
 // CHECK-NEXT: func foo(_ ptr: Swift.UnsafeBufferPointer<Swift.Int>) -> Swift.Void {
-// CHECK-NEXT:     return foo(ptr.baseAddress!, ptr.count)
+// CHECK-NEXT:     return unsafe foo(ptr.baseAddress!, ptr.count)
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient
 // CHECK-NEXT: func bar(_ ptr: Swift.UnsafeBufferPointer<Swift.CInt>) -> () {
-// CHECK-NEXT:     return bar(ptr.baseAddress!, ptr.count)
+// CHECK-NEXT:     return unsafe bar(ptr.baseAddress!, ptr.count)
 // CHECK-NEXT: }
 
 

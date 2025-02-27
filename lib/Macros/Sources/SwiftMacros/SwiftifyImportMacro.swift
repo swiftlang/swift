@@ -599,7 +599,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamPointerBoundsThunkBuilder {
     let unwrappedCall = ExprSyntax(
       """
         \(ptrRef).\(raw: funcName) { \(unwrappedName) in
-          return \(call)
+          return unsafe \(call)
         }
       """)
     return unwrappedCall
@@ -660,7 +660,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamPointerBoundsThunkBuilder {
         return ExprSyntax(
           """
             if \(name) == nil {
-              \(try base.buildFunctionCall(nullArgs))
+              unsafe \(try base.buildFunctionCall(nullArgs))
             } else {
               \(unwrappedCall)
             }
@@ -1142,7 +1142,7 @@ public struct SwiftifyImportMacro: PeerMacro {
         item: CodeBlockItemSyntax.Item(
           ReturnStmtSyntax(
             returnKeyword: .keyword(.return, trailingTrivia: " "),
-            expression: try builder.buildFunctionCall([:]))))
+            expression: ExprSyntax("unsafe \(try builder.buildFunctionCall([:]))"))))
       let body = CodeBlockSyntax(statements: CodeBlockItemListSyntax(checks + [call]))
       let lifetimeAttrs = lifetimeAttributes(funcDecl, lifetimeDependencies)
       let disfavoredOverload : [AttributeListSyntax.Element] = (onlyReturnTypeChanged ? [
