@@ -235,6 +235,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TF'                 // distributed method accessor
   global ::= global 'TI'                 // implementation of a dynamic_replaceable function
   global ::= global 'Tu'                 // async function pointer of a function
+  global ::= global 'Tv'                 // coro function pointer of a function
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function
   global ::= global 'Twb'                // back deployment thunk
   global ::= global 'TwB'                // back deployment fallback function

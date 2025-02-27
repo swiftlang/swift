@@ -7486,6 +7486,19 @@ llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
       entity, builder.finishAndCreateFuture()));
 }
 
+llvm::GlobalValue *irgen::emitCoroFunctionPointer(IRGenModule &IGM,
+                                                  llvm::Function *function,
+                                                  LinkEntity entity,
+                                                  Size size) {
+  ConstantInitBuilder initBuilder(IGM);
+  ConstantStructBuilder builder(
+      initBuilder.beginStruct(IGM.CoroFunctionPointerTy));
+  builder.addCompactFunctionReference(function);
+  builder.addInt32(size.getValue());
+  return cast<llvm::GlobalValue>(
+      IGM.defineCoroFunctionPointer(entity, builder.finishAndCreateFuture()));
+}
+
 static FormalLinkage getExistentialShapeLinkage(CanGenericSignature genSig,
                                                 CanType shapeType) {
   auto typeLinkage = getTypeLinkage(shapeType);

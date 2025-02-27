@@ -172,7 +172,8 @@ namespace irgen {
   public:
     enum class BasicKind {
       Function,
-      AsyncFunctionPointer
+      AsyncFunctionPointer,
+      CoroFunctionPointer,
     };
 
     enum class SpecialKind {
@@ -190,13 +191,15 @@ namespace irgen {
     };
 
   private:
-    static constexpr unsigned SpecialOffset = 2;
+    static constexpr unsigned SpecialOffset = 3;
     unsigned value;
   public:
     static constexpr BasicKind Function =
       BasicKind::Function;
     static constexpr BasicKind AsyncFunctionPointer =
       BasicKind::AsyncFunctionPointer;
+    static constexpr BasicKind CoroFunctionPointer =
+        BasicKind::CoroFunctionPointer;
 
     FunctionPointerKind(BasicKind kind)
       : value(unsigned(kind)) {}
@@ -219,6 +222,9 @@ namespace irgen {
     }
     bool isAsyncFunctionPointer() const {
       return value == unsigned(BasicKind::AsyncFunctionPointer);
+    }
+    bool isCoroFunctionPointer() const {
+      return value == unsigned(BasicKind::CoroFunctionPointer);
     }
 
     bool isSpecial() const {
@@ -325,7 +331,10 @@ namespace irgen {
     /// An additional value whose meaning varies by the FunctionPointer's Kind:
     /// - Kind::AsyncFunctionPointer -> pointer to the corresponding function
     ///                                 if the FunctionPointer was created via
-    ///                                 forDirect; nullptr otherwise. 
+    ///                                 forDirect; nullptr otherwise.
+    /// - Kind::CoroFunctionPointer - pointer to the corresponding function
+    ///                               if the FunctionPointer was created via
+    ///                               forDirect; nullptr otherwise.
     llvm::Value *SecondaryValue;
 
     PointerAuthInfo AuthInfo;
@@ -461,6 +470,13 @@ namespace irgen {
     /// pointer to the corresponding function if available.
     llvm::Value *getRawAsyncFunction() const {
       assert(kind.isAsyncFunctionPointer());
+      return SecondaryValue;
+    }
+
+    /// Assuming that the receiver is of kind CoroFunctionPointer, returns the
+    /// pointer to the corresponding function if available.
+    llvm::Value *getRawCoroFunction() const {
+      assert(kind.isCoroFunctionPointer());
       return SecondaryValue;
     }
 

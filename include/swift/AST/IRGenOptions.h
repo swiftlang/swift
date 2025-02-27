@@ -386,6 +386,7 @@ public:
   unsigned LazyInitializeClassMetadata : 1;
   unsigned LazyInitializeProtocolConformances : 1;
   unsigned IndirectAsyncFunctionPointer : 1;
+  unsigned IndirectCoroFunctionPointer : 1;
 
   /// Use absolute function references instead of relative ones.
   /// Mainly used on WebAssembly, that doesn't support relative references
@@ -580,10 +581,10 @@ public:
         HasValueNamesSetting(false), ValueNames(false),
         ReflectionMetadata(ReflectionMetadataMode::Runtime),
         EnableReflectionNames(true), DisableLLVMMergeFunctions(false),
-        EnableAnonymousContextMangledNames(false),
-        ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
+        EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
+        LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false),
-        IndirectAsyncFunctionPointer(false),
+        IndirectAsyncFunctionPointer(false), IndirectCoroFunctionPointer(false),
         CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
@@ -598,16 +599,15 @@ public:
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
-        MergeableSymbols(false),
-        EmitGenericRODatas(true), NoPreallocatedInstantiationCaches(false),
+        MergeableSymbols(false), EmitGenericRODatas(true),
+        NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(false),
         EmitYieldOnce2AsYieldOnce(true), AsyncFramePointerAll(false),
-        UseProfilingMarkerThunks(false),
-        DebugInfoForProfiling(false), CmdArgs(),
-        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        UseProfilingMarkerThunks(false), DebugInfoForProfiling(false),
+        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
         CASObjMode(llvm::CASBackendMode::Native) {

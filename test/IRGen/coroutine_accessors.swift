@@ -4,13 +4,11 @@
 // RUN:     -enable-library-evolution                        \
 // RUN: | %IRGenFileCheck %s --check-prefix=CHECK-OLD
 
-// For now, a crash is expected when attempting to use the callee-allocated ABI: 
-// it's not implemented.
-// RUN: not --crash                                             \
-// RUN:     %target-swift-emit-irgen                            \
-// RUN:         %s                                              \
-// RUN:         -enable-experimental-feature CoroutineAccessors \
-// RUN:         -enable-experimental-feature CoroutineAccessorsAllocateInCallee
+// RUN: %target-swift-emit-irgen                                            \
+// RUN:     %s                                                              \
+// RUN:     -enable-experimental-feature CoroutineAccessors                 \
+// RUN:     -enable-experimental-feature CoroutineAccessorsAllocateInCallee \
+// RUN: | %IRGenFileCheck %s --check-prefix=CHECK-NEW
 
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_CoroutineAccessorsAllocateInCallee
@@ -22,21 +20,21 @@ public var o: any AnyObject
 public var _i: Int = 0
 
 public var irm: Int {
-// CHECK-OLD-LABEL: define{{.*}} { ptr, {{i64|i32}} } @"$s19coroutine_accessors1SV3irmSivy"(
+// CHECK-LABEL:     define{{.*}} { ptr, {{i64|i32}} } @"$s19coroutine_accessors1SV3irmSivy"(
 // CHECK-OLD-SAME:      ptr noalias dereferenceable({{32|16}}) %0,
 // CHECK-OLD-SAME:      ptr %1,
 // CHECK-OLD-SAME:      [[INT]] %2
-// CHECK-OLD-SAME:  )
-// CHECK-OLD-SAME:  {
-// CHECK-OLD:       }
+// CHECK-SAME:      )
+// CHECK-SAME:      {
+// CHECK:           }
   read {
     yield _i
   }
-// CHECK-OLD-LABEL: define{{.*}} { ptr, ptr } @"$s19coroutine_accessors1SV3irmSivx"(
+// CHECK-LABEL:     define{{.*}} { ptr, ptr } @"$s19coroutine_accessors1SV3irmSivx"(
 // CHECK-OLD-SAME:      ptr noalias dereferenceable({{32|16}}) %0, 
 // CHECK-OLD-SAME:      ptr nocapture swiftself dereferenceable({{16|8}}) %1
-// CHECK-OLD-SAME:  )
-// CHECK-OLD-SAME:  {
+// CHECK-SAME:      )
+// CHECK-SAME:      {
 // CHECK-OLD:       }
   modify {
     yield &_i
