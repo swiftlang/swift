@@ -349,14 +349,15 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false
+      isDiscardingTask: false,
+      isSynchronousStart: false
     )
 #else
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 #endif
 
     // Create the task in this group.
@@ -393,13 +394,13 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 #else
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 #endif
 
     // Create the task in this group.
@@ -435,7 +436,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the task in this group.
     let builtinSerialExecutor =
@@ -476,7 +477,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the task in this group.
     let builtinSerialExecutor =
@@ -797,7 +798,8 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false
+      isDiscardingTask: false,
+      isSynchronousStart: false
     )
 
     // Create the task in this group.
@@ -837,7 +839,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the task in this group.
     let builtinSerialExecutor =
@@ -874,7 +876,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
@@ -913,7 +915,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the task in this group.
     _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)

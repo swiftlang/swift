@@ -251,7 +251,7 @@ extension Task where Success == Never, Failure == Never {
                 priority: nil, isChildTask: false, copyTaskLocals: false,
                 inheritContext: false, enqueueJob: false,
                 addPendingGroupTaskUnconditionally: false,
-                isDiscardingTask: false)
+                isDiscardingTask: false, isSynchronousStart: false)
               let (sleepTask, _) = Builtin.createAsyncTask(sleepTaskFlags) {
                 unsafe onSleepWake(token)
               }
