@@ -2475,15 +2475,13 @@ static void addSendableFixIt(const NominalTypeDecl *nominal,
 /// Add Fix-It text for the given generic param declaration type to adopt
 /// Sendable.
 static void addSendableFixIt(const GenericTypeParamDecl *genericArgument,
-                             InFlightDiagnostic &diag, bool unchecked) {
+                             InFlightDiagnostic &diag) {
   if (genericArgument->getInherited().empty()) {
     auto fixItLoc = genericArgument->getLoc();
-    diag.fixItInsertAfter(fixItLoc,
-                          unchecked ? ": @unchecked Sendable" : ": Sendable");
+    diag.fixItInsertAfter(fixItLoc, ": Sendable");
   } else {
     auto fixItLoc = genericArgument->getInherited().getEndLoc();
-    diag.fixItInsertAfter(fixItLoc,
-                          unchecked ? ", @unchecked Sendable" : ", Sendable");
+    diag.fixItInsertAfter(fixItLoc, " & Sendable");
   }
 }
 
@@ -2664,7 +2662,7 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
           genericParamTypeDecl->getModuleContext() == moduleDecl) {
         auto diag = genericParamTypeDecl->diagnose(
             diag::rbi_add_generic_parameter_sendable_conformance, type);
-        addSendableFixIt(genericParamTypeDecl, diag, /*unchecked=*/false);
+        addSendableFixIt(genericParamTypeDecl, diag);
         return;
       }
     }
