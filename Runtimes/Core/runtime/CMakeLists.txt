@@ -159,11 +159,13 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
     "${SwiftCore_SWIFTC_SOURCE_DIR}/include"
     "${PROJECT_BINARY_DIR}/include")
   target_link_libraries(swiftrt PRIVATE swiftShims)
-  # The driver requires that swifrt.o is under `usr/lib/swift/<platform>/<arch>`
-  # Regardless of settings
+  # The driver requires that swiftrt.o is under
+  # `usr/lib/(swift|swift_static)/<platform>/<arch>` regardless of whether the
+  # other files are under the platform and architecture subdirectories:
+  # https://github.com/swiftlang/swift-driver/blob/f66e33575150cc778289b5f573218c7a0c70bab6/Sources/SwiftDriver/Jobs/GenericUnixToolchain%2BLinkerSupport.swift#L186
   install(FILES $<TARGET_OBJECTS:swiftrt>
     COMPONENT SwiftCore_runtime
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift$<BOOL:${BUILD_SHARED_LIBS}>:_static>/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.o)
 elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
   add_library(swiftrtT OBJECT SwiftRT-COFF.cpp)
