@@ -815,7 +815,21 @@ Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
-// Span-providing properties
+// SE-0467 MutableSpan and MutableRawSpan
+Added: _$ss11MutableSpanVMa
+Added: _$ss11MutableSpanVMn
+Added: _$ss11MutableSpanVsRi_zRi0_zrlE10_unchecked5countAByxGSvSg_SitcfC
+Added: _$ss11MutableSpanVsRi_zRi0_zrlE6_countSivg
+Added: _$ss11MutableSpanVsRi_zRi0_zrlE8_pointerSvSgvg
+Added: _$ss11MutableSpanVsRi_zrlE10_uncheckedAByxGSryxG_tcfC
+Added: _$ss14MutableRawSpanV10_unchecked5countABSvSg_SitcfC
+Added: _$ss14MutableRawSpanV6_countSivg
+Added: _$ss14MutableRawSpanV8_pointerSvSgvg
+Added: _$ss14MutableRawSpanVMa
+Added: _$ss14MutableRawSpanVMn
+Added: _$ss14MutableRawSpanVN
+
+// SE-0456 Span-providing properties
 Added: _$sSRsRi_zrlE4spans4SpanVyxGvpMV
 Added: _$sSW5bytess7RawSpanVvpMV
 Added: _$sSa4spans4SpanVyxGvpMV
