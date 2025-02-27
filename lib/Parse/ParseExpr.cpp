@@ -3782,9 +3782,6 @@ ParserResult<AvailabilitySpec> Parser::parsePlatformVersionConstraintSpec() {
         Context, PlatformIdentifier, PlatformLoc, Version, VersionRange));
   }
 
-  // Register the platform name as a keyword token.
-  TokReceiver->registerTokenKindChange(PlatformLoc, tok::contextual_keyword);
-
   return makeParserResult(AvailabilitySpec::createForDomain(
       Context, AvailabilityDomain::forPlatform(Platform.value()), PlatformLoc,
       Version, VersionRange));
