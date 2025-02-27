@@ -78,6 +78,10 @@
 #define SWIFT_SILCOMBINE_PASS(Inst)
 #endif
 
+#ifndef SWIFT_SILCOMBINE_PASS_WITH_LEGACY
+#define SWIFT_SILCOMBINE_PASS_WITH_LEGACY(Inst)
+#endif
+
 /// PASS_RANGE(RANGE_ID, START, END)
 ///   Pass IDs between PassKind::START and PassKind::END, inclusive,
 ///   fall within the set known as
@@ -540,5 +544,6 @@ SWIFT_SILCOMBINE_PASS(UncheckedEnumDataInst)
 #undef SWIFT_MODULE_PASS
 #undef SWIFT_FUNCTION_PASS
 #undef SWIFT_SILCOMBINE_PASS
+#undef SWIFT_SILCOMBINE_PASS_WITH_LEGACY
 #undef PASS
 #undef PASS_RANGE
