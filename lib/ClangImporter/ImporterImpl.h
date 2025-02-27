@@ -807,10 +807,6 @@ private:
   llvm::DenseMap<const Decl *, ArrayRef<ProtocolDecl *>>
     ImportedProtocols;
 
-  /// The set of declaration context for which we've already ruled out the
-  /// presence of globals-as-members.
-  llvm::DenseSet<const IterableDeclContext *> checkedGlobalsAsMembers;
-
   void startedImportingEntity();
 
 public:

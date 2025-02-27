@@ -3574,8 +3574,8 @@ static ModuleDecl *tryLoadModule(ASTContext &C,
                              llvm::DenseMap<Identifier, ModuleDecl *>
                                &checkedModules) {
   // If we've already done this check, return the cached result.
-  auto known = checkedModules.find(moduleName);
-  if (known != checkedModules.end())
+  auto [known, inserted] = checkedModules.try_emplace(moduleName, nullptr);
+  if (!inserted)
     return known->second;
 
   ModuleDecl *module;
@@ -3587,7 +3587,7 @@ static ModuleDecl *tryLoadModule(ASTContext &C,
   else
     module = C.getModuleByIdentifier(moduleName);
 
-  checkedModules[moduleName] = module;
+  known->getSecond() = module;
   return module;
 }
 
