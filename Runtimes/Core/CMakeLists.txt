@@ -127,6 +127,7 @@ defaulted_option(SwiftCore_ENABLE_PRESPECIALIZATION "Enable generic metadata pre
 option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" OFF)
 option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)
 option(SwiftCore_ENABLE_INTERNAL_CHECKS "" OFF)
+set(SwiftCore_OPTIMIZATION_REMARKS OFF CACHE STRING "Set opt-remark format")
 
 defaulted_set(SwiftCore_OBJECT_FORMAT STRING "Object format: ELF COFF")
 defaulted_set(SwiftCore_THREADING_PACKAGE STRING "Threading Package: C11 Linux PThreads Win32")
@@ -179,9 +180,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:-disable-autolinking-runtime-compatibility-dynamic-replacements>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-strict-memory-safety>"
-  # TODO: we should reevaluate if it still makes sense to restrict this
-  # to Darwin, https://github.com/swiftlang/swift/issues/79279
-  "$<$<AND:$<PLATFORM_ID:Darwin>,$<COMPILE_LANGUAGE:Swift>>:-save-optimization-record=bitstream>"
+  "$<$<AND:$<BOOL:${SwiftCore_OPTIMIZATION_REMARKS}>,$<COMPILE_LANGUAGE:Swift>>:-save-optimization-record=${SwiftCore_OPTIMIZATION_REMARKS}>"
   "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
