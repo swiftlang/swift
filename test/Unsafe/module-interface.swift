@@ -20,11 +20,12 @@ public protocol P {
   func f()
 }
 
+// CHECK:  #if compiler(>=5.3) && $MemorySafetyAttributes
 // CHECK: public struct X : @unsafe UserModule.P
 public struct X: @unsafe P {
-// CHECK:  #if compiler(>=5.3) && $MemorySafetyAttributes
 // CHECK:  @unsafe public func f()
 // CHECK:  #else
+// CHECK: public struct X : UserModule.P
 // CHECK:  public func f()
 // CHECK:  #endif
   @unsafe public func f() { }

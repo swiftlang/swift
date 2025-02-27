@@ -18,6 +18,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "clang/AST/DeclObjC.h"
 #include "swift/Basic/Assertions.h"
 
@@ -350,8 +351,32 @@ static bool usesFeatureIsolatedConformances(Decl *decl) {
 }
 
 static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
-  return decl->getAttrs().hasAttribute<SafeAttr>() ||
-      decl->getAttrs().hasAttribute<UnsafeAttr>();
+  if (decl->getAttrs().hasAttribute<SafeAttr>() ||
+      decl->getAttrs().hasAttribute<UnsafeAttr>())
+    return true;
+
+  IterableDeclContext *idc;
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
+    idc = nominal;
+  else if (auto ext = dyn_cast<ExtensionDecl>(decl))
+    idc = ext;
+  else
+    idc = nullptr;
+
+  // Look for an @unsafe conformance ascribed to this declaration.
+  if (idc) {
+    auto conformances = idc->getLocalConformances();
+    for (auto conformance : conformances) {
+      auto rootConformance = conformance->getRootConformance();
+      if (auto rootNormalConformance =
+              dyn_cast<NormalProtocolConformance>(rootConformance)) {
+        if (rootNormalConformance->getExplicitSafety() == ExplicitSafety::Unsafe)
+          return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 UNINTERESTING_FEATURE(StrictMemorySafety)
