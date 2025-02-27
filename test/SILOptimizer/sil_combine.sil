@@ -3447,10 +3447,10 @@ class ClientSocket : Socket {
 }
 
 // CHECK-LABEL: static_existential
-// CHECK:bb0:
-// CHECK:  [[META:%.*]] = metatype $@thick ClientSocket.Type
-// CHECK:  [[WM:%.*]] = witness_method $ClientSocket
-// CHECK:  try_apply [[WM]]<ClientSocket>([[META]])
+// CHECK:       bb0:
+// CHECK-DAG:    [[META:%.*]] = metatype $@thick ClientSocket.Type
+// CHECK-DAG:    [[WM:%.*]] = witness_method $ClientSocket
+// CHECK:        try_apply [[WM]]<ClientSocket>([[META]])
 sil @static_existential : $@convention(thin) () -> (Builtin.Int32, @error MyErrorType) {
 bb0:
   %0 = metatype $@thick ClientSocket.Type
