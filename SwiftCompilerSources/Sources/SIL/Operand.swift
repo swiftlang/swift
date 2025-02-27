@@ -182,8 +182,12 @@ extension Sequence where Element == Operand {
     return self.lazy.map { $0.instruction }
   }
 
-  // This intentinally returns a Sequence of `Instruction` and not a Sequence of `I` to be able to use
-  // it as argument to `InstructionSet.insert(contentsOf:)`.
+  public func users<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, I> {
+    self.lazy.filter{ $0.instruction is I }.lazy.map { $0.instruction as! I }
+  }
+
+  // This overload which returns a Sequence of `Instruction` and not a Sequence of `I` is used for APIs, like
+  // `InstructionSet.insert(contentsOf:)`, which require a sequence of `Instruction`.
   public func users<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, Instruction> {
     self.lazy.filter{ $0.instruction is I }.users
   }
