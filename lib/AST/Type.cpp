@@ -4561,11 +4561,28 @@ bool TypeBase::hasSimpleTypeRepr() const {
   }
 
   case TypeKind::ProtocolComposition: {
-    // 'Any', 'AnyObject' and single protocol compositions are simple
     auto composition = cast<const ProtocolCompositionType>(this);
+
+    // A protocol composition is simple if its syntactic representation does not
+    // involve `&`. This is true if we have 'Any', 'AnyObject', or a single
+    // inverse requirement like `~Copyable`.
+
+    // All other protocol compositions contain at least two `&`-separated terms.
+
+    // Add each logical member Foo.
     auto memberCount = composition->getMembers().size();
+
+    // And each inverse requirement ~Foo.
+    for (auto ip : composition->getInverses()) {
+      (void) ip;
+      ++memberCount;
+    }
+
+    // And finally, AnyObject.
     if (composition->hasExplicitAnyObject())
-      return memberCount == 0;
+      ++memberCount;
+
+    // Almost always, this will be > 1.
     return memberCount <= 1;
   }
 
