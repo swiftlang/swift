@@ -8377,6 +8377,15 @@ ERROR(invalid_function_conversion_with_non_sendable,none,
 NOTE(type_does_not_conform_to_Sendable,none,
      "type %0 does not conform to 'Sendable' protocol", (Type))
 
+//===----------------------------------------------------------------------===//
+//                            MARK: SwiftSettings
+//===----------------------------------------------------------------------===//
+
+ERROR(swift_settings_invalid_setting, none,
+      "Unrecognized setting passed to #SwiftSettings", ())
+
+ERROR(swift_settings_must_be_top_level, none,
+      "#SwiftSettings can only be invoked as a top level declaration", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -26,7 +26,8 @@ using namespace swift;
 
 /// Does the interface of this declaration use a type for which the
 /// given predicate returns true?
-static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
+static bool usesTypeMatching(const Decl *decl,
+                             llvm::function_ref<bool(Type)> fn) {
   if (auto value = dyn_cast<ValueDecl>(decl)) {
     if (Type type = value->getInterfaceType()) {
       return type.findIf(fn);
@@ -393,6 +394,24 @@ UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(CoroutineAccessorsAllocateInCallee)
+
+static bool usesFeatureSwiftSettings(const Decl *decl) {
+  // If we cannot find the struct SwiftSetting decl, then we could not have
+  // specified #SwiftSettings.
+  if (!decl->getASTContext().getSwiftSettingDecl())
+    return false;
+
+  if (auto *nom = dyn_cast<NominalTypeDecl>(decl))
+    return nom == decl->getASTContext().getSwiftSettingDecl();
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+    if (auto *nominal = ext->getExtendedNominal())
+      if (usesFeatureSwiftSettings(nominal))
+        return true;
+  return usesTypeMatching(decl, [&](Type type) -> bool {
+    return type->getCanonicalType() ==
+           decl->getASTContext().getSwiftSettingType()->getCanonicalType();
+  });
+}
 
 bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   if (auto cd = dyn_cast<ClassDecl>(decl)) {
