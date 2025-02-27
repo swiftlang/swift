@@ -86,3 +86,20 @@ suite.test("InlineArray.span property")
     expectEqual(span[i], s[i])
   }
 }
+
+suite.test("InlineArray.span property (String)")
+.skip(.custom(
+  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
+  reason: "Requires Swift 6.2's standard library"
+))
+.code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var s = InlineArray<5, String>(repeating: "0")
+  s[3] = String(Int.random(in: 0..<1000))
+  let span = s.span
+  expectEqual(span.count, s.count)
+  for i in s.indices {
+    expectEqual(span[i], s[i])
+  }    
+}
