@@ -122,7 +122,7 @@ public struct ResultInfo : CustomStringConvertible {
   public var isSILIndirect: Bool {
     switch convention {
     case .indirect:
-      return hasLoweredAddresses || type.isOpenedExistentialWithError()
+      return hasLoweredAddresses || type.isExistentialArchetypeWithError()
     case .pack:
       return true
     case .owned, .unowned, .unownedInnerPointer, .autoreleased:
@@ -178,7 +178,7 @@ public struct ParameterInfo : CustomStringConvertible {
   public var isSILIndirect: Bool {
     switch convention {
     case .indirectIn, .indirectInGuaranteed:
-      return hasLoweredAddresses || type.isOpenedExistentialWithError
+      return hasLoweredAddresses || type.isExistentialArchetypeWithError
     case .indirectInout, .indirectInoutAliasable, .indirectInCXX:
       return true
     case .directOwned, .directUnowned, .directGuaranteed:

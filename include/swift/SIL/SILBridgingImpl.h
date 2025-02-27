@@ -476,11 +476,6 @@ bool BridgedType::isDynamicSelfMetatype() const {
   return instTy->is<swift::DynamicSelfType>();
 }
 
-BridgedType::MetatypeRepresentation BridgedType::getRepresentationOfMetatype(BridgedFunction f) const {
-  return BridgedType::MetatypeRepresentation(
-      unbridged().getRepresentationOfMetatype(f.getFunction()));
-}
-
 bool BridgedType::isCalleeConsumedFunction() const {
   return unbridged().isCalleeConsumedFunction();
 }
@@ -2453,10 +2448,10 @@ BridgedInstruction BridgedBuilder::createInitExistentialMetatype(BridgedValue me
       conformances.pcArray.unbridged<swift::ProtocolConformanceRef>())};
 }
 
-BridgedInstruction BridgedBuilder::createMetatype(BridgedType type,
-                                                  BridgedType::MetatypeRepresentation representation) const {
+BridgedInstruction BridgedBuilder::createMetatype(BridgedCanType instanceType,
+                                                  BridgedASTType::MetatypeRepresentation representation) const {
   auto *mt =
-      swift::MetatypeType::get(type.unbridged().getASTType(),
+      swift::MetatypeType::get(instanceType.unbridged(),
                                (swift::MetatypeRepresentation)representation);
   auto t = swift::SILType::getPrimitiveObjectType(swift::CanType(mt));
   return {unbridged().createMetatype(regularLoc(), t)};

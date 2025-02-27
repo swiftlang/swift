@@ -2984,22 +2984,39 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
 };
 
 struct BridgedASTType {
+  enum class TraitResult {
+    IsNot,
+    CanBe,
+    Is
+  };
+
+  enum class MetatypeRepresentation {
+    Thin,
+    Thick,
+    ObjC
+  };
+
   swift::TypeBase * _Nullable type;
 
   BRIDGED_INLINE swift::Type unbridged() const;
   BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanonicalType() const;
   BRIDGED_INLINE bool hasTypeParameter() const;
-  BRIDGED_INLINE bool hasOpenedExistential() const;
-  BRIDGED_INLINE bool isOpenedExistentialWithError() const;
+  BRIDGED_INLINE bool hasLocalArchetype() const;
+  BRIDGED_INLINE bool isExistentialArchetype() const;
+  BRIDGED_INLINE bool isExistentialArchetypeWithError() const;
+  BRIDGED_INLINE bool isExistential() const;
   BRIDGED_INLINE bool isEscapable() const;
   BRIDGED_INLINE bool isNoEscape() const;
   BRIDGED_INLINE bool isInteger() const;
   BRIDGED_INLINE bool isMetatypeType() const;
   BRIDGED_INLINE bool isExistentialMetatypeType() const;
+  BRIDGED_INLINE TraitResult canBeClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;
+  BRIDGED_INLINE MetatypeRepresentation getRepresentationOfMetatype() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedASTType fromType, BridgedASTType toType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;  
 };
 
@@ -3007,16 +3024,9 @@ class BridgedCanType {
   swift::TypeBase * _Nullable type;
 
 public:
-  enum class TraitResult {
-    IsNot,
-    CanBe,
-    Is
-  };
-
   BRIDGED_INLINE BridgedCanType(swift::CanType ty);
   BRIDGED_INLINE swift::CanType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getType() const;
-  BRIDGED_INLINE TraitResult canBeClass() const;
 };
 
 struct BridgedASTTypeArray {
