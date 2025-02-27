@@ -802,7 +802,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     /// and that the protocol type has a sole conformance, then we can propagate
     /// concrete type for it as well.
     ArchetypeType *archetypeTy;
-    if (SwiftArgType->isOpenedExistential() &&
+    if (isa<OpenedArchetypeType>(SwiftArgType) &&
         (archetypeTy = dyn_cast<ArchetypeType>(SwiftArgType)) &&
         (archetypeTy->getConformsTo().size() == 1)) {
       PD = archetypeTy->getConformsTo()[0];
@@ -1116,7 +1116,7 @@ SILValue SILCombiner::canCastArg(FullApplySite Apply,
                                  const OpenedArchetypeInfo &OAI,
                                  const ConcreteExistentialInfo &CEI,
                                  unsigned ArgIdx) {
-  if (!CEI.ConcreteValue || CEI.ConcreteType->isOpenedExistential() ||
+  if (!CEI.ConcreteValue || isa<OpenedArchetypeType>(CEI.ConcreteType) ||
       !CEI.ConcreteValue->getType().isAddress())
     return SILValue();
 
@@ -1378,7 +1378,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
 
   // If the lookup type is not an opened existential type,
   // it cannot be made more concrete.
-  if (!WMI->getLookupType()->isOpenedExistential())
+  if (!isa<OpenedArchetypeType>(WMI->getLookupType()))
     return nullptr;
 
   // Try to derive the concrete type and the related conformance of self and

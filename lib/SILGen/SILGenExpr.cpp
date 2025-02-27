@@ -3204,13 +3204,12 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   if (baseType->isAnyExistentialType()) {
     // Use the opened archetype from the AST for a protocol member, or make a
     // new one (which we'll upcast immediately below) for a class member.
-    ArchetypeType *opened;
+    OpenedArchetypeType *opened;
     if (storage->getDeclContext()->getSelfClassDecl()) {
       opened = OpenedArchetypeType::get(baseType);
     } else {
-      opened = subs.getReplacementTypes()[0]->castTo<ArchetypeType>();
+      opened = subs.getReplacementTypes()[0]->castTo<OpenedArchetypeType>();
     }
-    assert(opened->isOpenedExistential());
 
     FormalEvaluationScope scope(subSGF);
     
@@ -3657,8 +3656,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
     // Open an existential lvalue, if necessary.
     if (baseType->isAnyExistentialType()) {
-      auto opened = subs.getReplacementTypes()[0]->castTo<ArchetypeType>();
-      assert(opened->isOpenedExistential());
+      auto opened = subs.getReplacementTypes()[0]->castTo<OpenedArchetypeType>();
       baseType = opened->getCanonicalType();
       lv = subSGF.emitOpenExistentialLValue(loc, std::move(lv),
                                             CanArchetypeType(opened),
