@@ -301,6 +301,14 @@ Operand *BeginBorrowInst::getSingleNonEndingUse() const {
   return singleUse;
 }
 
+bool BorrowedFromInst::isReborrow() const {
+  // The forwarded operand is either a phi or undef.
+  if (auto *phi = dyn_cast<SILPhiArgument>(getBorrowedValue())) {
+    return phi->isReborrow();
+  }
+  return false;
+}
+
 namespace {
 class InstructionDestroyer
     : public SILInstructionVisitor<InstructionDestroyer> {
@@ -2014,10 +2022,13 @@ visitRecursivelyLifetimeEndingUses(
 // the dependent value.
 bool MarkDependenceInst::visitNonEscapingLifetimeEnds(
   llvm::function_ref<bool (Operand *)> visitScopeEnd,
-  llvm::function_ref<bool (Operand *)> visitUnknownUse) const {
+  llvm::function_ref<bool (Operand *)> visitUnknownUse) {
   assert(getFunction()->hasOwnership() && isNonEscaping()
          && "only meaningful for nonescaping dependencies");
   assert(getType().isObject() && "lifetime ends only exist for values");
+  assert(getOwnershipKind() == OwnershipKind::Owned
+         && getType().isEscapable(*getFunction())
+         && "only correct for owned escapable values");
   bool noUsers = true;
   if (!visitRecursivelyLifetimeEndingUses(this, noUsers, visitScopeEnd,
                                           visitUnknownUse)) {

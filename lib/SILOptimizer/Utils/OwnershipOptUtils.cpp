@@ -618,7 +618,7 @@ void BorrowedLifetimeExtender::analyzeExtendedScope() {
       SWIFT_ASSERT_ONLY(reborrowedOperands.insert(endScope));
 
       // TODO: if non-phi reborrows are added, handle multiple results.
-      discoverReborrow(borrowingOper.getBorrowIntroducingUserResult().value);
+      discoverReborrow(borrowingOper.getBorrowIntroducingUserResult());
     }
     return true;
   };

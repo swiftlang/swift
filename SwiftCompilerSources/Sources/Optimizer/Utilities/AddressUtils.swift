@@ -554,8 +554,8 @@ extension AddressOwnershipLiveRange {
   ///
   /// For address values, use AccessBase.computeOwnershipRange.
   ///
-  /// FIXME: This should use computeLinearLiveness rather than computeKnownLiveness as soon as lifetime completion
-  /// runs immediately after SILGen.
+  /// FIXME: This should use computeLinearLiveness rather than computeKnownLiveness as soon as complete OSSA lifetimes
+  /// are verified.
   private static func computeValueLiveRange(of value: Value, _ context: FunctionPassContext)
     -> AddressOwnershipLiveRange? {
     switch value.ownership {

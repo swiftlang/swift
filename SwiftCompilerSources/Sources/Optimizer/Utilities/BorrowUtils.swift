@@ -134,27 +134,26 @@ import SIL
 
 /// A scoped instruction that borrows one or more operands.
 ///
-/// If this instruction produces a borrowed value, then
-/// BeginBorrowValue(resultOf: self) != nil.
+/// If this instruction produces a borrowed value, then BeginBorrowValue(resultOf: self) != nil.
 ///
-/// This does not include instructions like `apply` and `try_apply` that
-/// instantaneously borrow a value from the caller.
+/// This does not include instructions like `apply` and `try_apply` that instantaneously borrow a value from the caller.
 ///
-/// This does not include `load_borrow` because it borrows a memory
-/// location, not the value of its operand.
+/// This does not include `load_borrow` because it borrows a memory location, not the value of its operand.
 ///
 /// Note: This must handle all instructions with a .borrow operand ownership.
 ///
-/// Note: mark_dependence is a BorrowingInstruction because it creates
-/// a borrow scope for its base operand. Its result, however, is not a
-/// BeginBorrowValue. It is instead a ForwardingInstruction relative
-/// to its value operand.
+/// Note: borrowed_from is a BorrowingInstruction because it creates a borrow scope for its enclosing operands. Its
+/// result, however, is only a BeginBorrowValue (.reborrow) if it forwards a reborrow phi. Otherwise, it simply forwards
+/// a guaranteed value and does not introduce a separate borrow scope.
 ///
-/// TODO: replace BorrowIntroducingInstruction
+/// Note: mark_dependence [nonescaping] is a BorrowingInstruction because it creates a borrow scope for its base
+/// operand. Its result, however, is not a BeginBorrowValue. Instead it is a ForwardingInstruction relative to its value
+/// operand.
 ///
-/// TODO: Add non-escaping MarkDependence.
+/// TODO: replace BorrowIntroducingInstruction with this.
 enum BorrowingInstruction : CustomStringConvertible, Hashable {
   case beginBorrow(BeginBorrowInst)
+  case borrowedFrom(BorrowedFromInst)
   case storeBorrow(StoreBorrowInst)
   case beginApply(BeginApplyInst)
   case partialApply(PartialApplyInst)
@@ -165,6 +164,8 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
     switch inst {
     case let bbi as BeginBorrowInst:
       self = .beginBorrow(bbi)
+    case let bfi as BorrowedFromInst:
+      self = .borrowedFrom(bfi)
     case let sbi as StoreBorrowInst:
       self = .storeBorrow(sbi)
     case let bai as BeginApplyInst:
@@ -172,6 +173,9 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
     case let pai as PartialApplyInst where !pai.mayEscape:
       self = .partialApply(pai)
     case let mdi as MarkDependenceInst:
+      guard mdi.isNonEscaping else {
+        return nil
+      }
       self = .markDependence(mdi)
     case let bi as BuiltinInst
            where bi.id == .StartAsyncLetWithLocalBuffer:
@@ -185,6 +189,8 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
     switch self {
     case .beginBorrow(let bbi):
       return bbi
+    case .borrowedFrom(let bfi):
+      return bfi
     case .storeBorrow(let sbi):
       return sbi
     case .beginApply(let bai):
@@ -198,68 +204,119 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
     }
   }
 
-  /// Visit the operands that end the local borrow scope.
-  ///
-  /// Note: When this instruction's result is BeginBorrowValue the
-  /// scopeEndingOperand may include reborrows. To find all uses that
-  /// contribute to liveness, the caller needs to determine whether an
-  /// incoming value dominates or is consumed by an outer adjacent
-  /// phi. See InteriorLiveness.
-  ///
-  /// FIXME: To generate conservatively correct liveness, this should return
-  /// .abortWalk if this is a mark_dependence and the scope-ending use is not
-  /// the last in the function (e.g. a store rather than a destroy or return).
-  /// The client needs to use LifetimeDependenceDefUseWalker to do better.
-  ///
-  /// TODO: to handle reborrow-extended uses, migrate ExtendedLiveness
-  /// to SwiftCompilerSources.
-  ///
-  /// TODO: Handle .partialApply and .markDependence forwarded uses
-  /// that are phi operands. Currently, partial_apply [on_stack]
-  /// and mark_dependence [nonescaping] cannot be cloned, so walking
-  /// through the phi safely returns dominated scope-ending operands.
-  /// Instead, this could report the phi as a scope-ending use, and
-  /// the client could decide whether to walk through them or to
-  /// construct reborrow-extended liveness.
-  ///
-  /// TODO: For instructions that are not a BeginBorrowValue, verify
-  /// that scope ending instructions exist on all paths. These
-  /// instructions should be complete after SILGen and never cloned to
-  /// produce phis.
-  func visitScopeEndingOperands(_ context: Context,
-                                visitor: @escaping (Operand) -> WalkResult)
-  -> WalkResult {
+  var innerValue: Value? {
+    if let dependent = dependentValue {
+      return dependent
+    }
+    return scopedValue
+  }
+
+  var dependentValue: Value? {
+    switch self {
+    case .borrowedFrom(let bfi):
+      let phi = bfi.borrowedPhi
+      if phi.isReborrow {
+        return nil
+      }
+      return phi.value
+    case .markDependence(let mdi):
+      if mdi.hasScopedLifetime {
+        return nil
+      }
+      return mdi
+    case .beginBorrow, .storeBorrow, .beginApply, .partialApply, .startAsyncLet:
+      return nil
+    }
+  }
+
+  /// If this is valid, then visitScopeEndingOperands succeeds.
+  var scopedValue: Value? {
     switch self {
     case .beginBorrow, .storeBorrow:
-      let svi = instruction as! SingleValueInstruction
-      return svi.uses.filterUsers(ofType: EndBorrowInst.self).walk {
-        visitor($0)
+      return instruction as! SingleValueInstruction
+    case let .borrowedFrom(bfi):
+      let phi = bfi.borrowedPhi
+      guard phi.isReborrow else {
+        return nil
       }
+      return phi.value
     case .beginApply(let bai):
-      return bai.token.uses.walk { return visitor($0) }
-    case .partialApply, .markDependence:
-      let svi = instruction as! SingleValueInstruction
-      assert(svi.ownership == .owned)
-      return visitForwardedUses(introducer: svi, context) {
-        switch $0 {
-        case let .operand(operand):
-          if operand.endsLifetime {
-            return visitor(operand)
-          }
-          return .continueWalk
-        case let .deadValue(_, operand):
-          if let operand = operand {
-            assert(!operand.endsLifetime,
-                   "a dead forwarding instruction cannot end a lifetime")
-          }
-          return .continueWalk
-        }
+      return bai.token
+    case .partialApply(let pai):
+      // We currently assume that closure lifetimes are always complete (destroyed on all paths).
+      return pai
+    case .markDependence(let mdi):
+      guard mdi.hasScopedLifetime else {
+        return nil
       }
+      return mdi
     case .startAsyncLet(let builtin):
-      return builtin.uses.walk {
+      return builtin
+    }
+  }
+
+  /// Visit the operands that end the local borrow scope.
+  ///
+  /// Returns .abortWalk if the borrow scope cannot be determined from lifetime-ending uses. For example:
+  /// - borrowed_from where 'borrowedPhi.isReborrow == false'
+  /// - non-owned mark_dependence [nonescaping]
+  /// - owned mark_dependence [nonescaping] with a ~Escapable result (LifetimeDependenceDefUseWalker is needed).
+  ///
+  /// Note: .partialApply and .markDependence cannot currently be forwarded to phis because partial_apply [on_stack] and
+  /// mark_dependence [nonescaping] cannot be cloned. Walking through the phi therefore safely returns dominated
+  /// scope-ending operands. Handling phis here requires the equivalent of borrowed_from for owned values.
+  ///
+  /// TODO: For instructions that are not a BeginBorrowValue, verify that scope ending instructions exist on all
+  /// paths. These instructions should be complete after SILGen and never cloned to produce phis.
+  func visitScopeEndingOperands(_ context: Context, visitor: @escaping (Operand) -> WalkResult) -> WalkResult {
+    guard let val = scopedValue else {
+      return .abortWalk
+    }
+    switch self {
+    case .beginBorrow, .storeBorrow:
+      return visitEndBorrows(value: val, context, visitor)
+    case .borrowedFrom:
+      return visitEndBorrows(value: val, context, visitor)
+    case .beginApply:
+      return val.uses.walk { return visitor($0) }
+    case .partialApply:
+      // We currently assume that closure lifetimes are always complete (destroyed on all paths).
+      return visitOwnedDependent(value: val, context, visitor)
+    case .markDependence:
+      return visitOwnedDependent(value: val, context, visitor)
+    case .startAsyncLet:
+      return val.uses.walk {
         if let builtinUser = $0.instruction as? BuiltinInst,
           builtinUser.id == .EndAsyncLetLifetime {
           return visitor($0)
+        }
+        return .continueWalk
+      }
+    }
+  }
+}
+
+extension BorrowingInstruction {
+  private func visitEndBorrows(value: Value, _ context: Context, _ visitor: @escaping (Operand) -> WalkResult)
+    -> WalkResult {
+    return value.lookThroughBorrowedFromUser.uses.filterUsers(ofType: EndBorrowInst.self).walk {
+      visitor($0)
+    }
+  }
+
+  private func visitOwnedDependent(value: Value, _ context: Context, _ visitor: @escaping (Operand) -> WalkResult)
+    -> WalkResult {
+    return visitForwardedUses(introducer: value, context) {
+      switch $0 {
+      case let .operand(operand):
+        if operand.endsLifetime {
+          return visitor(operand)
+        }
+        return .continueWalk
+      case let .deadValue(_, operand):
+        if let operand = operand {
+          assert(!operand.endsLifetime,
+                 "a dead forwarding instruction cannot end a lifetime")
         }
         return .continueWalk
       }
@@ -341,9 +398,12 @@ enum BeginBorrowValue {
   init?(resultOf borrowInstruction: BorrowingInstruction) {
     switch borrowInstruction {
     case let .beginBorrow(beginBorrow):
-      self = BeginBorrowValue(beginBorrow)!
+      self.init(beginBorrow)
+    case let .borrowedFrom(borrowedFrom):
+      // only returns non-nil if borrowedPhi is a reborrow
+      self.init(borrowedFrom.borrowedPhi.value)
     case let .beginApply(beginApply):
-      self = BeginBorrowValue(beginApply.token)!
+      self.init(beginApply.token)
     case .storeBorrow, .partialApply, .markDependence, .startAsyncLet:
       return nil
     }

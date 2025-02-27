@@ -362,9 +362,17 @@ struct BorrowingOperand {
   /// Returns false and early exits if the \p visitScopeEnd or \p
   /// visitUnknownUse returns false.
   ///
+  /// This only calls 'visitScopeEnd` when getScopeIntroducingUserResult() is
+  /// valid. Otherwise, it immediate calls visitUnknownUse on the current
+  /// operand.
+  ///
   /// For an instantaneous borrow, such as apply, this visits no uses. For
   /// begin_apply it visits the end_apply uses. For borrow introducers, it
   /// visits the end of the introduced borrow scope.
+  ///
+  /// For borrows that don't introduce a separate borrow scope, this calls
+  /// visitUnknownUse on the current operand. The client may need to check each
+  /// unknown operand to avoid infinite recursion.
   bool visitScopeEndingUses(function_ref<bool(Operand *)> visitScopeEnd,
                             function_ref<bool(Operand *)> visitUnknownUse
                             = [](Operand *){ return false; })
@@ -424,41 +432,32 @@ struct BorrowingOperand {
   /// cannot be reborrowed.
   ///
   /// If true, getBorrowIntroducingUserResult() can be called to acquire the
-  /// BorrowedValue that introduces a new borrow scope.
+  /// SILValue that introduces a new borrow scope.
   bool hasBorrowIntroducingUser() const {
-    // TODO: Can we derive this by running a borrow introducer check ourselves?
-    switch (kind) {
-    case BorrowingOperandKind::Invalid:
-      llvm_unreachable("Using invalid case?!");
-    case BorrowingOperandKind::BeginBorrow:
-    case BorrowingOperandKind::BorrowedFrom:
-    case BorrowingOperandKind::Branch:
-      return true;
-    case BorrowingOperandKind::StoreBorrow:
-    case BorrowingOperandKind::BeginApply:
-    case BorrowingOperandKind::Apply:
-    case BorrowingOperandKind::TryApply:
-    case BorrowingOperandKind::Yield:
-    case BorrowingOperandKind::PartialApplyStack:
-    case BorrowingOperandKind::MarkDependenceNonEscaping:
-    case BorrowingOperandKind::BeginAsyncLet:
-      return false;
-    }
-    llvm_unreachable("Covered switch isn't covered?!");
+    return getBorrowIntroducingUserResult() != SILValue();
   }
 
-  /// If this operand's user has a borrowed value result return a valid
-  /// BorrowedValue instance.
-  BorrowedValue getBorrowIntroducingUserResult() const;
+  /// If this operand's user has a single result that introduces the borrow
+  /// scope, return the result value. If the result is scoped (begin_borrow)
+  /// then it can be used to initialize a BorrowedValue. Some results, like
+  /// guaranteed forwarding phis, are not scoped.
+  SILValue getBorrowIntroducingUserResult() const;
 
-  /// Return the borrowing operand's value.
-  SILValue getScopeIntroducingUserResult();
-
-  /// Compute the implicit uses that this borrowing operand "injects" into the
-  /// set of its operands uses.
+  /// Return the borrowing operand's value if it is a scoped operation,
+  /// such as partial_apply, mark_dependence, store_borrow, begin_async_let.
   ///
-  /// E.x.: end_apply uses.
-  void getImplicitUses(SmallVectorImpl<Operand *> &foundUses) const;
+  /// This is meant to be equivalent to BeginBorrowValue in
+  /// SwiftCompilerSources.
+  SILValue getScopeIntroducingUserResult() const;
+
+  // Return the dependent value of borrowed-from or mark_dependence.
+  //
+  // This only returns a valid result when getScopeIntroducingUserResult()
+  // returns an invalid result. Ideally, we would convert BorrowingOperand into
+  // an enum to partition the kinds of borrows.
+  //
+  // This may be a guaranteed, trivial, or owned non-escapable value.
+  SILValue getDependentUserResult() const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }

@@ -524,11 +524,6 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
   }
   InteriorLiveness liveness(value);
   liveness.compute(domInfo, handleInnerScope);
-  // TODO: Rebuild outer adjacent phis on demand (SILGen does not currently
-  // produce guaranteed phis). See FindEnclosingDefs &
-  // findSuccessorDefsFromPredDefs. If no enclosing phi is found, we can create
-  // it here and use updateSSA to recursively populate phis.
-  assert(liveness.getUnenclosedPhis().empty());
   return endLifetimeAtBoundary(value, liveness.getLiveness(), boundary,
                                deadEndBlocks);
 }
