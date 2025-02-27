@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafePointer: AtomicRepresentable where Pointee: ~Copyable {
+extension UnsafePointer: @unsafe AtomicRepresentable where Pointee: ~Copyable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -37,7 +37,7 @@ extension UnsafePointer: AtomicRepresentable where Pointee: ~Copyable {
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafePointer<Pointee>
   ) -> AtomicRepresentation {
-    Int.encodeAtomicRepresentation(
+    unsafe Int.encodeAtomicRepresentation(
       Int(bitPattern: value)
     )
   }
@@ -58,14 +58,14 @@ extension UnsafePointer: AtomicRepresentable where Pointee: ~Copyable {
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> UnsafePointer<Pointee> {
-    UnsafePointer<Pointee>(
+    unsafe UnsafePointer<Pointee>(
       bitPattern: Int.decodeAtomicRepresentation(representation)
     )!
   }
 }
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafePointer: AtomicOptionalRepresentable where Pointee: ~Copyable {
+extension UnsafePointer: @unsafe AtomicOptionalRepresentable where Pointee: ~Copyable {
   /// The storage representation type that encodes to and decodes from
   /// `Optional<Self>` which is a suitable type when used in atomic operations
   /// on `Optional`.
@@ -88,7 +88,7 @@ extension UnsafePointer: AtomicOptionalRepresentable where Pointee: ~Copyable {
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming UnsafePointer<Pointee>?
   ) -> AtomicOptionalRepresentation {
-    Int.encodeAtomicRepresentation(
+    unsafe Int.encodeAtomicRepresentation(
       Int(bitPattern: value)
     )
   }
@@ -110,7 +110,7 @@ extension UnsafePointer: AtomicOptionalRepresentable where Pointee: ~Copyable {
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
   ) -> UnsafePointer<Pointee>? {
-    UnsafePointer<Pointee>(
+    unsafe UnsafePointer<Pointee>(
       bitPattern: Int.decodeAtomicRepresentation(representation)
     )
   }
@@ -121,7 +121,7 @@ extension UnsafePointer: AtomicOptionalRepresentable where Pointee: ~Copyable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeMutablePointer: AtomicRepresentable where Pointee: ~Copyable {
+extension UnsafeMutablePointer: @unsafe AtomicRepresentable where Pointee: ~Copyable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -143,7 +143,7 @@ extension UnsafeMutablePointer: AtomicRepresentable where Pointee: ~Copyable {
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeMutablePointer<Pointee>
   ) -> AtomicRepresentation {
-    Int.encodeAtomicRepresentation(
+    unsafe Int.encodeAtomicRepresentation(
       Int(bitPattern: value)
     )
   }
@@ -164,14 +164,14 @@ extension UnsafeMutablePointer: AtomicRepresentable where Pointee: ~Copyable {
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> UnsafeMutablePointer<Pointee> {
-    UnsafeMutablePointer<Pointee>(
+    unsafe UnsafeMutablePointer<Pointee>(
       bitPattern: Int.decodeAtomicRepresentation(representation)
     )!
   }
 }
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeMutablePointer: AtomicOptionalRepresentable
+extension UnsafeMutablePointer: @unsafe AtomicOptionalRepresentable
 where Pointee: ~Copyable {
   /// The storage representation type that encodes to and decodes from
   /// `Optional<Self>` which is a suitable type when used in atomic operations
@@ -195,7 +195,7 @@ where Pointee: ~Copyable {
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming UnsafeMutablePointer<Pointee>?
   ) -> AtomicOptionalRepresentation {
-    Int.encodeAtomicRepresentation(
+    unsafe Int.encodeAtomicRepresentation(
       Int(bitPattern: value)
     )
   }
@@ -217,7 +217,7 @@ where Pointee: ~Copyable {
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
   ) -> UnsafeMutablePointer<Pointee>? {
-    UnsafeMutablePointer<Pointee>(
+    unsafe UnsafeMutablePointer<Pointee>(
       bitPattern: Int.decodeAtomicRepresentation(representation)
     )
   }
@@ -228,7 +228,7 @@ where Pointee: ~Copyable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeRawPointer: AtomicRepresentable {
+extension UnsafeRawPointer: @unsafe AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -250,7 +250,7 @@ extension UnsafeRawPointer: AtomicRepresentable {
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeRawPointer
   ) -> AtomicRepresentation {
-    Int.encodeAtomicRepresentation(
+    unsafe Int.encodeAtomicRepresentation(
       Int(bitPattern: value)
     )
   }
@@ -271,14 +271,14 @@ extension UnsafeRawPointer: AtomicRepresentable {
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> UnsafeRawPointer {
-    UnsafeRawPointer(
+    unsafe UnsafeRawPointer(
       bitPattern: Int.decodeAtomicRepresentation(representation)
     )!
   }
 }
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeRawPointer: AtomicOptionalRepresentable {
+extension UnsafeRawPointer: @unsafe AtomicOptionalRepresentable {
   /// The storage representation type that encodes to and decodes from
   /// `Optional<Self>` which is a suitable type when used in atomic operations
   /// on `Optional`.
@@ -301,7 +301,7 @@ extension UnsafeRawPointer: AtomicOptionalRepresentable {
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming UnsafeRawPointer?
   ) -> AtomicOptionalRepresentation {
-    Int.encodeAtomicRepresentation(
+    unsafe Int.encodeAtomicRepresentation(
       Int(bitPattern: value)
     )
   }
@@ -323,7 +323,7 @@ extension UnsafeRawPointer: AtomicOptionalRepresentable {
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
   ) -> UnsafeRawPointer? {
-    UnsafeRawPointer(
+    unsafe UnsafeRawPointer(
       bitPattern: Int.decodeAtomicRepresentation(representation)
     )
   }
@@ -334,7 +334,7 @@ extension UnsafeRawPointer: AtomicOptionalRepresentable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeMutableRawPointer: AtomicRepresentable {
+extension UnsafeMutableRawPointer: @unsafe AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -356,7 +356,7 @@ extension UnsafeMutableRawPointer: AtomicRepresentable {
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeMutableRawPointer
   ) -> AtomicRepresentation {
-    Int.encodeAtomicRepresentation(
+    unsafe Int.encodeAtomicRepresentation(
       Int(bitPattern: value)
     )
   }
@@ -377,14 +377,14 @@ extension UnsafeMutableRawPointer: AtomicRepresentable {
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> UnsafeMutableRawPointer {
-    UnsafeMutableRawPointer(
+    unsafe UnsafeMutableRawPointer(
       bitPattern: Int.decodeAtomicRepresentation(representation)
     )!
   }
 }
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeMutableRawPointer: AtomicOptionalRepresentable {
+extension UnsafeMutableRawPointer: @unsafe AtomicOptionalRepresentable {
   /// The storage representation type that encodes to and decodes from
   /// `Optional<Self>` which is a suitable type when used in atomic operations
   /// on `Optional`.
@@ -407,7 +407,7 @@ extension UnsafeMutableRawPointer: AtomicOptionalRepresentable {
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming UnsafeMutableRawPointer?
   ) -> AtomicOptionalRepresentation {
-    Int.encodeAtomicRepresentation(
+    unsafe Int.encodeAtomicRepresentation(
       Int(bitPattern: value)
     )
   }
@@ -429,7 +429,7 @@ extension UnsafeMutableRawPointer: AtomicOptionalRepresentable {
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
   ) -> UnsafeMutableRawPointer? {
-    UnsafeMutableRawPointer(
+    unsafe UnsafeMutableRawPointer(
       bitPattern: Int.decodeAtomicRepresentation(representation)
     )
   }
@@ -440,7 +440,7 @@ extension UnsafeMutableRawPointer: AtomicOptionalRepresentable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.0, *)
-extension Unmanaged: AtomicRepresentable {
+extension Unmanaged: @unsafe AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -462,7 +462,7 @@ extension Unmanaged: AtomicRepresentable {
   public static func encodeAtomicRepresentation(
     _ value: consuming Unmanaged<Instance>
   ) -> AtomicRepresentation {
-    Int.encodeAtomicRepresentation(
+    unsafe Int.encodeAtomicRepresentation(
       Int(bitPattern: value.toOpaque())
     )
   }
@@ -483,14 +483,14 @@ extension Unmanaged: AtomicRepresentable {
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> Unmanaged<Instance> {
-    Unmanaged<Instance>.fromOpaque(
+    unsafe Unmanaged<Instance>.fromOpaque(
       UnsafeRawPointer.decodeAtomicRepresentation(representation)
     )
   }
 }
 
 @available(SwiftStdlib 6.0, *)
-extension Unmanaged: AtomicOptionalRepresentable {
+extension Unmanaged: @unsafe AtomicOptionalRepresentable {
   /// The storage representation type that encodes to and decodes from
   /// `Optional<Self>` which is a suitable type when used in atomic operations
   /// on `Optional`.
@@ -517,8 +517,8 @@ extension Unmanaged: AtomicOptionalRepresentable {
     //
     // Int.AtomicRepresentation(Int(bitPattern: value?.toOpaque())._value)
 
-    if let unmanaged = value {
-      return Int.encodeAtomicRepresentation(
+    if let unmanaged = unsafe value {
+      return unsafe Int.encodeAtomicRepresentation(
         Int(bitPattern: unmanaged.toOpaque())
       )
     }
@@ -543,8 +543,8 @@ extension Unmanaged: AtomicOptionalRepresentable {
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
   ) -> Unmanaged<Instance>? {
-    UnsafeRawPointer.decodeAtomicOptionalRepresentation(representation).map {
-      Unmanaged.fromOpaque($0)
+    unsafe UnsafeRawPointer.decodeAtomicOptionalRepresentation(representation).map {
+      unsafe Unmanaged.fromOpaque($0)
     }
   }
 }
@@ -554,7 +554,7 @@ extension Unmanaged: AtomicOptionalRepresentable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.0, *)
-extension OpaquePointer: AtomicRepresentable {
+extension OpaquePointer: @unsafe AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -597,14 +597,14 @@ extension OpaquePointer: AtomicRepresentable {
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> OpaquePointer {
-    OpaquePointer(
+    unsafe OpaquePointer(
       bitPattern: Int.decodeAtomicRepresentation(representation)
     )!
   }
 }
 
 @available(SwiftStdlib 6.0, *)
-extension OpaquePointer: AtomicOptionalRepresentable {
+extension OpaquePointer: @unsafe AtomicOptionalRepresentable {
   /// The storage representation type that encodes to and decodes from
   /// `Optional<Self>` which is a suitable type when used in atomic operations
   /// on `Optional`.
@@ -649,7 +649,7 @@ extension OpaquePointer: AtomicOptionalRepresentable {
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
   ) -> OpaquePointer? {
-    OpaquePointer(
+    unsafe OpaquePointer(
       bitPattern: Int.decodeAtomicRepresentation(representation)
     )
   }
@@ -704,7 +704,7 @@ extension ObjectIdentifier: AtomicRepresentable {
     _ representation: consuming AtomicRepresentation
   ) -> ObjectIdentifier {
     // ObjectIdentifier doesn't have a bitPattern init..?
-    unsafeBitCast(
+    unsafe unsafeBitCast(
       Int.decodeAtomicRepresentation(representation),
       to: ObjectIdentifier.self
     )
@@ -735,7 +735,7 @@ extension ObjectIdentifier: AtomicOptionalRepresentable {
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming ObjectIdentifier?
   ) -> AtomicOptionalRepresentation {
-    Int.encodeAtomicRepresentation(
+    unsafe Int.encodeAtomicRepresentation(
       // {U}Int have bitPattern inits for ObjectIdentifier, but not optional
       // ObjectIdentifier :sad:
       unsafeBitCast(value, to: Int.self)
@@ -760,7 +760,7 @@ extension ObjectIdentifier: AtomicOptionalRepresentable {
     _ representation: consuming AtomicOptionalRepresentation
   ) -> ObjectIdentifier? {
     // ObjectIdentifier doesn't have a bitPattern init..?
-    unsafeBitCast(
+    unsafe unsafeBitCast(
       Int.decodeAtomicRepresentation(representation),
       to: ObjectIdentifier?.self
     )
@@ -774,7 +774,7 @@ extension ObjectIdentifier: AtomicOptionalRepresentable {
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || (_pointerBitWidth(_64) && _hasAtomicBitWidth(_128))
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeBufferPointer: AtomicRepresentable where Element: ~Copyable {
+extension UnsafeBufferPointer: @unsafe AtomicRepresentable where Element: ~Copyable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -796,9 +796,9 @@ extension UnsafeBufferPointer: AtomicRepresentable where Element: ~Copyable {
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeBufferPointer<Element>
   ) -> AtomicRepresentation {
-    let valueCopy = value
+    let valueCopy = unsafe value
 
-    return WordPair.encodeAtomicRepresentation(
+    return unsafe WordPair.encodeAtomicRepresentation(
       WordPair(
         first: UInt(bitPattern: valueCopy.baseAddress),
         second: UInt(truncatingIfNeeded: valueCopy.count)
@@ -822,9 +822,9 @@ extension UnsafeBufferPointer: AtomicRepresentable where Element: ~Copyable {
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> UnsafeBufferPointer<Element> {
-    let wp = WordPair.decodeAtomicRepresentation(representation)
+    let wp = unsafe WordPair.decodeAtomicRepresentation(representation)
 
-    return UnsafeBufferPointer<Element>(
+    return unsafe UnsafeBufferPointer<Element>(
       start: UnsafePointer<Element>(bitPattern: wp.first),
       count: Int(truncatingIfNeeded: wp.second)
     )
@@ -840,7 +840,7 @@ extension UnsafeBufferPointer: AtomicRepresentable where Element: ~Copyable {
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || (_pointerBitWidth(_64) && _hasAtomicBitWidth(_128))
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeMutableBufferPointer: AtomicRepresentable
+extension UnsafeMutableBufferPointer: @unsafe AtomicRepresentable
 where Element: ~Copyable
 {
   /// The storage representation type that `Self` encodes to and decodes from
@@ -864,9 +864,9 @@ where Element: ~Copyable
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeMutableBufferPointer<Element>
   ) -> AtomicRepresentation {
-    let valueCopy = value
+    let valueCopy = unsafe value
 
-    return WordPair.encodeAtomicRepresentation(
+    return unsafe WordPair.encodeAtomicRepresentation(
       WordPair(
         first: UInt(bitPattern: valueCopy.baseAddress),
         second: UInt(truncatingIfNeeded: valueCopy.count)
@@ -890,9 +890,9 @@ where Element: ~Copyable
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> UnsafeMutableBufferPointer<Element> {
-    let wp = WordPair.decodeAtomicRepresentation(representation)
+    let wp = unsafe WordPair.decodeAtomicRepresentation(representation)
 
-    return UnsafeMutableBufferPointer<Element>(
+    return unsafe UnsafeMutableBufferPointer<Element>(
       start: UnsafeMutablePointer<Element>(bitPattern: wp.first),
       count: Int(truncatingIfNeeded: wp.second)
     )
@@ -908,7 +908,7 @@ where Element: ~Copyable
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || (_pointerBitWidth(_64) && _hasAtomicBitWidth(_128))
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeRawBufferPointer: AtomicRepresentable {
+extension UnsafeRawBufferPointer: @unsafe AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -930,9 +930,9 @@ extension UnsafeRawBufferPointer: AtomicRepresentable {
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeRawBufferPointer
   ) -> AtomicRepresentation {
-    let valueCopy = value
+    let valueCopy = unsafe value
 
-    return WordPair.encodeAtomicRepresentation(
+    return unsafe WordPair.encodeAtomicRepresentation(
       WordPair(
         first: UInt(bitPattern: valueCopy.baseAddress),
         second: UInt(truncatingIfNeeded: valueCopy.count)
@@ -956,9 +956,9 @@ extension UnsafeRawBufferPointer: AtomicRepresentable {
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> UnsafeRawBufferPointer {
-    let wp = WordPair.decodeAtomicRepresentation(representation)
+    let wp = unsafe WordPair.decodeAtomicRepresentation(representation)
 
-    return UnsafeRawBufferPointer(
+    return unsafe UnsafeRawBufferPointer(
       start: UnsafeRawPointer(bitPattern: wp.first),
       count: Int(truncatingIfNeeded: wp.second)
     )
@@ -974,7 +974,7 @@ extension UnsafeRawBufferPointer: AtomicRepresentable {
 #if (_pointerBitWidth(_32) && _hasAtomicBitWidth(_64)) || (_pointerBitWidth(_64) && _hasAtomicBitWidth(_128))
 
 @available(SwiftStdlib 6.0, *)
-extension UnsafeMutableRawBufferPointer: AtomicRepresentable {
+extension UnsafeMutableRawBufferPointer: @unsafe AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
   @available(SwiftStdlib 6.0, *)
@@ -996,9 +996,9 @@ extension UnsafeMutableRawBufferPointer: AtomicRepresentable {
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeMutableRawBufferPointer
   ) -> AtomicRepresentation {
-    let valueCopy = value
+    let valueCopy = unsafe value
 
-    return WordPair.encodeAtomicRepresentation(
+    return unsafe WordPair.encodeAtomicRepresentation(
       WordPair(
         first: UInt(bitPattern: valueCopy.baseAddress),
         second: UInt(truncatingIfNeeded: valueCopy.count)
@@ -1022,9 +1022,9 @@ extension UnsafeMutableRawBufferPointer: AtomicRepresentable {
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> UnsafeMutableRawBufferPointer {
-    let wp = WordPair.decodeAtomicRepresentation(representation)
+    let wp = unsafe WordPair.decodeAtomicRepresentation(representation)
 
-    return UnsafeMutableRawBufferPointer(
+    return unsafe UnsafeMutableRawBufferPointer(
       start: UnsafeMutableRawPointer(bitPattern: wp.first),
       count: Int(truncatingIfNeeded: wp.second)
     )

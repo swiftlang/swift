@@ -261,14 +261,14 @@ extension Task where Failure == Never {
 @available(SwiftStdlib 5.1, *)
 extension Task: Hashable {
   public func hash(into hasher: inout Hasher) {
-    UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
+    unsafe UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 
 @available(SwiftStdlib 5.1, *)
 extension Task: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
-    UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
+    unsafe UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
       UnsafeRawPointer(Builtin.bridgeToRawPointer(rhs._task))
   }
 }
@@ -443,10 +443,10 @@ extension Task where Success == Never, Failure == Never {
   /// If the system can't provide a priority,
   /// this property's value is `Priority.default`.
   public static var currentPriority: TaskPriority {
-    withUnsafeCurrentTask { unsafeTask in
+    unsafe withUnsafeCurrentTask { unsafeTask in
       // If we are running on behalf of a task, use that task's priority.
-      if let unsafeTask {
-         return unsafeTask.priority
+      if let unsafeTask = unsafe unsafeTask {
+         return unsafe unsafeTask.priority
       }
 
       // Otherwise, query the system.
@@ -459,10 +459,10 @@ extension Task where Success == Never, Failure == Never {
   /// If you access this property outside of any task, this returns nil
   @available(SwiftStdlib 5.7, *)
   public static var basePriority: TaskPriority? {
-    withUnsafeCurrentTask { task in
+    unsafe withUnsafeCurrentTask { task in
       // If we are running on behalf of a task, use that task's priority.
-      if let unsafeTask = task {
-         return TaskPriority(rawValue: _taskBasePriority(unsafeTask._task))
+      if let unsafeTask = unsafe task {
+         return unsafe TaskPriority(rawValue: _taskBasePriority(unsafeTask._task))
       }
       return nil
     }
@@ -674,7 +674,7 @@ extension Task where Failure == Never {
 
     // Create the asynchronous task.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     let (task, _) = Builtin.createTask(flags: flags,
                                        initialSerialExecutor:
@@ -763,7 +763,7 @@ extension Task where Failure == Never {
 
     // Create the asynchronous task.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     var task: Builtin.NativeObject?
     #if $BuiltinCreateAsyncTaskName
@@ -842,7 +842,7 @@ extension Task where Failure == Error {
 
     // Create the asynchronous task future.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     let (task, _) = Builtin.createTask(flags: flags,
                                        initialSerialExecutor:
@@ -932,7 +932,7 @@ self._task = task
 
   // Create the asynchronous task.
   let builtinSerialExecutor =
-    Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+    unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
   var task: Builtin.NativeObject?
   #if $BuiltinCreateAsyncTaskName
@@ -1010,7 +1010,7 @@ extension Task where Failure == Never {
 
     // Create the asynchronous task future.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     let (task, _) = Builtin.createTask(flags: flags,
                                        initialSerialExecutor:
@@ -1073,7 +1073,7 @@ extension Task where Failure == Never {
 
     // Create the asynchronous task.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     var task: Builtin.NativeObject?
     #if $BuiltinCreateAsyncTaskName
@@ -1151,7 +1151,7 @@ extension Task where Failure == Error {
 
     // Create the asynchronous task future.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     let (task, _) = Builtin.createTask(flags: flags,
                                        initialSerialExecutor:
@@ -1215,7 +1215,7 @@ extension Task where Failure == Error {
 
     // Create the asynchronous task future.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     var task: Builtin.NativeObject?
     #if $BuiltinCreateAsyncTaskName
@@ -1303,7 +1303,7 @@ extension Task where Success == Never, Failure == Never {
 @available(SwiftStdlib 5.1, *)
 public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) rethrows -> T {
   guard let _task = _getCurrentAsyncTask() else {
-    return try body(nil)
+    return try unsafe body(nil)
   }
 
   // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
@@ -1311,13 +1311,13 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
   //        How do we solve this properly?
   Builtin.retain(_task)
 
-  return try body(UnsafeCurrentTask(_task))
+  return try unsafe body(UnsafeCurrentTask(_task))
 }
 
 @available(SwiftStdlib 6.0, *)
 public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> T) async rethrows -> T {
   guard let _task = _getCurrentAsyncTask() else {
-    return try await body(nil)
+    return try unsafe await body(nil)
   }
 
   // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
@@ -1325,7 +1325,7 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> 
   //        How do we solve this properly?
   Builtin.retain(_task)
 
-  return try await body(UnsafeCurrentTask(_task))
+  return try unsafe await body(UnsafeCurrentTask(_task))
 }
 
 /// An unsafe reference to the current task.
@@ -1357,7 +1357,7 @@ public struct UnsafeCurrentTask {
 
   // May only be created by the standard library.
   internal init(_ task: Builtin.NativeObject) {
-    self._task = task
+    unsafe self._task = task
   }
 
   /// A Boolean value that indicates whether the current task was canceled.
@@ -1367,7 +1367,7 @@ public struct UnsafeCurrentTask {
   ///
   /// - SeeAlso: `checkCancellation()`
   public var isCancelled: Bool {
-    _taskIsCancelled(_task)
+    unsafe _taskIsCancelled(_task)
   }
 
   /// The current task's priority.
@@ -1375,7 +1375,7 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: `TaskPriority`
   /// - SeeAlso: `Task.currentPriority`
   public var priority: TaskPriority {
-    TaskPriority(rawValue: _taskCurrentPriority(_task))
+    unsafe TaskPriority(rawValue: _taskCurrentPriority(_task))
   }
 
   /// The current task's base priority.
@@ -1384,12 +1384,12 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: `Task.basePriority`
   @available(SwiftStdlib 5.9, *)
   public var basePriority: TaskPriority {
-    TaskPriority(rawValue: _taskBasePriority(_task))
+    unsafe TaskPriority(rawValue: _taskBasePriority(_task))
   }
 
   /// Cancel the current task.
   public func cancel() {
-    _taskCancel(_task)
+    unsafe _taskCancel(_task)
   }
 }
 
@@ -1398,16 +1398,16 @@ public struct UnsafeCurrentTask {
 extension UnsafeCurrentTask: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension UnsafeCurrentTask: Hashable {
+extension UnsafeCurrentTask: @unsafe Hashable {
   public func hash(into hasher: inout Hasher) {
-    UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
+    unsafe UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 
 @available(SwiftStdlib 5.1, *)
 extension UnsafeCurrentTask: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
-    UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
+    unsafe UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
       UnsafeRawPointer(Builtin.bridgeToRawPointer(rhs._task))
   }
 }
@@ -1478,7 +1478,7 @@ internal func _getGenericSerialExecutor() -> Builtin.Executor {
   // As the runtime relies on this in multiple places,
   // so instead of a runtime call to get this executor ref, we bitcast a "zero"
   // of expected size to the builtin executor type.
-  unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
+  unsafe unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
 }
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -1690,7 +1690,7 @@ public func _taskRunOnMainActor(operation: @escaping @MainActor () -> ()) {
   if _taskIsOnMainActor() {
     return withoutActuallyEscaping(operation) {
       (_ fn: @escaping YesActor) -> () in
-      let rawFn = unsafeBitCast(fn, to: NoActor.self)
+      let rawFn = unsafe unsafeBitCast(fn, to: NoActor.self)
       return rawFn()
     }
   }

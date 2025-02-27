@@ -75,7 +75,7 @@ extension ContinuousClock: Clock {
   public var minimumResolution: Swift.Duration {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
-    _getClockRes(
+    unsafe _getClockRes(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: _ClockID.continuous.rawValue)
@@ -86,7 +86,7 @@ extension ContinuousClock: Clock {
   public static var now: ContinuousClock.Instant {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
-    _getTime(
+    unsafe _getTime(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: _ClockID.continuous.rawValue)

@@ -51,11 +51,11 @@ extension DistributedActor {
       return
     }
 
-    let unownedExecutor = self.unownedExecutor
-    let expectationCheck = _taskIsCurrentExecutor(unownedExecutor._executor)
+    let unownedExecutor = unsafe self.unownedExecutor
+    let expectationCheck = unsafe _taskIsCurrentExecutor(unownedExecutor._executor)
 
     precondition(expectationCheck,
-        "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())",
+        unsafe "Incorrect actor executor assumption; Expected '\(unsafe self.unownedExecutor)' executor. \(message())",
         file: file, line: line)
   }
 }
@@ -99,9 +99,9 @@ extension DistributedActor {
       return
     }
 
-    let unownedExecutor = self.unownedExecutor
-    guard _taskIsCurrentExecutor(unownedExecutor._executor) else {
-      let msg = "Incorrect actor executor assumption; Expected '\(unownedExecutor)' executor. \(message())"
+    let unownedExecutor = unsafe self.unownedExecutor
+    guard unsafe _taskIsCurrentExecutor(unownedExecutor._executor) else {
+      let msg = unsafe "Incorrect actor executor assumption; Expected '\(unsafe unownedExecutor)' executor. \(message())"
       /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
       assertionFailure(msg, file: file, line: line) // short-cut so we get the exact same failure reporting semantics
       return
@@ -165,8 +165,8 @@ extension DistributedActor {
       fatalError("Cannot assume to be 'isolated \(Self.self)' since distributed actor '\(self)' is a remote actor reference.")
     }
 
-    let unownedExecutor = self.unownedExecutor
-    guard _taskIsCurrentExecutor(unownedExecutor._executor) else {
+    let unownedExecutor = unsafe self.unownedExecutor
+    guard unsafe _taskIsCurrentExecutor(unownedExecutor._executor) else {
       // TODO: offer information which executor we actually got when
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
     }
@@ -174,7 +174,7 @@ extension DistributedActor {
     // To do the unsafe cast, we have to pretend it's @escaping.
     return try withoutActuallyEscaping(operation) {
       (_ fn: @escaping YesActor) throws -> T in
-      let rawFn = unsafeBitCast(fn, to: NoActor.self)
+      let rawFn = unsafe unsafeBitCast(fn, to: NoActor.self)
       return try rawFn(self)
     }
   }

@@ -63,26 +63,26 @@ extension CxxSpan {
   /// Creates a C++ span from a Swift UnsafeBufferPointer
   @inlinable
   public init(_ unsafeBufferPointer: UnsafeBufferPointer<Element>) {
-    precondition(unsafeBufferPointer.baseAddress != nil, 
+    unsafe precondition(unsafeBufferPointer.baseAddress != nil, 
                   "UnsafeBufferPointer should not point to nil")
-    self.init(unsafeBufferPointer.baseAddress!, Size(unsafeBufferPointer.count))
+    unsafe self.init(unsafeBufferPointer.baseAddress!, Size(unsafeBufferPointer.count))
   }
 
   @inlinable
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
-    precondition(unsafeMutableBufferPointer.baseAddress != nil, 
+    unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
                   "UnsafeMutableBufferPointer should not point to nil")
-    self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+    unsafe self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
   }
 
   @available(SwiftStdlib 6.1, *)
   @inlinable
   @unsafe
   public init(_ span: Span<Element>) {
-    let (p, c) = unsafeBitCast(span, to: (UnsafeRawPointer?, Int).self)
-    precondition(p != nil, "Span should not point to nil")
-    let binding = p!.bindMemory(to: Element.self, capacity: c)
-    self.init(binding, Size(c))
+    let (p, c) = unsafe unsafeBitCast(span, to: (UnsafeRawPointer?, Int).self)
+    unsafe precondition(p != nil, "Span should not point to nil")
+    let binding = unsafe p!.bindMemory(to: Element.self, capacity: c)
+    unsafe self.init(binding, Size(c))
   }
 }
 
@@ -94,10 +94,10 @@ extension Span {
   public init<T: CxxSpan<Element>>(
     _unsafeCxxSpan span: borrowing T,
   ) {
-    let buffer = UnsafeBufferPointer(start: span.__dataUnsafe(), count: Int(span.size()))
+    let buffer = unsafe UnsafeBufferPointer(start: span.__dataUnsafe(), count: Int(span.size()))
     let newSpan = Span(_unsafeElements: buffer)
     // 'self' is limited to the caller's scope of the variable passed to the 'span' argument.
-    self = _overrideLifetime(newSpan, borrowing: span)
+    self = unsafe _overrideLifetime(newSpan, borrowing: span)
   }
 }
 
@@ -113,8 +113,8 @@ extension CxxMutableSpan {
   /// Creates a C++ span from a Swift UnsafeMutableBufferPointer
   @inlinable
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
-    precondition(unsafeMutableBufferPointer.baseAddress != nil, 
+    unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
                   "UnsafeMutableBufferPointer should not point to nil")
-    self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+    unsafe self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
   }
 }
