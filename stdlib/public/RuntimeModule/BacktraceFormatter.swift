@@ -416,7 +416,8 @@ private func untabify(_ s: String, tabWidth: Int = 8) -> String {
 /// @param path  The path to sanitize.
 ///
 /// @returns A string containing the sanitized path.
-private func sanitizePath(_ path: String) -> String {
+@_spi(Formatting)
+public func sanitizePath(_ path: String) -> String {
   #if os(macOS)
   return CRCopySanitizedPath(path,
                              kCRSanitizePathGlobAllTypes
