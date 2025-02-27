@@ -2432,8 +2432,6 @@ private:
   llvm::SmallDenseMap<PackElementExpr *, PackExpansionExpr *, 2>
       PackElementExpansions;
 
-  llvm::SmallVector<GenericEnvironment *, 4> PackElementGenericEnvironments;
-
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
