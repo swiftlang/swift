@@ -581,6 +581,10 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
   if (!argumentList->isUnlabeledUnary())
     return std::nullopt;
 
+  if (!isExpr<ApplyExpr>(
+          cs.getParentExpr(argumentList->getUnlabeledUnaryExpr())))
+    return std::nullopt;
+
   auto ODRE = isOverloadedDeclRef(disjunction);
   bool preserveFavoringOfUnlabeledUnaryArgument =
       !ODRE || numOverloadChoicesMatchingOnArity(ODRE, argumentList) < 2;

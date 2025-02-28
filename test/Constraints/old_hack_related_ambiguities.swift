@@ -272,3 +272,21 @@ func test_variadic_static_member_is_preferred_over_partially_applied_instance_ov
   let t: Test
   Test.fn(t) // Ok
 }
+
+// Unary unlabeled argument favoring hacks never applied to subscripts
+
+protocol Subscriptable {
+}
+
+extension Subscriptable {
+  subscript(key: String) -> Any? { nil }
+}
+
+struct MyValue {}
+
+extension Dictionary<String, MyValue> : Subscriptable {}
+
+func test_that_unary_argument_hacks_do_not_apply_to_subscripts(dict: [String: MyValue]) {
+  let value = dict["hello"]
+  let _: MyValue? = value // Ok
+}
