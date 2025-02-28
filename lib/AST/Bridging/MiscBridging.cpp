@@ -121,3 +121,14 @@ BridgedOwnedString BridgedSubstitutionMap::getDebugDescription() const {
   unbridged().dump(os);
   return BridgedOwnedString(str);
 }
+
+//===----------------------------------------------------------------------===//
+// MARK: GenericSignature
+//===----------------------------------------------------------------------===//
+
+BridgedOwnedString BridgedGenericSignature::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  unbridged().print(os);
+  return BridgedOwnedString(str);
+}

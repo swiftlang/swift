@@ -97,6 +97,9 @@ extension TypeProperties {
   public var representationOfMetatype: AST.`Type`.MetatypeRepresentation {
     type.bridged.getRepresentationOfMetatype().representation
   }
+  public var invocationGenericSignatureOfFunctionType: GenericSignature {
+    GenericSignature(bridged: type.bridged.getInvocationGenericSignatureOfFunctionType())
+  }
 
   public var canBeClass: Type.TraitResult { type.bridged.canBeClass().result }
 

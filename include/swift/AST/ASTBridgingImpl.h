@@ -19,6 +19,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
 #include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -453,6 +454,10 @@ BridgedASTType::MetatypeRepresentation BridgedASTType::getRepresentationOfMetaty
   return MetatypeRepresentation(unbridged()->getAs<swift::AnyMetatypeType>()->getRepresentation());
 }
 
+BridgedGenericSignature BridgedASTType::getInvocationGenericSignatureOfFunctionType() const {
+  return {unbridged()->castTo<swift::SILFunctionType>()->getInvocationGenericSignature().getPointer()};
+}
+
 BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {
   return {unbridged().subst(substMap.unbridged()).getPointer()};
 }
@@ -658,6 +663,14 @@ BridgedConformance BridgedSubstitutionMap::getConformance(SwiftInt index) const 
 
 BridgedASTTypeArray BridgedSubstitutionMap::getReplacementTypes() const {
   return {unbridged().getReplacementTypes()};
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedGenericSignature
+//===----------------------------------------------------------------------===//
+
+swift::GenericSignature BridgedGenericSignature::unbridged() const {
+  return swift::GenericSignature(impl);
 }
 
 //===----------------------------------------------------------------------===//

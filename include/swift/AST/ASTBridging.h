@@ -47,6 +47,8 @@ class DiagnosticEngine;
 class Fingerprint;
 class Identifier;
 class IfConfigClauseRangeInfo;
+class GenericSignature;
+class GenericSignatureImpl;
 struct LabeledStmtInfo;
 class LayoutConstraint;
 class LayoutConstraintInfo;
@@ -72,6 +74,7 @@ struct BridgedASTType;
 class BridgedCanType;
 class BridgedASTContext;
 struct BridgedSubstitutionMap;
+struct BridgedGenericSignature;
 struct BridgedConformance;
 class BridgedParameterList;
 enum BridgedPlatformKind : size_t;
@@ -2917,6 +2920,7 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;
   BRIDGED_INLINE MetatypeRepresentation getRepresentationOfMetatype() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getInvocationGenericSignatureOfFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedASTType fromType, BridgedASTType toType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;  
@@ -2978,6 +2982,13 @@ struct BridgedSubstitutionMap {
   BRIDGED_INLINE SwiftInt getNumConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getConformance(SwiftInt index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getReplacementTypes() const;
+};
+
+struct BridgedGenericSignature {
+  const swift::GenericSignatureImpl * _Nullable impl;
+
+  BRIDGED_INLINE swift::GenericSignature unbridged() const;
+  BridgedOwnedString getDebugDescription() const;
 };
 
 struct BridgedFingerprint {
