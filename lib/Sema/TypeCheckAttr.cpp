@@ -125,11 +125,12 @@ public:
       }
 
       TypeChecker::checkAvailability(
-        attr->getRange(), C.getIsolatedDeinitAvailability(),
-        D->getDeclContext(),
-        [&](StringRef platformName, llvm::VersionTuple version) {
-          return diagnoseAndRemoveAttr(attr, diag::isolated_deinit_unavailable, platformName, version);
-        });
+          attr->getRange(), C.getIsolatedDeinitAvailability(),
+          D->getDeclContext(),
+          [&](AvailabilityDomain domain, llvm::VersionTuple version) {
+            return diagnoseAndRemoveAttr(
+                attr, diag::isolated_deinit_unavailable, domain, version);
+          });
     }
   }
 

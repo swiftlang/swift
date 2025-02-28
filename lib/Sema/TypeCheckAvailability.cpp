@@ -2157,15 +2157,14 @@ static void fixAvailability(SourceRange ReferenceRange,
 
 static void diagnosePotentialUnavailability(
     SourceRange ReferenceRange,
-    llvm::function_ref<InFlightDiagnostic(StringRef, llvm::VersionTuple)>
+    llvm::function_ref<InFlightDiagnostic(AvailabilityDomain,
+                                          llvm::VersionTuple)>
         Diagnose,
     const DeclContext *ReferenceDC, const AvailabilityRange &Availability) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
   {
-    // FIXME: [availability] Update diagnostics to take an AvailabilityDomain.
-    auto Domain = Context.getTargetAvailabilityDomain();
-    auto Err = Diagnose(Domain.getNameForDiagnostics(),
+    auto Err = Diagnose(Context.getTargetAvailabilityDomain(),
                         Availability.getRawMinimumVersion());
 
     // Direct a fixit to the error if an existing guard is nearly-correct
@@ -2176,11 +2175,12 @@ static void diagnosePotentialUnavailability(
   fixAvailability(ReferenceRange, ReferenceDC, Availability, Context);
 }
 
-bool TypeChecker::checkAvailability(
-    SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
-    const DeclContext *ReferenceDC,
-    llvm::function_ref<InFlightDiagnostic(StringRef, llvm::VersionTuple)>
-        Diagnose) {
+bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
+                                    AvailabilityRange RequiredAvailability,
+                                    const DeclContext *ReferenceDC,
+                                    llvm::function_ref<InFlightDiagnostic(
+                                        AvailabilityDomain, llvm::VersionTuple)>
+                                        Diagnose) {
   ASTContext &ctx = ReferenceDC->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return false;
@@ -2197,16 +2197,15 @@ bool TypeChecker::checkAvailability(
   return false;
 }
 
-bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
-                                    AvailabilityRange RequiredAvailability,
-                                    Diag<StringRef, llvm::VersionTuple> Diag,
-                                    const DeclContext *ReferenceDC) {
+bool TypeChecker::checkAvailability(
+    SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
+    Diag<AvailabilityDomain, llvm::VersionTuple> Diag,
+    const DeclContext *ReferenceDC) {
   auto &Diags = ReferenceDC->getASTContext().Diags;
   return TypeChecker::checkAvailability(
       ReferenceRange, RequiredAvailability, ReferenceDC,
-      [&](StringRef platformName, llvm::VersionTuple version) {
-        return Diags.diagnose(ReferenceRange.Start, Diag, platformName,
-                              version);
+      [&](AvailabilityDomain domain, llvm::VersionTuple version) {
+        return Diags.diagnose(ReferenceRange.Start, Diag, domain, version);
       });
 }
 
@@ -3236,7 +3235,7 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
 
   if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
     if (auto missing = checkGenericArgsForInvertibleReqs(boundTy)) {
-      std::optional<Diag<StringRef, llvm::VersionTuple>> diag;
+      std::optional<Diag<AvailabilityDomain, llvm::VersionTuple>> diag;
       switch (*missing) {
       case InvertibleProtocolKind::Copyable:
         diag =
@@ -3607,11 +3606,11 @@ public:
         TypeChecker::checkAvailability(
             RE->getSourceRange(), featureKind.getAvailability(Context),
             Where.getDeclContext(),
-            [&](StringRef platformName, llvm::VersionTuple version) {
+            [&](AvailabilityDomain domain, llvm::VersionTuple version) {
               auto range = feature.getRange();
               auto diag = Context.Diags.diagnose(
                   range.getStart(), diag::regex_feature_unavailable,
-                  featureKind.getDescription(Context), platformName, version);
+                  featureKind.getDescription(Context), domain, version);
               diag.highlightChars(range);
               return diag;
             });

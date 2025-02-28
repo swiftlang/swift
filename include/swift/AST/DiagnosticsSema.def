@@ -6018,7 +6018,7 @@ ERROR(isolated_deinit_on_value_type,none,
       ())
 ERROR(isolated_deinit_unavailable,none,
       "isolated deinit is only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, llvm::VersionTuple))
 
 //------------------------------------------------------------------------------
 // MARK: String Processing
@@ -6033,7 +6033,7 @@ ERROR(regex_capture_types_failed_to_decode,none,
 
 ERROR(regex_feature_unavailable, none,
       "%0 is only available in %1 %2 or newer",
-      (StringRef, StringRef, llvm::VersionTuple))
+      (StringRef, AvailabilityDomain, llvm::VersionTuple))
 
 ERROR(must_import_regex_builder_module,none,
       "regex builder requires the 'RegexBuilder' module be imported'", ())
@@ -6848,40 +6848,40 @@ WARNING(availability_decl_only_version_newer_for_clients_warn, none,
 
 ERROR(availability_opaque_types_only_version_newer, none,
       "'some' return types are only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, llvm::VersionTuple))
 
 ERROR(availability_concurrency_only_version_newer, none,
       "concurrency is only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, llvm::VersionTuple))
 
 ERROR(availability_parameterized_protocol_only_version_newer, none,
       "runtime support for parameterized protocol types is only available in "
       "%0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, llvm::VersionTuple))
 
 ERROR(availability_isolated_any_only_version_newer, none,
       "runtime support for @isolated(any) function types is only available in "
       "%0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, llvm::VersionTuple))
 
 ERROR(availability_copyable_generics_casting_only_version_newer, none,
       "runtime support for casting types with noncopyable generic arguments "
       "is only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, llvm::VersionTuple))
 
 ERROR(availability_escapable_generics_casting_only_version_newer, none,
       "runtime support for casting types with nonescapable generic arguments "
       "is only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, llvm::VersionTuple))
 
 ERROR(availability_typed_throws_only_version_newer, none,
       "runtime support for typed throws function types is only available in "
       "%0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, llvm::VersionTuple))
 
 ERROR(availability_variadic_type_only_version_newer, none,
       "parameter packs in generic types are only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, llvm::VersionTuple))
 
 NOTE(availability_guard_with_version_check, none,
      "add 'if #available' version check", ())
@@ -8263,7 +8263,7 @@ ERROR(value_generics_missing_feature,none,
       "value generics require '-enable-experimental-feature ValueGenerics'", ())
 ERROR(availability_value_generic_type_only_version_newer, none,
       "values in generic types are only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, llvm::VersionTuple))
 ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
