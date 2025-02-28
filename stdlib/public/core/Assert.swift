@@ -275,7 +275,6 @@ public func preconditionFailure(
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `fatalError(_:file:line:)` is called.
 @_transparent
-@_unavailableInEmbedded
 #if $Embedded
 @_disfavoredOverload
 #endif
@@ -283,8 +282,19 @@ public func fatalError(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
+#if !$Embedded
   _assertionFailure("Fatal error", message(), file: file, line: line,
     flags: _fatalErrorFlags())
+#else
+  if _isDebugAssertConfiguration() {
+    _assertionFailure("Fatal error", message(), file: file, line: line,
+      flags: _fatalErrorFlags())
+  } else {
+    Builtin.condfail_message(true._value,
+      StaticString("fatal error").unsafeRawPointer)
+    Builtin.unreachable()
+  }
+#endif
 }
 
 #if $Embedded
