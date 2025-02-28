@@ -3693,6 +3693,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.UseCASBackend |= Args.hasArg(OPT_cas_backend);
   Opts.EmitCASIDFile |= Args.hasArg(OPT_cas_emit_casid_file);
 
+  Opts.DebugCallsiteInfo |= Args.hasArg(OPT_debug_callsite_info);
+
   return false;
 }
 
