@@ -7792,7 +7792,7 @@ getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
   if (refParentDecls.empty())
     return nullptr;
 
-  std::unordered_set<ValueDecl *> uniqueRetainDecls{}, uniqueReleaseDecls{};
+  std::set<StringRef> uniqueRetainDecls{}, uniqueReleaseDecls{};
   constexpr StringRef retainPrefix = "retain:";
   constexpr StringRef releasePrefix = "release:";
 
@@ -7801,16 +7801,10 @@ getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
     for (const auto *attr : refParentDecl->getAttrs()) {
       if (const auto swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
         const auto &attribute = swiftAttr->getAttribute();
-        llvm::SmallVector<ValueDecl *, 1> valueDecls;
-        if (attribute.starts_with(retainPrefix)) {
-          auto name = attribute.drop_front(retainPrefix.size()).str();
-          valueDecls = getValueDeclsForName(decl, ctx, name);
-          uniqueRetainDecls.insert(valueDecls.begin(), valueDecls.end());
-        } else if (attribute.starts_with(releasePrefix)) {
-          auto name = attribute.drop_front(releasePrefix.size()).str();
-          valueDecls = getValueDeclsForName(decl, ctx, name);
-          uniqueReleaseDecls.insert(valueDecls.begin(), valueDecls.end());
-        }
+        if (attribute.starts_with(retainPrefix))
+          uniqueRetainDecls.insert(attribute.drop_front(retainPrefix.size()));
+        else if (attribute.starts_with(releasePrefix))
+          uniqueReleaseDecls.insert(attribute.drop_front(releasePrefix.size()));
       }
     }
   }
@@ -8175,7 +8169,7 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
-bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
+static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
   // std::pair and std::tuple might have copy and move constructors, or base
   // classes with copy and move constructors, but they are not self-contained
   // types, e.g. `std::pair<UnsafeType, T>`.
@@ -8339,11 +8333,11 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     }
   }
 
-  if (retainReleaseAttrs.empty()) {
+  if (retainReleaseAttrs.empty())
     return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
-  } else if (retainReleaseAttrs.size() > 1) {
+
+  if (retainReleaseAttrs.size() > 1)
     return {CustomRefCountingOperationResult::tooManyAttributes, nullptr, ""};
-  }
 
   auto name = retainReleaseAttrs.front()
                   ->getAttribute()
