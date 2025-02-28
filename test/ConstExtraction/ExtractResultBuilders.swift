@@ -57,7 +57,7 @@ public enum FooBuilder {
     public static func buildBlock(_ components: Component...) -> Component {
         return components.flatMap { $0 }
     }
-    
+
     public static func buildLimitedAvailability(_ component: Component) -> Component {
         return component
     }
@@ -359,6 +359,9 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                       ]
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   }
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "element": {}
 // CHECK-NEXT:                 }
 // CHECK-NEXT:               ],
 // CHECK-NEXT:               "elseElements": [
@@ -379,6 +382,9 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                           ]
 // CHECK-NEXT:                         }
 // CHECK-NEXT:                       }
+// CHECK-NEXT:                     },
+// CHECK-NEXT:                     {
+// CHECK-NEXT:                       "element": {}
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   ],
 // CHECK-NEXT:                   "elseElements": [
@@ -397,6 +403,9 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                           ]
 // CHECK-NEXT:                         }
 // CHECK-NEXT:                       }
+// CHECK-NEXT:                     },
+// CHECK-NEXT:                     {
+// CHECK-NEXT:                       "element": {}
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   ]
 // CHECK-NEXT:                 }
@@ -455,6 +464,9 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                       ]
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   }
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "element": {}
 // CHECK-NEXT:                 }
 // CHECK-NEXT:               ],
 // CHECK-NEXT:               "elseElements": []
@@ -518,6 +530,9 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                 },
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "element": {}
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "element": {}
 // CHECK-NEXT:                 }
 // CHECK-NEXT:               ],
 // CHECK-NEXT:               "elseElements": [
@@ -536,6 +551,9 @@ public struct MyFooProviderInferredWithArrayReturn: FooProvider {
 // CHECK-NEXT:                       ]
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                   }
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "element": {}
 // CHECK-NEXT:                 }
 // CHECK-NEXT:               ]
 // CHECK-NEXT:             }
