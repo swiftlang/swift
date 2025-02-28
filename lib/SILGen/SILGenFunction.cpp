@@ -30,6 +30,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
@@ -208,6 +209,35 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
+}
+
+bool SILGenFunction::referenceAllowed(ValueDecl *decl) {
+  // Use in any non-fragile functions.
+  if (FunctionDC->getResilienceExpansion() == ResilienceExpansion::Maximal)
+    return true;
+
+  // Allow same-module references.
+  auto *targetMod = decl->getDeclContext()->getParentModule();
+  auto *thisMod = FunctionDC->getParentModule();
+  if (thisMod == targetMod)
+    return true;
+
+  ModuleDecl::ImportFilter filter = {
+    ModuleDecl::ImportFilterKind::Exported,
+    ModuleDecl::ImportFilterKind::Default,
+    ModuleDecl::ImportFilterKind::SPIOnly};
+  if (thisMod->getResilienceStrategy() != ResilienceStrategy::Resilient)
+    filter |= ModuleDecl::ImportFilterKind::InternalOrBelow;
+
+  // Look through public module local imports and their reexports.
+  llvm::SmallVector<ImportedModule, 8> imports;
+  thisMod->getImportedModules(imports, filter);
+  auto &importCache = getASTContext().getImportCache();
+  for (auto &import : imports) {
+    if (importCache.isImportedBy(targetMod, import.importedModule))
+      return true;
+  }
+  return false;
 }
 
 SILDebugLocation SILGenFunction::getSILDebugLocation(
