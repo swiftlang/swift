@@ -5,6 +5,7 @@
 // RUN:   -define-availability "_brokenPlatforms:spaceOS 10.11" \
 // RUN:   -define-availability "_refuseWildcard:iOS 13.0, *, macOS 11.0" \
 // RUN:   -define-availability "_incorrectCase:ios 13.0, macos 11.0" \
+// RUN:   -define-availability "_noVersion: macOS" \
 // RUN:   -define-availability "_duplicateVersion 1.0:iOS 13.0" \
 // RUN:   -define-availability "_duplicateVersion 1.0:iOS 13.0" \
 // RUN:   2>&1 | %FileCheck %s
@@ -16,8 +17,11 @@ public func brokenPlatforms() {}
 @available(_incorrectCase)
 public func incorrectCase() {}
 
-// CHECK: -define-availability argument:1:16: error: expected version number
-// CHECK-NEXT: _brokenParse:a b c d
+@available(_noVersion)
+public func noVersion() {}
+
+@available(_noVersionMulti)
+public func noVersionMulti() {}
 
 // CHECK: -define-availability argument:1:1: error: expected an identifier to begin an availability macro definition
 // CHECK-NEXT: :a b c d
@@ -39,3 +43,7 @@ public func incorrectCase() {}
 
 // CHECK: -define-availability argument:1:16: warning: unrecognized platform name 'ios'; did you mean 'iOS'?
 // CHECK-NEXT: _incorrectCase
+
+// FIXME: [availability] Diagnostic needs improvement
+// CHECK: -define-availability argument:1:13: warning: expected 'introduced', 'deprecated', or 'obsoleted' in 'available' attribute for platform 'macOS'
+// CHECK-NEXT: _noVersion: macOS

@@ -75,6 +75,19 @@ bool AvailabilityDomain::isVersioned() const {
   }
 }
 
+bool AvailabilityDomain::supportsQueries() const {
+  switch (getKind()) {
+  case Kind::Universal:
+  case Kind::Embedded:
+  case Kind::SwiftLanguage:
+  case Kind::PackageDescription:
+    return false;
+  case Kind::Platform:
+  case Kind::Custom:
+    return true;
+  }
+}
+
 bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   switch (getKind()) {
   case Kind::Universal:
@@ -94,7 +107,7 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
 llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
   switch (getKind()) {
   case Kind::Universal:
-    return "";
+    return "*";
   case Kind::SwiftLanguage:
     return "Swift";
   case Kind::PackageDescription:
@@ -247,7 +260,7 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
       !ctx.LangOpts.hasFeature(Feature::CustomAvailability) &&
       !declContext->isInSwiftinterface()) {
     diags.diagnose(loc, diag::attr_availability_requires_custom_availability,
-                   identifier);
+                   domain->getNameForDiagnostics());
     return std::nullopt;
   }
 

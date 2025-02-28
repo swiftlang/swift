@@ -28,7 +28,7 @@ if #unavailable( { // expected-error {{expected platform name}} expected-error {
 if #unavailable() { // expected-error {{expected platform name}}
 }
 
-if #unavailable(OSX { // expected-error {{expected version number}} expected-error {{expected ')'}} expected-note {{to match this opening '('}}
+if #unavailable(OSX { // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 
 if #unavailable(OSX) { // expected-error {{expected version number}}
@@ -62,7 +62,8 @@ if #unavailable(OSX 51, iOS 8.0, *) { }  // expected-error {{platform wildcard '
 if #unavailable(iOS 8.0) {
 }
 
-if #unavailable(iOSApplicationExtension, unavailable) { // expected-error 2{{expected version number}}
+if #unavailable(iOSApplicationExtension, unavailable) { // expected-error {{'unavailable' can't be combined with shorthand specification 'iOSApplicationExtension'}}
+// expected-note@-1 {{did you mean to specify an introduction version?}}
 }
 
 // Should this be a valid spelling since `#unvailable(*)` cannot be written?
@@ -80,7 +81,7 @@ if #unavailable(OSX 51, iOS 8.0) {
 if #unavailable(OSX 51, { // expected-error {{expected platform name}} // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 
-if #unavailable(OSX 51, iOS { // expected-error {{expected version number}} // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
+if #unavailable(OSX 51, iOS { // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 
 if #unavailable(OSX 51, iOS 8.0, iDishwasherOS 51) { // expected-warning {{unrecognized platform name 'iDishwasherOS'}}

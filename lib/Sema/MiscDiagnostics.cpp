@@ -23,6 +23,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -5130,6 +5131,8 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
   StringRef queryName =
       info->isUnavailability() ? "#unavailable" : "#available";
 
+  bool hasValidSpecs = false;
+  bool allValidSpecsArePlatform = true;
   std::optional<SourceLoc> wildcardLoc;
   llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
   for (auto spec : info->getSemanticAvailabilitySpecs(DC)) {
@@ -5140,24 +5143,44 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
     }
 
     auto domain = spec.getDomain();
+    auto loc = parsedSpec->getStartLoc();
+    bool hasVersion = !spec.getVersion().empty();
 
-    if (!domain.isPlatform()) {
-      diags.diagnose(
-          parsedSpec->getStartLoc(),
-          domain.isSwiftLanguage()
-              ? diag::availability_query_swift_not_allowed
-              : diag::availability_query_package_description_not_allowed,
-          queryName);
+    if (!domain.supportsQueries()) {
+      diags.diagnose(loc, diag::availability_query_not_allowed,
+                     domain.getNameForDiagnostics(), hasVersion, queryName);
       return true;
     }
 
-    // Diagnose duplicate platforms.
+    if (!domain.isPlatform() && info->getQueries().size() > 1) {
+      diags.diagnose(loc, diag::availability_must_occur_alone,
+                     domain.getNameForDiagnostics(), hasVersion);
+      return true;
+    }
+
+    if (domain.isVersioned()) {
+      if (!hasVersion) {
+        diags.diagnose(loc, diag::avail_query_expected_version_number);
+        return true;
+      }
+    } else if (hasVersion) {
+      diags
+          .diagnose(loc, diag::availability_unexpected_version,
+                    domain.getNameForDiagnostics())
+          .highlight(parsedSpec->getVersionSrcRange());
+      return true;
+    }
+
+    // Diagnose duplicate domains.
     if (!seenDomains.insert(domain).second) {
-      diags.diagnose(parsedSpec->getStartLoc(),
-                     diag::availability_query_repeated_platform,
-                     domain.getNameForAttributePrinting());
+      diags.diagnose(loc, diag::availability_query_already_specified,
+                     domain.isVersioned(), domain.getNameForDiagnostics());
       return true;
     }
+
+    hasValidSpecs = true;
+    if (!domain.isPlatform())
+      allValidSpecsArePlatform = false;
   }
 
   if (info->isUnavailability()) {
@@ -5167,7 +5190,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
                     diag::unavailability_query_wildcard_not_required)
           .fixItRemove(*wildcardLoc);
     }
-  } else if (!wildcardLoc) {
+  } else if (!wildcardLoc && hasValidSpecs && allValidSpecsArePlatform) {
     if (info->getQueries().size() > 0) {
       auto insertLoc = info->getQueries().back()->getSourceRange().End;
       diags.diagnose(insertLoc, diag::availability_query_wildcard_required)

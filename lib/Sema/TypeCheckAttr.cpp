@@ -4979,8 +4979,9 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
     llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
 
     SourceLoc groupEndLoc;
-    bool requiresWildcard = false;
     bool foundWildcard = false;
+    bool hasValidSpecs = false;
+    bool allValidSpecsArePlatform = true;
     int groupAttrCount = 0;
     for (auto *groupedAttr = groupHead; groupedAttr != nullptr;
          groupedAttr = groupedAttr->getNextGroupedAvailableAttr()) {
@@ -4999,8 +5000,6 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
         continue;
 
       auto domain = attr->getDomain();
-      if (domain.isPlatform())
-        requiresWildcard = true;
 
       if (groupAttrCount > 1 || !groupedAttr->isGroupTerminator() ||
           foundWildcard) {
@@ -5008,19 +5007,24 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
         // than one member.
         if (!domain.isPlatform()) {
           diagnose(loc, diag::availability_must_occur_alone,
-                   domain.getNameForAttributePrinting());
+                   domain.getNameForDiagnostics(), domain.isVersioned());
           continue;
         }
       }
 
       // Diagnose duplicate platforms.
       if (!seenDomains.insert(domain).second) {
-        diagnose(loc, diag::availability_query_repeated_platform,
-                 domain.getNameForAttributePrinting());
+        diagnose(loc, diag::availability_query_already_specified,
+                 domain.isVersioned(), domain.getNameForAttributePrinting());
+        continue;
       }
+
+      hasValidSpecs = true;
+      if (!domain.isPlatform())
+        allValidSpecsArePlatform = false;
     }
 
-    if (requiresWildcard && !foundWildcard) {
+    if (!foundWildcard && hasValidSpecs && allValidSpecsArePlatform) {
       diagnose(groupEndLoc, diag::availability_query_wildcard_required)
           .fixItInsert(groupEndLoc, ", *");
     }

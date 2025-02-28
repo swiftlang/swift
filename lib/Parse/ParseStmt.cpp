@@ -1481,7 +1481,7 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
                      diag::avail_query_meant_introduced)
                 .fixItInsert(PlatformNameEndLoc, ", introduced:");
           }
-
+          consumeToken();
           Status.setIsParseError();
           break;
         }

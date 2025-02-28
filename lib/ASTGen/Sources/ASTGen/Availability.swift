@@ -284,6 +284,7 @@ extension ASTGenVisitor {
     var result: [BridgedAvailabilitySpec] = []
 
     func handle(domainNode: TokenSyntax, versionNode: VersionTupleSyntax?) {
+      // FIXME: [availability] Add support for custom domains
       let nameLoc = self.generateSourceLoc(domainNode)
       let version = self.generate(versionTuple: versionNode)
       let versionRange = self.generateSourceRange(versionNode)
