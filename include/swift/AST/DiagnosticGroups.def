@@ -22,12 +22,12 @@
 
 GROUP(no_group, "")
 
-GROUP(DeprecatedDeclaration, "DeprecatedDeclaration.md")
-GROUP(Unsafe, "Unsafe.md")
-GROUP(UnknownWarningGroup, "UnknownWarningGroup.md")
-GROUP(PreconcurrencyImport, "PreconcurrencyImport.md")
-GROUP(StrictLanguageFeatures, "StrictLanguageFeatures.md")
-GROUP(ExistentialAny, "ExistentialAny.md")
+GROUP(DeprecatedDeclaration, "deprecated-declaration.md")
+GROUP(StrictMemorySafety, "strict-memory-safety.md")
+GROUP(UnknownWarningGroup, "unknown-warning-group.md")
+GROUP(PreconcurrencyImport, "preconcurrency-import.md")
+GROUP(StrictLanguageFeatures, "strict-language-features.md")
+GROUP(ExistentialAny, "existential-any.md")
 
 #define UNDEFINE_DIAGNOSTIC_GROUPS_MACROS
 #include "swift/AST/DefineDiagnosticGroupsMacros.h"

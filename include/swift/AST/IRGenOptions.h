@@ -296,6 +296,10 @@ public:
   /// indexing info.
   PathRemapper FilePrefixMap;
 
+  /// Indicates whether or not the frontend should generate callsite information
+  /// in the debug info.
+  bool DebugCallsiteInfo = false;
+
   /// What level of debug info to generate.
   IRGenDebugInfoLevel DebugInfoLevel : 2;
 
