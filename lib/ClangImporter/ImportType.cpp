@@ -519,6 +519,13 @@ namespace {
                 ImportHint::OtherPointer};
       }
 
+      // FIXME: remove workaround once Unsafe*Pointer supports
+      //        nonescapable pointees.
+      if (pointeeType && !pointeeType->isEscapable()) {
+        addImportDiagnostic(Diagnostic(diag::ptr_to_nonescapable, pointeeType));
+        return Type();
+      }
+
       PointerTypeKind pointerKind;
       if (quals.hasConst()) {
         pointerKind = PTK_UnsafePointer;
