@@ -63,6 +63,17 @@ public func print(_ object: some CustomStringConvertible, terminator: StaticStri
   }
 }
 
+func print(_ buf: UnsafeBufferPointer<UInt8>, terminator: StaticString = "\n") {
+  for c in buf {
+    putchar(CInt(c))
+  }
+  var p = terminator.utf8Start
+  while p.pointee != 0 {
+    putchar(CInt(p.pointee))
+    p += 1
+  }
+}
+
 func printCharacters(_ buf: UnsafeRawBufferPointer) {
   for unsafe c in unsafe buf {
     putchar(CInt(c))
