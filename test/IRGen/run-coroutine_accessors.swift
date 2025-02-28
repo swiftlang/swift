@@ -24,7 +24,7 @@ struct MaybePtrBox<T> {
   static func sentinel() -> UnsafeMutablePointer<T> {
     .init(bitPattern: 0xdeadbeef)!
   }
-  
+
   init() {
     ptr = .init(MaybePtrBox.sentinel())
   }
@@ -80,8 +80,39 @@ struct Stringg : AsyncMutatable {
   }
 }
 
+protocol Mutatable {
+  mutating func mutate()
+}
+
+struct Stringgg : Mutatable {
+  var value: String
+  mutating func mutate() {
+    value += value
+  }
+}
+
 @main
 struct M {
+  static func sync_mutate<T : Mutatable>(_ t: inout T?) {
+    var b = MaybePtrBox<T>()
+    b.set(t)
+    b.value?.mutate()
+    t = b.value
+  }
+  static func sync_main() {
+    var v1 = Optional<Stringgg>.none
+    // CHECK: nil
+    print(v1)
+    // CHECK: nil
+    sync_mutate(&v1)
+    print(v1)
+    var v2 = Optional.some(Stringgg(value: "hi"))
+    // CHECK: "hi"
+    print(v2)
+    sync_mutate(&v2)
+    // CHECK: "hihi"
+    print(v2)
+  }
   static func mutate<T : AsyncMutatable>(_ t: inout T?) async {
     var b = MaybePtrBox<T>()
     b.set(t)
@@ -89,10 +120,11 @@ struct M {
     t = b.value
   }
   static func main() async {
+    sync_main()
     var v1 = Optional<Stringg>.none
-    // CHECK: nil 
+    // CHECK: nil
     print(v1)
-    // CHECK: nil 
+    // CHECK: nil
     await mutate(&v1)
     print(v1)
     var v2 = Optional.some(Stringg(value: "hi"))

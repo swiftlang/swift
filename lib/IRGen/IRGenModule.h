@@ -876,6 +876,7 @@ public:
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
   llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
+  llvm::CallingConv::ID SwiftCoroCC;   /// swift calling convention for callee-allocated coroutines
 
   /// What kind of tail call should be used for async->async calls.
   llvm::CallInst::TailCallKind AsyncTailCallKind;
@@ -1226,14 +1227,13 @@ public:
                                            const PointerAuthEntity &entity,
                                            llvm::Constant *storageAddress);
 
-  llvm::Constant *getOrCreateHelperFunction(StringRef name,
-                                            llvm::Type *resultType,
-                                            ArrayRef<llvm::Type*> paramTypes,
-                        llvm::function_ref<void(IRGenFunction &IGF)> generate,
-                        bool setIsNoInline = false,
-                        bool forPrologue = false,
-                        bool isPerformanceConstraint = false,
-                        IRLinkage *optionalLinkage = nullptr);
+  llvm::Constant *getOrCreateHelperFunction(
+      StringRef name, llvm::Type *resultType, ArrayRef<llvm::Type *> paramTypes,
+      llvm::function_ref<void(IRGenFunction &IGF)> generate,
+      bool setIsNoInline = false, bool forPrologue = false,
+      bool isPerformanceConstraint = false,
+      IRLinkage *optionalLinkage = nullptr,
+      std::optional<llvm::CallingConv::ID> specialCallingConv = std::nullopt);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);

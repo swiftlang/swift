@@ -503,6 +503,13 @@ public:
 
   unsigned UseProfilingMarkerThunks : 1;
 
+  // Whether swiftcorocc should be used for yield_once_2 routines on x86_64.
+  unsigned UseCoroCCX8664 : 1;
+
+  // Whether swiftcorocc should be used for yield_once_2 routines on arm64
+  // variants.
+  unsigned UseCoroCCArm64 : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -606,8 +613,9 @@ public:
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(false),
         EmitYieldOnce2AsYieldOnce(true), AsyncFramePointerAll(false),
-        UseProfilingMarkerThunks(false), DebugInfoForProfiling(false),
-        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        UseProfilingMarkerThunks(false), UseCoroCCX8664(false),
+        UseCoroCCArm64(false), DebugInfoForProfiling(false), CmdArgs(),
+        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
         CASObjMode(llvm::CASBackendMode::Native) {

@@ -35,6 +35,9 @@
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/Analysis/ValueTracking.h"
+#include "llvm/IR/CallingConv.h"
+#include "llvm/IR/Constant.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/Compiler.h"
@@ -220,7 +223,11 @@ IRGenFunction::getDefaultCoroutineAllocatorKind() {
   if (isCoroutine()) {
     return CoroAllocatorKind::Malloc;
   }
-  return CoroAllocatorKind::Sync;
+  if (IGM.SwiftCoroCC != llvm::CallingConv::SwiftCoro) {
+    // If the swiftcorocc isn't available, fall back to malloc.
+    return CoroAllocatorKind::Malloc;
+  }
+  return CoroAllocatorKind::Stack;
 }
 
 llvm::Value *IRGenFunction::getAsyncTask() {
@@ -360,9 +367,10 @@ static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
 
 /// Expand the requirements of the given abstract calling convention
 /// into a "physical" calling convention.
-llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
-                                    SILFunctionTypeRepresentation convention,
-                                    bool isAsync) {
+llvm::CallingConv::ID
+irgen::expandCallingConv(IRGenModule &IGM,
+                         SILFunctionTypeRepresentation convention, bool isAsync,
+                         bool isCalleeAllocatedCoro) {
   switch (convention) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
@@ -379,6 +387,8 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
   case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
   case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
+    if (isCalleeAllocatedCoro && !IGM.getOptions().EmitYieldOnce2AsYieldOnce)
+      return IGM.SwiftCoroCC;
     if (isAsync)
       return IGM.SwiftAsyncCC;
     return getFreestandingConvention(IGM);
@@ -2391,7 +2401,8 @@ Signature SignatureExpansion::getSignature() {
          "C function type without C function info");
 
   auto callingConv =
-      expandCallingConv(IGM, FnType->getRepresentation(), FnType->isAsync());
+      expandCallingConv(IGM, FnType->getRepresentation(), FnType->isAsync(),
+                        FnType->isCalleeAllocatedCoroutine());
 
   Signature result;
   result.Type = llvmType;
@@ -5118,6 +5129,40 @@ void irgen::emitYieldManyCoroutineEntry(
                            allocFn, deallocFn, {});
 }
 
+static llvm::Constant *getCoroAllocWrapperFn(IRGenModule &IGM) {
+  return IGM.getOrCreateHelperFunction(
+      "__swift_coro_alloc_", IGM.Int8PtrTy,
+      {IGM.CoroAllocatorPtrTy, IGM.SizeTy},
+      [](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        auto *allocator = parameters.claimNext();
+        auto *size = parameters.claimNext();
+        auto *nullAllocator = IGF.Builder.CreateCmp(
+            llvm::CmpInst::Predicate::ICMP_EQ, allocator,
+            llvm::ConstantPointerNull::get(
+                cast<llvm::PointerType>(allocator->getType())));
+        auto *poplessReturn = IGF.createBasicBlock("coro.return.popless");
+        auto *normalReturn = IGF.createBasicBlock("coro.return.normal");
+        IGF.Builder.CreateCondBr(nullAllocator, poplessReturn, normalReturn);
+        IGF.Builder.emitBlock(poplessReturn);
+        // Emit the dynamic alloca.
+        auto *alloca =
+            IGF.Builder.IRBuilderBase::CreateAlloca(IGF.IGM.Int8Ty, size);
+        alloca->setAlignment(llvm::Align(MaximumAlignment));
+        auto *ret = IGF.Builder.CreateIntrinsic(
+            alloca->getType(), llvm::Intrinsic::coro_return, {alloca});
+        IGF.Builder.CreateRet(ret);
+        IGF.Builder.emitBlock(normalReturn);
+        auto *call = IGF.Builder.CreateCall(
+            IGF.IGM.getCoroAllocFunctionPointer(), {allocator, size});
+        IGF.Builder.CreateRet(call);
+      },
+      /*setIsNoInline=*/false,
+      /*forPrologue=*/false,
+      /*isPerformanceConstraint=*/false,
+      /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::SwiftCoro);
+}
+
 void irgen::emitYieldOnce2CoroutineEntry(
     IRGenFunction &IGF, LinkEntity coroFunction, CanSILFunctionType fnType,
     NativeCCEntryPointArgumentEmission &emission) {
@@ -5126,7 +5171,11 @@ void irgen::emitYieldOnce2CoroutineEntry(
       IGF.IGM.getAddrOfCoroFunctionPointer(coroFunction));
   llvm::Value *allocator = emission.getCoroutineAllocator();
   IGF.setCoroutineAllocator(allocator);
-  auto allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getCoroAllocFn());
+  auto isSwiftCoroCCAvailable =
+      IGF.IGM.SwiftCoroCC == llvm::CallingConv::SwiftCoro;
+  auto allocFn = IGF.IGM.getOpaquePtr(isSwiftCoroCCAvailable
+                                          ? getCoroAllocWrapperFn(IGF.IGM)
+                                          : IGF.IGM.getCoroAllocFn());
   auto deallocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getCoroDeallocFn());
   emitRetconCoroutineEntry(
       IGF, fnType, buffer, llvm::Intrinsic::coro_id_retcon_once_dynamic,

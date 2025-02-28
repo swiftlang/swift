@@ -3653,6 +3653,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_large_loadable_types_reg2mem,
                    OPT_disable_large_loadable_types_reg2mem,
                    Opts.EnableLargeLoadableTypesReg2Mem);
+  Opts.UseCoroCCX8664 = Args.hasFlag(
+      OPT_enable_x86_64_corocc, OPT_disable_x86_64_corocc, Opts.UseCoroCCX8664);
+  Opts.UseCoroCCArm64 = Args.hasFlag(
+      OPT_enable_arm64_corocc, OPT_disable_arm64_corocc, Opts.UseCoroCCArm64);
   Opts.EnableLayoutStringValueWitnesses = Args.hasFlag(OPT_enable_layout_string_value_witnesses,
                                                        OPT_disable_layout_string_value_witnesses,
                                                        Opts.EnableLayoutStringValueWitnesses);

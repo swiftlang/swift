@@ -146,9 +146,9 @@ namespace irgen {
   std::pair<llvm::Value *, llvm::Value *>
   getCoroFunctionAndSize(IRGenFunction &IGF, FunctionPointer functionPointer,
                          std::pair<bool, bool> values = {true, true});
-  llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
-                                     SILFunctionTypeRepresentation convention,
-                                     bool isAsync);
+  llvm::CallingConv::ID
+  expandCallingConv(IRGenModule &IGM, SILFunctionTypeRepresentation convention,
+                    bool isAsync, bool isCalleeAllocatedCoro);
 
   Signature emitCastOfFunctionPointer(IRGenFunction &IGF, llvm::Value *&fnPtr,
                                       CanSILFunctionType fnType,
