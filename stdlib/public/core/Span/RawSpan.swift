@@ -150,8 +150,9 @@ extension RawSpan {
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
   ) {
-    let rawBuffer =
-      UnsafeRawBufferPointer(unsafe UnsafeMutableRawBufferPointer(rebasing: buffer))
+    let rawBuffer = UnsafeRawBufferPointer(
+      unsafe UnsafeMutableRawBufferPointer(rebasing: buffer)
+    )
     let span = RawSpan(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
@@ -211,7 +212,7 @@ extension RawSpan {
   public init<T: BitwiseCopyable>(
     _unsafeElements buffer: borrowing Slice<UnsafeBufferPointer<T>>
   ) {
-    let rawBuffer = UnsafeRawBufferPointer(unsafe UnsafeBufferPointer(rebasing: buffer))
+    let rawBuffer = UnsafeRawBufferPointer(unsafe .init(rebasing: buffer))
     let span = RawSpan(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
@@ -251,8 +252,9 @@ extension RawSpan {
   public init<T: BitwiseCopyable>(
     _unsafeElements buffer: borrowing Slice<UnsafeMutableBufferPointer<T>>
   ) {
-    let rawBuffer =
-      UnsafeRawBufferPointer(unsafe UnsafeMutableBufferPointer(rebasing: buffer))
+    let rawBuffer = UnsafeRawBufferPointer(
+      unsafe UnsafeMutableBufferPointer(rebasing: buffer)
+    )
     let span = RawSpan(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
@@ -593,7 +595,9 @@ extension RawSpan {
       MemoryLayout<T>.size <= (_count &- offset),
       "Byte offset range out of bounds"
     )
-    return unsafe unsafeLoadUnaligned(fromUncheckedByteOffset: offset, as: T.self)
+    return unsafe unsafeLoadUnaligned(
+      fromUncheckedByteOffset: offset, as: T.self
+    )
   }
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -643,7 +647,7 @@ extension RawSpan {
   public func byteOffsets(of other: borrowing Self) -> Range<Int>? {
     if other._count > _count { return nil }
     guard let spanStart = other._pointer, _count > 0 else {
-      return unsafe _pointer == other._pointer ? Range(_uncheckedBounds: (0, 0)) : nil
+      return unsafe _pointer == other._pointer ? 0..<0 : nil
     }
     let start = _start()
     let spanEnd = unsafe spanStart + other._count

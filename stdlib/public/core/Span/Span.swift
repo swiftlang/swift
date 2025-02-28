@@ -293,7 +293,9 @@ extension Span where Element: BitwiseCopyable {
     byteCount: Int
   ) {
     _precondition(byteCount >= 0, "Count must not be negative")
-    let rawBuffer = unsafe UnsafeRawBufferPointer(start: pointer, count: byteCount)
+    let rawBuffer = unsafe UnsafeRawBufferPointer(
+      start: pointer, count: byteCount
+    )
     let span = Span(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'pointer'. Make the dependence explicit.
@@ -358,8 +360,9 @@ extension Span where Element: BitwiseCopyable {
   @_alwaysEmitIntoClient
   @lifetime(bytes)
   public init(_bytes bytes: consuming RawSpan) {
-    let rawBuffer =
-      unsafe UnsafeRawBufferPointer(start: bytes._pointer, count: bytes.byteCount)
+    let rawBuffer = unsafe UnsafeRawBufferPointer(
+      start: bytes._pointer, count: bytes.byteCount
+    )
     let span = Span(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'bytes'. Make the dependence explicit.
@@ -696,12 +699,14 @@ extension Span where Element: ~Copyable {
   public func indices(of other: borrowing Self) -> Range<Index>? {
     if other._count > _count { return nil }
     guard let spanStart = other._pointer, _count > 0 else {
-      return unsafe _pointer == other._pointer ? Range(_uncheckedBounds: (0, 0)) : nil
+      return unsafe _pointer == other._pointer ? 0..<0 : nil
     }
     let start = _start()
     let stride = MemoryLayout<Element>.stride
     let spanEnd = unsafe spanStart + stride &* other._count
-    if unsafe spanStart < start || spanEnd > (start + stride &* _count) { return nil }
+    if unsafe spanStart < start || spanEnd > (start + stride &* _count) {
+      return nil
+    }
     let byteOffset = unsafe start.distance(to: spanStart)
     let (lower, r) = byteOffset.quotientAndRemainder(dividingBy: stride)
     guard r == 0 else { return nil }
