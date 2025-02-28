@@ -235,7 +235,6 @@ extension InlineArray where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
-  @_transparent
   @_semantics("fixed_storage.get_count")
   @inline(__always)
   public var count: Int {
