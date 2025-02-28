@@ -362,8 +362,6 @@ $KnownNDKs = @{
 
 $IsCrossCompiling = $HostArchName -ne $BuildArchName
 
-$TimingData = New-Object System.Collections.Generic.List[System.Object]
-
 function Get-AndroidNDK {
   $NDK = $KnownNDKs[$AndroidNDKVersion]
   if ($NDK -eq $null) { throw "Unsupported Android NDK version" }
@@ -657,34 +655,80 @@ function Isolate-EnvVars([scriptblock]$Block) {
   }
 }
 
-function Track-AvgCPU([scriptblock]$Block) {
+$TimingData = New-Object System.Collections.Generic.List[System.Object]
+$logFileAvgCPU = $null
+
+function Track-AvgCPU($logFile) {
+  Write-Host "Tracking average CPU usage to file: $logFile"
+  $script:logFileAvgCPU = $logFile
+
   # Background jobs run in a separate process and cannot write to any variables.
-  # We don't know how long the job will run. We have to stop it explicitly, but
-  # then we cannot get a result via Receive-Job. Temporary file seems like the
-  # best workaround.
-  $SamplesFile = New-TemporaryFile
-  $Job = Start-Job -ArgumentList $SamplesFile -ScriptBlock {
-    Start-Sleep -Seconds 0.1
+  # We cannot say in advance how long the job will run, so we cannot use
+  # Receive-Job. Temporary file seems like the best solution.
+  return Start-Job -ArgumentList $logFile -ScriptBlock {
     while ($true) {
       $Sample = ((Get-Counter "\Processor(_Total)\% Processor Time").CounterSamples.CookedValue)
-      Add-Content -Path $using:SamplesFile -Value ([math]::Round($Sample))
+      Add-Content -Path $using:logFile -Value ([math]::Round($Sample))
+    }
+  }
+}
+
+function Annotate-AvgCPU($annotation) {
+  if ($script:logFileAvgCPU -ne $null) {
+    Add-Content -Path $script:logFileAvgCPU -Value $annotation
+  }
+}
+
+function Plot-AvgCPU {
+  if ($script:logFileAvgCPU -eq $null) {
+    Write-Warning "CPU tracking not enabled"
+    return
+  }
+
+  $logLines = Get-Content $script:logFileAvgCPU
+  $data = @()
+  $labels = @{}
+  $lineIndex = 0
+
+  foreach ($line in $logLines) {
+    if ($line -match '^(100(?:\.0+)?|[0-9]{1,2}(?:\.\d+)?)$') {
+      $value = [double]$matches[1]
+      if ($value -gt 100) {
+        Write-Warning "Percentage value out of range: $value"
+      }
+      $data += [PSCustomObject]@{ Index = $lineIndex; Value = $value }
+      $lineIndex++
+    } else {
+      $labels[$lineIndex] = $line
     }
   }
 
-  & $Block
+  $maxColumns = 50
+  $maxLines = [math]::Min(100, $data.Count)
+  $step = [math]::Ceiling($data.Count / $maxLines)
+  $maxValue = 100
 
-  Stop-Job $Job
-  Remove-Job $job
+  $i = 0
+  do {
+    $i += 1
+    $from = ($i - 1) * $step
+    $to = [math]::Min($i * $step, $data.Count) - 1
 
-  $Lines = Get-Content -Path $SamplesFile
-  $Values = $Lines | ForEach-Object { $_ -as [double] } | Where-Object { $_ -ne $null }
-  if ($Values -eq $null -or $Values.Count -eq 0) {
-    $script:AvgCPU = $null
-  }
+    $values = $data[$from..$to] | Select-Object -ExpandProperty Value
+    $average = ($values | Measure-Object -Average).Average
+    $scaledValue = [math]::Round(($average / $maxValue) * $maxColumns)
+    $bar = "#" * $scaledValue
 
-  # Function return values contain a lot of things including strings from nested
-  # calls to Write-Output.
-  $script:AvgCPU = [math]::Round(($Values | Measure-Object -Average).Average)
+    # Collect labels
+    $annot = @()
+    for ($j = $from; $j -le $to; $j++) {
+      if ($labels.ContainsKey($data[$j].Index)) {
+        $annot += $labels[$data[$j].Index]
+      }
+    }
+
+    Write-Host ("{0,-50}{1}" -f $bar, ($annot -join ", "))
+  } while ($i * $step -lt $data.Count)
 }
 
 function Invoke-VsDevShell($Arch) {
@@ -1084,6 +1128,7 @@ function Build-CMakeProject {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
   }
 
+  Annotate-AvgCPU "$Bin (configure)"
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
   # Enter the developer command shell early so we can resolve cmake.exe
@@ -1388,26 +1433,23 @@ function Build-CMakeProject {
     }
     Invoke-Program cmake.exe @cmakeGenerateArgs
 
-    # Build all requested targets. Measure CPU load for the build phase
-    # specifically. However, this includes install phases as well as nested
-    # CMake configuration phases.
-    Track-AvgCPU {
-      foreach ($Target in $BuildTargets) {
-        if ($Target -eq "default") {
-          Invoke-Program cmake.exe --build $Bin
-        } else {
-          Invoke-Program cmake.exe --build $Bin --target $Target
-        }
+    # Build all requested targets
+    Annotate-AvgCPU "$Bin (build)"
+    foreach ($Target in $BuildTargets) {
+      if ($Target -eq "default") {
+        Invoke-Program cmake.exe --build $Bin
+      } else {
+        Invoke-Program cmake.exe --build $Bin --target $Target
       }
+    }
 
-      if ($BuildTargets.Length -eq 0 -and $InstallTo) {
-        Invoke-Program cmake.exe --build $Bin --target install
-      }
+    if ($BuildTargets.Length -eq 0 -and $InstallTo) {
+      Invoke-Program cmake.exe --build $Bin --target install
     }
   }
 
   if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.LLVMName)' in $($Stopwatch.Elapsed) (CPU load $script:AvgCPU%)"
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.LLVMName)' in $($Stopwatch.Elapsed)"
     Write-Host ""
   }
 
@@ -1416,7 +1458,6 @@ function Build-CMakeProject {
       Arch = $Arch.LLVMName
       Platform = $Platform
       Checkout = $Src.Replace($SourceCache, '')
-      CPU = $script:AvgCPU
       "Elapsed Time" = $Stopwatch.Elapsed.ToString()
     })
   }
@@ -1497,13 +1538,12 @@ function Build-SPMProject {
       }
     }
 
-    Track-AvgCPU {
-      Invoke-Program "$($HostArch.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
-    }
+    Annotate-AvgCPU "$Bin (SPM)"
+    Invoke-Program "$($HostArch.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
   }
 
   if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.LLVMName)' in $($Stopwatch.Elapsed) (CPU load $script:AvgCPU%)"
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.LLVMName)' in $($Stopwatch.Elapsed)"
     Write-Host ""
   }
 
@@ -1512,7 +1552,6 @@ function Build-SPMProject {
       Arch = $Arch.LLVMName
       Checkout = $Src.Replace($SourceCache, '')
       Platform = "Windows"
-      CPU = $script:AvgCPU
       "Elapsed Time" = $Stopwatch.Elapsed.ToString()
     })
   }
@@ -3211,6 +3250,9 @@ if ($Clean) {
   }
 }
 
+if ($Summary) {
+  Track-AvgCPU -logFile New-TemporaryFile
+}
 
 if (-not $SkipBuild) {
   if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
@@ -3406,6 +3448,7 @@ if (-not $IsCrossCompiling) {
   exit 1
 } finally {
   if ($Summary) {
-    $TimingData | Select-Object Platform,Arch,Checkout,CPU,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
+    $TimingData | Select-Object Platform,Arch,Checkout,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
+    Plot-AvgCPU
   }
 }
