@@ -171,6 +171,7 @@ protected:
 
   struct BinaryModuleImports {
     llvm::StringSet<> moduleImports;
+    llvm::StringSet<> exportedModules;
     std::string headerImport;
   };
 
@@ -185,7 +186,7 @@ protected:
 
   /// If the module has a package name matching the one
   /// specified, return a set of package-only imports for this module.
-  static llvm::ErrorOr<llvm::StringSet<>>
+  static llvm::ErrorOr<std::vector<ScannerImportStatementInfo>>
   getMatchingPackageOnlyImportsOfModule(Twine modulePath,
                                         bool isFramework,
                                         bool isRequiredOSSAModules,
