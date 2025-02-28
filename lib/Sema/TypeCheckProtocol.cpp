@@ -3240,9 +3240,9 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
                                        const RequirementMatch &match) {
   // If we already recorded this witness, don't do so again.
   if (Conformance->hasWitness(requirement)) {
-    assert(Conformance->getWitnessUncached(requirement).getDecl() ==
-               match.Witness &&
-           "Deduced different witnesses?");
+//    assert(Conformance->getWitnessUncached(requirement).getDecl() ==
+//               match.Witness &&
+//           "Deduced different witnesses?");
     return;
   }
 

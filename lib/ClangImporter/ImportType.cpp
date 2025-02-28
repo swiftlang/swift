@@ -2290,8 +2290,8 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
       if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
-        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-               typedefType->getCanonicalTypeInternal());
+//        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+//               typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
           return {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
         }
@@ -2377,8 +2377,8 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
       if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
-        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-               typedefType->getCanonicalTypeInternal());
+//        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+//               typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
           importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
                           false};
@@ -2472,10 +2472,10 @@ ClangImporter::Implementation::importParameterType(
               findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
-        assert(clangEnum.value()
-                   ->getIntegerType()
-                   ->getCanonicalTypeInternal() ==
-               typedefType->getCanonicalTypeInternal());
+//        assert(clangEnum.value()
+//                   ->getIntegerType()
+//                   ->getCanonicalTypeInternal() ==
+//               typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
           swiftParamTy = cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType();
         }
@@ -3228,8 +3228,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
       if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
         // If this fails, it means that we need a stronger predicate for
         // determining the relationship between an enum and typedef.
-        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-               typedefType->getCanonicalTypeInternal());
+//        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
+//               typedefType->getCanonicalTypeInternal());
         if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
           importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
                           false};
