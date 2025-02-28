@@ -307,6 +307,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
 
 ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
     Identifier moduleName, StringRef moduleOutputPath,
+    StringRef sdkModuleOutputPath,
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenClangModules,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
@@ -325,9 +326,9 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
   // FIXME: submodules?
   scanners.push_back(std::make_unique<PlaceholderSwiftModuleScanner>(
       Ctx, LoadMode, moduleId, Ctx.SearchPathOpts.PlaceholderDependencyModuleMap,
-      delegate, moduleOutputPath));
+      delegate, moduleOutputPath, sdkModuleOutputPath));
   scanners.push_back(std::make_unique<SwiftModuleScanner>(
-      Ctx, LoadMode, moduleId, delegate, moduleOutputPath,
+      Ctx, LoadMode, moduleId, delegate, moduleOutputPath, sdkModuleOutputPath,
       SwiftModuleScanner::MDS_plain));
 
   // Check whether there is a module with this name that we can import.
