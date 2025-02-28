@@ -588,6 +588,17 @@ extension Span where Element: ~Copyable {
     unsafe _extracting(unchecked: bounds.relative(to: indices))
   }
 
+  @_alwaysEmitIntoClient
+  @lifetime(self)
+  public func _extracting(
+    unchecked bounds: ClosedRange<Index>
+  ) -> Self {
+    let range = Range(
+      _uncheckedBounds: (bounds.lowerBound, bounds.upperBound&+1)
+    )
+    return unsafe _extracting(unchecked: range)
+  }
+
   /// Constructs a new span over all the items of this span.
   ///
   /// The returned span's first item is always at offset 0; unlike buffer
