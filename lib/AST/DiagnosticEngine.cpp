@@ -1330,13 +1330,16 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     }
   }
 
+  auto groupID = diagnostic.getGroupID();
   StringRef Category;
   if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
     Category = "api-digester-breaking-change";
-  else if (isDeprecationDiagnostic(diagnostic.getID()))
-    Category = "deprecation";
   else if (isNoUsageDiagnostic(diagnostic.getID()))
     Category = "no-usage";
+  else if (groupID != DiagGroupID::no_group)
+    Category = getDiagGroupInfoByID(groupID).name;
+  else if (isDeprecationDiagnostic(diagnostic.getID()))
+    Category = "deprecation";
 
   auto fixIts = diagnostic.getFixIts();
   if (loc.isValid()) {
@@ -1362,12 +1365,13 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   }
 
   llvm::StringRef format;
-  if (includeDiagnosticName)
+  if (includeDiagnosticName) {
     format =
-        diagnosticStringWithNameFor(diagnostic.getID(), diagnostic.getGroupID(),
+        diagnosticStringWithNameFor(diagnostic.getID(), groupID,
                                     getPrintDiagnosticNamesMode());
-  else
+  } else {
     format = diagnosticStringFor(diagnostic.getID());
+  }
 
   return DiagnosticInfo(diagnostic.getID(), loc, toDiagnosticKind(behavior),
                         format, diagnostic.getArgs(), Category,
@@ -1523,6 +1527,18 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
       educationalNotePaths.push_back(notePath.str().str());
       ++associatedNotes;
     }
+
+    // Capture information about the diagnostic group along with the remaining
+    // educational notes.
+    auto groupID = diagnostic.getGroupID();
+    if (groupID != DiagGroupID::no_group) {
+      const auto &diagGroup = getDiagGroupInfoByID(groupID);
+
+      SmallString<128> docPath(getDiagnosticDocumentationPath());
+      llvm::sys::path::append(docPath, diagGroup.documentationFile);
+      educationalNotePaths.push_back(docPath.str().str());
+    }
+
     info->EducationalNotePaths = educationalNotePaths;
 
     for (auto &consumer : Consumers) {

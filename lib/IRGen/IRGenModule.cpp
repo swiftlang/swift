@@ -208,6 +208,24 @@ static void sanityCheckStdlib(IRGenModule &IGM) {
 }
 #endif
 
+static bool getIsCoroCCSupported(const clang::TargetInfo &targetInfo,
+                                 const IRGenOptions &IRGenOpts) {
+  // TODO: CoroutineAccessors: The one caller of this function should just be
+  //                           rewritten as follows (once clang::CC_CoroAsync is
+  //                           defined).
+  //
+  // clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_CoroAsync)
+  if (targetInfo.getTriple().isAArch64() && IRGenOpts.UseCoroCCArm64) {
+    return true;
+  }
+  if (targetInfo.getTriple().getArch() == llvm::Triple::x86_64 &&
+      IRGenOpts.UseCoroCCX8664) {
+    return true;
+  }
+
+  return false;
+}
+
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, StringRef ModuleName,
@@ -600,6 +618,14 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   } else {
     SwiftAsyncCC = SwiftCC;
     AsyncTailCallKind = llvm::CallInst::TCK_Tail;
+  }
+
+  bool isCoroCCSupported =
+      getIsCoroCCSupported(clangASTContext.getTargetInfo(), opts);
+  if (isCoroCCSupported) {
+    SwiftCoroCC = llvm::CallingConv::SwiftCoro;
+  } else {
+    SwiftCoroCC = llvm::CallingConv::Swift;
   }
 
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
