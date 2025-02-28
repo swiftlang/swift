@@ -276,6 +276,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         auto &imInfo = mainMod->getImplicitImportInfo();
         for (auto import : imInfo.AdditionalUnloadedImports) {
           Result->addModuleImport(import.module.getModulePath(),
+                                  import.options.contains(ImportFlags::Exported),
                                   &alreadyAddedModules, &Ctx.SourceMgr);
         }
 
@@ -301,8 +302,9 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
                return adjacentBinaryModulePackageOnlyImports.getError();
 
              for (const auto &requiredImport : *adjacentBinaryModulePackageOnlyImports)
-               if (!alreadyAddedModules.contains(requiredImport.getKey()))
-                 Result->addModuleImport(requiredImport.getKey(),
+               if (!alreadyAddedModules.contains(requiredImport.importIdentifier))
+                 Result->addModuleImport(requiredImport.importIdentifier,
+                                         requiredImport.isExported,
                                          &alreadyAddedModules);
            }
          }
