@@ -223,7 +223,7 @@ struct SILOptOptions {
 
   llvm::cl::opt<bool>
   DisableSILOwnershipVerifier = llvm::cl::opt<bool>(
-      "disable = llvm::cl::opt<bool> DisableSILOwnershipVerifier(-sil-ownership-verifier",
+      "disable-sil-ownership-verifier",
       llvm::cl::desc(
           "Do not verify SIL ownership invariants during SIL verification"));
 
