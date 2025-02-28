@@ -7058,6 +7058,10 @@ ValueOwnership swift::asValueOwnership(ParameterOwnership o) {
   llvm_unreachable("exhaustive switch");
 }
 
-StringRef ASTContext::getTargetPlatformStringForDiagnostics() const {
-  return prettyPlatformString(targetPlatform(LangOpts));
+AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
+  if (auto domain = AvailabilityDomain::forTargetPlatform(*this))
+    return *domain;
+
+  // Fall back to the universal domain for triples without a platform.
+  return AvailabilityDomain::forUniversal();
 }

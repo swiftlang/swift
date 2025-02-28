@@ -5193,7 +5193,7 @@ diagnoseUnsupportedObjCImplLayout(IRGenModule &IGM, ClassDecl *classDecl,
         diags.diagnose(
             field.getVarDecl(),
             diag::attr_objc_implementation_resilient_property_deployment_target,
-            ctx.getTargetPlatformStringForDiagnostics(),
+            ctx.getTargetAvailabilityDomain(),
             currentAvailability.getRawMinimumVersion(),
             requiredAvailability.getRawMinimumVersion());
       else

@@ -583,13 +583,14 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
                                             ResilienceExpansion::Maximal)) {
           auto stubAvailability = getObjCClassStubAvailability(ctx);
           auto *ancestor = getResilientAncestor(mod, classDecl);
-          softenIfAccessNote(value, reason.getAttr(),
-            value->diagnose(diag::objc_in_resilient_extension,
-                            value->getDescriptiveKind(),
-                            ancestor->getName(),
-                            ctx.getTargetPlatformStringForDiagnostics(),
-                            stubAvailability.getRawMinimumVersion())
-                .limitBehavior(behavior));
+          softenIfAccessNote(
+              value, reason.getAttr(),
+              value
+                  ->diagnose(diag::objc_in_resilient_extension,
+                             value->getDescriptiveKind(), ancestor->getName(),
+                             ctx.getTargetAvailabilityDomain(),
+                             stubAvailability.getRawMinimumVersion())
+                  .limitBehavior(behavior));
           reason.describe(value);
           return true;
         }
@@ -1356,7 +1357,7 @@ static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       auto *ancestor = getResilientAncestor(CD->getParentModule(), CD);
       swift::diagnoseAndRemoveAttr(CD, attr, diag::objc_for_resilient_class,
                                    ancestor->getName(),
-                                   ctx.getTargetPlatformStringForDiagnostics(),
+                                   ctx.getTargetAvailabilityDomain(),
                                    stubAvailability.getRawMinimumVersion())
           .limitBehavior(behavior);
       reason.describe(CD);

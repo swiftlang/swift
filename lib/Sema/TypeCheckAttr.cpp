@@ -1896,7 +1896,7 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
       auto diag = diagnose(
           attr->getLocation(),
           diag::attr_objc_implementation_raise_minimum_deployment_target,
-          Ctx.getTargetPlatformStringForDiagnostics(),
+          Ctx.getTargetAvailabilityDomain(),
           Ctx.getSwift50Availability().getRawMinimumVersion());
       if (attr->isEarlyAdopter()) {
         diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
@@ -2431,12 +2431,11 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
         if (D->isImplicit())
           diagnose(enclosingDecl->getLoc(),
                    diag::availability_implicit_decl_here,
-                   D->getDescriptiveKind(),
-                   Ctx.getTargetPlatformStringForDiagnostics(),
+                   D->getDescriptiveKind(), Ctx.getTargetAvailabilityDomain(),
                    AttrRange.getRawMinimumVersion());
         diagnose(enclosingDecl->getLoc(),
                  diag::availability_decl_more_than_enclosing_here,
-                 Ctx.getTargetPlatformStringForDiagnostics(),
+                 Ctx.getTargetAvailabilityDomain(),
                  EnclosingAnnotatedRange->getRawMinimumVersion());
       }
     }

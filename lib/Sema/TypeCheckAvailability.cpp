@@ -2163,7 +2163,9 @@ static void diagnosePotentialUnavailability(
   ASTContext &Context = ReferenceDC->getASTContext();
 
   {
-    auto Err = Diagnose(Context.getTargetPlatformStringForDiagnostics(),
+    // FIXME: [availability] Update diagnostics to take an AvailabilityDomain.
+    auto Domain = Context.getTargetAvailabilityDomain();
+    auto Err = Diagnose(Domain.getNameForDiagnostics(),
                         Availability.getRawMinimumVersion());
 
     // Direct a fixit to the error if an existing guard is nearly-correct
@@ -2231,7 +2233,7 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
     const AvailabilityRange &Availability, bool WarnBeforeDeploymentTarget,
     bool &IsError) {
   ASTContext &Context = ReferenceDC->getASTContext();
-  auto Platform = Context.getTargetPlatformStringForDiagnostics();
+  auto Domain = Context.getTargetAvailabilityDomain();
 
   if (requiresDeploymentTargetOrEarlier(Availability, Context)) {
     // The required OS version is at or before the deployment target so this
@@ -2242,12 +2244,12 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
     return Diagnostic(
         IsError ? diag::availability_decl_only_version_newer_for_clients
                 : diag::availability_decl_only_version_newer_for_clients_warn,
-        D, Platform, Availability.getRawMinimumVersion(),
+        D, Domain, Availability.getRawMinimumVersion(),
         ReferenceDC->getParentModule());
   }
 
   IsError = true;
-  return Diagnostic(diag::availability_decl_only_version_newer, D, Platform,
+  return Diagnostic(diag::availability_decl_only_version_newer, D, Domain,
                     Availability.getRawMinimumVersion());
 }
 
@@ -2294,10 +2296,9 @@ static void diagnosePotentialAccessorUnavailability(
                         : diag::availability_decl_only_version_newer;
 
   {
-    auto Err = Context.Diags.diagnose(
-        ReferenceRange.Start, diag, Accessor,
-        Context.getTargetPlatformStringForDiagnostics(),
-        Availability.getRawMinimumVersion());
+    auto Err = Context.Diags.diagnose(ReferenceRange.Start, diag, Accessor,
+                                      Context.getTargetAvailabilityDomain(),
+                                      Availability.getRawMinimumVersion());
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(
@@ -2343,8 +2344,7 @@ diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
     auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
     auto err = ctx.Diags.diagnose(
         loc, diag::conformance_availability_only_version_newer, type, proto,
-        ctx.getTargetPlatformStringForDiagnostics(),
-        availability.getRawMinimumVersion());
+        ctx.getTargetAvailabilityDomain(), availability.getRawMinimumVersion());
 
     auto behaviorLimit = behaviorLimitForExplicitUnavailability(rootConf, dc);
     if (behaviorLimit >= DiagnosticBehavior::Warning)
