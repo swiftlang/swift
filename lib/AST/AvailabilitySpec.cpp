@@ -29,22 +29,32 @@ AvailabilitySpec *AvailabilitySpec::createWildcard(ASTContext &ctx,
                                     /*VersionStartLoc=*/{});
 }
 
+static SourceRange getSpecSourceRange(SourceLoc domainLoc,
+                                      SourceRange versionRange) {
+  if (domainLoc.isInvalid())
+    return SourceRange();
+
+  if (versionRange.isValid())
+    return SourceRange(domainLoc, versionRange.End);
+
+  return SourceRange(domainLoc);
+}
+
 AvailabilitySpec *AvailabilitySpec::createForDomain(ASTContext &ctx,
                                                     AvailabilityDomain domain,
                                                     SourceLoc loc,
                                                     llvm::VersionTuple version,
                                                     SourceRange versionRange) {
-  DEBUG_ASSERT(!version.empty());
-  return new (ctx) AvailabilitySpec(domain, SourceRange(loc, versionRange.End),
-                                    version, versionRange.Start);
+  return new (ctx)
+      AvailabilitySpec(domain, getSpecSourceRange(loc, versionRange), version,
+                       versionRange.Start);
 }
 
 AvailabilitySpec *AvailabilitySpec::createForDomainIdentifier(
     ASTContext &ctx, Identifier domainIdentifier, SourceLoc loc,
     llvm::VersionTuple version, SourceRange versionRange) {
-  DEBUG_ASSERT(!version.empty());
   return new (ctx)
-      AvailabilitySpec(domainIdentifier, SourceRange(loc, versionRange.End),
+      AvailabilitySpec(domainIdentifier, getSpecSourceRange(loc, versionRange),
                        version, versionRange.Start);
 }
 

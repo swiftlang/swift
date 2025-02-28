@@ -62,11 +62,11 @@ func unconditionallyDeprecated() {}
 
 unconditionallyDeprecated() // expected-warning {{test deprecated}}
 
-@available(_PackageDescription 4.0, iOS 2.0, *) // expected-error {{'_PackageDescription' version-availability must be specified alone}}
-func shouldBeAlone() {} 
+@available(_PackageDescription 4.0, iOS 2.0, *) // expected-error {{PackageDescription version availability must be specified alone}}
+func shouldBeAlone() {}
 
-@available(_PackageDescription 4.0, swift 2.0, *) // expected-error {{'_PackageDescription' version-availability must be specified alone}} // expected-error {{'swift' version-availability must be specified alone}}
-func shouldBeAlone2() {} 
+@available(_PackageDescription 4.0, swift 2.0, *) // expected-error {{PackageDescription version availability must be specified alone}} // expected-error {{Swift version availability must be specified alone}}
+func shouldBeAlone2() {}
 
 @available(*, unavailable, renamed: "shortFour")
 @available(_PackageDescription 3)

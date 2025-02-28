@@ -3715,9 +3715,11 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
   llvm::VersionTuple Version;
   SourceRange VersionRange;
 
-  if (parseVersionTuple(Version, VersionRange,
-                        diag::avail_query_expected_version_number)) {
-    return nullptr;
+  if (Tok.isAny(tok::integer_literal, tok::floating_literal)) {
+    if (parseVersionTuple(Version, VersionRange,
+                          diag::avail_query_expected_version_number)) {
+      return nullptr;
+    }
   }
 
   return makeParserResult(AvailabilitySpec::createForDomainIdentifier(

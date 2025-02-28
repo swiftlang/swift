@@ -835,8 +835,9 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
       versionSourceRange = semanticAttr.getObsoletedSourceRange();
 
     diags
-        .diagnose(attrLoc, diag::attr_availability_unexpected_version, attr,
-                  domainName)
+        .diagnose(attrLoc, diag::availability_unexpected_version,
+                  domain->getNameForDiagnostics())
+        .limitBehaviorIf(domain->isUniversal(), DiagnosticBehavior::Warning)
         .highlight(versionSourceRange);
     return std::nullopt;
   }
@@ -862,11 +863,18 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     case AvailableAttr::Kind::Default:
       break;
     }
+  }
 
-    if (!hasVersionSpec) {
-      diags.diagnose(attrLoc, diag::attr_availability_expected_version_spec,
+  if (!hasVersionSpec && domain->isVersioned()) {
+    switch (attr->getKind()) {
+    case AvailableAttr::Kind::Default:
+      diags.diagnose(domainLoc, diag::attr_availability_expected_version_spec,
                      attrName, domainName);
       return std::nullopt;
+    case AvailableAttr::Kind::Deprecated:
+    case AvailableAttr::Kind::Unavailable:
+    case AvailableAttr::Kind::NoAsync:
+      break;
     }
   }
 
