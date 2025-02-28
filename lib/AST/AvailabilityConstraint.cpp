@@ -154,10 +154,10 @@ getAvailabilityConstraintForAttr(const Decl *decl,
   std::optional<llvm::VersionTuple> obsoletedVersion = attr.getObsoleted();
 
   {
-    StringRef obsoletedPlatform;
+    AvailabilityDomain unusedDomain;
     llvm::VersionTuple remappedObsoletedVersion;
-    if (AvailabilityInference::updateObsoletedPlatformForFallback(
-            attr, ctx, obsoletedPlatform, remappedObsoletedVersion))
+    if (AvailabilityInference::updateObsoletedAvailabilityDomainForFallback(
+            attr, ctx, unusedDomain, remappedObsoletedVersion))
       obsoletedVersion = remappedObsoletedVersion;
   }
 

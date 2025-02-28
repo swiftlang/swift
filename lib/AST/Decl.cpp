@@ -593,9 +593,9 @@ Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx,
                                      bool forTargetVariant) const {
   if (auto *attr = getAttrs().getBackDeployed(Ctx, forTargetVariant)) {
     auto version = attr->Version;
-    StringRef ignoredPlatformString;
-    AvailabilityInference::updateBeforePlatformForFallback(
-        attr, getASTContext(), ignoredPlatformString, version);
+    AvailabilityDomain ignoredDomain;
+    AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
+        attr, getASTContext(), ignoredDomain, version);
 
     // If the remap for fallback resulted in 1.0, then the
     // backdeployment prior to that is not meaningful.

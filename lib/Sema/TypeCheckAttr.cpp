@@ -5201,14 +5201,14 @@ void AttributeChecker::checkBackDeployedAttrs(
     auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
     if (auto unavailableDomain =
             availability.containsUnavailableDomain(backDeployedDomain)) {
-      auto platformString = prettyPlatformString(Attr->Platform);
+      auto domainForDiagnostics = backDeployedDomain;
       llvm::VersionTuple ignoredVersion;
 
-      AvailabilityInference::updateBeforePlatformForFallback(
-          Attr, Ctx, platformString, ignoredVersion);
+      AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
+          Attr, Ctx, domainForDiagnostics, ignoredVersion);
 
       diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
-               platformString);
+               domainForDiagnostics);
 
       // Find the attribute that makes the declaration unavailable.
       const Decl *attrDecl = D;
@@ -5232,24 +5232,23 @@ void AttributeChecker::checkBackDeployedAttrs(
     // fallback could never be executed at runtime.
     if (auto availableRangeAttrPair =
             getSemanticAvailableRangeDeclAndAttr(VD)) {
-      auto beforePlatformString = prettyPlatformString(Attr->Platform);
+      auto beforeDomain = AvailabilityDomain::forPlatform(Attr->Platform);
       auto beforeVersion = Attr->Version;
       auto availableAttr = availableRangeAttrPair.value().first;
       auto introVersion = availableAttr.getIntroduced().value();
-      StringRef introPlatformString =
-          availableAttr.getDomain().getNameForDiagnostics();
+      AvailabilityDomain introDomain = availableAttr.getDomain();
 
-      AvailabilityInference::updateBeforePlatformForFallback(
-          Attr, Ctx, beforePlatformString, beforeVersion);
-      AvailabilityInference::updateIntroducedPlatformForFallback(
-          availableAttr, Ctx, introPlatformString, introVersion);
+      AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
+          Attr, Ctx, beforeDomain, beforeVersion);
+      AvailabilityInference::updateIntroducedAvailabilityDomainForFallback(
+          availableAttr, Ctx, introDomain, introVersion);
 
       if (Attr->Version <= introVersion) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
-                 Attr, VD, beforePlatformString, beforeVersion);
+                 Attr, VD, beforeDomain, beforeVersion);
         diagnose(availableAttr.getParsedAttr()->AtLoc,
-                 diag::availability_introduced_in_version, VD,
-                 introPlatformString, introVersion)
+                 diag::availability_introduced_in_version, VD, introDomain,
+                 introVersion)
             .highlight(availableAttr.getParsedAttr()->getRange());
         continue;
       }

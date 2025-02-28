@@ -4006,11 +4006,11 @@ ERROR(attr_not_on_decl_with_invalid_access_level,none,
 ERROR(attr_has_no_effect_decl_not_available_before,none,
       "'%0' has no effect because %1 is not "
       "available before %2 %3",
-      (DeclAttribute, const ValueDecl *, StringRef, llvm::VersionTuple))
+      (DeclAttribute, const ValueDecl *, AvailabilityDomain, llvm::VersionTuple))
 
 ERROR(attr_has_no_effect_on_unavailable_decl,none,
       "'%0' has no effect because %1 is unavailable on %2",
-      (DeclAttribute, const ValueDecl *, StringRef))
+      (DeclAttribute, const ValueDecl *, AvailabilityDomain))
 
 ERROR(attr_ambiguous_reference_to_decl,none,
       "ambiguous reference to %0 in '@%1' attribute", (DeclNameRef, StringRef))
@@ -6780,7 +6780,7 @@ ERROR(attr_availability_requires_custom_availability, none,
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
-      (const ValueDecl *, bool, StringRef, StringRef))
+      (const ValueDecl *, bool, AvailabilityDomain, StringRef))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
@@ -6794,17 +6794,17 @@ NOTE(availability_marked_unavailable, none,
 
 NOTE(availability_introduced_in_version, none,
      "%0 was introduced in %1 %2",
-     (const ValueDecl *, StringRef, llvm::VersionTuple))
+     (const ValueDecl *, AvailabilityDomain, llvm::VersionTuple))
 
 NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",
-     (const ValueDecl *, StringRef, llvm::VersionTuple))
+     (const ValueDecl *, AvailabilityDomain, llvm::VersionTuple))
 
 GROUPED_WARNING(availability_deprecated, DeprecatedDeclaration, Deprecation,
                 "%0 %select{is|%select{is|was}3}1 "
                 "deprecated%select{| in %2%select{| %4}3}1%select{|: %5}5",
-                (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple,
-                 StringRef))
+                (const ValueDecl *, bool, AvailabilityDomain, bool,
+                 llvm::VersionTuple, StringRef))
 
 GROUPED_WARNING(
       availability_deprecated_rename, DeprecatedDeclaration, Deprecation,
@@ -6812,8 +6812,8 @@ GROUPED_WARNING(
       "deprecated%select{| in %2%select{| %4}3}1: "
       "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
       "'%7'",
-      (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple, bool,
-       unsigned, StringRef))
+      (const ValueDecl *, bool, AvailabilityDomain, bool, llvm::VersionTuple,
+       bool, unsigned, StringRef))
 #undef REPLACEMENT_DECL_KIND_SELECT
 
 NOTE(note_deprecated_rename, none,
@@ -6972,7 +6972,7 @@ NOTE(availability_unavailable_implicit_init, none,
 ERROR(conformance_availability_unavailable, none,
       "conformance of %0 to %1 is unavailable"
       "%select{ in %3|}2%select{|: %4}4",
-      (Type, Type, bool, StringRef, StringRef))
+      (Type, Type, bool, AvailabilityDomain, StringRef))
 
 NOTE(conformance_availability_marked_unavailable, none,
      "conformance of %0 to %1 has been explicitly marked "
@@ -6980,17 +6980,17 @@ NOTE(conformance_availability_marked_unavailable, none,
 
 NOTE(conformance_availability_introduced_in_version, none,
      "conformance of %0 to %1 was introduced in %2 %3",
-     (Type, Type, StringRef, llvm::VersionTuple))
+     (Type, Type, AvailabilityDomain, llvm::VersionTuple))
 
 NOTE(conformance_availability_obsoleted, none,
      "conformance of %0 to %1 was obsoleted in %2 %3",
-     (Type, Type, StringRef, llvm::VersionTuple))
+     (Type, Type, AvailabilityDomain, llvm::VersionTuple))
 
 GROUPED_WARNING(conformance_availability_deprecated,
                 DeprecatedDeclaration, Deprecation,
                 "conformance of %0 to %1 %select{is|%select{is|was}4}2 "
                 "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
-                (Type, Type, bool, StringRef, bool, llvm::VersionTuple,
+                (Type, Type, bool, AvailabilityDomain, bool, llvm::VersionTuple,
                  StringRef))
 
 ERROR(conformance_availability_only_version_newer, none,
