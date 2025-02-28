@@ -421,6 +421,17 @@ extension RawSpan {
     unsafe _extracting(unchecked: bounds.relative(to: byteOffsets))
   }
 
+  @_alwaysEmitIntoClient
+  @lifetime(self)
+  public func _extracting(
+    unchecked bounds: ClosedRange<Int>
+  ) -> Self {
+    let range = Range(
+      _uncheckedBounds: (bounds.lowerBound, bounds.upperBound&+1)
+    )
+    return unsafe _extracting(unchecked: range)
+  }
+
   /// Constructs a new span over all the bytes of this span.
   ///
   /// The returned span's first byte is always at offset 0; unlike buffer
