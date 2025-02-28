@@ -184,6 +184,7 @@ public:
     bool IsFuture;
     bool IsGroupChildTask;
     bool IsAsyncLetTask;
+    bool IsSynchronousStartTask;
 
     // Task flags.
     unsigned MaxPriority;
