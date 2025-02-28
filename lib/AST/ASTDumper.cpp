@@ -4771,6 +4771,10 @@ public:
                   getTypeOfKeyPathComponent),
         Ctx(ctx), DC(dc) {}
 
+  bool isTypeChecked() const {
+    return PrintBase::isTypeChecked() && DC;
+  }
+
   void printCommon(DeclAttribute *Attr, StringRef name, Label label) {
     printHead(name, DeclAttributeColor, label);
     printFlag(Attr->isImplicit(), "implicit");
@@ -5005,7 +5009,7 @@ public:
 
     if (Attr->getType()) {
       printTypeField(Attr->getType(), Label::always("type"));
-    } else if (MemberLoading == ASTDumpMemberLoading::TypeChecked) {
+    } else if (isTypeChecked()) {
       // If the type is null, it might be a macro reference. Try that if we're
       // dumping the fully type-checked AST.
       auto macroRef =
@@ -5359,6 +5363,43 @@ public:
 };
 
 } // end anonymous namespace
+
+void DeclAttribute::dump(const ASTContext &ctx) const {
+  dump(llvm::errs(), ctx);
+  llvm::errs() << '\n';
+}
+
+void DeclAttribute::dump(llvm::raw_ostream &os, const ASTContext &ctx) const {
+  DefaultWriter writer(os, /*indent=*/0);
+  PrintAttribute(writer, &ctx, nullptr)
+    .visit(const_cast<DeclAttribute*>(this), Label::optional(""));
+}
+
+void DeclAttribute::dump(const DeclContext *dc) const {
+  dump(llvm::errs(), dc);
+  llvm::errs() << '\n';
+}
+
+void DeclAttribute::dump(llvm::raw_ostream &os, const DeclContext *dc) const {
+  DefaultWriter writer(os, /*indent=*/0);
+  PrintAttribute(writer, &dc->getASTContext(), const_cast<DeclContext*>(dc))
+    .visit(const_cast<DeclAttribute*>(this), Label::optional(""));
+}
+
+
+void DeclAttributes::dump(const ASTContext &ctx) const {
+  for (auto attr : *this) {
+    attr->dump(llvm::errs(), ctx);
+    llvm::errs() << '\n';
+  }
+}
+
+void DeclAttributes::dump(const DeclContext *dc) const {
+  for (auto attr : *this) {
+    attr->dump(llvm::errs(), dc);
+    llvm::errs() << '\n';
+  }
+}
 
 void PrintBase::printRec(Decl *D, Label label) {
   printRecArbitrary([&](Label label) {
