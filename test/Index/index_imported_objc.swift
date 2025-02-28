@@ -42,3 +42,9 @@ func test() { // CHECK: [[@LINE]]:6 | function/Swift | test() | [[s:.*]] | Def |
   c.protocolAddedMethod()
   // CHECK: [[@LINE-1]]:5 | instance-method/Swift | protocolAddedMethod() | c:objc(pl)MemberAdding(im)protocolAddedMethod | Ref,Call,Dyn,RelRec,RelCall,RelCont | rel: 2 
 }
+class SubObjCClass: ObjCClass {
+  override func protocolAddedMethod() {}
+  // CHECK: [[@LINE-1]]:17 | instance-method/Swift | protocolAddedMethod() | c:@M@swift_ide_test@objc(cs)SubObjCClass(im)protocolAddedMethod | Def,Dyn,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | instance-method/Swift | protocolAddedMethod() | c:objc(pl)MemberAdding(im)protocolAddedMethod
+  // CHECK-NEXT: RelChild | class/Swift | SubObjCClass | c:@M@swift_ide_test@objc(cs)SubObjCClass
+}
