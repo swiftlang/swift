@@ -23,7 +23,7 @@
 GROUP(no_group, "")
 
 GROUP(DeprecatedDeclaration, "deprecated-declaration.md")
-GROUP(Unsafe, "unsafe.md")
+GROUP(StrictMemorySafety, "strict-memory-safety.md")
 GROUP(UnknownWarningGroup, "unknown-warning-group.md")
 GROUP(PreconcurrencyImport, "preconcurrency-import.md")
 GROUP(StrictLanguageFeatures, "strict-language-features.md")
