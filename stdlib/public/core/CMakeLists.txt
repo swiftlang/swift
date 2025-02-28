@@ -159,6 +159,7 @@ split_embedded_sources(
   EMBEDDED Sort.swift
   EMBEDDED Span/MutableRawSpan.swift
   EMBEDDED Span/MutableSpan.swift
+  EMBEDDED Span/OutputSpan.swift
   EMBEDDED Span/RawSpan.swift
   EMBEDDED Span/Span.swift
   EMBEDDED StaticString.swift
