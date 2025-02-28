@@ -264,7 +264,8 @@ extension ${TYPE} {
       % else:
       addPendingGroupTaskUnconditionally: true,
       % end
-      isDiscardingTask: ${str(IS_DISCARDING).lower()}
+      isDiscardingTask: ${str(IS_DISCARDING).lower()},
+      isSynchronousStart: false
     )
 
     let builtinSerialExecutor =
