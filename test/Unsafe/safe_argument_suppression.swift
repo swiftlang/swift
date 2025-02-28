@@ -36,7 +36,7 @@ class NotSafeSubclass: NotSafe {
   _ = NotSafe[ns]
   NotSafe.doStatically(NotSafe.self)
 
-  ns.stillUnsafe() // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}
+  ns.stillUnsafe() // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [StrictMemorySafety]}}
   // expected-note@-1{{reference to parameter 'ns' involves unsafe type 'NotSafe'}}
   // expected-note@-2{{reference to unsafe instance method 'stillUnsafe()'}}
 }

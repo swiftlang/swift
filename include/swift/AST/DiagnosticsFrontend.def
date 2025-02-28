@@ -590,7 +590,7 @@ ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",
       (StringRef))
 
-GROUPED_WARNING(command_line_conflicts_with_strict_safety,Unsafe,none,
+GROUPED_WARNING(command_line_conflicts_with_strict_safety,StrictMemorySafety,none,
       "'%0' is not memory-safe and should not be combined with "
       "strict memory safety checking", (StringRef))
 

@@ -8196,7 +8196,7 @@ NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
 NOTE(note_unsafe_storage,none,
      "%kindbase1 involves unsafe type %2", (bool, const ValueDecl *, Type))
 
-GROUPED_WARNING(decl_unsafe_storage,Unsafe,none,
+GROUPED_WARNING(decl_unsafe_storage,StrictMemorySafety,none,
       "%kindbase0 has storage involving unsafe types",
       (const Decl *))
 NOTE(decl_storage_mark_unsafe,none,
@@ -8206,11 +8206,11 @@ NOTE(decl_storage_mark_safe,none,
       "add '@safe' if this type encapsulates the unsafe storage in "
       "a safe interface", ())
 
-GROUPED_WARNING(unsafe_superclass,Unsafe,none,
+GROUPED_WARNING(unsafe_superclass,StrictMemorySafety,none,
      "%kindbase0 has superclass involving unsafe type %1", 
      (const ValueDecl *, Type))
 
-GROUPED_WARNING(conformance_involves_unsafe,Unsafe,none,
+GROUPED_WARNING(conformance_involves_unsafe,StrictMemorySafety,none,
      "conformance of %0 to %kind1 involves unsafe code; use '@unsafe' to "
      "indicate that the conformance is not memory-safe",
      (Type, const ValueDecl *))
@@ -8221,15 +8221,15 @@ NOTE(note_type_witness_unsafe,none,
       "unsafe type %0 cannot satisfy safe associated type %1",
       (Type, DeclName))
 
-GROUPED_WARNING(override_safe_with_unsafe,Unsafe,none,
+GROUPED_WARNING(override_safe_with_unsafe,StrictMemorySafety,none,
       "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
 
-GROUPED_WARNING(preconcurrency_import_unsafe,Unsafe,none,
+GROUPED_WARNING(preconcurrency_import_unsafe,StrictMemorySafety,none,
       "@preconcurrency import is not memory-safe because it can silently "
       "introduce data races", ())
-GROUPED_WARNING(unsafe_without_unsafe,Unsafe,none,
+GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
-GROUPED_WARNING(for_unsafe_without_unsafe,Unsafe,none,
+GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
       "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
 WARNING(no_unsafe_in_unsafe,none,
         "no unsafe operations occur within 'unsafe' expression", ())
