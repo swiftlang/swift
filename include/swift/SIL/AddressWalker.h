@@ -92,12 +92,12 @@ private:
   }
 
 public:
-  AddressUseKind walk(SILValue address) &&;
+  AddressUseKind walk(SILValue address);
 };
 
 template <typename Impl>
 inline AddressUseKind
-TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
+TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
   assert(!didInvalidate);
 
   // When we exit, set the result to be invalidated so we can't use this again.
