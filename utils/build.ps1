@@ -2405,7 +2405,7 @@ function Build-XCTest([Platform]$Platform, $Arch) {
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-xctest `
     -Bin $(Get-ProjectBinaryCache $Arch XCTest) `
-    -InstallTo "$([IO.Path]::Combine((Get-PlatformRoot $Platform), "Developer", "Library", "XCTest-development", "usr"))" `
+    -InstallTo "$([IO.Path]::Combine((Get-PlatformRoot $Platform), "Developer", "Library", "XCTest-$ProductVersion", "usr"))" `
     -Arch $Arch `
     -Platform $Platform `
     -UseBuiltCompilers Swift `
@@ -2449,7 +2449,7 @@ function Build-Testing([Platform]$Platform, $Arch) {
   Build-CMakeProject `
     -Src $SourceCache\swift-testing `
     -Bin (Get-ProjectBinaryCache $Arch Testing) `
-    -InstallTo "$([IO.Path]::Combine((Get-PlatformRoot $Platform), "Developer", "Library", "Testing-development", "usr"))" `
+    -InstallTo "$([IO.Path]::Combine((Get-PlatformRoot $Platform), "Developer", "Library", "Testing-$ProductVersion", "usr"))" `
     -Arch $Arch `
     -Platform $Platform `
     -UseBuiltCompilers C,CXX,Swift `
@@ -2469,8 +2469,8 @@ function Build-Testing([Platform]$Platform, $Arch) {
 function Write-PlatformInfoPlist([Platform] $Platform) {
   $Settings = @{
     DefaultProperties = @{
-      SWIFT_TESTING_VERSION = "development"
-      XCTEST_VERSION = "development"
+      SWIFT_TESTING_VERSION = "$ProductVersion"
+      XCTEST_VERSION = "$ProductVersion"
     }
   }
   if ($Platform -eq [Platform]::Windows) {
