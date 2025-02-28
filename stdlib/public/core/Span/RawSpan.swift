@@ -683,7 +683,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(droppingLast k: Int) -> Self {
-    _precondition(k >= 0, "Can't drop a negative number of elements")
+    _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
     return Self(_unchecked: _pointer, byteCount: byteCount &- droppedCount)
   }
@@ -709,7 +709,7 @@ extension RawSpan {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, byteCount)
     let newStart = unsafe _pointer?.advanced(by: byteCount &- newCount)
-    let newSpan = RawSpan(_unchecked: newStart, byteCount: newCount)
+    let newSpan = Self(_unchecked: newStart, byteCount: newCount)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
     return unsafe _overrideLifetime(newSpan, copying: self)
@@ -732,10 +732,10 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(droppingFirst k: Int) -> Self {
-    _precondition(k >= 0, "Can't drop a negative number of elements")
-    let droppedCount = min(k, byteCount)
-    let newStart = unsafe _pointer?.advanced(by: droppedCount)
-    let newSpan = RawSpan(_unchecked: newStart, byteCount: byteCount &- droppedCount)
+    _precondition(k >= 0, "Can't drop a negative number of bytes")
+    let dropped = min(k, byteCount)
+    let newStart = unsafe _pointer?.advanced(by: dropped)
+    let newSpan = Self(_unchecked: newStart, byteCount: byteCount &- dropped)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
     return unsafe _overrideLifetime(newSpan, copying: self)
