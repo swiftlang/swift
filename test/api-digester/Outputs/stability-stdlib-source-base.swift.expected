@@ -367,7 +367,6 @@ Struct CollectionOfOne is now with @_addressableForDependencies
 Protocol CodingKey has added inherited protocol SendableMetatype
 Protocol Error has added inherited protocol SendableMetatype
 
-Accessor Optional.unsafelyUnwrapped.Get() has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Escapable>
 Accessor UnsafeBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Accessor UnsafeMutableBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 
