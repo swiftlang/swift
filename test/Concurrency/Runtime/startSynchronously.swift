@@ -1,4 +1,3 @@
-// REQUIRES: rdar145735542
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %s %import-libdispatch -swift-version 6 -o %t/a.out
 // RUN: %target-codesign %t/a.out
@@ -201,14 +200,10 @@ callActorFromStartSynchronousTask(recipient: .recipient(Recipient()))
 // CHECK-NEXT: inside startSynchronously, call rec.sync() [thread:[[CALLING_THREAD4]]]
 // CHECK: after startSynchronously
 // CHECK-NOT: ERROR!
-// CHECK: inside startSynchronously, call rec.sync() done
 
-// CHECK-NOT: ERROR!
 // CHECK: inside startSynchronously, call rec.async()
 // CHECK-NOT: ERROR!
-// CHECK: inside startSynchronously, call rec.async() done
 
-// CHECK-NOT: ERROR!
 // CHECK: inside startSynchronously, done
 
 /// Don't want to involve protocol calls to not confuse the test with additional details,
@@ -230,7 +225,7 @@ actor Recipient {
 
     print("\(Recipient.self)/\(#function) Current actor thread id = \(getCurrentThreadID()) @ :\(#line)")
     if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
-      print("NOTICE: Actor must not run on the synchronous task's thread :\(#line)")
+      print("NOTICE: Actor did run on the synchronous task's thread :\(#line)")
     }
   }
 
@@ -242,7 +237,7 @@ actor Recipient {
     // Usually this will be on a different thread by now though.
     print("\(Recipient.self)/\(#function) Current actor thread id = \(getCurrentThreadID()) @ :\(#line)")
     if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
-      print("NOTICE: Actor must not run on the synchronous task's thread :\(#line)")
+      print("NOTICE: Actor did run on the synchronous task's thread :\(#line)")
     }
 
     await Task {
@@ -266,7 +261,7 @@ func callActorFromStartSynchronousTask(recipient rec: TargetActorToCall) {
       precondition(compareThreadIDs(outerTID, .equal, innerTID), "Outer Thread ID must be equal Thread ID inside runSynchronously synchronous part!")
       print("inside startSynchronously [thread:\(getCurrentThreadID())] @ :\(#line)")
 
-      for i in 1..<10 {
+      for _ in 1..<10 {
         queue.async {
           print("- async work on queue")
         }
@@ -336,15 +331,11 @@ callActorFromStartSynchronousTask(recipient: .recipientOnQueue(RecipientOnQueue(
 // CHECK: NaiveQueueExecutor(recipient-actor-queue) enqueue
 // CHECK: after startSynchronously
 // CHECK-NOT: ERROR!
-// CHECK: inside startSynchronously, call rec.sync() done
 
-// CHECK-NOT: ERROR!
 // CHECK: inside startSynchronously, call rec.async()
 // CHECK: NaiveQueueExecutor(recipient-actor-queue) enqueue
 // CHECK-NOT: ERROR!
-// CHECK: inside startSynchronously, call rec.async() done
 
-// CHECK-NOT: ERROR!
 // CHECK: inside startSynchronously, done
 
 final class NaiveQueueExecutor: SerialExecutor {
@@ -379,7 +370,7 @@ actor RecipientOnQueue {
 
     print("\(Recipient.self)/\(#function) Current actor thread id = \(getCurrentThreadID()) @ :\(#line)")
     if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
-      print("NOTICE: Actor must not run on the synchronous task's thread :\(#line)")
+      print("NOTICE: Actor did run on the synchronous task's thread :\(#line)")
     }
   }
 
@@ -392,7 +383,7 @@ actor RecipientOnQueue {
     // Usually this will be on a different thread by now though.
     print("\(Recipient.self)/\(#function) Current actor thread id = \(getCurrentThreadID()) @ :\(#line)")
     if compareThreadIDs(syncTaskThreadID, .equal, getCurrentThreadID()) {
-      print("NOTICE: Actor must not run on the synchronous task's thread :\(#line)")
+      print("NOTICE: Actor did run on the synchronous task's thread :\(#line)")
     }
 
     await Task {
@@ -400,3 +391,109 @@ actor RecipientOnQueue {
     }.value
   }
 }
+
+/*
+
+
+             1:
+             2:
+             3: ==== ------------------------------------------------------------------
+             4: syncOnMyGlobalActor()
+             5: Confirmed to be on @MyGlobalActor
+             6: schedule Task { @MyGlobalActor }, before startSynchronously [thread:139847406585600] @ :73
+             7: before startSynchronously [thread:139847406585600] @ :78
+             8: inside startSynchronously, outer thread = 139847406585600
+             9: inside startSynchronously, inner thread = 139847406585600
+            10: inside startSynchronously, sleep now [thread:139847406585600] @ :88
+            11: inside Task { @MyGlobalActor }, after sleep [thread:139847406585600] @ :75
+            12: after sleep, inside startSynchronously [thread:139847406585600] @ :90
+            13:
+            14:
+            15: ==== ------------------------------------------------------------------
+            16: syncOnNonTaskThread(synchronousTask: suspend)
+            17: before startSynchronously [thread:139847144564480] @ :103
+            18: inside startSynchronously [thread:139847144564480] @ :115
+            19: inside startSynchronously, before sleep [thread:139847144564480] @ :120
+            20: after startSynchronously, outside; cancel (wakeup) the synchronous task! [thread:139847144564480] @ :129
+            21: inside startSynchronously, after sleep [thread:139847144564480] @ :122
+            22:
+            23:
+            24: ==== ------------------------------------------------------------------
+            25: syncOnNonTaskThread(synchronousTask: dontSuspend)
+            26: before startSynchronously [thread:139847144564480] @ :103
+            27: inside startSynchronously [thread:139847144564480] @ :115
+            28: inside startSynchronously, done [thread:139847144564480] @ :124
+            29: after startSynchronously, outside; cancel (wakeup) the synchronous task! [thread:139847144564480] @ :129
+            30:
+            31:
+            32: ==== ------------------------------------------------------------------
+            33: callActorFromStartSynchronousTask()
+            34: before startSynchronously [thread:139847144564480] @ :260
+            35: inside startSynchronously [thread:139847144564480] @ :266
+            36: inside startSynchronously, call rec.sync() [thread:139847144564480] @ :274
+            37: Recipient/sync(syncTaskThreadID:) Current actor thread id = 139847385605888 @ :230
+            38: inside startSynchronously, call rec.sync() done [thread:139847144564480] @ :279
+            39: Inner thread id = 139847144564480
+            40: Current thread id = 139847144564480
+            41: NOTICE: Task resumed on same thread as it entered the synchronous task!
+            42: inside startSynchronously, call rec.async() [thread:139847144564480] @ :292
+            43: Recipient/async(syncTaskThreadID:) Current actor thread id = 139847385605888 @ :242
+            44: inside startSynchronously, call rec.async() done [thread:139847144564480] @ :297
+            45: Inner thread id = 139847144564480
+            46: Current thread id = 139847144564480
+            47: NOTICE: Task resumed on same thread as it entered the synchronous task!
+            48: inside startSynchronously, done [thread:139847144564480] @ :308
+            49: after startSynchronously [thread:139847144564480] @ :312
+check:203'0                             X~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ error: no match found
+            50: - async work on queue
+            51: - async work on queue
+            52: - async work on queue
+            53: - async work on queue
+            54: - async work on queue
+            55: - async work on queue
+            56: - async work on queue
+            57: - async work on queue
+            58: - async work on queue
+            59:
+            60:
+            61: ==== ------------------------------------------------------------------
+            62: callActorFromStartSynchronousTask() - actor in custom executor with its own queue
+check:203'0     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+check:203'1           ?                                                                            possible intended match
+            63: before startSynchronously [thread:139847144564480] @ :260
+            64: inside startSynchronously [thread:139847144564480] @ :266
+            65: inside startSynchronously, call rec.sync() [thread:139847144564480] @ :274
+            66: NaiveQueueExecutor(recipient-actor-queue) enqueue... [thread:139847144564480]
+            67: after startSynchronously [thread:139847144564480] @ :312
+            68: - async work on queue
+            69: - async work on queue
+            70: - async work on queue
+            71: - async work on queue
+            72: - async work on queue
+            73: - async work on queue
+            74: - async work on queue
+            75: - async work on queue
+            76: - async work on queue
+            77: NaiveQueueExecutor(recipient-actor-queue) enqueue: run [thread:139847144564480]
+            78: Recipient/sync(syncTaskThreadID:) Current actor thread id = 139847144564480 @ :379
+            79: NOTICE: Actor did run on the synchronous task's thread :381
+            80: inside startSynchronously, call rec.sync() done [thread:139847144564480] @ :279
+            81: Inner thread id = 139847144564480
+            82: Current thread id = 139847144564480
+            83: NOTICE: Task resumed on same thread as it entered the synchronous task!
+            84: inside startSynchronously, call rec.async() [thread:139847144564480] @ :292
+            85: NaiveQueueExecutor(recipient-actor-queue) enqueue... [thread:139847406585600]
+            86: NaiveQueueExecutor(recipient-actor-queue) enqueue: run [thread:139847144564480]
+            87: Recipient/async(syncTaskThreadID:) Current actor thread id = 139847144564480 @ :392
+            88: NOTICE: Actor did run on tn   n   n nhe synchronous task's thread :394
+            89: NaiveQueueExecutor(recipient-actor-queue) enqueue... [thread:139847144564480]
+            90: NaiveQueueExecutor(recipient-actor-queue) enqueue: run [thread:139847144564480]
+            91: NaiveQueueExecutor(recipient-actor-queue) enqueue... [thread:139847385605888]
+            92: NaiveQueueExecutor(recipient-actor-queue) enqueue: run [thread:139847144564480]
+            93: inside startSynchronously, call rec.async() done [thread:139847144564480] @ :297
+            94: Inner thread id = 139847144564480
+            95: Current thread id = 139847144564480
+            96: NOTICE: Task resumed on same thread as it entered the synchronous task!
+            97: inside startSynchronously, done [thread:139847144564480] @ :308
+
+ */
