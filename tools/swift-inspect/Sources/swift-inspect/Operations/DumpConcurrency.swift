@@ -212,6 +212,7 @@ fileprivate class ConcurrencyDumper {
       isStatusRecordLocked: reflectionInfo.IsStatusRecordLocked,
       isEscalated: reflectionInfo.IsEscalated,
       hasIsRunning: reflectionInfo.HasIsRunning,
+      isSynchronousStartTask: reflectionInfo.IsSynchronousStartTask,
       isRunning: reflectionInfo.IsRunning,
       isEnqueued: reflectionInfo.IsEnqueued,
       threadPort: reflectionInfo.HasThreadPort
