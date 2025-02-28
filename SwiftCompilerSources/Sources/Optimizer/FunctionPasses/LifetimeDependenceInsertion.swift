@@ -217,6 +217,11 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       // A coroutine creates its own borrow scope, nested within its borrowed operand.
       bases.append(source.value)
     case .result, .inParameter, .inoutParameter:
+      // addressable dependencies directly depend on the incoming address.
+      if source.convention.isAddressable {
+        bases.append(source.value)
+        return
+      }
       // Create a new dependence on the apply's access to the argument.
       for varIntoducer in gatherVariableIntroducers(for: source.value, context) {
         let scope = LifetimeDependence.Scope(base: varIntoducer, context)
