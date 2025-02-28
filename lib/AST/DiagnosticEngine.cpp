@@ -1334,12 +1334,12 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   StringRef Category;
   if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
     Category = "api-digester-breaking-change";
-  else if (isDeprecationDiagnostic(diagnostic.getID()))
-    Category = "deprecation";
   else if (isNoUsageDiagnostic(diagnostic.getID()))
     Category = "no-usage";
   else if (groupID != DiagGroupID::no_group)
     Category = getDiagGroupInfoByID(groupID).name;
+  else if (isDeprecationDiagnostic(diagnostic.getID()))
+    Category = "deprecation";
 
   auto fixIts = diagnostic.getFixIts();
   if (loc.isValid()) {

@@ -10,7 +10,7 @@ func f() { }
 
 func g() {
   f()
-// CHECK: [[@LINE-1]]:3: warning: 'f()' is deprecated: please do not use [DeprecatedDeclaration] [-W{{.*}}deprecated-declaration.md] [deprecation]
+// CHECK: [[@LINE-1]]:3: warning: 'f()' is deprecated: please do not use [DeprecatedDeclaration] [-W{{.*}}deprecated-declaration.md] [DeprecatedDeclaration]
 }
 
 
