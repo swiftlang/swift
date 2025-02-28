@@ -30,6 +30,14 @@
 
 ## Swift 6.1
 
+* [#78389][]:
+  Errors pertaining to the enforcement of [`any` syntax][SE-0335] on boxed
+  protocol types (aka existential types), including those produced by enabling
+  the upcoming feature `ExistentialAny`, are downgraded to warnings until a
+  future language mode.
+
+  These warnings can be escalated back to errors with `-Werror ExistentialAny`.
+
 * Previous versions of Swift would incorrectly allow Objective-C `-init...`
   methods with custom Swift names to be imported as initializers, but with base 
   names other than `init`. The compiler now diagnoses these attributes and
@@ -10745,4 +10753,5 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [#56139]: <https://github.com/apple/swift/issues/56139>
 [#70065]: <https://github.com/apple/swift/pull/70065>
 [#71075]: <https://github.com/apple/swift/pull/71075>
+[#78389]: <https://github.com/swiftlang/swift/pull/78389>
 [swift-syntax]: https://github.com/apple/swift-syntax
