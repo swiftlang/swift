@@ -5100,6 +5100,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   }
 
   const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
+      proto->getGenericSignature(),
       reqSig, QuerySubstitutionMap{substitutions});
   switch (result.getKind()) {
   case CheckRequirementsResult::Success:
@@ -5233,8 +5234,8 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
       }
 
       if (!diagnosedIsolatedConformanceIssue) {
-        bool foundIssue = forEachIsolatedConformance(
-            ProtocolConformanceRef(assocConf),
+        bool foundIssue = ProtocolConformanceRef(assocConf)
+          .forEachIsolatedConformance(
             [&](ProtocolConformance *isolatedConformance) {
               // If the conformance we're checking isn't isolated at all, it
               // needs "isolated".

@@ -300,7 +300,7 @@ static void desugarSuperclassRequirement(
 
   SmallVector<Requirement, 2> subReqs;
 
-  switch (req.checkRequirement(subReqs)) {
+  switch (req.checkRequirement(subReqs, /*allowMissing=*/false)) {
   case CheckRequirementResult::Success:
   case CheckRequirementResult::PackRequirement:
     break;
@@ -333,7 +333,7 @@ static void desugarLayoutRequirement(
 
   SmallVector<Requirement, 2> subReqs;
 
-  switch (req.checkRequirement(subReqs)) {
+  switch (req.checkRequirement(subReqs, /*allowMissing=*/false)) {
   case CheckRequirementResult::Success:
   case CheckRequirementResult::PackRequirement:
     break;

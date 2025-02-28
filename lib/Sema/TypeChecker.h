@@ -241,6 +241,14 @@ public:
     /// requirement \c Req. Accordingly, \c Req is a conditional requirement of
     /// the last conformance in the chain (if any).
     SmallVector<ParentConditionalConformance, 2> ReqPath;
+
+    /// The isolated conformances that caused the requirement failure.
+    llvm::TinyPtrVector<ProtocolConformance *> IsolatedConformances = {};
+
+    /// The protocol (Sendable or SendableMetatype) to which the type
+    /// parameter conforms, causing a conflict with the isolated conformances
+    /// described above.
+    ProtocolDecl *IsolatedConformanceProto = nullptr;
   };
 
 private:
@@ -271,6 +279,16 @@ public:
         RequirementFailureInfo{Req, SubstReq, ReqPath});
   }
 
+  static CheckGenericArgumentsResult createIsolatedConformanceFailure(
+      Requirement Req, Requirement SubstReq,
+      llvm::TinyPtrVector<ProtocolConformance *> IsolatedConformances,
+      ProtocolDecl *IsolatedConformanceProto) {
+    return CheckGenericArgumentsResult(
+        CheckRequirementsResult::RequirementFailure,
+        RequirementFailureInfo{Req, SubstReq, { }, IsolatedConformances,
+                               IsolatedConformanceProto});
+  }
+  
   const RequirementFailureInfo &getRequirementFailureInfo() const {
     assert(Kind == CheckRequirementsResult::RequirementFailure);
 
@@ -537,8 +555,17 @@ void diagnoseRequirementFailure(
 /// requirements and report on any requirement failures in detail for
 /// diagnostic needs.
 CheckGenericArgumentsResult
-checkGenericArgumentsForDiagnostics(ArrayRef<Requirement> requirements,
+checkGenericArgumentsForDiagnostics(GenericSignature signature,
+                                    ArrayRef<Requirement> requirements,
                                     TypeSubstitutionFn substitutions);
+
+/// Check the given generic parameter substitutions against the given
+/// generic signature and report on any requirement failures in detail for
+/// diagnostic needs.
+CheckGenericArgumentsResult
+checkGenericArgumentsForDiagnostics(GenericSignature signature,
+                                    TypeSubstitutionFn substitutions);
+
 
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
