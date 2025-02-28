@@ -1,0 +1,7 @@
+---
+Name: bionic
+Functions:
+- Name: posix_spawnattr_init
+  Parameters:
+  - Position: 0
+    Type: "posix_spawnattr_t _Nullable * _Nonnull"
