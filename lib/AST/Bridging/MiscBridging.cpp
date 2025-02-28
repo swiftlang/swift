@@ -98,6 +98,17 @@ BridgedOwnedString BridgedDeclObj::getDebugDescription() const {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedASTType
+//===----------------------------------------------------------------------===//
+
+BridgedOwnedString BridgedASTType::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  unbridged().dump(os);
+  return BridgedOwnedString(str);
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: Conformance
 //===----------------------------------------------------------------------===//
 

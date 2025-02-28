@@ -3002,7 +3002,7 @@ struct BridgedASTType {
   swift::TypeBase * _Nullable type;
 
   BRIDGED_INLINE swift::Type unbridged() const;
-  BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanonicalType() const;
   BRIDGED_INLINE bool isLegalFormalType() const;
   BRIDGED_INLINE bool hasTypeParameter() const;

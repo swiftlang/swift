@@ -390,10 +390,6 @@ swift::Type BridgedASTType::unbridged() const {
   return type;
 }
 
-BridgedOwnedString BridgedASTType::getDebugDescription() const {
-  return BridgedOwnedString(unbridged().getString());
-}
-
 BridgedCanType BridgedASTType::getCanonicalType() const {
   return unbridged()->getCanonicalType();
 }
