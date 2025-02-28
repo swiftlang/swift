@@ -5006,8 +5006,8 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
         // Only platform availability is allowed to be written groups with more
         // than one member.
         if (!domain.isPlatform()) {
-          diagnose(loc, diag::availability_must_occur_alone,
-                   domain.getNameForDiagnostics(), domain.isVersioned());
+          diagnose(loc, diag::availability_must_occur_alone, domain,
+                   domain.isVersioned());
           continue;
         }
       }
@@ -5015,7 +5015,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
       // Diagnose duplicate platforms.
       if (!seenDomains.insert(domain).second) {
         diagnose(loc, diag::availability_query_already_specified,
-                 domain.isVersioned(), domain.getNameForAttributePrinting());
+                 domain.isVersioned(), domain);
         continue;
       }
 

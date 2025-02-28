@@ -6755,9 +6755,9 @@ NOTE(type_eraser_init_spi,none,
 
 ERROR(availability_must_occur_alone, none,
       "%0 %select{|version }1availability must be specified alone",
-      (StringRef, bool))
+      (AvailabilityDomain, bool))
 ERROR(availability_unexpected_version, none,
-      "unexpected version number for %0", (StringRef))
+      "unexpected version number for %0", (AvailabilityDomain))
 WARNING(availability_unrecognized_platform_name,
         PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
 WARNING(availability_suggest_platform_name,
@@ -6766,17 +6766,17 @@ WARNING(availability_suggest_platform_name,
         (Identifier, StringRef))
 
 WARNING(attr_availability_expected_deprecated_version, none,
-       "expected version number with 'deprecated' in '%0' attribute for "
-       "platform '%1'", (StringRef, StringRef))
+       "expected version number with 'deprecated' in '%0' attribute for %1",
+       (const DeclAttribute, AvailabilityDomain))
 WARNING(attr_availability_cannot_be_used_for_domain, none,
-       "'%0' cannot be used in '%1' attribute for platform '%2'",
-       (StringRef, StringRef, StringRef))
+       "'%0' cannot be used in '%1' attribute for %2",
+       (StringRef, const DeclAttribute, AvailabilityDomain))
 WARNING(attr_availability_expected_version_spec, none,
        "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
-       "for platform '%1'", (StringRef, StringRef))
+       "for %1", (const DeclAttribute, AvailabilityDomain))
 ERROR(attr_availability_requires_custom_availability, none,
       "%0 requires '-enable-experimental-feature CustomAvailability'",
-      (StringRef))
+      (AvailabilityDomain))
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
@@ -7003,10 +7003,11 @@ ERROR(conformance_availability_only_version_newer, none,
 
 ERROR(availability_query_not_allowed, none,
       "%0 %select{|version }1checks not allowed in %2(...)",
-      (StringRef, bool, StringRef))
+      (AvailabilityDomain, bool, StringRef))
 
 ERROR(availability_query_already_specified, none,
-      "%select{|version for }0'%1' already specified", (bool, StringRef))
+      "%select{|version for }0%1 already specified",
+      (bool, AvailabilityDomain))
 
 ERROR(availability_query_wildcard_required, none,
       "must handle potential future platforms with '*'", ())

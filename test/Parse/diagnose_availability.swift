@@ -45,23 +45,23 @@ func allPlatformsDeprecatedAndObsoleted() {}
 func allPlatformsDeprecatedAndObsoleted2() {}
 
 @available(swift, unavailable)
-// expected-warning@-1 {{'unavailable' cannot be used in 'available' attribute for platform 'swift'}}
+// expected-warning@-1 {{'unavailable' cannot be used in '@available' attribute for Swift}}
 func swiftUnavailable() {}
 
 @available(swift, unavailable, introduced: 4.2)
-// expected-warning@-1 {{'unavailable' cannot be used in 'available' attribute for platform 'swift'}}
+// expected-warning@-1 {{'unavailable' cannot be used in '@available' attribute for Swift}}
 func swiftUnavailableIntroduced() {}
 
 @available(swift, deprecated)
-// expected-warning@-1 {{expected version number with 'deprecated' in 'available' attribute for platform 'swift'}}
+// expected-warning@-1 {{expected version number with 'deprecated' in '@available' attribute for Swift}}
 func swiftDeprecated() {}
 
 @available(swift, deprecated, obsoleted: 4.2)
-// expected-warning@-1 {{expected version number with 'deprecated' in 'available' attribute for platform 'swift'}}
+// expected-warning@-1 {{expected version number with 'deprecated' in '@available' attribute for Swift}}
 func swiftDeprecatedObsoleted() {}
 
 @available(swift, message: "missing valid option")
-// expected-warning@-1 {{expected 'introduced', 'deprecated', or 'obsoleted' in 'available' attribute for platform 'swift'}}
+// expected-warning@-1 {{expected 'introduced', 'deprecated', or 'obsoleted' in '@available' attribute for Swift}}
 func swiftMessage() {}
 
 @available(swift 5, deprecated: 6)

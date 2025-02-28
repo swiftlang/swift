@@ -807,7 +807,6 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   auto &ctx = decl->getASTContext();
   auto &diags = ctx.Diags;
   auto attrLoc = attr->getLocation();
-  auto attrName = attr->getAttrName();
   auto domainLoc = attr->getDomainLoc();
   auto declContext = decl->getInnermostDeclContext();
   auto mutableAttr = const_cast<AvailableAttr *>(attr);
@@ -817,7 +816,6 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   if (!domain)
     return std::nullopt;
 
-  auto domainName = domain->getNameForAttributePrinting();
   auto semanticAttr = SemanticAvailableAttr(attr);
 
   bool hasIntroduced = attr->getRawIntroduced().has_value();
@@ -834,9 +832,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     else if (hasObsoleted)
       versionSourceRange = semanticAttr.getObsoletedSourceRange();
 
-    diags
-        .diagnose(attrLoc, diag::availability_unexpected_version,
-                  domain->getNameForDiagnostics())
+    diags.diagnose(attrLoc, diag::availability_unexpected_version, *domain)
         .limitBehaviorIf(domain->isUniversal(), DiagnosticBehavior::Warning)
         .highlight(versionSourceRange);
     return std::nullopt;
@@ -846,18 +842,18 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     switch (attr->getKind()) {
     case AvailableAttr::Kind::Deprecated:
       diags.diagnose(attrLoc,
-                     diag::attr_availability_expected_deprecated_version,
-                     attrName, domainName);
+                     diag::attr_availability_expected_deprecated_version, attr,
+                     *domain);
       return std::nullopt;
 
     case AvailableAttr::Kind::Unavailable:
       diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
-                     "unavailable", attrName, domainName);
+                     "unavailable", attr, *domain);
       return std::nullopt;
 
     case AvailableAttr::Kind::NoAsync:
       diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
-                     "noasync", attrName, domainName);
+                     "noasync", attr, *domain);
       return std::nullopt;
 
     case AvailableAttr::Kind::Default:
@@ -869,7 +865,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     switch (attr->getKind()) {
     case AvailableAttr::Kind::Default:
       diags.diagnose(domainLoc, diag::attr_availability_expected_version_spec,
-                     attrName, domainName);
+                     attr, *domain);
       return std::nullopt;
     case AvailableAttr::Kind::Deprecated:
     case AvailableAttr::Kind::Unavailable:

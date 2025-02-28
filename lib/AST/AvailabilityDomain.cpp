@@ -260,7 +260,7 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
       !ctx.LangOpts.hasFeature(Feature::CustomAvailability) &&
       !declContext->isInSwiftinterface()) {
     diags.diagnose(loc, diag::attr_availability_requires_custom_availability,
-                   domain->getNameForDiagnostics());
+                   *domain);
     return std::nullopt;
   }
 
