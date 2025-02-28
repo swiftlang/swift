@@ -165,7 +165,7 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
   # https://github.com/swiftlang/swift-driver/blob/f66e33575150cc778289b5f573218c7a0c70bab6/Sources/SwiftDriver/Jobs/GenericUnixToolchain%2BLinkerSupport.swift#L186
   install(FILES $<TARGET_OBJECTS:swiftrt>
     COMPONENT SwiftCore_runtime
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift$<BOOL:${BUILD_SHARED_LIBS}>:_static>/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift$<$<BOOL:${BUILD_SHARED_LIBS}>:_static>/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.o)
 elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
   add_library(swiftrtT OBJECT SwiftRT-COFF.cpp)
