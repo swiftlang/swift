@@ -459,6 +459,7 @@ enum HostComponent {
   ASN1
   Certificates
   System
+  Build
   PackageManager
   Markdown
   Format
@@ -2526,6 +2527,28 @@ function Build-System($Arch) {
     }
 }
 
+function Build-Build($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-build `
+    -Bin (Get-HostProjectBinaryCache Build) `
+    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform Windows `
+    -UseBuiltCompilers C,CXX,Swift `
+    -SwiftSDK (Get-SwiftSDK Windows) `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
+      LLBuild_DIR = (Get-HostProjectCMakeModules LLBuild);
+      SwiftDriver_DIR = (Get-HostProjectCMakeModules Driver);
+      SwiftSystem_DIR = (Get-HostProjectCMakeModules System);
+      TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
+      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
+      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
+    }
+}
+
 function Build-ToolsSupportCore($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\swift-tools-support-core `
@@ -3246,6 +3269,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-ASN1 $HostArch
   Invoke-BuildStep Build-Certificates $HostArch
   Invoke-BuildStep Build-System $HostArch
+  Invoke-BuildStep Build-Build $HostArch
   Invoke-BuildStep Build-PackageManager $HostArch
   Invoke-BuildStep Build-Markdown $HostArch
   Invoke-BuildStep Build-Format $HostArch
