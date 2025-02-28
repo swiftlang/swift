@@ -635,9 +635,10 @@ extension Span where Element: ~Copyable  {
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = _pointer else {
+    guard let pointer = _pointer, _count > 0 else {
       return try unsafe body(.init(start: nil, count: 0))
     }
+    // manual memory rebinding to avoid recalculating the alignment checks
     let binding = Builtin.bindMemory(
       pointer._rawValue, count._builtinWordValue, Element.self
     )
@@ -667,8 +668,11 @@ extension Span where Element: BitwiseCopyable {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    try unsafe body(
-      .init(start: _pointer, count: _count * MemoryLayout<Element>.stride)
+    guard let _pointer, _count > 0 else {
+      return try unsafe body(.init(start: nil, count: 0))
+    }
+    return try unsafe body(
+      .init(start: _pointer, count: _count &* MemoryLayout<Element>.stride)
     )
   }
 }

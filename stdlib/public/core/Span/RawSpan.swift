@@ -469,7 +469,10 @@ extension RawSpan {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    try unsafe body(.init(start: _pointer, count: byteCount))
+    guard let _pointer, byteCount > 0 else {
+      return try unsafe body(.init(start: nil, count: 0))
+    }
+    return try unsafe body(.init(start: _pointer, count: byteCount))
   }
 }
 
