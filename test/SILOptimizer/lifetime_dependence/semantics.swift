@@ -3,7 +3,9 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature LifetimeDependence
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature AddressableParameters \
+// RUN:   -enable-experimental-feature AddressableTypes
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
@@ -129,7 +131,7 @@ struct InnerTrivial {
   }
 }
 
-struct InnerObject {
+struct Holder {
   let object: AnyObject
   var p: UnsafePointer<Int>
 
@@ -139,11 +141,35 @@ struct InnerObject {
   }
 }
 
+@_addressableForDependencies
+struct AddressableInt {
+  let object: AnyObject
+
+  @lifetime(borrow self)
+  borrowing func span() -> Span<Int> {
+    let p = UnsafePointer<Int>(Builtin.unprotectedAddressOfBorrow(self))
+    let span = Span(base: p, count: 1)
+    return _overrideLifetime(span, borrowing: self)
+  }
+}
+
+@_addressableForDependencies
+struct AddressableObject {
+  let object: AnyObject
+
+  @lifetime(borrow self)
+  borrowing func span() -> Span<AnyObject> {
+    let p = UnsafePointer<AnyObject>(Builtin.unprotectedAddressOfBorrow(self))
+    let span = Span(base: p, count: 1)
+    return _overrideLifetime(span, borrowing: self)
+  }
+}
+
 struct Outer {
   var _innerTrivial: InnerTrivial
-  var _innerObject: InnerObject
+  var _innerObject: Holder
   let trivialPointer: UnsafePointer<InnerTrivial>
-  let objectPointer: UnsafePointer<InnerObject>
+  let objectPointer: UnsafePointer<Holder>
 
   var innerTrivialAddress: InnerTrivial {
     unsafeAddress {
@@ -151,7 +177,7 @@ struct Outer {
     }
   }
 
-  var innerObjectAddress: InnerObject {
+  var innerObjectAddress: Holder {
     unsafeAddress {
       objectPointer
     }
@@ -161,7 +187,7 @@ struct Outer {
     get { _innerTrivial }
   }
 
-  var innerObjectTemp: InnerObject {
+  var innerObjectTemp: Holder {
     get { _innerObject }
   }
 
@@ -475,3 +501,34 @@ func testReturnObjectTemp(outer: Outer) -> Span<Int> {
   // expected-error @-1{{lifetime-dependent value escapes its scope}}
   // expected-note  @-2{{it depends on the lifetime of this parent value}}
 } // expected-note  {{this use causes the lifetime-dependent value to escape}}
+
+// =============================================================================
+// Scoped dependence on addressable parameters
+// =============================================================================
+
+@lifetime(borrow arg)
+func testAddressableInt(arg: AddressableInt) -> Span<Int> {
+  arg.span()
+}
+
+@lifetime(borrow arg)
+func testAddressableObject(arg: AddressableObject) -> Span<AnyObject> {
+  arg.span()
+}
+
+@lifetime(borrow arg)
+func borrowAddressHelper(arg: @addressable Holder) -> Span<Int> {
+  arg.span()
+}
+
+@lifetime(borrow arg)
+func testNonAddressable(arg: Holder) -> Span<Int> {
+  borrowAddressHelper(arg: arg)
+}
+
+/* TODO: rdar://145872854 (SILGen: @addressable inout arguments are copied)
+@lifetime(borrow arg)
+func test(arg: inout AddressableInt) -> Span<Int> {
+  arg.span()
+}
+*/
