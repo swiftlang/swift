@@ -25,7 +25,7 @@ namespace swift {
 
 enum class CoroAllocatorKind : uint8_t {
   // stacksave/stackrestore
-  Sync = 0,
+  Stack = 0,
   // swift_task_alloc/swift_task_dealloc_through
   Async = 1,
   // malloc/free

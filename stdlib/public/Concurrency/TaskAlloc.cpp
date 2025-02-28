@@ -87,7 +87,7 @@ CoroAllocator *const swift::_swift_coro_task_allocator = &CoroTaskAllocatorImpl;
 
 CoroAllocator *swift::swift_coro_getGlobalAllocator(CoroAllocatorFlags flags) {
   switch (flags.getKind()) {
-  case CoroAllocatorKind::Sync:
+  case CoroAllocatorKind::Stack:
     return nullptr;
   case CoroAllocatorKind::Async:
     return _swift_coro_task_allocator;
@@ -107,6 +107,8 @@ void *swift::swift_coro_alloc(CoroAllocator *allocator, size_t size) {
 }
 
 void swift::swift_coro_dealloc(CoroAllocator *allocator, void *ptr) {
+  if (!allocator)
+    return;
   // Calls to swift_coro_dealloc are emitted in resume funclets for every
   // live-across dynamic allocation.  Whether such calls immediately deallocate
   // memory depends on the allocator.
