@@ -32,7 +32,8 @@ extension TaskGroup {
       inheritContext: false,
       enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false
+      isDiscardingTask: false,
+      isSynchronousStart: false
     )
 
     let builtinSerialExecutor =
@@ -64,7 +65,8 @@ extension TaskGroup {
       inheritContext: false,
       enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: true
+      isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     let builtinSerialExecutor =
@@ -96,7 +98,8 @@ extension ThrowingTaskGroup {
       inheritContext: false,
       enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false
+      isDiscardingTask: false,
+      isSynchronousStart: false
     )
 
     let builtinSerialExecutor =
@@ -128,7 +131,8 @@ extension ThrowingTaskGroup {
       inheritContext: false,
       enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: true
+      isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     let builtinSerialExecutor =
@@ -160,7 +164,8 @@ extension DiscardingTaskGroup {
       inheritContext: false,
       enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: true
+      isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     let builtinSerialExecutor =
@@ -192,7 +197,8 @@ extension DiscardingTaskGroup {
       inheritContext: false,
       enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: true
+      isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     let builtinSerialExecutor =
@@ -224,13 +230,13 @@ extension ThrowingDiscardingTaskGroup {
       inheritContext: false,
       enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: true
+      isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-
-
+  
     _ = Builtin.createTask(
       flags: flags,
       initialSerialExecutor: builtinSerialExecutor,
@@ -257,7 +263,8 @@ extension ThrowingDiscardingTaskGroup {
       inheritContext: false,
       enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: true
+      isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     let builtinSerialExecutor =
