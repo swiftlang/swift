@@ -82,6 +82,10 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 +(void)sendDataWithCompletion: (void (^)(MyValue *)) completion;
 @end
 
+@interface TestDR : NSObject
+-(void) testWithCompletion: (void (^)(void)) completion;
+@end
+
 #pragma clang assume_nonnull end
 
 //--- main.swift
@@ -209,4 +213,9 @@ protocol CompletionWithoutSendable {
 extension DataHandler : CompletionWithoutSendable {
   // expected-error@-1 {{sendability of function types in class method 'sendData(completion:)' does not match requirement in protocol 'CompletionWithoutSendable'}}
   // It should be possible to infer `T` from method that mismatches on @Sendable in Swift 5 mode
+}
+
+extension TestDR {
+  @_dynamicReplacement(for: test(completion:))
+  func __replaceObjCFunc(_: @escaping () -> Void) {} // Ok
 }
