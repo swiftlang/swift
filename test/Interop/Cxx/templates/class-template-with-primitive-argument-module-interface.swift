@@ -40,3 +40,7 @@
 // CHECK: typealias DoubleConstWrappedMagicIntFixedSizeArr1 = DoubleWrapper<__cxxConst<MagicWrapper<Vector<CInt, 42>>>>
 // CHECK: typealias DoubleConstWrappedMagicIntFixedSizeArr2 = DoubleWrapper<__cxxConst<MagicWrapper<Vector<CInt, 43>>>>
 // CHECK: typealias DoubleConstWrappedMagicNullPtr = DoubleWrapper<__cxxConst<MagicWrapper<__cxxNullPtrT>>>
+
+// CHECK: typealias WrappedVolatileInt = MagicWrapper<__cxxVolatile<CInt>>
+// CHECK: typealias WrappedConstVolatileInt = MagicWrapper<__cxxConst<__cxxVolatile<CInt>>>
+// CHECK: typealias WrappedVolatileConstInt = MagicWrapper<__cxxConst<__cxxVolatile<CInt>>>

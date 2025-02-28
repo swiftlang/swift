@@ -49,4 +49,8 @@ typedef DoubleWrapper<const MagicWrapper<int[42]>> DoubleConstWrappedMagicIntFix
 typedef DoubleWrapper<const MagicWrapper<int[43]>> DoubleConstWrappedMagicIntFixedSizeArr2;
 typedef DoubleWrapper<const MagicWrapper<std::nullptr_t>> DoubleConstWrappedMagicNullPtr;
 
+typedef MagicWrapper<volatile int> WrappedVolatileInt;
+typedef MagicWrapper<const volatile int> WrappedConstVolatileInt;
+typedef MagicWrapper<volatile const int> WrappedVolatileConstInt;
+
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_WITH_PRIMITIVE_ARGUMENT_H
