@@ -12,6 +12,6 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ size: CInt, _ count: CInt) {
 // CHECK-NEXT:     if ptr.count < _ptrCount || _ptrCount < 0 {
 // CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
 // CHECK-NEXT:     }
-// CHECK-NEXT:     return myFunc(ptr.baseAddress!, size, count)
+// CHECK-NEXT:     return unsafe myFunc(ptr.baseAddress!, size, count)
 // CHECK-NEXT: }
 

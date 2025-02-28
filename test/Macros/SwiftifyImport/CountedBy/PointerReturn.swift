@@ -21,22 +21,22 @@ func lifetimeDependentBorrow(_ p: borrowing UnsafePointer<CInt>, _ len1: CInt, _
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func myFunc(_ len: CInt) -> UnsafeMutableBufferPointer<CInt> {
-// CHECK-NEXT:     return UnsafeMutableBufferPointer<CInt> (start: myFunc(len), count: Int(len))
+// CHECK-NEXT:     return unsafe UnsafeMutableBufferPointer<CInt> (start: myFunc(len), count: Int(len))
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func nonEscaping(_ len: CInt) -> UnsafeBufferPointer<CInt> {
-// CHECK-NEXT:     return UnsafeBufferPointer<CInt> (start: nonEscaping(len), count: Int(len))
+// CHECK-NEXT:     return unsafe UnsafeBufferPointer<CInt> (start: nonEscaping(len), count: Int(len))
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(p)
 // CHECK-NEXT: func lifetimeDependentCopy(_ p: Span<CInt>, _ len2: CInt) -> Span<CInt> {
-// CHECK-NEXT:     return Span<CInt> (_unsafeStart:   p.withUnsafeBufferPointer { _pPtr in
-// CHECK-NEXT:         return lifetimeDependentCopy(_pPtr.baseAddress!, CInt(exactly: p.count)!, len2)
+// CHECK-NEXT:     return unsafe Span<CInt> (_unsafeStart:   p.withUnsafeBufferPointer { _pPtr in
+// CHECK-NEXT:         return unsafe lifetimeDependentCopy(_pPtr.baseAddress!, CInt(exactly: p.count)!, len2)
 // CHECK-NEXT:       }, count: Int(len2))
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(borrow p)
 // CHECK-NEXT: func lifetimeDependentBorrow(_ p: borrowing UnsafeBufferPointer<CInt>, _ len2: CInt) -> Span<CInt> {
-// CHECK-NEXT:     return Span<CInt> (_unsafeStart: lifetimeDependentBorrow(p.baseAddress!, CInt(exactly: p.count)!, len2), count: Int(len2))
+// CHECK-NEXT:     return unsafe Span<CInt> (_unsafeStart: lifetimeDependentBorrow(p.baseAddress!, CInt(exactly: p.count)!, len2), count: Int(len2))
 // CHECK-NEXT: }
 

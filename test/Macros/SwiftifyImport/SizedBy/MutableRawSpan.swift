@@ -9,7 +9,7 @@ func myFunc(_ ptr: UnsafeMutableRawPointer, _ size: CInt) {
 
 // CHECK:      @_alwaysEmitIntoClient
 // CHECK-NEXT: func myFunc(_ ptr: MutableRawSpan) {
-// CHECK-NEXT:     return ptr.withUnsafeBytes { _ptrPtr in
-// CHECK-NEXT:         return myFunc(_ptrPtr.baseAddress!, CInt(exactly: ptr.byteCount)!)
+// CHECK-NEXT:     return unsafe ptr.withUnsafeBytes { _ptrPtr in
+// CHECK-NEXT:         return unsafe myFunc(_ptrPtr.baseAddress!, CInt(exactly: ptr.byteCount)!)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
