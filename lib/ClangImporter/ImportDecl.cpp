@@ -2039,10 +2039,8 @@ namespace {
       if (Impl.SwiftContext.LangOpts.hasFeature(Feature::LifetimeDependence)) {
         fd->getAttrs().add(new (Impl.SwiftContext)
                                UnsafeNonEscapableResultAttr(/*Implicit=*/true));
-        if (Impl.SwiftContext.LangOpts.hasFeature(
-                Feature::StrictMemorySafety))
-          fd->getAttrs().add(new (Impl.SwiftContext)
-                                 UnsafeAttr(/*Implicit=*/true));
+        fd->getAttrs().add(new (Impl.SwiftContext)
+                               UnsafeAttr(/*Implicit=*/true));
       }
     }
 
@@ -4179,19 +4177,19 @@ namespace {
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
       }
-      if (ASTContext.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
-        for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
-          if (swiftParams->get(idx)->getInterfaceType()->isEscapable())
-            continue;
-          if (param->hasAttr<clang::NoEscapeAttr>() || paramHasAnnotation[idx])
-            continue;
-          // We have a nonescapable parameter that does not have its lifetime
-          // annotated nor is it marked noescape.
-          auto attr = new (ASTContext) UnsafeAttr(/*implicit=*/true);
-          result->getAttrs().add(attr);
-          break;
-        }
+
+      for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
+        if (swiftParams->get(idx)->getInterfaceType()->isEscapable())
+          continue;
+        if (param->hasAttr<clang::NoEscapeAttr>() || paramHasAnnotation[idx])
+          continue;
+        // We have a nonescapable parameter that does not have its lifetime
+        // annotated nor is it marked noescape.
+        auto attr = new (ASTContext) UnsafeAttr(/*implicit=*/true);
+        result->getAttrs().add(attr);
+        break;
       }
+
       Impl.diagnoseTargetDirectly(decl);
     }
 
