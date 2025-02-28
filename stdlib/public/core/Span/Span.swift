@@ -545,7 +545,9 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(self)
-  public func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
+  public func _extracting(
+    _ bounds: some RangeExpression<Index>
+  ) -> Self {
     _extracting(bounds.relative(to: indices))
   }
 
@@ -568,7 +570,7 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(
-    unchecked bounds: some RangeExpression<Int>
+    unchecked bounds: some RangeExpression<Index>
   ) -> Self {
     unsafe _extracting(unchecked: bounds.relative(to: indices))
   }
