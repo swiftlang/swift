@@ -91,82 +91,82 @@ extension OutputSpan where Element: ~Copyable  {
     self.init(_unchecked: buffer, initialized: initialized)
   }
 
-  @_alwaysEmitIntoClient
-  @lifetime(borrow pointer)
-  public init(
-    _initializing pointer: UnsafeMutablePointer<Element>,
-    capacity: Int,
-    initialized: Int = 0
-  ) {
-    _precondition(capacity >= 0, "Capacity must be 0 or greater")
-    let buffer = UnsafeMutableBufferPointer(start: pointer, count: capacity)
-    let os = OutputSpan(_initializing: buffer, initialized: initialized)
-    self = _overrideLifetime(os, borrowing: pointer)
-  }
+//  @_alwaysEmitIntoClient
+//  @lifetime(borrow pointer)
+//  public init(
+//    _initializing pointer: UnsafeMutablePointer<Element>,
+//    capacity: Int,
+//    initialized: Int = 0
+//  ) {
+//    _precondition(capacity >= 0, "Capacity must be 0 or greater")
+//    let buffer = UnsafeMutableBufferPointer(start: pointer, count: capacity)
+//    let os = OutputSpan(_initializing: buffer, initialized: initialized)
+//    self = _overrideLifetime(os, borrowing: pointer)
+//  }
 }
 
 @available(SwiftStdlib 6.2, *)
 extension OutputSpan {
 
-  @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
-  public init(
-    _initializing buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>,
-    initialized: Int = 0
-  ) {
-    let rebased = UnsafeMutableBufferPointer(rebasing: buffer)
-    let os = OutputSpan(_initializing: rebased, initialized: 0)
-    self = _overrideLifetime(os, borrowing: buffer)
-  }
+//  @_alwaysEmitIntoClient
+//  @lifetime(borrow buffer)
+//  public init(
+//    _initializing buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>,
+//    initialized: Int = 0
+//  ) {
+//    let rebased = UnsafeMutableBufferPointer(rebasing: buffer)
+//    let os = OutputSpan(_initializing: rebased, initialized: 0)
+//    self = _overrideLifetime(os, borrowing: buffer)
+//  }
 }
 
 @available(SwiftStdlib 6.2, *)
 extension OutputSpan where Element: BitwiseCopyable {
 
-  @_alwaysEmitIntoClient
-  @lifetime(borrow bytes)
-  public init(
-    _initializing bytes: UnsafeMutableRawBufferPointer,
-    initialized: Int = 0
-  ) {
-    _precondition(
-      ((Int(bitPattern: bytes.baseAddress) &
-        (MemoryLayout<Element>.alignment&-1)) == 0),
-      "baseAddress must be properly aligned to access Element"
-    )
-    let (byteCount, stride) = (bytes.count, MemoryLayout<Element>.stride)
-    let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
-    _precondition(remainder == 0, "Span must contain a whole number of elements")
-    let pointer = bytes.baseAddress
-    let os = OutputSpan(
-      _unchecked: pointer, capacity: count, initialized: initialized
-    )
-    self = _overrideLifetime(os, borrowing: bytes)
-  }
+//  @_alwaysEmitIntoClient
+//  @lifetime(borrow bytes)
+//  public init(
+//    _initializing bytes: UnsafeMutableRawBufferPointer,
+//    initialized: Int = 0
+//  ) {
+//    _precondition(
+//      ((Int(bitPattern: bytes.baseAddress) &
+//        (MemoryLayout<Element>.alignment&-1)) == 0),
+//      "baseAddress must be properly aligned to access Element"
+//    )
+//    let (byteCount, stride) = (bytes.count, MemoryLayout<Element>.stride)
+//    let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
+//    _precondition(remainder == 0, "Span must contain a whole number of elements")
+//    let pointer = bytes.baseAddress
+//    let os = OutputSpan(
+//      _unchecked: pointer, capacity: count, initialized: initialized
+//    )
+//    self = _overrideLifetime(os, borrowing: bytes)
+//  }
 
-  @_alwaysEmitIntoClient
-  @lifetime(borrow pointer)
-  public init(
-    _initializing pointer: UnsafeMutableRawPointer,
-    capacity: Int,
-    initialized: Int = 0
-  ) {
-    _precondition(capacity >= 0, "Capacity must be 0 or greater")
-    let buffer = UnsafeMutableRawBufferPointer(start: pointer, count: capacity)
-    let os = OutputSpan(_initializing: buffer, initialized: initialized)
-    self = _overrideLifetime(os, borrowing: pointer)
-  }
+//  @_alwaysEmitIntoClient
+//  @lifetime(borrow pointer)
+//  public init(
+//    _initializing pointer: UnsafeMutableRawPointer,
+//    capacity: Int,
+//    initialized: Int = 0
+//  ) {
+//    _precondition(capacity >= 0, "Capacity must be 0 or greater")
+//    let buffer = UnsafeMutableRawBufferPointer(start: pointer, count: capacity)
+//    let os = OutputSpan(_initializing: buffer, initialized: initialized)
+//    self = _overrideLifetime(os, borrowing: pointer)
+//  }
 
-  @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
-  public init(
-    _initializing buffer: borrowing Slice<UnsafeMutableRawBufferPointer>,
-    initialized: Int = 0
-  ) {
-    let rebased = UnsafeMutableRawBufferPointer(rebasing: buffer)
-    let os = OutputSpan(_initializing: rebased, initialized: initialized)
-    self = _overrideLifetime(os, borrowing: buffer)
-  }
+//  @_alwaysEmitIntoClient
+//  @lifetime(borrow buffer)
+//  public init(
+//    _initializing buffer: borrowing Slice<UnsafeMutableRawBufferPointer>,
+//    initialized: Int = 0
+//  ) {
+//    let rebased = UnsafeMutableRawBufferPointer(rebasing: buffer)
+//    let os = OutputSpan(_initializing: rebased, initialized: initialized)
+//    self = _overrideLifetime(os, borrowing: buffer)
+//  }
 }
 
 @available(SwiftStdlib 6.2, *)
