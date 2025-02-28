@@ -5852,6 +5852,18 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
                         // isolation for this decl.
   }
 
+  // Asynchronous variants for functions imported from ObjC are
+  // `nonisolated(nonsending)` by default.
+  if (value->hasClangNode()) {
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(value)) {
+      if (!isa<ProtocolDecl>(AFD->getDeclContext()) &&
+          AFD->getForeignAsyncConvention()) {
+        return {
+            {ActorIsolation::forCallerIsolationInheriting(), {}}, nullptr, {}};
+      }
+    }
+  }
+
   // We did not find anything special, return unspecified.
   return {{ActorIsolation::forUnspecified(), {}}, nullptr, {}};
 }
