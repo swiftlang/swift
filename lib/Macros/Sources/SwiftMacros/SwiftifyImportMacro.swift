@@ -434,7 +434,7 @@ struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
     let genericArg = TypeSyntax(parsedDesugaredType.as(IdentifierTypeSyntax.self)!
       .genericArgumentClause!.arguments.first!.argument)!
     types[index] = replaceBaseType(param.type,
-      TypeSyntax("Span<\(raw: dropCxxQualifiers(genericArg)))>"))
+      TypeSyntax("Span<\(raw: dropCxxQualifiers(genericArg))>"))
     return try base.buildFunctionSignature(types, returnType)
   }
 
@@ -469,7 +469,7 @@ struct CxxSpanReturnThunkBuilder: BoundsCheckedThunkBuilder {
     let genericArg = TypeSyntax(parsedDesugaredType.as(IdentifierTypeSyntax.self)!
       .genericArgumentClause!.arguments.first!.argument)!
     let newType = replaceBaseType(signature.returnClause!.type,
-      TypeSyntax("Span<\(raw: dropCxxQualifiers(genericArg)))>"))
+      TypeSyntax("Span<\(raw: dropCxxQualifiers(genericArg))>"))
     return try base.buildFunctionSignature(argTypes, newType)
   }
 
