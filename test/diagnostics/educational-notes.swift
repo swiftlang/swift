@@ -12,7 +12,7 @@ let x = 1 +
 // A diagnostic with an educational note using supported markdown features
 typealias Crap = () -> ()
 extension Crap {}
-// CHECK:{{.*}}[0m[0;1;31merror: [0m[1mnon-nominal type 'Crap' (aka '() -> ()') cannot be extended
+// CHECK:{{.*}}[0m[0;1;31merror: [0m[1mnon-nominal type 'Crap' (aka '() -> ()') cannot be extended [^nominal-types]
 // CHECK-NEXT:[0mextension Crap {}
 // CHECK-NEXT:[0;1;32m^         ~~~~
 // CHECK-NEXT:[0m[0m[1mNominal Types[0m
@@ -40,7 +40,7 @@ extension Crap {}
 // CHECK-NEXT:[0m[1mHeader 1[0m
 // CHECK-NEXT:[0m[1mHeader 3[0m
 
-// NO-COLOR:{{.*}}error: non-nominal type 'Crap' (aka '() -> ()') cannot be extended
+// NO-COLOR:{{.*}}error: non-nominal type 'Crap' (aka '() -> ()') cannot be extended [^nominal-types]
 // NO-COLOR-NEXT:extension Crap {}
 // NO-COLOR-NEXT:^         ~~~~
 // NO-COLOR-NEXT:Nominal Types
@@ -82,3 +82,5 @@ extension Crap {}
 // CHECK-DESCRIPTIVE-NEXT:  |
 // CHECK-DESCRIPTIVE-NEXT: Nominal Types
 // CHECK-DESCRIPTIVE-NEXT: -------------
+
+// CHECK-DESCRIPTIVE-NEXT: [^nominal-types]: {{.*}}nominal-types.md

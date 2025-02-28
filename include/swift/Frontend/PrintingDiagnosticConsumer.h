@@ -26,6 +26,8 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <map>
+
 namespace swift {
 
 /// Diagnostic consumer that displays diagnostics to standard error.
@@ -41,6 +43,10 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   // constructing a snippet.
   SmallVector<std::string, 1> BufferedEducationalNotes;
   bool SuppressOutput = false;
+
+  /// Keeps track of all of the footnotes we've seen, whether from diagnostic
+  /// groups or from educational notes. These will be rendered at the end.
+  std::map<std::string, std::string> footnotePaths;
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
   /// swift-syntax rendering

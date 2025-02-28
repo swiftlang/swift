@@ -10,7 +10,7 @@ func f() { }
 
 func g() {
   f()
-// CHECK: [[@LINE-1]]:3: warning: 'f()' is deprecated: please do not use [DeprecatedDeclaration] [-W{{.*}}deprecated-declaration.md] [DeprecatedDeclaration]
+// CHECK: [[@LINE-1]]:3: warning: 'f()' is deprecated: please do not use [^DeprecatedDeclaration] [-W{{.*}}deprecated-declaration.md] [DeprecatedDeclaration]
 }
 
 
@@ -19,5 +19,5 @@ func beCareful() { }
 
 func test() {
   beCareful()
-// CHECK: [[@LINE-1]]:3: warning: expression uses unsafe constructs but is not marked with 'unsafe' [StrictMemorySafety] [-W{{.*}}strict-memory-safety.md] [StrictMemorySafety]
+// CHECK: [[@LINE-1]]:3: warning: expression uses unsafe constructs but is not marked with 'unsafe' [^StrictMemorySafety] [-W{{.*}}strict-memory-safety.md] [StrictMemorySafety]
 }
