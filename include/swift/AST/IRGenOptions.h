@@ -406,6 +406,10 @@ public:
   /// arguments.
   unsigned PrespecializeGenericMetadata : 1;
 
+  /// Emit pointers to the corresponding type metadata in non-public non-generic
+  /// type descriptors.
+  unsigned EmitSingletonMetadataPointers : 1;
+
   /// The path to load legacy type layouts from.
   StringRef ReadLegacyTypeInfoPath;
 
@@ -597,7 +601,8 @@ public:
         LazyInitializeProtocolConformances(false),
         IndirectAsyncFunctionPointer(false), IndirectCoroFunctionPointer(false),
         CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
-        PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
+        PrespecializeGenericMetadata(false),
+        EmitSingletonMetadataPointers(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         EnableLargeLoadableTypesReg2Mem(true),
         EnableLayoutStringValueWitnesses(false),

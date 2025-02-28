@@ -3880,6 +3880,13 @@ struct TargetCanonicalSpecializedMetadatasCachingOnceToken {
 };
 
 template <typename Runtime>
+struct TargetSingletonMetadataPointer {
+  TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>,
+                              /*Nullable*/ false>
+      metadata;
+};
+
+template <typename Runtime>
 class swift_ptrauth_struct_context_descriptor(TypeContextDescriptor)
     TargetTypeContextDescriptor : public TargetContextDescriptor<Runtime> {
 public:
@@ -3931,7 +3938,15 @@ public:
   }
 
   bool hasCanonicalMetadataPrespecializations() const {
-    return getTypeContextDescriptorFlags().hasCanonicalMetadataPrespecializations();
+    return this->isGeneric() &&
+           getTypeContextDescriptorFlags()
+               .hasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer();
+  }
+
+  bool hasSingletonMetadataPointer() const {
+    return !this->isGeneric() &&
+           getTypeContextDescriptorFlags()
+               .hasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer();
   }
 
   bool hasLayoutString() const {
@@ -4123,7 +4138,8 @@ class swift_ptrauth_struct_context_descriptor(ClassDescriptor)
                               TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                               TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
                               TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                              InvertibleProtocolSet> {
+                              InvertibleProtocolSet,
+                              TargetSingletonMetadataPointer<Runtime>> {
 private:
   using TrailingGenericContextObjects =
     swift::TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
@@ -4140,7 +4156,8 @@ private:
                                          TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                                          TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
                                          TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                                         InvertibleProtocolSet>;
+                                         InvertibleProtocolSet,
+                                         TargetSingletonMetadataPointer<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4170,6 +4187,7 @@ public:
       TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>;
   using MetadataCachingOnceToken =
       TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
+  using SingletonMetadataPointer = TargetSingletonMetadataPointer<Runtime>;
 
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
@@ -4309,6 +4327,10 @@ private:
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
     return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<SingletonMetadataPointer>) const {
+    return this->hasSingletonMetadataPointer() ? 1 : 0;
   }
 
 public:
@@ -4490,6 +4512,14 @@ public:
     return box->token.get();
   }
 
+  TargetMetadata<Runtime> *getSingletonMetadata() const {
+    if (!this->hasSingletonMetadataInitialization())
+      return nullptr;
+
+    auto box = this->template getTrailingObjects<SingletonMetadataPointer>();
+    return box->token.get();
+  }
+
   /// Retrieve the set of protocols that are inverted by this type's
   /// primary definition.
   ///
@@ -4537,7 +4567,8 @@ class swift_ptrauth_struct_context_descriptor(StructDescriptor)
                             TargetCanonicalSpecializedMetadatasListCount<Runtime>,
                             TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                             TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                            InvertibleProtocolSet> {
+                            InvertibleProtocolSet,
+                            TargetSingletonMetadataPointer<Runtime>> {
 public:
   using ForeignMetadataInitialization =
     TargetForeignMetadataInitialization<Runtime>;
@@ -4551,6 +4582,7 @@ public:
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
   using MetadataCachingOnceToken =
       TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
+  using SingletonMetadataPointer = TargetSingletonMetadataPointer<Runtime>;
 
 private:
   using TrailingGenericContextObjects =
@@ -4561,7 +4593,8 @@ private:
                                            MetadataListCount,
                                            MetadataListEntry,
                                            MetadataCachingOnceToken,
-                                           InvertibleProtocolSet>;
+                                           InvertibleProtocolSet,
+                                           TargetSingletonMetadataPointer<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4593,6 +4626,10 @@ private:
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
     return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<SingletonMetadataPointer>) const {
+    return this->hasSingletonMetadataPointer() ? 1 : 0;
   }
 
 public:
@@ -4648,6 +4685,14 @@ public:
     return box->token.get();
   }
 
+  TargetMetadata<Runtime> *getSingletonMetadata() const {
+    if (!this->hasSingletonMetadataInitialization())
+      return nullptr;
+
+    auto box = this->template getTrailingObjects<SingletonMetadataPointer>();
+    return box->token.get();
+  }
+
   /// Retrieve the set of protocols that are inverted by this type's
   /// primary definition.
   ///
@@ -4684,7 +4729,8 @@ class swift_ptrauth_struct_context_descriptor(EnumDescriptor)
                             TargetCanonicalSpecializedMetadatasListCount<Runtime>,
                             TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                             TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
-                            InvertibleProtocolSet> {
+                            InvertibleProtocolSet,
+                            TargetSingletonMetadataPointer<Runtime>> {
 public:
   using SingletonMetadataInitialization =
     TargetSingletonMetadataInitialization<Runtime>;
@@ -4698,6 +4744,7 @@ public:
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
   using MetadataCachingOnceToken =
       TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
+  using SingletonMetadataPointer = TargetSingletonMetadataPointer<Runtime>;
 
 private:
   using TrailingGenericContextObjects =
@@ -4708,7 +4755,8 @@ private:
                                         MetadataListCount,
                                         MetadataListEntry, 
                                         MetadataCachingOnceToken,
-                                        InvertibleProtocolSet>;
+                                        InvertibleProtocolSet,
+                                        TargetSingletonMetadataPointer<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4740,6 +4788,10 @@ private:
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
     return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<SingletonMetadataPointer>) const {
+    return this->hasSingletonMetadataPointer() ? 1 : 0;
   }
 
 public:
@@ -4806,6 +4858,14 @@ public:
       return nullptr;
     }
     auto box = this->template getTrailingObjects<MetadataCachingOnceToken>();
+    return box->token.get();
+  }
+
+  TargetMetadata<Runtime> *getSingletonMetadata() const {
+    if (!this->hasSingletonMetadataInitialization())
+      return nullptr;
+
+    auto box = this->template getTrailingObjects<SingletonMetadataPointer>();
     return box->token.get();
   }
 
