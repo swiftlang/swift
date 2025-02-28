@@ -6754,8 +6754,10 @@ NOTE(type_eraser_init_spi,none,
 //------------------------------------------------------------------------------
 
 ERROR(availability_must_occur_alone, none,
-      "'%0' version-availability must be specified alone", (StringRef))
-
+      "%0 %select{|version }1availability must be specified alone",
+      (StringRef, bool))
+ERROR(availability_unexpected_version, none,
+      "unexpected version number for %0", (StringRef))
 WARNING(availability_unrecognized_platform_name,
         PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
 WARNING(availability_suggest_platform_name,
@@ -6773,11 +6775,8 @@ WARNING(attr_availability_expected_version_spec, none,
        "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
        "for platform '%1'", (StringRef, StringRef))
 ERROR(attr_availability_requires_custom_availability, none,
-      "%0 requires -enable-experimental-feature CustomAvailability",
-      (Identifier))
-WARNING(attr_availability_unexpected_version,none,
-       "unexpected version number in '%0' attribute for '%1'",
-       (const DeclAttribute, StringRef))
+      "%0 requires '-enable-experimental-feature CustomAvailability'",
+      (StringRef))
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
@@ -7002,14 +7001,12 @@ ERROR(conformance_availability_only_version_newer, none,
 // MARK: if #available(...)
 //------------------------------------------------------------------------------
 
-ERROR(availability_query_swift_not_allowed, none,
-      "Swift language version checks not allowed in %0(...)", (StringRef))
+ERROR(availability_query_not_allowed, none,
+      "%0 %select{|version }1checks not allowed in %2(...)",
+      (StringRef, bool, StringRef))
 
-ERROR(availability_query_package_description_not_allowed, none,
-      "PackageDescription version checks not allowed in %0(...)", (StringRef))
-
-ERROR(availability_query_repeated_platform, none,
-      "version for '%0' already specified", (StringRef))
+ERROR(availability_query_already_specified, none,
+      "%select{|version for }0'%1' already specified", (bool, StringRef))
 
 ERROR(availability_query_wildcard_required, none,
       "must handle potential future platforms with '*'", ())

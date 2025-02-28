@@ -208,6 +208,9 @@ public:
   /// version ranges.
   bool isVersioned() const;
 
+  /// Returns true if the domain supports `#available`/`#unavailable` queries.
+  bool supportsQueries() const;
+
   /// Returns true if this domain is considered active in the current
   /// compilation context.
   bool isActive(const ASTContext &ctx) const;
