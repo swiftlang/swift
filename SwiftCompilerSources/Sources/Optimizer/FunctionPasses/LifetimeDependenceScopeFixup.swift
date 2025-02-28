@@ -293,7 +293,7 @@ private extension LifetimeDependence.Scope {
       var extensions = SingleInlineArray<ScopeExtension>()
       let applySite = yieldedValue.definingInstruction as! BeginApplyInst
       for operand in applySite.parameterOperands {
-        guard let dep = applySite.resultDependence(on: operand), dep == .scope else {
+        guard let dep = applySite.resultDependence(on: operand), dep.isScoped else {
           continue
         }
         // Pass a copy of innerScopes without modifying this one.

@@ -905,7 +905,7 @@ extension LifetimeDependenceDefUseWalker {
       return leafUse(of: operand)
     }
     if let dep = apply.resultDependence(on: operand),
-       dep == .inherit {
+       !dep.isScoped {
       // Operand is nonescapable and passed as a call argument. If the
       // result inherits its lifetime, then consider any nonescapable
       // result value to be a dependent use.

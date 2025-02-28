@@ -130,15 +130,16 @@ extension LifetimeDependentApply {
     var info = LifetimeSourceInfo()
     let hasScopedYield = applySite.parameterOperands.contains {
       if let dep = applySite.resultDependence(on: $0) {
-        return dep == .scope
+        return dep.isScoped
       }
       return false
     }
     if hasScopedYield {
-      // for consistency, we you yieldAddress if any yielded value is an address.
+      // for consistency, we use yieldAddress if any yielded value is an address.
       let targetKind = beginApply.yieldedValues.contains(where: { $0.type.isAddress })
         ? TargetKind.yieldAddress : TargetKind.yield
-      info.sources.push(LifetimeSource(targetKind: targetKind, convention: .scope, value: beginApply.token))
+      info.sources.push(LifetimeSource(targetKind: targetKind, convention: .scope(addressable: false),
+                                       value: beginApply.token))
     }
     for operand in applySite.parameterOperands {
       guard let dep = applySite.resultDependence(on: operand) else {

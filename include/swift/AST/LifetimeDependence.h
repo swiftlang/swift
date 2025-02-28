@@ -300,6 +300,11 @@ public:
       && scopeLifetimeParamIndices->contains(index);
   }
 
+  bool checkAddressable(int index) const {
+    return hasAddressableParamIndices()
+      && getAddressableIndices()->contains(index);
+  }
+
   std::string getString() const;
   void Profile(llvm::FoldingSetNodeID &ID) const;
   void getConcatenatedData(SmallVectorImpl<bool> &concatenatedData) const;
