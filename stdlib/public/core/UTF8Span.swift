@@ -5,35 +5,20 @@
 @frozen
 @available(SwiftStdlib 6.1, *)
 public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
-  public var unsafeBaseAddress: UnsafeRawPointer?
+  @usableFromInline
+  internal var _unsafeBaseAddress: UnsafeRawPointer?
 
   /*
    A bit-packed count and flags (such as isASCII)
 
-   ╔═══════╦═════╦═════╦═════╦══════════╦═══════╗
-   ║  b63  ║ b62 ║ b61 ║ b60 ║ b59:56   ║ b56:0 ║
-   ╠═══════╬═════╬═════╬═════╬══════════╬═══════╣
-   ║ ASCII ║ NFC ║ SSC ║ NUL ║ reserved ║ count ║
-   ╚═══════╩═════╩═════╩═════╩══════════╩═══════╝
+   ╔═══════╦═════╦══════════╦═══════╗
+   ║  b63  ║ b62 ║ b61:56   ║ b56:0 ║
+   ╠═══════╬═════╬══════════╬═══════╣
+   ║ ASCII ║ NFC ║ reserved ║ count ║
+   ╚═══════╩═════╩══════════╩═══════╝
 
-   ASCII means the contents are all-ASCII (<0x7F). 
-   NFC means contents are in normal form C for fast comparisons.
-   SSC means single-scalar Characters (i.e. grapheme clusters): every
-     `Character` holds only a single `Unicode.Scalar`.
-   NUL means the contents are a null-terminated C string (that is,
-     there is a guranteed, borrowed NULL byte after the end of `count`).
-
-   TODO: NUL means both no-interior and null-terminator, so does this
-   mean that String doesn't ever set it because we don't want to scan
-   for interior nulls? I think this is the only viable option...
-
-   TODO: Contains-newline would be useful for Regex `.`
-
-   Question: Should we have null-termination support?
-             A null-terminated UTF8Span has a NUL byte after its contents
-             and contains no interior NULs. How would we ensure the
-             NUL byte is exclusively borrowed by us?
-
+   ASCII means the contents are known to be all-ASCII (<0x7F).
+   NFC means contents are known to be in normal form C for fast comparisons.
    */
   @usableFromInline
   internal var _countAndFlags: UInt64
@@ -45,7 +30,7 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
     _unsafeAssumingValidUTF8 start: borrowing UnsafeRawPointer,
     _countAndFlags: UInt64
   ) {
-    self.unsafeBaseAddress = copy start
+    self._unsafeBaseAddress = copy start
     self._countAndFlags = _countAndFlags
 
     _invariantCheck()
@@ -55,8 +40,11 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
   // at least check the count first
   @_alwaysEmitIntoClient
   internal func _start() -> UnsafeRawPointer {
-    unsafeBaseAddress._unsafelyUnwrappedUnchecked
+    _unsafeBaseAddress._unsafelyUnwrappedUnchecked
   }
+
+  // HACK: working around lack of internals
+  internal var _str: String { _start()._str(0..<count) }
 }
 
 // TODO: init strategy: underscored public that use lifetime annotations
@@ -65,13 +53,23 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
 
 @available(SwiftStdlib 6.1, *)
 extension UTF8Span {
+  /// Creates a UTF8Span containing `codeUnits`. Validates that the input is
+  /// valid UTF-8, otherwise throws an error.
+  ///
+  /// The resulting UTF8Span has the same lifetime constraints as `codeUnits`.
+  public init(
+    validating codeUnits: consuming Span<UInt8>
+  ) throws(UTF8.EncodingError) {
+    try self.init(_validating: codeUnits)
+  }
+
   // TODO: this doesn't need to be underscored, I don't think
   @lifetime(codeUnits)
-  public init(
+  internal init(
     _validating codeUnits: consuming Span<UInt8>
   ) throws(UTF8.EncodingError) {
     guard let ptr = codeUnits._pointer else {
-      self.unsafeBaseAddress = nil
+      self._unsafeBaseAddress = nil
       self._countAndFlags = 0
       return
     }
@@ -81,10 +79,33 @@ extension UTF8Span {
     let count = codeUnits._count
     let isASCII = try basePtr._validateUTF8(limitedBy: count)
 
-    self.unsafeBaseAddress = .init(basePtr)
+    self._unsafeBaseAddress = .init(basePtr)
     self._countAndFlags = UInt64(truncatingIfNeeded: count)
     if isASCII {
       _setIsASCII()
+    }
+    _internalInvariant(self.count == codeUnits.count)
+  }
+
+  // TODO: SPI?
+  internal init(
+    _uncheckedAssumingValidUTF8 codeUnits: consuming Span<UInt8>,
+    isKnownASCII: Bool,
+    isKnownNFC: Bool
+  ) {
+    guard let ptr = codeUnits._pointer else {
+      self._unsafeBaseAddress = nil
+      self._countAndFlags = 0
+      return
+    }
+
+    self._unsafeBaseAddress = codeUnits._start()
+    self._countAndFlags = UInt64(truncatingIfNeeded: codeUnits.count)
+    if isKnownASCII {
+      _setIsASCII()
+    }
+    if isKnownNFC {
+      _setIsNFC()
     }
     _internalInvariant(self.count == codeUnits.count)
   }
@@ -161,30 +182,6 @@ extension UTF8Span {
 }
 
 
-// MARK: Canonical comparison
-
-@_unavailableInEmbedded
-@available(SwiftStdlib 6.1, *)
-extension UTF8Span {
-  // HACK: working around lack of internals
-  internal var _str: String { _start()._str(0..<count) }
-
-  /// Whether `self` is equivalent to `other` under Unicode Canonical
-  /// Equivalence.
-  public func isCanonicallyEquivalent(
-    to other: UTF8Span
-  ) -> Bool {
-    self._str == other._str
-  }
-
-  /// Whether `self` orders less than `other` under Unicode Canonical 
-  /// Equivalence using normalized code-unit order (in NFC).
-  public func isCanonicallyLessThan(
-    _ other: UTF8Span
-  ) -> Bool {
-    self._str < other._str
-  }
-}
 
 
 
@@ -206,7 +203,7 @@ extension UTF8Span {
   ///   parameter is valid only for the duration of its execution.
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  borrowing public func withUnsafeBufferPointer<
+  borrowing public func _withUnsafeBufferPointer<
     E: Error, Result: ~Copyable //& ~Escapable
   >(
     _ body: (_ buffer: /*borrowing*/ UnsafeBufferPointer<UInt8>) throws(E) -> Result
@@ -233,45 +230,38 @@ extension UTF8Span {
   }
 }
 
-#if false
-extension RawSpan {
-  public func parseUTF8(from start: Int, length: Int) throws -> UTF8Span {
-    let span = self[
-      uncheckedOffsets: start ..< start &+ length
-    ].view(as: UInt8.self)
-    return try UTF8Span(validating: span)
-  }
-
-  // TODO: Below are contingent on how we want to handle NUL-termination
-  public func parseNullTerminatedUTF8() throws -> UTF8Span {
-    fatalError()
-  }
-}
-
-// TODO: Below is contingent on a Cursor or Iterator type
-extension RawSpan.Cursor {
-  public mutating func parseUTF8(length: Int) throws -> UTF8Span {
-    fatalError()
-  }
-  public mutating func parseNullTerminatedUTF8() throws -> UTF8Span {
-    fatalError()
-  }
-}
-#endif
-
 @available(SwiftStdlib 6.1, *)
 extension UTF8Span {
-  public static func ~=(_ lhs: StaticString, _ rhs: UTF8Span) -> Bool {
-    return lhs.withUTF8Buffer { str in
-      rhs.withUnsafeBufferPointer { span in
-        str.elementsEqual(span)
-      }
-    }
+  public var isEmpty: Bool {
+    self.count == 0
   }
 
-  // Not doing == between two UTFSpan, as pointerness 
-  // Note: avove might not be possible 
+  public var span: Span<UInt8> {
+    Span(_unchecked: _unsafeBaseAddress, count: self.count)
+  }
+
+
+}
+
+func TODO(_ message: String) -> Never {
+  fatalError("TODO: message")
+}
+
+// TODO(toolchain): decide if we rebase on top of Guillaume's work
+@available(SwiftStdlib 6.1, *)
+extension String {
+  public var utf8Span: UTF8Span {
+    TODO("Decide when to rebase on top of Guillaume's PR")
+  }
+}
+
+@available(SwiftStdlib 6.1, *)
+extension Substring {
+  public var utf8Span: UTF8Span {
+    TODO("Decide when to rebase on top of Guillaume's PR")
+  }
 }
 
 
-// TODO: cString var, or something like that
+
+

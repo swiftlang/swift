@@ -20,7 +20,7 @@ extension Array {
 @available(SwiftStdlib 6.1, *)
 extension UTF8Span {
   func withSpan<R>(_ f: (Span<UInt8>) throws -> R) rethrows -> R {
-    try self.withUnsafeBufferPointer {
+    try self._withUnsafeBufferPointer {
       try f(Span(_unsafeElements: $0))
     }
   }
@@ -54,7 +54,7 @@ struct ContentEquivalenceTestCase {
   func testScalars() {
     withUTF8Span { utf8Span in 
       // Test forwards
-      var utf8SpanIter = utf8Span._makeScalarIterator()
+      var utf8SpanIter = utf8Span.makeUnicodeScalarIterator()
       var stringIter = str.unicodeScalars.makeIterator()
       while let scalar = utf8SpanIter.next() {
         expectEqual(scalar, stringIter.next(), stackTrace: loc)
@@ -80,7 +80,7 @@ struct ContentEquivalenceTestCase {
   func testCharacters() {
     withUTF8Span { utf8Span in 
       // Test forwards
-      var utf8SpanIter = utf8Span._makeCharacterIterator()
+      var utf8SpanIter = utf8Span.makeCharacterIterator()
       var stringIter = str.makeIterator()
       while let char = utf8SpanIter.next() {
         expectEqual(char, stringIter.next(), stackTrace: loc)

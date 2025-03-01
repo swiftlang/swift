@@ -99,7 +99,6 @@ extension Unicode.UTF8 {
   @available(SwiftStdlib 6.1, *)
   @frozen
   public struct EncodingError: Error, Sendable, Hashable
-  // TODO: embedded? , Codable 
   {
     /// The kind of encoding error
     public var kind: Unicode.UTF8.EncodingError.Kind
@@ -129,7 +128,6 @@ extension UTF8.EncodingError {
   /// The kind of encoding error encountered during validation
   @frozen
   public struct Kind: Error, Sendable, Hashable, RawRepresentable
-  // FIXME: error unavailable in embedded swift, Codable
    {
     public var rawValue: UInt8
 
@@ -197,54 +195,5 @@ extension UTF8.EncodingError.Kind: CustomStringConvertible {
 extension UTF8.EncodingError: CustomStringConvertible {
   public var description: String {
     "UTF8.EncodingError(\(kind), \(range))"
-  }
-}
-
-@available(SwiftStdlib 6.1, *)
-extension UTF8 {
-  public // For demo purposes
-  static func _checkAllErrors(
-    _ s: some Sequence<UInt8>
-  ) -> some Sequence<UTF8.EncodingError> {
-    // TODO: Span fast path
-    // TODO: Fixed size buffer for non-contig inputs
-    // TODO: Lifetime-dependent result variant
-    let cus = Array(s)
-    return cus.withUnsafeBytes {
-      var bufPtr = $0
-      var start = 0
-      var errors: Array<UTF8.EncodingError> = []
-
-      // Remember the previous error, so that we can
-      // apply it to subsequent bytes instead of reporting
-      // just `.unexpectedContinuation`.
-      var priorError: UTF8.EncodingError? = nil
-      while true {
-        do throws(UTF8.EncodingError) {
-          _ = try bufPtr.baseAddress!._validateUTF8(limitedBy: bufPtr.count)
-          return errors
-        } catch {
-          let adjustedRange =
-            error.range.lowerBound + start ..< error.range.upperBound + start
-
-          let kind: UTF8.EncodingError.Kind
-          if let prior = priorError,
-             prior.range.upperBound == adjustedRange.lowerBound,
-             error.kind == .unexpectedContinuationByte
-          {
-            kind = prior.kind
-          } else {
-            kind = error.kind
-          }
-          let adjustedErr = UTF8.EncodingError(kind, adjustedRange)
-          priorError = adjustedErr
-
-          let errEnd = error.range.upperBound
-          start += errEnd
-          bufPtr = .init(rebasing: bufPtr[errEnd...])
-          errors.append(adjustedErr)
-        }
-      }
-    }
   }
 }

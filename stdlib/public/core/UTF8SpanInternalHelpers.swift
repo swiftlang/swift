@@ -9,30 +9,30 @@
 // import Builtin
 
 extension UnsafeRawPointer {
-  @_alwaysEmitIntoClient
+  // @_alwaysEmitIntoClient
   internal func _loadByte(_ i: Int) -> UInt8 {
     _internalInvariant(i >= 0)
     return (self+i).loadUnaligned(as: UInt8.self)
   }
 
-  @_alwaysEmitIntoClient
+  // @_alwaysEmitIntoClient
   internal func _isUTF8Continuation(_ i: Int) -> Bool {
     UTF8.isContinuation(_loadByte(i))
   }
 
-  @_alwaysEmitIntoClient
+  // @_alwaysEmitIntoClient
   internal func _isScalarAligned(_ i: Int) -> Bool {
     _internalInvariant(i >= 0)
     return !_isUTF8Continuation(i)
   }
 
-  @_alwaysEmitIntoClient
-  internal func _nextScalarStart(_ i: Int) -> Int {
-    i &+ _utf8ScalarLength(_loadByte(i))
+  // @_alwaysEmitIntoClient
+  internal func _scalarLength(startingAt i: Int) -> Int {
+    _utf8ScalarLength(_loadByte(i))
   }
 
   // NOTE: Adaptation of `_decodeScalar` to work on URP
-  @_alwaysEmitIntoClient
+//  @_alwaysEmitIntoClient
   internal func _decodeScalar(
     startingAt i: Int
   ) -> (Unicode.Scalar, nextScalarStart: Int) {
@@ -56,7 +56,7 @@ extension UnsafeRawPointer {
     }
   }
 
-  @_alwaysEmitIntoClient
+  // @_alwaysEmitIntoClient
   internal func _decodeScalar(
     endingAt i: Int
   ) -> (Unicode.Scalar, previousScalarStart: Int) {
@@ -65,7 +65,7 @@ extension UnsafeRawPointer {
     return (_decodeScalar(startingAt: start).0, start)
   }
 
-  @_alwaysEmitIntoClient
+  // @_alwaysEmitIntoClient
   internal func _previousScalarStart(_ i: Int) -> Int {
     var prev = i &- 1
     _internalInvariant(prev >= 0)
@@ -77,7 +77,7 @@ extension UnsafeRawPointer {
     return prev
   }
 
-  @_alwaysEmitIntoClient
+  // @_alwaysEmitIntoClient
   internal func _scalarAlign(_ i: Int) -> Int {
     var i = i
     while _slowPath(!_isScalarAligned(i)) {
@@ -106,30 +106,30 @@ extension UnsafeRawPointer {
     String(decoding: _urbp(range) , as: UTF8.self)
   }
 
-  @usableFromInline
-  internal func _isCharacterAligned(
-    _ i: Int,
-    limitedBy end: Int
-  ) -> Bool {
-    print(i)
-    print(end)
-    _internalInvariant(i >= 0 && i <= end)
-    if i == 0 || i == end {
-      return true
-    }
+  // // @usableFromInline
+  // internal func _isCharacterAligned(
+  //   _ i: Int,
+  //   limitedBy end: Int
+  // ) -> Bool {
+  //   print(i)
+  //   print(end)
+  //   _internalInvariant(i >= 0 && i <= end)
+  //   if i == 0 || i == end {
+  //     return true
+  //   }
 
-    // TODO: call internals instead
-    let str = _str(0..<end)
-    let idx = str.utf8.index(str.utf8.startIndex, offsetBy: i)
-    return idx == str.index(after: str.index(before: idx))
-  }
+  //   // TODO: call internals instead
+  //   let str = _str(0..<end)
+  //   let idx = str.utf8.index(str.utf8.startIndex, offsetBy: i)
+  //   return idx == str.index(after: str.index(before: idx))
+  // }
 
-  @usableFromInline
+  // @usableFromInline
   internal func _nextCharacterStart(
     _ i: Int, limitedBy end: Int
   ) -> Int {
     _internalInvariant((0..<end).contains(i))
-    _internalInvariant(_isCharacterAligned(i, limitedBy: end))
+    _internalInvariant(_isScalarAligned(i))
 
     // TODO: call internals instead
     let str = _str(i..<end)
@@ -137,12 +137,12 @@ extension UnsafeRawPointer {
     return i + str.utf8.distance(from: str.startIndex, to: nextIdx)
   }
 
-  @usableFromInline
+  // @usableFromInline
   internal func _previousCharacterStart(
     _ i: Int,
     limitedBy end: Int
   ) -> Int {
-    _internalInvariant(_isCharacterAligned(i, limitedBy: end))
+    _internalInvariant(_isScalarAligned(i))
 
     // TODO: call internals instead
     let str = _str(0..<i)
@@ -150,7 +150,7 @@ extension UnsafeRawPointer {
     return str.utf8.distance(from: str.startIndex, to: prevIdx)
   }
 
-  @usableFromInline
+  // @usableFromInline
   internal func _decodeCharacter(
     startingAt i: Int, limitedBy end: Int
   ) -> (Character, nextCharacterStart: Int) {
@@ -158,7 +158,7 @@ extension UnsafeRawPointer {
     return (Character(_str(i..<nextStart)), nextStart)
   }
 
-  @usableFromInline
+  // @usableFromInline
   internal func _decodeCharacter(
     endingAt i: Int,
     limitedBy end: Int

@@ -1,27 +1,32 @@
 @available(SwiftStdlib 6.1, *)
 extension UTF8Span {
-
-  public func _makeScalarIterator() -> ScalarIterator {
+  /// Returns an iterator that will decode the code units into
+  /// `Unicode.Scalar`s.
+  ///
+  /// The resulting iterator has the same lifetime constraints as `self`.
+  public func makeUnicodeScalarIterator() -> UnicodeScalarIterator {
     .init(self)
   }
 
   /// Iterate the `Unicode.Scalar`s  contents of a `UTF8Span`.
   ///
   /// **TODO**: Examples
-  public struct ScalarIterator: ~Escapable {
-    public var codeUnits: UTF8Span
+  @frozen
+  public struct UnicodeScalarIterator: ~Escapable {
+    public let codeUnits: UTF8Span
 
     /// The byte offset of the start of the next scalar. This is
     /// always scalar-aligned.
-    ///
-    /// **TODO**: private(set)?
     fileprivate(set)
     public var currentCodeUnitOffset: Int
 
-    // TODO: underscored init?
     public init(_ codeUnits: UTF8Span) {
       self.codeUnits = codeUnits
       self.currentCodeUnitOffset = 0
+    }
+
+    private var _start: UnsafeRawPointer {
+      codeUnits._start()
     }
 
     /// Decode and return the scalar starting at `currentCodeUnitOffset`.
@@ -31,10 +36,12 @@ extension UTF8Span {
     ///
     /// Returns `nil` if at the end of the `UTF8Span`.
     public mutating func next() -> Unicode.Scalar? {
-      guard currentCodeUnitOffset < codeUnits.count else { return nil }
+      guard currentCodeUnitOffset < codeUnits.count else {
+        return nil
+      }
 
-      _internalInvariant(codeUnits.isScalarAligned(currentCodeUnitOffset))
-      let (result, newPos) = codeUnits._start()._decodeScalar(startingAt: currentCodeUnitOffset)
+      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+      let (result, newPos) = _start._decodeScalar(startingAt: currentCodeUnitOffset)
       self.currentCodeUnitOffset = newPos
       return result
     }
@@ -46,10 +53,12 @@ extension UTF8Span {
     ///
     /// Returns `nil` if at the start of the `UTF8Span`.
     public mutating func previous() -> Unicode.Scalar? {
-      guard currentCodeUnitOffset > 0 else { return nil }
+      guard currentCodeUnitOffset > 0 else {
+        return nil
+      }
 
-      _internalInvariant(codeUnits.isScalarAligned(currentCodeUnitOffset))
-      let (result, newPos) = codeUnits._start()._decodeScalar(endingAt: currentCodeUnitOffset)
+      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+      let (result, newPos) = _start._decodeScalar(endingAt: currentCodeUnitOffset)
       self.currentCodeUnitOffset = newPos
       return result
     }
@@ -61,7 +70,15 @@ extension UTF8Span {
     /// Returns the number of `Unicode.Scalar`s skipped over, which can be 0
     /// if at the end of the UTF8Span.
     public mutating func skipForward() -> Int {
-      fatalError()
+      guard currentCodeUnitOffset < codeUnits.count else {
+        return 0
+      }
+
+      _internalInvariant(codeUnits._boundsCheck(currentCodeUnitOffset))
+      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+
+      currentCodeUnitOffset &+= _start._scalarLength(startingAt: currentCodeUnitOffset)
+      return 1
     }
 
     /// Advance `codeUnitOffset` to the end of `n` scalars, without decoding
@@ -70,7 +87,12 @@ extension UTF8Span {
     /// Returns the number of `Unicode.Scalar`s skipped over, which can be
     /// fewer than `n` if at the end of the UTF8Span.
     public mutating func skipForward(by n: Int) -> Int {
-      fatalError()
+      var numSkipped = 0
+      while numSkipped < n && skipForward() != 0 {
+        numSkipped += 1
+      }
+
+      return numSkipped
     }
 
     /// Move `codeUnitOffset` to the start of the previous scalar, without
@@ -78,8 +100,16 @@ extension UTF8Span {
     ///
     /// Returns the number of `Unicode.Scalar`s skipped over, which can be 0
     /// if at the start of the UTF8Span.
-    public mutating func skipBack() -> Bool {
-      fatalError()
+    public mutating func skipBack() -> Int {
+      guard currentCodeUnitOffset > 0 else {
+        return 0
+      }
+
+      _internalInvariant(codeUnits._boundsCheck(currentCodeUnitOffset))
+      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+
+      currentCodeUnitOffset = _start._previousScalarStart(currentCodeUnitOffset)
+      return 1
     }
 
     /// Move `codeUnitOffset` to the start of the previous `n` scalars,
@@ -87,8 +117,13 @@ extension UTF8Span {
     ///
     /// Returns the number of `Unicode.Scalar`s skipped over, which can be
     /// fewer than `n` if at the start of the UTF8Span.
-    public mutating func skipBack(by n: Int) -> Bool {
-      fatalError()
+    public mutating func skipBack(by n: Int) -> Int {
+      var numSkipped = 0
+      while numSkipped < n && skipBack() != 0 {
+        numSkipped += 1
+      }
+
+      return numSkipped
     }
 
     /// Reset to the nearest scalar-aligned code unit offset `<= i`.
@@ -97,7 +132,9 @@ extension UTF8Span {
     public mutating func reset(roundingBackwardsFrom i: Int)  {
       // TODO: what about out of bounds (and beyond-count) values of i?
       var pos = i
-      while !codeUnits.isScalarAligned(pos) { pos -= 1 }
+      while !codeUnits._isScalarAligned(pos) {
+        pos -= 1
+      }
       self.currentCodeUnitOffset = pos
     }
 
@@ -107,35 +144,52 @@ extension UTF8Span {
     public mutating func reset(roundingForwardsFrom i: Int)  {
       // TODO: what about out of bounds (and beyond-count) values of i?
       var pos = i
-      while !codeUnits.isScalarAligned(pos) { pos += 1 }
+      while !codeUnits._isScalarAligned(pos) {
+        pos += 1
+      }
       self.currentCodeUnitOffset = pos
     }
 
     /// Reset this iterator to code unit offset `i`, skipping _all_ safety
-    /// checks.
+    /// checks (including bounds checks).
     ///
     /// Note: This is only for very specific, low-level use cases. If
     /// `codeUnitOffset` is not properly scalar-aligned, this function can
     /// result in undefined behavior when, e.g., `next()` is called.
     ///
+    /// TODO: verify that we're not UB, just garabage-data or guaranteed
+    ///       trap!
+    ///
     /// For example, this could be used by a regex engine to backtrack to a
     /// known-valid previous position.
     ///
     public mutating func reset(uncheckedAssumingAlignedTo i: Int) {
-      _internalInvariant(codeUnits.isScalarAligned(i))
+      _internalInvariant(codeUnits._isScalarAligned(i))
       self.currentCodeUnitOffset = i
     }
 
     /// Returns the UTF8Span containing all the content up to the iterator's
     /// current position.
-    public func _prefix() -> UTF8Span {
-      fatalError()
+    ///
+    /// The resultant `UTF8Span` has the same lifetime constraints as `self`.
+    public func prefix() -> UTF8Span {
+      let slice = codeUnits.span._extracting(0..<currentCodeUnitOffset)
+      return UTF8Span(
+        _uncheckedAssumingValidUTF8: slice,
+        isKnownASCII: codeUnits.isKnownASCII,
+        isKnownNFC: codeUnits.isKnownNFC)
     }
 
     /// Returns the UTF8Span containing all the content after the iterator's
     /// current position.
-    public func _suffix() -> UTF8Span {
-      fatalError()
+    ///
+    /// The resultant `UTF8Span` has the same lifetime constraints as `self`.
+    public func suffix() -> UTF8Span {
+      let slice = codeUnits.span._extracting(currentCodeUnitOffset..<codeUnits.count)
+      return UTF8Span(
+        _uncheckedAssumingValidUTF8: slice,
+        isKnownASCII: codeUnits.isKnownASCII,
+        isKnownNFC: codeUnits.isKnownNFC)
     }
   }
 }
@@ -143,7 +197,11 @@ extension UTF8Span {
 @available(SwiftStdlib 6.1, *)
 @_unavailableInEmbedded
 extension UTF8Span {
-  public func _makeCharacterIterator() -> CharacterIterator {
+  /// Returns an iterator that will construct `Character`s from the underlying
+  /// UTF-8 content.
+  ///
+  /// The resulting iterator has the same lifetime constraints as `self`.
+  public func makeCharacterIterator() -> CharacterIterator {
     .init(self)
   }
 
@@ -151,35 +209,21 @@ extension UTF8Span {
   ///
   /// **TODO**: Examples
   public struct CharacterIterator: ~Escapable {
-    public var codeUnits: UTF8Span
+    public let codeUnits: UTF8Span
 
-    /// **QUESTION**: The notion of `Character` aligned is complex. It can be
-    ///   defined as the same as scalar-aligned, as you can run the algorithm
-    ///   from any scalar position and get the emergent behavior, even if
-    ///   that position would split a `Character` as processed from another
-    ///   position. For example, when starting grapheme breaking in the
-    ///   middle of a long run of paired regional indicators, you can start
-    ///   from odd or even offsets and get different flag emoji out. That can
-    ///   occasionally be useful, but can yield counter intuitive results.
-    ///
-    ///   While we talk about code unit offsets always being scalar-aligned,
-    ///   we could go further to talk about `Character` aligned indices
-    ///   (where `Character`-alignment is relative to the start of the
-    ///   `UTF8Span`) and have API for those.
-
-    /// The byte offset of the start of the next `Character`. This is
-    /// always scalar-aligned and `Character`-aligned.
-    ///
-    /// **TODO**: How to talk about the
-    ///   assuming-the-UTF8Span-is-the-entire-content interpretation of
-    ///   `Character`-aligned?
+    /// The byte offset of the start of the next `Character`. This is always
+    /// scalar-aligned. It is always `Character`-aligned relative to the last
+    /// call to `reset` (or the start of the span if not called).
     fileprivate(set)
     public var currentCodeUnitOffset: Int
 
-    // TODO: underscored init?
     public init(_ span: UTF8Span) {
       self.codeUnits = span
       self.currentCodeUnitOffset = 0
+    }
+
+    private var _start: UnsafeRawPointer {
+      codeUnits._start()
     }
 
     /// Return the `Character` starting at `currentCodeUnitOffset`. After the
@@ -191,8 +235,8 @@ extension UTF8Span {
     public mutating func next() -> Character? {
       guard currentCodeUnitOffset < codeUnits.count else { return nil }
 
-      _internalInvariant(codeUnits.isScalarAligned(currentCodeUnitOffset))
-      let (result, newPos) = codeUnits._start()._decodeCharacter(
+      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+      let (result, newPos) = _start._decodeCharacter(
         startingAt: currentCodeUnitOffset,
         limitedBy: codeUnits.count
       )
@@ -209,8 +253,8 @@ extension UTF8Span {
     public mutating func previous() -> Character? {
       guard currentCodeUnitOffset > 0 else { return nil }
 
-      _internalInvariant(codeUnits.isScalarAligned(currentCodeUnitOffset))
-      let (result, newPos) = codeUnits._start()._decodeCharacter(
+      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+      let (result, newPos) = _start._decodeCharacter(
         endingAt: currentCodeUnitOffset,
         limitedBy: codeUnits.count)
       self.currentCodeUnitOffset = newPos
@@ -222,8 +266,16 @@ extension UTF8Span {
     ///
     /// Returns the number of `Character`s skipped over, which can be 0
     /// if at the end of the UTF8Span.
-    public mutating func skipForward() {
-      fatalError()
+    public mutating func skipForward() -> Int {
+      guard currentCodeUnitOffset < codeUnits.count else {
+        return 0
+      }
+
+      _internalInvariant(codeUnits._boundsCheck(currentCodeUnitOffset))
+      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+
+      self.currentCodeUnitOffset = _start._nextCharacterStart(currentCodeUnitOffset, limitedBy: codeUnits.count)
+      return 1
     }
 
     /// Advance `codeUnitOffset` to the end of `n` `Characters`, without
@@ -231,8 +283,13 @@ extension UTF8Span {
     ///
     /// Returns the number of `Character`s skipped over, which can be
     /// fewer than `n` if at the end of the UTF8Span.
-    public mutating func skipForward(by n: Int) {
-      fatalError()
+    public mutating func skipForward(by n: Int) -> Int {
+      var numSkipped = 0
+      while numSkipped < n && skipForward() != 0 {
+        numSkipped += 1
+      }
+
+      return numSkipped
     }
 
     /// Move `codeUnitOffset` to the start of the previous `Character`,
@@ -240,8 +297,17 @@ extension UTF8Span {
     ///
     /// Returns the number of `Character`s skipped over, which can be 0
     /// if at the start of the UTF8Span.
-    public mutating func skipBack() {
-      fatalError()
+    public mutating func skipBack() -> Int {
+      guard currentCodeUnitOffset > 0 else {
+        return 0
+      }
+
+      _internalInvariant(codeUnits._boundsCheck(currentCodeUnitOffset))
+      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+
+      currentCodeUnitOffset = _start._previousCharacterStart(currentCodeUnitOffset, limitedBy: codeUnits.count)
+      return 1
+
     }
 
     /// Move `codeUnitOffset` to the start of the previous `n` `Character`s,
@@ -249,8 +315,13 @@ extension UTF8Span {
     ///
     /// Returns the number of `Character`s skipped over, which can be
     /// fewer than `n` if at the start of the UTF8Span.
-    public mutating func skipBack(by n: Int) {
-      fatalError()
+    public mutating func skipBack(by n: Int) -> Int {
+      var numSkipped = 0
+      while numSkipped < n && skipBack() != 0 {
+        numSkipped += 1
+      }
+
+      return numSkipped
     }
 
     /// Reset to the nearest character-aligned position `<= i`.
@@ -283,96 +354,23 @@ extension UTF8Span {
     /// Returns the UTF8Span containing all the content up to the iterator's
     /// current position.
     public func prefix() -> UTF8Span {
-      fatalError()
+      let slice = codeUnits.span._extracting(0..<currentCodeUnitOffset)
+      return UTF8Span(
+        _uncheckedAssumingValidUTF8: slice,
+        isKnownASCII: codeUnits.isKnownASCII,
+        isKnownNFC: codeUnits.isKnownNFC)
     }
 
     /// Returns the UTF8Span containing all the content after the iterator's
     /// current position.
     public func suffix() -> UTF8Span {
-      fatalError()
-    }
-  }
-
-}
-
-@available(SwiftStdlib 6.1, *)
-extension UTF8Span {
-
-  public func _makeGraphemeBreakIterator() -> GraphemeBreakIterator {
-    .init(self)
-  }
-
-  /// **QUESTION**: There are many ways we could expose this functionality and
-  ///   I'd like some help here. As written, the caller would be looking at
-  ///   `currentCodeUnitOffset` and `state` while `next()` / `previous
-  ///   ()` would return `false` when they get to the end of the current
-  ///   span (which may or may not be a grapheme break, depending on whether
-  ///   there's more spans available or not).
-
-  /// **TODO**: Doc comments
-  public struct GraphemeBreakIterator: ~Escapable {
-    public var codeUnits: UTF8Span
-    public var currentCodeUnitOffset: Int
-    public var state: Unicode.GraphemeBreakingState
-
-    // TODO: underscored init?
-    public init(_ span: UTF8Span) {
-      self.codeUnits = span
-      self.currentCodeUnitOffset = 0
-      self.state = .init()
-    }
-
-    // TODO: underscored init?
-    public init(_ span: UTF8Span, using state: Unicode.GraphemeBreakingState) {
-      self.codeUnits = span
-      self.currentCodeUnitOffset = 0
-      self.state = state
-    }
-
-    public mutating func next() -> Bool {
-      fatalError()
-    }
-
-    public mutating func previous() -> Bool {
-      fatalError()
-    }
-
-
-    public mutating func skipForward() {
-    }
-
-    public mutating func skipForward(by n: Int) {}
-
-    public mutating func skipBack() {
-    }
-
-    public mutating func skipBack(by n: Int) {
-    }
-
-    public mutating func reset(
-      roundingBackwardsFrom i: Int, using: Unicode.GraphemeBreakingState
-    ) {
-    }
-
-    public mutating func reset(
-      roundingForwardsFrom i: Int, using: Unicode.GraphemeBreakingState
-    ) {
-    }
-
-    public mutating func reset(
-      uncheckedAssumingAlignedTo i: Int, using: Unicode.GraphemeBreakingState
-    ) {
-    }
-
-    public func prefix() -> UTF8Span {
-      fatalError()
-    }
-    public func suffix() -> UTF8Span {
-      fatalError()
+      let slice = codeUnits.span._extracting(currentCodeUnitOffset..<codeUnits.count)
+      return UTF8Span(
+        _uncheckedAssumingValidUTF8: slice,
+        isKnownASCII: codeUnits.isKnownASCII,
+        isKnownNFC: codeUnits.isKnownNFC)
     }
   }
 }
-
-
 
 
