@@ -1820,11 +1820,19 @@ function Build-mimalloc() {
     "ld64.lld.exe"
   )
   foreach ($Tool in $Tools) {
-    $Binary = [IO.Path]::Combine($Arch.ToolchainInstallRoot, "usr", "bin", $Tool)
+    $Binary = [IO.Path]::Combine($($Arch.ToolchainInstallRoot), "usr", "bin", $Tool)
     # Binary-patch in place
-    Start-Process -Wait -WindowStyle Hidden -FilePath "$SourceCache\mimalloc\bin\minject$BuildSuffix" -ArgumentList @("-f", "-i", "-v", "$Binary")
+    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-f" "-i" "-v" "$Binary"
     # Log the import table
-    Start-Process -Wait -WindowStyle Hidden -FilePath "$SourceCache\mimalloc\bin\minject$BuildSuffix" -ArgumentList @("-l", "$Binary")
+    $LogFile = "$BinaryCache\$($Arch.LLVMTarget)\mimalloc\minject-log-$Tool.txt"
+    $ErrorFile = "$BinaryCache\$($Arch.LLVMTarget)\mimalloc\minject-log-$Tool-error.txt"
+    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-l" "$Binary" > $LogFile 2> $ErrorFile
+    # Verify patching
+    $Found = Select-String -Path $LogFile -Pattern "mimalloc"
+    if (-not $Found) {
+      Get-Content $ErrorFile
+      throw "Failed to patch mimalloc for $Tool"
+    }
   }
 }
 
