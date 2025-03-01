@@ -8356,6 +8356,15 @@ ERROR(attr_execution_type_attr_incompatible_with_isolated_any,none,
       "cannot use '@execution' together with @isolated(any)",
       ())
 
+//===----------------------------------------------------------------------===//
+//                            MARK: SwiftSettings
+//===----------------------------------------------------------------------===//
+
+ERROR(swift_settings_invalid_setting, none,
+      "Unrecognized setting passed to #SwiftSettings", ())
+
+ERROR(swift_settings_must_be_top_level, none,
+      "#SwiftSettings can only be invoked as a top level declaration", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

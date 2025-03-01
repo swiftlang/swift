@@ -384,6 +384,7 @@ UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(CoroutineAccessorsAllocateInCallee)
+UNINTERESTING_FEATURE(SwiftSettings)
 
 bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   if (auto cd = dyn_cast<ClassDecl>(decl)) {
