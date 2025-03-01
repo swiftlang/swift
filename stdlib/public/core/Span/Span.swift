@@ -486,7 +486,7 @@ extension Span where Element: BitwiseCopyable {
     @_alwaysEmitIntoClient
     get {
       let rawSpan = RawSpan(_elements: self)
-      return _overrideLifetime(rawSpan, copying: self)
+      return unsafe _overrideLifetime(rawSpan, copying: self)
     }
   }
 }

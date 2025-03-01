@@ -571,7 +571,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     @_alwaysEmitIntoClient
     get {
       let span = Span(_unsafeElements: self)
-      return _overrideLifetime(span, borrowing: self)
+      return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 }

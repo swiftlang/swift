@@ -132,12 +132,12 @@ extension KeyValuePairs {
     @lifetime(borrow self)
     @_alwaysEmitIntoClient
     get {
-      let pointer = UnsafeRawPointer(_elements._buffer.firstElementAddress)
+      let rp = unsafe UnsafeRawPointer(_elements._buffer.firstElementAddress)
       let span = Span(
-        _unsafeStart: pointer.assumingMemoryBound(to: Element.self),
+        _unsafeStart: unsafe rp.assumingMemoryBound(to: Element.self),
         count: _elements.count
       )
-      return _overrideLifetime(span, borrowing: self)
+      return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 }

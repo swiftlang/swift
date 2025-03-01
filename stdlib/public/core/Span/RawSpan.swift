@@ -297,7 +297,7 @@ extension RawSpan {
       byteCount: span.count == 1 ? MemoryLayout<Element>.size
                  : span.count &* MemoryLayout<Element>.stride
     )
-    self = _overrideLifetime(rawSpan, copying: span)
+    self = unsafe _overrideLifetime(rawSpan, copying: span)
   }
 }
 
