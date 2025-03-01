@@ -25,6 +25,17 @@ struct NCE: ~Escapable, ~Copyable {
   init()
 }
 
+struct TrivialHolder {
+  var pointer: UnsafeRawPointer
+}
+
+struct Holder {
+  var object: AnyObject
+}
+
+@_addressableForDependencies
+struct AddressableForDeps {}
+
 sil @getPtr : $@convention(thin) () -> @out UnsafeRawPointer
 sil @getSpan : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @out NE
 sil @getInoutSpan : $@convention(thin) (@inout AnyObject) -> @lifetime(borrow 0) @out NCE
@@ -91,4 +102,40 @@ bb0(%0 : $*AnyObject):
   %7 = load [take] %2
   dealloc_stack %1
   return %7
+}
+
+// =============================================================================
+// @_addressable
+// =============================================================================
+
+sil hidden [ossa] @addressableArg : $@convention(method) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE {
+
+sil hidden [ossa] @addressableTuple : $@convention(method) (@in_guaranteed (Holder, Holder)) -> @lifetime(borrow address 0) @owned NE {
+
+sil hidden [ossa] @testAddressableArg : $@convention(thin) (Holder) -> Int {
+bb0(%0 : $Holder):
+  debug_value %0, let, name "arg", argno 1
+  %2 = alloc_stack $Holder
+  store %0 to [trivial] %2
+  %4 = function_ref @addressableArg : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+  %5 = apply %4(%2) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+  dealloc_stack %2
+  %7 = move_value [var_decl] %5
+  debug_value %7, let, name "ne"
+  %9 = alloc_stack $Int
+  %10 = begin_borrow %7
+  %11 = struct_extract %10, #NE.p
+  %12 = metatype $@thin Int.Type
+  %13 = metatype $@thick Int.Type
+
+  %14 = function_ref @$sSV4load14fromByteOffset2asxSi_xmtlFfA_ : $@convention(thin) <τ_0_0> () -> Int
+  %15 = apply %14<Int>() : $@convention(thin) <τ_0_0> () -> Int
+
+  %16 = function_ref @$sSV4load14fromByteOffset2asxSi_xmtlF : $@convention(method) <τ_0_0> (Int, @thick τ_0_0.Type, UnsafeRawPointer) -> @out τ_0_0
+  %17 = apply %16<Int>(%9, %15, %13, %11) : $@convention(method) <τ_0_0> (Int, @thick τ_0_0.Type, UnsafeRawPointer) -> @out τ_0_0
+  end_borrow %10
+  %19 = load [trivial] %9
+  dealloc_stack %9
+  destroy_value %7
+  return %19
 }
