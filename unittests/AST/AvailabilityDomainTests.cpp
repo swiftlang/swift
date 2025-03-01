@@ -52,16 +52,10 @@ TEST_F(AvailabilityDomainLattice, Contains) {
     // The universal domain is the bottom domain and contains all others.
     EXPECT_TRUE(Universal.contains(domain));
 
-    // FIXME: [availability] The following assertions should change when
-    // AvailabilityContext can support multiple simultaneous unavailable
-    // domains.
-
-    // The Swift domain is second from the bottom.
-    EXPECT_EQ(Swift.contains(domain), !domain.isUniversal());
-
-    // Package and Embedded are both third from the bottom.
-    EXPECT_EQ(Package.contains(domain), !domain.isUniversal() && !domain.isSwiftLanguage());
-    EXPECT_EQ(Embedded.contains(domain), !domain.isUniversal() && !domain.isSwiftLanguage());
+    // These domains only contain themselves.
+    EXPECT_EQ(Swift.contains(domain), domain.isSwiftLanguage());
+    EXPECT_EQ(Package.contains(domain), domain.isPackageDescription());
+    EXPECT_EQ(Embedded.contains(domain), domain.isEmbedded());
   }
 
   // Platform kind domains form their own lattice in which app extension domains
