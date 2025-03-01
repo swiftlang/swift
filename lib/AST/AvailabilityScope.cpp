@@ -581,7 +581,11 @@ void AvailabilityScope::verify(const AvailabilityScope *parent,
                         {{"child", this}, {"parent", parent}});
   }
 
-  if (!getAvailabilityContext().isContainedIn(parent->getAvailabilityContext()))
+  auto context = getAvailabilityContext();
+  if (!context.verify(ctx))
+    verificationError(ctx, "context is invalid", {{"node", this}});
+
+  if (!context.isContainedIn(parent->getAvailabilityContext()))
     verificationError(ctx, "child availability range not contained",
                       {{"child", this}, {"parent", parent}});
 }

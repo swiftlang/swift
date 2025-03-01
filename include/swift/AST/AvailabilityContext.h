@@ -112,6 +112,9 @@ public:
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP;
+
+  /// Returns true if all internal invariants are satisfied.
+  bool verify(ASTContext &ctx) const;
 };
 
 } // end namespace swift

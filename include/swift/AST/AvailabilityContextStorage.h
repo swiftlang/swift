@@ -61,6 +61,9 @@ public:
   bool isContainedIn(const Info &other) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) const;
+
+  /// Returns true if all internal invariants are satisfied.
+  bool verify(ASTContext &ctx) const;
 };
 
 /// As an implementation detail, the values that make up an `Availability`

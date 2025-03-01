@@ -155,6 +155,16 @@ void AvailabilityContext::Info::Profile(llvm::FoldingSetNodeID &ID) const {
   ID.AddBoolean(IsDeprecated);
 }
 
+bool AvailabilityContext::Info::verify(ASTContext &ctx) const {
+  // Unavailable domains must be sorted to ensure folding set node lookups yield
+  // consistent results.
+  if (!llvm::is_sorted(UnavailableDomains,
+                       StableAvailabilityDomainComparator()))
+    return false;
+
+  return true;
+}
+
 AvailabilityContext
 AvailabilityContext::forPlatformRange(const AvailabilityRange &range,
                                       ASTContext &ctx) {
@@ -278,3 +288,7 @@ void AvailabilityContext::print(llvm::raw_ostream &os) const {
 }
 
 void AvailabilityContext::dump() const { print(llvm::errs()); }
+
+bool AvailabilityContext::verify(ASTContext &ctx) const {
+  return storage->info.verify(ctx);
+}
