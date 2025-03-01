@@ -1436,14 +1436,14 @@ extension Array: RangeReplaceableCollection {
 #if _runtime(_ObjC)
       if _slowPath(!_buffer._isNative) {
         let buffer = _buffer.getOrAllocateAssociatedObjectBuffer()
-        let (pointer, count) = (buffer.firstElementAddress, buffer.count)
-        let span = Span(_unsafeStart: pointer, count: count)
-        return _overrideLifetime(span, borrowing: self)
+        let (pointer, count) = unsafe (buffer.firstElementAddress, buffer.count)
+        let span = unsafe Span(_unsafeStart: pointer, count: count)
+        return unsafe _overrideLifetime(span, borrowing: self)
       }
 #endif
-      let (pointer, count) = (_buffer.firstElementAddress, _buffer.count)
-      let span = Span(_unsafeStart: pointer, count: count)
-      return _overrideLifetime(span, borrowing: self)
+      let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
+      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 

@@ -1026,9 +1026,9 @@ extension ContiguousArray: RangeReplaceableCollection {
     @lifetime(borrow self)
     @_alwaysEmitIntoClient
     borrowing get {
-      let (pointer, count) = (_buffer.firstElementAddress, _buffer.count)
-      let span = Span(_unsafeStart: pointer, count: count)
-      return _overrideLifetime(span, borrowing: self)
+      let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
+      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 

@@ -640,7 +640,7 @@ extension _ArrayBuffer {
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     let buffer = getOrAllocateAssociatedObjectBuffer()
-    let (pointer, count) = (buffer.firstElementAddress, buffer.count)
+    let (pointer, count) = unsafe (buffer.firstElementAddress, buffer.count)
     return try unsafe body(UnsafeBufferPointer(start: pointer,  count: count))
   }
   

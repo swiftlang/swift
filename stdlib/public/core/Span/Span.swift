@@ -34,6 +34,7 @@ public struct Span<Element: ~Copyable & ~Escapable>
   @usableFromInline
   internal let _pointer: UnsafeRawPointer?
 
+  @unsafe
   @_alwaysEmitIntoClient
   internal func _start() -> UnsafeRawPointer {
     unsafe _pointer._unsafelyUnwrappedUnchecked
@@ -501,7 +502,7 @@ extension Span where Element: BitwiseCopyable {
     @_alwaysEmitIntoClient
     get {
       let rawSpan = RawSpan(_elements: self)
-      return _overrideLifetime(rawSpan, copying: self)
+      return unsafe _overrideLifetime(rawSpan, copying: self)
     }
   }
 }
@@ -603,7 +604,7 @@ extension Span where Element: ~Copyable {
   public func _extracting(
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
-    let range = Range(
+    let range = unsafe Range(
       _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
     )
     return unsafe _extracting(unchecked: range)
@@ -712,7 +713,7 @@ extension Span where Element: ~Copyable {
     guard let spanStart = other._pointer, _count > 0 else {
       return unsafe _pointer == other._pointer ? 0..<0 : nil
     }
-    let start = _start()
+    let start = unsafe _start()
     let stride = MemoryLayout<Element>.stride
     let spanEnd = unsafe spanStart + stride &* other._count
     if unsafe spanStart < start || spanEnd > (start + stride &* _count) {

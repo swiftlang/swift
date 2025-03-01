@@ -1172,13 +1172,14 @@ extension Unsafe${Mutable}RawBufferPointer {
     }
   }
 
+  @unsafe
   @available(SwiftStdlib 6.2, *)
   public var bytes: RawSpan {
     @lifetime(borrow self)
     @_alwaysEmitIntoClient
     get {
-      let span = RawSpan(_unsafeBytes: self)
-      return _overrideLifetime(span, borrowing: self)
+      let span = unsafe RawSpan(_unsafeBytes: self)
+      return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 }

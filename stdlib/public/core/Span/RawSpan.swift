@@ -32,6 +32,7 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   @usableFromInline
   internal let _pointer: UnsafeRawPointer?
 
+  @unsafe
   @_alwaysEmitIntoClient
   internal func _start() -> UnsafeRawPointer {
     unsafe _pointer._unsafelyUnwrappedUnchecked
@@ -443,7 +444,7 @@ extension RawSpan {
   public func _extracting(
     unchecked bounds: ClosedRange<Int>
   ) -> Self {
-    let range = Range(
+    let range = unsafe Range(
       _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
     )
     return unsafe _extracting(unchecked: range)
@@ -666,7 +667,7 @@ extension RawSpan {
     guard let spanStart = other._pointer, _count > 0 else {
       return unsafe _pointer == other._pointer ? 0..<0 : nil
     }
-    let start = _start()
+    let start = unsafe _start()
     let spanEnd = unsafe spanStart + other._count
     if unsafe spanStart < start || (start + _count) < spanEnd { return nil }
     let lower = unsafe start.distance(to: spanStart)

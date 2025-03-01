@@ -166,9 +166,9 @@ extension CollectionOfOne {
     @lifetime(borrow self)
     @_alwaysEmitIntoClient
     get {
-      let pointer = UnsafePointer<Element>(Builtin.addressOfBorrow(self))
-      let span = Span(_unsafeStart: pointer, count: 1)
-      return _overrideLifetime(span, borrowing: self)
+      let pointer = unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(self))
+      let span = unsafe Span(_unsafeStart: pointer, count: 1)
+      return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 }
