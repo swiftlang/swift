@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -146,26 +147,19 @@ ModuleDecl *AvailabilityDomain::getModule() const {
 }
 
 bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
-  // FIXME: [availability] This currently implements something closer to a
-  // total ordering instead of the more flexible partial ordering that it
-  // would ideally represent. Until AvailabilityContext supports tracking
-  // multiple unavailable domains simultaneously, a stricter ordering is
-  // necessary to support source compatibility.
   switch (getKind()) {
   case Kind::Universal:
     return true;
   case Kind::SwiftLanguage:
-    return !other.isUniversal();
   case Kind::PackageDescription:
   case Kind::Embedded:
-    return !other.isUniversal() && !other.isSwiftLanguage();
+  case Kind::Custom:
+    return other == *this;
   case Kind::Platform:
     if (getPlatformKind() == other.getPlatformKind())
       return true;
     return inheritsAvailabilityFromPlatform(other.getPlatformKind(),
                                             getPlatformKind());
-  case Kind::Custom:
-    return getCustomDomain() == other.getCustomDomain();
   }
 }
 
@@ -200,6 +194,33 @@ AvailabilityDomain AvailabilityDomain::copy(ASTContext &ctx) const {
     // To support this, the CustomAvailabilityDomain content would need to
     // be copied to the other context, allocating new storage if necessary.
     llvm::report_fatal_error("unsupported");
+  }
+}
+
+bool StableAvailabilityDomainComparator::operator()(
+    const AvailabilityDomain &lhs, const AvailabilityDomain &rhs) const {
+  auto lhsKind = lhs.getKind();
+  auto rhsKind = rhs.getKind();
+  if (lhsKind != rhsKind)
+    return lhsKind < rhsKind;
+
+  switch (lhsKind) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::PackageDescription:
+  case AvailabilityDomain::Kind::Embedded:
+    return false;
+  case AvailabilityDomain::Kind::Platform:
+    return lhs.getPlatformKind() < rhs.getPlatformKind();
+  case AvailabilityDomain::Kind::Custom: {
+    auto lhsMod = lhs.getModule();
+    auto rhsMod = rhs.getModule();
+    if (lhsMod != rhsMod)
+      return lhsMod->getName() < rhsMod->getName();
+
+    return lhs.getNameForAttributePrinting() <
+           rhs.getNameForAttributePrinting();
+  }
   }
 }
 

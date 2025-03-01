@@ -48,13 +48,6 @@ private:
     assert(storage);
   };
 
-  /// Retrieves an `AvailabilityContext` with the given platform availability
-  /// parameters.
-  static AvailabilityContext
-  get(const AvailabilityRange &platformAvailability,
-      std::optional<AvailabilityDomain> unavailableDomain, bool deprecated,
-      ASTContext &ctx);
-
 public:
   /// Retrieves an `AvailabilityContext` constrained by the given platform
   /// availability range.
@@ -119,6 +112,9 @@ public:
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP;
+
+  /// Returns true if all internal invariants are satisfied.
+  bool verify(ASTContext &ctx) const;
 };
 
 } // end namespace swift

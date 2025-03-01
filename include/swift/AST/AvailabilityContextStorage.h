@@ -31,8 +31,9 @@ public:
   /// The introduction version.
   AvailabilityRange Range;
 
-  /// The broadest unavailable domain.
-  std::optional<AvailabilityDomain> UnavailableDomain;
+  /// A sorted collection of disjoint domains that are known to be
+  /// unavailable in this context.
+  llvm::SmallVector<AvailabilityDomain, 1> UnavailableDomains;
 
   /// Whether or not the context is considered deprecated on the current
   /// platform.
@@ -49,20 +50,20 @@ public:
   bool constrainWith(const DeclAvailabilityConstraints &constraints,
                      ASTContext &ctx);
 
-  bool constrainUnavailability(std::optional<AvailabilityDomain> domain);
+  bool constrainUnavailability(
+      const llvm::SmallVectorImpl<AvailabilityDomain> &domains);
+  bool constrainUnavailability(AvailabilityDomain domain) {
+    return constrainUnavailability(
+        llvm::SmallVector<AvailabilityDomain>{domain});
+  }
 
   /// Returns true if `other` is as available or is more available.
   bool isContainedIn(const Info &other) const;
 
-  void Profile(llvm::FoldingSetNodeID &ID) const {
-    Range.getRawVersionRange().Profile(ID);
-    if (UnavailableDomain) {
-      UnavailableDomain->Profile(ID);
-    } else {
-      ID.AddPointer(nullptr);
-    }
-    ID.AddBoolean(IsDeprecated);
-  }
+  void Profile(llvm::FoldingSetNodeID &ID) const;
+
+  /// Returns true if all internal invariants are satisfied.
+  bool verify(ASTContext &ctx) const;
 };
 
 /// As an implementation detail, the values that make up an `Availability`

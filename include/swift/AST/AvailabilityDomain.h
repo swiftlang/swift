@@ -265,6 +265,14 @@ inline void simple_display(llvm::raw_ostream &os,
   domain.print(os);
 }
 
+/// A comparator that implements a stable, total ordering on
+/// `AvailabilityDomain` that can be used for sorting in contexts where the
+/// result must be stable and deterministic across compilations.
+struct StableAvailabilityDomainComparator {
+  bool operator()(const AvailabilityDomain &lhs,
+                  const AvailabilityDomain &rhs) const;
+};
+
 /// Represents an availability domain that has been defined in a module.
 class CustomAvailabilityDomain : public ASTAllocated<CustomAvailabilityDomain> {
 public:
