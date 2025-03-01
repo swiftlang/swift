@@ -3874,6 +3874,9 @@ static void processMemoryObject(MarkUninitializedInst *I,
 /// properly set and transform the code as required for flow-sensitive
 /// properties.
 static bool checkDefiniteInitialization(SILFunction &Fn) {
+  FrontendStatsTracer StatsTracer(Fn.getModule().getASTContext().Stats,
+                                  "definite-init", &Fn);
+
   LLVM_DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
                           <<  Fn.getName() << "\n");
   bool Changed = false;
