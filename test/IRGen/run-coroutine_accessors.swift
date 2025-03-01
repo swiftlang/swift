@@ -6,7 +6,6 @@
 // RUN:     -parse-as-library \
 // RUN:     -module-name main \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
-// RUN:     -enable-experimental-feature CoroutineAccessorsAllocateInCallee \
 // RUN:     -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s

@@ -2144,12 +2144,9 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   case SILCoroutineKind::None:
     break;
   case SILCoroutineKind::YieldOnce2:
-    if (!IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      emitYieldOnce2CoroutineEntry(
-          IGF, LinkEntity::forSILFunction(IGF.CurSILFn), funcTy, *emission);
-      break;
-    }
-    LLVM_FALLTHROUGH;
+    emitYieldOnce2CoroutineEntry(IGF, LinkEntity::forSILFunction(IGF.CurSILFn),
+                                 funcTy, *emission);
+    break;
   case SILCoroutineKind::YieldOnce:
     emitYieldOnceCoroutineEntry(IGF, funcTy, *emission);
     break;
@@ -2617,8 +2614,7 @@ void IRGenSILFunction::emitSILFunction() {
   if (isAsyncFn) {
     IGM.noteSwiftAsyncFunctionDef();
   }
-  if (funcTy->isCalleeAllocatedCoroutine() &&
-      !IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+  if (funcTy->isCalleeAllocatedCoroutine()) {
     emitCoroFunctionPointer(IGM, CurFn, LinkEntity::forSILFunction(CurSILFn));
   }
 
@@ -3885,19 +3881,15 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   case SILCoroutineKind::None:
     break;
 
-  case SILCoroutineKind::YieldOnce2:
-    if (!IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      assert(calleeFP.getKind().isCoroFunctionPointer());
-      auto frame = emission->getCoroStaticFrame();
-      auto *allocator = emission->getCoroAllocator();
-      llArgs.add(frame.getAddress().getAddress());
-      llArgs.add(allocator);
-      coroImpl = {CoroutineState::CalleeAllocated{frame, allocator}};
-
-      break;
-    }
-    LLVM_FALLTHROUGH;
-
+  case SILCoroutineKind::YieldOnce2: {
+    assert(calleeFP.getKind().isCoroFunctionPointer());
+    auto frame = emission->getCoroStaticFrame();
+    auto *allocator = emission->getCoroAllocator();
+    llArgs.add(frame.getAddress().getAddress());
+    llArgs.add(allocator);
+    coroImpl = {CoroutineState::CalleeAllocated{frame, allocator}};
+    break;
+  }
   case SILCoroutineKind::YieldOnce:
     coroutineBuffer = emitAllocYieldOnceCoroutineBuffer(*this);
     coroImpl = {CoroutineState::HeapAllocated{*coroutineBuffer}};
@@ -6592,10 +6584,6 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
     return;
   }
   if (isaResultOf<BeginApplyInst>(i->getOperand())) {
-    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      // This is a no-op when using the classic retcon.once lowering.
-      return;
-    }
     auto *mvi = getAsResultOf<BeginApplyInst>(i->getOperand());
     auto *bai = cast<BeginApplyInst>(mvi->getParent());
     const auto &coroutine = getLoweredCoroutine(bai->getTokenResult());

@@ -502,9 +502,6 @@ public:
   // Whether to emit typed malloc during coroutine frame allocation.
   unsigned EmitTypeMallocForCoroFrame : 1;
 
-  // Whether to use the yield_once ABI when emitting yield_once_2 coroutines.
-  unsigned EmitYieldOnce2AsYieldOnce : 1;
-
   // Whether to force emission of a frame for all async functions
   // (LLVM's 'frame-pointer=all').
   unsigned AsyncFramePointerAll : 1;
@@ -621,9 +618,9 @@ public:
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(false),
-        EmitYieldOnce2AsYieldOnce(true), AsyncFramePointerAll(false),
-        UseProfilingMarkerThunks(false), UseCoroCCX8664(false),
-        UseCoroCCArm64(false), DebugInfoForProfiling(false), CmdArgs(),
+        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
+        UseCoroCCX8664(false), UseCoroCCArm64(false),
+        DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
