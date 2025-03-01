@@ -12,6 +12,7 @@
 
 // A MutableSpan<Element> represents a span of memory which
 // contains initialized `Element` instances.
+@safe
 @frozen
 @available(SwiftStdlib 6.2, *)
 public struct MutableSpan<Element: ~Copyable & ~Escapable>
@@ -24,7 +25,7 @@ public struct MutableSpan<Element: ~Copyable & ~Escapable>
 
   @_alwaysEmitIntoClient
   internal func _start() -> UnsafeMutableRawPointer {
-    _pointer.unsafelyUnwrapped
+    unsafe _pointer.unsafelyUnwrapped
   }
 
   @_alwaysEmitIntoClient
@@ -33,7 +34,7 @@ public struct MutableSpan<Element: ~Copyable & ~Escapable>
     _unchecked start: UnsafeMutableRawPointer?,
     count: Int
   ) {
-    _pointer = start
+    _pointer = unsafe start
     _count = count
   }
 }
@@ -58,13 +59,13 @@ extension MutableSpan where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
   ) {
-    _precondition(
+    unsafe _precondition(
       ((Int(bitPattern: buffer.baseAddress) &
-        (MemoryLayout<Element>.alignment&-1)) == 0),
+        (MemoryLayout<Element>.alignment &- 1)) == 0),
       "baseAddress must be properly aligned to access Element"
     )
     let ms = MutableSpan<Element>(_unchecked: buffer)
-    self = _overrideLifetime(ms, borrowing: buffer)
+    self = unsafe _overrideLifetime(ms, borrowing: buffer)
   }
 
   @_alwaysEmitIntoClient
@@ -74,9 +75,9 @@ extension MutableSpan where Element: ~Copyable {
     count: Int
   ) {
     _precondition(count >= 0, "Count must not be negative")
-    let buffer = UnsafeMutableBufferPointer(start: start, count: count)
+    let buffer = unsafe UnsafeMutableBufferPointer(start: start, count: count)
     let ms = MutableSpan(_unsafeElements: buffer)
-    self = _overrideLifetime(ms, borrowing: start)
+    self = unsafe _overrideLifetime(ms, borrowing: start)
   }
 }
 
@@ -88,9 +89,9 @@ extension MutableSpan {
   public init(
     _unsafeElements elements: borrowing Slice<UnsafeMutableBufferPointer<Element>>
   ) {
-    let rb = UnsafeMutableBufferPointer(rebasing: elements)
+    let rb = unsafe UnsafeMutableBufferPointer(rebasing: elements)
     let ms = MutableSpan(_unsafeElements: rb)
-    self = _overrideLifetime(ms, borrowing: elements)
+    self = unsafe _overrideLifetime(ms, borrowing: elements)
   }
 }
 
@@ -102,20 +103,20 @@ extension MutableSpan where Element: BitwiseCopyable {
   public init(
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
   ) {
-    _precondition(
+    unsafe _precondition(
       ((Int(bitPattern: buffer.baseAddress) &
-        (MemoryLayout<Element>.alignment&-1)) == 0),
+        (MemoryLayout<Element>.alignment &- 1)) == 0),
       "baseAddress must be properly aligned to access Element"
     )
     let (byteCount, stride) = (buffer.count, MemoryLayout<Element>.stride)
     let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
     _precondition(remainder == 0, "Span must contain a whole number of elements")
-    let elements = UnsafeMutableBufferPointer<Element>(
+    let elements = unsafe UnsafeMutableBufferPointer<Element>(
       start: buffer.baseAddress?.assumingMemoryBound(to: Element.self),
       count: count
     )
     let ms = MutableSpan(_unsafeElements: elements)
-    self = _overrideLifetime(ms, borrowing: buffer)
+    self = unsafe _overrideLifetime(ms, borrowing: buffer)
   }
 
   @_alwaysEmitIntoClient
@@ -125,9 +126,11 @@ extension MutableSpan where Element: BitwiseCopyable {
     byteCount: Int
   ) {
     _precondition(byteCount >= 0, "Count must not be negative")
-    let bytes = UnsafeMutableRawBufferPointer(start: pointer, count: byteCount)
+    let bytes = unsafe UnsafeMutableRawBufferPointer(
+      start: pointer, count: byteCount
+    )
     let ms = MutableSpan(_unsafeBytes: bytes)
-    self = _overrideLifetime(ms, borrowing: pointer)
+    self = unsafe _overrideLifetime(ms, borrowing: pointer)
   }
 
   @_alwaysEmitIntoClient
@@ -135,9 +138,9 @@ extension MutableSpan where Element: BitwiseCopyable {
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
   ) {
-    let bytes = UnsafeMutableRawBufferPointer(rebasing: buffer)
+    let bytes = unsafe UnsafeMutableRawBufferPointer(rebasing: buffer)
     let ms = MutableSpan(_unsafeBytes: bytes)
-    self = _overrideLifetime(ms, borrowing: buffer)
+    self = unsafe _overrideLifetime(ms, borrowing: buffer)
   }
 }
 
@@ -147,10 +150,13 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(borrow mutableSpan)
   public init(_unsafeMutableSpan mutableSpan: borrowing MutableSpan<Element>) {
-    let pointer = mutableSpan._pointer?.assumingMemoryBound(to: Element.self)
-    let buffer = UnsafeBufferPointer(start: pointer, count: mutableSpan.count)
+    let pointer =
+      unsafe mutableSpan._pointer?.assumingMemoryBound(to: Element.self)
+    let buffer = unsafe UnsafeBufferPointer(
+      start: pointer, count: mutableSpan.count
+    )
     let span = Span(_unsafeElements: buffer)
-    self = _overrideLifetime(span, borrowing: mutableSpan)
+    self = unsafe _overrideLifetime(span, borrowing: mutableSpan)
   }
 }
 
@@ -175,42 +181,20 @@ extension RawSpan {
   ) {
     let pointer = mutableSpan._pointer
     let byteCount = mutableSpan.count &* MemoryLayout<Element>.stride
-    let buffer = UnsafeRawBufferPointer(start: pointer, count: byteCount)
+    let buffer = unsafe UnsafeRawBufferPointer(start: pointer, count: byteCount)
     let rawSpan = RawSpan(_unsafeBytes: buffer)
-    self = _overrideLifetime(rawSpan, borrowing: mutableSpan)
+    self = unsafe _overrideLifetime(rawSpan, borrowing: mutableSpan)
   }
 }
 
-//@available(SwiftStdlib 6.2, *)
-//extension MutableSpan where Element: Equatable {
-//
-//  @_alwaysEmitIntoClient
-//  public func _elementsEqual(_ other: borrowing Self) -> Bool {
-//    _elementsEqual(Span(_unsafeMutableSpan: other))
-//  }
-//
-//  @_alwaysEmitIntoClient
-//  public func _elementsEqual(_ other: Span<Element>) -> Bool {
-//    Span(_unsafeMutableSpan: self)._elementsEqual(other)
-//  }
-//
-//  @_alwaysEmitIntoClient
-//  public func _elementsEqual(_ other: some Collection<Element>) -> Bool {
-//    Span(_unsafeMutableSpan: self)._elementsEqual(other)
-//  }
-//
-//  @_alwaysEmitIntoClient
-//  public func _elementsEqual(_ other: some Sequence<Element>) -> Bool {
-//    Span(_unsafeMutableSpan: self)._elementsEqual(other)
-//  }
-//}
-//
 @available(SwiftStdlib 6.2, *)
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   public var _description: String {
-    let addr = String(UInt(bitPattern: _pointer), radix: 16, uppercase: false)
+    let addr = String(
+      unsafe UInt(bitPattern: _pointer), radix: 16, uppercase: false
+    )
     return "(0x\(addr), \(_count))"
   }
 }
@@ -261,11 +245,11 @@ extension MutableSpan where Element: ~Copyable {
   public subscript(_ position: Index) -> Element {
     unsafeAddress {
       _precondition(indices.contains(position), "index out of bounds")
-      return UnsafePointer(_unsafeAddressOfElement(unchecked: position))
+      return unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
     unsafeMutableAddress {
       _precondition(indices.contains(position), "index out of bounds")
-       return _unsafeAddressOfElement(unchecked: position)
+       return unsafe _unsafeAddressOfElement(unchecked: position)
     }
   }
 
@@ -277,13 +261,14 @@ extension MutableSpan where Element: ~Copyable {
   ///     must be greater or equal to zero, and less than `count`.
   ///
   /// - Complexity: O(1)
+  @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
     unsafeAddress {
-      UnsafePointer(_unsafeAddressOfElement(unchecked: position))
+      unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
     unsafeMutableAddress {
-      _unsafeAddressOfElement(unchecked: position)
+      unsafe _unsafeAddressOfElement(unchecked: position)
     }
   }
 
@@ -293,8 +278,8 @@ extension MutableSpan where Element: ~Copyable {
     unchecked position: Index
   ) -> UnsafeMutablePointer<Element> {
     let elementOffset = position &* MemoryLayout<Element>.stride
-    let address = _start().advanced(by: elementOffset)
-    return address.assumingMemoryBound(to: Element.self)
+    let address = unsafe _start().advanced(by: elementOffset)
+    return unsafe address.assumingMemoryBound(to: Element.self)
   }
 }
 
@@ -305,16 +290,17 @@ extension MutableSpan where Element: ~Copyable {
   public mutating func swapAt(_ i: Index, _ j: Index) {
     _precondition(indices.contains(Index(i)))
     _precondition(indices.contains(Index(j)))
-    swapAt(unchecked: i, unchecked: j)
+    unsafe swapAt(unchecked: i, unchecked: j)
   }
 
+  @unsafe
   @_alwaysEmitIntoClient
   public mutating func swapAt(unchecked i: Index, unchecked j: Index) {
-    let pi = _unsafeAddressOfElement(unchecked: i)
-    let pj = _unsafeAddressOfElement(unchecked: j)
-    let temporary = pi.move()
-    pi.initialize(to: pj.move())
-    pj.initialize(to: consume temporary)
+    let pi = unsafe _unsafeAddressOfElement(unchecked: i)
+    let pj = unsafe _unsafeAddressOfElement(unchecked: j)
+    let temporary = unsafe pi.move()
+    unsafe pi.initialize(to: pj.move())
+    unsafe pj.initialize(to: consume temporary)
   }
 }
 
@@ -331,11 +317,11 @@ extension MutableSpan where Element: BitwiseCopyable {
   public subscript(_ position: Index) -> Element {
     get {
       _precondition(indices.contains(position), "index out of bounds")
-      return self[unchecked: position]
+      return unsafe self[unchecked: position]
     }
     set {
       _precondition(indices.contains(position), "index out of bounds")
-      self[unchecked: position] = newValue
+      unsafe self[unchecked: position] = newValue
     }
   }
 
@@ -347,15 +333,20 @@ extension MutableSpan where Element: BitwiseCopyable {
   ///     must be greater or equal to zero, and less than `count`.
   ///
   /// - Complexity: O(1)
+  @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
     get {
       let offset = position&*MemoryLayout<Element>.stride
-      return _start().loadUnaligned(fromByteOffset: offset, as: Element.self)
+      return unsafe _start().loadUnaligned(
+        fromByteOffset: offset, as: Element.self
+      )
     }
     set {
       let offset = position&*MemoryLayout<Element>.stride
-      _start().storeBytes(of: newValue, toByteOffset: offset, as: Element.self)
+      unsafe _start().storeBytes(
+        of: newValue, toByteOffset: offset, as: Element.self
+      )
     }
   }
 }
@@ -373,18 +364,20 @@ extension MutableSpan where Element: ~Copyable {
 
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
-  public mutating func withUnsafeMutableBufferPointer<E: Error, Result: ~Copyable>(
+  public mutating func withUnsafeMutableBufferPointer<
+    E: Error, Result: ~Copyable
+  >(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
     guard let pointer = _pointer, count > 0 else {
-      return try body(.init(start: nil, count: 0))
+      return try unsafe body(.init(start: nil, count: 0))
     }
     // bind memory by hand to sidestep alignment concerns
     let binding = Builtin.bindMemory(
       pointer._rawValue, count._builtinWordValue, Element.self
     )
     defer { Builtin.rebindMemory(pointer._rawValue, binding) }
-    return try body(.init(start: .init(pointer._rawValue), count: count))
+    return try unsafe body(.init(start: .init(pointer._rawValue), count: count))
   }
 }
 
@@ -404,11 +397,11 @@ extension MutableSpan where Element: BitwiseCopyable {
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    let bytes = UnsafeMutableRawBufferPointer(
+    let bytes = unsafe UnsafeMutableRawBufferPointer(
       start: (_count == 0) ? nil : _start(),
       count: _count &* MemoryLayout<Element>.stride
     )
-    return try body(bytes)
+    return try unsafe body(bytes)
   }
 }
 
@@ -418,8 +411,8 @@ extension MutableSpan {
 
   @_alwaysEmitIntoClient
   public mutating func update(repeating repeatedValue: consuming Element) {
-    _start().withMemoryRebound(to: Element.self, capacity: count) {
-      $0.update(repeating: repeatedValue, count: count)
+    unsafe _start().withMemoryRebound(to: Element.self, capacity: count) {
+      unsafe $0.update(repeating: repeatedValue, count: count)
     }
   }
 
@@ -439,7 +432,7 @@ extension MutableSpan {
     var index = 0
     while index < _count {
       guard let element = elements.next() else { break }
-      self[unchecked: index] = element
+      unsafe self[unchecked: index] = element
       index &+= 1
     }
     return index
@@ -474,9 +467,11 @@ extension MutableSpan {
       source.count <= self.count,
       "destination span cannot contain every element from source."
     )
-    _start().withMemoryRebound(to: Element.self, capacity: source.count) { dest in
+    unsafe _start().withMemoryRebound(
+      to: Element.self, capacity: source.count
+    ) { dest in
       source.withUnsafeBufferPointer {
-        dest.update(from: $0.baseAddress!, count: $0.count)
+        unsafe dest.update(from: $0.baseAddress!, count: $0.count)
       }
     }
     return source.count
@@ -517,7 +512,7 @@ extension MutableSpan where Element: ~Copyable {
 //    let source = OutputSpan(_initializing: source, initialized: source.count)
 //    return self.moveUpdate(fromContentsOf: source)
     withUnsafeMutableBufferPointer {
-      $0.moveUpdate(fromContentsOf: source)
+      unsafe $0.moveUpdate(fromContentsOf: source)
     }
   }
 }
@@ -529,7 +524,9 @@ extension MutableSpan {
   public mutating func moveUpdate(
     fromContentsOf source: Slice<UnsafeMutableBufferPointer<Element>>
   ) -> Index {
-    moveUpdate(fromContentsOf: UnsafeMutableBufferPointer(rebasing: source))
+    unsafe moveUpdate(
+      fromContentsOf: UnsafeMutableBufferPointer(rebasing: source)
+    )
   }
 }
 
@@ -544,7 +541,8 @@ extension MutableSpan where Element: BitwiseCopyable {
     // rebind _start manually in order to avoid assumptions about alignment.
     let rp = _start()._rawValue
     let binding = Builtin.bindMemory(rp, count._builtinWordValue, Element.self)
-    UnsafeMutablePointer(rp).update(repeating: repeatedValue, count: count)
+    let rebound = unsafe UnsafeMutablePointer<Element>(rp)
+    unsafe rebound.update(repeating: repeatedValue, count: count)
     Builtin.rebindMemory(rp, binding)
   }
 
@@ -565,7 +563,7 @@ extension MutableSpan where Element: BitwiseCopyable {
     var index = 0
     while index < _count {
       guard let element = elements.next() else { break }
-      self[unchecked: index] = element
+      unsafe self[unchecked: index] = element
       index &+= 1
     }
     return index
@@ -603,8 +601,9 @@ extension MutableSpan where Element: BitwiseCopyable {
       "destination span cannot contain every element from source."
     )
     source.withUnsafeBufferPointer {
-      _start().copyMemory(
-        from: $0.baseAddress!, byteCount: $0.count&*MemoryLayout<Element>.stride
+      unsafe _start().copyMemory(
+        from: $0.baseAddress!,
+        byteCount: $0.count &* MemoryLayout<Element>.stride
       )
     }
     return source.count
@@ -643,7 +642,7 @@ extension MutableSpan where Element: ~Copyable {
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
       "Index range out of bounds"
     )
-    return _extracting(unchecked: bounds)
+    return unsafe _extracting(unchecked: bounds)
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -666,9 +665,9 @@ extension MutableSpan where Element: ~Copyable {
   @lifetime(borrow self)
   mutating public func _extracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
-    let newStart = _pointer?.advanced(by: delta)
+    let newStart = unsafe _pointer?.advanced(by: delta)
     let newSpan = Self(_unchecked: newStart, count: bounds.count)
-    return _overrideLifetime(newSpan, mutating: &self)
+    return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -713,7 +712,7 @@ extension MutableSpan where Element: ~Copyable {
   mutating public func _extracting(
     unchecked bounds: some RangeExpression<Index>
   ) -> Self {
-    _extracting(unchecked: bounds.relative(to: indices))
+    unsafe _extracting(unchecked: bounds.relative(to: indices))
   }
 
   @_alwaysEmitIntoClient
@@ -724,7 +723,7 @@ extension MutableSpan where Element: ~Copyable {
     let range = Range(
       _uncheckedBounds: (bounds.lowerBound, bounds.upperBound&+1)
     )
-    return _extracting(unchecked: range)
+    return unsafe _extracting(unchecked: range)
   }
 
   /// Constructs a new span over all the items of this span.
@@ -740,7 +739,7 @@ extension MutableSpan where Element: ~Copyable {
   @lifetime(borrow self)
   mutating public func _extracting(_: UnboundedRange) -> Self {
     let newSpan = Self(_unchecked: _start(), count: _count)
-    return _overrideLifetime(newSpan, mutating: &self)
+    return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 }
 
@@ -769,7 +768,7 @@ extension MutableSpan where Element: ~Copyable {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
     let newSpan = Self(_unchecked: _pointer, count: newCount)
-    return _overrideLifetime(newSpan, mutating: &self)
+    return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 
   /// Returns a span over all but the given number of trailing elements.
@@ -792,7 +791,7 @@ extension MutableSpan where Element: ~Copyable {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let newSpan = Self(_unchecked: _pointer, count: count &- droppedCount)
-    return _overrideLifetime(newSpan, mutating: &self)
+    return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 
   /// Returns a span containing the final elements of the span,
@@ -816,9 +815,9 @@ extension MutableSpan where Element: ~Copyable {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, count)
     let offset = (count &- newCount) * MemoryLayout<Element>.stride
-    let newStart = _pointer?.advanced(by: offset)
+    let newStart = unsafe _pointer?.advanced(by: offset)
     let newSpan = Self(_unchecked: newStart, count: newCount)
-    return _overrideLifetime(newSpan, mutating: &self)
+    return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 
   /// Returns a span over all but the given number of initial elements.
@@ -841,8 +840,8 @@ extension MutableSpan where Element: ~Copyable {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let offset = droppedCount * MemoryLayout<Element>.stride
-    let newStart = _pointer?.advanced(by: offset)
+    let newStart = unsafe _pointer?.advanced(by: offset)
     let newSpan = Self(_unchecked: newStart, count: count &- droppedCount)
-    return _overrideLifetime(newSpan, mutating: &self)
+    return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 }
