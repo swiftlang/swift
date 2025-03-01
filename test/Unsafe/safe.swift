@@ -175,6 +175,23 @@ func testUnsafePositionError() -> Int {
   return 3 + unsafe unsafeInt() // expected-error{{'unsafe' cannot appear to the right of a non-assignment operator}}
 }
 
+enum Color {
+case red
+}
+
+func unsafeFun() {
+  var unsafe = true
+  unsafe = false
+  unsafe.toggle()
+  _ = [unsafe]
+  _ = { unsafe }
+
+  let color: Color
+  // expected-warning@+1{{no unsafe operations occur within 'unsafe' expression}}
+  color = unsafe .red
+  _ = color
+}
+
 // @safe suppresses unsafe-type-related diagnostics on an entity
 struct MyArray<Element> {
   @safe func withUnsafeBufferPointer<R, E>(

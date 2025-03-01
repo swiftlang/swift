@@ -437,8 +437,10 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   }
 
   if (Tok.isContextualKeyword("unsafe") &&
-      !peekToken().isAtStartOfLine() &&
-      !peekToken().is(tok::r_paren)) {
+      !(peekToken().isAtStartOfLine() ||
+        peekToken().isAny(tok::r_paren, tok::r_brace, tok::r_square,
+                          tok::equal) ||
+        peekToken().is(tok::period))) {
     Tok.setKind(tok::contextual_keyword);
     SourceLoc unsafeLoc = consumeToken();
     ParserResult<Expr> sub =
