@@ -15,16 +15,6 @@ class D : C {
 class E {
 }
 
-// CHECK-LABEL: sil @test_unconditional_checked_cast
-// CHECK: bb0
-// CHECK-NEXT: unchecked_ref_cast
-// CHECK-NEXT: return
-sil @test_unconditional_checked_cast : $@convention(thin) <T_0_0, T_0_1> (RawBuffer) -> HeapBufferStorage<T_0_0, T_0_1> {
-bb0(%0 : $RawBuffer):
-  %3 = unconditional_checked_cast %0 : $RawBuffer to HeapBufferStorage<T_0_0, T_0_1>
-  return %3 : $HeapBufferStorage<T_0_0, T_0_1>
-}
-
 // CHECK-LABEL: sil @test_cond_fail
 // CHECK: bb0
 // CHECK-NEXT: tuple ()
@@ -62,19 +52,3 @@ bb0(%0 : $C):
   return %3 : $C
 }
 
-protocol Class : class {
-}
-
-class G : Class {
-}
-
-// CHECK-LABEL: sil @test_unconditional_checked_cast_class_exist
-// CHECK: unchecked_ref_cast
-// CHECK: return
-sil @test_unconditional_checked_cast_class_exist : $@convention(thin) (@owned Class) -> @owned G {
-bb0(%0 : $Class):
-  strong_retain %0 : $Class
-  %2 = unconditional_checked_cast %0 : $Class to G
-  strong_release %0 : $Class
-  return %2 : $G
-}

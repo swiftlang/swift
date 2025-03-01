@@ -66,15 +66,20 @@
 #endif
 
 /// SWIFT_SILCOMBINE_PASS(Inst)
-///   Similar to SWIFT_FUNCTION_PASS, but defines an instruction pass which is
-///   implemented in swift and is run by the SILCombiner.
+///   Similar to SWIFT_FUNCTION_PASS, but defines an instruction simplification
+///   which is implemented in swift and is run by the SILCombiner.
 ///   The \p Inst argument specifies the instruction class.
 ///
 ///   No further code is need on the C++ side. On the swift side an instruction
-///   pass must be registered for the instruction class with 'registerPass()'.
+///   simplification must be registered for the instruction class with
+///   `registerForSILCombine`.
 ///
 #ifndef SWIFT_SILCOMBINE_PASS
 #define SWIFT_SILCOMBINE_PASS(Inst)
+#endif
+
+#ifndef SWIFT_SILCOMBINE_PASS_WITH_LEGACY
+#define SWIFT_SILCOMBINE_PASS_WITH_LEGACY(Inst)
 #endif
 
 /// PASS_RANGE(RANGE_ID, START, END)
@@ -534,10 +539,16 @@ SWIFT_SILCOMBINE_PASS(DestructureTupleInst)
 SWIFT_SILCOMBINE_PASS(PointerToAddressInst)
 SWIFT_SILCOMBINE_PASS(TypeValueInst)
 SWIFT_SILCOMBINE_PASS(UncheckedEnumDataInst)
+SWIFT_SILCOMBINE_PASS(WitnessMethodInst)
+SWIFT_SILCOMBINE_PASS_WITH_LEGACY(AllocStackInst)
+SWIFT_SILCOMBINE_PASS_WITH_LEGACY(UnconditionalCheckedCastInst)
+SWIFT_SILCOMBINE_PASS_WITH_LEGACY(ApplyInst)
+SWIFT_SILCOMBINE_PASS_WITH_LEGACY(TryApplyInst)
 
 #undef IRGEN_PASS
 #undef SWIFT_MODULE_PASS
 #undef SWIFT_FUNCTION_PASS
 #undef SWIFT_SILCOMBINE_PASS
+#undef SWIFT_SILCOMBINE_PASS_WITH_LEGACY
 #undef PASS
 #undef PASS_RANGE

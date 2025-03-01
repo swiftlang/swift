@@ -610,8 +610,7 @@ void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
   passesRegistered = true;
 }
 
-#define SWIFT_SILCOMBINE_PASS(INST) \
-SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
+#define _RUN_SWIFT_SIMPLIFICATON(INST) \
   static BridgedInstructionPassRunFn runFunction = nullptr;                \
   static bool passDisabled = false;                                        \
   if (!runFunction) {                                                      \
@@ -633,11 +632,27 @@ SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
   }                                                                        \
   runSwiftInstructionPass(inst, runFunction);                              \
   return nullptr;                                                          \
+
+#define SWIFT_SILCOMBINE_PASS(INST) \
+SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
+  _RUN_SWIFT_SIMPLIFICATON(INST)                                           \
+}                                                                          \
+
+#define SWIFT_SILCOMBINE_PASS_WITH_LEGACY(INST) \
+SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
+  if (auto *result = legacyVisit##INST(inst))                              \
+    return result;                                                         \
+  if (!inst->isDeleted()) {                                                \
+    _RUN_SWIFT_SIMPLIFICATON(INST)                                         \
+  }                                                                        \
+  return nullptr;                                                          \
 }                                                                          \
 
 #define PASS(ID, TAG, DESCRIPTION)
 
 #include "swift/SILOptimizer/PassManager/Passes.def"
+
+#undef _RUN_SWIFT_SIMPLIFICATON
 
 //===----------------------------------------------------------------------===//
 //                                Entry Points
