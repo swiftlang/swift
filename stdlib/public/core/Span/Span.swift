@@ -444,16 +444,6 @@ extension Span where Element: ~Copyable {
 
 @available(SwiftStdlib 6.1, *)
 extension Span where Element: BitwiseCopyable {
-  @_semantics("fixed_storage.check_index")
-  @inline(__always)
-  @_alwaysEmitIntoClient
-  internal func _checkIndex(_ position: Index) {
-    _precondition(
-      UInt(bitPattern: position) <  UInt(bitPattern: _count),
-      "Index out of bounds"
-    )
-  }
-
   /// Accesses the element at the specified position in the `Span`.
   ///
   /// - Parameter position: The offset of the element to access. `position`
