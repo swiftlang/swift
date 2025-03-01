@@ -2197,38 +2197,6 @@ namespace {
             loc, std::nullopt, nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
-      // We have to do this after populating ImportedDecls to avoid importing
-      // the same multiple times.
-      if (Impl.SwiftContext.LangOpts.hasFeature(
-              Feature::StrictMemorySafety)) {
-        if (const auto *ctsd =
-                dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
-          for (auto arg : ctsd->getTemplateArgs().asArray()) {
-            llvm::SmallVector<clang::TemplateArgument, 1> nonPackArgs;
-            if (arg.getKind() == clang::TemplateArgument::Pack) {
-              auto pack = arg.getPackAsArray();
-              nonPackArgs.assign(pack.begin(), pack.end());
-            } else {
-              nonPackArgs.push_back(arg);
-            }
-            for (auto realArg : nonPackArgs) {
-              if (realArg.getKind() != clang::TemplateArgument::Type)
-                continue;
-              auto SwiftType = Impl.importTypeIgnoreIUO(
-                  realArg.getAsType(), ImportTypeKind::Abstract,
-                  [](Diagnostic &&diag) {}, false, Bridgeability::None,
-                  ImportTypeAttrs());
-              if (SwiftType && SwiftType->isUnsafe()) {
-                auto attr =
-                    new (Impl.SwiftContext) UnsafeAttr(/*implicit=*/true);
-                result->getAttrs().add(attr);
-                break;
-              }
-            }
-          }
-        }
-      }
-
       if (recordHasMoveOnlySemantics(decl)) {
         if (decl->isInStdNamespace() && decl->getName() == "promise") {
           // Do not import std::promise.
@@ -2236,16 +2204,6 @@ namespace {
         }
         result->getAttrs().add(new (Impl.SwiftContext)
                                    MoveOnlyAttr(/*Implicit=*/true));
-      }
-
-      bool isNonEscapable = false;
-      if (evaluateOrDefault(
-              Impl.SwiftContext.evaluator,
-              ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
-              CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
-        result->getAttrs().add(new (Impl.SwiftContext)
-                                   NonEscapableAttr(/*Implicit=*/true));
-        isNonEscapable = true;
       }
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
@@ -2257,6 +2215,44 @@ namespace {
             Impl.importDecl(baseRecordDecl, getVersion());
           }
         }
+      }
+
+      // We have to do this after populating ImportedDecls to avoid importing
+      // the same decl multiple times. Also after we imported the bases.
+      if (const auto *ctsd =
+              dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
+        for (auto arg : ctsd->getTemplateArgs().asArray()) {
+          llvm::SmallVector<clang::TemplateArgument, 1> nonPackArgs;
+          if (arg.getKind() == clang::TemplateArgument::Pack) {
+            auto pack = arg.getPackAsArray();
+            nonPackArgs.assign(pack.begin(), pack.end());
+          } else {
+            nonPackArgs.push_back(arg);
+          }
+          for (auto realArg : nonPackArgs) {
+            if (realArg.getKind() != clang::TemplateArgument::Type)
+              continue;
+            auto SwiftType = Impl.importTypeIgnoreIUO(
+                realArg.getAsType(), ImportTypeKind::Abstract,
+                [](Diagnostic &&diag) {}, false, Bridgeability::None,
+                ImportTypeAttrs());
+            if (SwiftType && SwiftType->isUnsafe()) {
+              auto attr = new (Impl.SwiftContext) UnsafeAttr(/*implicit=*/true);
+              result->getAttrs().add(attr);
+              break;
+            }
+          }
+        }
+      }
+
+      bool isNonEscapable = false;
+      if (evaluateOrDefault(
+              Impl.SwiftContext.evaluator,
+              ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
+              CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
+        result->getAttrs().add(new (Impl.SwiftContext)
+                                   NonEscapableAttr(/*Implicit=*/true));
+        isNonEscapable = true;
       }
 
       // Import each of the members.
@@ -2965,7 +2961,7 @@ namespace {
         }
       }
 
-      // It is import that we bail on an unimportable record *before* we import
+      // It is important that we bail on an unimportable record *before* we import
       // any of its members or cache the decl.
       auto semanticsKind = evaluateOrDefault(
           Impl.SwiftContext.evaluator,

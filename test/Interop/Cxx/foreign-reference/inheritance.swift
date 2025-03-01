@@ -50,7 +50,7 @@ FrtInheritanceTestSuite.test("ParentChild") {
 
   let derivedFromImmortalRefType = ImmortalRefereceExample.returnDerivedFromImmortalRefType()
   expectTrue(
-    !(type(of: derivedFromImmortalRefType) is AnyObject.Type),
+    type(of: derivedFromImmortalRefType) is AnyObject.Type,
     "Expected derivedFromImmortalRefType to be a value type, but it’s a reference type")
 
   let valType = ExplicitAnnotationHasPrecedence1.returnValueType()

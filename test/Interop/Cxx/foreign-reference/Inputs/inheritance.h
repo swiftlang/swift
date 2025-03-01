@@ -80,9 +80,7 @@ __attribute__((swift_attr("release:immortal"))) ImmortalRefType {};
 
 ImmortalRefType *returnImmortalRefType() { return new ImmortalRefType(); };
 
-// Doubt: Is it fine to not infer in the case of SWIFT_IMMORTAL_REFERENCE
-// rdar://145193396
-struct DerivedFromImmortalRefType : ImmortalRefType {}; // expected-warning {{unable to infer SWIFT_SHARED_REFERENCE for 'DerivedFromImmortalRefType', although one of its transitive base types is marked as SWIFT_SHARED_REFERENCE}}
+struct DerivedFromImmortalRefType : ImmortalRefType {};
 DerivedFromImmortalRefType *returnDerivedFromImmortalRefType() {
     return new DerivedFromImmortalRefType();
 };
@@ -284,7 +282,8 @@ __attribute__((swift_attr("retain:sameretain")))
 __attribute__((swift_attr("release:samerelease"))) B2 {};  // expected-error {{multiple functions 'sameretain' found; there must be exactly one retain function for reference type 'B2'}}
                                                             // expected-error@-1 {{multiple functions 'samerelease' found; there must be exactly one release function for reference type 'B2'}}
 
-struct D : B1, B2 {}; // expected-warning {{unable to infer SWIFT_SHARED_REFERENCE for 'D', although one of its transitive base types is marked as SWIFT_SHARED_REFERENCE}}
+struct D : B1, B2 {}; // expected-error {{multiple functions 'sameretain' found; there must be exactly one retain function for reference type 'D'}}
+                      // expected-error@-1 {{multiple functions 'samerelease' found; there must be exactly one release function for reference type 'D'}}
 D *returnD() { return new D(); };
 } // namespace OverloadedRetainRelease
 
