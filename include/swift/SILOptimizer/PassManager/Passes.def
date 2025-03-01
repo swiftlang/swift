@@ -86,8 +86,8 @@
 
 SWIFT_FUNCTION_PASS(AliasInfoDumper, "dump-alias-info",
      "Dump Alias Analysis over all Pairs")
-PASS(ABCOpt, "abcopts",
-     "Array Bounds Check Optimization")
+PASS(BoundsCheckOpts, "bcopts",
+     "Bounds Check Optimization")
 PASS(AccessEnforcementDom, "access-enforcement-dom",
      "Remove dominated access checks with no nested conflict")
 PASS(AccessEnforcementOpts, "access-enforcement-opts",

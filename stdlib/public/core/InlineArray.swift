@@ -235,7 +235,8 @@ extension InlineArray where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
-  @_transparent
+  @_semantics("fixed_storage.get_count")
+  @inline(__always)
   public var count: Int {
     count
   }
@@ -320,6 +321,13 @@ extension InlineArray where Element: ~Copyable {
     i &- 1
   }
 
+  @_alwaysEmitIntoClient
+  @_semantics("fixed_storage.check_index")
+  @inline(__always)
+  internal func _checkIndex(_ i: Int) {
+    _precondition(indices.contains(i), "Index out of bounds")
+  }
+
   /// Accesses the element at the specified position.
   ///
   /// The following example accesses an element of an array through its
@@ -345,15 +353,13 @@ extension InlineArray where Element: ~Copyable {
   public subscript(_ i: Int) -> Element {
     @_transparent
     unsafeAddress {
-      _precondition(indices.contains(i), "Index out of bounds")
-
+      _checkIndex(i)
       return unsafe _address + i
     }
 
     @_transparent
     unsafeMutableAddress {
-      _precondition(indices.contains(i), "Index out of bounds")
-
+       _checkIndex(i)
       return unsafe _mutableAddress + i
     }
   }

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -abcopts %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -bcopts %s | %FileCheck %s
 
 sil_stage canonical
 

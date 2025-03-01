@@ -594,6 +594,11 @@ SemanticFunctionLevel swift::getSemanticFunctionLevel(SILFunction *function) {
   //
   // Compiler "hints" and informational annotations (like remarks) should
   // ideally use a separate annotation rather than @_semantics.
+
+  if (isFixedStorageSemanticsCallKind(function)) {
+    return SemanticFunctionLevel::Fundamental;
+  }
+
   switch (getArraySemanticsKind(function)) {
   case ArrayCallKind::kNone:
     return SemanticFunctionLevel::Transient;
