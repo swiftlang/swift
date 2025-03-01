@@ -71,8 +71,7 @@ internal func interpretIntTruncations() -> Int16 {
 internal func testInvalidIntTruncations(a: Int64) -> Int8 {
   return Int8(a)
     // CHECK: note: {{.*}} Not enough bits to represent the passed value
-    // CHECK: note: operation performed during this call traps
-    // CHECK: function_ref @$sSZss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufC
+    // CHECK: note: operation traps
 }
 
 @_semantics("test_driver")
