@@ -271,7 +271,7 @@ func iosIsClosestThanMacOS() {}
 // platform it validates the availability.
 @available(iOS 8.0, iDishwasherOS 22.0, iOS 9.0, *)
 // expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
-// expected-error@-2 {{version for 'iOS' already specified}}
+// expected-error@-2 {{version for iOS already specified}}
 func shortFormWithUnrecognizedPlatformContinueValidating() {
 }
 

@@ -72,6 +72,7 @@ namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
+  class AvailabilityDomain;
   class AvailabilityMacroMap;
   class AvailabilityRange;
   class BoundGenericType;
@@ -1596,9 +1597,10 @@ private:
 public:
   clang::DarwinSDKInfo *getDarwinSDKInfo() const;
 
-  /// Returns the string to use in diagnostics when printing the platform being
-  /// targetted.
-  StringRef getTargetPlatformStringForDiagnostics() const;
+  /// Returns the availability domain corresponding to the target triple. If
+  /// there isn't a `PlatformKind` associated with the current target triple,
+  /// then this returns the universal domain (`*`).
+  AvailabilityDomain getTargetAvailabilityDomain() const;
 };
 
 } // end namespace swift

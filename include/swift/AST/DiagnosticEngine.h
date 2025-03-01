@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
 #include "swift/AST/ActorIsolation.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
@@ -143,6 +144,7 @@ namespace swift {
     DescriptiveDeclKind,
     DescriptiveStmtKind,
     DeclAttribute,
+    AvailabilityDomain,
     VersionTuple,
     LayoutConstraint,
     ActorIsolation,
@@ -179,6 +181,7 @@ namespace swift {
       DescriptiveDeclKind DescriptiveDeclKindVal;
       StmtKind DescriptiveStmtKindVal;
       const DeclAttribute *DeclAttributeVal;
+      AvailabilityDomain AvailabilityDomainVal;
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
       ActorIsolation ActorIsolationVal;
@@ -277,6 +280,10 @@ namespace swift {
     DiagnosticArgument(const DeclAttribute *attr)
         : Kind(DiagnosticArgumentKind::DeclAttribute),
           DeclAttributeVal(attr) {}
+
+    DiagnosticArgument(const AvailabilityDomain domain)
+        : Kind(DiagnosticArgumentKind::AvailabilityDomain),
+          AvailabilityDomainVal(domain) {}
 
     DiagnosticArgument(llvm::VersionTuple version)
       : Kind(DiagnosticArgumentKind::VersionTuple),
@@ -398,6 +405,11 @@ namespace swift {
     const DeclAttribute *getAsDeclAttribute() const {
       assert(Kind == DiagnosticArgumentKind::DeclAttribute);
       return DeclAttributeVal;
+    }
+
+    const AvailabilityDomain getAsAvailabilityDomain() const {
+      assert(Kind == DiagnosticArgumentKind::AvailabilityDomain);
+      return AvailabilityDomainVal;
     }
 
     llvm::VersionTuple getAsVersionTuple() const {

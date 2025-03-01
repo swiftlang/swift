@@ -45,5 +45,5 @@ public func noVersionMulti() {}
 // CHECK-NEXT: _incorrectCase
 
 // FIXME: [availability] Diagnostic needs improvement
-// CHECK: -define-availability argument:1:13: warning: expected 'introduced', 'deprecated', or 'obsoleted' in 'available' attribute for platform 'macOS'
+// CHECK: -define-availability argument:1:13: warning: expected 'introduced', 'deprecated', or 'obsoleted' in '@available' attribute for macOS
 // CHECK-NEXT: _noVersion: macOS

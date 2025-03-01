@@ -18,11 +18,11 @@ func asyncReplacement() async -> Int { }
 @available(*, noasync, renamed: "IOActor.readString()")
 func readStringFromIO() -> String {}
 
-// expected-warning@+1 {{'noasync' cannot be used in 'available' attribute for platform 'swift'}}
+// expected-warning@+1 {{'noasync' cannot be used in '@available' attribute for Swift}}
 @available(swift, noasync)
 func swiftNoAsync() { }
 
-// expected-warning@+1 {{'noasync' cannot be used in 'available' attribute for platform '_PackageDescription'}}
+// expected-warning@+1 {{'noasync' cannot be used in '@available' attribute for PackageDescription}}
 @available(_PackageDescription, noasync)
 func packageDescriptionNoAsync() { }
 

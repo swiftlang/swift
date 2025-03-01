@@ -1040,15 +1040,16 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 /// is allowed.
 std::optional<Diagnostic> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
 
-bool checkAvailability(
-    SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
-    const DeclContext *ReferenceDC,
-    llvm::function_ref<InFlightDiagnostic(StringRef, llvm::VersionTuple)>
-        Diagnose);
+bool checkAvailability(SourceRange ReferenceRange,
+                       AvailabilityRange RequiredAvailability,
+                       const DeclContext *ReferenceDC,
+                       llvm::function_ref<InFlightDiagnostic(
+                           AvailabilityDomain, llvm::VersionTuple)>
+                           Diagnose);
 
 bool checkAvailability(SourceRange ReferenceRange,
                        AvailabilityRange RequiredAvailability,
-                       Diag<StringRef, llvm::VersionTuple> Diag,
+                       Diag<AvailabilityDomain, llvm::VersionTuple> Diag,
                        const DeclContext *ReferenceDC);
 
 void checkConcurrencyAvailability(SourceRange ReferenceRange,
