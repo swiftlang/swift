@@ -51,6 +51,7 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
 
   for (auto *constraint : info.Constraints) {
     switch (constraint->getKind()) {
+    case ConstraintKind::NonisolatedConformsTo:
     case ConstraintKind::ConformsTo:
       if (constraint->getSecondType()->is<ProtocolType>())
         Protocols.push_back(constraint);
@@ -256,7 +257,8 @@ bool BindingSet::isPotentiallyIncomplete() const {
     // that's done as a last resort effort at resolving first member.
     if (auto *constraint = binding.getSource()) {
       if (binding.BindingType->is<ProtocolType>() &&
-          constraint->getKind() == ConstraintKind::ConformsTo)
+          (constraint->getKind() == ConstraintKind::ConformsTo ||
+           constraint->getKind() == ConstraintKind::NonisolatedConformsTo))
         return true;
     }
   }
@@ -1941,6 +1943,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::Defaultable:

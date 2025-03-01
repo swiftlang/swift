@@ -905,7 +905,7 @@ void TypeChecker::diagnoseRequirementFailure(
   const auto &req = reqFailureInfo.Req;
   const auto &substReq = reqFailureInfo.SubstReq;
 
-  Diag<Type, Type, Type> diagnostic;
+  std::optional<Diag<Type, Type, Type>> diagnostic;
   Diag<Type, Type, StringRef> diagnosticNote;
 
   const auto reqKind = req.getKind();
@@ -923,6 +923,24 @@ void TypeChecker::diagnoseRequirementFailure(
     break;
 
   case RequirementKind::Conformance: {
+    // If this was a failure due to isolated conformances conflicting with
+    // a Sendable or MetatypeSendable requirement, diagnose that.
+    if (reqFailureInfo.IsolatedConformanceProto) {
+      ASTContext &ctx =
+          reqFailureInfo.IsolatedConformanceProto->getASTContext();
+      auto isolatedConformance = reqFailureInfo.IsolatedConformances.front();
+      ctx.Diags.diagnose(
+          errorLoc, diag::isolated_conformance_with_sendable,
+          isolatedConformance->getType(),
+          isolatedConformance->getProtocol()->getName(),
+          reqFailureInfo
+            .IsolatedConformanceProto->isSpecificProtocol(
+              KnownProtocolKind::SendableMetatype),
+          req.getFirstType());
+      diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+      break;
+    }
+
     diagnoseConformanceFailure(substReq.getFirstType(),
                                substReq.getProtocolDecl(), nullptr, errorLoc);
 
@@ -951,9 +969,12 @@ void TypeChecker::diagnoseRequirementFailure(
   }
 
   ASTContext &ctx = targetTy->getASTContext();
-  // FIXME: Poor source-location information.
-  ctx.Diags.diagnose(errorLoc, diagnostic, targetTy, substReq.getFirstType(),
-                     substSecondTy);
+
+  if (diagnostic) {
+    // FIXME: Poor source-location information.
+    ctx.Diags.diagnose(errorLoc, *diagnostic, targetTy, substReq.getFirstType(),
+                       substSecondTy);
+  }
 
   const auto genericParamBindingsText = gatherGenericParamBindingsText(
       {req.getFirstType(), secondTy}, genericParams, substitutions);
@@ -966,6 +987,7 @@ void TypeChecker::diagnoseRequirementFailure(
 }
 
 CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
+    GenericSignature signature,
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions) {
   using ParentConditionalConformances =
@@ -1004,7 +1026,9 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     auto substReq = item.SubstReq;
 
     SmallVector<Requirement, 2> subReqs;
-    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true)) {
+    SmallVector<ProtocolConformance *, 2> isolatedConformances;
+    switch (substReq.checkRequirement(subReqs, /*allowMissing=*/true,
+                                      &isolatedConformances)) {
     case CheckRequirementResult::Success:
       break;
 
@@ -1035,6 +1059,20 @@ CheckGenericArgumentsResult TypeChecker::checkGenericArgumentsForDiagnostics(
     case CheckRequirementResult::SubstitutionFailure:
       hadSubstFailure = true;
       break;
+    }
+
+    if (!isolatedConformances.empty()) {
+      // Dig out the original type parameter for the requirement.
+      // FIXME: req might not be the right pre-substituted requirement,
+      // if this came from a conditional requirement.
+      if (auto failedProtocol =
+              typeParameterProhibitsIsolatedConformance(req.getFirstType(),
+                                                        signature)) {
+          return CheckGenericArgumentsResult::createIsolatedConformanceFailure(
+            req, substReq,
+            TinyPtrVector<ProtocolConformance *>(isolatedConformances),
+            *failedProtocol);
+      }
     }
   }
 
@@ -1139,4 +1177,29 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
   }
 
   return TypeAliasType::get(typeAlias, parent, genericArgs, result);
+}
+
+std::optional<ProtocolDecl *> swift::typeParameterProhibitsIsolatedConformance(
+    Type type, GenericSignature signature) {
+  if (!type->isTypeParameter())
+    return std::nullopt;
+
+  // An isolated conformance cannot be used in a context where the type
+  // parameter can escape the isolation domain in which the conformance
+  // was formed. To establish this, we look for Sendable or SendableMetatype
+  // requirements on the type parameter itself.
+  ASTContext &ctx = type->getASTContext();
+  auto sendableProto = ctx.getProtocol(KnownProtocolKind::Sendable);
+  auto sendableMetatypeProto =
+      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+
+  if (sendableProto &&
+      signature->requiresProtocol(type, sendableProto))
+    return sendableProto;
+
+  if (sendableMetatypeProto &&
+          signature->requiresProtocol(type, sendableMetatypeProto))
+    return sendableMetatypeProto;
+
+  return std::nullopt;
 }

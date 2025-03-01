@@ -667,7 +667,7 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
   };
 
   const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
-      genericSig.getRequirements(), substitutions);
+      genericSig, substitutions);
   switch (result.getKind()) {
   case CheckRequirementsResult::RequirementFailure:
     if (loc.isValid()) {
@@ -684,6 +684,14 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
     return true;
   }
   llvm_unreachable("invalid requirement check type");
+}
+
+CheckGenericArgumentsResult
+TypeChecker::checkGenericArgumentsForDiagnostics(
+    GenericSignature signature,
+    TypeSubstitutionFn substitutions) {
+  return checkGenericArgumentsForDiagnostics(
+      signature, signature.getRequirements(), substitutions);
 }
 
 void swift::diagnoseInvalidGenericArguments(SourceLoc loc,
@@ -1288,7 +1296,7 @@ Type TypeResolution::applyUnboundGenericArguments(
     };
 
     const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
-        genericSig.getRequirements(), substitutions);
+        genericSig, substitutions);
     switch (result.getKind()) {
     case CheckRequirementsResult::RequirementFailure:
       if (loc.isValid()) {

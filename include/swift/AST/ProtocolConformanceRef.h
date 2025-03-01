@@ -140,6 +140,14 @@ public:
   bool forEachMissingConformance(
       llvm::function_ref<bool(BuiltinProtocolConformance *missing)> fn) const;
 
+  /// Enumerate all of the isolated conformances in the given conformance.
+  ///
+  /// The given `body` will be called on each isolated conformance. If it ever
+  /// returns `true`, this function will abort the search and return `true`.
+  bool forEachIsolatedConformance(
+      llvm::function_ref<bool(ProtocolConformance*)> body
+  ) const;
+
   using OpaqueValue = void*;
   OpaqueValue getOpaqueValue() const { return Union.getOpaqueValue(); }
   static ProtocolConformanceRef getFromOpaqueValue(OpaqueValue value) {

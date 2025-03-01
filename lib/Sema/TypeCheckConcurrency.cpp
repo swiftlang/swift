@@ -7669,43 +7669,6 @@ bool swift::diagnoseNonSendableFromDeinit(
                                 var->getDescriptiveKind(), var->getName());
 }
 
-bool swift::forEachIsolatedConformance(
-    ProtocolConformanceRef conformance,
-    llvm::function_ref<bool(ProtocolConformance*)> body
-) {
-  if (conformance.isInvalid() || conformance.isAbstract())
-    return false;
-
-  if (conformance.isPack()) {
-    auto pack = conformance.getPack()->getPatternConformances();
-    for (auto conformance : pack) {
-      if (forEachIsolatedConformance(conformance, body))
-        return true;
-    }
-
-    return false;
-  }
-
-  // Is this an isolated conformance?
-  auto concrete = conformance.getConcrete();
-  if (auto normal =
-          dyn_cast<NormalProtocolConformance>(concrete->getRootConformance())) {
-    if (normal->isIsolated()) {
-      if (body(concrete))
-        return true;
-    }
-  }
-
-  // Check conformances that are part of this conformance.
-  auto subMap = concrete->getSubstitutionMap();
-  for (auto conformance : subMap.getConformances()) {
-    if (forEachIsolatedConformance(conformance, body))
-      return true;
-  }
-
-  return false;
-}
-
 ActorIsolation swift::getConformanceIsolation(ProtocolConformance *conformance) {
   auto rootNormal =
       dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());

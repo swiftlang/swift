@@ -1168,19 +1168,21 @@ void ConstraintSystem::openGenericRequirements(
   for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
     auto openedGenericLoc =
       locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
-    openGenericRequirement(outerDC, pos, requirements[pos],
+    openGenericRequirement(outerDC, signature, pos, requirements[pos],
                            skipProtocolSelfConstraint, openedGenericLoc,
                            substFn);
   }
 }
 
 void ConstraintSystem::openGenericRequirement(
-    DeclContext *outerDC, unsigned index, const Requirement &req,
+    DeclContext *outerDC, GenericSignature signature,
+    unsigned index, const Requirement &req,
     bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn) {
   std::optional<Requirement> openedReq;
   auto openedFirst = substFn(req.getFirstType());
 
+  bool prohibitIsolatedConformance = false;
   auto kind = req.getKind();
   switch (kind) {
   case RequirementKind::Conformance: {
@@ -1190,6 +1192,12 @@ void ConstraintSystem::openGenericRequirement(
     if (skipProtocolSelfConstraint && protoDecl == outerDC &&
         protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
       return;
+
+    // Check whether the given type parameter has requirements that
+    // prohibit it from using an isolated conformance.
+    if (typeParameterProhibitsIsolatedConformance(req.getFirstType(),
+                                                  signature))
+      prohibitIsolatedConformance = true;
 
     openedReq = Requirement(kind, openedFirst, req.getSecondType());
     break;
@@ -1206,7 +1214,8 @@ void ConstraintSystem::openGenericRequirement(
 
   addConstraint(*openedReq,
                 locator.withPathElement(
-                    LocatorPathElt::TypeParameterRequirement(index, kind)));
+                    LocatorPathElt::TypeParameterRequirement(index, kind)),
+                /*isFavored=*/false, prohibitIsolatedConformance);
 }
 
 /// Add the constraint on the type used for the 'Self' type for a member
