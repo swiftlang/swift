@@ -103,3 +103,19 @@ func testIsolationConformancesInTypes() {
   typealias A2 = PSendableWrapper<C> // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter 'T'}}
   typealias A3 = PSendableMetaWrapper<C> // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `SendableMetatype` type parameter 'T'}}
 }
+
+func acceptP<T: P>(_: T) { }
+
+func acceptSendableP<T: Sendable & P>(_: T) { }
+// expected-note@-1{{'acceptSendableP' declared here}}
+
+func acceptSendableMetaP<T: SendableMetatype & P>(_: T) { }
+// expected-note@-1{{'acceptSendableMetaP' declared here}}
+
+@MainActor
+func testIsolationConformancesInCall(c: C) {
+  acceptP(c) // okay
+
+  acceptSendableP(c) // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter}}
+  acceptSendableMetaP(c) // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter}}
+}

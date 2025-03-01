@@ -3252,6 +3252,21 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose when an isolated conformance is used in a place where one cannot
+/// be, e.g., due to a Sendable or SendableMetatype requirement on the
+/// corresponding type parameter.
+class DisallowedIsolatedConformance final : public FailureDiagnostic {
+  ProtocolConformance *conformance;
+
+public:
+  DisallowedIsolatedConformance(const Solution &solution,
+                                ProtocolConformance *conformance,
+                                ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), conformance(conformance) {}
+
+  bool diagnoseAsError() override;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

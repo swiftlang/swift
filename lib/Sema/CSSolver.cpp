@@ -2556,6 +2556,7 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
         switch (constraint->getKind()) {
         case ConstraintKind::Conversion:
         case ConstraintKind::Defaultable:
+        case ConstraintKind::NonisolatedConformsTo:
         case ConstraintKind::ConformsTo:
         case ConstraintKind::LiteralConformsTo:
         case ConstraintKind::TransitivelyConformsTo:

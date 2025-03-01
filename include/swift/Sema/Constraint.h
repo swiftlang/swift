@@ -85,6 +85,9 @@ enum class ConstraintKind : char {
   /// class type).
   SubclassOf,
   /// The first type must conform to the second type (which is a
+  /// protocol type) and the conformance must not be an isolated conformance.
+  NonisolatedConformsTo,
+  /// The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
   /// The first type describes a literal that conforms to the second
@@ -689,6 +692,7 @@ public:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::SubclassOf:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::NonisolatedConformsTo:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::TransitivelyConformsTo:
     case ConstraintKind::CheckedCast:

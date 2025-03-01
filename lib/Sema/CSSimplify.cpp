@@ -1877,7 +1877,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
           auto &CG = cs.getConstraintGraph();
 
           auto isTransferableConformance = [&typeVar](Constraint *constraint) {
-            if (constraint->getKind() != ConstraintKind::ConformsTo)
+            if (constraint->getKind() != ConstraintKind::ConformsTo &&
+                constraint->getKind() != ConstraintKind::NonisolatedConformsTo)
               return false;
 
             auto requirementTy = constraint->getFirstType();
@@ -2167,6 +2168,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SubclassOf:
+  case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::Defaultable:
@@ -2530,6 +2532,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SubclassOf:
+  case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::Defaultable:
@@ -3220,6 +3223,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SubclassOf:
+  case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::Defaultable:
@@ -4100,7 +4104,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
   if (auto layoutConstraint = layout.getLayoutConstraint()) {
     if (layoutConstraint->isClass()) {
-      if (kind == ConstraintKind::ConformsTo) {
+      if (kind == ConstraintKind::ConformsTo ||
+          kind == ConstraintKind::NonisolatedConformsTo) {
         if (!type1->satisfiesClassConstraint()) {
           if (shouldAttemptFixes()) {
             if (auto last = locator.last()) {
@@ -7170,6 +7175,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::SubclassOf:
+  case ConstraintKind::NonisolatedConformsTo:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::TransitivelyConformsTo:
     case ConstraintKind::Defaultable:
@@ -8525,6 +8531,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                         locator, flags);
   }
 
+  auto conformsToSubKind = (kind == ConstraintKind::NonisolatedConformsTo)
+      ? kind
+      : ConstraintKind::ConformsTo;
+
   // Dig out the fixed type to which this type refers.
   type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
 
@@ -8538,11 +8548,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
         auto patternLoc =
             locator.withPathElement(ConstraintLocator::PackExpansionPattern);
-        addConstraint(ConstraintKind::ConformsTo,
+        addConstraint(conformsToSubKind,
                       packExpansionType->getPatternType(), protocol,
                       patternLoc);
       } else {
-        addConstraint(ConstraintKind::ConformsTo, eltType, protocol,
+        addConstraint(conformsToSubKind, eltType, protocol,
                       locator.withPathElement(LocatorPathElt::PackElement(i)));
       }
     }
@@ -8607,6 +8617,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   if (type->isTypeVariableOrMember())
     return formUnsolved();
 
+  auto conformsToSubKind = kind;
+  if (kind != ConstraintKind::NonisolatedConformsTo)
+    conformsToSubKind = ConstraintKind::ConformsTo;
+
   // ConformsTo constraints are generated when opening a generic
   // signature with a RequirementKind::Conformance requirement, so
   // we must handle pack types on the left by splitting up into
@@ -8617,12 +8631,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       if (auto *packExpansionType = eltType->getAs<PackExpansionType>()) {
         auto patternLoc =
             locator.withPathElement(ConstraintLocator::PackExpansionPattern);
-        addConstraint(ConstraintKind::ConformsTo,
+        addConstraint(conformsToSubKind,
                       packExpansionType->getPatternType(),
                       protocol->getDeclaredInterfaceType(),
                       patternLoc);
       } else {
-        addConstraint(ConstraintKind::ConformsTo, eltType,
+        addConstraint(conformsToSubKind, eltType,
                       protocol->getDeclaredInterfaceType(),
                       locator.withPathElement(LocatorPathElt::PackElement(i)));
       }
@@ -8634,7 +8648,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // We sometimes get a pack expansion type here.
   if (auto *expansionType = type->getAs<PackExpansionType>()) {
     addConstraint(
-        ConstraintKind::ConformsTo, expansionType->getPatternType(),
+        conformsToSubKind, expansionType->getPatternType(),
         protocol->getDeclaredInterfaceType(),
         locator.withPathElement(LocatorPathElt::PackExpansionPattern()));
 
@@ -8658,6 +8672,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (numMissing > 0)
       increaseScore(SK_MissingSynthesizableConformance, locator, numMissing);
 
+    // If we aren't allowed to have an isolated conformance, check for any
+    // isolated conformances here.
+    if (kind == ConstraintKind::NonisolatedConformsTo &&
+        !conformance.getRequirement()->isMarkerProtocol()) {
+      // Grab the first isolated conformance, if there is one.
+      ProtocolConformance *isolatedConformance = nullptr;
+      conformance.forEachIsolatedConformance([&](ProtocolConformance *conf) {
+        if (!isolatedConformance)
+          isolatedConformance = conf;
+        return true;
+      });
+
+      if (isolatedConformance) {
+        auto fix = IgnoreIsolatedConformance::create(
+            *this, getConstraintLocator(locator), isolatedConformance);
+        if (recordFix(fix)) {
+          return SolutionKind::Error;
+        }
+      }
+    }
+
     // This conformance may be conditional, in which case we need to consider
     // those requirements as constraints too.
     if (conformance.isConcrete()) {
@@ -8670,7 +8705,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         addConstraint(
             req, getConstraintLocator(conformanceLoc,
                                       LocatorPathElt::ConditionalRequirement(
-                                          index++, req.getKind())));
+                                          index++, req.getKind())),
+            /*isFavored=*/false, kind == ConstraintKind::NonisolatedConformsTo);
       }
     }
 
@@ -8688,6 +8724,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return recordConformance(conformance);
     }
   } break;
+  case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo: {
     // If existential type is used as a for-in sequence, let's open it
@@ -8996,7 +9033,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
     // Conformance constraint that is introduced by an implicit conversion
     // for example to `AnyHashable`.
-    if (kind == ConstraintKind::ConformsTo &&
+    if ((kind == ConstraintKind::ConformsTo ||
+         kind == ConstraintKind::NonisolatedConformsTo) &&
         loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
       auto *fix = AllowArgumentMismatch::create(*this, type, protocolTy, loc);
       return recordFix(fix, /*impact=*/2) ? SolutionKind::Error
@@ -15731,6 +15769,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreOutOfPlaceThenStmt:
   case FixKind::IgnoreMissingEachKeyword:
   case FixKind::AllowInlineArrayLiteralCountMismatch:
+  case FixKind::IgnoreIsolatedConformance:
     llvm_unreachable("handled elsewhere");
   }
 
@@ -15780,6 +15819,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::SubclassOf:
     return simplifySubclassOfConstraint(first, second, locator, subflags);
 
+  case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
     return simplifyConformsToConstraint(first, second, kind, locator,
@@ -15992,7 +16032,8 @@ ConstraintSystem::addKeyPathConstraint(
 
 void ConstraintSystem::addConstraint(Requirement req,
                                      ConstraintLocatorBuilder locator,
-                                     bool isFavored) {
+                                     bool isFavored,
+                                     bool prohibitNonisolatedConformance) {
   bool conformsToAnyObject = false;
   std::optional<ConstraintKind> kind;
   switch (req.getKind()) {
@@ -16005,7 +16046,9 @@ void ConstraintSystem::addConstraint(Requirement req,
   }
 
   case RequirementKind::Conformance:
-    kind = ConstraintKind::ConformsTo;
+    kind = prohibitNonisolatedConformance
+        ? ConstraintKind::NonisolatedConformsTo
+        : ConstraintKind::ConformsTo;
     break;
   case RequirementKind::Superclass: {
     // FIXME: Should always use ConstraintKind::SubclassOf, but that breaks
@@ -16348,6 +16391,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                         constraint.getLocator(),
                                         /*flags*/ std::nullopt);
 
+  case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
     return simplifyConformsToConstraint(

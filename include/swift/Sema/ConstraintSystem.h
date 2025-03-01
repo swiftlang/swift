@@ -3666,7 +3666,8 @@ public:
 
   /// Add a requirement as a constraint to the constraint system.
   void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
-                     bool isFavored = false);
+                     bool isFavored,
+                     bool prohibitNonisolatedConformance);
 
   void addApplicationConstraint(
       FunctionType *appliedFn, Type calleeType,
@@ -4363,6 +4364,7 @@ public:
 
   // Record the given requirement in the constraint system.
   void openGenericRequirement(DeclContext *outerDC,
+                              GenericSignature signature,
                               unsigned index,
                               const Requirement &requirement,
                               bool skipProtocolSelfConstraint,
