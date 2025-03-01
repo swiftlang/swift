@@ -1735,6 +1735,19 @@ ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
         if (bufferID)
           return;
 
+        // '@StartTask' is gated behind the 'ConcurrencySyntaxSugar'
+        // experimental feature.
+        auto &ctx = fn->getASTContext();
+        if (macro->getParentModule()->getName().is("_Concurrency") &&
+            macro->getBaseIdentifier().is("StartTask") &&
+            !ctx.LangOpts.hasFeature(Feature::ConcurrencySyntaxSugar)) {
+          ctx.Diags.diagnose(
+              customAttr->getLocation(),
+              diag::experimental_macro,
+              macro->getName());
+          return;
+        }
+
         auto macroSourceFile = ::evaluateAttachedMacro(
             macro, fn, customAttr, false, MacroRole::Body);
         if (!macroSourceFile)
