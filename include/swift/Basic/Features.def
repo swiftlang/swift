@@ -473,6 +473,9 @@ EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
 /// Allow isolated conformances.
 EXPERIMENTAL_FEATURE(IsolatedConformances, true)
 
+/// Syntax sugar features for concurrency.
+EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
