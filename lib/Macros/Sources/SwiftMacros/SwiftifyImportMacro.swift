@@ -204,13 +204,42 @@ func replaceBaseType(_ type: TypeSyntax, _ base: TypeSyntax) -> TypeSyntax {
   return base
 }
 
-// The generated type names for template instantiations sometimes contain
-// a `_const` suffix for diambiguation purposes. We need to remove that.
-func dropConstSuffix(_ typeName: String) -> String {
-  if typeName.hasSuffix("_const") {
-    return String(typeName.dropLast("_const".count))
+// C++ type qualifiers, `const T` and `volatile T`, are encoded as fake generic
+// types, `__cxxConst<T>` and `__cxxVolatile<T>` respectively. Remove those.
+func dropQualifierGenerics(_ type: TypeSyntax) -> TypeSyntax {
+  guard let identifier = type.as(IdentifierTypeSyntax.self) else { return type }
+  guard let generic = identifier.genericArgumentClause else { return type }
+  guard let genericArg = generic.arguments.first else { return type }
+  guard case .type(let argType) = genericArg.argument else { return type }
+  switch identifier.name.text {
+  case "__cxxConst", "__cxxVolatile":
+    return dropQualifierGenerics(argType)
+  default:
+    return type
   }
-  return typeName
+}
+
+// The `const` type qualifier used to be encoded as a `_const` suffix on type
+// names (though this causes issues for more complex types). We still drop the
+// suffix here for backwards compatibility with older textual interfaces.
+func dropQualifierSuffix(_ type: TypeSyntax) -> TypeSyntax {
+  guard let identifier = type.as(IdentifierTypeSyntax.self) else { return type }
+  let typename = identifier.name.text
+  if typename.hasSuffix("_const") {
+    return TypeSyntax(identifier.with(\.name, TokenSyntax.identifier(
+      String(typename.dropLast("_const".count))
+    )))
+  }
+  return type
+}
+
+// The generated type names for template instantiations sometimes contain
+// encoded qualifiers for disambiguation purposes. We need to remove those.
+func dropCxxQualifiers(_ type: TypeSyntax) -> TypeSyntax {
+  if let attributed = type.as(AttributedTypeSyntax.self) {
+    return dropCxxQualifiers(attributed.baseType)
+  }
+  return dropQualifierSuffix(dropQualifierGenerics(type))
 }
 
 func getPointerMutability(text: String) -> Mutability? {
@@ -405,7 +434,7 @@ struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
     let genericArg = TypeSyntax(parsedDesugaredType.as(IdentifierTypeSyntax.self)!
       .genericArgumentClause!.arguments.first!.argument)!
     types[index] = replaceBaseType(param.type,
-      TypeSyntax("Span<\(raw: dropConstSuffix(try getTypeName(genericArg).text))>"))
+      TypeSyntax("Span<\(raw: dropCxxQualifiers(genericArg))>"))
     return try base.buildFunctionSignature(types, returnType)
   }
 
@@ -440,7 +469,7 @@ struct CxxSpanReturnThunkBuilder: BoundsCheckedThunkBuilder {
     let genericArg = TypeSyntax(parsedDesugaredType.as(IdentifierTypeSyntax.self)!
       .genericArgumentClause!.arguments.first!.argument)!
     let newType = replaceBaseType(signature.returnClause!.type,
-      TypeSyntax("Span<\(raw: dropConstSuffix(try getTypeName(genericArg).text))>"))
+      TypeSyntax("Span<\(raw: dropCxxQualifiers(genericArg))>"))
     return try base.buildFunctionSignature(argTypes, newType)
   }
 

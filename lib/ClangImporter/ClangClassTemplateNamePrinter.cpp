@@ -44,7 +44,7 @@ struct TemplateInstantiationNamePrinter
     case clang::BuiltinType::Void:
       return "Void";
     case clang::BuiltinType::NullPtr:
-      return "nil";
+      return "__cxxNullPtrT";
 
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)                  \
     case clang::BuiltinType::CLANG_BUILTIN_KIND:                               \
@@ -183,10 +183,18 @@ struct TemplateArgumentPrinter
   void VisitTypeTemplateArgument(const clang::TemplateArgument &arg,
                                  llvm::raw_svector_ostream &buffer) {
     auto ty = arg.getAsType();
+
+    if (ty.isConstQualified())
+      buffer << "__cxxConst<";
+    if (ty.isVolatileQualified())
+      buffer << "__cxxVolatile<";
+
     buffer << typePrinter.Visit(ty.getTypePtr());
-    if (ty.isConstQualified()) {
-      buffer << "_const";
-    }
+
+    if (ty.isVolatileQualified())
+      buffer << ">";
+    if (ty.isConstQualified())
+      buffer << ">";
   }
 
   void VisitIntegralTemplateArgument(const clang::TemplateArgument &arg,
