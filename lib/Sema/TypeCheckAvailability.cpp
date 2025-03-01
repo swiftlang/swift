@@ -1807,6 +1807,12 @@ static const Decl *relatedDeclForAvailabilityFixit(const Decl *D) {
     D = accessor->getStorage();
   }
 
+  auto abiRole = ABIRoleInfo(D);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart()) {
+    // ABI-only decls can't have @available attributes of their own.
+    D = abiRole.getCounterpart();
+  }
+
   return abstractSyntaxDeclForAvailableAttribute(D);
 }
 
@@ -1973,7 +1979,7 @@ fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
   // syntax to suggest the Fix-It may differ from the declaration to which
   // we attach availability attributes in the abstract syntax tree during
   // parsing.
-  const Decl *ConcDecl = concreteSyntaxDeclForAvailableAttribute(D);
+  const Decl *ConcDecl = relatedDeclForAvailabilityFixit(D);
 
   // To avoid exposing the pattern binding declaration to the user, get the
   // descriptive kind from one of the VarDecls.

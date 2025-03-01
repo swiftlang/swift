@@ -938,6 +938,11 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
 
 bool
 IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  // ABI-only decls get this from their API decl.
+  auto abiRole = ABIRoleInfo(decl);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->isDynamic();
+
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Dynamic, decl))
     return false;

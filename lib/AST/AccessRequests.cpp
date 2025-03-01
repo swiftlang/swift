@@ -43,6 +43,11 @@ AccessLevel
 AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   assert(!D->hasAccess());
 
+  // ABI decls share the access level of their API decl.
+  auto abiRole = ABIRoleInfo(D);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getFormalAccess();
+
   // Check if the decl has an explicit access control attribute.
   if (auto *AA = D->getAttrs().getAttribute<AccessControlAttr>())
     return AA->getAccess();
@@ -201,6 +206,12 @@ AccessLevel
 SetterAccessLevelRequest::evaluate(Evaluator &evaluator,
                                    AbstractStorageDecl *ASD) const {
   assert(!ASD->Accessors.getInt().hasValue());
+
+  // ABI decls share the access level of their API decl.
+  auto abiRole = ABIRoleInfo(ASD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getSetterFormalAccess();
+
   if (auto *SAA = ASD->getAttrs().getAttribute<SetterAccessAttr>())
     return SAA->getAccess();
 
