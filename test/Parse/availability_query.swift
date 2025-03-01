@@ -64,7 +64,7 @@ if #available(macoss 51, *) { // expected-warning {{unrecognized platform name '
 if #available(mac 51, *) { // expected-warning {{unrecognized platform name 'mac'; did you mean 'macOS'?}} {{15-18=macOS}}
 }
 
-if #available(OSX 51, OSX 52, *) {  // expected-error {{version for 'macOS' already specified}}
+if #available(OSX 51, OSX 52, *) {  // expected-error {{version for macOS already specified}}
 }
 
 if #available(OSX 52) { }  // expected-error {{must handle potential future platforms with '*'}} {{21-21=, *}}

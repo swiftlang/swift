@@ -55,7 +55,7 @@ if #unavailable(macoss 51) { // expected-warning {{unrecognized platform name 'm
 if #unavailable(mac 51) { // expected-warning {{unrecognized platform name 'mac'; did you mean 'macOS'?}} {{17-20=macOS}}
 }
 
-if #unavailable(OSX 51, OSX 52) {  // expected-error {{version for 'macOS' already specified}}
+if #unavailable(OSX 51, OSX 52) {  // expected-error {{version for macOS already specified}}
 }
 
 if #unavailable(OSX 51, iOS 8.0, *) { }  // expected-error {{platform wildcard '*' is always implicit in #unavailable}} {{34-35=}}

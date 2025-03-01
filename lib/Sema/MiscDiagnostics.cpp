@@ -5147,14 +5147,14 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
     bool hasVersion = !spec.getVersion().empty();
 
     if (!domain.supportsQueries()) {
-      diags.diagnose(loc, diag::availability_query_not_allowed,
-                     domain.getNameForDiagnostics(), hasVersion, queryName);
+      diags.diagnose(loc, diag::availability_query_not_allowed, domain,
+                     hasVersion, queryName);
       return true;
     }
 
     if (!domain.isPlatform() && info->getQueries().size() > 1) {
-      diags.diagnose(loc, diag::availability_must_occur_alone,
-                     domain.getNameForDiagnostics(), hasVersion);
+      diags.diagnose(loc, diag::availability_must_occur_alone, domain,
+                     hasVersion);
       return true;
     }
 
@@ -5164,9 +5164,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
         return true;
       }
     } else if (hasVersion) {
-      diags
-          .diagnose(loc, diag::availability_unexpected_version,
-                    domain.getNameForDiagnostics())
+      diags.diagnose(loc, diag::availability_unexpected_version, domain)
           .highlight(parsedSpec->getVersionSrcRange());
       return true;
     }
@@ -5174,7 +5172,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
     // Diagnose duplicate domains.
     if (!seenDomains.insert(domain).second) {
       diags.diagnose(loc, diag::availability_query_already_specified,
-                     domain.isVersioned(), domain.getNameForDiagnostics());
+                     domain.isVersioned(), domain);
       return true;
     }
 

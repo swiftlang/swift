@@ -87,14 +87,14 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
   // FIXME: Code completion doesn't offer accessors. It only emits 'VarDecl's.
   // So getter/setter specific availability doesn't work in code completion.
 
-  StringRef Platform = Attr.getDomain().getNameForDiagnostics();
+  auto Domain = Attr.getDomain();
   llvm::VersionTuple DeprecatedVersion;
   if (Attr.getDeprecated())
     DeprecatedVersion = Attr.getDeprecated().value();
 
   llvm::VersionTuple RemappedDeprecatedVersion;
-  if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-          Attr, Ctx, Platform, RemappedDeprecatedVersion))
+  if (AvailabilityInference::updateDeprecatedAvailabilityDomainForFallback(
+          Attr, Ctx, Domain, RemappedDeprecatedVersion))
     DeprecatedVersion = RemappedDeprecatedVersion;
 
   auto Message = Attr.getMessage();
@@ -102,18 +102,18 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
   if (!isSoftDeprecated) {
     if (Message.empty() && NewName.empty()) {
       getDiagnostics(severity, Out, diag::availability_deprecated, D,
-                     Attr.isPlatformSpecific(), Platform,
+                     Attr.isPlatformSpecific(), Domain,
                      Attr.getDeprecated().has_value(), DeprecatedVersion,
                      /*message*/ StringRef());
     } else if (!Message.empty()) {
       EncodedDiagnosticMessage EncodedMessage(Message);
       getDiagnostics(severity, Out, diag::availability_deprecated, D,
-                     Attr.isPlatformSpecific(), Platform,
+                     Attr.isPlatformSpecific(), Domain,
                      Attr.getDeprecated().has_value(), DeprecatedVersion,
                      EncodedMessage.Message);
     } else {
       getDiagnostics(severity, Out, diag::availability_deprecated_rename, D,
-                     Attr.isPlatformSpecific(), Platform,
+                     Attr.isPlatformSpecific(), Domain,
                      Attr.getDeprecated().has_value(), DeprecatedVersion, false,
                      /*ReplaceKind*/ 0, NewName);
     }
@@ -126,18 +126,18 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
 
     if (Message.empty() && NewName.empty()) {
       getDiagnostics(severity, Out, diag::ide_availability_softdeprecated, D,
-                     Attr.isPlatformSpecific(), Platform, !isDistantFuture,
+                     Attr.isPlatformSpecific(), Domain, !isDistantFuture,
                      DeprecatedVersion,
                      /*message*/ StringRef());
     } else if (!Message.empty()) {
       EncodedDiagnosticMessage EncodedMessage(Message);
       getDiagnostics(severity, Out, diag::ide_availability_softdeprecated, D,
-                     Attr.isPlatformSpecific(), Platform, !isDistantFuture,
+                     Attr.isPlatformSpecific(), Domain, !isDistantFuture,
                      DeprecatedVersion, EncodedMessage.Message);
     } else {
       getDiagnostics(severity, Out,
                      diag::ide_availability_softdeprecated_rename, D,
-                     Attr.isPlatformSpecific(), Platform, !isDistantFuture,
+                     Attr.isPlatformSpecific(), Domain, !isDistantFuture,
                      DeprecatedVersion, NewName);
     }
   }
