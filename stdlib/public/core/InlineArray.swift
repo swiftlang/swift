@@ -409,9 +409,8 @@ extension InlineArray where Element: ~Copyable {
     @lifetime(borrow self)
     @_alwaysEmitIntoClient
     borrowing get {
-      let pointer = _address
-      let span = Span(_unsafeStart: pointer, count: count)
-      return _overrideLifetime(span, borrowing: self)
+      let span = Span(_unsafeStart: _address, count: count)
+      return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 }

@@ -1123,7 +1123,7 @@ extension ArraySlice: RangeReplaceableCollection {
     borrowing get {
       let (pointer, count) = (_buffer.firstElementAddress, _buffer.count)
       let span = Span(_unsafeStart: pointer, count: count)
-      return _overrideLifetime(span, borrowing: self)
+      return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 

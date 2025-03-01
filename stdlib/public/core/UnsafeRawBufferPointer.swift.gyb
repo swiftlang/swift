@@ -1178,7 +1178,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     @_alwaysEmitIntoClient
     get {
       let span = RawSpan(_unsafeBytes: self)
-      return _overrideLifetime(span, borrowing: self)
+      return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 }
