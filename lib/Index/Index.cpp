@@ -20,6 +20,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
@@ -2156,14 +2157,20 @@ void index::indexSourceFile(SourceFile *SF, IndexDataConsumer &consumer) {
 }
 
 void index::indexModule(ModuleDecl *module, IndexDataConsumer &consumer) {
+  PrettyStackTraceDecl trace("indexing module", module);
+  ASTContext &ctx = module->getASTContext();
   assert(module);
+
   auto mName = module->getRealName().str();
-  if (module->getASTContext().blockListConfig.hasBlockListAction(mName,
+  if (ctx.blockListConfig.hasBlockListAction(mName,
       BlockListKeyKind::ModuleName,
       BlockListAction::SkipIndexingModule)) {
     return;
   }
-  IndexSwiftASTWalker walker(consumer, module->getASTContext());
+
+  llvm::SaveAndRestore<bool> S(ctx.ForceAllowModuleWithCompilerErrors, true);
+
+  IndexSwiftASTWalker walker(consumer, ctx);
   walker.visitModule(*module);
   consumer.finish();
 }
