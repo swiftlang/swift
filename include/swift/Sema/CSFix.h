@@ -487,6 +487,9 @@ enum class FixKind : uint8_t {
   /// Ignore when an 'InlineArray' literal has mismatched number of elements to
   /// the type it's attempting to bind to.
   AllowInlineArrayLiteralCountMismatch,
+
+  /// Ignore that a conformance is isolated but is not allowed to be.
+  IgnoreIsolatedConformance,
 };
 
 class ConstraintFix {
@@ -3862,6 +3865,35 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInlineArrayLiteralCountMismatch;
+  }
+};
+
+class IgnoreIsolatedConformance : public ConstraintFix {
+  ProtocolConformance *conformance;
+
+  IgnoreIsolatedConformance(ConstraintSystem &cs,
+                            ConstraintLocator *locator,
+                            ProtocolConformance *conformance)
+      : ConstraintFix(cs, FixKind::IgnoreIsolatedConformance, locator),
+        conformance(conformance) { }
+
+public:
+  std::string getName() const override {
+    return "ignore isolated conformance";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreIsolatedConformance *create(ConstraintSystem &cs,
+                                           ConstraintLocator *locator,
+                                           ProtocolConformance *conformance);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreIsolatedConformance;
   }
 };
 

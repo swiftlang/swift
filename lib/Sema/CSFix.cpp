@@ -2740,3 +2740,18 @@ bool AllowInlineArrayLiteralCountMismatch::diagnose(const Solution &solution,
                                            getLocator());
   return failure.diagnose(asNote);
 }
+
+IgnoreIsolatedConformance *
+IgnoreIsolatedConformance::create(ConstraintSystem &cs,
+                                  ConstraintLocator *locator,
+                                  ProtocolConformance *conformance) {
+  assert(conformance && "Must have an isolated conformance");
+  return new (cs.getAllocator())
+      IgnoreIsolatedConformance(cs, locator, conformance);
+}
+
+bool IgnoreIsolatedConformance::diagnose(const Solution &solution,
+                                         bool asNote) const {
+  DisallowedIsolatedConformance failure(solution, conformance, getLocator());
+  return failure.diagnose(asNote);
+}

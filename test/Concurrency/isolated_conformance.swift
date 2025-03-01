@@ -6,6 +6,10 @@ protocol P {
   func f() // expected-note 2{{mark the protocol requirement 'f()' 'async' to allow actor-isolated conformances}}
 }
 
+// ----------------------------------------------------------------------------
+// Definition of isolated conformances
+// ----------------------------------------------------------------------------
+
 // expected-note@+3{{add '@preconcurrency' to the 'P' conformance to defer isolation checking to run time}}{{25-25=@preconcurrency }}
 // expected-note@+2{{add 'isolated' to the 'P' conformance to restrict it to main actor-isolated code}}{{25-25=isolated }}
 @MainActor
@@ -77,4 +81,41 @@ struct S: isolated Q {
 @MainActor
 struct SMismatchedActors: isolated Q {
   typealias A = C2
+}
+
+// ----------------------------------------------------------------------------
+// Use checking of isolated conformances.
+// ----------------------------------------------------------------------------
+
+// expected-note@+1{{requirement specified as 'T' : 'P' [with T = C]}}
+struct PSendableWrapper<T: P & Sendable>: P {
+  func f() { }
+}
+
+// expected-note@+1{{requirement specified as 'T' : 'P' [with T = C]}}
+struct PSendableMetaWrapper<T: P & SendableMetatype>: P {
+  func f() { }
+}
+
+@MainActor
+func testIsolationConformancesInTypes() {
+  typealias A1 = PWrapper<C>
+  typealias A2 = PSendableWrapper<C> // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter 'T'}}
+  typealias A3 = PSendableMetaWrapper<C> // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `SendableMetatype` type parameter 'T'}}
+}
+
+func acceptP<T: P>(_: T) { }
+
+func acceptSendableP<T: Sendable & P>(_: T) { }
+// expected-note@-1{{'acceptSendableP' declared here}}
+
+func acceptSendableMetaP<T: SendableMetatype & P>(_: T) { }
+// expected-note@-1{{'acceptSendableMetaP' declared here}}
+
+@MainActor
+func testIsolationConformancesInCall(c: C) {
+  acceptP(c) // okay
+
+  acceptSendableP(c) // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter}}
+  acceptSendableMetaP(c) // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter}}
 }
