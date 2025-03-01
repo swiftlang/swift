@@ -2129,6 +2129,15 @@ FUNCTION(DeletedMethodError, Swift, swift_deletedMethodError, C_CC, AlwaysAvaila
         EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
+// void swift_deletedAsyncMethodError();
+FUNCTION(DeletedAsyncMethodError, _Concurrency, swift_deletedAsyncMethodError, SwiftAsyncCC,
+        ConcurrencyAvailability,
+        RETURNS(VoidTy),
+        ARGS(),
+        ATTRS(NoUnwind),
+        EFFECT(Concurrency),
+        UNKNOWN_MEMEFFECTS)
+
 FUNCTION(AllocError, Swift, swift_allocError, SwiftCC, AlwaysAvailable,
          RETURNS(ErrorPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy, WitnessTablePtrTy, OpaquePtrTy, Int1Ty),
