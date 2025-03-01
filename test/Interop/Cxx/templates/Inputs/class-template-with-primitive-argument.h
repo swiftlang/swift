@@ -38,4 +38,19 @@ typedef DoubleWrapper<MagicWrapper<int[42]>> DoubleWrappedMagicIntFixedSizeArr1;
 typedef DoubleWrapper<MagicWrapper<int[43]>> DoubleWrappedMagicIntFixedSizeArr2;
 typedef DoubleWrapper<MagicWrapper<std::nullptr_t>> DoubleWrappedMagicNullPtr;
 
+typedef DoubleWrapper<const MagicWrapper<int>> DoubleConstWrappedInt;
+typedef DoubleWrapper<const MagicWrapper<const int>> DoubleConstWrappedIntConst;
+typedef DoubleWrapper<const MagicWrapper<const long>> DoubleConstWrappedLongConst;
+typedef DoubleWrapper<const MagicWrapper<int*>> DoubleConstWrappedIntPtr;
+typedef DoubleWrapper<const MagicWrapper<const int*>> DoubleConstWrappedIntConstPtr;
+typedef DoubleWrapper<const MagicWrapper<int[]>> DoubleConstWrappedMagicIntArr;
+typedef DoubleWrapper<const MagicWrapper<long[]>> DoubleConstWrappedMagicLongArr;
+typedef DoubleWrapper<const MagicWrapper<int[42]>> DoubleConstWrappedMagicIntFixedSizeArr1;
+typedef DoubleWrapper<const MagicWrapper<int[43]>> DoubleConstWrappedMagicIntFixedSizeArr2;
+typedef DoubleWrapper<const MagicWrapper<std::nullptr_t>> DoubleConstWrappedMagicNullPtr;
+
+typedef MagicWrapper<volatile int> WrappedVolatileInt;
+typedef MagicWrapper<const volatile int> WrappedConstVolatileInt;
+typedef MagicWrapper<volatile const int> WrappedVolatileConstInt;
+
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_WITH_PRIMITIVE_ARGUMENT_H
