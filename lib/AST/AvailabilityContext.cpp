@@ -38,27 +38,10 @@ static bool constrainRange(AvailabilityRange &existing,
   return true;
 }
 
-static bool constrainUnavailableDomain(
-    std::optional<AvailabilityDomain> &domain,
-    const std::optional<AvailabilityDomain> &otherDomain) {
-  // If the other domain is absent or is the same domain, it's a noop.
-  if (!otherDomain || domain == otherDomain)
-    return false;
-
-  // Check if the other domain is a superset and constrain to it if it is.
-  if (!domain || otherDomain->contains(*domain)) {
-    domain = otherDomain;
-    return true;
-  }
-
-  return false;
-}
-
 bool AvailabilityContext::Info::constrainWith(const Info &other) {
   bool isConstrained = false;
   isConstrained |= constrainRange(Range, other.Range);
-  if (other.UnavailableDomain)
-    isConstrained |= constrainUnavailability(other.UnavailableDomain);
+  isConstrained |= constrainUnavailability(other.UnavailableDomains);
   isConstrained |= CONSTRAIN_BOOL(IsDeprecated, other.IsDeprecated);
 
   return isConstrained;
@@ -89,9 +72,51 @@ bool AvailabilityContext::Info::constrainWith(
   return isConstrained;
 }
 
+/// Returns true if `domain` is not already contained in `unavailableDomains`.
+/// Also, removes domains from `unavailableDomains` that are contained in
+/// `domain`.
+static bool shouldConstrainUnavailableDomains(
+    AvailabilityDomain domain,
+    llvm::SmallVectorImpl<AvailabilityDomain> &unavailableDomains) {
+  bool didRemove = false;
+  for (auto iter = unavailableDomains.rbegin(), end = unavailableDomains.rend();
+       iter != end; ++iter) {
+    auto const &existingDomain = *iter;
+
+    // Check if the domain is already unavailable.
+    if (existingDomain.contains(domain)) {
+      ASSERT(!didRemove); // This would indicate that the context is malformed.
+      return false;
+    }
+
+    // Check if the existing domain would be absorbed by the new domain.
+    if (domain.contains(existingDomain)) {
+      unavailableDomains.erase((iter + 1).base());
+      didRemove = true;
+    }
+  }
+
+  return true;
+}
+
 bool AvailabilityContext::Info::constrainUnavailability(
-    std::optional<AvailabilityDomain> domain) {
-  return constrainUnavailableDomain(UnavailableDomain, domain);
+    const llvm::SmallVectorImpl<AvailabilityDomain> &domains) {
+  llvm::SmallVector<AvailabilityDomain, 2> domainsToAdd;
+
+  for (auto domain : domains) {
+    if (shouldConstrainUnavailableDomains(domain, UnavailableDomains))
+      domainsToAdd.push_back(domain);
+  }
+
+  if (domainsToAdd.size() < 1)
+    return false;
+
+  // Add the candidate domain and then re-sort.
+  for (auto domain : domainsToAdd)
+    UnavailableDomains.push_back(domain);
+
+  llvm::sort(UnavailableDomains, StableAvailabilityDomainComparator());
+  return true;
 }
 
 bool AvailabilityContext::Info::isContainedIn(const Info &other) const {
@@ -99,14 +124,20 @@ bool AvailabilityContext::Info::isContainedIn(const Info &other) const {
   if (!Range.isContainedIn(other.Range))
     return false;
 
-  // The set of unavailable domains should be the same or larger.
-  if (auto otherUnavailableDomain = other.UnavailableDomain) {
-    if (!UnavailableDomain)
-      return false;
+  // Every unavailable domain in the other context should be contained in some
+  // unavailable domain in this context.
+  bool disjointUnavailability = llvm::any_of(
+      other.UnavailableDomains,
+      [&](const AvailabilityDomain &otherUnavailableDomain) {
+        return llvm::none_of(
+            UnavailableDomains,
+            [&otherUnavailableDomain](const AvailabilityDomain &domain) {
+              return domain.contains(otherUnavailableDomain);
+            });
+      });
 
-    if (!UnavailableDomain->contains(otherUnavailableDomain.value()))
-      return false;
-  }
+  if (disjointUnavailability)
+    return false;
 
   // The set of deprecated domains should be the same or larger.
   if (!IsDeprecated && other.IsDeprecated)
@@ -115,10 +146,29 @@ bool AvailabilityContext::Info::isContainedIn(const Info &other) const {
   return true;
 }
 
+void AvailabilityContext::Info::Profile(llvm::FoldingSetNodeID &ID) const {
+  Range.getRawVersionRange().Profile(ID);
+  ID.AddInteger(UnavailableDomains.size());
+  for (auto domain : UnavailableDomains) {
+    domain.Profile(ID);
+  }
+  ID.AddBoolean(IsDeprecated);
+}
+
+bool AvailabilityContext::Info::verify(ASTContext &ctx) const {
+  // Unavailable domains must be sorted to ensure folding set node lookups yield
+  // consistent results.
+  if (!llvm::is_sorted(UnavailableDomains,
+                       StableAvailabilityDomainComparator()))
+    return false;
+
+  return true;
+}
+
 AvailabilityContext
 AvailabilityContext::forPlatformRange(const AvailabilityRange &range,
                                       ASTContext &ctx) {
-  Info info{range, /*UnavailableDomain*/ std::nullopt,
+  Info info{range, /*UnavailableDomains*/ {},
             /*IsDeprecated*/ false};
   return AvailabilityContext(Storage::get(info, ctx));
 }
@@ -133,27 +183,20 @@ AvailabilityContext AvailabilityContext::forDeploymentTarget(ASTContext &ctx) {
       AvailabilityRange::forDeploymentTarget(ctx), ctx);
 }
 
-AvailabilityContext
-AvailabilityContext::get(const AvailabilityRange &platformAvailability,
-                         std::optional<AvailabilityDomain> unavailableDomain,
-                         bool deprecated, ASTContext &ctx) {
-  Info info{platformAvailability, unavailableDomain, deprecated};
-  return AvailabilityContext(Storage::get(info, ctx));
-}
-
 AvailabilityRange AvailabilityContext::getPlatformRange() const {
   return storage->info.Range;
 }
 
 bool AvailabilityContext::isUnavailable() const {
-  return storage->info.UnavailableDomain.has_value();
+  return storage->info.UnavailableDomains.size() > 0;
 }
 
 bool AvailabilityContext::containsUnavailableDomain(
     AvailabilityDomain domain) const {
-  if (auto unavailableDomain = storage->info.UnavailableDomain)
-    return unavailableDomain->contains(domain);
-
+  for (auto unavailableDomain : storage->info.UnavailableDomains) {
+    if (unavailableDomain.contains(domain))
+      return true;
+  }
   return false;
 }
 
@@ -217,10 +260,7 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
 }
 
 bool AvailabilityContext::isContainedIn(const AvailabilityContext other) const {
-  if (!storage->info.isContainedIn(other.storage->info))
-    return false;
-
-  return true;
+  return storage->info.isContainedIn(other.storage->info);
 }
 
 static std::string
@@ -236,11 +276,19 @@ stringForAvailability(const AvailabilityRange &availability) {
 void AvailabilityContext::print(llvm::raw_ostream &os) const {
   os << "version=" << stringForAvailability(getPlatformRange());
 
-  if (auto unavailableDomain = storage->info.UnavailableDomain)
-    os << " unavailable=" << unavailableDomain->getNameForAttributePrinting();
+  if (storage->info.UnavailableDomains.size() > 0) {
+    os << " unavailable=";
+    llvm::interleave(
+        storage->info.UnavailableDomains, os,
+        [&](const AvailabilityDomain &domain) { domain.print(os); }, ",");
+  }
 
   if (isDeprecated())
     os << " deprecated";
 }
 
 void AvailabilityContext::dump() const { print(llvm::errs()); }
+
+bool AvailabilityContext::verify(ASTContext &ctx) const {
+  return storage->info.verify(ctx);
+}
