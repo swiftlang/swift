@@ -1798,7 +1798,7 @@ bb0(%0 : @guaranteed $D, %1 : @guaranteed $C):
 // CHECK-NEXT: bb0: LiveWithin
 // CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %0 : $D, #D.object
 // CHECK-NEXT: regular user:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $*C on %{{.*}} : $*C
-// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: Incomplete liveness: Escaping address
 // CHECK-NEXT: last user:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $*C on %{{.*}} : $*C
 // CHECK-NEXT: testInteriorMarkDepAddressBase: interior_liveness with: %0
 
@@ -1832,7 +1832,7 @@ bb0(%0 : @guaranteed $D, %1 : @guaranteed $D):
 // CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %0 : $D, #D.object
 // CHECK-NEXT: regular user:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %{{.*}} : $*C
 // CHECK-NEXT: regular user:   end_access %{{.*}} : $*C
-// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: Incomplete liveness: Escaping address
 // CHECK-NEXT: last user:   end_access %{{.*}} : $*C
 // CHECK-NEXT: testInteriorMarkDepAddressDependent: interior_liveness with: %0
 
