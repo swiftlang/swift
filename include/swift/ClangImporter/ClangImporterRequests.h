@@ -347,8 +347,10 @@ enum class CxxRecordSemanticsKind {
   MoveOnly,
   Reference,
   Iterator,
-  // A record that is either not copyable or not destructible.
+  // A record that is either not copyable/movable or not destructible.
   MissingLifetimeOperation,
+  // A record that has no copy and no move operations
+  UnavailableConstructors,
   // A C++ record that represents a Swift class type exposed to C++ from Swift.
   SwiftClassType
 };
