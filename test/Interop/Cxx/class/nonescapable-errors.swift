@@ -91,6 +91,10 @@ using OwnerVector = std::vector<Owner>;
 ViewVector l1();
 OwnerVector l2();
 
+const View* usedToCrash(const View* p) {
+    return p;
+}
+
 //--- test.swift
 import Test
 import CxxStdlib
@@ -139,11 +143,23 @@ public func noAnnotations() -> View {
     // CHECK: nonescapable.h:77:12: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
     // CHECK-NO-LIFETIMES: nonescapable.h:77:12: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
     l2();
-    // CHECK-NOT: error
-    // CHECK-NOT: warning
     return View()
     // CHECK-NO-LIFETIMES: nonescapable.h:5:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
     // CHECK-NO-LIFETIMES: nonescapable.h:6:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+}
+
+public func test3(_ x: inout View) {
+    usedToCrash(&x)
+    // CHECK: error: cannot find 'usedToCrash' in scope
+    // CHECK: note: function 'usedToCrash' unavailable (cannot import)
+    // CHECK: note: return type unavailable (cannot import)
+    // CHECK: pointer to non-escapable type 'View' cannot be imported
+    // CHECK-NO-LIFETIMES: error: cannot find 'usedToCrash' in scope
+    // CHECK-NO-LIFETIMES: note: function 'usedToCrash' unavailable (cannot import)
+    // CHECK-NO-LIFETIMES: note: return type unavailable (cannot import)
+    // CHECK-NO-LIFETIMES: pointer to non-escapable type 'View' cannot be imported
+}
+    // CHECK-NOT: error
+    // CHECK-NOT: warning
     // CHECK-NO-LIFETIMES-NOT: error
     // CHECK-NO-LIFETIMES-NOT: warning
-}
