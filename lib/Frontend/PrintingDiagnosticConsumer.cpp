@@ -240,6 +240,21 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
   if (Info.IsChildNote)
     return;
 
+  // Collect any footnote paths.
+  auto remainingFootnotePaths = Info.EducationalNotePaths;
+
+  // If there is a category, it's always first.
+  if (!Info.Category.empty() && !remainingFootnotePaths.empty()) {
+    footnotePaths[Info.Category.str()] = remainingFootnotePaths.front();
+    remainingFootnotePaths = remainingFootnotePaths.drop_front();
+  }
+
+  // Educational notes follow.
+  for (const auto &path : remainingFootnotePaths) {
+    auto name = llvm::sys::path::stem(path);
+    footnotePaths[name.str()] = path;
+  }
+
   switch (FormattingStyle) {
   case DiagnosticOptions::FormattingStyle::Swift: {
 #if SWIFT_BUILD_SWIFT_SYNTAX
@@ -295,6 +310,23 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
 bool PrintingDiagnosticConsumer::finishProcessing() {
   // If there's an in-flight snippet, flush it.
   flush(false);
+
+  // Print footnotes, if there are any.
+  if (!footnotePaths.empty()) {
+    Stream << "\n\n";
+
+    for (const auto &entry : footnotePaths) {
+      Stream << "[";
+      if (ForceColors)
+        Stream.changeColor(llvm::raw_ostream::BRIGHT_WHITE, /*Bold=*/true);
+      Stream << "^" << entry.first;
+      if (ForceColors)
+        Stream.resetColor();
+      Stream << "]: ";
+      Stream << entry.second << "\n";
+    }
+  }
+
   return false;
 }
 

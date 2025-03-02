@@ -1525,15 +1525,8 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     info->ChildDiagnosticInfo = childInfoPtrs;
 
     SmallVector<std::string, 1> educationalNotePaths;
-    auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
-    while (associatedNotes && *associatedNotes) {
-      SmallString<128> notePath(getDiagnosticDocumentationPath());
-      llvm::sys::path::append(notePath, *associatedNotes);
-      educationalNotePaths.push_back(notePath.str().str());
-      ++associatedNotes;
-    }
 
-    // Capture information about the diagnostic group along with the remaining
+    // Capture information about the diagnostic group along with any
     // educational notes.
     auto groupID = diagnostic.getGroupID();
     if (groupID != DiagGroupID::no_group) {
@@ -1542,6 +1535,14 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
       SmallString<128> docPath(getDiagnosticDocumentationPath());
       llvm::sys::path::append(docPath, diagGroup.documentationFile);
       educationalNotePaths.push_back(docPath.str().str());
+    }
+
+    auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
+    while (associatedNotes && *associatedNotes) {
+      SmallString<128> notePath(getDiagnosticDocumentationPath());
+      llvm::sys::path::append(notePath, *associatedNotes);
+      educationalNotePaths.push_back(notePath.str().str());
+      ++associatedNotes;
     }
 
     info->EducationalNotePaths = educationalNotePaths;
@@ -1574,31 +1575,45 @@ llvm::StringRef DiagnosticEngine::diagnosticStringWithNameFor(
     DiagID id, DiagGroupID groupID,
     PrintDiagnosticNamesMode printDiagnosticNamesMode) {
   auto message = diagnosticStringFor(id);
-  auto formatMessageWithName = [&](StringRef message, StringRef name) {
-    const int additionalCharsLength = 3; // ' ', '[', ']'
-    std::string messageWithName;
-    messageWithName.reserve(message.size() + name.size() +
-                            additionalCharsLength);
-    messageWithName += message;
-    messageWithName += " [";
-    messageWithName += name;
-    messageWithName += "]";
-    return DiagnosticStringsSaver.save(messageWithName);
-  };
+  SmallVector<std::string, 1> names;
+
   switch (printDiagnosticNamesMode) {
   case PrintDiagnosticNamesMode::None:
     break;
   case PrintDiagnosticNamesMode::Identifier:
-    message = formatMessageWithName(message, diagnosticIDStringFor(id));
+    names.push_back(diagnosticIDStringFor(id).str());
     break;
   case PrintDiagnosticNamesMode::Group:
+    // Group name.
     if (groupID != DiagGroupID::no_group) {
-      message =
-          formatMessageWithName(message, getDiagGroupInfoByID(groupID).name);
+      names.push_back("^" + std::string(getDiagGroupInfoByID(groupID).name));
     }
+
     break;
   }
-  return message;
+
+  // Educational note names.
+  auto associatedNotes = educationalNotes[(uint32_t)id];
+  while (associatedNotes && *associatedNotes) {
+    SmallString<128> notePath(*associatedNotes);
+    names.push_back("^" + llvm::sys::path::stem(notePath).str());
+    ++associatedNotes;
+  }
+
+  if (names.empty())
+    return message;
+
+  std::string messageWithName;
+  messageWithName += message;
+  messageWithName += " [";
+  llvm::interleave(names.begin(), names.end(),
+                   [&](const std::string &name) {
+    messageWithName += name;
+  }, [&]() {
+    messageWithName += ", ";
+  });
+  messageWithName += "]";
+  return DiagnosticStringsSaver.save(messageWithName);
 }
 
 llvm::StringRef
