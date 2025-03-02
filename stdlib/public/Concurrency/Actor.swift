@@ -98,6 +98,11 @@ internal func _enqueueOnMain(_ job: UnownedJob)
 @available(SwiftStdlib 5.1, *)
 @freestanding(expression)
 public macro isolation<T>() -> T = Builtin.IsolationMacro
+
+@available(SwiftStdlib 5.1, *)
+@attached(body)
+public macro StartTask() =
+  #externalMacro(module: "SwiftMacros", type: "StartTaskMacro")
 #endif
 
 #if $IsolatedAny

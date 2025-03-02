@@ -7810,6 +7810,10 @@ ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())
 
+ERROR(experimental_macro,none,
+      "macro %0 is experimental",
+      (DeclName))
+
 ERROR(macro_resolve_circular_reference, none,
       "circular reference resolving %select{freestanding|attached}0 macro %1",
       (bool, DeclName))
