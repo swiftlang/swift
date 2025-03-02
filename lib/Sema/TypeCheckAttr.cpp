@@ -6962,6 +6962,13 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     return true;
   }
 
+  if (originalAFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() !=
+      derivative->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+    diags.diagnose(derivative->getLoc(),
+                   diag::derivative_attr_always_emit_into_client_mismatch);
+    return true;
+  }
+
   // Get the resolved differentiability parameter indices.
   auto *resolvedDiffParamIndices = attr->getParameterIndices();
 
