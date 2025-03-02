@@ -48,7 +48,7 @@ bool AvailabilityContext::Info::constrainWith(const Info &other) {
 }
 
 bool AvailabilityContext::Info::constrainWith(
-    const DeclAvailabilityConstraints &constraints, ASTContext &ctx) {
+    const DeclAvailabilityConstraints &constraints, const ASTContext &ctx) {
   bool isConstrained = false;
 
   for (auto constraint : constraints) {
@@ -155,7 +155,7 @@ void AvailabilityContext::Info::Profile(llvm::FoldingSetNodeID &ID) const {
   ID.AddBoolean(IsDeprecated);
 }
 
-bool AvailabilityContext::Info::verify(ASTContext &ctx) const {
+bool AvailabilityContext::Info::verify(const ASTContext &ctx) const {
   // Unavailable domains must be sorted to ensure folding set node lookups yield
   // consistent results.
   if (!llvm::is_sorted(UnavailableDomains,
@@ -167,18 +167,20 @@ bool AvailabilityContext::Info::verify(ASTContext &ctx) const {
 
 AvailabilityContext
 AvailabilityContext::forPlatformRange(const AvailabilityRange &range,
-                                      ASTContext &ctx) {
+                                      const ASTContext &ctx) {
   Info info{range, /*UnavailableDomains*/ {},
             /*IsDeprecated*/ false};
   return AvailabilityContext(Storage::get(info, ctx));
 }
 
-AvailabilityContext AvailabilityContext::forInliningTarget(ASTContext &ctx) {
+AvailabilityContext
+AvailabilityContext::forInliningTarget(const ASTContext &ctx) {
   return AvailabilityContext::forPlatformRange(
       AvailabilityRange::forInliningTarget(ctx), ctx);
 }
 
-AvailabilityContext AvailabilityContext::forDeploymentTarget(ASTContext &ctx) {
+AvailabilityContext
+AvailabilityContext::forDeploymentTarget(const ASTContext &ctx) {
   return AvailabilityContext::forPlatformRange(
       AvailabilityRange::forDeploymentTarget(ctx), ctx);
 }
@@ -205,7 +207,7 @@ bool AvailabilityContext::isDeprecated() const {
 }
 
 void AvailabilityContext::constrainWithContext(const AvailabilityContext &other,
-                                               ASTContext &ctx) {
+                                               const ASTContext &ctx) {
   bool isConstrained = false;
 
   Info info{storage->info};
@@ -218,7 +220,7 @@ void AvailabilityContext::constrainWithContext(const AvailabilityContext &other,
 }
 
 void AvailabilityContext::constrainWithPlatformRange(
-    const AvailabilityRange &platformRange, ASTContext &ctx) {
+    const AvailabilityRange &platformRange, const ASTContext &ctx) {
 
   Info info{storage->info};
   if (!constrainRange(info.Range, platformRange))
@@ -228,7 +230,7 @@ void AvailabilityContext::constrainWithPlatformRange(
 }
 
 void AvailabilityContext::constrainWithUnavailableDomain(
-    AvailabilityDomain domain, ASTContext &ctx) {
+    AvailabilityDomain domain, const ASTContext &ctx) {
   Info info{storage->info};
   if (!info.constrainUnavailability(domain))
     return;
@@ -289,6 +291,6 @@ void AvailabilityContext::print(llvm::raw_ostream &os) const {
 
 void AvailabilityContext::dump() const { print(llvm::errs()); }
 
-bool AvailabilityContext::verify(ASTContext &ctx) const {
+bool AvailabilityContext::verify(const ASTContext &ctx) const {
   return storage->info.verify(ctx);
 }
