@@ -2289,17 +2289,6 @@ bool AvailableAttr::isNoAsync() const {
   llvm_unreachable("Unhandled AvailableAttr::Kind in switch.");
 }
 
-llvm::VersionTuple
-SemanticAvailableAttr::getActiveVersion(const ASTContext &ctx) const {
-  if (isSwiftLanguageModeSpecific()) {
-    return ctx.LangOpts.EffectiveLanguageVersion;
-  } else if (isPackageDescriptionVersionSpecific()) {
-    return ctx.LangOpts.PackageDescriptionVersion;
-  } else {
-    return ctx.LangOpts.getMinPlatformVersion();
-  }
-}
-
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                TrailingWhereClause *clause, bool exported,
                                SpecializationKind kind,

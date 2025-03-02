@@ -454,24 +454,15 @@ std::optional<SemanticAvailableAttr> Decl::getDeprecatedAttr() const {
     if (attr.isUnconditionallyDeprecated())
       return attr;
 
-    auto deprecatedVersion = attr.getDeprecated();
-
-    AvailabilityDomain unusedDomain;
-    llvm::VersionTuple remappedDeprecatedVersion;
-    if (AvailabilityInference::updateDeprecatedAvailabilityDomainForFallback(
-            attr, ctx, unusedDomain, remappedDeprecatedVersion))
-      deprecatedVersion = remappedDeprecatedVersion;
-
-    if (!deprecatedVersion.has_value())
+    auto deprecatedRange = attr.getDeprecatedRange(ctx);
+    if (deprecatedRange.isKnownUnreachable())
       continue;
-
-    llvm::VersionTuple minVersion = attr.getActiveVersion(ctx);
 
     // We treat the declaration as deprecated if it is deprecated on
     // all deployment targets.
-    if (deprecatedVersion.value() <= minVersion) {
+    auto deploymentRange = attr.getDomain().getDeploymentRange(ctx);
+    if (deploymentRange && deploymentRange->isContainedIn(deprecatedRange))
       result.emplace(attr);
-    }
   }
   return result;
 }
@@ -485,14 +476,14 @@ std::optional<SemanticAvailableAttr> Decl::getSoftDeprecatedAttr() const {
     if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
       continue;
 
-    // FIXME: This needs to do a version remap.
-    auto deprecatedVersion = attr.getDeprecated();
-    if (!deprecatedVersion.has_value())
+    auto deprecatedRange = attr.getDeprecatedRange(ctx);
+    if (deprecatedRange.isKnownUnreachable())
       continue;
 
-    llvm::VersionTuple activeVersion = attr.getActiveVersion(ctx);
-
-    if (deprecatedVersion.value() > activeVersion)
+    // We treat the declaration as soft-deprecated if it is deprecated in a
+    // future version.
+    auto deploymentRange = attr.getDomain().getDeploymentRange(ctx);
+    if (!deploymentRange || !deploymentRange->isContainedIn(deprecatedRange))
       result.emplace(attr);
   }
   return result;
@@ -849,20 +840,20 @@ std::optional<llvm::VersionTuple> SemanticAvailableAttr::getIntroduced() const {
 
 AvailabilityRange
 SemanticAvailableAttr::getIntroducedRange(const ASTContext &Ctx) const {
-  assert(getDomain().isActive(Ctx));
+  DEBUG_ASSERT(getDomain().isActive(Ctx));
 
   auto *attr = getParsedAttr();
   if (!attr->getRawIntroduced().has_value())
     return AvailabilityRange::alwaysAvailable();
 
-  llvm::VersionTuple IntroducedVersion = getIntroduced().value();
-  AvailabilityDomain UnusedDomain;
-  llvm::VersionTuple RemappedIntroducedVersion;
+  llvm::VersionTuple introducedVersion = getIntroduced().value();
+  AvailabilityDomain unusedDomain;
+  llvm::VersionTuple remappedVersion;
   if (AvailabilityInference::updateIntroducedAvailabilityDomainForFallback(
-          *this, Ctx, UnusedDomain, RemappedIntroducedVersion))
-    IntroducedVersion = RemappedIntroducedVersion;
+          *this, Ctx, unusedDomain, remappedVersion))
+    introducedVersion = remappedVersion;
 
-  return AvailabilityRange{VersionRange::allGTE(IntroducedVersion)};
+  return AvailabilityRange{VersionRange::allGTE(introducedVersion)};
 }
 
 std::optional<llvm::VersionTuple> SemanticAvailableAttr::getDeprecated() const {
@@ -871,10 +862,46 @@ std::optional<llvm::VersionTuple> SemanticAvailableAttr::getDeprecated() const {
   return std::nullopt;
 }
 
+AvailabilityRange
+SemanticAvailableAttr::getDeprecatedRange(const ASTContext &Ctx) const {
+  DEBUG_ASSERT(getDomain().isActive(Ctx));
+
+  auto *attr = getParsedAttr();
+  if (!attr->getRawDeprecated().has_value())
+    return AvailabilityRange::neverAvailable();
+
+  llvm::VersionTuple deprecatedVersion = getDeprecated().value();
+  AvailabilityDomain unusedDomain;
+  llvm::VersionTuple remappedVersion;
+  if (AvailabilityInference::updateDeprecatedAvailabilityDomainForFallback(
+          *this, Ctx, unusedDomain, remappedVersion))
+    deprecatedVersion = remappedVersion;
+
+  return AvailabilityRange{VersionRange::allGTE(deprecatedVersion)};
+}
+
 std::optional<llvm::VersionTuple> SemanticAvailableAttr::getObsoleted() const {
   if (auto version = attr->getRawObsoleted())
     return canonicalizePlatformVersion(getPlatform(), *version);
   return std::nullopt;
+}
+
+AvailabilityRange
+SemanticAvailableAttr::getObsoletedRange(const ASTContext &Ctx) const {
+  DEBUG_ASSERT(getDomain().isActive(Ctx));
+
+  auto *attr = getParsedAttr();
+  if (!attr->getRawObsoleted().has_value())
+    return AvailabilityRange::neverAvailable();
+
+  llvm::VersionTuple obsoletedVersion = getObsoleted().value();
+  AvailabilityDomain unusedDomain;
+  llvm::VersionTuple remappedVersion;
+  if (AvailabilityInference::updateObsoletedAvailabilityDomainForFallback(
+          *this, Ctx, unusedDomain, remappedVersion))
+    obsoletedVersion = remappedVersion;
+
+  return AvailabilityRange{VersionRange::allGTE(obsoletedVersion)};
 }
 
 namespace {

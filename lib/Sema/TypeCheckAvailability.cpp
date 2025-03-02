@@ -2821,9 +2821,10 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
     return;
 
   auto Domain = Attr->getDomain();
+  auto DeprecatedRange = Attr->getDeprecatedRange(Context);
   llvm::VersionTuple DeprecatedVersion;
-  if (Attr->getDeprecated())
-    DeprecatedVersion = Attr->getDeprecated().value();
+  if (DeprecatedRange.hasMinimumVersion())
+    DeprecatedVersion = DeprecatedRange.getRawMinimumVersion();
 
   auto Message = Attr->getMessage();
   auto NewName = Attr->getRename();
@@ -2831,17 +2832,11 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
     Context.Diags
         .diagnose(ReferenceRange.Start, diag::availability_deprecated,
                   DeprecatedDecl, Attr->isPlatformSpecific(), Domain,
-                  Attr->getDeprecated().has_value(), DeprecatedVersion,
+                  !DeprecatedVersion.empty(), DeprecatedVersion,
                   /*message*/ StringRef())
         .highlight(Attr->getParsedAttr()->getRange());
     return;
   }
-
-  // FIXME: [availability] Remap before emitting diagnostic above.
-  llvm::VersionTuple RemappedDeprecatedVersion;
-  if (AvailabilityInference::updateDeprecatedAvailabilityDomainForFallback(
-          *Attr, Context, Domain, RemappedDeprecatedVersion))
-    DeprecatedVersion = RemappedDeprecatedVersion;
 
   SmallString<32> newNameBuf;
   std::optional<ReplacementDeclKind> replacementDeclKind =
@@ -2853,7 +2848,7 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
     Context.Diags
         .diagnose(ReferenceRange.Start, diag::availability_deprecated,
                   DeprecatedDecl, Attr->isPlatformSpecific(), Domain,
-                  Attr->getDeprecated().has_value(), DeprecatedVersion,
+                  !DeprecatedVersion.empty(), DeprecatedVersion,
                   EncodedMessage.Message)
         .highlight(Attr->getParsedAttr()->getRange());
   } else {
@@ -2862,7 +2857,7 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
     Context.Diags
         .diagnose(ReferenceRange.Start, diag::availability_deprecated_rename,
                   DeprecatedDecl, Attr->isPlatformSpecific(), Domain,
-                  Attr->getDeprecated().has_value(), DeprecatedVersion,
+                  !DeprecatedVersion.empty(), DeprecatedVersion,
                   replacementDeclKind.has_value(), rawReplaceKind, newName)
         .highlight(Attr->getParsedAttr()->getRange());
   }
@@ -2909,21 +2904,17 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
 
   auto domain = attr->getDomain();
+  auto deprecatedRange = attr->getDeprecatedRange(ctx);
   llvm::VersionTuple deprecatedVersion;
-  if (attr->getDeprecated())
-    deprecatedVersion = attr->getDeprecated().value();
-
-  llvm::VersionTuple remappedDeprecatedVersion;
-  if (AvailabilityInference::updateDeprecatedAvailabilityDomainForFallback(
-          *attr, ctx, domain, remappedDeprecatedVersion))
-    deprecatedVersion = remappedDeprecatedVersion;
+  if (deprecatedRange.hasMinimumVersion())
+    deprecatedVersion = deprecatedRange.getRawMinimumVersion();
 
   auto message = attr->getMessage();
   if (message.empty()) {
     ctx.Diags
         .diagnose(loc, diag::conformance_availability_deprecated, type, proto,
                   attr->isPlatformSpecific(), domain,
-                  attr->getDeprecated().has_value(), deprecatedVersion,
+                  !deprecatedVersion.empty(), deprecatedVersion,
                   /*message*/ StringRef())
         .highlight(attr->getParsedAttr()->getRange());
     return true;
@@ -2933,7 +2924,7 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
   ctx.Diags
       .diagnose(loc, diag::conformance_availability_deprecated, type, proto,
                 attr->isPlatformSpecific(), domain,
-                attr->getDeprecated().has_value(), deprecatedVersion,
+                !deprecatedVersion.empty(), deprecatedVersion,
                 encodedMessage.Message)
       .highlight(attr->getParsedAttr()->getRange());
   return true;

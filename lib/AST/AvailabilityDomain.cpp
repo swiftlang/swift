@@ -105,6 +105,31 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   }
 }
 
+static std::optional<llvm::VersionTuple>
+getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
+  switch (domain.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::Custom:
+    return std::nullopt;
+  case AvailabilityDomain::Kind::SwiftLanguage:
+    return ctx.LangOpts.EffectiveLanguageVersion;
+  case AvailabilityDomain::Kind::PackageDescription:
+    return ctx.LangOpts.PackageDescriptionVersion;
+  case AvailabilityDomain::Kind::Platform:
+    if (domain.isActive(ctx))
+      return ctx.LangOpts.getMinPlatformVersion();
+    return std::nullopt;
+  }
+}
+
+std::optional<AvailabilityRange>
+AvailabilityDomain::getDeploymentRange(const ASTContext &ctx) const {
+  if (auto version = getDeploymentVersion(*this, ctx))
+    return AvailabilityRange{VersionRange::allGTE(*version)};
+  return std::nullopt;
+}
+
 llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
   switch (getKind()) {
   case Kind::Universal:
