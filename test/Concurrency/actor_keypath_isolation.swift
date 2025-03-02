@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -emit-sil -o /dev/null -verify  -verify-additional-prefix swift5- -swift-version 5 %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -emit-sil -o /dev/null -verify -verify-additional-prefix swift6- -swift-version 6 %s
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 class Box {
     let size : Int = 0
@@ -48,8 +47,9 @@ func tryKeyPathsMisc(d : Door) {
 
     // in combination with other key paths
 
-    _ = (\Door.letBox).appending(path:  // expected-warning {{cannot form key path to actor-isolated property 'letBox'; this is an error in the Swift 6 language mode}}
-                                       \Box?.?.size)
+    _ = (\Door.letBox).appending(path: \Box?.?.size)
+    // expected-swift5-warning@-1 {{cannot form key path to actor-isolated property 'letBox'; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-2 {{cannot form key path to actor-isolated property 'letBox'}}
 
     _ = (\Door.varBox).appending(path:  // expected-error {{cannot form key path to actor-isolated property 'varBox'}}
                                        \Box.size)
@@ -58,18 +58,26 @@ func tryKeyPathsMisc(d : Door) {
 
 func tryKeyPathsFromAsync() async {
     _ = \Door.unsafeGlobActor_immutable
-    _ = \Door.unsafeGlobActor_mutable // expected-warning {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'; this is an error in the Swift 6 language mode}}
+    _ = \Door.unsafeGlobActor_mutable
+    // expected-swift5-warning@-1 {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-2 {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'}}
 }
 
 func tryNonSendable() {
-    _ = \Door.letDict[0] // expected-warning {{cannot form key path to actor-isolated property 'letDict'; this is an error in the Swift 6 language mode}}
+    _ = \Door.letDict[0]
+    // expected-swift5-warning@-1 {{cannot form key path to actor-isolated property 'letDict'; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-2 {{cannot form key path to actor-isolated property 'letDict'}}
     _ = \Door.varDict[0] // expected-error {{cannot form key path to actor-isolated property 'varDict'}}
-    _ = \Door.letBox!.size // expected-warning {{cannot form key path to actor-isolated property 'letBox'; this is an error in the Swift 6 language mode}}
+    _ = \Door.letBox!.size
+    // expected-swift5-warning@-1 {{cannot form key path to actor-isolated property 'letBox'; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-2 {{cannot form key path to actor-isolated property 'letBox'}}
 }
 
 func tryKeypaths() {
     _ = \Door.unsafeGlobActor_immutable
-    _ = \Door.unsafeGlobActor_mutable // expected-warning {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'; this is an error in the Swift 6 language mode}}
+    _ = \Door.unsafeGlobActor_mutable
+    // expected-swift5-warning@-1 {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-2 {{cannot form key path to main actor-isolated property 'unsafeGlobActor_mutable'}}
 
     _ = \Door.immutable
     _ = \Door.globActor_immutable
@@ -84,7 +92,52 @@ func tryKeypaths() {
     let _ : PartialKeyPath<Door> = \.mutable // expected-error{{cannot form key path to actor-isolated property 'mutable'}}
     let _ : AnyKeyPath = \Door.mutable  // expected-error{{cannot form key path to actor-isolated property 'mutable'}}
 
-    _ = \Door.globActor_mutable // expected-warning {{cannot form key path to main actor-isolated property 'globActor_mutable'; this is an error in the Swift 6 language mode}}
+    _ = \Door.globActor_mutable
+    // expected-swift5-warning@-1 {{cannot form key path to main actor-isolated property 'globActor_mutable'; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-2 {{cannot form key path to main actor-isolated property 'globActor_mutable'}}
     _ = \Door.[0] // expected-error{{cannot form key path to actor-isolated subscript 'subscript(_:)'}}
-    _ = \Door.["hello"] // expected-warning {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in the Swift 6 language mode}}
+    _ = \Door.["hello"]
+    // expected-swift5-warning@-1 {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-2 {{cannot form key path to main actor-isolated subscript 'subscript(_:)'}}
+}
+
+// Make sure that these diagnostics have a source location.
+do {
+  struct S1 {
+    @MainActor
+    var prop: Int { get {} }
+  }
+  @dynamicMemberLookup struct S2 {
+    subscript(dynamicMember keyPath: KeyPath<S1, Int>) -> Int { get {} }
+  }
+  @dynamicMemberLookup struct S3 {
+    subscript(dynamicMember keyPath: KeyPath<S2, Int>) -> Int { get {} }
+  }
+
+  nonisolated func test(s3: S3) {
+    let _ = s3.prop
+    // expected-swift5-warning@-1:15 {{cannot form key path that captures non-sendable type 'KeyPath<S1, Int>'; this is an error in the Swift 6 language mode}}
+    // expected-swift5-warning@-2:16 {{cannot form key path to main actor-isolated property 'prop'; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-3:16 {{cannot form key path to main actor-isolated property 'prop'}}
+  }
+}
+do {
+  struct S1 {
+    var prop: Int { get {} }
+  }
+  @dynamicMemberLookup struct S2 {
+    @MainActor
+    subscript(dynamicMember keyPath: KeyPath<S1, Int>) -> Int { get {} }
+    // expected-note@-1 {{'subscript(dynamicMember:)' declared here}}
+  }
+  @dynamicMemberLookup struct S3 {
+    subscript(dynamicMember keyPath: KeyPath<S2, Int>) -> Int { get {} }
+  }
+
+  nonisolated func test(s3: S3) {
+    let _ = s3.prop // s3[dynamicMember: \.[dynamicMember: \.prop]]
+    // expected-swift5-warning@-1:15 {{cannot form key path that captures non-sendable type 'KeyPath<S1, Int>'; this is an error in the Swift 6 language mode}}
+    // expected-swift5-warning@-2:15 {{cannot form key path to main actor-isolated subscript 'subscript(dynamicMember:)'; this is an error in the Swift 6 language mode}}
+    // expected-swift6-error@-3:15 {{cannot form key path to main actor-isolated subscript 'subscript(dynamicMember:)'}}
+  }
 }
