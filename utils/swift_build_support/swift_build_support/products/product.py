@@ -379,6 +379,8 @@ class Product(object):
     def get_linux_sysroot(self, platform, arch):
         if not self.is_cross_compile_target('{}-{}'.format(platform, arch)):
             return None
+        if self.args.cross_compile_sysroots:
+            return self.args.cross_compile_sysroots
         sysroot_arch, _, abi = self.get_linux_target_components(arch)
         # $ARCH-$PLATFORM-$ABI
         # E.x.: aarch64-linux-gnu
@@ -478,6 +480,11 @@ class Product(object):
 
         if self.is_release():
             cross_flags.append('-fno-stack-protector')
+
+        # Use lld if external sysroot is provided
+        if (self.is_cross_compile_target('{}-{}'.format(platform, arch))
+                and self.args.cross_compile_sysroots):
+            cross_flags.append('-w -fuse-ld=lld')
 
         return self.common_c_flags + cross_flags
 
