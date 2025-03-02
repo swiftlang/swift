@@ -67,7 +67,7 @@ extension UTF8Span {
         if s.value < 0x300 {
           continue
         }
-        TODO("Adapt _StringGutsSlice._fastNFCCheck()")
+        TODO("Refactor and adapt _StringGutsSlice._fastNFCCheck()")
       }
       self._countAndFlags |= Self._nfcBit
       return true

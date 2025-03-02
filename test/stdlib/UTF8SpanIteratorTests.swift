@@ -34,7 +34,7 @@ struct ContentEquivalenceTestCase {
 
   func withUTF8Span<R>(_ f: (UTF8Span) throws -> R) rethrows -> R {
     try Array(str.utf8).withSpan { span in 
-      try f(try! UTF8Span(_validating: span))
+      try f(try! UTF8Span(validating: span))
     }
   }
 
@@ -42,7 +42,7 @@ struct ContentEquivalenceTestCase {
     let otherBytes = Array((str+"abc").utf8)
 
     withUTF8Span { utf8Span in
-      utf8Span.withUnsafeBufferPointer {
+      utf8Span._withUnsafeBufferPointer {
         expectEqualSequence(str.utf8, $0, stackTrace: loc)
       }
     }

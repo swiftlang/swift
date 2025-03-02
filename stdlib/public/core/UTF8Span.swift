@@ -243,22 +243,34 @@ extension UTF8Span {
 
 }
 
+@available(SwiftStdlib 6.1, *)
+extension UTF8Span {
+  public static func ~=(_ lhs: StaticString, _ rhs: UTF8Span) -> Bool {
+    return lhs.withUTF8Buffer { str in
+      rhs._withUnsafeBufferPointer { span in
+        str.elementsEqual(span)
+      }
+    }
+  }
+}
+
+
 func TODO(_ message: String) -> Never {
-  fatalError("TODO: message")
+  fatalError("TODO: \(message)")
 }
 
 // TODO(toolchain): decide if we rebase on top of Guillaume's work
 @available(SwiftStdlib 6.1, *)
 extension String {
   public var utf8Span: UTF8Span {
-    TODO("Decide when to rebase on top of Guillaume's PR")
+    TODO("Decide whether to rebase on top of Span PR or wait for merge")
   }
 }
 
 @available(SwiftStdlib 6.1, *)
 extension Substring {
   public var utf8Span: UTF8Span {
-    TODO("Decide when to rebase on top of Guillaume's PR")
+    TODO("Decide whether to rebase on top of Span PR or wait for merge")
   }
 }
 

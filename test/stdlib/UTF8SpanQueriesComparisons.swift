@@ -17,7 +17,7 @@ extension Array where Element == UInt8 {
   }
   func withUTF8Span<R>(_ f: (UTF8Span) throws -> R) rethrows -> R {
     try self.withSpan { span in
-      try f(try! UTF8Span(_validating: span))
+      try f(try! UTF8Span(validating: span))
     }
   }
 }
