@@ -57,10 +57,10 @@ bool AvailabilityContext::Info::constrainWith(
     switch (constraint.getReason()) {
     case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
     case AvailabilityConstraint::Reason::Obsoleted:
-    case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
+    case AvailabilityConstraint::Reason::UnavailableForDeployment:
       isConstrained |= constrainUnavailability(domain);
       break;
-    case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
+    case AvailabilityConstraint::Reason::PotentiallyUnavailable:
       // FIXME: [availability] Support versioning for other kinds of domains.
       DEBUG_ASSERT(domain.isPlatform());
       if (domain.isPlatform())
@@ -188,7 +188,6 @@ AvailabilityContext::forDeploymentTarget(const ASTContext &ctx) {
 
 AvailabilityRange AvailabilityContext::getPlatformRange() const {
   return storage->info.PlatformRange;
-}
 }
 
 bool AvailabilityContext::isUnavailable() const {
