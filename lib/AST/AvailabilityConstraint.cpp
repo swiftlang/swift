@@ -148,20 +148,10 @@ getAvailabilityConstraintForAttr(const Decl *decl,
     return AvailabilityConstraint::unconditionallyUnavailable(attr);
 
   auto &ctx = decl->getASTContext();
-  auto deploymentVersion = attr.getActiveVersion(ctx);
-  auto deploymentRange =
-      AvailabilityRange(VersionRange::allGTE(deploymentVersion));
-  std::optional<llvm::VersionTuple> obsoletedVersion = attr.getObsoleted();
+  auto deploymentRange = attr.getDomain().getDeploymentRange(ctx);
 
-  {
-    AvailabilityDomain unusedDomain;
-    llvm::VersionTuple remappedObsoletedVersion;
-    if (AvailabilityInference::updateObsoletedAvailabilityDomainForFallback(
-            attr, ctx, unusedDomain, remappedObsoletedVersion))
-      obsoletedVersion = remappedObsoletedVersion;
-  }
-
-  if (obsoletedVersion && *obsoletedVersion <= deploymentVersion)
+  auto obsoletedRange = attr.getObsoletedRange(ctx);
+  if (deploymentRange && deploymentRange->isContainedIn(obsoletedRange))
     return AvailabilityConstraint::obsoleted(attr);
 
   AvailabilityRange introducedRange = attr.getIntroducedRange(ctx);
@@ -170,7 +160,8 @@ getAvailabilityConstraintForAttr(const Decl *decl,
   if (attr.isPlatformSpecific()) {
     if (!context.getPlatformRange().isContainedIn(introducedRange))
       return AvailabilityConstraint::introducedInLaterDynamicVersion(attr);
-  } else if (!deploymentRange.isContainedIn(introducedRange)) {
+  } else if (deploymentRange &&
+             !deploymentRange->isContainedIn(introducedRange)) {
     return AvailabilityConstraint::introducedInLaterVersion(attr);
   }
 
