@@ -9962,6 +9962,12 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
     if (!nd)
       continue;
 
+    if (!swiftDecl->getASTContext().LangOpts.hasFeature(
+            Feature::ImportCxxNonPublicBaseMembers) &&
+        (nd->getAccess() == clang::AS_private ||
+         nd->getAccess() == clang::AS_protected))
+      continue;
+
     // Currently, we don't import unnamed bitfields.
     if (isa<clang::FieldDecl>(m) &&
         cast<clang::FieldDecl>(m)->isUnnamedBitField())
@@ -10029,6 +10035,11 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   // If this is a C++ record, look through the base classes too.
   if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) {
     for (auto base : cxxRecord->bases()) {
+      if (!swiftDecl->getASTContext().LangOpts.hasFeature(
+              Feature::ImportCxxNonPublicBaseMembers) &&
+          base.getAccessSpecifier() != clang::AS_public)
+        continue;
+
       clang::QualType baseType = base.getType();
       if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();
