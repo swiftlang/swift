@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -214,7 +214,8 @@ void BridgedData_free(BridgedData data);
 //===----------------------------------------------------------------------===//
 
 enum ENUM_EXTENSIBILITY_ATTR(open) BridgedFeature {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description) FeatureName,
+#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
+  FeatureName,
 #include "swift/Basic/Features.def"
 };
 
