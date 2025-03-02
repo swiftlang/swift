@@ -694,7 +694,7 @@ void toolchains::Darwin::addCommonFrontendArgs(
     llvm::raw_string_ostream os(dwarfVersion);
     os << "-dwarf-version=";
     if (OI.DWARFVersion)
-      os << *OI.DWARFVersion;
+      os << std::to_string(*OI.DWARFVersion);
     else
       os << getDWARFVersionForTriple(getTriple());
   }
