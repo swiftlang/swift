@@ -293,8 +293,11 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
     }
 
     if (auto *mdi = dyn_cast<MarkDependenceInst>(user)) {
-      // If this is the base, just treat it as a liveness use.
+      // TODO: continue walking the dependent value, which may not be an
+      // address. See AddressUtils.swift. Until that is implemented, this must
+      // be considered a pointer escape.
       if (op->get() == mdi->getBase()) {
+        meet(AddressUseKind::PointerEscape);
         callVisitUse(op);
         continue;
       }
