@@ -826,7 +826,7 @@ InferredGenericSignatureRequest::evaluate(
 
       for (auto *gpDecl : *gpList) {
         if (gpDecl->isValue() &&
-            !gpDecl->getASTContext().LangOpts.hasFeature(Feature::ValueGenerics))
+            !gpDecl->getASTContext().LangOpts.hasFeature(Feature::ValueGenerics2))
           gpDecl->diagnose(diag::value_generics_missing_feature);
 
         auto *gpType = gpDecl->getDeclaredInterfaceType()

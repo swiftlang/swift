@@ -403,6 +403,10 @@ bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
 }
 
 static bool usesFeatureValueGenerics(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureValueGenerics2(Decl *decl) {
   auto genericContext = decl->getAsGenericContext();
 
   if (!genericContext || !genericContext->getGenericParams())

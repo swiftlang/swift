@@ -464,7 +464,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// Be strict about the Sendable conformance of metatypes.
 EXPERIMENTAL_FEATURE(StrictSendableMetatypes, true)
 
-
 /// Allow public enumerations to be extensible by default
 /// regardless of whether the module they are declared in
 /// is resilient or not.
@@ -472,6 +471,9 @@ EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
 
 /// Allow isolated conformances.
 EXPERIMENTAL_FEATURE(IsolatedConformances, true)
+
+// Enable values in generic signatures, e.g. <let N: Int>
+EXPERIMENTAL_FEATURE(ValueGenerics2, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
