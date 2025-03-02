@@ -29,7 +29,7 @@ class DeclAvailabilityConstraints;
 class AvailabilityContext::Info {
 public:
   /// The introduction version.
-  AvailabilityRange Range;
+  AvailabilityRange PlatformRange;
 
   /// A sorted collection of disjoint domains that are known to be
   /// unavailable in this context.

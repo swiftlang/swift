@@ -40,7 +40,7 @@ static bool constrainRange(AvailabilityRange &existing,
 
 bool AvailabilityContext::Info::constrainWith(const Info &other) {
   bool isConstrained = false;
-  isConstrained |= constrainRange(Range, other.Range);
+  isConstrained |= constrainRange(PlatformRange, other.PlatformRange);
   isConstrained |= constrainUnavailability(other.UnavailableDomains);
   isConstrained |= CONSTRAIN_BOOL(IsDeprecated, other.IsDeprecated);
 
@@ -64,7 +64,8 @@ bool AvailabilityContext::Info::constrainWith(
       // FIXME: [availability] Support versioning for other kinds of domains.
       DEBUG_ASSERT(domain.isPlatform());
       if (domain.isPlatform())
-        isConstrained |= constrainRange(Range, attr.getIntroducedRange(ctx));
+        isConstrained |=
+            constrainRange(PlatformRange, attr.getIntroducedRange(ctx));
       break;
     }
   }
@@ -121,7 +122,7 @@ bool AvailabilityContext::Info::constrainUnavailability(
 
 bool AvailabilityContext::Info::isContainedIn(const Info &other) const {
   // The available versions range be the same or smaller.
-  if (!Range.isContainedIn(other.Range))
+  if (!PlatformRange.isContainedIn(other.PlatformRange))
     return false;
 
   // Every unavailable domain in the other context should be contained in some
@@ -147,7 +148,7 @@ bool AvailabilityContext::Info::isContainedIn(const Info &other) const {
 }
 
 void AvailabilityContext::Info::Profile(llvm::FoldingSetNodeID &ID) const {
-  Range.getRawVersionRange().Profile(ID);
+  PlatformRange.getRawVersionRange().Profile(ID);
   ID.AddInteger(UnavailableDomains.size());
   for (auto domain : UnavailableDomains) {
     domain.Profile(ID);
@@ -186,7 +187,8 @@ AvailabilityContext::forDeploymentTarget(const ASTContext &ctx) {
 }
 
 AvailabilityRange AvailabilityContext::getPlatformRange() const {
-  return storage->info.Range;
+  return storage->info.PlatformRange;
+}
 }
 
 bool AvailabilityContext::isUnavailable() const {
@@ -223,7 +225,7 @@ void AvailabilityContext::constrainWithPlatformRange(
     const AvailabilityRange &platformRange, const ASTContext &ctx) {
 
   Info info{storage->info};
-  if (!constrainRange(info.Range, platformRange))
+  if (!constrainRange(info.PlatformRange, platformRange))
     return;
 
   storage = Storage::get(info, ctx);
@@ -253,7 +255,7 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
       swift::getAvailabilityConstraintsForDecl(decl, *this, flags);
   isConstrained |= info.constrainWith(constraints, decl->getASTContext());
   isConstrained |= CONSTRAIN_BOOL(info.IsDeprecated, decl->isDeprecated());
-  isConstrained |= constrainRange(info.Range, platformRange);
+  isConstrained |= constrainRange(info.PlatformRange, platformRange);
 
   if (!isConstrained)
     return;
