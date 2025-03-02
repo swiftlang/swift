@@ -193,6 +193,7 @@ public class AnyKeyPath: _AppendKeyPath {
 
         if optNextType == nil { return .some(offset) }
       }
+      fatalError()
     }
     #else
     // compiler optimizes _storedInlineOffset into a direct offset computation,
@@ -271,6 +272,7 @@ extension AnyKeyPath: Hashable {
             return true
           }
         }
+        fatalError()
       }
     }
   }
@@ -432,6 +434,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
             }
           }
         }
+        fatalError()
       }
     }
   }

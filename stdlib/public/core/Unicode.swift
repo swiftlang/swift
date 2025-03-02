@@ -585,6 +585,7 @@ public func transcode<
     }
     OutputEncoding.encodedReplacementCharacter.forEach(processCodeUnit)
   }
+  fatalError()
 }
 
 /// Instances of conforming types are used in internal `String`
