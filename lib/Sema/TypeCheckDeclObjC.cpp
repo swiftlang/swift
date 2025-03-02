@@ -3436,6 +3436,7 @@ private:
     WrongWritability,
     WrongRequiredAttr,
     WrongForeignErrorConvention,
+    WrongSendability,
 
     Match,
     MatchWithExplicitObjCName,
@@ -3622,70 +3623,93 @@ private:
     return lhs == rhs;
   }
 
-  static bool matchParamTypes(Type reqTy, Type implTy, ValueDecl *implDecl) {
+  static MatchOutcome matchParamTypes(Type reqTy, Type implTy,
+                                      ValueDecl *implDecl) {
     TypeMatchOptions matchOpts = {};
-
     // Try a plain type match.
     if (implTy->matchesParameter(reqTy, matchOpts))
-      return true;
+      return MatchOutcome::Match;
 
-    // If the implementation type is IUO, try unwrapping it.
-    if (auto unwrappedImplTy = implTy->getOptionalObjectType())
-      return implDecl->isImplicitlyUnwrappedOptional()
-                && unwrappedImplTy->matchesParameter(reqTy, matchOpts);
+    // Try to drop `@Sendable`.
+    {
+      auto ignoreSendable =
+          matchOpts | TypeMatchFlags::IgnoreFunctionSendability;
 
-    return false;
+      if (implTy->matchesParameter(reqTy, ignoreSendable))
+        return MatchOutcome::WrongSendability;
+    }
+
+    if (implDecl) {
+      // If the implementation type is IUO, try unwrapping it.
+      if (auto unwrappedImplTy = implTy->getOptionalObjectType())
+        return implDecl->isImplicitlyUnwrappedOptional() &&
+                       unwrappedImplTy->matchesParameter(reqTy, matchOpts)
+                   ? MatchOutcome::Match
+                   : MatchOutcome::WrongType;
+    }
+
+    return MatchOutcome::WrongType;
   }
 
-  static bool matchTypes(Type reqTy, Type implTy, ValueDecl *implDecl) {
+  static MatchOutcome matchTypes(Type reqTy, Type implTy, ValueDecl *implDecl) {
     TypeMatchOptions matchOpts = {};
 
     // Try a plain type match.
     if (reqTy->matches(implTy, matchOpts))
-      return true;
+      return MatchOutcome::Match;
 
     // If the implementation type is optional, try unwrapping it.
     if (auto unwrappedImplTy = implTy->getOptionalObjectType())
-      return implDecl->isImplicitlyUnwrappedOptional()
-                  && reqTy->matches(unwrappedImplTy, matchOpts);
+      return implDecl->isImplicitlyUnwrappedOptional() &&
+                     reqTy->matches(unwrappedImplTy, matchOpts)
+                 ? MatchOutcome::Match
+                 : MatchOutcome::WrongType;
 
     // Apply these rules to the result type and parameters if it's a function
     // type.
-    if (auto funcReqTy = reqTy->getAs<AnyFunctionType>())
-      if (auto funcImplTy = implTy->getAs<AnyFunctionType>())
-        return funcReqTy->matchesFunctionType(funcImplTy, matchOpts,
-                                              [=]() -> bool {
-          auto reqParams = funcReqTy->getParams();
-          auto implParams = funcImplTy->getParams();
-          if (reqParams.size() != implParams.size())
-            return false;
-
-          ParameterList *implParamList = nullptr;
-          if (auto afd = dyn_cast<AbstractFunctionDecl>(implDecl))
-            implParamList = afd->getParameters();
-
-          for (auto i : indices(reqParams)) {
-            const auto &reqParam = reqParams[i];
-            const auto &implParam = implParams[i];
-            if (implParamList) {
-              // Some of the parameters may be IUOs; apply special logic.
-              if (!matchParamTypes(reqParam.getOldType(),
-                                   implParam.getOldType(),
-                                   implParamList->get(i)))
+    if (auto funcReqTy = reqTy->getAs<AnyFunctionType>()) {
+      if (auto funcImplTy = implTy->getAs<AnyFunctionType>()) {
+        bool hasSendabilityMismatches = false;
+        bool isMatch = funcReqTy->matchesFunctionType(
+            funcImplTy, matchOpts, [=, &hasSendabilityMismatches]() -> bool {
+              auto reqParams = funcReqTy->getParams();
+              auto implParams = funcImplTy->getParams();
+              if (reqParams.size() != implParams.size())
                 return false;
-            } else {
-              // IUOs not allowed here; apply ordinary logic.
-              if (!reqParam.getOldType()->matchesParameter(
-                      implParam.getOldType(), matchOpts))
-                return false;
-            }
-          }
 
-          return matchTypes(funcReqTy->getResult(), funcImplTy->getResult(),
-                            implDecl);
-        });
+              ParameterList *implParamList = nullptr;
+              if (auto afd = dyn_cast<AbstractFunctionDecl>(implDecl))
+                implParamList = afd->getParameters();
 
-    return false;
+              for (auto i : indices(reqParams)) {
+                const auto &reqParam = reqParams[i];
+                const auto &implParam = implParams[i];
+
+                auto outcome = matchParamTypes(
+                    reqParam.getOldType(), implParam.getOldType(),
+                    implParamList ? implParamList->get(i) : nullptr);
+
+                if (outcome == MatchOutcome::WrongSendability)
+                  hasSendabilityMismatches = true;
+
+                if (outcome < MatchOutcome::WrongSendability)
+                  return false;
+              }
+
+              return matchTypes(funcReqTy->getResult(), funcImplTy->getResult(),
+                                implDecl) == MatchOutcome::Match;
+            });
+
+        if (isMatch) {
+          return hasSendabilityMismatches ? MatchOutcome::WrongSendability
+                                          : MatchOutcome::Match;
+        }
+
+        return MatchOutcome::WrongType;
+      }
+    }
+
+    return MatchOutcome::WrongType;
   }
 
   static Type getMemberType(ValueDecl *decl) {
@@ -3730,7 +3754,9 @@ private:
     if (cand->getKind() != req->getKind())
       return MatchOutcome::WrongDeclKind;
 
-    if (!matchTypes(getMemberType(req), getMemberType(cand), cand))
+    auto matchTypesOutcome =
+        matchTypes(getMemberType(req), getMemberType(cand), cand);
+    if (matchTypesOutcome == MatchOutcome::WrongType)
       return MatchOutcome::WrongType;
 
     if (auto reqVar = dyn_cast<AbstractStorageDecl>(req))
@@ -3750,6 +3776,15 @@ private:
     // If we got here, everything matched. But at what quality?
     if (explicitObjCName)
       return MatchOutcome::MatchWithExplicitObjCName;
+
+    // Sendable mismatches are downgraded to warnings because ObjC
+    // declarations are `@preconcurrency`, we need to make sure
+    // that there are no other problems before returning `WrongSendability`.
+    if (matchTypesOutcome == MatchOutcome::WrongSendability)
+      return MatchOutcome::WrongSendability;
+
+    ASSERT(matchTypesOutcome == MatchOutcome::Match &&
+           "unexpected matchTypes() return");
 
     return MatchOutcome::Match;
   }
@@ -3786,6 +3821,13 @@ private:
       // Successful outcomes!
       // If this member will require a vtable entry, diagnose that now.
       diagnoseVTableUse(cand);
+      return;
+
+    case MatchOutcome::WrongSendability:
+      diagnose(cand, diag::objc_implementation_sendability_mismatch, cand,
+               getMemberType(cand), getMemberType(req))
+          .limitBehaviorWithPreconcurrency(DiagnosticBehavior::Warning,
+                                           /*preconcurrency*/ true);
       return;
 
     case MatchOutcome::WrongImplicitObjCName:

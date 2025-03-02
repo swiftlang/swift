@@ -3873,10 +3873,11 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
   // Note: we might pass a constant attribute when typechecker is nullptr.
   // Any modification to attr must be guarded by a null check on TC.
   //
-  SmallVector<ValueDecl *, 4> results;
-  lookupReplacedDecl(replacedFunctionName, attr, base, results);
+  SmallVector<ValueDecl *, 4> lookupResults;
+  lookupReplacedDecl(replacedFunctionName, attr, base, lookupResults);
 
-  for (auto *result : results) {
+  SmallVector<AbstractFunctionDecl *, 4> candidates;
+  for (auto *result : lookupResults) {
     // Protocol requirements are not replaceable.
     if (isa<ProtocolDecl>(result->getDeclContext()))
       continue;
@@ -3884,51 +3885,94 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
     if (result->isStatic() != base->isStatic())
       continue;
 
-    auto resultTy = result->getInterfaceType();
-    auto replaceTy = base->getInterfaceType();
-    TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
-    matchMode |= TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
-    if (resultTy->matches(replaceTy, matchMode)) {
-      if (forDynamicReplacement && !result->isDynamic()) {
-        if (Diags) {
-          Diags->diagnose(attr->getLocation(),
-                          diag::dynamic_replacement_function_not_dynamic,
-                          result->getName());
-          attr->setInvalid();
-        }
-        return nullptr;
-      }
-      return cast<AbstractFunctionDecl>(result);
-    }
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(result))
+      candidates.push_back(AFD);
   }
+
+  if (candidates.empty()) {
+    if (Diags) {
+      Diags->diagnose(attr->getLocation(),
+                      forDynamicReplacement
+                          ? diag::dynamic_replacement_function_not_found
+                          : diag::specialize_target_function_not_found,
+                      replacedFunctionName);
+    }
+
+    attr->setInvalid();
+    return nullptr;
+  }
+
+  auto replaceTy = base->getInterfaceType();
+
+  // Filter based on the exact type match first.
+  SmallVector<AbstractFunctionDecl *> matches;
+  llvm::copy_if(candidates, std::back_inserter(matches),
+                [&replaceTy](AbstractFunctionDecl *F) {
+                  auto resultTy = F->getInterfaceType();
+                  TypeMatchOptions matchMode =
+                      TypeMatchFlags::AllowABICompatible;
+                  matchMode |=
+                      TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
+                  return resultTy->matches(replaceTy, matchMode);
+                });
+
+  // If there are no exact matches, strip sendability annotations
+  // from functions imported from Objective-C. This is a narrow
+  // fix for now but it could be extended to cover all `@preconcurrency`
+  // declarations.
+  if (matches.empty()) {
+    llvm::copy_if(candidates, std::back_inserter(matches),
+                  [&replaceTy](AbstractFunctionDecl *F) {
+                    if (!F->hasClangNode())
+                      return false;
+
+                    auto resultTy = F->getInterfaceType();
+                    TypeMatchOptions matchMode =
+                        TypeMatchFlags::AllowABICompatible;
+                    matchMode |=
+                        TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
+                    matchMode |= TypeMatchFlags::IgnoreFunctionSendability;
+                    matchMode |= TypeMatchFlags::IgnoreSendability;
+                    return resultTy->matches(replaceTy, matchMode);
+                  });
+  }
+
+  if (matches.size() == 1) {
+    auto result = matches.front();
+    if (forDynamicReplacement && !result->isDynamic()) {
+      if (Diags) {
+        Diags->diagnose(attr->getLocation(),
+                        diag::dynamic_replacement_function_not_dynamic,
+                        result->getName());
+        attr->setInvalid();
+      }
+      return nullptr;
+    }
+
+    return result;
+  }
+
+  attr->setInvalid();
 
   if (!Diags)
     return nullptr;
 
-  if (results.empty()) {
-    Diags->diagnose(attr->getLocation(),
-                    forDynamicReplacement
-                        ? diag::dynamic_replacement_function_not_found
-                        : diag::specialize_target_function_not_found,
-                    replacedFunctionName);
-  } else {
-    Diags->diagnose(attr->getLocation(),
-                    forDynamicReplacement
-                        ? diag::dynamic_replacement_function_of_type_not_found
-                        : diag::specialize_target_function_of_type_not_found,
-                    replacedFunctionName,
-                    base->getInterfaceType()->getCanonicalType());
+  Diags->diagnose(attr->getLocation(),
+                  forDynamicReplacement
+                      ? diag::dynamic_replacement_function_of_type_not_found
+                      : diag::specialize_target_function_of_type_not_found,
+                  replacedFunctionName,
+                  base->getInterfaceType()->getCanonicalType());
 
-    for (auto *result : results) {
-      Diags->diagnose(SourceLoc(),
-                      forDynamicReplacement
-                          ? diag::dynamic_replacement_found_function_of_type
-                          : diag::specialize_found_function_of_type,
-                      result->getName(),
-                      result->getInterfaceType()->getCanonicalType());
-    }
+  for (auto *result : matches) {
+    Diags->diagnose(SourceLoc(),
+                    forDynamicReplacement
+                        ? diag::dynamic_replacement_found_function_of_type
+                        : diag::specialize_found_function_of_type,
+                    result->getName(),
+                    result->getInterfaceType()->getCanonicalType());
   }
-  attr->setInvalid();
+
   return nullptr;
 }
 
