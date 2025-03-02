@@ -423,6 +423,9 @@ EXPERIMENTAL_FEATURE(SafeInteropWrappers, false)
 /// Ignore resilience errors due to C++ types.
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 
+/// Import inherited non-public members when importing C++ classes.
+EXPERIMENTAL_FEATURE(ImportCxxNonPublicBaseMembers, false)
+
 // Isolated deinit
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 

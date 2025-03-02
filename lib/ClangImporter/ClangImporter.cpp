@@ -6219,6 +6219,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         recordDecl->getClangDecl())
       continue;
 
+    if (!ctx.LangOpts.hasFeature(Feature::ImportCxxNonPublicBaseMembers) &&
+        (found->getAccess() == clang::AS_private ||
+         found->getAccess() == clang::AS_protected))
+      continue;
+
     // Don't import constructors on foreign reference types.
     if (isa<clang::CXXConstructorDecl>(found) && isa<ClassDecl>(recordDecl))
       continue;
@@ -6271,6 +6276,10 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       foundNameArities.insert(getArity(valueDecl));
 
     for (auto base : cxxRecord->bases()) {
+      if (!ctx.LangOpts.hasFeature(Feature::ImportCxxNonPublicBaseMembers) &&
+          base.getAccessSpecifier() != clang::AS_public)
+        continue;
+
       clang::QualType baseType = base.getType();
       if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();
