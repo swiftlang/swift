@@ -3309,8 +3309,8 @@ public:
   /// The source range of the `introduced:` version component.
   SourceRange getIntroducedSourceRange() const { return attr->IntroducedRange; }
 
-  /// Returns the effective range in which the declaration with this attribute
-  /// was introduced.
+  /// Returns the effective availability range for the attribute's `introduced:`
+  /// component (remapping or canonicalizing if necessary).
   AvailabilityRange getIntroducedRange(const ASTContext &Ctx) const;
 
   /// The version tuple for the `deprecated:` component.
@@ -3319,11 +3319,19 @@ public:
   /// The source range of the `deprecated:` version component.
   SourceRange getDeprecatedSourceRange() const { return attr->DeprecatedRange; }
 
+  /// Returns the effective availability range for the attribute's `deprecated:`
+  /// component (remapping or canonicalizing if necessary).
+  AvailabilityRange getDeprecatedRange(const ASTContext &Ctx) const;
+
   /// The version tuple for the `obsoleted:` component.
   std::optional<llvm::VersionTuple> getObsoleted() const;
 
   /// The source range of the `obsoleted:` version component.
   SourceRange getObsoletedSourceRange() const { return attr->ObsoletedRange; }
+
+  /// Returns the effective availability range for the attribute's `obsoleted:`
+  /// component (remapping or canonicalizing if necessary).
+  AvailabilityRange getObsoletedRange(const ASTContext &Ctx) const;
 
   /// Returns the `message:` field of the attribute, or an empty string.
   StringRef getMessage() const { return attr->Message; }
@@ -3371,12 +3379,6 @@ public:
 
   /// Whether this attribute an attribute that is specific to Embedded Swift.
   bool isEmbeddedSpecific() const { return getDomain().isEmbedded(); }
-
-  /// Returns the active version from the AST context corresponding to
-  /// the available kind. For example, this will return the effective language
-  /// version for swift version-specific availability kind, PackageDescription
-  /// version for PackageDescription version-specific availability.
-  llvm::VersionTuple getActiveVersion(const ASTContext &ctx) const;
 
   /// Returns true if this attribute is considered active in the current
   /// compilation context.
