@@ -19,6 +19,7 @@
 #define SWIFT_AST_AVAILABILITY_DOMAIN_H
 
 #include "swift/AST/ASTAllocated.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/Assertions.h"
@@ -214,6 +215,14 @@ public:
   /// Returns true if this domain is considered active in the current
   /// compilation context.
   bool isActive(const ASTContext &ctx) const;
+
+  /// Returns the minimum available range for the attribute's domain. For
+  /// example, for the domain of the platform that compilation is targeting,
+  /// this will be the deployment target. For the Swift language domain, this
+  /// will be the language mode for compilation. For domains which have don't
+  /// have a "deployment target", this returns `std::nullopt`.
+  std::optional<AvailabilityRange>
+  getDeploymentRange(const ASTContext &ctx) const;
 
   /// Returns the string to use in diagnostics to identify the domain. May
   /// return an empty string.
