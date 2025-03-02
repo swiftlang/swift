@@ -1354,13 +1354,25 @@ static void determineBestChoicesInContext(
       // types match i.e. Array<Element> as a parameter.
       //
       // This is slightly better than all of the conformances matching
-      // because the parameter is concrete and could split the graph.      
+      // because the parameter is concrete and could split the system.
       if (paramType->hasTypeParameter()) {
         auto *candidateDecl = candidateType->getAnyNominal();
         auto *paramDecl = paramType->getAnyNominal();
 
-        if (candidateDecl && paramDecl && candidateDecl == paramDecl)
-          return 0.8;
+        // Conservatively we need to make sure that this is not worse
+        // than matching against a generic parameter with or without
+        // requirements.
+        if (candidateDecl && paramDecl && candidateDecl == paramDecl) {
+          // If the candidate it not yet fully resolved, let's lower the
+          // score slightly to avoid over-favoring generic overload choices.
+          if (candidateType->hasTypeVariable())
+            return 0.8;
+
+          // If the candidate is fully resolved we need to treat this
+          // as we would generic parameter otherwise there is a risk
+          // of skipping some of the valid choices.
+          return choice->isOperator() ? 0.9 : 1.0;
+        }
       }
 
       return 0;
