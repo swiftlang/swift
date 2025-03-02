@@ -399,7 +399,7 @@ extension UnsafeRawPointer {
     capacity count: Int,
     _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
-    unsafe _debugPrecondition(
+    _debugPrecondition(
       Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
       "self must be a properly aligned pointer for type T"
     )
@@ -1016,7 +1016,7 @@ extension UnsafeMutableRawPointer {
     capacity count: Int,
     _ body: (_ pointer: UnsafeMutablePointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
-    unsafe _debugPrecondition(
+    _debugPrecondition(
       Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
       "self must be a properly aligned pointer for type T"
     )

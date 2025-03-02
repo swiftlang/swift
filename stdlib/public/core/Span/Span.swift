@@ -102,7 +102,7 @@ extension Span where Element: ~Copyable {
   ) {
     //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
     let baseAddress = unsafe UnsafeRawPointer(buffer.baseAddress)
-    unsafe _precondition(
+    _precondition(
       ((Int(bitPattern: baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
       "baseAddress must be properly aligned to access Element"
@@ -224,7 +224,7 @@ extension Span where Element: BitwiseCopyable {
   ) {
     //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
     let baseAddress = buffer.baseAddress
-    unsafe _precondition(
+    _precondition(
       ((Int(bitPattern: baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
       "baseAddress must be properly aligned to access Element"

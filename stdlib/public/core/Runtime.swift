@@ -550,12 +550,11 @@ func _uint64ToString(
 
 @inlinable
 internal func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
-  var result = unsafe _uint64ToString(
-    UInt64(
-      UInt(bitPattern: UnsafeRawPointer(value))),
-      radix: 16,
-      uppercase: false
-    )
+  var result = _uint64ToString(
+    UInt64(UInt(bitPattern: UnsafeRawPointer(value))),
+    radix: 16,
+    uppercase: false
+  )
   for _ in unsafe 0..<(2 * MemoryLayout<UnsafeRawPointer>.size - result.utf16.count) {
     result = "0" + result
   }
