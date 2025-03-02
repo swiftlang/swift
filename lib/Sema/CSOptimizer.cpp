@@ -41,13 +41,20 @@ struct DisjunctionInfo {
   /// The score of the disjunction is the highest score from its choices.
   /// If the score is nullopt it means that the disjunction is not optimizable.
   std::optional<double> Score;
+
+  /// Whether the decisions were based on speculative information
+  /// i.e. literal argument candidates or initializer type inference.
+  bool IsSpeculative = false;
+
   /// The highest scoring choices that could be favored when disjunction
   /// is attempted.
   llvm::TinyPtrVector<Constraint *> FavoredChoices;
 
   DisjunctionInfo() = default;
-  DisjunctionInfo(double score, ArrayRef<Constraint *> favoredChoices = {})
-      : Score(score), FavoredChoices(favoredChoices) {}
+  DisjunctionInfo(double score, bool speculative = false,
+                  ArrayRef<Constraint *> favoredChoices = {})
+      : Score(score), IsSpeculative(speculative),
+        FavoredChoices(favoredChoices) {}
 };
 
 static DeclContext *getDisjunctionDC(Constraint *disjunction) {
@@ -656,7 +663,7 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
       });
 
   return DisjunctionInfo(/*score=*/favoredChoices.empty() ? 0 : 1,
-                         favoredChoices);
+                         /*speculative=*/false, favoredChoices);
 }
 
 } // end anonymous namespace
@@ -720,7 +727,8 @@ static void determineBestChoicesInContext(
                   return decl &&
                          !decl->getInterfaceType()->is<AnyFunctionType>();
                 });
-            recordResult(disjunction, {/*score=*/1.0, favoredChoices});
+            recordResult(disjunction, {/*score=*/1.0, /*speculative=*/false,
+                                       favoredChoices});
             continue;
           }
 
@@ -760,7 +768,8 @@ static void determineBestChoicesInContext(
                                      });
 
       if (!favoredChoices.empty()) {
-        recordResult(disjunction, {/*score=*/0.01, favoredChoices});
+        recordResult(disjunction,
+                     {/*score=*/0.01, /*speculative=*/false, favoredChoices});
         continue;
       }
     }
@@ -1577,39 +1586,22 @@ static void determineBestChoicesInContext(
 
     bestOverallScore = std::max(bestOverallScore, bestScore);
 
-    DisjunctionInfo info(/*score=*/bestScore);
+    // Determine if the score and favoring decisions here are
+    // based only on "speculative" sources i.e. inference from
+    // literals.
+    //
+    // This information is going to be used by the disjunction
+    // selection algorithm to prevent over-eager selection of
+    // the operators over unsupported non-operator declarations.
+    bool isSpeculative = onlySpeculativeArgumentCandidates &&
+                         (!canUseContextualResultTypes ||
+                          !anyNonSpeculativeResultTypes(resultTypes));
+
+    DisjunctionInfo info(/*score=*/bestScore, isSpeculative);
 
     for (const auto &choice : favoredChoices) {
       if (choice.second == bestScore)
         info.FavoredChoices.push_back(choice.first);
-    }
-
-    // Reset operator disjunction score but keep favoring
-    // choices only available candidates where speculative
-    // with no contextual information available, standard
-    // comparison operators are a special cases because
-    // their return type is fixed to `Bool` unlike that of
-    // bitwise, arithmetic, and other operators.
-    //
-    // This helps to prevent over-eager selection of the
-    // operators over unsupported non-operator declarations.
-    if (isOperator && onlySpeculativeArgumentCandidates &&
-        (!canUseContextualResultTypes ||
-         !anyNonSpeculativeResultTypes(resultTypes))) {
-      if (cs.isDebugMode()) {
-        PrintOptions PO;
-        PO.PrintTypesForDebugging = true;
-
-        llvm::errs().indent(cs.solverState->getCurrentIndent())
-            << "<<< Disjunction "
-            << disjunction->getNestedConstraints()[0]
-                   ->getFirstType()
-                   ->getString(PO)
-            << " score " << bestScore
-            << " was reset due to having only speculative candidates\n";
-      }
-
-      info.Score = 0;
     }
 
     recordResult(disjunction, std::move(info));
@@ -1723,8 +1715,25 @@ ConstraintSystem::selectDisjunction() {
         if (auto preference = isPreferable(*this, first, second))
           return preference.value();
 
-        auto &[firstScore, firstFavoredChoices] = favorings[first];
-        auto &[secondScore, secondFavoredChoices] = favorings[second];
+        auto &[firstScore, isFirstSpeculative, firstFavoredChoices] =
+            favorings[first];
+        auto &[secondScore, isSecondSpeculative, secondFavoredChoices] =
+            favorings[second];
+
+        bool isFirstOperator = isOperatorDisjunction(first);
+        bool isSecondOperator = isOperatorDisjunction(second);
+
+        // Not all of the non-operator disjunctions are supported by the
+        // ranking algorithm, so to prevent eager selection of operators
+        // when anything concrete is known about them, let's reset the score
+        // and compare purely based on number of choices.
+        if (isFirstOperator != isSecondOperator) {
+          if (isFirstOperator && isFirstSpeculative)
+            firstScore = 0;
+
+          if (isSecondOperator && isSecondSpeculative)
+            secondScore = 0;
+        }
 
         // Rank based on scores only if both disjunctions are supported.
         if (firstScore && secondScore) {
