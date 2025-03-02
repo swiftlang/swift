@@ -412,22 +412,38 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   if (DS && DS->getInlinedFunction() &&
       DS->getInlinedFunction()->isTransparent())
     return;
-  
-  // Only for formal type metadata.
-  if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata())
+  // For formal type metadata and witness tables.
+  ProtocolDecl *proto = nullptr;
+
+  if (key.Kind.isAbstractProtocolConformance())
+    proto = key.Kind.getAbstractProtocolConformance();
+  else if (key.Kind.isConcreteProtocolConformance())
+    proto = key.Kind.getConcreteProtocolConformance()->getProtocol();
+  else if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata())
     return;
 
   // Only for archetypes, and not for opened/opaque archetypes.
   auto type = dyn_cast<ArchetypeType>(key.Type);
   if (!type)
     return;
-  if (!type->isRoot())
+  if (!type->isRoot() && !proto)
     return;
   if (!isa<PrimaryArchetypeType>(type) && !isa<PackArchetypeType>(type))
     return;
 
-  auto *typeParam = type->getInterfaceType()->castTo<GenericTypeParamType>();
-  auto name = typeParam->getName().str();
+  auto interfaceType = type->getInterfaceType();
+  llvm::StringRef name;
+  if (auto DMT =
+          llvm::dyn_cast<DependentMemberType>(interfaceType.getPointer())) {
+    name = DMT->getName().str();
+  } else if (auto GTPT = llvm::dyn_cast<GenericTypeParamType>(
+                 interfaceType.getPointer())) {
+    name = GTPT->getName().str();
+    if (name.empty())
+      name = GTPT->getCanonicalName().str();
+  } else {
+    return;
+  }
 
   llvm::Value *data = value.getMetadata();
 
@@ -447,10 +463,12 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   if (!IGF.IGM.DebugInfo)
     return;
 
-  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data,
-                                      typeParam->getDepth(),
-                                      typeParam->getIndex(),
-                                      name);
+  if (proto) {
+    IGF.IGM.DebugInfo->emitWitnessTable(IGF, data, name, proto);
+  } else {
+    auto *typeParam = type->getInterfaceType()->castTo<GenericTypeParamType>();
+    IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, typeParam);
+  }
 }
 
 void
