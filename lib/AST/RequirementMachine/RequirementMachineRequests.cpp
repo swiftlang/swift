@@ -825,10 +825,6 @@ InferredGenericSignatureRequest::evaluate(
              "Parsed an empty generic parameter list?");
 
       for (auto *gpDecl : *gpList) {
-        if (gpDecl->isValue() &&
-            !gpDecl->getASTContext().LangOpts.hasFeature(Feature::ValueGenerics))
-          gpDecl->diagnose(diag::value_generics_missing_feature);
-
         auto *gpType = gpDecl->getDeclaredInterfaceType()
                              ->castTo<GenericTypeParamType>();
         genericParams.push_back(gpType);
