@@ -487,7 +487,7 @@ extension _NativeSet {
   @inlinable
   @inline(__always)
   func isEqual(to other: _NativeSet) -> Bool {
-    if unsafe self._storage === other._storage { return true }
+    if self._storage === other._storage { return true }
     if self.count != other.count { return false }
 
     for member in self {
