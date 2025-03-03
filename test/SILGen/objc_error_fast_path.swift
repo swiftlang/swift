@@ -8,9 +8,10 @@
 // RUN:   %t/optimized.swift -module-name Lib \
 // RUN:   -emit-module -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -swift-version 5 -enable-library-evolution -O
+// RUN: %target-codesign %t/%target-library-name(Lib)
 // RUN: %target-build-swift %t/main.swift -o %t/main -I%t -lLib -L%t -O
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-run %t/main %t/%target-library-name(Lib) | %FileCheck %s
 
 /// Ensure the client has the optimization we're testing here.
 // RUN: %target-swift-frontend -typecheck -emit-silgen %t/Lib.swiftmodule > %t/Lib.sil
@@ -22,9 +23,10 @@
 // RUN:   %t/non-optimized.swift -module-name Lib \
 // RUN:   -emit-module -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -swift-version 5 -enable-library-evolution -O
+// RUN: %target-codesign %t/%target-library-name(Lib)
 // RUN: %target-build-swift %t/main.swift -o %t/main -I%t -lLib -L%t -O
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %s
+// RUN: %target-run %t/main %t/%target-library-name(Lib) | %FileCheck %s
 
 /// Ensure the client doesn't have the optimization we're testing here.
 // RUN: %target-swift-frontend -typecheck -emit-silgen %t/main.swift -I%t -O > %t/Lib.sil
