@@ -1,9 +1,9 @@
 // Check that we are resolving the correct member for all unambiguous members
 // in the Shadow struct.
 
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature ImportCxxNonPublicBaseMembers)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers)
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_ImportCxxNonPublicBaseMembers
+// REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
 import StdlibUnittest
 import NonPublicShadow

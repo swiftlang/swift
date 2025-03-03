@@ -6205,7 +6205,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       continue;
 
     if (inheritance &&
-        !ctx.LangOpts.hasFeature(Feature::ImportCxxNonPublicBaseMembers)) {
+        !ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers)) {
       auto access = found->getAccess();
       if (access == clang::AS_private || access == clang::AS_protected)
         continue;
@@ -6263,7 +6263,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       foundNameArities.insert(getArity(valueDecl));
 
     for (auto base : cxxRecord->bases()) {
-      if (!ctx.LangOpts.hasFeature(Feature::ImportCxxNonPublicBaseMembers) &&
+      if (!ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers) &&
           base.getAccessSpecifier() != clang::AS_public)
         continue;
 

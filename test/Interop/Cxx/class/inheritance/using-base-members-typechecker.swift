@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportCxxNonPublicBaseMembers
-// REQUIRES: swift_feature_ImportCxxNonPublicBaseMembers
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
+// REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
 import UsingBaseMembers
 

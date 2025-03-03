@@ -9963,7 +9963,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       continue;
 
     if (inheritance && !swiftDecl->getASTContext().LangOpts.hasFeature(
-                           Feature::ImportCxxNonPublicBaseMembers)) {
+                           Feature::ImportNonPublicCxxMembers)) {
       auto access = nd->getAccess();
       if (access == clang::AS_private || access == clang::AS_protected)
         continue;
@@ -10037,7 +10037,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) {
     for (auto base : cxxRecord->bases()) {
       if (!swiftDecl->getASTContext().LangOpts.hasFeature(
-              Feature::ImportCxxNonPublicBaseMembers) &&
+              Feature::ImportNonPublicCxxMembers) &&
           base.getAccessSpecifier() != clang::AS_public)
         continue;
 
