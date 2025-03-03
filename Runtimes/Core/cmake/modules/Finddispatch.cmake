@@ -91,7 +91,7 @@ elseif(LINUX)
       HINTS "${Swift_SDKROOT}/usr/lib/swift/linux")
     add_library(dispatch SHARED IMPORTED GLOBAL)
   endif()
-  set_target_properties(dispatch
+  set_target_properties(dispatch PROPERTIES
     IMPORTED_LOCATION "${dispatch_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES "${dispatch_INCLUDE_DIR}")
   find_package_handle_standard_args(dispatch DEFAULT_MSG
@@ -111,7 +111,7 @@ elseif(WIN32)
       "$ENV{SDKROOT}/usr/lib/swift")
 
   add_library(dispatch SHARED IMPORTED GLOBAL)
-  set_target_properties(dispatch
+  set_target_properties(dispatch PROPERTIES
     IMPORTED_IMPLIB "${dispatch_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES "${dispatch_INCLUDE_DIR}")
   find_package_handle_standard_args(dispatch DEFAULT_MSG
