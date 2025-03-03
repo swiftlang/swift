@@ -213,11 +213,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-Xclang=-msign-return-address-key=a_key");
   }
 
-  if (inputArgs.getLastArg(options::OPT_experimental_serialize_debug_info)) {
-    arguments.push_back(
-        inputArgs.MakeArgString(Twine("-experimental-serialize-debug-info")));
-  }
-
   if (inputArgs.hasArg(options::OPT_experimental_hermetic_seal_at_link)) {
     arguments.push_back("-enable-llvm-vfe");
     arguments.push_back("-enable-llvm-wme");

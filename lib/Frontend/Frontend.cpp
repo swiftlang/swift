@@ -207,7 +207,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
   serializationOpts.UserModuleVersion = opts.UserModuleVersion;
   serializationOpts.AllowableClients = opts.AllowableClients;
-  serializationOpts.SerializeDebugInfoSIL = opts.SerializeDebugInfoSIL;
+  serializationOpts.SerializeDebugInfoSIL = !opts.DisableSerializeDebugInfoSIL;
 
   serializationOpts.PublicDependentLibraries =
       getIRGenOptions().PublicLinkLibraries;

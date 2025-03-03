@@ -2931,10 +2931,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.PrintDebugInfo = true;
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_experimental_serialize_debug_info))
+  if (!Args.hasArg(OPT_disable_experimental_serialize_debug_info))
     Opts.PrintDebugInfo = true;
   //TODO: Remove this as only adding for SWB
-  if (FEOpts.SerializeDebugInfoSIL)
+  if (!FEOpts.DisableSerializeDebugInfoSIL)
     Opts.PrintDebugInfo = true;
 
   if (Args.hasArg(OPT_legacy_gsil))
