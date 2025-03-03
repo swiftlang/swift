@@ -4227,6 +4227,10 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   PPOpts.MacroIncludes.clear();
   PPOpts.Includes.clear();
 
+  // CodeGenOptions.
+  auto &CGOpts = instance.getCodeGenOpts();
+  CGOpts.DebugCompilationDir.clear();
+
   if (Impl.SwiftContext.ClangImporterOpts.UseClangIncludeTree) {
     // FileSystemOptions.
     auto &FSOpts = instance.getFileSystemOpts();
