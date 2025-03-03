@@ -6189,6 +6189,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   DeclName name = desc.name;
   ClangInheritanceInfo inheritance = desc.inheritance;
 
+  /*
   // HACK: the inherited, synthesized, private 'pointee' property used in MSVC's
   // std::optional implementation causes problems when conforming it to
   // CxxOptional (see conformToCxxOptionalIfNeeded()), since it clashes with the
@@ -6203,6 +6204,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         desc.name.getBaseName() == "pointee")
       return {};
   }
+  */
 
   auto &ctx = recordDecl->getASTContext();
   auto directResults = evaluateOrDefault(
@@ -6219,10 +6221,12 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         recordDecl->getClangDecl())
       continue;
 
-    if (!ctx.LangOpts.hasFeature(Feature::ImportCxxNonPublicBaseMembers) &&
-        (found->getAccess() == clang::AS_private ||
-         found->getAccess() == clang::AS_protected))
-      continue;
+    if (inheritance &&
+        !ctx.LangOpts.hasFeature(Feature::ImportCxxNonPublicBaseMembers)) {
+      auto access = found->getAccess();
+      if (access == clang::AS_private || access == clang::AS_protected)
+        continue;
+    }
 
     // Don't import constructors on foreign reference types.
     if (isa<clang::CXXConstructorDecl>(found) && isa<ClassDecl>(recordDecl))

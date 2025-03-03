@@ -9962,11 +9962,12 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
     if (!nd)
       continue;
 
-    if (!swiftDecl->getASTContext().LangOpts.hasFeature(
-            Feature::ImportCxxNonPublicBaseMembers) &&
-        (nd->getAccess() == clang::AS_private ||
-         nd->getAccess() == clang::AS_protected))
-      continue;
+    if (inheritance && !swiftDecl->getASTContext().LangOpts.hasFeature(
+                           Feature::ImportCxxNonPublicBaseMembers)) {
+      auto access = nd->getAccess();
+      if (access == clang::AS_private || access == clang::AS_protected)
+        continue;
+    }
 
     // Currently, we don't import unnamed bitfields.
     if (isa<clang::FieldDecl>(m) &&
