@@ -1,11 +1,15 @@
-// RUN: %target-sil-opt %s \
-// RUN:   --lifetime-dependence-scope-fixup \
+// RUN: %target-sil-opt \
+// RUN:   -lifetime-dependence-scope-fixup \
 // RUN:   -sil-verify-all \
 // RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   2>&1 | %FileCheck %s
+// RUN:   -enable-experimental-feature AddressableParameters \
+// RUN:   -enable-experimental-feature AddressableTypes \
+// RUN:   %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_AddressableParameters
+// REQUIRES: swift_feature_AddressableTypes
 
 // Test the SIL representation for lifetime dependence scope fixup.
 
@@ -15,6 +19,10 @@ import Builtin
 import Swift
 
 struct NE : ~Escapable {
+  var p: UnsafeRawPointer
+
+  @lifetime(immortal)
+  init()
 }
 
 struct Wrapper : ~Escapable {
@@ -30,6 +38,22 @@ struct NCContainer : ~Copyable {
   var ne: NE { get } // _read
   var wrapper: Wrapper { get } // _read
 }
+
+struct TrivialHolder {
+  var pointer: UnsafeRawPointer
+}
+
+struct Holder {
+  var object: AnyObject
+}
+
+@_addressableForDependencies
+struct AddressableForDeps {}
+
+sil @getPtr : $@convention(thin) () -> @out UnsafeRawPointer
+sil @getSpan : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @out NE
+
+sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
 
 sil [ossa] @Wrapper_init : $@convention(method) (@owned NE, @thin Wrapper.Type) -> @lifetime(copy 0) @owned Wrapper
 
@@ -119,4 +143,41 @@ bb0(%0 : $UnsafePointer<Int64>):
   destroy_value %2
   %19 = tuple ()
   return %19
+}
+
+// =============================================================================
+// @_addressable
+// =============================================================================
+
+sil [ossa] @addressableArg : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+
+// CHECK-LABEL: sil hidden [ossa] @testAddressableArg : $@convention(thin) (@guaranteed Holder) -> () {
+// CHECK: bb0(%0 : @guaranteed $Holder):
+// CHECK: [[ALLOC:%.*]] = alloc_stack $Holder
+// CHECK: [[SB:%.*]] = store_borrow %0 to [[ALLOC]]
+// CHECK: [[APPLY:%.*]] = apply %{{.*}}([[SB]]) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+// CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[APPLY]] on [[SB]]
+// CHECK: [[MV:%.*]] = move_value [var_decl] [[MD]]
+// CHECK: apply %{{.*}}([[MV]]) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK: destroy_value [[MV]]
+// CHECK: end_borrow [[SB]]
+// CHECK: dealloc_stack [[ALLOC]]
+// CHECK-LABEL: } // end sil function 'testAddressableArg'
+sil hidden [ossa] @testAddressableArg : $@convention(thin) (@guaranteed Holder) -> () {
+bb0(%0 : @guaranteed $Holder):
+  debug_value %0, let, name "arg", argno 1
+  %2 = alloc_stack $Holder
+  %3 = store_borrow %0 to %2
+  %4 = function_ref @addressableArg : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+  %5 = apply %4(%3) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+  %6 = mark_dependence [unresolved] %5 on %3
+  end_borrow %3
+  %8 = move_value [var_decl] %6
+  debug_value %8, let, name "ne"
+  %useNE = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %18 = apply %useNE(%8) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %8
+  dealloc_stack %2
+  %99 = tuple ()
+  return %99 : $()
 }
