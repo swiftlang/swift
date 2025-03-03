@@ -656,36 +656,36 @@ function Isolate-EnvVars([scriptblock]$Block) {
 }
 
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
-$logFileAvgCPU = $null
+$CPUUsageData = $null
 
-function Track-AvgCPU($logFile) {
-  Write-Host "Tracking average CPU usage to file: $logFile"
-  $script:logFileAvgCPU = $logFile
+if ($Summary) {
+  $CPUUsageData = New-TemporaryFile
+  Write-Host "Tracking average CPU usage to file: $CPUUsageData"
 
   # Background jobs run in a separate process and cannot write to any variables.
   # We cannot say in advance how long the job will run, so we cannot use
   # Receive-Job. Temporary file seems like the best solution.
-  return Start-Job -ArgumentList $logFile -ScriptBlock {
+  Start-Job -ArgumentList $CPUUsageData -ScriptBlock {
     while ($true) {
       $Sample = ((Get-Counter "\Processor(_Total)\% Processor Time").CounterSamples.CookedValue)
-      Add-Content -Path $using:logFile -Value ([math]::Round($Sample))
+      Add-Content -Path $using:CPUUsageData -Value ([math]::Round($Sample))
     }
   }
 }
 
-function Annotate-AvgCPU($annotation) {
-  if ($script:logFileAvgCPU -ne $null) {
-    Add-Content -Path $script:logFileAvgCPU -Value $annotation
+function Annotate-CPUUsage($annotation) {
+  if ($CPUUsageData -ne $null) {
+    Add-Content -Path $CPUUsageData -Value $annotation
   }
 }
 
-function Plot-AvgCPU {
-  if ($script:logFileAvgCPU -eq $null) {
+function Plot-CPUUsage {
+  if ($CPUUsageData -eq $null) {
     Write-Warning "CPU tracking not enabled"
     return
   }
 
-  $logLines = Get-Content $script:logFileAvgCPU
+  $logLines = Get-Content $CPUUsageData
   $data = @()
   $labels = @{}
   $lineIndex = 0
@@ -701,6 +701,11 @@ function Plot-AvgCPU {
     } else {
       $labels[$lineIndex] = $line
     }
+  }
+
+  if ($data.Count -eq 0) {
+    Write-Warning "CPU tracking didn't collect any data"
+    return
   }
 
   $maxColumns = 50
@@ -1128,7 +1133,7 @@ function Build-CMakeProject {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
   }
 
-  Annotate-AvgCPU "$Bin (configure)"
+  Annotate-CPUUsage "$Bin (configure)"
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
   # Enter the developer command shell early so we can resolve cmake.exe
@@ -1434,7 +1439,7 @@ function Build-CMakeProject {
     Invoke-Program cmake.exe @cmakeGenerateArgs
 
     # Build all requested targets
-    Annotate-AvgCPU "$Bin (build)"
+    Annotate-CPUUsage "$Bin (build)"
     foreach ($Target in $BuildTargets) {
       if ($Target -eq "default") {
         Invoke-Program cmake.exe --build $Bin
@@ -1538,7 +1543,7 @@ function Build-SPMProject {
       }
     }
 
-    Annotate-AvgCPU "$Bin (SPM)"
+    Annotate-CPUUsage "$Bin (SPM)"
     Invoke-Program "$($HostArch.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
   }
 
@@ -3250,10 +3255,6 @@ if ($Clean) {
   }
 }
 
-if ($Summary) {
-  Track-AvgCPU -logFile New-TemporaryFile
-}
-
 if (-not $SkipBuild) {
   if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
     throw "Minimum required sccache version is 0.7.4"
@@ -3449,6 +3450,6 @@ if (-not $IsCrossCompiling) {
 } finally {
   if ($Summary) {
     $TimingData | Select-Object Platform,Arch,Checkout,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
-    Plot-AvgCPU
+    Plot-CPUUsage
   }
 }
