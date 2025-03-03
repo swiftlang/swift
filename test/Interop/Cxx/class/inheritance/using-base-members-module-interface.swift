@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=UsingBaseMembers -print-access -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default -enable-experimental-feature ImportCxxNonPublicBaseMembers | %FileCheck %s
+// REQUIRES: swift_feature_ImportCxxNonPublicBaseMembers
 
 // CHECK:      public struct PublicBase {
 // CHECK-NEXT:   public init()

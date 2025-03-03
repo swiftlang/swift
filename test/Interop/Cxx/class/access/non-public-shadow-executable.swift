@@ -3,6 +3,7 @@
 
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature ImportCxxNonPublicBaseMembers)
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ImportCxxNonPublicBaseMembers
 
 import StdlibUnittest
 import NonPublicShadow

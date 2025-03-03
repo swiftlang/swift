@@ -8,6 +8,7 @@
 // something about "private".
 //
 // RUN: %target-swift-ide-test -print-module -module-to-print=NonPublicInheritance -print-access -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop -enable-experimental-feature ImportCxxNonPublicBaseMembers | %FileCheck %s
+// REQUIRES: swift_feature_ImportCxxNonPublicBaseMembers
 
 // CHECK:      public struct Base {
 // CHECK-NEXT:   public init()

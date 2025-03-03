@@ -7,6 +7,7 @@
 // RUN: %target-run %t/out
 //
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ImportCxxNonPublicBaseMembers
 
 import StdlibUnittest
 import NonPublicInheritance
