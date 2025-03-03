@@ -28,7 +28,7 @@ EXCEPTIONAL_FILES = [
 ]
 
 ENABLE_FEATURE_RE = re.compile(
-    r"-enable-(?:experimental|upcoming)-feature (?:-Xfrontend )?([A-Za-z0-9]*)"
+    r"-enable-(?:experimental|upcoming)-feature(?:\s+-Xfrontend)?\s*([A-Za-z0-9]*)"
 )
 FEATURE_LIT_MARKER_RE = re.compile(r"swift_feature_([A-Za-z0-9]*)")
 
