@@ -51,19 +51,21 @@ public:
     /// constraint.
     Obsoleted,
 
-    /// The declaration is only available in a later version. For example,
-    /// the declaration might only be introduced in the Swift 6 language mode
-    /// while the module is being compiled in the Swift 5 language mode.
-    IntroducedInLaterVersion,
+    /// The declaration is not available in the deployment configuration
+    /// specified for this compilation. For example, the declaration might only
+    /// be introduced in the Swift 6 language mode while the module is being
+    /// compiled in the Swift 5 language mode. These availability constraints
+    /// cannot be satisfied by adding constraining contextual availability using
+    /// `@available` attributes or `if #available` queries.
+    UnavailableForDeployment,
 
-    /// The declaration is referenced in a context that does not have an
-    /// adequate minimum version constraint. For example, a reference to a
-    /// declaration that is introduced in macOS 13 from a context that may
-    /// execute on earlier versions of macOS has this constraint. This
-    /// kind of constraint can be satisfied by tightening the minimum
-    /// version of the context with `if #available(...)` or by adding or
-    /// adjusting an `@available` attribute.
-    IntroducedInLaterDynamicVersion,
+    /// The declaration is referenced in a context that does not have adequate
+    /// availability constraints. For example, a reference to a declaration that
+    /// was introduced in macOS 13 from a context that may execute on earlier
+    /// versions of macOS cannot satisfy this constraint. The constraint
+    /// can be satisfied, though, by introducing an `@available` attribute or an
+    /// `if #available(...)` query.
+    PotentiallyUnavailable,
   };
 
   /// Classifies constraints into different high level categories.
@@ -93,14 +95,13 @@ public:
   }
 
   static AvailabilityConstraint
-  introducedInLaterVersion(SemanticAvailableAttr attr) {
-    return AvailabilityConstraint(Reason::IntroducedInLaterVersion, attr);
+  unavailableForDeployment(SemanticAvailableAttr attr) {
+    return AvailabilityConstraint(Reason::UnavailableForDeployment, attr);
   }
 
   static AvailabilityConstraint
-  introducedInLaterDynamicVersion(SemanticAvailableAttr attr) {
-    return AvailabilityConstraint(Reason::IntroducedInLaterDynamicVersion,
-                                  attr);
+  potentiallyUnavailable(SemanticAvailableAttr attr) {
+    return AvailabilityConstraint(Reason::PotentiallyUnavailable, attr);
   }
 
   Reason getReason() const { return attrAndReason.getInt(); }
@@ -112,9 +113,9 @@ public:
     switch (getReason()) {
     case Reason::UnconditionallyUnavailable:
     case Reason::Obsoleted:
-    case Reason::IntroducedInLaterVersion:
+    case Reason::UnavailableForDeployment:
       return Kind::Unavailable;
-    case Reason::IntroducedInLaterDynamicVersion:
+    case Reason::PotentiallyUnavailable:
       return Kind::PotentiallyAvailable;
     }
   }

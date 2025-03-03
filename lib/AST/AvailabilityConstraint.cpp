@@ -28,9 +28,9 @@ AvailabilityConstraint::getRequiredNewerAvailabilityRange(
   switch (getReason()) {
   case Reason::UnconditionallyUnavailable:
   case Reason::Obsoleted:
-  case Reason::IntroducedInLaterVersion:
+  case Reason::UnavailableForDeployment:
     return std::nullopt;
-  case Reason::IntroducedInLaterDynamicVersion:
+  case Reason::PotentiallyUnavailable:
     return getAttr().getIntroducedRange(ctx);
   }
 }
@@ -60,12 +60,12 @@ static bool constraintIsStronger(const AvailabilityConstraint &lhs,
     return false;
 
   case AvailabilityConstraint::Reason::Obsoleted:
-    // Pick the earliest obsoleted version.
+    // Pick the larger obsoleted range.
     return *lhs.getAttr().getObsoleted() < *rhs.getAttr().getObsoleted();
 
-  case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
-  case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
-    // Pick the latest introduced version.
+  case AvailabilityConstraint::Reason::UnavailableForDeployment:
+  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+    // Pick the smaller introduced range.
     return *lhs.getAttr().getIntroduced() > *rhs.getAttr().getIntroduced();
   }
 }
@@ -159,10 +159,10 @@ getAvailabilityConstraintForAttr(const Decl *decl,
   // FIXME: [availability] Expand this to cover custom versioned domains
   if (attr.isPlatformSpecific()) {
     if (!context.getPlatformRange().isContainedIn(introducedRange))
-      return AvailabilityConstraint::introducedInLaterDynamicVersion(attr);
+      return AvailabilityConstraint::potentiallyUnavailable(attr);
   } else if (deploymentRange &&
              !deploymentRange->isContainedIn(introducedRange)) {
-    return AvailabilityConstraint::introducedInLaterVersion(attr);
+    return AvailabilityConstraint::unavailableForDeployment(attr);
   }
 
   return std::nullopt;

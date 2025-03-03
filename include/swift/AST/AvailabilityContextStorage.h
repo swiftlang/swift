@@ -29,7 +29,7 @@ class DeclAvailabilityConstraints;
 class AvailabilityContext::Info {
 public:
   /// The introduction version.
-  AvailabilityRange Range;
+  AvailabilityRange PlatformRange;
 
   /// A sorted collection of disjoint domains that are known to be
   /// unavailable in this context.
@@ -48,7 +48,7 @@ public:
   /// restrictive than the current values. Returns true if any field was
   /// updated.
   bool constrainWith(const DeclAvailabilityConstraints &constraints,
-                     ASTContext &ctx);
+                     const ASTContext &ctx);
 
   bool constrainUnavailability(
       const llvm::SmallVectorImpl<AvailabilityDomain> &domains);
@@ -63,7 +63,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) const;
 
   /// Returns true if all internal invariants are satisfied.
-  bool verify(ASTContext &ctx) const;
+  bool verify(const ASTContext &ctx) const;
 };
 
 /// As an implementation detail, the values that make up an `Availability`
@@ -74,7 +74,7 @@ class AvailabilityContext::Storage final : public llvm::FoldingSetNode {
 public:
   Info info;
 
-  static const Storage *get(const Info &info, ASTContext &ctx);
+  static const Storage *get(const Info &info, const ASTContext &ctx);
 
   void Profile(llvm::FoldingSetNodeID &ID) const { info.Profile(ID); }
 };

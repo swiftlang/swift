@@ -40,7 +40,7 @@ static bool constrainRange(AvailabilityRange &existing,
 
 bool AvailabilityContext::Info::constrainWith(const Info &other) {
   bool isConstrained = false;
-  isConstrained |= constrainRange(Range, other.Range);
+  isConstrained |= constrainRange(PlatformRange, other.PlatformRange);
   isConstrained |= constrainUnavailability(other.UnavailableDomains);
   isConstrained |= CONSTRAIN_BOOL(IsDeprecated, other.IsDeprecated);
 
@@ -48,7 +48,7 @@ bool AvailabilityContext::Info::constrainWith(const Info &other) {
 }
 
 bool AvailabilityContext::Info::constrainWith(
-    const DeclAvailabilityConstraints &constraints, ASTContext &ctx) {
+    const DeclAvailabilityConstraints &constraints, const ASTContext &ctx) {
   bool isConstrained = false;
 
   for (auto constraint : constraints) {
@@ -57,14 +57,15 @@ bool AvailabilityContext::Info::constrainWith(
     switch (constraint.getReason()) {
     case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
     case AvailabilityConstraint::Reason::Obsoleted:
-    case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
+    case AvailabilityConstraint::Reason::UnavailableForDeployment:
       isConstrained |= constrainUnavailability(domain);
       break;
-    case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
+    case AvailabilityConstraint::Reason::PotentiallyUnavailable:
       // FIXME: [availability] Support versioning for other kinds of domains.
       DEBUG_ASSERT(domain.isPlatform());
       if (domain.isPlatform())
-        isConstrained |= constrainRange(Range, attr.getIntroducedRange(ctx));
+        isConstrained |=
+            constrainRange(PlatformRange, attr.getIntroducedRange(ctx));
       break;
     }
   }
@@ -121,7 +122,7 @@ bool AvailabilityContext::Info::constrainUnavailability(
 
 bool AvailabilityContext::Info::isContainedIn(const Info &other) const {
   // The available versions range be the same or smaller.
-  if (!Range.isContainedIn(other.Range))
+  if (!PlatformRange.isContainedIn(other.PlatformRange))
     return false;
 
   // Every unavailable domain in the other context should be contained in some
@@ -147,7 +148,7 @@ bool AvailabilityContext::Info::isContainedIn(const Info &other) const {
 }
 
 void AvailabilityContext::Info::Profile(llvm::FoldingSetNodeID &ID) const {
-  Range.getRawVersionRange().Profile(ID);
+  PlatformRange.getRawVersionRange().Profile(ID);
   ID.AddInteger(UnavailableDomains.size());
   for (auto domain : UnavailableDomains) {
     domain.Profile(ID);
@@ -155,7 +156,7 @@ void AvailabilityContext::Info::Profile(llvm::FoldingSetNodeID &ID) const {
   ID.AddBoolean(IsDeprecated);
 }
 
-bool AvailabilityContext::Info::verify(ASTContext &ctx) const {
+bool AvailabilityContext::Info::verify(const ASTContext &ctx) const {
   // Unavailable domains must be sorted to ensure folding set node lookups yield
   // consistent results.
   if (!llvm::is_sorted(UnavailableDomains,
@@ -167,24 +168,26 @@ bool AvailabilityContext::Info::verify(ASTContext &ctx) const {
 
 AvailabilityContext
 AvailabilityContext::forPlatformRange(const AvailabilityRange &range,
-                                      ASTContext &ctx) {
+                                      const ASTContext &ctx) {
   Info info{range, /*UnavailableDomains*/ {},
             /*IsDeprecated*/ false};
   return AvailabilityContext(Storage::get(info, ctx));
 }
 
-AvailabilityContext AvailabilityContext::forInliningTarget(ASTContext &ctx) {
+AvailabilityContext
+AvailabilityContext::forInliningTarget(const ASTContext &ctx) {
   return AvailabilityContext::forPlatformRange(
       AvailabilityRange::forInliningTarget(ctx), ctx);
 }
 
-AvailabilityContext AvailabilityContext::forDeploymentTarget(ASTContext &ctx) {
+AvailabilityContext
+AvailabilityContext::forDeploymentTarget(const ASTContext &ctx) {
   return AvailabilityContext::forPlatformRange(
       AvailabilityRange::forDeploymentTarget(ctx), ctx);
 }
 
 AvailabilityRange AvailabilityContext::getPlatformRange() const {
-  return storage->info.Range;
+  return storage->info.PlatformRange;
 }
 
 bool AvailabilityContext::isUnavailable() const {
@@ -205,7 +208,7 @@ bool AvailabilityContext::isDeprecated() const {
 }
 
 void AvailabilityContext::constrainWithContext(const AvailabilityContext &other,
-                                               ASTContext &ctx) {
+                                               const ASTContext &ctx) {
   bool isConstrained = false;
 
   Info info{storage->info};
@@ -218,17 +221,17 @@ void AvailabilityContext::constrainWithContext(const AvailabilityContext &other,
 }
 
 void AvailabilityContext::constrainWithPlatformRange(
-    const AvailabilityRange &platformRange, ASTContext &ctx) {
+    const AvailabilityRange &platformRange, const ASTContext &ctx) {
 
   Info info{storage->info};
-  if (!constrainRange(info.Range, platformRange))
+  if (!constrainRange(info.PlatformRange, platformRange))
     return;
 
   storage = Storage::get(info, ctx);
 }
 
 void AvailabilityContext::constrainWithUnavailableDomain(
-    AvailabilityDomain domain, ASTContext &ctx) {
+    AvailabilityDomain domain, const ASTContext &ctx) {
   Info info{storage->info};
   if (!info.constrainUnavailability(domain))
     return;
@@ -251,7 +254,7 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
       swift::getAvailabilityConstraintsForDecl(decl, *this, flags);
   isConstrained |= info.constrainWith(constraints, decl->getASTContext());
   isConstrained |= CONSTRAIN_BOOL(info.IsDeprecated, decl->isDeprecated());
-  isConstrained |= constrainRange(info.Range, platformRange);
+  isConstrained |= constrainRange(info.PlatformRange, platformRange);
 
   if (!isConstrained)
     return;
@@ -289,6 +292,6 @@ void AvailabilityContext::print(llvm::raw_ostream &os) const {
 
 void AvailabilityContext::dump() const { print(llvm::errs()); }
 
-bool AvailabilityContext::verify(ASTContext &ctx) const {
+bool AvailabilityContext::verify(const ASTContext &ctx) const {
   return storage->info.verify(ctx);
 }

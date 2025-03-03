@@ -5714,7 +5714,7 @@ SubstitutionMap::Storage *SubstitutionMap::Storage::get(
 }
 
 const AvailabilityContext::Storage *
-AvailabilityContext::Storage::get(const Info &info, ASTContext &ctx) {
+AvailabilityContext::Storage::get(const Info &info, const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
   info.Profile(id);
 
