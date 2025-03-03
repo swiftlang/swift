@@ -123,10 +123,12 @@ func testNonSendableDiagnostics(
   // expected-warning@-1 {{cannot convert '@execution(caller) @Sendable () async -> NonSendable' to '() async -> NonSendable' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
 
   let _: @MainActor (NonSendable) async -> Void = nonIsolated1 // Ok
-  let _: @MainActor (NonSendable) async -> Void = nonIsolated2 // Ok
+  let _: @MainActor (NonSendable) async -> Void = nonIsolated2 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
+  // expected-warning@-1 {{cannot convert '@Sendable (NonSendable) async -> Void' to '@MainActor (NonSendable) async -> Void' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
 
   let _: @MainActor () async -> NonSendable = nonIsolated3 // Ok
-  let _: @MainActor () async -> NonSendable = nonIsolated4 // Ok
+  let _: @MainActor () async -> NonSendable = nonIsolated4 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
+  // expected-warning@-1 {{cannot convert '@Sendable () async -> NonSendable' to '@MainActor () async -> NonSendable' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
 
   let _: @MainActor (NonSendable) async -> Void = caller1 // Ok
   let _: @MainActor () async -> NonSendable = caller2 // Ok

@@ -2804,8 +2804,21 @@ namespace {
               }
               break;
 
+            case FunctionTypeIsolation::Kind::NonIsolated: {
+              // Since @execution(concurrent) as an asynchronous
+              // function it would mean that without Sendable
+              // check it would be possible for non-Sendable state
+              // to escape from actor isolation.
+              if (fromFnType->isAsync()) {
+                diagnoseNonSendableParametersAndResult(
+                  toFnType, /*downgradeToWarning=*/true);
+                break;
+              }
+              // Runs on the actor.
+              break;
+            }
+
             // Runs on the actor.
-            case FunctionTypeIsolation::Kind::NonIsolated:
             case FunctionTypeIsolation::Kind::NonIsolatedCaller:
               break;
             }
