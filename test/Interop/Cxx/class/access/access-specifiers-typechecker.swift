@@ -1,6 +1,7 @@
 // Test that C++ access specifiers are honored.
 
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -enable-experimental-cxx-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -enable-experimental-cxx-interop -enable-experimental-feature ImportNonPublicCxxMembers
+// REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
 import AccessSpecifiers
 

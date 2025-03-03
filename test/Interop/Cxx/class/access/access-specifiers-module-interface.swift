@@ -2,7 +2,8 @@
 // Public C++ members should be imported with Swift-public access, and
 // private C++ members should be imported with Swift-private access.
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=AccessSpecifiers -print-access -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=AccessSpecifiers -print-access -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop -enable-experimental-feature ImportNonPublicCxxMembers | %FileCheck %s
+// REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
 // CHECK:      public struct PublicPrivate {
 // CHECK-NEXT:   public init()

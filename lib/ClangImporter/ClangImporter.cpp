@@ -6204,10 +6204,14 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         recordDecl->getClangDecl())
       continue;
 
-    if (inheritance &&
-        !ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers)) {
+    if (!ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers)) {
       auto access = found->getAccess();
-      if (access == clang::AS_private || access == clang::AS_protected)
+      if ((access == clang::AS_private || access == clang::AS_protected) &&
+          (inheritance || !isa<clang::FieldDecl>(found)))
+        // 'found' is a non-public member and ImportNonPublicCxxMembers is not
+        // enabled. Don't import it unless it is a non-inherited field, which
+        // we must import because it may affect implicit conformances that
+        // iterate through all of a struct's fields, e.g., Sendable (#76892).
         continue;
     }
 
