@@ -494,6 +494,7 @@ DemangleToMetadataTests.test("Nested types in same-type-constrained extensions")
 }
 
 struct NonCopyable: ~Copyable {}
+struct NonEscapable: ~Escapable {}
 
 if #available(SwiftStdlib 5.3, *) {
   DemangleToMetadataTests.test("Round-trip with _mangledTypeName and _typeByName") {
@@ -530,6 +531,11 @@ if #available(SwiftStdlib 5.3, *) {
   DemangleToMetadataTests.test("Check _MangledTypeName with any ~Copyable.Type") {
     let type: any ~Copyable.Type = NonCopyable.self
     expectEqual("4main11NonCopyableV", _mangledTypeName(type))
+  }
+
+  DemangleToMetadataTests.test("Check _MangledTypeName with any ~Escapable.Type") {
+    let type: any ~Escapable.Type = NonEscapable.self
+    expectEqual("4main12NonEscapableV", _mangledTypeName(type))
   }
 }
 
