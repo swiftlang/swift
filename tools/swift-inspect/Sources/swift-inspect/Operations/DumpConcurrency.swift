@@ -55,7 +55,6 @@ fileprivate class ConcurrencyDumper {
     var isStatusRecordLocked: Bool
     var isEscalated: Bool
     var hasIsRunning: Bool
-    var isSynchronousStartTask: Bool
     var isRunning: Bool
     var isEnqueued: Bool
     var threadPort: UInt32?
@@ -276,7 +275,6 @@ fileprivate class ConcurrencyDumper {
     if info.isEscalated { flags.append("escalated") }
     if info.hasIsRunning && info.isRunning { flags.append("running") }
     if info.isEnqueued { flags.append("enqueued") }
-    if info.isSynchronousStart { flags.append("isSynchronousStartTask") }
 
     let flagsStr = flags.isEmpty ? "0" : flags.joined(separator: "|")
     return flagsStr
