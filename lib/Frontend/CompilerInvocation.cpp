@@ -3013,6 +3013,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ShouldFunctionsBePreservedToDebugger &=
         LTOKind.value() == IRGenLLVMLTOKind::None;
 
+  
+  Opts.EnableAddressDependencies = Args.hasArg(OPT_enable_address_dependencies);
+
   return false;
 }
 

@@ -382,6 +382,9 @@ struct BridgedPassContext {
   bool enableSimplificationFor(BridgedInstruction inst) const;
   BRIDGED_INLINE bool enableWMORequiredDiagnostics() const;
 
+  // Temporary for AddressableParameters Bootstrapping.
+  BRIDGED_INLINE bool enableAddressDependencies() const;
+
   // Closure specializer
   SWIFT_IMPORT_UNSAFE BridgedFunction ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef specializedName,
                                                         const BridgedParameterInfo * _Nullable specializedBridgedParams,

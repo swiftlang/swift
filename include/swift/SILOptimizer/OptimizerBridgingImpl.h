@@ -573,6 +573,11 @@ bool BridgedPassContext::enableWMORequiredDiagnostics() const {
   return mod->getOptions().EnableWMORequiredDiagnostics;
 }
 
+bool BridgedPassContext::enableAddressDependencies() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return mod->getOptions().EnableAddressDependencies;
+}
+
 static_assert((int)BridgedPassContext::SILStage::Raw == (int)swift::SILStage::Raw);
 static_assert((int)BridgedPassContext::SILStage::Canonical == (int)swift::SILStage::Canonical);
 static_assert((int)BridgedPassContext::SILStage::Lowered == (int)swift::SILStage::Lowered);

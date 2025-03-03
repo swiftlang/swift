@@ -592,6 +592,10 @@ struct SILOptOptions {
       "swift-version",
       llvm::cl::desc(
           "The swift version to assume AST declarations correspond to"));
+
+  llvm::cl::opt<bool> EnableAddressDependencies = llvm::cl::opt<bool>(
+      "enable-address-dependencies",
+      llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
 };
 
 /// Regular expression corresponding to the value given in one of the
@@ -908,6 +912,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   SILOpts.EnablePackMetadataStackPromotion =
       options.EnablePackMetadataStackPromotion;
+
+  SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
 
   if (options.OptModeFlag == OptimizationMode::NotSet) {
     if (options.OptimizationGroup == OptGroup::Diagnostics)

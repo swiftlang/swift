@@ -218,7 +218,7 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       bases.append(source.value)
     case .result, .inParameter, .inoutParameter:
       // addressable dependencies directly depend on the incoming address.
-      if source.convention.isAddressable {
+      if context.options.enableAddressDependencies() && source.convention.isAddressable {
         bases.append(source.value)
         return
       }
