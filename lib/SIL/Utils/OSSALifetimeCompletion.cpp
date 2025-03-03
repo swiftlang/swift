@@ -61,6 +61,13 @@
 
 using namespace swift;
 
+// FIXME: remove this option after fixing:
+// rdar://145994924 (Mem2Reg calls lifetime completion without checking for
+// pointer escapes)
+llvm::cl::opt<bool> VerifyLifetimeCompletion(
+    "verify-lifetime-completion", llvm::cl::init(false),
+    llvm::cl::desc("."));
+
 static SILInstruction *endOSSALifetime(SILValue value,
                                        OSSALifetimeCompletion::LifetimeEnd end,
                                        SILBuilder &builder,
@@ -493,8 +500,16 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
     }
   };
   Walker walker(*this, scopedAddress, boundary, liveness);
-  std::move(walker).walk(scopedAddress.value);
-
+  AddressUseKind result = walker.walk(scopedAddress.value);
+  if (VerifyLifetimeCompletion && boundary != Boundary::Availability
+      && result != AddressUseKind::NonEscaping) {
+    llvm::errs() << "Incomplete liveness for:\n" << scopedAddress.value;
+    if (auto *escapingUse = walker.getEscapingUse()) {
+      llvm::errs() << "  escapes at:\n";
+      escapingUse->getUser()->printInContext(llvm::errs());
+    }
+    ASSERT(false && "caller must check for pointer escapes");
+  }
   return endLifetimeAtBoundary(scopedAddress.value, liveness, boundary,
                                deadEndBlocks);
 }
@@ -524,6 +539,15 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
   }
   InteriorLiveness liveness(value);
   liveness.compute(domInfo, handleInnerScope);
+  if (VerifyLifetimeCompletion && boundary != Boundary::Availability
+      && liveness.getAddressUseKind() != AddressUseKind::NonEscaping) {
+    llvm::errs() << "Incomplete liveness for: " << value;
+    if (auto *escapingUse = liveness.escapingUse) {
+      llvm::errs() << "  escapes at:\n";
+      escapingUse->getUser()->printInContext(llvm::errs());
+    }
+    ASSERT(false && "caller must check for pointer escapes");
+  }
   return endLifetimeAtBoundary(value, liveness.getLiveness(), boundary,
                                deadEndBlocks);
 }
