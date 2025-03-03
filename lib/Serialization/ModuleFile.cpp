@@ -135,7 +135,8 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
 }
 
 bool ModuleFile::allowCompilerErrors() const {
-  return getContext().LangOpts.AllowModuleWithCompilerErrors;
+  return getContext().LangOpts.AllowModuleWithCompilerErrors ||
+         getContext().ForceAllowModuleWithCompilerErrors;
 }
 
 Status
