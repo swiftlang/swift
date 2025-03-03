@@ -3827,6 +3827,8 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
 
     CopiedLoadBorrowEliminationState state(markedAddress->getFunction());
     CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(state);
+    // FIXME: should check AddressUseKind::NonEscaping != walk() to handle
+    // PointerEscape.
     if (AddressUseKind::Unknown ==
         std::move(copiedLoadBorrowEliminator).walk(markedAddress)) {
       LLVM_DEBUG(llvm::dbgs() << "Failed copied load borrow eliminator visit: "
@@ -3869,6 +3871,8 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     RAIILLVMDebug l("main use gathering visitor");
 
     visitor.reset(markedAddress);
+    // FIXME: should check walkResult != AddressUseKind::NonEscaping to handle
+    // PointerEscape.
     if (AddressUseKind::Unknown == std::move(visitor).walk(markedAddress)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Failed access path visit: " << *markedAddress);

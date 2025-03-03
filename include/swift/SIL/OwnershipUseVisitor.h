@@ -494,7 +494,7 @@ bool OwnershipUseVisitor<Impl>::visitInteriorPointerUses(Operand *use) {
   // just assumes that all scopes are incomplete.
   SmallVector<Operand *, 8> interiorUses;
   auto useKind = InteriorPointerOperand(use).findTransitiveUses(&interiorUses);
-  if (useKind == AddressUseKind::PointerEscape) {
+  if (useKind != AddressUseKind::NonEscaping) {
     if (!asImpl().handlePointerEscape(use))
       return false;
   }
