@@ -3,6 +3,10 @@
 
 import ReferenceCounted
 
+protocol MyProto {
+    func foo() -> Self
+}
+
 extension NS.LocalCount {
     static func g() {}
 
@@ -10,3 +14,13 @@ extension NS.LocalCount {
         Self.g()
     }
 }
+
+extension NS.LocalCount: MyProto {
+    public func foo() -> Self {
+        return self
+    }
+}
+
+let x = NS.LocalCount.create()
+x.f()
+let _ = x.foo()
