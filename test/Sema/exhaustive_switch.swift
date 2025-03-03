@@ -1489,3 +1489,13 @@ do {
       case (e: .y, b: true)?: break
   }
 }
+
+// https://github.com/swiftlang/swift/issues/61817
+do {
+  let b: Bool? = true
+  switch b {
+    case true: break
+    case false: break
+    case nil: break
+  }
+}
