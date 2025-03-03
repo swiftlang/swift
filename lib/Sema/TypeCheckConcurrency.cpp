@@ -2734,7 +2734,16 @@ namespace {
           // Converting to `@execution(caller)` function type
           case FunctionTypeIsolation::Kind::NonIsolatedCaller: {
             switch (fromIsolation.getKind()) {
-            case FunctionTypeIsolation::Kind::NonIsolated:
+            case FunctionTypeIsolation::Kind::NonIsolated: {
+              // nonisolated -> @execution(caller) doesn't cross
+              // an isolation boundary.
+              if (!fromFnType->isAsync())
+                break;
+
+              // @execution(concurrent) -> @execution(caller)
+              // crosses an isolation boundary.
+              LLVM_FALLTHROUGH;
+            }
             case FunctionTypeIsolation::Kind::GlobalActor:
             case FunctionTypeIsolation::Kind::Erased:
               diagnoseNonSendableParametersAndResult(toFnType);

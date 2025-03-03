@@ -103,13 +103,11 @@ func testNonSendableDiagnostics(
   let _: @execution(caller) () async -> NonSendable = erased2 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
   // expected-error@-1 {{cannot convert '@isolated(any) @Sendable () async -> NonSendable' to '@execution(caller) () async -> NonSendable' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
 
-  let _: @execution(caller) (NonSendable) async -> Void = nonIsolated1 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
-  // expected-error@-1 {{annot convert '@Sendable (NonSendable) -> Void' to '@execution(caller) (NonSendable) async -> Void' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
+  let _: @execution(caller) (NonSendable) async -> Void = nonIsolated1 // Ok
   let _: @execution(caller) (NonSendable) async -> Void = nonIsolated2 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
   // expected-error@-1 {{cannot convert '@Sendable (NonSendable) async -> Void' to '@execution(caller) (NonSendable) async -> Void' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
 
-  let _: @execution(caller) () async -> NonSendable = nonIsolated3 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
-  // expected-error@-1 {{cannot convert '@Sendable () -> NonSendable' to '@execution(caller) () async -> NonSendable' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
+  let _: @execution(caller) () async -> NonSendable = nonIsolated3 // Ok
   let _: @execution(caller) () async -> NonSendable = nonIsolated4 // expected-note {{type 'NonSendable' does not conform to 'Sendable' protocol}}
   // expected-error@-1 {{cannot convert '@Sendable () async -> NonSendable' to '@execution(caller) () async -> NonSendable' because crossing of an isolation boundary requires parameter and result types to conform to 'Sendable' protocol}}
 
