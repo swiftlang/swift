@@ -93,12 +93,24 @@ def check_test_file(test_file, existing_swift_features):
 
     for feature in enabled_features.difference(existing_swift_features):
         enabled_features.remove(feature)
-        print(f"error: {test_file}: Unknown feature in RUN line: {feature}")
+
+        # Be careful to not use RUN with a colon after it or Lit will pick
+        # it up.
+        print(
+            f"{test_file}: error: unknown feature '{feature}' enabled in 'RUN"
+            + ":' line"
+        )
         had_error = True
 
     for feature in required_features.difference(existing_swift_features):
         required_features.remove(feature)
-        print(f"error: {test_file}: Unknown feature in REQUIRES line: {feature}")
+
+        # Be careful to not use REQUIRES with a colon after it or Lit will pick
+        # it up.
+        print(
+            f"{test_file}: error: unknown feature '{feature}' in 'REQUIRES"
+            + f":' line: swift_feature_{feature}"
+        )
         had_error = True
 
     # If the sets are equal, we're fine.
@@ -110,12 +122,15 @@ def check_test_file(test_file, existing_swift_features):
     for feature in enabled_features.difference(required_features):
         # Be careful to not use REQUIRES with a colon after it or Lit will pick
         # it up.
-        print(f"error: {test_file}: Missing 'REQUIRES" + f": swift_feature_{feature}'")
+        print(
+            f"{test_file}: error: file enables '{feature}' but is missing '// REQUIRES"
+            + f": swift_feature_{feature}'"
+        )
         had_error = True
 
     for feature in required_features.difference(enabled_features):
         print(
-            f"error: {test_file}: Missing '-enable-(experimental|upcoming)-feature: {feature}'"
+            f"{test_file}: error: file requires 'swift_feature_{feature}' but does not enable '{feature}'"
         )
         had_error = True
 
