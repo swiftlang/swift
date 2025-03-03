@@ -225,7 +225,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
                                                       compiledCandidates.end());
 
         // If this interface specified '-autolink-force-load', add it to the
-        // set of linked libraries for this moduole.
+        // set of linked libraries for this module.
         std::vector<LinkLibrary> linkLibraries;
         if (llvm::find(ArgsRefs, "-autolink-force-load") != ArgsRefs.end()) {
           std::string linkName = realModuleName.str().str();
