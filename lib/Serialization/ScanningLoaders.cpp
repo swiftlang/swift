@@ -205,15 +205,6 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
           Args.push_back(candidate);
         }
 
-        // Compute the output path and add it to the command line
-        SmallString<128> outputPathBase(moduleOutputPath);
-        llvm::sys::path::append(
-            outputPathBase,
-            moduleName.str() + "-" + Hash + "." +
-                file_types::getExtension(file_types::TY_SwiftModuleFile));
-        Args.push_back("-o");
-        Args.push_back(outputPathBase.str().str());
-
         // Open the interface file.
         auto &fs = *Ctx.SourceMgr.getFileSystem();
         auto interfaceBuf = fs.getBufferForFile(moduleInterfacePath);
@@ -234,7 +225,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
                                                       compiledCandidates.end());
 
         // If this interface specified '-autolink-force-load', add it to the
-        // set of linked libraries for this module.
+        // set of linked libraries for this moduole.
         std::vector<LinkLibrary> linkLibraries;
         if (llvm::find(ArgsRefs, "-autolink-force-load") != ArgsRefs.end()) {
           std::string linkName = realModuleName.str().str();
@@ -250,11 +241,6 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
             InPath, compiledCandidatesRefs, ArgsRefs, {}, {}, linkLibraries,
             isFramework, isStatic, {}, /*module-cache-key*/ "", UserModVer);
-
-        // We do NOT need the code below to set output path in the dependency
-        // info because it will be calculated again later. We do not want to
-        // create output paths that do not exist in the end.
-        // Result->setOutputPathAndHash(outputPathBase.str().str(), Hash);
 
         if (Ctx.CASOpts.EnableCaching) {
           std::vector<std::string> clangDependencyFiles;

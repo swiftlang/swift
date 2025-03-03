@@ -172,7 +172,7 @@ public:
     SwiftInterfaceModuleOutputPathResolution::ResultTy swiftInterfaceOutputPath;
     if (resolvingDepInfo.isSwiftInterfaceModule()) {
       pruneUnusedVFSOverlay(swiftInterfaceOutputPath);
-      updateSwiftInterfaceModuleOutputPath(swiftInterfaceOutputPath);
+      addSwiftInterfaceModuleOutputPathToCommandLine(swiftInterfaceOutputPath);
     }
 
     // Update the dependency in the cache with the modified command-line.
@@ -455,19 +455,12 @@ private:
     return;
   }
 
-  void updateSwiftInterfaceModuleOutputPath(
+  void addSwiftInterfaceModuleOutputPathToCommandLine(
       const SwiftInterfaceModuleOutputPathResolution::ResultTy &outputPath) {
     StringRef outputName = outputPath.outputPath.str();
 
-    bool isOutputPath = false;
-    for (auto &A : commandline) {
-      if (isOutputPath) {
-        A = outputName.str();
-        break;
-      } else if (A == "-o") {
-        isOutputPath = true;
-      }
-    }
+    commandline.push_back("-o");
+    commandline.push_back(outputName.str());
 
     return;
   }
