@@ -10,12 +10,12 @@ class BankAccount {
 }
 
 actor Bank {
-	let name = "My Bank"
+    let name = "My Bank"
     let account = BankAccount()
 }
 
 nonisolated func depositAndPrintBalance(in bank: Bank, by value: Int) async {
-	let bankName = await bank.name // Fine, `name` is Sendable.
+    let bankName = await bank.name // Fine, `name` is Sendable.
     let account = await bank.account // ❌ Non-sendable type 'BankAccount' of property 'acount' cannot exit actor-isolated context
     account.balance += value
     print("Current balance in \(bankName): \(account.balance)")
@@ -32,13 +32,13 @@ class BankAccount {
 }
 
 actor Bank {
-	let name = "My Bank"
+    let name = "My Bank"
     let account = BankAccount()
 
     func depositAndPrintBalance(_ deposit: Int) {
-		account.balance += deposit // ✅
-		print("Current balance in \(name): \(account.balance)")
-	}
+        account.balance += deposit // ✅
+        print("Current balance in \(name): \(account.balance)")
+    }
 }
 ```
 
@@ -51,7 +51,7 @@ class BankAccount {
 
 @MainActor 
 final class Bank {
-	let name = "My Bank"
+    let name = "My Bank"
     let account = BankAccount()
 }
 
