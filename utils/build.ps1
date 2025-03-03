@@ -1951,13 +1951,13 @@ function Build-DS2([Platform]$Platform, $Arch) {
   Build-CMakeProject `
     -Src "$SourceCache\ds2" `
     -Bin "$BinaryCache\$($Arch.LLVMTarget)\ds2" `
-    -InstallTo "$(Get-PlatformRoot $Platform)\Developer\Library\$(Get-ModuleTriple $Arch)" `
+    -InstallTo "$(Get-PlatformRoot $Platform)\Developer\Library\ds2\usr" `
     -Arch $Arch `
     -Platform $Platform `
-    -BuildTargets default `
     -Defines @{
       CMAKE_SYSTEM_NAME = $Platform.ToString();
       DS2_REGSGEN2 = "$(Get-BuildProjectBinaryCache RegsGen2)/regsgen2.exe";
+      DS2_PROGRAM_PREFIX = "$(Get-ModuleTriple $Arch)-";
       BISON_EXECUTABLE = "$(Get-BisonExecutable)";
       FLEX_EXECUTABLE = "$(Get-FlexExecutable)";
     }
