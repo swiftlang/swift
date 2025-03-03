@@ -199,6 +199,7 @@ extension ASTGenVisitor {
         .atRethrows,
         .borrowed,
         .compilerInitialized,
+        .constVal,
         .dynamicCallable,
         .eagerMove,
         .exported,

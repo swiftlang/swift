@@ -354,6 +354,10 @@ static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureCompileTimeValues(Decl *decl) {
+  return decl->getAttrs().hasAttribute<ConstValAttr>();
+}
+
 static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
   if (decl->getAttrs().hasAttribute<SafeAttr>() ||
       decl->getAttrs().hasAttribute<UnsafeAttr>())
