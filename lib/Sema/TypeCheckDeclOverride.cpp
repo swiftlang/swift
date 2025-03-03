@@ -251,10 +251,10 @@ static bool isUnavailableInAllVersions(ValueDecl *decl) {
   for (auto constraint : constraints) {
     switch (constraint.getReason()) {
     case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
-    case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
+    case AvailabilityConstraint::Reason::UnavailableForDeployment:
       return true;
     case AvailabilityConstraint::Reason::Obsoleted:
-    case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
+    case AvailabilityConstraint::Reason::PotentiallyUnavailable:
       break;
     }
   }

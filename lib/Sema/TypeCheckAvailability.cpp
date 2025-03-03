@@ -3007,9 +3007,9 @@ bool shouldHideDomainNameForConstraintDiagnostic(
   case AvailabilityDomain::Kind::SwiftLanguage:
     switch (constraint.getReason()) {
     case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
-    case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
+    case AvailabilityConstraint::Reason::UnavailableForDeployment:
       return false;
-    case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
+    case AvailabilityConstraint::Reason::PotentiallyUnavailable:
     case AvailabilityConstraint::Reason::Obsoleted:
       return true;
     }
@@ -3058,7 +3058,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
                   proto)
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
+  case AvailabilityConstraint::Reason::UnavailableForDeployment:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
                    type, proto, domain, *attr.getIntroduced());
     break;
@@ -3068,7 +3068,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
                   domain, *attr.getObsoleted())
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
+  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
     llvm_unreachable("unexpected constraint");
   }
   return true;
@@ -3478,7 +3478,7 @@ bool diagnoseExplicitUnavailability(
     diags.diagnose(D, diag::availability_marked_unavailable, D)
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
+  case AvailabilityConstraint::Reason::UnavailableForDeployment:
     diags
         .diagnose(D, diag::availability_introduced_in_version, D, domain,
                   *Attr.getIntroduced())
@@ -3490,7 +3490,7 @@ bool diagnoseExplicitUnavailability(
                   *Attr.getObsoleted())
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
+  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
     llvm_unreachable("unexpected constraint");
     break;
   }
