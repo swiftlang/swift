@@ -241,6 +241,7 @@ class InteriorLiveness : public OSSALiveness {
 public:
   // Summarize address uses
   AddressUseKind addressUseKind = AddressUseKind::Unknown;
+  Operand *escapingUse = nullptr;
 
 public:
   InteriorLiveness(SILValue def): OSSALiveness(def) {}
