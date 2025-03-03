@@ -290,3 +290,39 @@ func test_that_unary_argument_hacks_do_not_apply_to_subscripts(dict: [String: My
   let value = dict["hello"]
   let _: MyValue? = value // Ok
 }
+
+// Unlabeled unary argument hack was disabled if there were any protocol requirements
+// or variadic generic overloads present in the result set (regadless of their viability).
+//
+// Remove the requirement and variadic overloads and this code would start failing even
+// though it shouldn't!
+
+struct Future<T> {
+}
+
+protocol DB {
+  func get(_: Int, _: Int) -> Future<Int?>
+}
+
+extension DB {
+  func get(_: Int, _: Int = 42) async throws -> Int? { nil }
+  func get(_: Int) -> Future<Int?> { .init() }
+
+  func fetch(_: Int, _: Int = 42) async throws -> Int? { nil }
+  func fetch(_: Int) -> Future<Int?> { .init() }
+  func fetch<each T>(values: repeat each T) -> Int { 42 }
+}
+
+struct TestUnary {
+  var db: any DB
+
+  func get(v: Int) async throws {
+    guard let _ = try await self.db.get(v) else { // Ok
+      return
+    }
+
+    guard let _ = try await self.db.fetch(v) else { // Ok
+      return
+    }
+  }
+}
