@@ -2386,7 +2386,7 @@ class ParameterTypeFlags {
     Specifier = 7 << SpecifierShift,
     NoDerivative = 1 << 6,
     Isolated = 1 << 7,
-    CompileTimeConst = 1 << 8,
+    CompileTimeLiteral = 1 << 8,
     Sending = 1 << 9,
     Addressable = 1 << 10,
     NumBits = 11
@@ -2404,12 +2404,12 @@ public:
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
                      ParamSpecifier specifier, bool isolated, bool noDerivative,
-                     bool compileTimeConst, bool isSending, bool isAddressable)
+                     bool compileTimeLiteral, bool isSending, bool isAddressable)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(specifier) << SpecifierShift | (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
-              (compileTimeConst ? CompileTimeConst : 0) |
+              (compileTimeLiteral ? CompileTimeLiteral : 0) |
               (isSending ? Sending : 0) |
               (isAddressable ? Addressable : 0)) {}
 
@@ -2417,7 +2417,7 @@ public:
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ParamSpecifier ownership,
-                    bool isolated, bool isNoDerivative, bool compileTimeConst,
+                    bool isolated, bool isNoDerivative, bool compileTimeLiteral,
                     bool isSending, bool isAddressable);
 
   bool isNone() const { return !value; }
@@ -2428,7 +2428,7 @@ public:
   bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
   bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
   bool isIsolated() const { return value.contains(Isolated); }
-  bool isCompileTimeConst() const { return value.contains(CompileTimeConst); }
+  bool isCompileTimeLiteral() const { return value.contains(CompileTimeLiteral); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
   bool isSending() const { return value.contains(Sending); }
   bool isAddressable() const { return value.contains(Addressable); }
@@ -2450,9 +2450,9 @@ public:
                                           : ParamSpecifier::Default);
   }
 
-  ParameterTypeFlags withCompileTimeConst(bool isConst) const {
-    return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::CompileTimeConst
-                                      : value - ParameterTypeFlags::CompileTimeConst);
+  ParameterTypeFlags withCompileTimeLiteral(bool isConst) const {
+    return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::CompileTimeLiteral
+                                      : value - ParameterTypeFlags::CompileTimeLiteral);
   }
   
   ParameterTypeFlags withShared(bool isShared) const {
@@ -2598,7 +2598,7 @@ public:
                               /*autoclosure*/ false,
                               /*nonEphemeral*/ false, getOwnershipSpecifier(),
                               /*isolated*/ false, /*noDerivative*/ false,
-                              /*compileTimeConst*/ false,
+                              /*compileTimeLiteral*/ false,
                               /*is sending*/ false,
                               /*is addressable*/ false);
   }
@@ -3391,8 +3391,8 @@ public:
     /// Whether or not the parameter is 'sending'.
     bool isSending() const { return Flags.isSending(); }
 
-    /// Whether the parameter is 'isCompileTimeConst'.
-    bool isCompileTimeConst() const { return Flags.isCompileTimeConst(); }
+    /// Whether the parameter is 'isCompileTimeLiteral'.
+    bool isCompileTimeLiteral() const { return Flags.isCompileTimeLiteral(); }
 
     /// Whether the parameter is marked '@noDerivative'.
     bool isNoDerivative() const { return Flags.isNoDerivative(); }
@@ -8077,7 +8077,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
     ParamSpecifier ownership, bool isolated, bool isNoDerivative,
-    bool compileTimeConst, bool isSending, bool isAddressable) {
+    bool compileTimeLiteral, bool isSending, bool isAddressable) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -8088,7 +8088,7 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     ownership = ParamSpecifier::InOut;
   }
   return {isVariadic, isAutoClosure,  isNonEphemeral,   ownership,
-          isolated,   isNoDerivative, compileTimeConst, isSending,
+          isolated,   isNoDerivative, compileTimeLiteral, isSending,
           isAddressable};
 }
 

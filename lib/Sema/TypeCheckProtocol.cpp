@@ -623,8 +623,8 @@ matchWitnessStructureImpl(ValueDecl *req, ValueDecl *witness,
       return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
 
     // Check that the compile-time constness matches.
-    if (reqASD->isCompileTimeConst() && !witnessASD->isCompileTimeConst()) {
-      return RequirementMatch(witness, MatchKind::CompileTimeConstConflict);
+    if (reqASD->isCompileTimeLiteral() && !witnessASD->isCompileTimeLiteral()) {
+      return RequirementMatch(witness, MatchKind::CompileTimeLiteralConflict);
     }
 
     // If the requirement is settable and the witness is not, reject it.
@@ -3086,9 +3086,9 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
                          diag);
     break;
   }
-  case MatchKind::CompileTimeConstConflict: {
+  case MatchKind::CompileTimeLiteralConflict: {
     auto witness = match.Witness;
-    auto missing = !witness->getAttrs().getAttribute<CompileTimeConstAttr>();
+    auto missing = !witness->getAttrs().getAttribute<CompileTimeLiteralAttr>();
     auto diag = diags.diagnose(witness, diag::protocol_witness_const_conflict,
                    missing);
     if (missing) {

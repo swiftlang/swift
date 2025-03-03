@@ -304,7 +304,7 @@ extension ASTGenVisitor {
         .indirect,
         .final,
         .knownToBeLocal,
-        .compileTimeConst:
+        .compileTimeLiteral:
 
         // generateSimpleDeclAttr will diagnose and fix-it to change it to modifiers.
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: attrKind))

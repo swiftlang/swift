@@ -3864,7 +3864,7 @@ static void printParameterFlags(ASTPrinter &printer,
   if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
 
-  if (flags.isCompileTimeConst())
+  if (flags.isCompileTimeLiteral())
     printer.printKeyword("_const", options, " ");
 }
 

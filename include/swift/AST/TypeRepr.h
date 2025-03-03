@@ -1112,7 +1112,7 @@ public:
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
-           T->getKind() == TypeReprKind::CompileTimeConst ||
+           T->getKind() == TypeReprKind::CompileTimeLiteral ||
            T->getKind() == TypeReprKind::LifetimeDependent ||
            T->getKind() == TypeReprKind::Sending;
   }
@@ -1174,15 +1174,15 @@ public:
 /// \code
 ///   x : _const Int
 /// \endcode
-class CompileTimeConstTypeRepr : public SpecifierTypeRepr {
+class CompileTimeLiteralTypeRepr : public SpecifierTypeRepr {
 public:
-  CompileTimeConstTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-    : SpecifierTypeRepr(TypeReprKind::CompileTimeConst, Base, InOutLoc) {}
+  CompileTimeLiteralTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::CompileTimeLiteral, Base, InOutLoc) {}
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::CompileTimeConst;
+    return T->getKind() == TypeReprKind::CompileTimeLiteral;
   }
-  static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
+  static bool classof(const CompileTimeLiteralTypeRepr *T) { return true; }
 };
 
 /// A sending type.
@@ -1626,7 +1626,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Isolated:
   case TypeReprKind::Sending:
   case TypeReprKind::Placeholder:
-  case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::CompileTimeLiteral:
   case TypeReprKind::LifetimeDependent:
   case TypeReprKind::Integer:
     return true;

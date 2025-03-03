@@ -4008,7 +4008,7 @@ public:
     bool isVariadic;
     bool isAutoClosure;
     bool isIsolated;
-    bool isCompileTimeConst;
+    bool isCompileTimeLiteral;
     bool isSending;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
@@ -4019,7 +4019,7 @@ public:
                                          contextID, rawSpecifier,
                                          interfaceTypeID, isIUO, isVariadic,
                                          isAutoClosure, isIsolated,
-                                         isCompileTimeConst,
+                                         isCompileTimeLiteral,
                                          isSending,
                                          rawDefaultArg,
                                          defaultExprType,
@@ -4061,7 +4061,7 @@ public:
     param->setVariadic(isVariadic);
     param->setAutoClosure(isAutoClosure);
     param->setIsolated(isIsolated);
-    param->setCompileTimeConst(isCompileTimeConst);
+    param->setCompileTimeLiteral(isCompileTimeLiteral);
     param->setSending(isSending);
 
     // Decode the default argument kind.
@@ -7199,13 +7199,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     IdentifierID internalLabelID;
     TypeID typeID;
     bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
-        isCompileTimeConst;
+        isCompileTimeLiteral;
     bool isNoDerivative, isSending, isAddressable;
     unsigned rawOwnership;
     decls_block::FunctionParamLayout::readRecord(
         scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
-        isCompileTimeConst, isSending, isAddressable);
+        isCompileTimeLiteral, isSending, isAddressable);
 
     auto ownership = getActualParamDeclSpecifier(
       (serialization::ParamDeclSpecifier)rawOwnership);
@@ -7220,7 +7220,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                         ParameterTypeFlags(isVariadic, isAutoClosure,
                                            isNonEphemeral, *ownership,
                                            isIsolated, isNoDerivative,
-                                           isCompileTimeConst, isSending,
+                                           isCompileTimeLiteral, isSending,
                                            isAddressable),
                         MF.getIdentifier(internalLabelID));
   }

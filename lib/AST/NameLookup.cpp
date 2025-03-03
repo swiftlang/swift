@@ -3223,7 +3223,7 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::Ownership:
-  case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::CompileTimeLiteral:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
   case TypeReprKind::SILBox:
