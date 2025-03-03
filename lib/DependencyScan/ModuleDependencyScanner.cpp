@@ -602,7 +602,7 @@ static void discoverCrossImportOverlayFiles(
   auto getModuleIDForImportIdentifier =
       [](const std::string &importIdentifierStr,
          const ModuleDependencyIDSet &directSwiftDepsSet,
-         const ModuleDependencyIDSet &directClangDepsSet) -> ModuleDependencyID {
+         const ModuleDependencyIDSet &directClangDepsSet) -> std::optional<ModuleDependencyID> {
     if (auto textualDepIt = directSwiftDepsSet.find(
             {importIdentifierStr, ModuleDependencyKind::SwiftInterface});
         textualDepIt != directSwiftDepsSet.end())
@@ -615,8 +615,8 @@ static void discoverCrossImportOverlayFiles(
                  {importIdentifierStr, ModuleDependencyKind::Clang});
              clangDepIt != directClangDepsSet.end())
       return *clangDepIt;
-    llvm_unreachable(
-        "Unresolved import during cross-import overlay resolution");
+    else
+      return std::nullopt;
   };
 
   // Collect the set of directly-imported module dependencies
@@ -625,9 +625,10 @@ static void discoverCrossImportOverlayFiles(
     auto importResolvedModuleID = getModuleIDForImportIdentifier(
         import.importIdentifier, mainModuleDirectSwiftDepsSet,
         mainModuleDirectClangDepsSet);
-    for (const auto &importLocation : import.importLocations)
-      perSourceFileDependencies[importLocation.bufferIdentifier].insert(
-          importResolvedModuleID);
+    if (importResolvedModuleID)
+      for (const auto &importLocation : import.importLocations)
+        perSourceFileDependencies[importLocation.bufferIdentifier].insert(
+          *importResolvedModuleID);
   }
 
   // For each source-file, build a set of module dependencies of the
@@ -658,9 +659,10 @@ static void discoverCrossImportOverlayFiles(
               auto importResolvedDepID = getModuleIDForImportIdentifier(
                   import.importIdentifier, directSwiftDepsSet,
                   directClangDepsSet);
-              if (!perSourceFileDependencies[bufferIdentifier].count(
-                      importResolvedDepID))
-                worklist.push_back(importResolvedDepID);
+              if (importResolvedDepID &&
+                  !perSourceFileDependencies[bufferIdentifier].count(
+                      *importResolvedDepID))
+                worklist.push_back(*importResolvedDepID);
             }
           }
         }
