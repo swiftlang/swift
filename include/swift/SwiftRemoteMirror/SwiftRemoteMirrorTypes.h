@@ -243,6 +243,7 @@ typedef struct swift_async_task_info {
   bool IsFuture;
   bool IsGroupChildTask;
   bool IsAsyncLetTask;
+  bool IsSynchronousStartTask;
 
   unsigned MaxPriority;
   bool IsCancelled;
