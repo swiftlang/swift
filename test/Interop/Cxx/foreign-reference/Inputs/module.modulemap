@@ -1,3 +1,8 @@
+module Constructor {
+  header "constructor.h"
+  requires cplusplus
+}
+
 module POD {
   header "pod.h"
   requires cplusplus
