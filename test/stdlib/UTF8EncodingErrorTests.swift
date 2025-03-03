@@ -2,6 +2,8 @@
 
 // REQUIRES: executable_test
 
+// FIXME: this test is currently broken
+
 import Swift
 import StdlibUnittest
 

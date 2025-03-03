@@ -40,7 +40,7 @@ extension UTF8Span {
         return nil
       }
 
-      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+      _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
       let (result, newPos) = _start._decodeScalar(startingAt: currentCodeUnitOffset)
       self.currentCodeUnitOffset = newPos
       return result
@@ -57,7 +57,7 @@ extension UTF8Span {
         return nil
       }
 
-      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+      _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
       let (result, newPos) = _start._decodeScalar(endingAt: currentCodeUnitOffset)
       self.currentCodeUnitOffset = newPos
       return result
@@ -74,8 +74,7 @@ extension UTF8Span {
         return 0
       }
 
-      _internalInvariant(codeUnits._boundsCheck(currentCodeUnitOffset))
-      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+      _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
 
       currentCodeUnitOffset &+= _start._scalarLength(startingAt: currentCodeUnitOffset)
       return 1
@@ -105,8 +104,7 @@ extension UTF8Span {
         return 0
       }
 
-      _internalInvariant(codeUnits._boundsCheck(currentCodeUnitOffset))
-      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+      _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
 
       currentCodeUnitOffset = _start._previousScalarStart(currentCodeUnitOffset)
       return 1
@@ -130,24 +128,14 @@ extension UTF8Span {
     ///
     /// **TODO**: Example
     public mutating func reset(roundingBackwardsFrom i: Int)  {
-      // TODO: what about out of bounds (and beyond-count) values of i?
-      var pos = i
-      while !codeUnits._isScalarAligned(pos) {
-        pos -= 1
-      }
-      self.currentCodeUnitOffset = pos
+      self.currentCodeUnitOffset = codeUnits._scalarAlignBackwards(i)
     }
 
     /// Reset to the nearest scalar-aligned code unit offset `>= i`.
     ///
     /// **TODO**: Example
     public mutating func reset(roundingForwardsFrom i: Int)  {
-      // TODO: what about out of bounds (and beyond-count) values of i?
-      var pos = i
-      while !codeUnits._isScalarAligned(pos) {
-        pos += 1
-      }
-      self.currentCodeUnitOffset = pos
+      self.currentCodeUnitOffset = codeUnits._scalarAlignForwards(i)
     }
 
     /// Reset this iterator to code unit offset `i`, skipping _all_ safety
@@ -164,7 +152,7 @@ extension UTF8Span {
     /// known-valid previous position.
     ///
     public mutating func reset(uncheckedAssumingAlignedTo i: Int) {
-      _internalInvariant(codeUnits._isScalarAligned(i))
+      _internalInvariant(codeUnits._isScalarAligned(unchecked: i))
       self.currentCodeUnitOffset = i
     }
 
@@ -235,7 +223,7 @@ extension UTF8Span {
     public mutating func next() -> Character? {
       guard currentCodeUnitOffset < codeUnits.count else { return nil }
 
-      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+      _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
       let (result, newPos) = _start._decodeCharacter(
         startingAt: currentCodeUnitOffset,
         limitedBy: codeUnits.count
@@ -253,7 +241,7 @@ extension UTF8Span {
     public mutating func previous() -> Character? {
       guard currentCodeUnitOffset > 0 else { return nil }
 
-      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+      _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
       let (result, newPos) = _start._decodeCharacter(
         endingAt: currentCodeUnitOffset,
         limitedBy: codeUnits.count)
@@ -271,8 +259,7 @@ extension UTF8Span {
         return 0
       }
 
-      _internalInvariant(codeUnits._boundsCheck(currentCodeUnitOffset))
-      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+      _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
 
       self.currentCodeUnitOffset = _start._nextCharacterStart(currentCodeUnitOffset, limitedBy: codeUnits.count)
       return 1
@@ -302,8 +289,7 @@ extension UTF8Span {
         return 0
       }
 
-      _internalInvariant(codeUnits._boundsCheck(currentCodeUnitOffset))
-      _internalInvariant(codeUnits._isScalarAligned(currentCodeUnitOffset))
+      _internalInvariant(codeUnits._isScalarAligned(unchecked: currentCodeUnitOffset))
 
       currentCodeUnitOffset = _start._previousCharacterStart(currentCodeUnitOffset, limitedBy: codeUnits.count)
       return 1
@@ -326,12 +312,12 @@ extension UTF8Span {
 
     /// Reset to the nearest character-aligned position `<= i`.
     public mutating func reset(roundingBackwardsFrom i: Int) {
-      fatalError()
+      self.currentCodeUnitOffset = codeUnits._scalarAlignBackwards(i)
     }
 
     /// Reset to the nearest character-aligned position `>= i`.
     public mutating func reset(roundingForwardsFrom i: Int) {
-      fatalError()
+      self.currentCodeUnitOffset = codeUnits._scalarAlignForwards(i)
     }
 
     /// Reset this iterator to code unit offset `i`, skipping _all_ safety
@@ -348,7 +334,8 @@ extension UTF8Span {
     /// known-valid previous position.
     ///
     public mutating func reset(uncheckedAssumingAlignedTo i: Int) {
-      fatalError()
+      _internalInvariant(codeUnits._isScalarAligned(unchecked: i))
+      self.currentCodeUnitOffset = i
     }
 
     /// Returns the UTF8Span containing all the content up to the iterator's

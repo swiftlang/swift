@@ -23,7 +23,7 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
   @usableFromInline
   internal var _countAndFlags: UInt64
 
-  @_alwaysEmitIntoClient
+  // @_alwaysEmitIntoClient
   @inline(__always)
   @lifetime(borrow start)
   internal init(
@@ -43,11 +43,9 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
     _unsafeBaseAddress._unsafelyUnwrappedUnchecked
   }
 
-  // HACK: working around lack of internals
+  // HACK: working around lack of internal plumbing work
   internal var _str: String { _start()._str(0..<count) }
 }
-
-// TODO: init strategy: underscored public that use lifetime annotations
 
 // TODO: try to convert code to be ran on Span instead of URP
 
@@ -109,80 +107,7 @@ extension UTF8Span {
     }
     _internalInvariant(self.count == codeUnits.count)
   }
-
-  // @_alwaysEmitIntoClient
-  // public init<Owner: ~Copyable & ~Escapable>(
-  //   validatingUnsafe codeUnits: UnsafeBufferPointer<UInt8>,
-  //   owner: borrowing Owner
-  // ) throws(UTF8.EncodingError) -> dependsOn(owner) Self {
-  //   try self.init(
-  //     validating: Span(unsafeElements: codeUnits, owner: owner))
-  // }
-
-  // // Question: do we want raw versions?
-  // @_alwaysEmitIntoClient
-  // public init<Owner: ~Copyable & ~Escapable>(
-  //   validatingUnsafeRaw codeUnits: UnsafeRawBufferPointer,
-  //   owner: borrowing Owner
-  // ) throws(UTF8.EncodingError) -> dependsOn(owner) Self {
-  //   try self.init(
-  //     validating: Span(unsafeBytes: codeUnits, owner: owner))
-  // }
-
-  // // Question: do we want separate count versions?
-  // @_alwaysEmitIntoClient
-  // public init<Owner: ~Copyable & ~Escapable>(
-  //   validatingUnsafeStart start: UnsafePointer<UInt8>,
-  //   count: Int,
-  //   owner: borrowing Owner
-  // ) throws(UTF8.EncodingError) -> dependsOn(owner) Self {
-  //   try self.init(
-  //     validating: Span(unsafeStart: start, count: count, owner: owner))
-  // }
-
-  // @_alwaysEmitIntoClient
-  // public init<Owner: ~Copyable & ~Escapable>(
-  //   validatingUnsafeStart start: UnsafeRawPointer,
-  //   count: Int,
-  //   owner: borrowing Owner
-  // ) throws(UTF8.EncodingError) -> dependsOn(owner) Self {
-  //   try self.init(
-  //     validating: Span(unsafeStart: start, byteCount: count, owner: owner))
-  // }
-
-  // // Question: Do we do a raw version? String doesn't have one
-  // // Also, should we do a UnsafePointer<UInt8> version, it's
-  // // annoying to not have one sometimes...?
-  // @_alwaysEmitIntoClient
-  // public init<Owner: ~Copyable & ~Escapable>(
-  //   validatingUnsafeRawCString nullTerminatedUTF8: UnsafeRawPointer,
-  //   owner: borrowing Owner
-  // ) throws(UTF8.EncodingError) -> dependsOn(owner) Self {
-  //   // TODO: is there a better way?
-  //   try self.init(
-  //     validatingUnsafeCString: nullTerminatedUTF8.assumingMemoryBound(
-  //       to: CChar.self
-  //     ),
-  //     owner: owner)
-  //   _internalInvariant(self.isNullTerminatedCString)
-  // }
-
-  // @_alwaysEmitIntoClient
-  // public init<Owner: ~Copyable & ~Escapable>(
-  //   validatingUnsafeCString nullTerminatedUTF8: UnsafePointer<CChar>,
-  //   owner: borrowing Owner
-  // ) throws(UTF8.EncodingError) -> dependsOn(owner) Self {
-  //   let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
-  //   try self.init(
-  //     validatingUnsafeStart: UnsafeRawPointer(nullTerminatedUTF8),
-  //     count: len,
-  //     owner: owner)
-  //   self._setIsNullTerminatedCString(true)
-  // }
 }
-
-
-
 
 
 // MARK: String
@@ -218,16 +143,14 @@ extension UTF8Span {
 
 @available(SwiftStdlib 6.1, *)
 extension UTF8Span {
-  @_alwaysEmitIntoClient @inline(__always)
+#if !INTERNAL_CHECKS_ENABLED
+  @inline(__always) internal func _invariantCheck() {}
+#else
+  @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-#if DEBUG
-    if isNullTerminatedCString {
-      _internalInvariant(
-        _start().load(fromByteOffset: count, as: UInt8.self) == 0)
-      // TODO: byte scan for no interior nulls...
-    }
-#endif
+    // TODO: validate the UTF-8 as an assertion (and isASCII)
   }
+#endif
 }
 
 @available(SwiftStdlib 6.1, *)

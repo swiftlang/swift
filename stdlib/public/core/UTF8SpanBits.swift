@@ -21,7 +21,15 @@ extension UTF8Span {
   ///
   /// Updates the `isKnownASCII` bit if contents are all-ASCII.
   public mutating func checkForASCII() -> Bool {
-    fatalError()
+    if isKnownASCII { return true }
+
+    let result = _withUnsafeBufferPointer {
+      _allASCII($0)
+    }
+    if result {
+      _setIsASCII()
+    }
+    return result
   }
 
   /// Returns whether the contents are known to be NFC. This is not
@@ -96,16 +104,6 @@ extension UTF8Span {
   @_alwaysEmitIntoClient @inline(__always)
   internal static var _nfcBit: UInt64 {
     0x4000_0000_0000_0000
-  }
-
-  @_alwaysEmitIntoClient @inline(__always)
-  internal static var _singleScalarCharactersBit: UInt64 {
-    0x2000_0000_0000_0000
-  }
-
-  @_alwaysEmitIntoClient @inline(__always)
-  internal static var _nullTerminatedCStringBit: UInt64 {
-    0x1000_0000_0000_0000
   }
 
   @_alwaysEmitIntoClient @inline(__always)

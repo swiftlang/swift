@@ -463,19 +463,6 @@ extension Unicode.Scalar {
   }
 }
 
-extension Unicode {
-  /// **QUESTION**: Hashable? Codable?
-  /// **QUESTION**: Can we be frozen? What's the cost of resiliency here?
-  public struct GraphemeBreakingState: Sendable, Equatable {
-    internal var _state: _GraphemeBreakingState
-
-    /// ...
-    public init() {
-      self._state = .init()
-    }
-  }
-}
-
 internal struct _GraphemeBreakingState: Sendable, Equatable {
   // When we're looking through an indic sequence, one of the requirements is
   // that there is at LEAST 1 InCB=Linker present between two InCB=Consonant.
