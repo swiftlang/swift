@@ -899,10 +899,16 @@ static SILValue tryRewriteToPartialApplyStack(
 
     OrigUnmodifiedDuringClosureLifetimeWalker origUseWalker(
         closureLiveness, origIsUnmodifiedDuringClosureLifetime);
-    auto walkResult = std::move(origUseWalker).walk(orig);
-
-    if (walkResult == AddressUseKind::Unknown ||
-        !origIsUnmodifiedDuringClosureLifetime) {
+    switch (origUseWalker.walk(orig)) {
+    case AddressUseKind::NonEscaping:
+    case AddressUseKind::Dependent:
+      // Dependent uses are ignored because they cannot modify the original.
+      break;
+    case AddressUseKind::PointerEscape:
+    case AddressUseKind::Unknown:
+      continue;
+    }
+    if (!origIsUnmodifiedDuringClosureLifetime) {
       continue;
     }
 

@@ -150,6 +150,7 @@ struct InteriorLivenessVisitor :
 
   bool handlePointerEscape(Operand *use) {
     interiorLiveness.addressUseKind = AddressUseKind::PointerEscape;
+    interiorLiveness.escapingUse = use;
     if (!handleUsePoint(use, UseLifetimeConstraint::NonLifetimeEnding))
       return false;
 
@@ -197,6 +198,9 @@ void InteriorLiveness::print(llvm::raw_ostream &OS) const {
     break;
   case AddressUseKind::PointerEscape:
     OS << "Incomplete liveness: Escaping address\n";
+    break;
+  case AddressUseKind::Dependent:
+    OS << "Incomplete liveness: Dependent value\n";
     break;
   case AddressUseKind::Unknown:
     OS << "Incomplete liveness: Unknown address use\n";

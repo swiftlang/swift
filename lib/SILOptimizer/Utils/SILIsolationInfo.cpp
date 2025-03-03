@@ -211,6 +211,8 @@ inferIsolationInfoForTempAllocStack(AllocStackInst *asi) {
   AddressWalker walker(state);
 
   // If we fail to walk, emit an unknown patten error.
+  //
+  // FIXME: check AddressUseKind::NonEscaping != walk().
   if (AddressUseKind::Unknown == std::move(walker).walk(asi)) {
     return SILIsolationInfo();
   }

@@ -1598,7 +1598,7 @@ void swift::insertDeallocOfCapturedArguments(
     SmallVector<Operand *, 2> uses;
     auto useFinding = findTransitiveUsesForAddress(asi, &uses);
     InstructionSet users(asi->getFunction());
-    if (useFinding != AddressUseKind::Unknown) {
+    if (useFinding == AddressUseKind::NonEscaping) {
       for (auto use : uses) {
         users.insert(use->getUser());
       }
@@ -1609,7 +1609,7 @@ void swift::insertDeallocOfCapturedArguments(
       if (isa<UnreachableInst>(terminator))
         continue;
       SILInstruction *insertionPoint = nullptr;
-      if (useFinding != AddressUseKind::Unknown) {
+      if (useFinding == AddressUseKind::NonEscaping) {
         insertionPoint = &block->front();
         for (auto &instruction : llvm::reverse(*block)) {
           if (users.contains(&instruction)) {
@@ -2463,6 +2463,7 @@ SILValue swift::getInitOfTemporaryAllocStack(AllocStackInst *asi) {
 
   AddressWalkerState state(asi->getFunction());
   AddressWalker walker(state);
+  // Note: ignore pointer escapes for the purpose of finding initializers.
   if (std::move(walker).walk(asi) == AddressUseKind::Unknown ||
       state.foundError)
     return SILValue();
