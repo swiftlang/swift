@@ -529,6 +529,20 @@ static unsigned numOverloadChoicesMatchingOnArity(OverloadedDeclRefExpr *ODRE,
   });
 }
 
+static bool isVariadicGenericOverload(ValueDecl *choice) {
+  auto genericContext = choice->getAsGenericContext();
+  if (!genericContext)
+    return false;
+
+  auto *GPL = genericContext->getGenericParams();
+  if (!GPL)
+    return false;
+
+  return llvm::any_of(GPL->getParams(), [&](const GenericTypeParamDecl *GP) {
+    return GP->isParameterPack();
+  });
+}
+
 /// This maintains an "old hack" behavior where overloads  of some
 /// `OverloadedDeclRef` calls were favored purely based on number of
 /// argument and (non-defaulted) parameters matching.
@@ -541,20 +555,6 @@ static void findFavoredChoicesBasedOnArity(
 
   if (numOverloadChoicesMatchingOnArity(ODRE, argumentList) > 1)
     return;
-
-  auto isVariadicGenericOverload = [&](ValueDecl *choice) {
-    auto genericContext = choice->getAsGenericContext();
-    if (!genericContext)
-      return false;
-
-    auto *GPL = genericContext->getGenericParams();
-    if (!GPL)
-      return false;
-
-    return llvm::any_of(GPL->getParams(), [&](const GenericTypeParamDecl *GP) {
-      return GP->isParameterPack();
-    });
-  };
 
   bool hasVariadicGenerics = false;
   SmallVector<Constraint *> favored;
@@ -589,6 +589,21 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 
   if (!isExpr<ApplyExpr>(
           cs.getParentExpr(argumentList->getUnlabeledUnaryExpr())))
+    return std::nullopt;
+
+  // The hack rolled back favoring choices if one of the overloads was a
+  // protocol requirement or variadic generic.
+  //
+  // Note that it doesn't matter whether such overload choices are viable
+  // or not, their presence disabled this "optimization".
+  if (llvm::any_of(disjunction->getNestedConstraints(), [](Constraint *choice) {
+        auto *decl = getOverloadChoiceDecl(choice);
+        if (!decl)
+          return false;
+
+        return isa<ProtocolDecl>(decl->getDeclContext()) ||
+               isVariadicGenericOverload(decl);
+      }))
     return std::nullopt;
 
   auto ODRE = isOverloadedDeclRef(disjunction);
