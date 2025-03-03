@@ -2795,15 +2795,6 @@ namespace {
                   toFnType, /*downgradeToWarning=*/true);
               break;
 
-            case FunctionTypeIsolation::Kind::GlobalActor:
-              // Actor isolation change.
-              if (fromIsolation.getGlobalActorType()->isEqual(
-                      toIsolation.getGlobalActorType())) {
-                diagnoseNonSendableParametersAndResult(
-                    toFnType, /*downgradeToWarning=*/true);
-              }
-              break;
-
             case FunctionTypeIsolation::Kind::NonIsolated: {
               // Since @execution(concurrent) as an asynchronous
               // function it would mean that without Sendable
@@ -2821,6 +2812,9 @@ namespace {
             // Runs on the actor.
             case FunctionTypeIsolation::Kind::NonIsolatedCaller:
               break;
+
+            case FunctionTypeIsolation::Kind::GlobalActor:
+              llvm_unreachable("invalid conversion");
             }
             break;
           }

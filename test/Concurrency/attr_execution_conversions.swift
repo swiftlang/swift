@@ -4,6 +4,11 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_ExecutionAttribute
 
+@globalActor
+actor MyActor {
+  static let shared = MyActor()
+}
+
 @execution(concurrent)
 func concurrentTest() async {
 }
@@ -132,4 +137,9 @@ func testNonSendableDiagnostics(
 
   let _: @MainActor (NonSendable) async -> Void = caller1 // Ok
   let _: @MainActor () async -> NonSendable = caller2 // Ok
+
+  let _: @MyActor (NonSendable) async -> Void = globalActor1
+  // expected-error@-1 {{cannot convert value actor-isolated to 'MainActor' to specified type actor-isolated to 'MyActor'}}
+  let _: @MyActor () async -> NonSendable = globalActor2
+  // expected-error@-1 {{cannot convert value actor-isolated to 'MainActor' to specified type actor-isolated to 'MyActor'}}
 }
