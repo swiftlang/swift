@@ -96,7 +96,7 @@ public class AnyKeyPath: _AppendKeyPath {
     }
 
 #if _pointerBitWidth(_64)
-    let offset = unsafe (0 &- Int(bitPattern: _kvcKeyPathStringPtr)) &- 1
+    let offset = (0 &- Int(bitPattern: _kvcKeyPathStringPtr)) &- 1
     guard _fastPath(offset >= 0) else {
       // This happens to be an actual _kvcKeyPathStringPtr, not an offset, if
       // we get here.
@@ -2046,7 +2046,7 @@ internal struct KeyPathBuffer {
     internal mutating func pushRaw(size: Int, alignment: Int)
         -> UnsafeMutableRawBufferPointer {
       var baseAddress = unsafe buffer.baseAddress._unsafelyUnwrappedUnchecked
-      var misalign = unsafe Int(bitPattern: baseAddress) & (alignment - 1)
+      var misalign = Int(bitPattern: baseAddress) & (alignment - 1)
       if misalign != 0 {
         misalign = alignment - misalign
         unsafe baseAddress = unsafe baseAddress.advanced(by: misalign)
@@ -2969,7 +2969,7 @@ internal func _getTypeByMangledNameInEnvironmentOrContext(
   genericEnvironmentOrContext: UnsafeRawPointer?,
   genericArguments: UnsafeRawPointer?)
   -> Any.Type? {
-  let taggedPointer = unsafe UInt(bitPattern: genericEnvironmentOrContext)
+  let taggedPointer = UInt(bitPattern: genericEnvironmentOrContext)
   if taggedPointer & 1 == 0 {
     return unsafe _getTypeByMangledNameInEnvironment(name, nameLength,
                       genericEnvironment: genericEnvironmentOrContext,
@@ -2990,7 +2990,7 @@ internal func _resolveKeyPathGenericArgReference(
     arguments: UnsafeRawPointer?)
     -> UnsafeRawPointer {
   // If the low bit is clear, it's a direct reference to the argument.
-  if unsafe (UInt(bitPattern: reference) & 0x01 == 0) {
+  if (UInt(bitPattern: reference) & 0x01 == 0) {
     return unsafe reference
   }
 
@@ -3682,7 +3682,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
   ) {
     let alignment = MemoryLayout<T>.alignment
     var baseAddress = unsafe destData.baseAddress._unsafelyUnwrappedUnchecked
-    var misalign = unsafe Int(bitPattern: baseAddress) & (alignment - 1)
+    var misalign = Int(bitPattern: baseAddress) & (alignment - 1)
     if misalign != 0 {
       misalign = alignment - misalign
       unsafe baseAddress = unsafe baseAddress.advanced(by: misalign)

@@ -451,7 +451,7 @@ extension UnsafePointer {
   ) -> UnsafePointer<Property>? {
     guard let o = property._storedInlineOffset else { return nil }
     _internalInvariant(o >= 0)
-    unsafe _debugPrecondition(
+    _debugPrecondition(
       !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
@@ -1343,7 +1343,7 @@ extension UnsafeMutablePointer {
   ) -> UnsafePointer<Property>? {
     guard let o = property._storedInlineOffset else { return nil }
     _internalInvariant(o >= 0)
-    unsafe _debugPrecondition(
+    _debugPrecondition(
       !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
@@ -1365,7 +1365,7 @@ extension UnsafeMutablePointer {
   ) -> UnsafeMutablePointer<Property>? {
     guard let o = property._storedInlineOffset else { return nil }
     _internalInvariant(o >= 0)
-    unsafe _debugPrecondition(
+    _debugPrecondition(
       !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )

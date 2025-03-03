@@ -340,6 +340,7 @@ extension Int {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
+  @safe
   @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
     if let pointer = pointer {
@@ -358,6 +359,7 @@ extension UInt {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
+  @safe
   @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
     if let pointer = pointer {

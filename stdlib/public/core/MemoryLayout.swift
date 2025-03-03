@@ -276,7 +276,7 @@ extension MemoryLayout where T: ~Copyable {
   }
 
   internal static func _roundingUpBaseToAlignment(_ value: UnsafeRawBufferPointer) -> UnsafeRawBufferPointer {
-    let baseAddressBits = unsafe Int(bitPattern: value.baseAddress)
+    let baseAddressBits = Int(bitPattern: value.baseAddress)
     var misalignment = baseAddressBits & _alignmentMask
     if misalignment != 0 {
       misalignment = _alignmentMask & -misalignment
@@ -288,7 +288,7 @@ extension MemoryLayout where T: ~Copyable {
   }
 
   internal static func _roundingUpBaseToAlignment(_ value: UnsafeMutableRawBufferPointer) -> UnsafeMutableRawBufferPointer {
-    let baseAddressBits = unsafe Int(bitPattern: value.baseAddress)
+    let baseAddressBits = Int(bitPattern: value.baseAddress)
     var misalignment = baseAddressBits & _alignmentMask
     if misalignment != 0 {
       misalignment = _alignmentMask & -misalignment

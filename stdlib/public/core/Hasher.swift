@@ -217,7 +217,7 @@ extension Hasher {
 
       // Load first unaligned partial word of data
       do {
-        let start = unsafe UInt(bitPattern: data)
+        let start = UInt(bitPattern: data)
         let end = _roundUp(start, toAlignment: MemoryLayout<UInt64>.alignment)
         let c = min(remaining, Int(end - start))
         if c > 0 {
@@ -227,7 +227,7 @@ extension Hasher {
           remaining -= c
         }
       }
-      unsafe _internalInvariant(
+      _internalInvariant(
         remaining == 0 ||
         Int(bitPattern: data) & (MemoryLayout<UInt64>.alignment - 1) == 0)
 
