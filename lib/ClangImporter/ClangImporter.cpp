@@ -6189,23 +6189,6 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   DeclName name = desc.name;
   ClangInheritanceInfo inheritance = desc.inheritance;
 
-  /*
-  // HACK: the inherited, synthesized, private 'pointee' property used in MSVC's
-  // std::optional implementation causes problems when conforming it to
-  // CxxOptional (see conformToCxxOptionalIfNeeded()), since it clashes with the
-  // public 'pointee' property synthesized from using _Mybase::operator* (where
-  // _Mybase is _Optional_construct_base). The root cause seems to be the
-  // cloned member cache's inability to manage special decls synthesized from
-  // operators.
-  if (auto *decl =
-          dyn_cast_or_null<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
-    if (decl->isInStdNamespace() && decl->getIdentifier() &&
-        decl->getName() == "_Optional_construct_base" &&
-        desc.name.getBaseName() == "pointee")
-      return {};
-  }
-  */
-
   auto &ctx = recordDecl->getASTContext();
   auto directResults = evaluateOrDefault(
       ctx.evaluator,
