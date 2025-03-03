@@ -2,10 +2,6 @@
 
 import Functions
 
-PrivatelyInherited().constInBase() // expected-error {{'constInBase' is inaccessible due to 'private' protection level}}
-ProtectedInherited().constInBase() // expected-error {{'constInBase' is inaccessible due to 'private' protection level}}
-
-
 extension Base {
   public func swiftFunc() {}
 }

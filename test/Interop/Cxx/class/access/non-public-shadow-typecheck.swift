@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default %s
+// RUN: %target-swift-frontend %s -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportCxxNonPublicBaseMembers
 import NonPublicShadow
 
 func f(s: Shadow) {

@@ -2,7 +2,7 @@
 // Test that all accessible inherited methods can be called.
 //
 // RUN: split-file %s %t
-// RUN: %target-build-swift -module-name main %t/blessed.swift -I %S/Inputs -o %t/out -Xfrontend -cxx-interoperability-mode=default
+// RUN: %target-build-swift -module-name main %t/blessed.swift -I %S/Inputs -o %t/out -Xfrontend -cxx-interoperability-mode=default -enable-experimental-feature ImportCxxNonPublicBaseMembers
 // RUN: %target-codesign %t/out
 // RUN: %target-run %t/out
 //
