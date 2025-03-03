@@ -270,6 +270,7 @@ namespace {
 
     bool ShouldSerializeAll;
     bool SerializeDebugInfoSIL;
+    const PathRemapper &DebuggingOptionsPrefixMap;
 
     void addMandatorySILFunction(const SILFunction *F,
                                  bool emitDeclarationsForOnoneSupport);
@@ -346,9 +347,9 @@ namespace {
 
   public:
     SILSerializer(Serializer &S, llvm::BitstreamWriter &Out, bool serializeAll,
-                  bool serializeDebugInfo)
+                  bool serializeDebugInfo, const PathRemapper &DebuggingOptionsPrefixMap)
         : S(S), Out(Out), ShouldSerializeAll(serializeAll),
-          SerializeDebugInfoSIL(serializeDebugInfo) {}
+          SerializeDebugInfoSIL(serializeDebugInfo), DebuggingOptionsPrefixMap(DebuggingOptionsPrefixMap) {}
 
     void writeSILModule(const SILModule *SILMod);
   };
@@ -3233,7 +3234,7 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
   }
 
   std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
-  FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
+  FNameID = S.addUniquedStringRef(DebuggingOptionsPrefixMap.remapPath(SM.getDisplayNameForLoc(SLoc)));
   SourceLocMap.insert({OpaquePtr, SourceLocMap.size() + 1});
   SourceLocLayout::emitRecord(Out, ScratchRecord,
                               SILAbbrCodes[SourceLocLayout::Code], Row, Column,
@@ -3291,14 +3292,14 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
   // TODO: we can emit SourceLocRef here
   if (SLoc.isValid()) {
     std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
-    FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
+    FNameID = S.addUniquedStringRef(DebuggingOptionsPrefixMap.remapPath(SM.getDisplayNameForLoc(SLoc)));
   } else if (Scope->Loc.isFilenameAndLocation()) {
     // getSourceLoc produces an empty SourceLoc for FilenameAndLocation, so
     // this needs to be handled separately. rdar://25225083.
     auto FNameLoc = Scope->Loc.getFilenameAndLocation();
     Row = FNameLoc->line;
     Column = FNameLoc->column;
-    FNameID = S.addUniquedStringRef(FNameLoc->filename);
+    FNameID = S.addUniquedStringRef(DebuggingOptionsPrefixMap.remapPath(FNameLoc->filename));
   }
 
   DebugScopeMap.insert({Scope, DebugScopeMap.size() + 1});
@@ -3694,6 +3695,6 @@ void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL,
   if (!SILMod)
     return;
 
-  SILSerializer SILSer(*this, Out, serializeAllSIL, serializeDebugInfo);
+  SILSerializer SILSer(*this, Out, serializeAllSIL, serializeDebugInfo, Options.DebuggingOptionsPrefixMap);
   SILSer.writeSILModule(SILMod);
 }

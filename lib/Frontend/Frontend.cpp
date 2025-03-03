@@ -228,10 +228,12 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
           !module->isExternallyConsumed());
 
   serializationOpts.PathObfuscator = opts.serializedPathObfuscator;
+  if (serializationOpts.SerializeDebugInfoSIL || serializationOpts.SerializeOptionsForDebugging)
+    serializationOpts.DebuggingOptionsPrefixMap =
+      getIRGenOptions().DebugPrefixMap;
+
   if (serializationOpts.SerializeOptionsForDebugging &&
       opts.DebugPrefixSerializedDebuggingOptions) {
-    serializationOpts.DebuggingOptionsPrefixMap =
-        getIRGenOptions().DebugPrefixMap;
     auto &remapper = serializationOpts.DebuggingOptionsPrefixMap;
     auto remapClangPaths = [&remapper](StringRef path) {
       return remapper.remapPath(path);
