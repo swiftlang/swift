@@ -3041,6 +3041,14 @@ ERROR(witness_requires_class_implementation,none,
       "cannot be implemented in a protocol extension because it returns 'Self' "
       "and has associated type requirements",
       (RequirementKind, const ValueDecl *, Type))
+ERROR(implicit_init_witness_not_accessible_proto,none,
+      "Implicit memberwise initializer %1 is declared internal because it was "
+      "synthesized. This conflicts with the requirement that it be declared "
+      "%select{%error|fileprivate|internal|package|public|%error}3 because it matches a "
+      "requirement in %select{private|fileprivate|internal|package|public|%error}4 protocol "
+      "%5",
+      (RequirementKind, const ValueDecl *, bool, AccessLevel, AccessLevel,
+       const ProtocolDecl *))
 ERROR(witness_not_accessible_proto,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be declared "
@@ -3079,6 +3087,9 @@ ERROR(type_witness_objc_generic_parameter,none,
       "type %0 involving Objective-C type parameter%select{| %1}2 cannot be "
       "used for associated type %3 of protocol %4",
       (Type, Type, bool, const AssociatedTypeDecl *, const ProtocolDecl *))
+NOTE(implicit_init_witness_fix_access,none,
+     "Explicitly declare %0 as '%select{%error|fileprivate|internal|package|public|%error}1' to "
+     "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
 NOTE(witness_fix_access,none,
      "mark the %kindonly0 as "
      "'%select{%error|fileprivate|internal|package|public|%error}1' to "
