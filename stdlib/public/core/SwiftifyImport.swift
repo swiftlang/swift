@@ -58,6 +58,8 @@ public enum _SwiftifyInfo {
 ///
 /// Parameter paramInfo: information about how the function uses the pointer passed to it. The
 /// safety of the generated wrapper function depends on this info being extensive and accurate.
+#if hasFeature(Macros)
 @attached(peer, names: overloaded)
 public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo..., typeMappings: [String: String] = [:]) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
+#endif
