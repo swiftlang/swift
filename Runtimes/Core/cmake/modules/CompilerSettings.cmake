@@ -49,6 +49,8 @@ if(NOT HAVE_SWIFT_ASYNC_CALL)
 endif()
 
 check_compiler_flag(CXX "-mcx16" HAVE_CXX_MCX16)
-if(HAVE_CXX_MCX16)
+if(HAVE_CXX_MCX16 AND
+    (CMAKE_CXX_COMPILER_ARCHITECTURE_ID MATCHES "(X86)|(X64)" OR
+     CMAKE_SYSTEM_PROCESSOR MATCHES "(i[3-6]86)|(x86_64)|(amd64)|(AMD64)"))
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-mcx16>)
 endif()
