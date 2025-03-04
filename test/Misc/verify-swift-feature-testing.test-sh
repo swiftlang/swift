@@ -33,59 +33,13 @@ ENABLE_FEATURE_RE = re.compile(
 FEATURE_LIT_MARKER_RE = re.compile(r"swift_feature_([A-Za-z0-9]*)")
 
 
-def find_test_files(swift_src_root):
-    # Look for every test file in the test directories with `REQUIRES` lines
-    # that mention `swift_feature_`.
-    # Look for every test file in the test directories with `RUN` lines that
-    # mention `-enable-experimental-feature` or `-enable-upcoming-feature`.
-    # Be careful to not use RUN or REQUIRES with a colon after them or Lit will
-    # pick them up.
-    output = subprocess.check_output(
-        [
-            "grep",
-            "--extended-regexp",
-            "--recursive",
-            "-e",
-            "REQUIRES[:].*swift_feature_",
-            "-e",
-            "RUN[:].*-enable-(experimental|upcoming)-feature",
-            "--files-with-matches",
-            str(swift_src_root / "test"),
-            str(swift_src_root / "validation-test"),
-        ],
-        text=True,
-    )
-    return output.splitlines()
-
-
-def find_run_and_requires_lines(test_file):
-    # Be careful to not use RUN or REQUIRES with a colon after them or Lit will
-    # pick them up.
-    output = subprocess.check_output(
-        [
-            "grep",
-            "--extended-regexp",
-            "--no-filename",
-            "-e",
-            "RUN[:]",
-            "-e",
-            "REQUIRES[:]",
-            test_file,
-        ],
-        text=True,
-    )
-    return output.splitlines()
-
-
-def check_test_file(test_file, existing_swift_features):
-    enabled_features = set()
-    required_features = set()
-
-    for line in find_run_and_requires_lines(test_file):
-        enabled_features.update(feature for feature in ENABLE_FEATURE_RE.findall(line))
-        required_features.update(
-            feature for feature in FEATURE_LIT_MARKER_RE.findall(line)
-        )
+def check_test_file(file_path, lines, existing_swift_features):
+    enabled_features = {
+        feature for line in lines for feature in ENABLE_FEATURE_RE.findall(line)
+    }
+    required_features = {
+        feature for line in lines for feature in FEATURE_LIT_MARKER_RE.findall(line)
+    }
 
     had_error = False
 
@@ -97,7 +51,7 @@ def check_test_file(test_file, existing_swift_features):
         # Be careful to not use RUN with a colon after it or Lit will pick
         # it up.
         print(
-            f"{test_file}: error: unknown feature '{feature}' enabled in 'RUN"
+            f"{file_path}: error: unknown feature '{feature}' enabled in 'RUN"
             + ":' line"
         )
         had_error = True
@@ -108,7 +62,7 @@ def check_test_file(test_file, existing_swift_features):
         # Be careful to not use REQUIRES with a colon after it or Lit will pick
         # it up.
         print(
-            f"{test_file}: error: unknown feature '{feature}' in 'REQUIRES"
+            f"{file_path}: error: unknown feature '{feature}' in 'REQUIRES"
             + f":' line: swift_feature_{feature}"
         )
         had_error = True
@@ -123,18 +77,47 @@ def check_test_file(test_file, existing_swift_features):
         # Be careful to not use REQUIRES with a colon after it or Lit will pick
         # it up.
         print(
-            f"{test_file}: error: file enables '{feature}' but is missing '// REQUIRES"
+            f"{file_path}: error: file enables '{feature}' but is missing '// REQUIRES"
             + f": swift_feature_{feature}'"
         )
         had_error = True
 
     for feature in required_features.difference(enabled_features):
         print(
-            f"{test_file}: error: file requires 'swift_feature_{feature}' but does not enable '{feature}'"
+            f"{file_path}: error: file requires 'swift_feature_{feature}' but does not enable '{feature}'"
         )
         had_error = True
 
     return had_error
+
+
+def find_matches(swift_src_root):
+    # Look for every `REQUIRES` line that mentions `swift_feature_` in the
+    # test directories.
+    # Look for every `RUN` line that mentions `-enable-experimental-feature` or
+    # `-enable-upcoming-feature` in the test directories.
+    output = subprocess.check_output(
+        [
+            "grep",
+            "--extended-regexp",
+            "--recursive",
+            # Separate paths from lines with a null char.
+            "--null",
+            "-e",
+            # Be careful to not use REQUIRES with a colon after it or Lit will
+            # pick it up.
+            "REQUIRES[:].*swift_feature_",
+            "-e",
+            # Be careful to not use RUN with a colon after it or Lit will pick
+            # it up.
+            "RUN[:].*-enable-(experimental|upcoming)-feature",
+            "test",
+            "validation-test",
+        ],
+        text=True,
+        cwd=str(swift_src_root),
+    )
+    return output.splitlines()
 
 
 def main():
@@ -145,14 +128,23 @@ def main():
     swift_src_root = pathlib.Path(sys.argv[1])
     existing_swift_features = set(json.loads(sys.argv[2]))
 
-    had_error = False
+    file_paths_to_lines = dict()
 
-    for test_file in find_test_files(swift_src_root):
+    # Build a dictionary that maps file paths to lists of matching lines.
+    for match in find_matches(swift_src_root):
+        # '<path><zero-byte><line>'
+        relative_file_path, line = match.split("\0")
+
         # Skip if this is one of the exceptional files.
-        if pathlib.Path(test_file).relative_to(swift_src_root) in EXCEPTIONAL_FILES:
+        if pathlib.Path(relative_file_path) in EXCEPTIONAL_FILES:
             continue
 
-        if check_test_file(test_file, existing_swift_features):
+        abs_file_path = swift_src_root / relative_file_path
+        file_paths_to_lines.setdefault(abs_file_path, list()).append(line)
+
+    had_error = False
+    for file_path, lines in file_paths_to_lines.items():
+        if check_test_file(file_path, lines, existing_swift_features):
             had_error = True
 
     if had_error:
