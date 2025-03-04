@@ -146,6 +146,7 @@ namespace swift {
     DescriptiveStmtKind,
     DeclAttribute,
     AvailabilityDomain,
+    AvailabilityRange,
     VersionTuple,
     LayoutConstraint,
     ActorIsolation,
@@ -184,6 +185,7 @@ namespace swift {
       StmtKind DescriptiveStmtKindVal;
       const DeclAttribute *DeclAttributeVal;
       AvailabilityDomain AvailabilityDomainVal;
+      AvailabilityRange AvailabilityRangeVal;
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
       ActorIsolation ActorIsolationVal;
@@ -287,6 +289,10 @@ namespace swift {
     DiagnosticArgument(const AvailabilityDomain domain)
         : Kind(DiagnosticArgumentKind::AvailabilityDomain),
           AvailabilityDomainVal(domain) {}
+
+    DiagnosticArgument(const AvailabilityRange &range)
+        : Kind(DiagnosticArgumentKind::AvailabilityRange),
+          AvailabilityRangeVal(range) {}
 
     DiagnosticArgument(llvm::VersionTuple version)
       : Kind(DiagnosticArgumentKind::VersionTuple),
@@ -416,6 +422,11 @@ namespace swift {
     const AvailabilityDomain getAsAvailabilityDomain() const {
       assert(Kind == DiagnosticArgumentKind::AvailabilityDomain);
       return AvailabilityDomainVal;
+    }
+
+    const AvailabilityRange getAsAvailabilityRange() const {
+      assert(Kind == DiagnosticArgumentKind::AvailabilityRange);
+      return AvailabilityRangeVal;
     }
 
     llvm::VersionTuple getAsVersionTuple() const {

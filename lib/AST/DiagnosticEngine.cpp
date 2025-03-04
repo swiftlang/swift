@@ -1063,6 +1063,11 @@ static void formatDiagnosticArgument(StringRef Modifier,
            "Improper modifier for AvailabilityDomain argument");
     Out << Arg.getAsAvailabilityDomain().getNameForDiagnostics();
     break;
+  case DiagnosticArgumentKind::AvailabilityRange:
+    assert(Modifier.empty() &&
+           "Improper modifier for AvailabilityRange argument");
+    Out << Arg.getAsAvailabilityRange().getRawMinimumVersion().getAsString();
+    break;
   case DiagnosticArgumentKind::VersionTuple:
     assert(Modifier.empty() &&
            "Improper modifier for VersionTuple argument");
