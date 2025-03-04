@@ -1494,7 +1494,8 @@ internal func _taskCurrentPriority(_ task: Builtin.NativeObject) -> UInt8
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_escalate")
-internal func _taskEscalate(_ task: Builtin.NativeObject, newPriority: UInt8)
+@discardableResult
+internal func _taskEscalate(_ task: Builtin.NativeObject, newPriority: UInt8) -> UInt8
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_basePriority")
