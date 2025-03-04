@@ -172,6 +172,12 @@ func test_varArgs6() {
 }
 test_varArgs6()
 
+func test_varArgs7() {
+  my_printf("No parameters: %ld %ld %ld %ld %ld %ld %ld %ld\n");
+  // CHECK: No parameters: 0 0 0 0 0 0 0 0
+}
+test_varArgs7()
+
 
 // CHECK: done.
 my_printf("done.")
