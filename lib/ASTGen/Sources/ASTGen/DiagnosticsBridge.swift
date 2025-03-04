@@ -346,17 +346,25 @@ public func addQueuedDiagnostic(
     )
     let categoryName = String(decoding: categoryNameBuffer, as: UTF8.self)
 
-    let documentationPath = documentationPath.map { documentationPathPtr in
+    let documentationURL = documentationPath.map { documentationPathPtr in
       let documentationPathBuffer = UnsafeBufferPointer(
         start: documentationPathPtr,
         count: documentationPathLength
       )
-      return String(decoding: documentationPathBuffer, as: UTF8.self)
+
+      let documentationPath = String(decoding: documentationPathBuffer, as: UTF8.self)
+
+      // If this looks doesn't look like a URL, prepend file://.
+      if !documentationPath.looksLikeURL {
+        return "file://\(documentationPath)"
+      }
+
+      return documentationPath
     }
 
     return DiagnosticCategory(
       name: categoryName,
-      documentationPath: documentationPath
+      documentationURL: documentationURL
     )
   }
 
@@ -388,4 +396,31 @@ public func renderQueuedDiagnostics(
   let renderedStr = formatter.annotateSources(in: queuedDiagnostics.pointee.grouped)
 
   renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
+}
+
+extension String {
+  /// Simple check to determine whether the string looks like the start of a
+  /// URL.
+  fileprivate var looksLikeURL: Bool {
+    var forwardSlashes: Int = 0
+    for c in self {
+      if c == "/" {
+        forwardSlashes += 1
+        if forwardSlashes > 2 {
+          return true
+        }
+
+        continue
+      }
+
+      if c.isLetter || c.isNumber {
+        forwardSlashes = 0
+        continue
+      }
+
+      return false
+    }
+
+    return false
+  }
 }
