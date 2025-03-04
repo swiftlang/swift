@@ -28,8 +28,8 @@ import C
 // CHECK-NEXT:          "moduleInterfacePath": "{{.*}}{{/|\\}}Inputs{{/|\\}}Swift{{/|\\}}A.swiftinterface",
 // CHECK:          "commandLine": [
 // CHECK:            "-fobjc-disable-direct-methods-for-testing"
-// CHECK:            "-o",
-// CHECK-NEXT:       "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
 // CHECK-NOT:        "/tmp/foo"
 // CHECK-NOT:        "-I/tmp/bar"
+// CHECK:            "-o",
+// CHECK-NEXT:       "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule"
 // CHECK:          ]
