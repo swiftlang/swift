@@ -18,6 +18,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckInvertible.h"
+#include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
@@ -3175,6 +3176,18 @@ namespace {
         checkDefaultArgument(defaultArg);
       }
 
+      if (auto erasureExpr = dyn_cast<ErasureExpr>(expr)) {
+        checkIsolatedConformancesInContext(
+            erasureExpr->getConformances(), erasureExpr->getLoc(),
+            getDeclContext());
+      }
+
+      if (auto *underlyingToOpaque = dyn_cast<UnderlyingToOpaqueExpr>(expr)) {
+        checkIsolatedConformancesInContext(
+            underlyingToOpaque->substitutions, underlyingToOpaque->getLoc(),
+            getDeclContext());
+      }
+
       return Action::Continue(expr);
     }
 
@@ -4281,6 +4294,9 @@ namespace {
         Expr *context = nullptr) {
       if (!declRef)
         return false;
+
+      // Make sure isolated conformances are formed in the right context.
+      checkIsolatedConformancesInContext(declRef, loc, getDeclContext());
 
       auto decl = declRef.getDecl();
 
@@ -7683,4 +7699,100 @@ ActorIsolation swift::getConformanceIsolation(ProtocolConformance *conformance) 
     return ActorIsolation::forNonisolated(false);
 
   return getActorIsolation(nominal);
+}
+
+namespace {
+  /// Identifies isolated conformances whose isolation differs from the
+  /// context's isolation.
+  class MismatchedIsolatedConformances {
+    llvm::TinyPtrVector<ProtocolConformance *> badIsolatedConformances;
+    DeclContext *fromDC;
+    mutable std::optional<ActorIsolation> fromIsolation;
+
+  public:
+    MismatchedIsolatedConformances(const DeclContext *fromDC)
+      : fromDC(const_cast<DeclContext *>(fromDC)) { }
+
+    ActorIsolation getContextIsolation() const {
+      if (!fromIsolation)
+        fromIsolation = getActorIsolationOfContext(fromDC);
+
+      return *fromIsolation;
+    }
+
+    ArrayRef<ProtocolConformance *> getBadIsolatedConformances() const {
+      return badIsolatedConformances;
+    }
+
+    explicit operator bool() const { return !badIsolatedConformances.empty(); }
+
+    bool operator()(ProtocolConformanceRef conformance) {
+      if (conformance.isAbstract() || conformance.isPack())
+        return false;
+
+      auto concrete = conformance.getConcrete();
+      auto normal = dyn_cast<NormalProtocolConformance>(
+          concrete->getRootConformance());
+      if (!normal)
+        return false;
+
+      if (!normal->isIsolated())
+        return false;
+
+      auto conformanceIsolation = getConformanceIsolation(concrete);
+      if (conformanceIsolation == getContextIsolation())
+        return true;
+
+      badIsolatedConformances.push_back(concrete);
+      return false;
+    }
+
+    /// If there were any bad isolated conformances, diagnose them and return
+    /// true. Otherwise, returns false.
+    bool diagnose(SourceLoc loc) const {
+      if (badIsolatedConformances.empty())
+        return false;
+
+      ASTContext &ctx = fromDC->getASTContext();
+      auto firstConformance = badIsolatedConformances.front();
+      ctx.Diags.diagnose(
+          loc, diag::isolated_conformance_wrong_domain,
+          getConformanceIsolation(firstConformance),
+          firstConformance->getType(),
+          firstConformance->getProtocol()->getName(),
+          getContextIsolation());
+      return true;
+    }
+  };
+
+}
+
+bool swift::checkIsolatedConformancesInContext(
+    ConcreteDeclRef declRef, SourceLoc loc, const DeclContext *dc) {
+  MismatchedIsolatedConformances mismatched(dc);
+  forEachConformance(declRef, mismatched);
+  return mismatched.diagnose(loc);
+}
+
+bool swift::checkIsolatedConformancesInContext(
+    ArrayRef<ProtocolConformanceRef> conformances, SourceLoc loc,
+    const DeclContext *dc) {
+  MismatchedIsolatedConformances mismatched(dc);
+  for (auto conformance: conformances)
+    forEachConformance(conformance, mismatched);
+  return mismatched.diagnose(loc);
+}
+
+bool swift::checkIsolatedConformancesInContext(
+    SubstitutionMap subs, SourceLoc loc, const DeclContext *dc) {
+  MismatchedIsolatedConformances mismatched(dc);
+  forEachConformance(subs, mismatched);
+  return mismatched.diagnose(loc);
+}
+
+bool swift::checkIsolatedConformancesInContext(
+    Type type, SourceLoc loc, const DeclContext *dc) {
+  MismatchedIsolatedConformances mismatched(dc);
+  forEachConformance(type, mismatched);
+  return mismatched.diagnose(loc);
 }
