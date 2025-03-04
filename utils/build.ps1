@@ -1807,12 +1807,6 @@ function Build-mimalloc() {
     Copy-Item -Path "$BinaryCache\$($Arch.LLVMTarget)\mimalloc\bin\$item" -Destination "$($Arch.ToolchainInstallRoot)\usr\bin\"
   }
 
-  # When cross-compiling, bundle the second mimalloc redirect dll as a workaround for
-  # https://github.com/microsoft/mimalloc/issues/997
-  if ($IsCrossCompiling) {
-    Copy-Item -Path "$BinaryCache\$($Arch.LLVMTarget)\mimalloc\bin\mimalloc-redirect$HostSuffix.dll" -Destination "$($Arch.ToolchainInstallRoot)\usr\bin\mimalloc-redirect$BuildSuffix.dll"
-  }
-
   # TODO: should we split this out into its own function?
   $Tools = @(
     "swift.exe",
@@ -3118,9 +3112,6 @@ function Build-Installer($Arch) {
   $Properties = @{
     BundleFlavor = "offline";
     TOOLCHAIN_ROOT = "$($Arch.ToolchainInstallRoot)\";
-    # When cross-compiling, bundle the second mimalloc redirect dll as a workaround for
-    # https://github.com/microsoft/mimalloc/issues/997
-    WORKAROUND_MIMALLOC_ISSUE_997 = if ($IsCrossCompiling) { "true" } else { "false" };
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$(Get-HostProjectBinaryCache DocC)\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
