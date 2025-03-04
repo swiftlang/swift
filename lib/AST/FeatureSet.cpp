@@ -350,6 +350,10 @@ static bool usesFeatureIsolatedConformances(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
   if (decl->getAttrs().hasAttribute<SafeAttr>() ||
       decl->getAttrs().hasAttribute<UnsafeAttr>())
