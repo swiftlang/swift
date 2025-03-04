@@ -7,7 +7,8 @@
 // against message wording changes), but it does require the message to mention
 // something about "private".
 //
-// RUN: %target-swift-ide-test -print-module -module-to-print=NonPublicInheritance -print-access -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=NonPublicInheritance -print-access -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop -enable-experimental-feature ImportNonPublicCxxMembers | %FileCheck %s
+// REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
 // CHECK:      public struct Base {
 // CHECK-NEXT:   public init()

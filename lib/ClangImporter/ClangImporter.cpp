@@ -6193,21 +6193,6 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   DeclName name = desc.name;
   ClangInheritanceInfo inheritance = desc.inheritance;
 
-  // HACK: the inherited, synthesized, private 'pointee' property used in MSVC's
-  // std::optional implementation causes problems when conforming it to
-  // CxxOptional (see conformToCxxOptionalIfNeeded()), since it clashes with the
-  // public 'pointee' property synthesized from using _Mybase::operator* (where
-  // _Mybase is _Optional_construct_base). The root cause seems to be the
-  // cloned member cache's inability to manage special decls synthesized from
-  // operators.
-  if (auto *decl =
-          dyn_cast_or_null<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
-    if (decl->isInStdNamespace() && decl->getIdentifier() &&
-        decl->getName() == "_Optional_construct_base" &&
-        desc.name.getBaseName() == "pointee")
-      return {};
-  }
-
   auto &ctx = recordDecl->getASTContext();
   auto directResults = evaluateOrDefault(
       ctx.evaluator,
@@ -6222,6 +6207,17 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     if (dyn_cast<clang::Decl>(found->getDeclContext()) !=
         recordDecl->getClangDecl())
       continue;
+
+    if (!ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers)) {
+      auto access = found->getAccess();
+      if ((access == clang::AS_private || access == clang::AS_protected) &&
+          (inheritance || !isa<clang::FieldDecl>(found)))
+        // 'found' is a non-public member and ImportNonPublicCxxMembers is not
+        // enabled. Don't import it unless it is a non-inherited field, which
+        // we must import because it may affect implicit conformances that
+        // iterate through all of a struct's fields, e.g., Sendable (#76892).
+        continue;
+    }
 
     // Don't import constructors on foreign reference types.
     if (isa<clang::CXXConstructorDecl>(found) && isa<ClassDecl>(recordDecl))
@@ -6275,6 +6271,10 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       foundNameArities.insert(getArity(valueDecl));
 
     for (auto base : cxxRecord->bases()) {
+      if (!ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers) &&
+          base.getAccessSpecifier() != clang::AS_public)
+        continue;
+
       clang::QualType baseType = base.getType();
       if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();

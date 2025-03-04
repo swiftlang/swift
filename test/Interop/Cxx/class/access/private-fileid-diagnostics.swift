@@ -1,5 +1,6 @@
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify %t/some/subdir/file1.swift -verify-additional-file %t/Cxx/include/cxx-header.h -I %t/Cxx/include -cxx-interoperability-mode=default -module-name main -suppress-remarks
+// RUN: %target-swift-frontend -typecheck -verify -suppress-remarks %t/some/subdir/file1.swift -verify-additional-file %t/Cxx/include/cxx-header.h -I %t/Cxx/include -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main
+// REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
 // This test uses -verify-additional-file, which do not work well on Windows:
 // UNSUPPORTED: OS=windows-msvc

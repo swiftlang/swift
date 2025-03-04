@@ -15,7 +15,8 @@
 // non-public in different contexts, and variations in module and file names.
 //
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/blessed.swift
+// REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
 //--- blessed.swift
 

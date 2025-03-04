@@ -1,4 +1,5 @@
-// RUN: %target-swift-ide-test -print-module -print-access -module-to-print=AccessInversion -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -print-access -module-to-print=AccessInversion -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers | %FileCheck %s
+// REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
 // CHECK: public struct Leaky {
 
