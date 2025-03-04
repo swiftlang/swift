@@ -723,8 +723,11 @@ public:
     llvm::PointerType *Int8PtrTy;      /// i8*
     llvm::PointerType *WitnessTableTy;
     llvm::PointerType *ObjCSELTy;
-    llvm::PointerType *FunctionPtrTy;
     llvm::PointerType *CaptureDescriptorPtrTy;
+  };
+  union {
+    llvm::PointerType *FunctionPtrTy;
+    llvm::PointerType *Int8ProgramSpacePtrTy; /// i8* in same address space as programs
   };
   union {
     llvm::PointerType *Int8PtrPtrTy;   /// i8**
