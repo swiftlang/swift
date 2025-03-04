@@ -1015,21 +1015,30 @@ NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
                                                          Type patternTy) {
   auto *subExpr = EP->getSubExpr();
   auto &ctx = EP->getDeclContext()->getASTContext();
+  const auto optType = patternTy->getOptionalObjectType();
 
-  if (patternTy->isBool()) {
-    // The type is Bool.
+  if (patternTy->isBool() || (optType && optType->isBool())) {
+    // The type is Bool or Optional<Bool>.
     // Check if the pattern is a Bool literal
     auto *semanticSubExpr = subExpr->getSemanticsProvidingExpr();
     if (auto *BLE = dyn_cast<BooleanLiteralExpr>(semanticSubExpr)) {
       auto *BP = new (ctx) BoolPattern(BLE->getLoc(), BLE->getValue());
-      BP->setType(patternTy);
-      return BP;
+      if (patternTy->isBool()) {
+        BP->setType(patternTy);
+        return BP;
+      }
+      // In an Optional<Bool> ExprPattern,
+      // treat true/false as true?/false?, respectively.
+      BP->setType(optType);
+      auto OP = OptionalSomePattern::createImplicit(ctx, BP, BLE->getEndLoc());
+      OP->setType(patternTy);
+      return OP;
     }
   }
 
   // case nil is equivalent to .none when switching on Optionals.
   if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
-    if (patternTy->getOptionalObjectType()) {
+    if (optType) {
       auto *NoneEnumElement = ctx.getOptionalNoneDecl();
       return EnumElementPattern::createImplicit(
           patternTy, NLE->getLoc(), DeclNameLoc(NLE->getLoc()), NoneEnumElement,
