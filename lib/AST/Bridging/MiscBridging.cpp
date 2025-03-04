@@ -98,6 +98,17 @@ BridgedOwnedString BridgedDeclObj::getDebugDescription() const {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedASTType
+//===----------------------------------------------------------------------===//
+
+BridgedOwnedString BridgedASTType::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  unbridged().dump(os);
+  return BridgedOwnedString(str);
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: Conformance
 //===----------------------------------------------------------------------===//
 
@@ -115,9 +126,26 @@ BridgedOwnedString BridgedConformance::getDebugDescription() const {
 static_assert(sizeof(BridgedSubstitutionMap) >= sizeof(swift::SubstitutionMap),
               "BridgedSubstitutionMap has wrong size");
 
+BridgedSubstitutionMap BridgedSubstitutionMap::get(BridgedGenericSignature genSig, BridgedArrayRef replacementTypes) {
+  return SubstitutionMap::get(genSig.unbridged(),
+                              replacementTypes.unbridged<Type>(),
+                              swift::LookUpConformanceInModule());
+}
+
 BridgedOwnedString BridgedSubstitutionMap::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
   unbridged().dump(os);
+  return BridgedOwnedString(str);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: GenericSignature
+//===----------------------------------------------------------------------===//
+
+BridgedOwnedString BridgedGenericSignature::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  unbridged().print(os);
   return BridgedOwnedString(str);
 }
