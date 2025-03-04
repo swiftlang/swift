@@ -1,5 +1,5 @@
 // RUN: cp %s %t
-// RUN: not %swift -typecheck -target %target-triple -verify-apply-fixes %t
+// RUN: not %target-swift-frontend -typecheck -verify-apply-fixes %t
 // RUN: diff %t %s.result
 
 func f1() {
