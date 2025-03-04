@@ -58,10 +58,10 @@ private:
     // compile-time known values
     verifyGlobals();
 
-    // Verify _const lets appearing as local variables
+    // Verify @const lets appearing as local variables
     verifyLocals();
 
-    // For each function call, ensure arguments to _const parameters
+    // For each function call, ensure arguments to @const parameters
     // are all compile-time known values
     verifyCallArguments();
   }
@@ -95,7 +95,7 @@ private:
                                          SILGlobalVariable &Global,
                                          VarDecl *Decl) {
     LLVM_DEBUG(llvm::dbgs()
-                   << "_const static let " << Decl->getName().str().str()
+                   << "@const static let " << Decl->getName().str().str()
                    << ": " << Decl->getTypeInContext().getString() << " = ";);
     auto StaticInitializerValue = Global.getStaticInitializerValue();
     assert(StaticInitializerValue && "Expected a static initializer");
@@ -115,7 +115,7 @@ private:
   void verifyInitializeOnceGlobal(ConstExprFunctionState &ConstExprState,
                                   SILGlobalVariable &Global, VarDecl *Decl) {
     LLVM_DEBUG(llvm::dbgs()
-                   << "_const [init_once] let " << Decl->getName().str().str()
+                   << "@const [init_once] let " << Decl->getName().str().str()
                    << ": " << Decl->getTypeInContext().getString() << " = ";);
     SILModule *M = getModule();
     for (SILFunction &Fn : *M) {
@@ -164,7 +164,7 @@ private:
     // statically with compile-time known values
     for (SILGlobalVariable &G : M->getSILGlobals()) {
       if (auto Decl = G.getDecl()) {
-        if (Decl->getAttrs().getAttribute<CompileTimeConstAttr>()) {
+        if (Decl->isConstVal()) {
           if (G.getStaticInitializerValue())
             verifyStaticallyInitializedGlobal(ConstExprState, G, Decl);
           else
@@ -176,17 +176,17 @@ private:
 
   void verifyLocal(DebugValueInst *DBI) {
     auto Decl = DBI->getDecl();
-    if (!Decl || !Decl->isCompileTimeConst())
+    if (!Decl || !Decl->isConstVal())
       return;
 
     auto Value = ConstExprState.getConstantValue(DBI->getOperand());
     LLVM_DEBUG(llvm::dbgs()
-                   << "_const let " << Decl->getName().str().str() << ": "
+                   << "@const let " << Decl->getName().str().str() << ": "
                    << Decl->getTypeInContext().getString() << " = ";);
     LLVM_DEBUG(printSymbolicValueValue(Value, Allocator););
     if (!Value.isConstant()) {
       getModule()->getASTContext().Diags.diagnose(
-          Decl->getParentInitializer()->getStartLoc(),
+          Decl->getStartLoc(),
           diag::require_const_arg_for_parameter);
     }
   }
@@ -200,7 +200,7 @@ private:
   }
 
   void verifyCallArguments() {
-    // Find all calls to functions which have _const parameters
+    // Find all calls to functions which have @const parameters
     for (SILFunction &Fn : *getModule())
       for (SILBasicBlock &BB : Fn)
         for (SILInstruction &I : BB)
@@ -220,29 +220,31 @@ private:
     auto CalleeParameters = CalleeDecl->getParameters();
     auto ApplyArgRefs = Apply->getArguments();
 
-    //    llvm::dbgs() << "\n-------------------------------------------\n";
-    //    llvm::dbgs() << "Apply: ";
-    //    Apply->dump();
-    //    llvm::dbgs() << CalleeDecl->getNameStr() << "\n";
-    //    llvm::dbgs() << "Apply Args: ";
-    //    llvm::dbgs() << ApplyArgRefs.size() << "\n";
-    //    llvm::dbgs() << "CalleeParameters: ";
-    //    llvm::dbgs() << CalleeParameters->size() << "\n";
-    //    llvm::dbgs() << "ArgumentOperandNumber: ";
-    //    llvm::dbgs() << Apply->getArgumentOperandNumber() << "\n";
+//    LLVM_DEBUG({
+//      llvm::dbgs() << "\n-------------------------------------------\n";
+//      llvm::dbgs() << "Apply: ";
+//      Apply->dump();
+//      llvm::dbgs() << CalleeDecl->getNameStr() << "\n";
+//      llvm::dbgs() << "Apply Args: ";
+//      llvm::dbgs() << ApplyArgRefs.size() << "\n";
+//      llvm::dbgs() << "CalleeParameters: ";
+//      llvm::dbgs() << CalleeParameters->size() << "\n";
+//      llvm::dbgs() << "ArgumentOperandNumber: ";
+//      llvm::dbgs() << Apply->getArgumentOperandNumber() << "\n";
+//    });
 
-    // TOOD: Needs work to correctly match params to args
+    // (AC) TODO: Needs work to correctly match params to args
     bool hasConst = false;
     for (size_t i = 0; i < CalleeParameters->size(); ++i)
-      if (CalleeParameters->get(i)->isCompileTimeConst())
+      if (CalleeParameters->get(i)->isConstVal())
         hasConst = true;
 
     if (hasConst) {
       for (size_t i = 0; i < CalleeParameters->size(); ++i) {
         auto CorrespondingArg = ApplyArgRefs[i];
-        if (CalleeParameters->get(i)->isCompileTimeConst()) {
+        if (CalleeParameters->get(i)->isConstVal()) {
           LLVM_DEBUG({
-            llvm::dbgs() << "[" << CalleeDecl->getNameStr() << "] argument: ";
+            llvm::dbgs() << "Argument of fn{" << CalleeDecl->getNameStr() << "} ";
             llvm::dbgs() << CalleeParameters->get(i)->getNameStr() << ": ";
             std::string typeName;
             llvm::raw_string_ostream out(typeName);
