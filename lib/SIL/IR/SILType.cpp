@@ -1293,6 +1293,11 @@ SILType::getConcurrencyDiagnosticBehavior(SILFunction *fn) const {
   if (!declRef)
     return {};
   auto *fromDC = declRef.getInnermostDeclContext();
+  
+  // Force metatype-related Sendability issues to be errors, always.
+  if (getASTType()->is<AnyMetatypeType>())
+    return std::nullopt;
+  
   return getASTType()->getConcurrencyDiagnosticBehaviorLimit(fromDC);
 }
 

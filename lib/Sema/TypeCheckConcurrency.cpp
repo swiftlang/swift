@@ -2909,8 +2909,13 @@ namespace {
                                    sendableContext,
                                    /*inDerivedConformance*/Type(),
                                    capturedType.getLoc(),
-                                   diag::non_sendable_metatype_capture,
-                                   /*closure=*/closure != nullptr);
+                                   [&](Type type, DiagnosticBehavior) {
+            ctx.Diags.diagnose(capturedType.getLoc(), 
+                               diag::non_sendable_metatype_capture,
+                               type, 
+                               /*closure=*/closure != nullptr);
+            return true;
+          });
         }
       }
     }
