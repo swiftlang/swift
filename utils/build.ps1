@@ -2539,6 +2539,10 @@ function Build-System($Arch) {
 }
 
 function Build-Build($Arch) {
+  # Use lld to workaround the ARM64 LNK1322 issue: https://github.com/swiftlang/swift/issues/79740
+  # FIXME(hjyamauchi) Have a real fix
+  $ArchSpecificOptions = if ($Arch -eq $ArchARM64) { @{ CMAKE_Swift_FLAGS = "-use-ld=lld-link"; } } else { @{} }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-build `
     -Bin (Get-HostProjectBinaryCache Build) `
@@ -2547,7 +2551,7 @@ function Build-Build($Arch) {
     -Platform Windows `
     -UseBuiltCompilers C,CXX,Swift `
     -SwiftSDK (Get-SwiftSDK Windows) `
-    -Defines @{
+    -Defines (@{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
@@ -2557,7 +2561,7 @@ function Build-Build($Arch) {
       TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
       SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
       SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
-    }
+    } + $ArchSpecificOptions)
 }
 
 function Build-ToolsSupportCore($Arch) {
@@ -3171,7 +3175,6 @@ if ($Clean) {
     }
   }
 }
-
 
 if (-not $SkipBuild) {
   if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
