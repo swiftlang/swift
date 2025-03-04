@@ -249,7 +249,7 @@ private struct ScopeExtension {
 
 private extension LifetimeDependence.Scope {
   /// The instruction that introduces an extendable scope. This returns a non-nil scope introducer for
-  /// Extendable.nestedScopes.
+  /// ScopeExtension.nestedScopes.
   var extendableBegin: Instruction? {
     switch self {
     case let .access(beginAccess):
@@ -258,6 +258,17 @@ private extension LifetimeDependence.Scope {
       return beginBorrow.value.definingInstruction!
     case let .yield(yieldedValue):
       return yieldedValue.definingInstruction!
+    case let .initialized(initializer):
+      switch initializer {
+      case let .store(initializingStore: store, initialAddress: _):
+        if let sb = store as? StoreBorrowInst {
+          return sb
+        }
+        return nil
+      case .argument, .yield:
+        // TODO: extend indirectly yielded scopes.
+        return nil
+      }
     default:
       return nil
     }
@@ -277,29 +288,31 @@ private extension LifetimeDependence.Scope {
       let accessExtension = gatherAccessExtension(beginAccess: beginAccess, innerScopes: &innerScopes)
       return SingleInlineArray(element: accessExtension)
     case let .borrowed(beginBorrow):
-      let borrowedValue = beginBorrow.baseOperand!.value
-      let enclosingScope = LifetimeDependence.Scope(base: borrowedValue, context)
-      innerScopes.push(self)
-      var innerBorrowScopes = innerScopes
-      innerBorrowScopes.push(enclosingScope)
-      if let extensions = enclosingScope.gatherExtensions(innerScopes: innerBorrowScopes, context) {
-        return extensions
-      }
-      // This is the outermost scope to be extended because gatherExtensions did not find an enclosing scope.
-      return SingleInlineArray(element: getOuterExtension(owner: enclosingScope.parentValue, nestedScopes: innerScopes,
-                                                          context))
+      return gatherBorrowExtension(borrowedValue: beginBorrow.baseOperand!.value, innerScopes: &innerScopes, context)
+
     case let .yield(yieldedValue):
       innerScopes.push(self)
       var extensions = SingleInlineArray<ScopeExtension>()
       let applySite = yieldedValue.definingInstruction as! BeginApplyInst
       for operand in applySite.parameterOperands {
-        guard let dep = applySite.resultDependence(on: operand), dep == .scope else {
+        guard let dep = applySite.resultDependence(on: operand), dep.isScoped else {
           continue
         }
         // Pass a copy of innerScopes without modifying this one.
         extensions.append(contentsOf: gatherOperandExtension(on: operand, innerScopes: innerScopes, context))
       }
       return extensions
+    case let .initialized(initializer):
+      switch initializer {
+      case let .store(initializingStore: store, initialAddress: _):
+        if let sb = store as? StoreBorrowInst {
+          return gatherBorrowExtension(borrowedValue: sb.source, innerScopes: &innerScopes, context)
+        }
+        return nil
+      case .argument, .yield:
+        // TODO: extend indirectly yielded scopes.
+        return nil
+      }
     default:
       return nil
     }
@@ -359,6 +372,23 @@ private extension LifetimeDependence.Scope {
       }
     }
     return ScopeExtension(owner: outerBeginAccess, nestedScopes: innerScopes, dependsOnArg: nil)
+  }
+
+  func gatherBorrowExtension(borrowedValue: Value,
+                             innerScopes: inout SingleInlineArray<LifetimeDependence.Scope>,
+                             _ context: FunctionPassContext)
+    -> SingleInlineArray<ScopeExtension> {
+
+    let enclosingScope = LifetimeDependence.Scope(base: borrowedValue, context)
+    innerScopes.push(self)
+    var innerBorrowScopes = innerScopes
+    innerBorrowScopes.push(enclosingScope)
+    if let extensions = enclosingScope.gatherExtensions(innerScopes: innerBorrowScopes, context) {
+      return extensions
+    }
+    // This is the outermost scope to be extended because gatherExtensions did not find an enclosing scope.
+    return SingleInlineArray(element: getOuterExtension(owner: enclosingScope.parentValue, nestedScopes: innerScopes,
+                                                        context))
   }
 }
 
@@ -584,6 +614,17 @@ private extension LifetimeDependence.Scope {
     case let .yield(yieldedValue):
       let beginApply = yieldedValue.definingInstruction as! BeginApplyInst
       return beginApply.createEnd(builder, context)
+    case let .initialized(initializer):
+      switch initializer {
+      case let .store(initializingStore: store, initialAddress: _):
+        if let sb = store as? StoreBorrowInst {
+          return builder.createEndBorrow(of: sb)
+        }
+        return nil
+      case .argument, .yield:
+        // TODO: extend indirectly yielded scopes.
+        return nil
+      }
     default:
       return nil
     }

@@ -156,6 +156,7 @@ struct BridgedYieldInfoArray {
 struct BridgedLifetimeDependenceInfo {
   swift::IndexSubset *_Nullable inheritLifetimeParamIndices;
   swift::IndexSubset *_Nullable scopeLifetimeParamIndices;
+  swift::IndexSubset *_Nullable addressableParamIndices;
   SwiftUInt targetIndex;
   bool immortal;
 
@@ -164,6 +165,7 @@ struct BridgedLifetimeDependenceInfo {
   BRIDGED_INLINE bool empty() const;
   BRIDGED_INLINE bool checkInherit(SwiftInt index) const;
   BRIDGED_INLINE bool checkScope(SwiftInt index) const;
+  BRIDGED_INLINE bool checkAddressable(SwiftInt index) const;
   BRIDGED_INLINE SwiftInt getTargetIndex() const;
 
   BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
