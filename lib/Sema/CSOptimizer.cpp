@@ -42,19 +42,50 @@ struct DisjunctionInfo {
   /// If the score is nullopt it means that the disjunction is not optimizable.
   std::optional<double> Score;
 
-  /// Whether the decisions were based on speculative information
-  /// i.e. literal argument candidates or initializer type inference.
-  bool IsSpeculative = false;
-
   /// The highest scoring choices that could be favored when disjunction
   /// is attempted.
   llvm::TinyPtrVector<Constraint *> FavoredChoices;
 
+  /// Whether the decisions were based on speculative information
+  /// i.e. literal argument candidates or initializer type inference.
+  bool IsSpeculative;
+
   DisjunctionInfo() = default;
-  DisjunctionInfo(double score, bool speculative = false,
-                  ArrayRef<Constraint *> favoredChoices = {})
-      : Score(score), IsSpeculative(speculative),
-        FavoredChoices(favoredChoices) {}
+  DisjunctionInfo(std::optional<double> score,
+                  ArrayRef<Constraint *> favoredChoices, bool speculative)
+      : Score(score), FavoredChoices(favoredChoices),
+        IsSpeculative(speculative) {}
+
+  static DisjunctionInfo none() { return {std::nullopt, {}, false}; }
+};
+
+class DisjunctionInfoBuilder {
+  std::optional<double> Score;
+  SmallVector<Constraint *, 2> FavoredChoices;
+  bool IsSpeculative;
+
+public:
+  DisjunctionInfoBuilder(std::optional<double> score)
+      : DisjunctionInfoBuilder(score, {}) {}
+
+  DisjunctionInfoBuilder(std::optional<double> score,
+                         ArrayRef<Constraint *> favoredChoices)
+      : Score(score),
+        FavoredChoices(favoredChoices.begin(), favoredChoices.end()),
+        IsSpeculative(false) {}
+
+  void setFavoredChoices(ArrayRef<Constraint *> choices) {
+    FavoredChoices.clear();
+    FavoredChoices.append(choices.begin(), choices.end());
+  }
+
+  void addFavoredChoice(Constraint *constraint) {
+    FavoredChoices.push_back(constraint);
+  }
+
+  void setSpeculative(bool value = true) { IsSpeculative = value; }
+
+  DisjunctionInfo build() { return {Score, FavoredChoices, IsSpeculative}; }
 };
 
 static DeclContext *getDisjunctionDC(Constraint *disjunction) {
@@ -625,7 +656,7 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
         isExpr<SubscriptExpr>(argument) ||
         isExpr<DynamicSubscriptExpr>(argument) ||
         isExpr<LiteralExpr>(argument) || isExpr<BinaryExpr>(argument)))
-    return {/*score=*/0};
+    return DisjunctionInfo::none();
 
   auto argumentType = cs.getType(argument)->getRValueType();
 
@@ -634,7 +665,7 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
   if (isa<BinaryExpr>(argument)) {
     auto chainTy = inferTypeOfArithmeticOperatorChain(cs.DC, argument);
     if (!chainTy)
-      return {/*score=*/0};
+      return DisjunctionInfo::none();
 
     argumentType = chainTy;
   }
@@ -644,11 +675,11 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
   if (auto *LE = dyn_cast<LiteralExpr>(argument)) {
     auto *P = TypeChecker::getLiteralProtocol(cs.getASTContext(), LE);
     if (!P)
-      return {/*score=*/0};
+      return DisjunctionInfo::none();
 
     auto defaultTy = TypeChecker::getDefaultType(P, cs.DC);
     if (!defaultTy)
-      return {/*score=*/0};
+      return DisjunctionInfo::none();
 
     argumentType = defaultTy;
   }
@@ -656,7 +687,7 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
   ASSERT(argumentType);
 
   if (argumentType->hasTypeVariable() || argumentType->hasDependentMember())
-    return {/*score=*/0};
+    return DisjunctionInfo::none();
 
   SmallVector<Constraint *, 2> favoredChoices;
   forEachDisjunctionChoice(
@@ -678,8 +709,9 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
           favoredChoices.push_back(choice);
       });
 
-  return DisjunctionInfo(/*score=*/favoredChoices.empty() ? 0 : 1,
-                         /*speculative=*/false, favoredChoices);
+  return DisjunctionInfoBuilder(/*score=*/favoredChoices.empty() ? 0 : 1,
+                                favoredChoices)
+      .build();
 }
 
 } // end anonymous namespace
@@ -704,11 +736,12 @@ static void determineBestChoicesInContext(
     // initializers for CGFloat<->Double conversions and restrictions with
     // multiple choices.
     if (disjunction->countFavoredNestedConstraints() > 0) {
-      DisjunctionInfo info(/*score=*/2.0);
-      llvm::copy_if(disjunction->getNestedConstraints(),
-                    std::back_inserter(info.FavoredChoices),
-                    [](Constraint *choice) { return choice->isFavored(); });
-      recordResult(disjunction, std::move(info));
+      DisjunctionInfoBuilder info(/*score=*/2.0);
+      for (auto *choice : disjunction->getNestedConstraints()) {
+        if (choice->isFavored())
+          info.addFavoredChoice(choice);
+      }
+      recordResult(disjunction, info.build());
       continue;
     }
 
@@ -743,8 +776,9 @@ static void determineBestChoicesInContext(
                   return decl &&
                          !decl->getInterfaceType()->is<AnyFunctionType>();
                 });
-            recordResult(disjunction, {/*score=*/1.0, /*speculative=*/false,
-                                       favoredChoices});
+            recordResult(
+                disjunction,
+                DisjunctionInfoBuilder(/*score=*/1.0, favoredChoices).build());
             continue;
           }
 
@@ -784,8 +818,9 @@ static void determineBestChoicesInContext(
                                      });
 
       if (!favoredChoices.empty()) {
-        recordResult(disjunction,
-                     {/*score=*/0.01, /*speculative=*/false, favoredChoices});
+        recordResult(
+            disjunction,
+            DisjunctionInfoBuilder(/*score=*/0.01, favoredChoices).build());
         continue;
       }
     }
@@ -1633,14 +1668,16 @@ static void determineBestChoicesInContext(
                          (!canUseContextualResultTypes ||
                           !anyNonSpeculativeResultTypes(resultTypes));
 
-    DisjunctionInfo info(/*score=*/bestScore, isSpeculative);
+    DisjunctionInfoBuilder info(/*score=*/bestScore);
+
+    info.setSpeculative(isSpeculative);
 
     for (const auto &choice : favoredChoices) {
       if (choice.second == bestScore)
-        info.FavoredChoices.push_back(choice.first);
+        info.addFavoredChoice(choice.first);
     }
 
-    recordResult(disjunction, std::move(info));
+    recordResult(disjunction, info.build());
   }
 
   if (cs.isDebugMode() && bestOverallScore > 0) {
@@ -1745,9 +1782,9 @@ ConstraintSystem::selectDisjunction() {
         if (auto preference = isPreferable(*this, first, second))
           return preference.value();
 
-        auto &[firstScore, isFirstSpeculative, firstFavoredChoices] =
+        auto &[firstScore, firstFavoredChoices, isFirstSpeculative] =
             favorings[first];
-        auto &[secondScore, isSecondSpeculative, secondFavoredChoices] =
+        auto &[secondScore, secondFavoredChoices, isSecondSpeculative] =
             favorings[second];
 
         bool isFirstOperator = isOperatorDisjunction(first);
