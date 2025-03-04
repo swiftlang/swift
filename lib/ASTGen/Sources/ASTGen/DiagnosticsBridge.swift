@@ -165,6 +165,8 @@ fileprivate struct SimpleDiagnostic: DiagnosticMessage {
 
   let severity: DiagnosticSeverity
 
+  let category: DiagnosticCategory?
+
   var diagnosticID: MessageID {
     .init(domain: "SwiftCompiler", id: "SimpleDiagnostic")
   }
@@ -237,6 +239,10 @@ public func addQueuedDiagnostic(
   textLength: Int,
   severity: BridgedDiagnosticSeverity,
   cLoc: BridgedSourceLoc,
+  categoryName: UnsafePointer<UInt8>?,
+  categoryLength: Int,
+  documentationPath: UnsafePointer<UInt8>?,
+  documentationPathLength: Int,
   highlightRangesPtr: UnsafePointer<BridgedSourceLoc>?,
   numHighlightRanges: Int
 ) {
@@ -333,13 +339,35 @@ public func addQueuedDiagnostic(
     }
   }
 
+  let category: DiagnosticCategory? = categoryName.map { categoryNamePtr in
+    let categoryNameBuffer = UnsafeBufferPointer(
+      start: categoryNamePtr,
+      count: categoryLength
+    )
+    let categoryName = String(decoding: categoryNameBuffer, as: UTF8.self)
+
+    let documentationPath = documentationPath.map { documentationPathPtr in
+      let documentationPathBuffer = UnsafeBufferPointer(
+        start: documentationPathPtr,
+        count: documentationPathLength
+      )
+      return String(decoding: documentationPathBuffer, as: UTF8.self)
+    }
+
+    return DiagnosticCategory(
+      name: categoryName,
+      documentationPath: documentationPath
+    )
+  }
+
   let textBuffer = UnsafeBufferPointer(start: text, count: textLength)
   let diagnostic = Diagnostic(
     node: node,
     position: position,
     message: SimpleDiagnostic(
       message: String(decoding: textBuffer, as: UTF8.self),
-      severity: severity.asSeverity
+      severity: severity.asSeverity,
+      category: category
     ),
     highlights: highlights
   )
