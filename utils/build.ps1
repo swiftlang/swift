@@ -362,8 +362,6 @@ $KnownNDKs = @{
 
 $IsCrossCompiling = $HostArchName -ne $BuildArchName
 
-$TimingData = New-Object System.Collections.Generic.List[System.Object]
-
 function Get-AndroidNDK {
   $NDK = $KnownNDKs[$AndroidNDKVersion]
   if ($NDK -eq $null) { throw "Unsupported Android NDK version" }
@@ -665,6 +663,87 @@ function Isolate-EnvVars([scriptblock]$Block) {
   }
 }
 
+$TimingData = New-Object System.Collections.Generic.List[System.Object]
+$CPUUsageData = $null
+
+if ($Summary) {
+  $CPUUsageData = New-TemporaryFile
+  Write-Host "Tracking average CPU usage to file: $CPUUsageData"
+
+  # Background jobs run in a separate process and cannot write to any variables.
+  # We cannot say in advance how long the job will run, so we cannot use
+  # Receive-Job. Temporary file seems like the best solution.
+  Start-Job -ArgumentList $CPUUsageData -ScriptBlock {
+    while ($true) {
+      $Sample = ((Get-Counter "\Processor(_Total)\% Processor Time").CounterSamples.CookedValue)
+      Add-Content -Path $using:CPUUsageData -Value ([math]::Round($Sample))
+    }
+  }
+}
+
+function Annotate-CPUUsage($annotation) {
+  if ($CPUUsageData -ne $null) {
+    Add-Content -Path $CPUUsageData -Value $annotation
+  }
+}
+
+function Plot-CPUUsage {
+  if ($CPUUsageData -eq $null) {
+    Write-Warning "CPU tracking not enabled"
+    return
+  }
+
+  $logLines = Get-Content $CPUUsageData
+  $data = @()
+  $labels = @{}
+  $lineIndex = 0
+
+  foreach ($line in $logLines) {
+    if ($line -match '^(100(?:\.0+)?|[0-9]{1,2}(?:\.\d+)?)$') {
+      $value = [double]$matches[1]
+      if ($value -gt 100) {
+        Write-Warning "Percentage value out of range: $value"
+      }
+      $data += [PSCustomObject]@{ Index = $lineIndex; Value = $value }
+      $lineIndex++
+    } else {
+      $labels[$lineIndex] = $line
+    }
+  }
+
+  if ($data.Count -eq 0) {
+    Write-Warning "CPU tracking didn't collect any data"
+    return
+  }
+
+  $maxColumns = 50
+  $maxLines = [math]::Min(100, $data.Count)
+  $step = [math]::Ceiling($data.Count / $maxLines)
+  $maxValue = 100
+
+  $i = 0
+  do {
+    $i += 1
+    $from = ($i - 1) * $step
+    $to = [math]::Min($i * $step, $data.Count) - 1
+
+    $values = $data[$from..$to] | Select-Object -ExpandProperty Value
+    $average = ($values | Measure-Object -Average).Average
+    $scaledValue = [math]::Round(($average / $maxValue) * $maxColumns)
+    $bar = "#" * $scaledValue
+
+    # Collect labels
+    $annot = @()
+    for ($j = $from; $j -le $to; $j++) {
+      if ($labels.ContainsKey($data[$j].Index)) {
+        $annot += $labels[$data[$j].Index]
+      }
+    }
+
+    Write-Host ("{0,-50}{1}" -f $bar, ($annot -join ", "))
+  } while ($i * $step -lt $data.Count)
+}
+
 function Invoke-VsDevShell($Arch) {
   $DevCmdArguments = "-no_logo -host_arch=$($BuildArch.VSName) -arch=$($Arch.VSName)"
   if ($CustomWinSDKRoot) {
@@ -936,6 +1015,7 @@ function Fetch-Dependencies {
       Arch = $BuildArch.LLVMName
       Platform = 'Windows'
       Checkout = 'Fetch-Dependencies'
+      CPU = ""
       "Elapsed Time" = $Stopwatch.Elapsed.ToString()
     })
   }
@@ -1061,6 +1141,7 @@ function Build-CMakeProject {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
   }
 
+  Annotate-CPUUsage "$Bin (configure)"
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
   # Enter the developer command shell early so we can resolve cmake.exe
@@ -1366,6 +1447,7 @@ function Build-CMakeProject {
     Invoke-Program cmake.exe @cmakeGenerateArgs
 
     # Build all requested targets
+    Annotate-CPUUsage "$Bin (build)"
     foreach ($Target in $BuildTargets) {
       if ($Target -eq "default") {
         Invoke-Program cmake.exe --build $Bin
@@ -1469,6 +1551,7 @@ function Build-SPMProject {
       }
     }
 
+    Annotate-CPUUsage "$Bin (SPM)"
     Invoke-Program "$($HostArch.ToolchainInstallRoot)\usr\bin\swift.exe" $ActionName @Arguments @AdditionalArguments
   }
 
@@ -3188,7 +3271,6 @@ if ($Clean) {
   }
 }
 
-
 if (-not $SkipBuild) {
   if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
     throw "Minimum required sccache version is 0.7.4"
@@ -3207,6 +3289,8 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-CMark $HostArch
   Invoke-BuildStep Build-XML2 Windows $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
+
+  Plot-CPUUsage -maxLines 50
 
   foreach ($Arch in $WindowsSDKArchs) {
     Invoke-BuildStep Build-ZLib Windows $Arch
@@ -3384,5 +3468,6 @@ if (-not $IsCrossCompiling) {
 } finally {
   if ($Summary) {
     $TimingData | Select-Object Platform,Arch,Checkout,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
+    Plot-CPUUsage
   }
 }
