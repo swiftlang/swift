@@ -132,14 +132,10 @@ public:
   /// Returns the domain that the constraint applies to.
   AvailabilityDomain getDomain() const { return getAttr().getDomain(); }
 
-  /// Returns the platform that this constraint applies to, or
-  /// `PlatformKind::none` if it is not platform specific.
-  PlatformKind getPlatform() const;
-
   /// Returns the required range for `IntroducedInNewerVersion` requirements, or
   /// `std::nullopt` otherwise.
   std::optional<AvailabilityRange>
-  getRequiredNewerAvailabilityRange(const ASTContext &ctx) const;
+  getPotentiallyUnavailableRange(const ASTContext &ctx) const;
 
   /// Some availability constraints are active for type-checking but cannot
   /// be translated directly into an `if #available(...)` runtime query.
