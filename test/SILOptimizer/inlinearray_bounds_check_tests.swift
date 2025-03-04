@@ -1,13 +1,10 @@
 // RUN: %target-swift-frontend %s -emit-sil -O \
-// RUN:   -disable-availability-checking \
-// RUN:   -enable-experimental-feature ValueGenerics | %FileCheck %s --check-prefix=CHECK-SIL 
+// RUN:   -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL 
 
 // RUN: %target-swift-frontend %s -emit-ir -O \
-// RUN:   -disable-availability-checking \
-// RUN:   -enable-experimental-feature ValueGenerics | %FileCheck %s  --check-prefix=CHECK-IR 
+// RUN:   -disable-availability-checking | %FileCheck %s  --check-prefix=CHECK-IR 
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_ValueGenerics
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
 // Bounds check should be eliminated

@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -disable-availability-checking -enable-experimental-feature ValueGenerics %s | %FileCheck %s
-
-// REQUIRES: swift_feature_ValueGenerics
+// RUN: %target-swift-frontend -emit-ir -disable-availability-checking %s | %FileCheck %s
 
 struct VerySmallSlab<T> {
   var inline: InlineArray<16, T?>

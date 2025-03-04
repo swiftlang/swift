@@ -1,13 +1,12 @@
-// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -disable-availability-checking -enable-experimental-feature ValueGenerics -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -disable-availability-checking -module-name=test -emit-sil | %FileCheck %s
 
 // Also do an end-to-end test to check all components, including IRGen.
 // RUN: %empty-directory(%t) 
-// RUN: %target-build-swift -parse-as-library -O -Xfrontend -disable-availability-checking -enable-experimental-feature ValueGenerics -module-name=test %s -o %t/a.out
+// RUN: %target-build-swift -parse-as-library -O -Xfrontend -disable-availability-checking -module-name=test %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // REQUIRES: executable_test,optimized_stdlib
-// REQUIRES: swift_feature_ValueGenerics
 // UNSUPPORTED: back_deployment_runtime
 
 extension InlineArray: Collection {
