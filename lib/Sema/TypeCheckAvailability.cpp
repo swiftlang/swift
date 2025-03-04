@@ -2166,14 +2166,14 @@ static void fixAvailability(SourceRange ReferenceRange,
 static void diagnosePotentialUnavailability(
     SourceRange ReferenceRange,
     llvm::function_ref<InFlightDiagnostic(AvailabilityDomain,
-                                          llvm::VersionTuple)>
+                                          AvailabilityRange)>
         Diagnose,
     const DeclContext *ReferenceDC, AvailabilityDomain Domain,
     const AvailabilityRange &Availability) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
   {
-    auto Err = Diagnose(Domain, Availability.getRawMinimumVersion());
+    auto Err = Diagnose(Domain, Availability);
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(
@@ -2183,11 +2183,13 @@ static void diagnosePotentialUnavailability(
   fixAvailability(ReferenceRange, ReferenceDC, Domain, Availability, Context);
 }
 
+// FIXME: [availability] Should this take an AvailabilityContext instead of
+// AvailabilityRange?
 bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
                                     AvailabilityRange RequiredAvailability,
                                     const DeclContext *ReferenceDC,
                                     llvm::function_ref<InFlightDiagnostic(
-                                        AvailabilityDomain, llvm::VersionTuple)>
+                                        AvailabilityDomain, AvailabilityRange)>
                                         Diagnose) {
   ASTContext &ctx = ReferenceDC->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
@@ -2211,13 +2213,13 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
 
 bool TypeChecker::checkAvailability(
     SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
-    Diag<AvailabilityDomain, llvm::VersionTuple> Diag,
+    Diag<AvailabilityDomain, AvailabilityRange> Diag,
     const DeclContext *ReferenceDC) {
   auto &Diags = ReferenceDC->getASTContext().Diags;
   return TypeChecker::checkAvailability(
       ReferenceRange, RequiredAvailability, ReferenceDC,
-      [&](AvailabilityDomain domain, llvm::VersionTuple version) {
-        return Diags.diagnose(ReferenceRange.Start, Diag, domain, version);
+      [&](AvailabilityDomain domain, AvailabilityRange range) {
+        return Diags.diagnose(ReferenceRange.Start, Diag, domain, range);
       });
 }
 
@@ -2226,8 +2228,7 @@ void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
   checkAvailability(
       ReferenceRange,
       ReferenceDC->getASTContext().getBackDeployedConcurrencyAvailability(),
-      diag::availability_concurrency_only_version_newer,
-      ReferenceDC);
+      diag::availability_concurrency_only_version_newer, ReferenceDC);
 }
 
 static bool
@@ -2248,8 +2249,9 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
   ASTContext &Context = ReferenceDC->getASTContext();
 
   if (!Availability.hasMinimumVersion()) {
+    // FIXME: [availability] Need a version-less diagnostic.
     return Diagnostic(diag::availability_decl_only_version_newer, D, Domain,
-                      {});
+                      AvailabilityRange(llvm::VersionTuple()));
   }
 
   if (requiresDeploymentTargetOrEarlier(Domain, Availability, Context)) {
@@ -2261,13 +2263,12 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
     return Diagnostic(
         IsError ? diag::availability_decl_only_version_newer_for_clients
                 : diag::availability_decl_only_version_newer_for_clients_warn,
-        D, Domain, Availability.getRawMinimumVersion(),
-        ReferenceDC->getParentModule());
+        D, Domain, Availability, ReferenceDC->getParentModule());
   }
 
   IsError = true;
   return Diagnostic(diag::availability_decl_only_version_newer, D, Domain,
-                    Availability.getRawMinimumVersion());
+                    Availability);
 }
 
 // Emits a diagnostic for a reference to a declaration that is potentially
@@ -2316,7 +2317,7 @@ static void diagnosePotentialAccessorUnavailability(
   {
     auto Err = Context.Diags.diagnose(ReferenceRange.Start, diag, Accessor,
                                       Context.getTargetAvailabilityDomain(),
-                                      Availability.getRawMinimumVersion());
+                                      Availability);
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(
@@ -2361,7 +2362,7 @@ static bool diagnosePotentialUnavailability(
     auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
     auto err = ctx.Diags.diagnose(
         loc, diag::conformance_availability_only_version_newer, type, proto,
-        domain, availability.getRawMinimumVersion());
+        domain, availability);
 
     auto behaviorLimit = behaviorLimitForExplicitUnavailability(rootConf, dc);
     if (behaviorLimit >= DiagnosticBehavior::Warning)
@@ -2840,17 +2841,13 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
 
   auto Domain = Attr->getDomain();
   auto DeprecatedRange = Attr->getDeprecatedRange(Context);
-  llvm::VersionTuple DeprecatedVersion;
-  if (DeprecatedRange.hasMinimumVersion())
-    DeprecatedVersion = DeprecatedRange.getRawMinimumVersion();
-
   auto Message = Attr->getMessage();
   auto NewName = Attr->getRename();
   if (Message.empty() && NewName.empty()) {
     Context.Diags
         .diagnose(ReferenceRange.Start, diag::availability_deprecated,
                   DeprecatedDecl, Attr->isPlatformSpecific(), Domain,
-                  !DeprecatedVersion.empty(), DeprecatedVersion,
+                  DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
                   /*message*/ StringRef())
         .highlight(Attr->getParsedAttr()->getRange());
     return;
@@ -2866,7 +2863,7 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
     Context.Diags
         .diagnose(ReferenceRange.Start, diag::availability_deprecated,
                   DeprecatedDecl, Attr->isPlatformSpecific(), Domain,
-                  !DeprecatedVersion.empty(), DeprecatedVersion,
+                  DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
                   EncodedMessage.Message)
         .highlight(Attr->getParsedAttr()->getRange());
   } else {
@@ -2875,7 +2872,7 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
     Context.Diags
         .diagnose(ReferenceRange.Start, diag::availability_deprecated_rename,
                   DeprecatedDecl, Attr->isPlatformSpecific(), Domain,
-                  !DeprecatedVersion.empty(), DeprecatedVersion,
+                  DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
                   replacementDeclKind.has_value(), rawReplaceKind, newName)
         .highlight(Attr->getParsedAttr()->getRange());
   }
@@ -2923,16 +2920,12 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
 
   auto domain = attr->getDomain();
   auto deprecatedRange = attr->getDeprecatedRange(ctx);
-  llvm::VersionTuple deprecatedVersion;
-  if (deprecatedRange.hasMinimumVersion())
-    deprecatedVersion = deprecatedRange.getRawMinimumVersion();
-
   auto message = attr->getMessage();
   if (message.empty()) {
     ctx.Diags
         .diagnose(loc, diag::conformance_availability_deprecated, type, proto,
                   attr->isPlatformSpecific(), domain,
-                  !deprecatedVersion.empty(), deprecatedVersion,
+                  deprecatedRange.hasMinimumVersion(), deprecatedRange,
                   /*message*/ StringRef())
         .highlight(attr->getParsedAttr()->getRange());
     return true;
@@ -2942,7 +2935,7 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
   ctx.Diags
       .diagnose(loc, diag::conformance_availability_deprecated, type, proto,
                 attr->isPlatformSpecific(), domain,
-                !deprecatedVersion.empty(), deprecatedVersion,
+                deprecatedRange.hasMinimumVersion(), deprecatedRange,
                 encodedMessage.Message)
       .highlight(attr->getParsedAttr()->getRange());
   return true;
@@ -3078,12 +3071,12 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
     break;
   case AvailabilityConstraint::Reason::UnavailableForDeployment:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
-                   type, proto, domain, *attr.getIntroduced());
+                   type, proto, domain, attr.getIntroducedRange(ctx));
     break;
   case AvailabilityConstraint::Reason::Obsoleted:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
-                  domain, *attr.getObsoleted())
+                  domain, attr.getObsoletedRange(ctx))
         .highlight(attr.getParsedAttr()->getRange());
     break;
   case AvailabilityConstraint::Reason::PotentiallyUnavailable:
@@ -3244,7 +3237,7 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
 
   if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
     if (auto missing = checkGenericArgsForInvertibleReqs(boundTy)) {
-      std::optional<Diag<AvailabilityDomain, llvm::VersionTuple>> diag;
+      std::optional<Diag<AvailabilityDomain, AvailabilityRange>> diag;
       switch (*missing) {
       case InvertibleProtocolKind::Copyable:
         diag =
@@ -3499,13 +3492,13 @@ bool diagnoseExplicitUnavailability(
   case AvailabilityConstraint::Reason::UnavailableForDeployment:
     diags
         .diagnose(D, diag::availability_introduced_in_version, D, domain,
-                  *Attr.getIntroduced())
+                  Attr.getIntroducedRange(ctx))
         .highlight(sourceRange);
     break;
   case AvailabilityConstraint::Reason::Obsoleted:
     diags
         .diagnose(D, diag::availability_obsoleted, D, domain,
-                  *Attr.getObsoleted())
+                  Attr.getObsoletedRange(ctx))
         .highlight(sourceRange);
     break;
   case AvailabilityConstraint::Reason::PotentiallyUnavailable:
@@ -3615,12 +3608,12 @@ public:
         TypeChecker::checkAvailability(
             RE->getSourceRange(), featureKind.getAvailability(Context),
             Where.getDeclContext(),
-            [&](AvailabilityDomain domain, llvm::VersionTuple version) {
-              auto range = feature.getRange();
+            [&](AvailabilityDomain domain, AvailabilityRange range) {
+              auto sourceRange = feature.getRange();
               auto diag = Context.Diags.diagnose(
-                  range.getStart(), diag::regex_feature_unavailable,
-                  featureKind.getDescription(Context), domain, version);
-              diag.highlightChars(range);
+                  sourceRange.getStart(), diag::regex_feature_unavailable,
+                  featureKind.getDescription(Context), domain, range);
+              diag.highlightChars(sourceRange);
               return diag;
             });
       }

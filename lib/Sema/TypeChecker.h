@@ -1067,16 +1067,22 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 /// is allowed.
 std::optional<Diagnostic> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
 
+/// Checks whether the required range of versions of the compilation's target
+/// platform are available at the given `SourceRange`. If not, `Diagnose` is
+/// invoked.
 bool checkAvailability(SourceRange ReferenceRange,
                        AvailabilityRange RequiredAvailability,
                        const DeclContext *ReferenceDC,
-                       llvm::function_ref<InFlightDiagnostic(
-                           AvailabilityDomain, llvm::VersionTuple)>
+                       llvm::function_ref<InFlightDiagnostic(AvailabilityDomain,
+                                                             AvailabilityRange)>
                            Diagnose);
 
+/// Checks whether the required range of versions of the compilation's target
+/// platform are available at the given `SourceRange`. If not, `Diag` is
+/// emitted.
 bool checkAvailability(SourceRange ReferenceRange,
                        AvailabilityRange RequiredAvailability,
-                       Diag<AvailabilityDomain, llvm::VersionTuple> Diag,
+                       Diag<AvailabilityDomain, AvailabilityRange> Diag,
                        const DeclContext *ReferenceDC);
 
 void checkConcurrencyAvailability(SourceRange ReferenceRange,

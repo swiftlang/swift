@@ -127,9 +127,9 @@ public:
       TypeChecker::checkAvailability(
           attr->getRange(), C.getIsolatedDeinitAvailability(),
           D->getDeclContext(),
-          [&](AvailabilityDomain domain, llvm::VersionTuple version) {
+          [&](AvailabilityDomain domain, AvailabilityRange range) {
             return diagnoseAndRemoveAttr(
-                attr, diag::isolated_deinit_unavailable, domain, version);
+                attr, diag::isolated_deinit_unavailable, domain, range);
           });
     }
   }
@@ -1898,8 +1898,7 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
       auto diag = diagnose(
           attr->getLocation(),
           diag::attr_objc_implementation_raise_minimum_deployment_target,
-          Ctx.getTargetAvailabilityDomain(),
-          Ctx.getSwift50Availability().getRawMinimumVersion());
+          Ctx.getTargetAvailabilityDomain(), Ctx.getSwift50Availability());
       if (attr->isEarlyAdopter()) {
         diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
       }
@@ -2434,11 +2433,10 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           diagnose(enclosingDecl->getLoc(),
                    diag::availability_implicit_decl_here,
                    D->getDescriptiveKind(), Ctx.getTargetAvailabilityDomain(),
-                   AttrRange.getRawMinimumVersion());
+                   AttrRange);
         diagnose(enclosingDecl->getLoc(),
                  diag::availability_decl_more_than_enclosing_here,
-                 Ctx.getTargetAvailabilityDomain(),
-                 EnclosingAnnotatedRange->getRawMinimumVersion());
+                 Ctx.getTargetAvailabilityDomain(), *EnclosingAnnotatedRange);
       }
     }
   }
@@ -5290,10 +5288,10 @@ void AttributeChecker::checkBackDeployedAttrs(
 
       if (Attr->Version <= introVersion) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
-                 Attr, VD, beforeDomain, beforeVersion);
+                 Attr, VD, beforeDomain, AvailabilityRange(beforeVersion));
         diagnose(availableAttr.getParsedAttr()->AtLoc,
                  diag::availability_introduced_in_version, VD, introDomain,
-                 introVersion)
+                 AvailabilityRange(introVersion))
             .highlight(availableAttr.getParsedAttr()->getRange());
         continue;
       }
