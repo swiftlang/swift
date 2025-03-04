@@ -1724,7 +1724,8 @@ namespace  {
     UNINTERESTING_ATTR(UnavailableFromAsync)
 
     UNINTERESTING_ATTR(NoMetadata)
-    UNINTERESTING_ATTR(CompileTimeConst)
+    UNINTERESTING_ATTR(CompileTimeLiteral)
+    UNINTERESTING_ATTR(ConstVal)
 
     UNINTERESTING_ATTR(BackDeployed)
     UNINTERESTING_ATTR(KnownToBeLocal)

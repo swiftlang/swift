@@ -1227,8 +1227,8 @@ std::optional<Type> AbstractFunctionDecl::getEffectiveThrownErrorType() const {
   return std::nullopt;
 }
 
-bool AbstractStorageDecl::isCompileTimeConst() const {
-  return getAttrs().hasAttribute<CompileTimeConstAttr>();
+bool AbstractStorageDecl::isCompileTimeLiteral() const {
+  return getAttrs().hasAttribute<CompileTimeLiteralAttr>();
 }
 
 bool AbstractStorageDecl::isTransparent() const {
@@ -8758,8 +8758,8 @@ void ParamDecl::setTypeRepr(TypeRepr *repr) {
       if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
         if (isa<IsolatedTypeRepr>(STR))
           setIsolated(true);
-        else if (isa<CompileTimeConstTypeRepr>(STR))
-          setCompileTimeConst(true);
+        else if (isa<CompileTimeLiteralTypeRepr>(STR))
+          setCompileTimeLiteral(true);
         else if (isa<SendingTypeRepr>(STR))
           setSending(true);
         unwrappedType = STR->getBase();
@@ -8926,7 +8926,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto internalLabel = getParameterName();
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
-      isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
+      isIsolated(), /*isNoDerivative*/ false, isCompileTimeLiteral(),
       isSending(), isAddressable());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }

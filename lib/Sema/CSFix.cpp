@@ -1368,19 +1368,19 @@ RemoveReturn *RemoveReturn::create(ConstraintSystem &cs, Type resultTy,
   return new (cs.getAllocator()) RemoveReturn(cs, resultTy, locator);
 }
 
-NotCompileTimeConst::NotCompileTimeConst(ConstraintSystem &cs, Type paramTy,
+NotCompileTimeLiteral::NotCompileTimeLiteral(ConstraintSystem &cs, Type paramTy,
                                          ConstraintLocator *locator):
-  ContextualMismatch(cs, FixKind::NotCompileTimeConst, paramTy,
+  ContextualMismatch(cs, FixKind::NotCompileTimeLiteral, paramTy,
                      cs.getASTContext().TheEmptyTupleType, locator,
                      FixBehavior::AlwaysWarning) {}
 
-NotCompileTimeConst *
-NotCompileTimeConst::create(ConstraintSystem &cs, Type paramTy,
+NotCompileTimeLiteral *
+NotCompileTimeLiteral::create(ConstraintSystem &cs, Type paramTy,
                             ConstraintLocator *locator) {
-  return new (cs.getAllocator()) NotCompileTimeConst(cs, paramTy, locator);
+  return new (cs.getAllocator()) NotCompileTimeLiteral(cs, paramTy, locator);
 }
 
-bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const {
+bool NotCompileTimeLiteral::diagnose(const Solution &solution, bool asNote) const {
   auto *locator = getLocator();
   if (auto *E = getAsExpr(locator->getAnchor())) {
     auto isAccepted = E->isSemanticallyConstExpr([&](Expr *E) {
@@ -1402,7 +1402,7 @@ bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const 
       return true;
   }
 
-  NotCompileTimeConstFailure failure(solution, locator);
+  NotCompileTimeLiteralFailure failure(solution, locator);
   return failure.diagnose(asNote);
 }
 

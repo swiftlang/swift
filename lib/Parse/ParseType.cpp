@@ -52,7 +52,7 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
   }
 
   if (ConstLoc.isValid()) {
-    ty = new (p.Context) CompileTimeConstTypeRepr(ty, ConstLoc);
+    ty = new (p.Context) CompileTimeLiteralTypeRepr(ty, ConstLoc);
   }
 
   if (SendingLoc.isValid()) {

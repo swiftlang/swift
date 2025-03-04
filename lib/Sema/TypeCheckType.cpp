@@ -2332,8 +2332,8 @@ namespace {
     NeverNullType resolveSendingTypeRepr(SendingTypeRepr *repr,
                                          TypeResolutionOptions options);
     NeverNullType
-    resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
-                                    TypeResolutionOptions options);
+    resolveCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *repr,
+                                      TypeResolutionOptions options);
     NeverNullType
     resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
                                      TypeResolutionOptions options);
@@ -2755,9 +2755,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
   case TypeReprKind::Sending:
     return resolveSendingTypeRepr(cast<SendingTypeRepr>(repr), options);
-  case TypeReprKind::CompileTimeConst:
-      return resolveCompileTimeConstTypeRepr(cast<CompileTimeConstTypeRepr>(repr),
-                                             options);
+  case TypeReprKind::CompileTimeLiteral:
+      return resolveCompileTimeLiteralTypeRepr(cast<CompileTimeLiteralTypeRepr>(repr),
+                                               options);
   case TypeReprKind::UnqualifiedIdent:
   case TypeReprKind::QualifiedIdent: {
       return resolveDeclRefTypeRepr(cast<DeclRefTypeRepr>(repr), options);
@@ -3820,7 +3820,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     OwnershipTypeRepr *ownershipRepr = nullptr;
 
     bool isolated = false;
-    bool compileTimeConst = false;
+    bool compileTimeLiteral = false;
     bool isSending = false;
     while (true) {
       if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
@@ -3838,8 +3838,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
           isolated = true;
           nestedRepr = specifierRepr->getBase();
           continue;
-        case TypeReprKind::CompileTimeConst:
-          compileTimeConst = true;
+        case TypeReprKind::CompileTimeLiteral:
+          compileTimeLiteral = true;
           nestedRepr = specifierRepr->getBase();
           continue;
         default:
@@ -3949,7 +3949,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst, isSending, addressable);
+        isolated, noDerivative, compileTimeLiteral, isSending, addressable);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
@@ -5245,8 +5245,8 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
 }
 
 NeverNullType
-TypeResolver::resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
-                                              TypeResolutionOptions options) {
+TypeResolver::resolveCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *repr,
+                                                TypeResolutionOptions options) {
   // TODO: more diagnostics
   return resolveType(repr->getBase(), options);
 }
@@ -6302,7 +6302,7 @@ private:
     case TypeReprKind::Isolated:
     case TypeReprKind::Sending:
     case TypeReprKind::Placeholder:
-    case TypeReprKind::CompileTimeConst:
+    case TypeReprKind::CompileTimeLiteral:
     case TypeReprKind::Vararg:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:

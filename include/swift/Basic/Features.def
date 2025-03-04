@@ -479,6 +479,9 @@ EXPERIMENTAL_FEATURE(IsolatedConformances, true)
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
+/// Allow declaration of compile-time values
+EXPERIMENTAL_FEATURE(CompileTimeValues, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

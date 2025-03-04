@@ -404,7 +404,7 @@ extension ASTGenVisitor {
     }
 
     if constLoc.isValid {
-      type = BridgedCompileTimeConstTypeRepr.createParsed(
+      type = BridgedCompileTimeLiteralTypeRepr.createParsed(
         self.ctx,
         base: type,
         specifierLoc: constLoc

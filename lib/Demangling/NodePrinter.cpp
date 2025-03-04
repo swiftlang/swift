@@ -452,7 +452,7 @@ private:
     case Node::Kind::Initializer:
     case Node::Kind::Isolated:
     case Node::Kind::Sending:
-    case Node::Kind::CompileTimeConst:
+    case Node::Kind::CompileTimeLiteral:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::KeyPathGetterThunkHelper:
@@ -1832,7 +1832,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "sending ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
-  case Node::Kind::CompileTimeConst:
+  case Node::Kind::CompileTimeLiteral:
     Printer << "_const ";
     print(Node->getChild(0), depth + 1);
     return nullptr;

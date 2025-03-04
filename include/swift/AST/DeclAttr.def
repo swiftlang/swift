@@ -459,7 +459,7 @@ CONTEXTUAL_DECL_ATTR(nonisolated, Nonisolated,
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
   DeclModifier | OnClass | OnFunc | OnAccessor | OnVar | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   118)
-CONTEXTUAL_SIMPLE_DECL_ATTR(_const, CompileTimeConst,
+CONTEXTUAL_SIMPLE_DECL_ATTR(_const, CompileTimeLiteral,
   DeclModifier | OnParam | OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   126)
 CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
@@ -547,7 +547,12 @@ DECL_ATTR(execution, Execution,
   166)
 DECL_ATTR_FEATURE_REQUIREMENT(Execution, ExecutionAttribute)
 
-LAST_DECL_ATTR(Execution)
+SIMPLE_DECL_ATTR(const, ConstVal,
+    OnParam | OnVar | OnFunc | ABIStableToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  167)
+DECL_ATTR_FEATURE_REQUIREMENT(ConstVal, CompileTimeValues)
+
+LAST_DECL_ATTR(ConstVal)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

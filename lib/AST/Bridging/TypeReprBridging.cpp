@@ -267,12 +267,12 @@ BridgedCompositionTypeRepr_createParsed(BridgedASTContext cContext,
       SourceRange{firstAmpLoc, types.back()->getEndLoc()});
 }
 
-BridgedCompileTimeConstTypeRepr
-BridgedCompileTimeConstTypeRepr_createParsed(BridgedASTContext cContext,
-                                             BridgedTypeRepr base,
-                                             BridgedSourceLoc cSpecifierLoc) {
+BridgedCompileTimeLiteralTypeRepr
+BridgedCompileTimeLiteralTypeRepr_createParsed(BridgedASTContext cContext,
+                                               BridgedTypeRepr base,
+                                               BridgedSourceLoc cSpecifierLoc) {
   return new (cContext.unbridged())
-      CompileTimeConstTypeRepr(base.unbridged(), cSpecifierLoc.unbridged());
+      CompileTimeLiteralTypeRepr(base.unbridged(), cSpecifierLoc.unbridged());
 }
 
 BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(

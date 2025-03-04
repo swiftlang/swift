@@ -1922,11 +1922,11 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         }
       }
 
-      if (!argument.isCompileTimeConst() && param.isCompileTimeConst()) {
+      if (!argument.isCompileTimeLiteral() && param.isCompileTimeLiteral()) {
         auto *locator = cs.getConstraintLocator(loc);
         SourceRange range;
         // simplify locator so the anchor is the exact argument.
-        cs.recordFix(NotCompileTimeConst::create(cs, paramTy,
+        cs.recordFix(NotCompileTimeLiteral::create(cs, paramTy,
           simplifyLocator(cs, locator, range)));
       }
 
@@ -8295,7 +8295,7 @@ ConstraintSystem::simplifyConstructionConstraint(
       auto &arg = fnType->getParams()[idx];
 
       // We can disregard '_const', it's not applicable for tuple construction.
-      auto flags = arg.getParameterFlags().withCompileTimeConst(false);
+      auto flags = arg.getParameterFlags().withCompileTimeLiteral(false);
 
       // We cannot handle inout for tuple construction.
       if (flags.isInOut()) {
@@ -15504,7 +15504,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveExtraneousArguments:
   case FixKind::SpecifyTypeForPlaceholder:
   case FixKind::AllowAutoClosurePointerConversion:
-  case FixKind::NotCompileTimeConst:
+  case FixKind::NotCompileTimeLiteral:
   case FixKind::RenameConflictingPatternVariables:
   case FixKind::AllowInvalidPackElement:
   case FixKind::AllowInvalidPackReference:

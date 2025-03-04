@@ -4689,7 +4689,7 @@ public:
         param->isVariadic(),
         param->isAutoClosure(),
         param->isIsolated(),
-        param->isCompileTimeConst(),
+        param->isCompileTimeLiteral(),
         param->isSending(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
@@ -5782,7 +5782,7 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeConst(), paramFlags.isSending(),
+          paramFlags.isCompileTimeLiteral(), paramFlags.isSending(),
           paramFlags.isAddressable());
     }
   }
