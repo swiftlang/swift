@@ -1,14 +1,14 @@
 // Constant values should be able to call "const" functions from other modules
-
+// REQUIRES: swift_feature_CompileTimeValues
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -parse-as-library
-// RUN: %target-swift-frontend -emit-ir -I %t %t/Main.swift
+// RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -parse-as-library -enable-experimental-feature CompileTimeValues
+// RUN: %target-swift-frontend -emit-ir -I %t %t/Main.swift -enable-experimental-feature CompileTimeValues
 
 //--- MyModule.swift
 
-_const
+@const
 public func foo() -> Int {
 	return 42
 }
@@ -17,4 +17,4 @@ public func foo() -> Int {
 
 import MyModule
 
-_const let constGlobal1: Int = foo()
+@const let constGlobal1: Int = foo()
