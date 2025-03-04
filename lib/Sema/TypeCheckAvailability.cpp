@@ -1425,7 +1425,7 @@ private:
     llvm::VersionTuple Version =
         (GetRuntimeContext ? Spec.getRuntimeVersion() : Spec.getVersion());
 
-    return AvailabilityRange(VersionRange::allGTE(Version));
+    return AvailabilityRange(Version);
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {

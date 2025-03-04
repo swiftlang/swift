@@ -58,17 +58,15 @@ void VersionRange::Profile(llvm::FoldingSetNodeID &id) const {
 
 AvailabilityRange
 AvailabilityRange::forDeploymentTarget(const ASTContext &Ctx) {
-  return AvailabilityRange(
-      VersionRange::allGTE(Ctx.LangOpts.getMinPlatformVersion()));
+  return AvailabilityRange(Ctx.LangOpts.getMinPlatformVersion());
 }
 
 AvailabilityRange AvailabilityRange::forInliningTarget(const ASTContext &Ctx) {
-  return AvailabilityRange(
-      VersionRange::allGTE(Ctx.LangOpts.MinimumInliningTargetVersion));
+  return AvailabilityRange(Ctx.LangOpts.MinimumInliningTargetVersion);
 }
 
 AvailabilityRange AvailabilityRange::forRuntimeTarget(const ASTContext &Ctx) {
-  return AvailabilityRange(VersionRange::allGTE(Ctx.LangOpts.RuntimeVersion));
+  return AvailabilityRange(Ctx.LangOpts.RuntimeVersion);
 }
 
 namespace {
@@ -853,7 +851,7 @@ SemanticAvailableAttr::getIntroducedRange(const ASTContext &Ctx) const {
           *this, Ctx, unusedDomain, remappedVersion))
     introducedVersion = remappedVersion;
 
-  return AvailabilityRange{VersionRange::allGTE(introducedVersion)};
+  return AvailabilityRange{introducedVersion};
 }
 
 std::optional<llvm::VersionTuple> SemanticAvailableAttr::getDeprecated() const {
@@ -877,7 +875,7 @@ SemanticAvailableAttr::getDeprecatedRange(const ASTContext &Ctx) const {
           *this, Ctx, unusedDomain, remappedVersion))
     deprecatedVersion = remappedVersion;
 
-  return AvailabilityRange{VersionRange::allGTE(deprecatedVersion)};
+  return AvailabilityRange{deprecatedVersion};
 }
 
 std::optional<llvm::VersionTuple> SemanticAvailableAttr::getObsoleted() const {
@@ -901,7 +899,7 @@ SemanticAvailableAttr::getObsoletedRange(const ASTContext &Ctx) const {
           *this, Ctx, unusedDomain, remappedVersion))
     obsoletedVersion = remappedVersion;
 
-  return AvailabilityRange{VersionRange::allGTE(obsoletedVersion)};
+  return AvailabilityRange{obsoletedVersion};
 }
 
 namespace {
@@ -931,8 +929,7 @@ AvailabilityRange ASTContext::getSwiftFutureAvailability() const {
   auto target = LangOpts.Target;
 
   auto getFutureAvailabilityRange = []() -> AvailabilityRange {
-    return AvailabilityRange(
-        VersionRange::allGTE(llvm::VersionTuple(99, 99, 0)));
+    return AvailabilityRange(llvm::VersionTuple(99, 99, 0));
   };
 
   if (target.isMacOSX()) {
