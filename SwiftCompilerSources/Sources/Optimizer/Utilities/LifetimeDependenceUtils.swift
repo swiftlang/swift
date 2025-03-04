@@ -105,10 +105,12 @@ struct LifetimeDependence : CustomStringConvertible {
       case let .initialized(initializer):
         let initialAddress = initializer.initialAddress
         precondition(initialAddress.type.isAddress, "expected an address")
-        precondition(initialAddress is AllocStackInst || initialAddress is FunctionArgument,
+        precondition(initialAddress is AllocStackInst || initialAddress is FunctionArgument
+                       || initialAddress is StoreBorrowInst,
                      "expected storage for a a local 'let'")
         if case let .store(store, _) = initializer {
-          precondition(store is StoringInstruction || store is SourceDestAddrInstruction || store is FullApplySite,
+          precondition(store is StoringInstruction || store is SourceDestAddrInstruction || store is FullApplySite
+                      || store is StoreBorrowInst,
                        "expected a store")
         }
       }
@@ -217,8 +219,8 @@ extension LifetimeDependence.Scope {
   /// Construct a lifetime dependence scope from the base value that other values depend on. This derives the kind of
   /// dependence scope and its parentValue from `base`.
   ///
-  /// The returned Scope must be the only scope for the given 'base' value.  This is generally non-recursive, except
-  /// that finds the single borrow introducer. Use-def walking is handled by a utility such as
+  /// The returned Scope must be the only scope for the given 'base' value. This is generally non-recursive, except
+  /// that it tries to find the single borrow introducer. General use-def walking is handled by a utility such as
   /// VariableIntroducerUseDefWalker, which can handle multiple introducers.
   ///
   /// `base` represents the OSSA lifetime that the dependent value must be used within. If `base` is owned, then it
@@ -291,7 +293,8 @@ extension LifetimeDependence.Scope {
     case let .yield(result):
       self.init(yield: result)
     case .storeBorrow(let sb):
-      self = Self(base: sb.source, context)
+      // Don't follow the stored value in case the dependence requires addressability.
+      self = .initialized(.store(initializingStore: sb, initialAddress: sb))
     }
   }
 
@@ -905,7 +908,7 @@ extension LifetimeDependenceDefUseWalker {
       return leafUse(of: operand)
     }
     if let dep = apply.resultDependence(on: operand),
-       dep == .inherit {
+       !dep.isScoped {
       // Operand is nonescapable and passed as a call argument. If the
       // result inherits its lifetime, then consider any nonescapable
       // result value to be a dependent use.

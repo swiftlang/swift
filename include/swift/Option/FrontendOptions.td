@@ -1489,6 +1489,9 @@ def platform_availability_inheritance_map_path
   : Separate<["-"], "platform-availability-inheritance-map-path">, MetaVarName<"<path>">,
     HelpText<"Path of the platform inheritance platform map">;
 
+def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
+  HelpText<"Enable enforcement of lifetime dependencies on addressable values.">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
 
 def disable_experimental_parser_round_trip : Flag<["-"],
