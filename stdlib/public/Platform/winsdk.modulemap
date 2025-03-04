@@ -248,6 +248,12 @@ module WinSDK [system] {
     export *
   }
 
+  module DDE {
+    header "dde.h"
+    header "ddeml.h"
+    export *
+  }
+
   module DFS {
     header "LMDFS.h"
     header "LM.h"
@@ -283,6 +289,13 @@ module WinSDK [system] {
 
       link "Imm32.lib"
     }
+  }
+
+  module LZ32 {
+    header "LZExpand.h"
+    export *
+
+    link "Lz32.Lib"
   }
 
   module Multimedia {
@@ -386,6 +399,11 @@ module WinSDK [system] {
       header "mcx.h"
       export *
     }
+  }
+
+  module OLE {
+    header "ole2.h"
+    export *
   }
 
   module OLE32 {
