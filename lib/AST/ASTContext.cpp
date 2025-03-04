@@ -5713,10 +5713,12 @@ SubstitutionMap::Storage *SubstitutionMap::Storage::get(
   return result;
 }
 
-const AvailabilityContext::Storage *
-AvailabilityContext::Storage::get(const Info &info, const ASTContext &ctx) {
+const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
+    const AvailabilityRange &platformRange, bool isDeprecated,
+    llvm::ArrayRef<DomainInfo> domainInfos, const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  info.Profile(id);
+  AvailabilityContext::Storage::Profile(id, platformRange, isDeprecated,
+                                        domainInfos);
 
   auto &foldingSet =
       ctx.getImpl().getArena(AllocationArena::Permanent).AvailabilityContexts;
@@ -5725,9 +5727,15 @@ AvailabilityContext::Storage::get(const Info &info, const ASTContext &ctx) {
   if (existing)
     return existing;
 
-  void *mem = ctx.Allocate(sizeof(AvailabilityContext::Storage),
-                           alignof(AvailabilityContext::Storage));
-  auto *newNode = ::new (mem) AvailabilityContext::Storage(info);
+  size_t storageToAlloc = AvailabilityContext::Storage::totalSizeToAlloc<
+      AvailabilityContext::DomainInfo>(domainInfos.size());
+  void *mem =
+      ctx.Allocate(storageToAlloc, alignof(AvailabilityContext::Storage));
+  auto *newNode = ::new (mem) AvailabilityContext::Storage(
+      platformRange, isDeprecated, domainInfos.size());
+  std::uninitialized_copy(
+      domainInfos.begin(), domainInfos.end(),
+      newNode->getTrailingObjects<AvailabilityContext::DomainInfo>());
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
