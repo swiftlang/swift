@@ -730,12 +730,12 @@ def avoid_emit_module_source_info :
 def emit_module_source_info_path :
   Separate<["-"], "emit-module-source-info-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output module source info file to <path>">;
 def emit_variant_module_source_info_path :
   Separate<["-"], "emit-variant-module-source-info-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput, NewDriverOnlyOption]>,
+         SupplementaryOutput, NewDriverOnlyOption, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output module source info file for the target variant to <path>">;
 
 def emit_parseable_module_interface :
