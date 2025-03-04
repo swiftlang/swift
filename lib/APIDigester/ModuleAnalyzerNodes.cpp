@@ -2439,7 +2439,7 @@ class ConstExtractor: public ASTWalker {
     }
     assert(ReferencedDecl);
     if (auto *VAR = dyn_cast<VarDecl>(ReferencedDecl)) {
-      if (!VAR->getAttrs().hasAttribute<CompileTimeConstAttr>()) {
+      if (!VAR->getAttrs().hasAttribute<CompileTimeLiteralAttr>()) {
         return false;
       }
       if (auto *PD = VAR->getParentPatternBinding()) {

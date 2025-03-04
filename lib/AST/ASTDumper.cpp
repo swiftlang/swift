@@ -4643,7 +4643,7 @@ public:
     printFoot();
   }
 
-  void visitCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *T, Label label) {
+  void visitCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *T, Label label) {
     printCommon("_const", label);
     printRec(T->getBase(), Label::optional("base"));
     printFoot();
@@ -4810,7 +4810,8 @@ public:
   TRIVIAL_ATTR_PRINTER(AtRethrows, at_rethrows)
   TRIVIAL_ATTR_PRINTER(Borrowed, borrowed)
   TRIVIAL_ATTR_PRINTER(Borrowing, borrowing)
-  TRIVIAL_ATTR_PRINTER(CompileTimeConst, compile_time_const)
+  TRIVIAL_ATTR_PRINTER(CompileTimeLiteral, compile_time_literal)
+  TRIVIAL_ATTR_PRINTER(ConstVal, compile_time_value)
   TRIVIAL_ATTR_PRINTER(CompilerInitialized, compiler_initialized)
   TRIVIAL_ATTR_PRINTER(Consuming, consuming)
   TRIVIAL_ATTR_PRINTER(Convenience, convenience)
@@ -5804,7 +5805,7 @@ namespace {
       printFlag(paramFlags.isVariadic(), "vararg");
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
-      printFlag(paramFlags.isCompileTimeConst(), "compileTimeConst");
+      printFlag(paramFlags.isCompileTimeLiteral(), "compileTimeLiteral");
       printFlag(getDumpString(paramFlags.getValueOwnership()));
     }
 

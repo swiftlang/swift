@@ -370,7 +370,7 @@ NODE(AsyncSuspendResumePartialFunction)
 
 // Added in Swift 5.6
 NODE(AccessibleFunctionRecord)
-NODE(CompileTimeConst)
+NODE(CompileTimeLiteral)
 
 // Added in Swift 5.7
 NODE(BackDeploymentThunk)

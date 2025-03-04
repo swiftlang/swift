@@ -2496,11 +2496,11 @@ BridgedCompositionTypeRepr_createParsed(BridgedASTContext cContext,
                                         BridgedArrayRef types,
                                         BridgedSourceLoc cFirstAmpLoc);
 
-SWIFT_NAME("BridgedCompileTimeConstTypeRepr.createParsed(_:base:specifierLoc:)")
-BridgedCompileTimeConstTypeRepr
-BridgedCompileTimeConstTypeRepr_createParsed(BridgedASTContext cContext,
-                                             BridgedTypeRepr base,
-                                             BridgedSourceLoc cSpecifierLoc);
+SWIFT_NAME("BridgedCompileTimeLiteralTypeRepr.createParsed(_:base:specifierLoc:)")
+BridgedCompileTimeLiteralTypeRepr
+BridgedCompileTimeLiteralTypeRepr_createParsed(BridgedASTContext cContext,
+                                               BridgedTypeRepr base,
+                                               BridgedSourceLoc cSpecifierLoc);
 
 SWIFT_NAME("BridgedDeclRefTypeRepr.createParsed(_:base:name:nameLoc:"
            "genericArguments:angleRange:)")

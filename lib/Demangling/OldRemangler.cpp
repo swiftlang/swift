@@ -1961,7 +1961,7 @@ ManglingError Remangler::mangleSending(Node *node, unsigned depth) {
   return mangleSingleChildNode(node, depth + 1); // type
 }
 
-ManglingError Remangler::mangleCompileTimeConst(Node *node, unsigned depth) {
+ManglingError Remangler::mangleCompileTimeLiteral(Node *node, unsigned depth) {
   Buffer << "Yt";
   return mangleSingleChildNode(node, depth + 1); // type
 }

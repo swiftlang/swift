@@ -1334,7 +1334,7 @@ namespace decls_block {
                      ParamDeclSpecifierField, // inout, shared or owned?
                      BCFixed<1>,              // isolated
                      BCFixed<1>,              // noDerivative?
-                     BCFixed<1>,              // compileTimeConst
+                     BCFixed<1>,              // compileTimeLiteral
                      BCFixed<1>,              // sending
                      BCFixed<1>               // addressable
                      >;
@@ -1708,7 +1708,7 @@ namespace decls_block {
     BCFixed<1>,              // isVariadic?
     BCFixed<1>,              // isAutoClosure?
     BCFixed<1>,              // isIsolated?
-    BCFixed<1>,              // isCompileTimeConst?
+    BCFixed<1>,              // isCompileTimeLiteral?
     BCFixed<1>,              // isSending?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type

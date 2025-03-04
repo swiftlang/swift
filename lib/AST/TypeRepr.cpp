@@ -870,7 +870,7 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
       Printer.printKeyword("__owned", Opts, " ");
     }
     break;
-  case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::CompileTimeLiteral:
     Printer.printKeyword("_const", Opts, " ");
     break;
   }

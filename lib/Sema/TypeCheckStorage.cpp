@@ -466,7 +466,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     shouldRequireStatic = isa<NominalTypeDecl>(d);
   }
   for (auto *sv: vars) {
-    bool hasConst = sv->getAttrs().getAttribute<CompileTimeConstAttr>();
+    bool hasConst = sv->getAttrs().getAttribute<CompileTimeLiteralAttr>();
     if (!hasConst)
       continue;
     bool hasStatic = StaticSpelling != StaticSpellingKind::None;

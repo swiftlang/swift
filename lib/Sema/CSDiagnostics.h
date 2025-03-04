@@ -1873,9 +1873,9 @@ public:
   bool diagnoseAsError() override;
 };
 
-class NotCompileTimeConstFailure final : public FailureDiagnostic {
+class NotCompileTimeLiteralFailure final : public FailureDiagnostic {
 public:
-  NotCompileTimeConstFailure(const Solution &solution, ConstraintLocator *locator)
+  NotCompileTimeLiteralFailure(const Solution &solution, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;
