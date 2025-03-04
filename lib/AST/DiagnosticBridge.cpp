@@ -64,9 +64,17 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
     highlightRanges.push_back(range.getEnd().getOpaquePointerValue());
   }
 
+  StringRef documentationPath;
+  if (info.EducationalNotePaths.size() > 0)
+    documentationPath = info.EducationalNotePaths[0];
+
   // FIXME: Translate Fix-Its.
   swift_ASTGen_addQueuedDiagnostic(queuedDiagnostics, text.data(), text.size(),
                                    severity, info.Loc.getOpaquePointerValue(),
+                                   info.Category.data(),
+                                   info.Category.size(),
+                                   documentationPath.data(),
+                                   documentationPath.size(),
                                    highlightRanges.data(),
                                    highlightRanges.size() / 2);
 }

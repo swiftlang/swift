@@ -1351,6 +1351,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
 
   auto groupID = diagnostic.getGroupID();
   StringRef Category;
+  const char * const *associatedNotes = nullptr;
   if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
     Category = "api-digester-breaking-change";
   else if (isNoUsageDiagnostic(diagnostic.getID()))
@@ -1359,6 +1360,10 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     Category = getDiagGroupInfoByID(groupID).name;
   else if (isDeprecationDiagnostic(diagnostic.getID()))
     Category = "deprecation";
+  else if ((associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()]) &&
+           *associatedNotes) {
+    Category = llvm::sys::path::stem(*associatedNotes);
+  }
 
   auto fixIts = diagnostic.getFixIts();
   if (loc.isValid()) {
