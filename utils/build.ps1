@@ -2557,6 +2557,12 @@ function Build-Build($Arch) {
       TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
       SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
       SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
+    } + if ($Arch -eq $ArchARM64) {
+      # Use lld to workaround the LNK1322 issue: https://github.com/swiftlang/swift/issues/79740
+      # FIXME(hjyamauchi) Have a real fix
+      @{ CMAKE_Swift_FLAGS = "-use-ld=lld-link"; }
+    } else {
+      @{}
     }
 }
 
@@ -3171,7 +3177,6 @@ if ($Clean) {
     }
   }
 }
-
 
 if (-not $SkipBuild) {
   if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
