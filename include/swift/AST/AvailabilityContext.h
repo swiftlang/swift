@@ -37,10 +37,9 @@ class Decl;
 class AvailabilityContext {
 public:
   class Storage;
+  class DomainInfo;
 
 private:
-  class Info;
-
   /// A non-null pointer to uniqued storage for this availability context.
   const Storage *storage;
 
