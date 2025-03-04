@@ -134,15 +134,16 @@ internal func _assertionFailure(
 #if !$Embedded
 @inline(never)
 #else
+@_disfavoredOverload
 @inline(__always)
 #endif
 @_semantics("programtermination_point")
-@_unavailableInEmbedded
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
+#if !$Embedded
   prefix.withUTF8Buffer {
     (prefix) -> Void in
     var message = message
@@ -158,6 +159,14 @@ internal func _assertionFailure(
       }
     }
   }
+#else
+  if _isDebugAssertConfiguration() {
+    var message = message
+    message.withUTF8 { (messageUTF8) -> Void in
+      _embeddedReportFatalErrorInFile(prefix: prefix, message: messageUTF8, file: file, line: line)
+    }
+  }
+#endif
 
   Builtin.int_trap()
 }
