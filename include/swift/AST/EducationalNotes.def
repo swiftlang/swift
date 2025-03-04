@@ -33,9 +33,6 @@ EDUCATIONAL_NOTES(non_nominal_extension, "nominal-types.md")
 EDUCATIONAL_NOTES(associated_type_witness_conform_impossible,
                   "nominal-types.md")
 
-EDUCATIONAL_NOTES(cannot_infer_closure_result_type,
-                  "complex-closure-inference.md")
-
 EDUCATIONAL_NOTES(invalid_dynamic_callable_type,
                   "dynamic-callable-requirements.md")
 EDUCATIONAL_NOTES(missing_dynamic_callable_kwargs_method,
@@ -85,6 +82,27 @@ EDUCATIONAL_NOTES(result_builder_missing_build_array,
                   
 EDUCATIONAL_NOTES(multiple_inheritance,
                   "multiple-inheritance.md")
+
+EDUCATIONAL_NOTES(regionbasedisolation_named_send_yields_race,
+                  "sending-risks-data-race.md")
+EDUCATIONAL_NOTES(regionbasedisolation_type_send_yields_race,
+                  "sending-risks-data-race.md")
+EDUCATIONAL_NOTES(regionbasedisolation_typed_tns_passed_sending_closure,
+                  "sending-closure-risks-data-race.md")
+EDUCATIONAL_NOTES(shared_mutable_state_decl,
+                  "mutable-global-variable.md")
+EDUCATIONAL_NOTES(shared_immutable_state_decl,
+                  "mutable-global-variable.md")
+EDUCATIONAL_NOTES(non_sendable_capture,
+                  "sendable-closure-captures.md")
+EDUCATIONAL_NOTES(concurrent_access_of_local_capture,
+                  "sendable-closure-captures.md")
+EDUCATIONAL_NOTES(concurrent_access_of_inout_param,
+                  "sendable-closure-captures.md")
+EDUCATIONAL_NOTES(actor_isolated_call,
+                  "actor-isolated-call.md")
+EDUCATIONAL_NOTES(actor_isolated_call_decl,
+                  "actor-isolated-call.md")
 
 EDUCATIONAL_NOTES(error_in_swift_lang_mode,
                   "error-in-future-swift-version.md")
