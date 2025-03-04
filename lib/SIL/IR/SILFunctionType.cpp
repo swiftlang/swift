@@ -1256,6 +1256,9 @@ public:
     case ValueOwnership::Shared:
       return ParameterConvention::Indirect_In_Guaranteed;
     case ValueOwnership::Owned:
+      if (kind == ConventionsKind::CFunction ||
+          kind == ConventionsKind::CFunctionType)
+        return getIndirectParameter(index, type, substTL);
       return ParameterConvention::Indirect_In;
     }
     llvm_unreachable("unhandled ownership");
@@ -3392,6 +3395,8 @@ static ParameterConvention getIndirectCParameterConvention(clang::QualType type)
   // A trivial const * parameter in C should be considered @in.
   if (importer::isCxxConstReferenceType(type.getTypePtr()))
     return ParameterConvention::Indirect_In_Guaranteed;
+  if (type->isRValueReferenceType())
+    return ParameterConvention::Indirect_In_CXX;
   if (auto *decl = type->getAsRecordDecl()) {
     if (!decl->isParamDestroyedInCallee())
       return ParameterConvention::Indirect_In_CXX;
