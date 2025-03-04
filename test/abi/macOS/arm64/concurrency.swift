@@ -384,28 +384,22 @@ Added: _$sScT16escalatePriority_2toyScTyxq_G_ScPtFZ
 Added: _$ss33withTaskPriorityEscalationHandler9operation02onC9Escalated9isolationxxyYaq_YKXE_yScPYbXEScA_pSgYitYaq_YKs5ErrorR_r0_lF
 Added: _$ss33withTaskPriorityEscalationHandler9operation02onC9Escalated9isolationxxyYaq_YKXE_yScPYbXEScA_pSgYitYaq_YKs5ErrorR_r0_lFTu
 
-// Task.DispatchSerialQueue
+// task names
+Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvgZ
+Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvpZMV
+Added: _swift_task_getCurrentTaskName
+Added: _$sScG22startTaskSynchronously4name8priority9operationySSSg_ScPSgxyYacntF
+Added: _$sScG37startTaskSynchronouslyUnlessCancelled4name8priority9operationySSSg_ScPSgxyYacntF
+Added: _$sScTss5Error_pRs_rlE18startSynchronously4name8priority_ScTyxsAA_pGSSSg_ScPSgxyYaKcntFZ
+Added: _$sScTss5NeverORs_rlE18startSynchronously4name8priority_ScTyxABGSSSg_ScPSgxyYaKcntFZ
+Added: _$sScg22startTaskSynchronously4name8priority9operationySSSg_ScPSgxyYacntF
+Added: _$sScg37startTaskSynchronouslyUnlessCancelled4name8priority9operationySSSg_ScPSgxyYacntF
+Added: _$ss19DiscardingTaskGroupV05startB13Synchronously4name8priority9operationySSSg_ScPSgyyYacntF
+Added: _$ss19DiscardingTaskGroupV05startB28SynchronouslyUnlessCancelled4name8priority9operationySSSg_ScPSgyyYacntF
+Added: _$ss27ThrowingDiscardingTaskGroupV05startC13Synchronously4name8priority9operationySSSg_ScPSgyyYacntF
+Added: _$ss27ThrowingDiscardingTaskGroupV05startC28SynchronouslyUnlessCancelled4name8priority9operationySSSg_ScPSgyyYacntF
+
 Added: _swift_task_startSynchronously
-// static (extension in Swift):Swift.Task< where B == Swift.Error>.startSynchronously(priority: Swift.TaskPriority?, _: __owned () async throws -> A) -> Swift.Task<A, Swift.Error>
-Added: _$sScTss5Error_pRs_rlE18startSynchronously8priority_ScTyxsAA_pGScPSg_xyYaKcntFZ
-// static (extension in Swift):Swift.Task< where B == Swift.Never>.startSynchronously(priority: Swift.TaskPriority?, _: __owned () async throws -> A) -> Swift.Task<A, Swift.Never>
-Added: _$sScTss5NeverORs_rlE18startSynchronously8priority_ScTyxABGScPSg_xyYaKcntFZ
-// Swift.TaskGroup.startTaskSynchronously(priority: Swift.TaskPriority?, operation: __owned () async -> A) -> ()
-Added: _$sScG22startTaskSynchronously8priority9operationyScPSg_xyYacntF
-// Swift.TaskGroup.startTaskSynchronouslyUnlessCancelled(priority: Swift.TaskPriority?, operation: __owned () async -> A) -> ()
-Added: _$sScG37startTaskSynchronouslyUnlessCancelled8priority9operationyScPSg_xyYacntF
-// Swift.ThrowingTaskGroup.startTaskSynchronously(priority: Swift.TaskPriority?, operation: __owned () async -> A) -> ()
-Added: _$sScg22startTaskSynchronously8priority9operationyScPSg_xyYacntF
-// Swift.ThrowingTaskGroup.startTaskSynchronouslyUnlessCancelled(priority: Swift.TaskPriority?, operation: __owned () async -> A) -> ()
-Added: _$sScg37startTaskSynchronouslyUnlessCancelled8priority9operationyScPSg_xyYacntF
-// Swift.DiscardingTaskGroup.startTaskSynchronously(priority: Swift.TaskPriority?, operation: __owned () async -> ()) -> ()
-Added: _$ss19DiscardingTaskGroupV05startB13Synchronously8priority9operationyScPSg_yyYacntF
-// Swift.DiscardingTaskGroup.startTaskSynchronouslyUnlessCancelled(priority: Swift.TaskPriority?, operation: __owned () async -> ()) -> ()
-Added: _$ss19DiscardingTaskGroupV05startB28SynchronouslyUnlessCancelled8priority9operationyScPSg_yyYacntF
-// Swift.ThrowingDiscardingTaskGroup.startTaskSynchronously(priority: Swift.TaskPriority?, operation: __owned () async -> ()) -> ()
-Added: _$ss27ThrowingDiscardingTaskGroupV05startC13Synchronously8priority9operationyScPSg_yyYacntF
-// Swift.ThrowingDiscardingTaskGroup.startTaskSynchronouslyUnlessCancelled(priority: Swift.TaskPriority?, operation: __owned () async -> ()) -> ()
-Added: _$ss27ThrowingDiscardingTaskGroupV05startC28SynchronouslyUnlessCancelled8priority9operationyScPSg_yyYacntF
 
 // add callee-allocated coro entrypoints
 // TODO: CoroutineAccessors: several of these symbols should be in swiftCore
