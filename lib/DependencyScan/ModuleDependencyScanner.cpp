@@ -405,7 +405,8 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
       break;
 
     case ImplicitStdlibKind::Stdlib:
-      mainDependencies.addModuleImport("Swift", &alreadyAddedModules);
+      mainDependencies.addModuleImport("Swift", /* isExported */false,
+                                       &alreadyAddedModules);
       break;
     }
 
