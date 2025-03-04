@@ -2269,6 +2269,25 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
       return true;
     }
 
+    bool allowSendableFunctionMismatch() const {
+      // Allow mismatches on `@Sendable` only if the witness comes
+      // from ObjC as a very narrow fix to avoid introducing new
+      // ambiguities like this:
+      //
+      // protocol P {
+      //   associatedtype T
+      //   func test(_: (T) -> Void)
+      // }
+      //
+      // struct S : P {
+      //   func test(_: @Sendable (Int) -> Void) {}
+      //   func test(_: (Int) -> Void) {}
+      // }
+      //
+      // Currently, there is only one binding for `T` - `Int`.
+      return Inferred.Witness && Inferred.Witness->hasClangNode();
+    }
+
     bool mismatch(GenericTypeParamType *selfParamType,
                   TypeBase *secondType, Type sugaredFirstType) {
       if (selfParamType->isEqual(Conformance->getProtocol()->getSelfInterfaceType())) {

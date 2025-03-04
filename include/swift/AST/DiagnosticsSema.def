@@ -1898,6 +1898,11 @@ ERROR(objc_implementation_type_mismatch,none,
       "%kind0 of type %1 does not match type %2 declared by the header",
       (ValueDecl *, Type, Type))
 
+ERROR(objc_implementation_sendability_mismatch,none,
+      "sendability of function types in %kind0 of type %1 does not match "
+      "type %2 declared by the header",
+      (ValueDecl *, Type, Type))
+
 ERROR(objc_implementation_required_attr_mismatch,none,
       "%kind0 %select{should not|should}2 be 'required' to match %1 declared "
       "by the header",
@@ -8362,6 +8367,13 @@ ERROR(attr_execution_type_attr_incompatible_with_isolated_param,none,
 ERROR(attr_execution_type_attr_incompatible_with_isolated_any,none,
       "cannot use '@execution' together with @isolated(any)",
       ())
+
+ERROR(invalid_function_conversion_with_non_sendable,none,
+      "cannot convert %0 to %1 because crossing of an isolation boundary "
+      "requires parameter and result types to conform to 'Sendable' protocol",
+      (Type, Type))
+NOTE(type_does_not_conform_to_Sendable,none,
+     "type %0 does not conform to 'Sendable' protocol", (Type))
 
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

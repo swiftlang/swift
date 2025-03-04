@@ -39,6 +39,7 @@
 
 namespace clang {
 class NamedDecl;
+class Type;
 }
 
 namespace swift {
@@ -150,7 +151,8 @@ namespace swift {
     ActorIsolation,
     IsolationSource,
     Diagnostic,
-    ClangDecl
+    ClangDecl,
+    ClangType,
   };
 
   namespace diag {
@@ -188,6 +190,7 @@ namespace swift {
       IsolationSource IsolationSourceVal;
       DiagnosticInfo *DiagnosticVal;
       const clang::NamedDecl *ClangDecl;
+      const clang::Type *ClangType;
     };
     
   public:
@@ -310,6 +313,9 @@ namespace swift {
 
     DiagnosticArgument(const clang::NamedDecl *ND)
         : Kind(DiagnosticArgumentKind::ClangDecl), ClangDecl(ND) {}
+
+    DiagnosticArgument(const clang::Type *Ty)
+        : Kind(DiagnosticArgumentKind::ClangType), ClangType(Ty) {}
 
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
@@ -440,6 +446,11 @@ namespace swift {
     const clang::NamedDecl *getAsClangDecl() const {
       assert(Kind == DiagnosticArgumentKind::ClangDecl);
       return ClangDecl;
+    }
+
+    const clang::Type *getAsClangType() const {
+      assert(Kind == DiagnosticArgumentKind::ClangType);
+      return ClangType;
     }
   };
 
@@ -1796,6 +1807,7 @@ namespace swift {
   }
 
   void printClangDeclName(const clang::NamedDecl *ND, llvm::raw_ostream &os);
+  void printClangTypeName(const clang::Type *Ty, llvm::raw_ostream &os);
 
   /// Temporary on-stack storage and unescaping for encoded diagnostic
   /// messages.
