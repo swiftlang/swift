@@ -116,51 +116,13 @@
 
 // CHECK-NEXT: public struct PrivatelyInherited {
 // CHECK-NEXT:   public init()
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private mutating func mutatingInBase() -> UnsafePointer<CChar>?
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private func constInBase() -> UnsafePointer<CChar>?
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private func takesArgsInBase(_ a: Int32, _ b: Int32, _ c: Int32) -> UnsafePointer<CChar>?
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private func takesNonTrivialInBase(_ a: NonTrivial) -> UnsafePointer<CChar>?
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private func returnsNonTrivialInBase() -> NonTrivial
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private mutating func swiftRenamed(input i: Int32) -> Int32
-// CHECK-NEXT:   @available(swift, obsoleted: 3, renamed: "swiftRenamed(input:)")
-// CHECK-NEXT:   private mutating func renamed(_ i: Int32) -> Int32
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   @_effects(readonly) private func pure() -> Int32
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private func sameMethodNameSameSignature() -> Int32
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private func sameMethodDifferentSignature() -> Int32
-// CHECK-NEXT: }
+// CHECK-NOT:    public
+// CHECK:      }
 
 // CHECK-NEXT: public struct ProtectedInherited {
 // CHECK-NEXT:   public init()
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private mutating func mutatingInBase() -> UnsafePointer<CChar>?
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private func constInBase() -> UnsafePointer<CChar>?
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private func takesArgsInBase(_ a: Int32, _ b: Int32, _ c: Int32) -> UnsafePointer<CChar>?
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private func takesNonTrivialInBase(_ a: NonTrivial) -> UnsafePointer<CChar>?
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private func returnsNonTrivialInBase() -> NonTrivial
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private mutating func swiftRenamed(input i: Int32) -> Int32
-// CHECK-NEXT:   @available(swift, obsoleted: 3, renamed: "swiftRenamed(input:)")
-// CHECK-NEXT:   private mutating func renamed(_ i: Int32) -> Int32
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   @_effects(readonly) private func pure() -> Int32
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private func sameMethodNameSameSignature() -> Int32
-// CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   private func sameMethodDifferentSignature() -> Int32
-// CHECK-NEXT: }
+// CHECK-NOT:    public
+// CHECK:      }
 
 // CHECK-NEXT: public struct EmptyBaseClass {
 // CHECK-NEXT:   public init()
@@ -186,8 +148,8 @@
 // CHECK-NEXT:   public func getX() -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func getXMut() -> Int32
-// CHECK-NEXT:   private var x: Int32
-// CHECK-NEXT: }
+// CHECK-NOT:    public
+// CHECK:      }
 
 // CHECK-NEXT: public struct CopyTrackedDerivedClass {
 // CHECK-NEXT:   public init(_ x: Int32)
@@ -199,16 +161,15 @@
 // CHECK-NEXT:   public func getX() -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func getXMut() -> Int32
-// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
-// CHECK-NEXT:   private var x: Int32
-// CHECK-NEXT: }
+// CHECK-NOT:    public
+// CHECK:      }
 
 // CHECK-NEXT: public struct NonEmptyBase {
 // CHECK-NEXT:   public init()
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getY() -> Int32
-// CHECK-NEXT:   private var y: Int32
-// CHECK-NEXT: }
+// CHECK-NOT:    public
+// CHECK:      }
 
 // CHECK-NEXT: public struct CopyTrackedDerivedDerivedClass {
 // CHECK-NEXT:   public init(_ x: Int32)
@@ -216,14 +177,12 @@
 // CHECK-NEXT:   @_transparent public init()
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getY() -> Int32
-// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
-// CHECK-NEXT:   private var y: Int32
-// CHECK-NEXT:   @discardableResult
+// CHECK-NOT:    public
+// CHECK:        @discardableResult
 // CHECK-NEXT:   public func getDerivedX() -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getX() -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func getXMut() -> Int32
-// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
-// CHECK-NEXT:   private var x: Int32
-// CHECK-NEXT: }
+// CHECK-NOT:    public
+// CHECK:      }

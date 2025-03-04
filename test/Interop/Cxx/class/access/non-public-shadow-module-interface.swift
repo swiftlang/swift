@@ -1,4 +1,5 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=NonPublicShadow -print-access -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=NonPublicShadow -print-access -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers | %FileCheck %s
+// REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
 // We only check the module interface of Shadow to keep this test concise
 
