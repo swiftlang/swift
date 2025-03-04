@@ -5151,13 +5151,11 @@ static llvm::Constant *getCoroAllocWrapperFn(IRGenModule &IGM) {
       /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::SwiftCoro);
 }
 
-void irgen::emitYieldOnce2CoroutineEntry(
-    IRGenFunction &IGF, LinkEntity coroFunction, CanSILFunctionType fnType,
-    NativeCCEntryPointArgumentEmission &emission) {
-  auto *buffer = emission.getCoroutineBuffer();
-  auto cfp = cast<llvm::GlobalVariable>(
-      IGF.IGM.getAddrOfCoroFunctionPointer(coroFunction));
-  llvm::Value *allocator = emission.getCoroutineAllocator();
+void irgen::emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
+                                         CanSILFunctionType fnType,
+                                         llvm::Value *buffer,
+                                         llvm::Value *allocator,
+                                         llvm::GlobalVariable *cfp) {
   IGF.setCoroutineAllocator(allocator);
   auto isSwiftCoroCCAvailable =
       IGF.IGM.SwiftCoroCC == llvm::CallingConv::SwiftCoro;
@@ -5169,6 +5167,15 @@ void irgen::emitYieldOnce2CoroutineEntry(
       IGF, fnType, buffer, llvm::Intrinsic::coro_id_retcon_once_dynamic,
       Size(-1) /*dynamic-to-IRGen size*/, IGF.IGM.getCoroStaticFrameAlignment(),
       {cfp, allocator}, allocFn, deallocFn, {});
+}
+void irgen::emitYieldOnce2CoroutineEntry(
+    IRGenFunction &IGF, LinkEntity coroFunction, CanSILFunctionType fnType,
+    NativeCCEntryPointArgumentEmission &emission) {
+  auto *buffer = emission.getCoroutineBuffer();
+  auto cfp = cast<llvm::GlobalVariable>(
+      IGF.IGM.getAddrOfCoroFunctionPointer(coroFunction));
+  llvm::Value *allocator = emission.getCoroutineAllocator();
+  emitYieldOnce2CoroutineEntry(IGF, fnType, buffer, allocator, cfp);
 }
 
 static Address createOpaqueBufferAlloca(IRGenFunction &IGF,

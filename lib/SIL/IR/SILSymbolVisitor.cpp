@@ -543,7 +543,7 @@ public:
     auto *accessor = dyn_cast<AccessorDecl>(AFD);
     if (accessor &&
         requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
-      addCoroFunctionPointer(SILDeclRef(AFD));
+      addCoroFunctionPointer(SILDeclRef(accessor));
     }
 
     // Skip non objc compatible methods or non-public methods.
@@ -842,6 +842,11 @@ public:
               llvm::dyn_cast_or_null<AbstractFunctionDecl>(declRef.getDecl());
           if (decl && decl->hasBody()) {
             Visitor.addFunction(declRef);
+            auto *accessor = dyn_cast<AccessorDecl>(decl);
+            if (accessor && requiresFeatureCoroutineAccessors(
+                                accessor->getAccessorKind())) {
+              Visitor.addCoroFunctionPointer(SILDeclRef(accessor));
+            }
           }
         }
 

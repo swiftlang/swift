@@ -496,6 +496,11 @@ void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
       if (AFD->hasAsync())
         addSymbol(decorated + "Tu", SymbolSource::forUnknown(),
                   SymbolFlags::Text);
+    auto *accessor = dyn_cast<AccessorDecl>(PWT);
+    if (accessor &&
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind()))
+      addSymbol(decorated + "Twc", SymbolSource::forUnknown(),
+                SymbolFlags::Text);
   }
 }
 

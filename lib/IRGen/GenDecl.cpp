@@ -1918,6 +1918,11 @@ void IRGenerator::emitDynamicReplacements() {
           IGM.getAddrOfAsyncFunctionPointer(
               LinkEntity::forSILFunction(newFunc)),
           IGM.Int8PtrTy));
+    } else if (newFunc->getLoweredFunctionType()
+                   ->isCalleeAllocatedCoroutine()) {
+      replacement.addRelativeAddress(llvm::ConstantExpr::getBitCast(
+          IGM.getAddrOfCoroFunctionPointer(LinkEntity::forSILFunction(newFunc)),
+          IGM.Int8PtrTy));
     } else {
       replacement.addCompactFunctionReference(IGM.getAddrOfSILFunction(
           newFunc, NotForDefinition)); // direct relative reference.
@@ -2148,6 +2153,15 @@ void IRGenModule::emitVTableStubs() {
       auto entity = LinkEntity::forSILFunction(const_cast<SILFunction *>(&F));
       auto *fnPtr = emitAsyncFunctionPointer(*this, stub, entity, asyncLayout.getSize());
       alias = fnPtr;
+    } else if (F.getLoweredFunctionType()->isCalleeAllocatedCoroutine()) {
+      // TODO: We cannot directly create a pointer to
+      // `swift_deletedCalleeAllocatedCoroutineMethodError` to workaround a
+      // linker crash. Instead use the stub, which calls
+      // swift_deletedMethodError. This works because swift_deletedMethodError
+      // takes no parameters and simply aborts the program.
+      auto entity = LinkEntity::forSILFunction(const_cast<SILFunction *>(&F));
+      auto *cfp = emitCoroFunctionPointer(*this, stub, entity);
+      alias = cfp;
     } else {
       alias = llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage,
                                         F.getName(), stub);
@@ -2970,6 +2984,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto *funPtr =
       f->isAsync()
           ? IGF.IGM.getAddrOfAsyncFunctionPointer(LinkEntity::forSILFunction(f))
+      : f->getLoweredFunctionType()->isCalleeAllocatedCoroutine()
+          ? IGF.IGM.getAddrOfCoroFunctionPointer(LinkEntity::forSILFunction(f))
           : IGF.CurFn;
   auto linkEntry =
       getChainEntryForDynamicReplacement(*this, varEntity, funPtr);
@@ -3140,6 +3156,9 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
 
     emitDeallocAsyncContext(IGF, calleeContextBuffer);
     forwardAsyncCallResult(IGF, silFunctionType, layout, suspend);
+  } else if (f->getLoweredFunctionType()->isCalleeAllocatedCoroutine()) {
+    // TODO: CoroutineAccessors: Implement replaceable function prologs.
+    llvm::report_fatal_error("unimplemented");
   } else {
     // Call the replacement function.
     SmallVector<llvm::Value *, 16> forwardedArgs;
@@ -4409,6 +4428,8 @@ AccessibleFunction AccessibleFunction::forSILFunction(IRGenModule &IGM,
   llvm::Constant *funcAddr = nullptr;
   if (func->isAsync()) {
     funcAddr = IGM.getAddrOfAsyncFunctionPointer(func);
+  } else if (func->getLoweredFunctionType()->isCalleeAllocatedCoroutine()) {
+    funcAddr = IGM.getAddrOfCoroFunctionPointer(func);
   } else {
     funcAddr = IGM.getAddrOfSILFunction(func, NotForDefinition);
   }

@@ -612,6 +612,7 @@ struct SILDeclRef {
   }
   
   bool hasAsync() const;
+  bool isCalleeAllocatedCoroutine() const;
 
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;

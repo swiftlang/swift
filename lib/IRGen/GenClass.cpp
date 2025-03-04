@@ -3103,8 +3103,16 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
                                            signature.getType()->getPointerTo());
     llvm::Constant *secondaryValue = nullptr;
+    auto *accessor = dyn_cast<AccessorDecl>(method.getDecl());
     if (cast<AbstractFunctionDecl>(method.getDecl())->hasAsync()) {
       auto *silFn = IGF.IGM.getSILFunctionForAsyncFunctionPointer(
+          methodInfo.getDirectImpl());
+      secondaryValue = cast<llvm::Constant>(
+          IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition));
+    } else if (accessor &&
+               requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
+      assert(methodType->isCalleeAllocatedCoroutine());
+      auto *silFn = IGF.IGM.getSILFunctionForCoroFunctionPointer(
           methodInfo.getDirectImpl());
       secondaryValue = cast<llvm::Constant>(
           IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition));
