@@ -521,21 +521,13 @@ function Get-TargetInfo($Arch) {
   # Cache the result of "swift -print-target-info" as $Arch.Cache.TargetInfo
   $CacheKey = "TargetInfo"
   if (-not $Arch.Cache.ContainsKey($CacheKey)) {
-    $CompilersBinaryCache = if ($IsCrossCompiling) {
-      Get-BuildProjectBinaryCache Compilers
-    } else {
-      Get-HostProjectBinaryCache Compilers
-    }
-    $ToolchainBinDir = Join-Path -Path $CompilersBinaryCache -ChildPath "bin"
-    $CMarkDir = Join-Path -Path (Get-CMarkBinaryCache $BuildArch) -ChildPath "src"
-    $SwiftExe = Join-Path -Path $ToolchainBinDir -ChildPath "swift.exe"
     Isolate-EnvVars {
-      $env:Path = "$ToolchainBinDir;$CMarkDir;$(Get-PinnedToolchainRuntime);${env:Path}"
-      $TargetInfoJson = & $SwiftExe -target $Arch.LLVMTarget -print-target-info
+      $env:Path = "$(Get-PinnedToolchainRuntime);$(Get-PinnedToolchainToolsDir);${env:Path}"
+      $TargetInfo = & swiftc -target $Arch.LLVMTarget -print-target-info
       if ($LastExitCode -ne 0) {
-        throw "Unable to print target info for $($Arch.LLVMTarget) $TargetInfoJson"
+        throw "Unable to print target info for '$($Arch.LLVMTarget)'"
       }
-      $TargetInfo = $TargetInfoJson | ConvertFrom-Json
+      $TargetInfo = $TargetInfo | ConvertFrom-JSON
       $Arch.Cache[$CacheKey] = $TargetInfo.target
     }
   }
@@ -543,8 +535,7 @@ function Get-TargetInfo($Arch) {
 }
 
 function Get-ModuleTriple($Arch) {
-  $targetInfo = Get-TargetInfo -Arch $Arch
-  return $targetInfo.moduleTriple
+  return (Get-TargetInfo -Arch $Arch).moduleTriple
 }
 
 function Copy-File($Src, $Dst) {
