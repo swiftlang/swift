@@ -4167,3 +4167,121 @@ ModuleDecl::getAvailabilityDomainForIdentifier(Identifier identifier) const {
 
   return AvailabilityDomain::forCustom(iter->getSecond());
 }
+
+namespace {
+
+enum class SwiftSettingKind {
+  Unknown = 0,
+  DefaultIsolation,
+};
+
+struct SwiftSettingsWalker : ASTWalker {
+  ASTContext &ctx;
+  SourceFileLangOptions result;
+
+  SwiftSettingsWalker(ASTContext &ctx) : ctx(ctx), result() {}
+
+  CanType patternMatchDefaultIsolationMainActor(CallExpr *callExpr);
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+    if (auto *macroExpr = dyn_cast<MacroExpansionExpr>(expr);
+        macroExpr && macroExpr->getMacroRef()) {
+      if (auto *macro =
+              dyn_cast<MacroDecl>(macroExpr->getMacroRef().getDecl())) {
+        auto macroDef = macro->getDefinition();
+        if (macroDef.kind == MacroDefinition::Kind::Builtin &&
+            macroDef.getBuiltinKind() == BuiltinMacroKind::SwiftSettingsMacro) {
+          // Ok, we found our SwiftSettingsMacro. Lets start pattern matching.
+          for (auto arg : *macroExpr->getArgs()) {
+            // If we did not find any macro, we emit an unknown macro error.
+            bool foundMacro = false;
+
+            if (auto *callExpr = dyn_cast<CallExpr>(arg.getExpr())) {
+              if (auto *directCallee = dyn_cast<DotSyntaxCallExpr>(
+                      callExpr->getDirectCallee())) {
+                if (auto *funcDecl =
+                        dyn_cast<FuncDecl>(directCallee->getCalledValue())) {
+                  auto kind = llvm::StringSwitch<SwiftSettingKind>(
+                                  funcDecl->getBaseIdentifier().get())
+                                  .Case("defaultIsolation",
+                                        SwiftSettingKind::DefaultIsolation)
+                                  .Default(SwiftSettingKind::Unknown);
+                  switch (kind) {
+                  case SwiftSettingKind::Unknown:
+                    // Emit error.
+                    break;
+                  case SwiftSettingKind::DefaultIsolation:
+                    if (auto actor =
+                            patternMatchDefaultIsolationMainActor(callExpr)) {
+                      result.defaultIsolation = actor;
+                      foundMacro = true;
+                    }
+
+                    if (isa<NilLiteralExpr>(callExpr->getArgs()->getExpr(0))) {
+                      result.defaultIsolation = {Type()};
+                      foundMacro = true;
+                    }
+                  }
+                }
+              }
+            }
+
+            // If we did not pattern match a macro, emit an error.
+            if (!foundMacro) {
+              ctx.Diags.diagnose(arg.getStartLoc(),
+                                 diag::swift_settings_invalid_setting);
+            }
+          }
+        }
+      }
+    }
+    return Action::Continue(expr);
+  }
+};
+
+} // namespace
+
+CanType
+SwiftSettingsWalker::patternMatchDefaultIsolationMainActor(CallExpr *callExpr) {
+  auto *firstArg =
+      dyn_cast<InjectIntoOptionalExpr>(callExpr->getArgs()->getExpr(0));
+  if (!firstArg)
+    return CanType();
+
+  auto *erasureExpr = dyn_cast<ErasureExpr>(firstArg->getSubExpr());
+  if (!erasureExpr)
+    return CanType();
+
+  auto *selfExpr = dyn_cast<DotSelfExpr>(erasureExpr->getSubExpr());
+  if (!selfExpr)
+    return CanType();
+
+  auto *typeExpr = dyn_cast<TypeExpr>(selfExpr->getSubExpr());
+  if (!typeExpr)
+    return CanType();
+
+  auto instanceType = typeExpr->getInstanceType()->getCanonicalType();
+  if (instanceType != ctx.getMainActorType()->getCanonicalType())
+    return CanType();
+
+  return instanceType;
+}
+
+SourceFileLangOptions
+SourceFileLangOptionsRequest::evaluate(Evaluator &evaluator,
+                                       SourceFile *f) const {
+  SwiftSettingsWalker walker(f->getASTContext());
+
+  if (f->getASTContext().LangOpts.hasFeature(Feature::SwiftSettings)) {
+    for (auto *decl : f->getTopLevelDecls())
+      decl->walk(walker);
+  }
+
+  return walker.result;
+}
+
+SourceFileLangOptions SourceFile::getLanguageOptions() const {
+  auto &eval = getASTContext().evaluator;
+  auto *self = const_cast<SourceFile *>(this);
+  return evaluateOrDefault(eval, SourceFileLangOptionsRequest{self}, {});
+}
