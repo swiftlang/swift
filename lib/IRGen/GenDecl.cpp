@@ -3863,8 +3863,11 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
   // Clang may have defined the variable already.
-  if (auto existing = Module.getNamedGlobal(link.getName()))
-    return getElementBitCast(existing, defaultType);
+  if (auto existing = Module.getNamedGlobal(link.getName())) {
+    auto var = getElementBitCast(existing, defaultType);
+    GlobalVars[entity] = var;
+    return var;
+  }
 
   const LazyConstantInitializer *lazyInitializer = nullptr;
   std::optional<ConstantInitBuilder> lazyBuilder;
@@ -4003,6 +4006,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
   getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
 
   auto entry = GlobalVars[entity];
+  assert(entry);
   
   /// Returns a direct reference.
   auto direct = [&]() -> ConstantReference {
