@@ -3724,15 +3724,12 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
               failed.Result.getKind() != CheckTypeWitnessResult::Superclass) {
             Type resultType;
             SourceRange typeRange;
-            if (auto *var = dyn_cast<VarDecl>(failed.Witness)) {
-              resultType = var->getValueInterfaceType();
-              typeRange = var->getTypeSourceRangeForDiagnostics();
+            if (auto *storage = dyn_cast<AbstractStorageDecl>(failed.Witness)) {
+              resultType = storage->getValueInterfaceType();
+              typeRange = storage->getTypeSourceRangeForDiagnostics();
             } else if (auto *func = dyn_cast<FuncDecl>(failed.Witness)) {
               resultType = func->getResultInterfaceType();
               typeRange = func->getResultTypeSourceRange();
-            } else if (auto *subscript = dyn_cast<SubscriptDecl>(failed.Witness)) {
-              resultType = subscript->getElementInterfaceType();
-              typeRange = subscript->getElementTypeSourceRange();
             }
 
             // If the type witness was inferred from an existential

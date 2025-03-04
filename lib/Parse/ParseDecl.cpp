@@ -2187,7 +2187,7 @@ Parser::parseAllowFeatureSuppressionAttribute(bool inverted, SourceLoc atLoc,
 
   auto range = SourceRange(loc, parensRange.End);
   return makeParserResult(AllowFeatureSuppressionAttr::create(
-      Context, loc, range, /*implicit*/ false, /*inverted*/ inverted,
+      Context, atLoc, range, /*implicit*/ false, /*inverted*/ inverted,
       features));
 }
 

@@ -34,6 +34,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Strings.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -403,6 +404,27 @@ bool DeclAttribute::canClone() const {
   }
 }
 
+// Ensure that every DeclAttribute subclass implements its own isEquivalent().
+static void checkDeclAttributeIsEquivalents() {
+#define DECL_ATTR(_,CLASS,...) \
+  bool(CLASS##Attr::*ptr##CLASS)(const CLASS##Attr *, Decl *) const = &CLASS##Attr::isEquivalent; \
+  (void)ptr##CLASS;
+#include "swift/AST/DeclAttr.def"
+}
+
+bool DeclAttribute::isEquivalent(const DeclAttribute *other, Decl *attachedTo) const {
+  (void)checkDeclAttributeIsEquivalents;
+  if (getKind() != other->getKind())
+    return false;
+  switch (getKind()) {
+#define DECL_ATTR(_,CLASS, ...) \
+  case DeclAttrKind::CLASS:\
+    return static_cast<const CLASS##Attr *>(this)->isEquivalent(\
+                static_cast<const CLASS##Attr *>(other), attachedTo);
+#include "swift/AST/DeclAttr.def"
+  }
+}
+
 const BackDeployedAttr *
 DeclAttributes::getBackDeployed(const ASTContext &ctx,
                                 bool forTargetVariant) const {
@@ -428,7 +450,7 @@ DeclAttributes::getBackDeployed(const ASTContext &ctx,
   return bestAttr;
 }
 
-void DeclAttributes::dump(const Decl *D) const {
+void DeclAttributes::print(const Decl *D) const {
   StreamPrinter P(llvm::errs());
   PrintOptions PO = PrintOptions::printDeclarations();
   print(P, PO, D);
@@ -2110,6 +2132,26 @@ Type TypeEraserAttr::getResolvedType(const ProtocolDecl *PD) const {
                            ErrorType::get(ctx));
 }
 
+static bool eqTypes(Type first, Type second) {
+  if (first.isNull() || second.isNull())
+    return false;
+  return first->getCanonicalType() == second->getCanonicalType();
+}
+
+bool TypeEraserAttr::isEquivalent(const TypeEraserAttr *other,
+                                  Decl *attachedTo) const {
+  // Only makes sense when attached to a protocol.
+  auto proto = dyn_cast<ProtocolDecl>(attachedTo);
+  if (!proto)
+    return true;
+
+  Type thisType = getResolvedType(proto),
+       otherType = other->getResolvedType(proto);
+  if (thisType.isNull() || otherType.isNull())
+    return false;
+  return thisType->getCanonicalType() == otherType->getCanonicalType();
+}
+
 Type RawLayoutAttr::getResolvedLikeType(StructDecl *sd) const {
   auto &ctx = sd->getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -2126,6 +2168,34 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
                               const_cast<RawLayoutAttr *>(this),
                               /*isLikeType*/ false},
                            ErrorType::get(ctx));
+}
+
+bool RawLayoutAttr::isEquivalent(const RawLayoutAttr *other,
+                                 Decl *attachedTo) const {
+  if (shouldMoveAsLikeType() != other->shouldMoveAsLikeType())
+    return false;
+
+  if (auto thisSizeAndAlignment = getSizeAndAlignment())
+    return thisSizeAndAlignment == other->getSizeAndAlignment();
+
+  auto SD = dyn_cast<StructDecl>(attachedTo);
+  if (!SD)
+    return true;
+
+  if (auto thisScalarLikeType = getResolvedScalarLikeType(SD)) {
+    auto otherScalarLikeType = other->getResolvedScalarLikeType(SD);
+    return otherScalarLikeType && eqTypes(*thisScalarLikeType,
+                                          *otherScalarLikeType);
+  }
+
+  if (auto thisArrayLikeTypes = getResolvedArrayLikeTypeAndCount(SD)) {
+    auto otherArrayLikeTypes = other->getResolvedArrayLikeTypeAndCount(SD);
+    return otherArrayLikeTypes
+            && eqTypes(thisArrayLikeTypes->first, otherArrayLikeTypes->first)
+            && eqTypes(thisArrayLikeTypes->second, otherArrayLikeTypes->second);
+  }
+
+  llvm_unreachable("unknown variant of RawLayoutAttr");
 }
 
 AvailableAttr::AvailableAttr(
@@ -2220,6 +2290,19 @@ AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
       Message, Rename, Introduced, implicit ? SourceRange() : IntroducedRange,
       Deprecated, implicit ? SourceRange() : DeprecatedRange, Obsoleted,
       implicit ? SourceRange() : ObsoletedRange, implicit, isSPI());
+}
+
+bool AvailableAttr::isEquivalent(const AvailableAttr *other,
+                                 Decl *attachedTo) const {
+  return getRawIntroduced() == other->getRawIntroduced()
+          && getRawDeprecated() == other->getRawDeprecated()
+          && getRawObsoleted() == other->getRawObsoleted()
+          && getMessage() == other->getMessage()
+          && getRename() == other->getRename()
+          && isSPI() == other->isSPI()
+          && getKind() == other->getKind()
+          && attachedTo->getSemanticAvailableAttr(this)->getDomain()
+                ==  attachedTo->getSemanticAvailableAttr(other)->getDomain();
 }
 
 std::optional<OriginallyDefinedInAttr::ActiveVersion>
@@ -2397,6 +2480,64 @@ GenericSignature SpecializeAttr::getSpecializedSignature(
                            nullptr);
 }
 
+template<typename Element, typename Eq>
+bool sameElements(ArrayRef<Element> first, ArrayRef<Element> second, Eq eq) {
+  if (first.size() != second.size())
+    return false;
+
+  llvm::SmallSet<unsigned, 8> claimedSecondIndices;
+
+  for (auto firstElem : first) {
+    bool found = false;
+    for (auto i : indices(second)) {
+      if (!eq(firstElem, second[i]) || claimedSecondIndices.count(i))
+        continue;
+
+      found = true;
+      claimedSecondIndices.insert(i);
+      break;
+    }
+
+    if (!found)
+      return false;
+  }
+
+  return true;
+}
+
+template<typename Element>
+bool sameElements(ArrayRef<Element> first, ArrayRef<Element> second) {
+  return sameElements(first, second, std::equal_to<Element>());
+}
+
+bool SpecializeAttr::isEquivalent(const SpecializeAttr *other,
+                                  Decl *attachedTo) const {
+  if (isExported() != other->isExported() ||
+      getSpecializationKind() != other->getSpecializationKind() ||
+      getTargetFunctionName() != other->getTargetFunctionName() ||
+      specializedSignature.getCanonicalSignature() !=
+        other->specializedSignature.getCanonicalSignature())
+    return false;
+
+  if (!sameElements(getSPIGroups(), other->getSPIGroups()))
+    return false;
+
+  SmallVector<CanType, 8> thisTypeErasedParams, otherTypeErasedParams;
+  for (auto ty : getTypeErasedParams())
+    thisTypeErasedParams.push_back(ty->getCanonicalType());
+  for (auto ty : other->getTypeErasedParams())
+    otherTypeErasedParams.push_back(ty->getCanonicalType());
+
+  if (!sameElements(ArrayRef(thisTypeErasedParams),
+                    ArrayRef(otherTypeErasedParams)))
+    return false;
+
+  return sameElements(getAvailableAttrs(), other->getAvailableAttrs(),
+                      [=](AvailableAttr *thisAttr, AvailableAttr *otherAttr) {
+    return thisAttr->isEquivalent(otherAttr, attachedTo);
+  });
+}
+
 SPIAccessControlAttr::SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,
                                            ArrayRef<Identifier> spiGroups)
     : DeclAttribute(DeclAttrKind::SPIAccessControl, atLoc, range,
@@ -2423,6 +2564,11 @@ SPIAccessControlAttr *SPIAccessControlAttr::clone(ASTContext &C,
       getSPIGroups());
   attr->setImplicit(implicit);
   return attr;
+}
+
+bool SPIAccessControlAttr::isEquivalent(const SPIAccessControlAttr *other,
+                                        Decl *attachedTo) const {
+  return sameElements(getSPIGroups(), other->getSPIGroups());
 }
 
 DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
@@ -2661,11 +2807,18 @@ StorageRestrictionsAttr::create(
                                            /*implicit=*/false);
 }
 
-ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
-                               TypeRepr *TyR, DeclName MemberName,
-                               DeclNameLoc MemberNameLoc)
+bool StorageRestrictionsAttr::
+isEquivalent(const StorageRestrictionsAttr *other, Decl *attachedTo) const {
+  return sameElements(getAccessesNames(), other->getAccessesNames())
+           && sameElements(getInitializesNames(), other->getInitializesNames());
+}
+
+ImplementsAttr::
+ImplementsAttr(SourceLoc atLoc, SourceRange range,
+               llvm::PointerUnion<TypeRepr *, DeclContext *> TyROrDC,
+               DeclName MemberName, DeclNameLoc MemberNameLoc)
     : DeclAttribute(DeclAttrKind::Implements, atLoc, range, /*Implicit=*/false),
-      TyR(TyR), MemberName(MemberName), MemberNameLoc(MemberNameLoc) {}
+      TyROrDC(TyROrDC), MemberName(MemberName), MemberNameLoc(MemberNameLoc) {}
 
 ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
@@ -2682,9 +2835,8 @@ ImplementsAttr *ImplementsAttr::create(DeclContext *DC,
                                        DeclName MemberName) {
   auto &ctx = DC->getASTContext();
   void *mem = ctx.Allocate(sizeof(ImplementsAttr), alignof(ImplementsAttr));
-  auto *attr = new (mem) ImplementsAttr(
-      SourceLoc(), SourceRange(), nullptr,
-      MemberName, DeclNameLoc());
+  auto *attr = new (mem) ImplementsAttr(SourceLoc(), SourceRange(), DC,
+                                        MemberName, DeclNameLoc());
   ctx.evaluator.cacheOutput(ImplementsAttrProtocolRequest{attr, DC},
                             std::move(Proto));
   return attr;
@@ -2701,6 +2853,13 @@ ImplementsAttr::getCachedProtocol(DeclContext *dc) const {
   if (dc->getASTContext().evaluator.hasCachedResult(request))
     return getProtocol(dc);
   return std::nullopt;
+}
+
+bool ImplementsAttr::isEquivalent(const ImplementsAttr *other,
+                                  Decl *attachedTo) const {
+  auto DC = attachedTo->getDeclContext();
+  return getMemberName() == other->getMemberName()
+          && getProtocol(DC) == other->getProtocol(DC);
 }
 
 CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
@@ -2769,6 +2928,14 @@ bool CustomAttr::isArgUnsafe() const {
   }
 
   return isArgUnsafeBit;
+}
+
+bool CustomAttr::isEquivalent(const CustomAttr *other, Decl *attachedTo) const {
+  // For the sake of both @abi checking and implementability, we're going to
+  // ignore expressions in the arguments and initializer.
+
+  return isArgUnsafe() == other->isArgUnsafe() && eqTypes(getType(),
+                                                          other->getType());
 }
 
 MacroRoleAttr::MacroRoleAttr(SourceLoc atLoc, SourceRange range,
@@ -2898,10 +3065,26 @@ AllowFeatureSuppressionAttr *AllowFeatureSuppressionAttr::create(
       AllowFeatureSuppressionAttr(atLoc, range, implicit, inverted, features);
 }
 
+bool AllowFeatureSuppressionAttr::
+isEquivalent(const AllowFeatureSuppressionAttr *other, Decl *attachedTo) const {
+  if (getInverted() != other->getInverted())
+    return false;
+
+  return sameElements(getSuppressedFeatures(), other->getSuppressedFeatures());
+}
+
 LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
                                    SourceRange baseRange, bool implicit,
                                    LifetimeEntry *entry) {
   return new (context) LifetimeAttr(atLoc, baseRange, implicit, entry);
+}
+
+
+bool LifetimeAttr::isEquivalent(const LifetimeAttr *other,
+                                Decl *attachedTo) const {
+  // FIXME: This is kind of cheesy.
+  return getLifetimeEntry()->getString()
+      == other->getLifetimeEntry()->getString();
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
