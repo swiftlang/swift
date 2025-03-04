@@ -1070,6 +1070,7 @@ static void determineBestChoicesInContext(
       Literal = 0x02,
       ExactOnly = 0x04,
       DisableCGFloatDoubleConversion = 0x08,
+      StringInterpolation = 0x10,
     };
 
     using MatchOptions = OptionSet<MatchFlag>;
@@ -1177,13 +1178,16 @@ static void determineBestChoicesInContext(
                   paramType, KnownProtocolKind::ExpressibleByBooleanLiteral))
             return 0.3;
 
-          if (candidateType->isString() &&
-              (TypeChecker::conformsToKnownProtocol(
-                   paramType, KnownProtocolKind::ExpressibleByStringLiteral) ||
-               TypeChecker::conformsToKnownProtocol(
-                   paramType,
-                   KnownProtocolKind::ExpressibleByStringInterpolation)))
-            return 0.3;
+          if (candidateType->isString()) {
+            auto literalProtocol =
+                options.contains(MatchFlag::StringInterpolation)
+                    ? KnownProtocolKind::ExpressibleByStringInterpolation
+                    : KnownProtocolKind::ExpressibleByStringLiteral;
+
+            if (TypeChecker::conformsToKnownProtocol(paramType,
+                                                     literalProtocol))
+              return 0.3;
+          }
 
           auto &ctx = cs.getASTContext();
 
@@ -1522,6 +1526,11 @@ static void determineBestChoicesInContext(
               if (candidate.type->isCGFloat() &&
                   candidate.fromInitializerCall)
                 options |= MatchFlag::DisableCGFloatDoubleConversion;
+
+              if (isExpr<InterpolatedStringLiteralExpr>(
+                      argumentList->getExpr(argIdx)
+                          ->getSemanticsProvidingExpr()))
+                options |= MatchFlag::StringInterpolation;
 
               // The specifier for a candidate only matters for `inout` check.
               auto candidateScore = scoreCandidateMatch(
