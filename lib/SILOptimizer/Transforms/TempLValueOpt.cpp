@@ -113,8 +113,6 @@ void TempLValueOptPass::run() {
 }
 
 static SingleValueInstruction *isMovableProjection(SILValue addr) {
-  if (auto *enumData = dyn_cast<InitEnumDataAddrInst>(addr))
-    return enumData;
   if (auto *existentialAddr = dyn_cast<InitExistentialAddrInst>(addr))
     return existentialAddr;
     
