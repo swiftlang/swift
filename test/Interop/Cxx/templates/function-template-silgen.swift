@@ -16,10 +16,8 @@ import FunctionTemplates
 // CHECK:   [[ADD_TWO_FN:%.*]] = function_ref @{{_Z18addMixedTypeParamsIiiET_S0_T0_|\?\?\$addMixedTypeParams@HH@@YAHHH@Z}} : $@convention(c) (Int32, Int32) -> Int32
 // CHECK:   [[C:%.*]] = apply [[ADD_TWO_FN]]([[A]], [[B]]) : $@convention(c) (Int32, Int32) -> Int32
 
-// CHECK:   [[C_32_ADDR:%.*]] = alloc_stack $Int32
-// CHECK:   [[C_32:%.*]] = load [[C_32_ADDR]] : $*Int32
 // CHECK:   [[ADD_FN:%.*]] = function_ref @{{_Z17addSameTypeParamsIiET_S0_S0_|\?\?\$addSameTypeParams@H@@YAHHH@Z}} : $@convention(c) (Int32, Int32) -> Int32
-// CHECK:   [[OUT:%.*]] = apply [[ADD_FN]]([[B]], [[C_32]]) : $@convention(c) (Int32, Int32) -> Int32
+// CHECK:   [[OUT:%.*]] = apply [[ADD_FN]]([[B]], [[C_32:%.*]]) : $@convention(c) (Int32, Int32) -> Int32
 // CHECK:   return [[OUT]] : $Int32
 
 // CHECK-LABEL: end sil function '$s4main4test1xs5Int32VAE_tF'
