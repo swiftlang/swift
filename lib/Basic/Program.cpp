@@ -198,7 +198,7 @@ swift::ExecuteWithPipe(llvm::StringRef program,
                        llvm::ArrayRef<llvm::StringRef> args,
                        std::optional<llvm::ArrayRef<llvm::StringRef>> env) {
   using unique_handle = std::unique_ptr<void, decltype(&CloseHandle)>;
-  enum { PI_READ, PI_WRITE };
+  enum class PI : uint8_t {READ, WRITE };
 
   unique_handle input[2] = {
     {INVALID_HANDLE_VALUE, CloseHandle},
@@ -214,18 +214,18 @@ swift::ExecuteWithPipe(llvm::StringRef program,
 
   if (!CreatePipe(&hRead, &hWrite, &saAttrs, 0))
     return std::error_code(GetLastError(), std::system_category());
-  output[PI_READ].reset(hRead);
-  output[PI_WRITE].reset(hWrite);
+  output[PI::READ].reset(hRead);
+  output[PI::WRITE].reset(hWrite);
 
-  if (!SetHandleInformation(output[PI_READ].get(), HANDLE_FLAG_INHERIT, FALSE))
+  if (!SetHandleInformation(output[PI::READ].get(), HANDLE_FLAG_INHERIT, FALSE))
     return std::error_code(GetLastError(), std::system_category());
 
   if (!CreatePipe(&hRead, &hWrite, &saAttrs, 0))
     return std::error_code(GetLastError(), std::system_category());
-  input[PI_READ].reset(hRead);
-  input[PI_WRITE].reset(hWrite);
+  input[PI::READ].reset(hRead);
+  input[PI::WRITE].reset(hWrite);
 
-  if (!SetHandleInformation(input[PI_WRITE].get(), HANDLE_FLAG_INHERIT, FALSE))
+  if (!SetHandleInformation(input[PI::WRITE].get(), HANDLE_FLAG_INHERIT, FALSE))
     return std::error_code(GetLastError(), std::system_category());
 
   if (!DuplicateHandle(GetCurrentProcess(), GetStdHandle(STD_ERROR_HANDLE),
@@ -236,8 +236,8 @@ swift::ExecuteWithPipe(llvm::StringRef program,
 
   STARTUPINFO si = {0};
   si.cb = sizeof(si);
-  si.hStdInput = input[PI_READ].get();
-  si.hStdOutput = output[PI_WRITE].get();
+  si.hStdInput = input[PI::READ].get();
+  si.hStdOutput = output[PI::WRITE].get();
   si.hStdError = error.get();
   si.dwFlags = STARTF_USESTDHANDLES;
 
@@ -265,17 +265,17 @@ swift::ExecuteWithPipe(llvm::StringRef program,
   unique_handle hThread{pi.hThread, CloseHandle};
   unique_handle hProcess{pi.hProcess, CloseHandle};
 
-  int ifd = _open_osfhandle(reinterpret_cast<intptr_t>(input[PI_WRITE].get()), 0);
+  int ifd = _open_osfhandle(reinterpret_cast<intptr_t>(input[PI::WRITE].get()), 0);
   if (ifd < 0)
     return std::error_code(errno, std::system_category());
-  input[PI_WRITE].release();
+  input[PI::WRITE].release();
 
-  int ofd = _open_osfhandle(reinterpret_cast<intptr_t>(output[PI_READ].get()), 0);
+  int ofd = _open_osfhandle(reinterpret_cast<intptr_t>(output[PI::READ].get()), 0);
   if (ofd < 0) {
     _close(ifd);
     return std::error_code(errno, std::system_category());
   }
-  output[PI_READ].release();
+  output[PI::READ].release();
 
   llvm::sys::ProcessInfo proc;
   proc.Pid = pi.dwProcessId;
