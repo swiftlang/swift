@@ -566,7 +566,7 @@ namespace {
       if (!cxxRecordDecl)
         return nullptr;
       for (auto ctor : cxxRecordDecl->ctors()) {
-        if (ctor->isMoveConstructor() &&
+        if (ctor->isMoveConstructor() && !hasNonFirstDefaultArg(ctor) &&
             ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
           return ctor;
       }

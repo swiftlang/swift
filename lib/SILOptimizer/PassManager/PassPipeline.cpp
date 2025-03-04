@@ -681,7 +681,7 @@ static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
 
   // Skip EagerSpecializer on embedded Swift, which already specializes
   // everything. Otherwise this would create metatype references for functions
-  // with @_specialize attribute and those are incompatible with Emebdded Swift.
+  // with @_specialize attribute and those are incompatible with Embedded Swift.
   if (!P.getOptions().EmbeddedSwift) {
     P.addEagerSpecializer();
   }

@@ -2966,15 +2966,23 @@ namespace {
       auto semanticsKind = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
           CxxRecordSemantics({decl, Impl.SwiftContext, &Impl}), {});
-      if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation &&
+      if ((semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation ||
+           semanticsKind == CxxRecordSemanticsKind::UnavailableConstructors) &&
           // Let un-specialized class templates through. We'll sort out their
-          // members once they're instranciated.
+          // members once they're instantiated.
           !Impl.importSymbolicCXXDecls) {
+
+        if (semanticsKind == CxxRecordSemanticsKind::UnavailableConstructors) {
+          Impl.addImportDiagnostic(
+              decl, Diagnostic(diag::record_unsupported_default_args),
+              decl->getLocation());
+        }
+
         Impl.addImportDiagnostic(
             decl,
             Diagnostic(diag::record_not_automatically_importable,
                        Impl.SwiftContext.AllocateCopy(decl->getNameAsString()),
-                       "does not have a copy constructor or destructor"),
+                       "it must have a copy/move constructor and a destructor"),
             decl->getLocation());
         return nullptr;
       }
