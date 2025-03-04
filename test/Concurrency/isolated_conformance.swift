@@ -119,3 +119,9 @@ func testIsolationConformancesInCall(c: C) {
   acceptSendableP(c) // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter}}
   acceptSendableMetaP(c) // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter}}
 }
+
+func testIsolationConformancesFromOutside(c: C) {
+  acceptP(c) // expected-error{{main actor-isolated isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  let _: any P = c // expected-error{{main actor-isolated isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+  let _ = PWrapper<C>() // expected-error{{main actor-isolated isolated conformance of 'C' to 'P' cannot be used in nonisolated context}}
+}

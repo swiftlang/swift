@@ -43,6 +43,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PotentialMacroExpansions.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -7158,4 +7159,107 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     proto->setDefaultAssociatedConformanceWitness(
         req.getFirstType()->getCanonicalType(), requirementProto, conformance);
   }
+}
+
+bool swift::forEachConformance(
+    SubstitutionMap subs,
+    llvm::function_ref<bool(ProtocolConformanceRef)> body) {
+  if (!subs)
+    return false;
+
+  for (auto type: subs.getReplacementTypes()) {
+    if (forEachConformance(type, body))
+      return true;
+  }
+
+  for (auto conformance: subs.getConformances()) {
+    if (forEachConformance(conformance, body))
+      return true;
+  }
+
+  return false;
+}
+
+bool swift::forEachConformance(
+    ProtocolConformanceRef conformance,
+    llvm::function_ref<bool(ProtocolConformanceRef)> body) {
+  // Visit this conformance.
+  if (body(conformance))
+    return true;
+
+  if (conformance.isInvalid() || conformance.isAbstract())
+    return false;
+
+  if (conformance.isPack()) {
+    auto pack = conformance.getPack()->getPatternConformances();
+    for (auto conformance : pack) {
+      if (forEachConformance(conformance, body))
+        return true;
+    }
+
+    return false;
+  }
+
+  // Check the substitution make within this conformance.
+  auto concrete = conformance.getConcrete();
+  if (forEachConformance(concrete->getSubstitutionMap(), body))
+    return true;
+
+
+  return false;
+}
+
+bool swift::forEachConformance(
+    Type type, llvm::function_ref<bool(ProtocolConformanceRef)> body) {
+  return type.findIf([&](Type type) {
+    if (auto typeAlias = dyn_cast<TypeAliasType>(type.getPointer())) {
+      if (forEachConformance(typeAlias->getSubstitutionMap(), body))
+        return true;
+
+      return false;
+    }
+
+    if (auto opaqueArchetype =
+            dyn_cast<OpaqueTypeArchetypeType>(type.getPointer())) {
+      if (forEachConformance(opaqueArchetype->getSubstitutions(), body))
+        return true;
+
+      return false;
+    }
+
+    // Look through type sugar.
+    if (auto sugarType = dyn_cast<SyntaxSugarType>(type.getPointer())) {
+      type = sugarType->getImplementationType();
+    }
+
+    if (auto boundGeneric = dyn_cast<BoundGenericType>(type.getPointer())) {
+      auto subs = boundGeneric->getContextSubstitutionMap();
+      if (forEachConformance(subs, body))
+        return true;
+
+      return false;
+    }
+
+    return false;
+  });
+}
+
+bool swift::forEachConformance(
+    ConcreteDeclRef declRef,
+    llvm::function_ref<bool(ProtocolConformanceRef)> body) {
+  if (!declRef)
+    return false;
+
+  Type type = declRef.getDecl()->getInterfaceType();
+  if (auto subs = declRef.getSubstitutions()) {
+    if (forEachConformance(subs, body))
+      return true;
+
+    type = type.subst(subs);
+  }
+
+  if (forEachConformance(type, body))
+    return true;
+
+  return false;
 }
