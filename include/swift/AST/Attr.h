@@ -3294,8 +3294,7 @@ class SemanticAvailableAttr final {
 public:
   SemanticAvailableAttr(const AvailableAttr *attr) : attr(attr) {
     assert(attr);
-    bool hasDomain = attr->getDomainOrIdentifier().isDomain();
-    assert(hasDomain);
+    assert(attr->getDomainOrIdentifier().isDomain());
   }
 
   const AvailableAttr *getParsedAttr() const { return attr; }
