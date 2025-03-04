@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,7 +20,6 @@
 
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/Feature.h"
-#include "swift/Basic/FixedBitSet.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/PlaygroundOption.h"
@@ -725,19 +724,6 @@ namespace swift {
       return cxxInteropCompatVersion.isVersionAtLeast(major, minor);
     }
 
-    /// Determine whether the given feature is enabled.
-    bool hasFeature(Feature feature) const;
-
-    /// Determine whether the given feature is enabled, looking up the feature
-    /// by name.
-    bool hasFeature(llvm::StringRef featureName) const;
-
-    /// Enable the given feature.
-    void enableFeature(Feature feature) { Features.insert(feature); }
-
-    /// Disable the given feature.
-    void disableFeature(Feature feature) { Features.remove(feature); }
-
     /// Sets the "_hasAtomicBitWidth" conditional.
     void setHasAtomicBitWidth(llvm::Triple triple);
 
@@ -822,10 +808,68 @@ namespace swift {
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
 
-    /// The set of features that have been enabled. Doesn't include upcoming
-    /// features, which are checked against the language version in
-    /// `hasFeature`.
-    FixedBitSet<numFeatures(), Feature> Features;
+  public:
+    // MARK: Features
+    // =========================================================================
+
+    /// A wrapper around the feature state enumeration.
+    struct FeatureState {
+      enum Kind : uint8_t { Off, EnabledForAdoption, Enabled };
+
+    private:
+      Feature feature;
+      Kind state;
+
+    public:
+      FeatureState(Feature feature, Kind state)
+          : feature(feature), state(state) {}
+
+      /// Returns whether the feature is enabled.
+      bool isEnabled() const;
+
+      /// Returns whether the feature is enabled in adoption mode. Should only
+      /// be called if the feature is known to support this mode.
+      bool isEnabledForAdoption() const;
+
+      operator Kind() const { return state; }
+    };
+
+  private:
+    class FeatureStateStorage {
+      std::vector<FeatureState::Kind> states;
+
+    public:
+      FeatureStateStorage();
+
+      /// Sets the given state for the given feature.
+      void setState(Feature feature, FeatureState::Kind state);
+
+      /// Retrieves the state of the given feature.
+      FeatureState getState(Feature feature) const;
+    };
+
+    /// The states of language features.
+    FeatureStateStorage featureStates;
+
+  public:
+    /// Retrieve the state of the given feature.
+    FeatureState getFeatureState(Feature feature) const;
+
+    /// Returns whether the given feature is enabled.
+    bool hasFeature(Feature feature) const;
+
+    /// Returns whether a feature with the given name is enabled. Returns
+    /// `false` if a feature by this name is not known.
+    bool hasFeature(llvm::StringRef featureName) const;
+
+    /// Enables the given feature (enables in adoption mode if `forAdoption` is
+    /// `true`).
+    void enableFeature(Feature feature, bool forAdoption = false);
+
+    /// Disables the given feature.
+    void disableFeature(Feature feature);
+
+    // =========================================================================
   };
 
   class TypeCheckerOptions final {

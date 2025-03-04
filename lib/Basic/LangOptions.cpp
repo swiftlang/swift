@@ -17,6 +17,7 @@
 
 #include "swift/Basic/LangOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
@@ -34,8 +35,8 @@ using namespace swift;
 
 LangOptions::LangOptions() {
   // Add all promoted language features
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
-  Features.insert(Feature::FeatureName);
+#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
+  this->enableFeature(Feature::FeatureName);
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
 #define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
@@ -44,14 +45,16 @@ LangOptions::LangOptions() {
   // Special case: remove macro support if the compiler wasn't built with a
   // host Swift.
 #if !SWIFT_BUILD_SWIFT_SYNTAX
-  Features.removeAll({Feature::Macros, Feature::FreestandingExpressionMacros,
-                      Feature::AttachedMacros, Feature::ExtensionMacros});
+  this->disableFeature(Feature::Macros);
+  this->disableFeature(Feature::FreestandingExpressionMacros);
+  this->disableFeature(Feature::AttachedMacros);
+  this->disableFeature(Feature::ExtensionMacros);
 #endif
 
   // Note: Introduce default-on language options here.
-  Features.insert(Feature::NoncopyableGenerics);
-  Features.insert(Feature::BorrowingSwitch);
-  Features.insert(Feature::MoveOnlyPartialConsumption);
+  this->enableFeature(Feature::NoncopyableGenerics);
+  this->enableFeature(Feature::BorrowingSwitch);
+  this->enableFeature(Feature::MoveOnlyPartialConsumption);
 
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
@@ -291,8 +294,50 @@ bool LangOptions::isCustomConditionalCompilationFlagSet(StringRef Name) const {
       != CustomConditionalCompilationFlags.end();
 }
 
+bool LangOptions::FeatureState::isEnabled() const {
+  return this->state != FeatureState::Off;
+}
+
+bool LangOptions::FeatureState::isEnabledForAdoption() const {
+  ASSERT(isFeatureAdoptable(this->feature) &&
+         "You forgot to make the feature adoptable!");
+
+  return this->state == FeatureState::EnabledForAdoption;
+}
+
+LangOptions::FeatureStateStorage::FeatureStateStorage()
+    : states(numFeatures(), FeatureState::Off) {}
+
+void LangOptions::FeatureStateStorage::setState(Feature feature,
+                                                FeatureState::Kind state) {
+  auto index = size_t(feature);
+
+  this->states[index] = state;
+}
+
+LangOptions::FeatureState
+LangOptions::FeatureStateStorage::getState(Feature feature) const {
+  auto index = size_t(feature);
+
+  return FeatureState(feature, this->states[index]);
+}
+
+LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
+  auto state = this->featureStates.getState(feature);
+  if (state.isEnabled())
+    return state;
+
+  if (auto version = getFeatureLanguageVersion(feature)) {
+    if (this->isSwiftVersionAtLeast(*version)) {
+      return FeatureState(feature, FeatureState::Enabled);
+    }
+  }
+
+  return state;
+}
+
 bool LangOptions::hasFeature(Feature feature) const {
-  if (Features.contains(feature))
+  if (this->featureStates.getState(feature).isEnabled())
     return true;
 
   if (auto version = getFeatureLanguageVersion(feature))
@@ -303,7 +348,7 @@ bool LangOptions::hasFeature(Feature feature) const {
 
 bool LangOptions::hasFeature(llvm::StringRef featureName) const {
   auto feature = llvm::StringSwitch<std::optional<Feature>>(featureName)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
   .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
                      .Default(std::nullopt);
@@ -311,6 +356,19 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
     return hasFeature(*feature);
 
   return false;
+}
+
+void LangOptions::enableFeature(Feature feature, bool forAdoption) {
+  if (forAdoption) {
+    ASSERT(isFeatureAdoptable(feature));
+    this->featureStates.setState(feature, FeatureState::EnabledForAdoption);
+  } else {
+    this->featureStates.setState(feature, FeatureState::Enabled);
+  }
+}
+
+void LangOptions::disableFeature(Feature feature) {
+  this->featureStates.setState(feature, FeatureState::Off);
 }
 
 void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
