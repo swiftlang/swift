@@ -399,6 +399,8 @@ Added: _$ss19DiscardingTaskGroupV05startB28SynchronouslyUnlessCancelled4name8pri
 Added: _$ss27ThrowingDiscardingTaskGroupV05startC13Synchronously4name8priority9operationySSSg_ScPSgyyYacntF
 Added: _$ss27ThrowingDiscardingTaskGroupV05startC28SynchronouslyUnlessCancelled4name8priority9operationySSSg_ScPSgyyYacntF
 
+Added: _swift_task_startSynchronously
+
 // add callee-allocated coro entrypoints
 // TODO: CoroutineAccessors: several of these symbols should be in swiftCore
 Added: __swift_coro_malloc_allocator

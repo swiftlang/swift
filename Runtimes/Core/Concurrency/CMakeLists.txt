@@ -83,7 +83,7 @@ add_library(swift_Concurrency
   TaskLocal.swift
   TaskSleep.swift
   TaskSleepDuration.swift
-  "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift")
+  "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+startSynchronously.swift")
 
 include(${SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR}.cmake)
