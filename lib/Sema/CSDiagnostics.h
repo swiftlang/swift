@@ -1707,8 +1707,9 @@ public:
   KeyPathSubscriptIndexHashableFailure(const Solution &solution, Type type,
                                        ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), NonConformingType(type) {
-    assert(locator->isResultOfKeyPathDynamicMemberLookup() ||
-           locator->isKeyPathSubscriptComponent());
+    assert((locator->isResultOfKeyPathDynamicMemberLookup() ||
+            locator->isKeyPathSubscriptComponent()) ||
+           locator->isKeyPathMemberComponent());
   }
 
   SourceLoc getLoc() const override;
@@ -1806,6 +1807,88 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to reference a method or initializer as a key path
+/// component.
+///
+/// Only diagnosed if `-KeyPathWithMethodMember` feature flag is not set.
+///
+/// ```swift
+/// struct S {
+///   init() { }
+///   func foo() -> Int { return 42 }
+///   static func bar() -> Int { return 0 }
+/// }
+///
+/// _ = \S.foo
+/// _ = \S.Type.bar
+/// _ = \S.init
+/// ```
+class UnsupportedMethodRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  UnsupportedMethodRefInKeyPath(const Solution &solution, ValueDecl *method,
+                                ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, method, locator) {
+    assert(isa<FuncDecl>(method) || isa<ConstructorDecl>(method));
+  }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference a mutating method as a key path component
+/// e.g.
+///
+/// ```swift
+/// struct S {
+///   var year = 2024
+///
+///   mutating func updateYear(to newYear: Int) {
+///     self.year = newYear
+///   }
+///
+/// _ = \S.updateYear(to: 2025)
+/// ```
+class InvalidMutatingMethodRefInKeyPath final
+    : public InvalidMemberRefInKeyPath {
+public:
+  InvalidMutatingMethodRefInKeyPath(const Solution &solution, ValueDecl *member,
+                                    ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator) {
+    assert(isa<FuncDecl>(member));
+  }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference an async or throwing method as a key path
+/// component e.g.
+///
+/// ```swift
+/// struct S {
+///   var year = 2024
+///
+///   func fetchAndValidate() async throws -> Int {
+///     let fetchedYear = await fetchValue()
+///       if fetchedYear < 0 {
+///         throw ValidationError.invalidYear
+///       }
+///     return fetchedYear
+///   }
+///
+/// _ = \S.fetchAndValidate()
+/// ```
+class InvalidAsyncOrThrowsMethodRefInKeyPath final
+    : public InvalidMemberRefInKeyPath {
+public:
+  InvalidAsyncOrThrowsMethodRefInKeyPath(const Solution &solution,
+                                         ValueDecl *member,
+                                         ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator) {
+    assert(isa<FuncDecl>(member));
+  }
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose an attempt to reference a member which has a mutating getter as a
 /// key path component e.g.
 ///
@@ -1830,31 +1913,6 @@ public:
                                            ValueDecl *member,
                                            ConstraintLocator *locator)
       : InvalidMemberRefInKeyPath(solution, member, locator) {}
-
-  bool diagnoseAsError() override;
-};
-
-/// Diagnose an attempt to reference a method or initializer as a key path component
-/// e.g.
-///
-/// ```swift
-/// struct S {
-///   init() { }
-///   func foo() -> Int { return 42 }
-///   static func bar() -> Int { return 0 }
-/// }
-///
-/// _ = \S.foo
-/// _ = \S.Type.bar
-/// _ = \S.init
-/// ```
-class InvalidMethodRefInKeyPath final : public InvalidMemberRefInKeyPath {
-public:
-  InvalidMethodRefInKeyPath(const Solution &solution, ValueDecl *method,
-                            ConstraintLocator *locator)
-      : InvalidMemberRefInKeyPath(solution, method, locator) {
-    assert(isa<FuncDecl>(method) || isa<ConstructorDecl>(method));
-  }
 
   bool diagnoseAsError() override;
 };

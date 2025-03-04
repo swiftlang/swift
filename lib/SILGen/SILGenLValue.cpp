@@ -3822,7 +3822,7 @@ static SGFAccessKind getBaseAccessKindForAccessor(SILGenModule &SGM,
   if (accessor->isMutating())
     return SGFAccessKind::ReadWrite;
 
-  auto declRef = SGM.getAccessorDeclRef(accessor, ResilienceExpansion::Minimal);
+  auto declRef = SGM.getFuncDeclRef(accessor, ResilienceExpansion::Minimal);
   if (shouldEmitSelfAsRValue(accessor, baseFormalType, forBorrowExpr)) {
     return SGM.isNonMutatingSelfIndirect(declRef)
                ? SGFAccessKind::OwnedAddressRead
@@ -4203,7 +4203,8 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
     actorIso = getActorIsolation(decl);
 
   auto *argList = e->getArgs();
-  auto indices = SGF.prepareSubscriptIndices(e, decl, subs, strategy, argList);
+  auto storageCanType = SGF.prepareStorageType(decl, subs);
+  auto indices = SGF.prepareIndices(e, storageCanType, strategy, argList);
 
   CanType formalRValueType = getSubstFormalRValueType(e);
   lv.addMemberSubscriptComponent(SGF, e, decl, subs,
