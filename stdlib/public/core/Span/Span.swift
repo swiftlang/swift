@@ -97,6 +97,7 @@ extension Span where Element: ~Copyable {
   ///   - buffer: an `UnsafeBufferPointer` to initialized elements.
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
+  @unsafe
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) {
@@ -123,6 +124,7 @@ extension Span where Element: ~Copyable {
   ///   - buffer: an `UnsafeMutableBufferPointer` to initialized elements.
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
+  @unsafe
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
   ) {
@@ -145,6 +147,7 @@ extension Span where Element: ~Copyable {
   ///   - count: the number of initialized elements in the span.
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
+  @unsafe
   public init(
     _unsafeStart pointer: UnsafePointer<Element>,
     count: Int
@@ -171,6 +174,7 @@ extension Span {
   ///   - buffer: an `UnsafeBufferPointer` to initialized elements.
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
+  @unsafe
   public init(
     _unsafeElements buffer: borrowing Slice<UnsafeBufferPointer<Element>>
   ) {
@@ -191,6 +195,7 @@ extension Span {
   ///   - buffer: an `UnsafeMutableBufferPointer` to initialized elements.
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
+  @unsafe
   public init(
     _unsafeElements buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>
   ) {
@@ -219,6 +224,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - buffer: a buffer to initialized elements.
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
+  @unsafe
   public init(
     _unsafeBytes buffer: UnsafeRawBufferPointer
   ) {
@@ -254,6 +260,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - buffer: a buffer to initialized elements.
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
+  @unsafe
   public init(
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
   ) {
@@ -280,6 +287,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - byteCount: the number of initialized elements in the span.
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
+  @unsafe
   public init(
     _unsafeStart pointer: UnsafeRawPointer,
     byteCount: Int
@@ -306,6 +314,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - buffer: a buffer to initialized elements.
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
+  @unsafe
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeRawBufferPointer>
   ) {
@@ -330,6 +339,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - buffer: a buffer to initialized elements.
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
+  @unsafe
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
   ) {
