@@ -14,7 +14,7 @@
 // features.
 //
 //
-// LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+// LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)
 //
 //   The LANGUAGE_FEATURE macro describes each named feature that is
 //   introduced in Swift. It allows Swift code to check for a particular
@@ -22,6 +22,20 @@
 //
 //     FeatureName: The name given to this feature to be used in source code,
 //       e.g., AsyncAwait.
+//     IsAdoptable: Whether the feature implements adoption mode.
+//
+//       If the feature is upcoming (source-breaking) and provides for a
+//       mechanical code migration, it should implement adoption mode.
+//
+//       Adoption mode is a feature-oriented code migration mechanism: a mode
+//       of operation that should produce compiler warnings with attached
+//       fix-its that can be applied to preserve the behavior of the code once
+//       the upcoming feature is enacted.
+//       These warnings must belong to a diagnostic group named after the
+//       feature. Adoption mode itself *and* the fix-its it produces must be
+//       source and binary compatible with how the code is compiled when the
+//       feature is disabled.
+//
 //     SENumber: The number assigned to this feature in the Swift Evolution
 //       process, or 0 if there isn't one.
 //     Description: A string literal describing the feature.
@@ -91,13 +105,14 @@
 #endif
 
 #ifndef SUPPRESSIBLE_LANGUAGE_FEATURE
-#  define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
-  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+  #define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)    \
+    LANGUAGE_FEATURE(FeatureName, /*IsAdoptable=*/false, SENumber,             \
+                     Description)
 #endif
 
 #ifndef OPTIONAL_LANGUAGE_FEATURE
-#  define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
-  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+  #define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)        \
+    LANGUAGE_FEATURE(FeatureName, /*IsAdoptable=*/false, SENumber, Description)
 #endif
 
 // A feature that's both conditionally-suppressible and experimental.
@@ -116,20 +131,35 @@
 #endif
 
 #ifndef CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE
-#  define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
-     LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+  #define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber,   \
+                                                      Description)             \
+    LANGUAGE_FEATURE(FeatureName, /*IsAdoptable=*/false, SENumber,             \
+                     Description)
+#endif
+
+// An upcoming feature that supports adoption mode.
+#ifndef ADOPTABLE_UPCOMING_FEATURE
+  #if defined(UPCOMING_FEATURE)
+    #define ADOPTABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
+      UPCOMING_FEATURE(FeatureName, SENumber, Version)
+  #else
+    #define ADOPTABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
+      LANGUAGE_FEATURE(FeatureName, /*IsAdoptable=*/true, SENumber,            \
+                       #FeatureName)
+  #endif
 #endif
 
 #ifndef UPCOMING_FEATURE
-#  define UPCOMING_FEATURE(FeatureName, SENumber, Version)   \
-     LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
+  #define UPCOMING_FEATURE(FeatureName, SENumber, Version)                     \
+    LANGUAGE_FEATURE(FeatureName, /*IsAdoptable=*/false, SENumber,             \
+                     #FeatureName)
 #endif
 
 #ifndef EXPERIMENTAL_FEATURE
-// Warning: setting `AvailableInProd` to `true` on a feature means that the flag
-//          cannot be dropped in the future.
-#  define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)  \
-     LANGUAGE_FEATURE(FeatureName, 0, #FeatureName)
+  // Warning: setting `AvailableInProd` to `true` on a feature means that the
+  // flag cannot be dropped in the future.
+  #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)                   \
+    LANGUAGE_FEATURE(FeatureName, /*IsAdoptable=*/false, 0, #FeatureName)
 #endif
 
 #ifndef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
@@ -138,8 +168,9 @@
 #endif
 
 #ifndef BASELINE_LANGUAGE_FEATURE
-#  define BASELINE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
-  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+  #define BASELINE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)        \
+    LANGUAGE_FEATURE(FeatureName, /*IsAdoptable=*/false, SENumber,             \
+                     Description)
 #endif
 
 BASELINE_LANGUAGE_FEATURE(AsyncAwait, 296, "async/await")
@@ -210,10 +241,14 @@ BASELINE_LANGUAGE_FEATURE(BodyMacros, 415, "Function body macros")
 SUPPRESSIBLE_LANGUAGE_FEATURE(SendingArgsAndResults, 430, "Sending arg and results")
 BASELINE_LANGUAGE_FEATURE(BorrowingSwitch, 432, "Noncopyable type pattern matching")
 CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) function types")
-LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
-LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
-LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
-LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
+LANGUAGE_FEATURE(IsolatedAny2, /*IsAdoptable=*/false, 431,
+                 "@isolated(any) function types")
+LANGUAGE_FEATURE(ObjCImplementation, /*IsAdoptable=*/false, 436,
+                 "@objc @implementation extensions")
+LANGUAGE_FEATURE(NonescapableTypes, /*IsAdoptable=*/false, 446,
+                 "Nonescapable types")
+LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, /*IsAdoptable=*/false, 0,
+                 "Builtin.emplace typed throws")
 SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
 
 // Swift 6
@@ -234,7 +269,7 @@ UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, 6)
 UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 
 // Swift 7
-UPCOMING_FEATURE(ExistentialAny, 335, 7)
+ADOPTABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 
@@ -485,6 +520,7 @@ EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
+#undef ADOPTABLE_UPCOMING_FEATURE
 #undef BASELINE_LANGUAGE_FEATURE
 #undef OPTIONAL_LANGUAGE_FEATURE
 #undef CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE
