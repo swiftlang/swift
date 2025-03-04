@@ -118,7 +118,7 @@
 /// Unconditionally unwrapping a `nil` instance with `!` triggers a runtime
 /// error.
 @frozen
-public enum Optional<Wrapped: ~Copyable>: ~Copyable {
+public enum Optional<Wrapped: ~Copyable & ~Escapable>: ~Copyable, ~Escapable {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
   // that it is an `enum` with cases named `none` and `some`.
 
@@ -132,14 +132,19 @@ public enum Optional<Wrapped: ~Copyable>: ~Copyable {
   case some(Wrapped)
 }
 
-extension Optional: Copyable where Wrapped: Copyable {}
+extension Optional: Copyable where Wrapped: Copyable & ~Escapable {}
 
-extension Optional: Sendable where Wrapped: ~Copyable & Sendable { }
+extension Optional: Escapable where Wrapped: Escapable & ~Copyable {}
 
-extension Optional: BitwiseCopyable where Wrapped: BitwiseCopyable { }
+extension Optional: BitwiseCopyable
+where Wrapped: BitwiseCopyable & ~Escapable {}
+
+extension Optional: Sendable where Wrapped: ~Copyable & ~Escapable & Sendable {}
+
 
 @_preInverseGenerics
-extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable {
+extension Optional: ExpressibleByNilLiteral
+where Wrapped: ~Copyable & ~Escapable {
   /// Creates an instance initialized with `nil`.
   ///
   /// Do not call this initializer directly. It is used by the compiler when you
@@ -151,15 +156,17 @@ extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable {
   /// initializer behind the scenes.
   @_transparent
   @_preInverseGenerics
+  @lifetime(immortal)
   public init(nilLiteral: ()) {
     self = .none
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Creates an instance that stores the given value.
   @_transparent
   @_preInverseGenerics
+  @lifetime(some)
   public init(_ some: consuming Wrapped) { self = .some(some) }
 }
 
@@ -340,6 +347,9 @@ extension Optional {
   @inlinable
   @unsafe
   public var unsafelyUnwrapped: Wrapped {
+    // FIXME: Generalize this for ~Escapable wrapped types. Unfortunately this
+    // currently hides it from C++ interop, breaking the stdlib overlay.
+    // (rdar://145800780)
     @inline(__always)
     get {
       if let x = self {
@@ -350,7 +360,7 @@ extension Optional {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   // FIXME(NCG): Do we want this? It seems like we do. Make this public.
   @_alwaysEmitIntoClient
   public consuming func _consumingUnsafelyUnwrap() -> Wrapped {
@@ -363,12 +373,13 @@ extension Optional where Wrapped: ~Copyable {
   }
 }
 
-extension Optional {
+extension Optional where Wrapped: ~Escapable {
   /// - Returns: `unsafelyUnwrapped`.
   ///
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
   @inlinable
+  @_preInverseGenerics
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
     get {
@@ -394,7 +405,7 @@ extension Optional where Wrapped: ~Copyable {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Takes the wrapped value being stored in this instance and returns it while
   /// also setting the instance to `nil`. If there is no value being stored in
   /// this instance, this returns `nil` instead.
@@ -412,6 +423,7 @@ extension Optional where Wrapped: ~Copyable {
   /// - Returns: The wrapped value being stored in this instance. If this
   ///   instance is `nil`, returns `nil`.
   @_alwaysEmitIntoClient
+  @lifetime(self)
   public mutating func take() -> Self {
     let result = consume self
     self = nil
@@ -572,7 +584,7 @@ public struct _OptionalNilComparisonType: ExpressibleByNilLiteral {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Returns a Boolean value indicating whether an argument matches `nil`.
   ///
   /// You can use the pattern-matching operator (`~=`) to test whether an
@@ -797,8 +809,13 @@ extension Optional where Wrapped: ~Copyable {
 @_alwaysEmitIntoClient
 public func ?? <T: ~Copyable>(
   optional: consuming T?,
-  defaultValue: @autoclosure () throws -> T // FIXME: typed throw
+  defaultValue: @autoclosure () throws -> T // FIXME: typed throws
 ) rethrows -> T {
+  // FIXME: We want this to support nonescapable `T` types.
+  // To implement that, we need to be able to express that the result's lifetime
+  // is limited to the intersection of `optional` and the result of
+  // `defaultValue`:
+  //    @lifetime(optional, defaultValue.result)
   switch consume optional {
   case .some(let value):
     return value
@@ -866,11 +883,15 @@ internal func _legacy_abi_optionalNilCoalescingOperator <T>(
 ///     `optional` have the same type.
 @_transparent
 @_alwaysEmitIntoClient
-// FIXME: This needs to support typed throws.
 public func ?? <T: ~Copyable>(
   optional: consuming T?,
-  defaultValue: @autoclosure () throws -> T?
+  defaultValue: @autoclosure () throws -> T? // FIXME: typed throws
 ) rethrows -> T? {
+  // FIXME: We want this to support nonescapable `T` types.
+  // To implement that, we need to be able to express that the result's lifetime
+  // is limited to the intersection of `optional` and the result of
+  // `defaultValue`:
+  //    @lifetime(optional, defaultValue.result)
   switch consume optional {
   case .some(let value):
     return value
