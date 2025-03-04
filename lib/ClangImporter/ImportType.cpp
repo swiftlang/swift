@@ -480,6 +480,17 @@ namespace {
       if (pointeeQualType->isDependentType())
         return Type();
 
+      // FIXME: remove workaround once Unsafe*Pointer supports
+      //        nonescapable pointees.
+      if (evaluateOrDefault(
+              Impl.SwiftContext.evaluator,
+              ClangTypeEscapability({pointeeQualType.getTypePtr(), nullptr}),
+              CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
+        addImportDiagnostic(Diagnostic(diag::ptr_to_nonescapable,
+                                       pointeeQualType.getTypePtr()));
+        return Type();
+      }
+
       // All other C pointers to concrete types map to
       // UnsafeMutablePointer<T> or OpaquePointer.
 
