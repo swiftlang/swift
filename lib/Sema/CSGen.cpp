@@ -1177,6 +1177,7 @@ namespace {
     /// component kind.
     Type addApplyConstraints(
         Expr *anchor, Type memberTy, ArgumentList *argList,
+        ConstraintLocator *memberComponentLoc,
         ConstraintLocator *applyComponentLoc,
         SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
       // Locators used in this expression.
@@ -1197,6 +1198,14 @@ namespace {
 
       SmallVector<AnyFunctionType::Param, 8> params;
       getMatchingParams(argList, params);
+
+      SourceLoc loc =
+          CurDC->getAsDecl() ? CurDC->getAsDecl()->getLoc() : SourceLoc();
+      for (auto index : indices(params)) {
+        const auto &param = params[index];
+        CS.verifyThatArgumentIsHashable(index, param.getParameterType(),
+                                        memberComponentLoc, loc);
+      }
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
@@ -3851,8 +3860,11 @@ namespace {
 
         case KeyPathExpr::Component::Kind::UnresolvedApply:
         case KeyPathExpr::Component::Kind::Apply: {
+          auto prevMemberLocator = CS.getConstraintLocator(
+              locator, LocatorPathElt::KeyPathComponent(i - 1));
           base = addApplyConstraints(E, base, component.getArgs(),
-                                     memberLocator, &componentTypeVars);
+                                     prevMemberLocator, memberLocator,
+                                     &componentTypeVars);
           break;
         }
 
