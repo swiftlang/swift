@@ -240,6 +240,44 @@ bool witnessHasImplementsAttrForRequiredName(ValueDecl *witness,
 bool witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
                                                  ValueDecl *requirement);
 
+using VisitedConformances = llvm::SmallPtrSet<void *, 16>;
+
+/// Visit each conformance within the given type.
+///
+/// If `body` returns true for any conformance, this function stops the
+/// traversal and returns true.
+bool forEachConformance(
+    Type type, llvm::function_ref<bool(ProtocolConformanceRef)> body,
+    VisitedConformances *visitedConformances = nullptr);
+
+/// Visit each conformance within the given conformance (including the given
+/// one).
+///
+/// If `body` returns true for any conformance, this function stops the
+/// traversal and returns true.
+bool forEachConformance(
+    ProtocolConformanceRef conformance,
+    llvm::function_ref<bool(ProtocolConformanceRef)> body,
+    VisitedConformances *visitedConformances = nullptr);
+
+/// Visit each conformance within the given substitution map.
+///
+/// If `body` returns true for any conformance, this function stops the
+/// traversal and returns true.
+bool forEachConformance(
+    SubstitutionMap subs,
+    llvm::function_ref<bool(ProtocolConformanceRef)> body,
+    VisitedConformances *visitedConformances = nullptr);
+
+/// Visit each conformance within the given declaration reference.
+///
+/// If `body` returns true for any conformance, this function stops the
+/// traversal and returns true.
+bool forEachConformance(
+    ConcreteDeclRef declRef,
+    llvm::function_ref<bool(ProtocolConformanceRef)> body,
+    VisitedConformances *visitedConformances = nullptr);
+
 }
 
 #endif // SWIFT_SEMA_PROTOCOL_H
