@@ -22,7 +22,8 @@ import Swift
 /// owning the contiguous memory, ensuring temporal safety and avoiding
 /// use-after-free errors. Operations on `RawSpan` are bounds-checked,
 /// ensuring spcial safety and avoiding buffer overflow errors.
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
+@_originallyDefinedIn(module: "Swift;Compatibility62", SwiftStdlib 6.0)
 @frozen
 @safe
 public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
@@ -83,10 +84,10 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension RawSpan: @unchecked Sendable {}
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -302,7 +303,8 @@ extension RawSpan {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
+@_originallyDefinedIn(module: "Swift;Compatibility62", SwiftStdlib 6.0)
 extension RawSpan {
 
   /// The number of bytes in the span.
@@ -331,7 +333,7 @@ extension RawSpan {
 }
 
 // MARK: extracting sub-spans
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension RawSpan {
 
   /// Constructs a new span over the bytes within the supplied range of
@@ -441,7 +443,7 @@ extension RawSpan {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension RawSpan {
 
   /// Calls the given closure with a pointer to the underlying bytes of
@@ -466,7 +468,7 @@ extension RawSpan {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension RawSpan {
 
   /// View the bytes of this span as type `T`
@@ -498,7 +500,7 @@ extension RawSpan {
 }
 
 // MARK: load
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension RawSpan {
 
   /// Returns a new instance of the given type, constructed from the raw memory
@@ -612,7 +614,7 @@ extension RawSpan {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension RawSpan {
   /// Returns a Boolean value indicating whether two `RawSpan` instances
   /// refer to the same region in memory.
@@ -644,7 +646,7 @@ extension RawSpan {
 }
 
 // MARK: prefixes and suffixes
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension RawSpan {
 
   /// Returns a span containing the initial bytes of this span,

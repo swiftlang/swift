@@ -23,7 +23,8 @@ import Swift
 /// use-after-free errors. Operations on `Span` are bounds-checked,
 /// ensuring spcial safety and avoiding buffer overflow errors.
 @frozen
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
+@_originallyDefinedIn(module: "Swift;Compatibility62", SwiftStdlib 6.0)
 @safe
 public struct Span<Element: ~Copyable & ~Escapable>
 : ~Escapable, Copyable, BitwiseCopyable {
@@ -85,10 +86,10 @@ public struct Span<Element: ~Copyable & ~Escapable>
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension Span: @unchecked Sendable where Element: Sendable {}
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension Span where Element: ~Copyable {
 
   /// Unsafely create a `Span` over initialized memory.
@@ -162,7 +163,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension Span {
 
   /// Unsafely create a `Span` over initialized memory.
@@ -206,7 +207,7 @@ extension Span {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension Span where Element: BitwiseCopyable {
 
   /// Unsafely create a `Span` over initialized memory.
@@ -361,7 +362,8 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
+@_originallyDefinedIn(module: "Swift;Compatibility62", SwiftStdlib 6.0)
 extension Span where Element: ~Copyable {
 
   /// The number of elements in the span.
@@ -392,7 +394,8 @@ extension Span where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
+@_originallyDefinedIn(module: "Swift;Compatibility62", SwiftStdlib 6.0)
 extension Span where Element: ~Copyable {
 
   /// Accesses the element at the specified position in the `Span`.
@@ -439,7 +442,8 @@ extension Span where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
+@_originallyDefinedIn(module: "Swift;Compatibility62", SwiftStdlib 6.0)
 extension Span where Element: BitwiseCopyable {
 
   /// Accesses the element at the specified position in the `Span`.
@@ -480,7 +484,7 @@ extension Span where Element: BitwiseCopyable {
 }
 
 // MARK: sub-spans
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension Span where Element: ~Copyable {
 
   /// Constructs a new span over the items within the supplied range of
@@ -594,7 +598,7 @@ extension Span where Element: ~Copyable {
 }
 
 // MARK: UnsafeBufferPointer access hatch
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension Span where Element: ~Copyable  {
 
   /// Calls a closure with a pointer to the viewed contiguous storage.
@@ -624,7 +628,7 @@ extension Span where Element: ~Copyable  {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension Span where Element: BitwiseCopyable {
 
   /// Calls the given closure with a pointer to the underlying bytes of
@@ -651,7 +655,7 @@ extension Span where Element: BitwiseCopyable {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension Span where Element: ~Copyable {
   /// Returns a Boolean value indicating whether two `Span` instances
   /// refer to the same region in memory.
@@ -684,7 +688,7 @@ extension Span where Element: ~Copyable {
 }
 
 // MARK: prefixes and suffixes
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 5.0, *)
 extension Span where Element: ~Copyable {
 
   /// Returns a span containing the initial elements of this span,

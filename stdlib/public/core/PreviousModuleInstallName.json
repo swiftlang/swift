@@ -1,0 +1,6 @@
+[
+  {
+    "module": "Compatibility62",
+    "install_name": "libswiftCompatibility62.dylib"
+  }
+]

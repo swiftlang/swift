@@ -345,6 +345,10 @@ if(SWIFT_STDLIB_HAS_COMMANDLINE)
   list(APPEND swift_core_incorporate_object_libraries swiftCommandLineSupport)
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-previous-module-installname-map-file" "-Xfrontend" "${CMAKE_CURRENT_SOURCE_DIR}/PreviousModuleInstallName.json")
+endif()
+
 set(swiftCore_common_options
                   IS_STDLIB IS_STDLIB_CORE
                     ${SWIFTLIB_SOURCES}
