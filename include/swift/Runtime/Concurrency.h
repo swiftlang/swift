@@ -1048,7 +1048,7 @@ enum swift_task_is_current_executor_flag : uint64_t {
   Assert = 0x8,
 
   /// The routine should use 'isIsolatingCurrentContext' function on the
-  /// 'expected' executor instead of
+  /// 'expected' executor instead of `checkIsolated`.
   HasIsIsolatingCurrentContext = 0x10,
 };
 
