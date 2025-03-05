@@ -377,11 +377,6 @@ static bool isLoadFromStack(SILInstruction *i, AllocStackInst *asi) {
   if (!isa<LoadInst>(i) && !isa<LoadBorrowInst>(i))
     return false;
 
-  if (auto *lbi = dyn_cast<LoadBorrowInst>(i)) {
-    if (BorrowedValue(lbi).hasReborrow())
-      return false;
-  }
-
   // Skip struct and tuple address projections.
   ValueBase *op = i->getOperand(0);
   while (op != asi) {
