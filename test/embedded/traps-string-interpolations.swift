@@ -26,19 +26,19 @@ public func test5(i: Int) {
   preconditionFailure("\(i) is not 42")
 }
 
-// CHECK:      define {{.*}}@"$e4main5test11iySi_tF"
+// CHECK:      define {{.*}}@"$s4main5test11iySi_tF"
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   tail call void asm sideeffect ""
 // CHECK-NEXT:   tail call void @llvm.trap()
 // CHECK-NEXT:   unreachable
 // CHECK-NEXT: }
 
-// CHECK:      define {{.*}}@"$e4main5test21iySi_tF"
+// CHECK:      define {{.*}}@"$s4main5test21iySi_tF"
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
 
-// CHECK:      define {{.*}}@"$e4main5test31iySi_tF"
+// CHECK:      define {{.*}}@"$s4main5test31iySi_tF"
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   %.not = icmp eq i64 %0, 42
 // CHECK-NEXT:   br i1 %.not, label %1, label %2
@@ -52,12 +52,12 @@ public func test5(i: Int) {
 // CHECK-NEXT:   unreachable
 // CHECK-NEXT: }
 
-// CHECK:      define {{.*}}@"$e4main5test41iySi_tF"
+// CHECK:      define {{.*}}@"$s4main5test41iySi_tF"
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
 
-// CHECK:      define {{.*}}@"$e4main5test51iySi_tF"
+// CHECK:      define {{.*}}@"$s4main5test51iySi_tF"
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   tail call void asm sideeffect ""
 // CHECK-NEXT:   tail call void @llvm.trap()
