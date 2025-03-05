@@ -350,6 +350,8 @@ extension LifetimeDependence.Scope {
       self = .initialized(.yield(result))
       return
     }
+    // @inout arguments belong to the coroutine because they are valid for the duration of the yield, and, if local
+    // mutation or reassignment were relevant, then the dependence would be on an access scope instead.
     self = .yield(result)
   }
 }

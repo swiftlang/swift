@@ -53,6 +53,8 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
     self.inExclusiveRange.insert(beginInst)
   }
 
+  // Note: 'ends' are simply the instructions to insert in the range. 'self.ends' might not return the same sequence
+  // as this 'ends' argument because 'self.ends' will not include block exits.
   init<S: Sequence>(begin beginInst: Instruction, ends: S, _ context: some Context) where S.Element: Instruction {
     self = InstructionRange(begin: beginInst, context)
     insert(contentsOf: ends)
