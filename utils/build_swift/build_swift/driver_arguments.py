@@ -703,6 +703,9 @@ def create_argument_parser():
     option('--swift-freestanding-is-darwin', toggle_true,
            help='True if the freestanding platform is a Darwin one.')
 
+    option('--enable-new-runtime-build', toggle_true,
+           help='True to enable the new runtime build.')
+
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
 
