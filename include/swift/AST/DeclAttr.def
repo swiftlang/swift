@@ -538,7 +538,8 @@ SIMPLE_DECL_ATTR(safe, Safe,
   164)
 
 DECL_ATTR(abi, ABI,
-  OnAbstractFunction | OnVar /* will eventually add types */ | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnConstructor | OnFunc | OnSubscript | OnVar | LongAttribute |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   165)
 DECL_ATTR_FEATURE_REQUIREMENT(ABI, ABIAttribute)
 

@@ -1531,7 +1531,7 @@ void MemberLookupTable::addMember(Decl *member) {
     A->getMemberName().addToLookupTable(Lookup, vd);
 
   auto abiRole = ABIRoleInfo(vd);
-  if (!abiRole.providesABI())
+  if (!abiRole.providesABI() && abiRole.getCounterpart())
     addMember(abiRole.getCounterpart());
 }
 
