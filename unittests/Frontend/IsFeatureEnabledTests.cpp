@@ -20,7 +20,7 @@ namespace {
 static const FeatureWrapper baselineF(Feature::AsyncAwait);
 static const FeatureWrapper upcomingF(Feature::DynamicActorIsolation);
 static const FeatureWrapper adoptableUpcomingF(Feature::ExistentialAny);
-static const FeatureWrapper experimentalF(Feature::NamedOpaqueTypes);
+static const FeatureWrapper experimentalF(Feature::StructLetDestructuring);
 static const FeatureWrapper strictConcurrencyF(Feature::StrictConcurrency);
 
 using FeatureState = LangOptions::FeatureState;
@@ -64,6 +64,9 @@ TEST_F(IsFeatureEnabledTest, VerifyTestedFeatures) {
 
   feature = experimentalF;
   {
+    // If these tests start failing because `experimentalF` was promoted, swap
+    // it for another experimental feature one that is available in production.
+    ASSERT_TRUE(isFeatureAvailableInProduction(feature));
     ASSERT_TRUE(getExperimentalFeature(feature.name));
     ASSERT_FALSE(isFeatureAdoptable(feature));
   }
