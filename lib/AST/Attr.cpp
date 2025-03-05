@@ -1078,6 +1078,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     break;
   }
+  case DeclAttrKind::OriginallyDefinedIn: {
+    auto Attr = cast<OriginallyDefinedInAttr>(this);
+    auto Name = D->getDeclContext()->getParentModule()->getName().str();
+    if (Options.IsForSwiftInterface && Attr->ManglingModuleName == Name)
+      return false;
+    break;
+  }
   default:
     break;
   }
