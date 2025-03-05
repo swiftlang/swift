@@ -3085,8 +3085,8 @@ function Test-PackageManager {
   Build-SPMProject `
     -Action Test `
     -Src $SrcDir `
-    -Bin "$BinaryCache\$($HostArch.LLVMTarget)\PackageManagerTests" `
-    -Arch $HostArch `
+    -Bin "$BinaryCache\$($BuildArch.LLVMTarget)\PackageManagerTests" `
+    -Arch $BuildArch `
     -Xcc "-I$LibraryRoot\sqlite-3.46.0\usr\include" -Xlinker "-L$LibraryRoot\sqlite-3.46.0\usr\lib"
 }
 
