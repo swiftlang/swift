@@ -308,7 +308,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
-  public func storeBytes<T: BitwiseCopyable>(
+  public mutating func storeBytes<T: BitwiseCopyable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
     _precondition(
@@ -321,7 +321,7 @@ extension MutableRawSpan {
 
   @unsafe
   @_alwaysEmitIntoClient
-  public func storeBytes<T: BitwiseCopyable>(
+  public mutating func storeBytes<T: BitwiseCopyable>(
     of value: T, toUncheckedByteOffset offset: Int, as type: T.Type
   ) {
     unsafe _start().storeBytes(of: value, toByteOffset: offset, as: type)
@@ -334,20 +334,18 @@ extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
   public mutating func update<S: Sequence>(
-    startingAt byteOffset: Int = 0,
     from source: S
   ) -> (unwritten: S.Iterator, byteOffset: Int) where S.Element: BitwiseCopyable {
     var iterator = source.makeIterator()
-    let offset = update(startingAt: byteOffset, from: &iterator)
+    let offset = update(from: &iterator)
     return (iterator, offset)
   }
 
   @_alwaysEmitIntoClient
   public mutating func update<Element: BitwiseCopyable>(
-    startingAt byteOffset: Int = 0,
     from elements: inout some IteratorProtocol<Element>
   ) -> Int {
-    var offset = byteOffset
+    var offset = 0
     while offset + MemoryLayout<Element>.stride <= _count {
       guard let element = elements.next() else { break }
       unsafe storeBytes(
@@ -360,18 +358,15 @@ extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
   public mutating func update<C: Collection>(
-    startingAt byteOffset: Int = 0,
     fromContentsOf source: C
   ) -> Int where C.Element: BitwiseCopyable {
     let newOffset = source.withContiguousStorageIfAvailable {
-      self.update(
-        startingAt: byteOffset, fromContentsOf: Span(_unsafeElements: $0)
-      )
+      self.update(fromContentsOf: RawSpan(_unsafeElements: $0))
     }
     if let newOffset { return newOffset }
 
     var elements = source.makeIterator()
-    let lastOffset = update(startingAt: byteOffset, from: &elements)
+    let lastOffset = update(from: &elements)
     _precondition(
       elements.next() == nil,
       "destination span cannot contain every element from source."
@@ -381,45 +376,40 @@ extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
   public mutating func update<Element: BitwiseCopyable>(
-    startingAt byteOffset: Int = 0,
     fromContentsOf source: Span<Element>
   ) -> Int {
-//    update(startingAt: byteOffset, from: source.bytes)
+//    update(from: source.bytes)
     source.withUnsafeBytes {
-      update(startingAt: byteOffset, fromContentsOf: $0)
+      update(fromContentsOf: $0)
     }
   }
 
   @_alwaysEmitIntoClient
   public mutating func update<Element: BitwiseCopyable>(
-    startingAt byteOffset: Int = 0,
     fromContentsOf source: borrowing MutableSpan<Element>
   ) -> Int {
-//    update(startingAt: byteOffset, from: source.storage.bytes)
+//    update(from: source.span.bytes)
     source.withUnsafeBytes {
-      update(startingAt: byteOffset, fromContentsOf: $0)
+      update(fromContentsOf: $0)
     }
   }
 
   @_alwaysEmitIntoClient
   public mutating func update(
-    startingAt byteOffset: Int = 0,
-    from source: RawSpan
+    fromContentsOf source: RawSpan
   ) -> Int {
-    if source.byteCount == 0 { return byteOffset }
+    if source.byteCount == 0 { return 0 }
     source.withUnsafeBytes {
-      unsafe _start().advanced(by: byteOffset)
-                     .copyMemory(from: $0.baseAddress!, byteCount: $0.count)
+      unsafe _start().copyMemory(from: $0.baseAddress!, byteCount: $0.count)
     }
-    return byteOffset &+ source.byteCount
+    return source.byteCount
   }
 
   @_alwaysEmitIntoClient
   public mutating func update(
-    startingAt byteOffset: Int = 0,
-    from source: borrowing MutableRawSpan
+    fromContentsOf source: borrowing MutableRawSpan
   ) -> Int {
-    update(startingAt: byteOffset, from: source.bytes)
+    update(fromContentsOf: source.bytes)
   }
 }
 
@@ -514,20 +504,9 @@ extension MutableRawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(
-    unchecked bounds: some RangeExpression<Int>
-  ) -> Self {
-    unsafe _extracting(unchecked: bounds.relative(to: byteOffsets))
-  }
-
-  @unsafe
-  @_alwaysEmitIntoClient
-  @lifetime(borrow self)
-  mutating public func _extracting(
-    unchecked bounds: ClosedRange<Int>
-  ) -> Self {
-    let range = Range(
-      _uncheckedBounds: (bounds.lowerBound, bounds.upperBound&+1)
+  mutating public func _extracting(unchecked bounds: ClosedRange<Int>) -> Self {
+    let range = unsafe Range(
+      uncheckedBounds: (bounds.lowerBound, bounds.upperBound+1)
     )
     return unsafe _extracting(unchecked: range)
   }
