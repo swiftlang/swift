@@ -1154,8 +1154,9 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
   return {foundWitness, hasUninstantiatedSuperclass};
 }
 
-/// Determine if
-static bool isExecutingInIsolationOfConformance(
+/// Determine if we are executing within the isolation domain of the global
+/// actor to which the given conformance is isolated.
+static bool _isExecutingInIsolationOfConformance(
     const Metadata *const type,
     const ProtocolConformanceDescriptor *description,
     const WitnessTable *table
@@ -1198,6 +1199,164 @@ static bool isExecutingInIsolationOfConformance(
   return isCurrentGlobalActor(globalActorType, globalActorWitnessTable);
 }
 
+static bool _checkConformanceIsolation(
+    const Metadata *const type, const WitnessTable *table);
+
+/// Check for conformance isolation for a protocol requirement within the
+/// conditional requirements of a witness table.
+static bool _checkConformanceIsolationOfProtocolRequirement(
+    const Metadata *const type, const WitnessTable *table,
+    const GenericRequirementDescriptor &requirement,
+    const WitnessTable *conditionalWitnessTable
+) {
+  assert(requirement.Flags.getKind() == GenericRequirementKind::Protocol);
+  assert(!requirement.Flags.isPackRequirement());
+
+  // If the conditional witness table has neither a global actor nor conditional
+  // requirements, there's nothing to check.
+  auto conditionalDescription = conditionalWitnessTable->getDescription();
+  if (!conditionalDescription ||
+      !(conditionalDescription->hasConditionalRequirements() ||
+        conditionalDescription->hasGlobalActorIsolation()))
+    return true;
+
+  // Recurse into this conformance.
+
+  // Resolve the conforming type.
+  SubstGenericParametersFromMetadata substitutions(type);
+  auto result = swift_getTypeByMangledName(
+     MetadataState::Abstract, requirement.getParam(),
+     /*FIXME:conditionalArgs.data()*/{ },
+     [&substitutions](unsigned depth, unsigned index) {
+        return substitutions.getMetadata(depth, index).Ptr;
+      },
+    [&substitutions](const Metadata *type, unsigned index) {
+      return substitutions.getWitnessTable(type, index);
+    });
+  if (result.isError())
+    return false;
+
+  return _checkConformanceIsolation(
+      result.getType().getMetadata(), conditionalWitnessTable);
+}
+
+/// Check for conformance isolation for a protocol requirement pack within the
+/// conditional requirements of a witness table.
+static bool _checkConformanceIsolationOfProtocolRequirementPack(
+    const Metadata *const type, const WitnessTable *table,
+    const GenericRequirementDescriptor &requirement,
+    WitnessTablePackPointer conditionalWitnessTables
+) {
+  assert(requirement.Flags.getKind() == GenericRequirementKind::Protocol);
+  assert(requirement.Flags.isPackRequirement());
+
+  // Check each of the conditional witness tables. If any has neither a global
+  // actor nor conditional requirements, there's nothing to check for that one.
+  MetadataPackPointer conformingTypes;
+  unsigned count = conditionalWitnessTables.getNumElements();
+  for (unsigned index = 0; index != count; ++index) {
+    auto conditionalWitnessTable =
+        conditionalWitnessTables.getElements()[index];
+
+    // If the conditional witness table has neither a global actor nor conditional
+    // requirements, there's nothing to check.
+    auto conditionalDescription = conditionalWitnessTable->getDescription();
+    if (!conditionalDescription ||
+        !(conditionalDescription->hasConditionalRequirements() ||
+          conditionalDescription->hasGlobalActorIsolation()))
+      continue;
+
+    // If we don't have it already, get the parameter pack for the
+    // conforming types.
+    if (!conformingTypes) {
+      // Resolve the conforming type.
+      SubstGenericParametersFromMetadata substitutions(type);
+      auto result = swift::getTypePackByMangledName(
+         requirement.getParam(),
+         /*FIXME:conditionalArgs.data()*/{ },
+         [&substitutions](unsigned depth, unsigned index) {
+            return substitutions.getMetadata(depth, index).Ptr;
+          },
+        [&substitutions](const Metadata *type, unsigned index) {
+          return substitutions.getWitnessTable(type, index);
+        });
+      if (result.isError())
+        return false;
+
+      conformingTypes = result.getType();
+      assert(conformingTypes.getNumElements() == count);
+    }
+
+    if (!_checkConformanceIsolation(
+            conformingTypes.getElements()[index], conditionalWitnessTable))
+      return false;
+  }
+
+  return true;
+}
+
+/// Check whether all isolated conformances in the given witness table (and
+/// any witness tables it depends on) are satisfied by the current execution
+/// context.
+///
+/// Returns false if there is an isolated conformance but we are not executing
+/// in that isolation domain.
+static bool _checkConformanceIsolation(const Metadata *const type, const WitnessTable *table) {
+  if (!table)
+    return true;
+
+  auto description = table->getDescription();
+  if (!description)
+    return true;
+
+  // If this conformance has global actor isolation, check that we are
+  // running in that isolation domain.
+  if (description->hasGlobalActorIsolation() &&
+      !_isExecutingInIsolationOfConformance(type, description, table)) {
+    return false;
+  }
+
+  // Check any witness tables that are part of a conditional conformance.
+  unsigned instantiationArgIndex = 0;
+  for (const auto &requirement: description->getConditionalRequirements()) {
+    if (!requirement.Flags.hasKeyArgument())
+      continue;
+
+    switch (requirement.Flags.getKind()) {
+    case GenericRequirementKind::Protocol: {
+      auto instantiationArg =
+          ((void* const *)table)[-1 - (int)instantiationArgIndex];
+      if (requirement.Flags.isPackRequirement()) {
+        if (!_checkConformanceIsolationOfProtocolRequirementPack(
+                 type, table, requirement,
+                 WitnessTablePackPointer(instantiationArg)))
+          return false;
+      } else {
+        if (!_checkConformanceIsolationOfProtocolRequirement(
+                type, table, requirement,
+                (const WitnessTable *)instantiationArg)) {
+          return false;
+        }
+      }
+
+      break;
+    }
+
+    case GenericRequirementKind::SameType:
+    case GenericRequirementKind::BaseClass:
+    case GenericRequirementKind::SameConformance:
+    case GenericRequirementKind::SameShape:
+    case GenericRequirementKind::InvertedProtocols:
+    case GenericRequirementKind::Layout:
+      break;
+    }
+
+    ++instantiationArgIndex;
+  }
+
+  return true;
+}
+
 static const WitnessTable *
 swift_conformsToProtocolCommonImpl(const Metadata *const type,
                                    const ProtocolDescriptor *protocol) {
@@ -1222,17 +1381,9 @@ swift_conformsToProtocolCommonImpl(const Metadata *const type,
         swift_conformsToProtocolMaybeInstantiateSuperclasses(
             type, protocol, true /*instantiateSuperclassMetadata*/);
 
-  // If the conformance is isolated to a global actor, check whether we are
-  // currently executing on that global actor. Otherwise, the type does not
-  // conform.
-  if (table) {
-    if (auto description = table->getDescription()) {
-      if (description->hasGlobalActorIsolation() &&
-          !isExecutingInIsolationOfConformance(type, description, table)) {
-        return nullptr;
-      }
-    }
-  }
+  // Check for isolated conformances.
+  if (!_checkConformanceIsolation(type, table))
+    return nullptr;
 
   return table;
 }

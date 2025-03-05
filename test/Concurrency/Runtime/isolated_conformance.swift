@@ -31,6 +31,26 @@ extension Wrapper: P where T: P {
   }
 }
 
+@available(SwiftStdlib 5.9, *)
+struct WrapMany<each T> {
+  var wrapped: (repeat each T)
+}
+
+@available(SwiftStdlib 5.9, *)
+extension WrapMany: P where repeat each T: P {
+  func f() {
+    print("Wrapper for many")
+  }
+}
+
+extension Int: P {
+  func f() { }
+}
+
+extension String: P {
+  func f() { }
+}
+
 func tryCastToP(_ value: any Sendable) -> Bool {
   if let p = value as? any P {
     p.f()
@@ -50,6 +70,11 @@ let wrappedMC = Wrapper(wrapped: mc)
 precondition(tryCastToP(mc))
 precondition(tryCastToP(wrappedMC))
 
+if #available(SwiftStdlib 5.9, *) {
+  let wrappedMany = WrapMany(wrapped: (17, mc, "Pack"))
+  precondition(tryCastToP(wrappedMany))
+}
+
 // CHECK: Testing a separate task on the main actor
 // CHECK-NEXT: MyClass.f()
 // CHECK-NEXT: Wrapper for MyClass.f()
@@ -57,21 +82,32 @@ print("Testing a separate task on the main actor")
 await Task.detached { @MainActor in
   precondition(tryCastToP(mc))
   precondition(tryCastToP(wrappedMC))
-}.value
 
-// FIXME: Currently not handling the wrapper case appropriately, because
-// we don't track whether we used an isolated conformance to satisfy another
-// conformance at runtime.
+  if #available(SwiftStdlib 5.9, *) {
+    let wrappedMany = WrapMany(wrapped: (17, mc, "Pack"))
+    precondition(tryCastToP(wrappedMany))
+  }
+
+}.value
 
 // CHECK: Testing a separate task off the main actor
 print("Testing a separate task off the main actor")
 await Task.detached {
   if #available(SwiftStdlib 6.2, *) {
     precondition(!tryCastToP(mc))
-  // precondition(!tryCastToP(wrappedMC))
+    precondition(!tryCastToP(wrappedMC))
+
+    let wrappedMany = WrapMany(wrapped: (17, mc, "Pack"))
+    precondition(!tryCastToP(wrappedMany))
   } else {
     print("Cast succeeds, but shouldn't")
     precondition(tryCastToP(mc))
+    precondition(tryCastToP(wrappedMC))
+
+    if #available(SwiftStdlib 5.9, *) {
+      let wrappedMany = WrapMany(wrapped: (17, mc, "Pack"))
+      precondition(tryCastToP(wrappedMany))
+    }
   }
 }.value
 
