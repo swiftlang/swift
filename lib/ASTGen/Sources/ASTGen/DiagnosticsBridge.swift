@@ -165,6 +165,8 @@ fileprivate struct SimpleDiagnostic: DiagnosticMessage {
 
   let severity: DiagnosticSeverity
 
+  let category: DiagnosticCategory?
+
   var diagnosticID: MessageID {
     .init(domain: "SwiftCompiler", id: "SimpleDiagnostic")
   }
@@ -237,6 +239,10 @@ public func addQueuedDiagnostic(
   textLength: Int,
   severity: BridgedDiagnosticSeverity,
   cLoc: BridgedSourceLoc,
+  categoryName: UnsafePointer<UInt8>?,
+  categoryLength: Int,
+  documentationPath: UnsafePointer<UInt8>?,
+  documentationPathLength: Int,
   highlightRangesPtr: UnsafePointer<BridgedSourceLoc>?,
   numHighlightRanges: Int
 ) {
@@ -333,13 +339,43 @@ public func addQueuedDiagnostic(
     }
   }
 
+  let category: DiagnosticCategory? = categoryName.map { categoryNamePtr in
+    let categoryNameBuffer = UnsafeBufferPointer(
+      start: categoryNamePtr,
+      count: categoryLength
+    )
+    let categoryName = String(decoding: categoryNameBuffer, as: UTF8.self)
+
+    let documentationURL = documentationPath.map { documentationPathPtr in
+      let documentationPathBuffer = UnsafeBufferPointer(
+        start: documentationPathPtr,
+        count: documentationPathLength
+      )
+
+      let documentationPath = String(decoding: documentationPathBuffer, as: UTF8.self)
+
+      // If this looks doesn't look like a URL, prepend file://.
+      if !documentationPath.looksLikeURL {
+        return "file://\(documentationPath)"
+      }
+
+      return documentationPath
+    }
+
+    return DiagnosticCategory(
+      name: categoryName,
+      documentationURL: documentationURL
+    )
+  }
+
   let textBuffer = UnsafeBufferPointer(start: text, count: textLength)
   let diagnostic = Diagnostic(
     node: node,
     position: position,
     message: SimpleDiagnostic(
       message: String(decoding: textBuffer, as: UTF8.self),
-      severity: severity.asSeverity
+      severity: severity.asSeverity,
+      category: category
     ),
     highlights: highlights
   )
@@ -360,4 +396,31 @@ public func renderQueuedDiagnostics(
   let renderedStr = formatter.annotateSources(in: queuedDiagnostics.pointee.grouped)
 
   renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
+}
+
+extension String {
+  /// Simple check to determine whether the string looks like the start of a
+  /// URL.
+  fileprivate var looksLikeURL: Bool {
+    var forwardSlashes: Int = 0
+    for c in self {
+      if c == "/" {
+        forwardSlashes += 1
+        if forwardSlashes > 2 {
+          return true
+        }
+
+        continue
+      }
+
+      if c.isLetter || c.isNumber {
+        forwardSlashes = 0
+        continue
+      }
+
+      return false
+    }
+
+    return false
+  }
 }
