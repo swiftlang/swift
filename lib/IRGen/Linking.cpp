@@ -558,18 +558,23 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
   case Kind::DistributedAccessorCoroFunctionPointer: {
     std::string Result(
         getUnderlyingEntityForCoroFunctionPointer().mangleAsString(Ctx));
-    Result.append("Tv");
+    Result.append("Twc");
     return Result;
   }
   case Kind::DistributedThunkCoroFunctionPointer: {
     std::string Result = getSILDeclRef().mangle();
     Result.append("TE");
-    Result.append("Tv");
+    Result.append("Twc");
     return Result;
   }
   case Kind::CoroFunctionPointerAST: {
     std::string Result = getSILDeclRef().mangle();
-    Result.append("Tv");
+    Result.append("Twc");
+    return Result;
+  }
+  case Kind::KnownCoroFunctionPointer: {
+    std::string Result(static_cast<char *>(Pointer));
+    Result.append("Twc");
     return Result;
   }
   }

@@ -235,10 +235,10 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TF'                 // distributed method accessor
   global ::= global 'TI'                 // implementation of a dynamic_replaceable function
   global ::= global 'Tu'                 // async function pointer of a function
-  global ::= global 'Tv'                 // coro function pointer of a function
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function
   global ::= global 'Twb'                // back deployment thunk
   global ::= global 'TwB'                // back deployment fallback function
+  global ::= global 'Twc'                // coro function pointer of a function
   global ::= entity entity 'TV'          // vtable override thunk, derived followed by base
   global ::= type label-list? 'D'        // type mangling for the debugger with label list for function types.
   global ::= type 'TC'                   // continuation prototype (not actually used for real symbols)
