@@ -199,9 +199,6 @@ if ($PinnedBuild -eq "") {
   }
 }
 
-# Store the revision zero variant of the Windows SDK version (no-op if unspecified)
-$WindowsSDKMajorMinorBuildMatch = [Regex]::Match($WinSDKVersion, "^\d+\.\d+\.\d+")
-$WinSDKVersionRevisionZero = if ($WindowsSDKMajorMinorBuildMatch.Success) { $WindowsSDKMajorMinorBuildMatch.Value + ".0" } else { "" }
 $CustomWinSDKRoot = $null # Overwritten if we download a Windows SDK from nuget
 
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -661,7 +658,7 @@ function Invoke-VsDevShell($Arch) {
   if ($CustomWinSDKRoot) {
     $DevCmdArguments += " -winsdk=none"
   } elseif ($WinSDKVersion) {
-    $DevCmdArguments += " -winsdk=$WinSDKVersionRevisionZero"
+    $DevCmdArguments += " -winsdk=$WinSDKVersion"
   }
 
   if ($ToBatch) {
@@ -673,22 +670,22 @@ function Invoke-VsDevShell($Arch) {
 
     if ($CustomWinSDKRoot) {
       # Using a non-installed Windows SDK. Setup environment variables manually.
-      $WinSDKVerIncludeRoot = "$CustomWinSDKRoot\include\$WinSDKVersionRevisionZero"
+      $WinSDKVerIncludeRoot = "$CustomWinSDKRoot\include\$WinSDKVersion"
       $WinSDKIncludePath = "$WinSDKVerIncludeRoot\ucrt;$WinSDKVerIncludeRoot\um;$WinSDKVerIncludeRoot\shared;$WinSDKVerIncludeRoot\winrt;$WinSDKVerIncludeRoot\cppwinrt"
-      $WinSDKVerLibRoot = "$CustomWinSDKRoot\lib\$WinSDKVersionRevisionZero"
+      $WinSDKVerLibRoot = "$CustomWinSDKRoot\lib\$WinSDKVersion"
 
-      $env:WindowsLibPath = "$CustomWinSDKRoot\UnionMetadata\$WinSDKVersionRevisionZero;$CustomWinSDKRoot\References\$WinSDKVersionRevisionZero"
+      $env:WindowsLibPath = "$CustomWinSDKRoot\UnionMetadata\$WinSDKVersion;$CustomWinSDKRoot\References\$WinSDKVersion"
       $env:WindowsSdkBinPath = "$CustomWinSDKRoot\bin"
-      $env:WindowsSDKLibVersion = "$WinSDKVersionRevisionZero\"
-      $env:WindowsSdkVerBinPath = "$CustomWinSDKRoot\bin\$WinSDKVersionRevisionZero"
-      $env:WindowsSDKVersion = "$WinSDKVersionRevisionZero\"
+      $env:WindowsSDKLibVersion = "$WinSDKVersion\"
+      $env:WindowsSdkVerBinPath = "$CustomWinSDKRoot\bin\$WinSDKVersion"
+      $env:WindowsSDKVersion = "$WinSDKVersion\"
 
       $env:EXTERNAL_INCLUDE += ";$WinSDKIncludePath"
       $env:INCLUDE += ";$WinSDKIncludePath"
       $env:LIB += ";$WinSDKVerLibRoot\ucrt\$($Arch.ShortName);$WinSDKVerLibRoot\um\$($Arch.ShortName)"
       $env:LIBPATH += ";$env:WindowsLibPath"
       $env:PATH += ";$env:WindowsSdkVerBinPath\$($Arch.ShortName);$env:WindowsSdkBinPath\$($Arch.ShortName)"
-      $env:UCRTVersion = $WinSDKVersionRevisionZero
+      $env:UCRTVersion = $WinSDKVersion
       $env:UniversalCRTSdkDir = $CustomWinSDKRoot
     }
   }
@@ -913,7 +910,7 @@ function Fetch-Dependencies {
 
       foreach ($Arch in $WinSDKArchs) {
         Invoke-Program nuget install $Package.$($Arch.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
-        Copy-Directory "$NugetRoot\$Package.$($Arch.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersionRevisionZero"
+        Copy-Directory "$NugetRoot\$Package.$($Arch.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
       }
     }
   }
