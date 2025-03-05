@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -46,7 +46,6 @@
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/EnumMap.h"
-#include "swift/Basic/FixedBitSet.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -6505,15 +6504,7 @@ private:
                                       /*isAlias=*/isa<TypeAliasDecl>(decl)));
     }
 
-    // If the feature is enabled in adoption mode, warn unconditionally.
-    // Otherwise, until Swift 7.
-    if (Ctx.LangOpts.getFeatureState(Feature::ExistentialAny)
-            .isEnabledForAdoption()) {
-      diag->limitBehavior(DiagnosticBehavior::Warning);
-    } else {
-      diag->warnUntilSwiftVersion(7);
-    }
-
+    diag->warnUntilSwiftVersion(7);
     emitInsertAnyFixit(*diag, T);
   }
 

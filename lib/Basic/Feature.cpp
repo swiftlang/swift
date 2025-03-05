@@ -18,7 +18,7 @@ using namespace swift;
 
 bool swift::isFeatureAvailableInProduction(Feature feature) {
   switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   case Feature::FeatureName:                                                   \
     return true;
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)                     \
@@ -31,7 +31,7 @@ bool swift::isFeatureAvailableInProduction(Feature feature) {
 
 llvm::StringRef swift::getFeatureName(Feature feature) {
   switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   case Feature::FeatureName:                                                   \
     return #FeatureName;
 #include "swift/Basic/Features.def"
@@ -41,7 +41,7 @@ llvm::StringRef swift::getFeatureName(Feature feature) {
 
 std::optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
   return llvm::StringSwitch<std::optional<Feature>>(name)
-#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version)                       \
   .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
@@ -50,7 +50,7 @@ std::optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
 
 std::optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
   return llvm::StringSwitch<std::optional<Feature>>(name)
-#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)                     \
   .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
@@ -59,7 +59,7 @@ std::optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
 
 std::optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
   switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version)                       \
   case Feature::FeatureName:                                                   \
     return Version;
@@ -69,18 +69,9 @@ std::optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
   }
 }
 
-bool swift::isFeatureAdoptable(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
-  case Feature::FeatureName:                                                   \
-    return IsAdoptable;
-#include "swift/Basic/Features.def"
-  }
-}
-
 bool swift::includeInModuleInterface(Feature feature) {
   switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   case Feature::FeatureName:                                                   \
     return true;
 #define EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(FeatureName,       \
