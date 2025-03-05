@@ -64,7 +64,14 @@ public:
 
   /// Returns the range of platform versions which may execute code in the
   /// availability context, starting at its introduction version.
+  // FIXME: [availability] Remove; superseded by getAvailableRange().
   AvailabilityRange getPlatformRange() const;
+
+  /// Returns the range which is available for `domain` in this context. If
+  /// there are not any constraints established for `domain`, returns
+  /// `std::nullopt`.
+  std::optional<AvailabilityRange>
+  getAvailabilityRange(AvailabilityDomain domain, const ASTContext &ctx) const;
 
   /// Returns true if this context contains any unavailable domains.
   bool isUnavailable() const;
@@ -80,8 +87,14 @@ public:
                             const ASTContext &ctx);
 
   /// Constrain the platform availability range with `platformRange`.
+  // FIXME: [availability] Remove; superseded by constrainWithAvailableRange().
   void constrainWithPlatformRange(const AvailabilityRange &platformRange,
                                   const ASTContext &ctx);
+
+  /// Constrain the available range for `domain` by `range`.
+  void constrainWithAvailabilityRange(const AvailabilityRange &range,
+                                      AvailabilityDomain domain,
+                                      const ASTContext &ctx);
 
   /// Constrain the context by adding \p domain to the set of unavailable
   /// domains.

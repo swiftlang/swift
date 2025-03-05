@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift
-// REQUIRES: OS=windows-msvc
+// RUN: %target-typecheck-verify-swift -target x86_64-unknown-windows-msvc -parse-stdlib
 
 // expected-note@+2{{'unavailable()' has been explicitly marked unavailable here}}
 @available(Windows, unavailable, message: "unsupported")
