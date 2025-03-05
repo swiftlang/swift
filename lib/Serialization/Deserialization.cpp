@@ -5933,11 +5933,20 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
            Platform);
         llvm::VersionTuple MovedVer;
         DECODE_VER_TUPLE(MovedVer)
-        auto ModuleNameEnd = blobData.find('\0');
-        assert(ModuleNameEnd != StringRef::npos);
-        auto ModuleName = blobData.slice(0, ModuleNameEnd);
+
+        auto ManglingModuleNameEnd = blobData.find('\0');
+        assert(ManglingModuleNameEnd != StringRef::npos);
+        auto ManglingModuleName = blobData.slice(0, ManglingModuleNameEnd);
+
+        blobData = blobData.slice(ManglingModuleNameEnd, blobData.size());
+
+        auto LinkerModuleNameEnd = blobData.find('\0');
+        assert(LinkerModuleNameEnd != StringRef::npos);
+        auto LinkerModuleName = blobData.slice(0, LinkerModuleNameEnd);
+
         Attr = new (ctx) OriginallyDefinedInAttr(SourceLoc(), SourceRange(),
-                                                 ModuleName,
+                                                 ManglingModuleName,
+                                                 LinkerModuleName,
                                                  (PlatformKind)Platform,
                                                  MovedVer,
                                                  isImplicit);
