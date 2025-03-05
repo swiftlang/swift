@@ -1682,7 +1682,7 @@ extension ASTGenVisitor {
           return nil
         }
 
-        guard let moveAsLike = args.isEmpty ? false : generateConsumingMoveAsLike() else {
+        guard let moveAsLike = args.isEmpty ? false : generateConsumingMovesAsLike() else {
           return nil
         }
 
@@ -1711,7 +1711,7 @@ extension ASTGenVisitor {
           return nil
         }
 
-        guard let moveAsLike = args.isEmpty ? false : generateConsumingMoveAsLike() else {
+        guard let moveAsLike = args.isEmpty ? false : generateConsumingMovesAsLike() else {
           return nil
         }
 
@@ -1738,10 +1738,10 @@ extension ASTGenVisitor {
         }
       }
 
-      func generateConsumingMoveAsLike() -> Bool? {
+      func generateConsumingMovesAsLike() -> Bool? {
         self.generateConsumingPlainIdentifierAttrOption(args: &args) {
           switch $0.rawText {
-          case "moveAsLike":
+          case "movesAsLike":
             return true
           default:
             // TODO: Diagnose.

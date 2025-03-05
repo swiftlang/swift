@@ -240,6 +240,7 @@ struct ReferenceOwnershipModifierTest<X: AnyObject> {
 }
 
 @_rawLayout(like: T) struct RawStorage<T>: ~Copyable {}
+@_rawLayout(like: T, movesAsLike) struct RawStorage2<T>: ~Copyable {}
 @_rawLayout(likeArrayOf: T, count: 4) struct RawSmallArray<T>: ~Copyable {}
 @_rawLayout(size: 4, alignment: 4) struct Lock: ~Copyable {}
 
