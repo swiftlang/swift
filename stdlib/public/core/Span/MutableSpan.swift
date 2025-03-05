@@ -25,7 +25,7 @@ public struct MutableSpan<Element: ~Copyable & ~Escapable>
 
   @_alwaysEmitIntoClient
   internal func _start() -> UnsafeMutableRawPointer {
-    unsafe _pointer.unsafelyUnwrapped
+    unsafe _pointer._unsafelyUnwrappedUnchecked
   }
 
   @_alwaysEmitIntoClient
