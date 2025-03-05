@@ -2050,17 +2050,29 @@ public:
 class OriginallyDefinedInAttr: public DeclAttribute {
 public:
   OriginallyDefinedInAttr(SourceLoc AtLoc, SourceRange Range,
-                          StringRef OriginalModuleName, PlatformKind Platform,
+                          StringRef OriginalModuleName,
+                          PlatformKind Platform,
+                          const llvm::VersionTuple MovedVersion, bool Implicit);
+
+  OriginallyDefinedInAttr(SourceLoc AtLoc, SourceRange Range,
+                          StringRef ManglingModuleName,
+                          StringRef LinkerModuleName,
+                          PlatformKind Platform,
                           const llvm::VersionTuple MovedVersion, bool Implicit)
       : DeclAttribute(DeclAttrKind::OriginallyDefinedIn, AtLoc, Range,
                       Implicit),
-        OriginalModuleName(OriginalModuleName), Platform(Platform),
+        ManglingModuleName(ManglingModuleName),
+        LinkerModuleName(LinkerModuleName),
+        Platform(Platform),
         MovedVersion(MovedVersion) {}
 
   OriginallyDefinedInAttr *clone(ASTContext &C, bool implicit) const;
 
-  // The original module name.
-  const StringRef OriginalModuleName;
+  // The original module name for mangling.
+  const StringRef ManglingModuleName;
+
+  // The original module name for linker directives.
+  const StringRef LinkerModuleName;
 
   /// The platform of the symbol.
   const PlatformKind Platform;
@@ -2069,7 +2081,8 @@ public:
   const llvm::VersionTuple MovedVersion;
 
   struct ActiveVersion {
-    StringRef ModuleName;
+    StringRef ManglingModuleName;
+    StringRef LinkerModuleName;
     PlatformKind Platform;
     llvm::VersionTuple Version;
     bool ForTargetVariant = false;
@@ -2085,7 +2098,8 @@ public:
   /// Create a copy of this attribute.
   OriginallyDefinedInAttr *clone(ASTContext &ctx) const {
     return new (ctx) OriginallyDefinedInAttr(
-        AtLoc, Range, OriginalModuleName, Platform, MovedVersion, isImplicit());
+        AtLoc, Range, ManglingModuleName, LinkerModuleName,
+        Platform, MovedVersion, isImplicit());
   }
 };
 
