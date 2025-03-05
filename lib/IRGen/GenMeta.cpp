@@ -1424,7 +1424,7 @@ namespace {
 
       // For related entities, set the original type name as the ABI name
       // and remember the related entity tag.
-      StringRef abiName;
+      std::string abiName;
       if (auto *synthesizedTypeAttr =
             Type->getAttrs()
                  .template getAttribute<ClangImporterSynthesizedTypeAttr>()) {
@@ -1444,7 +1444,7 @@ namespace {
         if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
           abiName = Type->getName().str();
         else
-          abiName = clangDecl->getName();
+          abiName = clangDecl->getQualifiedNameAsString();
 
         // Typedefs and compatibility aliases that have been promoted to
         // their own nominal types need to be marked specially.
@@ -1458,7 +1458,7 @@ namespace {
       // If the ABI name differs from the user-facing name, add it as
       // an override.
       if (!abiName.empty() && abiName != UserFacingName) {
-        getMutableImportInfo().ABIName = std::string(abiName);
+        getMutableImportInfo().ABIName = abiName;
       }
     }
 
