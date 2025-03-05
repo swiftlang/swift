@@ -799,6 +799,9 @@ public:
   /// Determine whether the type is an opened existential type with Error inside
   bool isOpenedExistentialWithError();
 
+  /// Determine whether the type is an Optional type.
+  bool isOptional() const;
+
   /// Retrieve the set of type parameter packs that occur within this type.
   void getTypeParameterPacks(SmallVectorImpl<Type> &rootParameterPacks);
 
@@ -7907,6 +7910,10 @@ inline bool TypeBase::isOpenedExistential() const {
 
   CanType T = getCanonicalType();
   return isa<OpenedArchetypeType>(T);
+}
+
+inline bool TypeBase::isOptional() const {
+  return getCanonicalType()->isOptional();
 }
 
 inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {
