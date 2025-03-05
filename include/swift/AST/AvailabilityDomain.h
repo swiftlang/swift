@@ -330,6 +330,12 @@ class AvailabilityDomainOrIdentifier {
   std::optional<AvailabilityDomain>
   lookUpInDeclContext(SourceLoc loc, const DeclContext *declContext) const;
 
+  void setResolved(std::optional<AvailabilityDomain> domain) {
+    if (domain)
+      storage.setPointer(*domain);
+    storage.setInt(true);
+  }
+
 public:
   AvailabilityDomainOrIdentifier(Identifier identifier)
       : storage(identifier) {};
@@ -359,18 +365,19 @@ public:
     return std::nullopt;
   }
 
+  /// Returns true if either a resolved domain is available or if the attempt
+  /// to look up the domain from the identifier was unsuccessful.
+  bool isResolved() const { return storage.getInt() || isDomain(); }
+
   std::optional<AvailabilityDomain>
   resolveInDeclContext(SourceLoc loc, const DeclContext *declContext) {
     // Return the domain directly if already resolved.
-    if (storage.getInt() || isDomain())
+    if (isResolved())
       return getAsDomain();
 
     // Look up the domain and cache the result.
     auto result = lookUpInDeclContext(loc, declContext);
-    if (result)
-      storage.setPointer(*result);
-    storage.setInt(true);
-
+    setResolved(result);
     return result;
   }
 

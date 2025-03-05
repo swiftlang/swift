@@ -20,6 +20,7 @@
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/CatchNode.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/Evaluator.h"
@@ -5226,6 +5227,28 @@ public:
   bool isCached() const { return true; }
   std::optional<std::optional<SemanticAvailableAttr>> getCachedResult() const;
   void cacheResult(std::optional<SemanticAvailableAttr> value) const;
+};
+
+class SemanticAvailabilitySpecRequest
+    : public SimpleRequest<SemanticAvailabilitySpecRequest,
+                           std::optional<SemanticAvailabilitySpec>(
+                               const AvailabilitySpec *, const DeclContext *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<SemanticAvailabilitySpec>
+  evaluate(Evaluator &evaluator, const AvailabilitySpec *spec,
+           const DeclContext *declContext) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<std::optional<SemanticAvailabilitySpec>>
+  getCachedResult() const;
+  void cacheResult(std::optional<SemanticAvailabilitySpec> value) const;
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker
