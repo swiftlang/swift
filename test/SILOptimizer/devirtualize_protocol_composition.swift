@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -parse-as-library -O -wmo -emit-sil  %s | %FileCheck %s
-// RUN: %target-swift-frontend -parse-as-library -Osize -wmo -emit-sil  %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -O -wmo -emit-sil  %s -disable-experimental-serialize-debug-info | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -Osize -wmo -emit-sil  %s -disable-experimental-serialize-debug-info | %FileCheck %s
 
 // REQUIRES: objc_interop
 

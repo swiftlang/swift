@@ -20,7 +20,7 @@ class Node {
 // CHECK:   store [[NIL]] to [init] [[SELF_NEXT_ACCESS]] : $*Optional<Node>
 // CHECK:   end_access [[SELF_NEXT_ACCESS]] : $*Optional<Node>
 // CHECK:   store [[SELF_NEXT_COPY]] to [init] [[ITER]] : $*Optional<Node>
-// CHECK:   br [[LOOPBB:bb.*]] //
+// CHECK:   br [[LOOPBB:bb.*]], loc {{.*}}, scope {{.*}} //
 
 // CHECK: [[LOOPBB]]:
 // CHECK:   [[ITER_COPY:%.*]] = load [copy] [[ITER]] : $*Optional<Node>

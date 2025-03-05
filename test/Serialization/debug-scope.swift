@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_debug.swift -experimental-serialize-debug-info -O -g
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_debug.swift -O -g
 // RUN: llvm-bcanalyzer %t/def_debug.swiftmodule | %FileCheck %s --check-prefix=SIL
 // RUN: %target-swift-frontend -module-name debug -g -emit-sil -I %t %s -O | %FileCheck %s --dump-input=fail
 // RUN: %target-swift-frontend -module-name debug -g -emit-sil -I %t %s | %FileCheck %s --check-prefix=NOOPT --dump-input=fail

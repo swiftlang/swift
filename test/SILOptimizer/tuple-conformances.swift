@@ -54,7 +54,7 @@ public func caller() {
 
 // Make sure the witness method call in transparentCallee() was devirtualized to Int.protocolMethod().
 
-// CHECK: [[FN:%.*]] = function_ref @$sSi4mainE14protocolMethodyyFZ : $@convention(method) (@thin Int.Type) -> () // user: %6
+// CHECK: [[FN:%.*]] = function_ref @$sSi4mainE14protocolMethodyyFZ : $@convention(method) (@thin Int.Type) -> (), loc {{.*}}, scope {{.*}} // user: %6
 // CHECK: apply [[FN]]({{.*}}) : $@convention(method) (@thin Int.Type) -> ()
 
 // FIXME: This is the `tuple.protocolMethod()` in transparentCaller(). It should

@@ -21,7 +21,7 @@ open class OtherDerived : Derived {
 // CHECK: bb0(%0 : @guaranteed $OtherDerived):
 // CHECK:       [[SELF:%.*]] = copy_value %0 : $OtherDerived
 // CHECK-NEXT:  [[SUPER:%.*]] = upcast [[SELF]] : $OtherDerived to $Derived
-// CHECK:       [[METHOD:%.*]] = function_ref @$s17vtables_multifile7DerivedC14privateMethod1yyF : $@convention(method) (@guaranteed Derived) -> () // user: %5
+// CHECK:       [[METHOD:%.*]] = function_ref @$s17vtables_multifile7DerivedC14privateMethod1yyF : $@convention(method) (@guaranteed Derived) -> (), loc {{.*}}, scope {{.*}} // user: %5
 // CHECK-NEXT:  apply [[METHOD:%.*]]([[SUPER]]) : $@convention(method) (@guaranteed Derived) -> ()
 // CHECK-NEXT:  destroy_value [[SUPER]] : $Derived
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()

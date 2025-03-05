@@ -29,7 +29,7 @@ protocol P2 {
 actor A: P2 {
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s4test1ACAA2P2A2aDPxyYacfCTW
   // CHECK-NOT: hop_to_executor
-  // CHECK: function_ref @$s4test1ACACycfC : $@convention(method) (@thick A.Type) -> @owned A // user: %3
+  // CHECK: function_ref @$s4test1ACACycfC : $@convention(method) (@thick A.Type) -> @owned A, loc {{.*}}, scope {{.*}} // user: %3
   // CHECK-NEXT: apply
   // CHECK: return
 }

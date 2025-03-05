@@ -36,22 +36,22 @@
 // CHECK: sil shared [transparent] [thunk] @$s7FileLib02MyB0V12AppleLogging8LoggableAadEP9verbositySivgTW : $@convention(witness_method: Loggable) (@in_guaranteed MyLib) -> Int {
 // CHECK: // %0                                             // user: %1
 // CHECK: bb0(%0 : $*MyLib):
-// CHECK:   %1 = load %0 : $*MyLib                          // user: %3
+// CHECK:   %1 = load %0 : $*MyLib, loc {{.*}}, scope {{.*}}                          // user: %3
 // CHECK:   // function_ref MyLib.verbosity.getter
-// CHECK:   %2 = function_ref @$s7FileLib02MyB0V9verbositySivg : $@convention(method) (MyLib) -> Int // user: %3
-// CHECK:   %3 = apply %2(%1) : $@convention(method) (MyLib) -> Int // user: %4
-// CHECK:   return %3 : $Int                                // id: %4
+// CHECK:   %2 = function_ref @$s7FileLib02MyB0V9verbositySivg : $@convention(method) (MyLib) -> Int, loc {{.*}}, scope {{.*}} // user: %3
+// CHECK:   %3 = apply %2(%1) : $@convention(method) (MyLib) -> Int, loc {{.*}}, scope {{.*}} // user: %4
+// CHECK:   return %3 : $Int, loc {{.*}}, scope {{.*}}                                // id: %4
 // CHECK: } // end sil function '$s7FileLib02MyB0V12AppleLogging8LoggableAadEP9verbositySivgTW'
 
 // CHECK: // start()
 // CHECK: sil @$s7FileLib5start12AppleLogging8Loggable_pSgyF : $@convention(thin) () -> @out Optional<any Loggable> {
-// CHECK: // %0 "$return_value"                             // user: %2
+// CHECK: // %0 "$return_value"                            // user: %2
 // CHECK: bb0(%0 : $*Optional<any Loggable>):
 // CHECK:   // function_ref setup()
-// CHECK:   %1 = function_ref @$s12AppleLogging5setupAA8Loggable_pSgyF : $@convention(thin) () -> @out Optional<any Loggable> // user: %2
+// CHECK:   %1 = function_ref @$s12AppleLogging5setupAA8Loggable_pSgyF : $@convention(thin) () -> @out Optional<any Loggable>, loc {{.*}}, scope {{.*}} // user: %2
 // CHECK:   %2 = apply %1(%0) : $@convention(thin) () -> @out Optional<any Loggable>
-// CHECK:   %3 = tuple ()                                   // user: %4
-// CHECK: return %3 : $()                                 // id: %4
+// CHECK:   %3 = tuple (), loc {{.*}}, scope {{.*}}                                   // user: %4
+// CHECK: return %3 : $(), loc {{.*}}, scope {{.*}}                                 // id: %4
 // CHECK: } // end sil function '$s7FileLib5start12AppleLogging8Loggable_pSgyF'
 
 // CHECK: // setup()

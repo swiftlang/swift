@@ -11,6 +11,7 @@ import Swift
 // CHECK-NEXT: alloc_global
 // CHECK-NEXT: global_addr
 // CHECK-NEXT: struct
+// CHECK-NEXT: debug_value
 // CHECK-NEXT: struct
 // CHECK-NEXT: store
 // CHECK-NEXT: integer_literal

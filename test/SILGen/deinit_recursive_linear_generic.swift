@@ -15,7 +15,7 @@ class Node<A, B> {
 // CHECK:   store [[NIL]] to [init] [[SELF_NEXT_ACCESS]] : $*Optional<Node<A, B>>
 // CHECK:   end_access [[SELF_NEXT_ACCESS]] : $*Optional<Node<A, B>>
 // CHECK:   store [[SELF_NEXT_COPY]] to [init] [[ITER]] : $*Optional<Node<A, B>>
-// CHECK:   br [[LOOPBB:bb.*]] //
+// CHECK:   br [[LOOPBB:bb.*]], loc {{.*}}, scope {{.*}} //
 
 // CHECK: [[LOOPBB]]:
 // CHECK:   [[ITER_COPY:%.*]] = load [copy] [[ITER]] : $*Optional<Node<A, B>>

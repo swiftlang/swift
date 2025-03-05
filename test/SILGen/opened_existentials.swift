@@ -25,7 +25,7 @@ public func test() -> String {
   // logic to wait until the argument is evaluated.
 
   // CHECK: [[PSTACK:%.*]] = alloc_stack $any P
-  // CHECK: [[GETP:%.*]] = function_ref @$s19opened_existentials4getPAA1P_pyF : $@convention(thin) () -> @out any P // user: %2
+  // CHECK: [[GETP:%.*]] = function_ref @$s19opened_existentials4getPAA1P_pyF : $@convention(thin) () -> @out any P, loc {{.*}}, scope {{.*}} // user: %2
   // CHECK: [[P:%.*]] = apply [[GETP]]([[PSTACK]]) : $@convention(thin) () -> @out any P
   // CHECK: [[OPENEDP:%.*]] = open_existential_addr immutable_access [[PSTACK]] : $*any P to $*@opened
   // CHECK: [[F:%.*]] = function_ref @$s19opened_existentials1fSSyF : $@convention(thin) () -> @owned String

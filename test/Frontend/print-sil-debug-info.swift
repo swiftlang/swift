@@ -1,7 +1,7 @@
 // Just a simple test to see whether debug info is printed to SIL
 // if any of the '-g<kind>' (except '-gnone') is given.
 
-// RUN: %target-swift-frontend -emit-sil -gnone %s | %FileCheck --check-prefix=CHECK-GNONE %s
+// RUN: %target-swift-frontend -emit-sil -gnone %s -disable-experimental-serialize-debug-info | %FileCheck --check-prefix=CHECK-GNONE %s
 // RUN: %target-swift-frontend -emit-sil -gline-tables-only %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -g %s | %FileCheck %s
 

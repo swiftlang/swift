@@ -42,10 +42,10 @@ func asyncFunc() async {
 // async_Main
 // CHECK-SIL-LABEL: sil private @async_Main : $@convention(thin) @async () -> () {
 // call main
-// CHECK-SIL:  %0 = metatype $@thin MyProgram.Type             // user: %2
+// CHECK-SIL:  %0 = metatype $@thin MyProgram.Type, loc {{.*}}            // user: %2
 // CHECK-SIL-NEXT:  // function_ref static MyProgram.$main()
-// CHECK-SIL-NEXT:  %1 = function_ref @$s10async_main9MyProgramV5$mainyyYaKFZ : $@convention(method) @async (@thin MyProgram.Type) -> @error any Error // user: %2
-// CHECK-SIL-NEXT:  try_apply %1(%0) : $@convention(method) @async (@thin MyProgram.Type) -> @error any Error, normal bb1, error bb2 // id: %2
+// CHECK-SIL-NEXT:  %1 = function_ref @$s10async_main9MyProgramV5$mainyyYaKFZ : $@convention(method) @async (@thin MyProgram.Type) -> @error any Error, scope {{.*}} // user: %2
+// CHECK-SIL-NEXT:  try_apply %1(%0) : $@convention(method) @async (@thin MyProgram.Type) -> @error any Error, normal bb1, error bb2, scope {{.*}} // id: %2
 
 // unwrap error and exit or explode
 // CHECK-SIL: bb1(%3 : $()):

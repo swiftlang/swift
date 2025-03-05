@@ -19,9 +19,9 @@
 // CHECK:   [[FUNC:%.*]] = function_ref @$s22hoptomainactorifneeded11testClosureyyYaFyyScMYccfU_ : $@convention(thin) () -> ()
 // CHECK:   [[TTFI:%.*]] = thin_to_thick_function [[FUNC]] : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
 // CHECK:   [[THUNKED:%.*]] = thunk [hop_to_mainactor_if_needed] [[TTFI]]()
-// CHECK:   [[BLOCK:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> () // users: %16, %12, %9
-// CHECK:   [[BLOCK_PROJECT:%.*]] = project_block_storage [[BLOCK]] : $*@block_storage @callee_guaranteed () -> () // users: %15, %10
-// CHECK:   store [[THUNKED]] to [init] [[BLOCK_PROJECT]] : $*@callee_guaranteed () -> () // id: %10
+// CHECK:   [[BLOCK:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> (), loc {{.*}}, scope {{.*}} // users: %16, %12, %9
+// CHECK:   [[BLOCK_PROJECT:%.*]] = project_block_storage [[BLOCK]] : $*@block_storage @callee_guaranteed () -> (), loc {{.*}} scope {{.*}} // users: %15, %10
+// CHECK:   store [[THUNKED]] to [init] [[BLOCK_PROJECT]] : $*@callee_guaranteed () -> (), loc {{.*}}, scope {{.*}} // id: %10
 // CHECK: } // end sil function '$s22hoptomainactorifneeded11testClosureyyYaF'
 
 // Check that we actually emit the thunk and call taskRunOnMainActor.

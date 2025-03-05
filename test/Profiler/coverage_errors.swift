@@ -194,7 +194,7 @@ enum SomeErr : Error {
 // CHECK:       increment_profiler_counter 1
 //
 // CHECK:       [[BB_NORMAL]]
-// CHECK:       [[METHOD:%[0-9]+]] = function_ref @$s15coverage_errors1SV14throwingMethodSiyKF : $@convention(method) (S) -> (Int, @error any Error) // user: %5
+// CHECK:       [[METHOD:%[0-9]+]] = function_ref @$s15coverage_errors1SV14throwingMethodSiyKF : $@convention(method) (S) -> (Int, @error any Error), loc {{.*}}, scope {{.*}} // user: %5
 // CHECK:       try_apply [[METHOD]]({{%[0-9]+}}) : $@convention(method) (S) -> (Int, @error any Error), normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERR:bb[0-9]+]]
 //
 // CHECK:       [[BB_ERR]]

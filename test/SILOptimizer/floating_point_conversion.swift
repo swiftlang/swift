@@ -11,7 +11,11 @@ func convert<
 // CHECK-LABEL: sil @$s4test0A13DoubleToFloatySfSdF
 // CHECK:      bb0(%0 : $Double):
 // CHECK:        struct_extract %0 : $Double, #Double._value
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: debug_value
 // CHECK-NEXT:   builtin "fptrunc_FPIEEE64_FPIEEE32"
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: debug_value
 // CHECK-NEXT:   struct $Float
 // CHECK-NEXT:   return
 // CHECK-NEXT: } // end sil function '$s4test0A13DoubleToFloatySfSdF'
@@ -22,7 +26,11 @@ public func testDoubleToFloat(_ x: Double) -> Float {
 // CHECK-LABEL: sil @$s4test0A13FloatToDoubleySdSfF
 // CHECK:      bb0(%0 : $Float):
 // CHECK:        struct_extract %0 : $Float, #Float._value
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: debug_value
 // CHECK-NEXT:   builtin "fpext_FPIEEE32_FPIEEE64"
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: debug_value
 // CHECK-NEXT:   struct $Double
 // CHECK-NEXT:   return
 // CHECK-NEXT: } // end sil function '$s4test0A13FloatToDoubleySdSfF'
