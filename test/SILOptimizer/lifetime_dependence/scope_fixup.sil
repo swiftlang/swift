@@ -153,31 +153,87 @@ sil [ossa] @addressableArg : $@convention(thin) (@in_guaranteed Holder) -> @life
 
 // CHECK-LABEL: sil hidden [ossa] @testAddressableArg : $@convention(thin) (@guaranteed Holder) -> () {
 // CHECK: bb0(%0 : @guaranteed $Holder):
+// CHECK: [[BORROWA:%.*]] = begin_borrow %0
+// CHECK: [[BORROWB:%.*]] = begin_borrow [[BORROWA]]
 // CHECK: [[ALLOC:%.*]] = alloc_stack $Holder
-// CHECK: [[SB:%.*]] = store_borrow %0 to [[ALLOC]]
+// CHECK: [[SB:%.*]] = store_borrow [[BORROWB]] to [[ALLOC]]
 // CHECK: [[APPLY:%.*]] = apply %{{.*}}([[SB]]) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
 // CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[APPLY]] on [[SB]]
 // CHECK: [[MV:%.*]] = move_value [var_decl] [[MD]]
 // CHECK: apply %{{.*}}([[MV]]) : $@convention(thin) (@guaranteed NE) -> ()
 // CHECK: destroy_value [[MV]]
 // CHECK: end_borrow [[SB]]
+// CHECK: end_borrow [[BORROWB]]
+// CHECK: end_borrow [[BORROWA]]
 // CHECK: dealloc_stack [[ALLOC]]
 // CHECK-LABEL: } // end sil function 'testAddressableArg'
 sil hidden [ossa] @testAddressableArg : $@convention(thin) (@guaranteed Holder) -> () {
 bb0(%0 : @guaranteed $Holder):
   debug_value %0, let, name "arg", argno 1
-  %2 = alloc_stack $Holder
-  %3 = store_borrow %0 to %2
-  %4 = function_ref @addressableArg : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
-  %5 = apply %4(%3) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
-  %6 = mark_dependence [unresolved] %5 on %3
-  end_borrow %3
-  %8 = move_value [var_decl] %6
-  debug_value %8, let, name "ne"
-  %useNE = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
-  %18 = apply %useNE(%8) : $@convention(thin) (@guaranteed NE) -> ()
-  destroy_value %8
-  dealloc_stack %2
+  %borrow0a = begin_borrow %0 : $Holder
+  %borrow0b = begin_borrow %borrow0a : $Holder
+  // store-borrow
+  %sballoc = alloc_stack $Holder
+  %sb = store_borrow %borrow0b to %sballoc
+  %fdep = function_ref @addressableArg : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+  %ne = apply %fdep(%sb) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+  %nedep = mark_dependence [unresolved] %ne on %sb
+  end_borrow %sb
+  end_borrow %borrow0b : $Holder
+  end_borrow %borrow0a : $Holder
+  %nevar = move_value [var_decl] %nedep
+  debug_value %nevar, let, name "ne"
+  %fuse = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %user = apply %fuse(%nevar) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %nevar
+  dealloc_stack %sballoc
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testIndirectYield : $@convention(thin) (@guaranteed Holder) -> () {
+// CHECK: bb0(%0 : @guaranteed $Holder):
+// CHECK: [[BORROW0A:%.*]] = begin_borrow %0
+// CHECK: [[BORROW0B:%.*]] = begin_borrow %0
+// CHECK: [[BORROW0C:%.*]] = begin_borrow %0
+// CHECK: ([[YIELD1:%.*]], [[TOKEN1:%.*]]) = begin_apply undef([[BORROW0A:%.*]], [[BORROW0B:%.*]]) : $@yield_once @convention(thin) (@guaranteed Holder, @guaranteed Holder) -> @lifetime(borrow 0, borrow 1) @yields @guaranteed Holder
+// CHECK: ([[YIELD2:%.*]], [[TOKEN2:%.*]]) = begin_apply undef([[BORROW0C:%.*]], [[YIELD1:%.*]]) : $@yield_once @convention(thin) (@guaranteed Holder, @guaranteed Holder) -> @lifetime(borrow 0, borrow 1) @yields @inout Holder
+// CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[YIELD2]]
+// CHECK: apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+// CHECK: mark_dependence [unresolved]
+// CHECK: [[NE:%.*]] = move_value [var_decl]
+// CHECK: apply %{{.*}}(%{{.*}}) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK: destroy_value [[NE]]
+// CHECK: end_access [[ACCESS]]
+// CHECK: end_apply [[TOKEN2]] as $()
+// CHECK: end_apply [[TOKEN1]] as $()
+// CHECK-DAG: end_borrow [[BORROW0C]]
+// CHECK-DAG: end_borrow [[BORROW0B]]
+// CHECK-DAG: end_borrow [[BORROW0A]]
+// CHECK-LABEL: } // end sil function 'testIndirectYield'
+sil hidden [ossa] @testIndirectYield : $@convention(thin) (@guaranteed Holder) -> () {
+bb0(%0 : @guaranteed $Holder):
+  debug_value %0, let, name "arg", argno 1
+  %borrow0a = begin_borrow %0 : $Holder
+  %borrow0b = begin_borrow %0 : $Holder
+  %borrow0c = begin_borrow %0 : $Holder
+  (%yieldval, %tokena) = begin_apply undef(%borrow0a, %borrow0b) : $@yield_once @convention(thin) (@guaranteed Holder, @guaranteed Holder) -> @lifetime(borrow 0, borrow 1) @yields @guaranteed Holder
+  (%yieldaddr, %tokenb) = begin_apply undef(%borrow0c, %yieldval) : $@yield_once @convention(thin) (@guaranteed Holder, @guaranteed Holder) -> @lifetime(borrow 0, borrow 1) @yields @inout Holder
+  %access = begin_access [read] [dynamic] %yieldaddr
+  %fdep = function_ref @addressableArg : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+  %ne = apply %fdep(%access) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+  %nedep = mark_dependence [unresolved] %ne on %access
+  end_access %access
+  end_apply %tokenb as $()
+  end_apply %tokena as $()
+  end_borrow %borrow0c : $Holder
+  end_borrow %borrow0b : $Holder
+  end_borrow %borrow0a : $Holder
+  %nevar = move_value [var_decl] %nedep
+  debug_value %nevar, let, name "ne"
+  %fuse = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %user = apply %fuse(%nevar) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %nevar
   %99 = tuple ()
   return %99 : $()
 }
