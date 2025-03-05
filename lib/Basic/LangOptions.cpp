@@ -51,6 +51,9 @@ LangOptions::LangOptions() {
   disableFeature(Feature::ExtensionMacros);
 #endif
 
+  // ASTGen.
+  enableFeature(Feature::ParserASTGen);
+
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
   if (DefaultOn) \
