@@ -158,7 +158,6 @@ internal func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
 }
 
-#if !$Embedded
 /// Returns a Boolean value indicating whether two types are identical.
 ///
 /// - Parameters:
@@ -176,11 +175,7 @@ public func == (
   case (.none, .none):
     return true
   case let (.some(ty0), .some(ty1)):
-    // FIXME: this should read `Bool(Builtin.is_same_metatype(ty0, ty1))`,
-    // but that currently requires copyability/escapability (rdar://145707064)
-    let p1 = unsafeBitCast(ty0, to: UnsafeRawPointer.self)
-    let p2 = unsafeBitCast(ty1, to: UnsafeRawPointer.self)
-    return p1 == p2
+    return Bool(Builtin.is_same_metatype(ty0, ty1))
   default:
     return false
   }
@@ -202,6 +197,9 @@ public func != (
   !(t0 == t1)
 }
 
+#if !$Embedded
+// Embedded Swift is unhappy about conversions from `Any.Type` to
+// `any (~Copyable & ~Escapable).Type` (rdar://145706221)
 @usableFromInline
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 internal func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
@@ -217,37 +215,6 @@ internal func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 internal func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
   !(t0 == t1)
-}
-#else
-// FIXME: $Embedded doesn't grok `any (~Copyable & Escapable).Type` yet (rdar://145706221)
-
-/// Returns a Boolean value indicating whether two types are identical.
-///
-/// - Parameters:
-///   - t0: A type to compare.
-///   - t1: Another type to compare.
-/// - Returns: `true` if both `t0` and `t1` are `nil` or if they represent the
-///   same type; otherwise, `false`.
-@inlinable @_transparent
-public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
-  switch (t0, t1) {
-  case (.none, .none): return true
-  case let (.some(ty0), .some(ty1)):
-    return Bool(Builtin.is_same_metatype(ty0, ty1))
-  default: return false
-  }
-}
-
-/// Returns a Boolean value indicating whether two types are not identical.
-///
-/// - Parameters:
-///   - t0: A type to compare.
-///   - t1: Another type to compare.
-/// - Returns: `true` if one, but not both, of `t0` and `t1` are `nil`, or if
-///   they represent different types; otherwise, `false`.
-@inlinable @_transparent
-public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
-  return !(t0 == t1)
 }
 #endif
 
