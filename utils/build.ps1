@@ -1034,7 +1034,6 @@ function Build-CMakeProject {
     [string[]] $UseMSVCCompilers = @(), # C,CXX
     [string[]] $UseBuiltCompilers = @(), # ASM,C,CXX,Swift
     [string[]] $UsePinnedCompilers = @(), # ASM,C,CXX,Swift
-    [switch] $UseSwiftSwiftDriver = $false,
     [switch] $AddAndroidCMakeEnv = $false,
     [switch] $UseGNUDriver = $false,
     [string] $SwiftSDK = "",
@@ -1072,14 +1071,6 @@ function Build-CMakeProject {
       } else {
         $env:SCCACHE_DIR = $Cache
       }
-    }
-    if ($UseSwiftSwiftDriver) {
-      $env:SWIFT_DRIVER_SWIFT_FRONTEND_EXEC = ([IO.Path]::Combine($CompilersBinaryCache, "bin", "swift-frontend.exe"))
-    }
-
-    # TODO(compnerd) workaround swiftc.exe symlink not existing.
-    if ($UseSwiftSwiftDriver) {
-      Copy-Item -Force ([IO.Path]::Combine($DriverBinaryCache, "bin", "swift-driver.exe")) ([IO.Path]::Combine($DriverBinaryCache, "bin", "swiftc.exe"))
     }
 
     # Add additional defines (unless already present)
@@ -1218,9 +1209,7 @@ function Build-CMakeProject {
     if ($UsePinnedCompilers.Contains("Swift") -Or $UseBuiltCompilers.Contains("Swift")) {
       $SwiftArgs = @()
 
-      if ($UseSwiftSwiftDriver) {
-        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER ([IO.Path]::Combine($DriverBinaryCache, "bin", "swiftc.exe"))
-      } elseif ($UseBuiltCompilers.Contains("Swift")) {
+      if ($UseBuiltCompilers.Contains("Swift")) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", "swiftc.exe"))
       } else {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER (Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath  "swiftc.exe")
