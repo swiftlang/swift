@@ -12,6 +12,7 @@
 
 // OutputSpan<Element> represents a span of memory which contains
 // a variable number of `Element` instances, followed by uninitialized memory.
+@safe
 @frozen
 @available(SwiftStdlib 6.2, *)
 public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
@@ -25,7 +26,7 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
 
   @_alwaysEmitIntoClient
   internal func _start() -> UnsafeMutableRawPointer {
-    _pointer.unsafelyUnwrapped
+    unsafe _pointer._unsafelyUnwrappedUnchecked
   }
 
   @_alwaysEmitIntoClient
@@ -39,9 +40,11 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
 
   deinit {
     if _initialized > 0 {
-      _start().withMemoryRebound(to: Element.self, capacity: _initialized) {
+      unsafe _start().withMemoryRebound(
+        to: Element.self, capacity: _initialized
+      ) {
         [ workaround = _initialized ] in
-        _ = $0.deinitialize(count: workaround)
+        _ = unsafe $0.deinitialize(count: workaround)
       }
     }
   }
@@ -53,7 +56,7 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
     capacity: Int,
     initialized: Int
   ) {
-    _pointer = start
+    _pointer = unsafe start
     self.capacity = capacity
     _initialized = initialized
   }
@@ -85,7 +88,7 @@ extension OutputSpan where Element: ~Copyable  {
   ) {
     _precondition(
       ((Int(bitPattern: buffer.baseAddress) &
-        (MemoryLayout<Element>.alignment&-1)) == 0),
+        (MemoryLayout<Element>.alignment &- 1)) == 0),
       "baseAddress must be properly aligned to access Element"
     )
     self.init(_unchecked: buffer, initialized: initialized)
@@ -99,9 +102,9 @@ extension OutputSpan where Element: ~Copyable  {
 //    initialized: Int = 0
 //  ) {
 //    _precondition(capacity >= 0, "Capacity must be 0 or greater")
-//    let buffer = UnsafeMutableBufferPointer(start: pointer, count: capacity)
-//    let os = OutputSpan(_initializing: buffer, initialized: initialized)
-//    self = _overrideLifetime(os, borrowing: pointer)
+//    let buf = unsafe UnsafeMutableBufferPointer(start: pointer, count: capacity)
+//    let os = OutputSpan(_initializing: buf, initialized: initialized)
+//    self = unsafe _overrideLifetime(os, borrowing: pointer)
 //  }
 }
 
@@ -114,9 +117,9 @@ extension OutputSpan {
 //    _initializing buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>,
 //    initialized: Int = 0
 //  ) {
-//    let rebased = UnsafeMutableBufferPointer(rebasing: buffer)
+//    let rebased = unsafe UnsafeMutableBufferPointer(rebasing: buffer)
 //    let os = OutputSpan(_initializing: rebased, initialized: 0)
-//    self = _overrideLifetime(os, borrowing: buffer)
+//    self = unsafe _overrideLifetime(os, borrowing: buffer)
 //  }
 }
 
@@ -141,7 +144,7 @@ extension OutputSpan where Element: BitwiseCopyable {
 //    let os = OutputSpan(
 //      _unchecked: pointer, capacity: count, initialized: initialized
 //    )
-//    self = _overrideLifetime(os, borrowing: bytes)
+//    self = unsafe _overrideLifetime(os, borrowing: bytes)
 //  }
 
 //  @_alwaysEmitIntoClient
@@ -152,9 +155,9 @@ extension OutputSpan where Element: BitwiseCopyable {
 //    initialized: Int = 0
 //  ) {
 //    _precondition(capacity >= 0, "Capacity must be 0 or greater")
-//    let buffer = UnsafeMutableRawBufferPointer(start: pointer, count: capacity)
-//    let os = OutputSpan(_initializing: buffer, initialized: initialized)
-//    self = _overrideLifetime(os, borrowing: pointer)
+//    let buf = unsafe UnsafeMutableRawBufferPointer(start: pointer, count: capacity)
+//    let os = OutputSpan(_initializing: buf, initialized: initialized)
+//    self = unsafe _overrideLifetime(os, borrowing: pointer)
 //  }
 
 //  @_alwaysEmitIntoClient
@@ -163,9 +166,9 @@ extension OutputSpan where Element: BitwiseCopyable {
 //    _initializing buffer: borrowing Slice<UnsafeMutableRawBufferPointer>,
 //    initialized: Int = 0
 //  ) {
-//    let rebased = UnsafeMutableRawBufferPointer(rebasing: buffer)
+//    let rebased = unsafe UnsafeMutableRawBufferPointer(rebasing: buffer)
 //    let os = OutputSpan(_initializing: rebased, initialized: initialized)
-//    self = _overrideLifetime(os, borrowing: buffer)
+//    self = unsafe _overrideLifetime(os, borrowing: buffer)
 //  }
 }
 
@@ -175,8 +178,8 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public mutating func append(_ value: consuming Element) {
     _precondition(_initialized < capacity, "Output buffer overflow")
-    let p = _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
-    p.initializeMemory(as: Element.self, to: value)
+    let p = unsafe _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
+    unsafe p.initializeMemory(as: Element.self, to: value)
     _initialized &+= 1
   }
 
@@ -184,14 +187,14 @@ extension OutputSpan where Element: ~Copyable {
   public mutating func deinitializeLastElement() -> Element? {
     guard _initialized > 0 else { return nil }
     _initialized &-= 1
-    let p = _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
-    return p.withMemoryRebound(to: Element.self, capacity: 1, { $0.move() })
+    let p = unsafe _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
+    return unsafe p.withMemoryRebound(to: Element.self, capacity: 1, { unsafe $0.move() })
   }
 
   @_alwaysEmitIntoClient
   public mutating func deinitialize() {
-    _ = _start().withMemoryRebound(to: Element.self, capacity: _initialized) {
-      $0.deinitialize(count: _initialized)
+    _ = unsafe _start().withMemoryRebound(to: Element.self, capacity: _initialized) {
+      unsafe $0.deinitialize(count: _initialized)
     }
     _initialized = 0
   }
@@ -209,9 +212,9 @@ extension OutputSpan {
       "destination span cannot contain number of elements requested."
     )
     let offset = _initialized&*MemoryLayout<Element>.stride
-    let p = _start().advanced(by: offset)
-    p.withMemoryRebound(to: Element.self, capacity: count) {
-      $0.initialize(repeating: repeatedValue, count: count)
+    let p = unsafe _start().advanced(by: offset)
+    unsafe p.withMemoryRebound(to: Element.self, capacity: count) {
+      unsafe $0.initialize(repeating: repeatedValue, count: count)
     }
     _initialized &+= count
   }
@@ -231,8 +234,8 @@ extension OutputSpan {
   ) {
     while _initialized < capacity {
       guard let element = elements.next() else { break }
-      let p = _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
-      p.initializeMemory(as: Element.self, to: element)
+      let p = unsafe _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
+      unsafe p.initializeMemory(as: Element.self, to: element)
       _initialized &+= 1
     }
   }
@@ -249,11 +252,11 @@ extension OutputSpan {
     }
 
     let available = capacity &- _initialized
-    let tail = _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
+    let tail = unsafe _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
     var (iterator, copied) =
-    tail.withMemoryRebound(to: Element.self, capacity: available) {
-      let suffix = UnsafeMutableBufferPointer(start: $0, count: available)
-      return source._copyContents(initializing: suffix)
+    unsafe tail.withMemoryRebound(to: Element.self, capacity: available) {
+      let suffix = unsafe UnsafeMutableBufferPointer(start: $0, count: available)
+      return unsafe source._copyContents(initializing: suffix)
     }
     _precondition(
       iterator.next() == nil,
@@ -272,9 +275,9 @@ extension OutputSpan {
       source.count <= available,
       "destination span cannot contain every element from source."
     )
-    let tail = _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
+    let tail = unsafe _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
     _ = source.withUnsafeBufferPointer {
-      tail.initializeMemory(
+      unsafe tail.initializeMemory(
         as: Element.self, from: $0.baseAddress!, count: $0.count
       )
     }
@@ -282,7 +285,9 @@ extension OutputSpan {
   }
 
   @_alwaysEmitIntoClient
-  public mutating func append(fromContentsOf source: borrowing MutableSpan<Element>) {
+  public mutating func append(
+    fromContentsOf source: borrowing MutableSpan<Element>
+  ) {
     source.withUnsafeBufferPointer { append(fromContentsOf: $0) }
   }
 }
@@ -299,10 +304,10 @@ extension OutputSpan where Element: ~Copyable {
       source.count <= available,
       "buffer cannot contain every element from source."
     )
-    let buffer = source.relinquishBorrowedMemory()
+    let buffer = unsafe source.relinquishBorrowedMemory()
     // we must now deinitialize the returned UMBP
-    let tail = _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
-    tail.moveInitializeMemory(
+    let tail = unsafe _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
+    unsafe tail.moveInitializeMemory(
       as: Element.self, from: buffer.baseAddress!, count: buffer.count
     )
     _initialized &+= buffer.count
@@ -324,7 +329,9 @@ extension OutputSpan {
   public mutating func moveAppend(
     fromContentsOf source: Slice<UnsafeMutableBufferPointer<Element>>
   ) {
-    moveAppend(fromContentsOf: UnsafeMutableBufferPointer(rebasing: source))
+    moveAppend(
+      fromContentsOf: unsafe UnsafeMutableBufferPointer(rebasing: source)
+    )
   }
 }
 
@@ -340,10 +347,10 @@ extension OutputSpan where Element: ~Copyable {
   public var span: Span<Element> {
     @lifetime(borrow self)
     borrowing get {
-      let pointer = _pointer?.assumingMemoryBound(to: Element.self)
-      let buffer = UnsafeBufferPointer(start: pointer, count: _initialized)
+      let pointer = unsafe _pointer?.assumingMemoryBound(to: Element.self)
+      let buffer = unsafe UnsafeBufferPointer(start: pointer, count: _initialized)
       let span = Span(_unsafeElements: buffer)
-      return _overrideLifetime(span, borrowing: self)
+      return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 
@@ -351,10 +358,12 @@ extension OutputSpan where Element: ~Copyable {
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(borrow self)
     mutating get {
-      let pointer = _pointer?.assumingMemoryBound(to: Element.self)
-      let buffer = UnsafeMutableBufferPointer(start: pointer, count: _initialized)
+      let pointer = unsafe _pointer?.assumingMemoryBound(to: Element.self)
+      let buffer = unsafe UnsafeMutableBufferPointer(
+        start: pointer, count: _initialized
+      )
       let span = MutableSpan(_unsafeElements: buffer)
-      return _overrideLifetime(span, mutating: &self)
+      return unsafe _overrideLifetime(span, mutating: &self)
     }
   }
 }
@@ -362,22 +371,27 @@ extension OutputSpan where Element: ~Copyable {
 @available(SwiftStdlib 6.2, *)
 extension OutputSpan where Element: ~Copyable {
 
+  @unsafe
   @_alwaysEmitIntoClient
-  public consuming func relinquishBorrowedMemory() -> UnsafeMutableBufferPointer<Element> {
+  public consuming func relinquishBorrowedMemory(
+  ) -> UnsafeMutableBufferPointer<Element> {
     let (start, count) = (self._pointer, self._initialized)
     discard self
-    let typed = start?.bindMemory(to: Element.self, capacity: count)
-    return .init(start: typed, count: count)
+    let typed = unsafe start?.bindMemory(to: Element.self, capacity: count)
+    return unsafe UnsafeMutableBufferPointer(start: typed, count: count)
   }
 }
 
 @available(SwiftStdlib 6.2, *)
 extension OutputSpan where Element: BitwiseCopyable {
 
+  @unsafe
   @_alwaysEmitIntoClient
-  public consuming func relinquishBorrowedBytes() -> UnsafeMutableRawBufferPointer {
+  public consuming func relinquishBorrowedBytes(
+  ) -> UnsafeMutableRawBufferPointer {
     let (start, count) = (self._pointer, self._initialized)
     discard self
-    return .init(start: start, count: count&*MemoryLayout<Element>.stride)
+    let byteCount = count&*MemoryLayout<Element>.stride
+    return unsafe UnsafeMutableRawBufferPointer(start: start, count: byteCount)
   }
 }
