@@ -486,53 +486,6 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   return mainDependencies;
 }
 
-/// Retrieve the module dependencies for the Clang module with the given name.
-std::optional<const ModuleDependencyInfo *>
-ModuleDependencyScanner::getNamedClangModuleDependencyInfo(
-    StringRef moduleName, ModuleDependenciesCache &cache,
-    ModuleDependencyIDSetVector &discoveredClangModules) {
-  // Check whether we've cached this result.
-  auto moduleID = ModuleDependencyID{moduleName.str(),
-                                     ModuleDependencyKind::Clang};
-  if (auto found = cache.findDependency(moduleID)) {
-    discoveredClangModules.insert(moduleID);
-    auto directClangDeps = cache.getImportedClangDependencies(moduleID);
-    ModuleDependencyIDSetVector reachableClangModules;
-    reachableClangModules.insert(directClangDeps.begin(),
-                                 directClangDeps.end());
-    for (unsigned currentModuleIdx = 0;
-         currentModuleIdx < reachableClangModules.size();
-         ++currentModuleIdx) {
-      auto moduleID = reachableClangModules[currentModuleIdx];
-      auto dependencies =
-        cache.findKnownDependency(moduleID).getImportedClangDependencies();
-      reachableClangModules.insert(dependencies.begin(), dependencies.end());
-    }
-    discoveredClangModules.insert(reachableClangModules.begin(),
-                                  reachableClangModules.end());
-    return found;
-  }
-
-  // Otherwise perform filesystem scan
-  auto moduleIdentifier = getModuleImportIdentifier(moduleName);
-  auto moduleDependencies = withDependencyScanningWorker(
-      [&cache, moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
-        return ScanningWorker->scanFilesystemForClangModuleDependency(
-          moduleIdentifier, cache.getModuleOutputPath(),
-          cache.getAlreadySeenClangModules(),
-          cache.getScanService().getPrefixMapper());
-      });
-  if (moduleDependencies.empty())
-    return std::nullopt;
-
-  discoveredClangModules.insert(moduleID);
-  for (const auto &dep : moduleDependencies)
-    discoveredClangModules.insert(dep.first);
-
-  cache.recordDependencies(moduleDependencies);
-  return cache.findDependency(moduleID);
-}
-
 /// Retrieve the module dependencies for the Swift module with the given name.
 std::optional<const ModuleDependencyInfo *>
 ModuleDependencyScanner::getNamedSwiftModuleDependencyInfo(
