@@ -33,6 +33,23 @@ var funcForVar: Int = 0
 @abi(var varForFunc_abi: Int) // expected-error {{cannot give global function 'varForFunc()' the ABI of a pattern binding}}
 func varForFunc() {}
 
+struct SameKind {
+  @abi(subscript(sub1 _: Int) -> Int)
+  subscript(sub1 _: Int) -> Int { 0 }
+
+  @abi(func sub2(_: Int) -> Int) // expected-error {{cannot give subscript 'subscript(sub2:)' the ABI of a instance method}}
+  subscript(sub2 _: Int) -> Int { 0 }
+
+  @abi(subscript(sub3 _: Int) -> Int) // expected-error {{cannot give instance method 'sub3' the ABI of a subscript}}
+  func sub3(_: Int) -> Int { 0 }
+
+  @abi(var sub4: Int) // expected-error {{cannot give subscript 'subscript(sub4:)' the ABI of a pattern binding}}
+  subscript(sub4 _: Int) -> Int { 0 }
+
+  @abi(subscript(sub4 _: Int) -> Int) // expected-error {{cannot give property 'sub4' the ABI of a subscript}}
+  var sub4: Int { 0 }
+}
+
 //
 // Function arity checking
 //
@@ -90,6 +107,58 @@ func param01_generic11<T>(_: Int) -> T { fatalError() }
 
 @abi(func param11_generic11<T>(_: Int) -> T)
 func param11_generic11<T>(_: Int) -> T { fatalError() }
+
+
+
+struct SubscriptArity {
+  @abi(subscript(param11_generic00 _: Int) -> Int)
+  subscript(param11_generic00 _: Int) -> Int { 0 }
+
+  @abi(subscript(param21_generic00 _: Int, _: Int) -> Int) // expected-error {{cannot give subscript 'subscript(param21_generic00:)' the ABI of a subscript with a different number of parameters}}
+  subscript(param21_generic00 _: Int) -> Int { 0 }
+
+  @abi(subscript(param12_generic00 _: Int) -> Int) // expected-error {{cannot give subscript 'subscript(param12_generic00:_:)' the ABI of a subscript with a different number of parameters}}
+  subscript(param12_generic00 _: Int, _: Int) -> Int { 0 }
+
+  @abi(subscript(param22_generic00 _: Int, _: Int) -> Int)
+  subscript(param22_generic00 _: Int, _: Int) -> Int { 0 }
+
+  @abi(subscript<T>(param11_generic10 _: T) -> Int) // expected-error {{declaration in '@abi' should not have generic signature because 'subscript(param11_generic10:)' is not generic}}
+  subscript(param11_generic10 _: Int) -> Int { 0 }
+
+  @abi(subscript<T>(param21_generic10 _: T, _: Int) -> Int) // expected-error {{declaration in '@abi' should not have generic signature because 'subscript(param21_generic10:)' is not generic}}
+  subscript(param21_generic10 _: Int) -> Int { 0 }
+
+  @abi(subscript<T>(param12_generic10 _: T) -> Int) // expected-error {{declaration in '@abi' should not have generic signature because 'subscript(param12_generic10:_:)' is not generic}}
+  subscript(param12_generic10 _: Int, _: Int) -> Int { 0 }
+
+  @abi(subscript<T>(param22_generic10 _: T, _: Int) -> Int) // expected-error {{declaration in '@abi' should not have generic signature because 'subscript(param22_generic10:_:)' is not generic}}
+  subscript(param22_generic10 _: Int, _: Int) -> Int { 0 }
+
+  @abi(subscript(param11_generic01 _: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable>'}}
+  subscript<T>(param11_generic01 _: T) -> Int { 0 }
+
+  @abi(subscript(param21_generic01 _: Int, _: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable>'}}
+  subscript<T>(param21_generic01 _: T) -> Int { 0 }
+
+  @abi(subscript(param12_generic01 _: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable>'}}
+  subscript<T>(param12_generic01 _: T, _: Int) -> Int { 0 }
+
+  @abi(subscript(param22_generic01 _: Int, _: Int) -> Int) // expected-error {{declaration in '@abi' should have generic signature compatible with '<T where T : Copyable, T : Escapable>'}}
+  subscript<T>(param22_generic01 _: T, _: Int) -> Int { 0 }
+
+  @abi(subscript<T>(param11_generic11 _: T) -> Int)
+  subscript<T>(param11_generic11 _: T) -> Int { 0 }
+
+  @abi(subscript<T>(param21_generic11 _: T, _: Int) -> Int) // expected-error {{cannot give subscript 'subscript(param21_generic11:)' the ABI of a subscript with a different number of parameters}}
+  subscript<T>(param21_generic11 _: T) -> Int { 0 }
+
+  @abi(subscript<T>(param12_generic11 _: T) -> Int) // expected-error {{cannot give subscript 'subscript(param12_generic11:_:)' the ABI of a subscript with a different number of parameters}}
+  subscript<T>(param12_generic11 _: T, _: Int) -> Int { 0 }
+
+  @abi(subscript<T>(param22_generic11 _: T, _: Int) -> Int)
+  subscript<T>(param22_generic11 _: T, _: Int) -> Int { 0 }
+}
 
 //
 // Throws effect checking
