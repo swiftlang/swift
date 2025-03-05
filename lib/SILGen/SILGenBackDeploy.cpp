@@ -225,8 +225,7 @@ bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
   // high enough that the ABI implementation of the back deployed declaration is
   // guaranteed to be available.
   auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
-  auto declAvailability =
-      AvailabilityRange(VersionRange::allGTE(*backDeployBeforeVersion));
+  auto declAvailability = AvailabilityRange(*backDeployBeforeVersion);
   if (deploymentAvailability.isContainedIn(declAvailability))
     return false;
 

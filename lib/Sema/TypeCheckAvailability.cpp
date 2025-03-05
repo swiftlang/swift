@@ -1425,7 +1425,7 @@ private:
     llvm::VersionTuple Version =
         (GetRuntimeContext ? Spec.getRuntimeVersion() : Spec.getVersion());
 
-    return AvailabilityRange(VersionRange::allGTE(Version));
+    return AvailabilityRange(Version);
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -1953,10 +1953,9 @@ static void findAvailabilityFixItNodes(
 
 /// Emit a diagnostic note and Fix-It to add an @available attribute
 /// on the given declaration for the given version range.
-static void
-fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
-                       const AvailabilityRange &RequiredAvailability,
-                       ASTContext &Context) {
+static void fixAvailabilityForDecl(
+    SourceRange ReferenceRange, const Decl *D, AvailabilityDomain Domain,
+    const AvailabilityRange &RequiredAvailability, ASTContext &Context) {
   assert(D);
 
   // Don't suggest adding an @available() to a declaration where we would
@@ -1989,11 +1988,10 @@ fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
 
   StringRef OriginalIndent =
       Lexer::getIndentationForLine(Context.SourceMgr, InsertLoc);
-  PlatformKind Target = targetPlatform(Context.LangOpts);
 
   D->diagnose(diag::availability_add_attribute, KindForDiagnostic)
       .fixItInsert(InsertLoc, diag::insert_available_attr,
-                   platformString(Target),
+                   Domain.getNameForAttributePrinting(),
                    RequiredAvailability.getVersionString(), OriginalIndent);
 }
 
@@ -2004,14 +2002,19 @@ fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
 /// condition to the required range.
 static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC,
-    const AvailabilityRange &RequiredAvailability, ASTContext &Context,
-    InFlightDiagnostic &Err) {
+    AvailabilityDomain Domain, const AvailabilityRange &RequiredAvailability,
+    ASTContext &Context, InFlightDiagnostic &Err) {
+  // FIXME: [availability] Support fixing availability for non-platform domains
+  if (!Domain.isPlatform())
+    return false;
+
   const AvailabilityScope *scope = nullptr;
   (void)TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
                                                            ReferenceDC, &scope);
   if (!scope)
     return false;
 
+  // FIXME: [availability] Support fixing availability for versionless domains.
   auto ExplicitAvailability = scope->getExplicitAvailabilityRange();
   if (ExplicitAvailability && !RequiredAvailability.isAlwaysAvailable() &&
       scope->getReason() != AvailabilityScope::Reason::Root &&
@@ -2123,9 +2126,14 @@ static void fixAvailabilityByAddingVersionCheck(
 /// requiting the given OS version range.
 static void fixAvailability(SourceRange ReferenceRange,
                             const DeclContext *ReferenceDC,
+                            AvailabilityDomain Domain,
                             const AvailabilityRange &RequiredAvailability,
                             ASTContext &Context) {
   if (ReferenceRange.isInvalid())
+    return;
+
+  // FIXME: [availability] Support non-platform domains.
+  if (!Domain.isPlatform())
     return;
 
   std::optional<ASTNode> NodeToWrapInVersionCheck;
@@ -2145,12 +2153,12 @@ static void fixAvailability(SourceRange ReferenceRange,
 
   // Suggest adding availability attributes.
   if (FoundMemberDecl) {
-    fixAvailabilityForDecl(ReferenceRange, FoundMemberDecl,
+    fixAvailabilityForDecl(ReferenceRange, FoundMemberDecl, Domain,
                            RequiredAvailability, Context);
   }
 
   if (FoundTypeLevelDecl) {
-    fixAvailabilityForDecl(ReferenceRange, FoundTypeLevelDecl,
+    fixAvailabilityForDecl(ReferenceRange, FoundTypeLevelDecl, Domain,
                            RequiredAvailability, Context);
   }
 }
@@ -2158,31 +2166,37 @@ static void fixAvailability(SourceRange ReferenceRange,
 static void diagnosePotentialUnavailability(
     SourceRange ReferenceRange,
     llvm::function_ref<InFlightDiagnostic(AvailabilityDomain,
-                                          llvm::VersionTuple)>
+                                          AvailabilityRange)>
         Diagnose,
-    const DeclContext *ReferenceDC, const AvailabilityRange &Availability) {
+    const DeclContext *ReferenceDC, AvailabilityDomain Domain,
+    const AvailabilityRange &Availability) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
   {
-    auto Err = Diagnose(Context.getTargetAvailabilityDomain(),
-                        Availability.getRawMinimumVersion());
+    auto Err = Diagnose(Domain, Availability);
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(
-            ReferenceRange, ReferenceDC, Availability, Context, Err))
+            ReferenceRange, ReferenceDC, Domain, Availability, Context, Err))
       return;
   }
-  fixAvailability(ReferenceRange, ReferenceDC, Availability, Context);
+  fixAvailability(ReferenceRange, ReferenceDC, Domain, Availability, Context);
 }
 
+// FIXME: [availability] Should this take an AvailabilityContext instead of
+// AvailabilityRange?
 bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
                                     AvailabilityRange RequiredAvailability,
                                     const DeclContext *ReferenceDC,
                                     llvm::function_ref<InFlightDiagnostic(
-                                        AvailabilityDomain, llvm::VersionTuple)>
+                                        AvailabilityDomain, AvailabilityRange)>
                                         Diagnose) {
   ASTContext &ctx = ReferenceDC->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
+    return false;
+
+  auto domain = ctx.getTargetAvailabilityDomain();
+  if (domain.isUniversal())
     return false;
 
   auto availabilityAtLocation =
@@ -2190,7 +2204,7 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
                                                          ReferenceDC);
   if (!availabilityAtLocation.isContainedIn(RequiredAvailability)) {
     diagnosePotentialUnavailability(ReferenceRange, Diagnose, ReferenceDC,
-                                    RequiredAvailability);
+                                    domain, RequiredAvailability);
     return true;
   }
 
@@ -2199,13 +2213,13 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
 
 bool TypeChecker::checkAvailability(
     SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
-    Diag<AvailabilityDomain, llvm::VersionTuple> Diag,
+    Diag<AvailabilityDomain, AvailabilityRange> Diag,
     const DeclContext *ReferenceDC) {
   auto &Diags = ReferenceDC->getASTContext().Diags;
   return TypeChecker::checkAvailability(
       ReferenceRange, RequiredAvailability, ReferenceDC,
-      [&](AvailabilityDomain domain, llvm::VersionTuple version) {
-        return Diags.diagnose(ReferenceRange.Start, Diag, domain, version);
+      [&](AvailabilityDomain domain, AvailabilityRange range) {
+        return Diags.diagnose(ReferenceRange.Start, Diag, domain, range);
       });
 }
 
@@ -2214,27 +2228,33 @@ void TypeChecker::checkConcurrencyAvailability(SourceRange ReferenceRange,
   checkAvailability(
       ReferenceRange,
       ReferenceDC->getASTContext().getBackDeployedConcurrencyAvailability(),
-      diag::availability_concurrency_only_version_newer,
-      ReferenceDC);
+      diag::availability_concurrency_only_version_newer, ReferenceDC);
 }
 
 static bool
-requiresDeploymentTargetOrEarlier(const AvailabilityRange &availability,
+requiresDeploymentTargetOrEarlier(AvailabilityDomain domain,
+                                  const AvailabilityRange &availability,
                                   ASTContext &ctx) {
-  auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
-  return deploymentTarget.isContainedIn(availability);
+  if (auto deploymentRange = domain.getDeploymentRange(ctx))
+    return deploymentRange->isContainedIn(availability);
+  return false;
 }
 
 /// Returns the diagnostic to emit for the potentially unavailable decl and sets
 /// \p IsError accordingly.
 static Diagnostic getPotentialUnavailabilityDiagnostic(
     const ValueDecl *D, const DeclContext *ReferenceDC,
-    const AvailabilityRange &Availability, bool WarnBeforeDeploymentTarget,
-    bool &IsError) {
+    AvailabilityDomain Domain, const AvailabilityRange &Availability,
+    bool WarnBeforeDeploymentTarget, bool &IsError) {
   ASTContext &Context = ReferenceDC->getASTContext();
-  auto Domain = Context.getTargetAvailabilityDomain();
 
-  if (requiresDeploymentTargetOrEarlier(Availability, Context)) {
+  if (!Availability.hasMinimumVersion()) {
+    // FIXME: [availability] Need a version-less diagnostic.
+    return Diagnostic(diag::availability_decl_only_version_newer, D, Domain,
+                      AvailabilityRange(llvm::VersionTuple()));
+  }
+
+  if (requiresDeploymentTargetOrEarlier(Domain, Availability, Context)) {
     // The required OS version is at or before the deployment target so this
     // diagnostic should indicate that the decl could be unavailable to clients
     // of the module containing the reference.
@@ -2243,13 +2263,12 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
     return Diagnostic(
         IsError ? diag::availability_decl_only_version_newer_for_clients
                 : diag::availability_decl_only_version_newer_for_clients_warn,
-        D, Domain, Availability.getRawMinimumVersion(),
-        ReferenceDC->getParentModule());
+        D, Domain, Availability, ReferenceDC->getParentModule());
   }
 
   IsError = true;
   return Diagnostic(diag::availability_decl_only_version_newer, D, Domain,
-                    Availability.getRawMinimumVersion());
+                    Availability);
 }
 
 // Emits a diagnostic for a reference to a declaration that is potentially
@@ -2258,6 +2277,7 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
 static bool
 diagnosePotentialUnavailability(const ValueDecl *D, SourceRange ReferenceRange,
                                 const DeclContext *ReferenceDC,
+                                AvailabilityDomain Domain,
                                 const AvailabilityRange &Availability,
                                 bool WarnBeforeDeploymentTarget = false) {
   ASTContext &Context = ReferenceDC->getASTContext();
@@ -2267,17 +2287,17 @@ diagnosePotentialUnavailability(const ValueDecl *D, SourceRange ReferenceRange,
   bool IsError;
   {
     auto Diag = Context.Diags.diagnose(
-        ReferenceRange.Start,
-        getPotentialUnavailabilityDiagnostic(
-            D, ReferenceDC, Availability, WarnBeforeDeploymentTarget, IsError));
+        ReferenceRange.Start, getPotentialUnavailabilityDiagnostic(
+                                  D, ReferenceDC, Domain, Availability,
+                                  WarnBeforeDeploymentTarget, IsError));
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(
-            ReferenceRange, ReferenceDC, Availability, Context, Diag))
+            ReferenceRange, ReferenceDC, Domain, Availability, Context, Diag))
       return IsError;
   }
 
-  fixAvailability(ReferenceRange, ReferenceDC, Availability, Context);
+  fixAvailability(ReferenceRange, ReferenceDC, Domain, Availability, Context);
   return IsError;
 }
 
@@ -2285,8 +2305,8 @@ diagnosePotentialUnavailability(const ValueDecl *D, SourceRange ReferenceRange,
 /// potentially unavailable.
 static void diagnosePotentialAccessorUnavailability(
     const AccessorDecl *Accessor, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC, const AvailabilityRange &Availability,
-    bool ForInout) {
+    const DeclContext *ReferenceDC, AvailabilityDomain Domain,
+    const AvailabilityRange &Availability, bool ForInout) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
   assert(Accessor->isGetterOrSetter());
@@ -2297,15 +2317,15 @@ static void diagnosePotentialAccessorUnavailability(
   {
     auto Err = Context.Diags.diagnose(ReferenceRange.Start, diag, Accessor,
                                       Context.getTargetAvailabilityDomain(),
-                                      Availability.getRawMinimumVersion());
+                                      Availability);
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(
-            ReferenceRange, ReferenceDC, Availability, Context, Err))
+            ReferenceRange, ReferenceDC, Domain, Availability, Context, Err))
       return;
   }
 
-  fixAvailability(ReferenceRange, ReferenceDC, Availability, Context);
+  fixAvailability(ReferenceRange, ReferenceDC, Domain, Availability, Context);
 }
 
 static DiagnosticBehavior
@@ -2329,11 +2349,10 @@ behaviorLimitForExplicitUnavailability(
 
 /// Emits a diagnostic for a protocol conformance that is potentially
 /// unavailable at the given source location.
-static bool
-diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
-                                const ExtensionDecl *ext, SourceLoc loc,
-                                const DeclContext *dc,
-                                const AvailabilityRange &availability) {
+static bool diagnosePotentialUnavailability(
+    const RootProtocolConformance *rootConf, const ExtensionDecl *ext,
+    SourceLoc loc, const DeclContext *dc, AvailabilityDomain domain,
+    const AvailabilityRange &availability) {
   ASTContext &ctx = dc->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return false;
@@ -2343,7 +2362,7 @@ diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
     auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
     auto err = ctx.Diags.diagnose(
         loc, diag::conformance_availability_only_version_newer, type, proto,
-        ctx.getTargetAvailabilityDomain(), availability.getRawMinimumVersion());
+        domain, availability);
 
     auto behaviorLimit = behaviorLimitForExplicitUnavailability(rootConf, dc);
     if (behaviorLimit >= DiagnosticBehavior::Warning)
@@ -2352,12 +2371,12 @@ diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
       err.warnUntilSwiftVersion(6);
 
     // Direct a fixit to the error if an existing guard is nearly-correct
-    if (fixAvailabilityByNarrowingNearbyVersionCheck(loc, dc, availability, ctx,
-                                                     err))
+    if (fixAvailabilityByNarrowingNearbyVersionCheck(loc, dc, domain,
+                                                     availability, ctx, err))
       return true;
   }
 
-  fixAvailability(loc, dc, availability, ctx);
+  fixAvailability(loc, dc, domain, availability, ctx);
   return true;
 }
 
@@ -2822,17 +2841,13 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
 
   auto Domain = Attr->getDomain();
   auto DeprecatedRange = Attr->getDeprecatedRange(Context);
-  llvm::VersionTuple DeprecatedVersion;
-  if (DeprecatedRange.hasMinimumVersion())
-    DeprecatedVersion = DeprecatedRange.getRawMinimumVersion();
-
   auto Message = Attr->getMessage();
   auto NewName = Attr->getRename();
   if (Message.empty() && NewName.empty()) {
     Context.Diags
         .diagnose(ReferenceRange.Start, diag::availability_deprecated,
                   DeprecatedDecl, Attr->isPlatformSpecific(), Domain,
-                  !DeprecatedVersion.empty(), DeprecatedVersion,
+                  DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
                   /*message*/ StringRef())
         .highlight(Attr->getParsedAttr()->getRange());
     return;
@@ -2848,7 +2863,7 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
     Context.Diags
         .diagnose(ReferenceRange.Start, diag::availability_deprecated,
                   DeprecatedDecl, Attr->isPlatformSpecific(), Domain,
-                  !DeprecatedVersion.empty(), DeprecatedVersion,
+                  DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
                   EncodedMessage.Message)
         .highlight(Attr->getParsedAttr()->getRange());
   } else {
@@ -2857,7 +2872,7 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
     Context.Diags
         .diagnose(ReferenceRange.Start, diag::availability_deprecated_rename,
                   DeprecatedDecl, Attr->isPlatformSpecific(), Domain,
-                  !DeprecatedVersion.empty(), DeprecatedVersion,
+                  DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
                   replacementDeclKind.has_value(), rawReplaceKind, newName)
         .highlight(Attr->getParsedAttr()->getRange());
   }
@@ -2905,16 +2920,12 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
 
   auto domain = attr->getDomain();
   auto deprecatedRange = attr->getDeprecatedRange(ctx);
-  llvm::VersionTuple deprecatedVersion;
-  if (deprecatedRange.hasMinimumVersion())
-    deprecatedVersion = deprecatedRange.getRawMinimumVersion();
-
   auto message = attr->getMessage();
   if (message.empty()) {
     ctx.Diags
         .diagnose(loc, diag::conformance_availability_deprecated, type, proto,
                   attr->isPlatformSpecific(), domain,
-                  !deprecatedVersion.empty(), deprecatedVersion,
+                  deprecatedRange.hasMinimumVersion(), deprecatedRange,
                   /*message*/ StringRef())
         .highlight(attr->getParsedAttr()->getRange());
     return true;
@@ -2924,7 +2935,7 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
   ctx.Diags
       .diagnose(loc, diag::conformance_availability_deprecated, type, proto,
                 attr->isPlatformSpecific(), domain,
-                !deprecatedVersion.empty(), deprecatedVersion,
+                deprecatedRange.hasMinimumVersion(), deprecatedRange,
                 encodedMessage.Message)
       .highlight(attr->getParsedAttr()->getRange());
   return true;
@@ -3060,12 +3071,12 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
     break;
   case AvailabilityConstraint::Reason::UnavailableForDeployment:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
-                   type, proto, domain, *attr.getIntroduced());
+                   type, proto, domain, attr.getIntroducedRange(ctx));
     break;
   case AvailabilityConstraint::Reason::Obsoleted:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
-                  domain, *attr.getObsoleted())
+                  domain, attr.getObsoletedRange(ctx))
         .highlight(attr.getParsedAttr()->getRange());
     break;
   case AvailabilityConstraint::Reason::PotentiallyUnavailable:
@@ -3226,7 +3237,7 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
 
   if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
     if (auto missing = checkGenericArgsForInvertibleReqs(boundTy)) {
-      std::optional<Diag<AvailabilityDomain, llvm::VersionTuple>> diag;
+      std::optional<Diag<AvailabilityDomain, AvailabilityRange>> diag;
       switch (*missing) {
       case InvertibleProtocolKind::Copyable:
         diag =
@@ -3481,13 +3492,13 @@ bool diagnoseExplicitUnavailability(
   case AvailabilityConstraint::Reason::UnavailableForDeployment:
     diags
         .diagnose(D, diag::availability_introduced_in_version, D, domain,
-                  *Attr.getIntroduced())
+                  Attr.getIntroducedRange(ctx))
         .highlight(sourceRange);
     break;
   case AvailabilityConstraint::Reason::Obsoleted:
     diags
         .diagnose(D, diag::availability_obsoleted, D, domain,
-                  *Attr.getObsoleted())
+                  Attr.getObsoletedRange(ctx))
         .highlight(sourceRange);
     break;
   case AvailabilityConstraint::Reason::PotentiallyUnavailable:
@@ -3597,12 +3608,12 @@ public:
         TypeChecker::checkAvailability(
             RE->getSourceRange(), featureKind.getAvailability(Context),
             Where.getDeclContext(),
-            [&](AvailabilityDomain domain, llvm::VersionTuple version) {
-              auto range = feature.getRange();
+            [&](AvailabilityDomain domain, AvailabilityRange range) {
+              auto sourceRange = feature.getRange();
               auto diag = Context.Diags.diagnose(
-                  range.getStart(), diag::regex_feature_unavailable,
-                  featureKind.getDescription(Context), domain, version);
-              diag.highlightChars(range);
+                  sourceRange.getStart(), diag::regex_feature_unavailable,
+                  featureKind.getDescription(Context), domain, range);
+              diag.highlightChars(sourceRange);
               return diag;
             });
       }
@@ -4176,24 +4187,24 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (!constraint)
     return false;
 
-  auto requiredRange = constraint->getRequiredNewerAvailabilityRange(ctx);
-
   // Diagnose (and possibly signal) for potential unavailability
+  auto domain = constraint->getDomain();
+  auto requiredRange = constraint->getPotentiallyUnavailableRange(ctx);
   if (!requiredRange)
     return false;
 
   if (Flags.contains(
           DeclAvailabilityFlag::
               AllowPotentiallyUnavailableAtOrBelowDeploymentTarget) &&
-      requiresDeploymentTargetOrEarlier(*requiredRange, ctx))
+      requiresDeploymentTargetOrEarlier(domain, *requiredRange, ctx))
     return false;
 
   if (accessor) {
     bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
-    diagnosePotentialAccessorUnavailability(accessor, R, DC, *requiredRange,
-                                            forInout);
+    diagnosePotentialAccessorUnavailability(accessor, R, DC, domain,
+                                            *requiredRange, forInout);
   } else {
-    if (!diagnosePotentialUnavailability(D, R, DC, *requiredRange))
+    if (!diagnosePotentialUnavailability(D, R, DC, domain, *requiredRange))
       return false;
   }
 
@@ -4680,8 +4691,9 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
       // Diagnose (and possibly signal) for potential unavailability
       if (auto requiredRange =
-              constraint->getRequiredNewerAvailabilityRange(ctx)) {
+              constraint->getPotentiallyUnavailableRange(ctx)) {
         if (diagnosePotentialUnavailability(rootConf, ext, loc, DC,
+                                            constraint->getDomain(),
                                             *requiredRange)) {
           maybeEmitAssociatedTypeNote();
           return true;

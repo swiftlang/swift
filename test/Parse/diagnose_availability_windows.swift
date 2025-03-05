@@ -11,14 +11,14 @@ unavailable()
 @available(Windows, introduced: 10.0.17763, deprecated: 10.0.19140)
 func introduced_deprecated() {}
 
-// expected-error@+1 {{'introduced_deprecated()' is only available in * 10.0.17763 or newe}}
+// expected-error@+1 {{'introduced_deprecated()' is only available in Windows 10.0.17763 or newer}}
 introduced_deprecated()
 // expected-note@-1 {{add 'if #available' version check}}
 
 @available(Windows 10, *)
 func windows10() {}
 
-// expected-error@+1 {{'windows10()' is only available in * 10 or newer}}
+// expected-error@+1 {{'windows10()' is only available in Windows 10 or newer}}
 windows10()
 // expected-note@-1 {{add 'if #available' version check}}
 

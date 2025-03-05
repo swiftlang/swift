@@ -208,6 +208,8 @@ class AvailabilityRange {
   VersionRange Range;
 
 public:
+  explicit AvailabilityRange(llvm::VersionTuple LowerEndpoint)
+      : Range(VersionRange::allGTE(LowerEndpoint)) {}
   explicit AvailabilityRange(VersionRange Range) : Range(Range) {}
 
   /// Creates a context that imposes the constraints of the ASTContext's

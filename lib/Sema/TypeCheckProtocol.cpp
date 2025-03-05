@@ -4533,7 +4533,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           diags.diagnose(diagLoc, diag::availability_protocol_requires_version,
                          conformance->getProtocol(), witness,
                          ctx.getTargetAvailabilityDomain(),
-                         check.RequiredAvailability.getRawMinimumVersion());
+                         check.RequiredAvailability);
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
           diags.diagnose(requirement,
                          diag::availability_protocol_requirement_here);
@@ -5037,20 +5037,18 @@ static bool diagnoseTypeWitnessAvailability(
         });
   }
 
-  auto requiredAvailability = AvailabilityRange::alwaysAvailable();
-  if (!TypeChecker::isAvailabilitySafeForConformance(conformance->getProtocol(),
-                                                     assocType, witness, dc,
-                                                     requiredAvailability)) {
-    auto requiredVersion = requiredAvailability.getRawMinimumVersion();
+  auto requiredRange = AvailabilityRange::alwaysAvailable();
+  if (!TypeChecker::isAvailabilitySafeForConformance(
+          conformance->getProtocol(), assocType, witness, dc, requiredRange)) {
     ctx.addDelayedConformanceDiag(
         conformance, shouldError,
-        [witness, requiredVersion](NormalProtocolConformance *conformance) {
+        [witness, requiredRange](NormalProtocolConformance *conformance) {
           SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
           auto &ctx = conformance->getDeclContext()->getASTContext();
           ctx.Diags
               .diagnose(loc, diag::availability_protocol_requires_version,
                         conformance->getProtocol(), witness,
-                        ctx.getTargetAvailabilityDomain(), requiredVersion)
+                        ctx.getTargetAvailabilityDomain(), requiredRange)
               .warnUntilSwiftVersion(warnBeforeVersion);
 
           emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);
