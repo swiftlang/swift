@@ -6,4 +6,6 @@ add_swift_unittest(SwiftFrontendTests
 
 target_link_libraries(SwiftFrontendTests
   PRIVATE
-    swiftFrontend)
+    swiftFrontend
+    # FIXME: Circular dependencies (AST <-> Parse)
+    swiftAST)
