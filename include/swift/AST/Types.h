@@ -6359,6 +6359,12 @@ public:
   /// Constructs a protocol composition corresponding to the `Any` type.
   static Type theAnyType(const ASTContext &C);
 
+  /// Constructs a protocol composition corresponding to the `any ~Copyable &
+  /// ~Escapable` type.
+  ///
+  /// Note: This includes the inverse of all current invertible protocols.
+  static Type theUnconstrainedAnyType(const ASTContext &C);
+
   /// Constructs a protocol composition corresponding to the `AnyObject` type.
   static Type theAnyObjectType(const ASTContext &C);
 
