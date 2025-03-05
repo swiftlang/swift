@@ -269,7 +269,7 @@
 /unittests/AST/                           @hborla @slavapestov @xedin
 /unittests/AST/*Evaluator*                @CodaFi @slavapestov
 /unittests/DependencyScan/                @artemcm @cachemeifyoucan
-/unittests/Frontend*/                     @artemcm @tshortli
+/unittests/FrontendTool/                  @artemcm @tshortli
 /unittests/Parse/                         @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
 /unittests/Reflection/                    @slavapestov
 /unittests/SIL/                           @jckarter
