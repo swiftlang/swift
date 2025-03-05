@@ -50,11 +50,13 @@ class AvailabilitySpec : public ASTAllocated<AvailabilitySpec> {
   // Location of the availability macro expanded to create this spec.
   SourceLoc MacroLoc;
 
+  unsigned IsInvalid : 1;
+
   AvailabilitySpec(AvailabilityDomainOrIdentifier DomainOrIdentifier,
                    SourceRange SrcRange, llvm::VersionTuple Version,
                    SourceLoc VersionStartLoc)
       : DomainOrIdentifier(DomainOrIdentifier), SrcRange(SrcRange),
-        Version(Version), VersionStartLoc(VersionStartLoc) {}
+        Version(Version), VersionStartLoc(VersionStartLoc), IsInvalid(false) {}
 
 public:
   /// Creates a wildcard availability specification that guards execution
@@ -91,6 +93,9 @@ public:
   SourceRange getSourceRange() const { return SrcRange; }
   SourceLoc getStartLoc() const { return SrcRange.Start; }
 
+  /// Returns true if this spec did not type-check successfully.
+  bool isInvalid() const { return IsInvalid; }
+
   AvailabilityDomainOrIdentifier getDomainOrIdentifier() const {
     return DomainOrIdentifier;
   }
@@ -115,6 +120,14 @@ public:
   void setMacroLoc(SourceLoc loc) { MacroLoc = loc; }
 
   void print(llvm::raw_ostream &os) const;
+
+private:
+  friend class SemanticAvailabilitySpecRequest;
+
+  std::optional<AvailabilityDomain>
+  resolveInDeclContext(const DeclContext *declContext);
+
+  void setInvalid() { IsInvalid = true; }
 };
 
 inline void simple_display(llvm::raw_ostream &os,
