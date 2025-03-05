@@ -176,7 +176,7 @@ private:
 
   void verifyLocal(DebugValueInst *DBI) {
     auto Decl = DBI->getDecl();
-    if (!Decl || !Decl->isConstVal())
+    if (!Decl || !isa<VarDecl>(Decl) || isa<ParamDecl>(Decl) || !Decl->isConstVal())
       return;
 
     auto Value = ConstExprState.getConstantValue(DBI->getOperand());
@@ -186,8 +186,8 @@ private:
     LLVM_DEBUG(printSymbolicValueValue(Value, Allocator););
     if (!Value.isConstant()) {
       getModule()->getASTContext().Diags.diagnose(
-          Decl->getStartLoc(),
-          diag::require_const_arg_for_parameter);
+          Decl->getParentInitializer()->getStartLoc(),
+          diag::require_const_initializer_for_const);
     }
   }
 
@@ -219,19 +219,6 @@ private:
 
     auto CalleeParameters = CalleeDecl->getParameters();
     auto ApplyArgRefs = Apply->getArguments();
-
-//    LLVM_DEBUG({
-//      llvm::dbgs() << "\n-------------------------------------------\n";
-//      llvm::dbgs() << "Apply: ";
-//      Apply->dump();
-//      llvm::dbgs() << CalleeDecl->getNameStr() << "\n";
-//      llvm::dbgs() << "Apply Args: ";
-//      llvm::dbgs() << ApplyArgRefs.size() << "\n";
-//      llvm::dbgs() << "CalleeParameters: ";
-//      llvm::dbgs() << CalleeParameters->size() << "\n";
-//      llvm::dbgs() << "ArgumentOperandNumber: ";
-//      llvm::dbgs() << Apply->getArgumentOperandNumber() << "\n";
-//    });
 
     // (AC) TODO: Needs work to correctly match params to args
     bool hasConst = false;
