@@ -2931,9 +2931,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.PrintDebugInfo = true;
   }
 
-  if (!Args.hasArg(OPT_disable_experimental_serialize_debug_info))
-    Opts.PrintDebugInfo = true;
-  //TODO: Remove this as only adding for SWB
   if (!FEOpts.DisableSerializeDebugInfoSIL)
     Opts.PrintDebugInfo = true;
 
