@@ -572,6 +572,49 @@ IRGenModule::getSILFunctionForAsyncFunctionPointer(llvm::Constant *afp) {
   return nullptr;
 }
 
+llvm::Constant *IRGenModule::getAddrOfCoroFunctionPointer(LinkEntity entity) {
+  llvm::Constant *Pointer =
+      getAddrOfLLVMVariable(LinkEntity::forCoroFunctionPointer(entity),
+                            NotForDefinition, DebugTypeInfo());
+  if (!getOptions().IndirectCoroFunctionPointer)
+    return Pointer;
+
+  // When the symbol does not have DLL Import storage, we must directly address
+  // it. Otherwise, we will form an invalid reference.
+  if (!Pointer->isDLLImportDependent())
+    return Pointer;
+
+  llvm::Constant *PointerPointer = getOrCreateGOTEquivalent(
+      Pointer, LinkEntity::forCoroFunctionPointer(entity));
+  llvm::Constant *PointerPointerConstant =
+      llvm::ConstantExpr::getPtrToInt(PointerPointer, IntPtrTy);
+  llvm::Constant *Marker = llvm::Constant::getIntegerValue(
+      IntPtrTy, APInt(IntPtrTy->getBitWidth(), 1));
+  // TODO(compnerd) ensure that the pointer alignment guarantees that bit-0 is
+  // cleared. We cannot use an `getOr` here as it does not form a relocatable
+  // expression.
+  llvm::Constant *Address =
+      llvm::ConstantExpr::getAdd(PointerPointerConstant, Marker);
+
+  IndirectCoroFunctionPointers[entity] = Address;
+  return llvm::ConstantExpr::getIntToPtr(Address,
+                                         CoroFunctionPointerTy->getPointerTo());
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfCoroFunctionPointer(SILFunction *function) {
+  (void)getAddrOfSILFunction(function, NotForDefinition);
+  return getAddrOfCoroFunctionPointer(LinkEntity::forSILFunction(function));
+}
+
+llvm::Constant *IRGenModule::defineCoroFunctionPointer(LinkEntity entity,
+                                                       ConstantInit init) {
+  auto coroEntity = LinkEntity::forCoroFunctionPointer(entity);
+  auto *var = cast<llvm::GlobalVariable>(
+      getAddrOfLLVMVariable(coroEntity, init, DebugTypeInfo()));
+  return var;
+}
+
 llvm::GlobalValue *IRGenModule::defineMethodDescriptor(
     SILDeclRef declRef, NominalTypeDecl *nominalDecl,
     llvm::Constant *definition, llvm::Type *typeOfDefinitionValue) {

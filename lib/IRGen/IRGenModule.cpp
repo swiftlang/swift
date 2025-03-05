@@ -208,6 +208,24 @@ static void sanityCheckStdlib(IRGenModule &IGM) {
 }
 #endif
 
+static bool getIsCoroCCSupported(const clang::TargetInfo &targetInfo,
+                                 const IRGenOptions &IRGenOpts) {
+  // TODO: CoroutineAccessors: The one caller of this function should just be
+  //                           rewritten as follows (once clang::CC_CoroAsync is
+  //                           defined).
+  //
+  // clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_CoroAsync)
+  if (targetInfo.getTriple().isAArch64() && IRGenOpts.UseCoroCCArm64) {
+    return true;
+  }
+  if (targetInfo.getTriple().getArch() == llvm::Triple::x86_64 &&
+      IRGenOpts.UseCoroCCX8664) {
+    return true;
+  }
+
+  return false;
+}
+
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, StringRef ModuleName,
@@ -602,6 +620,14 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     AsyncTailCallKind = llvm::CallInst::TCK_Tail;
   }
 
+  bool isCoroCCSupported =
+      getIsCoroCCSupported(clangASTContext.getTargetInfo(), opts);
+  if (isCoroCCSupported) {
+    SwiftCoroCC = llvm::CallingConv::SwiftCoro;
+  } else {
+    SwiftCoroCC = llvm::CallingConv::Swift;
+  }
+
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
                                                      Module,
@@ -783,6 +809,24 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
+
+  CoroFunctionPointerTy = createStructType(*this, "swift.coro_func_pointer",
+                                           {RelativeAddressTy, Int32Ty}, true);
+  CoroFunctionPointerPtrTy = CoroFunctionPointerTy->getPointerTo();
+  CoroAllocationTy = PtrTy;
+  CoroAllocateFnTy =
+      llvm::FunctionType::get(CoroAllocationTy, SizeTy, /*isVarArg*/ false);
+  CoroDeallocateFnTy =
+      llvm::FunctionType::get(VoidTy, CoroAllocationTy, /*isVarArg*/ false);
+  CoroAllocatorFlagsTy = Int32Ty;
+  // swift/ABI/Coro.h : CoroAllocator
+  CoroAllocatorTy = createStructType(*this, "swift.coro_allocator",
+                                     {
+                                         Int32Ty, // CoroAllocator.Flags
+                                         CoroAllocateFnTy,
+                                         CoroDeallocateFnTy,
+                                     });
+  CoroAllocatorPtrTy = CoroAllocatorTy->getPointerTo();
 }
 
 IRGenModule::~IRGenModule() {
@@ -1006,6 +1050,14 @@ namespace RuntimeConstants {
 
   RuntimeAvailability ValueGenericTypeAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getValueGenericTypeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability CoroutineAccessorsAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getCoroutineAccessorsAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }

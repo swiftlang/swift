@@ -792,12 +792,6 @@ public:
     return getRecursiveProperties().hasOpaqueArchetype();
   }
 
-  /// Determine whether the type is an opened existential type.
-  ///
-  /// To determine whether there is an opened existential type
-  /// anywhere in the type, use \c hasOpenedExistential.
-  bool isOpenedExistential() const;
-
   /// Determine whether the type is an opened existential type with Error inside
   bool isOpenedExistentialWithError();
 
@@ -2392,7 +2386,7 @@ class ParameterTypeFlags {
     Specifier = 7 << SpecifierShift,
     NoDerivative = 1 << 6,
     Isolated = 1 << 7,
-    CompileTimeConst = 1 << 8,
+    CompileTimeLiteral = 1 << 8,
     Sending = 1 << 9,
     Addressable = 1 << 10,
     NumBits = 11
@@ -2410,12 +2404,12 @@ public:
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
                      ParamSpecifier specifier, bool isolated, bool noDerivative,
-                     bool compileTimeConst, bool isSending, bool isAddressable)
+                     bool compileTimeLiteral, bool isSending, bool isAddressable)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(specifier) << SpecifierShift | (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
-              (compileTimeConst ? CompileTimeConst : 0) |
+              (compileTimeLiteral ? CompileTimeLiteral : 0) |
               (isSending ? Sending : 0) |
               (isAddressable ? Addressable : 0)) {}
 
@@ -2423,7 +2417,7 @@ public:
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ParamSpecifier ownership,
-                    bool isolated, bool isNoDerivative, bool compileTimeConst,
+                    bool isolated, bool isNoDerivative, bool compileTimeLiteral,
                     bool isSending, bool isAddressable);
 
   bool isNone() const { return !value; }
@@ -2434,7 +2428,7 @@ public:
   bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
   bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
   bool isIsolated() const { return value.contains(Isolated); }
-  bool isCompileTimeConst() const { return value.contains(CompileTimeConst); }
+  bool isCompileTimeLiteral() const { return value.contains(CompileTimeLiteral); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
   bool isSending() const { return value.contains(Sending); }
   bool isAddressable() const { return value.contains(Addressable); }
@@ -2456,9 +2450,9 @@ public:
                                           : ParamSpecifier::Default);
   }
 
-  ParameterTypeFlags withCompileTimeConst(bool isConst) const {
-    return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::CompileTimeConst
-                                      : value - ParameterTypeFlags::CompileTimeConst);
+  ParameterTypeFlags withCompileTimeLiteral(bool isConst) const {
+    return ParameterTypeFlags(isConst ? value | ParameterTypeFlags::CompileTimeLiteral
+                                      : value - ParameterTypeFlags::CompileTimeLiteral);
   }
   
   ParameterTypeFlags withShared(bool isShared) const {
@@ -2604,7 +2598,7 @@ public:
                               /*autoclosure*/ false,
                               /*nonEphemeral*/ false, getOwnershipSpecifier(),
                               /*isolated*/ false, /*noDerivative*/ false,
-                              /*compileTimeConst*/ false,
+                              /*compileTimeLiteral*/ false,
                               /*is sending*/ false,
                               /*is addressable*/ false);
   }
@@ -2824,7 +2818,7 @@ public:
 
   /// Retrieve the set of generic arguments provided at this level.
   ArrayRef<Type> getGenericArgs() const {
-    return {getTrailingObjectsPointer(), Bits.BoundGenericType.GenericArgCount};
+    return {getTrailingObjectsPointer(), static_cast<size_t>(Bits.BoundGenericType.GenericArgCount)};
   }
 
   SmallVector<Type, 2> getExpandedGenericArgs();
@@ -3397,8 +3391,8 @@ public:
     /// Whether or not the parameter is 'sending'.
     bool isSending() const { return Flags.isSending(); }
 
-    /// Whether the parameter is 'isCompileTimeConst'.
-    bool isCompileTimeConst() const { return Flags.isCompileTimeConst(); }
+    /// Whether the parameter is 'isCompileTimeLiteral'.
+    bool isCompileTimeLiteral() const { return Flags.isCompileTimeLiteral(); }
 
     /// Whether the parameter is marked '@noDerivative'.
     bool isNoDerivative() const { return Flags.isNoDerivative(); }
@@ -6365,7 +6359,7 @@ public:
   /// a protocol composition type; you also have to look at
   /// hasExplicitAnyObject().
   ArrayRef<Type> getMembers() const {
-    return {getTrailingObjects<Type>(), Bits.ProtocolCompositionType.Count};
+    return {getTrailingObjects<Type>(), static_cast<size_t>(Bits.ProtocolCompositionType.Count)};
   }
 
   InvertibleProtocolSet getInverses() const { return Inverses; }
@@ -6463,7 +6457,7 @@ public:
 
   ArrayRef<Type> getArgs() const {
     return {getTrailingObjects<Type>(),
-            Bits.ParameterizedProtocolType.ArgCount};
+            static_cast<size_t>(Bits.ParameterizedProtocolType.ArgCount)};
   }
 
   bool requiresClass() const {
@@ -7246,7 +7240,7 @@ public:
   /// Returns \c true if this type parameter is declared as a value.
   ///
   /// \code
-  /// struct Slab<let count: Int, Element: ~Copyable>
+  /// struct InlineArray<let count: Int, Element: ~Copyable>
   /// \endcode
   bool isValue() const {
     return ParamKind == GenericTypeParamKind::Value;
@@ -7513,7 +7507,7 @@ public:
   static Type get(const ASTContext &ctx, ArrayRef<Type> terms);
 
   ArrayRef<Type> getTerms() const {
-    return { getTrailingObjects<Type>(), Bits.ErrorUnionType.NumTerms };
+    return { getTrailingObjects<Type>(), static_cast<size_t>(Bits.ErrorUnionType.NumTerms) };
   };
 
   // Support for FoldingSet.
@@ -7932,14 +7926,6 @@ inline bool TypeBase::isClassExistentialType() {
   return false;
 }
 
-inline bool TypeBase::isOpenedExistential() const {
-  if (!hasOpenedExistential())
-    return false;
-
-  CanType T = getCanonicalType();
-  return isa<OpenedArchetypeType>(T);
-}
-
 inline bool TypeBase::canDynamicallyBeOptionalType(bool includeExistential) {
   CanType T = getCanonicalType();
   auto isArchetypeOrExistential = isa<ArchetypeType>(T) ||
@@ -8091,7 +8077,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
     ParamSpecifier ownership, bool isolated, bool isNoDerivative,
-    bool compileTimeConst, bool isSending, bool isAddressable) {
+    bool compileTimeLiteral, bool isSending, bool isAddressable) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -8102,7 +8088,7 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     ownership = ParamSpecifier::InOut;
   }
   return {isVariadic, isAutoClosure,  isNonEphemeral,   ownership,
-          isolated,   isNoDerivative, compileTimeConst, isSending,
+          isolated,   isNoDerivative, compileTimeLiteral, isSending,
           isAddressable};
 }
 

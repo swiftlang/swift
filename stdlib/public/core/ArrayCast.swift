@@ -21,7 +21,7 @@
 internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Array<SourceValue>>,
   _ target: UnsafeMutablePointer<Array<TargetValue>>) {
-  target.initialize(to: _arrayForceCast(source.pointee))
+  unsafe target.initialize(to: _arrayForceCast(source.pointee))
 }
 
 /// Implements `source as! [TargetElement]`.
@@ -58,8 +58,8 @@ internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Array<SourceValue>>,
   _ target: UnsafeMutablePointer<Array<TargetValue>>
 ) -> Bool {
-  if let result: Array<TargetValue> = _arrayConditionalCast(source.pointee) {
-    target.initialize(to: result)
+  if let result: Array<TargetValue> = unsafe _arrayConditionalCast(source.pointee) {
+    unsafe target.initialize(to: result)
     return true
   }
   return false

@@ -345,7 +345,7 @@ extension SignedNumeric {
 @inlinable
 public func abs<T: SignedNumeric & Comparable>(_ x: T) -> T {
   if T.self == T.Magnitude.self {
-    return unsafeBitCast(x.magnitude, to: T.self)
+    return unsafe unsafeBitCast(x.magnitude, to: T.self)
   }
 
   return x < (0 as T) ? -x : x
@@ -1433,8 +1433,8 @@ extension BinaryInteger {
     }
 
     result.reverse()
-    return result.withUnsafeBufferPointer {
-      return String._fromASCII($0)
+    return unsafe result.withUnsafeBufferPointer {
+      return unsafe String._fromASCII($0)
     }
   }
 

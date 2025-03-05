@@ -224,6 +224,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::STRICT_MEMORY_SAFETY:
       extendedInfo.setStrictMemorySafety(true);
       break;
+    case options_block::EXTENSIBLE_ENUMS:
+      extendedInfo.setSupportsExtensibleEnums(true);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1501,6 +1504,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
       Bits.StrictMemorySafety = extInfo.strictMemorySafety();
+      Bits.SupportsExtensibleEnums = extInfo.supportsExtensibleEnums();
       MiscVersion = info.miscVersion;
       SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();

@@ -296,6 +296,10 @@ public:
   /// indexing info.
   PathRemapper FilePrefixMap;
 
+  /// Indicates whether or not the frontend should generate callsite information
+  /// in the debug info.
+  bool DebugCallsiteInfo = false;
+
   /// What level of debug info to generate.
   IRGenDebugInfoLevel DebugInfoLevel : 2;
 
@@ -372,6 +376,8 @@ public:
   /// Emit names of struct stored properties and enum cases.
   unsigned EnableReflectionNames : 1;
 
+  unsigned DisableLLVMMergeFunctions : 1;
+
   /// Emit mangled names of anonymous context descriptors.
   unsigned EnableAnonymousContextMangledNames : 1;
 
@@ -384,6 +390,7 @@ public:
   unsigned LazyInitializeClassMetadata : 1;
   unsigned LazyInitializeProtocolConformances : 1;
   unsigned IndirectAsyncFunctionPointer : 1;
+  unsigned IndirectCoroFunctionPointer : 1;
 
   /// Use absolute function references instead of relative ones.
   /// Mainly used on WebAssembly, that doesn't support relative references
@@ -398,6 +405,10 @@ public:
   /// Create metadata specializations for generic types at statically known type
   /// arguments.
   unsigned PrespecializeGenericMetadata : 1;
+
+  /// Emit pointers to the corresponding type metadata in non-public non-generic
+  /// type descriptors.
+  unsigned EmitSingletonMetadataPointers : 1;
 
   /// The path to load legacy type layouts from.
   StringRef ReadLegacyTypeInfoPath;
@@ -488,6 +499,9 @@ public:
 
   unsigned EmitAsyncFramePushPopMetadata : 1;
 
+  // Whether to emit typed malloc during coroutine frame allocation.
+  unsigned EmitTypeMallocForCoroFrame : 1;
+
   // Whether to use the yield_once ABI when emitting yield_once_2 coroutines.
   unsigned EmitYieldOnce2AsYieldOnce : 1;
 
@@ -496,6 +510,13 @@ public:
   unsigned AsyncFramePointerAll : 1;
 
   unsigned UseProfilingMarkerThunks : 1;
+
+  // Whether swiftcorocc should be used for yield_once_2 routines on x86_64.
+  unsigned UseCoroCCX8664 : 1;
+
+  // Whether swiftcorocc should be used for yield_once_2 routines on arm64
+  // variants.
+  unsigned UseCoroCCArm64 : 1;
 
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
@@ -574,12 +595,14 @@ public:
         SwiftAsyncFramePointer(SwiftAsyncFramePointerKind::Auto),
         HasValueNamesSetting(false), ValueNames(false),
         ReflectionMetadata(ReflectionMetadataMode::Runtime),
-        EnableReflectionNames(true), EnableAnonymousContextMangledNames(false),
-        ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
+        EnableReflectionNames(true), DisableLLVMMergeFunctions(false),
+        EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
+        LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false),
-        IndirectAsyncFunctionPointer(false),
+        IndirectAsyncFunctionPointer(false), IndirectCoroFunctionPointer(false),
         CompactAbsoluteFunctionPointer(false), DisableLegacyTypeInfo(false),
-        PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
+        PrespecializeGenericMetadata(false),
+        EmitSingletonMetadataPointers(false), UseIncrementalLLVMCodeGen(true),
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         EnableLargeLoadableTypesReg2Mem(true),
         EnableLayoutStringValueWitnesses(false),
@@ -592,14 +615,15 @@ public:
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
-        MergeableSymbols(false),
-        EmitGenericRODatas(true), NoPreallocatedInstantiationCaches(false),
+        MergeableSymbols(false), EmitGenericRODatas(true),
+        NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
-        EmitAsyncFramePushPopMetadata(true), EmitYieldOnce2AsYieldOnce(true),
-        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
-        DebugInfoForProfiling(false), CmdArgs(),
+        EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(false),
+        EmitYieldOnce2AsYieldOnce(true), AsyncFramePointerAll(false),
+        UseProfilingMarkerThunks(false), UseCoroCCX8664(false),
+        UseCoroCCArm64(false), DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),

@@ -256,6 +256,13 @@ void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
   job->schedulerPrivate[SwiftJobDispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
 
+  // dispatch_time takes a signed int64_t. SwiftJobDelay is unsigned, so
+  // extremely large values get interpreted as negative numbers, which results
+  // in zero delay. Clamp the value to INT64_MAX. That's about 292 years, so
+  // there should be no noticeable difference.
+  if (delay > (SwiftJobDelay)INT64_MAX)
+    delay = INT64_MAX;
+
   dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delay);
   dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
 }

@@ -1,13 +1,27 @@
 // RUN: %target-sil-opt -sil-print-types -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
+import Builtin
 import Swift
 
 class C {}
+
+enum Never {}
+
+struct Pointer {
+  var rawValue: Builtin.RawPointer
+}
+
+struct Int32 {
+  var int: Builtin.Int32
+}
+sil @run : $@convention(thin) () -> Never
 sil @getOwned : $@convention(thin) () -> @owned C
 sil @barrier : $@convention(thin) () -> ()
 sil [ossa] @getC : $@convention(thin) () -> @owned C
 sil [ossa] @borrowC : $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @takeC : $@convention(thin) (@owned C) -> ()
+sil @getPointer : $@convention(thin) () -> (@owned Pointer)
+
 struct S {}
 
 struct MoS: ~Copyable {}
@@ -885,6 +899,33 @@ die:
   unreachable
 }
 
+// CHECK-LABEL: begin running test {{.*}} on consume_copy_before_use_in_dead_end_2
+// CHECK-LABEL: sil [ossa] @consume_copy_before_use_in_dead_end_2 : {{.*}} {
+// CHECK-NOT:     destroy_value [dead_end]
+// CHECK-LABEL: } // end sil function 'consume_copy_before_use_in_dead_end_2'
+// CHECK-LABEL: end running test {{.*}} on consume_copy_before_use_in_dead_end_2
+sil [ossa] @consume_copy_before_use_in_dead_end_2 : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  cond_br undef, exit, die
+
+exit:
+  destroy_value %c
+  %retval = tuple ()
+  return %retval
+
+die:
+  %move = move_value %c
+  %copy = copy_value %move
+  specify_test "canonicalize_ossa_lifetime true false true %move"
+  apply undef(%move) : $@convention(thin) (@owned C) -> ()
+  %addr = alloc_stack $C
+  %token = store_borrow %copy to %addr
+  apply undef() : $@convention(thin) () -> ()
+  %reload = load_borrow %token
+  apply undef(%reload) : $@convention(thin) (@guaranteed C) -> ()
+  unreachable
+}
+
 // The destroy of a value must not be hoisted over a destroy of a copy of a
 // partial_apply [on_stack] which captures the value.
 // CHECK-LABEL: begin running test {{.*}} on destroy_after_pa_copy_destroy
@@ -917,4 +958,44 @@ entry(%a: @owned $C):
   destroy_value %c
   %retval = tuple ()
   return %retval
+}
+
+// CHECK-LABEL: begin running test {{.*}} on extend_lifetime_to_deadend_despite_copy_consume
+// CHECK-LABEL: sil [ossa] @extend_lifetime_to_deadend_despite_copy_consume : {{.*}} {
+// CHECK:         copy_value
+// CHECK-LABEL: } // end sil function 'extend_lifetime_to_deadend_despite_copy_consume'
+// CHECK-LABEL: end running test {{.*}} on extend_lifetime_to_deadend_despite_copy_consume
+sil [ossa] @extend_lifetime_to_deadend_despite_copy_consume : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  specify_test "canonicalize_ossa_lifetime true false true @argument"
+  %cc = copy_value %c
+  %takeC = function_ref @takeC : $@convention(thin) (@owned C) -> ()
+  apply %takeC(%cc) : $@convention(thin) (@owned C) -> ()
+  %run = function_ref @run : $@convention(thin) () -> Never
+  unreachable
+}
+
+/// If there's a pointer escape (here, mark_dependence) of the value, we can't
+/// canonicalize its lifetime.
+// CHECK-LABEL: begin running test {{.*}} on dont_canonicalize_on_pointer_escape
+// CHECK-LABEL: sil [ossa] @dont_canonicalize_on_pointer_escape : {{.*}} {
+// CHECK:         load
+// CHECK-NEXT:    destroy_value
+// CHECK-LABEL: } // end sil function 'dont_canonicalize_on_pointer_escape'
+// CHECK-LABEL: end running test {{.*}} on dont_canonicalize_on_pointer_escape
+sil [ossa] @dont_canonicalize_on_pointer_escape : $@convention(thin) () -> () {
+entry:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %getPointer = function_ref @getPointer : $@convention(thin) () -> (@owned Pointer)
+  %c = apply %getC() : $@convention(thin) () -> (@owned C)
+  %pointer = apply %getPointer() : $@convention(thin) () -> (@owned Pointer)
+  specify_test "canonicalize_ossa_lifetime true false true %c"
+  %rawPointer = struct_extract %pointer, #Pointer.rawValue
+  %o = pointer_to_address %rawPointer to [strict] $*Int32
+  %dependent = mark_dependence [nonescaping] %o on %c
+  %int_addr = struct_element_addr %dependent, #Int32.int
+  %int = load [trivial] %int_addr
+  destroy_value %c
+  %retval = tuple ()
+  return %retval : $()
 }

@@ -40,11 +40,11 @@ private func registerPass(
   }
 }
 
-protocol SILCombineSimplifyable : Instruction {
+protocol SILCombineSimplifiable : Instruction {
   func simplify(_ context: SimplifyContext)
 }
 
-private func run<InstType: SILCombineSimplifyable>(_ instType: InstType.Type,
+private func run<InstType: SILCombineSimplifiable>(_ instType: InstType.Type,
                                                    _ bridgedCtxt: BridgedInstructionPassCtxt) {
   let inst = bridgedCtxt.instruction.getAs(instType)
   let context = SimplifyContext(_bridged: bridgedCtxt.passContext,
@@ -53,7 +53,7 @@ private func run<InstType: SILCombineSimplifyable>(_ instType: InstType.Type,
   inst.simplify(context)
 }
 
-private func registerForSILCombine<InstType: SILCombineSimplifyable>(
+private func registerForSILCombine<InstType: SILCombineSimplifiable>(
       _ instType: InstType.Type,
       _ runFn: @escaping (@convention(c) (BridgedInstructionPassCtxt) -> ())) {
   "\(instType)"._withBridgedStringRef { instClassStr in
@@ -68,7 +68,6 @@ private func registerSwiftPasses() {
   registerPass(stackProtection, { stackProtection.run($0) })
 
   // Function passes
-  registerPass(allocVectorLowering, { allocVectorLowering.run($0) })
   registerPass(asyncDemotion, { asyncDemotion.run($0) })
   registerPass(booleanLiteralFolding, { booleanLiteralFolding.run($0) })
   registerPass(letPropertyLowering, { letPropertyLowering.run($0) })

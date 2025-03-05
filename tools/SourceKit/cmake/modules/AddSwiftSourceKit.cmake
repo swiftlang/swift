@@ -212,7 +212,7 @@ macro(add_sourcekit_library name)
   set(srcs ${SOURCEKITLIB_UNPARSED_ARGUMENTS})
 
   llvm_process_sources(srcs ${srcs})
-  if(MSVC_IDE OR XCODE)
+  if(MSVC_IDE)
     # Add public headers
     file(RELATIVE_PATH lib_path
       ${SOURCEKIT_SOURCE_DIR}/lib/
@@ -406,9 +406,9 @@ macro(add_sourcekit_framework name)
     endif()
   endforeach()
 
-  if(MSVC_IDE OR XCODE)
+  if(MSVC_IDE)
     set_source_files_properties(${headers} PROPERTIES HEADER_FILE_ONLY ON)
-  endif(MSVC_IDE OR XCODE)
+  endif(MSVC_IDE)
 
   if(LLVM_COMMON_DEPENDS)
     add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
@@ -445,6 +445,9 @@ macro(add_sourcekit_framework name)
       "${framework_location}/Versions/A" "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}")
     list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
 
+    file(GENERATE OUTPUT "xpc_service_name.txt" CONTENT "com.apple.SourceKitService.${SOURCEKIT_VERSION_STRING}_${SOURCEKIT_TOOLCHAIN_NAME}")
+    target_sources(${name} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/xpc_service_name.txt")
+
     set_target_properties(${name} PROPERTIES
                           BUILD_WITH_INSTALL_RPATH TRUE
                           FOLDER "SourceKit frameworks"
@@ -455,7 +458,8 @@ macro(add_sourcekit_framework name)
                           MACOSX_FRAMEWORK_IDENTIFIER "com.apple.${name}"
                           MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0"
                           MACOSX_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}"
-                          PUBLIC_HEADER "${headers}")
+                          PUBLIC_HEADER "${headers}"
+                          RESOURCE "${CMAKE_CURRENT_BINARY_DIR}/xpc_service_name.txt")
     add_dependencies(${SOURCEKITFW_INSTALL_IN_COMPONENT} ${name})
     swift_install_in_component(TARGETS ${name}
                                FRAMEWORK

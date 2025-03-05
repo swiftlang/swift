@@ -300,7 +300,7 @@ There are three kind of arguments:
 ```
 
 - Phi arguments: If a block has multiple predecessor blocks, the terminators of
-  the predecessor blocks must be `br` or `cond_br` instructions and the the
+  the predecessor blocks must be `br` or `cond_br` instructions and the
   operand values of those branch instructions are passed to the block's
   arguments. This corresponds to LLVM's phi nodes. Basic block arguments are
   bound by the branch from the predecessor block:

@@ -28,3 +28,8 @@ func dummy() {}
 
 @_silgen_name("whatever", extra)  // expected-error@:27 {{unexpected arguments in '_silgen_name' attribute}}
 func _whatever()
+
+struct S {
+    subscript(x: Int) { _ = 1 } // expected-error@:23 {{expected '->' and return type in subscript}}
+                                // expected-note@-1:23 {{insert '->' and return type}}
+}

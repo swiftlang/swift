@@ -126,10 +126,16 @@ public:
 /// A default argument expression.  The parent context is the function
 /// (possibly a closure) for which this is a default argument.
 class DefaultArgumentInitializer : public Initializer {
-public:
   explicit DefaultArgumentInitializer(DeclContext *parent, unsigned index)
       : Initializer(InitializerKind::DefaultArgument, parent) {
     SpareBits = index;
+  }
+
+public:
+  static DefaultArgumentInitializer *create(DeclContext *parent,
+                                            unsigned index) {
+    return new (parent->getASTContext())
+        DefaultArgumentInitializer(parent, index);
   }
 
   unsigned getIndex() const { return SpareBits; }
@@ -137,7 +143,7 @@ public:
   /// Change the parent of this context.  This is necessary because
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
-  void changeFunction(DeclContext *parent, ParameterList *paramLists);
+  void changeFunction(DeclContext *parent);
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))

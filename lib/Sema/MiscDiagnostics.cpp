@@ -21,7 +21,9 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -630,8 +632,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     std::optional<MagicIdentifierLiteralExpr::Kind>
     getMagicIdentifierDefaultArgKind(const ParamDecl *param) {
       switch (param->getDefaultArgumentKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-      case DefaultArgumentKind::NAME: \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
+      case DefaultArgumentKind::NAME:                                          \
         return MagicIdentifierLiteralExpr::Kind::NAME;
 #include "swift/AST/MagicIdentifierKinds.def"
 
@@ -4350,6 +4352,9 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     if (auto *expr = OpaqueValueMap[OVE])
       return markStoredOrInOutExpr(expr, Flags);
 
+  if (auto *ABIConv = dyn_cast<ABISafeConversionExpr>(E))
+    return markStoredOrInOutExpr(ABIConv->getSubExpr(), Flags);
+
   // If we don't know what kind of expression this is, assume it's a reference
   // and mark it as a read.
   E->walk(*this);
@@ -5119,21 +5124,89 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
 /// was emitted.
 static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
                                           DeclContext *DC) {
+  if (info->isInvalid())
+    return false;
+
+  auto &diags = DC->getASTContext().Diags;
+  StringRef queryName =
+      info->isUnavailability() ? "#unavailable" : "#available";
+
+  bool hasValidSpecs = false;
+  bool allValidSpecsArePlatform = true;
+  std::optional<SourceLoc> wildcardLoc;
+  llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
+  for (auto spec : info->getSemanticAvailabilitySpecs(DC)) {
+    auto parsedSpec = spec.getParsedSpec();
+    if (spec.isWildcard()) {
+      wildcardLoc = parsedSpec->getStartLoc();
+      continue;
+    }
+
+    auto domain = spec.getDomain();
+    auto loc = parsedSpec->getStartLoc();
+    bool hasVersion = !spec.getVersion().empty();
+
+    if (!domain.supportsQueries()) {
+      diags.diagnose(loc, diag::availability_query_not_allowed, domain,
+                     hasVersion, queryName);
+      return true;
+    }
+
+    if (!domain.isPlatform() && info->getQueries().size() > 1) {
+      diags.diagnose(loc, diag::availability_must_occur_alone, domain,
+                     hasVersion);
+      return true;
+    }
+
+    if (domain.isVersioned()) {
+      if (!hasVersion) {
+        diags.diagnose(loc, diag::avail_query_expected_version_number);
+        return true;
+      }
+    } else if (hasVersion) {
+      diags.diagnose(loc, diag::availability_unexpected_version, domain)
+          .highlight(parsedSpec->getVersionSrcRange());
+      return true;
+    }
+
+    // Diagnose duplicate domains.
+    if (!seenDomains.insert(domain).second) {
+      diags.diagnose(loc, diag::availability_query_already_specified,
+                     domain.isVersioned(), domain);
+      return true;
+    }
+
+    hasValidSpecs = true;
+    if (!domain.isPlatform())
+      allValidSpecsArePlatform = false;
+  }
+
+  if (info->isUnavailability()) {
+    if (wildcardLoc) {
+      diags
+          .diagnose(*wildcardLoc,
+                    diag::unavailability_query_wildcard_not_required)
+          .fixItRemove(*wildcardLoc);
+    }
+  } else if (!wildcardLoc && hasValidSpecs && allValidSpecsArePlatform) {
+    if (info->getQueries().size() > 0) {
+      auto insertLoc = info->getQueries().back()->getSourceRange().End;
+      diags.diagnose(insertLoc, diag::availability_query_wildcard_required)
+          .fixItInsertAfter(insertLoc, ", *");
+    }
+  }
+
   // Reject inlinable code using availability macros. In order to lift this
   // restriction, macros would need to either be expanded when printed in
   // swiftinterfaces or be parsable as macros by module clients.
   auto fragileKind = DC->getFragileFunctionKind();
   if (fragileKind.kind != FragileFunctionKind::None) {
-    for (auto queries : info->getQueries()) {
-      if (auto availSpec =
-              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries)) {
-        if (availSpec->getMacroLoc().isValid()) {
-          DC->getASTContext().Diags.diagnose(
-              availSpec->getMacroLoc(),
-              swift::diag::availability_macro_in_inlinable,
-              fragileKind.getSelector());
-          return true;
-        }
+    for (auto availSpec : info->getQueries()) {
+      if (availSpec->getMacroLoc().isValid()) {
+        diags.diagnose(availSpec->getMacroLoc(),
+                       swift::diag::availability_macro_in_inlinable,
+                       fragileKind.getSelector());
+        return true;
       }
     }
   }
@@ -5229,7 +5302,8 @@ static void checkLabeledStmtConditions(ASTContext &ctx,
       break;
     case StmtConditionElement::CK_Availability: {
       auto info = elt.getAvailability();
-      (void)diagnoseAvailabilityCondition(info, DC);
+      if (diagnoseAvailabilityCondition(info, DC))
+        info->setInvalid();
       break;
     }
     case StmtConditionElement::CK_HasSymbol: {

@@ -91,7 +91,9 @@ private func optimize(value: Value, _ context: FunctionPassContext) {
   var hoistableDestroys = selectHoistableDestroys(of: value, context)
   defer { hoistableDestroys.deinitialize() }
 
-  var minimalLiverange = InstructionRange(withLiverangeOf: value, ignoring: hoistableDestroys, context)
+  guard var minimalLiverange = InstructionRange(withLiverangeOf: value, ignoring: hoistableDestroys, context) else {
+    return
+  }
   defer { minimalLiverange.deinitialize() }
 
   hoistDestroys(of: value, toEndOf: minimalLiverange, restrictingTo: &hoistableDestroys, context)
@@ -177,10 +179,10 @@ private func removeDestroys(
 
 private extension InstructionRange {
 
-  init(withLiverangeOf initialDef: Value, ignoring ignoreDestroys: InstructionSet, _ context: FunctionPassContext)
+  init?(withLiverangeOf initialDef: Value, ignoring ignoreDestroys: InstructionSet, _ context: FunctionPassContext)
   {
     var liverange = InstructionRange(for: initialDef, context)
-    var visitor = InteriorUseWalker(definingValue: initialDef, ignoreEscape: true, visitInnerUses: false, context) {
+    var visitor = InteriorUseWalker(definingValue: initialDef, ignoreEscape: false, visitInnerUses: true, context) {
       if !ignoreDestroys.contains($0.instruction) {
         liverange.insert($0.instruction)
       }
@@ -197,7 +199,10 @@ private extension InstructionRange {
       return .continueWalk
     }
 
-    _ = visitor.visitUses()
+    guard visitor.visitUses() == .continueWalk else {
+      liverange.deinitialize()
+      return nil
+    }
     self = liverange
   }
 

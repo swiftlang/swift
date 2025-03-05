@@ -477,6 +477,9 @@ bool Implementation::gatherUses(SILValue value) {
                               false /*is lifetime ending*/);
       }
       // The liveness extends to the scope-ending uses of the borrow.
+      //
+      // FIXME: this ignores visitScopeEndingUses failure, which may result from
+      // unknown uses or dead borrows.
       BorrowingOperand(nextUse).visitScopeEndingUses([&](Operand *end) -> bool {
         if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
           return false;
@@ -1090,6 +1093,7 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
     LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow after borrow scope:\n"
                                "    ";
                op->getUser()->print(llvm::dbgs()));
+    // FIXME: ignoring the visitScopeEndingUses result ignores unknown uses.
     bOp.visitScopeEndingUses([&](Operand *endScope) -> bool {
       auto *endScopeInst = endScope->getUser();
       LLVM_DEBUG(llvm::dbgs() << "       ";
@@ -1107,6 +1111,7 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
     // End the borrow where the original borrow of the subject was ended.
     // TODO: handle if the switch isn't directly on a borrow?
     auto beginBorrow = cast<BeginBorrowInst>(swi->getOperand());
+    // FIXME: ignoring the visitScopeEndingUses result ignores unknown uses.
     BorrowingOperand(&beginBorrow->getOperandRef())
       .visitScopeEndingUses([&](Operand *endScope) -> bool {
         auto *endScopeInst = endScope->getUser();

@@ -862,6 +862,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, HAS_CXX_INTEROPERABILITY_ENABLED);
   BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
   BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
+  BLOCK_RECORD(options_block, STRICT_MEMORY_SAFETY);
   BLOCK_RECORD(options_block, CXX_STDLIB_KIND);
   BLOCK_RECORD(options_block, PUBLIC_MODULE_NAME);
   BLOCK_RECORD(options_block, SWIFT_INTERFACE_COMPILER_VERSION);
@@ -964,6 +965,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE_REF);
   BLOCK_RECORD(sil_block, SIL_SOURCE_LOC);
   BLOCK_RECORD(sil_block, SIL_SOURCE_LOC_REF);
+  BLOCK_RECORD(sil_block, SIL_DEBUG_VALUE);
+  BLOCK_RECORD(sil_block, SIL_DEBUG_VALUE_DELIMITER);
 
 
   BLOCK(SIL_INDEX_BLOCK);
@@ -1177,6 +1180,11 @@ void Serializer::writeHeader() {
         options_block::CXXStdlibKindLayout CXXStdlibKind(Out);
         CXXStdlibKind.emit(ScratchRecord,
                            static_cast<uint8_t>(M->getCXXStdlibKind()));
+      }
+
+      if (M->supportsExtensibleEnums()) {
+        options_block::ExtensibleEnumsLayout ExtensibleEnums(Out);
+        ExtensibleEnums.emit(ScratchRecord);
       }
 
       if (Options.SerializeOptionsForDebugging) {
@@ -2695,7 +2703,9 @@ void Serializer::writeLifetimeDependencies(
     LifetimeDependenceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, info.getTargetIndex(), info.isImmortal(),
         info.hasInheritLifetimeParamIndices(),
-        info.hasScopeLifetimeParamIndices(), paramIndices);
+        info.hasScopeLifetimeParamIndices(),
+        info.hasAddressableParamIndices(),
+        paramIndices);
     paramIndices.clear();
   }
 }
@@ -4679,7 +4689,7 @@ public:
         param->isVariadic(),
         param->isAutoClosure(),
         param->isIsolated(),
-        param->isCompileTimeConst(),
+        param->isCompileTimeLiteral(),
         param->isSending(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
@@ -5772,7 +5782,7 @@ public:
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isIsolated(), paramFlags.isNoDerivative(),
-          paramFlags.isCompileTimeConst(), paramFlags.isSending(),
+          paramFlags.isCompileTimeLiteral(), paramFlags.isSending(),
           paramFlags.isAddressable());
     }
   }
@@ -5781,6 +5791,8 @@ public:
     switch (isolation.getKind()) {
     case swift::FunctionTypeIsolation::Kind::NonIsolated:
       return unsigned(FunctionTypeIsolation::NonIsolated);
+    case swift::FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      return unsigned(FunctionTypeIsolation::NonIsolatedCaller);
     case swift::FunctionTypeIsolation::Kind::Parameter:
       return unsigned(FunctionTypeIsolation::Parameter);
     case swift::FunctionTypeIsolation::Kind::Erased:

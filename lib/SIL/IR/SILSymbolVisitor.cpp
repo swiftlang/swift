@@ -132,6 +132,15 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     Visitor.addAsyncFunctionPointer(declRef);
   }
 
+  void addCoroFunctionPointer(SILDeclRef declRef) {
+    auto silLinkage = effectiveLinkageForClassMember(
+        declRef.getLinkage(ForDefinition), declRef.getSubclassScope());
+    if (shouldSkipVisit(silLinkage))
+      return;
+
+    Visitor.addCoroFunctionPointer(declRef);
+  }
+
   void addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
                                     const AutoDiffConfig &config,
                                     AutoDiffLinearMapKind kind) {
@@ -529,6 +538,12 @@ public:
 
     if (AFD->hasAsync()) {
       addAsyncFunctionPointer(SILDeclRef(AFD));
+    }
+
+    auto *accessor = dyn_cast<AccessorDecl>(AFD);
+    if (accessor &&
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
+      addCoroFunctionPointer(SILDeclRef(AFD));
     }
 
     // Skip non objc compatible methods or non-public methods.

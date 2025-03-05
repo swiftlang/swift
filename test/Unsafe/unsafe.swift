@@ -1,13 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/unsafe_swift_decls.swiftmodule %S/Inputs/unsafe_swift_decls.swift -enable-experimental-feature AllowUnsafeAttribute
+// RUN: %target-swift-frontend -emit-module-path %t/unsafe_swift_decls.swiftmodule %S/Inputs/unsafe_swift_decls.swift
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -I %t -print-diagnostic-groups
+// RUN: %target-typecheck-verify-swift -strict-memory-safety -I %t -print-diagnostic-groups
 
 // Make sure everything compiles without error when unsafe code is allowed.
-// RUN: %target-swift-frontend -typecheck -enable-experimental-feature AllowUnsafeAttribute %s -I %t
-
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-// REQUIRES: swift_feature_WarnUnsafe
+// RUN: %target-swift-frontend -typecheck %s -I %t
 
 import unsafe_swift_decls
 
@@ -19,7 +16,7 @@ protocol P {
   @unsafe func g()
 }
 
-struct XP: P { // expected-warning{{conformance of 'XP' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{12-12=@unsafe }}
+struct XP: P { // expected-warning{{conformance of 'XP' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [StrictMemorySafety]}}{{12-12=@unsafe }}
   @unsafe func f() { } // expected-note{{unsafe instance method 'f()' cannot satisfy safe requirement}}
   @unsafe func g() { }
 }
@@ -33,7 +30,7 @@ protocol Ptrable2 {
 }
 
 extension HasAPointerType: Ptrable2 { } // expected-note{{unsafe type 'HasAPointerType.Ptr' (aka 'PointerType') cannot satisfy safe associated type 'Ptr'}}
-  // expected-warning@-1{{conformance of 'HasAPointerType' to protocol 'Ptrable2' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{28-28=@unsafe }}
+  // expected-warning@-1{{conformance of 'HasAPointerType' to protocol 'Ptrable2' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [StrictMemorySafety]}}{{28-28=@unsafe }}
 
 struct UnsafeXP: @unsafe P {
   @unsafe func f() { }
@@ -47,7 +44,7 @@ protocol MultiP {
 
 struct ConformsToMultiP { }
 
-// expected-warning@+1{{conformance of 'ConformsToMultiP' to protocol 'MultiP' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{29-29=@unsafe }}
+// expected-warning@+1{{conformance of 'ConformsToMultiP' to protocol 'MultiP' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [StrictMemorySafety]}}{{29-29=@unsafe }}
 extension ConformsToMultiP: MultiP {
   // expected-note@-1{{unsafe type 'UnsafeSuper' cannot satisfy safe associated type 'Ptr'}}
   @unsafe func f() -> UnsafeSuper {
@@ -77,7 +74,7 @@ class Super {
 }
 
 class Sub: Super { // expected-note{{make class 'Sub' @unsafe to allow unsafe overrides of safe superclass methods}}{{1-1=@unsafe }}
-  @unsafe override func f() { } // expected-warning{{override of safe instance method with unsafe instance method [Unsafe]}}
+  @unsafe override func f() { } // expected-warning{{override of safe instance method with unsafe instance method [StrictMemorySafety]}}
   @unsafe override func g() { }  
 }
 
@@ -120,7 +117,7 @@ class ExclusivityChecking {
   func f() { }
 };
 
-// TODO: diagnose the need for @unsafe when there's an unsafe superclass.
+// expected-warning@+1{{class 'UnsafeSub' has superclass involving unsafe type 'UnsafeSuper' [StrictMemorySafety]}}{{1-1=@unsafe }}
 class UnsafeSub: UnsafeSuper { }
 
 // -----------------------------------------------------------------------
@@ -132,13 +129,13 @@ struct BufferThingy<T> {
 }
 
 func testConstruction() {
-  let _ = BufferThingy<Int>(count: 17) // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}{{11-11=unsafe }}
+  let _ = BufferThingy<Int>(count: 17) // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [StrictMemorySafety]}}{{11-11=unsafe }}
   // expected-note@-1{{reference to unsafe initializer 'init(count:)'}}
 }
 
 func testRHS(b: Bool, x: Int) {
   @unsafe let limit = 17
-  if b && x > limit { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}{{6-6=unsafe }}
+  if b && x > limit { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [StrictMemorySafety]}}{{6-6=unsafe }}
     // expected-note@-1{{reference to unsafe let 'limit'}}
   }
 }
@@ -150,12 +147,9 @@ func testRHS(b: Bool, x: Int) {
 @unsafe var unsafeVar: Int = 0
 
 
-// expected-warning@+3{{global function 'testMe' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
 func testMe(
-  _ pointer: PointerType, // expected-note{{reference to unsafe struct 'PointerType'}}
-  _ unsafeSuper: UnsafeSuper // expected-note{{reference to unsafe class 'UnsafeSuper'}}
+  _ pointer: PointerType,
+  _ unsafeSuper: UnsafeSuper
 ) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
   unsafeF() // expected-note{{reference to unsafe global function 'unsafeF()'}}
@@ -173,19 +167,32 @@ func testMe(
 // Various declaration kinds
 // -----------------------------------------------------------------------
 
-// expected-warning@+3{{type alias 'SuperUnsafe' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
-typealias SuperUnsafe = UnsafeSuper // expected-note{{reference to unsafe class 'UnsafeSuper'}}
+typealias SuperUnsafe = UnsafeSuper
 
 @unsafe typealias SuperUnsafe2 = UnsafeSuper
 
+// expected-warning@+3{{enum 'HasUnsafeThings' has storage involving unsafe types [StrictMemorySafety]}}
+// expected-note@+2{{add '@unsafe' if this type is also unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' if this type encapsulates the unsafe storage in a safe interface}}{{1-1=@safe }}
 enum HasUnsafeThings {
 
-// expected-warning@+3{{enum case 'one' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
-case one(UnsafeSuper)  // expected-note{{reference to unsafe class 'UnsafeSuper'}}
+case one(UnsafeSuper) // expected-note{{enum case 'one' involves unsafe type 'UnsafeSuper'}}
 
-@unsafe case two(UnsafeSuper)
+case two(UnsafeSuper) // expected-note{{enum case 'two' involves unsafe type 'UnsafeSuper'}}
+}
+
+// expected-warning@+3{{class 'ClassWithUnsafeStorage' has storage involving unsafe types [StrictMemorySafety]}}
+// expected-note@+2{{add '@unsafe' if this type is also unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' if this type encapsulates the unsafe storage in a safe interface}}{{1-1=@safe }}
+class ClassWithUnsafeStorage {
+  var int: Int = 0
+  var array: [UnsafeSuper]? = nil // expected-note{{property 'array' involves unsafe type 'UnsafeSuper'}}
+}
+
+// expected-warning@+3{{generic struct 'GenericStructWithUnsafeThings' has storage involving unsafe types}}
+// expected-note@+2{{add '@unsafe' if this type is also unsafe to use}}
+// expected-note@+1{{add '@safe' if this type encapsulates the unsafe storage in a safe interface}}
+struct GenericStructWithUnsafeThings<T> {
+  var property: T
+  var pointer: PointerType // expected-note{{property 'pointer' involves unsafe type 'PointerType'}}
 }

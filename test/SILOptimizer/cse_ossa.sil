@@ -1,4 +1,7 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -cse -enable-experimental-feature ValueGenerics | %FileCheck %s
+
+// REQUIRES: swift_feature_ValueGenerics
+
 sil_stage canonical
 
 import Builtin
@@ -1326,5 +1329,27 @@ exit(%proj : @guaranteed $C, %borrow : @guaranteed $S, %owned_s_2 : @owned $S):
     end_borrow %borrow : $S
     destroy_value %owned_s_2 : $S
     return %copy : $C
+}
+
+// CHECK-LABEL: sil [ossa] @type_value_test : {{.*}} {
+// CHECK:         type_value
+// CHECK-NOT:     type_value
+// CHECK-LABEL: } // end sil function 'type_value_test'
+sil [ossa] @type_value_test : $@convention(thin) <let N : Int> (@in_guaranteed InlineArray<N, Int>, Int) -> () {
+bb0(%0 : $*InlineArray<N, Int>, %1 : $Int):
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = type_value $Int for N
+  %4 = struct_extract %1, #Int._value
+  %5 = struct_extract %3, #Int._value
+  %6 = builtin "cmp_slt_Int64"(%4, %2) : $Builtin.Int1
+  cond_fail %6, "Index out of bounds"
+  %8 = integer_literal $Builtin.Int64, 0
+  %9 = type_value $Int for N
+  %10 = struct_extract %1, #Int._value
+  %11 = struct_extract %9, #Int._value
+  %12 = builtin "cmp_slt_Int64"(%10, %8) : $Builtin.Int1
+  cond_fail %12, "Index out of bounds"
+  %14 = tuple ()
+  return %14
 }
 

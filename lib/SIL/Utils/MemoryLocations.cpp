@@ -436,7 +436,7 @@ bool MemoryLocations::analyzeAddrProjection(
       // open_existential_addr).
       if (!isa<OpenExistentialAddrInst>(loc->representativeValue))
         return false;
-      assert(loc->representativeValue->getType().isOpenedExistential());
+      assert(loc->representativeValue->getType().is<OpenedArchetypeType>());
       loc->representativeValue = projection;
     }
   }

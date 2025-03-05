@@ -331,6 +331,10 @@ public:
   /// optimizer.
   bool UseAggressiveReg2MemForCodeSize = true;
 
+  /// Enable enforcement of lifetime dependencies on addressable arguments.
+  /// Temporarily used to bootstrap the AddressableParameters feature.
+  bool EnableAddressDependencies = false;
+
   SILOptions() {}
 
   /// Return a hash code of any components from these options that should

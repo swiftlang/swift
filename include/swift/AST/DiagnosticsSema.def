@@ -1841,7 +1841,7 @@ ERROR(attr_objc_implementation_no_conformance,none,
 ERROR(attr_objc_implementation_raise_minimum_deployment_target,none,
       "'@implementation' of an Objective-C class requires a minimum deployment "
       "target of at least %0 %1",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 ERROR(attr_implementation_requires_language,none,
       "'@implementation' used without specifying the language being "
       "implemented",
@@ -1896,6 +1896,11 @@ ERROR(objc_implementation_must_be_settable,none,
 
 ERROR(objc_implementation_type_mismatch,none,
       "%kind0 of type %1 does not match type %2 declared by the header",
+      (ValueDecl *, Type, Type))
+
+ERROR(objc_implementation_sendability_mismatch,none,
+      "sendability of function types in %kind0 of type %1 does not match "
+      "type %2 declared by the header",
       (ValueDecl *, Type, Type))
 
 ERROR(objc_implementation_required_attr_mismatch,none,
@@ -3991,11 +3996,11 @@ ERROR(attr_not_on_decl_with_invalid_access_level,none,
 ERROR(attr_has_no_effect_decl_not_available_before,none,
       "'%0' has no effect because %1 is not "
       "available before %2 %3",
-      (DeclAttribute, const ValueDecl *, StringRef, llvm::VersionTuple))
+      (DeclAttribute, const ValueDecl *, AvailabilityDomain, AvailabilityRange))
 
 ERROR(attr_has_no_effect_on_unavailable_decl,none,
       "'%0' has no effect because %1 is unavailable on %2",
-      (DeclAttribute, const ValueDecl *, StringRef))
+      (DeclAttribute, const ValueDecl *, AvailabilityDomain))
 
 ERROR(attr_ambiguous_reference_to_decl,none,
       "ambiguous reference to %0 in '@%1' attribute", (DeclNameRef, StringRef))
@@ -5607,6 +5612,10 @@ ERROR(non_sendable_isolated_capture,none,
       "capture of %1 with non-sendable type %0 in an isolated "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
+ERROR(non_sendable_metatype_capture,none,
+      "capture of non-sendable type %0 in an isolated "
+      "%select{local function|closure}1",
+      (Type, bool))
 ERROR(self_capture_deinit_task,none,
       "capture of 'self' in a closure that outlives deinit",
       ())
@@ -5839,11 +5848,12 @@ ERROR(any_not_existential,none,
 ERROR(incorrect_optional_any,none,
       "optional 'any' type must be written %0",
       (Type))
-ERROR(existential_requires_any,none,
-      "use of %select{protocol |}2%0 as a type must be written %1",
-      (Type, Type, bool))
-ERROR(inverse_requires_any,none,
-      "constraint that suppresses conformance requires 'any'", ())
+
+GROUPED_ERROR(existential_requires_any,ExistentialAny,none,
+              "use of %select{protocol |}2%0 as a type must be written %1",
+              (Type, Type, bool))
+GROUPED_ERROR(inverse_requires_any,ExistentialAny,none,
+              "constraint that suppresses conformance requires 'any'", ())
 
 ERROR(nonisolated_mutable_storage,none,
       "'nonisolated' cannot be applied to mutable stored properties",
@@ -5998,7 +6008,7 @@ ERROR(isolated_deinit_on_value_type,none,
       ())
 ERROR(isolated_deinit_unavailable,none,
       "isolated deinit is only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 //------------------------------------------------------------------------------
 // MARK: String Processing
@@ -6013,7 +6023,7 @@ ERROR(regex_capture_types_failed_to_decode,none,
 
 ERROR(regex_feature_unavailable, none,
       "%0 is only available in %1 %2 or newer",
-      (StringRef, StringRef, llvm::VersionTuple))
+      (StringRef, AvailabilityDomain, AvailabilityRange))
 
 ERROR(must_import_regex_builder_module,none,
       "regex builder requires the 'RegexBuilder' module be imported'", ())
@@ -6340,6 +6350,17 @@ ERROR(invalid_objc_swift_rooted_class,none,
 NOTE(invalid_objc_swift_root_class_insert_nsobject,none,
      "inherit from 'NSObject' to silence this error", ())
 
+WARNING(objc_header_sorting_arbitrary,none,
+        "arbitrarily printing %0 before %1 in generated header; subsequent "
+        "compilations may print them in a different order",
+        (Decl *, Decl *))
+NOTE(objc_header_sorting_arbitrary_other,none,
+     "%1 will be printed after %0 during this compilation",
+     (Decl *, Decl *))
+NOTE(objc_header_sorting_arbitrary_please_report,none,
+     "please report this as a bug in the Swift compiler and describe both "
+     "declarations", ())
+
 ERROR(invalid_nonobjc_decl,none,
       "only class members and extensions of classes can be declared @nonobjc", ())
 ERROR(invalid_nonobjc_extension,none,
@@ -6352,7 +6373,7 @@ ERROR(objc_in_generic_extension,none,
       "cannot contain '@objc' members", (bool))
 ERROR(objc_in_resilient_extension,none,
       "'@objc' %0 in extension of subclass of %1 requires %2 %3",
-      (DescriptiveDeclKind, Identifier, StringRef, llvm::VersionTuple))
+      (DescriptiveDeclKind, Identifier, AvailabilityDomain, AvailabilityRange))
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
@@ -6363,7 +6384,7 @@ ERROR(objc_for_generic_class,none,
       "because they are not directly visible from Objective-C", ())
 ERROR(objc_for_resilient_class,none,
       "explicit '@objc' on subclass of %0 requires %1 %2",
-      (Identifier, StringRef, llvm::VersionTuple))
+      (Identifier, AvailabilityDomain, AvailabilityRange))
 ERROR(objc_getter_for_nonobjc_property,none,
       "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,none,
@@ -6722,26 +6743,34 @@ NOTE(type_eraser_init_spi,none,
 // MARK: @available
 //------------------------------------------------------------------------------
 
+ERROR(availability_must_occur_alone, none,
+      "%0 %select{|version }1availability must be specified alone",
+      (AvailabilityDomain, bool))
+ERROR(availability_unexpected_version, none,
+      "unexpected version number for %0", (AvailabilityDomain))
+WARNING(availability_unrecognized_platform_name,
+        PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
+WARNING(availability_suggest_platform_name,
+        PointsToFirstBadToken, "unrecognized platform name %0;"
+        " did you mean '%1'?",
+        (Identifier, StringRef))
+
 WARNING(attr_availability_expected_deprecated_version, none,
-       "expected version number with 'deprecated' in '%0' attribute for "
-       "platform '%1'", (StringRef, StringRef))
+       "expected version number with 'deprecated' in '%0' attribute for %1",
+       (const DeclAttribute, AvailabilityDomain))
 WARNING(attr_availability_cannot_be_used_for_domain, none,
-       "'%0' cannot be used in '%1' attribute for platform '%2'",
-       (StringRef, StringRef, StringRef))
+       "'%0' cannot be used in '%1' attribute for %2",
+       (StringRef, const DeclAttribute, AvailabilityDomain))
 WARNING(attr_availability_expected_version_spec, none,
        "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
-       "for platform '%1'", (StringRef, StringRef))
+       "for %1", (const DeclAttribute, AvailabilityDomain))
 ERROR(attr_availability_requires_custom_availability, none,
-      "specifying '%0' in '%1' attribute requires "
-      "-enable-experimental-feature CustomAvailability",
-      (StringRef, const DeclAttribute))
-WARNING(attr_availability_unexpected_version,none,
-       "unexpected version number in '%0' attribute for '%1'",
-       (const DeclAttribute, StringRef))
+      "%0 requires '-enable-experimental-feature CustomAvailability'",
+      (AvailabilityDomain))
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
-      (const ValueDecl *, bool, StringRef, StringRef))
+      (const ValueDecl *, bool, AvailabilityDomain, StringRef))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
@@ -6755,17 +6784,17 @@ NOTE(availability_marked_unavailable, none,
 
 NOTE(availability_introduced_in_version, none,
      "%0 was introduced in %1 %2",
-     (const ValueDecl *, StringRef, llvm::VersionTuple))
+     (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
 
 NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",
-     (const ValueDecl *, StringRef, llvm::VersionTuple))
+     (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
 
 GROUPED_WARNING(availability_deprecated, DeprecatedDeclaration, Deprecation,
                 "%0 %select{is|%select{is|was}3}1 "
                 "deprecated%select{| in %2%select{| %4}3}1%select{|: %5}5",
-                (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple,
-                 StringRef))
+                (const ValueDecl *, bool, AvailabilityDomain, bool,
+                 AvailabilityRange, StringRef))
 
 GROUPED_WARNING(
       availability_deprecated_rename, DeprecatedDeclaration, Deprecation,
@@ -6773,8 +6802,8 @@ GROUPED_WARNING(
       "deprecated%select{| in %2%select{| %4}3}1: "
       "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
       "'%7'",
-      (const ValueDecl *, bool, StringRef, bool, llvm::VersionTuple, bool,
-       unsigned, StringRef))
+      (const ValueDecl *, bool, AvailabilityDomain, bool, AvailabilityRange,
+       bool, unsigned, StringRef))
 #undef REPLACEMENT_DECL_KIND_SELECT
 
 NOTE(note_deprecated_rename, none,
@@ -6786,62 +6815,63 @@ ERROR(availability_decl_more_than_enclosing, none,
 
 NOTE(availability_implicit_decl_here, none,
      "%0 implicitly declared here with availability of %1 %2 or newer",
-     (DescriptiveDeclKind, StringRef, llvm::VersionTuple))
+     (DescriptiveDeclKind, AvailabilityDomain, AvailabilityRange))
 
 NOTE(availability_decl_more_than_enclosing_here, none,
      "enclosing scope requires availability of %0 %1 or newer",
-     (StringRef, llvm::VersionTuple))
+     (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_decl_only_version_newer, none,
       "%0 is only available in %1 %2 or newer",
-      (const ValueDecl *, StringRef, llvm::VersionTuple))
+      (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_decl_only_version_newer_for_clients, none,
       "%0 is only available in %1 %2 or newer; clients of %3 may have a lower"
       " deployment target",
-      (const ValueDecl *, StringRef, llvm::VersionTuple, ModuleDecl *))
+      (const ValueDecl *, AvailabilityDomain, AvailabilityRange, ModuleDecl *))
 
 WARNING(availability_decl_only_version_newer_for_clients_warn, none,
         "%0 is only available in %1 %2 or newer; clients of %3 may have a lower"
         " deployment target",
-        (const ValueDecl *, StringRef, llvm::VersionTuple, ModuleDecl *))
+        (const ValueDecl *, AvailabilityDomain, AvailabilityRange,
+         ModuleDecl *))
 
 ERROR(availability_opaque_types_only_version_newer, none,
       "'some' return types are only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_concurrency_only_version_newer, none,
       "concurrency is only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_parameterized_protocol_only_version_newer, none,
       "runtime support for parameterized protocol types is only available in "
       "%0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_isolated_any_only_version_newer, none,
       "runtime support for @isolated(any) function types is only available in "
       "%0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_copyable_generics_casting_only_version_newer, none,
       "runtime support for casting types with noncopyable generic arguments "
       "is only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_escapable_generics_casting_only_version_newer, none,
       "runtime support for casting types with nonescapable generic arguments "
       "is only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_typed_throws_only_version_newer, none,
       "runtime support for typed throws function types is only available in "
       "%0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_variadic_type_only_version_newer, none,
       "parameter packs in generic types are only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 NOTE(availability_guard_with_version_check, none,
      "add 'if #available' version check", ())
@@ -6854,7 +6884,7 @@ FIXIT(insert_available_attr,
 
 ERROR(availability_inout_accessor_only_version_newer, none,
       "cannot pass as inout because %0 is only available in %1 %2 or newer",
-      (const ValueDecl *, StringRef, llvm::VersionTuple))
+      (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
@@ -6900,7 +6930,8 @@ WARNING(availability_enum_element_no_potential_warn,
 
 ERROR(availability_protocol_requires_version,
       none, "protocol %0 requires %1 to be available in %2 %3 and newer",
-      (const ProtocolDecl *, const ValueDecl *, StringRef, llvm::VersionTuple))
+      (const ProtocolDecl *, const ValueDecl *, AvailabilityDomain,
+       AvailabilityRange))
 
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
@@ -6933,7 +6964,7 @@ NOTE(availability_unavailable_implicit_init, none,
 ERROR(conformance_availability_unavailable, none,
       "conformance of %0 to %1 is unavailable"
       "%select{ in %3|}2%select{|: %4}4",
-      (Type, Type, bool, StringRef, StringRef))
+      (Type, Type, bool, AvailabilityDomain, StringRef))
 
 NOTE(conformance_availability_marked_unavailable, none,
      "conformance of %0 to %1 has been explicitly marked "
@@ -6941,22 +6972,40 @@ NOTE(conformance_availability_marked_unavailable, none,
 
 NOTE(conformance_availability_introduced_in_version, none,
      "conformance of %0 to %1 was introduced in %2 %3",
-     (Type, Type, StringRef, llvm::VersionTuple))
+     (Type, Type, AvailabilityDomain, AvailabilityRange))
 
 NOTE(conformance_availability_obsoleted, none,
      "conformance of %0 to %1 was obsoleted in %2 %3",
-     (Type, Type, StringRef, llvm::VersionTuple))
+     (Type, Type, AvailabilityDomain, AvailabilityRange))
 
 GROUPED_WARNING(conformance_availability_deprecated,
                 DeprecatedDeclaration, Deprecation,
                 "conformance of %0 to %1 %select{is|%select{is|was}4}2 "
                 "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
-                (Type, Type, bool, StringRef, bool, llvm::VersionTuple,
+                (Type, Type, bool, AvailabilityDomain, bool, AvailabilityRange,
                  StringRef))
 
 ERROR(conformance_availability_only_version_newer, none,
       "conformance of %0 to %1 is only available in %2 %3 or newer",
-      (Type, Type, StringRef, llvm::VersionTuple))
+      (Type, Type, AvailabilityDomain, AvailabilityRange))
+
+//------------------------------------------------------------------------------
+// MARK: if #available(...)
+//------------------------------------------------------------------------------
+
+ERROR(availability_query_not_allowed, none,
+      "%0 %select{|version }1checks not allowed in %2(...)",
+      (AvailabilityDomain, bool, StringRef))
+
+ERROR(availability_query_already_specified, none,
+      "%select{|version for }0%1 already specified",
+      (bool, AvailabilityDomain))
+
+ERROR(availability_query_wildcard_required, none,
+      "must handle potential future platforms with '*'", ())
+
+ERROR(unavailability_query_wildcard_not_required, none,
+      "platform wildcard '*' is always implicit in #unavailable", ())
 
 //------------------------------------------------------------------------------
 // MARK: @discardableResult
@@ -7486,13 +7535,6 @@ ERROR(result_builder_buildpartialblock_accumulated_not_accessible,none,
         "this behavior is deprecated", ())
 
 //------------------------------------------------------------------------------
-// MARK: Implicit conversion diagnostics
-//------------------------------------------------------------------------------
-ERROR(cannot_implicitly_convert_in_optional_context,none,
-      "cannot implicitly convert value of type %0 to expected type %1",
-      (Type, Type))
-
-//------------------------------------------------------------------------------
 // MARK: marker protocol diagnostics
 //------------------------------------------------------------------------------
 ERROR(marker_protocol_requirement, none,
@@ -7773,6 +7815,10 @@ ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())
 
+ERROR(experimental_macro,none,
+      "macro %0 is experimental",
+      (DeclName))
+
 ERROR(macro_resolve_circular_reference, none,
       "circular reference resolving %select{freestanding|attached}0 macro %1",
       (bool, DeclName))
@@ -7976,10 +8022,6 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
 
-ERROR(span_requires_feature_flag,none,
-      "'%0' requires -enable-experimental-feature Span",
-      (StringRef))
-
 //------------------------------------------------------------------------------
 // MARK: Init accessors
 //------------------------------------------------------------------------------
@@ -8034,7 +8076,7 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_invalid_param_name, none,
-      "invalid parameter name specified '%0'", (StringRef))
+      "invalid parameter name specified %0", (Identifier))
 ERROR(lifetime_dependence_invalid_param_index, none,
       "invalid parameter index specified '%0'", (unsigned))
 ERROR(lifetime_dependence_invalid_self_in_static, none,
@@ -8123,9 +8165,6 @@ NOTE(sending_function_result_with_sending_param_note, none,
 //------------------------------------------------------------------------------
 // MARK: Strict Safety Diagnostics
 //------------------------------------------------------------------------------
-ERROR(unsafe_attr_disabled,none,
-      "attribute requires '-enable-experimental-feature AllowUnsafeAttribute'", ())
-
 NOTE(note_reference_to_unsafe_decl,none,
       "%select{reference|call}0 to unsafe %kind1",
       (bool, const ValueDecl *))
@@ -8148,17 +8187,24 @@ NOTE(note_reference_exclusivity_unchecked,none,
 NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
      "@unsafe conformance of %0 to %kind1 involves unsafe code",
      (Type, const ValueDecl *))
+NOTE(note_unsafe_storage,none,
+     "%kindbase1 involves unsafe type %2", (bool, const ValueDecl *, Type))
 
-GROUPED_WARNING(decl_signature_involves_unsafe,Unsafe,none,
-      "%kindbase0 has an interface that involves unsafe types",
+GROUPED_WARNING(decl_unsafe_storage,StrictMemorySafety,none,
+      "%kindbase0 has storage involving unsafe types",
       (const Decl *))
-NOTE(decl_signature_mark_unsafe,none,
-      "add '@unsafe' to indicate that this declaration is unsafe to use",
+NOTE(decl_storage_mark_unsafe,none,
+      "add '@unsafe' if this type is also unsafe to use",
       ())
-NOTE(decl_signature_mark_safe,none,
-      "add '@safe' to indicate that this declaration is memory-safe to use", ())
+NOTE(decl_storage_mark_safe,none,
+      "add '@safe' if this type encapsulates the unsafe storage in "
+      "a safe interface", ())
 
-GROUPED_WARNING(conformance_involves_unsafe,Unsafe,none,
+GROUPED_WARNING(unsafe_superclass,StrictMemorySafety,none,
+     "%kindbase0 has superclass involving unsafe type %1", 
+     (const ValueDecl *, Type))
+
+GROUPED_WARNING(conformance_involves_unsafe,StrictMemorySafety,none,
      "conformance of %0 to %kind1 involves unsafe code; use '@unsafe' to "
      "indicate that the conformance is not memory-safe",
      (Type, const ValueDecl *))
@@ -8169,16 +8215,20 @@ NOTE(note_type_witness_unsafe,none,
       "unsafe type %0 cannot satisfy safe associated type %1",
       (Type, DeclName))
 
-GROUPED_WARNING(override_safe_with_unsafe,Unsafe,none,
+GROUPED_WARNING(override_safe_with_unsafe,StrictMemorySafety,none,
       "override of safe %0 with unsafe %0", (DescriptiveDeclKind))
 
-GROUPED_WARNING(preconcurrency_import_unsafe,Unsafe,none,
+GROUPED_WARNING(preconcurrency_import_unsafe,StrictMemorySafety,none,
       "@preconcurrency import is not memory-safe because it can silently "
       "introduce data races", ())
-GROUPED_WARNING(unsafe_without_unsafe,Unsafe,none,
+GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
+GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
+      "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
 WARNING(no_unsafe_in_unsafe,none,
         "no unsafe operations occur within 'unsafe' expression", ())
+WARNING(no_unsafe_in_unsafe_for,none,
+        "no unsafe operations occur within 'unsafe' for-in loop", ())
 NOTE(make_subclass_unsafe,none,
      "make class %0 @unsafe to allow unsafe overrides of safe superclass methods",
      (DeclName))
@@ -8207,16 +8257,16 @@ ERROR(value_generics_missing_feature,none,
       "value generics require '-enable-experimental-feature ValueGenerics'", ())
 ERROR(availability_value_generic_type_only_version_newer, none,
       "values in generic types are only available in %0 %1 or newer",
-      (StringRef, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
 //===----------------------------------------------------------------------===//
-// MARK: Slab
+// MARK: InlineArray
 //===----------------------------------------------------------------------===//
 
-ERROR(slab_literal_incorrect_count,none,
-      "expected %0 elements in slab literal, but got %1", (Type, Type))
+ERROR(inlinearray_literal_incorrect_count,none,
+      "expected %0 elements in inline array literal, but got %1", (Type, Type))
 
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute
@@ -8254,6 +8304,36 @@ ERROR(attr_abi_incompatible_with_silgen_name,none,
       (DescriptiveDeclKind))
 
 //===----------------------------------------------------------------------===//
+// MARK: Isolated conformances
+//===----------------------------------------------------------------------===//
+ERROR(isolated_conformance_not_global_actor_isolated,none,
+      "isolated conformance is only permitted on global-actor-isolated types",
+      ())
+ERROR(isolated_conformance_experimental_feature,none,
+      "isolated conformances require experimental feature "
+      " 'IsolatedConformances'", ())
+ERROR(nonisolated_conformance_depends_on_isolated_conformance,none,
+      "conformance of %0 to %1 depends on %2 conformance of %3 to %4; mark it as 'isolated'",
+      (Type, DeclName, ActorIsolation, Type, DeclName))
+ERROR(isolated_conformance_mismatch_with_associated_isolation,none,
+      "%0 conformance of %1 to %2 cannot depend on %3 conformance of %4 to %5",
+      (ActorIsolation, Type, DeclName, ActorIsolation, Type, DeclName))
+NOTE(add_isolated_to_conformance,none,
+     "add 'isolated' to the %0 conformance to restrict it to %1 code",
+    (DeclName, ActorIsolation))
+ERROR(isolated_conformance_with_sendable,none,
+      "isolated conformance of %0 to %1 cannot be used to satisfy conformance "
+      "requirement for a %select{`Sendable`|`SendableMetatype`}2 type "
+      "parameter %3", (Type, DeclName, bool, Type))
+ERROR(isolated_conformance_with_sendable_simple,none,
+      "isolated conformance of %0 to %1 cannot be used to satisfy conformance "
+      "requirement for a `Sendable` type parameter ",
+      (Type, DeclName))
+ERROR(isolated_conformance_wrong_domain,none,
+      "%0 isolated conformance of %1 to %2 cannot be used in %3 context",
+      (ActorIsolation, Type, DeclName, ActorIsolation))
+
+//===----------------------------------------------------------------------===//
 // MARK: @execution Attribute
 //===----------------------------------------------------------------------===//
 
@@ -8265,33 +8345,35 @@ ERROR(attr_execution_type_attr_only_on_async,none,
       "cannot use '@execution' on non-async function type",
       ())
 
-ERROR(attr_execution_concurrent_incompatible_isolated_parameter,none,
-      "cannot use '@execution(concurrent)' on %kind0 because it has "
+ERROR(attr_execution_incompatible_isolated_parameter,none,
+      "cannot use '@execution' on %kind0 because it has "
       "an isolated parameter: %1",
       (ValueDecl *, ValueDecl *))
 
-ERROR(attr_execution_concurrent_incompatible_dynamically_isolated_parameter,none,
-      "cannot use '@execution(concurrent)' on %kind0 because it has "
+ERROR(attr_execution_incompatible_dynamically_isolated_parameter,none,
+      "cannot use '@execution' on %kind0 because it has "
       "a dynamically isolated parameter: %1",
       (ValueDecl *, ValueDecl *))
 
-ERROR(attr_execution_concurrent_incompatible_with_nonisolated,none,
-      "cannot use '@execution(concurrent)' and 'nonisolated' on the same %0 "
-      "because they serve the same purpose",
-      (ValueDecl *))
-
-ERROR(attr_execution_concurrent_type_attr_incompatible_with_global_isolation,none,
-      "cannot use '@execution(concurrent)' because function type is "
-      "isolated to global actor %0",
+ERROR(attr_execution_type_attr_incompatible_with_global_isolation,none,
+      "cannot use '@execution' because function type is "
+      "isolated to a global actor %0",
       (Type))
 
-ERROR(attr_execution_concurrent_type_attr_incompatible_with_isolated_param,none,
-      "cannot use '@execution(concurrent)' together with isolated parameter",
+ERROR(attr_execution_type_attr_incompatible_with_isolated_param,none,
+      "cannot use '@execution' together with an isolated parameter",
       ())
 
-ERROR(attr_execution_concurrent_type_attr_incompatible_with_isolated_any,none,
-      "cannot use '@execution(concurrent)' together with @isolated(any)",
+ERROR(attr_execution_type_attr_incompatible_with_isolated_any,none,
+      "cannot use '@execution' together with @isolated(any)",
       ())
+
+ERROR(invalid_function_conversion_with_non_sendable,none,
+      "cannot convert %0 to %1 because crossing of an isolation boundary "
+      "requires parameter and result types to conform to 'Sendable' protocol",
+      (Type, Type))
+NOTE(type_does_not_conform_to_Sendable,none,
+     "type %0 does not conform to 'Sendable' protocol", (Type))
 
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

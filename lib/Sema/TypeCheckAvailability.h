@@ -127,8 +127,7 @@ public:
   ///
   /// If the declaration is exported, the resulting context is restricted to
   /// referencing exported types only. Otherwise it can reference anything.
-  static ExportContext forDeclSignature(
-      Decl *D, llvm::SmallVectorImpl<UnsafeUse> *unsafeUses);
+  static ExportContext forDeclSignature(Decl *D);
 
   /// Create an instance describing the declarations that can be referenced
   /// from the given function's body.
@@ -201,13 +200,6 @@ public:
   /// Get the ExportabilityReason for diagnostics. If this is 'None', there
   /// are no restrictions on referencing unexported declarations.
   std::optional<ExportabilityReason> getExportabilityReason() const;
-
-  /// If \p decl is unconditionally unavailable in this context, and the context
-  /// is not also unavailable in the same way, then this returns the specific
-  /// `@available` attribute that makes the decl unavailable. Otherwise, returns
-  /// nullptr.
-  std::optional<SemanticAvailableAttr>
-  shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
 };
 
 /// Check if a declaration is exported as part of a module's external interface.
@@ -249,14 +241,6 @@ bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
                                        const ValueDecl *base,
                                        SemanticAvailableAttr attr);
-
-/// Checks whether a declaration should be considered unavailable when referred
-/// to in the given declaration context and availability context and, if so,
-/// returns a result that describes the unsatisfied constraint.
-/// Returns `std::nullopt` if the declaration is available.
-std::optional<AvailabilityConstraint>
-getUnsatisfiedAvailabilityConstraint(const Decl *decl,
-                                     AvailabilityContext availabilityContext);
 
 /// Checks whether a declaration should be considered unavailable when referred
 /// to at the given source location in the given decl context and, if so,

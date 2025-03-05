@@ -146,6 +146,7 @@ BridgedParameterInfo BridgedParameterInfoArray::at(SwiftInt parameterIndex) cons
 BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info)
     : inheritLifetimeParamIndices(info.getInheritIndices()),
       scopeLifetimeParamIndices(info.getScopeIndices()),
+      addressableParamIndices(info.getAddressableIndices()),
       targetIndex(info.getTargetIndex()), immortal(info.isImmortal()) {}
 
 SwiftInt BridgedLifetimeDependenceInfoArray::count() const {
@@ -170,6 +171,10 @@ bool BridgedLifetimeDependenceInfo::checkInherit(SwiftInt index) const {
 bool BridgedLifetimeDependenceInfo::checkScope(SwiftInt index) const {
   return scopeLifetimeParamIndices &&
          scopeLifetimeParamIndices->contains(index);
+}
+
+bool BridgedLifetimeDependenceInfo::checkAddressable(SwiftInt index) const {
+  return addressableParamIndices && addressableParamIndices->contains(index);
 }
 
 SwiftInt BridgedLifetimeDependenceInfo::getTargetIndex() const {
@@ -2001,10 +2006,6 @@ BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
       swift::HasDynamicLifetime_t(hasDynamicLifetime),
       swift::IsLexical_t(isLexical), swift::IsFromVarDecl_t(isFromVarDecl),
       swift::UsesMoveableValueDebugInfo_t(wasMoved), /*skipVarDeclAssert=*/ true)};
-}
-
-BridgedInstruction BridgedBuilder::createAllocVector(BridgedValue capacity, BridgedType type) const {
-  return {unbridged().createAllocVector(regularLoc(), capacity.getSILValue(), type.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) const {

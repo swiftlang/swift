@@ -13461,6 +13461,7 @@ _swift_conformsToProtocolCommon
 _swift_copyAuxiliaryExecutablePath
 _swift_copyKeyPathTrivialIndices
 _swift_copyPOD
+_swift_coroFrameAlloc
 _swift_deallocBox
 _swift_deallocClassInstance
 _swift_deallocError

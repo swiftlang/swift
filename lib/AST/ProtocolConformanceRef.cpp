@@ -386,6 +386,42 @@ bool ProtocolConformanceRef::forEachMissingConformance(
   return false;
 }
 
+bool ProtocolConformanceRef::forEachIsolatedConformance(
+    llvm::function_ref<bool(ProtocolConformance*)> body
+) const {
+  if (isInvalid() || isAbstract())
+    return false;
+
+  if (isPack()) {
+    auto pack = getPack()->getPatternConformances();
+    for (auto conformance : pack) {
+      if (conformance.forEachIsolatedConformance(body))
+        return true;
+    }
+
+    return false;
+  }
+
+  // Is this an isolated conformance?
+  auto concrete = getConcrete();
+  if (auto normal =
+          dyn_cast<NormalProtocolConformance>(concrete->getRootConformance())) {
+    if (normal->isIsolated()) {
+      if (body(concrete))
+        return true;
+    }
+  }
+
+  // Check conformances that are part of this conformance.
+  auto subMap = concrete->getSubstitutionMap();
+  for (auto conformance : subMap.getConformances()) {
+    if (conformance.forEachIsolatedConformance(body))
+      return true;
+  }
+
+  return false;
+}
+
 void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isAbstract()) {
     simple_display(out, conformanceRef.getAbstract());

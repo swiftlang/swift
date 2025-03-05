@@ -1404,13 +1404,14 @@ void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
 // DefaultArgumentInitContextRequest computation.
 //----------------------------------------------------------------------------//
 
-std::optional<Initializer *>
+std::optional<DefaultArgumentInitializer *>
 DefaultArgumentInitContextRequest::getCachedResult() const {
   auto *param = std::get<0>(getStorage());
   return param->getCachedDefaultArgumentInitContext();
 }
 
-void DefaultArgumentInitContextRequest::cacheResult(Initializer *init) const {
+void DefaultArgumentInitContextRequest::cacheResult(
+    DefaultArgumentInitializer *init) const {
   auto *param = std::get<0>(getStorage());
   param->setDefaultArgumentInitContext(init);
 }
@@ -1654,16 +1655,16 @@ void RenamedDeclRequest::cacheResult(ValueDecl *value) const {
 }
 
 //----------------------------------------------------------------------------//
-// TypeCheckSourceFileRequest computation.
+// TypeCheckPrimaryFileRequest computation.
 //----------------------------------------------------------------------------//
 
-evaluator::DependencySource TypeCheckSourceFileRequest::readDependencySource(
+evaluator::DependencySource TypeCheckPrimaryFileRequest::readDependencySource(
     const evaluator::DependencyRecorder &e) const {
   return std::get<0>(getStorage());
 }
 
 std::optional<evaluator::SideEffect>
-TypeCheckSourceFileRequest::getCachedResult() const {
+TypeCheckPrimaryFileRequest::getCachedResult() const {
   auto *SF = std::get<0>(getStorage());
   if (SF->ASTStage == SourceFile::TypeChecked)
     return std::make_tuple<>();
@@ -1671,7 +1672,7 @@ TypeCheckSourceFileRequest::getCachedResult() const {
   return std::nullopt;
 }
 
-void TypeCheckSourceFileRequest::cacheResult(evaluator::SideEffect) const {
+void TypeCheckPrimaryFileRequest::cacheResult(evaluator::SideEffect) const {
   auto *SF = std::get<0>(getStorage());
 
   // Verify that we've checked types correctly.
@@ -2724,7 +2725,7 @@ SemanticAvailableAttrRequest::getCachedResult() const {
   if (!attr->hasComputedSemanticAttr())
     return std::nullopt;
 
-  if (!attr->hasCachedDomain()) {
+  if (!attr->getDomainOrIdentifier().isDomain()) {
     return std::optional<SemanticAvailableAttr>{};
   }
 

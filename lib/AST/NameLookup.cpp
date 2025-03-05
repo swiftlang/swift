@@ -19,6 +19,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceAttributes.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
@@ -825,6 +826,20 @@ static void recordShadowedDeclsAfterSignatureMatch(
       type = asd->getOverloadSignatureType();
     else
       type = removeThrownError(decl->getInterfaceType()->getCanonicalType());
+
+    // Strip `@Sendable` annotations for declarations that come from
+    // or are exposed to Objective-C to make it possible to introduce
+    // new annotations without breaking shadowing rules.
+    //
+    // This is a narrow fix for specific backwards-incompatible cases
+    // we know about, it could be extended to use `isObjC()` in the
+    // future if we find problematic cases were a more general change
+    // is required.
+    if (decl->hasClangNode() || decl->getAttrs().hasAttribute<ObjCAttr>()) {
+      type =
+          type->stripConcurrency(/*recursive=*/true, /*dropGlobalActor=*/false)
+              ->getCanonicalType();
+    }
 
     // Record this declaration based on its signature.
     auto &known = collisions[type];
@@ -3143,6 +3158,12 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
                                        attributed->getTypeRepr(), dc, options);
   }
 
+  case TypeReprKind::Isolated: {
+    auto isolated = cast<IsolatedTypeRepr>(typeRepr);
+    return directReferencesForTypeRepr(evaluator, ctx,
+                                       isolated->getBase(), dc, options);
+  }
+
   case TypeReprKind::Composition: {
     auto composition = cast<CompositionTypeRepr>(typeRepr);
     for (auto component : composition->getTypes()) {
@@ -3216,8 +3237,7 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::Ownership:
-  case TypeReprKind::Isolated:
-  case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::CompileTimeLiteral:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
   case TypeReprKind::SILBox:
@@ -3932,6 +3952,21 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
+/// Find the location of 'isolated' within this type representation.
+static SourceLoc findIsolatedLoc(TypeRepr *typeRepr) {
+  do {
+    if (auto isolatedTypeRepr = dyn_cast<IsolatedTypeRepr>(typeRepr))
+      return isolatedTypeRepr->getLoc();
+
+    if (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+      typeRepr = attrTypeRepr->getTypeRepr();
+      continue;
+    }
+        
+    return SourceLoc();
+  } while (true);
+}
+
 /// Decompose the ith inheritance clause entry to a list of type declarations,
 /// inverses, and optional AnyObject member.
 void swift::getDirectlyInheritedNominalTypeDecls(
@@ -3962,23 +3997,22 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: This is a hack. We need cooperation from
   // InheritedDeclsReferencedRequest to make this work.
   SourceLoc loc;
-  SourceLoc uncheckedLoc;
-  SourceLoc preconcurrencyLoc;
-  SourceLoc unsafeLoc;
+  ConformanceAttributes attributes;
   auto inheritedTypes = InheritedTypes(decl);
   bool isSuppressed = inheritedTypes.getEntry(i).isSuppressed();
   if (TypeRepr *typeRepr = inheritedTypes.getTypeRepr(i)) {
     loc = typeRepr->getLoc();
-    uncheckedLoc = typeRepr->findAttrLoc(TypeAttrKind::Unchecked);
-    preconcurrencyLoc = typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency);
-    unsafeLoc = typeRepr->findAttrLoc(TypeAttrKind::Unsafe);
+    attributes.uncheckedLoc = typeRepr->findAttrLoc(TypeAttrKind::Unchecked);
+    attributes.preconcurrencyLoc = typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency);
+    attributes.unsafeLoc = typeRepr->findAttrLoc(TypeAttrKind::Unsafe);
+    
+    // Look for an IsolatedTypeRepr.
+    attributes.isolatedLoc = findIsolatedLoc(typeRepr);
   }
 
   // Form the result.
   for (auto nominal : nominalTypes) {
-    result.push_back(
-        {nominal, loc, uncheckedLoc, preconcurrencyLoc, unsafeLoc,
-          isSuppressed});
+    result.push_back({nominal, loc, attributes, isSuppressed});
   }
 }
 
@@ -4008,10 +4042,11 @@ swift::getDirectlyInheritedNominalTypeDecls(
   for (auto attr :
        protoDecl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     auto loc = attr->getLocation();
+    ConformanceAttributes attributes;
+    if (attr->isUnchecked())
+      attributes.uncheckedLoc = loc;
     result.push_back(
-        {attr->getProtocol(), loc, attr->isUnchecked() ? loc : SourceLoc(),
-         /*preconcurrencyLoc=*/SourceLoc(), SourceLoc(),
-          /*isSuppressed=*/false});
+        {attr->getProtocol(), loc, attributes, /*isSuppressed=*/false});
   }
 
   // Else we have access to this information on the where clause.
@@ -4022,8 +4057,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
   // the source location.
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, SourceLoc(), SourceLoc(),
-                        SourceLoc(), SourceLoc(),  /*isSuppressed=*/false);
+    result.emplace_back(inheritedNominal, SourceLoc(), ConformanceAttributes(),
+                        /*isSuppressed=*/false);
 
   return result;
 }

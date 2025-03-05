@@ -168,7 +168,7 @@ struct ProjectOptions: ParsableArguments {
       disabled by default. 
       
       A development snapshot is necessary to avoid spurious build/live issues
-      due to the fact that the the stdlib is built using the just-built Swift
+      due to the fact that the stdlib is built using the just-built Swift
       compiler, which may support features not yet supported by the Swift
       compiler in Xcode's toolchain.
       """

@@ -151,7 +151,6 @@ OPERAND_OWNERSHIP(TrivialUse, AwaitAsyncContinuation)
 OPERAND_OWNERSHIP(TrivialUse, AddressToPointer)
 OPERAND_OWNERSHIP(TrivialUse, AllocRef)        // with tail operand
 OPERAND_OWNERSHIP(TrivialUse, AllocRefDynamic) // with tail operand
-OPERAND_OWNERSHIP(TrivialUse, AllocVector)
 OPERAND_OWNERSHIP(TrivialUse, BeginAccess)
 OPERAND_OWNERSHIP(TrivialUse, MoveOnlyWrapperToCopyableAddr)
 OPERAND_OWNERSHIP(TrivialUse, CopyableToMoveOnlyWrapperAddr)
@@ -430,7 +429,7 @@ OperandOwnershipClassifier::visitBeginBorrowInst(BeginBorrowInst *borrow) {
 OperandOwnership
 OperandOwnershipClassifier::visitBorrowedFromInst(BorrowedFromInst *bfi) {
   return getOperandIndex() == 0 ? OperandOwnership::GuaranteedForwarding
-                                : OperandOwnership::InstantaneousUse;
+                                : OperandOwnership::Borrow;
 }
 
 // MARK: Instructions whose use ownership depends on the operand in question.

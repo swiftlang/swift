@@ -39,6 +39,8 @@
 #include "swift/Parse/Lexer.h" // bad dependency
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/PrettyPrinter.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
@@ -440,7 +442,8 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
     limitBehavior(limit);
   }
 
-  if (majorVersion == 6) {
+  // Record all of the diagnostics that are going to be emitted.
+  if (majorVersion == 6 && limit != DiagnosticBehavior::Ignore) {
     if (auto stats = Engine->statsReporter) {
       ++stats->getFrontendCounters().NumSwift6Errors;
     }
@@ -751,6 +754,11 @@ void swift::printClangDeclName(const clang::NamedDecl *ND,
   ND->getNameForDiagnostic(os, ND->getASTContext().getPrintingPolicy(), false);
 }
 
+void swift::printClangTypeName(const clang::Type *Ty, llvm::raw_ostream &os) {
+  clang::QualType::print(Ty, clang::Qualifiers(), os,
+                         clang::PrintingPolicy{clang::LangOptions()}, "");
+}
+
 /// Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier,
@@ -1050,6 +1058,16 @@ static void formatDiagnosticArgument(StringRef Modifier,
       Out << '@' << Arg.getAsDeclAttribute()->getAttrName();
     break;
 
+  case DiagnosticArgumentKind::AvailabilityDomain:
+    assert(Modifier.empty() &&
+           "Improper modifier for AvailabilityDomain argument");
+    Out << Arg.getAsAvailabilityDomain().getNameForDiagnostics();
+    break;
+  case DiagnosticArgumentKind::AvailabilityRange:
+    assert(Modifier.empty() &&
+           "Improper modifier for AvailabilityRange argument");
+    Out << Arg.getAsAvailabilityRange().getRawMinimumVersion().getAsString();
+    break;
   case DiagnosticArgumentKind::VersionTuple:
     assert(Modifier.empty() &&
            "Improper modifier for VersionTuple argument");
@@ -1086,6 +1104,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
     assert(Modifier.empty() && "Improper modifier for ClangDecl argument");
     Out << FormatOpts.OpeningQuotationMark;
     printClangDeclName(Arg.getAsClangDecl(), Out);
+    Out << FormatOpts.ClosingQuotationMark;
+    break;
+
+  case DiagnosticArgumentKind::ClangType:
+    assert(Modifier.empty() && "Improper modifier for ClangDecl argument");
+    Out << FormatOpts.OpeningQuotationMark;
+    printClangTypeName(Arg.getAsClangType(), Out);
     Out << FormatOpts.ClosingQuotationMark;
     break;
   }
@@ -1329,13 +1354,16 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     }
   }
 
+  auto groupID = diagnostic.getGroupID();
   StringRef Category;
   if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
     Category = "api-digester-breaking-change";
-  else if (isDeprecationDiagnostic(diagnostic.getID()))
-    Category = "deprecation";
   else if (isNoUsageDiagnostic(diagnostic.getID()))
     Category = "no-usage";
+  else if (groupID != DiagGroupID::no_group)
+    Category = getDiagGroupInfoByID(groupID).name;
+  else if (isDeprecationDiagnostic(diagnostic.getID()))
+    Category = "deprecation";
 
   auto fixIts = diagnostic.getFixIts();
   if (loc.isValid()) {
@@ -1361,12 +1389,13 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   }
 
   llvm::StringRef format;
-  if (includeDiagnosticName)
+  if (includeDiagnosticName) {
     format =
-        diagnosticStringWithNameFor(diagnostic.getID(), diagnostic.getGroupID(),
+        diagnosticStringWithNameFor(diagnostic.getID(), groupID,
                                     getPrintDiagnosticNamesMode());
-  else
+  } else {
     format = diagnosticStringFor(diagnostic.getID());
+  }
 
   return DiagnosticInfo(diagnostic.getID(), loc, toDiagnosticKind(behavior),
                         format, diagnostic.getArgs(), Category,
@@ -1522,6 +1551,18 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
       educationalNotePaths.push_back(notePath.str().str());
       ++associatedNotes;
     }
+
+    // Capture information about the diagnostic group along with the remaining
+    // educational notes.
+    auto groupID = diagnostic.getGroupID();
+    if (groupID != DiagGroupID::no_group) {
+      const auto &diagGroup = getDiagGroupInfoByID(groupID);
+
+      SmallString<128> docPath(getDiagnosticDocumentationPath());
+      llvm::sys::path::append(docPath, diagGroup.documentationFile);
+      educationalNotePaths.push_back(docPath.str().str());
+    }
+
     info->EducationalNotePaths = educationalNotePaths;
 
     for (auto &consumer : Consumers) {

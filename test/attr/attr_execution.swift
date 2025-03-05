@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-experimental-feature ExecutionAttribute
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+// REQUIRES: swift_feature_ExecutionAttribute
 
 @execution(something) func invalidAttr() async {} // expected-error {{unknown option 'something' for attribute 'execution'}}
 
@@ -42,18 +42,24 @@ do {
 
 struct TestAttributeCollisions {
   @execution(concurrent) nonisolated func testNonIsolated() async {}
-  // expected-error@-1 {{cannot use '@execution(concurrent)' and 'nonisolated' on the same 'testNonIsolated()' because they serve the same purpose}}
 
   @execution(concurrent) func test(arg: isolated MainActor) async {}
-  // expected-error@-1 {{cannot use '@execution(concurrent)' on instance method 'test(arg:)' because it has an isolated parameter: 'arg'}}
+  // expected-error@-1 {{cannot use '@execution' on instance method 'test(arg:)' because it has an isolated parameter: 'arg'}}
 
   @execution(concurrent) func testIsolationAny(arg: @isolated(any) () -> Void) async {}
-  // expected-error@-1 {{cannot use '@execution(concurrent)' on instance method 'testIsolationAny(arg:)' because it has a dynamically isolated parameter: 'arg'}}
+  // expected-error@-1 {{cannot use '@execution' on instance method 'testIsolationAny(arg:)' because it has a dynamically isolated parameter: 'arg'}}
 
   @MainActor @execution(concurrent) func testGlobalActor() async {}
   // expected-warning @-1 {{instance method 'testGlobalActor()' has multiple actor-isolation attributes ('MainActor' and 'execution(concurrent)')}}
 
+  @execution(caller) nonisolated func testNonIsolatedCaller() async {} // Ok
+  @MainActor @execution(caller) func testGlobalActorCaller() async {}
+  // expected-warning@-1 {{instance method 'testGlobalActorCaller()' has multiple actor-isolation attributes ('MainActor' and 'execution(caller)')}}
+  @execution(caller) func testCaller(arg: isolated MainActor) async {}
+  // expected-error@-1 {{cannot use '@execution' on instance method 'testCaller(arg:)' because it has an isolated parameter: 'arg'}}
+  
   @execution(concurrent) @Sendable func test(_: @Sendable () -> Void, _: sending Int) async {} // Ok
+  @execution(caller) @Sendable func testWithSendableCaller(_: @Sendable () -> Void, _: sending Int) async {} // Ok
 }
 
 @MainActor

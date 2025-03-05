@@ -169,7 +169,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 
   @_alwaysEmitIntoClient
   var key: Builtin.RawPointer {
-    unsafeBitCast(self, to: Builtin.RawPointer.self)
+    unsafe unsafeBitCast(self, to: Builtin.RawPointer.self)
   }
 
   /// Gets the value currently bound to this task-local from the current task.
@@ -178,14 +178,14 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// or if the task-local has no value bound, this will return the `defaultValue`
   /// of the task local.
   public func get() -> Value {
-    guard let rawValue = _taskLocalValueGet(key: key) else {
+    guard let rawValue = unsafe _taskLocalValueGet(key: key) else {
       return self.defaultValue
     }
 
     // Take the value; The type should be correct by construction
     let storagePtr =
-        rawValue.bindMemory(to: Value.self, capacity: 1)
-    return UnsafeMutablePointer<Value>(mutating: storagePtr).pointee
+        unsafe rawValue.bindMemory(to: Value.self, capacity: 1)
+    return unsafe UnsafeMutablePointer<Value>(mutating: storagePtr).pointee
   }
 
   /// Binds the task-local to the specific value for the duration of the asynchronous operation.
@@ -376,8 +376,8 @@ func _taskLocalsCopy(
 @available(*, deprecated, message: "The situation diagnosed by this is not handled gracefully rather than by crashing")
 func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) {
   if _taskHasTaskGroupStatusRecord() {
-    file.withCString { _fileStart in
-      _reportIllegalTaskLocalBindingWithinWithTaskGroup(
+    unsafe file.withCString { _fileStart in
+      unsafe _reportIllegalTaskLocalBindingWithinWithTaskGroup(
           _fileStart, file.count, true, line)
     }
   }

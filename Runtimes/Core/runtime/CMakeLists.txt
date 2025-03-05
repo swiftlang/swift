@@ -102,6 +102,7 @@ target_compile_definitions(swiftRuntime
     $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_LIB_SUBDIR="${SwiftCore_PLATFORM_SUBDIR}">
     $<$<BOOL:${SwiftCore_ENABLE_FATALERROR_BACKTRACE}>:-DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING>
   PUBLIC
+    $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>
     $<$<BOOL:${SwiftCore_ENABLE_OS_TRACE_LAZY_INIT}>:-DSWIFT_USE_OS_TRACE_LAZY_INIT>)
 
 target_include_directories(swiftRuntime PRIVATE
@@ -110,6 +111,7 @@ target_include_directories(swiftRuntime PRIVATE
 
 target_link_libraries(swiftRuntime PRIVATE
   $<$<PLATFORM_ID:Windows>:User32>
+  $<$<PLATFORM_ID:Windows>:ShLwApi>
   swiftShims
   swiftDemangling)
 
@@ -142,6 +144,12 @@ if(SwiftCore_ENABLE_OBJC_INTEROP)
     ObjCRuntimeGetImageNameFromClass.mm)
 endif()
 
+if(NOT BUILD_SHARED_LIBS)
+  install(TARGETS swiftRuntime
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
+endif()
+
 string(TOLOWER "${SwiftCore_OBJECT_FORMAT}x" SwiftCore_OBJECT_FORMAT)
 if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
   add_library(swiftrt OBJECT SwiftRT-ELF-WASM.cpp)
@@ -151,10 +159,13 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
     "${SwiftCore_SWIFTC_SOURCE_DIR}/include"
     "${PROJECT_BINARY_DIR}/include")
   target_link_libraries(swiftrt PRIVATE swiftShims)
-  # The driver requires that swifrt.o is under `usr/lib/swift/<platform>/<arch>`
-  # Regardless of settings
+  # The driver requires that swiftrt.o is under
+  # `usr/lib/(swift|swift_static)/<platform>/<arch>` regardless of whether the
+  # other files are under the platform and architecture subdirectories:
+  # https://github.com/swiftlang/swift-driver/blob/f66e33575150cc778289b5f573218c7a0c70bab6/Sources/SwiftDriver/Jobs/GenericUnixToolchain%2BLinkerSupport.swift#L186
   install(FILES $<TARGET_OBJECTS:swiftrt>
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    COMPONENT SwiftCore_runtime
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.o)
 elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
   add_library(swiftrtT OBJECT SwiftRT-COFF.cpp)
@@ -168,6 +179,7 @@ elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
   add_library(swiftrt OBJECT SwiftRT-COFF.cpp)
   target_link_libraries(swiftrt PRIVATE swiftShims)
   install(FILES $<TARGET_OBJECTS:swiftrt>
+    COMPONENT SwiftCore_runtime
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.obj)
 elseif(NOT "${SwiftCore_OBJECT_FORMAT}" STREQUAL "x")

@@ -615,6 +615,9 @@ def disable_reflection_names : Flag<["-"], "disable-reflection-names">,
   HelpText<"Disable emission of names of stored properties and enum cases in"
            "reflection metadata">;
 
+def disable_llvm_merge_functions_pass : Flag<["-"], "disable-llvm-merge-functions-pass">,
+  HelpText<"Disable the MergeFunctionPass LLVM IR pass">;
+
 def function_sections: Flag<["-"], "function-sections">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Emit functions to separate sections.">;
@@ -835,6 +838,10 @@ def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">,
 
 def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">,
   HelpText<"Expression type checking trail change limit">;
+
+def solver_disable_shrink :
+  Flag<["-"], "solver-disable-shrink">,
+  HelpText<"Disable the shrink phase of expression type checking">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
@@ -1109,6 +1116,10 @@ def prespecialize_generic_metadata : Flag<["-"], "prespecialize-generic-metadata
    HelpText<"Statically specialize metadata for generic types at types that "
             "are known to be used in source.">;
 
+def emit_singleton_metadata_pointer : Flag<["-"], "emit-singleton-metadata-pointer">,
+   HelpText<"Emit a pointer to the corresponding type metadata into non-public "
+            "non-generic type descriptors.">;
+
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;
 
@@ -1141,6 +1152,18 @@ def enable_large_loadable_types_reg2mem : Flag<["-"], "enable-large-loadable-typ
 
 def disable_large_loadable_types_reg2mem : Flag<["-"], "disable-large-loadable-types-reg2mem">,
   HelpText<"Disable large loadable types register to memory pass">;
+
+def enable_x86_64_corocc : Flag<["-"], "enable-x86_64-corocc">,
+  HelpText<"Use swiftcorocc for yield_once_2 routines on x86_64.">;
+
+def disable_x86_64_corocc : Flag<["-"], "disable-x86_64-corocc">,
+  HelpText<"Don't use swiftcorocc for yield_once_2 routines on x86_64.">;
+
+def enable_arm64_corocc : Flag<["-"], "enable-arm64-corocc">,
+  HelpText<"Use swiftcorocc for yield_once_2 routines on arm64 variants.">;
+
+def disable_arm64_corocc : Flag<["-"], "disable-arm64-corocc">,
+  HelpText<"Don't use swiftcorocc for yield_once_2 routines on arm64 variants.">;
 
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_pack_metadata_stack_promotion :
@@ -1341,6 +1364,13 @@ def disable_async_frame_push_pop_metadata :
   Flag<["-"], "disable-async-frame-push-pop-metadata">,
   HelpText<"Disable async frame push pop metadata">;
 
+def enable_emit_type_malloc_for_coro_frame :
+  Flag<["-"], "enable-emit-type-malloc-for-coro-frame">,
+  HelpText<"Enable emitting typed malloc for coroutine frame allocation">;
+def disable_emit_type_malloc_for_coro_frame :
+  Flag<["-"], "disable-emit-type-malloc-for-coro-frame">,
+  HelpText<"Disable emitting typed malloc for coroutine frame allocation">;
+
 def enable_async_frame_pointer_all :
   Flag<["-"], "enable-async-frame-pointer-all">,
   HelpText<"Always emit async frame stack frames (frame-pointer=all)">;
@@ -1458,6 +1488,9 @@ def scanner_debug_write_output: Flag<["-"], "scanner-debug-write-output">,
 def platform_availability_inheritance_map_path
   : Separate<["-"], "platform-availability-inheritance-map-path">, MetaVarName<"<path>">,
     HelpText<"Path of the platform inheritance platform map">;
+
+def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
+  HelpText<"Enable enforcement of lifetime dependencies on addressable values.">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
 

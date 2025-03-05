@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %s
-// RUN: %target-swift-frontend -parse-as-library %t/availability-real-sdk.swiftmodule -typecheck -emit-objc-header-path %t/availability-real-sdk.h -import-objc-header %S/../Inputs/empty.h
+// RUN: %target-swift-frontend -parse-as-library %t/availability-real-sdk.swiftmodule -typecheck -verify -emit-objc-header-path %t/availability-real-sdk.h -import-objc-header %S/../Inputs/empty.h
 // RUN: %FileCheck %s < %t/availability-real-sdk.h
 // RUN: %check-in-clang %t/availability-real-sdk.h
 

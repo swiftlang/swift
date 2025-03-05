@@ -736,7 +736,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -805,7 +805,10 @@ protected:
     SerializePackageEnabled : 1,
 
     /// Whether this module has enabled strict memory safety checking.
-    StrictMemorySafety : 1
+    StrictMemorySafety : 1,
+
+    /// Whether this module has enabled `ExtensibleEnums` feature.
+    ExtensibleEnums : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1516,6 +1519,10 @@ public:
   /// Returns true if this declaration has any `@backDeployed` attributes.
   bool hasBackDeployedAttr() const;
 
+  /// Apply the specified function to decls that should be placed _next_ to
+  /// this decl when constructing AST.
+  void forEachDeclToHoist(llvm::function_ref<void(Decl *)> callback) const;
+
   /// Emit a diagnostic tied to this declaration.
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(
@@ -1829,12 +1836,13 @@ public:
   bool isPreconcurrency() const {
     return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
   }
+  bool isIsolated() const {
+    return getOptions().contains(ProtocolConformanceFlags::Isolated);
+  }
 
   ExplicitSafety getExplicitSafety() const {
     if (getOptions().contains(ProtocolConformanceFlags::Unsafe))
       return ExplicitSafety::Unsafe;
-    if (getOptions().contains(ProtocolConformanceFlags::Safe))
-      return ExplicitSafety::Safe;
     return ExplicitSafety::Unspecified;
   }
 
@@ -1845,13 +1853,10 @@ public:
   }
 
   void setOption(ExplicitSafety safety) {
-    RawOptions = (getOptions() - ProtocolConformanceFlags::Unsafe
-                    - ProtocolConformanceFlags::Safe).toRaw();
+    RawOptions = (getOptions() - ProtocolConformanceFlags::Unsafe).toRaw();
     switch (safety) {
     case ExplicitSafety::Unspecified:
-      break;
     case ExplicitSafety::Safe:
-      RawOptions = (getOptions() | ProtocolConformanceFlags::Safe).toRaw();
       break;
     case ExplicitSafety::Unsafe:
       RawOptions = (getOptions() | ProtocolConformanceFlags::Unsafe).toRaw();
@@ -3994,7 +3999,7 @@ public:
   /// type parameter.
   ///
   /// \code
-  /// struct Slab<let count: Int, Element: ~Copyable>
+  /// struct InlineArray<let count: Int, Element: ~Copyable>
   /// \endcode
   bool isValue() const {
     return getParamKind() == GenericTypeParamKind::Value;
@@ -5588,12 +5593,6 @@ public:
   ///   value requirement.
   bool hasSelfOrAssociatedTypeRequirements() const;
 
-  /// Determine whether an existential type constrained by this protocol must
-  /// be written using `any` syntax.
-  ///
-  /// \Note This method takes language feature state into account.
-  bool existentialRequiresAny() const;
-
   /// Returns a list of protocol requirements that must be assessed to
   /// determine a concrete's conformance effect polymorphism kind.
   PolymorphicEffectRequirementList getPolymorphicEffectRequirements(
@@ -5940,7 +5939,7 @@ public:
   void setStatic(bool IsStatic) {
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
-  bool isCompileTimeConst() const;
+  bool isCompileTimeLiteral() const;
 
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
@@ -6861,6 +6860,7 @@ public:
 
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
+  friend class ParameterList;
   friend class DefaultArgumentInitContextRequest;
   friend class DefaultArgumentExprRequest;
   friend class DefaultArgumentTypeRequest;
@@ -6870,7 +6870,7 @@ class ParamDecl : public VarDecl {
     Destructured = 1 << 0,
 
     /// Whether or not this parameter is '_const'.
-    IsCompileTimeConst = 1 << 1,
+    IsCompileTimeLiteral = 1 << 1,
   };
 
   llvm::PointerIntPair<Identifier, 3, OptionSet<ArgumentNameFlags>>
@@ -6887,7 +6887,8 @@ class ParamDecl : public VarDecl {
 
     /// Stores the context for the default argument as well as a bit to
     /// indicate whether the default expression has been type-checked.
-    llvm::PointerIntPair<Initializer *, 1, bool> InitContextAndIsTypeChecked;
+    llvm::PointerIntPair<DefaultArgumentInitializer *, 1, bool>
+        InitContextAndIsTypeChecked;
 
     StringRef StringRepresentation;
     CaptureInfo Captures;
@@ -6895,7 +6896,8 @@ class ParamDecl : public VarDecl {
 
   /// Retrieve the cached initializer context for the parameter's default
   /// argument without triggering a request.
-  std::optional<Initializer *> getCachedDefaultArgumentInitContext() const;
+  std::optional<DefaultArgumentInitializer *>
+  getCachedDefaultArgumentInitContext() const;
 
   /// NOTE: This is stored using bits from TyReprAndFlags and
   /// DefaultValueAndFlags.
@@ -7004,12 +7006,11 @@ public:
                  DeclContext *Parent,
                  ParamSpecifier specifier = ParamSpecifier::Default);
 
-  static ParamDecl *createParsed(ASTContext &Context, SourceLoc specifierLoc,
-                                 SourceLoc argumentNameLoc,
-                                 Identifier argumentName,
-                                 SourceLoc parameterNameLoc,
-                                 Identifier parameterName, Expr *defaultValue,
-                                 DeclContext *dc);
+  static ParamDecl *createParsed(
+      ASTContext &Context, SourceLoc specifierLoc, SourceLoc argumentNameLoc,
+      Identifier argumentName, SourceLoc parameterNameLoc,
+      Identifier parameterName, Expr *defaultValue,
+      DefaultArgumentInitializer *defaultValueInitContext, DeclContext *dc);
 
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const {
@@ -7031,7 +7032,9 @@ public:
 
   /// Retrieve the TypeRepr corresponding to the parsed type of the parameter, if it exists.
   TypeRepr *getTypeRepr() const { return TyReprAndFlags.getPointer(); }
-  void setTypeRepr(TypeRepr *repr) { TyReprAndFlags.setPointer(repr); }
+
+  /// Set the parsed TypeRepr on the parameter.
+  void setTypeRepr(TypeRepr *repr);
 
   bool isDestructured() const {
     auto flags = ArgumentNameAndFlags.getInt();
@@ -7120,7 +7123,7 @@ public:
   /// Retrieve the initializer context for the parameter's default argument.
   Initializer *getDefaultArgumentInitContext() const;
 
-  void setDefaultArgumentInitContext(Initializer *initContext);
+  void setDefaultArgumentInitContext(DefaultArgumentInitializer *initContext);
 
   CaptureInfo getDefaultArgumentCaptureInfo() const;
 
@@ -7214,15 +7217,15 @@ public:
   }
 
   /// Whether or not this parameter is marked with '_const'.
-  bool isCompileTimeConst() const {
+  bool isCompileTimeLiteral() const {
     return ArgumentNameAndFlags.getInt().contains(
-        ArgumentNameFlags::IsCompileTimeConst);
+        ArgumentNameFlags::IsCompileTimeLiteral);
   }
 
-  void setCompileTimeConst(bool value = true) {
+  void setCompileTimeLiteral(bool value = true) {
     auto flags = ArgumentNameAndFlags.getInt();
-    flags = value ? flags | ArgumentNameFlags::IsCompileTimeConst
-                  : flags - ArgumentNameFlags::IsCompileTimeConst;
+    flags = value ? flags | ArgumentNameFlags::IsCompileTimeLiteral
+                  : flags - ArgumentNameFlags::IsCompileTimeLiteral;
     ArgumentNameAndFlags.setInt(flags);
   }
 
@@ -7456,6 +7459,8 @@ public:
   /// Retrieve the type of the element referenced by a subscript
   /// operation.
   Type getElementInterfaceType() const;
+
+  std::optional<Type> getCachedElementInterfaceType() const;
 
   TypeRepr *getElementTypeRepr() const { return ElementTy.getTypeRepr(); }
   SourceRange getElementTypeSourceRange() const {
@@ -8371,8 +8376,6 @@ public:
 
   TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }
 
-  void setDeserializedResultTypeLoc(TypeLoc ResultTyR);
-
   SourceRange getResultTypeSourceRange() const {
     return FnRetType.getSourceRange();
   }
@@ -8672,7 +8675,7 @@ public:
   /// Get the list of elements declared in this case.
   ArrayRef<EnumElementDecl *> getElements() const {
     return {getTrailingObjects<EnumElementDecl *>(),
-            Bits.EnumCaseDecl.NumElements};
+            static_cast<size_t>(Bits.EnumCaseDecl.NumElements)};
   }
   SourceRange getSourceRange() const;
 
@@ -8899,9 +8902,6 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// inserted at the end of the initializer by SILGen.
   Expr *CallToSuperInit = nullptr;
 
-  /// Valid when lifetime dependence specifiers are present.
-  TypeLoc InitRetType;
-
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                   bool Failable, SourceLoc FailabilityLoc,
@@ -8910,7 +8910,7 @@ public:
                   TypeLoc thrownTy,
                   ParameterList *BodyParams,
                   GenericParamList *GenericParams,
-                  DeclContext *Parent, TypeRepr *InitRetTy);
+                  DeclContext *Parent);
 
   static ConstructorDecl *
   createImported(ASTContext &ctx, ClangNode clangNode, DeclName name,
@@ -8931,10 +8931,6 @@ public:
 
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();
-
-  TypeRepr *getResultTypeRepr() const { return InitRetType.getTypeRepr(); }
-
-  void setDeserializedResultTypeLoc(TypeLoc ResultTyR);
 
   /// Get the typechecked call to super.init expression, which needs to be
   /// inserted at the end of the initializer by SILGen.

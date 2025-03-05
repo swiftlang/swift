@@ -125,11 +125,12 @@ public:
       }
 
       TypeChecker::checkAvailability(
-        attr->getRange(), C.getIsolatedDeinitAvailability(),
-        D->getDeclContext(),
-        [&](StringRef platformName, llvm::VersionTuple version) {
-          return diagnoseAndRemoveAttr(attr, diag::isolated_deinit_unavailable, platformName, version);
-        });
+          attr->getRange(), C.getIsolatedDeinitAvailability(),
+          D->getDeclContext(),
+          [&](AvailabilityDomain domain, AvailabilityRange range) {
+            return diagnoseAndRemoveAttr(
+                attr, diag::isolated_deinit_unavailable, domain, range);
+          });
     }
   }
 
@@ -189,6 +190,8 @@ public:
   IGNORED_ATTR(LexicalLifetimes)
   IGNORED_ATTR(AllowFeatureSuppression)
   IGNORED_ATTR(PreInverseGenerics)
+  IGNORED_ATTR(Safe)
+  IGNORED_ATTR(Unsafe)
 #undef IGNORED_ATTR
 
 private:
@@ -263,55 +266,31 @@ public:
       return;
     }
 
-    switch (attr->getBehavior()) {
-    case ExecutionKind::Concurrent: {
-      // 'concurrent' doesn't work with explicit `nonisolated`
-      if (F->hasExplicitIsolationAttribute()) {
-        if (F->getAttrs().hasAttribute<NonisolatedAttr>()) {
-          diagnoseAndRemoveAttr(
-              attr,
-              diag::attr_execution_concurrent_incompatible_with_nonisolated, F);
-          return;
-        }
+    auto parameters = F->getParameters();
+    if (!parameters)
+      return;
+
+    for (auto *P : *parameters) {
+      auto *repr = P->getTypeRepr();
+      if (!repr)
+        continue;
+
+      // isolated parameters affect isolation of the function itself
+      if (isa<IsolatedTypeRepr>(repr)) {
+        diagnoseAndRemoveAttr(
+            attr, diag::attr_execution_incompatible_isolated_parameter, F, P);
+        return;
       }
 
-      auto parameters = F->getParameters();
-      if (!parameters)
-        return;
-
-      for (auto *P : *parameters) {
-        auto *repr = P->getTypeRepr();
-        if (!repr)
-          continue;
-
-        // isolated parameters affect isolation of the function itself
-        if (isa<IsolatedTypeRepr>(repr)) {
+      if (auto *attrType = dyn_cast<AttributedTypeRepr>(repr)) {
+        if (attrType->has(TypeAttrKind::Isolated)) {
           diagnoseAndRemoveAttr(
               attr,
-              diag::attr_execution_concurrent_incompatible_isolated_parameter,
+              diag::attr_execution_incompatible_dynamically_isolated_parameter,
               F, P);
           return;
         }
-
-        if (auto *attrType = dyn_cast<AttributedTypeRepr>(repr)) {
-          if (attrType->has(TypeAttrKind::Isolated)) {
-            diagnoseAndRemoveAttr(
-                attr,
-                diag::
-                    attr_execution_concurrent_incompatible_dynamically_isolated_parameter,
-                F, P);
-            return;
-          }
-        }
       }
-
-      break;
-    }
-
-    case ExecutionKind::Caller: {
-      // no restrictions for now.
-      break;
-    }
     }
   }
 
@@ -454,7 +433,8 @@ public:
 
   void visitFinalAttr(FinalAttr *attr);
   void visitMoveOnlyAttr(MoveOnlyAttr *attr);
-  void visitCompileTimeConstAttr(CompileTimeConstAttr *attr) {}
+  void visitCompileTimeLiteralAttr(CompileTimeLiteralAttr *attr) {}
+  void visitConstValAttr(ConstValAttr *attr) {}
   void visitIBActionAttr(IBActionAttr *attr);
   void visitIBSegueActionAttr(IBSegueActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
@@ -588,8 +568,6 @@ public:
   void visitStaticExclusiveOnlyAttr(StaticExclusiveOnlyAttr *attr);
   void visitWeakLinkedAttr(WeakLinkedAttr *attr);
   void visitSILGenNameAttr(SILGenNameAttr *attr);
-  void visitUnsafeAttr(UnsafeAttr *attr);
-  void visitSafeAttr(SafeAttr *attr);
   void visitLifetimeAttr(LifetimeAttr *attr);
   void visitAddressableSelfAttr(AddressableSelfAttr *attr);
   void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
@@ -1920,8 +1898,7 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
       auto diag = diagnose(
           attr->getLocation(),
           diag::attr_objc_implementation_raise_minimum_deployment_target,
-          Ctx.getTargetPlatformStringForDiagnostics(),
-          Ctx.getSwift50Availability().getRawMinimumVersion());
+          Ctx.getTargetAvailabilityDomain(), Ctx.getSwift50Availability());
       if (attr->isEarlyAdopter()) {
         diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
       }
@@ -2417,27 +2394,6 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
     }
   }
 
-  SourceLoc attrLoc = parsedAttr->getLocation();
-  auto versionAvailability = attr->getVersionAvailability(Ctx);
-  if (versionAvailability == AvailableVersionComparison::Obsoleted ||
-      versionAvailability == AvailableVersionComparison::Unavailable) {
-    if (auto cannotBeUnavailable =
-            TypeChecker::diagnosticIfDeclCannotBeUnavailable(D)) {
-      diagnose(attrLoc, cannotBeUnavailable.value());
-      return;
-    }
-
-    if (auto *PD = dyn_cast<ProtocolDecl>(DC)) {
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        if (VD->isProtocolRequirement() && !PD->isObjC()) {
-          diagnoseAndRemoveAttr(parsedAttr,
-                                diag::unavailable_method_non_objc_protocol);
-          return;
-        }
-      }
-    }
-  }
-
   // The remaining diagnostics are only for attributes with introduced versions
   // for specific platforms.
   if (!attr->isPlatformSpecific() || !attr->getIntroduced().has_value())
@@ -2476,27 +2432,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
         if (D->isImplicit())
           diagnose(enclosingDecl->getLoc(),
                    diag::availability_implicit_decl_here,
-                   D->getDescriptiveKind(),
-                   Ctx.getTargetPlatformStringForDiagnostics(),
-                   AttrRange.getRawMinimumVersion());
+                   D->getDescriptiveKind(), Ctx.getTargetAvailabilityDomain(),
+                   AttrRange);
         diagnose(enclosingDecl->getLoc(),
                  diag::availability_decl_more_than_enclosing_here,
-                 Ctx.getTargetPlatformStringForDiagnostics(),
-                 EnclosingAnnotatedRange->getRawMinimumVersion());
+                 Ctx.getTargetAvailabilityDomain(), *EnclosingAnnotatedRange);
       }
     }
-  }
-
-  std::optional<Diagnostic> MaybeNotAllowed =
-      TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D);
-  if (MaybeNotAllowed.has_value()) {
-    AvailabilityRange DeploymentRange =
-        AvailabilityRange::forDeploymentTarget(Ctx);
-    if (EnclosingAnnotatedRange.has_value())
-      DeploymentRange.intersectWith(*EnclosingAnnotatedRange);
-
-    if (!DeploymentRange.isContainedIn(AttrRange))
-      diagnose(attrLoc, MaybeNotAllowed.value());
   }
 }
 
@@ -3313,7 +3255,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     return nullptr;
   }
 
-  auto where = ExportContext::forDeclSignature(D, nullptr);
+  auto where = ExportContext::forDeclSignature(D);
   diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where,
                            std::nullopt);
 
@@ -3930,10 +3872,11 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
   // Note: we might pass a constant attribute when typechecker is nullptr.
   // Any modification to attr must be guarded by a null check on TC.
   //
-  SmallVector<ValueDecl *, 4> results;
-  lookupReplacedDecl(replacedFunctionName, attr, base, results);
+  SmallVector<ValueDecl *, 4> lookupResults;
+  lookupReplacedDecl(replacedFunctionName, attr, base, lookupResults);
 
-  for (auto *result : results) {
+  SmallVector<AbstractFunctionDecl *, 4> candidates;
+  for (auto *result : lookupResults) {
     // Protocol requirements are not replaceable.
     if (isa<ProtocolDecl>(result->getDeclContext()))
       continue;
@@ -3941,51 +3884,94 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
     if (result->isStatic() != base->isStatic())
       continue;
 
-    auto resultTy = result->getInterfaceType();
-    auto replaceTy = base->getInterfaceType();
-    TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
-    matchMode |= TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
-    if (resultTy->matches(replaceTy, matchMode)) {
-      if (forDynamicReplacement && !result->isDynamic()) {
-        if (Diags) {
-          Diags->diagnose(attr->getLocation(),
-                          diag::dynamic_replacement_function_not_dynamic,
-                          result->getName());
-          attr->setInvalid();
-        }
-        return nullptr;
-      }
-      return cast<AbstractFunctionDecl>(result);
-    }
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(result))
+      candidates.push_back(AFD);
   }
+
+  if (candidates.empty()) {
+    if (Diags) {
+      Diags->diagnose(attr->getLocation(),
+                      forDynamicReplacement
+                          ? diag::dynamic_replacement_function_not_found
+                          : diag::specialize_target_function_not_found,
+                      replacedFunctionName);
+    }
+
+    attr->setInvalid();
+    return nullptr;
+  }
+
+  auto replaceTy = base->getInterfaceType();
+
+  // Filter based on the exact type match first.
+  SmallVector<AbstractFunctionDecl *> matches;
+  llvm::copy_if(candidates, std::back_inserter(matches),
+                [&replaceTy](AbstractFunctionDecl *F) {
+                  auto resultTy = F->getInterfaceType();
+                  TypeMatchOptions matchMode =
+                      TypeMatchFlags::AllowABICompatible;
+                  matchMode |=
+                      TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
+                  return resultTy->matches(replaceTy, matchMode);
+                });
+
+  // If there are no exact matches, strip sendability annotations
+  // from functions imported from Objective-C. This is a narrow
+  // fix for now but it could be extended to cover all `@preconcurrency`
+  // declarations.
+  if (matches.empty()) {
+    llvm::copy_if(candidates, std::back_inserter(matches),
+                  [&replaceTy](AbstractFunctionDecl *F) {
+                    if (!F->hasClangNode())
+                      return false;
+
+                    auto resultTy = F->getInterfaceType();
+                    TypeMatchOptions matchMode =
+                        TypeMatchFlags::AllowABICompatible;
+                    matchMode |=
+                        TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
+                    matchMode |= TypeMatchFlags::IgnoreFunctionSendability;
+                    matchMode |= TypeMatchFlags::IgnoreSendability;
+                    return resultTy->matches(replaceTy, matchMode);
+                  });
+  }
+
+  if (matches.size() == 1) {
+    auto result = matches.front();
+    if (forDynamicReplacement && !result->isDynamic()) {
+      if (Diags) {
+        Diags->diagnose(attr->getLocation(),
+                        diag::dynamic_replacement_function_not_dynamic,
+                        result->getName());
+        attr->setInvalid();
+      }
+      return nullptr;
+    }
+
+    return result;
+  }
+
+  attr->setInvalid();
 
   if (!Diags)
     return nullptr;
 
-  if (results.empty()) {
-    Diags->diagnose(attr->getLocation(),
-                    forDynamicReplacement
-                        ? diag::dynamic_replacement_function_not_found
-                        : diag::specialize_target_function_not_found,
-                    replacedFunctionName);
-  } else {
-    Diags->diagnose(attr->getLocation(),
-                    forDynamicReplacement
-                        ? diag::dynamic_replacement_function_of_type_not_found
-                        : diag::specialize_target_function_of_type_not_found,
-                    replacedFunctionName,
-                    base->getInterfaceType()->getCanonicalType());
+  Diags->diagnose(attr->getLocation(),
+                  forDynamicReplacement
+                      ? diag::dynamic_replacement_function_of_type_not_found
+                      : diag::specialize_target_function_of_type_not_found,
+                  replacedFunctionName,
+                  base->getInterfaceType()->getCanonicalType());
 
-    for (auto *result : results) {
-      Diags->diagnose(SourceLoc(),
-                      forDynamicReplacement
-                          ? diag::dynamic_replacement_found_function_of_type
-                          : diag::specialize_found_function_of_type,
-                      result->getName(),
-                      result->getInterfaceType()->getCanonicalType());
-    }
+  for (auto *result : matches) {
+    Diags->diagnose(SourceLoc(),
+                    forDynamicReplacement
+                        ? diag::dynamic_replacement_found_function_of_type
+                        : diag::specialize_found_function_of_type,
+                    result->getName(),
+                    result->getInterfaceType()->getCanonicalType());
   }
-  attr->setInvalid();
+
   return nullptr;
 }
 
@@ -4990,18 +4976,149 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
   }
 }
 
-void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> Attrs) {
-  if (Attrs.empty())
+/// Find each of the `AvailableAttr`s that represents the first attribute in a
+/// group of attributes what were parsed from a short-form available attribute,
+/// e.g. `@available(macOS , iOS, *)`.
+static llvm::SmallVector<const AvailableAttr *, 4>
+getAvailableAttrGroups(ArrayRef<const AvailableAttr *> attrs) {
+  llvm::SmallSet<const AvailableAttr *, 8> seen;
+
+  // Collect the of the grouped attributes that are reachable starting from any
+  // other attribute.
+  for (auto attr : attrs) {
+    auto next = attr;
+    while ((next = next->getNextGroupedAvailableAttr())) {
+      if (!seen.insert(next).second)
+        break;
+    }
+  }
+
+  // The grouped attributes that are _not_ reachable from any other attribute
+  // are the results.
+  llvm::SmallVector<const AvailableAttr *, 4> results;
+  for (auto attr : attrs) {
+    if (attr->isGroupMember() && !seen.contains(attr))
+      results.push_back(attr);
+  }
+
+  return results;
+}
+
+void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
+  if (attrs.empty())
     return;
 
   // Only diagnose top level decls since nested ones may have inherited availability.
   if (!D->getDeclContext()->getInnermostDeclarationDeclContext()) {
     // If all available are spi available, we should use @_spi instead.
-    if (std::all_of(Attrs.begin(), Attrs.end(), [](AvailableAttr *AV) {
-      return AV->isSPI();
-    })) {
+    if (std::all_of(attrs.begin(), attrs.end(),
+                    [](AvailableAttr *AV) { return AV->isSPI(); })) {
       diagnose(D->getLoc(), diag::spi_preferred_over_spi_available);
     }
+  }
+
+  auto attrGroups = getAvailableAttrGroups(attrs);
+  for (const AvailableAttr *groupHead : attrGroups) {
+    llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
+
+    SourceLoc groupEndLoc;
+    bool foundWildcard = false;
+    bool hasValidSpecs = false;
+    bool allValidSpecsArePlatform = true;
+    int groupAttrCount = 0;
+    for (auto *groupedAttr = groupHead; groupedAttr != nullptr;
+         groupedAttr = groupedAttr->getNextGroupedAvailableAttr()) {
+      groupAttrCount++;
+      auto loc = groupedAttr->getLocation();
+      groupEndLoc = groupedAttr->getEndLoc();
+      if (groupedAttr->isGroupedWithWildcard())
+        foundWildcard = true;
+
+      auto attr = D->getSemanticAvailableAttr(groupedAttr);
+
+      // If the attribute cannot be resolved, it may have had an unrecognized
+      // domain. Assume this unrecognized domain could be an unrecognized
+      // platform and skip it.
+      if (!attr)
+        continue;
+
+      auto domain = attr->getDomain();
+
+      if (groupAttrCount > 1 || !groupedAttr->isGroupTerminator() ||
+          foundWildcard) {
+        // Only platform availability is allowed to be written groups with more
+        // than one member.
+        if (!domain.isPlatform()) {
+          diagnose(loc, diag::availability_must_occur_alone, domain,
+                   domain.isVersioned());
+          continue;
+        }
+      }
+
+      // Diagnose duplicate platforms.
+      if (!seenDomains.insert(domain).second) {
+        diagnose(loc, diag::availability_query_already_specified,
+                 domain.isVersioned(), domain);
+        continue;
+      }
+
+      hasValidSpecs = true;
+      if (!domain.isPlatform())
+        allValidSpecsArePlatform = false;
+    }
+
+    if (!foundWildcard && hasValidSpecs && allValidSpecsArePlatform) {
+      diagnose(groupEndLoc, diag::availability_query_wildcard_required)
+          .fixItInsert(groupEndLoc, ", *");
+    }
+  }
+
+  if (Ctx.LangOpts.DisableAvailabilityChecking)
+    return;
+
+  // Compute availability constraints for the decl, relative to its parent
+  // declaration or to the deployment target.
+  auto availabilityContext = AvailabilityContext::forDeploymentTarget(Ctx);
+  if (auto parent =
+          AvailabilityInference::parentDeclForInferredAvailability(D)) {
+    auto parentAvailability = TypeChecker::availabilityForDeclSignature(parent);
+    availabilityContext.constrainWithContext(parentAvailability, Ctx);
+  }
+
+  auto availabilityConstraint =
+      getAvailabilityConstraintsForDecl(D, availabilityContext)
+          .getPrimaryConstraint();
+  if (!availabilityConstraint)
+    return;
+
+  // If the decl is unavailable relative to its parent and it's not a
+  // declaration that is allowed to be unavailable, diagnose.
+  if (availabilityConstraint->isUnavailable()) {
+    auto attr = availabilityConstraint->getAttr();
+    if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D)) {
+      diagnose(attr.getParsedAttr()->getLocation(), diag.value());
+      return;
+    }
+
+    if (auto *PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        if (VD->isProtocolRequirement() && !PD->isObjC()) {
+          diagnoseAndRemoveAttr(
+              const_cast<AvailableAttr *>(attr.getParsedAttr()),
+              diag::unavailable_method_non_objc_protocol);
+          return;
+        }
+      }
+    }
+  }
+
+  // If the decl is potentially unavailable relative to its parent and it's
+  // not a declaration that is allowed to be potentially unavailable, diagnose.
+  if (availabilityConstraint->isPotentiallyAvailable()) {
+    auto attr = availabilityConstraint->getAttr();
+    if (auto diag =
+            TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D))
+      diagnose(attr.getParsedAttr()->getLocation(), diag.value());
   }
 }
 
@@ -5127,14 +5244,14 @@ void AttributeChecker::checkBackDeployedAttrs(
     auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
     if (auto unavailableDomain =
             availability.containsUnavailableDomain(backDeployedDomain)) {
-      auto platformString = prettyPlatformString(Attr->Platform);
+      auto domainForDiagnostics = backDeployedDomain;
       llvm::VersionTuple ignoredVersion;
 
-      AvailabilityInference::updateBeforePlatformForFallback(
-          Attr, Ctx, platformString, ignoredVersion);
+      AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
+          Attr, Ctx, domainForDiagnostics, ignoredVersion);
 
       diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
-               platformString);
+               domainForDiagnostics);
 
       // Find the attribute that makes the declaration unavailable.
       const Decl *attrDecl = D;
@@ -5158,24 +5275,23 @@ void AttributeChecker::checkBackDeployedAttrs(
     // fallback could never be executed at runtime.
     if (auto availableRangeAttrPair =
             getSemanticAvailableRangeDeclAndAttr(VD)) {
-      auto beforePlatformString = prettyPlatformString(Attr->Platform);
+      auto beforeDomain = AvailabilityDomain::forPlatform(Attr->Platform);
       auto beforeVersion = Attr->Version;
       auto availableAttr = availableRangeAttrPair.value().first;
       auto introVersion = availableAttr.getIntroduced().value();
-      StringRef introPlatformString =
-          availableAttr.getDomain().getNameForDiagnostics();
+      AvailabilityDomain introDomain = availableAttr.getDomain();
 
-      AvailabilityInference::updateBeforePlatformForFallback(
-          Attr, Ctx, beforePlatformString, beforeVersion);
-      AvailabilityInference::updateIntroducedPlatformForFallback(
-          availableAttr, Ctx, introPlatformString, introVersion);
+      AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
+          Attr, Ctx, beforeDomain, beforeVersion);
+      AvailabilityInference::updateIntroducedAvailabilityDomainForFallback(
+          availableAttr, Ctx, introDomain, introVersion);
 
       if (Attr->Version <= introVersion) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
-                 Attr, VD, beforePlatformString, beforeVersion);
+                 Attr, VD, beforeDomain, AvailabilityRange(beforeVersion));
         diagnose(availableAttr.getParsedAttr()->AtLoc,
-                 diag::availability_introduced_in_version, VD,
-                 introPlatformString, introVersion)
+                 diag::availability_introduced_in_version, VD, introDomain,
+                 AvailabilityRange(introVersion))
             .highlight(availableAttr.getParsedAttr()->getRange());
         continue;
       }
@@ -5369,6 +5485,10 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
       return std::nullopt;
 
     if (parentIsUnavailable(D))
+      return std::nullopt;
+
+    // Be lenient in interfaces to accomodate @_spi_available.
+    if (D->getDeclContext()->isInSwiftinterface())
       return std::nullopt;
 
     // Do not permit unavailable script-mode global variables; their initializer
@@ -8056,20 +8176,6 @@ void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
                         attr->getAttrName(), Ctx.LangOpts.Target.str());
 }
 
-void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
-  if (Ctx.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
-    return;
-
-  diagnoseAndRemoveAttr(attr, diag::unsafe_attr_disabled);
-}
-
-void AttributeChecker::visitSafeAttr(SafeAttr *attr) {
-  if (Ctx.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
-    return;
-
-  diagnoseAndRemoveAttr(attr, diag::unsafe_attr_disabled);
-}
-
 void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {}
 
 void AttributeChecker::visitAddressableSelfAttr(AddressableSelfAttr *attr) {
@@ -8323,142 +8429,6 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   }
 
   return renamedDecl;
-}
-
-static std::optional<AvailabilityDomain>
-getAvailabilityDomainForName(StringRef name, const DeclContext *declContext) {
-  if (auto builtinDomain =
-          AvailabilityDomain::builtinDomainForString(name, declContext))
-    return builtinDomain;
-
-  auto &ctx = declContext->getASTContext();
-  auto identifier = ctx.getIdentifier(name);
-  if (auto customDomain =
-          ctx.MainModule->getAvailabilityDomainForIdentifier(identifier))
-    return customDomain;
-
-  return std::nullopt;
-}
-
-std::optional<SemanticAvailableAttr>
-SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
-                                       const AvailableAttr *attr,
-                                       const Decl *decl) const {
-  if (attr->hasCachedDomain())
-    return SemanticAvailableAttr(attr);
-
-  auto &ctx = decl->getASTContext();
-  auto &diags = ctx.Diags;
-  auto attrLoc = attr->getLocation();
-  auto attrName = attr->getAttrName();
-  auto domainLoc = attr->getDomainLoc();
-  auto introducedVersion = attr->getRawIntroduced();
-  auto deprecatedVersion = attr->getRawDeprecated();
-  auto obsoletedVersion = attr->getRawObsoleted();
-  auto mutableAttr = const_cast<AvailableAttr *>(attr);
-  auto domain = attr->getCachedDomain();
-
-  if (!domain) {
-    auto domainName = attr->getDomainString();
-    ASSERT(domainName);
-
-    // Attempt to resolve the domain specified for the attribute and diagnose
-    // if no domain is found.
-    auto declContext = decl->getInnermostDeclContext();
-    domain = getAvailabilityDomainForName(*domainName, declContext);
-    if (!domain) {
-      if (auto suggestion = closestCorrectedPlatformString(*domainName)) {
-        diags
-            .diagnose(domainLoc, diag::attr_availability_suggest_platform,
-                      *domainName, attrName, *suggestion)
-            .fixItReplace(SourceRange(domainLoc), *suggestion);
-      } else {
-        diags.diagnose(attrLoc, diag::attr_availability_unknown_platform,
-                       *domainName, attrName);
-      }
-      return std::nullopt;
-    }
-
-    if (domain->isCustom() &&
-        !ctx.LangOpts.hasFeature(Feature::CustomAvailability) &&
-        !declContext->isInSwiftinterface()) {
-      diags.diagnose(domainLoc,
-                     diag::attr_availability_requires_custom_availability,
-                     *domainName, attr);
-      return std::nullopt;
-    }
-
-    mutableAttr->setCachedDomain(*domain);
-  }
-
-  auto domainName = domain->getNameForAttributePrinting();
-  auto semanticAttr = SemanticAvailableAttr(attr);
-
-  bool hasVersionSpec =
-      (introducedVersion || deprecatedVersion || obsoletedVersion);
-
-  if (!domain->isVersioned() && hasVersionSpec) {
-    SourceRange versionSourceRange;
-    if (introducedVersion)
-      versionSourceRange = semanticAttr.getIntroducedSourceRange();
-    else if (deprecatedVersion)
-      versionSourceRange = semanticAttr.getDeprecatedSourceRange();
-    else if (obsoletedVersion)
-      versionSourceRange = semanticAttr.getObsoletedSourceRange();
-
-    diags
-        .diagnose(attrLoc, diag::attr_availability_unexpected_version, attr,
-                  domainName)
-        .highlight(versionSourceRange);
-    return std::nullopt;
-  }
-
-  if (domain->isSwiftLanguage() || domain->isPackageDescription()) {
-    switch (attr->getKind()) {
-    case AvailableAttr::Kind::Deprecated:
-      diags.diagnose(attrLoc,
-                     diag::attr_availability_expected_deprecated_version,
-                     attrName, domainName);
-      return std::nullopt;
-
-    case AvailableAttr::Kind::Unavailable:
-      diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
-                     "unavailable", attrName, domainName);
-      return std::nullopt;
-
-    case AvailableAttr::Kind::NoAsync:
-      diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
-                     "noasync", attrName, domainName);
-      return std::nullopt;
-
-    case AvailableAttr::Kind::Default:
-      break;
-    }
-
-    if (!hasVersionSpec) {
-      diags.diagnose(attrLoc, diag::attr_availability_expected_version_spec,
-                     attrName, domainName);
-      return std::nullopt;
-    }
-  }
-
-  // Canonicalize platform versions.
-  // FIXME: [availability] This should be done when remapping versions instead.
-  if (domain->isPlatform()) {
-    auto canonicalizeVersion = [&](llvm::VersionTuple version) {
-      return canonicalizePlatformVersion(domain->getPlatformKind(), version);
-    };
-    if (introducedVersion)
-      mutableAttr->setRawIntroduced(canonicalizeVersion(*introducedVersion));
-
-    if (deprecatedVersion)
-      mutableAttr->setRawDeprecated(canonicalizeVersion(*deprecatedVersion));
-
-    if (obsoletedVersion)
-      mutableAttr->setRawObsoleted(canonicalizeVersion(*obsoletedVersion));
-  }
-
-  return semanticAttr;
 }
 
 template <typename ATTR>

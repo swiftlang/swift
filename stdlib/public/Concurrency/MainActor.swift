@@ -44,12 +44,12 @@ import Swift
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    return unsafe UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    return unsafe UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
   }
 
   @inlinable
@@ -134,7 +134,7 @@ extension MainActor {
 
     /// This is guaranteed to be fatal if the check fails,
     /// as this is our "safe" version of this API.
-    let executor: Builtin.Executor = Self.shared.unownedExecutor.executor
+    let executor: Builtin.Executor = unsafe Self.shared.unownedExecutor.executor
     guard _taskIsCurrentExecutor(executor) else {
       // TODO: offer information which executor we actually got
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
@@ -143,7 +143,7 @@ extension MainActor {
     // To do the unsafe cast, we have to pretend it's @escaping.
     return try withoutActuallyEscaping(operation) {
       (_ fn: @escaping YesActor) throws -> T in
-      let rawFn = unsafeBitCast(fn, to: NoActor.self)
+      let rawFn = unsafe unsafeBitCast(fn, to: NoActor.self)
       return try rawFn()
     }
   }

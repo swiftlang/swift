@@ -860,7 +860,8 @@ static std::optional<bool> shouldInlineGeneric(FullApplySite AI,
   // because they need to be preserved, so that the optimizer
   // can properly optimize a user code later.
   ModuleDecl *SwiftModule = Callee->getModule().getSwiftModule();
-  if (Callee->hasSemanticsAttrThatStartsWith("array.") &&
+  if ((Callee->hasSemanticsAttrThatStartsWith("array.") ||
+       Callee->hasSemanticsAttrThatStartsWith("fixed_storage.")) &&
       (SwiftModule->isStdlibModule() || SwiftModule->isOnoneSupportModule()))
     return false;
 
@@ -1151,8 +1152,12 @@ void SILPerformanceInliner::collectAppliesToInline(
         // caller block limit at this point. In such a case, we continue. This
         // will ensure that any further non inline always functions are skipped,
         // but we /do/ inline any inline_always functions remaining.
-        if (NumCallerBlocks > OverallCallerBlockLimit)
+        if (NumCallerBlocks > OverallCallerBlockLimit &&
+            // Still allow inlining of small functions.
+            !hasMaxNumberOfBasicBlocks(Callee, 8) &&
+            !Caller->hasSemanticsAttr(semantics::OPTIMIZE_SIL_INLINE_AGGRESSIVE)) {
           continue;
+        }
 
         // Otherwise, calculate our block weights and determine if we want to
         // inline this.
@@ -1163,8 +1168,9 @@ void SILPerformanceInliner::collectAppliesToInline(
         Weight W(BlockWeight, WeightCorrections.lookup(AI));
 
         if (decideInWarmBlock(AI, W, constTracker, NumCallerBlocks,
-                              BBToWeightMap))
+                              BBToWeightMap)) {
           InitialCandidates.push_back(AI);
+        }
       }
     }
 

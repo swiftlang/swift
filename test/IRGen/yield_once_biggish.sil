@@ -40,8 +40,8 @@ entry:
   // CHECK-64-SAME: , align 8
 
   //   Coroutine setup.
-  // CHECK-32-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], ptr %0, ptr @"$s18yield_once_biggish7BiggishVyxGAA9SomeClassCRbzlIetAYx_TC", ptr @malloc, ptr @free)
-  // CHECK-64-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr %0, ptr @"$s18yield_once_biggish7BiggishVyxGAA9SomeClassCRbzlIetAYx_TC", ptr @malloc, ptr @free)
+  // CHECK-32-NEXT: [[ID:%.*]] = call token (i32, i32, ptr, ptr, ptr, ptr, ...) @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], ptr %0, ptr @"$s18yield_once_biggish7BiggishVyxGAA9SomeClassCRbzlIetAYx_TC", ptr @malloc, ptr @free)
+  // CHECK-64-NEXT: [[ID:%.*]] = call token (i32, i32, ptr, ptr, ptr, ptr, ...) @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr %0, ptr @"$s18yield_once_biggish7BiggishVyxGAA9SomeClassCRbzlIetAYx_TC", ptr @malloc, ptr @free)
   // CHECK-NEXT:    [[BEGIN:%.*]] = call ptr @llvm.coro.begin(token [[ID]], ptr null)
   // CHECK-NEXT:    store ptr
   // CHECK-NEXT:    call swiftcc void @marker(i32 1000)

@@ -31,6 +31,10 @@ class NonSendableKlass { // expected-complete-note 53{{}}
   func getSendableGenericStructAsync() async -> SendableGenericStruct { fatalError() }
 }
 
+nonisolated final class NonIsolatedFinalKlass {
+  var ns = NonSendableKlass()
+}
+
 class SendableKlass : @unchecked Sendable {}
 
 actor MyActor {
@@ -1931,5 +1935,36 @@ func testIndirectAndDirectSendingResultsWithGlobalActor() async {
   let ns2: NonSendableKlass = await s.getNonSendableKlassIndirect()
   Task.detached {
     _ = ns2
+  }
+}
+
+// We used to not check if bodies were not empty when emitting the error for
+// using result in the throwing task group. Make sure we do not crash.
+func testFunctionIsNotEmpty(input: SendableKlass) async throws {
+  var result: [SendableKlass] = []
+  try await withThrowingTaskGroup(of: Void.self) { taskGroup in // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+    taskGroup.addTask { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      result.append(input) // expected-tns-note {{closure captures reference to mutable var 'result' which is accessible to code in the current task}}
+    }
+  }
+}
+
+func unsafeNonIsolatedAppliesToAssignToOutParam(ns: NonSendableKlass) -> sending NonSendableKlass {
+  func withUnsafeValue<T>(_ block: (NonSendableKlass) throws -> sending T) rethrows -> sending T {
+    fatalError()
+  }
+
+  return withUnsafeValue {
+    nonisolated(unsafe) let obj = $0
+    return obj
+  }
+}
+
+extension NonIsolatedFinalKlass {
+  // We used to crash while computing the isolation of the ref_element_addr
+  // here. Make sure we do not crash.
+  func testGetIsolationInfoOfField() async {
+    await transferToMain(ns) // expected-tns-warning {{sending 'self.ns' risks causing data races}}
+    // expected-tns-note @-1 {{sending task-isolated 'self.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
   }
 }

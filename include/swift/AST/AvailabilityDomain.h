@@ -19,10 +19,12 @@
 #define SWIFT_AST_AVAILABILITY_DOMAIN_H
 
 #include "swift/AST/ASTAllocated.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -207,9 +209,20 @@ public:
   /// version ranges.
   bool isVersioned() const;
 
+  /// Returns true if the domain supports `#available`/`#unavailable` queries.
+  bool supportsQueries() const;
+
   /// Returns true if this domain is considered active in the current
   /// compilation context.
   bool isActive(const ASTContext &ctx) const;
+
+  /// Returns the minimum available range for the attribute's domain. For
+  /// example, for the domain of the platform that compilation is targeting,
+  /// this will be the deployment target. For the Swift language domain, this
+  /// will be the language mode for compilation. For domains which have don't
+  /// have a "deployment target", this returns `std::nullopt`.
+  std::optional<AvailabilityRange>
+  getDeploymentRange(const ASTContext &ctx) const;
 
   /// Returns the string to use in diagnostics to identify the domain. May
   /// return an empty string.
@@ -247,6 +260,26 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddPointer(getOpaqueValue());
   }
+
+  void print(llvm::raw_ostream &os) const;
+
+private:
+  friend class AvailabilityDomainOrIdentifier;
+
+  AvailabilityDomain copy(ASTContext &ctx) const;
+};
+
+inline void simple_display(llvm::raw_ostream &os,
+                           const AvailabilityDomain &domain) {
+  domain.print(os);
+}
+
+/// A comparator that implements a stable, total ordering on
+/// `AvailabilityDomain` that can be used for sorting in contexts where the
+/// result must be stable and deterministic across compilations.
+struct StableAvailabilityDomainComparator {
+  bool operator()(const AvailabilityDomain &lhs,
+                  const AvailabilityDomain &rhs) const;
 };
 
 /// Represents an availability domain that has been defined in a module.
@@ -277,10 +310,90 @@ public:
   ModuleDecl *getModule() const { return mod; }
 };
 
+/// Represents either a resolved availability domain or an identifier written
+/// in source that has not yet been resolved to a domain.
+class AvailabilityDomainOrIdentifier {
+  friend struct llvm::PointerLikeTypeTraits<AvailabilityDomainOrIdentifier>;
+
+  using DomainOrIdentifier = llvm::PointerUnion<AvailabilityDomain, Identifier>;
+
+  /// Stores an extra bit representing whether the domain has been resolved.
+  using Storage = llvm::PointerIntPair<DomainOrIdentifier, 1, bool>;
+  Storage storage;
+
+  AvailabilityDomainOrIdentifier(Storage storage) : storage(storage) {}
+
+  static AvailabilityDomainOrIdentifier fromOpaque(void *opaque) {
+    return AvailabilityDomainOrIdentifier(Storage::getFromOpaqueValue(opaque));
+  }
+
+  std::optional<AvailabilityDomain>
+  lookUpInDeclContext(SourceLoc loc, const DeclContext *declContext) const;
+
+  void setResolved(std::optional<AvailabilityDomain> domain) {
+    if (domain)
+      storage.setPointer(*domain);
+    storage.setInt(true);
+  }
+
+public:
+  AvailabilityDomainOrIdentifier(Identifier identifier)
+      : storage(identifier) {};
+  AvailabilityDomainOrIdentifier(AvailabilityDomain domain)
+      : storage(domain) {};
+
+  bool isDomain() const {
+    return storage.getPointer().is<AvailabilityDomain>();
+  }
+  bool isIdentifier() const { return storage.getPointer().is<Identifier>(); }
+
+  /// Overwrites the existing domain or identifier with the given domain.
+  void setDomain(AvailabilityDomain domain) { storage = Storage(domain); }
+
+  /// Returns the resolved domain, or `std::nullopt` if there isn't one.
+  std::optional<AvailabilityDomain> getAsDomain() const {
+    if (isDomain())
+      return storage.getPointer().get<AvailabilityDomain>();
+    return std::nullopt;
+  }
+
+  /// Returns the unresolved identifier, or `std::nullopt` if the domain has
+  /// been resolved.
+  std::optional<Identifier> getAsIdentifier() const {
+    if (isIdentifier())
+      return storage.getPointer().get<Identifier>();
+    return std::nullopt;
+  }
+
+  /// Returns true if either a resolved domain is available or if the attempt
+  /// to look up the domain from the identifier was unsuccessful.
+  bool isResolved() const { return storage.getInt() || isDomain(); }
+
+  std::optional<AvailabilityDomain>
+  resolveInDeclContext(SourceLoc loc, const DeclContext *declContext) {
+    // Return the domain directly if already resolved.
+    if (isResolved())
+      return getAsDomain();
+
+    // Look up the domain and cache the result.
+    auto result = lookUpInDeclContext(loc, declContext);
+    setResolved(result);
+    return result;
+  }
+
+  /// Creates a new `AvailabilityDomainOrIdentifier`, defensively copying
+  /// members of the original into the given `ASTContext` in case it is
+  /// different than the context that the original was created for.
+  AvailabilityDomainOrIdentifier copy(ASTContext &ctx) const;
+
+  void print(llvm::raw_ostream &os) const;
+};
+
 } // end namespace swift
 
 namespace llvm {
 using swift::AvailabilityDomain;
+using swift::AvailabilityDomainOrIdentifier;
 
 // An AvailabilityDomain is "pointer like".
 template <typename T>
@@ -316,6 +429,25 @@ struct DenseMapInfo<AvailabilityDomain> {
                       const AvailabilityDomain RHS) {
     return LHS == RHS;
   }
+};
+
+// An AvailabilityDomainOrIdentifier is "pointer like".
+template <typename T>
+struct PointerLikeTypeTraits;
+template <>
+struct PointerLikeTypeTraits<swift::AvailabilityDomainOrIdentifier> {
+public:
+  static inline void *getAsVoidPointer(AvailabilityDomainOrIdentifier value) {
+    return value.storage.getOpaqueValue();
+  }
+  static inline swift::AvailabilityDomainOrIdentifier
+  getFromVoidPointer(void *P) {
+    return AvailabilityDomainOrIdentifier::fromOpaque(P);
+  }
+  enum {
+    NumLowBitsAvailable = PointerLikeTypeTraits<
+        AvailabilityDomainOrIdentifier::Storage>::NumLowBitsAvailable
+  };
 };
 
 } // end namespace llvm

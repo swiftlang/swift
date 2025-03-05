@@ -44,8 +44,8 @@ extension ASTGenVisitor {
       return self.generate(memberType: node).asTypeRepr
     case .metatypeType(let node):
       return self.generate(metatypeType: node)
-    case .missingType:
-      fatalError("unimplemented")
+    case .missingType(let node):
+      return self.generate(missingType: node)
     case .namedOpaqueReturnType(let node):
       return self.generate(namedOpaqueReturnType: node).asTypeRepr
     case .optionalType(let node):
@@ -162,6 +162,13 @@ extension ASTGenVisitor {
         protocolKeywordLoc: tyLoc
       ).asTypeRepr
     }
+  }
+
+  func generate(missingType node: MissingTypeSyntax) -> BridgedTypeRepr {
+    return BridgedErrorTypeRepr.create(
+      self.ctx,
+      range: self.generateSourceRange(node)
+    ).asTypeRepr
   }
 
   func generate(
@@ -294,49 +301,130 @@ extension ASTGenVisitor {
 
 // MARK: - SpecifierTypeRepr/AttributedTypeRepr
 
-extension BridgedAttributedTypeSpecifier {
-  fileprivate init?(from keyword: Keyword?) {
-    switch keyword {
-    case .inout: self = .inOut
-    case .borrowing: self = .borrowing
-    case .consuming: self = .consuming
-    case .__shared: self = .legacyShared
-    case .__owned: self = .legacyOwned
-    case ._const: self = .const
-    case .isolated: self = .isolated
-    default: return nil
+extension ASTGenVisitor {
+  func generateLifetimeDescriptor(lifetimeSpecifierArgument node: LifetimeSpecifierArgumentSyntax) -> BridgedLifetimeDescriptor? {
+    switch node.parameter.rawTokenKind {
+    case .identifier, .keyword:
+      return self.generateLifetimeDescriptor(
+        nameToken: node.parameter,
+        lifetimeDependenceKind: .default
+      )
+    case .integerLiteral:
+      guard let index = Int(node.parameter.text) else {
+        // TODO: Diagnose.
+        fatalError("(compiler bug) invalid integer literal")
+      }
+      return.forOrdered(
+        index,
+        dependenceKind: .default,
+        loc: self.generateSourceLoc(node.parameter)
+      )
+    default:
+      // TODO: Diagnose.
+      fatalError("expected identifier, 'self', or integer in @lifetime")
     }
   }
-}
 
-extension ASTGenVisitor {
   func generate(attributedType node: AttributedTypeSyntax) -> BridgedTypeRepr {
     var type = generate(type: node.baseType)
 
-    // Handle specifiers.
-    if case .simpleTypeSpecifier(let simpleSpecifier) = node.specifiers.first {
-      let specifier = simpleSpecifier.specifier
-      if let kind = BridgedAttributedTypeSpecifier(from: specifier.keywordKind) {
-        type =
-          BridgedSpecifierTypeRepr.createParsed(
-            self.ctx,
-            base: type,
-            specifier: kind,
-            specifierLoc: self.generateSourceLoc(specifier)
-          ).asTypeRepr
-      } else {
-        self.diagnose(.unexpectedTokenKind(token: specifier))
+    // Specifiers
+    var ownership: BridgedParamSpecifier = .default
+    var ownershipLoc: BridgedSourceLoc = nil
+    var isolatedLoc: BridgedSourceLoc = nil
+    var constLoc: BridgedSourceLoc = nil
+    var sendingLoc: BridgedSourceLoc = nil
+    var lifetimeEntry: BridgedLifetimeEntry? = nil
+
+    // TODO: Diagnostics for duplicated specifiers, and ordering.
+    for node in node.specifiers {
+      let loc = self.generateSourceLoc(node)
+      switch node {
+      case .simpleTypeSpecifier(let node):
+        switch node.specifier.keywordKind {
+        case .inout:
+          (ownership, ownershipLoc) = (.inOut, loc)
+        case .__shared:
+          (ownership, ownershipLoc) = (.legacyShared, loc)
+        case .__owned:
+          (ownership, ownershipLoc) = (.legacyOwned, loc)
+        case .borrowing:
+          (ownership, ownershipLoc) = (.borrowing, loc)
+        case .consuming:
+          (ownership, ownershipLoc) = (.consuming, loc)
+        case .isolated:
+          isolatedLoc = loc
+        case ._const:
+          constLoc = loc
+        case .sending:
+          sendingLoc = loc
+        default:
+          // TODO: Diagnostics.
+          fatalError("(compiler bug) unrecognized type specifier")
+        }
+      case .lifetimeTypeSpecifier(let node):
+        lifetimeEntry = .createParsed(
+          self.ctx,
+          range: self.generateSourceRange(
+            start: node.dependsOnKeyword,
+            end: node.rightParen
+          ),
+          sources: node.arguments.lazy.compactMap(self.generateLifetimeDescriptor(lifetimeSpecifierArgument:)).bridgedArray(in: self)
+        )
       }
     }
 
-    // Handle type attributes.
-    if let typeAttributes = self.generateTypeAttributes(node) {
+    // Attributes.
+    let typeAttributes = self.generateTypeAttributes(node)
+
+    if !typeAttributes.isEmpty {
       type =
         BridgedAttributedTypeRepr.createParsed(
           self.ctx,
           base: type,
-          consumingAttributes: typeAttributes
+          attributes: typeAttributes.lazy.bridgedArray(in: self)
         ).asTypeRepr
+    }
+
+    if ownershipLoc.isValid && ownership != .default {
+      type = BridgedOwnershipTypeRepr.createParsed(
+        self.ctx,
+        base: type,
+        specifier: ownership,
+        specifierLoc: ownershipLoc
+      ).asTypeRepr
+    }
+
+    if isolatedLoc.isValid {
+      type = BridgedIsolatedTypeRepr.createParsed(
+        self.ctx,
+        base: type,
+        specifierLoc: isolatedLoc
+      ).asTypeRepr
+    }
+
+    if constLoc.isValid {
+      type = BridgedCompileTimeLiteralTypeRepr.createParsed(
+        self.ctx,
+        base: type,
+        specifierLoc: constLoc
+      ).asTypeRepr
+    }
+
+    if sendingLoc.isValid {
+      type = BridgedSendingTypeRepr.createParsed(
+        self.ctx,
+        base: type,
+        specifierLoc: constLoc
+      ).asTypeRepr
+    }
+
+    if let lifetimeEntry {
+      type = BridgedLifetimeDependentTypeRepr.createParsed(
+        self.ctx,
+        base: type,
+        entry: lifetimeEntry
+      ).asTypeRepr
     }
 
     return type
@@ -370,5 +458,103 @@ extension ASTGenVisitor {
         TrailingCommaLoc: self.generateSourceLoc(element.trailingComma)
       )
     }.bridgedArray(in: self)
+  }
+}
+
+extension ASTGenVisitor {
+  struct GeneratedGenericArguments {
+    var arguments: BridgedArrayRef = .init()
+    var range: BridgedSourceRange = .init()
+  }
+
+  /// Generate 'TypeRepr' from a expression, because 'conformances' arguments in
+  /// macro role attributes are parsed as normal expressions.
+  func generateTypeRepr(
+    expr node: ExprSyntax,
+    genericArgs: GeneratedGenericArguments = GeneratedGenericArguments()
+  ) -> BridgedTypeRepr? {
+    if !genericArgs.arguments.isEmpty {
+      guard node.is(MemberAccessExprSyntax.self) || node.is(DeclReferenceExprSyntax.self) else {
+        // TODO: Diagnose.
+        fatalError("generic arguments cannot be applied")
+      }
+    }
+
+    switch node.as(ExprSyntaxEnum.self) {
+
+    case .typeExpr(let node):
+      return self.generate(type: node.type)
+
+    case .declReferenceExpr(let node):
+      guard node.argumentNames == nil else {
+        // 'Foo.bar(_:baz:)'
+        break
+      }
+      let name = self.generateIdentifierAndSourceLoc(node.baseName)
+      return BridgedUnqualifiedIdentTypeRepr .createParsed(
+        self.ctx,
+        name: name.identifier,
+        nameLoc: name.sourceLoc,
+        genericArgs: genericArgs.arguments,
+        leftAngleLoc: genericArgs.range.start,
+        rightAngleLoc: genericArgs.range.end
+      ).asTypeRepr
+
+    case .memberAccessExpr(let node):
+      guard let parsedBase = node.base else {
+        // Implicit member expressions. E.g. '.Foo'
+        break
+      }
+      guard let base = self.generateTypeRepr(expr: parsedBase) else {
+        // Unsupported base expr. E.g. 'foo().bar'
+        return nil
+      }
+      guard node.declName.argumentNames == nil else {
+        // Function name. E.g. 'Foo.bar(_:baz:)'
+        break
+      }
+      let name = self.generateIdentifierAndSourceLoc(node.declName.baseName)
+      return BridgedDeclRefTypeRepr.createParsed(
+        self.ctx,
+        base: base,
+        name: name.identifier,
+        nameLoc: name.sourceLoc,
+        genericArguments: genericArgs.arguments,
+        angleRange: genericArgs.range
+      ).asTypeRepr
+
+    case .genericSpecializationExpr(let node):
+      let args = node.genericArgumentClause.arguments.lazy.map {
+        self.generate(genericArgument: $0.argument)
+      }
+      return self.generateTypeRepr(
+        expr: node.expression,
+        genericArgs: GeneratedGenericArguments(
+          arguments: args.bridgedArray(in: self),
+          range: self.generateSourceRange(node.genericArgumentClause)
+        )
+      )
+
+    case .sequenceExpr(let node):
+      // TODO: Support composition type?
+      _ = node
+      break
+
+    case .tupleExpr(let node):
+      // TODO: Support tuple type?
+      _ = node
+      break
+
+    case .arrowExpr(let node):
+      // TODO: Support function type?
+      _ = node
+      break
+
+    default:
+      break
+    }
+
+    // TODO: Diagnose
+    fatalError("invalid/unimplemented expression for type")
   }
 }

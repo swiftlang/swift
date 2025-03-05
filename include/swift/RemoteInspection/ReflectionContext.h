@@ -184,6 +184,7 @@ public:
     bool IsFuture;
     bool IsGroupChildTask;
     bool IsAsyncLetTask;
+    bool IsSynchronousStartTask;
 
     // Task flags.
     unsigned MaxPriority;
@@ -1038,10 +1039,12 @@ public:
       // Generic SIL @box type - there is always an instantiated metadata
       // pointer for the boxed type.
       if (auto Meta = readMetadata(*MetadataAddress)) {
-        auto GenericHeapMeta =
-          cast<TargetGenericBoxHeapMetadata<Runtime>>(Meta.getLocalBuffer());
-        return getMetadataTypeInfo(GenericHeapMeta->BoxedType,
-                                   ExternalTypeInfo);
+        if (auto *GenericHeapMeta = cast<TargetGenericBoxHeapMetadata<Runtime>>(
+                Meta.getLocalBuffer())) {
+          auto MetadataAddress = GenericHeapMeta->BoxedType;
+          auto TR = readTypeFromMetadata(MetadataAddress);
+          return getTypeInfo(TR, ExternalTypeInfo);
+        }
       }
       return nullptr;
     }

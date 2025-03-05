@@ -15,10 +15,14 @@
 //===----------------------------------------------------------------------===//
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
@@ -45,6 +49,82 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << ", ";
   simple_display(out, value.members);
 }
+
+namespace {
+
+/// Find 'ValueDecl' with opaque type results and let \p SF track the opaque
+/// return type mapping.
+// FIXME: This should be done in Sema or AST?
+class OpaqueResultCollector : public ASTWalker {
+  SourceFile &SF;
+
+public:
+  OpaqueResultCollector(SourceFile &SF) : SF(SF) {}
+
+  void handle(ValueDecl *VD) const {
+    TypeRepr *tyR = nullptr;
+    if (auto *FD = dyn_cast<FuncDecl>(VD)) {
+      if (isa<AccessorDecl>(VD))
+        return;
+      tyR = FD->getResultTypeRepr();
+    } else if (auto *VarD = dyn_cast<VarDecl>(VD)) {
+      if (!VarD->getParentPatternBinding())
+        return;
+      tyR = VarD->getTypeReprOrParentPatternTypeRepr();
+    } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
+      tyR = SD->getElementTypeRepr();
+    }
+
+    if (!tyR || !tyR->hasOpaque())
+      return;
+
+    SF.addUnvalidatedDeclWithOpaqueResultType(VD);
+  }
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    if (auto *VD = dyn_cast<ValueDecl>(D))
+      handle(VD);
+
+    if (auto *IDC = dyn_cast<IterableDeclContext>(D)) {
+      // Only walk into cached parsed members to avoid invoking lazy parsing.
+      ParseMembersRequest req(IDC);
+      if (SF.getASTContext().evaluator.hasCachedResult(req)) {
+        auto memberResult = evaluateOrFatal(SF.getASTContext().evaluator, req);
+        for (auto *D : memberResult.members)
+          D->walk(*this);
+      }
+      return Action::SkipChildren();
+    }
+
+    return Action::Continue();
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::None;
+  }
+
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    return Action::SkipNode();
+  }
+};
+
+void registerDeclWithOpaqueResultType(SourceFile *SF, ArrayRef<ASTNode> items) {
+  if (!SF)
+    return;
+  OpaqueResultCollector walker(*SF);
+  for (const ASTNode &item : items)
+    const_cast<ASTNode &>(item).walk(walker);
+}
+
+void registerDeclWithOpaqueResultType(SourceFile *SF, ArrayRef<Decl *> items) {
+  if (!SF)
+    return;
+  OpaqueResultCollector walker(*SF);
+  for (Decl *item : items)
+    item->walk(walker);
+}
+
+} // namespace
 
 FingerprintAndMembers
 ParseMembersRequest::evaluate(Evaluator &evaluator,
@@ -81,6 +161,9 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
   auto declsAndHash = parser.parseDeclListDelayed(idc);
   FingerprintAndMembers fingerprintAndMembers = {declsAndHash.second,
                                                  declsAndHash.first};
+
+  registerDeclWithOpaqueResultType(sf->getOutermostParentSourceFile(),
+                                   fingerprintAndMembers.members);
   return FingerprintAndMembers{
       fingerprintAndMembers.fingerprint,
       ctx.AllocateCopy(llvm::ArrayRef(fingerprintAndMembers.members))};
@@ -133,6 +216,8 @@ ParseAbstractFunctionBodyRequest::evaluate(Evaluator &evaluator,
     Parser parser(bufferID, *sf, /*SIL*/ nullptr);
     auto result = parser.parseAbstractFunctionBodyDelayed(afd);
     afd->setBodyKind(BodyKind::Parsed);
+    registerDeclWithOpaqueResultType(afd->getOutermostParentSourceFile(),
+                                     result.getBody()->getElements());
     return result;
   }
   }
@@ -163,7 +248,7 @@ getBridgedGeneratedSourceFileKind(const GeneratedSourceInfo *genInfo) {
   case GeneratedSourceInfo::Kind::DefaultArgument:
     return BridgedGeneratedSourceFileKindDefaultArgument;
   case GeneratedSourceInfo::AttributeFromClang:
-    return BridgedGeneratedSourceFileKindAttribute;
+    return BridgedGeneratedSourceFileKindAttributeFromClang;
   }
 }
 
@@ -268,6 +353,11 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   if (genInfo && genInfo->declContext) {
     declContext = genInfo->declContext;
   }
+  Decl *attachedDecl = nullptr;
+  if (genInfo && genInfo->astNode) {
+    attachedDecl =
+        ASTNode::getFromOpaqueValue(genInfo->astNode).dyn_cast<Decl *>();
+  }
 
   // Parse the file.
   auto *exportedSourceFile = SF.getExportedSourceFile();
@@ -300,7 +390,7 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   // Generate AST nodes.
   SmallVector<ASTNode, 128> items;
   swift_ASTGen_buildTopLevelASTNodes(
-      &Diags, exportedSourceFile, declContext, Ctx,
+      &Diags, exportedSourceFile, declContext, attachedDecl, Ctx,
       static_cast<SmallVectorImpl<ASTNode> *>(&items),
       appendToVector<BridgedASTNode, ASTNode>);
 
@@ -310,6 +400,9 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   if (SF.hasInterfaceHash())
     fp = swift_ASTGen_getSourceFileFingerprint(exportedSourceFile, Ctx)
              .unbridged();
+
+  registerDeclWithOpaqueResultType(declContext->getOutermostParentSourceFile(),
+                                   items);
 
   return SourceFileParsingResult{/*TopLevelItems=*/Ctx.AllocateCopy(items),
                                  /*CollectedTokens=*/std::nullopt,
@@ -443,6 +536,9 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
   if (parser.CurrentTokenHash)
     fp = Fingerprint(std::move(*parser.CurrentTokenHash));
 
+  registerDeclWithOpaqueResultType(
+      parser.CurDeclContext->getOutermostParentSourceFile(), items);
+
   return SourceFileParsingResult{ctx.AllocateCopy(items), tokensRef, fp};
 }
 
@@ -533,11 +629,7 @@ bool parseAvailabilityMacroDefinitionViaASTGen(
   version = parsed.version.unbridged();
   specs.clear();
   for (auto spec : parsed.specs.unbridged<BridgedAvailabilitySpec>()) {
-    // Currently availability macros only supports platform version specs.
-    if (auto *platformVersionSpec =
-            dyn_cast<PlatformVersionConstraintAvailabilitySpec>(
-                spec.unbridged()))
-      specs.push_back(platformVersionSpec);
+    specs.push_back(spec.unbridged());
   }
 
   return false;
@@ -565,13 +657,7 @@ bool parseAvailabilityMacroDefinitionViaLegacyParser(
   // Copy the Specs to the requesting ASTContext from the temporary context
   // in the ParserUnit.
   for (auto *spec : tmpSpecs) {
-    // Currently availability macros only supports platform version specs.
-    if (auto *platformVersionSpec =
-            dyn_cast<PlatformVersionConstraintAvailabilitySpec>(spec)) {
-      auto copy = new (ctx)
-          PlatformVersionConstraintAvailabilitySpec(*platformVersionSpec);
-      specs.push_back(copy);
-    }
+    specs.push_back(spec->clone(ctx));
   }
 
   return false;

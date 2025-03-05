@@ -13,8 +13,8 @@
 import ASTBridging
 import SwiftDiagnostics
 @_spi(Compiler) import SwiftIfConfig
-import SwiftParser
-import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) import SwiftParser
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
 /// A build configuration that uses the compiler's ASTContext to answer
 /// queries.
@@ -359,11 +359,15 @@ private enum InactiveCodeChecker {
       // match.
       switch self {
       case .name(let name):
-        guard let identifier = token.identifier, identifier.name == name else {
-          continue
+        if let identifier = token.identifier, identifier.name == name {
+          break
         }
 
-        break
+        if case .keyword = token.tokenKind, token.text == name {
+          break
+        }
+
+        continue
 
       case .tryOrThrow:
         guard let keywordKind = token.keywordKind,
@@ -517,7 +521,11 @@ public func extractInlinableText(
   sourceText: BridgedStringRef
 ) -> BridgedStringRef {
   let textBuffer = UnsafeBufferPointer<UInt8>(start: sourceText.data, count: sourceText.count)
-  var parser = Parser(textBuffer)
+  var parser = Parser(
+    textBuffer,
+    swiftVersion: Parser.SwiftVersion(from: astContext),
+    experimentalFeatures: Parser.ExperimentalFeatures(from: astContext)
+  )
   let syntax = SourceFileSyntax.parse(from: &parser)
 
   let configuration = CompilerBuildConfiguration(
@@ -531,6 +539,28 @@ public func extractInlinableText(
     retainFeatureCheckIfConfigs: true
   ).result
 
+  // Remove "unsafe" expressions.
+  let inlineableSyntax = syntaxWithoutInactive.withoutUnsafeExpressions
+
   // Remove comments and return the result.
-  return allocateBridgedString(syntaxWithoutInactive.descriptionWithoutCommentsAndSourceLocations)
+  return allocateBridgedString(inlineableSyntax.descriptionWithoutCommentsAndSourceLocations)
+}
+
+/// Used by withoutUnsafeExpressions to remove "unsafe" expressions from
+/// a syntax tree.
+fileprivate class RemoveUnsafeExprSyntaxRewriter: SyntaxRewriter {
+  override func visit(_ node: UnsafeExprSyntax) -> ExprSyntax {
+    return node.expression.with(\.leadingTrivia, node.leadingTrivia)
+  }
+
+  override func visit(_ node: ForStmtSyntax) -> StmtSyntax {
+    return StmtSyntax(node.with(\.unsafeKeyword, nil))
+  }
+}
+
+extension SyntaxProtocol {
+  /// Return a new syntax tree with all "unsafe" expressions removed.
+  var withoutUnsafeExpressions: Syntax {
+    RemoveUnsafeExprSyntaxRewriter().rewrite(self)
+  }
 }

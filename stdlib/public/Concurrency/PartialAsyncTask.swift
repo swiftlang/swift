@@ -89,7 +89,7 @@ public struct UnownedJob: Sendable {
   @inlinable
   @available(*, deprecated, renamed: "ExecutorJob.runSynchronously(on:)")
   public func _runSynchronously(on executor: UnownedSerialExecutor) {
-    _swiftJobRun(self, executor)
+    unsafe _swiftJobRun(self, executor)
   }
 
   /// Run this job on the passed in executor.
@@ -105,7 +105,7 @@ public struct UnownedJob: Sendable {
   @_alwaysEmitIntoClient
   @inlinable
   public func runSynchronously(on executor: UnownedSerialExecutor) {
-    _swiftJobRun(self, executor)
+    unsafe _swiftJobRun(self, executor)
   }
 
   /// Run this job isolated to the passed task executor.
@@ -159,7 +159,7 @@ public struct UnownedJob: Sendable {
   @inlinable
   public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
                                taskExecutor: UnownedTaskExecutor) {
-    _swiftJobRunOnTaskExecutor(self, serialExecutor, taskExecutor)
+    unsafe _swiftJobRunOnTaskExecutor(self, serialExecutor, taskExecutor)
   }
 
 }
@@ -250,7 +250,7 @@ extension Job {
   @_alwaysEmitIntoClient
   @inlinable
   __consuming public func runSynchronously(on executor: UnownedSerialExecutor) {
-    _swiftJobRun(UnownedJob(self), executor)
+    unsafe _swiftJobRun(UnownedJob(self), executor)
   }
 }
 
@@ -318,7 +318,7 @@ extension ExecutorJob {
   @_alwaysEmitIntoClient
   @inlinable
   __consuming public func runSynchronously(on executor: UnownedSerialExecutor) {
-    _swiftJobRun(UnownedJob(self), executor)
+    unsafe _swiftJobRun(UnownedJob(self), executor)
   }
 
   /// Run this job on the passed in task executor.
@@ -367,7 +367,7 @@ extension ExecutorJob {
   @inlinable
   __consuming public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
                                taskExecutor: UnownedTaskExecutor) {
-    _swiftJobRunOnTaskExecutor(UnownedJob(self), serialExecutor, taskExecutor)
+    unsafe _swiftJobRunOnTaskExecutor(UnownedJob(self), serialExecutor, taskExecutor)
   }
 }
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -485,7 +485,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
 
   @_alwaysEmitIntoClient
   internal init(_ context: Builtin.RawUnsafeContinuation) {
-    self.context = context
+    unsafe self.context = context
   }
 
   /// Resume the task that's awaiting the continuation
@@ -504,7 +504,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   @_alwaysEmitIntoClient
   public func resume(returning value: sending T) where E == Never {
     #if compiler(>=5.5) && $BuiltinContinuation
-    Builtin.resumeNonThrowingContinuationReturning(context, value)
+    unsafe Builtin.resumeNonThrowingContinuationReturning(context, value)
     #else
     fatalError("Swift compiler is incompatible with this SDK version")
     #endif
@@ -526,7 +526,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   @_alwaysEmitIntoClient
   public func resume(returning value: sending T) {
     #if compiler(>=5.5) && $BuiltinContinuation
-    Builtin.resumeThrowingContinuationReturning(context, value)
+    unsafe Builtin.resumeThrowingContinuationReturning(context, value)
     #else
     fatalError("Swift compiler is incompatible with this SDK version")
     #endif
@@ -548,7 +548,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   @_alwaysEmitIntoClient
   public func resume(throwing error: consuming E) {
     #if compiler(>=5.5) && $BuiltinContinuation
-    Builtin.resumeThrowingContinuationThrowing(context, error)
+    unsafe Builtin.resumeThrowingContinuationThrowing(context, error)
     #else
     fatalError("Swift compiler is incompatible with this SDK version")
     #endif
@@ -577,9 +577,9 @@ extension UnsafeContinuation {
   public func resume<Er: Error>(with result: __shared sending Result<T, Er>) where E == Error {
     switch result {
       case .success(let val):
-        self.resume(returning: val)
+        unsafe self.resume(returning: val)
       case .failure(let err):
-        self.resume(throwing: err)
+        unsafe self.resume(throwing: err)
     }
   }
 
@@ -603,9 +603,9 @@ extension UnsafeContinuation {
   public func resume(with result: __shared sending Result<T, E>) {
     switch result {
       case .success(let val):
-        self.resume(returning: val)
+        unsafe self.resume(returning: val)
       case .failure(let err):
-        self.resume(throwing: err)
+        unsafe self.resume(throwing: err)
     }
   }
 
@@ -621,7 +621,7 @@ extension UnsafeContinuation {
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
   public func resume() where T == Void {
-    self.resume(returning: ())
+    unsafe self.resume(returning: ())
   }
 }
 
@@ -634,7 +634,7 @@ internal func _resumeUnsafeContinuation<T>(
   _ continuation: UnsafeContinuation<T, Never>,
   _ value: sending T
 ) {
-  continuation.resume(returning: value)
+  unsafe continuation.resume(returning: value)
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -643,7 +643,7 @@ internal func _resumeUnsafeThrowingContinuation<T>(
   _ continuation: UnsafeContinuation<T, Error>,
   _ value: sending T
 ) {
-  continuation.resume(returning: value)
+  unsafe continuation.resume(returning: value)
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -652,7 +652,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
   _ continuation: UnsafeContinuation<T, Error>,
   _ error: consuming Error
 ) {
-  continuation.resume(throwing: error)
+  unsafe continuation.resume(throwing: error)
 }
 
 #endif
@@ -689,7 +689,7 @@ public func withUnsafeContinuation<T>(
   _ fn: (UnsafeContinuation<T, Never>) -> Void
 ) async -> sending T {
   return await Builtin.withUnsafeContinuation {
-    fn(UnsafeContinuation<T, Never>($0))
+    unsafe fn(UnsafeContinuation<T, Never>($0))
   }
 }
 
@@ -726,7 +726,7 @@ public func withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeContinuation<T, Error>) -> Void
 ) async throws -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {
-    fn(UnsafeContinuation<T, Error>($0))
+    unsafe fn(UnsafeContinuation<T, Error>($0))
   }
 }
 
@@ -740,7 +740,7 @@ public func _unsafeInheritExecutor_withUnsafeContinuation<T>(
   _ fn: (UnsafeContinuation<T, Never>) -> Void
 ) async -> sending T {
   return await Builtin.withUnsafeContinuation {
-    fn(UnsafeContinuation<T, Never>($0))
+    unsafe fn(UnsafeContinuation<T, Never>($0))
   }
 }
 
@@ -754,7 +754,7 @@ public func _unsafeInheritExecutor_withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeContinuation<T, Error>) -> Void
 ) async throws -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {
-    fn(UnsafeContinuation<T, Error>($0))
+    unsafe fn(UnsafeContinuation<T, Error>($0))
   }
 }
 

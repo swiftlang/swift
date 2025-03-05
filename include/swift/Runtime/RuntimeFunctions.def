@@ -2099,6 +2099,12 @@ FUNCTION(Free, c, free, C_CC, AlwaysAvailable,
          NO_ATTRS,
          EFFECT(Deallocating),
          UNKNOWN_MEMEFFECTS)
+FUNCTION(CoroFrameAlloc, Swift, swift_coroFrameAlloc, C_CC, AlwaysAvailable,
+         RETURNS(Int8PtrTy),
+         ARGS(SizeTy, Int64Ty),
+         NO_ATTRS,
+         EFFECT(Allocating),
+         UNKNOWN_MEMEFFECTS)
 
 // void *_Block_copy(void *block);
 FUNCTION(BlockCopy, BlocksRuntime, _Block_copy, C_CC, AlwaysAvailable,
@@ -2313,6 +2319,16 @@ FUNCTION(TaskAlloc,
 FUNCTION(TaskDealloc,
          _Concurrency, swift_task_dealloc, SwiftCC,
          ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(Concurrency),
+         MEMEFFECTS(ArgMemOnly))
+
+// void swift_task_dealloc_through(void *ptr);
+FUNCTION(TaskDeallocThrough,
+         _Concurrency, swift_task_dealloc_through, SwiftCC,
+         CoroutineAccessorsAvailability,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
@@ -2981,6 +2997,36 @@ FUNCTION(MemsetS, c, memset_s, C_CC, AlwaysAvailable,
          ARGS(PtrTy, SizeTy, Int32Ty, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
+// void *swift_coro_alloc(CoroAllocator *, size_t size);
+FUNCTION(CoroAlloc,
+         _Concurrency, swift_coro_alloc, SwiftCC,
+         CoroutineAccessorsAvailability,
+         RETURNS(Int8PtrTy),
+         ARGS(CoroAllocatorPtrTy, SizeTy),
+         NO_ATTRS,
+         EFFECT(Allocating, Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_coro_dealloc(CoroAllocator *, void *ptr);
+FUNCTION(CoroDealloc,
+         _Concurrency, swift_coro_dealloc, SwiftCC,
+         CoroutineAccessorsAvailability,
+         RETURNS(VoidTy),
+         ARGS(CoroAllocatorPtrTy, Int8PtrTy),
+         NO_ATTRS,
+         EFFECT(Deallocating, Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// const CoroAllocator *swift_coro_getGlobalAllocator(CoroAllocatorFlags flags);
+FUNCTION(CoroGetGlobalAllocator, 
+         _Concurrency, swift_coro_getGlobalAllocator, SwiftCC, 
+         CoroutineAccessorsAvailability, 
+         RETURNS(CoroAllocatorPtrTy), 
+         ARGS(CoroAllocatorFlagsTy), 
+         ATTRS(NoUnwind, WillReturn), 
+         EFFECT(Allocating),
          UNKNOWN_MEMEFFECTS)
 
 #undef RETURNS

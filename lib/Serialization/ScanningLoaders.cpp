@@ -205,15 +205,6 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
           Args.push_back(candidate);
         }
 
-        // Compute the output path and add it to the command line
-        SmallString<128> outputPathBase(moduleOutputPath);
-        llvm::sys::path::append(
-            outputPathBase,
-            moduleName.str() + "-" + Hash + "." +
-                file_types::getExtension(file_types::TY_SwiftModuleFile));
-        Args.push_back("-o");
-        Args.push_back(outputPathBase.str().str());
-
         // Open the interface file.
         auto &fs = *Ctx.SourceMgr.getFileSystem();
         auto interfaceBuf = fs.getBufferForFile(moduleInterfacePath);
@@ -248,9 +239,8 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         bool isStatic = llvm::find(ArgsRefs, "-static") != ArgsRefs.end();
 
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
-            outputPathBase.str().str(), InPath, compiledCandidatesRefs,
-            ArgsRefs, {}, {}, linkLibraries, Hash, isFramework,
-            isStatic, {}, /*module-cache-key*/ "", UserModVer);
+            InPath, compiledCandidatesRefs, ArgsRefs, {}, {}, linkLibraries,
+            isFramework, isStatic, {}, /*module-cache-key*/ "", UserModVer);
 
         if (Ctx.CASOpts.EnableCaching) {
           std::vector<std::string> clangDependencyFiles;
@@ -272,6 +262,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         auto &imInfo = mainMod->getImplicitImportInfo();
         for (auto import : imInfo.AdditionalUnloadedImports) {
           Result->addModuleImport(import.module.getModulePath(),
+                                  import.options.contains(ImportFlags::Exported),
                                   &alreadyAddedModules, &Ctx.SourceMgr);
         }
 
@@ -297,8 +288,9 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
                return adjacentBinaryModulePackageOnlyImports.getError();
 
              for (const auto &requiredImport : *adjacentBinaryModulePackageOnlyImports)
-               if (!alreadyAddedModules.contains(requiredImport.getKey()))
-                 Result->addModuleImport(requiredImport.getKey(),
+               if (!alreadyAddedModules.contains(requiredImport.importIdentifier))
+                 Result->addModuleImport(requiredImport.importIdentifier,
+                                         requiredImport.isExported,
                                          &alreadyAddedModules);
            }
          }

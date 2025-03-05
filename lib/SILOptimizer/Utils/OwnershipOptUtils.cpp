@@ -439,6 +439,18 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
   }
 }
 
+bool OwnershipRAUWHelper::mayIntroduceUnoptimizableCopies() {
+  if (oldValue->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return false;
+  }
+
+  if (areUsesWithinValueLifetime(newValue, ctx->guaranteedUsePoints,
+                                 &ctx->deBlocks)) {
+    return false;
+  }
+  return true;
+}
+
 bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
                                               ArrayRef<Operand *> uses) {
   assert(value->isLexical());
@@ -606,7 +618,7 @@ void BorrowedLifetimeExtender::analyzeExtendedScope() {
       SWIFT_ASSERT_ONLY(reborrowedOperands.insert(endScope));
 
       // TODO: if non-phi reborrows are added, handle multiple results.
-      discoverReborrow(borrowingOper.getBorrowIntroducingUserResult().value);
+      discoverReborrow(borrowingOper.getBorrowIntroducingUserResult());
     }
     return true;
   };

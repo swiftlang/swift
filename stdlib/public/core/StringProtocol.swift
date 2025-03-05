@@ -210,11 +210,12 @@ extension String {
   /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
   ///
   @_alwaysEmitIntoClient
+  @safe
   public mutating func withUTF8<R>(
     _ body: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
     makeContiguousUTF8()
-    return try _guts.withFastUTF8(body)
+    return try unsafe _guts.withFastUTF8(body)
   }
 }
 
@@ -276,10 +277,11 @@ extension Substring {
   /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
   ///
   @_alwaysEmitIntoClient
+  @safe
   public mutating func withUTF8<R>(
     _ body: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
     makeContiguousUTF8()
-    return try _wholeGuts.withFastUTF8(range: _offsetRange, body)
+    return try unsafe _wholeGuts.withFastUTF8(range: _offsetRange, body)
   }
 }

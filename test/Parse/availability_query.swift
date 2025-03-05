@@ -30,7 +30,7 @@ if #available( { // expected-error {{expected platform name}} expected-error {{e
 if #available() { // expected-error {{expected platform name}}
 }
 
-if #available(OSX { // expected-error {{expected version number}} expected-error {{expected ')'}} expected-note {{to match this opening '('}}
+if #available(OSX { // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 
 if #available(OSX) { // expected-error {{expected version number}}
@@ -42,11 +42,11 @@ if #available(OSX 0) { // expected-warning {{expected version number; this is an
 if #available(OSX 0.0) { // expected-warning {{expected version number; this is an error in the Swift 6 language mode}}
 }
 
-if #available(OSX 51 { // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-error {{must handle potential future platforms with '*'}} {{21-21=, *}}
+if #available(OSX 51 { // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 
 if #available(iDishwasherOS 51) { // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
-// expected-error@-1 {{must handle potential future platforms with '*'}}
+// expected-error@-1 {{condition required for target platform}}
 }
 
 if #available(iDishwasherOS 51, *) { // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
@@ -64,7 +64,7 @@ if #available(macoss 51, *) { // expected-warning {{unrecognized platform name '
 if #available(mac 51, *) { // expected-warning {{unrecognized platform name 'mac'; did you mean 'macOS'?}} {{15-18=macOS}}
 }
 
-if #available(OSX 51, OSX 52, *) {  // expected-error {{version for 'macOS' already specified}}
+if #available(OSX 51, OSX 52, *) {  // expected-error {{version for macOS already specified}}
 }
 
 if #available(OSX 52) { }  // expected-error {{must handle potential future platforms with '*'}} {{21-21=, *}}
@@ -74,7 +74,9 @@ if #available(OSX 51, iOS 8.0) { }  // expected-error {{must handle potential fu
 if #available(iOS 8.0, *) {
 }
 
-if #available(iOSApplicationExtension, unavailable) { // expected-error 2{{expected version number}}
+if #available(iOSApplicationExtension, unavailable) { // expected-error {{'unavailable' can't be combined with shorthand specification 'iOSApplicationExtension'}}
+// expected-error@-1 {{condition required for target platform}}
+// expected-note@-2 {{did you mean to specify an introduction version?}}
 }
 	
 // Want to make sure we can parse this. Perhaps we should not let this validate, though.
@@ -95,7 +97,7 @@ if #available(OSX 51, { // expected-error {{expected platform name}} // expected
 if #available(OSX 51,) { // expected-error {{expected platform name}}
 }
 
-if #available(OSX 51, iOS { // expected-error {{expected version number}} // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
+if #available(OSX 51, iOS { // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 
 if #available(OSX 51, iOS 8.0, iDishwasherOS 51) { // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
@@ -125,4 +127,7 @@ if let _ = Optional(42), #available(iOS 8.0, *) {}
 if #available(macOS 51, *) {
 }
 
+// FIXME: This is weird, but it's already accepted. It should probably be diagnosed.
+if #available(*, macOS 51) {
+}
 

@@ -245,15 +245,21 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
 
 static bool isUnavailableInAllVersions(ValueDecl *decl) {
   ASTContext &ctx = decl->getASTContext();
-  auto attr = decl->getUnavailableAttr();
-  if (!attr)
-    return false;
 
-  if (attr->isUnconditionallyUnavailable())
-    return true;
+  auto deploymentContext = AvailabilityContext::forDeploymentTarget(ctx);
+  auto constraints = getAvailabilityConstraintsForDecl(decl, deploymentContext);
+  for (auto constraint : constraints) {
+    switch (constraint.getReason()) {
+    case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+    case AvailabilityConstraint::Reason::UnavailableForDeployment:
+      return true;
+    case AvailabilityConstraint::Reason::Obsoleted:
+    case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+      break;
+    }
+  }
 
-  return attr->getVersionAvailability(ctx) ==
-         AvailableVersionComparison::Unavailable;
+  return false;
 }
 
 /// Perform basic checking to determine whether a declaration can override a
@@ -1718,7 +1724,8 @@ namespace  {
     UNINTERESTING_ATTR(UnavailableFromAsync)
 
     UNINTERESTING_ATTR(NoMetadata)
-    UNINTERESTING_ATTR(CompileTimeConst)
+    UNINTERESTING_ATTR(CompileTimeLiteral)
+    UNINTERESTING_ATTR(ConstVal)
 
     UNINTERESTING_ATTR(BackDeployed)
     UNINTERESTING_ATTR(KnownToBeLocal)
@@ -2253,7 +2260,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     diagnoseOverrideForAvailability(override, base);
   }
 
-  if (ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+  if (ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
     // If the override is unsafe but the base declaration is not, then the
     // inheritance itself is unsafe.
     auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);

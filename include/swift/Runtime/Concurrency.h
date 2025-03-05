@@ -18,6 +18,7 @@
 #define SWIFT_RUNTIME_CONCURRENCY_H
 
 #include "swift/ABI/AsyncLet.h"
+#include "swift/ABI/Coro.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskGroup.h"
 
@@ -118,6 +119,35 @@ void *swift_task_alloc(size_t size);
 /// must be allocated and deallocated in a strict stack discipline.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_dealloc(void *ptr);
+
+/// Deallocate multiple memory allocations in a task.
+///
+/// The pointer provided must be a pointer previously allocated on
+/// this task that has not yet been deallocated.  All allocations up to and
+/// including that allocation will be deallocated.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void swift_task_dealloc_through(void *ptr);
+
+// TODO: CoroutineAccessors: Eliminate this entry point and replace its uses
+//                           with direct references the globals.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+CoroAllocator *swift_coro_getGlobalAllocator(CoroAllocatorFlags flags);
+
+// TODO: CoroutineAccessors: Mark the underlying struct const.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+CoroAllocator *const _swift_coro_task_allocator;
+
+// TODO: CoroutineAccessors: Move these declarations back to swiftCore {{
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void *swift_coro_alloc(CoroAllocator *allocator, size_t size);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void swift_coro_dealloc(CoroAllocator *allocator, void *ptr);
+
+// TODO: CoroutineAccessors: Mark the underlying struct const.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+CoroAllocator *const _swift_coro_malloc_allocator;
+// }} TODO: CoroutineAccessors
 
 /// Cancel a task and all of its child tasks.
 ///
@@ -1024,6 +1054,9 @@ JobPriority swift_task_getCurrentThreadPriority(void);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_startOnMainActor(AsyncTask* job);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_startSynchronously(AsyncTask* job);
 
 /// Donate this thread to the global executor until either the
 /// given condition returns true or we've run out of cooperative

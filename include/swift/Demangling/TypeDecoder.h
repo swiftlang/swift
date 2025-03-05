@@ -941,6 +941,10 @@ protected:
                  NodeKind::IsolatedAnyFunctionType) {
         extFlags = extFlags.withIsolatedAny();
         ++firstChildIdx;
+      } else if (Node->getChild(firstChildIdx)->getKind() ==
+                 NodeKind::NonIsolatedCallerFunctionType) {
+        extFlags = extFlags.withNonIsolatedCaller();
+        ++firstChildIdx;
       }
 
       FunctionMetadataDifferentiabilityKind diffKind;

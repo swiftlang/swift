@@ -285,7 +285,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
 /// ConcreteTypeDef to the definition of that type.
 void ConcreteExistentialInfo::initializeConcreteTypeDef(
     SILInstruction *typeConversionInst) {
-  if (!ConcreteType->isOpenedExistential())
+  if (!isa<OpenedArchetypeType>(ConcreteType))
     return;
 
   assert(isValid());

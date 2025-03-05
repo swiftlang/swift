@@ -16,7 +16,9 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
@@ -1288,84 +1290,20 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
 /// removing specs for unrecognized platforms.
 static void
 validateAvailabilitySpecList(Parser &P,
-                             SmallVectorImpl<AvailabilitySpec *> &Specs,
+                             const SmallVectorImpl<AvailabilitySpec *> &Specs,
                              Parser::AvailabilitySpecSource Source) {
-  llvm::SmallSet<PlatformKind, 4> Platforms;
-  std::optional<SourceLoc> OtherPlatformSpecLoc = std::nullopt;
-
-  if (Specs.size() == 1 &&
-      isa<PlatformAgnosticVersionConstraintAvailabilitySpec>(Specs[0])) {
-    // @available(swift N) and @available(_PackageDescription N) are allowed
-    // only in isolation; they cannot be combined with other availability specs
-    // in a single list.
+  if (Source != Parser::AvailabilitySpecSource::Macro)
     return;
-  }
 
-  SmallVector<AvailabilitySpec *, 5> RecognizedSpecs;
+  std::optional<SourceLoc> WildcardSpecLoc;
   for (auto *Spec : Specs) {
-    RecognizedSpecs.push_back(Spec);
-    if (auto *OtherPlatSpec = dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
-      OtherPlatformSpecLoc = OtherPlatSpec->getStarLoc();
-      continue;
-    }
-
-    if (auto *PlatformAgnosticSpec =
-         dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-      P.diagnose(PlatformAgnosticSpec->getPlatformAgnosticNameLoc(),
-                 diag::availability_must_occur_alone,
-                 PlatformAgnosticSpec->isLanguageVersionSpecific() 
-                   ? "swift" 
-                   : "_PackageDescription");
-      continue;
-    }
-
-    auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
-    // We keep specs for unrecognized platforms around for error recovery
-    // during parsing but remove them once parsing is completed.
-    if (VersionSpec->isUnrecognizedPlatform()) {
-      RecognizedSpecs.pop_back();
-      continue;
-    }
-
-    bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
-    if (!Inserted) {
-      // Rule out multiple version specs referring to the same platform.
-      // For example, we emit an error for
-      /// #available(OSX 10.10, OSX 10.11, *)
-      PlatformKind Platform = VersionSpec->getPlatform();
-      P.diagnose(VersionSpec->getPlatformLoc(),
-                 diag::availability_query_repeated_platform,
-                 platformString(Platform));
+    if (Spec->isWildcard()) {
+      WildcardSpecLoc = Spec->getStartLoc();
     }
   }
 
-  switch (Source) {
-  case Parser::AvailabilitySpecSource::Available: {
-    if (OtherPlatformSpecLoc == std::nullopt) {
-      SourceLoc InsertWildcardLoc = P.PreviousLoc;
-      P.diagnose(InsertWildcardLoc, diag::availability_query_wildcard_required)
-        .fixItInsertAfter(InsertWildcardLoc, ", *");
-    }
-    break;
-  }
-  case Parser::AvailabilitySpecSource::Unavailable: {
-    if (OtherPlatformSpecLoc != std::nullopt) {
-      SourceLoc Loc = OtherPlatformSpecLoc.value();
-      P.diagnose(Loc, diag::unavailability_query_wildcard_not_required)
-        .fixItRemove(Loc);
-    }
-    break;
-  }
-  case Parser::AvailabilitySpecSource::Macro: {
-    if (OtherPlatformSpecLoc != std::nullopt) {
-      SourceLoc Loc = OtherPlatformSpecLoc.value();
-      P.diagnose(Loc, diag::attr_availability_wildcard_in_macro);
-    }
-    break;
-  }
-  }
-
-  Specs = RecognizedSpecs;
+  if (WildcardSpecLoc)
+    P.diagnose(*WildcardSpecLoc, diag::attr_availability_wildcard_in_macro);
 }
 
 // #available(...)
@@ -1400,18 +1338,6 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   SmallVector<AvailabilitySpec *, 5> Specs;
   ParserStatus Status = parseAvailabilitySpecList(Specs, Source);
 
-  for (auto *Spec : Specs) {
-    if (auto *PlatformAgnostic =
-          dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-      diagnose(PlatformAgnostic->getPlatformAgnosticNameLoc(),
-               PlatformAgnostic->isLanguageVersionSpecific()
-                   ? diag::pound_available_swift_not_allowed
-                   : diag::pound_available_package_description_not_allowed,
-               getTokenText(MainToken));
-      Status.setIsParseError();
-    }
-  }
-
   SourceLoc RParenLoc;
   if (parseMatchingToken(tok::r_paren, RParenLoc,
                          diag::avail_query_expected_rparen, LParenLoc))
@@ -1431,6 +1357,9 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
 
   auto *result = PoundAvailableInfo::create(Context, PoundLoc, LParenLoc, Specs,
                                             RParenLoc, isUnavailability);
+  if (Status.isError())
+    result->setInvalid();
+
   return makeParserResult(Status, result);
 }
 
@@ -1544,21 +1473,15 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
           // If this was preceded by a single platform version constraint, we
           // can guess that the intention was to treat it as 'introduced' and
           // suggest a fix-it to combine them.
-          if (Specs.size() == 1 &&
-              PlatformVersionConstraintAvailabilitySpec::classof(Previous) &&
-              Text != "introduced") {
-            auto *PlatformSpec =
-                cast<PlatformVersionConstraintAvailabilitySpec>(Previous);
+          if (Specs.size() == 1 && Text != "introduced") {
+            auto PlatformNameEndLoc = Lexer::getLocForEndOfToken(
+                SourceManager, Previous->getStartLoc());
 
-            auto PlatformNameEndLoc =
-              Lexer::getLocForEndOfToken(SourceManager,
-                                         PlatformSpec->getPlatformLoc());
-
-            diagnose(PlatformSpec->getPlatformLoc(),
+            diagnose(Previous->getStartLoc(),
                      diag::avail_query_meant_introduced)
                 .fixItInsert(PlatformNameEndLoc, ", introduced:");
           }
-
+          consumeToken();
           Status.setIsParseError();
           break;
         }
@@ -2445,6 +2368,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   auto StartOfControl = Tok.getLoc();
   SourceLoc AwaitLoc;
   SourceLoc TryLoc;
+  SourceLoc UnsafeLoc;
 
   if (Tok.isContextualKeyword("await")) {
     AwaitLoc = consumeToken();
@@ -2455,10 +2379,15 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     }
   }
 
+  if (Tok.isContextualKeyword("unsafe") &&
+      !peekToken().isAny(tok::colon, tok::kw_in)) {
+    UnsafeLoc = consumeToken();
+  }
+  
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletionCallbacks) {
       CodeCompletionCallbacks->completeForEachPatternBeginning(
-          TryLoc.isValid(), AwaitLoc.isValid());
+          TryLoc.isValid(), AwaitLoc.isValid(), UnsafeLoc.isValid());
     }
     consumeToken(tok::code_complete);
     // Since 'completeForeachPatternBeginning' is a keyword only completion,
@@ -2572,7 +2501,8 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
 
   return makeParserResult(
       Status,
-      new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, pattern.get(), InLoc,
+      new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc,
+                                pattern.get(), InLoc,
                                 Container.get(), WhereLoc, Where.getPtrOrNull(),
                                 Body.get()));
 }

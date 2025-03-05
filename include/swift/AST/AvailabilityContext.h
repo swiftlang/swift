@@ -37,10 +37,9 @@ class Decl;
 class AvailabilityContext {
 public:
   class Storage;
+  class DomainInfo;
 
 private:
-  class Info;
-
   /// A non-null pointer to uniqued storage for this availability context.
   const Storage *storage;
 
@@ -48,27 +47,20 @@ private:
     assert(storage);
   };
 
-  /// Retrieves an `AvailabilityContext` with the given platform availability
-  /// parameters.
-  static AvailabilityContext
-  get(const AvailabilityRange &platformAvailability,
-      std::optional<AvailabilityDomain> unavailableDomain, bool deprecated,
-      ASTContext &ctx);
-
 public:
   /// Retrieves an `AvailabilityContext` constrained by the given platform
   /// availability range.
   static AvailabilityContext forPlatformRange(const AvailabilityRange &range,
-                                              ASTContext &ctx);
+                                              const ASTContext &ctx);
 
   /// Retrieves the maximally available `AvailabilityContext` for the
   /// compilation. The platform availability range will be set to the minimum
   /// inlining target (which may just be the deployment target).
-  static AvailabilityContext forInliningTarget(ASTContext &ctx);
+  static AvailabilityContext forInliningTarget(const ASTContext &ctx);
 
   /// Retrieves an `AvailabilityContext` with the platform availability range
   /// set to the deployment target.
-  static AvailabilityContext forDeploymentTarget(ASTContext &ctx);
+  static AvailabilityContext forDeploymentTarget(const ASTContext &ctx);
 
   /// Returns the range of platform versions which may execute code in the
   /// availability context, starting at its introduction version.
@@ -84,16 +76,17 @@ public:
   bool isDeprecated() const;
 
   /// Constrain with another `AvailabilityContext`.
-  void constrainWithContext(const AvailabilityContext &other, ASTContext &ctx);
+  void constrainWithContext(const AvailabilityContext &other,
+                            const ASTContext &ctx);
 
   /// Constrain the platform availability range with `platformRange`.
   void constrainWithPlatformRange(const AvailabilityRange &platformRange,
-                                  ASTContext &ctx);
+                                  const ASTContext &ctx);
 
   /// Constrain the context by adding \p domain to the set of unavailable
   /// domains.
   void constrainWithUnavailableDomain(AvailabilityDomain domain,
-                                      ASTContext &ctx);
+                                      const ASTContext &ctx);
 
   /// Constrain with the availability attributes of `decl`.
   void constrainWithDecl(const Decl *decl);
@@ -119,6 +112,9 @@ public:
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP;
+
+  /// Returns true if all internal invariants are satisfied.
+  bool verify(const ASTContext &ctx) const;
 };
 
 } // end namespace swift

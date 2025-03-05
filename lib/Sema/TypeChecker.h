@@ -241,6 +241,14 @@ public:
     /// requirement \c Req. Accordingly, \c Req is a conditional requirement of
     /// the last conformance in the chain (if any).
     SmallVector<ParentConditionalConformance, 2> ReqPath;
+
+    /// The isolated conformances that caused the requirement failure.
+    llvm::TinyPtrVector<ProtocolConformance *> IsolatedConformances = {};
+
+    /// The protocol (Sendable or SendableMetatype) to which the type
+    /// parameter conforms, causing a conflict with the isolated conformances
+    /// described above.
+    ProtocolDecl *IsolatedConformanceProto = nullptr;
   };
 
 private:
@@ -271,6 +279,16 @@ public:
         RequirementFailureInfo{Req, SubstReq, ReqPath});
   }
 
+  static CheckGenericArgumentsResult createIsolatedConformanceFailure(
+      Requirement Req, Requirement SubstReq,
+      llvm::TinyPtrVector<ProtocolConformance *> IsolatedConformances,
+      ProtocolDecl *IsolatedConformanceProto) {
+    return CheckGenericArgumentsResult(
+        CheckRequirementsResult::RequirementFailure,
+        RequirementFailureInfo{Req, SubstReq, { }, IsolatedConformances,
+                               IsolatedConformanceProto});
+  }
+  
   const RequirementFailureInfo &getRequirementFailureInfo() const {
     assert(Kind == CheckRequirementsResult::RequirementFailure);
 
@@ -537,8 +555,17 @@ void diagnoseRequirementFailure(
 /// requirements and report on any requirement failures in detail for
 /// diagnostic needs.
 CheckGenericArgumentsResult
-checkGenericArgumentsForDiagnostics(ArrayRef<Requirement> requirements,
+checkGenericArgumentsForDiagnostics(GenericSignature signature,
+                                    ArrayRef<Requirement> requirements,
                                     TypeSubstitutionFn substitutions);
+
+/// Check the given generic parameter substitutions against the given
+/// generic signature and report on any requirement failures in detail for
+/// diagnostic needs.
+CheckGenericArgumentsResult
+checkGenericArgumentsForDiagnostics(GenericSignature signature,
+                                    TypeSubstitutionFn substitutions);
+
 
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
@@ -764,8 +791,7 @@ bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
 /// together.
 ///
 /// \returns true if a failure occurred.
-bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
-                              GenericEnvironment *packElementEnv);
+bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt);
 
 /// Compute the set of captures for the given closure.
 void computeCaptures(AbstractClosureExpr *ACE);
@@ -1041,15 +1067,22 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 /// is allowed.
 std::optional<Diagnostic> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
 
-bool checkAvailability(
-    SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
-    const DeclContext *ReferenceDC,
-    llvm::function_ref<InFlightDiagnostic(StringRef, llvm::VersionTuple)>
-        Diagnose);
-
+/// Checks whether the required range of versions of the compilation's target
+/// platform are available at the given `SourceRange`. If not, `Diagnose` is
+/// invoked.
 bool checkAvailability(SourceRange ReferenceRange,
                        AvailabilityRange RequiredAvailability,
-                       Diag<StringRef, llvm::VersionTuple> Diag,
+                       const DeclContext *ReferenceDC,
+                       llvm::function_ref<InFlightDiagnostic(AvailabilityDomain,
+                                                             AvailabilityRange)>
+                           Diagnose);
+
+/// Checks whether the required range of versions of the compilation's target
+/// platform are available at the given `SourceRange`. If not, `Diag` is
+/// emitted.
+bool checkAvailability(SourceRange ReferenceRange,
+                       AvailabilityRange RequiredAvailability,
+                       Diag<AvailabilityDomain, AvailabilityRange> Diag,
                        const DeclContext *ReferenceDC);
 
 void checkConcurrencyAvailability(SourceRange ReferenceRange,
@@ -1524,6 +1557,15 @@ bool maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
+
+/// Determine whether the type parameter has requirements that would prohibit
+/// it from using any isolated conformances.
+///
+/// Returns the protocol to which the type conforms that causes the conflict,
+/// which can be either Sendable or SendableMetatype.
+std::optional<ProtocolDecl *> typeParameterProhibitsIsolatedConformance(
+    Type type, GenericSignature signature);
+
 } // end namespace swift
 
 #endif

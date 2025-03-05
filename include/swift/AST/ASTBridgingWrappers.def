@@ -85,6 +85,12 @@
 #endif
 #include "swift/AST/DeclAttr.def"
 
+#ifndef TYPE_ATTR
+#define SIMPLE_TYPE_ATTR(...)
+#define TYPE_ATTR(SPELLING, CLASS) AST_BRIDGING_WRAPPER_NONNULL(CLASS##TypeAttr)
+#endif
+#include "swift/AST/TypeAttr.def"
+
 // Some of the base classes need to be nullable to allow them to be used as
 // optional parameters.
 AST_BRIDGING_WRAPPER_NULLABLE(Decl)
@@ -102,16 +108,14 @@ AST_BRIDGING_WRAPPER_NULLABLE(GenericParamList)
 AST_BRIDGING_WRAPPER_NULLABLE(TrailingWhereClause)
 AST_BRIDGING_WRAPPER_NULLABLE(ParameterList)
 AST_BRIDGING_WRAPPER_NULLABLE(PatternBindingInitializer)
+AST_BRIDGING_WRAPPER_NULLABLE(DefaultArgumentInitializer)
 AST_BRIDGING_WRAPPER_NULLABLE(CustomAttributeInitializer)
-AST_BRIDGING_WRAPPER_NONNULL(TypeAttributes)
 AST_BRIDGING_WRAPPER_NONNULL(CustomAttribute)
 AST_BRIDGING_WRAPPER_NULLABLE(ArgumentList)
 AST_BRIDGING_WRAPPER_NULLABLE(AvailabilitySpec)
-AST_BRIDGING_WRAPPER_NULLABLE(PlatformVersionConstraintAvailabilitySpec)
-AST_BRIDGING_WRAPPER_NULLABLE(PlatformAgnosticVersionConstraintAvailabilitySpec)
-AST_BRIDGING_WRAPPER_NULLABLE(OtherPlatformAvailabilitySpec)
 AST_BRIDGING_WRAPPER_CONST_NONNULL(AvailabilityMacroMap)
 AST_BRIDGING_WRAPPER_NONNULL(PoundAvailableInfo)
+AST_BRIDGING_WRAPPER_NONNULL(LifetimeEntry)
 
 // Non-AST types to generate wrappers for.
 AST_BRIDGING_WRAPPER_NULLABLE(DiagnosticEngine)

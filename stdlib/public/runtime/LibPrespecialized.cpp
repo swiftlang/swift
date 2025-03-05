@@ -33,6 +33,13 @@
 #define HAS_OS_FEATURE 1
 #endif
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <ShlWapi.h>
+#include <Windows.h>
+#endif
+
 using namespace swift;
 
 static bool prespecializedLoggingEnabled = false;
@@ -67,10 +74,42 @@ static bool environmentProcessListContainsProcess(const char *list,
 }
 
 static bool isThisProcessEnabled(const LibPrespecializedData<InProcess> *data) {
+#if defined(_WIN32)
+  DWORD dwSize = MAX_PATH;
+  DWORD dwResult;
+  std::unique_ptr<WCHAR[]> pwszBuffer(new WCHAR[dwSize]);
+  while (true) {
+    dwResult = GetModuleFileNameW(nullptr, pwszBuffer.get(), dwSize);
+    if (dwResult == 0)
+      return true;
+    if (dwResult < dwSize)
+      break;
+    if (dwResult == dwSize && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+      pwszBuffer.reset(new WCHAR[dwSize <<= 1]);
+  }
+
+  PCWSTR pwszBaseName = PathFindFileNameW(pwszBuffer.get());
+
+  DWORD cchLength =
+      WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS | WC_NO_BEST_FIT_CHARS,
+                          pwszBaseName, -1, nullptr, 0, nullptr, nullptr);
+  if (cchLength == 0)
+    return true;
+
+  std::unique_ptr<char[]> pszBaseName{new char[cchLength]};
+  cchLength = WideCharToMultiByte(
+      CP_UTF8, WC_ERR_INVALID_CHARS | WC_NO_BEST_FIT_CHARS, pwszBaseName, -1,
+      pszBaseName.get(), cchLength, nullptr, nullptr);
+  if (cchLength == 0)
+    return true;
+
+  const char *__progname = pszBaseName.get();
+#else
   extern const char *__progname;
 
   if (!__progname)
     return true;
+#endif
 
   auto envEnabledProcesses =
       runtime::environment::SWIFT_DEBUG_LIB_PRESPECIALIZED_ENABLED_PROCESSES();

@@ -24,20 +24,20 @@ extension Task where Success == Never, Failure == Never {
   ) async throws {
     // Create a token which will initially have the value "not started", which
     // means the continuation has neither been created nor completed.
-    let token = UnsafeSleepStateToken()
+    let token = unsafe UnsafeSleepStateToken()
 
     do {
       // Install a cancellation handler to resume the continuation by
       // throwing CancellationError.
       try await withTaskCancellationHandler {
-        let _: () = try await withUnsafeThrowingContinuation { continuation in
+        let _: () = try unsafe await withUnsafeThrowingContinuation { continuation in
           while true {
-            let state = token.load()
-            switch state {
+            let state = unsafe token.load()
+            switch unsafe state {
             case .notStarted:
               // Try to swap in the continuation word.
-              let newState = SleepState.activeContinuation(continuation)
-              if !token.exchange(expected: state, desired: newState) {
+              let newState = unsafe SleepState.activeContinuation(continuation)
+              if unsafe !token.exchange(expected: state, desired: newState) {
                 // Keep trying!
                 continue
               }
@@ -49,9 +49,9 @@ extension Task where Success == Never, Failure == Never {
                 priority: nil, isChildTask: false, copyTaskLocals: false,
                 inheritContext: false, enqueueJob: false,
                 addPendingGroupTaskUnconditionally: false,
-                isDiscardingTask: false)
+                isDiscardingTask: false, isSynchronousStart: false)
               let (sleepTask, _) = Builtin.createAsyncTask(sleepTaskFlags) {
-                onSleepWake(token)
+                unsafe onSleepWake(token)
               }
               let toleranceSeconds: Int64
               let toleranceNanoseconds: Int64
@@ -78,18 +78,18 @@ extension Task where Success == Never, Failure == Never {
             case .cancelledBeforeStarted:
               // Finish the continuation normally. We'll throw later, after
               // we clean up.
-              continuation.resume()
+              unsafe continuation.resume()
               return
           }
         }
         }
       } onCancel: {
-        onSleepCancel(token)
+        unsafe onSleepCancel(token)
       }
 
       // Determine whether we got cancelled before we even started.
       let cancelledBeforeStarted: Bool
-      switch token.load() {
+      switch unsafe token.load() {
       case .notStarted, .activeContinuation, .cancelled:
         fatalError("Invalid state for non-cancelled sleep task")
 
@@ -102,7 +102,7 @@ extension Task where Success == Never, Failure == Never {
 
       // We got here without being cancelled, so deallocate the storage for
       // the flag word and continuation.
-      token.deallocate()
+      unsafe token.deallocate()
 
       // If we got cancelled before we even started, through the cancellation
       // error now.

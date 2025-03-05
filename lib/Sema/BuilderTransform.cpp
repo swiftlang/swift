@@ -261,7 +261,8 @@ protected:
   }
 
   std::pair<NullablePtr<Expr>, std::optional<UnsupportedElt>>
-  transform(BraceStmt *braceStmt, SmallVectorImpl<ASTNode> &newBody) {
+  transform(BraceStmt *braceStmt, SmallVectorImpl<ASTNode> &newBody,
+            bool isolateBuildBlock = false) {
     SmallVector<Expr *, 4> buildBlockArguments;
 
     auto failTransform = [&](UnsupportedElt unsupported) {
@@ -326,6 +327,14 @@ protected:
       auto *buildBlock = builder.buildCall(
           braceStmt->getStartLoc(), ctx.Id_buildBlock, buildBlockArguments,
           /*argLabels=*/{});
+
+      if (isolateBuildBlock) {
+        auto *buildBlockVar = captureExpr(buildBlock, newBody);
+        return std::make_pair(
+            builder.buildVarRef(buildBlockVar, braceStmt->getStartLoc()),
+            std::nullopt);
+      }
+
       return std::make_pair(buildBlock, std::nullopt);
     }
   }
@@ -502,7 +511,8 @@ protected:
 
       auto *ifBraceStmt = cast<BraceStmt>(ifStmt->getThenStmt());
 
-      std::tie(thenVarRef, unsupported) = transform(ifBraceStmt, thenBody);
+      std::tie(thenVarRef, unsupported) =
+          transform(ifBraceStmt, thenBody, /*isolateBuildBlock=*/true);
       if (unsupported) {
         recordUnsupported(*unsupported);
         return nullptr;
@@ -537,7 +547,8 @@ protected:
         auto *elseBraceStmt = cast<BraceStmt>(elseStmt);
         SmallVector<ASTNode> elseBody;
 
-        std::tie(elseVarRef, unsupported) = transform(elseBraceStmt, elseBody);
+        std::tie(elseVarRef, unsupported) = transform(
+            elseBraceStmt, elseBody, /*isolateBuildBlock=*/true);
         if (unsupported) {
           recordUnsupported(*unsupported);
           return nullptr;
@@ -634,7 +645,8 @@ protected:
     std::optional<UnsupportedElt> unsupported;
     SmallVector<ASTNode, 4> newBody;
 
-    std::tie(caseVarRef, unsupported) = transform(body, newBody);
+    std::tie(caseVarRef, unsupported) =
+        transform(body, newBody, /*isolateBuildBlock=*/true);
 
     if (unsupported) {
       recordUnsupported(*unsupported);
@@ -726,6 +738,7 @@ protected:
     auto *newForEach = new (ctx)
         ForEachStmt(forEachStmt->getLabelInfo(), forEachStmt->getForLoc(),
                     forEachStmt->getTryLoc(), forEachStmt->getAwaitLoc(),
+                    forEachStmt->getUnsafeLoc(),
                     forEachStmt->getPattern(), forEachStmt->getInLoc(),
                     forEachStmt->getParsedSequence(),
                     forEachStmt->getWhereLoc(), forEachStmt->getWhere(),

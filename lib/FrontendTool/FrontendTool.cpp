@@ -467,9 +467,13 @@ getPrimaryOrMainSourceFile(const CompilerInstance &Instance) {
 static bool dumpAST(CompilerInstance &Instance,
                     ASTDumpMemberLoading memberLoading) {
   const FrontendOptions &opts = Instance.getInvocation().getFrontendOptions();
-  auto dumpAST = [&](SourceFile *SF, raw_ostream &out) {
+  auto dumpAST = [&](SourceFile *SF, llvm::raw_ostream &out) {
     switch (opts.DumpASTFormat) {
     case FrontendOptions::ASTFormat::Default:
+      SF->dump(out, memberLoading);
+      break;
+    case FrontendOptions::ASTFormat::DefaultWithDeclContext:
+      swift::dumpDeclContextHierarchy(out, *SF);
       SF->dump(out, memberLoading);
       break;
     case FrontendOptions::ASTFormat::JSON:
@@ -495,7 +499,7 @@ static bool dumpAST(CompilerInstance &Instance,
       auto OutputFilename = PSPs.OutputFilename;
       if (withOutputPath(Instance.getASTContext().Diags,
                          Instance.getOutputBackend(), OutputFilename,
-                         [&](raw_ostream &out) -> bool {
+                         [&](llvm::raw_ostream &out) -> bool {
                            dumpAST(sourceFile, out);
                            return false;
                          }))
@@ -974,6 +978,21 @@ static void dumpAPIIfNeeded(const CompilerInstance &Instance) {
   }
 }
 
+static bool shouldEmitIndexData(const CompilerInvocation &Invocation) {
+  const auto &opts = Invocation.getFrontendOptions();
+  auto action = opts.RequestedAction;
+
+  if (action == FrontendOptions::ActionType::CompileModuleFromInterface &&
+      opts.ExplicitInterfaceBuild) {
+    return true;
+  }
+
+  // FIXME: This predicate matches the status quo, but there's no reason
+  // indexing cannot run for actions that do not require stdlib e.g. to better
+  // facilitate tests.
+  return FrontendOptions::doesActionRequireSwiftStandardLibrary(action);
+}
+
 /// Perform any actions that must have access to the ASTContext, and need to be
 /// delayed until the Swift compile pipeline has finished. This may be called
 /// before or after LLVM depending on when the ASTContext gets freed.
@@ -1068,10 +1087,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     }
   }
 
-  // FIXME: This predicate matches the status quo, but there's no reason
-  // indexing cannot run for actions that do not require stdlib e.g. to better
-  // facilitate tests.
-  if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action)) {
+  if (shouldEmitIndexData(Invocation)) {
     emitIndexData(Instance);
   }
 
@@ -1091,6 +1107,8 @@ static bool printSwiftVersion(const CompilerInvocation &Invocation) {
                << '\n';
   llvm::outs() << "Target: " << Invocation.getLangOptions().Target.str()
                << '\n';
+  if (!llvm::cl::getCompilerBuildConfig().empty())
+    llvm::cl::printBuildConfig(llvm::outs());
   return false;
 }
 

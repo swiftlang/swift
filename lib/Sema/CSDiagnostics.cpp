@@ -940,7 +940,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
 
   while (!path.empty()) {
     auto last = path.back();
-    if (last.is<LocatorPathElt::OptionalPayload>() ||
+    if (last.is<LocatorPathElt::OptionalInjection>() ||
         last.is<LocatorPathElt::GenericType>() ||
         last.is<LocatorPathElt::GenericArgument>()) {
       path = path.drop_back();
@@ -2837,22 +2837,6 @@ bool ContextualFailure::diagnoseAsError() {
     break;
   }
 
-  case ConstraintLocator::OptionalPayload: {
-    // If this is an attempt at a Double <-> CGFloat conversion
-    // through optional chaining, let's produce a tailored diagnostic.
-    if (isExpr<OptionalEvaluationExpr>(getAnchor())) {
-      if ((fromType->isDouble() || fromType->isCGFloat()) &&
-          (toType->isDouble() || toType->isCGFloat())) {
-        fromType = OptionalType::get(fromType);
-        toType = OptionalType::get(toType);
-        diagnostic = diag::cannot_implicitly_convert_in_optional_context;
-        break;
-      }
-    }
-
-    return false;
-  }
-
   case ConstraintLocator::EnumPatternImplicitCastMatch: {
     // In this case, the types are reversed, as we are checking whether we
     // can convert the pattern type to the context type.
@@ -4206,8 +4190,10 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
     } else if (cxxMethod->getReturnType()->isRecordType()) {
       if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(
               cxxMethod->getReturnType()->getAsRecordDecl())) {
+        // `importerImpl` is set to nullptr here to avoid diagnostics during
+        // this CxxRecordSemantics evaluation.
         auto methodSemantics = evaluateOrDefault(
-            ctx.evaluator, CxxRecordSemantics({cxxRecord, ctx}), {});
+            ctx.evaluator, CxxRecordSemantics({cxxRecord, ctx, nullptr}), {});
         if (methodSemantics == CxxRecordSemanticsKind::Iterator) {
           ctx.Diags.diagnose(loc, diag::iterator_method_unavailable,
                              name.getBaseIdentifier().str());
@@ -6488,7 +6474,7 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
   return true;
 }
 
-bool NotCompileTimeConstFailure::diagnoseAsError() {
+bool NotCompileTimeLiteralFailure::diagnoseAsError() {
   emitDiagnostic(diag::expect_compile_time_const);
   return true;
 }
@@ -9572,7 +9558,23 @@ bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
   return true;
 }
 
-bool IncorrectSlabLiteralCount::diagnoseAsError() {
-  emitDiagnostic(diag::slab_literal_incorrect_count, lhsCount, rhsCount);
+bool IncorrectInlineArrayLiteralCount::diagnoseAsError() {
+  emitDiagnostic(diag::inlinearray_literal_incorrect_count, lhsCount, rhsCount);
+  return true;
+}
+
+bool DisallowedIsolatedConformance::diagnoseAsError() {
+  emitDiagnostic(diag::isolated_conformance_with_sendable_simple,
+                 conformance->getType(),
+                 conformance->getProtocol()->getName());
+
+  auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!selectedOverload)
+    return true;
+
+  if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
+    emitDiagnosticAt(decl, diag::decl_declared_here, decl);
+  }
+
   return true;
 }

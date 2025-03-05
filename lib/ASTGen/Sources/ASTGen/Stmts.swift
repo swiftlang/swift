@@ -66,7 +66,7 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode? {
+  func generate(codeBlockItem node: CodeBlockItemSyntax) -> BridgedASTNode? {
     // TODO: Set semicolon loc.
     switch node.item {
     case .decl(let node):
@@ -89,7 +89,17 @@ extension ASTGenVisitor {
       guard let item = self.generate(codeBlockItem: codeBlockItem) else {
         return
       }
-      allItems.append(item.bridged)
+      allItems.append(item)
+
+      // Hoist 'VarDecl' to the block.
+      if item.kind == .decl {
+        withBridgedSwiftClosure { ptr in
+          let d = ptr!.load(as: BridgedDecl.self)
+          allItems.append(.decl(d))
+        } call: { handle in
+          item.castToDecl().forEachDeclToHoist(handle)
+        }
+      }
     }
 
     return allItems.lazy.bridgedArray(in: self)
@@ -138,18 +148,25 @@ extension ASTGenVisitor {
       var pat = self.generate(pattern: node.pattern)
       let keywordLoc = self.generateSourceLoc(node.bindingSpecifier)
       let isLet = node.bindingSpecifier.keywordKind == .let
-      pat =
-        BridgedBindingPattern.createParsed(
-          self.ctx,
-          keywordLoc: keywordLoc,
-          isLet: isLet,
-          subPattern: pat
-        ).asPattern
+      pat = BridgedBindingPattern.createParsed(
+        self.ctx,
+        keywordLoc: keywordLoc,
+        isLet: isLet,
+        subPattern: pat
+      ).asPattern
 
       // NOTE: (From the comment in libParse) The let/var pattern is part of the
-      // statement. But since the statement doesn't have the information. But,
-      // I'm not sure this should really be implicit.
+      // statement. But since the statement doesn't have the information, I'm not
+      // sure this should really be implicit.
       pat.setImplicit()
+
+      if let typeAnnotation = node.typeAnnotation {
+        pat = BridgedTypedPattern.createParsed(
+          self.ctx,
+          pattern: pat,
+          type: self.generate(type: typeAnnotation.type)
+        ).asPattern
+      }
 
       let initializer: BridgedExpr
       if let initNode = node.initializer {
@@ -313,6 +330,7 @@ extension ASTGenVisitor {
       forLoc: self.generateSourceLoc(node.forKeyword),
       tryLoc: self.generateSourceLoc(node.tryKeyword),
       awaitLoc: self.generateSourceLoc(node.awaitKeyword),
+      unsafeLoc: self.generateSourceLoc(node.unsafeKeyword),
       // NOTE: The pattern can be either a refutable pattern after `case` or a
       // normal binding pattern. ASTGen doesn't care because it should be handled
       // by the parser.
@@ -494,7 +512,7 @@ extension ASTGenVisitor {
       }
     } body: { caseNode in
       allBridgedCases.append(
-        ASTNode.stmt(self.generate(switchCase: caseNode).asStmt).bridged
+        .stmt(self.generate(switchCase: caseNode).asStmt)
       )
     }
 

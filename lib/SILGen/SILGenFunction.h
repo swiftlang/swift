@@ -789,6 +789,15 @@ public:
   bool isEmittingTopLevelCode() { return IsEmittingTopLevelCode; }
   void stopEmittingTopLevelCode() { IsEmittingTopLevelCode = false; }
 
+  /// Can the generated code reference \c decl safely?
+  ///
+  /// Checks that the module defining \c decl is as visible to clients as the
+  /// code referencing it, preventing an inlinable function to reference an
+  /// implementation-only dependency and similar. This applies similar checks
+  /// as the exportability checker does to source code for decls referenced by
+  /// generated code.
+  bool referenceAllowed(ValueDecl *decl);
+
   std::optional<SILAccessEnforcement>
   getStaticEnforcement(VarDecl *var = nullptr);
   std::optional<SILAccessEnforcement>

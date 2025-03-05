@@ -440,6 +440,7 @@ NOTE(sdk_version_pbm_version,none,
 NOTE(compiled_module_ignored_reason,none,
      "compiled module '%0' was ignored because %select{%error"
      "|it belongs to a framework in the SDK"
+     "|it's a library module in the SDK"
      "|loading from module interfaces is preferred"
      "|it's a compiler host module"
      "|the module name is blocklisted,"
@@ -589,7 +590,7 @@ ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",
       (StringRef))
 
-GROUPED_WARNING(command_line_conflicts_with_strict_safety,Unsafe,none,
+GROUPED_WARNING(command_line_conflicts_with_strict_safety,StrictMemorySafety,none,
       "'%0' is not memory-safe and should not be combined with "
       "strict memory safety checking", (StringRef))
 

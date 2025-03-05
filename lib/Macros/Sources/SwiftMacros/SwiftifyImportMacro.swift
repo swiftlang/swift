@@ -88,6 +88,9 @@ struct CxxSpan: ParamInfo {
       return CxxSpanThunkBuilder(base: base, index: i - 1, signature: funcDecl.signature,
         typeMappings: typeMappings, node: original, nonescaping: nonescaping)
     case .return:
+      if dependencies.isEmpty {
+        return base
+      }
       return CxxSpanReturnThunkBuilder(base: base, signature: funcDecl.signature,
         typeMappings: typeMappings, node: original)
     case .self:
@@ -125,7 +128,7 @@ struct CountedBy: ParamInfo {
       return CountedOrSizedReturnPointerThunkBuilder(
         base: base, countExpr: count,
         signature: funcDecl.signature,
-        nonescaping: nonescaping, isSizedBy: sizedBy)
+        nonescaping: nonescaping, isSizedBy: sizedBy, dependencies: dependencies)
     case .self:
       return base
     }
@@ -184,11 +187,13 @@ func getTypeName(_ type: TypeSyntax) throws -> TokenSyntax {
   }
 }
 
-func replaceTypeName(_ type: TypeSyntax, _ name: TokenSyntax) -> TypeSyntax {
+func replaceTypeName(_ type: TypeSyntax, _ name: TokenSyntax) throws -> TypeSyntax {
   if let memberType = type.as(MemberTypeSyntax.self) {
     return TypeSyntax(memberType.with(\.name, name))
   }
-  let idType = type.as(IdentifierTypeSyntax.self)!
+  guard let idType = type.as(IdentifierTypeSyntax.self) else {
+    throw DiagnosticError("unexpected type \(type) with kind \(type.kind)", node: type)
+  }
   return TypeSyntax(idType.with(\.name, name))
 }
 
@@ -199,13 +204,42 @@ func replaceBaseType(_ type: TypeSyntax, _ base: TypeSyntax) -> TypeSyntax {
   return base
 }
 
-// The generated type names for template instantiations sometimes contain
-// a `_const` suffix for diambiguation purposes. We need to remove that.
-func dropConstSuffix(_ typeName: String) -> String {
-  if typeName.hasSuffix("_const") {
-    return String(typeName.dropLast("_const".count))
+// C++ type qualifiers, `const T` and `volatile T`, are encoded as fake generic
+// types, `__cxxConst<T>` and `__cxxVolatile<T>` respectively. Remove those.
+func dropQualifierGenerics(_ type: TypeSyntax) -> TypeSyntax {
+  guard let identifier = type.as(IdentifierTypeSyntax.self) else { return type }
+  guard let generic = identifier.genericArgumentClause else { return type }
+  guard let genericArg = generic.arguments.first else { return type }
+  guard case .type(let argType) = genericArg.argument else { return type }
+  switch identifier.name.text {
+  case "__cxxConst", "__cxxVolatile":
+    return dropQualifierGenerics(argType)
+  default:
+    return type
   }
-  return typeName
+}
+
+// The `const` type qualifier used to be encoded as a `_const` suffix on type
+// names (though this causes issues for more complex types). We still drop the
+// suffix here for backwards compatibility with older textual interfaces.
+func dropQualifierSuffix(_ type: TypeSyntax) -> TypeSyntax {
+  guard let identifier = type.as(IdentifierTypeSyntax.self) else { return type }
+  let typename = identifier.name.text
+  if typename.hasSuffix("_const") {
+    return TypeSyntax(identifier.with(\.name, TokenSyntax.identifier(
+      String(typename.dropLast("_const".count))
+    )))
+  }
+  return type
+}
+
+// The generated type names for template instantiations sometimes contain
+// encoded qualifiers for disambiguation purposes. We need to remove those.
+func dropCxxQualifiers(_ type: TypeSyntax) -> TypeSyntax {
+  if let attributed = type.as(AttributedTypeSyntax.self) {
+    return dropCxxQualifiers(attributed.baseType)
+  }
+  return dropQualifierSuffix(dropQualifierGenerics(type))
 }
 
 func getPointerMutability(text: String) -> Mutability? {
@@ -264,6 +298,10 @@ func transformType(_ prev: TypeSyntax, _ generateSpan: Bool, _ isSizedBy: Bool) 
   if let impOptType = prev.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
     return try transformType(impOptType.wrappedType, generateSpan, isSizedBy)
   }
+  if let attrType = prev.as(AttributedTypeSyntax.self) {
+    return TypeSyntax(
+      attrType.with(\.baseType, try transformType(attrType.baseType, generateSpan, isSizedBy)))
+  }
   let name = try getTypeName(prev)
   let text = name.text
   let isRaw = isRawPointerType(text: text)
@@ -283,7 +321,7 @@ func transformType(_ prev: TypeSyntax, _ generateSpan: Bool, _ isSizedBy: Bool) 
   if isSizedBy {
     return TypeSyntax(IdentifierTypeSyntax(name: token))
   }
-  return replaceTypeName(prev, token)
+  return try replaceTypeName(prev, token)
 }
 
 protocol BoundsCheckedThunkBuilder {
@@ -396,7 +434,7 @@ struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
     let genericArg = TypeSyntax(parsedDesugaredType.as(IdentifierTypeSyntax.self)!
       .genericArgumentClause!.arguments.first!.argument)!
     types[index] = replaceBaseType(param.type,
-      TypeSyntax("Span<\(raw: dropConstSuffix(try getTypeName(genericArg).text))>"))
+      TypeSyntax("Span<\(raw: dropCxxQualifiers(genericArg))>"))
     return try base.buildFunctionSignature(types, returnType)
   }
 
@@ -431,13 +469,13 @@ struct CxxSpanReturnThunkBuilder: BoundsCheckedThunkBuilder {
     let genericArg = TypeSyntax(parsedDesugaredType.as(IdentifierTypeSyntax.self)!
       .genericArgumentClause!.arguments.first!.argument)!
     let newType = replaceBaseType(signature.returnClause!.type,
-      TypeSyntax("Span<\(raw: dropConstSuffix(try getTypeName(genericArg).text))>"))
+      TypeSyntax("Span<\(raw: dropCxxQualifiers(genericArg))>"))
     return try base.buildFunctionSignature(argTypes, newType)
   }
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
     let call = try base.buildFunctionCall(pointerArgs)
-    return "Span(_unsafeCxxSpan: \(call))"
+    return "_unsafeRemoveLifetime(Span(_unsafeCxxSpan: \(call)))"
   }
 }
 
@@ -485,8 +523,9 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   public let signature: FunctionSignatureSyntax
   public let nonescaping: Bool
   public let isSizedBy: Bool
+  public let dependencies: [LifetimeDependence]
 
-  var generateSpan: Bool = false // needs more lifetime information
+  var generateSpan: Bool { !dependencies.isEmpty }
 
   var oldType: TypeSyntax {
     return signature.returnClause!.type
@@ -504,9 +543,14 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
     let call = try base.buildFunctionCall(pointerArgs)
+    let startLabel = if generateSpan {
+      "_unsafeStart"
+    } else {
+      "start"
+    }
     return
       """
-      \(raw: try newType)(start: \(call), count: Int(\(countExpr)))
+      \(raw: try newType)(\(raw: startLabel): \(call), count: Int(\(countExpr)))
       """
   }
 }
@@ -584,7 +628,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamPointerBoundsThunkBuilder {
     let unwrappedCall = ExprSyntax(
       """
         \(ptrRef).\(raw: funcName) { \(unwrappedName) in
-          return \(call)
+          return unsafe \(call)
         }
       """)
     return unwrappedCall
@@ -645,7 +689,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamPointerBoundsThunkBuilder {
         return ExprSyntax(
           """
             if \(name) == nil {
-              \(try base.buildFunctionCall(nullArgs))
+              unsafe \(try base.buildFunctionCall(nullArgs))
             } else {
               \(unwrappedCall)
             }
@@ -894,14 +938,18 @@ public struct SwiftifyImportMacro: PeerMacro {
     }
     var result : [ParamInfo] = []
     let process = { type, expr, orig in
-      let typeName = try getTypeName(type).text;
-      if let desugaredType = typeMappings[typeName] {
-        if let unqualifiedDesugaredType = getUnqualifiedStdName(desugaredType) {
-          if unqualifiedDesugaredType.starts(with: "span<") {
-            result.append(CxxSpan(pointerIndex: expr, nonescaping: false,
-              dependencies: [], typeMappings: typeMappings, original: orig))
+      do {
+        let typeName = try getTypeName(type).text
+        if let desugaredType = typeMappings[typeName] {
+          if let unqualifiedDesugaredType = getUnqualifiedStdName(desugaredType) {
+            if unqualifiedDesugaredType.starts(with: "span<") {
+              result.append(CxxSpan(pointerIndex: expr, nonescaping: false,
+                dependencies: [], typeMappings: typeMappings, original: orig))
+            }
           }
         }
+      } catch is DiagnosticError {
+        // type doesn't match expected pattern
       }
     }
     for (idx, param) in signature.parameterClause.parameters.enumerated() {
@@ -1098,6 +1146,11 @@ public struct SwiftifyImportMacro: PeerMacro {
         }
       }
       try checkArgs(parsedArgs, funcDecl)
+      parsedArgs.sort { a, b in
+        // make sure return value cast to Span happens last so that withUnsafeBufferPointer
+        // doesn't return a ~Escapable type
+        (a.pointerIndex != .return && b.pointerIndex == .return) || paramOrReturnIndex(a.pointerIndex) < paramOrReturnIndex(b.pointerIndex)
+      }
       let baseBuilder = FunctionCallBuilder(funcDecl)
 
       let skipTrivialCount = hasTrivialCountVariants(parsedArgs)
@@ -1118,7 +1171,7 @@ public struct SwiftifyImportMacro: PeerMacro {
         item: CodeBlockItemSyntax.Item(
           ReturnStmtSyntax(
             returnKeyword: .keyword(.return, trailingTrivia: " "),
-            expression: try builder.buildFunctionCall([:]))))
+            expression: ExprSyntax("unsafe \(try builder.buildFunctionCall([:]))"))))
       let body = CodeBlockSyntax(statements: CodeBlockItemListSyntax(checks + [call]))
       let lifetimeAttrs = lifetimeAttributes(funcDecl, lifetimeDependencies)
       let disfavoredOverload : [AttributeListSyntax.Element] = (onlyReturnTypeChanged ? [

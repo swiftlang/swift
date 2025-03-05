@@ -452,12 +452,6 @@ public:
     return getASTType()->isClassExistentialType();
   }
 
-  /// Returns true if the referenced type is an opened existential type
-  /// (which is actually a kind of archetype).
-  bool isOpenedExistential() const {
-    return getASTType()->isOpenedExistential();
-  }
-
   /// Returns true if the referenced type is expressed in terms of one
   /// or more opened existential archetypes.
   bool hasOpenedExistential() const {

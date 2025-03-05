@@ -154,7 +154,7 @@ public:
 
   enum { numCustomBits = std::numeric_limits<CustomBitsType>::digits };
 
-  constexpr static const size_t maxBitfieldID =
+  constexpr static const uint64_t maxBitfieldID =
       std::numeric_limits<uint64_t>::max();
 
   /// Gets the ID (= index in the function's block list) of the block.

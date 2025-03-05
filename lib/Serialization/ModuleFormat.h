@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 920; // concurrent revert
+const uint16_t SWIFTMODULE_VERSION_MINOR = 924; // ExtensibleEnums feature
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -707,6 +707,7 @@ enum class FunctionTypeIsolation : uint8_t {
   Parameter,
   Erased,
   GlobalActorOffset, // Add this to the global actor type ID
+  NonIsolatedCaller,
 };
 using FunctionTypeIsolationField = TypeIDField;
 
@@ -973,6 +974,7 @@ namespace options_block {
     PUBLIC_MODULE_NAME,
     SWIFT_INTERFACE_COMPILER_VERSION,
     STRICT_MEMORY_SAFETY,
+    EXTENSIBLE_ENUMS,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1081,6 +1083,10 @@ namespace options_block {
   using SwiftInterfaceCompilerVersionLayout = BCRecordLayout<
     SWIFT_INTERFACE_COMPILER_VERSION,
     BCBlob // version tuple
+  >;
+
+  using ExtensibleEnumsLayout = BCRecordLayout<
+    EXTENSIBLE_ENUMS
   >;
 }
 
@@ -1328,7 +1334,7 @@ namespace decls_block {
                      ParamDeclSpecifierField, // inout, shared or owned?
                      BCFixed<1>,              // isolated
                      BCFixed<1>,              // noDerivative?
-                     BCFixed<1>,              // compileTimeConst
+                     BCFixed<1>,              // compileTimeLiteral
                      BCFixed<1>,              // sending
                      BCFixed<1>               // addressable
                      >;
@@ -1702,7 +1708,7 @@ namespace decls_block {
     BCFixed<1>,              // isVariadic?
     BCFixed<1>,              // isAutoClosure?
     BCFixed<1>,              // isIsolated?
-    BCFixed<1>,              // isCompileTimeConst?
+    BCFixed<1>,              // isCompileTimeLiteral?
     BCFixed<1>,              // isSending?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
@@ -2283,6 +2289,7 @@ namespace decls_block {
                      BCFixed<1>,         // isImmortal
                      BCFixed<1>,         // hasInheritLifetimeParamIndices
                      BCFixed<1>,         // hasScopeLifetimeParamIndices
+                     BCFixed<1>,         // hasAddressableParamIndices
                      BCArray<BCFixed<1>> // concatenated param indices
                      >;
 

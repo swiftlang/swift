@@ -767,3 +767,7 @@ void ConstantAggregateBuilderBase::addSignedPointer(llvm::Constant *pointer,
   addSignedPointer(pointer, schema.getKey(), schema.isAddressDiscriminated(),
                    llvm::ConstantInt::get(IGM().Int64Ty, otherDiscriminator));
 }
+
+llvm::ConstantInt* IRGenFunction::getMallocTypeId() {
+  return getDiscriminatorForString(IGM, CurFn->getName());
+}

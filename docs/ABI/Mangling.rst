@@ -235,6 +235,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TF'                 // distributed method accessor
   global ::= global 'TI'                 // implementation of a dynamic_replaceable function
   global ::= global 'Tu'                 // async function pointer of a function
+  global ::= global 'Tv'                 // coro function pointer of a function
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function
   global ::= global 'Twb'                // back deployment thunk
   global ::= global 'TwB'                // back deployment fallback function
@@ -755,6 +756,9 @@ Types
     throws ::= type 'YK'                     // 'throws(type)' annotation on function types
     function-isolation ::= type 'YA'         // @isolated(any) on function type
     sending-result ::= 'YT'                  // -> sending T
+  #endif
+  #if SWIFT_RUNTIME_VERSION >= 6.2
+    function-isolation :== 'YC'              // @execution(caller) on function type
   #endif
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type

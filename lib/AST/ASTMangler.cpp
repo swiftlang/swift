@@ -1379,8 +1379,12 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
     case TypeKind::BuiltinUnboundGeneric:
-    case TypeKind::Locatable:
-      llvm_unreachable("not a real type");
+      llvm::errs() << "Don't know how to mangle a BuiltinUnboundGenericType\n";
+      abort();
+    case TypeKind::Locatable: {
+      auto loc = cast<LocatableType>(tybase);
+      return appendType(loc->getSinglyDesugaredType(), sig, forDecl);
+    }
     case TypeKind::BuiltinFixedArray: {
       auto bfa = cast<BuiltinFixedArrayType>(tybase);
       appendType(bfa->getSize(), sig, forDecl);
@@ -3285,6 +3289,10 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     if (AllowIsolatedAny)
       appendOperator("YA");
     break;
+
+  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    appendOperator("YC");
+    break;
   }
 
   if (isRecursedInto && fn->hasSendingResult()) {
@@ -3478,7 +3486,7 @@ void ASTMangler::appendParameterTypeListElement(
     appendOperator("Yi");
   if (flags.isSending())
     appendOperator("Yu");
-  if (flags.isCompileTimeConst())
+  if (flags.isCompileTimeLiteral())
     appendOperator("Yt");
 
   if (!name.empty())
@@ -4012,6 +4020,43 @@ static bool isMethodDecl(const Decl *decl) {
     && decl->getDeclContext()->isTypeContext();
 }
 
+/// Map any local archetypes in a decl's interface type out of context, such
+/// that the resulting type is suitable for mangling.
+///
+/// Note this does not guarantee that different archetypes produce different
+/// interface types across decls, but it is guaranteed within a single decl
+/// type. This is okay though since local decls are assigned discriminators.
+static Type mapLocalArchetypesOutOfContextForDecl(const ValueDecl *decl,
+                                                  Type ty) {
+  if (!ty->hasLocalArchetype())
+    return ty;
+
+  ASSERT(decl->getDeclContext()->isLocalContext());
+
+  CaptureInfo captureInfo;
+  auto *innerDC = decl->getInnermostDeclContext();
+  auto genericSig = innerDC->getGenericSignatureOfContext();
+  if (auto fn = AnyFunctionRef::fromDeclContext(innerDC))
+    captureInfo = fn->getCaptureInfo();
+
+  // Record any captured generic environments we have.
+  llvm::SmallSetVector<GenericEnvironment *, 4> capturedEnvs;
+  for (auto *genericEnv : captureInfo.getGenericEnvironments())
+    capturedEnvs.insert(genericEnv);
+
+  // We may still have archetypes local to the current context, e.g for
+  // decls in local for loops over pack expansions. In this case, collect
+  // any remaining generic environments from the type.
+  ty.visit([&](Type t) {
+    if (auto *archetypeTy = t->getAs<LocalArchetypeType>()) {
+      capturedEnvs.insert(archetypeTy->getGenericEnvironment());
+    }
+  });
+
+  return swift::mapLocalArchetypesOutOfContext(ty, genericSig,
+                                               capturedEnvs.getArrayRef());
+}
+
 CanType ASTMangler::getDeclTypeForMangling(
                                        const ValueDecl *decl,
                                        GenericSignature &genericSig,
@@ -4043,6 +4088,9 @@ CanType ASTMangler::getDeclTypeForMangling(
   if (decl->preconcurrency()) {
     ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true);
   }
+
+  // Map any local archetypes out of context.
+  ty = mapLocalArchetypesOutOfContextForDecl(decl, ty);
 
   auto canTy = ty->getCanonicalType();
 

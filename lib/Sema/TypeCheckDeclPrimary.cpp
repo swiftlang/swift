@@ -1361,17 +1361,16 @@ Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
   return Type();
 }
 
-Initializer *
+DefaultArgumentInitializer *
 DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
                                             ParamDecl *param) const {
-  auto &ctx = param->getASTContext();
   auto *parentDC = param->getDeclContext();
   auto *paramList = getParameterList(cast<ValueDecl>(parentDC->getAsDecl()));
 
   // In order to compute the initializer context for this parameter, we need to
   // know its index in the parameter list. Therefore iterate over the parameters
   // looking for it and fill in the other parameter's contexts while we're here.
-  Initializer *result = nullptr;
+  DefaultArgumentInitializer *result = nullptr;
   for (auto idx : indices(*paramList)) {
     auto *otherParam = paramList->get(idx);
 
@@ -1386,7 +1385,7 @@ DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
     // Create a new initializer context. If this is for the parameter that
     // kicked off the request, make a note of it for when we return. Otherwise
     // cache the result ourselves.
-    auto *initDC = new (ctx) DefaultArgumentInitializer(parentDC, idx);
+    auto *initDC = DefaultArgumentInitializer::create(parentDC, idx);
     if (param == otherParam) {
       result = initDC;
     } else {
@@ -2387,12 +2386,19 @@ public:
                           "`" + VD->getBaseName().userFacingName().str() + "`");
       }
 
-      // Expand extension macros.
       if (auto *nominal = dyn_cast<NominalTypeDecl>(VD)) {
+        // Expand extension macros.
         (void)evaluateOrDefault(
             Ctx.evaluator,
             ExpandExtensionMacros{nominal},
             { });
+
+        // If strict memory safety checking is enabled, check the storage
+        // of the nominal type.
+        if (Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety) &&
+            !isa<ProtocolDecl>(nominal)) {
+          checkUnsafeStorage(nominal);
+        }
       }
     }
   }
@@ -2462,7 +2468,7 @@ public:
     // concurrency checking enabled.
     if (ID->preconcurrency() &&
         Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        Ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+        Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
       diagnoseUnsafeUse(UnsafeUse::forPreconcurrencyImport(ID));
     }
   }
@@ -3985,7 +3991,7 @@ public:
       return;
     }
 
-    // Record a dependency from TypeCheckSourceFileRequest to
+    // Record a dependency from TypeCheckPrimaryFileRequest to
     // ExtendedNominalRequest, since the call to getExtendedNominal()
     // above doesn't record a dependency when reading a cached value.
     ED->computeExtendedNominal();

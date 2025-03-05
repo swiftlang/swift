@@ -18,6 +18,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "clang/AST/DeclObjC.h"
 #include "swift/Basic/Assertions.h"
 
@@ -121,7 +122,8 @@ UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
-UNINTERESTING_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext)
+UNINTERESTING_FEATURE(AsyncCallerExecution)
+UNINTERESTING_FEATURE(ExtensibleEnums)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
@@ -193,12 +195,10 @@ static bool usesFeatureNonescapableTypes(Decl *decl) {
 
 UNINTERESTING_FEATURE(StaticExclusiveOnly)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
-UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
 UNINTERESTING_FEATURE(GenerateForceToMainActorThunks)
-UNINTERESTING_FEATURE(Span)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
@@ -270,6 +270,7 @@ UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)
 UNINTERESTING_FEATURE(Extern)
 UNINTERESTING_FEATURE(ConsumeSelfInDeinit)
+UNINTERESTING_FEATURE(StrictSendableMetatypes)
 
 static bool usesFeatureBitwiseCopyable2(Decl *decl) {
   if (!decl->getModuleContext()->isStdlibModule()) {
@@ -330,10 +331,6 @@ UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
 UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
 UNINTERESTING_FEATURE(TrailingComma)
 
-static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
-  return decl->getAttrs().hasAttribute<UnsafeAttr>();
-}
-
 static ABIAttr *getABIAttr(Decl *decl) {
   if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
     for (auto i : range(pbd->getNumPatternEntries()))
@@ -348,10 +345,52 @@ static bool usesFeatureABIAttribute(Decl *decl) {
   return getABIAttr(decl) != nullptr;
 }
 
-UNINTERESTING_FEATURE(WarnUnsafe)
-UNINTERESTING_FEATURE(SafeInterop)
+static bool usesFeatureIsolatedConformances(Decl *decl) { 
+  // FIXME: Check conformances associated with this decl?
+  return false;
+}
+
+static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureCompileTimeValues(Decl *decl) {
+  return decl->getAttrs().hasAttribute<ConstValAttr>();
+}
+
+static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<SafeAttr>() ||
+      decl->getAttrs().hasAttribute<UnsafeAttr>())
+    return true;
+
+  IterableDeclContext *idc;
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
+    idc = nominal;
+  else if (auto ext = dyn_cast<ExtensionDecl>(decl))
+    idc = ext;
+  else
+    idc = nullptr;
+
+  // Look for an @unsafe conformance ascribed to this declaration.
+  if (idc) {
+    auto conformances = idc->getLocalConformances();
+    for (auto conformance : conformances) {
+      auto rootConformance = conformance->getRootConformance();
+      if (auto rootNormalConformance =
+              dyn_cast<NormalProtocolConformance>(rootConformance)) {
+        if (rootNormalConformance->getExplicitSafety() == ExplicitSafety::Unsafe)
+          return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
+UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(CoroutineAccessorsAllocateInCallee)
 
@@ -410,6 +449,50 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 static bool usesFeatureCustomAvailability(Decl *decl) {
   // FIXME: [availability] Check whether @available attributes for custom
   // domains are attached to the decl.
+  return false;
+}
+
+static bool usesFeatureBuiltinEmplaceTypedThrows(Decl *decl) {
+  // Callers of 'Builtin.emplace' should explicitly guard the usage with #if.
+  return false;
+}
+
+static bool usesFeatureExecutionAttribute(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<ExecutionAttr>())
+    return true;
+
+  auto VD = dyn_cast<ValueDecl>(decl);
+  if (!VD)
+    return false;
+
+  auto hasExecutionAttr = [](TypeRepr *R) {
+    if (!R)
+      return false;
+
+    return R->findIf([](TypeRepr *repr) {
+      if (auto *AT = dyn_cast<AttributedTypeRepr>(repr)) {
+        return llvm::any_of(AT->getAttrs(), [](TypeOrCustomAttr attr) {
+          if (auto *TA = attr.dyn_cast<TypeAttribute *>()) {
+            return isa<ExecutionTypeAttr>(TA);
+          }
+          return false;
+        });
+      }
+      return false;
+    });
+  };
+
+  // Check if any parameters that have `@execution` attribute.
+  if (auto *PL = getParameterList(VD)) {
+    for (auto *P : *PL) {
+      if (hasExecutionAttr(P->getTypeRepr()))
+        return true;
+    }
+  }
+
+  if (hasExecutionAttr(VD->getResultTypeRepr()))
+    return true;
+
   return false;
 }
 

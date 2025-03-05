@@ -2251,7 +2251,7 @@ ManglingError Remangler::mangleSending(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleCompileTimeConst(Node *node, unsigned depth) {
+ManglingError Remangler::mangleCompileTimeLiteral(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
   Buffer << "Yt";
   return ManglingError::Success;
@@ -3472,6 +3472,12 @@ ManglingError Remangler::mangleGlobalActorFunctionType(Node *node,
 ManglingError Remangler::mangleIsolatedAnyFunctionType(Node *node,
                                                        unsigned depth) {
   Buffer << "YA";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleNonIsolatedCallerFunctionType(Node *node,
+                                                             unsigned depth) {
+  Buffer << "YC";
   return ManglingError::Success;
 }
 

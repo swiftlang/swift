@@ -1159,7 +1159,6 @@ public:
     Type OldType = CurrentType;
     if (CurrentType && (Old != nullptr || Options.PrintAsMember)) {
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        assert(Options.CurrentModule);
         auto Subs = CurrentType->getContextSubstitutionMap(
           NTD->getDeclContext());
         setCurrentType(NTD->getDeclaredInterfaceType().subst(Subs));
@@ -2901,14 +2900,12 @@ void PrintAST::printInherited(const Decl *decl) {
         Printer << "@preconcurrency ";
       switch (inherited.getExplicitSafety()) {
       case ExplicitSafety::Unspecified:
-        break;
-
       case ExplicitSafety::Safe:
-        Printer << "@safe ";
         break;
 
       case ExplicitSafety::Unsafe:
-        Printer << "@unsafe ";
+        if (!llvm::is_contained(Options.ExcludeAttrList, TypeAttrKind::Unsafe))
+          Printer << "@unsafe ";
         break;
       }
       if (inherited.isSuppressed())
@@ -3214,9 +3211,16 @@ struct ExcludeAttrRAII {
 }
 
 static void
-suppressingFeatureAllowUnsafeAttribute(PrintOptions &options,
+suppressingFeatureMemorySafetyAttributes(PrintOptions &options,
                                        llvm::function_ref<void()> action) {
   ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::Unsafe);
+  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::Safe);
+  options.ExcludeAttrList.push_back(TypeAttrKind::Unsafe);
+  SWIFT_DEFER {
+    assert(options.ExcludeAttrList.back() == TypeAttrKind::Unsafe);
+    options.ExcludeAttrList.pop_back();
+  };
+
   action();
 }
 
@@ -3248,6 +3252,14 @@ suppressingFeatureCustomAvailability(PrintOptions &options,
                                      llvm::function_ref<void()> action) {
   // FIXME: [availability] Save and restore a bit controlling whether
   // @available attributes for custom domains are printed.
+  action();
+}
+
+static void
+suppressingFeatureExecutionAttribute(PrintOptions &options,
+                                    llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope1(options.SuppressExecutionAttribute, true);
+  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::Execution);
   action();
 }
 
@@ -3852,7 +3864,7 @@ static void printParameterFlags(ASTPrinter &printer,
   if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
 
-  if (flags.isCompileTimeConst())
+  if (flags.isCompileTimeLiteral())
     printer.printKeyword("_const", options, " ");
 }
 
@@ -4008,8 +4020,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << " = ";
 
     switch (param->getDefaultArgumentKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case DefaultArgumentKind::NAME:
+#define MAGIC_IDENTIFIER(NAME, STRING) case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
       Printer.printKeyword(defaultArgStr, Options);
       break;
@@ -6421,6 +6432,11 @@ public:
     case FunctionTypeIsolation::Kind::Erased:
       if (!Options.SuppressIsolatedAny)
         Printer << "@isolated(any) ";
+      break;
+
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      if (!Options.SuppressExecutionAttribute)
+        Printer << "@execution(caller) ";
       break;
     }
 

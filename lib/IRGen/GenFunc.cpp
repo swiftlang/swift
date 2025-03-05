@@ -1300,9 +1300,8 @@ public:
   }
   void mapAsyncParameters(FunctionPointer fnPtr) override {
     llvm::Value *dynamicContextSize32;
-    std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
-        subIGF, origType->getRepresentation(), fnPtr, nullptr,
-        std::make_pair(true, true));
+    std::tie(calleeFunction, dynamicContextSize32) =
+        getAsyncFunctionAndSize(subIGF, fnPtr, std::make_pair(true, true));
     auto *dynamicContextSize =
         subIGF.Builder.CreateZExt(dynamicContextSize32, subIGF.IGM.SizeTy);
     calleeContextBuffer =
@@ -1459,13 +1458,30 @@ public:
         cast<SILFunctionType>(
           unsubstType->mapTypeOutOfContext()->getCanonicalType())));
 
-    // Use malloc and free as our allocator.
-    auto allocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getMallocFn());
+    
+    // Use free as our allocator.
     auto deallocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getFreeFn());
 
     // Call the right 'llvm.coro.id.retcon' variant.
     llvm::Value *buffer = origParams.claimNext();
-    llvm::Value *id = subIGF.Builder.CreateIntrinsicCall(
+    llvm::Value *id;
+    if (subIGF.IGM.getOptions().EmitTypeMallocForCoroFrame) {
+      // Use swift_coroFrameAlloc as our allocator.
+    auto coroAllocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getCoroFrameAllocFn());
+    auto mallocTypeId = subIGF.getMallocTypeId();
+      id = subIGF.Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::coro_id_retcon_once,
+        {llvm::ConstantInt::get(
+             subIGF.IGM.Int32Ty,
+             getYieldOnceCoroutineBufferSize(subIGF.IGM).getValue()),
+         llvm::ConstantInt::get(
+             subIGF.IGM.Int32Ty,
+             getYieldOnceCoroutineBufferAlignment(subIGF.IGM).getValue()),
+         buffer, prototype, coroAllocFn, deallocFn, mallocTypeId});
+    } else {
+      // Use malloc as our allocator.
+      auto allocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getMallocFn());
+      id = subIGF.Builder.CreateIntrinsicCall(
         llvm::Intrinsic::coro_id_retcon_once,
         {llvm::ConstantInt::get(
              subIGF.IGM.Int32Ty,
@@ -1474,6 +1490,7 @@ public:
              subIGF.IGM.Int32Ty,
              getYieldOnceCoroutineBufferAlignment(subIGF.IGM).getValue()),
          buffer, prototype, allocFn, deallocFn});
+    }
 
     // Call 'llvm.coro.begin', just for consistency with the normal pattern.
     // This serves as a handle that we can pass around to other intrinsics.

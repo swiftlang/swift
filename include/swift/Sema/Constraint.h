@@ -85,6 +85,9 @@ enum class ConstraintKind : char {
   /// class type).
   SubclassOf,
   /// The first type must conform to the second type (which is a
+  /// protocol type) and the conformance must not be an isolated conformance.
+  NonisolatedConformsTo,
+  /// The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
   /// The first type describes a literal that conforms to the second
@@ -689,6 +692,7 @@ public:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::SubclassOf:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::NonisolatedConformsTo:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::TransitivelyConformsTo:
     case ConstraintKind::CheckedCast:
@@ -839,6 +843,11 @@ public:
       return !constraint->isDisabled();
     });
   }
+
+  /// Returns the number of resolved argument types for an applied disjunction
+  /// constraint. This is always zero for disjunctions that do not represent
+  /// an applied overload.
+  unsigned countResolvedArgumentTypes(ConstraintSystem &cs) const;
 
   /// Determine if this constraint represents explicit conversion,
   /// e.g. coercion constraint "as X" which forms a disjunction.

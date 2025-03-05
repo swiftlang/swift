@@ -205,19 +205,21 @@ public struct DiscardingTaskGroup {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 #else
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 #endif
 
     // Create the task in this group.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createDiscardingTask(flags: flags,
                                      initialSerialExecutor: builtinSerialExecutor,
@@ -252,19 +254,21 @@ public struct DiscardingTaskGroup {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 #else
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 #endif
 
     // Create the task in this group.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createDiscardingTask(flags: flags,
                                      initialSerialExecutor: builtinSerialExecutor,
@@ -281,12 +285,13 @@ public struct DiscardingTaskGroup {
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     // Create the task in this group.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createDiscardingTask(flags: flags,
                                      initialSerialExecutor: builtinSerialExecutor,
@@ -317,12 +322,13 @@ public struct DiscardingTaskGroup {
     let flags = taskCreateFlags(
       priority: nil, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     // Create the task in this group.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createDiscardingTask(flags: flags,
                                      initialSerialExecutor: builtinSerialExecutor,
@@ -635,12 +641,13 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     // Create the task in this group.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createDiscardingTask(flags: flags,
                                      initialSerialExecutor: builtinSerialExecutor,
@@ -666,12 +673,13 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     // Create the task in this group.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createDiscardingTask(flags: flags,
                                      initialSerialExecutor: builtinSerialExecutor,

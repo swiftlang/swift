@@ -1,7 +1,10 @@
 include(CheckSourceCompiles)
 include(CheckCompilerFlag)
 
-# Use C+17
+# Use Swift 5 mode
+set(CMAKE_Swift_LANGUAGE_VERSION 5)
+
+# Use C++17
 set(SwiftCore_MIN_CXX_STANDARD 17)
 # Unset CMAKE_CXX_STANDARD if it's too low and in the CMakeCache.txt
 if($CACHE{CMAKE_CXX_STANDARD} AND $CACHE{CMAKE_CXX_STANDARD} LESS ${SwiftCore_MIN_CXX_STANDARD})
@@ -46,6 +49,8 @@ if(NOT HAVE_SWIFT_ASYNC_CALL)
 endif()
 
 check_compiler_flag(CXX "-mcx16" HAVE_CXX_MCX16)
-if(HAVE_CXX_MCX16)
+if(HAVE_CXX_MCX16 AND
+    (CMAKE_CXX_COMPILER_ARCHITECTURE_ID MATCHES "(X86)|(X64)" OR
+     CMAKE_SYSTEM_PROCESSOR MATCHES "(i[3-6]86)|(x86_64)|(amd64)|(AMD64)"))
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-mcx16>)
 endif()

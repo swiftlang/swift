@@ -1,7 +1,8 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature ExecutionAttribute -enable-experimental-feature AsyncCallerExecution %s | %FileCheck %s
 
 // REQUIRES: asserts
-// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+// REQUIRES: swift_feature_ExecutionAttribute
+// REQUIRES: swift_feature_AsyncCallerExecution
 
 
 // CHECK-LABEL: // concurrentTest()

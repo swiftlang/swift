@@ -196,7 +196,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.DocOutputPath = outs.ModuleDocOutputPath;
   serializationOpts.SourceInfoOutputPath = outs.ModuleSourceInfoOutputPath;
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-  if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
+  if (opts.ModuleHasBridgingHeader && !outs.ModuleOutputPath.empty())
     serializationOpts.SerializeBridgingHeader = true;
   // For batch mode, emit empty header path as placeholder.
   if (serializationOpts.SerializeBridgingHeader &&
@@ -408,22 +408,10 @@ bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
 
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
     DiagVerifier = std::make_unique<DiagnosticVerifier>(
-        SourceMgr, InputSourceCodeBufferIDs,
+        SourceMgr, InputSourceCodeBufferIDs, diagOpts.AdditionalVerifierFiles,
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
         diagOpts.VerifyIgnoreUnknown, diagOpts.UseColor,
         diagOpts.AdditionalDiagnosticVerifierPrefixes);
-    for (const auto &filename : diagOpts.AdditionalVerifierFiles) {
-      auto result = getFileSystem().getBufferForFile(filename);
-      if (!result) {
-        Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
-                             filename, result.getError().message());
-        hadError |= true;
-        continue;
-      }
-
-      auto bufferID = SourceMgr.addNewSourceBuffer(std::move(result.get()));
-      DiagVerifier->appendAdditionalBufferID(bufferID);
-    }
 
     addDiagnosticConsumer(DiagVerifier.get());
   }
@@ -1302,10 +1290,12 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
-  if (frontendOpts.ImplicitObjCPCHPath.empty())
-    imports.BridgingHeaderPath = frontendOpts.ImplicitObjCHeaderPath;
-  else
-    imports.BridgingHeaderPath = frontendOpts.ImplicitObjCPCHPath;
+  if (frontendOpts.ModuleHasBridgingHeader) {
+    if (frontendOpts.ImplicitObjCPCHPath.empty())
+      imports.BridgingHeaderPath = frontendOpts.ImplicitObjCHeaderPath;
+    else
+      imports.BridgingHeaderPath = frontendOpts.ImplicitObjCPCHPath;
+  }
   return imports;
 }
 
@@ -1465,8 +1455,10 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setAllowNonResilientAccess();
     if (Invocation.getSILOptions().EnableSerializePackage)
       MainModule->setSerializePackageEnabled();
-    if (Invocation.getLangOptions().hasFeature(Feature::WarnUnsafe))
+    if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
+    if (Invocation.getLangOptions().hasFeature(Feature::ExtensibleEnums))
+      MainModule->setSupportsExtensibleEnums(true);
 
     configureAvailabilityDomains(getASTContext(),
                                  Invocation.getFrontendOptions(), MainModule);

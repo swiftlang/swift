@@ -594,6 +594,11 @@ SemanticFunctionLevel swift::getSemanticFunctionLevel(SILFunction *function) {
   //
   // Compiler "hints" and informational annotations (like remarks) should
   // ideally use a separate annotation rather than @_semantics.
+
+  if (isFixedStorageSemanticsCallKind(function)) {
+    return SemanticFunctionLevel::Fundamental;
+  }
+
   switch (getArraySemanticsKind(function)) {
   case ArrayCallKind::kNone:
     return SemanticFunctionLevel::Transient;
@@ -632,7 +637,6 @@ SemanticFunctionLevel swift::getSemanticFunctionLevel(SILFunction *function) {
   // transient and should be inlined away immediately.
   case ArrayCallKind::kArrayUninitializedIntrinsic:
   case ArrayCallKind::kArrayFinalizeIntrinsic:
-  case ArrayCallKind::kCopyIntoVector:
     return SemanticFunctionLevel::Transient;
 
   } // end switch

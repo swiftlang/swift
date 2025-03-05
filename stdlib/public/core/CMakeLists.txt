@@ -92,6 +92,7 @@ split_embedded_sources(
   EMBEDDED HashTable.swift
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
+  EMBEDDED InlineArray.swift
   EMBEDDED InputStream.swift
   EMBEDDED IntegerParsing.swift
   EMBEDDED Integers.swift
@@ -151,7 +152,6 @@ split_embedded_sources(
   EMBEDDED SetVariant.swift
   EMBEDDED ShadowProtocols.swift
     NORMAL Shims.swift
-  EMBEDDED Slab.swift
   EMBEDDED Slice.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift
@@ -322,6 +322,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCo
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "ValueGenerics")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableParameters")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableTypes")
+list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
   set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")

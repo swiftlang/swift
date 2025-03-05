@@ -452,7 +452,7 @@ private:
     case Node::Kind::Initializer:
     case Node::Kind::Isolated:
     case Node::Kind::Sending:
-    case Node::Kind::CompileTimeConst:
+    case Node::Kind::CompileTimeLiteral:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::KeyPathGetterThunkHelper:
@@ -572,6 +572,7 @@ private:
     case Node::Kind::DifferentiableFunctionType:
     case Node::Kind::GlobalActorFunctionType:
     case Node::Kind::IsolatedAnyFunctionType:
+    case Node::Kind::NonIsolatedCallerFunctionType:
     case Node::Kind::SendingResultFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
@@ -915,6 +916,14 @@ private:
       print(node->getChild(startIndex), depth + 1);
       ++startIndex;
     }
+
+    Node *nonIsolatedCallerNode = nullptr;
+    if (node->getChild(startIndex)->getKind() ==
+          Node::Kind::NonIsolatedCallerFunctionType) {
+      nonIsolatedCallerNode = node->getChild(startIndex);
+      ++startIndex;
+    }
+
     if (node->getChild(startIndex)->getKind() ==
           Node::Kind::GlobalActorFunctionType) {
       print(node->getChild(startIndex), depth + 1);
@@ -962,6 +971,9 @@ private:
     case MangledDifferentiabilityKind::NonDifferentiable:
       break;
     }
+
+    if (nonIsolatedCallerNode)
+      print(nonIsolatedCallerNode, depth + 1);
 
     if (isSendable)
       Printer << "@Sendable ";
@@ -1820,7 +1832,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "sending ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
-  case Node::Kind::CompileTimeConst:
+  case Node::Kind::CompileTimeLiteral:
     Printer << "_const ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
@@ -3107,6 +3119,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::IsolatedAnyFunctionType:
     Printer << "@isolated(any) ";
+    return nullptr;
+  case Node::Kind::NonIsolatedCallerFunctionType:
+    Printer << "@execution(caller) ";
     return nullptr;
   case Node::Kind::SendingResultFunctionType:
     Printer << "sending ";

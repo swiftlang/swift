@@ -236,6 +236,7 @@ public struct LocalTestingDistributedActorSystemError: DistributedActorSystemErr
 // === lock ----------------------------------------------------------------
 
 @available(SwiftStdlib 5.7, *)
+@safe
 fileprivate class _Lock {
   #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
   private let underlying: UnsafeMutablePointer<os_unfair_lock>
@@ -252,7 +253,7 @@ fileprivate class _Lock {
   init() {
     #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
     self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    self.underlying.initialize(to: os_unfair_lock())
+    unsafe self.underlying.initialize(to: os_unfair_lock())
     #elseif os(Windows)
     self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
     InitializeSRWLock(self.underlying)
@@ -280,8 +281,8 @@ fileprivate class _Lock {
     #endif
 
     #if !os(WASI)
-    self.underlying.deinitialize(count: 1)
-    self.underlying.deallocate()
+    unsafe self.underlying.deinitialize(count: 1)
+    unsafe self.underlying.deallocate()
     #endif
   }
 
@@ -289,7 +290,7 @@ fileprivate class _Lock {
   @discardableResult
   func withLock<T>(_ body: () -> T) -> T {
     #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-    os_unfair_lock_lock(self.underlying)
+    unsafe os_unfair_lock_lock(self.underlying)
     #elseif os(Windows)
     AcquireSRWLockExclusive(self.underlying)
     #elseif os(WASI)
@@ -302,7 +303,7 @@ fileprivate class _Lock {
 
     defer {
       #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-      os_unfair_lock_unlock(self.underlying)    
+      unsafe os_unfair_lock_unlock(self.underlying)    
       #elseif os(Windows)
       ReleaseSRWLockExclusive(self.underlying)
       #elseif os(WASI)

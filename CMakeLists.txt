@@ -157,6 +157,8 @@ else()
     set(SWIFT_HOST_VARIANT_SDK_default "OSX")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "WASI")
     set(SWIFT_HOST_VARIANT_SDK_default "WASI")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Emscripten")
+    set(SWIFT_HOST_VARIANT_SDK_default "EMSCRIPTEN")
   else()
     message(FATAL_ERROR "Unable to detect SDK for host system: ${CMAKE_SYSTEM_NAME}")
   endif()
@@ -1023,11 +1025,6 @@ set(SWIFT_GYB_FLAGS
 set(SWIFT_MODULE_CACHE_PATH
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/module-cache")
 
-# Xcode: use libc++ and c++11 using proper build settings.
-if(XCODE)
-  swift_common_xcode_cxx_config()
-endif()
-
 # Check what linux distribution is being used.
 # This can be used to determine the default linker to use.
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.22")
@@ -1243,6 +1240,15 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASI")
       "Deployment OS for Swift host tools (the compiler) [wasi]")
 
   configure_sdk_unix("WASI" "wasm32")
+  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
+
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "EMSCRIPTEN")
+
+  set(SWIFT_HOST_VARIANT "emscripten" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [emscripten]")
+
+  configure_sdk_unix("Emscripten" "wasm32")
   set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 
@@ -1626,7 +1632,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DSwiftCore_PLATFORM_SUBDIR=${SWIFT_SDK_${sdk}_LIB_SUBDIR}
-          -DSwiftCore_ARCH_SUBDIR=${arch})
+          -DSwiftCore_ARCH_SUBDIR=${arch}
+          -DSwiftCore_ENABLE_CONCURRENCY=YES)
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}" swift-frontend)
       endif()

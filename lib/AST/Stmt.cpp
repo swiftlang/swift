@@ -17,6 +17,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
@@ -618,6 +619,11 @@ PoundAvailableInfo::create(ASTContext &ctx, SourceLoc PoundLoc,
                                            RParenLoc, isUnavailability);
 }
 
+SemanticAvailabilitySpecs PoundAvailableInfo::getSemanticAvailabilitySpecs(
+    const DeclContext *declContext) const {
+  return SemanticAvailabilitySpecs(getQueries(), declContext);
+}
+
 SourceLoc PoundAvailableInfo::getEndLoc() const {
   if (RParenLoc.isInvalid()) {
     if (NumQueries == 0) {
@@ -770,7 +776,7 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
   }
 
   MutableArrayRef<CaseLabelItem> items{getTrailingObjects<CaseLabelItem>(),
-                                       Bits.CaseStmt.NumPatterns};
+                                       static_cast<size_t>(Bits.CaseStmt.NumPatterns)};
 
   // At the beginning mark all of our var decls as being owned by this
   // statement. In the typechecker we wireup the case stmt var decl list since

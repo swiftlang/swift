@@ -424,7 +424,7 @@ SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeCheckSourceFileRequest,
+SWIFT_REQUEST(TypeChecker, TypeCheckPrimaryFileRequest,
               bool(SouceFile *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ConformanceAccessScopeRequest,
               ConformanceAccessScope(DeclContext *, ProtocolDecl *),
@@ -615,4 +615,8 @@ SWIFT_REQUEST(TypeChecker, GenericTypeParamDeclGetValueTypeRequest,
 SWIFT_REQUEST(TypeChecker, SemanticAvailableAttrRequest,
               std::optional<SemanticAvailableAttr>
               (const AvailableAttr *, const Decl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SemanticAvailabilitySpecRequest,
+              std::optional<SemanticAvailabilitySpec>
+              (const AvailabilitySpec *, const DeclContext *),
               SeparatelyCached, NoLocationInfo)

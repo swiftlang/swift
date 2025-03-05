@@ -2832,33 +2832,6 @@ llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
     return initVal;
   }
   if (SILInstruction *initInst = var->getStaticInitializerValue()) {
-
-    if (auto *vector = dyn_cast<AllocVectorInst>(initInst)) {
-      auto *capacityConst = emitConstantValue(*this, vector->getCapacity()).claimNextConstant();
-      uint64_t capacity = cast<llvm::ConstantInt>(capacityConst)->getZExtValue();
-      auto &ti = cast<FixedTypeInfo>(getTypeInfo(vector->getType()));
-      auto *elementTy = cast<llvm::StructType>(ti.getStorageType());
-      Size::int_type paddingBytes = (ti.getFixedStride() - ti.getFixedSize()).getValue();
-      if (paddingBytes != 0) {
-        llvm::ArrayType *padding = llvm::ArrayType::get(Int8Ty, paddingBytes);
-        elementTy = llvm::StructType::get(getLLVMContext(), {elementTy, padding});
-      }
-      auto *arrayTy = llvm::ArrayType::get(elementTy, capacity);
-      return llvm::ConstantAggregateZero::get(arrayTy);
-    }
-
-    if (auto *vector = dyn_cast<VectorInst>(initInst)) {
-      llvm::SmallVector<llvm::Constant *, 8> elementValues;
-      for (SILValue element : vector->getElements()) {
-        auto &ti = cast<FixedTypeInfo>(getTypeInfo(element->getType()));
-        Size paddingBytes = ti.getFixedStride() - ti.getFixedSize();
-        Explosion e = emitConstantValue(*this, element);
-        elementValues.push_back(getConstantValue(std::move(e), paddingBytes.getValue()));
-      }
-      auto *arrTy = llvm::ArrayType::get(elementValues[0]->getType(), elementValues.size());
-      return llvm::ConstantArray::get(arrTy, elementValues);
-    }
-
     Explosion initExp = emitConstantValue(*this,
                                   cast<SingleValueInstruction>(initInst));
     return getConstantValue(std::move(initExp), /*paddingBytes=*/ 0);
@@ -3073,9 +3046,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
         f->getForwardingSubstitutionMap());
     llvm::Value *dynamicContextSize32;
     llvm::Value *calleeFunction;
-    std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
-        IGF, silFunctionType->getRepresentation(), asyncFnPtr, nullptr,
-        std::make_pair(false, true));
+    std::tie(calleeFunction, dynamicContextSize32) =
+        getAsyncFunctionAndSize(IGF, asyncFnPtr, std::make_pair(false, true));
     auto *dynamicContextSize =
         Builder.CreateZExt(dynamicContextSize32, IGM.SizeTy);
     auto calleeContextBuffer = emitAllocAsyncContext(IGF, dynamicContextSize);
@@ -6244,10 +6216,10 @@ IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType) {
 }
 
 /// Should we be defining the given helper function?
-static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
-                                          llvm::Constant *fn,
-                                          bool setIsNoInline,
-                                          IRLinkage *linkage) {
+static llvm::Function *
+shouldDefineHelper(IRGenModule &IGM, llvm::Constant *fn, bool setIsNoInline,
+                   IRLinkage *linkage,
+                   std::optional<llvm::CallingConv::ID> specialCallingConv) {
   auto *def = dyn_cast<llvm::Function>(fn);
   if (!def) return nullptr;
   if (!def->empty()) return nullptr;
@@ -6259,7 +6231,7 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
     ApplyIRLinkage(*linkage).to(def);
 
   def->setDoesNotThrow();
-  def->setCallingConv(IGM.DefaultCC);
+  def->setCallingConv(specialCallingConv.value_or(IGM.DefaultCC));
   if (setIsNoInline)
     def->addFnAttr(llvm::Attribute::NoInline);
   return def;
@@ -6273,14 +6245,12 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
 /// does not collide with any other helper function.  In general, it should
 /// be a Swift-specific C reserved name; that is, it should start with
 //  "__swift".
-llvm::Constant *
-IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
-                                       ArrayRef<llvm::Type*> paramTys,
-                        llvm::function_ref<void(IRGenFunction &IGF)> generate,
-                        bool setIsNoInline,
-                        bool forPrologue,
-                        bool isPerformanceConstraint,
-                        IRLinkage *optionalLinkageOverride) {
+llvm::Constant *IRGenModule::getOrCreateHelperFunction(
+    StringRef fnName, llvm::Type *resultTy, ArrayRef<llvm::Type *> paramTys,
+    llvm::function_ref<void(IRGenFunction &IGF)> generate, bool setIsNoInline,
+    bool forPrologue, bool isPerformanceConstraint,
+    IRLinkage *optionalLinkageOverride,
+    std::optional<llvm::CallingConv::ID> specialCallingConv) {
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(resultTy, paramTys, false);
 
@@ -6288,8 +6258,9 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
       cast<llvm::Constant>(
           Module.getOrInsertFunction(fnName, fnTy).getCallee());
 
-  if (llvm::Function *def = shouldDefineHelper(*this, fn, setIsNoInline,
-                                               optionalLinkageOverride)) {
+  if (llvm::Function *def =
+          shouldDefineHelper(*this, fn, setIsNoInline, optionalLinkageOverride,
+                             specialCallingConv)) {
     IRGenFunction IGF(*this, def, isPerformanceConstraint);
     if (DebugInfo && !forPrologue)
       DebugInfo->emitArtificialFunction(IGF, def);

@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
 #include "swift/AST/ActorIsolation.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
@@ -38,6 +39,7 @@
 
 namespace clang {
 class NamedDecl;
+class Type;
 }
 
 namespace swift {
@@ -143,12 +145,15 @@ namespace swift {
     DescriptiveDeclKind,
     DescriptiveStmtKind,
     DeclAttribute,
+    AvailabilityDomain,
+    AvailabilityRange,
     VersionTuple,
     LayoutConstraint,
     ActorIsolation,
     IsolationSource,
     Diagnostic,
-    ClangDecl
+    ClangDecl,
+    ClangType,
   };
 
   namespace diag {
@@ -179,12 +184,15 @@ namespace swift {
       DescriptiveDeclKind DescriptiveDeclKindVal;
       StmtKind DescriptiveStmtKindVal;
       const DeclAttribute *DeclAttributeVal;
+      AvailabilityDomain AvailabilityDomainVal;
+      AvailabilityRange AvailabilityRangeVal;
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
       ActorIsolation ActorIsolationVal;
       IsolationSource IsolationSourceVal;
       DiagnosticInfo *DiagnosticVal;
       const clang::NamedDecl *ClangDecl;
+      const clang::Type *ClangType;
     };
     
   public:
@@ -278,6 +286,14 @@ namespace swift {
         : Kind(DiagnosticArgumentKind::DeclAttribute),
           DeclAttributeVal(attr) {}
 
+    DiagnosticArgument(const AvailabilityDomain domain)
+        : Kind(DiagnosticArgumentKind::AvailabilityDomain),
+          AvailabilityDomainVal(domain) {}
+
+    DiagnosticArgument(const AvailabilityRange &range)
+        : Kind(DiagnosticArgumentKind::AvailabilityRange),
+          AvailabilityRangeVal(range) {}
+
     DiagnosticArgument(llvm::VersionTuple version)
       : Kind(DiagnosticArgumentKind::VersionTuple),
         VersionVal(version) { }
@@ -303,6 +319,9 @@ namespace swift {
 
     DiagnosticArgument(const clang::NamedDecl *ND)
         : Kind(DiagnosticArgumentKind::ClangDecl), ClangDecl(ND) {}
+
+    DiagnosticArgument(const clang::Type *Ty)
+        : Kind(DiagnosticArgumentKind::ClangType), ClangType(Ty) {}
 
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
@@ -400,6 +419,16 @@ namespace swift {
       return DeclAttributeVal;
     }
 
+    const AvailabilityDomain getAsAvailabilityDomain() const {
+      assert(Kind == DiagnosticArgumentKind::AvailabilityDomain);
+      return AvailabilityDomainVal;
+    }
+
+    const AvailabilityRange getAsAvailabilityRange() const {
+      assert(Kind == DiagnosticArgumentKind::AvailabilityRange);
+      return AvailabilityRangeVal;
+    }
+
     llvm::VersionTuple getAsVersionTuple() const {
       assert(Kind == DiagnosticArgumentKind::VersionTuple);
       return VersionVal;
@@ -428,6 +457,11 @@ namespace swift {
     const clang::NamedDecl *getAsClangDecl() const {
       assert(Kind == DiagnosticArgumentKind::ClangDecl);
       return ClangDecl;
+    }
+
+    const clang::Type *getAsClangType() const {
+      assert(Kind == DiagnosticArgumentKind::ClangType);
+      return ClangType;
     }
   };
 
@@ -1784,6 +1818,7 @@ namespace swift {
   }
 
   void printClangDeclName(const clang::NamedDecl *ND, llvm::raw_ostream &os);
+  void printClangTypeName(const clang::Type *Ty, llvm::raw_ostream &os);
 
   /// Temporary on-stack storage and unescaping for encoded diagnostic
   /// messages.

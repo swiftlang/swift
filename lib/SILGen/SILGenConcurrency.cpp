@@ -74,17 +74,18 @@ setExpectedExecutorForParameterIsolation(SILGenFunction &SGF,
   // If we have caller isolation inheriting... just grab from our isolated
   // argument.
   if (actorIsolation.getKind() == ActorIsolation::CallerIsolationInheriting) {
-    if (auto *isolatedArg = SGF.F.maybeGetIsolatedArgument()) {
-      ManagedValue isolatedMV;
-      if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
-        isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
-      } else {
-        isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
-      }
-
-      SGF.ExpectedExecutor.set(SGF.emitLoadActorExecutor(loc, isolatedMV));
-      return;
+    auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
+    assert(isolatedArg &&
+           "Caller Isolation Inheriting without isolated parameter");
+    ManagedValue isolatedMV;
+    if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
+    } else {
+      isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
     }
+
+    SGF.ExpectedExecutor.set(SGF.emitLoadActorExecutor(loc, isolatedMV));
+    return;
   }
 
   llvm_unreachable("Unhandled case?!");
@@ -563,6 +564,7 @@ SILGenFunction::emitFunctionTypeIsolation(SILLocation loc,
 
   // Emit nonisolated by simply emitting Optional.none in the result type.
   case FunctionTypeIsolation::Kind::NonIsolated:
+  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
     return emitNonIsolatedIsolation(loc);
 
   // Emit global actor isolation by loading .shared from the global actor,

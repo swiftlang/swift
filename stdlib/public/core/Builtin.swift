@@ -129,14 +129,14 @@ public func _specialize<T, U>(_ x: T, for: U.Type) -> U? {
 /// `unsafeBitCast` something to `AnyObject`.
 @usableFromInline @_transparent
 internal func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
-  return unsafeBitCast(x, to: AnyObject.self)
+  return unsafe unsafeBitCast(x, to: AnyObject.self)
 }
 
 @usableFromInline @_transparent
 internal func == (
   lhs: Builtin.NativeObject, rhs: Builtin.NativeObject
 ) -> Bool {
-  return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
+  return unsafe unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @usableFromInline @_transparent
@@ -150,7 +150,7 @@ internal func != (
 internal func == (
   lhs: Builtin.RawPointer, rhs: Builtin.RawPointer
 ) -> Bool {
-  return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
+  return unsafe unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @usableFromInline @_transparent
@@ -284,10 +284,10 @@ public func _unsafeUncheckedDowncast<T: AnyObject>(_ x: AnyObject, to type: T.Ty
 @inline(__always)
 public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
   -> UnsafeMutableRawPointer {
-  let storedPropertyOffset = _roundUp(
+  let storedPropertyOffset = unsafe _roundUp(
     MemoryLayout<SwiftShims.HeapObject>.size,
     toAlignment: MemoryLayout<Optional<AnyObject>>.alignment)
-  return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(x)) +
+  return unsafe UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(x)) +
     storedPropertyOffset
 }
 
@@ -945,7 +945,7 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 public func type<T, Metatype>(of value: T) -> Metatype {
   // This implementation is never used, since calls to `Swift.type(of:)` are
   // resolved as a special case by the type checker.
-  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+  unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
     ("internal consistency error: 'type(of:)' operation failed to resolve"
      as StaticString).utf8Start._rawValue)
   Builtin.unreachable()
@@ -1042,7 +1042,7 @@ public func withoutActuallyEscaping<ClosureType, ResultType, Failure>(
   // This implementation is never used, since calls to
   // `Swift.withoutActuallyEscaping(_:do:)` are resolved as a special case by
   // the type checker.
-  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+  unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
     ("internal consistency error: 'withoutActuallyEscaping(_:do:)' operation failed to resolve"
      as StaticString).utf8Start._rawValue)
   Builtin.unreachable()
@@ -1057,7 +1057,7 @@ func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
   // This implementation is never used, since calls to
   // `Swift.withoutActuallyEscaping(_:do:)` are resolved as a special case by
   // the type checker.
-  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+  unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
     ("internal consistency error: 'withoutActuallyEscaping(_:do:)' operation failed to resolve"
      as StaticString).utf8Start._rawValue)
   Builtin.unreachable()
@@ -1073,7 +1073,7 @@ public func _openExistential<ExistentialType, ContainedType, ResultType, Failure
   // This implementation is never used, since calls to
   // `Swift._openExistential(_:do:)` are resolved as a special case by
   // the type checker.
-  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+  unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
     ("internal consistency error: '_openExistential(_:do:)' operation failed to resolve"
      as StaticString).utf8Start._rawValue)
   Builtin.unreachable()
@@ -1088,7 +1088,7 @@ func __abi_openExistential<ExistentialType, ContainedType, ResultType>(
   // This implementation is never used, since calls to
   // `Swift._openExistential(_:do:)` are resolved as a special case by
   // the type checker.
-  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+  unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
     ("internal consistency error: '_openExistential(_:do:)' operation failed to resolve"
      as StaticString).utf8Start._rawValue)
   Builtin.unreachable()
@@ -1103,12 +1103,5 @@ func __abi_openExistential<ExistentialType, ContainedType, ResultType>(
 @_alwaysEmitIntoClient
 public // @SPI(OSLog)
 func _getGlobalStringTablePointer(_ constant: String) -> UnsafePointer<CChar> {
-  return UnsafePointer<CChar>(Builtin.globalStringTablePointer(constant));
-}
-
-@_transparent
-@_alwaysEmitIntoClient
-public
-func _allocateVector<Element>(elementType: Element.Type, capacity: Int) -> UnsafeMutablePointer<Element> {
-  return UnsafeMutablePointer(Builtin.allocVector(elementType, capacity._builtinWordValue))
+  return unsafe UnsafePointer<CChar>(Builtin.globalStringTablePointer(constant));
 }

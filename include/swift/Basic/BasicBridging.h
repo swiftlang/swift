@@ -457,7 +457,7 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedGeneratedSourceFileKind {
   BridgedGeneratedSourceFileKindReplacedFunctionBody,
   BridgedGeneratedSourceFileKindPrettyPrinted,
   BridgedGeneratedSourceFileKindDefaultArgument,
-  BridgedGeneratedSourceFileKindAttribute,
+  BridgedGeneratedSourceFileKindAttributeFromClang,
 
   BridgedGeneratedSourceFileKindNone,
 };
@@ -510,6 +510,18 @@ struct BridgedVersionTuple {
   BridgedVersionTuple(llvm::VersionTuple);
 
   llvm::VersionTuple unbridged() const;
+};
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedSwiftClosure
+//===----------------------------------------------------------------------===//
+
+/// Wrapping a pointer to a Swift closure `(UnsafeRawPointer?) -> Void`
+/// See 'withBridgedSwiftClosure(closure:call:)' in ASTGen.
+struct BridgedSwiftClosure {
+  const void *_Nonnull closure;
+
+  BRIDGED_INLINE void operator()(const void *_Nullable);
 };
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

@@ -1197,7 +1197,8 @@ ModuleFile::getConformanceChecked(ProtocolConformanceID conformanceID) {
   }
 }
 
-GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
+Expected<GenericParamList *>
+ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   using namespace decls_block;
 
   assert(DC && "need a context for the decls in the list");
@@ -1222,7 +1223,10 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   ArrayRef<uint64_t> paramIDs;
   GenericParamListLayout::readRecord(scratch, paramIDs);
   for (DeclID nextParamID : paramIDs) {
-    auto genericParam = cast<GenericTypeParamDecl>(getDecl(nextParamID));
+    Decl *nextParam;
+    UNWRAP(getDeclChecked(nextParamID), nextParam);
+
+    auto genericParam = cast<GenericTypeParamDecl>(nextParam);
     params.push_back(genericParam);
   }
 
@@ -2871,7 +2875,7 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
     DeclContext *parent;
     UNWRAP(getDeclContextChecked(parentID), parent);
 
-    declContextOrOffset = new (ctx) DefaultArgumentInitializer(parent, index);
+    declContextOrOffset = DefaultArgumentInitializer::create(parent, index);
     break;
   }
 
@@ -3427,7 +3431,8 @@ public:
     DeclContext *DC;
     UNWRAP(MF.getDeclContextChecked(contextID), DC);
 
-    auto genericParams = MF.maybeReadGenericParams(DC);
+    GenericParamList *genericParams;
+    UNWRAP(MF.maybeReadGenericParams(DC), genericParams);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3586,7 +3591,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto genericParams = MF.maybeReadGenericParams(DC);
+    GenericParamList *genericParams;
+    UNWRAP(MF.maybeReadGenericParams(DC), genericParams);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3700,7 +3706,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto *genericParams = MF.maybeReadGenericParams(parent);
+    GenericParamList *genericParams;
+    UNWRAP(MF.maybeReadGenericParams(parent), genericParams);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3717,8 +3724,7 @@ public:
                                                /*ThrowsLoc=*/SourceLoc(),
                                                TypeLoc::withoutLoc(thrownType),
                                                /*BodyParams=*/nullptr,
-                                               genericParams, parent,
-                                               nullptr);
+                                               genericParams, parent);
     declOrOffset = ctor;
 
     ctor->setGenericSignature(MF.getGenericSignature(genericSigID));
@@ -4002,7 +4008,7 @@ public:
     bool isVariadic;
     bool isAutoClosure;
     bool isIsolated;
-    bool isCompileTimeConst;
+    bool isCompileTimeLiteral;
     bool isSending;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
@@ -4013,7 +4019,7 @@ public:
                                          contextID, rawSpecifier,
                                          interfaceTypeID, isIUO, isVariadic,
                                          isAutoClosure, isIsolated,
-                                         isCompileTimeConst,
+                                         isCompileTimeLiteral,
                                          isSending,
                                          rawDefaultArg,
                                          defaultExprType,
@@ -4055,7 +4061,7 @@ public:
     param->setVariadic(isVariadic);
     param->setAutoClosure(isAutoClosure);
     param->setIsolated(isIsolated);
-    param->setCompileTimeConst(isCompileTimeConst);
+    param->setCompileTimeLiteral(isCompileTimeLiteral);
     param->setSending(isSending);
 
     // Decode the default argument kind.
@@ -4255,7 +4261,8 @@ public:
     // Read generic params before reading the type, because the type may
     // reference generic parameters, and we want them to have a dummy
     // DeclContext for now.
-    GenericParamList *genericParams = MF.maybeReadGenericParams(DC);
+    GenericParamList *genericParams;
+    UNWRAP(MF.maybeReadGenericParams(DC), genericParams);
 
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
     if (!staticSpelling.has_value())
@@ -4489,7 +4496,8 @@ public:
     if (declOrOffset.isComplete())
       return cast<OpaqueTypeDecl>(declOrOffset.get());
 
-    auto genericParams = MF.maybeReadGenericParams(declContext);
+    GenericParamList *genericParams;
+    UNWRAP(MF.maybeReadGenericParams(declContext), genericParams);
 
     // Create the decl.
     auto opaqueDecl = OpaqueTypeDecl::get(
@@ -4690,7 +4698,8 @@ public:
     ctx.evaluator.cacheOutput(InheritedProtocolsRequest{proto},
                               ctx.AllocateCopy(inherited));
 
-    auto genericParams = MF.maybeReadGenericParams(DC);
+    GenericParamList *genericParams;
+    UNWRAP(MF.maybeReadGenericParams(DC), genericParams);
     assert(genericParams && "protocol with no generic parameters?");
     ctx.evaluator.cacheOutput(GenericParamListRequest{proto},
                               std::move(genericParams));
@@ -4885,7 +4894,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto genericParams = MF.maybeReadGenericParams(DC);
+    GenericParamList *genericParams;
+    UNWRAP(MF.maybeReadGenericParams(DC), genericParams);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -4963,7 +4973,8 @@ public:
       return DCOrError.takeError();
     auto DC = DCOrError.get();
 
-    auto genericParams = MF.maybeReadGenericParams(DC);
+    GenericParamList *genericParams;
+    UNWRAP(MF.maybeReadGenericParams(DC), genericParams);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -5158,7 +5169,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto *genericParams = MF.maybeReadGenericParams(parent);
+    GenericParamList *genericParams;
+    UNWRAP(MF.maybeReadGenericParams(parent), genericParams);
     if (declOrOffset.isComplete())
       return declOrOffset;
     
@@ -5264,7 +5276,12 @@ public:
     // Generic parameter lists are written from outermost to innermost.
     // Keep reading until we run out of generic parameter lists.
     GenericParamList *outerParams = nullptr;
-    while (auto *genericParams = MF.maybeReadGenericParams(DC)) {
+    while (true) {
+      GenericParamList *genericParams;
+      UNWRAP(MF.maybeReadGenericParams(DC), genericParams);
+      if (!genericParams)
+        break;
+
       genericParams->setOuterParameters(outerParams);
 
       // Set up the DeclContexts for the GenericTypeParamDecls in the list.
@@ -5408,7 +5425,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto *genericParams = MF.maybeReadGenericParams(parent);
+    GenericParamList *genericParams;
+    UNWRAP(MF.maybeReadGenericParams(parent), genericParams);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -7133,6 +7151,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto isolation = swift::FunctionTypeIsolation::forNonIsolated();
   if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolated)) {
     // do nothing
+  } else if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolatedCaller)) {
+    isolation = swift::FunctionTypeIsolation::forNonIsolatedCaller();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Parameter)) {
     isolation = swift::FunctionTypeIsolation::forParameter();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Erased)) {
@@ -7179,13 +7199,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     IdentifierID internalLabelID;
     TypeID typeID;
     bool isVariadic, isAutoClosure, isNonEphemeral, isIsolated,
-        isCompileTimeConst;
+        isCompileTimeLiteral;
     bool isNoDerivative, isSending, isAddressable;
     unsigned rawOwnership;
     decls_block::FunctionParamLayout::readRecord(
         scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
         isNonEphemeral, rawOwnership, isIsolated, isNoDerivative,
-        isCompileTimeConst, isSending, isAddressable);
+        isCompileTimeLiteral, isSending, isAddressable);
 
     auto ownership = getActualParamDeclSpecifier(
       (serialization::ParamDeclSpecifier)rawOwnership);
@@ -7200,7 +7220,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                         ParameterTypeFlags(isVariadic, isAutoClosure,
                                            isNonEphemeral, *ownership,
                                            isIsolated, isNoDerivative,
-                                           isCompileTimeConst, isSending,
+                                           isCompileTimeLiteral, isSending,
                                            isAddressable),
                         MF.getIdentifier(internalLabelID));
   }
@@ -9099,13 +9119,16 @@ ModuleFile::maybeReadLifetimeDependence(unsigned numParams) {
   bool isImmortal;
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
+  bool hasAddressableParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(
       scratch, targetIndex, isImmortal, hasInheritLifetimeParamIndices,
-      hasScopeLifetimeParamIndices, lifetimeDependenceData);
+      hasScopeLifetimeParamIndices, hasAddressableParamIndices,
+      lifetimeDependenceData);
 
   SmallBitVector inheritLifetimeParamIndices(numParams, false);
   SmallBitVector scopeLifetimeParamIndices(numParams, false);
+  SmallBitVector addressableParamIndices(numParams, false);
 
   unsigned startIndex = 0;
   auto pushData = [&](SmallBitVector &bits) {
@@ -9123,6 +9146,9 @@ ModuleFile::maybeReadLifetimeDependence(unsigned numParams) {
   if (hasScopeLifetimeParamIndices) {
     pushData(scopeLifetimeParamIndices);
   }
+  if (hasAddressableParamIndices) {
+    pushData(addressableParamIndices);
+  }
 
   ASTContext &ctx = getContext();
   return LifetimeDependenceInfo(
@@ -9132,5 +9158,8 @@ ModuleFile::maybeReadLifetimeDependence(unsigned numParams) {
       hasScopeLifetimeParamIndices
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
           : nullptr,
-      targetIndex, isImmortal);
+      targetIndex, isImmortal,
+      hasAddressableParamIndices
+          ? IndexSubset::get(ctx, addressableParamIndices)
+          : nullptr);
 }

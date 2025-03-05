@@ -16,8 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_SILDeclRef_H
-#define SWIFT_SIL_SILDeclRef_H
+#ifndef SWIFT_SIL_SILDECLREF_H
+#define SWIFT_SIL_SILDECLREF_H
 
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ClangNode.h"

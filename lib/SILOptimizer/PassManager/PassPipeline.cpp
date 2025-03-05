@@ -257,7 +257,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
-  P.addAllocVectorLowering();
   P.addInitializeStaticGlobals();
 
   // MandatoryPerformanceOptimizations might create specializations that are not
@@ -404,7 +403,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addPerformanceConstantPropagation();
   P.addSimplifyCFG();
   // End of unrolling passes.
-  P.addABCOpt();
+  P.addBoundsCheckOpts();
   // Cleanup.
   P.addDCE();
   P.addCOWArrayOpts();
@@ -475,7 +474,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   if (OpLevel == OptimizationLevelKind::MidLevel) {
     P.addHighLevelLICM();
     P.addArrayCountPropagation();
-    P.addABCOpt();
+    P.addBoundsCheckOpts();
     P.addDCE();
     P.addCOWArrayOpts();
     P.addDCE();

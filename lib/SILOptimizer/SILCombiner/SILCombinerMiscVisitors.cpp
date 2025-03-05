@@ -655,7 +655,6 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   // their definitions.
   if (IEI && !OEI &&
       !IEI->getLoweredConcreteType().hasOpenedExistential()) {
-    assert(!IEI->getLoweredConcreteType().isOpenedExistential());
     Builder.setCurrentDebugScope(AS->getDebugScope());
     auto varInfo = AS->getVarInfo();
     if (varInfo) {

@@ -917,7 +917,7 @@ public:
 
   ArrayRef<TupleTypeReprElement> getElements() const {
     return { getTrailingObjects<TupleTypeReprElement>(),
-             Bits.TupleTypeRepr.NumElements };
+             static_cast<size_t>(Bits.TupleTypeRepr.NumElements) };
   }
 
   void getElementTypes(SmallVectorImpl<TypeRepr *> &Types) const {
@@ -1003,7 +1003,7 @@ class CompositionTypeRepr final : public TypeRepr,
 
 public:
   ArrayRef<TypeRepr *> getTypes() const {
-    return {getTrailingObjects<TypeRepr*>(), Bits.CompositionTypeRepr.NumTypes};
+    return {getTrailingObjects<TypeRepr*>(), static_cast<size_t>(Bits.CompositionTypeRepr.NumTypes)};
   }
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }
@@ -1112,7 +1112,7 @@ public:
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
-           T->getKind() == TypeReprKind::CompileTimeConst ||
+           T->getKind() == TypeReprKind::CompileTimeLiteral ||
            T->getKind() == TypeReprKind::LifetimeDependent ||
            T->getKind() == TypeReprKind::Sending;
   }
@@ -1174,15 +1174,15 @@ public:
 /// \code
 ///   x : _const Int
 /// \endcode
-class CompileTimeConstTypeRepr : public SpecifierTypeRepr {
+class CompileTimeLiteralTypeRepr : public SpecifierTypeRepr {
 public:
-  CompileTimeConstTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-    : SpecifierTypeRepr(TypeReprKind::CompileTimeConst, Base, InOutLoc) {}
+  CompileTimeLiteralTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::CompileTimeLiteral, Base, InOutLoc) {}
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::CompileTimeConst;
+    return T->getKind() == TypeReprKind::CompileTimeLiteral;
   }
-  static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
+  static bool classof(const CompileTimeLiteralTypeRepr *T) { return true; }
 };
 
 /// A sending type.
@@ -1494,7 +1494,7 @@ public:
   
   ArrayRef<Field> getFields() const {
     return {getTrailingObjects<Field>(),
-            Bits.SILBoxTypeRepr.NumFields};
+            static_cast<size_t>(Bits.SILBoxTypeRepr.NumFields)};
   }
   ArrayRef<TypeRepr *> getGenericArguments() const {
     return {getTrailingObjects<TypeRepr*>(),
@@ -1626,7 +1626,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Isolated:
   case TypeReprKind::Sending:
   case TypeReprKind::Placeholder:
-  case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::CompileTimeLiteral:
   case TypeReprKind::LifetimeDependent:
   case TypeReprKind::Integer:
     return true;

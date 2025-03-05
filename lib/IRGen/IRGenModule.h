@@ -842,6 +842,15 @@ public:
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
   // clang-format on
 
+  llvm::StructType *CoroFunctionPointerTy; // { i32, i32 }
+  llvm::PointerType *CoroFunctionPointerPtrTy;
+  llvm::PointerType *CoroAllocationTy;
+  llvm::FunctionType *CoroAllocateFnTy;
+  llvm::FunctionType *CoroDeallocateFnTy;
+  llvm::IntegerType *CoroAllocatorFlagsTy;
+  llvm::StructType *CoroAllocatorTy;
+  llvm::PointerType *CoroAllocatorPtrTy;
+
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   llvm::Constant *swiftImmortalRefCount = nullptr;
@@ -867,6 +876,7 @@ public:
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
   llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
+  llvm::CallingConv::ID SwiftCoroCC;   /// swift calling convention for callee-allocated coroutines
 
   /// What kind of tail call should be used for async->async calls.
   llvm::CallInst::TailCallKind AsyncTailCallKind;
@@ -889,6 +899,7 @@ public:
     return getPointerAlignment();
   }
   Alignment getAsyncContextAlignment() const;
+  Alignment getCoroStaticFrameAlignment() const;
 
   /// Return the offset, relative to the address point, of the start of the
   /// type-specific members of an enum metadata.
@@ -1216,14 +1227,13 @@ public:
                                            const PointerAuthEntity &entity,
                                            llvm::Constant *storageAddress);
 
-  llvm::Constant *getOrCreateHelperFunction(StringRef name,
-                                            llvm::Type *resultType,
-                                            ArrayRef<llvm::Type*> paramTypes,
-                        llvm::function_ref<void(IRGenFunction &IGF)> generate,
-                        bool setIsNoInline = false,
-                        bool forPrologue = false,
-                        bool isPerformanceConstraint = false,
-                        IRLinkage *optionalLinkage = nullptr);
+  llvm::Constant *getOrCreateHelperFunction(
+      StringRef name, llvm::Type *resultType, ArrayRef<llvm::Type *> paramTypes,
+      llvm::function_ref<void(IRGenFunction &IGF)> generate,
+      bool setIsNoInline = false, bool forPrologue = false,
+      bool isPerformanceConstraint = false,
+      IRLinkage *optionalLinkage = nullptr,
+      std::optional<llvm::CallingConv::ID> specialCallingConv = std::nullopt);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);
@@ -1277,6 +1287,7 @@ private:
                                            
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> IndirectAsyncFunctionPointers;
+  llvm::DenseMap<LinkEntity, llvm::Constant *> IndirectCoroFunctionPointers;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
@@ -1643,6 +1654,11 @@ public:
   llvm::Constant *defineAsyncFunctionPointer(LinkEntity entity,
                                              ConstantInit init);
   SILFunction *getSILFunctionForAsyncFunctionPointer(llvm::Constant *afp);
+
+  llvm::Constant *getAddrOfCoroFunctionPointer(LinkEntity entity);
+  llvm::Constant *getAddrOfCoroFunctionPointer(SILFunction *function);
+  llvm::Constant *defineCoroFunctionPointer(LinkEntity entity,
+                                            ConstantInit init);
 
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
                                          ForDefinition_t forDefinition);

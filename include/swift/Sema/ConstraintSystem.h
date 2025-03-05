@@ -488,14 +488,6 @@ public:
   /// literal (represented by `ArrayExpr` and `DictionaryExpr` in AST).
   bool isCollectionLiteralType() const;
 
-  /// Determine whether this type variable represents a literal such
-  /// as an integer value, a floating-point value with and without a sign.
-  bool isNumberLiteralType() const;
-
-  /// Determine whether this type variable represents a result type of a
-  /// function call.
-  bool isFunctionResult() const;
-
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -1568,14 +1560,13 @@ public:
   llvm::DenseMap<PackExpansionType *, TypeVariableType *>
       OpenedPackExpansionTypes;
 
-  /// The pack expansion environment that can open pack elements for
-  /// a given locator.
-  llvm::DenseMap<ConstraintLocator *, std::pair<UUID, Type>>
+  /// The generic environment that can open pack elements for a given
+  /// pack expansion.
+  llvm::DenseMap<PackExpansionExpr *, GenericEnvironment *>
       PackExpansionEnvironments;
 
-  /// The pack expansion environment that can open a given pack element.
-  llvm::DenseMap<PackElementExpr *, PackExpansionExpr *>
-      PackEnvironments;
+  /// The pack expansion expression for a given pack element.
+  llvm::DenseMap<PackElementExpr *, PackExpansionExpr *> PackElementExpansions;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::DenseSet<ConstraintLocator *> DefaultedConstraints;
@@ -1806,18 +1797,37 @@ public:
   /// "resolved" concrete type.
   Type getResolvedType(ASTNode node) const;
 
-  Type getContextualType(ASTNode anchor) const {
+  std::optional<ContextualTypeInfo>
+  getContextualTypeInfo(ASTNode anchor) const {
     for (const auto &entry : contextualTypes) {
-      if (entry.first == anchor) {
-        // The contextual information record could contain the purpose
-        // without a type i.e. when the context is an optional-some or
-        // an invalid pattern binding.
-        if (auto contextualTy = entry.second.getType())
+      if (entry.first == anchor)
+        return entry.second;
+    }
+    return std::nullopt;
+  }
+
+  Type getContextualType(ASTNode anchor) const {
+    if (auto info = getContextualTypeInfo(anchor)) {
+      // The contextual information record could contain the purpose
+      // without a type i.e. when the context is an optional-some or
+      // an invalid pattern binding.
+      if (auto contextualTy = info->getType())
           return simplifyType(contextualTy);
-      }
     }
     return Type();
   }
+
+  ContextualTypePurpose getContextualTypePurpose(ASTNode anchor) const {
+    if (auto info = getContextualTypeInfo(anchor)) {
+      return info->purpose;
+    }
+    return CTP_Unused;
+  }
+
+  /// Retrieve the generic environment for the opened element of a given pack
+  /// expansion, or \c nullptr if no environment was recorded.
+  GenericEnvironment *
+  getPackExpansionEnvironment(PackExpansionExpr *expr) const;
 
   /// For a given locator describing a function argument conversion, or a
   /// constraint within an argument conversion, returns information about the
@@ -2250,6 +2260,10 @@ private:
 
   llvm::SetVector<TypeVariableType *> TypeVariables;
 
+  /// Maps expressions to types for choosing a favored overload
+  /// type in a disjunction constraint.
+  llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
+
   /// Maps discovered closures to their types inferred
   /// from declared parameters/result and body.
   ///
@@ -2412,13 +2426,11 @@ private:
   llvm::SmallDenseMap<PackExpansionType *, TypeVariableType *, 4>
       OpenedPackExpansionTypes;
 
-  llvm::SmallDenseMap<ConstraintLocator *, std::pair<UUID, Type>, 4>
+  llvm::SmallDenseMap<PackExpansionExpr *, GenericEnvironment *, 4>
       PackExpansionEnvironments;
 
   llvm::SmallDenseMap<PackElementExpr *, PackExpansionExpr *, 2>
-      PackEnvironments;
-
-  llvm::SmallVector<GenericEnvironment *, 4> PackElementGenericEnvironments;
+      PackElementExpansions;
 
   /// The set of functions that have been transformed by a result builder.
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
@@ -2462,6 +2474,74 @@ public:
       SynthesizedConformances;
 
 private:
+  /// Describe the candidate expression for partial solving.
+  /// This class used by shrink & solve methods which apply
+  /// variation of directional path consistency algorithm in attempt
+  /// to reduce scopes of the overload sets (disjunctions) in the system.
+  class Candidate {
+    Expr *E;
+    DeclContext *DC;
+    llvm::BumpPtrAllocator &Allocator;
+
+    // Contextual Information.
+    Type CT;
+    ContextualTypePurpose CTP;
+
+  public:
+    Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
+              ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
+        : E(expr), DC(cs.DC), Allocator(cs.Allocator), CT(ct), CTP(ctp) {}
+
+    /// Return underlying expression.
+    Expr *getExpr() const { return E; }
+
+    /// Try to solve this candidate sub-expression
+    /// and re-write it's OSR domains afterwards.
+    ///
+    /// \param shrunkExprs The set of expressions which
+    /// domains have been successfully shrunk so far.
+    ///
+    /// \returns true on solver failure, false otherwise.
+    bool solve(llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs);
+
+    /// Apply solutions found by solver as reduced OSR sets for
+    /// for current and all of it's sub-expressions.
+    ///
+    /// \param solutions The solutions found by running solver on the
+    /// this candidate expression.
+    ///
+    /// \param shrunkExprs The set of expressions which
+    /// domains have been successfully shrunk so far.
+    void applySolutions(
+        llvm::SmallVectorImpl<Solution> &solutions,
+        llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) const;
+
+    /// Check if attempt at solving of the candidate makes sense given
+    /// the current conditions - number of shrunk domains which is related
+    /// to the given candidate over the total number of disjunctions present.
+    static bool
+    isTooComplexGiven(ConstraintSystem *const cs,
+                      llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) {
+      SmallVector<Constraint *, 8> disjunctions;
+      cs->collectDisjunctions(disjunctions);
+
+      unsigned unsolvedDisjunctions = disjunctions.size();
+      for (auto *disjunction : disjunctions) {
+        auto *locator = disjunction->getLocator();
+        if (!locator)
+          continue;
+
+        if (auto *OSR = getAsExpr<OverloadSetRefExpr>(locator->getAnchor())) {
+          if (shrunkExprs.count(OSR) > 0)
+            --unsolvedDisjunctions;
+        }
+      }
+
+      // The threshold used to be `TypeCheckerOpts.SolverShrinkUnsolvedThreshold`
+      return unsolvedDisjunctions >= 10;
+    }
+  };
+
   /// Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs,
@@ -2985,6 +3065,15 @@ public:
     return nullptr;
   }
 
+  TypeBase* getFavoredType(Expr *E) {
+    assert(E != nullptr);
+    return this->FavoredTypes[E];
+  }
+  void setFavoredType(Expr *E, TypeBase *T) {
+    assert(E != nullptr);
+    this->FavoredTypes[E] = T;
+  }
+
   /// Set the type in our type map for the given node, and record the change
   /// in the trail.
   ///
@@ -3298,25 +3387,39 @@ public:
   void recordOpenedExistentialType(ConstraintLocator *locator,
                                    OpenedArchetypeType *opened);
 
-  /// Get the opened element generic environment for the given locator.
-  GenericEnvironment *getPackElementEnvironment(ConstraintLocator *locator,
-                                                CanType shapeClass);
+  /// Retrieve the generic environment for the opened element of a given pack
+  /// expansion, or \c nullptr if no environment was recorded yet.
+  GenericEnvironment *
+  getPackExpansionEnvironment(PackExpansionExpr *expr) const;
+
+  /// Create a new opened element generic environment for the given pack
+  /// expansion.
+  GenericEnvironment *
+  createPackExpansionEnvironment(PackExpansionExpr *expr,
+                                 CanGenericTypeParamType shapeParam);
 
   /// Update PackExpansionEnvironments and record a change in the trail.
-  void recordPackExpansionEnvironment(ConstraintLocator *locator,
-                                      std::pair<UUID, Type> uuidAndShape);
-
-  /// Get the opened element generic environment for the given pack element.
-  PackExpansionExpr *getPackEnvironment(PackElementExpr *packElement) const;
-
-  /// Associate an opened element generic environment to a pack element,
-  /// and record a change in the trail.
-  void addPackEnvironment(PackElementExpr *packElement,
-                          PackExpansionExpr *packExpansion);
+  void recordPackExpansionEnvironment(PackExpansionExpr *expr,
+                                      GenericEnvironment *env);
 
   /// Undo the above change.
-  void removePackEnvironment(PackElementExpr *packElement) {
-    bool erased = PackEnvironments.erase(packElement);
+  void removePackExpansionEnvironment(PackExpansionExpr *expr) {
+    bool erased = PackExpansionEnvironments.erase(expr);
+    ASSERT(erased);
+  }
+
+  /// Get the pack expansion expr for the given pack element.
+  PackExpansionExpr *
+  getPackElementExpansion(PackElementExpr *packElement) const;
+
+  /// Associate a pack element with a given pack expansion, and record the
+  /// change in the trail.
+  void recordPackElementExpansion(PackElementExpr *packElement,
+                                  PackExpansionExpr *packExpansion);
+
+  /// Undo the above change.
+  void removePackElementExpansion(PackElementExpr *packElement) {
+    bool erased = PackElementExpansions.erase(packElement);
     ASSERT(erased);
   }
 
@@ -3563,7 +3666,8 @@ public:
 
   /// Add a requirement as a constraint to the constraint system.
   void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
-                     bool isFavored = false);
+                     bool isFavored,
+                     bool prohibitNonisolatedConformance);
 
   void addApplicationConstraint(
       FunctionType *appliedFn, Type calleeType,
@@ -4260,6 +4364,7 @@ public:
 
   // Record the given requirement in the constraint system.
   void openGenericRequirement(DeclContext *outerDC,
+                              GenericSignature signature,
                               unsigned index,
                               const Requirement &requirement,
                               bool skipProtocolSelfConstraint,
@@ -4951,6 +5056,11 @@ private:
                                               TypeMatchOptions flags,
                                               ConstraintLocatorBuilder locator);
 
+  /// Attempt to match a pack element type with the fully resolved pattern type
+  /// for the pack expansion.
+  SolutionKind matchPackElementType(Type elementType, Type patternType,
+                                    ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify a PackElementOf constraint.
   ///
   /// Solving this constraint is delayed until the element type is fully
@@ -5245,11 +5355,19 @@ private:
   /// \returns true if an error occurred, false otherwise.
   bool solveSimplified(SmallVectorImpl<Solution> &solutions);
 
+  /// Find reduced domains of disjunction constraints for given
+  /// expression, this is achieved to solving individual sub-expressions
+  /// and combining resolving types. Such algorithm is called directional
+  /// path consistency because it goes from children to parents for all
+  /// related sub-expressions taking union of their domains.
+  ///
+  /// \param expr The expression to find reductions for.
+  void shrink(Expr *expr);
+
   /// Pick a disjunction from the InactiveConstraints list.
   ///
-  /// \returns The selected disjunction and a set of it's favored choices.
-  std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
-  selectDisjunction();
+  /// \returns The selected disjunction.
+  Constraint *selectDisjunction();
 
   /// Pick a conjunction from the InactiveConstraints list.
   ///
@@ -5437,6 +5555,11 @@ public:
   /// \returns true if solution cannot be applied.
   bool applySolutionToBody(TapExpr *tapExpr,
                            SyntacticElementTargetRewriter &rewriter);
+
+  /// Reorder the disjunctive clauses for a given expression to
+  /// increase the likelihood that a favored constraint will be successfully
+  /// resolved before any others.
+  void optimizeConstraints(Expr *e);
 
   void startExpressionTimer(ExpressionTimer::AnchorType anchor);
 
@@ -6178,8 +6301,7 @@ class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
 public:
   using Element = DisjunctionChoice;
 
-  DisjunctionChoiceProducer(ConstraintSystem &cs, Constraint *disjunction,
-                            llvm::TinyPtrVector<Constraint *> &favorites)
+  DisjunctionChoiceProducer(ConstraintSystem &cs, Constraint *disjunction)
       : BindingProducer(cs, disjunction->shouldRememberChoice()
                                 ? disjunction->getLocator()
                                 : nullptr),
@@ -6188,11 +6310,6 @@ public:
         Disjunction(disjunction) {
     assert(disjunction->getKind() == ConstraintKind::Disjunction);
     assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
-
-    // Mark constraints as favored. This information
-    // is going to be used by partitioner.
-    for (auto *choice : favorites)
-      cs.favorConstraint(choice);
 
     // Order and partition the disjunction choices.
     partitionDisjunction(Ordering, PartitionBeginning);
@@ -6238,9 +6355,8 @@ private:
   // Partition the choices in the disjunction into groups that we will
   // iterate over in an order appropriate to attempt to stop before we
   // have to visit all of the options.
-  void
-  partitionDisjunction(SmallVectorImpl<unsigned> &Ordering,
-                       SmallVectorImpl<unsigned> &PartitionBeginning);
+  void partitionDisjunction(SmallVectorImpl<unsigned> &Ordering,
+                            SmallVectorImpl<unsigned> &PartitionBeginning);
 
   /// Partition the choices in the range \c first to \c last into groups and
   /// order the groups in the best order to attempt based on the argument

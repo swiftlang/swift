@@ -72,6 +72,7 @@ namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
+  class AvailabilityDomain;
   class AvailabilityMacroMap;
   class AvailabilityRange;
   class BoundGenericType;
@@ -379,6 +380,12 @@ public:
   /// Should we globally ignore swiftmodule files adjacent to swiftinterface
   /// files?
   bool IgnoreAdjacentModules = false;
+
+  /// Override to accept reading errors from swiftmodules and being generally
+  /// more tolerant to inconsistencies. This is enabled for
+  /// index-while-building as it runs last and it can afford to read an AST
+  /// with inconsistencies.
+  bool ForceAllowModuleWithCompilerErrors = false;
 
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
@@ -1596,9 +1603,10 @@ private:
 public:
   clang::DarwinSDKInfo *getDarwinSDKInfo() const;
 
-  /// Returns the string to use in diagnostics when printing the platform being
-  /// targetted.
-  StringRef getTargetPlatformStringForDiagnostics() const;
+  /// Returns the availability domain corresponding to the target triple. If
+  /// there isn't a `PlatformKind` associated with the current target triple,
+  /// then this returns the universal domain (`*`).
+  AvailabilityDomain getTargetAvailabilityDomain() const;
 };
 
 } // end namespace swift

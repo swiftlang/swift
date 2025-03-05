@@ -86,113 +86,55 @@ static BridgedPlatformKind bridge(PlatformKind platform) {
 // MARK: AvailabilitySpec
 //===----------------------------------------------------------------------===//
 
+BridgedAvailabilitySpec
+BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
+                                       BridgedSourceLoc cLoc) {
+  return AvailabilitySpec::createWildcard(cContext.unbridged(),
+                                          cLoc.unbridged());
+}
+
+BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomain(
+    BridgedASTContext cContext, BridgedAvailabilityDomain cDomain,
+    BridgedSourceLoc cLoc, BridgedVersionTuple cVersion,
+    BridgedSourceRange cVersionRange) {
+  return AvailabilitySpec::createForDomain(
+      cContext.unbridged(), cDomain.unbridged(), cLoc.unbridged(),
+      cVersion.unbridged(), cVersionRange.unbridged());
+}
+
 BridgedSourceRange
 BridgedAvailabilitySpec_getSourceRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getSourceRange();
 }
 
+bool BridgedAvailabilitySpec_isWildcard(BridgedAvailabilitySpec spec) {
+  return spec.unbridged()->isWildcard();
+}
+
+// FIXME: [availability] Remove this (re-implement ASTGen to match ParseDecl)
 BridgedAvailabilityDomain
 BridgedAvailabilitySpec_getDomain(BridgedAvailabilitySpec spec) {
-  auto domain = spec.unbridged()->getDomain();
+  auto domain = spec.unbridged()->getDomainOrIdentifier().getAsDomain();
   if (domain)
     return *domain;
   return BridgedAvailabilityDomain();
 }
 
+// FIXME: [availability] Remove this (re-implement ASTGen to match ParseDecl)
 BridgedPlatformKind
 BridgedAvailabilitySpec_getPlatform(BridgedAvailabilitySpec spec) {
-  auto platform = spec.unbridged()->getPlatform();
-  if (platform)
-    return bridge(*platform);
-  return BridgedPlatformKind_None;
+  auto domain = spec.unbridged()->getDomainOrIdentifier().getAsDomain();
+  if (domain)
+    return bridge(domain->getPlatformKind());
+  return bridge(PlatformKind::none);
 }
 
 BridgedVersionTuple
-BridgedAvailabilitySpec_getVersion(BridgedAvailabilitySpec spec) {
-  return spec.unbridged()->getVersion();
+BridgedAvailabilitySpec_getRawVersion(BridgedAvailabilitySpec spec) {
+  return spec.unbridged()->getRawVersion();
 }
 
 BridgedSourceRange
 BridgedAvailabilitySpec_getVersionRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getVersionSrcRange();
-}
-
-static AvailabilitySpecKind unbridge(BridgedAvailabilitySpecKind kind) {
-  switch (kind) {
-  case BridgedAvailabilitySpecKindPlatformVersionConstraint:
-    return AvailabilitySpecKind::PlatformVersionConstraint;
-  case BridgedAvailabilitySpecKindOtherPlatform:
-    return AvailabilitySpecKind::OtherPlatform;
-  case BridgedAvailabilitySpecKindLanguageVersionConstraint:
-    return AvailabilitySpecKind::LanguageVersionConstraint;
-  case BridgedAvailabilitySpecKindPackageDescriptionVersionConstraint:
-    return AvailabilitySpecKind::PackageDescriptionVersionConstraint;
-  }
-  llvm_unreachable("unhandled enum value");
-}
-
-BridgedPlatformVersionConstraintAvailabilitySpec
-BridgedPlatformVersionConstraintAvailabilitySpec_createParsed(
-    BridgedASTContext cContext, BridgedPlatformKind cPlatform,
-    BridgedSourceLoc cPlatformLoc, BridgedVersionTuple cVersion,
-    BridgedVersionTuple cRuntimeVersion, BridgedSourceRange cVersionSrcRange) {
-  return new (cContext.unbridged()) PlatformVersionConstraintAvailabilitySpec(
-      unbridge(cPlatform), cPlatformLoc.unbridged(), cVersion.unbridged(),
-      cRuntimeVersion.unbridged(), cVersionSrcRange.unbridged());
-}
-
-BridgedPlatformAgnosticVersionConstraintAvailabilitySpec
-BridgedPlatformAgnosticVersionConstraintAvailabilitySpec_createParsed(
-    BridgedASTContext cContext, BridgedAvailabilitySpecKind cKind,
-    BridgedSourceLoc cNameLoc, BridgedVersionTuple cVersion,
-    BridgedSourceRange cVersionSrcRange) {
-  return new (cContext.unbridged())
-      PlatformAgnosticVersionConstraintAvailabilitySpec(
-          unbridge(cKind), cNameLoc.unbridged(), cVersion.unbridged(),
-          cVersionSrcRange.unbridged());
-}
-
-BridgedOtherPlatformAvailabilitySpec
-BridgedOtherPlatformAvailabilitySpec_createParsed(BridgedASTContext cContext,
-                                                  BridgedSourceLoc cLoc) {
-  return new (cContext.unbridged())
-      OtherPlatformAvailabilitySpec(cLoc.unbridged());
-}
-
-BridgedAvailabilitySpec
-BridgedPlatformVersionConstraintAvailabilitySpec_asAvailabilitySpec(
-    BridgedPlatformVersionConstraintAvailabilitySpec spec) {
-  return static_cast<AvailabilitySpec *>(spec.unbridged());
-}
-
-BridgedAvailabilitySpec
-BridgedPlatformAgnosticVersionConstraintAvailabilitySpec_asAvailabilitySpec(
-    BridgedPlatformAgnosticVersionConstraintAvailabilitySpec spec) {
-  return static_cast<AvailabilitySpec *>(spec.unbridged());
-}
-
-BridgedAvailabilitySpec BridgedOtherPlatformAvailabilitySpec_asAvailabilitySpec(
-    BridgedOtherPlatformAvailabilitySpec spec) {
-  return static_cast<AvailabilitySpec *>(spec.unbridged());
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: AvailabilityDomain
-//===----------------------------------------------------------------------===//
-
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forUniversal() {
-  return swift::AvailabilityDomain::forUniversal();
-}
-BridgedAvailabilityDomain
-BridgedAvailabilityDomain::forPlatform(BridgedPlatformKind platformKind) {
-  return swift::AvailabilityDomain::forPlatform(unbridge(platformKind));
-}
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forSwiftLanguage() {
-  return swift::AvailabilityDomain::forSwiftLanguage();
-}
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forPackageDescription() {
-  return swift::AvailabilityDomain::forPackageDescription();
-}
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forEmbedded() {
-  return swift::AvailabilityDomain::forEmbedded();
 }

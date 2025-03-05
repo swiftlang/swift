@@ -15,7 +15,7 @@ import BasicBridging
 import SwiftDiagnostics
 import SwiftIfConfig
 
-@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
 extension ASTGenVisitor {
   struct DeclAttributesResult {
@@ -146,7 +146,7 @@ extension ASTGenVisitor {
       case .inline:
         return handle(self.generateInlineAttr(attribute: node)?.asDeclAttribute)
       case .lifetime:
-        fatalError("unimplemented")
+        return handle(self.generateLifetimeAttr(attribute: node)?.asDeclAttribute)
       case .macroRole:
         return handle(self.generateMacroRoleAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
       case .nonSendable:
@@ -166,7 +166,7 @@ extension ASTGenVisitor {
       case .projectedValueProperty:
         return handle(self.generateProjectedValuePropertyAttr(attribute: node)?.asDeclAttribute)
       case .rawLayout:
-        fatalError("unimplemented")
+        return handle(self.generateRawLayoutAttr(attribute: node)?.asDeclAttribute)
       case .section:
         return handle(self.generateSectionAttr(attribute: node)?.asDeclAttribute)
       case .semantics:
@@ -187,6 +187,8 @@ extension ASTGenVisitor {
         fatalError("unimplemented")
       case .unavailableFromAsync:
         return handle(self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute)
+      case .none where attrName == "_unavailableInEmbedded":
+        return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 
       // Simple attributes.
       case .addressableSelf,
@@ -197,6 +199,7 @@ extension ASTGenVisitor {
         .atRethrows,
         .borrowed,
         .compilerInitialized,
+        .constVal,
         .dynamicCallable,
         .eagerMove,
         .exported,
@@ -302,7 +305,7 @@ extension ASTGenVisitor {
         .indirect,
         .final,
         .knownToBeLocal,
-        .compileTimeConst:
+        .compileTimeLiteral:
 
         // generateSimpleDeclAttr will diagnose and fix-it to change it to modifiers.
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: attrKind))
@@ -387,7 +390,7 @@ extension ASTGenVisitor {
     case .typeAlias(let typealiasDecl):
       abiDecl = self.generate(typeAliasDecl: typealiasDecl)?.asDecl
     case .variable(let varDecl):
-      abiDecl = self.generate(variableDecl: varDecl).asDecl
+      abiDecl = self.generate(variableDecl: varDecl)
     case .missing(_):
       // This error condition will have been diagnosed in SwiftSyntax.
       abiDecl = nil
@@ -880,6 +883,129 @@ extension ASTGenVisitor {
     )
   }
 
+  func generateLifetimeDescriptor(nameToken node: TokenSyntax, lifetimeDependenceKind: BridgedParsedLifetimeDependenceKind = .default) -> BridgedLifetimeDescriptor {
+    let ident = self.generateIdentifier(node)
+    let loc = self.generateSourceLoc(node)
+    if ident == ctx.id_self {
+      return .forSelf(
+        dependenceKind: lifetimeDependenceKind,
+        loc: loc
+      )
+    } else {
+      return .forNamed(
+        ident,
+        dependenceKind: lifetimeDependenceKind,
+        loc: loc
+      );
+    }
+  }
+
+  func generateLifetimeDescriptor(expr node: ExprSyntax) -> BridgedLifetimeDescriptor? {
+    let lifetimeDependenceKind: BridgedParsedLifetimeDependenceKind
+    let descriptorExpr: ExprSyntax
+    if let copyExpr = node.as(CopyExprSyntax.self) {
+      lifetimeDependenceKind = .inherit
+      descriptorExpr = copyExpr.expression
+    } else if let borrowExpr = node.as(BorrowExprSyntax.self) {
+      lifetimeDependenceKind = .scope
+      descriptorExpr = borrowExpr.expression
+    } else {
+      lifetimeDependenceKind = .default
+      descriptorExpr = node
+    }
+
+    let loc = self.generateSourceLoc(descriptorExpr)
+    if
+      let declRefExpr = descriptorExpr.as(DeclReferenceExprSyntax.self),
+      declRefExpr.argumentNames == nil
+    {
+      return generateLifetimeDescriptor(
+        nameToken: declRefExpr.baseName,
+        lifetimeDependenceKind: lifetimeDependenceKind
+      )
+    }
+
+    if let index = descriptorExpr.as(IntegerLiteralExprSyntax.self)?.representedLiteralValue {
+      return .forOrdered(
+        index,
+        dependenceKind: lifetimeDependenceKind,
+        loc: loc
+      )
+    }
+
+    // TODO: Diangose
+    fatalError("expected identifier, 'self', or integer in @lifetime")
+  }
+
+  func generateLifetimeEntry(attribute node: AttributeSyntax) -> BridgedLifetimeEntry? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      guard !args.isEmpty else {
+        // TODO: Diagnose
+        fatalError("expected arguments in @lifetime attribute")
+      }
+
+      var target: BridgedLifetimeDescriptor? = nil
+      var sources: [BridgedLifetimeDescriptor] = []
+      var first = true
+      while let arg = args.popFirst() {
+        if first {
+          if let targetToken = arg.label {
+            target = self.generateLifetimeDescriptor(nameToken: targetToken)
+          }
+          first = false
+        } else {
+          if arg.label != nil {
+            // TODO: Diagnose.
+            fatalError("invalid argument label in @lifetime attribute")
+          }
+        }
+
+        if let src = self.generateLifetimeDescriptor(expr: arg.expression) {
+          sources.append(src)
+        }
+      }
+
+      if let target {
+        return .createParsed(
+          self.ctx,
+          range: self.generateAttrSourceRange(node),
+          sources: sources.lazy.bridgedArray(in: self),
+          target: target
+        )
+      } else {
+        return .createParsed(
+          self.ctx,
+          range: self.generateAttrSourceRange(node),
+          sources: sources.lazy.bridgedArray(in: self)
+        )
+      }
+    }
+  }
+
+  /// E.g.
+  ///   ```
+  ///   @lifetime(src1, src2)
+  ///   @lifetime(target: borrow src1, copy src2)
+  ///   @lifetime(2)
+  ///   @lifetime(self)
+  ///   ```
+  func generateLifetimeAttr(attribute node: AttributeSyntax) -> BridgedLifetimeAttr? {
+    guard self.ctx.langOptsHasFeature(.LifetimeDependence) else {
+      // TODO: Diagnose
+      fatalError("@lifetime attribute requires 'LifetimeDependence' feature")
+    }
+    guard let entry = self.generateLifetimeEntry(attribute: node) else {
+      // TODO: Diagnose?
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      entry: entry
+    )
+  }
+
   func generateMacroIntroducedDeclNameKind(declReferenceExpr node: DeclReferenceExprSyntax) -> BridgedMacroIntroducedDeclNameKind? {
     if node.argumentNames != nil {
       // TODO: Diagnose
@@ -1320,6 +1446,142 @@ extension ASTGenVisitor {
     )
   }
 
+  func generateValueOrType(expr node: ExprSyntax) -> BridgedTypeRepr? {
+    var node = node
+
+    // Try value first.
+    let minusLoc: BridgedSourceLoc
+    if let prefixExpr = node.as(PrefixOperatorExprSyntax.self),
+      prefixExpr.operator.rawText == "-",
+      prefixExpr.expression.is(IntegerLiteralExprSyntax.self) {
+      minusLoc = self.generateSourceLoc(prefixExpr.operator)
+      node = prefixExpr.expression
+    } else {
+      minusLoc = nil
+    }
+    if let integerExpr = node.as(IntegerLiteralExprSyntax.self) {
+      let value = self.copyAndStripUnderscores(text: integerExpr.literal.rawText)
+      return BridgedIntegerTypeRepr.createParsed(
+        self.ctx,
+        string: value,
+        loc: self.generateSourceLoc(node), minusLoc: minusLoc
+      ).asTypeRepr
+    }
+
+    assert(!minusLoc.isValid)
+    return self.generateTypeRepr(expr: node)
+  }
+
+  func generateRawLayoutAttr(attribute node: AttributeSyntax) -> BridgedRawLayoutAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      switch args.first?.label?.rawText {
+      case "size":
+        return generateSizeAlignment()
+      case "like":
+        return generateScalarLike()
+      case "likeArrayOf":
+        return generateArrayLike()
+      default:
+        // TODO: Diagnose.
+        fatalError("invalid argument for @rawLayout attribute")
+      }
+
+      func generateSizeAlignment() -> BridgedRawLayoutAttr? {
+        guard let size = generateConsumingIntegerLiteralOption(label: "size") else {
+          // Should already be diagnosed.
+          return nil
+        }
+        guard let alignment = generateConsumingIntegerLiteralOption(label: "alignment") else {
+          // Should already be diagnosed.
+          return nil
+        }
+        return .createParsed(
+          self.ctx,
+          atLoc: self.generateSourceLoc(node.atSign),
+          range: self.generateAttrSourceRange(node),
+          size: size,
+          alignment: alignment
+        )
+      }
+
+      func generateScalarLike() -> BridgedRawLayoutAttr? {
+        let tyR = self.generateConsumingAttrOption(args: &args, label: "like") {
+          self.generateTypeRepr(expr: $0)
+        }
+        guard let tyR else {
+          return nil
+        }
+
+        guard let moveAsLike = args.isEmpty ? false : generateConsumingMoveAsLike() else {
+          return nil
+        }
+
+        return .createParsed(
+          self.ctx,
+          atLoc: self.generateSourceLoc(node.atSign),
+          range: self.generateAttrSourceRange(node),
+          like: tyR,
+          moveAsLike: moveAsLike
+        )
+      }
+
+      func generateArrayLike() -> BridgedRawLayoutAttr? {
+        let tyR = self.generateConsumingAttrOption(args: &args, label: "likeArrayOf") {
+          self.generateTypeRepr(expr: $0)
+        }
+        guard let tyR else {
+          return nil
+        }
+
+        // 'count:' can be integer literal or a generic parameter.
+        let count = self.generateConsumingAttrOption(args: &args, label: "count") {
+          self.generateValueOrType(expr: $0)
+        }
+        guard let count else {
+          return nil
+        }
+
+        guard let moveAsLike = args.isEmpty ? false : generateConsumingMoveAsLike() else {
+          return nil
+        }
+
+        return .createParsed(
+          self.ctx,
+          atLoc: self.generateSourceLoc(node.atSign),
+          range: self.generateAttrSourceRange(node),
+          likeArrayOf: tyR,
+          count: count,
+          moveAsLike: moveAsLike
+        )
+      }
+
+      func generateConsumingIntegerLiteralOption(label: SyntaxText) -> Int? {
+        self.generateConsumingAttrOption(args: &args, label: label) {
+          guard let integerExpr = $0.as(IntegerLiteralExprSyntax.self) else {
+            // TODO: Diagnose
+            fatalError("expected integer literal for '\(String(syntaxText: label)):' in @_rawLayout")
+          }
+          guard let count = integerExpr.representedLiteralValue else {
+            fatalError("invalid value literal for '\(String(syntaxText: label)):' in @_rawLayout")
+          }
+          return count
+        }
+      }
+
+      func generateConsumingMoveAsLike() -> Bool? {
+        self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+          switch $0.rawText {
+          case "moveAsLike":
+            return true
+          default:
+            // TODO: Diagnose.
+            fatalError("expected 'moveAsLike' in @rawLayout attribute")
+          }
+        }
+      }
+    }
+  }
+
   // FIXME: This is a decl modifier
   func generateReferenceOwnershipAttr(attribute node: AttributeSyntax, attrName: SyntaxText)
     -> BridgedReferenceOwnershipAttr?
@@ -1655,6 +1917,30 @@ extension ASTGenVisitor {
     )
   }
 
+  func generateUnavailableInEmbeddedAttr(attribute node: AttributeSyntax) -> BridgedAvailableAttr? {
+    if ctx.langOptsHasFeature(.Embedded) {
+      return BridgedAvailableAttr.createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        domain: .forEmbedded(),
+        domainLoc: nil,
+        kind: .unavailable,
+        message: "unavailable in embedded Swift",
+        renamed: "",
+        introduced: BridgedVersionTuple(),
+        introducedRange: BridgedSourceRange(),
+        deprecated: BridgedVersionTuple(),
+        deprecatedRange:  BridgedSourceRange(),
+        obsoleted: BridgedVersionTuple(),
+        obsoletedRange: BridgedSourceRange()
+      )
+    } else {
+      // For non-Embedded mode, ignore it.
+      return nil
+    }
+  }
+
   func generateSimpleDeclAttr(attribute node: AttributeSyntax, kind: BridgedDeclAttrKind) -> BridgedDeclAttribute? {
     // TODO: Diagnose extraneous arguments.
     // TODO: Diagnose if `kind` is a modifier.
@@ -1842,15 +2128,20 @@ extension ASTGenVisitor {
       return self.generateAccessControlAttr(declModifier: node, level: .public)
     case .open:
       return self.generateAccessControlAttr(declModifier: node, level: .open)
+    case .nonisolated:
+      return self.generateNonisolatedAttr(declModifier: node)?.asDeclAttribute
     case .weak, .unowned:
       return self.generateReferenceOwnershipAttr(declModifier: node)?.asDeclAttribute
     default:
       // Other modifiers are all "simple" attributes.
       let kind = BridgedDeclAttrKind(from: node.name.rawText.bridged)
       guard kind != .none else {
-        // TODO: Diagnose?
-        assertionFailure("unknown decl modifier")
-        return nil
+        // TODO: Diagnose.
+        fatalError("(compiler bug) unknown decl modifier")
+      }
+      if !BridgedDeclAttribute.isDeclModifier(kind) {
+        // TODO: Diagnose.
+        fatalError("(compiler bug) decl attribute was parsed as a modifier")
       }
       return self.generateSimpleDeclAttr(declModifier: node, kind: kind)
     }
@@ -1860,7 +2151,10 @@ extension ASTGenVisitor {
     -> BridgedDeclAttribute?
   {
     if let detail = node.detail {
-      precondition(detail.detail.keywordKind == .set, "only accepted modifier argument is '(set)'")
+      guard detail.detail.rawText == "set" else {
+        // TODO: Diagnose
+        fatalError("only accepted modifier argument is '(set)'")
+      }
       return BridgedSetterAccessAttr.createParsed(
         self.ctx,
         range: self.generateSourceRange(node),
@@ -1873,6 +2167,27 @@ extension ASTGenVisitor {
         accessLevel: level
       ).asDeclAttribute
     }
+  }
+
+  func generateNonisolatedAttr(declModifier node: DeclModifierSyntax) -> BridgedNonisolatedAttr? {
+    let isUnsafe: Bool
+    switch node.detail?.detail.rawText {
+    case "unsafe":
+      isUnsafe = true
+    case nil:
+      isUnsafe = false
+    case let text?:
+      // TODO: Diagnose
+      _ = text
+      fatalError("invalid argument for nonisolated modifier")
+    }
+
+    return BridgedNonisolatedAttr.createParsed(
+      self.ctx,
+      atLoc: nil,
+      range: self.generateSourceRange(node),
+      isUnsafe: isUnsafe
+    )
   }
 
   func generateReferenceOwnershipAttr(declModifier node: DeclModifierSyntax) -> BridgedReferenceOwnershipAttr? {
@@ -1888,17 +2203,18 @@ extension ASTGenVisitor {
       kind = .weak
       guard node.detail == nil else {
         // TODO: Diagnose.
-        return nil
+        fatalError("invalid argument for 'weak' modifier")
       }
     case .unowned:
-      switch node.detail?.detail.keywordKind {
-      case .safe, nil:
+      switch node.detail?.detail.rawText {
+      case "safe", nil:
         kind = .unowned
-      case .unsafe:
+      case "unsafe":
         kind = .unmanaged
-      case _?:
+      case let text?:
         // TODO: Diagnose
-        kind = .unowned
+        _ = text
+        fatalError("invalid argument for 'unowned' modifier")
       }
     default:
       preconditionFailure("ReferenceOwnership modifier must be 'weak' or 'unowned'")
@@ -1922,6 +2238,21 @@ extension ASTGenVisitor {
       atLoc: nil,
       nameLoc: self.generateSourceLoc(node.name)
     )
+  }
+}
+
+extension ASTGenVisitor {
+  func generate(generatedAttributeClauseFile node: AttributeClauseFileSyntax) -> BridgedDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
+
+    // Attach the attribute list to a implicit 'MissingDecl' as the placeholder.
+    let decl = BridgedMissingDecl.create(
+      self.ctx,
+      declContext: self.declContext,
+      loc: self.generateSourceLoc(node.endOfFileToken)
+    ).asDecl
+    decl.attachParsedAttrs(attrs.attributes)
+    return decl
   }
 }
 

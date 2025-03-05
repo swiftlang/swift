@@ -474,21 +474,22 @@ if("ANDROID" IN_LIST SWIFT_SDKS)
     endif()
   endforeach()
 
-  set(android_posix_filesystem_apinotes_source "posix_filesystem.apinotes")
-  set(apinotes_subdir "${SWIFTLIB_DIR}/apinotes")
   add_custom_command_target(
     copy_android_posix_filesystem_apinotes_resource
     COMMAND
-      "${CMAKE_COMMAND}" "-E" "make_directory" ${apinotes_subdir}
+      ${CMAKE_COMMAND} -E make_directory "${SWIFTLIB_DIR}/apinotes"
     COMMAND
-      "${CMAKE_COMMAND}" "-E" "copy_if_different"
-        "${CMAKE_CURRENT_SOURCE_DIR}/${android_posix_filesystem_apinotes_source}" ${apinotes_subdir}
-    OUTPUT ${apinotes_subdir}/${android_posix_filesystem_apinotes_source}
-    COMMENT "Copying Android posix_filesystem API notes to resource directories")
+      ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/posix_filesystem.apinotes" "${SWIFTLIB_DIR}/apinotes"
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/spawn.apinotes" "${SWIFTLIB_DIR}/apinotes"
+    OUTPUT
+      "${SWIFTLIB_DIR}/apinotes/posix_filesystem.apinotes"
+      "${SWIFTLIB_DIR}/apinotes/spawn.apinotes"
+    COMMENT
+      "Copying Android API Notes to resource directories")
   add_dependencies(sdk-overlay ${copy_android_posix_filesystem_apinotes_resource})
   list(APPEND android_modulemap_target_list ${copy_android_posix_filesystem_apinotes_resource})
-  swift_install_in_component(FILES
-                              "${android_posix_filesystem_apinotes_source}"
+  swift_install_in_component(FILES posix_filesystem.apinotes spawn.apinotes
                              DESTINATION "lib/swift/apinotes"
                              COMPONENT sdk-overlay)
 endif()

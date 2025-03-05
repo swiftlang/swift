@@ -640,8 +640,6 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
         // This copy_addr [take] will perform the final deinitialization.
         return false;
       }
-      assert(!tempObj->getType().isMoveOnly() &&
-             "introducing copy of move-only value!?");
       return true;
     }
     if (auto *li = dyn_cast<LoadInst>(lastLoadInst)) {
@@ -650,8 +648,6 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
         // This load [take] will perform the final deinitialization.
         return false;
       }
-      assert(!tempObj->getType().isMoveOnly() &&
-             "introducing copy of move-only value!?");
       return true;
     }
     return true;

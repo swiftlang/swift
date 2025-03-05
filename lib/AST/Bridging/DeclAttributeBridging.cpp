@@ -66,6 +66,13 @@ BridgedDeclAttribute BridgedDeclAttribute_createSimple(
                                      cAtLoc.unbridged(), cAttrLoc.unbridged());
 }
 
+bool BridgedDeclAttribute_isDeclModifier(BridgedDeclAttrKind cKind) {
+  auto optKind = unbridged(cKind);
+  if (!optKind)
+    return false;
+  return DeclAttribute::isDeclModifier(*optKind);
+}
+
 void BridgedDeclAttributes_add(BridgedDeclAttributes *cAttrs,
                                BridgedDeclAttribute cAdd) {
   auto attrs = cAttrs->unbridged();
@@ -106,17 +113,18 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsed(
                     /*IsSPI=*/false);
 }
 
-BridgedAvailableAttr BridgedAvailableAttr_createParsedStr(
+BridgedAvailableAttr BridgedAvailableAttr_createParsedIdentifier(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedStringRef cDomainString,
+    BridgedSourceRange cRange, BridgedIdentifier cDomainIdentifier,
     BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
     BridgedStringRef cMessage, BridgedStringRef cRenamed,
     BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
     BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
     BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange) {
+
   return new (cContext.unbridged())
       AvailableAttr(cAtLoc.unbridged(), cRange.unbridged(),
-                    cDomainString.unbridged(), cDomainLoc.unbridged(),
+                    cDomainIdentifier.unbridged(), cDomainLoc.unbridged(),
                     unbridge(cKind), cMessage.unbridged(), cRenamed.unbridged(),
                     cIntroduced.unbridged(), cIntroducedRange.unbridged(),
                     cDeprecated.unbridged(), cDeprecatedRange.unbridged(),
@@ -359,6 +367,72 @@ BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
       InlineAttr(cAtLoc.unbridged(), cRange.unbridged(), unbridged(cKind));
 }
 
+static swift::ParsedLifetimeDependenceKind
+unbridged(BridgedParsedLifetimeDependenceKind kind) {
+  switch (kind) {
+  case BridgedParsedLifetimeDependenceKindDefault:
+    return swift::ParsedLifetimeDependenceKind::Default;
+  case BridgedParsedLifetimeDependenceKindScope:
+    return swift::ParsedLifetimeDependenceKind::Scope;
+  case BridgedParsedLifetimeDependenceKindInherit:
+    return swift::ParsedLifetimeDependenceKind::Inherit;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+swift::LifetimeDescriptor BridgedLifetimeDescriptor::unbridged() {
+  switch (kind) {
+  case DescriptorKind::Named:
+    return LifetimeDescriptor::forNamed(
+        value.name.unbridged(), ::unbridged(dependenceKind), loc.unbridged());
+  case DescriptorKind::Ordered:
+    return LifetimeDescriptor::forOrdered(
+        value.index, ::unbridged(dependenceKind), loc.unbridged());
+  case DescriptorKind::Self:
+    return LifetimeDescriptor::forSelf(::unbridged(dependenceKind),
+                                       loc.unbridged());
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+static BridgedLifetimeEntry BridgedLifetimeEntry_createParsedImpl(
+    BridgedASTContext cContext, BridgedSourceRange cRange,
+    BridgedArrayRef cSources,
+    std::optional<BridgedLifetimeDescriptor> cTarget) {
+  SmallVector<LifetimeDescriptor> sources;
+  for (auto cSource : cSources.unbridged<BridgedLifetimeDescriptor>())
+    sources.push_back(cSource.unbridged());
+  std::optional<LifetimeDescriptor> target;
+  if (cTarget)
+    target = cTarget->unbridged();
+
+  return LifetimeEntry::create(cContext.unbridged(), cRange.Start.unbridged(),
+                               cRange.End.unbridged(), sources, target);
+}
+
+BridgedLifetimeEntry
+BridgedLifetimeEntry_createParsed(BridgedASTContext cContext,
+                                  BridgedSourceRange cRange,
+                                  BridgedArrayRef cSources) {
+  return BridgedLifetimeEntry_createParsedImpl(cContext, cRange, cSources,
+                                               std::nullopt);
+}
+
+BridgedLifetimeEntry BridgedLifetimeEntry_createParsed(
+    BridgedASTContext cContext, BridgedSourceRange cRange,
+    BridgedArrayRef cSources, BridgedLifetimeDescriptor cTarget) {
+  return BridgedLifetimeEntry_createParsedImpl(cContext, cRange, cSources,
+                                               cTarget);
+}
+
+BridgedLifetimeAttr BridgedLifetimeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedLifetimeEntry cEntry) {
+  return LifetimeAttr::create(cContext.unbridged(), cAtLoc.unbridged(),
+                              cRange.unbridged(), /*implicit=*/false,
+                              cEntry.unbridged());
+}
+
 BridgedMacroRole BridgedMacroRole_fromString(BridgedStringRef str) {
   // Match the role string to the known set of roles.
   auto role =
@@ -558,8 +632,37 @@ BridgedRawDocCommentAttr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged()) RawDocCommentAttr(cRange.unbridged());
 }
 
-static ReferenceOwnership unbridged(BridgedReferenceOwnership kind) {
+BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, size_t size, size_t alignment) {
+  return new (cContext.unbridged())
+      RawLayoutAttr(size, alignment, cAtLoc.unbridged(), cRange.unbridged());
+}
+
+SWIFT_NAME("BridgedRawLayoutAttr.createParsed(_:atLoc:range:like:moveAsLike:)")
+BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedTypeRepr cLikeType, bool moveAsLike) {
+  return new (cContext.unbridged())
+      RawLayoutAttr(cLikeType.unbridged(), moveAsLike, cAtLoc.unbridged(),
+                    cRange.unbridged());
+}
+
+SWIFT_NAME("BridgedRawLayoutAttr.createParsed(_:atLoc:range:likeArrayOf:count:"
+           "moveAsLike:)")
+BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedTypeRepr cLikeType,
+    BridgedTypeRepr cCountType, bool moveAsLike) {
+  return new (cContext.unbridged())
+      RawLayoutAttr(cLikeType.unbridged(), cCountType.unbridged(), moveAsLike,
+                    cAtLoc.unbridged(), cRange.unbridged());
+}
+
+ReferenceOwnership unbridged(BridgedReferenceOwnership kind) {
   switch (kind) {
+  case BridgedReferenceOwnershipStrong:
+    return ReferenceOwnership::Strong;
   case BridgedReferenceOwnershipWeak:
     return ReferenceOwnership::Weak;
   case BridgedReferenceOwnershipUnowned:

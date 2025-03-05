@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -48,6 +48,12 @@
 // for features that can be assumed to be available in any Swift compiler that
 // will be used to process the textual interface files produced by this
 // Swift compiler.
+//
+// OPTIONAL_LANGUAGE_FEATURE is the same as LANGUAGE_FEATURE, but describes
+// accepted features that can be enabled independently of language version and
+// are not scheduled to be enabled in some specific language version. Examples
+// of optional language features include strict memory safety checking (SE-0458)
+// and Embedded Swift.
 //===----------------------------------------------------------------------===//
 
 #ifndef LANGUAGE_FEATURE
@@ -72,7 +78,7 @@
 // A feature that's both suppressible and upcoming.
 // Delegates to whichever the includer defines.
 #ifndef SUPPRESSIBLE_UPCOMING_FEATURE
-#  if defined(SUPPRESSIBLE_UPCOMING_FEATURE) && \
+#  if defined(SUPPRESSIBLE_LANGUAGE_FEATURE) && \
       defined(UPCOMING_FEATURE)
 #    error ambiguous defines when including Features.def
 #  elif defined(SUPPRESSIBLE_LANGUAGE_FEATURE)
@@ -86,6 +92,11 @@
 
 #ifndef SUPPRESSIBLE_LANGUAGE_FEATURE
 #  define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
+  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#endif
+
+#ifndef OPTIONAL_LANGUAGE_FEATURE
+#  define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
   LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #endif
 
@@ -158,7 +169,6 @@ BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskWithExecutor, 0, "Task create bu
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor, 0, "Task create in discarding task group with extra executor preference")
 BASELINE_LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc")
 BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedStackAlloc, 0, "Builtin.unprotectedStackAlloc")
-BASELINE_LANGUAGE_FEATURE(BuiltinAllocVector, 0, "Builtin.allocVector")
 BASELINE_LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline")
 BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf")
 BASELINE_LANGUAGE_FEATURE(NewCxxMethodSafetyHeuristics, 0, "Only import C++ methods that return pointers (projections) on owned types as unsafe")
@@ -203,6 +213,8 @@ CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) fu
 LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
 LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
+LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
+SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -226,6 +238,14 @@ UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 
+// Optional language features / modes
+
+/// Diagnose uses of language constructs and APIs that can violate memory
+/// safety.
+OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory safety")
+
+// Experimental features
+
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
@@ -235,7 +255,6 @@ EXPERIMENTAL_FEATURE(MacrosOnImports, true)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
-EXPERIMENTAL_FEATURE(Span, true)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
@@ -367,9 +386,6 @@ EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
 
-/// Enables the FixedArray data type.
-EXPERIMENTAL_FEATURE(FixedArrays, true)
-
 // Group Main Actor Isolation Errors by Scope
 EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 
@@ -400,21 +416,15 @@ EXPERIMENTAL_FEATURE(Extern, true)
 // Enable trailing comma for comma-separated lists.
 EXPERIMENTAL_FEATURE(TrailingComma, false)
 
-/// Allow the @unsafe attribute.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AllowUnsafeAttribute, true)
-
-/// Warn on use of unsafe constructs.
-EXPERIMENTAL_FEATURE(WarnUnsafe, true)
-
-/// Import unsafe C and C++ constructs as @unsafe.
-EXPERIMENTAL_FEATURE(SafeInterop, true)
-
 // Import bounds safety and lifetime attributes from interop headers to
 // generate Swift wrappers with safe pointer types.
 EXPERIMENTAL_FEATURE(SafeInteropWrappers, false)
 
 /// Ignore resilience errors due to C++ types.
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
+
+/// Import inherited non-public members when importing C++ classes.
+EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
 // Isolated deinit
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
@@ -443,17 +453,40 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 /// Allow the @abi attribute.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
 
+/// Allow the @execution attribute. This is also connected to
+/// AsyncCallerExecution feature.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExecutionAttribute, false)
+
 /// Functions with nonisolated isolation inherit their isolation from the
 /// calling context.
-EXPERIMENTAL_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext, false)
+EXPERIMENTAL_FEATURE(AsyncCallerExecution, false)
 
 /// Allow custom availability domains to be defined and referenced.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
+
+/// Be strict about the Sendable conformance of metatypes.
+EXPERIMENTAL_FEATURE(StrictSendableMetatypes, true)
+
+
+/// Allow public enumerations to be extensible by default
+/// regardless of whether the module they are declared in
+/// is resilient or not.
+EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
+
+/// Allow isolated conformances.
+EXPERIMENTAL_FEATURE(IsolatedConformances, true)
+
+/// Syntax sugar features for concurrency.
+EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
+
+/// Allow declaration of compile-time values
+EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef BASELINE_LANGUAGE_FEATURE
+#undef OPTIONAL_LANGUAGE_FEATURE
 #undef CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE
 #undef CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE
 #undef SUPPRESSIBLE_EXPERIMENTAL_FEATURE

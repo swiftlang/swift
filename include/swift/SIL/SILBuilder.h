@@ -437,16 +437,6 @@ public:
         isFromVarDecl, wasMoved));
   }
 
-  AllocVectorInst *
-  createAllocVector(SILLocation loc, SILValue capacity, SILType elementType) {
-    if (isInsertingIntoGlobal()) {
-      return insert(AllocVectorInst::createInInitializer(
-          getSILDebugLocation(loc, true), capacity, elementType, getModule()));
-    }
-    return insert(AllocVectorInst::create(
-        getSILDebugLocation(loc, true), capacity, elementType, getFunction()));
-  }
-
   AllocPackInst *createAllocPack(SILLocation loc, SILType packType) {
     return insert(AllocPackInst::create(getSILDebugLocation(loc), packType,
                                         getFunction()));
@@ -1075,7 +1065,7 @@ public:
       SILLocation Loc, SILValue src, SILDebugVariable Var,
       PoisonRefs_t poisonRefs = DontPoisonRefs,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
-      bool trace = false);
+      bool trace = false, bool overrideLoc = true);
   DebugValueInst *createDebugValueAddr(
       SILLocation Loc, SILValue src, SILDebugVariable Var,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
@@ -3125,12 +3115,16 @@ private:
     C.notifyInserted(TheInst);
 
 #ifndef NDEBUG
-    // If we are inserting into a specific function (rather than a block for a
-    // global_addr), verify that our instruction/the associated location are in
-    // sync. We don't care if an instruction is used in global_addr.
-    if (F)
-      TheInst->verifyDebugInfo();
-    TheInst->verifyOperandOwnership(&C.silConv);
+    // A vector instruction can only be in a global initializer. Therefore there
+    // is no point in verifying debug info or ownership.
+    if (!isa<VectorInst>(TheInst)) {
+      // If we are inserting into a specific function (rather than a block for a
+      // global_addr), verify that our instruction/the associated location are in
+      // sync. We don't care if an instruction is used in global_addr.
+      if (F)
+        TheInst->verifyDebugInfo();
+      TheInst->verifyOperandOwnership(&C.silConv);
+    }
 #endif
   }
 

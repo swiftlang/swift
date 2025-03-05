@@ -5439,6 +5439,10 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
     case FunctionTypeIsolation::Kind::NonIsolated:
       break;
 
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      hopToIsolatedParameter = true;
+      break;
+
     // For a function with parameter isolation, we'll have to dig the
     // argument out after translation but before making the call.
     case FunctionTypeIsolation::Kind::Parameter:

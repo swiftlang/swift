@@ -1873,9 +1873,9 @@ public:
   bool diagnoseAsError() override;
 };
 
-class NotCompileTimeConstFailure final : public FailureDiagnostic {
+class NotCompileTimeLiteralFailure final : public FailureDiagnostic {
 public:
-  NotCompileTimeConstFailure(const Solution &solution, ConstraintLocator *locator)
+  NotCompileTimeLiteralFailure(const Solution &solution, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;
@@ -3234,20 +3234,35 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose when a slab literal has an incorrect number of elements for the
-/// contextual slab type it's initializing.
+/// Diagnose when an inline array literal has an incorrect number of elements
+/// for the contextual inline array type it's initializing.
 ///
 /// \code
-/// let x: Slab<4, Int> = [1, 2] // expected '4' elements but got '2'
+/// let x: InlineArray<4, Int> = [1, 2] // expected '4' elements but got '2'
 /// \endcode
-class IncorrectSlabLiteralCount final : public FailureDiagnostic {
+class IncorrectInlineArrayLiteralCount final : public FailureDiagnostic {
   Type lhsCount, rhsCount;
 
 public:
-  IncorrectSlabLiteralCount(const Solution &solution, Type lhsCount,
+  IncorrectInlineArrayLiteralCount(const Solution &solution, Type lhsCount,
                             Type rhsCount, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), lhsCount(resolveType(lhsCount)),
         rhsCount(resolveType(rhsCount)) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose when an isolated conformance is used in a place where one cannot
+/// be, e.g., due to a Sendable or SendableMetatype requirement on the
+/// corresponding type parameter.
+class DisallowedIsolatedConformance final : public FailureDiagnostic {
+  ProtocolConformance *conformance;
+
+public:
+  DisallowedIsolatedConformance(const Solution &solution,
+                                ProtocolConformance *conformance,
+                                ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), conformance(conformance) {}
 
   bool diagnoseAsError() override;
 };

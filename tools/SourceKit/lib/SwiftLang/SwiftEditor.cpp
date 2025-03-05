@@ -164,7 +164,8 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
 
   SKInfo.ID = DiagnosticEngine::diagnosticIDStringFor(Info.ID).str();
 
-  if (Info.Category == "deprecation") {
+  if (Info.Category == "deprecation" ||
+      Info.Category.starts_with("Deprecated")) {
     SKInfo.Categories.push_back(DiagnosticCategory::Deprecation);
   } else if (Info.Category == "no-usage") {
     SKInfo.Categories.push_back(DiagnosticCategory::NoUsage);

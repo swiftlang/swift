@@ -151,20 +151,34 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1+1,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1+1+1+1,
       /// An `AvailableAttr::Kind` value.
       Kind : 4,
 
       /// State storage for `SemanticAvailableAttrRequest`.
       HasComputedSemanticAttr : 1,
-      HasDomain : 1,
 
       /// State storage for `RenamedDeclRequest`.
       HasComputedRenamedDecl : 1,
       HasRenamedDecl : 1,
 
       /// Whether this attribute was spelled `@_spi_available`.
-      IsSPI : 1
+      IsSPI : 1,
+
+      /// Whether this attribute belongs to a chain of adjacent `@available`
+      /// attributes that were generated from a single attribute written in
+      /// source using short form syntax, e.g.
+      ///
+      ///     @available(macOS 15, iOS 18, *)
+      ///
+      IsGroupMember : 1,
+
+      /// Whether this attribute is the final one in its group.
+      IsGroupTerminator : 1,
+
+      /// Whether any members of the group were written as a wildcard
+      /// specification (`*`) in source.
+      IsGroupedWithWildcard : 1
     );
 
     SWIFT_INLINE_BITFIELD(ClangImporterSynthesizedTypeAttr, DeclAttribute, 1,
@@ -704,23 +718,6 @@ public:
   }
 };
 
-/// Determine the result of comparing an availability attribute to a specific
-/// platform or language version.
-enum class AvailableVersionComparison {
-  /// The entity is guaranteed to be available.
-  Available,
-
-  /// The entity is never available.
-  Unavailable,
-
-  /// The entity might be unavailable at runtime, because it was introduced
-  /// after the requested minimum platform version.
-  PotentiallyUnavailable,
-
-  /// The entity has been obsoleted.
-  Obsoleted,
-};
-
 /// Defines the @available attribute.
 class AvailableAttr : public DeclAttribute {
 public:
@@ -737,16 +734,8 @@ public:
     NoAsync,
   };
 
-  AvailableAttr(SourceLoc AtLoc, SourceRange Range, AvailabilityDomain Domain,
-                SourceLoc DomainLoc, Kind Kind, StringRef Message,
-                StringRef Rename, const llvm::VersionTuple &Introduced,
-                SourceRange IntroducedRange,
-                const llvm::VersionTuple &Deprecated,
-                SourceRange DeprecatedRange,
-                const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
-                bool Implicit, bool IsSPI);
-
-  AvailableAttr(SourceLoc AtLoc, SourceRange Range, StringRef DomainString,
+  AvailableAttr(SourceLoc AtLoc, SourceRange Range,
+                AvailabilityDomainOrIdentifier DomainOrIdentifier,
                 SourceLoc DomainLoc, Kind Kind, StringRef Message,
                 StringRef Rename, const llvm::VersionTuple &Introduced,
                 SourceRange IntroducedRange,
@@ -757,44 +746,28 @@ public:
 
 private:
   friend class SemanticAvailableAttr;
+  friend class SemanticAvailableAttrRequest;
 
-  union {
-    AvailabilityDomain Domain;
-    StringRef DomainString;
-  };
+  AvailabilityDomainOrIdentifier DomainOrIdentifier;
   const SourceLoc DomainLoc;
 
   const StringRef Message;
   const StringRef Rename;
 
-  llvm::VersionTuple Introduced;
+  const llvm::VersionTuple Introduced;
   const SourceRange IntroducedRange;
-  llvm::VersionTuple Deprecated;
+  const llvm::VersionTuple Deprecated;
   const SourceRange DeprecatedRange;
-  llvm::VersionTuple Obsoleted;
+  const llvm::VersionTuple Obsoleted;
   const SourceRange ObsoletedRange;
 
 public:
   /// Returns true if the `AvailabilityDomain` associated with the attribute
   /// has been resolved successfully.
-  bool hasCachedDomain() const { return Bits.AvailableAttr.HasDomain; }
+  bool hasCachedDomain() const { return DomainOrIdentifier.isDomain(); }
 
-  /// Returns the `AvailabilityDomain` associated with the attribute, or
-  /// `std::nullopt` if it has either not yet been resolved or could not be
-  /// resolved successfully.
-  std::optional<AvailabilityDomain> getCachedDomain() const {
-    if (hasCachedDomain())
-      return Domain;
-    return std::nullopt;
-  }
-
-  /// If the attribute does not already have a cached `AvailabilityDomain`, this
-  /// returns the domain string that was written in source, from which an
-  /// `AvailabilityDomain` can be resolved.
-  std::optional<StringRef> getDomainString() const {
-    if (hasCachedDomain())
-      return std::nullopt;
-    return DomainString;
+  AvailabilityDomainOrIdentifier getDomainOrIdentifier() const {
+    return DomainOrIdentifier;
   }
 
   SourceLoc getDomainLoc() const { return DomainLoc; }
@@ -838,6 +811,10 @@ public:
   /// a rename decl even when this string is empty.
   StringRef getRename() const { return Rename; }
 
+  bool hasCachedRenamedDecl() const {
+    return Bits.AvailableAttr.HasRenamedDecl;
+  }
+
   /// Whether this is an unconditionally unavailable entity.
   bool isUnconditionallyUnavailable() const;
 
@@ -849,6 +826,33 @@ public:
 
   /// Whether this attribute was spelled `@_spi_available`.
   bool isSPI() const { return Bits.AvailableAttr.IsSPI; }
+
+  /// Returns the next attribute in the chain of adjacent `@available`
+  /// attributes that were generated from a single attribute written in source
+  /// using short form syntax e.g. (`@available(macOS 15, iOS 18, *)`).
+  const AvailableAttr *getNextGroupedAvailableAttr() const {
+    if (Bits.AvailableAttr.IsGroupMember && !isGroupTerminator())
+      return dyn_cast_or_null<AvailableAttr>(Next);
+    return nullptr;
+  }
+
+  bool isGroupMember() const { return Bits.AvailableAttr.IsGroupMember; }
+  void setIsGroupMember() { Bits.AvailableAttr.IsGroupMember = true; }
+
+  /// Whether this attribute is the final one in its group.
+  bool isGroupTerminator() const {
+    return Bits.AvailableAttr.IsGroupTerminator;
+  }
+  void setIsGroupTerminator() { Bits.AvailableAttr.IsGroupTerminator = true; }
+
+  /// Whether any members of the group were written as a wildcard specification
+  /// (`*`) in source.
+  bool isGroupedWithWildcard() const {
+    return Bits.AvailableAttr.IsGroupedWithWildcard;
+  }
+  void setIsGroupedWithWildcard() {
+    Bits.AvailableAttr.IsGroupedWithWildcard = true;
+  }
 
   /// Returns the kind of availability the attribute specifies.
   Kind getKind() const { return static_cast<Kind>(Bits.AvailableAttr.Kind); }
@@ -893,10 +897,6 @@ public:
     return DA->getKind() == DeclAttrKind::Available;
   }
 
-  bool hasCachedRenamedDecl() const {
-    return Bits.AvailableAttr.HasRenamedDecl;
-  }
-
 private:
   friend class RenamedDeclRequest;
 
@@ -911,18 +911,6 @@ private:
 
 private:
   friend class SemanticAvailableAttrRequest;
-
-  void setRawIntroduced(llvm::VersionTuple version) { Introduced = version; }
-
-  void setRawDeprecated(llvm::VersionTuple version) { Deprecated = version; }
-
-  void setRawObsoleted(llvm::VersionTuple version) { Obsoleted = version; }
-
-  void setCachedDomain(AvailabilityDomain domain) {
-    assert(!Bits.AvailableAttr.HasDomain);
-    Domain = domain;
-    Bits.AvailableAttr.HasDomain = true;
-  }
 
   bool hasComputedSemanticAttr() const {
     return Bits.AvailableAttr.HasComputedSemanticAttr;
@@ -2962,7 +2950,7 @@ public:
 
   ArrayRef<Identifier> getSuppressedFeatures() const {
     return {getTrailingObjects<Identifier>(),
-            Bits.AllowFeatureSuppressionAttr.NumFeatures};
+            static_cast<size_t>(Bits.AllowFeatureSuppressionAttr.NumFeatures)};
   }
 
   static bool classof(const DeclAttribute *DA) {
@@ -3306,41 +3294,43 @@ class SemanticAvailableAttr final {
 public:
   SemanticAvailableAttr(const AvailableAttr *attr) : attr(attr) {
     assert(attr);
-    assert(attr->hasCachedDomain());
+    assert(attr->getDomainOrIdentifier().isDomain());
   }
 
   const AvailableAttr *getParsedAttr() const { return attr; }
   const AvailabilityDomain getDomain() const {
-    return attr->getCachedDomain().value();
+    return attr->getDomainOrIdentifier().getAsDomain().value();
   }
 
-  /// The version tuple written in source for the `introduced:` component.
-  std::optional<llvm::VersionTuple> getIntroduced() const {
-    return attr->getRawIntroduced();
-  }
+  /// The version tuple for the `introduced:` component.
+  std::optional<llvm::VersionTuple> getIntroduced() const;
 
   /// The source range of the `introduced:` version component.
   SourceRange getIntroducedSourceRange() const { return attr->IntroducedRange; }
 
-  /// Returns the effective range in which the declaration with this attribute
-  /// was introduced.
+  /// Returns the effective availability range for the attribute's `introduced:`
+  /// component (remapping or canonicalizing if necessary).
   AvailabilityRange getIntroducedRange(const ASTContext &Ctx) const;
 
-  /// The version tuple written in source for the `deprecated:` component.
-  std::optional<llvm::VersionTuple> getDeprecated() const {
-    return attr->getRawDeprecated();
-  }
+  /// The version tuple for the `deprecated:` component.
+  std::optional<llvm::VersionTuple> getDeprecated() const;
 
   /// The source range of the `deprecated:` version component.
   SourceRange getDeprecatedSourceRange() const { return attr->DeprecatedRange; }
 
-  /// The version tuple written in source for the `obsoleted:` component.
-  std::optional<llvm::VersionTuple> getObsoleted() const {
-    return attr->getRawObsoleted();
-  }
+  /// Returns the effective availability range for the attribute's `deprecated:`
+  /// component (remapping or canonicalizing if necessary).
+  AvailabilityRange getDeprecatedRange(const ASTContext &Ctx) const;
+
+  /// The version tuple for the `obsoleted:` component.
+  std::optional<llvm::VersionTuple> getObsoleted() const;
 
   /// The source range of the `obsoleted:` version component.
   SourceRange getObsoletedSourceRange() const { return attr->ObsoletedRange; }
+
+  /// Returns the effective availability range for the attribute's `obsoleted:`
+  /// component (remapping or canonicalizing if necessary).
+  AvailabilityRange getObsoletedRange(const ASTContext &Ctx) const;
 
   /// Returns the `message:` field of the attribute, or an empty string.
   StringRef getMessage() const { return attr->Message; }
@@ -3388,18 +3378,6 @@ public:
 
   /// Whether this attribute an attribute that is specific to Embedded Swift.
   bool isEmbeddedSpecific() const { return getDomain().isEmbedded(); }
-
-  /// Returns the active version from the AST context corresponding to
-  /// the available kind. For example, this will return the effective language
-  /// version for swift version-specific availability kind, PackageDescription
-  /// version for PackageDescription version-specific availability.
-  llvm::VersionTuple getActiveVersion(const ASTContext &ctx) const;
-
-  /// Compare this attribute's version information against the platform or
-  /// language version (assuming the this attribute pertains to the active
-  /// platform).
-  AvailableVersionComparison
-  getVersionAvailability(const ASTContext &ctx) const;
 
   /// Returns true if this attribute is considered active in the current
   /// compilation context.

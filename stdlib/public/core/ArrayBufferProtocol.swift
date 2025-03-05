@@ -140,7 +140,7 @@ where Indices == Range<Int> {
 extension _ArrayBufferProtocol {
   @inlinable
   internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
-    return firstElementAddress
+    return unsafe firstElementAddress
   }
 
   // Make sure the compiler does not inline _copyBuffer to reduce code size.
@@ -150,7 +150,7 @@ extension _ArrayBufferProtocol {
   internal init(copying buffer: Self) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
-    buffer._copyContents(
+    unsafe buffer._copyContents(
       subRange: buffer.indices,
       initializing: newBuffer.firstElementAddress)
     self = Self( _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
@@ -163,20 +163,20 @@ extension _ArrayBufferProtocol {
     elementsOf newValues: __owned C
   ) where C: Collection, C.Element == Element {
     _internalInvariant(startIndex == 0, "_SliceBuffer should override this function.")
-    let elements = self.firstElementAddress
+    let elements = unsafe self.firstElementAddress
 
     // erase all the elements we're replacing to create a hole
-    let holeStart = elements + subrange.lowerBound
-    let holeEnd = holeStart + newCount
+    let holeStart = unsafe elements + subrange.lowerBound
+    let holeEnd = unsafe holeStart + newCount
     let eraseCount = subrange.count
-    holeStart.deinitialize(count: eraseCount)
+    unsafe holeStart.deinitialize(count: eraseCount)
 
     let growth = newCount - eraseCount
 
     if growth != 0 {
-      let tailStart = elements + subrange.upperBound
+      let tailStart = unsafe elements + subrange.upperBound
       let tailCount = self.count - subrange.upperBound
-      holeEnd.moveInitialize(from: tailStart, count: tailCount)
+      unsafe holeEnd.moveInitialize(from: tailStart, count: tailCount)
       self.count += growth
     }
 
@@ -190,14 +190,14 @@ extension _ArrayBufferProtocol {
           $0.count == newCount,
           "invalid Collection: count differed in successive traversals"
         )
-        holeStart.initialize(from: $0.baseAddress!, count: newCount)
+        unsafe holeStart.initialize(from: $0.baseAddress!, count: newCount)
       }
       if done == nil {
-        var place = holeStart
+        var place = unsafe holeStart
         var i = newValues.startIndex
-        while place < holeEnd {
-          place.initialize(to: newValues[i])
-          place += 1
+        while unsafe place < holeEnd {
+          unsafe place.initialize(to: newValues[i])
+          unsafe place += 1
           newValues.formIndex(after: &i)
         }
         _expectEnd(of: newValues, is: i)

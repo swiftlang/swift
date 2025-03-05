@@ -2213,35 +2213,6 @@ public:
   DeallocStackInst *getSingleDeallocStack() const;
 };
 
-/// AllocVectorInst - Like AllocStackInst, but allocates a vector of elements.
-class AllocVectorInst final
-    : public UnaryInstructionWithTypeDependentOperandsBase<
-           SILInstructionKind::AllocVectorInst, AllocVectorInst, AllocationInst> {
-  friend SILBuilder;
-
-  AllocVectorInst(SILDebugLocation loc, SILValue capacity, SILType resultType,
-                  ArrayRef<SILValue> typeDependentOperands)
-    : UnaryInstructionWithTypeDependentOperandsBase(loc, capacity,
-                                                    typeDependentOperands,
-                                                    resultType) {
-  }
-
-  static AllocVectorInst *create(SILDebugLocation Loc, SILValue capacity,
-                                 SILType elementType, SILFunction &F);
-
-  static AllocVectorInst *createInInitializer(SILDebugLocation Loc,
-                        SILValue capacity, SILType elementType, SILModule &M);
-
-public:
-  /// getElementType - Get the type of the allocated memory (as opposed to the
-  /// type of the instruction itself, which will be an address type).
-  SILType getElementType() const {
-    return getType().getObjectType();
-  }
-
-  SILValue getCapacity() const { return getOperand(); }
-};
-
 /// AllocPackInst - This represents the allocation of a value pack
 /// in stack memory.  The memory is provided uninitialized.
 class AllocPackInst final
@@ -4798,7 +4769,7 @@ class BorrowedFromInst final : public InstructionBaseWithTrailingOperands<
 
 public:
 
-  SILValue getBorrowedValue() {
+  SILValue getBorrowedValue() const {
     return getAllOperands()[0].get();
   }
 
@@ -4811,6 +4782,8 @@ public:
   OperandValueArrayRef getEnclosingValues() const {
     return OperandValueArrayRef(getEnclosingValueOperands());
   }
+
+  bool isReborrow() const;
 };
 
 inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
@@ -8842,10 +8815,22 @@ public:
       uint8_t(MarkDependenceKind::Escaping);
   }
 
-  /// Visit the instructions that end the lifetime of an OSSA on-stack closure.
+  // True if the dependence is limited to the scope of an OSSA lifetime. Only
+  // for nonescaping dependencies with owned escapable values.
+  bool hasScopedLifetime() const {
+    return isNonEscaping() && getType().isObject()
+      && getOwnershipKind() == OwnershipKind::Owned
+      && getType().isEscapable(*getFunction());
+  }
+
+  /// Visit the instructions that end the lifetime the dependent value.
+  ///
+  /// Preconditions:
+  /// - isNonEscaping()
+  /// - Produces an owned, Escapable, non-address value
   bool visitNonEscapingLifetimeEnds(
     llvm::function_ref<bool (Operand*)> visitScopeEnd,
-    llvm::function_ref<bool (Operand*)> visitUnknownUse) const;
+    llvm::function_ref<bool (Operand*)> visitUnknownUse);
 };
 
 /// Promote an Objective-C block that is on the stack to the heap, or simply

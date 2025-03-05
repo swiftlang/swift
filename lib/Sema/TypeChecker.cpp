@@ -124,20 +124,20 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
 
   if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
     switch (E->getKind()) {
-#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case MagicIdentifierLiteralExpr::NAME: \
-      return TypeChecker::getProtocol( \
-          Context, expr->getLoc(), \
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING)                                  \
+    case MagicIdentifierLiteralExpr::NAME:                                     \
+      return TypeChecker::getProtocol(                                         \
+          Context, expr->getLoc(),                                             \
           KnownProtocolKind::ExpressibleByStringLiteral);
 
-#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case MagicIdentifierLiteralExpr::NAME: \
-      return TypeChecker::getProtocol( \
-          Context, expr->getLoc(), \
+#define MAGIC_INT_IDENTIFIER(NAME, STRING)                                     \
+    case MagicIdentifierLiteralExpr::NAME:                                     \
+      return TypeChecker::getProtocol(                                         \
+          Context, expr->getLoc(),                                             \
           KnownProtocolKind::ExpressibleByIntegerLiteral);
 
-#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case MagicIdentifierLiteralExpr::NAME: \
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING)                                 \
+    case MagicIdentifierLiteralExpr::NAME:                                     \
       return nullptr;
 
 #include "swift/AST/MagicIdentifierKinds.def"
@@ -251,11 +251,11 @@ void swift::performTypeChecking(SourceFile &SF) {
   }
 
   return (void)evaluateOrDefault(SF.getASTContext().evaluator,
-                                 TypeCheckSourceFileRequest{&SF}, {});
+                                 TypeCheckPrimaryFileRequest{&SF}, {});
 }
 
 evaluator::SideEffect
-TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
+TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   assert(SF && "Source file cannot be null!");
   assert(SF->ASTStage != SourceFile::TypeChecked &&
          "Should not be re-typechecking this file!");

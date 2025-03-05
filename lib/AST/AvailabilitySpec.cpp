@@ -17,119 +17,127 @@
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
-SourceRange AvailabilitySpec::getSourceRange() const {
-  switch (getKind()) {
-  case AvailabilitySpecKind::PlatformVersionConstraint:
-    return cast<PlatformVersionConstraintAvailabilitySpec>(this)->getSourceRange();
-
- case AvailabilitySpecKind::LanguageVersionConstraint:
- case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-   return cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(this)->getSourceRange();
-
-  case AvailabilitySpecKind::OtherPlatform:
-    return cast<OtherPlatformAvailabilitySpec>(this)->getSourceRange();
-  }
-  llvm_unreachable("bad AvailabilitySpecKind");
+AvailabilitySpec *AvailabilitySpec::createWildcard(ASTContext &ctx,
+                                                   SourceLoc starLoc) {
+  return new (ctx) AvailabilitySpec(AvailabilityDomain::forUniversal(), starLoc,
+                                    /*Version=*/{},
+                                    /*VersionStartLoc=*/{});
 }
 
-std::optional<AvailabilityDomain> AvailabilitySpec::getDomain() const {
-  switch (getKind()) {
-  case AvailabilitySpecKind::PlatformVersionConstraint: {
-    auto spec = cast<PlatformVersionConstraintAvailabilitySpec>(this);
-    return AvailabilityDomain::forPlatform(spec->getPlatform());
-  }
-  case AvailabilitySpecKind::LanguageVersionConstraint:
-    return AvailabilityDomain::forSwiftLanguage();
-  case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-    return AvailabilityDomain::forPackageDescription();
-  case AvailabilitySpecKind::OtherPlatform:
-    return std::nullopt;
-  }
-  llvm_unreachable("bad AvailabilitySpecKind");
-}
-
-std::optional<PlatformKind> AvailabilitySpec::getPlatform() const {
-  switch (getKind()) {
-  case AvailabilitySpecKind::PlatformVersionConstraint: {
-    auto spec = cast<PlatformVersionConstraintAvailabilitySpec>(this);
-    return spec->getPlatform();
-  }
-  case AvailabilitySpecKind::LanguageVersionConstraint:
-  case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-  case AvailabilitySpecKind::OtherPlatform:
-    return std::nullopt;
-  }
-  llvm_unreachable("bad AvailabilitySpecKind");
-}
-
-llvm::VersionTuple AvailabilitySpec::getVersion() const {
-  switch (getKind()) {
-  case AvailabilitySpecKind::PlatformVersionConstraint: {
-    auto spec = cast<PlatformVersionConstraintAvailabilitySpec>(this);
-    return spec->getVersion();
-  }
-  case AvailabilitySpecKind::LanguageVersionConstraint:
-  case AvailabilitySpecKind::PackageDescriptionVersionConstraint: {
-    auto spec = cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(this);
-    return spec->getVersion();
-  }
-  case AvailabilitySpecKind::OtherPlatform:
-    return llvm::VersionTuple();
-  }
-  llvm_unreachable("bad AvailabilitySpecKind");
-}
-
-SourceRange AvailabilitySpec::getVersionSrcRange() const {
-  switch (getKind()) {
-  case AvailabilitySpecKind::PlatformVersionConstraint: {
-    auto spec = cast<PlatformVersionConstraintAvailabilitySpec>(this);
-    return spec->getVersionSrcRange();
-  }
-  case AvailabilitySpecKind::LanguageVersionConstraint:
-  case AvailabilitySpecKind::PackageDescriptionVersionConstraint: {
-    auto spec = cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(this);
-    return spec->getVersionSrcRange();
-  }
-  case AvailabilitySpecKind::OtherPlatform:
+static SourceRange getSpecSourceRange(SourceLoc domainLoc,
+                                      SourceRange versionRange) {
+  if (domainLoc.isInvalid())
     return SourceRange();
-  }
-  llvm_unreachable("bad AvailabilitySpecKind");
+
+  if (versionRange.isValid())
+    return SourceRange(domainLoc, versionRange.End);
+
+  return SourceRange(domainLoc);
 }
 
-SourceRange PlatformVersionConstraintAvailabilitySpec::getSourceRange() const {
-  return SourceRange(PlatformLoc, VersionSrcRange.End);
+AvailabilitySpec *AvailabilitySpec::createForDomain(ASTContext &ctx,
+                                                    AvailabilityDomain domain,
+                                                    SourceLoc loc,
+                                                    llvm::VersionTuple version,
+                                                    SourceRange versionRange) {
+  return new (ctx)
+      AvailabilitySpec(domain, getSpecSourceRange(loc, versionRange), version,
+                       versionRange.Start);
 }
 
-void PlatformVersionConstraintAvailabilitySpec::print(raw_ostream &OS,
-                                              unsigned Indent) const {
-  OS.indent(Indent) << '(' << "platform_version_constraint_availability_spec"
-                    << " platform='" << platformString(getPlatform()) << "'"
-                    << " version='" << getVersion() << "'"
-                    << ')';
+AvailabilitySpec *AvailabilitySpec::createForDomainIdentifier(
+    ASTContext &ctx, Identifier domainIdentifier, SourceLoc loc,
+    llvm::VersionTuple version, SourceRange versionRange) {
+  return new (ctx)
+      AvailabilitySpec(domainIdentifier, getSpecSourceRange(loc, versionRange),
+                       version, versionRange.Start);
 }
 
-SourceRange PlatformAgnosticVersionConstraintAvailabilitySpec::getSourceRange() const {
-  return SourceRange(PlatformAgnosticNameLoc, VersionSrcRange.End);
+AvailabilitySpec *AvailabilitySpec::clone(ASTContext &ctx) const {
+  return new (ctx) AvailabilitySpec(getDomainOrIdentifier().copy(ctx), SrcRange,
+                                    Version, VersionStartLoc);
 }
 
-void PlatformAgnosticVersionConstraintAvailabilitySpec::print(raw_ostream &OS,
-                                                      unsigned Indent) const {
-  OS.indent(Indent) << '('
-                    << "platform_agnostic_version_constraint_availability_spec"
-                    << " kind='"
-                    << (isLanguageVersionSpecific() ?
-                         "swift" : "package_description")
-                    << "'"
-                    << " version='" << getVersion() << "'"
-                    << ')';
+void AvailabilitySpec::print(llvm::raw_ostream &os) const {
+  getDomainOrIdentifier().print(os);
+
+  if (!getRawVersion().empty())
+    os << " " << getRawVersion().getAsString();
 }
 
-void OtherPlatformAvailabilitySpec::print(raw_ostream &OS, unsigned Indent) const {
-  OS.indent(Indent) << '(' << "other_constraint_availability_spec"
-                    << " "
-                    << ')';
+std::optional<AvailabilityDomain>
+AvailabilitySpec::resolveInDeclContext(const DeclContext *declContext) {
+  auto domainOrIdentifier = getDomainOrIdentifier();
+  auto result =
+      domainOrIdentifier.resolveInDeclContext(getStartLoc(), declContext);
+  DomainOrIdentifier = domainOrIdentifier;
+  return result;
+}
+
+std::optional<SemanticAvailabilitySpec>
+AvailabilitySpec::getSemanticAvailabilitySpec(
+    const DeclContext *declContext) const {
+  return evaluateOrDefault(declContext->getASTContext().evaluator,
+                           SemanticAvailabilitySpecRequest{this, declContext},
+                           std::nullopt);
+}
+
+llvm::VersionTuple SemanticAvailabilitySpec::getVersion() const {
+  // For macOS Big Sur, we canonicalize 10.16 to 11.0 for compile-time
+  // checking since clang canonicalizes availability markup. However, to
+  // support Beta versions of macOS Big Sur where the OS
+  // reports 10.16 at run time, we need to compare against 10.16,
+  //
+  // This means for:
+  //
+  // if #available(macOS 10.16, *) { ... }
+  //
+  // we need to store the uncanonicalized version for codegen and canonicalize
+  // it as necessary for compile-time checks.
+  return canonicalizePlatformVersion(getDomain().getPlatformKind(),
+                                     spec->getRawVersion());
+}
+
+std::optional<SemanticAvailabilitySpec>
+SemanticAvailabilitySpecs::Filter::operator()(
+    const AvailabilitySpec *spec) const {
+  if (auto semanticSpec = spec->getSemanticAvailabilitySpec(declContext))
+    return semanticSpec;
+  return std::nullopt;
+}
+
+std::optional<SemanticAvailabilitySpec>
+SemanticAvailabilitySpecRequest::evaluate(
+    Evaluator &evaluator, const AvailabilitySpec *spec,
+    const DeclContext *declContext) const {
+  AvailabilitySpec *mutableSpec = const_cast<AvailabilitySpec *>(spec);
+  if (mutableSpec->resolveInDeclContext(declContext).has_value())
+    return SemanticAvailabilitySpec(spec);
+  return std::nullopt;
+}
+
+std::optional<std::optional<SemanticAvailabilitySpec>>
+SemanticAvailabilitySpecRequest::getCachedResult() const {
+  auto *spec = std::get<0>(getStorage());
+  auto domainOrIdentifier = spec->getDomainOrIdentifier();
+  if (!domainOrIdentifier.isResolved())
+    return {};
+
+  if (spec->isInvalid())
+    return {std::nullopt};
+
+  return SemanticAvailabilitySpec(spec);
+}
+
+void SemanticAvailabilitySpecRequest::cacheResult(
+    std::optional<SemanticAvailabilitySpec> value) const {
+  auto *mutableSpec = const_cast<AvailabilitySpec *>(std::get<0>(getStorage()));
+  if (!value)
+    mutableSpec->setInvalid();
 }

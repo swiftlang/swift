@@ -758,7 +758,7 @@ static bool parseDeclSILOptional(
                                  diag::sil_availability_expected_version))
         return true;
 
-      *availability = AvailabilityRange(VersionRange::allGTE(version));
+      *availability = AvailabilityRange(version);
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
@@ -1603,7 +1603,7 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
             P.consumeToken();
             IsNegative = true;
           }
-          int64_t Val;
+          uint64_t Val;
           if (parseInteger(Val, diag::sil_invalid_constant))
             return true;
           if (IsNegative)
@@ -4986,21 +4986,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       ResultVal =
           B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime, isLexical,
                              isFromVarDecl, usesMoveableValueDebugInfo);
-    break;
-  }
-  case SILInstructionKind::AllocVectorInst: {
-    SILType Ty;
-    if (parseSILType(Ty))
-      return true;
-
-    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
-      return true;
-
-    SILValue capacity;
-    if (parseTypedValueRef(capacity, B))
-      return true;
-
-    ResultVal = B.createAllocVector(InstLoc, capacity, Ty);
     break;
   }
   case SILInstructionKind::MetatypeInst: {

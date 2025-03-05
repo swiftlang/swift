@@ -793,7 +793,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     if (!seenFeatures.insert(*feature).second)
       continue;
 
-    // If the the current language mode enables the feature by default then
+    // If the current language mode enables the feature by default then
     // diagnose and skip it.
     if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
       if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
@@ -877,6 +877,9 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::BuiltinModule);
 
   Opts.enableFeature(Feature::LayoutPrespecialization);
+
+  if (Args.hasArg(OPT_strict_memory_safety))
+    Opts.enableFeature(Feature::StrictMemorySafety);
 
   return HadError;
 }
@@ -1855,6 +1858,9 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   for (auto A : Args.getAllArgValues(OPT_debug_forbid_typecheck_prefix)) {
     Opts.DebugForbidTypecheckPrefixes.push_back(A);
   }
+
+  if (Args.getLastArg(OPT_solver_disable_shrink))
+    Opts.SolverDisableShrink = true;
 
   if (Args.getLastArg(OPT_solver_disable_splitter))
     Opts.SolverDisableSplitter = true;
@@ -3007,6 +3013,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ShouldFunctionsBePreservedToDebugger &=
         LTOKind.value() == IRGenLLVMLTOKind::None;
 
+  
+  Opts.EnableAddressDependencies = Args.hasArg(OPT_enable_address_dependencies);
+
   return false;
 }
 
@@ -3403,6 +3412,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableReflectionNames = false;
   }
 
+  if (Args.hasArg(OPT_disable_llvm_merge_functions_pass)) {
+    Opts.DisableLLVMMergeFunctions = true;
+  }
+
   if (Args.hasArg(OPT_force_public_linkage)) {
     Opts.ForcePublicLinkage = true;
   }
@@ -3421,6 +3434,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   // AsyncFunctionPointer access.
   Opts.IndirectAsyncFunctionPointer = Triple.isOSBinFormatCOFF();
 
+  // PE/COFF cannot deal with the cross-module reference to the
+  // CoroFunctionPointer data block.  Force the use of indirect
+  // CoroFunctionPointer access.
+  Opts.IndirectCoroFunctionPointer = Triple.isOSBinFormatCOFF();
+
   // On some Harvard architectures that allow sliding code and data address space
   // offsets independently, it's impossible to make direct relative reference to
   // code from data because the relative offset between them is not representable.
@@ -3436,6 +3454,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_prespecialize_generic_metadata) &&
       !Args.hasArg(OPT_disable_generic_metadata_prespecialization)) {
     Opts.PrespecializeGenericMetadata = true;
+  }
+
+  if (Args.hasArg(OPT_emit_singleton_metadata_pointer)) {
+    Opts.EmitSingletonMetadataPointers = true;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_read_legacy_type_info_path_EQ)) {
@@ -3627,6 +3649,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_async_frame_push_pop_metadata,
                  OPT_disable_async_frame_push_pop_metadata,
                  Opts.EmitAsyncFramePushPopMetadata);
+  Opts.EmitTypeMallocForCoroFrame =
+  Args.hasFlag(OPT_enable_emit_type_malloc_for_coro_frame,
+              OPT_disable_emit_type_malloc_for_coro_frame,
+              Opts.EmitTypeMallocForCoroFrame);
   Opts.AsyncFramePointerAll = Args.hasFlag(OPT_enable_async_frame_pointer_all,
                                            OPT_disable_async_frame_pointer_all,
                                            Opts.AsyncFramePointerAll);
@@ -3634,6 +3660,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_large_loadable_types_reg2mem,
                    OPT_disable_large_loadable_types_reg2mem,
                    Opts.EnableLargeLoadableTypesReg2Mem);
+  Opts.UseCoroCCX8664 = Args.hasFlag(
+      OPT_enable_x86_64_corocc, OPT_disable_x86_64_corocc, Opts.UseCoroCCX8664);
+  Opts.UseCoroCCArm64 = Args.hasFlag(
+      OPT_enable_arm64_corocc, OPT_disable_arm64_corocc, Opts.UseCoroCCArm64);
   Opts.EnableLayoutStringValueWitnesses = Args.hasFlag(OPT_enable_layout_string_value_witnesses,
                                                        OPT_disable_layout_string_value_witnesses,
                                                        Opts.EnableLayoutStringValueWitnesses);
@@ -3673,6 +3703,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.UseCASBackend |= Args.hasArg(OPT_cas_backend);
   Opts.EmitCASIDFile |= Args.hasArg(OPT_cas_emit_casid_file);
+
+  Opts.DebugCallsiteInfo |= Args.hasArg(OPT_debug_callsite_info);
 
   return false;
 }
@@ -3898,7 +3930,7 @@ bool CompilerInvocation::parseArgs(
     }
   }
 
-  if (LangOpts.hasFeature(Feature::WarnUnsafe)) {
+  if (LangOpts.hasFeature(Feature::StrictMemorySafety)) {
     if (SILOpts.RemoveRuntimeAsserts ||
         SILOpts.AssertConfig == SILOptions::Unchecked) {
       Diags.diagnose(SourceLoc(),

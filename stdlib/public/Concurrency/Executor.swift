@@ -292,7 +292,7 @@ extension Executor {
 extension SerialExecutor {
   @available(SwiftStdlib 5.9, *)
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    UnownedSerialExecutor(ordinary: self)
+    unsafe UnownedSerialExecutor(ordinary: self)
   }
 }
 
@@ -328,17 +328,17 @@ public struct UnownedSerialExecutor: Sendable {
   /// which needs to reach for this from an @_transparent function which prevents @_spi use.
   @available(SwiftStdlib 5.9, *)
   public var _executor: Builtin.Executor {
-    self.executor
+    unsafe self.executor
   }
 
   @inlinable
   public init(_ executor: Builtin.Executor) {
-    self.executor = executor
+    unsafe self.executor = executor
   }
 
   @inlinable
   public init<E: SerialExecutor>(ordinary executor: __shared E) {
-    self.executor = Builtin.buildOrdinarySerialExecutorRef(executor)
+    unsafe self.executor = Builtin.buildOrdinarySerialExecutorRef(executor)
   }
 
   /// Opts the executor into complex "same exclusive execution context" equality checks.
@@ -354,13 +354,13 @@ public struct UnownedSerialExecutor: Sendable {
   @available(SwiftStdlib 5.9, *)
   @inlinable
   public init<E: SerialExecutor>(complexEquality executor: __shared E) {
-    self.executor = Builtin.buildComplexEqualitySerialExecutorRef(executor)
+    unsafe self.executor = Builtin.buildComplexEqualitySerialExecutorRef(executor)
   }
 
   @_spi(ConcurrencyExecutors)
   @available(SwiftStdlib 5.9, *)
   public var _isComplexEquality: Bool {
-    _executor_isComplexEquality(self)
+    unsafe _executor_isComplexEquality(self)
   }
 
 }
@@ -396,7 +396,7 @@ public struct UnownedTaskExecutor: Sendable {
 extension UnownedTaskExecutor: Equatable {
   @inlinable
   public static func == (_ lhs: UnownedTaskExecutor, _ rhs: UnownedTaskExecutor) -> Bool {
-    unsafeBitCast(lhs.executor, to: (Int, Int).self) == unsafeBitCast(rhs.executor, to: (Int, Int).self)
+    unsafe unsafeBitCast(lhs.executor, to: (Int, Int).self) == unsafeBitCast(rhs.executor, to: (Int, Int).self)
   }
 }
 
@@ -473,7 +473,7 @@ internal func _task_serialExecutor_checkIsolated<E>(executor: E)
 @_silgen_name("_task_serialExecutor_getExecutorRef")
 internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.Executor
     where E: SerialExecutor {
-  return executor.asUnownedSerialExecutor().executor
+  return unsafe executor.asUnownedSerialExecutor().executor
 }
 
 /// Obtain the executor ref by calling the executor's `asUnownedTaskExecutor()`.
@@ -537,11 +537,10 @@ internal final class DispatchQueueShim: @unchecked Sendable, SerialExecutor {
   }
 
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    return UnownedSerialExecutor(ordinary: self)
+    return unsafe UnownedSerialExecutor(ordinary: self)
   }
 }
 #endif // SWIFT_CONCURRENCY_USES_DISPATCH
-
 
 @available(SwiftStdlib 6.1, *)
 @_silgen_name("swift_task_deinitOnExecutor")

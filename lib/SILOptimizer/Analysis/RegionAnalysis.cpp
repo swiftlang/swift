@@ -320,6 +320,8 @@ static bool isLookThroughIfOperandAndResultNonSendable(SILInstruction *inst) {
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+  case SILInstructionKind::ConvertFunctionInst:
     return true;
   }
 }
@@ -1553,8 +1555,13 @@ enum class TranslationSemantics {
   Ignored,
 
   /// An instruction whose result produces a completely new region. E.x.:
-  /// alloc_box, alloc_pack, key_path. This results in the translator
-  /// producing a partition op that introduces the new region.
+  /// alloc_box, alloc_pack, key_path, a function without any parameters. This
+  /// results in the translator producing a partition op that introduces the new
+  /// region.
+  ///
+  /// NOTE: This just introduces a new value and must always occur before a
+  /// value is actually used. The isolation of the value is actually determined
+  /// by invoking tryToTrackValue and SILIsolationInfo::get().
   AssignFresh,
 
   /// An instruction that merges together all of its operands regions and
@@ -2939,7 +2946,6 @@ CONSTANT_TRANSLATION(AllocBoxInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocPackInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocRefDynamicInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocRefInst, AssignFresh)
-CONSTANT_TRANSLATION(AllocVectorInst, AssignFresh)
 CONSTANT_TRANSLATION(KeyPathInst, AssignFresh)
 CONSTANT_TRANSLATION(FunctionRefInst, AssignFresh)
 CONSTANT_TRANSLATION(DynamicFunctionRefInst, AssignFresh)
@@ -2953,9 +2959,10 @@ CONSTANT_TRANSLATION(WitnessMethodInst, AssignFresh)
 CONSTANT_TRANSLATION(IntegerLiteralInst, AssignFresh)
 CONSTANT_TRANSLATION(FloatLiteralInst, AssignFresh)
 CONSTANT_TRANSLATION(StringLiteralInst, AssignFresh)
-// Metatypes are Sendable, but AnyObject isn't
-CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, AssignFresh)
-CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, AssignFresh)
+// Metatypes are often, but not always, Sendable, but AnyObject isn't
+CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, Assign)
+CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, Assign)
+CONSTANT_TRANSLATION(MetatypeInst, AssignFresh)
 
 //===---
 // Assign
@@ -2980,8 +2987,6 @@ CONSTANT_TRANSLATION(LoadUnownedInst, Assign)
 // getUnderlyingTrackedObject.
 CONSTANT_TRANSLATION(AddressToPointerInst, Assign)
 CONSTANT_TRANSLATION(BaseAddrForOffsetInst, Assign)
-CONSTANT_TRANSLATION(ConvertEscapeToNoEscapeInst, Assign)
-CONSTANT_TRANSLATION(ConvertFunctionInst, Assign)
 CONSTANT_TRANSLATION(ThunkInst, Assign)
 CONSTANT_TRANSLATION(CopyBlockInst, Assign)
 CONSTANT_TRANSLATION(CopyBlockWithoutEscapingInst, Assign)
@@ -2998,6 +3003,12 @@ CONSTANT_TRANSLATION(UncheckedAddrCastInst, Assign)
 CONSTANT_TRANSLATION(UncheckedEnumDataInst, Assign)
 CONSTANT_TRANSLATION(UncheckedOwnershipConversionInst, Assign)
 CONSTANT_TRANSLATION(IndexRawPointerInst, Assign)
+
+CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Assign)
+CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Assign)
+CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, Assign)
+CONSTANT_TRANSLATION(ValueMetatypeInst, Assign)
+CONSTANT_TRANSLATION(ExistentialMetatypeInst, Assign)
 
 // These are used by SIL to aggregate values together in a gep like way. We
 // want to look at uses of structs, not the struct uses itself. So just
@@ -3096,7 +3107,6 @@ CONSTANT_TRANSLATION(EndUnpairedAccessInst, Ignored)
 CONSTANT_TRANSLATION(HopToExecutorInst, Ignored)
 CONSTANT_TRANSLATION(InjectEnumAddrInst, Ignored)
 CONSTANT_TRANSLATION(DestroyNotEscapedClosureInst, Ignored)
-CONSTANT_TRANSLATION(MetatypeInst, Ignored)
 CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 CONSTANT_TRANSLATION(DebugStepInst, Ignored)
@@ -3121,21 +3131,8 @@ CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Require)
 CONSTANT_TRANSLATION(RebindMemoryInst, Require)
 CONSTANT_TRANSLATION(BindMemoryInst, Require)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Require)
-// Require of the value we extract the metatype from.
-CONSTANT_TRANSLATION(ValueMetatypeInst, Require)
-// Require of the value we extract the metatype from.
-CONSTANT_TRANSLATION(ExistentialMetatypeInst, Require)
 // These can take a parameter. If it is non-Sendable, use a require.
 CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, Require)
-
-//===---
-// Asserting If Non Sendable Parameter
-//
-
-// Takes metatypes as parameters and metatypes today are always sendable.
-CONSTANT_TRANSLATION(InitExistentialMetatypeInst, AssertingIfNonSendable)
-CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, AssertingIfNonSendable)
-CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, AssertingIfNonSendable)
 
 //===---
 // Terminators
@@ -3317,6 +3314,8 @@ LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedValueCastInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(TupleElementAddrInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(StructElementAddrInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTakeEnumDataAddrInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(ConvertEscapeToNoEscapeInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(ConvertFunctionInst)
 
 #undef LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND
 

@@ -86,6 +86,7 @@ add_library(swiftCore
   HashTable.swift
   Identifiable.swift
   Indices.swift
+  InlineArray.swift
   InputStream.swift
   IntegerParsing.swift
   Integers.swift
@@ -145,7 +146,6 @@ add_library(swiftCore
   SetVariant.swift
   ShadowProtocols.swift
   Shims.swift
-  Slab.swift
   Slice.swift
   SmallString.swift
   Sort.swift
@@ -274,14 +274,13 @@ if(APPLE AND BUILD_SHARED_LIBS)
 endif()
 
 target_compile_options(swiftCore PRIVATE
+  # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
+  # see also 327ea8bce2d1107a847d444651b19ca6a2901c9e
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
-  $<$<COMPILE_LANGUAGE:Swift>:-disable-autolinking-runtime-compatibility-dynamic-replacements>
-  $<$<COMPILE_LANGUAGE:Swift>:-no-link-objc-runtime>
-  $<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-objc-attr-requires-foundation-module>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>")
 
@@ -292,10 +291,13 @@ if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-partial-specialization>")
 endif()
 
-target_compile_definitions(swiftCore PRIVATE
-  $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
-  $<$<BOOL:${SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS}>:-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER>
-  $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftCore>)
+target_compile_definitions(swiftCore
+  PRIVATE
+    $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
+    $<$<BOOL:${SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS}>:-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER>
+    $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftCore>
+  INTERFACE
+    $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>)
 target_compile_options(swiftCore PRIVATE
   "$<$<AND:$<BOOL:${BUILD_SHARED_LIBS}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -DswiftCore_EXPORTS>")
 
@@ -304,10 +306,11 @@ target_link_libraries(swiftCore
     swiftRuntime
     swiftLLVMSupport
     swiftDemangling
-    swiftShims
     swiftStdlibStubs
     swiftThreading
-    $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>)
+    $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>
+  PUBLIC
+    swiftShims)
 target_link_options(swiftCore PRIVATE
   -nostartfiles)
 if(NOT POLICY CMP0157)
@@ -325,17 +328,17 @@ if(NOT ANDROID AND NOT APPLE AND NOT LINUX AND NOT WIN32 AND UNIX)
 endif()
 
 install(TARGETS swiftCore
+  EXPORT SwiftCoreTargets
+  COMPONENT SwiftCore_runtime
   ARCHIVE DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Swift.swiftmodule"
-  DESTINATION "${SwiftCore_INSTALL_SWIFTMODULEDIR}/Swift.swiftmodule"
-  RENAME "${SwiftCore_MODULE_TRIPLE}.swiftmodule")
 emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)
 
 # Configure plist creation for Darwin platforms.
 generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftCore)
+embed_manifest(swiftCore)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/swiftCore.cmake" OPTIONAL)
 

@@ -212,18 +212,20 @@ bool ArgsToFrontendOptionsConverter::convert(
   // Ensure that the compiler was built with zlib support if it was the
   // requested AST format.
   if (const Arg *A = Args.getLastArg(OPT_dump_ast_format)) {
-    auto format =
-        llvm::StringSwitch<std::optional<FrontendOptions::ASTFormat>>(A->getValue())
-            .Case("json", FrontendOptions::ASTFormat::JSON)
-            .Case("json-zlib", FrontendOptions::ASTFormat::JSONZlib)
-            .Case("default", FrontendOptions::ASTFormat::Default)
-            .Default(std::nullopt);
+    auto format = llvm::StringSwitch<std::optional<FrontendOptions::ASTFormat>>(
+                      A->getValue())
+                      .Case("json", FrontendOptions::ASTFormat::JSON)
+                      .Case("json-zlib", FrontendOptions::ASTFormat::JSONZlib)
+                      .Case("default", FrontendOptions::ASTFormat::Default)
+                      .Case("default-with-decl-contexts",
+                            FrontendOptions::ASTFormat::DefaultWithDeclContext)
+                      .Default(std::nullopt);
     if (!format.has_value()) {
       Diags.diagnose(SourceLoc(), diag::unknown_dump_ast_format, A->getValue());
       return true;
     }
     if (format != FrontendOptions::ASTFormat::Default &&
-        !Args.hasArg(OPT_dump_ast)) {
+        (!Args.hasArg(OPT_dump_ast) && !Args.hasArg(OPT_dump_parse))) {
       Diags.diagnose(SourceLoc(), diag::ast_format_requires_dump_ast);
       return true;
     }
@@ -901,7 +903,7 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
       Opts.ImplicitObjCHeaderPath = A->getValue();
     // If `-import-object-header` is used, it means the module has a direct
     // bridging header dependency and it can be serialized into binary module.
-    Opts.SerializeBridgingHeader |= true;
+    Opts.ModuleHasBridgingHeader |= true;
   }
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_pch))
     Opts.ImplicitObjCPCHPath = A->getValue();

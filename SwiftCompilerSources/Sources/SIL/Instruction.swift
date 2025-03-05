@@ -1087,6 +1087,10 @@ class MarkDependenceInst : SingleValueInstruction {
   public func settleToEscaping() {
     bridged.MarkDependenceInst_settleToEscaping()
   }
+
+  public var hasScopedLifetime: Bool {
+    return isNonEscaping && type.isObject && ownership == .owned && type.isEscapable(in: parentFunction)
+  }
 }
 
 final public class RefToBridgeObjectInst : SingleValueInstruction {
@@ -1273,10 +1277,6 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
   public var deallocations: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
     uses.users(ofType: DeallocStackInst.self)
   }
-}
-
-final public class AllocVectorInst : SingleValueInstruction, Allocation, UnaryInstruction {
-  public var capacity: Value { operand.value }
 }
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {

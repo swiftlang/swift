@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/SourceFile.h" // only for isMacroSignatureFile
 #include "swift/AST/TypeRepr.h"
@@ -51,7 +52,7 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
   }
 
   if (ConstLoc.isValid()) {
-    ty = new (p.Context) CompileTimeConstTypeRepr(ty, ConstLoc);
+    ty = new (p.Context) CompileTimeLiteralTypeRepr(ty, ConstLoc);
   }
 
   if (SendingLoc.isValid()) {
@@ -162,7 +163,9 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
-  if (isParameterSpecifier()) {
+  if (isParameterSpecifier() &&
+      !(!Context.LangOpts.hasFeature(Feature::IsolatedConformances) &&
+        Tok.isContextualKeyword("isolated"))) {
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.
     diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
@@ -716,7 +719,7 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
   // variadic generic types.
   if (!startsWithGreater(Tok)) {
     while (true) {
-      // Note: This can be a value type, e.g. 'Slab<3, Int>'.
+      // Note: This can be a value type, e.g. 'InlineArray<3, Int>'.
       ParserResult<TypeRepr> Ty = parseTypeOrValue(diag::expected_type);
       if (Ty.isNull() || Ty.hasCodeCompletion()) {
         // Skip until we hit the '>'.

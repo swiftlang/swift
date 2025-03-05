@@ -1,11 +1,16 @@
-// RUN: %target-sil-opt %s \
-// RUN:   --lifetime-dependence-insertion \
+// RUN: %target-sil-opt \
+// RUN:   -lifetime-dependence-insertion \
+// RUN:   -enable-address-dependencies \
 // RUN:   -sil-verify-all \
 // RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   2>&1 | %FileCheck %s
+// RUN:   -enable-experimental-feature AddressableParameters \
+// RUN:   -enable-experimental-feature AddressableTypes \
+// RUN:   %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_AddressableParameters
+// REQUIRES: swift_feature_AddressableTypes
 
 sil_stage raw
 
@@ -25,9 +30,22 @@ struct NCE: ~Escapable, ~Copyable {
   init()
 }
 
+struct TrivialHolder {
+  var pointer: UnsafeRawPointer
+}
+
+struct Holder {
+  var object: AnyObject
+}
+
+@_addressableForDependencies
+struct AddressableForDeps {}
+
 sil @getPtr : $@convention(thin) () -> @out UnsafeRawPointer
 sil @getSpan : $@convention(thin) (@in_guaranteed AnyObject) -> @lifetime(borrow 0) @out NE
 sil @getInoutSpan : $@convention(thin) (@inout AnyObject) -> @lifetime(borrow 0) @out NCE
+
+sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
 
 // Check that the inserted dependence is on the 'self' argument, not the temporary borrow.
 //
@@ -91,4 +109,66 @@ bb0(%0 : $*AnyObject):
   %7 = load [take] %2
   dealloc_stack %1
   return %7
+}
+
+// =============================================================================
+// @_addressable
+// =============================================================================
+
+sil [ossa] @loadFromPointer : $@convention(thin) <τ_0_0> (UnsafeRawPointer) -> @out τ_0_0
+
+sil [ossa] @addressableTrivialArg : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address 0) @owned NE
+
+// CHECK-LABEL: sil hidden [ossa] @testAddressableTrivialArg : $@convention(thin) (TrivialHolder) -> Int {
+// CHECK: [[ALLOC:%.*]] = alloc_stack $TrivialHolder
+// CHECK: [[APPLY:%.*]] = apply %{{.*}}([[ALLOC]]) : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address 0) @owned NE
+// CHECK: mark_dependence [unresolved] [[APPLY]] on [[ALLOC]]
+// CHECK-LABEL: } // end sil function 'testAddressableTrivialArg'
+sil hidden [ossa] @testAddressableTrivialArg : $@convention(thin) (TrivialHolder) -> Int {
+bb0(%0 : $TrivialHolder):
+  debug_value %0, let, name "arg", argno 1
+  %2 = alloc_stack $TrivialHolder
+  store %0 to [trivial] %2
+  %4 = function_ref @addressableTrivialArg : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address 0) @owned NE
+  %5 = apply %4(%2) : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address 0) @owned NE
+  %7 = move_value [var_decl] %5
+  debug_value %7, let, name "ne"
+  %9 = alloc_stack $Int
+  %10 = begin_borrow %7
+  %11 = struct_extract %10, #NE.p
+  %16 = function_ref @loadFromPointer : $@convention(thin) <τ_0_0> (UnsafeRawPointer) -> @out τ_0_0
+  %17 = apply %16<Int>(%9, %11) : $@convention(thin) <τ_0_0> (UnsafeRawPointer) -> @out τ_0_0
+  end_borrow %10
+  %19 = load [trivial] %9
+  dealloc_stack %9
+  destroy_value %7
+  dealloc_stack %2
+  return %19
+}
+
+sil [ossa] @addressableArg : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+
+// CHECK-LABEL: sil hidden [ossa] @testAddressableArg : $@convention(thin) (@guaranteed Holder) -> () {
+// CHECK: bb0(%0 : @guaranteed $Holder):
+// CHECK: [[ALLOC:%.*]] = alloc_stack $Holder
+// CHECK: [[SB:%.*]] = store_borrow %0 to [[ALLOC]]
+// CHECK: [[APPLY:%.*]] = apply %{{.*}}([[SB]]) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+// CHECK: mark_dependence [unresolved] [[APPLY]] on [[SB]]
+// CHECK-LABEL: } // end sil function 'testAddressableArg'
+sil hidden [ossa] @testAddressableArg : $@convention(thin) (@guaranteed Holder) -> () {
+bb0(%0 : @guaranteed $Holder):
+  debug_value %0, let, name "arg", argno 1
+  %2 = alloc_stack $Holder
+  %3 = store_borrow %0 to %2
+  %4 = function_ref @addressableArg : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+  %5 = apply %4(%3) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address 0) @owned NE
+  end_borrow %3
+  %8 = move_value [var_decl] %5
+  debug_value %8, let, name "ne"
+  %useNE = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %18 = apply %useNE(%8) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %8
+  dealloc_stack %2
+  %99 = tuple ()
+  return %99 : $()
 }

@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift %s -Xfrontend -disable-availability-checking -parse-as-library -o %t/async_task_priority
-// RUN: %target-codesign %t/async_task_priority
-// RUN: %target-run %t/async_task_priority
+// RUN: %target-build-swift %s -Xfrontend -disable-availability-checking -parse-as-library -o %t/async_task_escalate_priority
+// RUN: %target-codesign %t/async_task_escalate_priority
+// RUN: %target-run %t/async_task_escalate_priority
 
 // REQUIRES: VENDOR=apple
 // REQUIRES: executable_test
@@ -24,7 +24,11 @@
 
 import Darwin
 @preconcurrency import Dispatch
-import StdlibUnittest
+
+func expectEqual(_ l: TaskPriority, _ r: TaskPriority,
+                 function: String = #function, file: String = #fileID, line: UInt = #line) {
+  precondition(l == r, "Priority [\(l)] did not equal \(r) @ \(file):\(line)(\(function))")
+}
 
 func loopUntil(priority: TaskPriority) async {
   var loops = 10
@@ -77,8 +81,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
 
     let top_level = Task.detached { /* To detach from main actor when running work */
 
-      let tests = TestSuite("Task Priority escalation")
-      tests.test("Basic task_escalate when task is running") {
+      func basicTask_escalateWhenTaskIsRunning() async {
         let sem1 = DispatchSemaphore(value: 0)
         let sem2 = DispatchSemaphore(value: 0)
         let task = Task(priority: .background) {
@@ -97,8 +100,9 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
         Task.escalatePriority(task, to: .default)
         sem2.wait()
       }
+      await basicTask_escalateWhenTaskIsRunning()
 
-      tests.test("Trigger task escalation handler") {
+      func triggerTaskEscalationHandler() {
         let sem1 = DispatchSemaphore(value: 0)
         let sem2 = DispatchSemaphore(value: 0)
         let semEscalated = DispatchSemaphore(value: 0)
@@ -134,8 +138,9 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
         semEscalated.wait()
         sem2.wait()
       }
+      await triggerTaskEscalationHandler()
 
-      tests.test("Trigger twice: Escalate to medium, and then again to high") {
+      func triggerTwice_escalateToMediumAndThenAgainToHigh() {
         let sem1 = DispatchSemaphore(value: 0)
         let semEscalatedMedium = DispatchSemaphore(value: 0)
         let semEscalatedHigh = DispatchSemaphore(value: 0)
@@ -176,8 +181,9 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
         // we got escalated twice
         semEscalatedInHandler.wait()
       }
+      await triggerTwice_escalateToMediumAndThenAgainToHigh()
 
-      tests.test("Don't trigger in already escalated task") {
+      func dontTriggerInAlreadyEscalatedTask() {
         let sem1 = DispatchSemaphore(value: 0)
         let sem2 = DispatchSemaphore(value: 0)
         let semEscalated = DispatchSemaphore(value: 0)
@@ -219,8 +225,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
         semEscalated.wait()
         sem2.wait()
       }
-
-      await runAllTestsAsync()
+      await dontTriggerInAlreadyEscalatedTask()
     }
 
     await top_level.value

@@ -81,7 +81,7 @@ import SwiftShims
 /// including the line and column numbers where the error occurred:
 ///
 ///     struct XMLParsingError: Error {
-///         enum ErrorKind {
+///         enum Kind {
 ///             case invalidCharacter
 ///             case mismatchedTag
 ///             case internalError
@@ -89,7 +89,7 @@ import SwiftShims
 ///
 ///         let line: Int
 ///         let column: Int
-///         let kind: ErrorKind
+///         let kind: Kind
 ///     }
 ///
 ///     func parse(_ source: String) throws -> XMLDoc {
@@ -139,25 +139,25 @@ extension Error {
 @_silgen_name("")
 internal func _getErrorDomainNSString<T: Error>(_ x: UnsafePointer<T>)
 -> AnyObject {
-  return x.pointee._domain._bridgeToObjectiveCImpl()
+  return unsafe x.pointee._domain._bridgeToObjectiveCImpl()
 }
 
 @_silgen_name("")
 internal func _getErrorCode<T: Error>(_ x: UnsafePointer<T>) -> Int {
-  return x.pointee._code
+  return unsafe x.pointee._code
 }
 
 @_silgen_name("")
 internal func _getErrorUserInfoNSDictionary<T: Error>(_ x: UnsafePointer<T>)
 -> AnyObject? {
-  return x.pointee._userInfo.map { $0 }
+  return unsafe x.pointee._userInfo.map { $0 }
 }
 
 // Called by the casting machinery to extract an NSError from an Error value.
 @_silgen_name("")
 internal func _getErrorEmbeddedNSErrorIndirect<T: Error>(
     _ x: UnsafePointer<T>) -> AnyObject? {
-  return x.pointee._getEmbeddedNSError()
+  return unsafe x.pointee._getEmbeddedNSError()
 }
 
 /// Called by compiler-generated code to extract an NSError from an Error value.

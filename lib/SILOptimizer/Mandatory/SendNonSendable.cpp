@@ -238,7 +238,7 @@ findClosureUse(Operand *initialOperand) {
       return {};
 
     auto *f = as.getCalleeFunction();
-    if (!f)
+    if (!f || f->empty())
       return {};
 
     unsigned argumentIndex = as.getCalleeArgIndex(*initialOperand);
@@ -280,7 +280,7 @@ findClosureUse(Operand *initialOperand) {
     // See if we have a callee function. In such a case, find our operand in the
     // callee and visit its uses.
     if (auto as = dyn_cast<PartialApplyInst>(op->getUser())) {
-      if (auto *f = as->getCalleeFunction()) {
+      if (auto *f = as->getCalleeFunction(); f && !f->empty()) {
         auto *fArg = f->getArgument(ApplySite(as).getCalleeArgIndex(*op));
         for (auto *use : fArg->getUses()) {
           if (visitedOperand.insert(use).second)
@@ -294,7 +294,7 @@ findClosureUse(Operand *initialOperand) {
     // immediately invoked. In such a case, we can emit a better diagnostic in
     // the called closure.
     if (auto fas = FullApplySite::isa(op->getUser())) {
-      if (auto *f = fas.getCalleeFunction()) {
+      if (auto *f = fas.getCalleeFunction(); f && !f->empty()) {
         auto *fArg = cast<SILFunctionArgument>(
             f->getArgument(fas.getCalleeArgIndex(*op)));
         if (fArg->isClosureCapture()) {
@@ -2475,15 +2475,13 @@ static void addSendableFixIt(const NominalTypeDecl *nominal,
 /// Add Fix-It text for the given generic param declaration type to adopt
 /// Sendable.
 static void addSendableFixIt(const GenericTypeParamDecl *genericArgument,
-                             InFlightDiagnostic &diag, bool unchecked) {
+                             InFlightDiagnostic &diag) {
   if (genericArgument->getInherited().empty()) {
     auto fixItLoc = genericArgument->getLoc();
-    diag.fixItInsertAfter(fixItLoc,
-                          unchecked ? ": @unchecked Sendable" : ": Sendable");
+    diag.fixItInsertAfter(fixItLoc, ": Sendable");
   } else {
     auto fixItLoc = genericArgument->getInherited().getEndLoc();
-    diag.fixItInsertAfter(fixItLoc,
-                          unchecked ? ", @unchecked Sendable" : ", Sendable");
+    diag.fixItInsertAfter(fixItLoc, " & Sendable");
   }
 }
 
@@ -2664,7 +2662,7 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
           genericParamTypeDecl->getModuleContext() == moduleDecl) {
         auto diag = genericParamTypeDecl->diagnose(
             diag::rbi_add_generic_parameter_sendable_conformance, type);
-        addSendableFixIt(genericParamTypeDecl, diag, /*unchecked=*/false);
+        addSendableFixIt(genericParamTypeDecl, diag);
         return;
       }
     }

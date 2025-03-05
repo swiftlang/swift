@@ -1005,6 +1005,11 @@ def disable_upcoming_feature : Separate<["-"], "disable-upcoming-feature">,
   HelpText<"Disable a feature that will be introduced in an upcoming language "
            "version">;
 
+def strict_memory_safety : Flag<["-"], "strict-memory-safety">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Enable strict memory safety checking">;
+
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
   HelpText<"Report performed transformations by optimization passes whose "
@@ -2190,6 +2195,10 @@ def external_plugin_path : Separate<["-"], "external-plugin-path">, Group<plugin
 def cas_backend: Flag<["-"], "cas-backend">,
   Flags<[FrontendOption, NoDriverOption]>,
   HelpText<"Enable using CASBackend for object file output">;
+
+def debug_callsite_info: Flag<["-"], "debug-callsite-info">,
+  Flags<[FrontendOption, NoDriverOption]>,
+  HelpText<"Generate callsite information in debug info">;
 
 def cas_backend_mode: Joined<["-"], "cas-backend-mode=">,
   Flags<[FrontendOption, NoDriverOption]>,

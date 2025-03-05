@@ -40,7 +40,6 @@ swift::Identifier BridgedIdentifier::unbridged() const {
   return swift::Identifier::getFromOpaquePointer(Raw);
 }
 
-SWIFT_NAME("getter:BridgedIdentifier.isOperator(self:)")
 bool BridgedIdentifier_isOperator(const BridgedIdentifier ident) {
   return ident.unbridged().isOperator();
 }
@@ -107,7 +106,6 @@ BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr) {
   return *static_cast<swift::ASTContext *>(ptr);
 }
 
-BRIDGED_INLINE
 void *_Nullable BridgedASTContext_allocate(BridgedASTContext bridged,
                                            size_t size, size_t alignment) {
   return bridged.unbridged().Allocate(size, alignment);
@@ -117,6 +115,12 @@ BridgedStringRef BridgedASTContext_allocateCopyString(BridgedASTContext bridged,
                                                       BridgedStringRef cStr) {
   return bridged.unbridged().AllocateCopy(cStr.unbridged());
 }
+
+#define IDENTIFIER_WITH_NAME(Name, _) \
+BridgedIdentifier BridgedASTContext_id_##Name(BridgedASTContext bridged) { \
+return bridged.unbridged().Id_##Name; \
+}
+#include "swift/AST/KnownIdentifiers.def"
 
 //===----------------------------------------------------------------------===//
 // MARK: BridgedDeclContext
@@ -146,6 +150,19 @@ BridgedClosureExpr BridgedDeclContext_castToClosureExpr(BridgedDeclContext dc) {
 
 BridgedASTContext BridgedDeclContext_getASTContext(BridgedDeclContext dc) {
   return dc.unbridged()->getASTContext();
+}
+
+BridgedSourceFile
+BridgedDeclContext_getParentSourceFile(BridgedDeclContext dc) {
+  return dc.unbridged()->getParentSourceFile();
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedSoureFile
+//===----------------------------------------------------------------------===//
+
+bool BridgedSourceFile_isScriptMode(BridgedSourceFile sf) {
+  return sf.unbridged()->isScriptMode();
 }
 
 //===----------------------------------------------------------------------===//
@@ -211,14 +228,32 @@ bool BridgedDeclObj::Destructor_isIsolated() const {
 // MARK: BridgedASTNode
 //===----------------------------------------------------------------------===//
 
+BridgedASTNode::BridgedASTNode(void *_Nonnull pointer, BridgedASTNodeKind kind)
+    : opaque(intptr_t(pointer) | kind) {
+  assert(getPointer() == pointer && getKind() == kind);
+}
+
+BridgedExpr BridgedASTNode::castToExpr() const {
+  assert(getKind() == BridgedASTNodeKindExpr);
+  return static_cast<swift::Expr *>(getPointer());
+}
+BridgedStmt BridgedASTNode::castToStmt() const {
+  assert(getKind() == BridgedASTNodeKindStmt);
+  return static_cast<swift::Stmt *>(getPointer());
+}
+BridgedDecl BridgedASTNode::castToDecl() const {
+  assert(getKind() == BridgedASTNodeKindDecl);
+  return static_cast<swift::Decl *>(getPointer());
+}
+
 swift::ASTNode BridgedASTNode::unbridged() const {
-  switch (Kind) {
-  case ASTNodeKindExpr:
-    return swift::ASTNode(static_cast<swift::Expr *>(Raw));
-  case ASTNodeKindStmt:
-    return swift::ASTNode(static_cast<swift::Stmt *>(Raw));
-  case ASTNodeKindDecl:
-    return swift::ASTNode(static_cast<swift::Decl *>(Raw));
+  switch (getKind()) {
+  case BridgedASTNodeKindExpr:
+    return castToExpr().unbridged();
+  case BridgedASTNodeKindStmt:
+    return castToStmt().unbridged();
+  case BridgedASTNodeKindDecl:
+    return castToDecl().unbridged();
   }
 }
 
@@ -247,12 +282,33 @@ swift::DeclAttributes BridgedDeclAttributes::unbridged() const {
   return attrs;
 }
 
+//===----------------------------------------------------------------------===//
+// MARK: AvailabilityDomain
+//===----------------------------------------------------------------------===//
+
 BridgedAvailabilityDomain::BridgedAvailabilityDomain(
     swift::AvailabilityDomain domain)
     : opaque(domain.getOpaqueValue()) {}
 
 swift::AvailabilityDomain BridgedAvailabilityDomain::unbridged() const {
   return swift::AvailabilityDomain::fromOpaque(opaque);
+}
+
+BridgedAvailabilityDomain BridgedAvailabilityDomain::forUniversal() {
+  return swift::AvailabilityDomain::forUniversal();
+}
+BridgedAvailabilityDomain
+BridgedAvailabilityDomain::forPlatform(BridgedPlatformKind platformKind) {
+  return swift::AvailabilityDomain::forPlatform(unbridge(platformKind));
+}
+BridgedAvailabilityDomain BridgedAvailabilityDomain::forSwiftLanguage() {
+  return swift::AvailabilityDomain::forSwiftLanguage();
+}
+BridgedAvailabilityDomain BridgedAvailabilityDomain::forPackageDescription() {
+  return swift::AvailabilityDomain::forPackageDescription();
+}
+BridgedAvailabilityDomain BridgedAvailabilityDomain::forEmbedded() {
+  return swift::AvailabilityDomain::forEmbedded();
 }
 
 //===----------------------------------------------------------------------===//
@@ -273,6 +329,11 @@ swift::ParamSpecifier unbridge(BridgedParamSpecifier specifier) {
     CASE(ImplicitlyCopyableConsuming)
 #undef CASE
   }
+}
+
+void BridgedParamDecl_setTypeRepr(BridgedParamDecl cDecl,
+                                  BridgedTypeRepr cType) {
+  cDecl.unbridged()->setTypeRepr(cType.unbridged());
 }
 
 void BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
@@ -444,6 +505,34 @@ BridgedConformance BridgedConformanceArray::getAt(SwiftInt index) const {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedLayoutConstraint
+//===----------------------------------------------------------------------===//
+
+BridgedLayoutConstraint::BridgedLayoutConstraint()
+    : raw(swift::LayoutConstraint().getPointer()) {}
+
+BridgedLayoutConstraint::BridgedLayoutConstraint(
+    swift::LayoutConstraint constraint)
+    : raw(constraint.getPointer()) {}
+
+swift::LayoutConstraint BridgedLayoutConstraint::unbridged() const {
+  return raw;
+}
+
+bool BridgedLayoutConstraint_isNull(BridgedLayoutConstraint cConstraint) {
+  return cConstraint.unbridged().isNull();
+}
+
+bool BridgedLayoutConstraint_isKnownLayout(
+    BridgedLayoutConstraint cConstraint) {
+  return cConstraint.unbridged()->isKnownLayout();
+}
+
+bool BridgedLayoutConstraint_isTrivial(BridgedLayoutConstraint cConstraint) {
+  return cConstraint.unbridged()->isTrivial();
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: Macros
 //===----------------------------------------------------------------------===//
 
@@ -598,6 +687,54 @@ swift::StmtConditionElement BridgedStmtConditionElement::unbridged() const {
   return swift::StmtConditionElement::fromOpaqueValue(Raw);
 }
 
+//===----------------------------------------------------------------------===//
+// MARK: BridgedCaptureListEntry
+//===----------------------------------------------------------------------===//
+
+BridgedCaptureListEntry::BridgedCaptureListEntry(swift::CaptureListEntry CLE)
+    : PBD(CLE.PBD) {}
+
+swift::CaptureListEntry BridgedCaptureListEntry::unbridged() const {
+  return swift::CaptureListEntry(PBD);
+}
+
+BridgedVarDecl BridegedCaptureListEntry_getVar(BridgedCaptureListEntry entry) {
+  return entry.unbridged().getVar();
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: NumberLiteralExpr
+//===----------------------------------------------------------------------===//
+
+void BridgedFloatLiteralExpr_setNegative(BridgedFloatLiteralExpr cExpr,
+                                         BridgedSourceLoc cLoc) {
+  cExpr.unbridged()->setNegative(cLoc.unbridged());
+}
+
+void BridgedIntegerLiteralExpr_setNegative(BridgedIntegerLiteralExpr cExpr,
+                                           BridgedSourceLoc cLoc) {
+  cExpr.unbridged()->setNegative(cLoc.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedTypeOrCustomAttr
+//===----------------------------------------------------------------------===//
+
+BridgedTypeOrCustomAttr::BridgedTypeOrCustomAttr(void *_Nonnull pointer,
+                                                 Kind kind)
+    : opaque(intptr_t(pointer) | kind) {
+  assert(getPointer() == pointer && getKind() == kind);
+}
+
+BridgedTypeAttribute BridgedTypeOrCustomAttr::castToTypeAttr() const {
+  assert(getKind() == Kind::TypeAttr);
+  return static_cast<swift::TypeAttribute *>(getPointer());
+}
+
+BridgedCustomAttr BridgedTypeOrCustomAttr::castToCustomAttr() const {
+  assert(getKind() == Kind::CustomAttr);
+  return static_cast<swift::CustomAttr *>(getPointer());
+}
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

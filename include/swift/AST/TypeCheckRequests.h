@@ -20,6 +20,7 @@
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/CatchNode.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/Evaluator.h"
@@ -3136,7 +3137,7 @@ public:
 /// Computes an initializer context for a parameter with a default argument.
 class DefaultArgumentInitContextRequest
     : public SimpleRequest<DefaultArgumentInitContextRequest,
-                           Initializer *(ParamDecl *),
+                           DefaultArgumentInitializer *(ParamDecl *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3145,14 +3146,14 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  Initializer * evaluate(Evaluator &evaluator,
-                                         ParamDecl *param) const;
+  DefaultArgumentInitializer *evaluate(Evaluator &evaluator,
+                                       ParamDecl *param) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  std::optional<Initializer *> getCachedResult() const;
-  void cacheResult(Initializer *init) const;
+  std::optional<DefaultArgumentInitializer *> getCachedResult() const;
+  void cacheResult(DefaultArgumentInitializer *init) const;
 };
 
 /// Computes the fully type-checked default argument expression for a given
@@ -3300,9 +3301,9 @@ public:
   void cacheResult(evaluator::SideEffect value) const;
 };
 
-class TypeCheckSourceFileRequest
+class TypeCheckPrimaryFileRequest
     : public SimpleRequest<
-          TypeCheckSourceFileRequest, evaluator::SideEffect(SourceFile *),
+          TypeCheckPrimaryFileRequest, evaluator::SideEffect(SourceFile *),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5226,6 +5227,28 @@ public:
   bool isCached() const { return true; }
   std::optional<std::optional<SemanticAvailableAttr>> getCachedResult() const;
   void cacheResult(std::optional<SemanticAvailableAttr> value) const;
+};
+
+class SemanticAvailabilitySpecRequest
+    : public SimpleRequest<SemanticAvailabilitySpecRequest,
+                           std::optional<SemanticAvailabilitySpec>(
+                               const AvailabilitySpec *, const DeclContext *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<SemanticAvailabilitySpec>
+  evaluate(Evaluator &evaluator, const AvailabilitySpec *spec,
+           const DeclContext *declContext) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<std::optional<SemanticAvailabilitySpec>>
+  getCachedResult() const;
+  void cacheResult(std::optional<SemanticAvailabilitySpec> value) const;
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

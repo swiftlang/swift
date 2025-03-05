@@ -47,6 +47,10 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
                           getTypeVariablesBuffer().begin());
 }
 
+static bool isAdmissibleType(Type type) {
+  return !type->hasUnboundGenericType() && !type->hasTypeParameter();
+}
+
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
                        ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
@@ -55,6 +59,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
       IsFavored(false), IsIsolated(false),
       NumTypeVariables(typeVars.size()), Types{First, Second, Type()},
       Locator(locator) {
+  ASSERT(isAdmissibleType(First));
+  ASSERT(isAdmissibleType(Second));
+
   switch (Kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -66,6 +73,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::SubclassOf:
+  case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
@@ -84,11 +92,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
   case ConstraintKind::LValueObject:
-    assert(!First.isNull());
-    assert(!Second.isNull());
     break;
   case ConstraintKind::DynamicCallableApplicableFunction:
-    assert(First->is<FunctionType>()
+    ASSERT(First->is<FunctionType>()
            && "The left-hand side type should be a function type");
     break;
 
@@ -99,8 +105,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::Defaultable:
   case ConstraintKind::FallbackType:
-    assert(!First.isNull());
-    assert(!Second.isNull());
     break;
 
   case ConstraintKind::BindOverload:
@@ -136,6 +140,10 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
       IsFavored(false), IsIsolated(false),
       NumTypeVariables(typeVars.size()), Types{First, Second, Third},
       Locator(locator) {
+  ASSERT(isAdmissibleType(First));
+  ASSERT(isAdmissibleType(Second));
+  ASSERT(isAdmissibleType(Third));
+
   switch (Kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -147,6 +155,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::SubclassOf:
+  case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
@@ -180,9 +189,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
 
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
-    assert(!First.isNull());
-    assert(!Second.isNull());
-    assert(!Third.isNull());
     break;
   }
 
@@ -256,8 +262,8 @@ Constraint::Constraint(ConstraintKind kind,
       RememberChoice(false), IsFavored(false), IsIsolated(false),
       NumTypeVariables(typeVars.size()), Types{first, second, Type()},
       Locator(locator) {
-  assert(!first.isNull());
-  assert(!second.isNull());
+  ASSERT(isAdmissibleType(first));
+  ASSERT(isAdmissibleType(second));
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
@@ -269,8 +275,8 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
       IsFavored(false), IsIsolated(false),
       NumTypeVariables(typeVars.size()), Types{first, second, Type()},
       Locator(locator) {
-  assert(!first.isNull());
-  assert(!second.isNull());
+  ASSERT(isAdmissibleType(first));
+  ASSERT(isAdmissibleType(second));
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
   if (fix)
     *getTrailingObjects<ConstraintFix *>() = fix;
@@ -297,8 +303,8 @@ Constraint::Constraint(FunctionType *appliedFn, Type calleeType,
       HasRestriction(false), IsActive(false), IsDisabled(false),
       IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       IsIsolated(false), NumTypeVariables(typeVars.size()), Locator(locator) {
-  assert(appliedFn);
-  assert(calleeType);
+  ASSERT(isAdmissibleType(appliedFn));
+  ASSERT(isAdmissibleType(calleeType));
   assert(trailingClosureMatching >= 0 && trailingClosureMatching <= 2);
   assert(useDC);
 
@@ -312,6 +318,7 @@ Constraint::Constraint(FunctionType *appliedFn, Type calleeType,
 
 ProtocolDecl *Constraint::getProtocol() const {
   assert((Kind == ConstraintKind::ConformsTo ||
+          Kind == ConstraintKind::NonisolatedConformsTo ||
           Kind == ConstraintKind::LiteralConformsTo ||
           Kind == ConstraintKind::TransitivelyConformsTo)
           && "Not a conformance constraint");
@@ -409,6 +416,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
       Out << " operator arg conv "; break;
   case ConstraintKind::SubclassOf: Out << " subclass of "; break;
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
+  case ConstraintKind::NonisolatedConformsTo:
+      Out << " nonisolated conforms to ";
+      break;
   case ConstraintKind::LiteralConformsTo: Out << " literal conforms to "; break;
   case ConstraintKind::TransitivelyConformsTo: Out << " transitive conformance to "; break;
   case ConstraintKind::CheckedCast: Out << " checked cast to "; break;
@@ -691,6 +701,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::OptionalObject:
   case ConstraintKind::Defaultable:
   case ConstraintKind::SubclassOf:
+  case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
@@ -726,6 +737,17 @@ gatherReferencedTypeVars(Constraint *constraint,
   }
 }
 
+unsigned Constraint::countResolvedArgumentTypes(ConstraintSystem &cs) const {
+  auto *argumentFuncType = cs.getAppliedDisjunctionArgumentFunction(this);
+  if (!argumentFuncType)
+    return 0;
+
+  return llvm::count_if(argumentFuncType->getParams(), [&](const AnyFunctionType::Param arg) {
+    auto argType = cs.getFixedTypeRecursive(arg.getPlainType(), /*wantRValue=*/true);
+    return !argType->isTypeVariableOrMember();
+  });
+}
+
 bool Constraint::isExplicitConversion() const {
   assert(Kind == ConstraintKind::Disjunction);
 
@@ -750,6 +772,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
 
   // Conformance constraints expect an existential on the right-hand side.
   assert((kind != ConstraintKind::ConformsTo &&
+          kind != ConstraintKind::NonisolatedConformsTo &&
           kind != ConstraintKind::TransitivelyConformsTo) ||
          second->isExistentialType());
 

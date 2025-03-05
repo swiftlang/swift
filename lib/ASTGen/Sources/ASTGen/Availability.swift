@@ -72,6 +72,9 @@ extension ASTGenVisitor {
 
     var result: [BridgedAvailableAttr] = []
     for spec in specs {
+      guard !spec.isWildcard else {
+        continue
+      }
       let domain = spec.domain
       guard !domain.isNull() else {
         continue
@@ -85,7 +88,7 @@ extension ASTGenVisitor {
         kind: .default,
         message: BridgedStringRef(),
         renamed: BridgedStringRef(),
-        introduced: spec.version,
+        introduced: spec.rawVersion,
         introducedRange: spec.versionRange,
         deprecated: BridgedVersionTuple(),
         deprecatedRange: BridgedSourceRange(),
@@ -234,7 +237,7 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: atLoc,
       range: range,
-      domainString: platformStr.bridged,
+      domainIdentifier: self.ctx.getIdentifier(platformStr.bridged),
       domainLoc: platformLoc,
       kind: attrKind,
       message: message ?? BridgedStringRef(),
@@ -254,7 +257,7 @@ extension ASTGenVisitor {
     return map.has(name: name.bridged)
   }
 
-  func generate(availabilityMacroDefinition node: AvailabilityMacroDefinitionSyntax) -> BridgedAvailabilityMacroDefinition {
+  func generate(availabilityMacroDefinition node: AvailabilityMacroDefinitionFileSyntax) -> BridgedAvailabilityMacroDefinition {
 
     let name = allocateBridgedString(node.platformVersion.platform.text)
     let version = self.generate(versionTuple: node.platformVersion.version)
@@ -281,24 +284,25 @@ extension ASTGenVisitor {
     var result: [BridgedAvailabilitySpec] = []
 
     func handle(domainNode: TokenSyntax, versionNode: VersionTupleSyntax?) {
+      // FIXME: [availability] Add support for custom domains
       let nameLoc = self.generateSourceLoc(domainNode)
       let version = self.generate(versionTuple: versionNode)
       let versionRange = self.generateSourceRange(versionNode)
 
       switch domainNode.rawText {
       case "swift", "_PackageVersion":
-        let kind: BridgedAvailabilitySpecKind = domainNode.rawText == "swift"
-          ? .languageVersionConstraint
-          : .packageDescriptionVersionConstraint
+        let domain: BridgedAvailabilityDomain = domainNode.rawText == "swift"
+          ? .forSwiftLanguage()
+          : .forPackageDescription()
 
-        let spec = BridgedPlatformAgnosticVersionConstraintAvailabilitySpec.createParsed(
+        let spec = BridgedAvailabilitySpec.create(
           self.ctx,
-          kind: kind,
+          domain: domain,
           nameLoc: nameLoc,
           version: version?.bridged ?? BridgedVersionTuple(),
           versionRange: versionRange
         )
-        result.append(spec.asAvailabilitySpec)
+        result.append(spec)
 
       case let name:
         var macroMatched = false;
@@ -329,15 +333,14 @@ extension ASTGenVisitor {
             // TODO: Diagnostics.
             fatalError("expected version")
           }
-          let spec = BridgedPlatformVersionConstraintAvailabilitySpec.createParsed(
+          let spec = BridgedAvailabilitySpec.create(
             self.ctx,
-            platform: platform,
-            platformLoc: nameLoc,
+            domain: BridgedAvailabilityDomain.forPlatform(platform),
+            nameLoc: nameLoc,
             version: version.bridged,
-            runtimeVersion: version.bridged,
             versionRange: versionRange
           )
-          result.append(spec.asAvailabilitySpec)
+          result.append(spec)
         }
       }
     }
@@ -345,11 +348,11 @@ extension ASTGenVisitor {
     for parsed in node {
       switch parsed.argument {
       case .token(let tok) where tok.rawText == "*":
-        let spec = BridgedOtherPlatformAvailabilitySpec.createParsed(
+        let spec = BridgedAvailabilitySpec.createWildcard(
           self.ctx,
           loc: self.generateSourceLoc(tok)
         )
-        result.append(spec.asAvailabilitySpec)
+        result.append(spec)
       case .token(let tok):
         handle(domainNode: tok, versionNode: nil)
       case .availabilityVersionRestriction(let platformVersion):
@@ -393,7 +396,7 @@ extension ASTGenVisitor {
             guard platform != .none else {
               continue
             }
-            result.append((platform: platform, version: spec.version))
+            result.append((platform: platform, version: spec.rawVersion))
           }
         }
         continue
@@ -447,7 +450,7 @@ func parseAvailabilityMacroDefinition(
 
   // Parse.
   var parser = Parser(buffer)
-  let parsed = AvailabilityMacroDefinitionSyntax.parse(from: &parser)
+  let parsed = AvailabilityMacroDefinitionFileSyntax.parse(from: &parser)
 
   // Emit diagnostics.
   let diagnostics = ParseDiagnosticsGenerator.diagnostics(for: parsed)

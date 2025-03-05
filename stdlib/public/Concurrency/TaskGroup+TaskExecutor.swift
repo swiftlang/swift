@@ -42,10 +42,10 @@ extension TaskGroup {
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     _ = Builtin.createTask(flags: flags,
@@ -98,11 +98,11 @@ extension TaskGroup {
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the task in this group with an executor preference.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     _ = Builtin.createTask(flags: flags,
@@ -155,11 +155,11 @@ extension ThrowingTaskGroup {
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the task in this group with an executor preference.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     _ = Builtin.createTask(flags: flags,
@@ -208,11 +208,11 @@ extension ThrowingTaskGroup {
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
+      isDiscardingTask: false, isSynchronousStart: false)
 
     // Create the task in this group with an executor preference.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     _ = Builtin.createTask(flags: flags,
@@ -265,11 +265,12 @@ extension DiscardingTaskGroup {
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: true)
+      isDiscardingTask: true,
+      isSynchronousStart: false)
 
     // Create the task in this group with an executor preference.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     _ = Builtin.createTask(flags: flags,
@@ -322,12 +323,13 @@ extension DiscardingTaskGroup {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     // Create the task in this group with an executor preference.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     _ = Builtin.createTask(flags: flags,
@@ -380,11 +382,12 @@ extension ThrowingDiscardingTaskGroup {
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: true)
+      isDiscardingTask: true,
+      isSynchronousStart: false)
 
     // Create the task in this group with an executor preference.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     _ = Builtin.createTask(flags: flags,
@@ -437,12 +440,13 @@ extension ThrowingDiscardingTaskGroup {
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
+      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true,
+      isSynchronousStart: false
     )
 
     // Create the task in this group with an executor preference.
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
 #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
     _ = Builtin.createTask(flags: flags,

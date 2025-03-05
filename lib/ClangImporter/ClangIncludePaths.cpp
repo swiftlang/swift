@@ -560,7 +560,7 @@ void GetWindowsFileMappings(
       fileMapping.redirectedFiles.emplace_back(std::string(VCToolsInjection),
                                                AuxiliaryFile);
 
-    // Because we wish to be backwrds compatible with older Visual Studio
+    // Because we wish to be backwards compatible with older Visual Studio
     // releases, we inject empty headers which allow us to have definitions for
     // modules referencing headers which may not exist. We stub out the headers
     // with empty files to allow a single module definition to work across

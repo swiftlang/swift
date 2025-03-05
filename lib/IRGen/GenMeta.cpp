@@ -1589,7 +1589,8 @@ namespace {
     void setCommonFlags(TypeContextDescriptorFlags &flags) {
       setClangImportedFlags(flags);
       setMetadataInitializationKind(flags);
-      setHasCanonicalMetadataPrespecializations(flags);
+      setHasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer(
+          flags);
     }
     
     void setClangImportedFlags(TypeContextDescriptorFlags &flags) {
@@ -1623,8 +1624,11 @@ namespace {
       flags.setMetadataInitialization(MetadataInitialization);
     }
 
-    void setHasCanonicalMetadataPrespecializations(TypeContextDescriptorFlags &flags) {
-      flags.setHasCanonicalMetadataPrespecializations(hasCanonicalMetadataPrespecializations());
+    void setHasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer(
+        TypeContextDescriptorFlags &flags) {
+      flags.setHasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer(
+          hasCanonicalMetadataPrespecializations() ||
+          hasSingletonMetadataPointer());
     }
 
     bool hasCanonicalMetadataPrespecializations() {
@@ -1634,6 +1638,30 @@ namespace {
                             return pair.second ==
                                    TypeMetadataCanonicality::Canonical;
                           });
+    }
+
+    bool hasSingletonMetadataPointer() {
+      if (!IGM.IRGen.Opts.EmitSingletonMetadataPointers)
+        return false;
+
+      bool isGeneric = Type->isGenericContext();
+      bool noInitialization =
+          MetadataInitialization ==
+          TypeContextDescriptorFlags::NoMetadataInitialization;
+      auto isPublic = Type->getFormalAccessScope().isPublic();
+
+      auto kind = asImpl().getContextKind();
+      auto isSupportedKind = kind == ContextDescriptorKind::Class ||
+                             kind == ContextDescriptorKind::Struct ||
+                             kind == ContextDescriptorKind::Enum;
+
+      // Only emit a singleton metadata pointer if:
+      //   The type is not generic (there's no single metadata if it's generic).
+      //   The metadata doesn't require runtime initialization. (The metadata
+      //       can't safely be accessed directly if it does.)
+      //   The type is not public. (If it's public it can be found by symbol.)
+      //   It's a class, struct, or enum.
+      return !isGeneric && noInitialization && !isPublic && isSupportedKind;
     }
 
     void maybeAddMetadataInitialization() {
@@ -1724,6 +1752,14 @@ namespace {
       B.addRelativeAddress(cachingOnceToken);
     }
 
+    void maybeAddSingletonMetadataPointer() {
+      if (hasSingletonMetadataPointer()) {
+        auto type = Type->getDeclaredTypeInContext()->getCanonicalType();
+        auto metadata = IGM.getAddrOfTypeMetadata(type);
+        B.addRelativeAddress(metadata);
+      }
+    }
+
     // Subclasses should provide:
     // ContextDescriptorKind getContextKind();
     // void addLayoutInfo();
@@ -1758,6 +1794,7 @@ namespace {
       super::layout();
       maybeAddCanonicalMetadataPrespecializations();
       addInvertedProtocols();
+      maybeAddSingletonMetadataPointer();
     }
 
     ContextDescriptorKind getContextKind() {
@@ -1832,6 +1869,7 @@ namespace {
       super::layout();
       maybeAddCanonicalMetadataPrespecializations();
       addInvertedProtocols();
+      maybeAddSingletonMetadataPointer();
     }
     
     ContextDescriptorKind getContextKind() {
@@ -1965,6 +2003,7 @@ namespace {
       addObjCResilientClassStubInfo();
       maybeAddCanonicalMetadataPrespecializations();
       addInvertedProtocols();
+      maybeAddSingletonMetadataPointer();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -5193,9 +5232,8 @@ diagnoseUnsupportedObjCImplLayout(IRGenModule &IGM, ClassDecl *classDecl,
         diags.diagnose(
             field.getVarDecl(),
             diag::attr_objc_implementation_resilient_property_deployment_target,
-            ctx.getTargetPlatformStringForDiagnostics(),
-            currentAvailability.getRawMinimumVersion(),
-            requiredAvailability.getRawMinimumVersion());
+            ctx.getTargetAvailabilityDomain(), currentAvailability,
+            requiredAvailability);
       else
         diags.diagnose(
             field.getVarDecl(),
@@ -6985,6 +7023,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Copyable:
   case KnownProtocolKind::Escapable:
   case KnownProtocolKind::BitwiseCopyable:
+  case KnownProtocolKind::SendableMetatype:
     return SpecialProtocol::None;
   }
 
@@ -7483,6 +7522,19 @@ llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
   builder.addInt32(size.getValue());
   return cast<llvm::GlobalValue>(IGM.defineAsyncFunctionPointer(
       entity, builder.finishAndCreateFuture()));
+}
+
+llvm::GlobalValue *irgen::emitCoroFunctionPointer(IRGenModule &IGM,
+                                                  llvm::Function *function,
+                                                  LinkEntity entity,
+                                                  Size size) {
+  ConstantInitBuilder initBuilder(IGM);
+  ConstantStructBuilder builder(
+      initBuilder.beginStruct(IGM.CoroFunctionPointerTy));
+  builder.addCompactFunctionReference(function);
+  builder.addInt32(size.getValue());
+  return cast<llvm::GlobalValue>(
+      IGM.defineCoroFunctionPointer(entity, builder.finishAndCreateFuture()));
 }
 
 static FormalLinkage getExistentialShapeLinkage(CanGenericSignature genSig,

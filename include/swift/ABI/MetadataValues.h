@@ -1222,6 +1222,7 @@ class TargetExtendedFunctionTypeFlags {
 
     // Values for the enumerated isolation kinds
     IsolatedAny            = 0x00000002U,
+    NonIsolatedCaller      = 0x00000004U,
 
     // Values if we have a sending result.
     HasSendingResult  = 0x00000010U,
@@ -1254,6 +1255,12 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
+  withNonIsolatedCaller() const {
+    return TargetExtendedFunctionTypeFlags<int_type>((Data & ~IsolationMask) |
+                                                     NonIsolatedCaller);
+  }
+
+  const TargetExtendedFunctionTypeFlags<int_type>
   withSendingResult(bool newValue = true) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
         (Data & ~HasSendingResult) |
@@ -1271,6 +1278,10 @@ public:
 
   bool isIsolatedAny() const {
     return (Data & IsolationMask) == IsolatedAny;
+  }
+
+  bool isNonIsolatedCaller() const {
+    return (Data & IsolationMask) == NonIsolatedCaller;
   }
 
   bool hasSendingResult() const {
@@ -1861,9 +1872,10 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     /// Meaningful for all type-descriptor kinds.
     HasImportInfo = 2,
 
-    /// Set if the type descriptor has a pointer to a list of canonical
-    /// prespecializations.
-    HasCanonicalMetadataPrespecializations = 3,
+    /// Set if the generic type descriptor has a pointer to a list of canonical
+    /// prespecializations, or the non-generic type descriptor has a pointer to
+    /// its singleton metadata.
+    HasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer = 3,
 
     /// Set if the metadata contains a pointer to a layout string
     HasLayoutString = 4,
@@ -1948,7 +1960,10 @@ public:
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasImportInfo, hasImportInfo, setHasImportInfo)
 
-  FLAGSET_DEFINE_FLAG_ACCESSORS(HasCanonicalMetadataPrespecializations, hasCanonicalMetadataPrespecializations, setHasCanonicalMetadataPrespecializations)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(
+      HasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer,
+      hasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer,
+      setHasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(HasLayoutString,
                                 hasLayoutString,
@@ -2657,13 +2672,13 @@ public:
     Task_EnqueueJob                               = 12,
     Task_AddPendingGroupTaskUnconditionally       = 13,
     Task_IsDiscardingTask                         = 14,
-
     /// The task function is consumed by calling it (@callee_owned).
     /// The context pointer should be treated as opaque and non-copyable;
     /// in particular, it should not be retained or released.
     ///
     /// Supported starting in Swift 6.1.
-    Task_IsTaskFunctionConsumed                       = 15,
+    Task_IsTaskFunctionConsumed                   = 15,
+    Task_IsStartSynchronouslyTask                 = 16,
   };
 
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
@@ -2696,6 +2711,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsTaskFunctionConsumed,
                                 isTaskFunctionConsumed,
                                 setIsTaskFunctionConsumed)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsStartSynchronouslyTask,
+                                isSynchronousStartTask,
+                                setIsSYnchronousStartTask)
 };
 
 /// Flags for schedulable jobs.
