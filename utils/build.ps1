@@ -2184,24 +2184,28 @@ function Write-SDKSettingsPlist([Platform]$Platform, $Arch) {
   $SDKSettings | ConvertTo-JSON | Out-FIle -FilePath "$($Arch.SDKInstallRoot)\SDKSettings.json"
 }
 
-function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
-  Isolate-EnvVars {
-    if ($Test) {
-      $Targets = @("default", "ExperimentalTest")
-      $InstallPath = ""
-      $env:CTEST_OUTPUT_ON_FAILURE = "YES"
-    } else {
-      $Targets = @("install")
-      $InstallPath = "$($Arch.SDKInstallRoot)\usr"
+function Build-Dispatch([Platform]$Platform, $Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-corelibs-libdispatch `
+    -Bin (Get-TargetProjectBinaryCache $Arch Dispatch) `
+    -InstallTo "$($Arch.SDKInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX,Swift `
+    -Defines @{
+      ENABLE_SWIFT = "YES";
     }
+}
 
+function Test-Dispatch {
+  Isolate-EnvVars {
+    $env:CTEST_OUTPUT_ON_FAILURE = "YES"
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-libdispatch `
-      -Bin (Get-TargetProjectBinaryCache $Arch Dispatch) `
-      -InstallTo $InstallPath `
-      -Arch $Arch `
-      -Platform $Platform `
-      -BuildTargets $Targets `
+      -Bin (Get-TargetProjectBinaryCache $BuildArch Dispatch) `
+      -Arch $BuildArch `
+      -Platform Windows `
+      -BuildTargets default,ExperimentalTest `
       -UseBuiltCompilers C,CXX,Swift `
       -Defines @{
         ENABLE_SWIFT = "YES";
@@ -3318,7 +3322,7 @@ if (-not $IsCrossCompiling) {
   }
 
   if ($Test -contains "dispatch") {
-    Build-Dispatch Windows $HostArch -Test
+    Test-Dispatch
   }
   if ($Test -contains "foundation") {
     Build-Foundation Windows $HostArch -Test
