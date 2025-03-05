@@ -3075,7 +3075,7 @@ function Build-DocC() {
     --product docc
 }
 
-function Test-PackageManager() {
+function Test-PackageManager {
   $SrcDir = if (Test-Path -Path "$SourceCache\swift-package-manager" -PathType Container) {
     "$SourceCache\swift-package-manager"
   } else {
@@ -3329,7 +3329,7 @@ if (-not $IsCrossCompiling) {
     Build-Testing Windows $HostArch -Test
   }
   if ($Test -contains "llbuild") { Test-LLBuild }
-  if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
+  if ($Test -contains "swiftpm") { Test-PackageManager }
   if ($Test -contains "swift-format") { Test-Format }
   if ($Test -contains "sourcekit-lsp") { Test-SourceKitLSP }
 }
