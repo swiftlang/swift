@@ -2248,27 +2248,23 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
     bool WarnBeforeDeploymentTarget, bool &IsError) {
   ASTContext &Context = ReferenceDC->getASTContext();
 
-  if (!Availability.hasMinimumVersion()) {
-    // FIXME: [availability] Need a version-less diagnostic.
-    return Diagnostic(diag::availability_decl_only_version_newer, D, Domain,
-                      AvailabilityRange(llvm::VersionTuple()));
-  }
-
   if (requiresDeploymentTargetOrEarlier(Domain, Availability, Context)) {
     // The required OS version is at or before the deployment target so this
     // diagnostic should indicate that the decl could be unavailable to clients
     // of the module containing the reference.
     IsError = !WarnBeforeDeploymentTarget;
 
-    return Diagnostic(
-        IsError ? diag::availability_decl_only_version_newer_for_clients
-                : diag::availability_decl_only_version_newer_for_clients_warn,
-        D, Domain, Availability, ReferenceDC->getParentModule());
+    auto diag = Diagnostic(diag::availability_decl_only_in_for_clients, D,
+                           Domain, Availability.hasMinimumVersion(),
+                           Availability, ReferenceDC->getParentModule());
+    if (!IsError)
+      diag.setBehaviorLimit(DiagnosticBehavior::Warning);
+    return diag;
   }
 
   IsError = true;
-  return Diagnostic(diag::availability_decl_only_version_newer, D, Domain,
-                    Availability);
+  return Diagnostic(diag::availability_decl_only_in, D, Domain,
+                    Availability.hasMinimumVersion(), Availability);
 }
 
 // Emits a diagnostic for a reference to a declaration that is potentially
@@ -2311,13 +2307,14 @@ static void diagnosePotentialAccessorUnavailability(
 
   assert(Accessor->isGetterOrSetter());
 
-  auto &diag = ForInout ? diag::availability_inout_accessor_only_version_newer
-                        : diag::availability_decl_only_version_newer;
+  auto &diag = ForInout ? diag::availability_inout_accessor_only_in
+                        : diag::availability_decl_only_in;
 
   {
-    auto Err = Context.Diags.diagnose(ReferenceRange.Start, diag, Accessor,
-                                      Context.getTargetAvailabilityDomain(),
-                                      Availability);
+    auto Err =
+        Context.Diags.diagnose(ReferenceRange.Start, diag, Accessor,
+                               Context.getTargetAvailabilityDomain(),
+                               Availability.hasMinimumVersion(), Availability);
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(
