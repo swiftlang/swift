@@ -27,7 +27,7 @@ using namespace swift;
 
 static void disableExpensiveSILOptions(SILOptions &Opts) {
   // Disable the sanitizers.
-  Opts.Sanitizers = {};
+  Opts.Sanitizers = OptionSet<SanitizerKind>();
 
   // Disable PGO and code coverage.
   Opts.GenerateProfile = false;
