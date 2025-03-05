@@ -769,7 +769,25 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   if (!domain)
     return std::nullopt;
 
-  auto semanticAttr = SemanticAvailableAttr(attr);
+  auto checkVersion = [&](std::optional<llvm::VersionTuple> version,
+                          SourceRange sourceRange) {
+    if (version && !VersionRange::isValidVersion(*version)) {
+      diags
+          .diagnose(attrLoc, diag::availability_unsupported_version_number,
+                    *version)
+          .highlight(sourceRange);
+      return true;
+    }
+
+    return false;
+  };
+
+  if (checkVersion(attr->getRawIntroduced(), attr->IntroducedRange))
+    return std::nullopt;
+  if (checkVersion(attr->getRawDeprecated(), attr->DeprecatedRange))
+    return std::nullopt;
+  if (checkVersion(attr->getRawObsoleted(), attr->ObsoletedRange))
+    return std::nullopt;
 
   bool hasIntroduced = attr->getRawIntroduced().has_value();
   bool hasDeprecated = attr->getRawDeprecated().has_value();
@@ -779,11 +797,11 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   if (!domain->isVersioned() && hasVersionSpec) {
     SourceRange versionSourceRange;
     if (hasIntroduced)
-      versionSourceRange = semanticAttr.getIntroducedSourceRange();
+      versionSourceRange = attr->IntroducedRange;
     else if (hasDeprecated)
-      versionSourceRange = semanticAttr.getDeprecatedSourceRange();
+      versionSourceRange = attr->DeprecatedRange;
     else if (hasObsoleted)
-      versionSourceRange = semanticAttr.getObsoletedSourceRange();
+      versionSourceRange = attr->ObsoletedRange;
 
     diags.diagnose(attrLoc, diag::availability_unexpected_version, *domain)
         .limitBehaviorIf(domain->isUniversal(), DiagnosticBehavior::Warning)
@@ -827,7 +845,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     }
   }
 
-  return semanticAttr;
+  return SemanticAvailableAttr(attr);
 }
 
 std::optional<llvm::VersionTuple> SemanticAvailableAttr::getIntroduced() const {

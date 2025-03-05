@@ -17,7 +17,7 @@
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityDomain.h"
-#include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -116,21 +116,35 @@ std::optional<SemanticAvailabilitySpec>
 SemanticAvailabilitySpecRequest::evaluate(
     Evaluator &evaluator, const AvailabilitySpec *spec,
     const DeclContext *declContext) const {
+  if (spec->isInvalid())
+    return std::nullopt;
+
+  auto &diags = declContext->getASTContext().Diags;
   AvailabilitySpec *mutableSpec = const_cast<AvailabilitySpec *>(spec);
-  if (mutableSpec->resolveInDeclContext(declContext).has_value())
-    return SemanticAvailabilitySpec(spec);
-  return std::nullopt;
+  if (!mutableSpec->resolveInDeclContext(declContext).has_value())
+    return std::nullopt;
+
+  auto version = spec->getRawVersion();
+  if (!VersionRange::isValidVersion(version)) {
+    diags
+        .diagnose(spec->getStartLoc(),
+                  diag::availability_unsupported_version_number, version)
+        .highlight(spec->getVersionSrcRange());
+    return std::nullopt;
+  }
+
+  return SemanticAvailabilitySpec(spec);
 }
 
 std::optional<std::optional<SemanticAvailabilitySpec>>
 SemanticAvailabilitySpecRequest::getCachedResult() const {
   auto *spec = std::get<0>(getStorage());
+  if (spec->isInvalid())
+    return std::optional<SemanticAvailabilitySpec>();
+
   auto domainOrIdentifier = spec->getDomainOrIdentifier();
   if (!domainOrIdentifier.isResolved())
-    return {};
-
-  if (spec->isInvalid())
-    return {std::nullopt};
+    return std::nullopt;
 
   return SemanticAvailabilitySpec(spec);
 }

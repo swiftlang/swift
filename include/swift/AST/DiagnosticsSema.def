@@ -6754,6 +6754,8 @@ WARNING(availability_suggest_platform_name,
         PointsToFirstBadToken, "unrecognized platform name %0;"
         " did you mean '%1'?",
         (Identifier, StringRef))
+WARNING(availability_unsupported_version_number, none,
+        "'%0' is not a supported version number", (llvm::VersionTuple))
 
 WARNING(attr_availability_expected_deprecated_version, none,
        "expected version number with 'deprecated' in '%0' attribute for %1",
