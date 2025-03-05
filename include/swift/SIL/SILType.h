@@ -458,6 +458,11 @@ public:
     return getASTType()->hasOpenedExistential();
   }
 
+  /// Returns true if the referenced type is an Optional type.
+  bool isOptional() const {
+    return getASTType()->isOptional();
+  }
+
   TypeTraitResult canBeClass() const {
     return getASTType()->canBeClass();
   }

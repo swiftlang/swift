@@ -370,7 +370,28 @@ extension ValueDefUseWalker {
         // We need to ignore this because otherwise the path wouldn't contain the right `existential` field kind.
         return leafUse(value: operand, path: path)
       }
-      return walkDownUses(ofValue: urc, path: path)
+      // The `unchecked_ref_cast` is designed to be able to cast between
+      // `Optional<ClassType>` and `ClassType`. We need to handle these
+      // cases by checking if the type is optional and adjust the path
+      // accordingly.
+      switch (urc.type.isOptional, urc.fromInstance.type.isOptional) {
+        case (true, false):
+          if walkDownUses(ofValue: urc, path: path.push(.enumCase, index: 0)) == .abortWalk {
+            return .abortWalk
+          }
+          return walkDownUses(ofValue: urc, path: path.push(.enumCase, index: 1))
+        case (false, true):
+          if let path = path.popIfMatches(.enumCase, index: 0) {
+            if walkDownUses(ofValue: urc, path: path) == .abortWalk {
+              return .abortWalk
+            } else if let path = path.popIfMatches(.enumCase, index: 1) {
+              return walkDownUses(ofValue: urc, path: path)
+            }
+          }
+          return .abortWalk
+        default:
+          return walkDownUses(ofValue: urc, path: path)
+      }
     case let beginDealloc as BeginDeallocRefInst:
       if operand.index == 0 {
         return walkDownUses(ofValue: beginDealloc, path: path)
@@ -699,7 +720,29 @@ extension ValueUseDefWalker {
         // We need to ignore this because otherwise the path wouldn't contain the right `existential` field kind.
         return rootDef(value: urc, path: path)
       }
-      return walkUp(value: urc.fromInstance, path: path)
+      // The `unchecked_ref_cast` is designed to be able to cast between
+      // `Optional<ClassType>` and `ClassType`. We need to handle these
+      // cases by checking if the type is optional and adjust the path
+      // accordingly.
+      switch (urc.type.isOptional, urc.fromInstance.type.isOptional) {
+        case (true, false):
+          if let path = path.popIfMatches(.enumCase, index: 0) {
+            if walkUp(value: urc.fromInstance, path: path) == .abortWalk {
+              return .abortWalk
+            } else if let path = path.popIfMatches(.enumCase, index: 1) {
+              return walkUp(value: urc.fromInstance, path: path)
+            }
+          }
+          return .abortWalk
+        case (false, true):
+          if walkUp(value: urc.fromInstance, path: path.push(.enumCase, index: 0)) == .abortWalk {
+            return .abortWalk
+          } else {
+            return walkUp(value: urc.fromInstance, path: path.push(.enumCase, index: 1))
+          }
+        default:
+          return walkUp(value: urc.fromInstance, path: path)
+      }
     case let arg as Argument:
       if let phi = Phi(arg) {
         for incoming in phi.incomingValues {
