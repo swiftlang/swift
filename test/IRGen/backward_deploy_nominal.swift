@@ -4,6 +4,9 @@
 // RUN: %target-swift-frontend -emit-ir -parse-as-library -parse-stdlib %s -module-name Compatibility59 -module-abi-name Swift | %FileCheck %s --check-prefix=CHECK-SHIM
 // RUN: %target-swift-frontend -emit-ir -parse-as-library -parse-stdlib %s -module-name Compatibility59 -module-abi-name Swift | %FileCheck %s --check-prefix=ALSO-SHIM
 
+// RUN: %target-swift-emit-module-interface(%t/Swift.swiftinterface) %s -parse-as-library -parse-stdlib -module-name Swift
+// RUN: %FileCheck %s --check-prefix=CHECK-INTERFACE < %t/Swift.swiftinterface
+
 // REQUIRES: OS=macosx
 
 // Let's just pretend...
@@ -22,3 +25,8 @@ public struct Fridge<Contents> {}
 // The compatibility shim does not have any linker directives.
 // ALSO-SHIM-NOT: $ld$hide$
 // ALSO-SHIM-NOT: $ld$previous$
+
+// There is no @_originallyDefinedIn in the swiftinterface:
+// CHECK-INTERFACE-NOT: @_originallyDefinedIn
+// CHECK-INTERFACE: @available(macOS 13, *)
+// CHECK-INTERFACE-NEXT: public struct Fridge<Contents> {
