@@ -497,9 +497,9 @@ extension MutableSpan where Element: ~Copyable {
 //      source.count <= self.count,
 //      "destination span cannot contain every element from source."
 //    )
-//    let buffer = source.relinquishBorrowedMemory()
+//    let buffer = unsafe source.relinquishBorrowedMemory()
 //    // we must now deinitialize the returned UMBP
-//    _start().moveInitializeMemory(
+//    unsafe _start().moveInitializeMemory(
 //      as: Element.self, from: buffer.baseAddress!, count: buffer.count
 //    )
 //    return buffer.count
@@ -524,9 +524,7 @@ extension MutableSpan {
   public mutating func moveUpdate(
     fromContentsOf source: Slice<UnsafeMutableBufferPointer<Element>>
   ) -> Index {
-    unsafe moveUpdate(
-      fromContentsOf: UnsafeMutableBufferPointer(rebasing: source)
-    )
+    moveUpdate(fromContentsOf: unsafe .init(rebasing: source))
   }
 }
 
@@ -707,14 +705,6 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @unsafe
-  @_alwaysEmitIntoClient
-  @lifetime(borrow self)
-  mutating public func _extracting(
-    unchecked bounds: some RangeExpression<Index>
-  ) -> Self {
-    unsafe _extracting(unchecked: bounds.relative(to: indices))
-  }
-
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
   mutating public func _extracting(
