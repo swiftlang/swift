@@ -514,7 +514,7 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
 };
 
 class BridgedDiagnosticArgument {
-  int64_t storage[4];
+  int64_t storage[3];
 
 public:
   BRIDGED_INLINE BridgedDiagnosticArgument(const swift::DiagnosticArgument &arg);
