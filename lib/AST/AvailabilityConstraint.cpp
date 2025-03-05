@@ -18,12 +18,8 @@
 
 using namespace swift;
 
-PlatformKind AvailabilityConstraint::getPlatform() const {
-  return getAttr().getPlatform();
-}
-
 std::optional<AvailabilityRange>
-AvailabilityConstraint::getRequiredNewerAvailabilityRange(
+AvailabilityConstraint::getPotentiallyUnavailableRange(
     const ASTContext &ctx) const {
   switch (getReason()) {
   case Reason::UnconditionallyUnavailable:

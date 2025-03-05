@@ -126,7 +126,7 @@ getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
 std::optional<AvailabilityRange>
 AvailabilityDomain::getDeploymentRange(const ASTContext &ctx) const {
   if (auto version = getDeploymentVersion(*this, ctx))
-    return AvailabilityRange{VersionRange::allGTE(*version)};
+    return AvailabilityRange{*version};
   return std::nullopt;
 }
 

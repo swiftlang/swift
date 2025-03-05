@@ -1370,7 +1370,7 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
   // When computing availability for linkage, use the "before" version from
   // the @backDeployed attribute, if present.
   if (auto backDeployVersion = getBackDeployedBeforeOSVersion(ctx))
-    return AvailabilityRange{VersionRange::allGTE(*backDeployVersion)};
+    return AvailabilityRange{*backDeployVersion};
 
   auto containingContext = AvailabilityInference::annotatedAvailableRange(this);
   if (containingContext.has_value()) {

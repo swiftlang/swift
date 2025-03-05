@@ -88,57 +88,50 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
   // So getter/setter specific availability doesn't work in code completion.
 
   auto Domain = Attr.getDomain();
-  llvm::VersionTuple DeprecatedVersion;
-  if (Attr.getDeprecated())
-    DeprecatedVersion = Attr.getDeprecated().value();
-
-  llvm::VersionTuple RemappedDeprecatedVersion;
-  if (AvailabilityInference::updateDeprecatedAvailabilityDomainForFallback(
-          Attr, Ctx, Domain, RemappedDeprecatedVersion))
-    DeprecatedVersion = RemappedDeprecatedVersion;
-
+  auto DeprecatedRange = Attr.getDeprecatedRange(Ctx);
   auto Message = Attr.getMessage();
   auto NewName = Attr.getRename();
   if (!isSoftDeprecated) {
     if (Message.empty() && NewName.empty()) {
       getDiagnostics(severity, Out, diag::availability_deprecated, D,
                      Attr.isPlatformSpecific(), Domain,
-                     Attr.getDeprecated().has_value(), DeprecatedVersion,
+                     DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
                      /*message*/ StringRef());
     } else if (!Message.empty()) {
       EncodedDiagnosticMessage EncodedMessage(Message);
       getDiagnostics(severity, Out, diag::availability_deprecated, D,
                      Attr.isPlatformSpecific(), Domain,
-                     Attr.getDeprecated().has_value(), DeprecatedVersion,
+                     DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
                      EncodedMessage.Message);
     } else {
       getDiagnostics(severity, Out, diag::availability_deprecated_rename, D,
                      Attr.isPlatformSpecific(), Domain,
-                     Attr.getDeprecated().has_value(), DeprecatedVersion, false,
+                     DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
+                     false,
                      /*ReplaceKind*/ 0, NewName);
     }
   } else {
     // '100000' is used as a version number in API that will be deprecated in an
     // upcoming release. This number is to match the 'API_TO_BE_DEPRECATED'
     // macro defined in Darwin platforms.
-    static llvm::VersionTuple DISTANT_FUTURE_VESION(100000);
-    bool isDistantFuture = DeprecatedVersion >= DISTANT_FUTURE_VESION;
+    bool isDistantFuture = DeprecatedRange.isContainedIn(
+        AvailabilityRange(llvm::VersionTuple(100000)));
 
     if (Message.empty() && NewName.empty()) {
       getDiagnostics(severity, Out, diag::ide_availability_softdeprecated, D,
                      Attr.isPlatformSpecific(), Domain, !isDistantFuture,
-                     DeprecatedVersion,
+                     DeprecatedRange,
                      /*message*/ StringRef());
     } else if (!Message.empty()) {
       EncodedDiagnosticMessage EncodedMessage(Message);
       getDiagnostics(severity, Out, diag::ide_availability_softdeprecated, D,
                      Attr.isPlatformSpecific(), Domain, !isDistantFuture,
-                     DeprecatedVersion, EncodedMessage.Message);
+                     DeprecatedRange, EncodedMessage.Message);
     } else {
       getDiagnostics(severity, Out,
                      diag::ide_availability_softdeprecated_rename, D,
                      Attr.isPlatformSpecific(), Domain, !isDistantFuture,
-                     DeprecatedVersion, NewName);
+                     DeprecatedRange, NewName);
     }
   }
   return false;
