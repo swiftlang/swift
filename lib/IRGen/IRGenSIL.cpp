@@ -8369,6 +8369,8 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
 
     auto &schema = methodType->isAsync()
                        ? getOptions().PointerAuth.AsyncSwiftClassMethodPointers
+                   : methodType->isCalleeAllocatedCoroutine()
+                       ? getOptions().PointerAuth.CoroSwiftClassMethodPointers
                        : getOptions().PointerAuth.SwiftClassMethodPointers;
     auto authInfo =
       PointerAuthInfo::emit(*this, schema, /*storageAddress=*/nullptr, method);

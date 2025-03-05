@@ -298,10 +298,15 @@ static void buildMethodDescriptorFields(IRGenModule &IGM,
   if (func->shouldUseObjCDispatch())
     flags = flags.withIsDynamic(true);
 
+  auto *accessor = dyn_cast<AccessorDecl>(func);
+
   // Include the pointer-auth discriminator.
-  if (auto &schema = func->hasAsync()
-                         ? IGM.getOptions().PointerAuth.AsyncSwiftClassMethods
-                         : IGM.getOptions().PointerAuth.SwiftClassMethods) {
+  if (auto &schema =
+          func->hasAsync() ? IGM.getOptions().PointerAuth.AsyncSwiftClassMethods
+          : accessor &&
+                  requiresFeatureCoroutineAccessors(accessor->getAccessorKind())
+              ? IGM.getOptions().PointerAuth.CoroSwiftClassMethods
+              : IGM.getOptions().PointerAuth.SwiftClassMethods) {
     auto discriminator =
       PointerAuthInfo::getOtherDiscriminator(IGM, schema, fn);
     flags = flags.withExtraDiscriminator(discriminator->getZExtValue());
@@ -4530,9 +4535,13 @@ namespace {
         VTableEntriesForVFE.push_back(std::pair<Size, SILDeclRef>(offset, fn));
       }
 
+      auto *accessor = dyn_cast<AccessorDecl>(afd);
       PointerAuthSchema schema =
           afd->hasAsync() ? IGM.getOptions().PointerAuth.AsyncSwiftClassMethods
-                          : IGM.getOptions().PointerAuth.SwiftClassMethods;
+          : accessor &&
+                  requiresFeatureCoroutineAccessors(accessor->getAccessorKind())
+              ? IGM.getOptions().PointerAuth.CoroSwiftClassMethods
+              : IGM.getOptions().PointerAuth.SwiftClassMethods;
       B.addSignedPointer(ptr, schema, fn);
     }
 

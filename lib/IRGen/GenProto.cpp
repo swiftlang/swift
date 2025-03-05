@@ -1682,6 +1682,8 @@ public:
       PointerAuthSchema schema =
           isAsyncRequirement
               ? IGM.getOptions().PointerAuth.AsyncProtocolWitnesses
+          : isCalleeAllocatedCoroutineRequirement
+              ? IGM.getOptions().PointerAuth.CoroProtocolWitnesses
               : IGM.getOptions().PointerAuth.ProtocolWitnesses;
       Table.addSignedPointer(witness, schema, requirement);
 
@@ -4387,6 +4389,8 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
 
   auto &schema = fnType->isAsync()
                      ? IGF.getOptions().PointerAuth.AsyncProtocolWitnesses
+                 : fnType->isCalleeAllocatedCoroutine()
+                     ? IGF.getOptions().PointerAuth.CoroProtocolWitnesses
                      : IGF.getOptions().PointerAuth.ProtocolWitnesses;
   auto authInfo = PointerAuthInfo::emit(IGF, schema, slot.getAddress(), member);
 

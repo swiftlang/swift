@@ -3093,6 +3093,8 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto fnPtr = emitVTableSlotLoad(IGF, slot, method, signature);
     auto &schema = methodType->isAsync()
                        ? IGF.getOptions().PointerAuth.AsyncSwiftClassMethods
+                   : methodType->isCalleeAllocatedCoroutine()
+                       ? IGF.getOptions().PointerAuth.CoroSwiftClassMethods
                        : IGF.getOptions().PointerAuth.SwiftClassMethods;
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);

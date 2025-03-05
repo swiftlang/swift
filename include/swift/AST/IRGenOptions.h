@@ -230,6 +230,26 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Type layout string descriminator.
   PointerAuthSchema TypeLayoutString;
+
+  /// Like SwiftFunctionPointers but for use with CoroFunctionPointer values.
+  PointerAuthSchema CoroSwiftFunctionPointers;
+
+  /// Like SwiftClassMethods but for use with CoroFunctionPointer values.
+  PointerAuthSchema CoroSwiftClassMethods;
+
+  /// Like ProtocolWitnesses but for use with CoroFunctionPointer values.
+  PointerAuthSchema CoroProtocolWitnesses;
+
+  /// Like SwiftClassMethodPointers but for use with CoroFunctionPointer
+  /// values.
+  PointerAuthSchema CoroSwiftClassMethodPointers;
+
+  /// Like SwiftDynamicReplacements but for use with CoroFunctionPointer
+  /// values.
+  PointerAuthSchema CoroSwiftDynamicReplacements;
+
+  /// Like PartialApplyCapture but for use with CoroFunctionPointer values.
+  PointerAuthSchema CoroPartialApplyCapture;
 };
 
 enum class JITDebugArtifact : unsigned {

@@ -805,6 +805,10 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
       if (auto &schema =
               entry->getImplementation()->getLoweredFunctionType()->isAsync()
                   ? IGM.getOptions().PointerAuth.AsyncSwiftClassMethods
+              : entry->getImplementation()
+                      ->getLoweredFunctionType()
+                      ->isCalleeAllocatedCoroutine()
+                  ? IGM.getOptions().PointerAuth.CoroSwiftClassMethods
                   : IGM.getOptions().PointerAuth.SwiftClassMethods) {
         auto discriminator =
           PointerAuthInfo::getOtherDiscriminator(IGM, schema, method);

@@ -1823,9 +1823,15 @@ static llvm::GlobalVariable *getChainEntryForDynamicReplacement(
         IGM.DynamicReplacementLinkEntryTy, linkEntry, indices);
     bool isAsyncFunction =
         entity.hasSILFunction() && entity.getSILFunction()->isAsync();
+    bool isCalleeAllocatedCoroutine =
+        entity.hasSILFunction() && entity.getSILFunction()
+                                       ->getLoweredFunctionType()
+                                       ->isCalleeAllocatedCoroutine();
     auto &schema =
         isAsyncFunction
             ? IGM.getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+        : isCalleeAllocatedCoroutine
+            ? IGM.getOptions().PointerAuth.CoroSwiftDynamicReplacements
             : IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
     assert(entity.hasSILFunction() || entity.isOpaqueTypeDescriptorAccessor());
     auto authEntity = entity.hasSILFunction()
@@ -2945,8 +2951,14 @@ static llvm::GlobalVariable *createGlobalForDynamicReplacementFunctionKey(
   B.addRelativeAddress(linkEntry);
   bool isAsyncFunction =
       keyEntity.hasSILFunction() && keyEntity.getSILFunction()->isAsync();
+  bool isCalleeAllocatedCoroutine =
+      keyEntity.hasSILFunction() && keyEntity.getSILFunction()
+                                        ->getLoweredFunctionType()
+                                        ->isCalleeAllocatedCoroutine();
   auto schema = isAsyncFunction
                     ? IGM.getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+                : isCalleeAllocatedCoroutine
+                    ? IGM.getOptions().PointerAuth.CoroSwiftDynamicReplacements
                     : IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
   if (schema) {
     assert(keyEntity.hasSILFunction() ||
@@ -2957,7 +2969,9 @@ static llvm::GlobalVariable *createGlobalForDynamicReplacementFunctionKey(
     B.addInt32((uint32_t)PointerAuthInfo::getOtherDiscriminator(IGM, schema,
                                                                 authEntity)
                    ->getZExtValue() |
-               ((uint32_t)isAsyncFunction ? 0x10000 : 0x0));
+               ((uint32_t)isAsyncFunction    ? 0x10000
+                : isCalleeAllocatedCoroutine ? 0x20000
+                                             : 0x0));
   } else
     B.addInt32(0);
   B.finishAndSetAsInitializer(key);
@@ -3009,6 +3023,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
 
   auto &schema = f->isAsync()
                      ? getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+                 : f->getLoweredFunctionType()->isCalleeAllocatedCoroutine()
+                     ? getOptions().PointerAuth.CoroSwiftDynamicReplacements
                      : getOptions().PointerAuth.SwiftDynamicReplacements;
   llvm::Value *ReplFn = nullptr, *hasReplFn = nullptr;
 
@@ -3227,9 +3243,15 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
     forwardedArgs.push_back(&arg);
   bool isAsyncFunction =
       keyEntity.hasSILFunction() && keyEntity.getSILFunction()->isAsync();
+  bool isCalleeAllocatedCoroutine =
+      keyEntity.hasSILFunction() && keyEntity.getSILFunction()
+                                        ->getLoweredFunctionType()
+                                        ->isCalleeAllocatedCoroutine();
   auto &schema =
       isAsyncFunction
           ? IGM.getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+      : isCalleeAllocatedCoroutine
+          ? IGM.getOptions().PointerAuth.CoroSwiftDynamicReplacements
           : IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
   assert(keyEntity.hasSILFunction() ||
          keyEntity.isOpaqueTypeDescriptorAccessor());
@@ -3356,6 +3378,8 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
 
   auto &schema = f->isAsync()
                      ? getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+                 : f->getLoweredFunctionType()->isCalleeAllocatedCoroutine()
+                     ? getOptions().PointerAuth.CoroSwiftDynamicReplacements
                      : getOptions().PointerAuth.SwiftDynamicReplacements;
   auto authInfo = PointerAuthInfo::emit(
       IGF, schema, fnPtrAddr,
