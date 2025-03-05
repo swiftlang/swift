@@ -1154,6 +1154,50 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
   return {foundWitness, hasUninstantiatedSuperclass};
 }
 
+/// Determine if
+static bool isExecutingInIsolationOfConformance(
+    const Metadata *const type,
+    const ProtocolConformanceDescriptor *description,
+    const WitnessTable *table
+) {
+  // Resolve the global actor type.
+  SubstGenericParametersFromMetadata substitutions(type);
+  auto result = swift_getTypeByMangledName(
+     MetadataState::Abstract, description->getGlobalActorType(),
+     /*FIXME:conditionalArgs.data()*/{ },
+     [&substitutions](unsigned depth, unsigned index) {
+        return substitutions.getMetadata(depth, index).Ptr;
+      },
+    [&substitutions](const Metadata *type, unsigned index) {
+      return substitutions.getWitnessTable(type, index);
+    });
+  if (result.isError())
+    return false;
+
+  const Metadata *globalActorType = result.getType().getMetadata();
+  if (!globalActorType)
+    return false;
+
+  auto globalActorConformance = description->getGlobalActorConformance();
+  if (!globalActorConformance)
+    return false;
+
+  auto globalActorWitnessTable =
+      globalActorConformance->getWitnessTable(globalActorType);
+  if (!globalActorWitnessTable)
+    return false;
+
+  // The concurrency library provides a function to check whether we
+  // are executing on the given global actor.
+  auto isCurrentGlobalActor = SWIFT_LAZY_CONSTANT(reinterpret_cast<bool (*)(const Metadata *, const WitnessTable *)>(
+      dlsym(RTLD_DEFAULT, "swift_task_isCurrentGlobalActor")));
+  if (!isCurrentGlobalActor)
+    return false;
+
+  // Check whether we are running on this global actor.
+  return isCurrentGlobalActor(globalActorType, globalActorWitnessTable);
+}
+
 static const WitnessTable *
 swift_conformsToProtocolCommonImpl(const Metadata *const type,
                                    const ProtocolDescriptor *protocol) {
@@ -1177,6 +1221,18 @@ swift_conformsToProtocolCommonImpl(const Metadata *const type,
     std::tie(table, hasUninstantiatedSuperclass) =
         swift_conformsToProtocolMaybeInstantiateSuperclasses(
             type, protocol, true /*instantiateSuperclassMetadata*/);
+
+  // If the conformance is isolated to a global actor, check whether we are
+  // currently executing on that global actor. Otherwise, the type does not
+  // conform.
+  if (table) {
+    if (auto description = table->getDescription()) {
+      if (description->hasGlobalActorIsolation() &&
+          !isExecutingInIsolationOfConformance(type, description, table)) {
+        return nullptr;
+      }
+    }
+  }
 
   return table;
 }

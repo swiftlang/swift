@@ -746,6 +746,7 @@ private:
     HasResilientWitnessesMask = 0x01u << 16,
     HasGenericWitnessTableMask = 0x01u << 17,
     IsConformanceOfProtocolMask = 0x01u << 18,
+    HasGlobalActorIsolation = 0x01u << 19,
 
     NumConditionalPackDescriptorsMask = 0xFFu << 24,
     NumConditionalPackDescriptorsShift = 24
@@ -805,6 +806,14 @@ public:
                                  : 0));
   }
   
+  ConformanceFlags withHasGlobalActorIsolation(
+                                           bool hasGlobalActorIsolation) const {
+    return ConformanceFlags((Value & ~HasGlobalActorIsolation)
+                            | (hasGlobalActorIsolation
+                                 ? HasGlobalActorIsolation
+                                 : 0));
+  }
+  
   /// Retrieve the type reference kind kind.
   TypeReferenceKind getTypeReferenceKind() const {
     return TypeReferenceKind(
@@ -843,7 +852,12 @@ public:
   bool isConformanceOfProtocol() const {
     return Value & IsConformanceOfProtocolMask;
   }
-  
+
+  /// Does this conformance have a global actor to which it is isolated?
+  bool hasGlobalActorIsolation() const {
+    return Value & HasGlobalActorIsolation;
+  }
+
   /// Retrieve the # of conditional requirements.
   unsigned getNumConditionalRequirements() const {
     return (Value & NumConditionalRequirementsMask)

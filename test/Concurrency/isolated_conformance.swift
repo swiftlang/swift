@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -swift-version 6 -enable-experimental-feature IsolatedConformances %s
 
 // REQUIRES: swift_feature_IsolatedConformances
+// REQUIRES: concurrency
 
 protocol P {
   func f() // expected-note 2{{mark the protocol requirement 'f()' 'async' to allow actor-isolated conformances}}
