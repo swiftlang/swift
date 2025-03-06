@@ -504,6 +504,13 @@ void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
   attrs = attrs.addParamAttributes(this->getLLVMContext(), argIndex, b);
 }
 
+void IRGenModule::addSwiftCoroAttributes(llvm::AttributeList &attrs,
+                                         unsigned argIndex) {
+  llvm::AttrBuilder b(getLLVMContext());
+  b.addAttribute(llvm::Attribute::SwiftCoro);
+  attrs = attrs.addParamAttributes(this->getLLVMContext(), argIndex, b);
+}
+
 void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
                                           unsigned argIndex) {
   llvm::AttrBuilder b(getLLVMContext());
@@ -891,6 +898,7 @@ void SignatureExpansion::expandCoroutineContinuationParameters() {
   if (FnType->isCalleeAllocatedCoroutine()) {
     // Whether this is an unwind resumption.
     ParamIRTypes.push_back(IGM.CoroAllocatorPtrTy);
+    IGM.addSwiftCoroAttributes(Attrs, ParamIRTypes.size() - 1);
   } else {
     // Whether this is an unwind resumption.
     ParamIRTypes.push_back(IGM.Int1Ty);
@@ -922,6 +930,7 @@ void SignatureExpansion::addCoroutineContextParameter() {
 
 void SignatureExpansion::addCoroutineAllocatorParameter() {
   ParamIRTypes.push_back(IGM.CoroAllocatorPtrTy);
+  IGM.addSwiftCoroAttributes(Attrs, ParamIRTypes.size() - 1);
 }
 
 NativeConventionSchema::NativeConventionSchema(IRGenModule &IGM,
@@ -5149,7 +5158,11 @@ static llvm::Constant *getCoroAllocWrapperFn(IRGenModule &IGM) {
       /*setIsNoInline=*/false,
       /*forPrologue=*/false,
       /*isPerformanceConstraint=*/false,
-      /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::SwiftCoro);
+      /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::SwiftCoro,
+      /*transformAttributes=*/
+      [&IGM](llvm::AttributeList &attrs) {
+        IGM.addSwiftCoroAttributes(attrs, 0);
+      });
 }
 
 void irgen::emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,

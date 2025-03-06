@@ -9,7 +9,7 @@
 // REQUIRES: swift_feature_CoroutineAccessors
 
 // CHECK-LABEL: @__swift_coro_alloc_(
-// CHECK-SAME:      ptr [[ALLOCATOR:%[^,]+]]
+// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]]
 // CHECK-SAME:      i64 [[SIZE:%[^)]+]]
 // CHECK-SAME:  )
 // CHECK-SAME:  {
