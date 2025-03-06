@@ -184,7 +184,7 @@ extension OutputSpan where Element: ~Copyable {
   }
 
   @_alwaysEmitIntoClient
-  public mutating func deinitializeLastElement() -> Element? {
+  public mutating func removeLast() -> Element? {
     guard _initialized > 0 else { return nil }
     _initialized &-= 1
     let p = unsafe _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
@@ -192,7 +192,7 @@ extension OutputSpan where Element: ~Copyable {
   }
 
   @_alwaysEmitIntoClient
-  public mutating func deinitialize() {
+  public mutating func removeAll() {
     _ = unsafe _start().withMemoryRebound(to: Element.self, capacity: _initialized) {
       unsafe $0.deinitialize(count: _initialized)
     }
