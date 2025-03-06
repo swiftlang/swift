@@ -159,6 +159,7 @@ public struct Range<Bound: Comparable> {
 
   // This works around _debugPrecondition() impacting the performance of
   // optimized code. (rdar://72246338)
+  @unsafe
   @_alwaysEmitIntoClient @inline(__always)
   internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
