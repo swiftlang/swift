@@ -30,6 +30,17 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             repo_path = os.path.join(self.source_root, repo)
             self.assertTrue(os.path.isdir(repo_path))
 
+    def test_single_threaded_clone(self):
+        self.call([self.update_checkout_path,
+                   '--config', self.config_path,
+                   '--source-root', self.source_root,
+                   '--clone',
+                   '-j', '1'])
+
+        for repo in self.get_all_repos():
+            repo_path = os.path.join(self.source_root, repo)
+            self.assertTrue(os.path.isdir(repo_path))
+
 
 class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
     def __init__(self, *args, **kwargs):
