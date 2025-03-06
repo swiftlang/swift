@@ -1011,24 +1011,39 @@ void repairTupleOrAssociatedValuePatternIfApplicable(
   }
 }
 
+/// Try to simplify an `ExprPattern` with a Boolean literal sub-expression
+/// to a `BoolPattern`, recursively unwrapping optional types if necessary.
+static NullablePtr<Pattern> simplifyToBoolPattern(ASTContext &Ctx,
+                                                  const ExprPattern *EP,
+                                                  const BooleanLiteralExpr *BLE,
+                                                  Type patternTy) {
+  // If the type is Bool, return a BoolPattern.
+  if (patternTy->isBool()) {
+    auto *BP = new (Ctx) BoolPattern(BLE->getLoc(), BLE->getValue());
+    BP->setType(patternTy);
+    return BP;
+  }
+  // If the pattern type is optional, attempt to simplify the wrapped type.
+  // `true` and `false` are treated as if they had `?` appended
+  // for each level of optionality.
+  if (auto wrappedType = patternTy->getOptionalObjectType()) {
+    if (auto P =
+            simplifyToBoolPattern(Ctx, EP, BLE, wrappedType).getPtrOrNull()) {
+      auto OP = OptionalSomePattern::createImplicit(Ctx, P, P->getEndLoc());
+      OP->setType(patternTy);
+      return OP;
+    }
+  }
+  return nullptr;
+}
+
 NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
                                                          Type patternTy) {
   auto *subExpr = EP->getSubExpr();
   auto &ctx = EP->getDeclContext()->getASTContext();
 
-  if (patternTy->isBool()) {
-    // The type is Bool.
-    // Check if the pattern is a Bool literal
-    auto *semanticSubExpr = subExpr->getSemanticsProvidingExpr();
-    if (auto *BLE = dyn_cast<BooleanLiteralExpr>(semanticSubExpr)) {
-      auto *BP = new (ctx) BoolPattern(BLE->getLoc(), BLE->getValue());
-      BP->setType(patternTy);
-      return BP;
-    }
-  }
-
   // case nil is equivalent to .none when switching on Optionals.
-  if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
+  if (auto *NLE = dyn_cast<NilLiteralExpr>(subExpr)) {
     if (patternTy->getOptionalObjectType()) {
       auto *NoneEnumElement = ctx.getOptionalNoneDecl();
       return EnumElementPattern::createImplicit(
@@ -1045,7 +1060,13 @@ NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
         return nullptr;
     }
   }
-  return nullptr;
+
+  const auto *BLE =
+      dyn_cast<BooleanLiteralExpr>(subExpr->getSemanticsProvidingExpr());
+  if (!BLE)
+    return nullptr;
+
+  return simplifyToBoolPattern(ctx, EP, BLE, patternTy);
 }
 
 /// Perform top-down type coercion on the given pattern.
