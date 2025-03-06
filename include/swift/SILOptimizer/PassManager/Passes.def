@@ -407,6 +407,8 @@ SWIFT_MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
      "Dump the results of FunctionUses")
 SWIFT_MODULE_PASS(MandatoryPerformanceOptimizations, "mandatory-performance-optimizations",
      "Performs optimizations for performance-annotated functions")
+SWIFT_MODULE_PASS(ConstGlobalVariableFoldingPass, "const-global-variable-folding",
+     "Performs simplification and folding of @const global variable initializers")
 SWIFT_MODULE_PASS(ReadOnlyGlobalVariablesPass, "read-only-global-variables",
      "Converts read-only var-globals to let-globals")
 SWIFT_MODULE_PASS(StackProtection, "stack-protection",
@@ -421,8 +423,6 @@ SWIFT_FUNCTION_PASS(Simplification, "simplification",
     "Peephole simplifications")
 SWIFT_FUNCTION_PASS(OnoneSimplification, "onone-simplification",
     "Peephole simplifications which runs at -Onone")
-SWIFT_FUNCTION_PASS(ConstPropagation, "const-propagation",
-    "Compile-time value propagation")
 SWIFT_FUNCTION_PASS(LateOnoneSimplification, "late-onone-simplification",
     "Peephole simplifications which can only run late in the -Onone pipeline")
 SWIFT_FUNCTION_PASS(CleanupDebugSteps, "cleanup-debug-steps",

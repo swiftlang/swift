@@ -91,29 +91,11 @@ private:
     }
   }
 
-  void verifyStaticallyInitializedGlobal(ConstExprFunctionState &ConstExprState,
-                                         SILGlobalVariable &Global,
-                                         VarDecl *Decl) {
-    LLVM_DEBUG(llvm::dbgs()
-                   << "@const static let " << Decl->getName().str().str()
-                   << ": " << Decl->getTypeInContext().getString() << " = ";);
-    auto StaticInitializerValue = Global.getStaticInitializerValue();
-    assert(StaticInitializerValue && "Expected a static initializer");
-    if (auto *SI = dyn_cast<StructInst>(StaticInitializerValue)) {
-      for (auto &SIO : SI->getAllOperands()) {
-        if (!ConstExprState.getConstantValue(SIO.get())
-                 .containsOnlyConstants()) {
-          Decl->diagnose(diag::require_const_initializer_for_const);
-          LLVM_DEBUG(llvm::dbgs() << "Unknown\n";);
-        } else
-          LLVM_DEBUG(printSymbolicValueValue(
-              ConstExprState.getConstantValue(SIO.get()), Allocator));
-      }
-    }
-  }
-
   void verifyInitializeOnceGlobal(ConstExprFunctionState &ConstExprState,
                                   SILGlobalVariable &Global, VarDecl *Decl) {
+    // TODO: Determine cases if/where this is necessary to perform,
+    // i.e. where we currently fail to simplify to a statically-initialized
+    // value.
     LLVM_DEBUG(llvm::dbgs()
                    << "@const [init_once] let " << Decl->getName().str().str()
                    << ": " << Decl->getTypeInContext().getString() << " = ";);
@@ -129,19 +111,11 @@ private:
             for (SILInstruction &I : BB) {
               if (auto *GlobalAddr = dyn_cast<GlobalAddrInst>(&I)) {
                 if (GlobalAddr->getReferencedGlobal() == &Global) {
-                  // Get the sole store to the global addr
-                  // ACTODO: check if single use valid/exists
-                  // Find sole store
-//                  for (auto *use : getNonDebugUses(existentialBox)) {
-//                    worklist.insert(use);
-//                  }
-
                   if (auto SingleUse = GlobalAddr->getSingleUse()) {
                     auto SoleUseUser = SingleUse->getUser();
                     assert(isa<StoreInst>(SoleUseUser));
-                    auto Value = ConstExprState.getConstantValue(
-                        dyn_cast<StoreInst>(SoleUseUser)->getSrc());
-
+                    auto src = dyn_cast<StoreInst>(SoleUseUser)->getSrc();
+                    auto Value = ConstExprState.getConstantValue(src);
                     if (Value.isConstant()) {
                       LLVM_DEBUG(printSymbolicValueValue(Value, Allocator););
                       return;
@@ -165,9 +139,29 @@ private:
     for (SILGlobalVariable &G : M->getSILGlobals()) {
       if (auto Decl = G.getDecl()) {
         if (Decl->isConstVal()) {
-          if (G.getStaticInitializerValue())
-            verifyStaticallyInitializedGlobal(ConstExprState, G, Decl);
-          else
+          if (G.getStaticInitializerValue()) {
+            // Presence of a static initializer alone confirms
+            // this to be a constant value.
+            LLVM_DEBUG(
+                llvm::dbgs()
+                    << "@const static let " << Decl->getName().str().str()
+                    << ": " << Decl->getTypeInContext().getString() << " = ";
+                auto StaticInitializerValue = G.getStaticInitializerValue();
+                assert(StaticInitializerValue &&
+                       "Expected a static initializer");
+                if (auto *SI = dyn_cast<StructInst>(StaticInitializerValue)) {
+                  for (auto &SIO : SI->getAllOperands()) {
+                    if (!ConstExprState.getConstantValue(SIO.get())
+                             .containsOnlyConstants())
+                      LLVM_DEBUG(llvm::dbgs()
+                                     << "Unknown to the Constant Evaluator\n";);
+                    else
+                      LLVM_DEBUG(printSymbolicValueValue(
+                          ConstExprState.getConstantValue(SIO.get()),
+                          Allocator));
+                  }
+                });
+          } else
             verifyInitializeOnceGlobal(ConstExprState, G, Decl);
         }
       }
@@ -244,8 +238,8 @@ private:
             printSymbolicValueValue(Value, Allocator);
           });
           if (!ConstExprState.getConstantValue(CorrespondingArg).isConstant()) {
-            // FIXME: Is there a way to get this source loc without going throuh
-            // the ApplyExpr?
+            // FIXME: Is there a way to get this source loc without going
+            // throuh the ApplyExpr?
             auto ArgLocation = Apply->getLoc().getSourceLoc();
             if (auto ApplyExprNode = Apply->getLoc().getAsASTNode<ApplyExpr>())
               ArgLocation = ApplyExprNode->getArgs()[i].getLoc();
