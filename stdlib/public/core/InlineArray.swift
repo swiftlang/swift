@@ -136,7 +136,7 @@ extension InlineArray where Element: ~Copyable {
   /// - Complexity: O(*n*), where *n* is the number of elements in the array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
-  public init<E: Error>(_ body: (Int) throws(E) -> Element) throws(E) {
+  public init<E: Error>(_ body: (Index) throws(E) -> Element) throws(E) {
 #if $BuiltinEmplaceTypedThrows
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
       let buffer = InlineArray<count, Element>._initializationBuffer(
@@ -284,7 +284,7 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var startIndex: Int {
+  public var startIndex: Index {
     0
   }
 
@@ -297,7 +297,7 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var endIndex: Int {
+  public var endIndex: Index {
     count
   }
 
@@ -307,7 +307,7 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var indices: Range<Int> {
+  public var indices: Range<Index> {
     Range(_uncheckedBounds: (0, count))
   }
 
@@ -321,7 +321,7 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public borrowing func index(after i: Int) -> Int {
+  public borrowing func index(after i: Index) -> Index {
     i &+ 1
   }
 
@@ -335,14 +335,14 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public borrowing func index(before i: Int) -> Int {
+  public borrowing func index(before i: Index) -> Index {
     i &- 1
   }
 
   @_alwaysEmitIntoClient
   @_semantics("fixed_storage.check_index")
   @inline(__always)
-  internal func _checkIndex(_ i: Int) {
+  internal func _checkIndex(_ i: Index) {
     _precondition(indices.contains(i), "Index out of bounds")
   }
 
@@ -355,7 +355,7 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_addressableSelf
   @_alwaysEmitIntoClient
-  public subscript(_ i: Int) -> Element {
+  public subscript(_ i: Index) -> Element {
     @_transparent
     unsafeAddress {
       _checkIndex(i)
@@ -389,8 +389,8 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public mutating func swapAt(
-    _ i: Int,
-    _ j: Int
+    _ i: Index,
+    _ j: Index
   ) {
     guard i != j else {
       return
