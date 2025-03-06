@@ -35,6 +35,7 @@ template<typename T> class ArrayRef;
 namespace swift {
 enum class AccessorKind;
 class AvailabilityDomain;
+class AvailabilityDomainOrIdentifier;
 class Argument;
 class ASTContext;
 struct ASTNode;
@@ -678,6 +679,10 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedPlatformKind : size_t {
 SWIFT_NAME("BridgedPlatformKind.init(from:)")
 BridgedPlatformKind BridgedPlatformKind_fromString(BridgedStringRef cStr);
 
+SWIFT_NAME("BridgedPlatformKind.init(from:)")
+BridgedPlatformKind
+BridgedPlatformKind_fromIdentifier(BridgedIdentifier cIdent);
+
 swift::PlatformKind unbridge(BridgedPlatformKind cPlatform);
 
 SWIFT_NAME("BridgedAvailabilityMacroMap.has(self:name:)")
@@ -701,19 +706,39 @@ struct BridgedAvailabilityMacroDefinition {
   BridgedArrayRef specs;
 };
 
-struct BridgedAvailabilityDomain;
+struct BridgedAvailabilityDomainOrIdentifier {
+  void *_Nullable opaque;
+
+  BridgedAvailabilityDomainOrIdentifier() : opaque(nullptr) {};
+  BRIDGED_INLINE BridgedAvailabilityDomainOrIdentifier(
+      swift::AvailabilityDomainOrIdentifier domain);
+  BRIDGED_INLINE swift::AvailabilityDomainOrIdentifier unbridged() const;
+};
+
+SWIFT_NAME("getter:BridgedAvailabilityDomainOrIdentifier.isDomain(self:)")
+BRIDGED_INLINE bool BridgedAvailabilityDomainOrIdentifier_isDomain(
+    BridgedAvailabilityDomainOrIdentifier cVal);
+
+SWIFT_NAME("getter:BridgedAvailabilityDomainOrIdentifier.asIdentifier(self:)")
+BRIDGED_INLINE BridgedIdentifier
+BridgedAvailabilityDomainOrIdentifier_getAsIdentifier(
+    BridgedAvailabilityDomainOrIdentifier cVal);
 
 SWIFT_NAME("BridgedAvailabilitySpec.createWildcard(_:loc:)")
 BridgedAvailabilitySpec
 BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
                                        BridgedSourceLoc cLoc);
 
-SWIFT_NAME("BridgedAvailabilitySpec.create(_:domain:nameLoc:version:"
-           "versionRange:)")
-BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomain(
-    BridgedASTContext cContext, BridgedAvailabilityDomain cDomain,
-    BridgedSourceLoc cLoc, BridgedVersionTuple cVersion,
-    BridgedSourceRange cVersionRange);
+SWIFT_NAME(
+    "BridgedAvailabilitySpec.createForDomainIdentifier(_:name:nameLoc:version:"
+    "versionRange:)")
+BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomainIdentifier(
+    BridgedASTContext cContext, BridgedIdentifier cName, BridgedSourceLoc cLoc,
+    BridgedVersionTuple cVersion, BridgedSourceRange cVersionRange);
+
+SWIFT_NAME("getter:BridgedAvailabilitySpec.domainOrIdentifier(self:)")
+BridgedAvailabilityDomainOrIdentifier
+BridgedAvailabilitySpec_getDomainOrIdentifier(BridgedAvailabilitySpec spec);
 
 SWIFT_NAME("getter:BridgedAvailabilitySpec.sourceRange(self:)")
 BridgedSourceRange
@@ -721,14 +746,6 @@ BridgedAvailabilitySpec_getSourceRange(BridgedAvailabilitySpec spec);
 
 SWIFT_NAME("getter:BridgedAvailabilitySpec.isWildcard(self:)")
 bool BridgedAvailabilitySpec_isWildcard(BridgedAvailabilitySpec spec);
-
-SWIFT_NAME("getter:BridgedAvailabilitySpec.domain(self:)")
-BridgedAvailabilityDomain
-BridgedAvailabilitySpec_getDomain(BridgedAvailabilitySpec spec);
-
-SWIFT_NAME("getter:BridgedAvailabilitySpec.platform(self:)")
-BridgedPlatformKind
-BridgedAvailabilitySpec_getPlatform(BridgedAvailabilitySpec spec);
 
 SWIFT_NAME("getter:BridgedAvailabilitySpec.rawVersion(self:)")
 BridgedVersionTuple
@@ -880,6 +897,13 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsedIdentifier(
     BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
     BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
     BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange);
+
+SWIFT_NAME("BridgedAvailableAttr.setIsGroupMember(self:)")
+void BridgedAvailableAttr_setIsGroupMember(BridgedAvailableAttr cAttr);
+SWIFT_NAME("BridgedAvailableAttr.setIsGroupedWithWildcard(self:)")
+void BridgedAvailableAttr_setIsGroupedWithWildcard(BridgedAvailableAttr cAttr);
+SWIFT_NAME("BridgedAvailableAttr.setIsGroupTerminator(self:)")
+void BridgedAvailableAttr_setIsGroupTerminator(BridgedAvailableAttr cAttr);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExecutionKind {
   BridgedExecutionKindConcurrent,

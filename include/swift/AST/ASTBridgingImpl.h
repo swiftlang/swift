@@ -312,6 +312,31 @@ BridgedAvailabilityDomain BridgedAvailabilityDomain::forEmbedded() {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: AvailabilityDomainOrIdentifier
+//===----------------------------------------------------------------------===//
+
+BridgedAvailabilityDomainOrIdentifier::BridgedAvailabilityDomainOrIdentifier(
+    swift::AvailabilityDomainOrIdentifier domainOrIdentifier)
+    : opaque(domainOrIdentifier.getOpaqueValue()) {}
+
+swift::AvailabilityDomainOrIdentifier
+BridgedAvailabilityDomainOrIdentifier::unbridged() const {
+  return swift::AvailabilityDomainOrIdentifier::fromOpaque(opaque);
+}
+
+bool BridgedAvailabilityDomainOrIdentifier_isDomain(
+    BridgedAvailabilityDomainOrIdentifier cVal) {
+  return cVal.unbridged().isDomain();
+}
+
+BridgedIdentifier BridgedAvailabilityDomainOrIdentifier_getAsIdentifier(
+    BridgedAvailabilityDomainOrIdentifier cVal) {
+  if (auto ident = cVal.unbridged().getAsIdentifier())
+    return *ident;
+  return swift::Identifier();
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedParamDecl
 //===----------------------------------------------------------------------===//
 

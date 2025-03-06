@@ -58,6 +58,11 @@ BridgedPlatformKind BridgedPlatformKind_fromString(BridgedStringRef cStr) {
   }
 }
 
+BridgedPlatformKind
+BridgedPlatformKind_fromIdentifier(BridgedIdentifier cIdent) {
+  return BridgedPlatformKind_fromString(cIdent.unbridged().str());
+}
+
 PlatformKind unbridge(BridgedPlatformKind platform) {
   switch (platform) {
   case BridgedPlatformKind_None:
@@ -93,13 +98,17 @@ BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
                                           cLoc.unbridged());
 }
 
-BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomain(
-    BridgedASTContext cContext, BridgedAvailabilityDomain cDomain,
-    BridgedSourceLoc cLoc, BridgedVersionTuple cVersion,
-    BridgedSourceRange cVersionRange) {
-  return AvailabilitySpec::createForDomain(
-      cContext.unbridged(), cDomain.unbridged(), cLoc.unbridged(),
+BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomainIdentifier(
+    BridgedASTContext cContext, BridgedIdentifier cName, BridgedSourceLoc cLoc,
+    BridgedVersionTuple cVersion, BridgedSourceRange cVersionRange) {
+  return AvailabilitySpec::createForDomainIdentifier(
+      cContext.unbridged(), cName.unbridged(), cLoc.unbridged(),
       cVersion.unbridged(), cVersionRange.unbridged());
+}
+
+BridgedAvailabilityDomainOrIdentifier
+BridgedAvailabilitySpec_getDomainOrIdentifier(BridgedAvailabilitySpec spec) {
+  return spec.unbridged()->getDomainOrIdentifier();
 }
 
 BridgedSourceRange
@@ -109,24 +118,6 @@ BridgedAvailabilitySpec_getSourceRange(BridgedAvailabilitySpec spec) {
 
 bool BridgedAvailabilitySpec_isWildcard(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->isWildcard();
-}
-
-// FIXME: [availability] Remove this (re-implement ASTGen to match ParseDecl)
-BridgedAvailabilityDomain
-BridgedAvailabilitySpec_getDomain(BridgedAvailabilitySpec spec) {
-  auto domain = spec.unbridged()->getDomainOrIdentifier().getAsDomain();
-  if (domain)
-    return *domain;
-  return BridgedAvailabilityDomain();
-}
-
-// FIXME: [availability] Remove this (re-implement ASTGen to match ParseDecl)
-BridgedPlatformKind
-BridgedAvailabilitySpec_getPlatform(BridgedAvailabilitySpec spec) {
-  auto domain = spec.unbridged()->getDomainOrIdentifier().getAsDomain();
-  if (domain)
-    return bridge(domain->getPlatformKind());
-  return bridge(PlatformKind::none);
 }
 
 BridgedVersionTuple

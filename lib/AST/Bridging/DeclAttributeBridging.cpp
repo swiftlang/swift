@@ -168,6 +168,16 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsedIdentifier(
                     /*IsSPI=*/false);
 }
 
+void BridgedAvailableAttr_setIsGroupMember(BridgedAvailableAttr cAttr) {
+  cAttr.unbridged()->setIsGroupMember();
+}
+void BridgedAvailableAttr_setIsGroupedWithWildcard(BridgedAvailableAttr cAttr) {
+  cAttr.unbridged()->setIsGroupedWithWildcard();
+}
+void BridgedAvailableAttr_setIsGroupTerminator(BridgedAvailableAttr cAttr) {
+  cAttr.unbridged()->setIsGroupTerminator();
+}
+
 static std::optional<AccessLevel> unbridge(BridgedAccessLevel level) {
   switch (level) {
   case BridgedAccessLevelPrivate:
