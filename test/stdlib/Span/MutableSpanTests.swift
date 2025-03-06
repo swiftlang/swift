@@ -102,7 +102,7 @@ suite.test("Span from MutableSpan")
   var array = [0, 1, 2]
   array.withUnsafeMutableBufferPointer {
     let mutable = MutableSpan(_unsafeElements: $0)
-    let immutable  = Span(_unsafeMutableSpan: mutable)
+    let immutable  = Span(_mutableSpan: mutable)
     expectEqual(mutable.count, immutable.count)
   }
 }
