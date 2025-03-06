@@ -11,7 +11,6 @@
 # ----------------------------------------------------------------------------
 
 import os
-import platform
 
 from build_swift.build_swift.constants import MULTIROOT_DATA_FILE_PATH
 
@@ -119,8 +118,6 @@ class SwiftSyntax(product.Product):
                 "verify-source-code",
                 ['--toolchain', self.install_toolchain_path(host_target)]
             )
-            if platform.system() == 'Darwin':
-                self.run_swift_syntax_dev_utils(host_target, "verify-documentation", [])
 
         self.run_swiftsyntax_build_script(target=host_target,
                                           command='build')
