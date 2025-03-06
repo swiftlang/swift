@@ -9,6 +9,13 @@
 // REQUIRES: CPU=arm64 || CPU=arm64e || CPU=x86_64
 // REQUIRES: swift_feature_CoroutineAccessors
 
+// CHECK-LABEL: @"$s27coroutine_accessors_popless1iSivyTwc" = {{.*}}global{{.*}} %swift.coro_func_pointer <{
+//           :    sub (
+// CHECK-SAME:      $s27coroutine_accessors_popless1iSivy
+//           :      $s27coroutine_accessors_popless1iSivyTwc
+//           :    ),
+// CHECK-SAME:    i32 0
+// CHECK-SAME:  }>
 // CHECK-LABEL: @"$s27coroutine_accessors_popless1iSivxTwc" = {{.*}}global{{.*}} %swift.coro_func_pointer <{
 //           :    sub (
 // CHECK-SAME:      $s27coroutine_accessors_popless1iSivx
@@ -29,7 +36,7 @@
 // CHECK-SAME:  }
 
 // CHECK-LABEL: @_swift_coro_alloc(
-// CHECK-SAME:      ptr [[ALLOCATOR:%[^,]+]]
+// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]]
 // CHECK-SAME:      i64 [[SIZE:%[^)]+]]
 // CHECK-SAME:  )
 // CHECK-SAME:  {
@@ -53,7 +60,7 @@
 // CHECK:       }
 
 // CHECK-LABEL: @_swift_coro_dealloc(
-// CHECK-SAME:      ptr [[ALLOCATOR:%[^,]+]]
+// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]]
 // CHECK-SAME:      ptr [[ADDRESS:%[^)]+]]
 // CHECK-SAME:  )
 // CHECK-SAME:  {
@@ -231,7 +238,7 @@ public var force_yield_once_2_convention : () {
   }
 // CHECK-LABEL: define{{.*}} { ptr, ptr } @increment_i_yield_once_2(
 //                  ptr noalias %0
-// CHECK-SAME:      ptr [[ALLOCATOR:%[^)]+]]
+// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^)]+]]
 // CHECK-SAME:  )
 // CHECK-SAME:  {
 //      :         [[SIZE_32:%[^,]+]] = load i32
