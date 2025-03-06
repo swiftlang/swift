@@ -617,7 +617,7 @@ llvm::Error DiagnosticSerializer::deserializeDiagnosticInfo(
                                   Kind,
                                   Info.FormatString,
                                   {},
-                                  Info.Category,
+                                  Info.Category.empty() ? StringRef() : Info.Category,
                                   *BICD,
                                   ChildDiagPtrs,
                                   Ranges,
