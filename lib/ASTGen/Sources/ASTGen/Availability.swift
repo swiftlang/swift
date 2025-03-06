@@ -311,6 +311,7 @@ extension ASTGenVisitor {
         if !expanded.isEmpty {
           expanded.withElements(ofType: UnsafeRawPointer.self) { buffer in
             for ptr in buffer {
+              // TODO: Clone and spec.setMacroLoc().
               result.append(BridgedAvailabilitySpec(raw: UnsafeMutableRawPointer(mutating: ptr)))
             }
           }

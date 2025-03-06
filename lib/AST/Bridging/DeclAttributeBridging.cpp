@@ -131,25 +131,6 @@ static AvailableAttr::Kind unbridge(BridgedAvailableAttrKind value) {
 
 BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedAvailabilityDomain cDomain,
-    BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
-    BridgedStringRef cMessage, BridgedStringRef cRenamed,
-    BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
-    BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
-    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange) {
-  return new (cContext.unbridged())
-      AvailableAttr(cAtLoc.unbridged(), cRange.unbridged(), cDomain.unbridged(),
-                    cDomainLoc.unbridged(), unbridge(cKind),
-                    cMessage.unbridged(), cRenamed.unbridged(),
-                    cIntroduced.unbridged(), cIntroducedRange.unbridged(),
-                    cDeprecated.unbridged(), cDeprecatedRange.unbridged(),
-                    cObsoleted.unbridged(), cObsoletedRange.unbridged(),
-                    /*Implicit=*/false,
-                    /*IsSPI=*/false);
-}
-
-BridgedAvailableAttr BridgedAvailableAttr_createParsedIdentifier(
-    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedIdentifier cDomainIdentifier,
     BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
     BridgedStringRef cMessage, BridgedStringRef cRenamed,
@@ -166,6 +147,14 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsedIdentifier(
                     cObsoleted.unbridged(), cObsoletedRange.unbridged(),
                     /*Implicit=*/false,
                     /*IsSPI=*/false);
+}
+
+BridgedAvailableAttr
+BridgedAvailableAttr_createUnavailableInEmbedded(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cAtLoc,
+                                                 BridgedSourceRange cRange) {
+  return AvailableAttr::createUnavailableInEmbedded(
+      cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged());
 }
 
 void BridgedAvailableAttr_setIsGroupMember(BridgedAvailableAttr cAttr) {

@@ -4299,13 +4299,8 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   if (!DK && Tok.getText() == UNAVAILABLE_IN_EMBEDDED_ATTRNAME) {
     SourceLoc attrLoc = consumeToken();
     if (Context.LangOpts.hasFeature(Feature::Embedded)) {
-      StringRef Message = "unavailable in embedded Swift", Renamed;
-      auto attr = new (Context) AvailableAttr(
-          AtLoc, SourceRange(AtLoc, attrLoc), AvailabilityDomain::forEmbedded(),
-          SourceLoc(), AvailableAttr::Kind::Unavailable, Message, Renamed,
-          llvm::VersionTuple(), SourceRange(), llvm::VersionTuple(),
-          SourceRange(), llvm::VersionTuple(), SourceRange(),
-          /*Implicit=*/false, /*IsSPI=*/false);
+      auto attr = AvailableAttr::createUnavailableInEmbedded(
+          Context, AtLoc, SourceRange(AtLoc, attrLoc));
       Attributes.add(attr);
     }
     return makeParserSuccess();

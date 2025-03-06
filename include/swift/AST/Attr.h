@@ -888,6 +888,11 @@ public:
       llvm::VersionTuple Introduced, llvm::VersionTuple Deprecated,
       llvm::VersionTuple Obsoleted);
 
+  /// Create an `AvailableAttr` for `@_unavailableInEmbedded`.
+  static AvailableAttr *createUnavailableInEmbedded(ASTContext &ctx,
+                                                    SourceLoc AtLoc,
+                                                    SourceRange Range);
+
   AvailableAttr *clone(ASTContext &C, bool implicit) const;
   AvailableAttr *clone(ASTContext &C) const {
     return clone(C, isImplicit());

@@ -2208,6 +2208,19 @@ AvailableAttr *AvailableAttr::createPlatformVersioned(
       /*SPI=*/false);
 }
 
+AvailableAttr *AvailableAttr::createUnavailableInEmbedded(ASTContext &C,
+                                                          SourceLoc AtLoc,
+                                                          SourceRange Range) {
+  return new (C) AvailableAttr(
+      AtLoc, Range, AvailabilityDomain::forEmbedded(), SourceLoc(),
+      AvailableAttr::Kind::Unavailable, "unavailable in embedded Swift",
+      /*Rename=*/StringRef(),
+      /*Introduced=*/llvm::VersionTuple(), /*IntroducedRange=*/{},
+      /*Deprecated=*/llvm::VersionTuple(), /*DeprecatedRange=*/{},
+      /*Obsoleted=*/llvm::VersionTuple(), /*ObsoletedRange=*/{},
+      /*Implicit=*/false, /*IsSPI=*/false);
+}
+
 bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
                                         bool forTargetVariant) const {
   return isPlatformActive(Platform, ctx.LangOpts, forTargetVariant);

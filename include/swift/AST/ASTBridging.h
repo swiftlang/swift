@@ -873,23 +873,10 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAvailableAttrKind {
   BridgedAvailableAttrKindNoAsync,
 };
 
-SWIFT_NAME(
-    "BridgedAvailableAttr.createParsed(_:atLoc:range:domain:domainLoc:kind:message:"
-    "renamed:introduced:introducedRange:deprecated:deprecatedRange:"
-    "obsoleted:obsoletedRange:)")
-BridgedAvailableAttr BridgedAvailableAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedAvailabilityDomain cDomain, BridgedSourceLoc cDomainLoc,
-    BridgedAvailableAttrKind cKind, BridgedStringRef cMessage,
-    BridgedStringRef cRenamed, BridgedVersionTuple cIntroduced,
-    BridgedSourceRange cIntroducedRange, BridgedVersionTuple cDeprecated,
-    BridgedSourceRange cDeprecatedRange, BridgedVersionTuple cObsoleted,
-    BridgedSourceRange cObsoletedRange);
-
 SWIFT_NAME("BridgedAvailableAttr.createParsed(_:atLoc:range:domainIdentifier:"
            "domainLoc:kind:message:renamed:introduced:introducedRange:"
            "deprecated:deprecatedRange:obsoleted:obsoletedRange:)")
-BridgedAvailableAttr BridgedAvailableAttr_createParsedIdentifier(
+BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedIdentifier cDomainIdentifier,
     BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
@@ -897,6 +884,12 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsedIdentifier(
     BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
     BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
     BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange);
+
+SWIFT_NAME("BridgedAvailableAttr.createUnavailableInEmbedded(_:atLoc:range:)")
+BridgedAvailableAttr
+BridgedAvailableAttr_createUnavailableInEmbedded(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cAtLoc,
+                                                 BridgedSourceRange cRange);
 
 SWIFT_NAME("BridgedAvailableAttr.setIsGroupMember(self:)")
 void BridgedAvailableAttr_setIsGroupMember(BridgedAvailableAttr cAttr);
