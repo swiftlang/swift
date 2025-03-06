@@ -34,7 +34,6 @@ template<typename T> class ArrayRef;
 
 namespace swift {
 enum class AccessorKind;
-class AvailabilityDomain;
 class AvailabilityDomainOrIdentifier;
 class Argument;
 class ASTContext;
@@ -754,23 +753,6 @@ BridgedAvailabilitySpec_getRawVersion(BridgedAvailabilitySpec spec);
 SWIFT_NAME("getter:BridgedAvailabilitySpec.versionRange(self:)")
 BridgedSourceRange
 BridgedAvailabilitySpec_getVersionRange(BridgedAvailabilitySpec spec);
-
-struct BridgedAvailabilityDomain {
-  void *_Nullable opaque;
-
-  BridgedAvailabilityDomain() : opaque(nullptr) {};
-  BRIDGED_INLINE BridgedAvailabilityDomain(swift::AvailabilityDomain domain);
-  BRIDGED_INLINE swift::AvailabilityDomain unbridged() const;
-
-  BRIDGED_INLINE static BridgedAvailabilityDomain forUniversal();
-  BRIDGED_INLINE static BridgedAvailabilityDomain
-  forPlatform(BridgedPlatformKind platformKind);
-  BRIDGED_INLINE static BridgedAvailabilityDomain forSwiftLanguage();
-  BRIDGED_INLINE static BridgedAvailabilityDomain forPackageDescription();
-  BRIDGED_INLINE static BridgedAvailabilityDomain forEmbedded();
-
-  bool isNull() const { return opaque == nullptr; };
-};
 
 //===----------------------------------------------------------------------===//
 // MARK: AutoDiff

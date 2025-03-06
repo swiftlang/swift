@@ -75,18 +75,6 @@ PlatformKind unbridge(BridgedPlatformKind platform) {
   llvm_unreachable("unhandled enum value");
 }
 
-static BridgedPlatformKind bridge(PlatformKind platform) {
-  switch (platform) {
-  case PlatformKind::none:
-    return BridgedPlatformKind_None;
-#define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
-  case PlatformKind::X:                                                        \
-    return BridgedPlatformKind_##X;
-#include "swift/AST/PlatformKinds.def"
-  }
-  llvm_unreachable("unhandled enum value");
-}
-
 //===----------------------------------------------------------------------===//
 // MARK: AvailabilitySpec
 //===----------------------------------------------------------------------===//

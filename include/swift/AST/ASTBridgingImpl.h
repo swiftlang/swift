@@ -283,35 +283,6 @@ swift::DeclAttributes BridgedDeclAttributes::unbridged() const {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: AvailabilityDomain
-//===----------------------------------------------------------------------===//
-
-BridgedAvailabilityDomain::BridgedAvailabilityDomain(
-    swift::AvailabilityDomain domain)
-    : opaque(domain.getOpaqueValue()) {}
-
-swift::AvailabilityDomain BridgedAvailabilityDomain::unbridged() const {
-  return swift::AvailabilityDomain::fromOpaque(opaque);
-}
-
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forUniversal() {
-  return swift::AvailabilityDomain::forUniversal();
-}
-BridgedAvailabilityDomain
-BridgedAvailabilityDomain::forPlatform(BridgedPlatformKind platformKind) {
-  return swift::AvailabilityDomain::forPlatform(unbridge(platformKind));
-}
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forSwiftLanguage() {
-  return swift::AvailabilityDomain::forSwiftLanguage();
-}
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forPackageDescription() {
-  return swift::AvailabilityDomain::forPackageDescription();
-}
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forEmbedded() {
-  return swift::AvailabilityDomain::forEmbedded();
-}
-
-//===----------------------------------------------------------------------===//
 // MARK: AvailabilityDomainOrIdentifier
 //===----------------------------------------------------------------------===//
 
