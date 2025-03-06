@@ -94,6 +94,17 @@ BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomainIdentifier(
       cVersion.unbridged(), cVersionRange.unbridged());
 }
 
+BridgedAvailabilitySpec
+BridgedAvailabilitySpec_clone(BridgedAvailabilitySpec spec,
+                              BridgedASTContext cContext) {
+  return spec.unbridged()->clone(cContext.unbridged());
+}
+
+void BridgedAvailabilitySpec_setMacroLoc(BridgedAvailabilitySpec spec,
+                                         BridgedSourceLoc cLoc) {
+  spec.unbridged()->setMacroLoc(cLoc.unbridged());
+}
+
 BridgedAvailabilityDomainOrIdentifier
 BridgedAvailabilitySpec_getDomainOrIdentifier(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getDomainOrIdentifier();

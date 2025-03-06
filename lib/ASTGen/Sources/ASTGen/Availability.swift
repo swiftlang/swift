@@ -309,10 +309,15 @@ extension ASTGenVisitor {
           version: version?.bridged ?? BridgedVersionTuple()
         )
         if !expanded.isEmpty {
+          let macroLoc = self.generateSourceLoc(domainNode)
           expanded.withElements(ofType: UnsafeRawPointer.self) { buffer in
             for ptr in buffer {
-              // TODO: Clone and spec.setMacroLoc().
-              result.append(BridgedAvailabilitySpec(raw: UnsafeMutableRawPointer(mutating: ptr)))
+              // Make a copy of the specs to add the macro source location
+              // for the diagnostic about the use of macros in inlinable code.
+              let spec = BridgedAvailabilitySpec(raw: UnsafeMutableRawPointer(mutating: ptr))
+                .clone(self.ctx)
+              spec.setMacroLoc(macroLoc)
+              result.append(spec)
             }
           }
           return
@@ -325,6 +330,8 @@ extension ASTGenVisitor {
         // TODO: Diagnostics.
         fatalError("expected version")
       }
+      // FIXME: Wasting ASTContext memory.
+      // 'AvailabilitySpec' is 'ASTAllocated' but created spec is ephemeral in context of `@available` attributes.
       let spec = BridgedAvailabilitySpec.createForDomainIdentifier(
         self.ctx,
         name: platform.identifier,

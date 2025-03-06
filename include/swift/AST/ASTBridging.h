@@ -735,6 +735,15 @@ BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomainIdentifier(
     BridgedASTContext cContext, BridgedIdentifier cName, BridgedSourceLoc cLoc,
     BridgedVersionTuple cVersion, BridgedSourceRange cVersionRange);
 
+SWIFT_NAME("BridgedAvailabilitySpec.clone(self:_:)")
+BridgedAvailabilitySpec
+BridgedAvailabilitySpec_clone(BridgedAvailabilitySpec spec,
+                              BridgedASTContext cContext);
+
+SWIFT_NAME("BridgedAvailabilitySpec.setMacroLoc(self:_:)")
+void BridgedAvailabilitySpec_setMacroLoc(BridgedAvailabilitySpec spec,
+                                         BridgedSourceLoc cLoc);
+
 SWIFT_NAME("getter:BridgedAvailabilitySpec.domainOrIdentifier(self:)")
 BridgedAvailabilityDomainOrIdentifier
 BridgedAvailabilitySpec_getDomainOrIdentifier(BridgedAvailabilitySpec spec);
