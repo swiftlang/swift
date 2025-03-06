@@ -139,9 +139,8 @@ private:
                   if (auto SingleUse = GlobalAddr->getSingleUse()) {
                     auto SoleUseUser = SingleUse->getUser();
                     assert(isa<StoreInst>(SoleUseUser));
-                    auto Value = ConstExprState.getConstantValue(
-                        dyn_cast<StoreInst>(SoleUseUser)->getSrc());
-
+                    auto src = dyn_cast<StoreInst>(SoleUseUser)->getSrc();
+                    auto Value = ConstExprState.getConstantValue(src);
                     if (Value.isConstant()) {
                       LLVM_DEBUG(printSymbolicValueValue(Value, Allocator););
                       return;
