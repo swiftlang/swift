@@ -374,8 +374,33 @@ extension InlineArray where Element: ~Copyable {
 
     @_transparent
     unsafeMutableAddress {
-       _checkIndex(i)
+      _checkIndex(i)
       return unsafe _mutableAddress + i
+    }
+  }
+
+  /// Accesses the element at the specified position.
+  ///
+  /// - Warning: This subscript trades safety for performance. Using an invalid
+  ///   index results in undefined behavior.
+  ///
+  /// - Parameter i: The position of the element to access. `i` must be a valid
+  ///   index of the array that is not equal to the `endIndex` property.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.2, *)
+  @_addressableSelf
+  @_alwaysEmitIntoClient
+  @unsafe
+  public subscript(unchecked i: Index) -> Element {
+    @_transparent
+    unsafeAddress {
+      unsafe _address + i
+    }
+
+    @_transparent
+    unsafeMutableAddress {
+      unsafe _mutableAddress + i
     }
   }
 }
