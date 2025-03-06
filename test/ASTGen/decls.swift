@@ -346,3 +346,5 @@ func testBuilder() {
     1
   }
 }
+
+struct ExpansionRequirementTest<each T> where repeat each T: Comparable {}
