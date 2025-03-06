@@ -1190,13 +1190,11 @@ static bool _isExecutingInIsolationOfConformance(
 
   // The concurrency library provides a function to check whether we
   // are executing on the given global actor.
-  auto isCurrentGlobalActor = SWIFT_LAZY_CONSTANT(reinterpret_cast<bool (*)(const Metadata *, const WitnessTable *)>(
-      dlsym(RTLD_DEFAULT, "swift_task_isCurrentGlobalActor")));
-  if (!isCurrentGlobalActor)
+  if (!_swift_task_isCurrentGlobalActorHook)
     return false;
 
   // Check whether we are running on this global actor.
-  return isCurrentGlobalActor(globalActorType, globalActorWitnessTable);
+  return _swift_task_isCurrentGlobalActorHook(globalActorType, globalActorWitnessTable);
 }
 
 static bool _checkConformanceIsolation(

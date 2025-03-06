@@ -1769,6 +1769,10 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Isolated deinit body function pointer
   const uint16_t DeinitWorkFunction = 0x8438; // = 33848
+
+  /// IsCurrentGlobalActor function used between the Swift runtime and
+  /// concurrency runtime.
+  const uint16_t IsCurrentGlobalActorFunction = 0xd1b8; // = 53688
 }
 
 /// The number of arguments that will be passed directly to a generic
