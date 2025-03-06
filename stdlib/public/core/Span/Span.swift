@@ -373,7 +373,7 @@ extension Span where Element: BitwiseCopyable {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension Span where Element: ~Copyable {
+extension Span where Element: ~Copyable & ~Escapable {
 
   /// The number of elements in the span.
   ///
