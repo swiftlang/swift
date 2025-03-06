@@ -276,6 +276,16 @@ extension InlineArray where Element: ~Copyable {
     count
   }
 
+  /// A Boolean value indicating whether the array is empty.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var isEmpty: Bool {
+    count == 0
+  }
+
   /// The position of the first element in a nonempty array.
   ///
   /// If the array is empty, `startIndex` is equal to `endIndex`.
