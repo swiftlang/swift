@@ -2840,7 +2840,7 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
     return;
 
   auto Domain = Attr->getDomain();
-  auto DeprecatedRange = Attr->getDeprecatedRange(Context);
+  auto DeprecatedRange = Attr->getDeprecatedRange(Context).value();
   auto Message = Attr->getMessage();
   auto NewName = Attr->getRename();
   if (Message.empty() && NewName.empty()) {
@@ -2919,7 +2919,7 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
 
   auto domain = attr->getDomain();
-  auto deprecatedRange = attr->getDeprecatedRange(ctx);
+  auto deprecatedRange = attr->getDeprecatedRange(ctx).value();
   auto message = attr->getMessage();
   if (message.empty()) {
     ctx.Diags
@@ -3071,12 +3071,12 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
     break;
   case AvailabilityConstraint::Reason::UnavailableForDeployment:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
-                   type, proto, domain, attr.getIntroducedRange(ctx));
+                   type, proto, domain, attr.getIntroducedRange(ctx).value());
     break;
   case AvailabilityConstraint::Reason::Obsoleted:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
-                  domain, attr.getObsoletedRange(ctx))
+                  domain, attr.getObsoletedRange(ctx).value())
         .highlight(attr.getParsedAttr()->getRange());
     break;
   case AvailabilityConstraint::Reason::PotentiallyUnavailable:
@@ -3492,13 +3492,13 @@ bool diagnoseExplicitUnavailability(
   case AvailabilityConstraint::Reason::UnavailableForDeployment:
     diags
         .diagnose(D, diag::availability_introduced_in_version, D, domain,
-                  Attr.getIntroducedRange(ctx))
+                  Attr.getIntroducedRange(ctx).value())
         .highlight(sourceRange);
     break;
   case AvailabilityConstraint::Reason::Obsoleted:
     diags
         .diagnose(D, diag::availability_obsoleted, D, domain,
-                  Attr.getObsoletedRange(ctx))
+                  Attr.getObsoletedRange(ctx).value())
         .highlight(sourceRange);
     break;
   case AvailabilityConstraint::Reason::PotentiallyUnavailable:

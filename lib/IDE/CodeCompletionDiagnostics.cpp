@@ -88,7 +88,7 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
   // So getter/setter specific availability doesn't work in code completion.
 
   auto Domain = Attr.getDomain();
-  auto DeprecatedRange = Attr.getDeprecatedRange(Ctx);
+  auto DeprecatedRange = Attr.getDeprecatedRange(Ctx).value();
   auto Message = Attr.getMessage();
   auto NewName = Attr.getRename();
   if (!isSoftDeprecated) {

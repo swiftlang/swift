@@ -212,9 +212,10 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
       break;
     case AvailabilityConstraint::Reason::PotentiallyUnavailable:
       DEBUG_ASSERT(domain.isPlatform());
-      if (domain.isPlatform())
-        isConstrained |=
-            constrainRange(platformRange, attr.getIntroducedRange(ctx));
+      if (domain.isPlatform()) {
+        if (auto introducedRange = attr.getIntroducedRange(ctx))
+          isConstrained |= constrainRange(platformRange, *introducedRange);
+      }
       // FIXME: [availability] Store other potentially unavailable domains in
       // domainInfos.
       break;
