@@ -22,7 +22,7 @@ struct MaybePtrBox<T> {
   private var ptr: UnsafeMutablePointer<T>
 
   static func sentinel() -> UnsafeMutablePointer<T> {
-    .init(bitPattern: 0xdeadbeef)!
+    .init(bitPattern: 0xffff)!
   }
 
   init() {
