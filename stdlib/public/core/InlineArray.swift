@@ -294,7 +294,7 @@ extension InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public var indices: Range<Int> {
-    Range(_uncheckedBounds: (0, count))
+    unsafe Range(_uncheckedBounds: (0, count))
   }
 
   /// Returns the position immediately after the given index.

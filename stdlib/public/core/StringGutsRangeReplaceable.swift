@@ -367,7 +367,7 @@ extension _StringGuts {
     let j = result._guts.count
     result.append(contentsOf: selfStr[bounds.upperBound...])
     self = result._guts
-    return Range(_uncheckedBounds: (i, j))
+    return unsafe Range(_uncheckedBounds: (i, j))
   }
 
   // - Returns: The encoded offset range of the replaced contents in the result.
@@ -421,7 +421,7 @@ extension _StringGuts {
     let j = result._guts.count
     result.append(contentsOf: selfStr[bounds.upperBound...])
     self = result._guts
-    return Range(_uncheckedBounds: (i, j))
+    return unsafe Range(_uncheckedBounds: (i, j))
   }
 
   // - Returns: The encoded offset range of the replaced contents in the result.
@@ -443,7 +443,7 @@ extension _StringGuts {
     updateNativeStorage {
       unsafe $0.replace(from: start, to: end, with: codeUnits)
     }
-    return Range(_uncheckedBounds: (start, start + codeUnits.count))
+    return unsafe Range(_uncheckedBounds: (start, start + codeUnits.count))
   }
 
   // - Returns: The encoded offset range of the replaced contents in the result.
@@ -468,7 +468,7 @@ extension _StringGuts {
       $0.replace(
         from: start, to: end, with: codeUnits, replacementCount: replCount)
     }
-    return Range(_uncheckedBounds: (start, start + replCount))
+    return unsafe Range(_uncheckedBounds: (start, start + replCount))
   }
 
   /// Run `body` to mutate the given `subrange` of this string within
@@ -540,9 +540,9 @@ extension _StringGuts {
     let oldRange = subrange._encodedOffsetRange
     let newRange = body(&self)
 
-    let oldBounds = Range(
+    let oldBounds = unsafe Range(
       _uncheckedBounds: (startIndex._encodedOffset, endIndex._encodedOffset))
-    let newBounds = Range(_uncheckedBounds: (
+    let newBounds = unsafe Range(_uncheckedBounds: (
         oldBounds.lowerBound,
         oldBounds.upperBound &+ newRange.count &- oldRange.count))
 

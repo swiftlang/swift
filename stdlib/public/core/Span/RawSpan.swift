@@ -322,7 +322,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var byteOffsets: Range<Int> {
-    .init(_uncheckedBounds: (0, byteCount))
+    unsafe Range(_uncheckedBounds: (0, byteCount))
   }
 }
 
@@ -629,13 +629,13 @@ extension RawSpan {
   public func byteOffsets(of other: borrowing Self) -> Range<Int>? {
     if other._count > _count { return nil }
     guard let spanStart = other._pointer, _count > 0 else {
-      return unsafe _pointer == other._pointer ? Range(_uncheckedBounds: (0, 0)) : nil
+      return unsafe _pointer == other._pointer ? 0..<0 : nil
     }
     let start = _start()
     let spanEnd = unsafe spanStart + other._count
     if unsafe spanStart < start || (start + _count) < spanEnd { return nil }
     let lower = unsafe start.distance(to: spanStart)
-    return Range(_uncheckedBounds: (lower, lower &+ other._count))
+    return unsafe Range(_uncheckedBounds: (lower, lower &+ other._count))
   }
 }
 
