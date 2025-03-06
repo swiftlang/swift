@@ -1234,7 +1234,9 @@ public:
       bool setIsNoInline = false, bool forPrologue = false,
       bool isPerformanceConstraint = false,
       IRLinkage *optionalLinkage = nullptr,
-      std::optional<llvm::CallingConv::ID> specialCallingConv = std::nullopt);
+      std::optional<llvm::CallingConv::ID> specialCallingConv = std::nullopt,
+      std::optional<llvm::function_ref<void(llvm::AttributeList &)>>
+          transformAttrs = std::nullopt);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);
@@ -1936,6 +1938,8 @@ public:
 
   /// Add the swiftself attribute.
   void addSwiftSelfAttributes(llvm::AttributeList &attrs, unsigned argIndex);
+
+  void addSwiftCoroAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
   void addSwiftAsyncContextAttributes(llvm::AttributeList &attrs,
                                       unsigned argIndex);
