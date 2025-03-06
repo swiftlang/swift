@@ -176,7 +176,8 @@ private:
 
   void verifyLocal(DebugValueInst *DBI) {
     auto Decl = DBI->getDecl();
-    if (!Decl || !isa<VarDecl>(Decl) || isa<ParamDecl>(Decl) || !Decl->isConstVal())
+    if (!Decl || !isa<VarDecl>(Decl) || isa<ParamDecl>(Decl) ||
+        !Decl->isConstVal())
       return;
 
     auto Value = ConstExprState.getConstantValue(DBI->getOperand());
@@ -228,14 +229,16 @@ private:
 
     if (hasConst) {
       for (size_t i = 0; i < CalleeParameters->size(); ++i) {
-        auto CorrespondingArg = ApplyArgRefs[i];
-        if (CalleeParameters->get(i)->isConstVal()) {
+        const auto &CorrespondingArg = ApplyArgRefs[i];
+        const auto &CorrespondingParameter = CalleeParameters->get(i);
+        if (CorrespondingParameter->isConstVal()) {
           LLVM_DEBUG({
-            llvm::dbgs() << "Argument of fn{" << CalleeDecl->getNameStr() << "} ";
-            llvm::dbgs() << CalleeParameters->get(i)->getNameStr() << ": ";
+            llvm::dbgs() << "Argument of fn{" << CalleeDecl->getNameStr()
+                         << "} ";
+            llvm::dbgs() << CorrespondingParameter->getNameStr() << ": ";
             std::string typeName;
             llvm::raw_string_ostream out(typeName);
-            CalleeParameters->get(i)->getTypeRepr()->print(out);
+            CorrespondingParameter->getTypeRepr()->print(out);
             auto Value = ConstExprState.getConstantValue(CorrespondingArg);
             llvm::dbgs() << typeName << " = ";
             printSymbolicValueValue(Value, Allocator);
@@ -248,6 +251,10 @@ private:
               ArgLocation = ApplyExprNode->getArgs()[i].getLoc();
             getModule()->getASTContext().Diags.diagnose(
                 ArgLocation, diag::require_const_arg_for_parameter);
+            getModule()->getASTContext().Diags.diagnose(
+                CorrespondingParameter->getLoc(),
+                diag::kind_declname_declared_here, DescriptiveDeclKind::Param,
+                CorrespondingParameter->getName());
           }
         }
       }

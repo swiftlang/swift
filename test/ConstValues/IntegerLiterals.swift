@@ -1,6 +1,6 @@
 // Constant globals on simple integer literals
 // REQUIRES: swift_feature_CompileTimeValues
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -enable-experimental-feature CompileTimeValues
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -verify -enable-experimental-feature CompileTimeValues
 
 @const let constGlobal1: Int = 42
 @const let constGlobal2: UInt = 42
