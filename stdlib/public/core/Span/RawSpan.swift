@@ -418,14 +418,6 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(
-    unchecked bounds: some RangeExpression<Int>
-  ) -> Self {
-    unsafe _extracting(unchecked: bounds.relative(to: byteOffsets))
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(self)
-  public func _extracting(
     unchecked bounds: ClosedRange<Int>
   ) -> Self {
     let range = Range(

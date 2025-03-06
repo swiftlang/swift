@@ -155,7 +155,7 @@ suite.test("_extracting() functions")
     let sub1 = span._extracting(0..<2)
     let sub2 = span._extracting(..<2)
     let sub3 = span._extracting(...)
-    let sub4 = span._extracting(unchecked: 2...)
+    let sub4 = span._extracting(2...)
 
     sub1.withUnsafeBytes { p1 in
       sub2.withUnsafeBytes { p2 in
