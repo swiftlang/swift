@@ -189,6 +189,10 @@ extension ASTGenVisitor {
         return handle(self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute)
       case .none where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
+      case .none where attrName == "_functionBuilder":
+        // TODO: Diagnostics. '_functionBuilder' is renamed to 'resultBuilder'
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .resultBuilder))
+
 
       // Simple attributes.
       case .addressableSelf,
