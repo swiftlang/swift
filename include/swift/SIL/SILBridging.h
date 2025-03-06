@@ -570,6 +570,7 @@ struct BridgedGlobalVar {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedInstruction getFirstStaticInitInst() const;
   bool canBeInitializedStatically() const;
   bool mustBeInitializedStatically() const;
+  bool isConstVal() const;
 };
 
 struct OptionalBridgedGlobalVar {

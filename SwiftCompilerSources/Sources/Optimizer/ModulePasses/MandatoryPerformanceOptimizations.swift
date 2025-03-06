@@ -47,6 +47,15 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   }
 }
 
+/// Performance the same set of top-down optimization as the above "mandatory-performance-optimizations"
+/// pass, but only on the initializers of '@const' globals.
+let constGlobalVariableFoldingPass = ModulePass(name: "const-global-variable-folding") {
+  (moduleContext: ModulePassContext) in
+  var worklist = FunctionWorklist()
+  worklist.addAllConstGlobalInitOnceFunctions(of: moduleContext)
+  optimizeFunctionsTopDown(using: &worklist, moduleContext)
+}
+
 private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
                                       _ moduleContext: ModulePassContext) {
   while let f = worklist.pop() {
@@ -501,6 +510,15 @@ fileprivate struct FunctionWorklist {
     for f in moduleContext.functions where f.isGlobalInitOnceFunction {
       if let global = f.getInitializedGlobal(),
          global.mustBeInitializedStatically {
+        pushIfNotVisited(f)
+      }
+    }
+  }
+
+  mutating func addAllConstGlobalInitOnceFunctions(of moduleContext: ModulePassContext) {
+    for f in moduleContext.functions where f.isGlobalInitOnceFunction {
+      if let global = f.getInitializedGlobal(),
+         global.isConst {
         pushIfNotVisited(f)
       }
     }

@@ -71,6 +71,10 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
     return bridged.mustBeInitializedStatically()
   }
 
+  public var isConst: Bool {
+    return bridged.isConstVal()
+  }
+
   public static func ==(lhs: GlobalVariable, rhs: GlobalVariable) -> Bool {
     lhs === rhs
   }
