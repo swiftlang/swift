@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -49,6 +49,20 @@ GROUPED_WARNING(feature_not_experimental, StrictLanguageFeatures, DefaultIgnore,
                 "'%0' is not an experimental feature, "
                 "use -%select{disable|enable}1-upcoming-feature instead",
                 (StringRef, bool))
+
+GROUPED_WARNING(invalid_feature_mode, StrictLanguageFeatures, none,
+                "'%0' is not a recognized mode for feature '%1'"
+                "%select{|; did you mean '%2'?}3",
+                (StringRef, StringRef, StringRef, bool))
+
+GROUPED_WARNING(cannot_disable_feature_with_mode, StrictLanguageFeatures, none,
+                "'%0' argument '%1' cannot specify a mode",
+                (StringRef, StringRef))
+
+GROUPED_WARNING(feature_does_not_support_adoption_mode, StrictLanguageFeatures,
+                none,
+                "feature '%0' does not support adoption mode",
+                (StringRef))
 
 ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "

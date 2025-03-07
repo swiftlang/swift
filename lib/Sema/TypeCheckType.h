@@ -19,7 +19,6 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/LangOptions.h"
 
 namespace swift {
 
