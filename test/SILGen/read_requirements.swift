@@ -55,7 +55,7 @@ public protocol P1 : ~Copyable {
 // CHECK:        unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements2P1P4ubgsAA1UVvy'
 
-// CHECK-LABEL: sil [ossa] @$s17read_requirements2P1P4ubgsAA1UVvx : {{.*}} {
+// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements2P1P4ubgsAA1UVvx : {{.*}} {
 // CHECK:       bb0(
 // CHECK-SAME:      [[SELF_UNCHECKED:%[^:]+]]
 // CHECK-SAME:  ):
