@@ -148,10 +148,7 @@ let s1 = "Long string containing the characters é, ß, 🦆, and 👨‍👧‍
 let s2 = "Long ascii string with no accented characters (obviously)."
 
 StringCreateTests.test("Validating.utf8")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.0, *) { false } else { true } },
-  reason: "Requires Swift 6.0's standard library"
-))
+.require(.stdlib_6_0)
 .code {
   guard #available(SwiftStdlib 6.0, *) else { return }
 
@@ -182,10 +179,7 @@ StringCreateTests.test("Validating.utf8")
 }
 
 StringCreateTests.test("Validating.utf8.from.int8")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.0, *) { false } else { true } },
-  reason: "Requires Swift 6.0's standard library"
-))
+.require(.stdlib_6_0)
 .code {
   guard #available(SwiftStdlib 6.0, *) else { return }
 
@@ -209,10 +203,7 @@ StringCreateTests.test("Validating.utf8.from.int8")
 }
 
 StringCreateTests.test("Validating.ascii")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.0, *) { false } else { true } },
-  reason: "Requires Swift 6.0's standard library"
-))
+.require(.stdlib_6_0)
 .code {
   guard #available(SwiftStdlib 6.0, *) else { return }
 
@@ -236,10 +227,7 @@ StringCreateTests.test("Validating.ascii")
 }
 
 StringCreateTests.test("Validating.utf16")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.0, *) { false } else { true } },
-  reason: "Requires Swift 6.0's standard library"
-))
+.require(.stdlib_6_0)
 .code {
   guard #available(SwiftStdlib 6.0, *) else { return }
 
@@ -263,10 +251,7 @@ StringCreateTests.test("Validating.utf16")
 }
 
 StringCreateTests.test("Validating.utf32")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.0, *) { false } else { true } },
-  reason: "Requires Swift 6.0's standard library"
-))
+.require(.stdlib_6_0)
 .code {
   guard #available(SwiftStdlib 6.0, *) else { return }
 
