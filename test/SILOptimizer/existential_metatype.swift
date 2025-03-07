@@ -1,4 +1,8 @@
 // RUN: %target-swift-frontend %s -O -Xllvm -sil-print-types -emit-sil -parse-as-library | %FileCheck %s
+
+// is_same_metatype builtin is no longer used due to rdar://145707064 (Builtin.is_same_metatype should support noncopyable/nonescapable types)
+// XFAIL: rdar145707064
+
 protocol SomeP {}
 
 public enum SpecialEnum : SomeP {}

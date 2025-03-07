@@ -582,7 +582,8 @@ BUILTIN_MISC_OPERATION(IsConcrete, "isConcrete", "n", Special)
 /// IsBitwiseTakable has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsBitwiseTakable, "isbitwisetakable", "n", Special)
 
-/// IsSameMetatype has type (Any.Type, Any.Type) -> Bool
+/// IsSameMetatype has type
+/// (any (~Copyable & ~Escapable).Type, any (~Copyable & ~Escapable).Type) -> Bool
 BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer

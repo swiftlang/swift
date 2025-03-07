@@ -61,8 +61,14 @@ public struct ObjectIdentifier: Sendable {
   ///
   /// - Parameters:
   ///   - x: A metatype.
-  @inlinable // trivial-implementation
-  public init(_ x: Any.Type) {
+  @_alwaysEmitIntoClient
+  public init(_ x: any (~Copyable & ~Escapable).Type) {
+    self._value = unsafe unsafeBitCast(x, to: Builtin.RawPointer.self)
+  }
+
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  internal init(_ x: Any.Type) {
     self._value = unsafe unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
 }
@@ -80,7 +86,7 @@ public struct ObjectIdentifier: Sendable {
   }
 
   @inlinable // trivial-implementation
-  public init<Object>(_ x: Object.Type) {
+  public init<T: ~Copyable & ~Escapable>(_ x: T.Type) {
     self._value = unsafe unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
 }
