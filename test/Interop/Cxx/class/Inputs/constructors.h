@@ -108,4 +108,18 @@ struct HasPtrAuthMember {
 };
 #endif
 
+struct MoveConstructorWithOneParameterWithDefaultArg {
+  int value;
+
+  MoveConstructorWithOneParameterWithDefaultArg(int value) : value(value) {}
+
+  MoveConstructorWithOneParameterWithDefaultArg(
+      const MoveConstructorWithOneParameterWithDefaultArg &) = delete;
+
+  MoveConstructorWithOneParameterWithDefaultArg(
+      MoveConstructorWithOneParameterWithDefaultArg &&other =
+          MoveConstructorWithOneParameterWithDefaultArg{0})
+      : value(other.value + 1) {}
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_CONSTRUCTORS_H
