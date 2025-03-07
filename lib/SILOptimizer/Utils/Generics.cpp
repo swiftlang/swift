@@ -370,6 +370,8 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
     LLVM_DEBUG(llvm::dbgs() << "Scan caller's specialization history\n");
   }
 
+  llvm::SmallSet<const GenericSpecializationInformation *, 8> visited;
+
   while (CurSpecializationInfo) {
     LLVM_DEBUG(llvm::dbgs() << "Current caller is a specialization:\n"
                             << "Caller: "
@@ -384,6 +386,10 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
                        .getReplacementTypes()) {
                  Replacement->dump(llvm::dbgs());
                });
+
+    if (!visited.insert(CurSpecializationInfo).second) {
+      return true;
+    }
 
     if (CurSpecializationInfo->getParent() == GenericFunc) {
       LLVM_DEBUG(llvm::dbgs() << "Found a call graph loop, checking "
