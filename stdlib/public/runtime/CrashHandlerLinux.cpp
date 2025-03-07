@@ -76,7 +76,6 @@ uint32_t currently_paused();
 void wait_paused(uint32_t expected, const struct timespec *timeout);
 int  memserver_start();
 int  memserver_entry(void *);
-bool run_backtracer(int fd);
 
 ssize_t safe_read(int fd, void *buf, size_t len) {
   uint8_t *ptr = (uint8_t *)buf;
@@ -261,13 +260,13 @@ handle_fatal_signal(int signum,
   _swift_displayCrashMessage(signum, pc);
 
   // Actually start the backtracer
-  if (!run_backtracer(fd)) {
+  if (!_swift_spawnBacktracer(&crashInfo, fd)) {
     const char *message = _swift_backtraceSettings.color == OnOffTty::On
       ? " failed\n\n" : " failed ***\n\n";
-    if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
-      write(STDERR_FILENO, message, strlen(message));
-    else
+    if (_swift_backtraceSettings.outputTo == OutputTo::Stdout)
       write(STDOUT_FILENO, message, strlen(message));
+    else
+      write(STDERR_FILENO, message, strlen(message));
   }
 
 #if !MEMSERVER_USE_PROCESS
@@ -784,183 +783,6 @@ memserver_entry(void *dummy __attribute__((unused))) {
   return result;
 }
 
-// .. Starting the backtracer ..................................................
-
-char addr_buf[18];
-char timeout_buf[22];
-char limit_buf[22];
-char top_buf[22];
-const char *backtracer_argv[] = {
-  "swift-backtrace",            // 0
-  "--unwind",                   // 1
-  "precise",                    // 2
-  "--demangle",                 // 3
-  "true",                       // 4
-  "--interactive",              // 5
-  "true",                       // 6
-  "--color",                    // 7
-  "true",                       // 8
-  "--timeout",                  // 9
-  timeout_buf,                  // 10
-  "--preset",                   // 11
-  "friendly",                   // 12
-  "--crashinfo",                // 13
-  addr_buf,                     // 14
-  "--threads",                  // 15
-  "preset",                     // 16
-  "--registers",                // 17
-  "preset",                     // 18
-  "--images",                   // 19
-  "preset",                     // 20
-  "--limit",                    // 21
-  limit_buf,                    // 22
-  "--top",                      // 23
-  top_buf,                      // 24
-  "--sanitize",                 // 25
-  "preset",                     // 26
-  "--cache",                    // 27
-  "true",                       // 28
-  "--output-to",                // 29
-  "stdout",                     // 30
-  "--symbolicate",              // 31
-  "full",                       // 32
-  NULL
-};
-
-const char *
-trueOrFalse(bool b) {
-  return b ? "true" : "false";
-}
-
-const char *
-trueOrFalse(OnOffTty oot) {
-  return trueOrFalse(oot == OnOffTty::On);
-}
-
-bool
-run_backtracer(int memserver_fd)
-{
-  // Set-up the backtracer's command line arguments
-  switch (_swift_backtraceSettings.algorithm) {
-  case UnwindAlgorithm::Fast:
-    backtracer_argv[2] = "fast";
-    break;
-  default:
-    backtracer_argv[2] = "precise";
-    break;
-  }
-
-  // (The TTY option has already been handled at this point, so these are
-  //  all either "On" or "Off".)
-  backtracer_argv[4] = trueOrFalse(_swift_backtraceSettings.demangle);
-  backtracer_argv[6] = trueOrFalse(_swift_backtraceSettings.interactive);
-  backtracer_argv[8] = trueOrFalse(_swift_backtraceSettings.color);
-
-  switch (_swift_backtraceSettings.threads) {
-  case ThreadsToShow::Preset:
-    backtracer_argv[16] = "preset";
-    break;
-  case ThreadsToShow::All:
-    backtracer_argv[16] = "all";
-    break;
-  case ThreadsToShow::Crashed:
-    backtracer_argv[16] = "crashed";
-    break;
-  }
-
-  switch (_swift_backtraceSettings.registers) {
-  case RegistersToShow::Preset:
-    backtracer_argv[18] = "preset";
-    break;
-  case RegistersToShow::None:
-    backtracer_argv[18] = "none";
-    break;
-  case RegistersToShow::All:
-    backtracer_argv[18] = "all";
-    break;
-  case RegistersToShow::Crashed:
-    backtracer_argv[18] = "crashed";
-    break;
-  }
-
-  switch (_swift_backtraceSettings.images) {
-  case ImagesToShow::Preset:
-    backtracer_argv[20] = "preset";
-    break;
-  case ImagesToShow::None:
-    backtracer_argv[20] = "none";
-    break;
-  case ImagesToShow::All:
-    backtracer_argv[20] = "all";
-    break;
-  case ImagesToShow::Mentioned:
-    backtracer_argv[20] = "mentioned";
-    break;
-  }
-
-  switch (_swift_backtraceSettings.preset) {
-  case Preset::Friendly:
-    backtracer_argv[12] = "friendly";
-    break;
-  case Preset::Medium:
-    backtracer_argv[12] = "medium";
-    break;
-  default:
-    backtracer_argv[12] = "full";
-    break;
-  }
-
-  switch (_swift_backtraceSettings.sanitize) {
-  case SanitizePaths::Preset:
-    backtracer_argv[26] = "preset";
-    break;
-  case SanitizePaths::Off:
-    backtracer_argv[26] = "false";
-    break;
-  case SanitizePaths::On:
-    backtracer_argv[26] = "true";
-    break;
-  }
-
-  switch (_swift_backtraceSettings.outputTo) {
-  case OutputTo::Stdout:
-    backtracer_argv[30] = "stdout";
-    break;
-  case OutputTo::Auto: // Shouldn't happen, but if it does pick stderr
-  case OutputTo::Stderr:
-    backtracer_argv[30] = "stderr";
-    break;
-  }
-
-  backtracer_argv[28] = trueOrFalse(_swift_backtraceSettings.cache);
-
-  switch (_swift_backtraceSettings.symbolicate) {
-  case Symbolication::Off:
-    backtracer_argv[32] = "off";
-    break;
-  case Symbolication::Fast:
-    backtracer_argv[32] = "fast";
-    break;
-  case Symbolication::Full:
-    backtracer_argv[32] = "full";
-    break;
-  }
-
-  _swift_formatUnsigned(_swift_backtraceSettings.timeout, timeout_buf);
-
-  if (_swift_backtraceSettings.limit < 0)
-    std::strcpy(limit_buf, "none");
-  else
-    _swift_formatUnsigned(_swift_backtraceSettings.limit, limit_buf);
-
-  _swift_formatUnsigned(_swift_backtraceSettings.top, top_buf);
-  _swift_formatAddress(&crashInfo, addr_buf);
-
-  // Actually execute it
-  return _swift_spawnBacktracer(backtracer_argv, memserver_fd);
-}
-
 } // namespace
 
 #endif // __linux__
-
