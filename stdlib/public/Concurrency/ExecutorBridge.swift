@@ -18,6 +18,10 @@
 import Swift
 
 @available(SwiftStdlib 6.2, *)
+@_silgen_name("_swift_exit")
+internal func _exit(result: CInt)
+
+@available(SwiftStdlib 6.2, *)
 @_silgen_name("_swift_task_isMainExecutorSwift")
 internal func _isMainExecutor<E>(_ executor: E) -> Bool where E: SerialExecutor {
   return executor.isMainExecutor
