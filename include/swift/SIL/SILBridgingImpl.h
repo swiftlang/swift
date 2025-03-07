@@ -450,10 +450,6 @@ bool BridgedType::isBuiltinVector() const {
   return unbridged().isBuiltinVector();
 }
 
-bool BridgedType::isLegalFormalType() const {
-  return unbridged().getASTType()->isLegalFormalType();
-}
-
 BridgedType BridgedType::getBuiltinVectorElementType() const {
   return unbridged().getBuiltinVectorElementType();
 }

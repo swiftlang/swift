@@ -398,6 +398,10 @@ BridgedCanType BridgedASTType::getCanonicalType() const {
   return unbridged()->getCanonicalType();
 }
 
+bool BridgedASTType::isLegalFormalType() const {
+  return unbridged()->isLegalFormalType();
+}
+
 bool BridgedASTType::hasTypeParameter() const {
   return unbridged()->hasTypeParameter();
 }

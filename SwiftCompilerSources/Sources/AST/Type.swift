@@ -84,6 +84,7 @@ public protocol TypeProperties {
 extension TypeProperties {
   public var description: String { String(taking: type.bridged.getDebugDescription()) }
 
+  public var isLegalFormalType: Bool { type.bridged.isLegalFormalType() }
   public var hasTypeParameter: Bool { type.bridged.hasTypeParameter() }
   public var hasLocalArchetype: Bool { type.bridged.hasLocalArchetype() }
   public var isExistentialArchetype: Bool { type.bridged.isExistentialArchetype() }
