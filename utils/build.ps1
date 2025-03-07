@@ -498,9 +498,6 @@ function Invoke-BuildStep([string] $Name) {
     Add-TimingData $BuildArch.LLVMName "Windows" ($Name -replace "Build-","") $Stopwatch.Elapsed
   }
   if ($Name.Replace("Build-", "") -eq $BuildTo) {
-    if ($Summary) {
-      Write-Summary
-    }
     exit 0
   }
 }
