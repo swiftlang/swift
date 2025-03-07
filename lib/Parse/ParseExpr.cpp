@@ -441,7 +441,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
         peekToken().isAny(tok::r_paren, tok::r_brace, tok::r_square,
                           tok::equal, tok::colon, tok::comma) ||
         (isExprBasic && peekToken().is(tok::l_brace)) ||
-        peekToken().is(tok::period))) {
+        peekToken().is(tok::period) ||
+        (peekToken().isAny(tok::l_paren, tok::l_square) &&
+         peekToken().getRange().getStart() == Tok.getRange().getEnd()))) {
     Tok.setKind(tok::contextual_keyword);
     SourceLoc unsafeLoc = consumeToken();
     ParserResult<Expr> sub =
