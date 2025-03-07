@@ -5813,7 +5813,7 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
              IsolationSource(overriddenValue, IsolationSource::Override)},
             overriddenValue,
             isolation}; // use the overridden decl's iso as the default
-                        // isolatiotn for this decl.
+                        // isolation for this decl.
   }
 
   // We did not find anything special, return unspecified.
