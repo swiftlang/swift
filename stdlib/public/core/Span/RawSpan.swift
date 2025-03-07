@@ -441,7 +441,7 @@ extension RawSpan {
     unchecked bounds: ClosedRange<Int>
   ) -> Self {
     let range = Range(
-      _uncheckedBounds: (bounds.lowerBound, bounds.upperBound&+1)
+      _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
     )
     return unsafe _extracting(unchecked: range)
   }

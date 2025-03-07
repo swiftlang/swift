@@ -591,7 +591,7 @@ extension Span where Element: ~Copyable {
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
     let range = Range(
-      _uncheckedBounds: (bounds.lowerBound, bounds.upperBound&+1)
+      _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
     )
     return unsafe _extracting(unchecked: range)
   }
