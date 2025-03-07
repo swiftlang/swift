@@ -361,7 +361,8 @@ $IsCrossCompiling = $HostArchName -ne $BuildArchName
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
 
 function Add-TimingData {
-  param(
+  param
+  (
     [Parameter(Mandatory)]
     [string] $Arch,
     [Parameter(Mandatory)]
