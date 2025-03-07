@@ -283,32 +283,28 @@ swift::DeclAttributes BridgedDeclAttributes::unbridged() const {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: AvailabilityDomain
+// MARK: AvailabilityDomainOrIdentifier
 //===----------------------------------------------------------------------===//
 
-BridgedAvailabilityDomain::BridgedAvailabilityDomain(
-    swift::AvailabilityDomain domain)
-    : opaque(domain.getOpaqueValue()) {}
+BridgedAvailabilityDomainOrIdentifier::BridgedAvailabilityDomainOrIdentifier(
+    swift::AvailabilityDomainOrIdentifier domainOrIdentifier)
+    : opaque(domainOrIdentifier.getOpaqueValue()) {}
 
-swift::AvailabilityDomain BridgedAvailabilityDomain::unbridged() const {
-  return swift::AvailabilityDomain::fromOpaque(opaque);
+swift::AvailabilityDomainOrIdentifier
+BridgedAvailabilityDomainOrIdentifier::unbridged() const {
+  return swift::AvailabilityDomainOrIdentifier::fromOpaque(opaque);
 }
 
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forUniversal() {
-  return swift::AvailabilityDomain::forUniversal();
+bool BridgedAvailabilityDomainOrIdentifier_isDomain(
+    BridgedAvailabilityDomainOrIdentifier cVal) {
+  return cVal.unbridged().isDomain();
 }
-BridgedAvailabilityDomain
-BridgedAvailabilityDomain::forPlatform(BridgedPlatformKind platformKind) {
-  return swift::AvailabilityDomain::forPlatform(unbridge(platformKind));
-}
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forSwiftLanguage() {
-  return swift::AvailabilityDomain::forSwiftLanguage();
-}
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forPackageDescription() {
-  return swift::AvailabilityDomain::forPackageDescription();
-}
-BridgedAvailabilityDomain BridgedAvailabilityDomain::forEmbedded() {
-  return swift::AvailabilityDomain::forEmbedded();
+
+BridgedIdentifier BridgedAvailabilityDomainOrIdentifier_getAsIdentifier(
+    BridgedAvailabilityDomainOrIdentifier cVal) {
+  if (auto ident = cVal.unbridged().getAsIdentifier())
+    return *ident;
+  return swift::Identifier();
 }
 
 //===----------------------------------------------------------------------===//

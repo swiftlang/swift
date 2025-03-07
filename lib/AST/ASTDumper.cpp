@@ -4945,8 +4945,18 @@ public:
   void visitAvailableAttr(AvailableAttr *Attr, Label label) {
     printCommon(Attr, "available_attr", label);
 
-    printFieldRaw([&](auto &out) { Attr->getDomainOrIdentifier().print(out); },
-                  Label::always("domain"));
+    printFlag(Attr->isGroupMember(), "group_member");
+    printFlag(Attr->isGroupedWithWildcard(), "group_with_wildcard");
+    printFlag(Attr->isGroupTerminator(), "group_terminator");
+
+    auto domainOrIdentifier = Attr->getDomainOrIdentifier();
+    if (domainOrIdentifier.isDomain()) {
+      printFieldRaw([&](auto &out) { domainOrIdentifier.getAsDomain()->print(out); },
+                    Label::always("domain"));
+    } else {
+      printFlag(domainOrIdentifier.isResolved(), "resolved");
+      printField(*domainOrIdentifier.getAsIdentifier(), Label::always("domainIdentifier"));
+    }
 
     switch (Attr->getKind()) {
     case swift::AvailableAttr::Kind::Default:
