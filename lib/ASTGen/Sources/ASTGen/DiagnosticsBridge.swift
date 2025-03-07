@@ -339,12 +339,19 @@ public func addQueuedDiagnostic(
     }
   }
 
-  let category: DiagnosticCategory? = categoryName.map { categoryNamePtr in
+  let category: DiagnosticCategory? = categoryName.flatMap { categoryNamePtr in
     let categoryNameBuffer = UnsafeBufferPointer(
       start: categoryNamePtr,
       count: categoryLength
     )
     let categoryName = String(decoding: categoryNameBuffer, as: UTF8.self)
+
+    // If the data comes from serialized diagnostics, it's possible that
+    // the category name is empty because StringRef() is serialized into
+    // an empty string.
+    guard !categoryName.isEmpty else {
+      return nil
+    }
 
     let documentationURL = documentationPath.map { documentationPathPtr in
       let documentationPathBuffer = UnsafeBufferPointer(
