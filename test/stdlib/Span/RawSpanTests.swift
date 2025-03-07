@@ -131,12 +131,11 @@ suite.test("unsafeLoadUnaligned(as:)")
 
     let suffix = span._extracting(droppingFirst: 2)
     let u0 = suffix.unsafeLoadUnaligned(as: UInt64.self)
-    expectEqual(u0 & 0xff, 2)
-    expectEqual(u0.byteSwapped & 0xff, 9)
-    let u1 = span.unsafeLoadUnaligned(fromByteOffset: 6, as: UInt64.self)
-    expectEqual(u1 & 0xff, 6)
-    let u3 = span.unsafeLoadUnaligned(fromUncheckedByteOffset: 7, as: UInt32.self)
-    expectEqual(u3 & 0xff, 7)
+    expectEqual(u0.littleEndian & 0xff, 2)
+    expectEqual(u0.bigEndian & 0xff, 9)
+    let u1 = span.unsafeLoadUnaligned(fromByteOffset: 7, as: Int32.self)
+    expectEqual(u1.littleEndian & 0xff, 7)
+    expectEqual(u1.bigEndian & 0xff, 10)
   }
 }
 
