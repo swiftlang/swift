@@ -260,6 +260,18 @@ const WitnessTable *
 swift_conformsToProtocolCommon(const Metadata *type,
                                const ProtocolDescriptor *protocol);
 
+/// Check whether a type conforms to a given native Swift protocol. This
+/// is similar to swift_conformsToProtocolCommon, but allows the caller to
+/// capture the global actor isolation of the conformance rather than
+/// checking that the code is currently executing on that global actor.
+SWIFT_RUNTIME_EXPORT
+const WitnessTable *
+swift_conformsToProtocolCommonIsolated(
+    const Metadata *type,
+    const ProtocolDescriptor *protocol,
+    const Metadata **globalActorIsolationType,
+    const WitnessTable **globalActorIsolationWitnessTable);
+
 } // end namespace swift
 
 #endif // SWIFT_RUNTIME_CASTING_H

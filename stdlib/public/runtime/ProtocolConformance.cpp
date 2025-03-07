@@ -27,6 +27,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Basic/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include "Private.h"
@@ -323,9 +324,63 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
   swift_unreachable("Unhandled TypeReferenceKind in switch.");
 }
 
+namespace {
+
+/// Describes the result of looking in the conformance cache.
+struct ConformanceLookupResult {
+  /// The actual witness table, which will be NULL if the type does not
+  /// conform.
+  const WitnessTable *witnessTable = nullptr;
+
+  /// The global actor to which this conformance is isolated, or NULL for
+  /// a nonisolated conformances.
+  const Metadata *globalActorIsolationType = nullptr;
+
+  /// When the conformance is global-actor-isolated, this is the conformance
+  /// of globalActorIsolationType to GlobalActor.
+  const WitnessTable *globalActorIsolationWitnessTable = nullptr;
+
+  ConformanceLookupResult() { }
+
+  ConformanceLookupResult(std::nullptr_t) { }
+
+  ConformanceLookupResult(const WitnessTable *witnessTable,
+                          const Metadata *globalActorIsolationType,
+                          const WitnessTable *globalActorIsolationWitnessTable)
+    : witnessTable(witnessTable),
+      globalActorIsolationType(globalActorIsolationType),
+      globalActorIsolationWitnessTable(globalActorIsolationWitnessTable) { }
+
+  explicit operator bool() const { return witnessTable != nullptr; }
+
+  /// Given a type and conformance descriptor, form a conformance lookup
+  /// result.
+  static ConformanceLookupResult fromConformance(
+      const Metadata *type,
+      const ProtocolConformanceDescriptor *conformanceDescriptor);
+};
+
+}
+
+/// Determine the global actor isolation for the given witness table.
+///
+/// Returns true if an error occurred, false if global actor isolation was
+/// successfully computed (which can mean "not isolated").
+static bool _checkWitnessTableIsolation(
+  const Metadata *type,
+  const WitnessTable *wtable,
+  llvm::ArrayRef<const void *> conditionalArgs,
+  const Metadata *&globalActorIsolationType,
+  const WitnessTable *&globalActorIsolationWitnessTable
+);
+
 template<>
 const WitnessTable *
-ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
+ProtocolConformanceDescriptor::getWitnessTable(
+    const Metadata *type,
+    const Metadata *&globalActorIsolationType,
+    const WitnessTable *&globalActorIsolationWitnessTable
+) const {
   // If needed, check the conditional requirements.
   llvm::SmallVector<const void *, 8> conditionalArgs;
 
@@ -345,16 +400,104 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
-        });
+        },
+        &globalActorIsolationType,
+        &globalActorIsolationWitnessTable);
     if (error)
       return nullptr;
   }
 #if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
-  return (const WitnessTable *)
+  auto wtable = (const WitnessTable *)
     swift_getWitnessTableRelative(this, type, conditionalArgs.data());
 #else
-  return swift_getWitnessTable(this, type, conditionalArgs.data());
+  auto wtable = swift_getWitnessTable(this, type, conditionalArgs.data());
 #endif
+
+  if (!wtable)
+    return nullptr;
+
+  // Check the global-actor isolation for this conformance, combining it with
+  // any global-actor isolation determined based on the conditional
+  // requirements above.
+  if (_checkWitnessTableIsolation(
+          type, wtable, conditionalArgs, globalActorIsolationType,
+          globalActorIsolationWitnessTable))
+    return nullptr;
+
+  return wtable;
+}
+
+ConformanceLookupResult ConformanceLookupResult::fromConformance(
+    const Metadata *type,
+    const ProtocolConformanceDescriptor *conformanceDescriptor) {
+  const Metadata *globalActorIsolationType = nullptr;
+  const WitnessTable *globalActorIsolationWitnessTable = nullptr;
+  auto wtable = conformanceDescriptor->getWitnessTable(
+      type, globalActorIsolationType, globalActorIsolationWitnessTable);
+  return {
+    wtable,
+    globalActorIsolationType,
+    globalActorIsolationWitnessTable
+  };
+}
+
+/// Determine the global actor isolation for the given witness table.
+///
+/// Returns true if an error occurred, false if global actor isolation was
+/// successfully computed (which can mean "not isolated").
+static bool _checkWitnessTableIsolation(
+  const Metadata *type,
+  const WitnessTable *wtable,
+  llvm::ArrayRef<const void *> conditionalArgs,
+  const Metadata *&globalActorIsolationType,
+  const WitnessTable *&globalActorIsolationWitnessTable
+) {
+  // If there's no protocol conformance descriptor, do nothing.
+  auto description = wtable->getDescription();
+  if (!description)
+    return false;
+
+  // If this conformance doesn't have global actor isolation, we're done.
+  if (!description->hasGlobalActorIsolation())
+    return false;
+
+  // Resolve the global actor type.
+  SubstGenericParametersFromMetadata substitutions(type);
+  auto result = swift_getTypeByMangledName(
+     MetadataState::Abstract, description->getGlobalActorType(),
+     conditionalArgs.data(),
+     [&substitutions](unsigned depth, unsigned index) {
+        return substitutions.getMetadata(depth, index).Ptr;
+      },
+    [&substitutions](const Metadata *type, unsigned index) {
+      return substitutions.getWitnessTable(type, index);
+    });
+  if (result.isError())
+    return true;
+
+  auto myGlobalActorIsolationType = result.getType().getMetadata();
+  if (!myGlobalActorIsolationType)
+    return true;
+
+  // If the global actor isolation from this conformance conflicts with
+  // the one we already have, fail.
+  if (globalActorIsolationType &&
+      globalActorIsolationType != myGlobalActorIsolationType)
+    return true;
+
+  // Dig out the witness table.
+  auto myConformance = description->getGlobalActorConformance();
+  if (!myConformance)
+    return true;
+
+  auto myWitnessTable = ConformanceLookupResult::fromConformance(
+      myGlobalActorIsolationType, myConformance);
+  if (!myWitnessTable)
+    return true;
+
+  globalActorIsolationType = myGlobalActorIsolationType;
+  globalActorIsolationWitnessTable = myWitnessTable.witnessTable;
+  return false;
 }
 
 namespace {
@@ -396,11 +539,22 @@ namespace {
   struct ConformanceCacheEntry {
   private:
     ConformanceCacheKey Key;
-    const WitnessTable *Witness;
+
+    /// The witness table or along with a bit that indicates whether the
+    /// conformance is isolated to a global actor.
+    llvm::PointerUnion<const WitnessTable *, const ConformanceLookupResult *>
+        WitnessTableOrLookupResult;
 
   public:
-    ConformanceCacheEntry(ConformanceCacheKey key, const WitnessTable *witness)
-        : Key(key), Witness(witness) {}
+    ConformanceCacheEntry(ConformanceCacheKey key,
+                          ConformanceLookupResult result)
+        : Key(key) {
+      if (result.globalActorIsolationType) {
+        WitnessTableOrLookupResult = new ConformanceLookupResult(result);
+      } else {
+        WitnessTableOrLookupResult = result.witnessTable;
+      }
+    }
 
     bool matchesKey(const ConformanceCacheKey &key) const {
       return Key.Type == key.Type && Key.Proto == key.Proto;
@@ -410,14 +564,23 @@ namespace {
       return hash_value(entry.Key);
     }
 
-    template <class... Args>
-    static size_t getExtraAllocationSize(Args &&... ignored) {
-      return 0;
-    }
-
     /// Get the cached witness table, or null if we cached failure.
     const WitnessTable *getWitnessTable() const {
-      return Witness;
+      if (auto witnessTable = WitnessTableOrLookupResult.dyn_cast<const WitnessTable *>())
+        return witnessTable;
+
+      return WitnessTableOrLookupResult.get<const ConformanceLookupResult *>()
+          ->witnessTable;
+    }
+
+    ConformanceLookupResult getResult() const {
+      if (auto witnessTable = WitnessTableOrLookupResult.dyn_cast<const WitnessTable *>())
+        return ConformanceLookupResult { witnessTable, nullptr, nullptr };
+
+      if (auto lookupResult = WitnessTableOrLookupResult.dyn_cast<const ConformanceLookupResult *>())
+        return *lookupResult;
+
+      return nullptr;
     }
   };
 } // end anonymous namespace
@@ -486,7 +649,7 @@ struct ConformanceState {
   }
 
   void cacheResult(const Metadata *type, const ProtocolDescriptor *proto,
-                   const WitnessTable *witness, size_t sectionsCount) {
+                   ConformanceLookupResult result, size_t sectionsCount) {
     Cache.getOrInsert(ConformanceCacheKey(type, proto),
                       [&](ConformanceCacheEntry *entry, bool created) {
                         // Create the entry if needed. If it already exists,
@@ -514,7 +677,7 @@ struct ConformanceState {
                           return false; // abandon the new entry
 
                         ::new (entry) ConformanceCacheEntry(
-                            ConformanceCacheKey(type, proto), witness);
+                            ConformanceCacheKey(type, proto), result);
                         return true; // keep the new entry
                       });
   }
@@ -628,8 +791,8 @@ swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin
 /// First element of the return value is `true` if the result is authoritative
 /// i.e. the result is for the type itself and not a superclass. If `false`
 /// then we cached a conformance on a superclass, but that may be overridden.
-/// A return value of `{ false, nullptr }` indicates nothing was cached.
-static std::pair<bool, const WitnessTable *>
+/// A return value of `{ false, { } }` indicates nothing was cached.
+static std::pair<bool, ConformanceLookupResult>
 searchInConformanceCache(const Metadata *type,
                          const ProtocolDescriptor *protocol,
                          bool instantiateSuperclassMetadata) {
@@ -641,12 +804,12 @@ searchInConformanceCache(const Metadata *type,
       type, instantiateSuperclassMetadata};
   for (; auto type = superclassIterator.metadata; ++superclassIterator) {
     if (auto *Value = snapshot.find(ConformanceCacheKey(type, protocol))) {
-      return {type == origType, Value->getWitnessTable()};
+      return { type == origType, Value->getResult() };
     }
   }
 
   // We did not find a cache entry.
-  return {false, nullptr};
+  return { false, ConformanceLookupResult{} };
 }
 
 /// Get the appropriate context descriptor for a type. If the descriptor is a
@@ -747,7 +910,7 @@ namespace {
 static void validateDyldResults(
     ConformanceState &C, const Metadata *type,
     const ProtocolDescriptor *protocol,
-    const WitnessTable *dyldCachedWitnessTable,
+    ConformanceLookupResult dyldCachedWitnessTable,
     const ProtocolConformanceDescriptor *dyldCachedConformanceDescriptor,
     bool instantiateSuperclassMetadata) {
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
@@ -879,7 +1042,8 @@ static _dyld_protocol_conformance_result getDyldOnDiskConformance(
 /// value is a tuple consisting of the found witness table (if any), the found
 /// conformance descriptor (if any), and a bool that's true if a failure is
 /// definitive.
-static std::tuple<const WitnessTable *, const ProtocolConformanceDescriptor *,
+static std::tuple<ConformanceLookupResult,
+                  const ProtocolConformanceDescriptor *,
                   bool>
 findConformanceWithDyld(ConformanceState &C, const Metadata *type,
                         const ProtocolDescriptor *protocol,
@@ -937,8 +1101,9 @@ findConformanceWithDyld(ConformanceState &C, const Metadata *type,
       // so do it up front.
       DYLD_CONFORMANCES_LOG("DYLD Found conformance descriptor %p for %s",
                             conformanceDescriptor, protocol->Name.get());
-      auto *witnessTable = conformanceDescriptor->getWitnessTable(type);
-      return std::make_tuple(witnessTable, conformanceDescriptor, false);
+      auto result = ConformanceLookupResult::fromConformance(
+          type, conformanceDescriptor);
+      return std::make_tuple(result, conformanceDescriptor, false);
     }
     break;
   }
@@ -976,16 +1141,16 @@ findConformanceWithDyld(ConformanceState &C, const Metadata *type,
 
 /// Check if a type conforms to a protocol, possibly instantiating superclasses
 /// that have not yet been instantiated. The return value is a pair consisting
-/// of the witness table for the conformance (or NULL if no conformance was
+/// of the the result of the lookup (which evaluates false if no conformance was
 /// found), and a boolean indicating whether there are uninstantiated
 /// superclasses that were not searched.
-static std::pair<const WitnessTable *, bool>
+static std::pair<ConformanceLookupResult, bool>
 swift_conformsToProtocolMaybeInstantiateSuperclasses(
     const Metadata *const type, const ProtocolDescriptor *protocol,
     bool instantiateSuperclassMetadata) {
   auto &C = Conformances.get();
 
-  const WitnessTable *dyldCachedWitnessTable = nullptr;
+  ConformanceLookupResult dyldCachedWitnessTable;
   const ProtocolConformanceDescriptor *dyldCachedConformanceDescriptor =
       nullptr;
 
@@ -1019,7 +1184,7 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
                                   instantiateSuperclassMetadata);
 
       if (definitiveFailure)
-        return {nullptr, false};
+        return {ConformanceLookupResult{}, false};
 
       if (dyldCachedWitnessTable || dyldCachedConformanceDescriptor)
         break;
@@ -1044,10 +1209,11 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
       searchInConformanceCache(type, protocol, instantiateSuperclassMetadata);
   if (found.first) {
     // An authoritative negative result can be overridden by a result from dyld.
-    if (!found.second) {
+    if (!found.second.witnessTable) {
       if (dyldCachedWitnessTable)
         return {dyldCachedWitnessTable, false};
     }
+
     return {found.second, false};
   }
 
@@ -1056,7 +1222,8 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
     auto *matchingType = std::get<const Metadata *>(
         candidate.getMatchingType(type, instantiateSuperclassMetadata));
     assert(matchingType);
-    auto witness = dyldCachedConformanceDescriptor->getWitnessTable(matchingType);
+    auto witness = ConformanceLookupResult::fromConformance(
+        matchingType, dyldCachedConformanceDescriptor);
     C.cacheResult(type, protocol, witness, /*always cache*/ 0);
     DYLD_CONFORMANCES_LOG("Caching generic conformance to %s found by DYLD",
                           protocol->Name.get());
@@ -1064,7 +1231,7 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
   }
 
   // Scan conformance records.
-  llvm::SmallDenseMap<const Metadata *, const WitnessTable *> foundWitnesses;
+  llvm::SmallDenseMap<const Metadata *, ConformanceLookupResult> foundWitnesses;
   auto processSection = [&](const ConformanceSection &section) {
     // Eagerly pull records for nondependent witnesses into our cache.
     auto processDescriptor = [&](const ProtocolConformanceDescriptor &descriptor) {
@@ -1082,7 +1249,8 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
           candidate.getMatchingType(type, instantiateSuperclassMetadata);
       noteFinalMetadataState(finalState);
       if (matchingType) {
-        auto witness = descriptor.getWitnessTable(matchingType);
+        auto witness = ConformanceLookupResult::fromConformance(
+            matchingType, &descriptor);
         C.cacheResult(matchingType, protocol, witness, /*always cache*/ 0);
         foundWitnesses.insert({matchingType, witness});
       }
@@ -1110,13 +1278,13 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
   }
 
   // Find the most specific conformance that was scanned.
-  const WitnessTable *foundWitness = nullptr;
+  ConformanceLookupResult foundWitness = nullptr;
   const Metadata *foundType = nullptr;
 
   MaybeIncompleteSuperclassIterator superclassIterator{
       type, instantiateSuperclassMetadata};
   for (; auto searchType = superclassIterator.metadata; ++superclassIterator) {
-    const WitnessTable *witness = foundWitnesses.lookup(searchType);
+    auto witness = foundWitnesses.lookup(searchType);
     if (witness) {
       if (!foundType) {
         foundWitness = witness;
@@ -1136,7 +1304,7 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
   }
   noteFinalMetadataState(superclassIterator.state);
 
-  traceState.end(foundWitness);
+  traceState.end(foundWitness.witnessTable);
 
   // If it's for a superclass or if we didn't find anything, then add an
   // authoritative entry for this type.
@@ -1154,211 +1322,13 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
   return {foundWitness, hasUninstantiatedSuperclass};
 }
 
-/// Determine if we are executing within the isolation domain of the global
-/// actor to which the given conformance is isolated.
-static bool _isExecutingInIsolationOfConformance(
-    const Metadata *const type,
-    const ProtocolConformanceDescriptor *description,
-    const WitnessTable *table
-) {
-  // Resolve the global actor type.
-  SubstGenericParametersFromMetadata substitutions(type);
-  auto result = swift_getTypeByMangledName(
-     MetadataState::Abstract, description->getGlobalActorType(),
-     /*FIXME:conditionalArgs.data()*/{ },
-     [&substitutions](unsigned depth, unsigned index) {
-        return substitutions.getMetadata(depth, index).Ptr;
-      },
-    [&substitutions](const Metadata *type, unsigned index) {
-      return substitutions.getWitnessTable(type, index);
-    });
-  if (result.isError())
-    return false;
-
-  const Metadata *globalActorType = result.getType().getMetadata();
-  if (!globalActorType)
-    return false;
-
-  auto globalActorConformance = description->getGlobalActorConformance();
-  if (!globalActorConformance)
-    return false;
-
-  auto globalActorWitnessTable =
-      globalActorConformance->getWitnessTable(globalActorType);
-  if (!globalActorWitnessTable)
-    return false;
-
-  // The concurrency library provides a function to check whether we
-  // are executing on the given global actor.
-  if (!_swift_task_isCurrentGlobalActorHook)
-    return false;
-
-  // Check whether we are running on this global actor.
-  return _swift_task_isCurrentGlobalActorHook(globalActorType, globalActorWitnessTable);
-}
-
-static bool _checkConformanceIsolation(
-    const Metadata *const type, const WitnessTable *table);
-
-/// Check for conformance isolation for a protocol requirement within the
-/// conditional requirements of a witness table.
-static bool _checkConformanceIsolationOfProtocolRequirement(
-    const Metadata *const type, const WitnessTable *table,
-    const GenericRequirementDescriptor &requirement,
-    const WitnessTable *conditionalWitnessTable
-) {
-  assert(requirement.Flags.getKind() == GenericRequirementKind::Protocol);
-  assert(!requirement.Flags.isPackRequirement());
-
-  // If the conditional witness table has neither a global actor nor conditional
-  // requirements, there's nothing to check.
-  auto conditionalDescription = conditionalWitnessTable->getDescription();
-  if (!conditionalDescription ||
-      !(conditionalDescription->hasConditionalRequirements() ||
-        conditionalDescription->hasGlobalActorIsolation()))
-    return true;
-
-  // Recurse into this conformance.
-
-  // Resolve the conforming type.
-  SubstGenericParametersFromMetadata substitutions(type);
-  auto result = swift_getTypeByMangledName(
-     MetadataState::Abstract, requirement.getParam(),
-     /*FIXME:conditionalArgs.data()*/{ },
-     [&substitutions](unsigned depth, unsigned index) {
-        return substitutions.getMetadata(depth, index).Ptr;
-      },
-    [&substitutions](const Metadata *type, unsigned index) {
-      return substitutions.getWitnessTable(type, index);
-    });
-  if (result.isError())
-    return false;
-
-  return _checkConformanceIsolation(
-      result.getType().getMetadata(), conditionalWitnessTable);
-}
-
-/// Check for conformance isolation for a protocol requirement pack within the
-/// conditional requirements of a witness table.
-static bool _checkConformanceIsolationOfProtocolRequirementPack(
-    const Metadata *const type, const WitnessTable *table,
-    const GenericRequirementDescriptor &requirement,
-    WitnessTablePackPointer conditionalWitnessTables
-) {
-  assert(requirement.Flags.getKind() == GenericRequirementKind::Protocol);
-  assert(requirement.Flags.isPackRequirement());
-
-  // Check each of the conditional witness tables. If any has neither a global
-  // actor nor conditional requirements, there's nothing to check for that one.
-  MetadataPackPointer conformingTypes;
-  unsigned count = conditionalWitnessTables.getNumElements();
-  for (unsigned index = 0; index != count; ++index) {
-    auto conditionalWitnessTable =
-        conditionalWitnessTables.getElements()[index];
-
-    // If the conditional witness table has neither a global actor nor conditional
-    // requirements, there's nothing to check.
-    auto conditionalDescription = conditionalWitnessTable->getDescription();
-    if (!conditionalDescription ||
-        !(conditionalDescription->hasConditionalRequirements() ||
-          conditionalDescription->hasGlobalActorIsolation()))
-      continue;
-
-    // If we don't have it already, get the parameter pack for the
-    // conforming types.
-    if (!conformingTypes) {
-      // Resolve the conforming type.
-      SubstGenericParametersFromMetadata substitutions(type);
-      auto result = swift::getTypePackByMangledName(
-         requirement.getParam(),
-         /*FIXME:conditionalArgs.data()*/{ },
-         [&substitutions](unsigned depth, unsigned index) {
-            return substitutions.getMetadata(depth, index).Ptr;
-          },
-        [&substitutions](const Metadata *type, unsigned index) {
-          return substitutions.getWitnessTable(type, index);
-        });
-      if (result.isError())
-        return false;
-
-      conformingTypes = result.getType();
-      assert(conformingTypes.getNumElements() == count);
-    }
-
-    if (!_checkConformanceIsolation(
-            conformingTypes.getElements()[index], conditionalWitnessTable))
-      return false;
-  }
-
-  return true;
-}
-
-/// Check whether all isolated conformances in the given witness table (and
-/// any witness tables it depends on) are satisfied by the current execution
-/// context.
-///
-/// Returns false if there is an isolated conformance but we are not executing
-/// in that isolation domain.
-static bool _checkConformanceIsolation(const Metadata *const type, const WitnessTable *table) {
-  if (!table)
-    return true;
-
-  auto description = table->getDescription();
-  if (!description)
-    return true;
-
-  // If this conformance has global actor isolation, check that we are
-  // running in that isolation domain.
-  if (description->hasGlobalActorIsolation() &&
-      !_isExecutingInIsolationOfConformance(type, description, table)) {
-    return false;
-  }
-
-  // Check any witness tables that are part of a conditional conformance.
-  unsigned instantiationArgIndex = 0;
-  for (const auto &requirement: description->getConditionalRequirements()) {
-    if (!requirement.Flags.hasKeyArgument())
-      continue;
-
-    switch (requirement.Flags.getKind()) {
-    case GenericRequirementKind::Protocol: {
-      auto instantiationArg =
-          ((void* const *)table)[-1 - (int)instantiationArgIndex];
-      if (requirement.Flags.isPackRequirement()) {
-        if (!_checkConformanceIsolationOfProtocolRequirementPack(
-                 type, table, requirement,
-                 WitnessTablePackPointer(instantiationArg)))
-          return false;
-      } else {
-        if (!_checkConformanceIsolationOfProtocolRequirement(
-                type, table, requirement,
-                (const WitnessTable *)instantiationArg)) {
-          return false;
-        }
-      }
-
-      break;
-    }
-
-    case GenericRequirementKind::SameType:
-    case GenericRequirementKind::BaseClass:
-    case GenericRequirementKind::SameConformance:
-    case GenericRequirementKind::SameShape:
-    case GenericRequirementKind::InvertedProtocols:
-    case GenericRequirementKind::Layout:
-      break;
-    }
-
-    ++instantiationArgIndex;
-  }
-
-  return true;
-}
-
 static const WitnessTable *
-swift_conformsToProtocolCommonImpl(const Metadata *const type,
-                                   const ProtocolDescriptor *protocol) {
-  const WitnessTable *table;
+swift_conformsToProtocolCommonIsolatedImpl(
+    const Metadata *const type,
+    const ProtocolDescriptor *protocol,
+    const Metadata **globalActorIsolationType,
+    const WitnessTable **globalActorIsolationWitnessTable) {
+  ConformanceLookupResult found;
   bool hasUninstantiatedSuperclass;
 
   // First, try without instantiating any new superclasses. This avoids
@@ -1367,23 +1337,57 @@ swift_conformsToProtocolCommonImpl(const Metadata *const type,
   // in the chain before we get to an uninstantiated superclass) so this search
   // will succeed without trying to instantiate Super while it's already being
   // instantiated.=
-  std::tie(table, hasUninstantiatedSuperclass) =
+  std::tie(found, hasUninstantiatedSuperclass) =
       swift_conformsToProtocolMaybeInstantiateSuperclasses(
           type, protocol, false /*instantiateSuperclassMetadata*/);
 
   // If no conformance was found, and there is an uninstantiated superclass that
   // was not searched, then try the search again and instantiate all
   // superclasses.
-  if (!table && hasUninstantiatedSuperclass)
-    std::tie(table, hasUninstantiatedSuperclass) =
+  if (!found && hasUninstantiatedSuperclass)
+    std::tie(found, hasUninstantiatedSuperclass) =
         swift_conformsToProtocolMaybeInstantiateSuperclasses(
             type, protocol, true /*instantiateSuperclassMetadata*/);
 
   // Check for isolated conformances.
-  if (!_checkConformanceIsolation(type, table))
-    return nullptr;
+  if (found.globalActorIsolationType) {
+    // If we were asked to report the global actor isolation, do so.
+    if (globalActorIsolationType) {
+      // If the existing global actor isolation differs from the one we
+      // computed, it's a conflict. Fail.
+      if (*globalActorIsolationType &&
+          *globalActorIsolationType != found.globalActorIsolationType)
+        return nullptr;
 
-  return table;
+      // Report the global actor isolation.
+      *globalActorIsolationType = found.globalActorIsolationType;
+      if (globalActorIsolationWitnessTable) {
+        *globalActorIsolationWitnessTable =
+            found.globalActorIsolationWitnessTable;
+      }
+    } else {
+      // The concurrency library provides a function to check whether we
+      // are executing on the given global actor.
+      if (!_swift_task_isCurrentGlobalActorHook)
+        return nullptr;
+
+      // Check whether we are running on this global actor.
+      if (!_swift_task_isCurrentGlobalActorHook(
+              found.globalActorIsolationType,
+              found.globalActorIsolationWitnessTable))
+        return nullptr;
+    }
+  }
+
+  return found.witnessTable;
+}
+
+static const WitnessTable *
+swift_conformsToProtocolCommonImpl(
+    const Metadata *const type,
+    const ProtocolDescriptor *protocol) {
+  return swift_conformsToProtocolCommonIsolatedImpl(
+      type, protocol, nullptr, nullptr);
 }
 
 static const WitnessTable *
@@ -1564,7 +1568,9 @@ checkGenericRequirement(
     llvm::SmallVectorImpl<const void *> &extraArguments,
     SubstGenericParameterFn substGenericParam,
     SubstDependentWitnessTableFn substWitnessTable,
-    llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed) {
+    llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed,
+    const Metadata **globalActorIsolationType,
+    const WitnessTable **globalActorIsolationWitnessTable) {
   assert(!req.getFlags().isPackRequirement());
 
   // Make sure we understand the requirement we're dealing with.
@@ -1584,7 +1590,8 @@ checkGenericRequirement(
   case GenericRequirementKind::Protocol: {
     const WitnessTable *witnessTable = nullptr;
     if (!_conformsToProtocol(nullptr, subjectType, req.getProtocol(),
-                             &witnessTable)) {
+                             &witnessTable, globalActorIsolationType,
+                             globalActorIsolationWitnessTable)) {
       const char *protoName =
           req.getProtocol() ? req.getProtocol().getName() : "<null>";
       return TYPE_LOOKUP_ERROR_FMT(
@@ -1681,7 +1688,9 @@ checkGenericPackRequirement(
     llvm::SmallVectorImpl<const void *> &extraArguments,
     SubstGenericParameterFn substGenericParam,
     SubstDependentWitnessTableFn substWitnessTable,
-    llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed) {
+    llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed,
+    const Metadata **globalActorIsolationType,
+    const WitnessTable **globalActorIsolationWitnessTable) {
   assert(req.getFlags().isPackRequirement());
 
   // Make sure we understand the requirement we're dealing with.
@@ -1708,7 +1717,8 @@ checkGenericPackRequirement(
 
       const WitnessTable *witnessTable = nullptr;
       if (!_conformsToProtocol(nullptr, elt, req.getProtocol(),
-                               &witnessTable)) {
+                               &witnessTable, globalActorIsolationType,
+                               globalActorIsolationWitnessTable)) {
         const char *protoName =
             req.getProtocol() ? req.getProtocol().getName() : "<null>";
         return TYPE_LOOKUP_ERROR_FMT(
@@ -2110,7 +2120,8 @@ checkInvertibleRequirements(const Metadata *type,
         },
         [&substFn](const Metadata *type, unsigned index) {
           return substFn.getWitnessTable(type, index);
-        });
+        },
+        nullptr, nullptr);
     if (error)
       return error;
   }
@@ -2124,16 +2135,21 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
     llvm::SmallVectorImpl<const void *> &extraArguments,
     SubstGenericParameterFn substGenericParam,
     SubstGenericParameterOrdinalFn substGenericParamOrdinal,
-    SubstDependentWitnessTableFn substWitnessTable) {
+    SubstDependentWitnessTableFn substWitnessTable,
+    const Metadata **globalActorIsolationType,
+    const WitnessTable **globalActorIsolationWitnessTable) {
   // The suppressed conformances for each generic parameter.
   llvm::SmallVector<InvertibleProtocolSet, 4> allSuppressed;
 
   for (const auto &req : requirements) {
     if (req.getFlags().isPackRequirement()) {
-      auto error = checkGenericPackRequirement(req, extraArguments,
-                                               substGenericParam,
-                                               substWitnessTable,
-                                               allSuppressed);
+      auto error = checkGenericPackRequirement(
+          req, extraArguments,
+          substGenericParam,
+          substWitnessTable,
+          allSuppressed,
+          globalActorIsolationType,
+          globalActorIsolationWitnessTable);
       if (error)
         return error;
     } else if (req.getFlags().isValueRequirement()) {
@@ -2147,7 +2163,9 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
       auto error = checkGenericRequirement(req, extraArguments,
                                            substGenericParam,
                                            substWitnessTable,
-                                           allSuppressed);
+                                           allSuppressed,
+                                           globalActorIsolationType,
+                                           globalActorIsolationWitnessTable);
       if (error)
         return error;
     }

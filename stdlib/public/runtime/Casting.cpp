@@ -529,13 +529,18 @@ static bool _unknownClassConformsToObjCProtocol(const OpaqueValue *value,
 }
 #endif
 
-bool swift::_conformsToProtocol(const OpaqueValue *value,
-                                const Metadata *type,
-                                ProtocolDescriptorRef protocol,
-                                const WitnessTable **conformance) {
+bool swift::_conformsToProtocol(
+    const OpaqueValue *value,
+    const Metadata *type,
+    ProtocolDescriptorRef protocol,
+    const WitnessTable **conformance,
+    const Metadata **globalActorIsolationType,
+    const WitnessTable **globalActorIsolationWitnessTable) {
   // Look up the witness table for protocols that need them.
   if (protocol.needsWitnessTable()) {
-    auto witness = swift_conformsToProtocolCommon(type, protocol.getSwiftProtocol());
+    auto witness = swift_conformsToProtocolCommonIsolated(
+        type, protocol.getSwiftProtocol(), globalActorIsolationType,
+        globalActorIsolationWitnessTable);
     if (!witness)
       return false;
     if (conformance)
@@ -624,7 +629,8 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   }
 
   for (auto protocol : existentialType->getProtocols()) {
-    if (!_conformsToProtocol(value, type, protocol, conformances))
+    if (!_conformsToProtocol(
+            value, type, protocol, conformances, nullptr, nullptr))
       return false;
     if (conformances != nullptr && protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);

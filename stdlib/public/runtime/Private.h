@@ -567,6 +567,10 @@ public:
   /// generic requirements (e.g., those that need to be
   /// passed to an instantiation function) will be added to this vector.
   ///
+  /// \param globalActorIsolationType When non-NULL, the global actor isolation
+  /// of these requirements will be reported through this OUT parameter.
+  /// When NULL, any global actor isolation will be checked dynamically.
+  /// 
   /// \returns the error if an error occurred, None otherwise.
   std::optional<TypeLookupError> _checkGenericRequirements(
       llvm::ArrayRef<GenericParamDescriptor> genericParams,
@@ -574,7 +578,9 @@ public:
       llvm::SmallVectorImpl<const void *> &extraArguments,
       SubstGenericParameterFn substGenericParam,
       SubstGenericParameterOrdinalFn substGenericParamOrdinal,
-      SubstDependentWitnessTableFn substWitnessTable);
+      SubstDependentWitnessTableFn substWitnessTable,
+      const Metadata **globalActorIsolationType,
+      const WitnessTable **globalActorIsolationWitnessTable);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
@@ -686,10 +692,19 @@ public:
   /// \param conformance - if non-null, and the protocol requires a
   ///   witness table, and the type implements the protocol, the witness
   ///   table will be placed here
-  bool _conformsToProtocol(const OpaqueValue *value,
-                           const Metadata *type,
-                           ProtocolDescriptorRef protocol,
-                           const WitnessTable **conformance);
+  /// \param globalActorIsolationType - when non-NULL and the conformance is
+  /// global-actor-isolated, capture the global actor isolation type in this
+  /// out variable rather than checking when we are executing on that global
+  /// actor.
+  /// \param globalActorIsolationWitnessTable - receives the witness table for
+  /// *globalActorIsolationType's conformance to GlobalActor.
+  bool _conformsToProtocol(
+      const OpaqueValue *value,
+      const Metadata *type,
+      ProtocolDescriptorRef protocol,
+      const WitnessTable **conformance,
+      const Metadata **globalActorIsolationType,
+      const WitnessTable **globalActorIsolationWitnessTable);
 
   /// Construct type metadata for the given protocol.
   const Metadata *

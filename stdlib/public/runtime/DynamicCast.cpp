@@ -1384,7 +1384,8 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   }
 
   for (auto protocol : existentialType->getProtocols()) {
-    if (!swift::_conformsToProtocol(value, type, protocol, conformances))
+    if (!swift::_conformsToProtocol(value, type, protocol, conformances,
+                                    nullptr, nullptr))
       return false;
     if (conformances != nullptr && protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);
@@ -1879,7 +1880,8 @@ static DynamicCastResult tryCastToExtendedExistential(
         },
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("Resolution of witness tables is not supported");
-        });
+        },
+        nullptr, nullptr);
     if (error)
       return DynamicCastResult::Failure;
   }

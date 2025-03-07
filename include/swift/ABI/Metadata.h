@@ -2884,8 +2884,16 @@ public:
   /// Get the witness table for the specified type, realizing it if
   /// necessary, or return null if the conformance does not apply to the
   /// type.
+  ///
+  /// The globalActorIsolationType will be populated with the type of the global
+  /// actor to which this conformance is isolated, or NULL if this is a
+  /// nonisolated conformances. When it is isolated,
+  /// globalActorIsolationConformance is the conformance of
+  /// globalActorIsolationType to the GlobalActor protocol.
   const swift::TargetWitnessTable<Runtime> *
-  getWitnessTable(const TargetMetadata<Runtime> *type) const;
+  getWitnessTable(const TargetMetadata<Runtime> *type,
+                  const Metadata *&globalActorIsolationType,
+                  const WitnessTable *&globalActorIsolationConformance) const;
 
   /// Retrieve the resilient witnesses.
   llvm::ArrayRef<ResilientWitness> getResilientWitnesses() const {

@@ -193,6 +193,16 @@ OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocolCommon, const WitnessTable *, , ,
                               const ProtocolDescriptor *protocol),
                              (type, protocol))
 
+OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocolCommonIsolated,
+                             const WitnessTable *, , , swift::,
+                             (const Metadata * const type,
+                              const ProtocolDescriptor *protocol,
+                              const Metadata **globalActorIsolationType,
+                              const WitnessTable **
+                                  globalActorIsolationWitnessTable),
+                             (type, protocol, globalActorIsolationType,
+                              globalActorIsolationWitnessTable))
+
 OVERRIDE_KEYPATH(getKeyPath, const HeapObject *, , , swift::,
                  (const void *pattern, const void *arguments),
                  (pattern, arguments))

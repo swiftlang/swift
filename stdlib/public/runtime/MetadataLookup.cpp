@@ -1602,7 +1602,8 @@ _gatherGenericParameters(const ContextDescriptor *context,
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
-        });
+        },
+        nullptr, nullptr);
     if (error)
       return *error;
 
@@ -2043,7 +2044,8 @@ public:
         },
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("never called");
-        });
+        },
+        nullptr, nullptr);
     if (error)
       return *error;
 
@@ -3056,7 +3058,8 @@ swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
       },
       [&substFn](const Metadata *type, unsigned index) {
         return substFn.getWitnessTable(type, index);
-      });
+      },
+      nullptr, nullptr);
 
   if (error) {
     return {/*ptr=*/nullptr, -1};
