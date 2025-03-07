@@ -138,7 +138,7 @@ public struct Slice<Base: Collection> {
 
   @_alwaysEmitIntoClient @inline(__always)
   internal var _bounds: Range<Base.Index> {
-    Range(_uncheckedBounds: (_startIndex, _endIndex))
+    unsafe Range(_uncheckedBounds: (_startIndex, _endIndex))
   }
 }
 

@@ -395,7 +395,7 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var indices: Range<Index> {
-    Range(_uncheckedBounds: (0, _count))
+    unsafe Range(_uncheckedBounds: (0, _count))
   }
 }
 
@@ -679,7 +679,7 @@ extension Span where Element: ~Copyable {
   public func indices(of other: borrowing Self) -> Range<Index>? {
     if other._count > _count { return nil }
     guard let spanStart = other._pointer, _count > 0 else {
-      return unsafe _pointer == other._pointer ? Range(_uncheckedBounds: (0, 0)) : nil
+      return unsafe _pointer == other._pointer ? 0..<0 : nil
     }
     let start = _start()
     let stride = MemoryLayout<Element>.stride
@@ -688,7 +688,7 @@ extension Span where Element: ~Copyable {
     let byteOffset = unsafe start.distance(to: spanStart)
     let (lower, r) = byteOffset.quotientAndRemainder(dividingBy: stride)
     guard r == 0 else { return nil }
-    return Range(_uncheckedBounds: (lower, lower &+ other._count))
+    return unsafe Range(_uncheckedBounds: (lower, lower &+ other._count))
   }
 }
 

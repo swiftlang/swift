@@ -70,6 +70,7 @@ public struct ClosedRange<Bound: Comparable> {
 
   // This works around _debugPrecondition() impacting the performance of
   // optimized code. (rdar://72246338)
+  @unsafe
   @_alwaysEmitIntoClient @inline(__always)
   internal init(_uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
@@ -89,7 +90,9 @@ public struct ClosedRange<Bound: Comparable> {
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     _debugPrecondition(bounds.lower <= bounds.upper,
       "ClosedRange requires lowerBound <= upperBound")
-    self.init(_uncheckedBounds: (lower: bounds.lower, upper: bounds.upper))
+    unsafe self.init(
+      _uncheckedBounds: (lower: bounds.lower, upper: bounds.upper)
+    )
   }
 }
 
@@ -109,7 +112,7 @@ extension ClosedRange: RangeExpression {
   @inlinable // trivial-implementation
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
-    return Range(
+    return unsafe Range(
       _uncheckedBounds: (
         lower: lowerBound,
         upper: collection.index(after: self.upperBound)))
@@ -405,7 +408,7 @@ extension Comparable {
   public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
     _precondition(
       minimum <= maximum, "Range requires lowerBound <= upperBound")
-    return ClosedRange(_uncheckedBounds: (lower: minimum, upper: maximum))
+    return unsafe ClosedRange(_uncheckedBounds: (lower: minimum, upper: maximum))
   }
 }
 
@@ -496,7 +499,7 @@ extension ClosedRange {
       limits.upperBound < self.upperBound ? limits.upperBound
           : limits.lowerBound > self.upperBound ? limits.lowerBound
           : self.upperBound
-    return ClosedRange(_uncheckedBounds: (lower: lower, upper: upper))
+    return unsafe ClosedRange(_uncheckedBounds: (lower: lower, upper: upper))
   }
 }
 
@@ -512,7 +515,9 @@ extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
   public init(_ other: Range<Bound>) {
     _precondition(!other.isEmpty, "Can't form an empty closed range")
     let upperBound = other.upperBound.advanced(by: -1)
-    self.init(_uncheckedBounds: (lower: other.lowerBound, upper: upperBound))
+    unsafe self.init(
+      _uncheckedBounds: (lower: other.lowerBound, upper: upperBound)
+    )
   }
 }
 
@@ -581,7 +586,7 @@ extension ClosedRange: Decodable where Bound: Decodable {
           codingPath: decoder.codingPath,
           debugDescription: "Cannot initialize \(ClosedRange.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
     }
-    self.init(_uncheckedBounds: (lower: lowerBound, upper: upperBound))
+    unsafe self.init(_uncheckedBounds: (lower: lowerBound, upper: upperBound))
   }
 }
 
