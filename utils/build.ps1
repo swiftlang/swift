@@ -3207,6 +3207,10 @@ if (-not $SkipBuild) {
 
     # Build platform: SDK, Redist and XCTest
     Invoke-BuildStep Build-Runtime Windows $Arch
+
+    # FIXME(#79839)
+    Get-ChildItem -Path "$($Arch.SDKRoot)\usr\lib\swift\android" -Filter "*.swiftinterface" -Recurse
+
     Invoke-BuildStep Build-Dispatch Windows $Arch
     # FIXME(compnerd) ensure that the _build_ is the first arch and don't rebuild on each arch
     Invoke-BuildStep Build-FoundationMacros -Build Windows $BuildArch
@@ -3232,6 +3236,10 @@ if (-not $SkipBuild) {
 
     # Build platform: SDK, Redist and XCTest
     Invoke-BuildStep Build-Runtime Android $Arch
+
+    # FIXME(#79839)
+    Get-ChildItem -Path "$($Arch.SDKRoot)\usr\lib\swift\android" -Filter "*.swiftinterface" -Recurse
+
     Invoke-BuildStep Build-Dispatch Android $Arch
     Invoke-BuildStep Build-Foundation Android $Arch
     Invoke-BuildStep Build-Sanitizers Android $Arch
