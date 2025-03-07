@@ -36,11 +36,20 @@ if(DEFINED CMAKE_JOB_POOLS)
   set_property(GLOBAL PROPERTY JOB_POOLS "${CMAKE_JOB_POOLS}")
 else()
   # Make a job pool for things that can't yet be distributed
-  cmake_host_system_information(
-    RESULT localhost_logical_cores QUERY NUMBER_OF_LOGICAL_CORES)
-  set_property(GLOBAL APPEND PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
-  # Put linking in that category
-  set(CMAKE_JOB_POOL_LINK local_jobs)
+  #
+  # Share the link job pool with LLVM unless requested for more flexible
+  # parallelism and avoiding memory thrashing. Set up a separate link job pool
+  # for the Swift build targets here *only* if CMAKE_JOB_POOL_LINK is not
+  # already set at this point (via the command line option or indirectly through
+  # LLVM_PARALLEL_LINK_JOBS) for the case where SWIFT_PARALLEL_LINK_JOBS, which
+  # will override this below, is not set.
+  if(NOT CMAKE_JOB_POOL_LINK)
+    cmake_host_system_information(
+      RESULT localhost_logical_cores QUERY NUMBER_OF_LOGICAL_CORES)
+    set_property(GLOBAL APPEND PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
+    # Put linking in that category
+    set(CMAKE_JOB_POOL_LINK local_jobs)
+  endif()
 endif()
 
 enable_language(C)

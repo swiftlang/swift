@@ -1687,6 +1687,17 @@ function Build-Compilers() {
       $SwiftFlags += @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
     }
 
+    # Limit the number of parallel links to avoid OOM when debug info is enabled
+    $DebugOptions = @{}
+    if ($DebugInfo) {
+      # One job per 16 GB of RAM
+      $ParallelLinkJobs = [math]::Round((Get-WmiObject Win32_ComputerSystem).TotalPhysicalMemory / 16GB)
+      Write-Host "ParallelLinkJobs $ParallelLinkJobs"
+      if ((Get-WmiObject Win32_ComputerSystem).NumberOfLogicalProcessors -gt $ParallelLinkJobs) {
+        $DebugOptions = @{ LLVM_PARALLEL_LINK_JOBS = "$ParallelLinkJobs"; }
+      }
+    }
+
     New-Item -ItemType SymbolicLink -Path "$BinaryCache\$($HostArch.LLVMTarget)\compilers" -Target "$BinaryCache\5" -ErrorAction Ignore
     Build-CMakeProject `
       -Src $SourceCache\llvm-project\llvm `
@@ -1737,7 +1748,7 @@ function Build-Compilers() {
         SWIFT_STDLIB_ASSERTIONS = "NO";
         SWIFTSYNTAX_ENABLE_ASSERTIONS = "NO";
         "cmark-gfm_DIR" = "$($Arch.ToolchainInstallRoot)\usr\lib\cmake";
-      })
+      } + $DebugOptions)
   }
 
   $Settings = @{
