@@ -22,12 +22,21 @@ using namespace swift;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 
+void _swift_exit(int result) {
+  exit(result);
+}
+
 extern "C" SWIFT_CC(swift)
 void _swift_task_checkIsolatedSwift(
   HeapObject *executor,
   const Metadata *executorType,
   const SerialExecutorWitnessTable *witnessTable
 );
+
+extern "C" SWIFT_CC(swift)
+void _swift_task_checkIsolatedSwift(HeapObject *executor,
+                                    const Metadata *executorType,
+                                    const SerialExecutorWitnessTable *witnessTable);
 
 extern "C" SWIFT_CC(swift)
 void _swift_task_isIsolatingCurrentContextSwift(

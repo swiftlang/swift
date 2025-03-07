@@ -520,6 +520,10 @@ public struct ExecutorEvent: Identifiable, Comparable, Sendable {
 
   public var id: Self.ID
 
+  public init(id: Self.ID) {
+    self.id = id
+  }
+
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.id < rhs.id
   }
@@ -569,43 +573,30 @@ public protocol EventableExecutor {
 public protocol MainExecutor: RunLoopExecutor, SerialExecutor, EventableExecutor {
 }
 
-#if SWIFT_STDLIB_DISABLE_CUSTOM_EXECUTORS
-// For this to work, there must be a definition of PlatformMainExecutor and
-// PlatformDefaultExecutor available in the Concurrency runtime for the
-// platform in question.
 
-let _platformMainExecutor = PlatformMainExecutor()
-let _platformDefaultExecutor = PlatformDefaultExecutor()
-
+/// An ExecutorFactory is used to create the default main and task
+/// executors.
 @available(SwiftStdlib 6.2, *)
-extension MainActor {
-  /// The main executor, which is started implicitly by the `async main`
-  /// entry point and owns the "main" thread.
-  ///
-  /// Attempting to set this after the first `enqueue` on the main
-  /// executor is a fatal error.
-  public static var executor: PlatformMainExecutor {
-    return _platformMainExecutor
-  }
+public protocol ExecutorFactory {
+  /// Constructs and returns the main executor, which is started implicitly
+  /// by the `async main` entry point and owns the "main" thread.
+  static var mainExecutor: any MainExecutor { get }
+
+  /// Constructs and returns the default or global executor, which is the
+  /// default place in which we run tasks.
+  static var defaultExecutor: any TaskExecutor { get }
 }
 
 @available(SwiftStdlib 6.2, *)
-extension Task where Success == Never, Failure == Never {
-  /// The default or global executor, which is the default place in which
-  /// we run tasks.
-  ///
-  /// Attempting to set this after the first `enqueue` on the global
-  /// executor is a fatal error.
-  public static var defaultExecutor: PlatformDefaultExecutor {
-    return _platformDefaultExecutor
-  }
+@_silgen_name("swift_createExecutors")
+public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
+  MainActor._executor = factory.mainExecutor
+  Task._defaultExecutor = factory.defaultExecutor
 }
-
-#else // !SWIFT_STDLIB_DISABLE_CUSTOM_EXECUTORS
 
 @available(SwiftStdlib 6.2, *)
 extension MainActor {
-  private static var _executor: (any MainExecutor)? = nil
+  static var _executor: (any MainExecutor)? = nil
 
   /// The main executor, which is started implicitly by the `async main`
   /// entry point and owns the "main" thread.
@@ -613,24 +604,16 @@ extension MainActor {
   /// Attempting to set this after the first `enqueue` on the main
   /// executor is a fatal error.
   public static var executor: any MainExecutor {
-    get {
-      if _executor == nil {
-        _executor = PlatformMainExecutor()
-      }
-      return _executor!
+    if _executor == nil {
+      _executor = PlatformExecutorFactory.mainExecutor
     }
-    set {
-      if _executor != nil {
-        fatalError("The main executor can be set only once, at program start")
-      }
-      _executor = newValue
-    }
+    return _executor!
   }
 }
 
 @available(SwiftStdlib 6.2, *)
 extension Task where Success == Never, Failure == Never {
-  private static var _defaultExecutor: (any TaskExecutor)? = nil
+  static var _defaultExecutor: (any TaskExecutor)? = nil
 
   /// The default or global executor, which is the default place in which
   /// we run tasks.
@@ -638,22 +621,12 @@ extension Task where Success == Never, Failure == Never {
   /// Attempting to set this after the first `enqueue` on the global
   /// executor is a fatal error.
   public static var defaultExecutor: any TaskExecutor {
-    get {
-      if _defaultExecutor == nil {
-        _defaultExecutor = PlatformDefaultExecutor()
-      }
-      return _defaultExecutor!
+    if _defaultExecutor == nil {
+      _defaultExecutor = PlatformExecutorFactory.defaultExecutor
     }
-    set {
-      if _defaultExecutor != nil {
-        fatalError("The default executor can be set only once, at program start")
-      }
-      _defaultExecutor = newValue
-    }
+    return _defaultExecutor!
   }
 }
-
-#endif
 
 @available(SwiftStdlib 6.2, *)
 extension Task where Success == Never, Failure == Never {

@@ -332,11 +332,20 @@ void swift_dispatchEnqueueWithDeadline(bool global,
     job->schedulerPrivate[SwiftJobDispatchQueueIndex] = queue;
   }
 
-  uint64_t deadline = sec * NSEC_PER_SEC + nsec;
+  uint64_t deadline;
+  if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &deadline)
+      || __builtin_add_overflow(nsec, deadline, &deadline)) {
+    deadline = UINT64_MAX;
+  }
+
   dispatch_time_t when = clock_and_value_to_time(clock, deadline);
 
   if (tnsec != -1) {
-    uint64_t leeway = tsec * NSEC_PER_SEC + tnsec;
+    uint64_t leeway;
+    if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway)
+        || __builtin_add_overflow(tnsec, deadline, &leeway)) {
+      leeway = UINT64_MAX;
+    }
 
     dispatch_source_t source =
       dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
