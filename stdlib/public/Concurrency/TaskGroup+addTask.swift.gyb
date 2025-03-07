@@ -269,7 +269,7 @@ extension ${TYPE} {
     )
 
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     var task: Builtin.NativeObject?
 
