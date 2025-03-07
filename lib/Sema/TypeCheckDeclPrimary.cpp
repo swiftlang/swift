@@ -3128,6 +3128,7 @@ public:
 
     // An associated type that was introduced after the protocol
     auto module = AT->getDeclContext()->getParentModule();
+    // FIXME: [availability] Query AvailabilityContext, not platform range.
     if (!defaultType &&
         module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
         AvailabilityInference::availableRange(proto).isSupersetOf(
