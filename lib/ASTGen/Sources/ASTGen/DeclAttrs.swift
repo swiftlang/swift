@@ -2120,21 +2120,10 @@ extension ASTGenVisitor {
 
   func generateUnavailableInEmbeddedAttr(attribute node: AttributeSyntax) -> BridgedAvailableAttr? {
     if ctx.langOptsHasFeature(.Embedded) {
-      return BridgedAvailableAttr.createParsed(
+      return BridgedAvailableAttr.createUnavailableInEmbedded(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
-        range: self.generateAttrSourceRange(node),
-        domain: .forEmbedded(),
-        domainLoc: nil,
-        kind: .unavailable,
-        message: "unavailable in embedded Swift",
-        renamed: "",
-        introduced: BridgedVersionTuple(),
-        introducedRange: BridgedSourceRange(),
-        deprecated: BridgedVersionTuple(),
-        deprecatedRange:  BridgedSourceRange(),
-        obsoleted: BridgedVersionTuple(),
-        obsoletedRange: BridgedSourceRange()
+        range: self.generateAttrSourceRange(node)
       )
     } else {
       // For non-Embedded mode, ignore it.

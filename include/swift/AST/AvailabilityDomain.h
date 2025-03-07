@@ -334,10 +334,6 @@ class AvailabilityDomainOrIdentifier {
 
   AvailabilityDomainOrIdentifier(Storage storage) : storage(storage) {}
 
-  static AvailabilityDomainOrIdentifier fromOpaque(void *opaque) {
-    return AvailabilityDomainOrIdentifier(Storage::getFromOpaqueValue(opaque));
-  }
-
   std::optional<AvailabilityDomain>
   lookUpInDeclContext(SourceLoc loc, const DeclContext *declContext) const;
 
@@ -396,6 +392,12 @@ public:
   /// members of the original into the given `ASTContext` in case it is
   /// different than the context that the original was created for.
   AvailabilityDomainOrIdentifier copy(ASTContext &ctx) const;
+
+  static AvailabilityDomainOrIdentifier fromOpaque(void *opaque) {
+    return AvailabilityDomainOrIdentifier(Storage::getFromOpaqueValue(opaque));
+  }
+
+  void *getOpaqueValue() const { return storage.getOpaqueValue(); }
 
   void print(llvm::raw_ostream &os) const;
 };
