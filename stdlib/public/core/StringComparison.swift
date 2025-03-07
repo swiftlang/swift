@@ -265,6 +265,7 @@ private func _findBoundary(
 
     unsafe idx &-= _utf8ScalarLength(utf8, endingAt: idx)
   }
+  fatalError()
 }
 
 @frozen
