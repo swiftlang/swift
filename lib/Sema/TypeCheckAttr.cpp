@@ -2396,23 +2396,24 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
 
   // The remaining diagnostics are only for attributes with introduced versions
   // for specific platforms.
-  if (!attr->isPlatformSpecific() || !attr->getIntroduced().has_value())
+  auto introducedRange = attr->getIntroducedRange(Ctx);
+  if (!attr->isPlatformSpecific() || !introducedRange)
     return;
 
   // Find the innermost enclosing declaration with an availability
   // range annotation and ensure that this attribute's available version range
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
-  std::optional<AvailabilityRange> EnclosingAnnotatedRange;
-  AvailabilityRange AttrRange = attr->getIntroducedRange(Ctx);
+  std::optional<AvailabilityRange> enclosingIntroducedRange;
 
   if (auto *parent = getEnclosingDeclForDecl(D)) {
     if (auto enclosingAvailable =
             getSemanticAvailableRangeDeclAndAttr(parent)) {
       SemanticAvailableAttr enclosingAttr = enclosingAvailable->first;
       const Decl *enclosingDecl = enclosingAvailable->second;
-      EnclosingAnnotatedRange.emplace(enclosingAttr.getIntroducedRange(Ctx));
-      if (!AttrRange.isContainedIn(*EnclosingAnnotatedRange)) {
+      enclosingIntroducedRange = enclosingAttr.getIntroducedRange(Ctx);
+      if (enclosingIntroducedRange &&
+          !introducedRange->isContainedIn(*enclosingIntroducedRange)) {
         auto limit = DiagnosticBehavior::Unspecified;
         if (D->isImplicit()) {
           // Incorrect availability for an implicit declaration is likely a
@@ -2433,10 +2434,10 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           diagnose(enclosingDecl->getLoc(),
                    diag::availability_implicit_decl_here,
                    D->getDescriptiveKind(), Ctx.getTargetAvailabilityDomain(),
-                   AttrRange);
+                   *introducedRange);
         diagnose(enclosingDecl->getLoc(),
                  diag::availability_decl_more_than_enclosing_here,
-                 Ctx.getTargetAvailabilityDomain(), *EnclosingAnnotatedRange);
+                 Ctx.getTargetAvailabilityDomain(), *enclosingIntroducedRange);
       }
     }
   }

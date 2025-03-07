@@ -72,7 +72,8 @@ extension ASTGenVisitor {
         return (self.generateConventionTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .differentiable:
-        fatalError("unimplemented")
+        return (self.generateDifferentiableTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .execution:
         return (self.generateExecutionTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
@@ -173,7 +174,53 @@ extension ASTGenVisitor {
       clangTypeLoc: cTypeNameLoc ?? BridgedSourceLoc()
     )
   }
-  
+
+  func generateDifferentiableTypeAttr(attribute node: AttributeSyntax) -> BridgedDifferentiableTypeAttr? {
+    let differentiability: BridgedDifferentiabilityKind
+    let differentiabilityLoc: BridgedSourceLoc
+    if let args = node.arguments {
+      guard let args = args.as(DifferentiableAttributeArgumentsSyntax.self) else {
+        fatalError("(compiler bug) invalid arguments for @differentiable attribute")
+      }
+
+      if let kindSpecifier = args.kindSpecifier {
+        differentiability = self.generateDifferentiabilityKind(text: kindSpecifier.rawText)
+        differentiabilityLoc = self.generateSourceLoc(kindSpecifier)
+
+        guard differentiability != .nonDifferentiable else {
+          // TODO: Diagnose
+          fatalError("invalid kind for @differentiable type attribute")
+        }
+
+        guard kindSpecifier.nextToken(viewMode: .fixedUp) == node.rightParen else {
+          // TODO: Diagnose
+          fatalError("only expeceted 'reverse' in @differentiable type attribute")
+        }
+      } else {
+        // TODO: Diagnose
+        fatalError("expected @differentiable(reverse)")
+      }
+    } else {
+      differentiability = .normal
+      differentiabilityLoc = nil
+    }
+
+    // Only 'reverse' is supported today.
+    guard differentiability == .reverse else {
+      // TODO: Diagnose
+      fatalError("Only @differentiable(reverse) is supported")
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      parensRange: self.generateAttrParensRange(attribute: node),
+      kind: differentiability,
+      kindLoc: differentiabilityLoc
+    )
+  }
+
   func generateExecutionTypeAttr(attribute node: AttributeSyntax) -> BridgedExecutionTypeAttr? {
     let behaviorLoc = self.generateSourceLoc(node.arguments)
     let behavior: BridgedExecutionTypeAttrExecutionKind? = self.generateSingleAttrOption(

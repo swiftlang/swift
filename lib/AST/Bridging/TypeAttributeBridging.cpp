@@ -78,6 +78,15 @@ BridgedConventionTypeAttr BridgedConventionTypeAttr_createParsed(
       {cClangType.unbridged(), cClangTypeLoc.unbridged()});
 }
 
+BridgedDifferentiableTypeAttr BridgedDifferentiableTypeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
+    BridgedDifferentiabilityKind cKind, BridgedSourceLoc cKindLoc) {
+  return new (cContext.unbridged()) DifferentiableTypeAttr(
+      cAtLoc.unbridged(), cNameLoc.unbridged(), cParensRange.unbridged(),
+      {unbridged(cKind), cKindLoc.unbridged()});
+}
+
 BridgedExecutionTypeAttr BridgedExecutionTypeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
