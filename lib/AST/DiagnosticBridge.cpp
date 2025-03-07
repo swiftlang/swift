@@ -77,6 +77,13 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
                                    documentationPath.size(),
                                    highlightRanges.data(),
                                    highlightRanges.size() / 2);
+
+  // TODO: A better way to do this would be to pass the notes as an
+  // argument to `swift_ASTGen_addQueuedDiagnostic` but that requires
+  // bridging of `Note` structure and new serialization.
+  for (auto *childNote : info.ChildDiagnosticInfo) {
+    addQueueDiagnostic(queuedDiagnostics, *childNote, SM);
+  }
 }
 
 void DiagnosticBridge::enqueueDiagnostic(SourceManager &SM,
