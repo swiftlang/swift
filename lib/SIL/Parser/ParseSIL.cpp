@@ -758,7 +758,7 @@ static bool parseDeclSILOptional(
                                  diag::sil_availability_expected_version))
         return true;
 
-      *availability = AvailabilityRange(VersionRange::allGTE(version));
+      *availability = AvailabilityRange(version);
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;

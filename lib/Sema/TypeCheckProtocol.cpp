@@ -624,8 +624,8 @@ matchWitnessStructureImpl(ValueDecl *req, ValueDecl *witness,
       return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
 
     // Check that the compile-time constness matches.
-    if (reqASD->isCompileTimeConst() && !witnessASD->isCompileTimeConst()) {
-      return RequirementMatch(witness, MatchKind::CompileTimeConstConflict);
+    if (reqASD->isCompileTimeLiteral() && !witnessASD->isCompileTimeLiteral()) {
+      return RequirementMatch(witness, MatchKind::CompileTimeLiteralConflict);
     }
 
     // If the requirement is settable and the witness is not, reject it.
@@ -3087,9 +3087,9 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
                          diag);
     break;
   }
-  case MatchKind::CompileTimeConstConflict: {
+  case MatchKind::CompileTimeLiteralConflict: {
     auto witness = match.Witness;
-    auto missing = !witness->getAttrs().getAttribute<CompileTimeConstAttr>();
+    auto missing = !witness->getAttrs().getAttribute<CompileTimeLiteralAttr>();
     auto diag = diags.diagnose(witness, diag::protocol_witness_const_conflict,
                    missing);
     if (missing) {
@@ -4533,7 +4533,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           diags.diagnose(diagLoc, diag::availability_protocol_requires_version,
                          conformance->getProtocol(), witness,
                          ctx.getTargetAvailabilityDomain(),
-                         check.RequiredAvailability.getRawMinimumVersion());
+                         check.RequiredAvailability);
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
           diags.diagnose(requirement,
                          diag::availability_protocol_requirement_here);
@@ -5037,20 +5037,18 @@ static bool diagnoseTypeWitnessAvailability(
         });
   }
 
-  auto requiredAvailability = AvailabilityRange::alwaysAvailable();
-  if (!TypeChecker::isAvailabilitySafeForConformance(conformance->getProtocol(),
-                                                     assocType, witness, dc,
-                                                     requiredAvailability)) {
-    auto requiredVersion = requiredAvailability.getRawMinimumVersion();
+  auto requiredRange = AvailabilityRange::alwaysAvailable();
+  if (!TypeChecker::isAvailabilitySafeForConformance(
+          conformance->getProtocol(), assocType, witness, dc, requiredRange)) {
     ctx.addDelayedConformanceDiag(
         conformance, shouldError,
-        [witness, requiredVersion](NormalProtocolConformance *conformance) {
+        [witness, requiredRange](NormalProtocolConformance *conformance) {
           SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
           auto &ctx = conformance->getDeclContext()->getASTContext();
           ctx.Diags
               .diagnose(loc, diag::availability_protocol_requires_version,
                         conformance->getProtocol(), witness,
-                        ctx.getTargetAvailabilityDomain(), requiredVersion)
+                        ctx.getTargetAvailabilityDomain(), requiredRange)
               .warnUntilSwiftVersion(warnBeforeVersion);
 
           emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);

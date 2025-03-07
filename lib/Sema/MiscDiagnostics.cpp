@@ -5158,6 +5158,17 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       return true;
     }
 
+    if (hasVersion) {
+      auto rawVersion = parsedSpec->getRawVersion();
+      if (!VersionRange::isValidVersion(rawVersion)) {
+        diags
+            .diagnose(loc, diag::availability_unsupported_version_number,
+                      rawVersion)
+            .highlight(parsedSpec->getVersionSrcRange());
+        return true;
+      }
+    }
+
     if (domain.isVersioned()) {
       if (!hasVersion) {
         diags.diagnose(loc, diag::avail_query_expected_version_number);

@@ -3168,7 +3168,7 @@ private:
   using TrailingGenericContextObjects::numTrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<MangledContextName>) const {
-    return this->hasMangledNam() ? 1 : 0;
+    return this->hasMangledName() ? 1 : 0;
   }
 
 public:

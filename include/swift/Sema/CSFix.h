@@ -409,7 +409,7 @@ enum class FixKind : uint8_t {
   AllowAssociatedValueMismatch,
 
   /// Produce an error for not getting a compile-time constant
-  NotCompileTimeConst,
+  NotCompileTimeLiteral,
 
   /// Ignore a type mismatch while trying to infer generic parameter type
   /// from default expression.
@@ -2084,20 +2084,20 @@ public:
   }
 };
 
-class NotCompileTimeConst final : public ContextualMismatch {
-  NotCompileTimeConst(ConstraintSystem &cs, Type paramTy, ConstraintLocator *locator);
+class NotCompileTimeLiteral final : public ContextualMismatch {
+  NotCompileTimeLiteral(ConstraintSystem &cs, Type paramTy, ConstraintLocator *locator);
 
 public:
   std::string getName() const override { return "replace with an literal"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static NotCompileTimeConst *create(ConstraintSystem &cs,
-                                     Type paramTy,
-                                     ConstraintLocator *locator);
+  static NotCompileTimeLiteral *create(ConstraintSystem &cs,
+                                       Type paramTy,
+                                       ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::NotCompileTimeConst;
+    return fix->getKind() == FixKind::NotCompileTimeLiteral;
   }
 };
 

@@ -1,7 +1,7 @@
 //--- blessed.swift
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift
-
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift -enable-experimental-feature ImportNonPublicCxxMembers
+// REQUIRES: swift_feature_ImportNonPublicCxxMembers
 import NonPublicInheritance
 
 // Extensions of each class test whether we correctly modeled *which* members

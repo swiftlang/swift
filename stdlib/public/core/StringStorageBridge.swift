@@ -54,7 +54,7 @@ extension _AbstractStringStorage {
     _precondition(aRange.location + aRange.length <= Int(count),
                   "Range out of bounds")
 
-    let range = Range(
+    let range = unsafe Range(
       _uncheckedBounds: (aRange.location, aRange.location+aRange.length))
     let str = asString
     unsafe str._copyUTF16CodeUnits(

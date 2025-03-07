@@ -76,6 +76,19 @@ bool AvailabilityDomain::isVersioned() const {
   }
 }
 
+bool AvailabilityDomain::supportsContextRefinement() const {
+  switch (getKind()) {
+  case Kind::Universal:
+  case Kind::Embedded:
+  case Kind::SwiftLanguage:
+  case Kind::PackageDescription:
+    return false;
+  case Kind::Platform:
+  case Kind::Custom:
+    return true;
+  }
+}
+
 bool AvailabilityDomain::supportsQueries() const {
   switch (getKind()) {
   case Kind::Universal:
@@ -105,6 +118,17 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   }
 }
 
+bool AvailabilityDomain::isActiveForTargetPlatform(
+    const ASTContext &ctx) const {
+  if (isPlatform()) {
+    if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx)) {
+      auto compatibleDomain = targetDomain->getABICompatibilityDomain();
+      return compatibleDomain.contains(*this);
+    }
+  }
+  return false;
+}
+
 static std::optional<llvm::VersionTuple>
 getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
   switch (domain.getKind()) {
@@ -126,7 +150,7 @@ getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
 std::optional<AvailabilityRange>
 AvailabilityDomain::getDeploymentRange(const ASTContext &ctx) const {
   if (auto version = getDeploymentVersion(*this, ctx))
-    return AvailabilityRange{VersionRange::allGTE(*version)};
+    return AvailabilityRange{*version};
   return std::nullopt;
 }
 

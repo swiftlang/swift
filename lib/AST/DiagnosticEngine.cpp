@@ -39,6 +39,8 @@
 #include "swift/Parse/Lexer.h" // bad dependency
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/PrettyPrinter.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
@@ -752,6 +754,11 @@ void swift::printClangDeclName(const clang::NamedDecl *ND,
   ND->getNameForDiagnostic(os, ND->getASTContext().getPrintingPolicy(), false);
 }
 
+void swift::printClangTypeName(const clang::Type *Ty, llvm::raw_ostream &os) {
+  clang::QualType::print(Ty, clang::Qualifiers(), os,
+                         clang::PrintingPolicy{clang::LangOptions()}, "");
+}
+
 /// Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier,
@@ -1056,6 +1063,11 @@ static void formatDiagnosticArgument(StringRef Modifier,
            "Improper modifier for AvailabilityDomain argument");
     Out << Arg.getAsAvailabilityDomain().getNameForDiagnostics();
     break;
+  case DiagnosticArgumentKind::AvailabilityRange:
+    assert(Modifier.empty() &&
+           "Improper modifier for AvailabilityRange argument");
+    Out << Arg.getAsAvailabilityRange().getRawMinimumVersion().getAsString();
+    break;
   case DiagnosticArgumentKind::VersionTuple:
     assert(Modifier.empty() &&
            "Improper modifier for VersionTuple argument");
@@ -1092,6 +1104,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
     assert(Modifier.empty() && "Improper modifier for ClangDecl argument");
     Out << FormatOpts.OpeningQuotationMark;
     printClangDeclName(Arg.getAsClangDecl(), Out);
+    Out << FormatOpts.ClosingQuotationMark;
+    break;
+
+  case DiagnosticArgumentKind::ClangType:
+    assert(Modifier.empty() && "Improper modifier for ClangDecl argument");
+    Out << FormatOpts.OpeningQuotationMark;
+    printClangTypeName(Arg.getAsClangType(), Out);
     Out << FormatOpts.ClosingQuotationMark;
     break;
   }
@@ -1337,6 +1356,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
 
   auto groupID = diagnostic.getGroupID();
   StringRef Category;
+  const char * const *associatedNotes = nullptr;
   if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
     Category = "api-digester-breaking-change";
   else if (isNoUsageDiagnostic(diagnostic.getID()))
@@ -1345,6 +1365,10 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     Category = getDiagGroupInfoByID(groupID).name;
   else if (isDeprecationDiagnostic(diagnostic.getID()))
     Category = "deprecation";
+  else if ((associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()]) &&
+           *associatedNotes) {
+    Category = llvm::sys::path::stem(*associatedNotes);
+  }
 
   auto fixIts = diagnostic.getFixIts();
   if (loc.isValid()) {

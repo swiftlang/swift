@@ -14,11 +14,46 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
+
+//===----------------------------------------------------------------------===//
+// MARK: AutoDiff
+//===----------------------------------------------------------------------===//
+
+DifferentiabilityKind unbridged(BridgedDifferentiabilityKind cKind) {
+  switch (cKind) {
+  case BridgedDifferentiabilityKindNonDifferentiable:
+    return DifferentiabilityKind::NonDifferentiable;
+  case BridgedDifferentiabilityKindForward:
+    return DifferentiabilityKind::Forward;
+  case BridgedDifferentiabilityKindReverse:
+    return DifferentiabilityKind::Reverse;
+  case BridgedDifferentiabilityKindNormal:
+    return DifferentiabilityKind::Normal;
+  case BridgedDifferentiabilityKindLinear:
+    return DifferentiabilityKind::Linear;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+ParsedAutoDiffParameter BridgedParsedAutoDiffParameter::unbridged() const {
+  switch (kind) {
+  case Kind::Named:
+    return ParsedAutoDiffParameter::getNamedParameter(loc.unbridged(),
+                                                      value.name.unbridged());
+  case Kind::Ordered:
+    return ParsedAutoDiffParameter::getOrderedParameter(loc.unbridged(),
+                                                        value.index);
+  case Kind::Self:
+    return ParsedAutoDiffParameter::getSelfParameter(loc.unbridged());
+  }
+  llvm_unreachable("unhandled enum value");
+}
 
 //===----------------------------------------------------------------------===//
 // MARK: DeclAttributes
@@ -96,25 +131,6 @@ static AvailableAttr::Kind unbridge(BridgedAvailableAttrKind value) {
 
 BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedAvailabilityDomain cDomain,
-    BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
-    BridgedStringRef cMessage, BridgedStringRef cRenamed,
-    BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
-    BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
-    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange) {
-  return new (cContext.unbridged())
-      AvailableAttr(cAtLoc.unbridged(), cRange.unbridged(), cDomain.unbridged(),
-                    cDomainLoc.unbridged(), unbridge(cKind),
-                    cMessage.unbridged(), cRenamed.unbridged(),
-                    cIntroduced.unbridged(), cIntroducedRange.unbridged(),
-                    cDeprecated.unbridged(), cDeprecatedRange.unbridged(),
-                    cObsoleted.unbridged(), cObsoletedRange.unbridged(),
-                    /*Implicit=*/false,
-                    /*IsSPI=*/false);
-}
-
-BridgedAvailableAttr BridgedAvailableAttr_createParsedIdentifier(
-    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedIdentifier cDomainIdentifier,
     BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
     BridgedStringRef cMessage, BridgedStringRef cRenamed,
@@ -131,6 +147,24 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsedIdentifier(
                     cObsoleted.unbridged(), cObsoletedRange.unbridged(),
                     /*Implicit=*/false,
                     /*IsSPI=*/false);
+}
+
+BridgedAvailableAttr
+BridgedAvailableAttr_createUnavailableInEmbedded(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cAtLoc,
+                                                 BridgedSourceRange cRange) {
+  return AvailableAttr::createUnavailableInEmbedded(
+      cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged());
+}
+
+void BridgedAvailableAttr_setIsGroupMember(BridgedAvailableAttr cAttr) {
+  cAttr.unbridged()->setIsGroupMember();
+}
+void BridgedAvailableAttr_setIsGroupedWithWildcard(BridgedAvailableAttr cAttr) {
+  cAttr.unbridged()->setIsGroupedWithWildcard();
+}
+void BridgedAvailableAttr_setIsGroupTerminator(BridgedAvailableAttr cAttr) {
+  cAttr.unbridged()->setIsGroupTerminator();
 }
 
 static std::optional<AccessLevel> unbridge(BridgedAccessLevel level) {
@@ -219,6 +253,62 @@ BridgedCustomAttr BridgedCustomAttr_createParsed(
   return CustomAttr::create(
       context, cAtLoc.unbridged(), new (context) TypeExpr(cType.unbridged()),
       cInitContext.unbridged(), cArgumentList.unbridged());
+}
+
+BridgedDerivativeAttr BridgedDerivativeAttr_createParsedImpl(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedNullableTypeRepr cBaseType,
+    BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
+    std::optional<BridgedAccessorKind> cAccessorKind, BridgedArrayRef cParams) {
+  std::optional<AccessorKind> accessorKind;
+  if (cAccessorKind)
+    accessorKind = unbridged(*cAccessorKind);
+  SmallVector<ParsedAutoDiffParameter, 2> params;
+  for (auto &elem : cParams.unbridged<BridgedParsedAutoDiffParameter>())
+    params.push_back(elem.unbridged());
+
+  return DerivativeAttr::create(cContext.unbridged(),
+                                /*implicit=*/false, cAtLoc.unbridged(),
+                                cRange.unbridged(), cBaseType.unbridged(),
+                                DeclNameRefWithLoc{cOriginalName.unbridged(),
+                                                   cOriginalNameLoc.unbridged(),
+                                                   accessorKind},
+                                params);
+}
+
+BridgedDerivativeAttr BridgedDerivativeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedNullableTypeRepr cBaseType,
+    BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
+    BridgedAccessorKind cAccessorKind, BridgedArrayRef cParams) {
+  return BridgedDerivativeAttr_createParsedImpl(
+      cContext, cAtLoc, cRange, cBaseType, cOriginalName, cOriginalNameLoc,
+      cAccessorKind, cParams);
+}
+
+BridgedDerivativeAttr BridgedDerivativeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedNullableTypeRepr cBaseType,
+    BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
+    BridgedArrayRef cParams) {
+  return BridgedDerivativeAttr_createParsedImpl(
+      cContext, cAtLoc, cRange, cBaseType, cOriginalName, cOriginalNameLoc,
+      /*cAccessorKind=*/std::nullopt, cParams);
+}
+
+BridgedDifferentiableAttr BridgedDifferentiableAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedDifferentiabilityKind cKind,
+    BridgedArrayRef cParams,
+    BridgedNullableTrailingWhereClause cGenericWhereClause) {
+  SmallVector<ParsedAutoDiffParameter, 2> params;
+  for (auto &elem : cParams.unbridged<BridgedParsedAutoDiffParameter>())
+    params.push_back(elem.unbridged());
+
+  return DifferentiableAttr::create(cContext.unbridged(), /*implicit=*/false,
+                                    cAtLoc.unbridged(), cRange.unbridged(),
+                                    unbridged(cKind), params,
+                                    cGenericWhereClause.unbridged());
 }
 
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
@@ -750,6 +840,24 @@ BridgedSILGenNameAttr BridgedSILGenNameAttr_createParsed(
   return new (cContext.unbridged())
       SILGenNameAttr(cName.unbridged(), isRaw, cAtLoc.unbridged(),
                      cRange.unbridged(), /*Implicit=*/false);
+}
+
+BridgedTransposeAttr BridgedTransposeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedNullableTypeRepr cBaseType,
+    BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
+    BridgedArrayRef cParams) {
+  SmallVector<ParsedAutoDiffParameter, 2> params;
+  for (auto &elem : cParams.unbridged<BridgedParsedAutoDiffParameter>())
+    params.push_back(elem.unbridged());
+
+  return TransposeAttr::create(
+      cContext.unbridged(),
+      /*implicit=*/false, cAtLoc.unbridged(), cRange.unbridged(),
+      cBaseType.unbridged(),
+      DeclNameRefWithLoc{cOriginalName.unbridged(), cOriginalNameLoc.unbridged(),
+                         /*AccessorKind=*/std::nullopt},
+      params);
 }
 
 BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -45,7 +45,7 @@ static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
 
 #define BASELINE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)          \
   static bool usesFeature##FeatureName(Decl *decl) { return false; }
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)
 #include "swift/Basic/Features.def"
 
 #define UNINTERESTING_FEATURE(FeatureName)                                     \
@@ -354,6 +354,10 @@ static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureCompileTimeValues(Decl *decl) {
+  return decl->getAttrs().hasAttribute<ConstValAttr>();
+}
+
 static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
   if (decl->getAttrs().hasAttribute<SafeAttr>() ||
       decl->getAttrs().hasAttribute<UnsafeAttr>())
@@ -386,6 +390,7 @@ static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
 UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
+UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(CoroutineAccessorsAllocateInCallee)
 
@@ -546,7 +551,7 @@ void FeatureSet::collectFeaturesUsed(Decl *decl, InsertOrRemove operation) {
 
   // Go through each of the features, checking whether the
   // declaration uses that feature.
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
   if (CHECK(usesFeature##FeatureName))                                         \
     collectRequiredFeature(Feature::FeatureName, operation);
 #define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \

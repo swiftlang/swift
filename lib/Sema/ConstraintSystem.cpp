@@ -331,9 +331,14 @@ void ConstraintSystem::recordAppliedDisjunction(
 /// Retrieve a dynamic result signature for the given declaration.
 static std::tuple<char, ObjCSelector, CanType>
 getDynamicResultSignature(ValueDecl *decl) {
+  // Handle functions.
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    // Handle functions.
-    auto type = func->getMethodInterfaceType();
+    // Strip `@Sendable` and `any Sendable` because it should be
+    // possible to add them without affecting lookup results and
+    // shadowing. All of the declarations that are processed here
+    // are `@objc` and hence `@preconcurrency`.
+    auto type = func->getMethodInterfaceType()->stripConcurrency(
+        /*recursive=*/true, /*dropGlobalActor=*/false);
     return std::make_tuple(func->isStatic(), func->getObjCSelector(),
                            type->getCanonicalType());
   }

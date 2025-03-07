@@ -1227,8 +1227,8 @@ std::optional<Type> AbstractFunctionDecl::getEffectiveThrownErrorType() const {
   return std::nullopt;
 }
 
-bool AbstractStorageDecl::isCompileTimeConst() const {
-  return getAttrs().hasAttribute<CompileTimeConstAttr>();
+bool AbstractStorageDecl::isCompileTimeLiteral() const {
+  return getAttrs().hasAttribute<CompileTimeLiteralAttr>();
 }
 
 bool AbstractStorageDecl::isTransparent() const {
@@ -1370,7 +1370,7 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
   // When computing availability for linkage, use the "before" version from
   // the @backDeployed attribute, if present.
   if (auto backDeployVersion = getBackDeployedBeforeOSVersion(ctx))
-    return AvailabilityRange{VersionRange::allGTE(*backDeployVersion)};
+    return AvailabilityRange{*backDeployVersion};
 
   auto containingContext = AvailabilityInference::annotatedAvailableRange(this);
   if (containingContext.has_value()) {
@@ -8758,8 +8758,8 @@ void ParamDecl::setTypeRepr(TypeRepr *repr) {
       if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
         if (isa<IsolatedTypeRepr>(STR))
           setIsolated(true);
-        else if (isa<CompileTimeConstTypeRepr>(STR))
-          setCompileTimeConst(true);
+        else if (isa<CompileTimeLiteralTypeRepr>(STR))
+          setCompileTimeLiteral(true);
         else if (isa<SendingTypeRepr>(STR))
           setSending(true);
         unwrappedType = STR->getBase();
@@ -8926,7 +8926,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto internalLabel = getParameterName();
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
-      isIsolated(), /*isNoDerivative*/ false, isCompileTimeConst(),
+      isIsolated(), /*isNoDerivative*/ false, isCompileTimeLiteral(),
       isSending(), isAddressable());
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
@@ -10919,6 +10919,39 @@ ArrayRef<VarDecl *> AccessorDecl::getAccessedProperties() const {
     return SR->getAccessesProperties(const_cast<AccessorDecl *>(this));
 
   return {};
+}
+
+bool AccessorDecl::isRequirementWithSynthesizedDefaultImplementation() const {
+  if (!isa<ProtocolDecl>(getDeclContext()))
+    return false;
+
+  if (!getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors)) {
+    return false;
+  }
+  if (!requiresFeatureCoroutineAccessors(getAccessorKind())) {
+    return false;
+  }
+  if (getStorage()->getOverrideLoc()) {
+    return false;
+  }
+  return getStorage()->requiresCorrespondingUnderscoredCoroutineAccessor(
+      getAccessorKind(), this);
+}
+
+bool AccessorDecl::doesAccessorHaveBody() const {
+  auto *accessor = this;
+  auto *storage = accessor->getStorage();
+
+  if (isa<ProtocolDecl>(accessor->getDeclContext())) {
+    return isRequirementWithSynthesizedDefaultImplementation();
+  }
+
+  // NSManaged getters and setters don't have bodies.
+  if (storage->getAttrs().hasAttribute<NSManagedAttr>(/*AllowInvalid=*/true))
+    if (accessor->isGetterOrSetter())
+      return false;
+
+  return true;
 }
 
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {

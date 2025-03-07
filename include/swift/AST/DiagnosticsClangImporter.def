@@ -365,5 +365,9 @@ NOTE(bridged_pointer_type_not_found,none,
      "for bridging; module 'Swift' may be broken",
      (unsigned))
 
+NOTE(ptr_to_nonescapable,none,
+     "pointer to non-escapable type %0 cannot be imported",
+     (const clang::Type*))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

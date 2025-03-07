@@ -199,9 +199,6 @@ if ($PinnedBuild -eq "") {
   }
 }
 
-# Store the revision zero variant of the Windows SDK version (no-op if unspecified)
-$WindowsSDKMajorMinorBuildMatch = [Regex]::Match($WinSDKVersion, "^\d+\.\d+\.\d+")
-$WinSDKVersionRevisionZero = if ($WindowsSDKMajorMinorBuildMatch.Success) { $WindowsSDKMajorMinorBuildMatch.Value + ".0" } else { "" }
 $CustomWinSDKRoot = $null # Overwritten if we download a Windows SDK from nuget
 
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -521,21 +518,13 @@ function Get-TargetInfo($Arch) {
   # Cache the result of "swift -print-target-info" as $Arch.Cache.TargetInfo
   $CacheKey = "TargetInfo"
   if (-not $Arch.Cache.ContainsKey($CacheKey)) {
-    $CompilersBinaryCache = if ($IsCrossCompiling) {
-      Get-BuildProjectBinaryCache Compilers
-    } else {
-      Get-HostProjectBinaryCache Compilers
-    }
-    $ToolchainBinDir = Join-Path -Path $CompilersBinaryCache -ChildPath "bin"
-    $CMarkDir = Join-Path -Path (Get-CMarkBinaryCache $BuildArch) -ChildPath "src"
-    $SwiftExe = Join-Path -Path $ToolchainBinDir -ChildPath "swift.exe"
     Isolate-EnvVars {
-      $env:Path = "$ToolchainBinDir;$CMarkDir;$(Get-PinnedToolchainRuntime);${env:Path}"
-      $TargetInfoJson = & $SwiftExe -target $Arch.LLVMTarget -print-target-info
+      $env:Path = "$(Get-PinnedToolchainRuntime);$(Get-PinnedToolchainToolsDir);${env:Path}"
+      $TargetInfo = & swiftc -target $Arch.LLVMTarget -print-target-info
       if ($LastExitCode -ne 0) {
-        throw "Unable to print target info for $($Arch.LLVMTarget) $TargetInfoJson"
+        throw "Unable to print target info for '$($Arch.LLVMTarget)'"
       }
-      $TargetInfo = $TargetInfoJson | ConvertFrom-Json
+      $TargetInfo = $TargetInfo | ConvertFrom-JSON
       $Arch.Cache[$CacheKey] = $TargetInfo.target
     }
   }
@@ -543,8 +532,7 @@ function Get-TargetInfo($Arch) {
 }
 
 function Get-ModuleTriple($Arch) {
-  $targetInfo = Get-TargetInfo -Arch $Arch
-  return $targetInfo.moduleTriple
+  return (Get-TargetInfo -Arch $Arch).moduleTriple
 }
 
 function Copy-File($Src, $Dst) {
@@ -670,7 +658,7 @@ function Invoke-VsDevShell($Arch) {
   if ($CustomWinSDKRoot) {
     $DevCmdArguments += " -winsdk=none"
   } elseif ($WinSDKVersion) {
-    $DevCmdArguments += " -winsdk=$WinSDKVersionRevisionZero"
+    $DevCmdArguments += " -winsdk=$WinSDKVersion"
   }
 
   if ($ToBatch) {
@@ -682,22 +670,22 @@ function Invoke-VsDevShell($Arch) {
 
     if ($CustomWinSDKRoot) {
       # Using a non-installed Windows SDK. Setup environment variables manually.
-      $WinSDKVerIncludeRoot = "$CustomWinSDKRoot\include\$WinSDKVersionRevisionZero"
+      $WinSDKVerIncludeRoot = "$CustomWinSDKRoot\include\$WinSDKVersion"
       $WinSDKIncludePath = "$WinSDKVerIncludeRoot\ucrt;$WinSDKVerIncludeRoot\um;$WinSDKVerIncludeRoot\shared;$WinSDKVerIncludeRoot\winrt;$WinSDKVerIncludeRoot\cppwinrt"
-      $WinSDKVerLibRoot = "$CustomWinSDKRoot\lib\$WinSDKVersionRevisionZero"
+      $WinSDKVerLibRoot = "$CustomWinSDKRoot\lib\$WinSDKVersion"
 
-      $env:WindowsLibPath = "$CustomWinSDKRoot\UnionMetadata\$WinSDKVersionRevisionZero;$CustomWinSDKRoot\References\$WinSDKVersionRevisionZero"
+      $env:WindowsLibPath = "$CustomWinSDKRoot\UnionMetadata\$WinSDKVersion;$CustomWinSDKRoot\References\$WinSDKVersion"
       $env:WindowsSdkBinPath = "$CustomWinSDKRoot\bin"
-      $env:WindowsSDKLibVersion = "$WinSDKVersionRevisionZero\"
-      $env:WindowsSdkVerBinPath = "$CustomWinSDKRoot\bin\$WinSDKVersionRevisionZero"
-      $env:WindowsSDKVersion = "$WinSDKVersionRevisionZero\"
+      $env:WindowsSDKLibVersion = "$WinSDKVersion\"
+      $env:WindowsSdkVerBinPath = "$CustomWinSDKRoot\bin\$WinSDKVersion"
+      $env:WindowsSDKVersion = "$WinSDKVersion\"
 
       $env:EXTERNAL_INCLUDE += ";$WinSDKIncludePath"
       $env:INCLUDE += ";$WinSDKIncludePath"
       $env:LIB += ";$WinSDKVerLibRoot\ucrt\$($Arch.ShortName);$WinSDKVerLibRoot\um\$($Arch.ShortName)"
       $env:LIBPATH += ";$env:WindowsLibPath"
       $env:PATH += ";$env:WindowsSdkVerBinPath\$($Arch.ShortName);$env:WindowsSdkBinPath\$($Arch.ShortName)"
-      $env:UCRTVersion = $WinSDKVersionRevisionZero
+      $env:UCRTVersion = $WinSDKVersion
       $env:UniversalCRTSdkDir = $CustomWinSDKRoot
     }
   }
@@ -922,7 +910,7 @@ function Fetch-Dependencies {
 
       foreach ($Arch in $WinSDKArchs) {
         Invoke-Program nuget install $Package.$($Arch.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
-        Copy-Directory "$NugetRoot\$Package.$($Arch.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersionRevisionZero"
+        Copy-Directory "$NugetRoot\$Package.$($Arch.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
       }
     }
   }
@@ -2555,6 +2543,10 @@ function Build-System($Arch) {
 }
 
 function Build-Build($Arch) {
+  # Use lld to workaround the ARM64 LNK1322 issue: https://github.com/swiftlang/swift/issues/79740
+  # FIXME(hjyamauchi) Have a real fix
+  $ArchSpecificOptions = if ($Arch -eq $ArchARM64) { @{ CMAKE_Swift_FLAGS = "-use-ld=lld-link"; } } else { @{} }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-build `
     -Bin (Get-HostProjectBinaryCache Build) `
@@ -2563,7 +2555,7 @@ function Build-Build($Arch) {
     -Platform Windows `
     -UseBuiltCompilers C,CXX,Swift `
     -SwiftSDK (Get-SwiftSDK Windows) `
-    -Defines @{
+    -Defines (@{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
@@ -2573,7 +2565,7 @@ function Build-Build($Arch) {
       TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
       SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
       SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
-    }
+    } + $ArchSpecificOptions)
 }
 
 function Build-ToolsSupportCore($Arch) {
@@ -3187,7 +3179,6 @@ if ($Clean) {
     }
   }
 }
-
 
 if (-not $SkipBuild) {
   if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {

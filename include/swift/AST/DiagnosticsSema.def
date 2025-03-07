@@ -1841,7 +1841,7 @@ ERROR(attr_objc_implementation_no_conformance,none,
 ERROR(attr_objc_implementation_raise_minimum_deployment_target,none,
       "'@implementation' of an Objective-C class requires a minimum deployment "
       "target of at least %0 %1",
-      (AvailabilityDomain, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 ERROR(attr_implementation_requires_language,none,
       "'@implementation' used without specifying the language being "
       "implemented",
@@ -1896,6 +1896,11 @@ ERROR(objc_implementation_must_be_settable,none,
 
 ERROR(objc_implementation_type_mismatch,none,
       "%kind0 of type %1 does not match type %2 declared by the header",
+      (ValueDecl *, Type, Type))
+
+ERROR(objc_implementation_sendability_mismatch,none,
+      "sendability of function types in %kind0 of type %1 does not match "
+      "type %2 declared by the header",
       (ValueDecl *, Type, Type))
 
 ERROR(objc_implementation_required_attr_mismatch,none,
@@ -3991,7 +3996,7 @@ ERROR(attr_not_on_decl_with_invalid_access_level,none,
 ERROR(attr_has_no_effect_decl_not_available_before,none,
       "'%0' has no effect because %1 is not "
       "available before %2 %3",
-      (DeclAttribute, const ValueDecl *, AvailabilityDomain, llvm::VersionTuple))
+      (DeclAttribute, const ValueDecl *, AvailabilityDomain, AvailabilityRange))
 
 ERROR(attr_has_no_effect_on_unavailable_decl,none,
       "'%0' has no effect because %1 is unavailable on %2",
@@ -6003,7 +6008,7 @@ ERROR(isolated_deinit_on_value_type,none,
       ())
 ERROR(isolated_deinit_unavailable,none,
       "isolated deinit is only available in %0 %1 or newer",
-      (AvailabilityDomain, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 //------------------------------------------------------------------------------
 // MARK: String Processing
@@ -6018,7 +6023,7 @@ ERROR(regex_capture_types_failed_to_decode,none,
 
 ERROR(regex_feature_unavailable, none,
       "%0 is only available in %1 %2 or newer",
-      (StringRef, AvailabilityDomain, llvm::VersionTuple))
+      (StringRef, AvailabilityDomain, AvailabilityRange))
 
 ERROR(must_import_regex_builder_module,none,
       "regex builder requires the 'RegexBuilder' module be imported'", ())
@@ -6368,7 +6373,7 @@ ERROR(objc_in_generic_extension,none,
       "cannot contain '@objc' members", (bool))
 ERROR(objc_in_resilient_extension,none,
       "'@objc' %0 in extension of subclass of %1 requires %2 %3",
-      (DescriptiveDeclKind, Identifier, AvailabilityDomain, llvm::VersionTuple))
+      (DescriptiveDeclKind, Identifier, AvailabilityDomain, AvailabilityRange))
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
@@ -6379,7 +6384,7 @@ ERROR(objc_for_generic_class,none,
       "because they are not directly visible from Objective-C", ())
 ERROR(objc_for_resilient_class,none,
       "explicit '@objc' on subclass of %0 requires %1 %2",
-      (Identifier, AvailabilityDomain, llvm::VersionTuple))
+      (Identifier, AvailabilityDomain, AvailabilityRange))
 ERROR(objc_getter_for_nonobjc_property,none,
       "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,none,
@@ -6749,6 +6754,8 @@ WARNING(availability_suggest_platform_name,
         PointsToFirstBadToken, "unrecognized platform name %0;"
         " did you mean '%1'?",
         (Identifier, StringRef))
+WARNING(availability_unsupported_version_number, none,
+        "'%0' is not a supported version number", (llvm::VersionTuple))
 
 WARNING(attr_availability_expected_deprecated_version, none,
        "expected version number with 'deprecated' in '%0' attribute for %1",
@@ -6779,17 +6786,17 @@ NOTE(availability_marked_unavailable, none,
 
 NOTE(availability_introduced_in_version, none,
      "%0 was introduced in %1 %2",
-     (const ValueDecl *, AvailabilityDomain, llvm::VersionTuple))
+     (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
 
 NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",
-     (const ValueDecl *, AvailabilityDomain, llvm::VersionTuple))
+     (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
 
 GROUPED_WARNING(availability_deprecated, DeprecatedDeclaration, Deprecation,
                 "%0 %select{is|%select{is|was}3}1 "
                 "deprecated%select{| in %2%select{| %4}3}1%select{|: %5}5",
                 (const ValueDecl *, bool, AvailabilityDomain, bool,
-                 llvm::VersionTuple, StringRef))
+                 AvailabilityRange, StringRef))
 
 GROUPED_WARNING(
       availability_deprecated_rename, DeprecatedDeclaration, Deprecation,
@@ -6797,7 +6804,7 @@ GROUPED_WARNING(
       "deprecated%select{| in %2%select{| %4}3}1: "
       "%select{renamed to|replaced by}5%" REPLACEMENT_DECL_KIND_SELECT "6 "
       "'%7'",
-      (const ValueDecl *, bool, AvailabilityDomain, bool, llvm::VersionTuple,
+      (const ValueDecl *, bool, AvailabilityDomain, bool, AvailabilityRange,
        bool, unsigned, StringRef))
 #undef REPLACEMENT_DECL_KIND_SELECT
 
@@ -6810,63 +6817,58 @@ ERROR(availability_decl_more_than_enclosing, none,
 
 NOTE(availability_implicit_decl_here, none,
      "%0 implicitly declared here with availability of %1 %2 or newer",
-     (DescriptiveDeclKind, AvailabilityDomain, llvm::VersionTuple))
+     (DescriptiveDeclKind, AvailabilityDomain, AvailabilityRange))
 
 NOTE(availability_decl_more_than_enclosing_here, none,
      "enclosing scope requires availability of %0 %1 or newer",
-     (AvailabilityDomain, llvm::VersionTuple))
+     (AvailabilityDomain, AvailabilityRange))
 
-ERROR(availability_decl_only_version_newer, none,
-      "%0 is only available in %1 %2 or newer",
-      (const ValueDecl *, AvailabilityDomain, llvm::VersionTuple))
+ERROR(availability_decl_only_in, none,
+      "%0 is only available in %1%select{| %3 or newer}2",
+      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
 
-ERROR(availability_decl_only_version_newer_for_clients, none,
-      "%0 is only available in %1 %2 or newer; clients of %3 may have a lower"
-      " deployment target",
-      (const ValueDecl *, AvailabilityDomain, llvm::VersionTuple, ModuleDecl *))
-
-WARNING(availability_decl_only_version_newer_for_clients_warn, none,
-        "%0 is only available in %1 %2 or newer; clients of %3 may have a lower"
-        " deployment target",
-        (const ValueDecl *, AvailabilityDomain, llvm::VersionTuple,
-         ModuleDecl *))
+ERROR(availability_decl_only_in_for_clients, none,
+      "%0 is only available in %1%select{| %3 or newer}2"
+      "%select{|; clients of %4 may have a lower deployment target}2",
+      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange,
+       ModuleDecl *))
 
 ERROR(availability_opaque_types_only_version_newer, none,
       "'some' return types are only available in %0 %1 or newer",
-      (AvailabilityDomain, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_concurrency_only_version_newer, none,
       "concurrency is only available in %0 %1 or newer",
-      (AvailabilityDomain, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_parameterized_protocol_only_version_newer, none,
       "runtime support for parameterized protocol types is only available in "
       "%0 %1 or newer",
-      (AvailabilityDomain, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_isolated_any_only_version_newer, none,
       "runtime support for @isolated(any) function types is only available in "
       "%0 %1 or newer",
-      (AvailabilityDomain, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_copyable_generics_casting_only_version_newer, none,
       "runtime support for casting types with noncopyable generic arguments "
       "is only available in %0 %1 or newer",
-      (AvailabilityDomain, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_escapable_generics_casting_only_version_newer, none,
       "runtime support for casting types with nonescapable generic arguments "
       "is only available in %0 %1 or newer",
-      (AvailabilityDomain, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_typed_throws_only_version_newer, none,
       "runtime support for typed throws function types is only available in "
       "%0 %1 or newer",
-      (AvailabilityDomain, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 ERROR(availability_variadic_type_only_version_newer, none,
       "parameter packs in generic types are only available in %0 %1 or newer",
-      (AvailabilityDomain, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 
 NOTE(availability_guard_with_version_check, none,
      "add 'if #available' version check", ())
@@ -6877,9 +6879,10 @@ FIXIT(insert_available_attr,
       "@available(%0 %1, *)\n%2",
       (StringRef, StringRef, StringRef))
 
-ERROR(availability_inout_accessor_only_version_newer, none,
-      "cannot pass as inout because %0 is only available in %1 %2 or newer",
-      (const ValueDecl *, AvailabilityDomain, llvm::VersionTuple))
+ERROR(availability_inout_accessor_only_in, none,
+      "cannot pass as inout because %0 is only available in %1"
+      "%select{| %3 or newer}2",
+      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
 
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
@@ -6926,7 +6929,7 @@ WARNING(availability_enum_element_no_potential_warn,
 ERROR(availability_protocol_requires_version,
       none, "protocol %0 requires %1 to be available in %2 %3 and newer",
       (const ProtocolDecl *, const ValueDecl *, AvailabilityDomain,
-       llvm::VersionTuple))
+       AvailabilityRange))
 
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
@@ -6967,22 +6970,22 @@ NOTE(conformance_availability_marked_unavailable, none,
 
 NOTE(conformance_availability_introduced_in_version, none,
      "conformance of %0 to %1 was introduced in %2 %3",
-     (Type, Type, AvailabilityDomain, llvm::VersionTuple))
+     (Type, Type, AvailabilityDomain, AvailabilityRange))
 
 NOTE(conformance_availability_obsoleted, none,
      "conformance of %0 to %1 was obsoleted in %2 %3",
-     (Type, Type, AvailabilityDomain, llvm::VersionTuple))
+     (Type, Type, AvailabilityDomain, AvailabilityRange))
 
 GROUPED_WARNING(conformance_availability_deprecated,
                 DeprecatedDeclaration, Deprecation,
                 "conformance of %0 to %1 %select{is|%select{is|was}4}2 "
                 "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
-                (Type, Type, bool, AvailabilityDomain, bool, llvm::VersionTuple,
+                (Type, Type, bool, AvailabilityDomain, bool, AvailabilityRange,
                  StringRef))
 
 ERROR(conformance_availability_only_version_newer, none,
       "conformance of %0 to %1 is only available in %2 %3 or newer",
-      (Type, Type, AvailabilityDomain, llvm::VersionTuple))
+      (Type, Type, AvailabilityDomain, AvailabilityRange))
 
 //------------------------------------------------------------------------------
 // MARK: if #available(...)
@@ -8252,7 +8255,7 @@ ERROR(value_generics_missing_feature,none,
       "value generics require '-enable-experimental-feature ValueGenerics'", ())
 ERROR(availability_value_generic_type_only_version_newer, none,
       "values in generic types are only available in %0 %1 or newer",
-      (AvailabilityDomain, llvm::VersionTuple))
+      (AvailabilityDomain, AvailabilityRange))
 ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
@@ -8362,6 +8365,13 @@ ERROR(attr_execution_type_attr_incompatible_with_isolated_param,none,
 ERROR(attr_execution_type_attr_incompatible_with_isolated_any,none,
       "cannot use '@execution' together with @isolated(any)",
       ())
+
+ERROR(invalid_function_conversion_with_non_sendable,none,
+      "cannot convert %0 to %1 because crossing of an isolation boundary "
+      "requires parameter and result types to conform to 'Sendable' protocol",
+      (Type, Type))
+NOTE(type_does_not_conform_to_Sendable,none,
+     "type %0 does not conform to 'Sendable' protocol", (Type))
 
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

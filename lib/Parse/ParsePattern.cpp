@@ -595,9 +595,9 @@ mapParsedParameters(Parser &parser,
       }
 
       if (paramInfo.CompileConstLoc.isValid()) {
-        type = new (parser.Context) CompileTimeConstTypeRepr(
+        type = new (parser.Context) CompileTimeLiteralTypeRepr(
             type, paramInfo.CompileConstLoc);
-        param->setCompileTimeConst();
+        param->setCompileTimeLiteral();
       }
 
       if (paramInfo.SendingLoc.isValid()) {

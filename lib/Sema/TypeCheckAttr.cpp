@@ -127,9 +127,9 @@ public:
       TypeChecker::checkAvailability(
           attr->getRange(), C.getIsolatedDeinitAvailability(),
           D->getDeclContext(),
-          [&](AvailabilityDomain domain, llvm::VersionTuple version) {
+          [&](AvailabilityDomain domain, AvailabilityRange range) {
             return diagnoseAndRemoveAttr(
-                attr, diag::isolated_deinit_unavailable, domain, version);
+                attr, diag::isolated_deinit_unavailable, domain, range);
           });
     }
   }
@@ -433,7 +433,8 @@ public:
 
   void visitFinalAttr(FinalAttr *attr);
   void visitMoveOnlyAttr(MoveOnlyAttr *attr);
-  void visitCompileTimeConstAttr(CompileTimeConstAttr *attr) {}
+  void visitCompileTimeLiteralAttr(CompileTimeLiteralAttr *attr) {}
+  void visitConstValAttr(ConstValAttr *attr) {}
   void visitIBActionAttr(IBActionAttr *attr);
   void visitIBSegueActionAttr(IBSegueActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
@@ -1897,8 +1898,7 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
       auto diag = diagnose(
           attr->getLocation(),
           diag::attr_objc_implementation_raise_minimum_deployment_target,
-          Ctx.getTargetAvailabilityDomain(),
-          Ctx.getSwift50Availability().getRawMinimumVersion());
+          Ctx.getTargetAvailabilityDomain(), Ctx.getSwift50Availability());
       if (attr->isEarlyAdopter()) {
         diag.wrapIn(diag::wrap_objc_implementation_will_become_error);
       }
@@ -2396,23 +2396,24 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
 
   // The remaining diagnostics are only for attributes with introduced versions
   // for specific platforms.
-  if (!attr->isPlatformSpecific() || !attr->getIntroduced().has_value())
+  auto introducedRange = attr->getIntroducedRange(Ctx);
+  if (!attr->isPlatformSpecific() || !introducedRange)
     return;
 
   // Find the innermost enclosing declaration with an availability
   // range annotation and ensure that this attribute's available version range
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
-  std::optional<AvailabilityRange> EnclosingAnnotatedRange;
-  AvailabilityRange AttrRange = attr->getIntroducedRange(Ctx);
+  std::optional<AvailabilityRange> enclosingIntroducedRange;
 
   if (auto *parent = getEnclosingDeclForDecl(D)) {
     if (auto enclosingAvailable =
             getSemanticAvailableRangeDeclAndAttr(parent)) {
       SemanticAvailableAttr enclosingAttr = enclosingAvailable->first;
       const Decl *enclosingDecl = enclosingAvailable->second;
-      EnclosingAnnotatedRange.emplace(enclosingAttr.getIntroducedRange(Ctx));
-      if (!AttrRange.isContainedIn(*EnclosingAnnotatedRange)) {
+      enclosingIntroducedRange = enclosingAttr.getIntroducedRange(Ctx);
+      if (enclosingIntroducedRange &&
+          !introducedRange->isContainedIn(*enclosingIntroducedRange)) {
         auto limit = DiagnosticBehavior::Unspecified;
         if (D->isImplicit()) {
           // Incorrect availability for an implicit declaration is likely a
@@ -2433,11 +2434,10 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           diagnose(enclosingDecl->getLoc(),
                    diag::availability_implicit_decl_here,
                    D->getDescriptiveKind(), Ctx.getTargetAvailabilityDomain(),
-                   AttrRange.getRawMinimumVersion());
+                   *introducedRange);
         diagnose(enclosingDecl->getLoc(),
                  diag::availability_decl_more_than_enclosing_here,
-                 Ctx.getTargetAvailabilityDomain(),
-                 EnclosingAnnotatedRange->getRawMinimumVersion());
+                 Ctx.getTargetAvailabilityDomain(), *enclosingIntroducedRange);
       }
     }
   }
@@ -3873,10 +3873,11 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
   // Note: we might pass a constant attribute when typechecker is nullptr.
   // Any modification to attr must be guarded by a null check on TC.
   //
-  SmallVector<ValueDecl *, 4> results;
-  lookupReplacedDecl(replacedFunctionName, attr, base, results);
+  SmallVector<ValueDecl *, 4> lookupResults;
+  lookupReplacedDecl(replacedFunctionName, attr, base, lookupResults);
 
-  for (auto *result : results) {
+  SmallVector<AbstractFunctionDecl *, 4> candidates;
+  for (auto *result : lookupResults) {
     // Protocol requirements are not replaceable.
     if (isa<ProtocolDecl>(result->getDeclContext()))
       continue;
@@ -3884,51 +3885,94 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
     if (result->isStatic() != base->isStatic())
       continue;
 
-    auto resultTy = result->getInterfaceType();
-    auto replaceTy = base->getInterfaceType();
-    TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
-    matchMode |= TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
-    if (resultTy->matches(replaceTy, matchMode)) {
-      if (forDynamicReplacement && !result->isDynamic()) {
-        if (Diags) {
-          Diags->diagnose(attr->getLocation(),
-                          diag::dynamic_replacement_function_not_dynamic,
-                          result->getName());
-          attr->setInvalid();
-        }
-        return nullptr;
-      }
-      return cast<AbstractFunctionDecl>(result);
-    }
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(result))
+      candidates.push_back(AFD);
   }
+
+  if (candidates.empty()) {
+    if (Diags) {
+      Diags->diagnose(attr->getLocation(),
+                      forDynamicReplacement
+                          ? diag::dynamic_replacement_function_not_found
+                          : diag::specialize_target_function_not_found,
+                      replacedFunctionName);
+    }
+
+    attr->setInvalid();
+    return nullptr;
+  }
+
+  auto replaceTy = base->getInterfaceType();
+
+  // Filter based on the exact type match first.
+  SmallVector<AbstractFunctionDecl *> matches;
+  llvm::copy_if(candidates, std::back_inserter(matches),
+                [&replaceTy](AbstractFunctionDecl *F) {
+                  auto resultTy = F->getInterfaceType();
+                  TypeMatchOptions matchMode =
+                      TypeMatchFlags::AllowABICompatible;
+                  matchMode |=
+                      TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
+                  return resultTy->matches(replaceTy, matchMode);
+                });
+
+  // If there are no exact matches, strip sendability annotations
+  // from functions imported from Objective-C. This is a narrow
+  // fix for now but it could be extended to cover all `@preconcurrency`
+  // declarations.
+  if (matches.empty()) {
+    llvm::copy_if(candidates, std::back_inserter(matches),
+                  [&replaceTy](AbstractFunctionDecl *F) {
+                    if (!F->hasClangNode())
+                      return false;
+
+                    auto resultTy = F->getInterfaceType();
+                    TypeMatchOptions matchMode =
+                        TypeMatchFlags::AllowABICompatible;
+                    matchMode |=
+                        TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
+                    matchMode |= TypeMatchFlags::IgnoreFunctionSendability;
+                    matchMode |= TypeMatchFlags::IgnoreSendability;
+                    return resultTy->matches(replaceTy, matchMode);
+                  });
+  }
+
+  if (matches.size() == 1) {
+    auto result = matches.front();
+    if (forDynamicReplacement && !result->isDynamic()) {
+      if (Diags) {
+        Diags->diagnose(attr->getLocation(),
+                        diag::dynamic_replacement_function_not_dynamic,
+                        result->getName());
+        attr->setInvalid();
+      }
+      return nullptr;
+    }
+
+    return result;
+  }
+
+  attr->setInvalid();
 
   if (!Diags)
     return nullptr;
 
-  if (results.empty()) {
-    Diags->diagnose(attr->getLocation(),
-                    forDynamicReplacement
-                        ? diag::dynamic_replacement_function_not_found
-                        : diag::specialize_target_function_not_found,
-                    replacedFunctionName);
-  } else {
-    Diags->diagnose(attr->getLocation(),
-                    forDynamicReplacement
-                        ? diag::dynamic_replacement_function_of_type_not_found
-                        : diag::specialize_target_function_of_type_not_found,
-                    replacedFunctionName,
-                    base->getInterfaceType()->getCanonicalType());
+  Diags->diagnose(attr->getLocation(),
+                  forDynamicReplacement
+                      ? diag::dynamic_replacement_function_of_type_not_found
+                      : diag::specialize_target_function_of_type_not_found,
+                  replacedFunctionName,
+                  base->getInterfaceType()->getCanonicalType());
 
-    for (auto *result : results) {
-      Diags->diagnose(SourceLoc(),
-                      forDynamicReplacement
-                          ? diag::dynamic_replacement_found_function_of_type
-                          : diag::specialize_found_function_of_type,
-                      result->getName(),
-                      result->getInterfaceType()->getCanonicalType());
-    }
+  for (auto *result : matches) {
+    Diags->diagnose(SourceLoc(),
+                    forDynamicReplacement
+                        ? diag::dynamic_replacement_found_function_of_type
+                        : diag::specialize_found_function_of_type,
+                    result->getName(),
+                    result->getInterfaceType()->getCanonicalType());
   }
-  attr->setInvalid();
+
   return nullptr;
 }
 
@@ -5245,10 +5289,10 @@ void AttributeChecker::checkBackDeployedAttrs(
 
       if (Attr->Version <= introVersion) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
-                 Attr, VD, beforeDomain, beforeVersion);
+                 Attr, VD, beforeDomain, AvailabilityRange(beforeVersion));
         diagnose(availableAttr.getParsedAttr()->AtLoc,
                  diag::availability_introduced_in_version, VD, introDomain,
-                 introVersion)
+                 AvailabilityRange(introVersion))
             .highlight(availableAttr.getParsedAttr()->getRange());
         continue;
       }

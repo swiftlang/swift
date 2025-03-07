@@ -75,7 +75,7 @@ ERROR(attr_objc_implementation_resilient_property_deployment_target, none,
       "'@implementation' on %0 %1 does not support stored properties whose "
       "size can change due to library evolution; raise the minimum deployment "
       "target to %0 %2 or store this value in an object or 'any' type",
-      (AvailabilityDomain, const llvm::VersionTuple, const llvm::VersionTuple))
+      (AvailabilityDomain, const AvailabilityRange, const AvailabilityRange))
 
 ERROR(unable_to_load_pass_plugin,none,
       "unable to load plugin '%0': '%1'", (StringRef, StringRef))

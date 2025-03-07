@@ -827,6 +827,20 @@ static void recordShadowedDeclsAfterSignatureMatch(
     else
       type = removeThrownError(decl->getInterfaceType()->getCanonicalType());
 
+    // Strip `@Sendable` annotations for declarations that come from
+    // or are exposed to Objective-C to make it possible to introduce
+    // new annotations without breaking shadowing rules.
+    //
+    // This is a narrow fix for specific backwards-incompatible cases
+    // we know about, it could be extended to use `isObjC()` in the
+    // future if we find problematic cases were a more general change
+    // is required.
+    if (decl->hasClangNode() || decl->getAttrs().hasAttribute<ObjCAttr>()) {
+      type =
+          type->stripConcurrency(/*recursive=*/true, /*dropGlobalActor=*/false)
+              ->getCanonicalType();
+    }
+
     // Record this declaration based on its signature.
     auto &known = collisions[type];
     if (known.size() == 1) {
@@ -3223,7 +3237,7 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::Ownership:
-  case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::CompileTimeLiteral:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
   case TypeReprKind::SILBox:

@@ -973,7 +973,7 @@ namespace {
           flags = flags.withInOut(true);
         }
         if (arg.isConst()) {
-          flags = flags.withCompileTimeConst(true);
+          flags = flags.withCompileTimeLiteral(true);
         }
         result.emplace_back(ty, arg.getLabel(), flags);
       }

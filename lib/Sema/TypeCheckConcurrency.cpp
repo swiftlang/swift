@@ -2654,12 +2654,58 @@ namespace {
     /// Some function conversions synthesized by the constraint solver may not
     /// be correct AND the solver doesn't know, so we must emit a diagnostic.
     void checkFunctionConversion(Expr *funcConv, Type fromType, Type toType) {
-      if (auto fromFnType = fromType->getAs<FunctionType>()) {
-        if (auto fromActor = fromFnType->getGlobalActor()) {
-          if (auto toFnType = toType->getAs<FunctionType>()) {
+      auto diagnoseNonSendableParametersAndResult =
+          [&](FunctionType *fnType, bool downgradeToWarning = false) {
+            auto *dc = getDeclContext();
+            llvm::SmallPtrSet<Type, 2> nonSendableTypes;
 
-            // ignore some kinds of casts, as they're diagnosed elsewhere.
-            if (toFnType->hasGlobalActor() || toFnType->isAsync())
+            SendableCheckContext context(dc);
+            for (auto &param : fnType->getParams()) {
+              diagnoseNonSendableTypes(
+                  param.getPlainType(), context,
+                  /*inDerivedConformance=*/Type(), funcConv->getLoc(),
+                  [&](Type type, DiagnosticBehavior behavior) {
+                    nonSendableTypes.insert(type);
+                    return true;
+                  });
+            }
+
+            diagnoseNonSendableTypes(
+                fnType->getResult(), context,
+                /*inDerivedConformance=*/Type(), funcConv->getLoc(),
+                [&](Type type, DiagnosticBehavior behavior) {
+                  nonSendableTypes.insert(type);
+                  return true;
+                });
+
+            if (!nonSendableTypes.empty()) {
+              auto &ctx = dc->getASTContext();
+              {
+                auto diag = ctx.Diags.diagnose(
+                    funcConv->getLoc(),
+                    diag::invalid_function_conversion_with_non_sendable,
+                    fromType, toType);
+
+                if (downgradeToWarning)
+                  diag.warnUntilSwiftVersion(7);
+              }
+
+              for (auto type : nonSendableTypes) {
+                ctx.Diags.diagnose(funcConv->getLoc(),
+                                   diag::type_does_not_conform_to_Sendable,
+                                   type);
+              }
+            }
+          };
+
+      if (auto fromFnType = fromType->getAs<FunctionType>()) {
+        if (auto toFnType = toType->getAs<FunctionType>()) {
+          auto fromIsolation = fromFnType->getIsolation();
+          auto toIsolation = toFnType->getIsolation();
+
+          if (auto fromActor = fromFnType->getGlobalActor()) {
+            if (toFnType->hasGlobalActor() ||
+                (toFnType->isAsync() && !toIsolation.isNonIsolatedCaller()))
               return;
 
             auto dc = const_cast<DeclContext*>(getDeclContext());
@@ -2672,7 +2718,115 @@ namespace {
                             diag::converting_func_loses_global_actor, fromType,
                             toType, fromActor)
                   .warnUntilSwiftVersion(6);
+              return;
             }
+          }
+
+          // Conversions from non-Sendable types are handled by
+          // region-based isolation.
+          // Function conversions are used to inject concurrency attributes
+          // into interface types until that changes we won't be able to
+          // diagnose all of the cases here.
+          if (!fromFnType->isSendable())
+            return;
+
+          switch (toIsolation.getKind()) {
+          // Converting to `@execution(caller)` function type
+          case FunctionTypeIsolation::Kind::NonIsolatedCaller: {
+            switch (fromIsolation.getKind()) {
+            case FunctionTypeIsolation::Kind::NonIsolated: {
+              // nonisolated -> @execution(caller) doesn't cross
+              // an isolation boundary.
+              if (!fromFnType->isAsync())
+                break;
+
+              // @execution(concurrent) -> @execution(caller)
+              // crosses an isolation boundary.
+              LLVM_FALLTHROUGH;
+            }
+            case FunctionTypeIsolation::Kind::GlobalActor:
+            case FunctionTypeIsolation::Kind::Erased:
+              diagnoseNonSendableParametersAndResult(toFnType);
+              break;
+
+            case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+            case FunctionTypeIsolation::Kind::Parameter:
+              llvm_unreachable("invalid conversion");
+            }
+            break;
+          }
+
+          // Converting to nonisolated synchronous or @execution(concurrent)
+          // asynchronous function type could require crossing an isolation
+          // boundary.
+          case FunctionTypeIsolation::Kind::NonIsolated: {
+            switch (fromIsolation.getKind()) {
+            case FunctionTypeIsolation::Kind::Parameter:
+            case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+            case FunctionTypeIsolation::Kind::Erased:
+              diagnoseNonSendableParametersAndResult(
+                  toFnType, /*downgradeToWarning=*/true);
+              break;
+
+            case FunctionTypeIsolation::Kind::GlobalActor: {
+              // Handled above by `safeToDropGlobalActor` check.
+              break;
+            }
+
+            case FunctionTypeIsolation::Kind::NonIsolated: {
+              // nonisolated synchronous <-> @execution(concurrent)
+              if (fromFnType->isAsync() != toFnType->isAsync()) {
+                diagnoseNonSendableParametersAndResult(
+                    toFnType, /*downgradeToWarning=*/true);
+              }
+              break;
+            }
+            }
+            break;
+          }
+
+          // Converting to an actor-isolated function always
+          // requires crossing an isolation boundary.
+          case FunctionTypeIsolation::Kind::GlobalActor: {
+            switch (fromIsolation.getKind()) {
+            case FunctionTypeIsolation::Kind::Parameter:
+            case FunctionTypeIsolation::Kind::Erased:
+              diagnoseNonSendableParametersAndResult(
+                  toFnType, /*downgradeToWarning=*/true);
+              break;
+
+            case FunctionTypeIsolation::Kind::NonIsolated: {
+              // Since @execution(concurrent) as an asynchronous
+              // function it would mean that without Sendable
+              // check it would be possible for non-Sendable state
+              // to escape from actor isolation.
+              if (fromFnType->isAsync()) {
+                diagnoseNonSendableParametersAndResult(
+                  toFnType, /*downgradeToWarning=*/true);
+                break;
+              }
+              // Runs on the actor.
+              break;
+            }
+
+            // Runs on the actor.
+            case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+              break;
+
+            case FunctionTypeIsolation::Kind::GlobalActor:
+              llvm_unreachable("invalid conversion");
+            }
+            break;
+          }
+
+          // Converting to @isolated(any) doesn't cross an isolation
+          // boundary.
+          case FunctionTypeIsolation::Kind::Erased:
+            break;
+
+          // TODO: Figure out what exactly needs to happen here.
+          case FunctionTypeIsolation::Kind::Parameter:
+            break;
           }
         }
       }

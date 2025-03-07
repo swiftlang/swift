@@ -17,7 +17,8 @@
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityDomain.h"
-#include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -70,16 +71,21 @@ void AvailabilitySpec::print(llvm::raw_ostream &os) const {
     os << " " << getRawVersion().getAsString();
 }
 
+std::optional<AvailabilityDomain>
+AvailabilitySpec::resolveInDeclContext(const DeclContext *declContext) {
+  auto domainOrIdentifier = getDomainOrIdentifier();
+  auto result =
+      domainOrIdentifier.resolveInDeclContext(getStartLoc(), declContext);
+  DomainOrIdentifier = domainOrIdentifier;
+  return result;
+}
+
 std::optional<SemanticAvailabilitySpec>
 AvailabilitySpec::getSemanticAvailabilitySpec(
     const DeclContext *declContext) const {
-  AvailabilitySpec *mutableThis = const_cast<AvailabilitySpec *>(this);
-  auto domain = mutableThis->DomainOrIdentifier.resolveInDeclContext(
-      getStartLoc(), declContext);
-
-  if (domain)
-    return SemanticAvailabilitySpec(this);
-  return std::nullopt;
+  return evaluateOrDefault(declContext->getASTContext().evaluator,
+                           SemanticAvailabilitySpecRequest{this, declContext},
+                           std::nullopt);
 }
 
 llvm::VersionTuple SemanticAvailabilitySpec::getVersion() const {
@@ -104,4 +110,48 @@ SemanticAvailabilitySpecs::Filter::operator()(
   if (auto semanticSpec = spec->getSemanticAvailabilitySpec(declContext))
     return semanticSpec;
   return std::nullopt;
+}
+
+std::optional<SemanticAvailabilitySpec>
+SemanticAvailabilitySpecRequest::evaluate(
+    Evaluator &evaluator, const AvailabilitySpec *spec,
+    const DeclContext *declContext) const {
+  if (spec->isInvalid())
+    return std::nullopt;
+
+  auto &diags = declContext->getASTContext().Diags;
+  AvailabilitySpec *mutableSpec = const_cast<AvailabilitySpec *>(spec);
+  if (!mutableSpec->resolveInDeclContext(declContext).has_value())
+    return std::nullopt;
+
+  auto version = spec->getRawVersion();
+  if (!VersionRange::isValidVersion(version)) {
+    diags
+        .diagnose(spec->getStartLoc(),
+                  diag::availability_unsupported_version_number, version)
+        .highlight(spec->getVersionSrcRange());
+    return std::nullopt;
+  }
+
+  return SemanticAvailabilitySpec(spec);
+}
+
+std::optional<std::optional<SemanticAvailabilitySpec>>
+SemanticAvailabilitySpecRequest::getCachedResult() const {
+  auto *spec = std::get<0>(getStorage());
+  if (spec->isInvalid())
+    return std::optional<SemanticAvailabilitySpec>();
+
+  auto domainOrIdentifier = spec->getDomainOrIdentifier();
+  if (!domainOrIdentifier.isResolved())
+    return std::nullopt;
+
+  return SemanticAvailabilitySpec(spec);
+}
+
+void SemanticAvailabilitySpecRequest::cacheResult(
+    std::optional<SemanticAvailabilitySpec> value) const {
+  auto *mutableSpec = const_cast<AvailabilitySpec *>(std::get<0>(getStorage()));
+  if (!value)
+    mutableSpec->setInvalid();
 }

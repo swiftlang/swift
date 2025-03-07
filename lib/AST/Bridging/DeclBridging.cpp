@@ -111,7 +111,7 @@ static StaticSpellingKind unbridged(BridgedStaticSpelling kind) {
   return static_cast<StaticSpellingKind>(kind);
 }
 
-static AccessorKind unbridged(BridgedAccessorKind kind) {
+AccessorKind unbridged(BridgedAccessorKind kind) {
   return static_cast<AccessorKind>(kind);
 }
 

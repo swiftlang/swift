@@ -126,9 +126,9 @@ extension ASTGenVisitor {
       case .cDecl:
         return handle(self.generateCDeclAttr(attribute: node)?.asDeclAttribute)
       case .derivative:
-        fatalError("unimplemented")
+        return handle(self.generateDerivativeAttr(attribute: node)?.asDeclAttribute)
       case .differentiable:
-        fatalError("unimplemented")
+        return handle(self.generateDifferentiableAttr(attribute: node)?.asDeclAttribute)
       case .dynamicReplacement:
         return handle(self.generateDynamicReplacementAttr(attribute: node)?.asDeclAttribute)
       case .documentation:
@@ -182,7 +182,7 @@ extension ASTGenVisitor {
       case .swiftNativeObjCRuntimeBase:
         return handle(self.generateSwiftNativeObjCRuntimeBaseAttr(attribute: node)?.asDeclAttribute)
       case .transpose:
-        fatalError("unimplemented")
+        return handle(self.generateTransposeAttr(attribute: node)?.asDeclAttribute)
       case .typeEraser:
         fatalError("unimplemented")
       case .unavailableFromAsync:
@@ -199,6 +199,7 @@ extension ASTGenVisitor {
         .atRethrows,
         .borrowed,
         .compilerInitialized,
+        .constVal,
         .dynamicCallable,
         .eagerMove,
         .exported,
@@ -304,7 +305,7 @@ extension ASTGenVisitor {
         .indirect,
         .final,
         .knownToBeLocal,
-        .compileTimeConst:
+        .compileTimeLiteral:
 
         // generateSimpleDeclAttr will diagnose and fix-it to change it to modifiers.
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: attrKind))
@@ -549,6 +550,176 @@ extension ASTGenVisitor {
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
       name: name
+    )
+  }
+
+  struct GeneratedDerivativeOriginalDecl {
+    var baseType: BridgedTypeRepr?
+    var declName: BridgedDeclNameRef
+    var declNameLoc: BridgedDeclNameLoc
+  }
+
+  func generateDerivativeOriginalDecl(expr: ExprSyntax) -> GeneratedDerivativeOriginalDecl? {
+    var baseType: BridgedTypeRepr?
+    var declName: BridgedDeclNameRef
+    var declNameLoc: BridgedDeclNameLoc
+
+    if let declrefExpr = expr.as(DeclReferenceExprSyntax.self) {
+      baseType = nil
+      (declName, declNameLoc) =  self.generateDeclNameRef(declReferenceExpr: declrefExpr)
+
+    } else if let memberExpr = expr.as(MemberAccessExprSyntax.self),
+              let baseExpr = memberExpr.base {
+      guard let _baseType = self.generateTypeRepr(expr: baseExpr) else {
+        // TODO: Diagnose.
+        fatalError("invalid type expression for @derivative qualified decl name")
+      }
+      baseType = _baseType
+      (declName, declNameLoc) = self.generateDeclNameRef(declReferenceExpr: memberExpr.declName)
+
+    } else {
+      // TODO: Diagnosse.
+      fatalError("invalid expression for @derivative original decl name")
+    }
+
+    return GeneratedDerivativeOriginalDecl(
+      baseType: baseType,
+      declName: declName,
+      declNameLoc: declNameLoc
+    )
+  }
+
+  func generateDifferentiabilityKind(text: SyntaxText) -> BridgedDifferentiabilityKind {
+    switch text {
+    case "reverse": return .reverse
+    case "wrt", "withRespectTo": return .normal
+    case "_liner": return .linear
+    case "_forward": return .forward
+    default: return .nonDifferentiable
+    }
+  }
+
+  func generate(differentiabilityArgument node: DifferentiabilityArgumentSyntax) -> BridgedParsedAutoDiffParameter {
+    let loc = self.generateSourceLoc(node)
+    switch node.argument.rawTokenKind {
+    case .identifier:
+      return .forNamed(self.generateIdentifier(node.argument), loc: loc)
+
+    case .integerLiteral:
+      guard let index = Int(node.argument.text) else {
+        // TODO: Diagnose
+        fatalError("(compiler bug) invalid integer literal token text")
+      }
+      return .forOrdered(index, loc: loc)
+
+    case .keyword where node.argument.rawText == "self":
+      return .forSelf(loc: loc)
+
+    default:
+      // TODO: Diagnose
+      fatalError("(compiler bug) invalid token for 'wrt:' argument")
+    }
+  }
+
+  func generate(differentiabilityWithRespectToArgument node: DifferentiabilityWithRespectToArgumentSyntax?) -> BridgedArrayRef {
+    guard let node else {
+      return BridgedArrayRef()
+    }
+    switch node.arguments {
+    case .argument(let node): // Single argument e.g. 'wrt: foo'
+      return CollectionOfOne(self.generate(differentiabilityArgument: node)).bridgedArray(in: self)
+    case .argumentList(let node): // Multiple arguments e.g. 'wrt: (self, 2)'
+      return  node.arguments.lazy.map(self.generate(differentiabilityArgument:)).bridgedArray(in: self)
+    }
+  }
+
+  /// E.g.
+  ///   ```
+  ///   @derivative(of: foo(arg:), wrt: self)
+  ///   ```
+  func generateDerivativeAttr(attribute node: AttributeSyntax) -> BridgedDerivativeAttr? {
+    guard let args = node.arguments?.as(DerivativeAttributeArgumentsSyntax.self) else {
+      fatalError("(compiler bug) invalid arguments for @derivative attribute")
+    }
+    guard let originalDecl = self.generateDerivativeOriginalDecl(expr: args.originalDeclName) else {
+      return nil
+    }
+
+    let accessorKind: BridgedAccessorKind?
+    if let accessorToken = args.accessorSpecifier {
+      accessorKind = self.generate(accessorSpecifier: accessorToken)
+    } else {
+      accessorKind = nil
+    }
+
+    let parameters = self.generate(differentiabilityWithRespectToArgument: args.arguments)
+
+    if let accessorKind {
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        baseType: originalDecl.baseType.asNullable,
+        originalName: originalDecl.declName,
+        originalNameLoc: originalDecl.declNameLoc,
+        accessorKind: accessorKind,
+        params: parameters
+      )
+    } else {
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        baseType: originalDecl.baseType.asNullable,
+        originalName: originalDecl.declName,
+        originalNameLoc: originalDecl.declNameLoc,
+        params: parameters
+      )
+    }
+  }
+
+
+  /// E.g.
+  ///   ```
+  ///   @differentiable(reverse, wrt: (self, 3) where T: U)
+  ///   @differentiable(reverse, wrt: foo where T: U)
+  ///   ```
+  func generateDifferentiableAttr(attribute node: AttributeSyntax) -> BridgedDifferentiableAttr? {
+    guard let args = node.arguments?.as(DifferentiableAttributeArgumentsSyntax.self) else {
+      fatalError("(compiler bug) invalid arguments for @differentiable attribute")
+    }
+
+    var differentiability: BridgedDifferentiabilityKind
+    if let kindSpecifier = args.kindSpecifier {
+      differentiability = self.generateDifferentiabilityKind(text: kindSpecifier.rawText)
+    } else {
+      differentiability = .normal
+    }
+    if differentiability == .normal {
+      // TODO: Diagnose "'@differentiable' has been renamed to '@differentiable(reverse)"
+      differentiability = .reverse
+    }
+    guard differentiability == .reverse || differentiability == .linear else {
+      // TODO: Diagnose.
+      fatalError("not supported kind for @differentiable attribute")
+    }
+
+    let parameters = self.generate(differentiabilityWithRespectToArgument: args.arguments)
+
+    let whereClause: BridgedTrailingWhereClause?
+    if let node = args.genericWhereClause {
+      whereClause = self.generate(genericWhereClause: node)
+    } else {
+      whereClause = nil
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      kind: differentiability,
+      params: parameters,
+      genericWhereClause: whereClause.asNullable
     )
   }
 
@@ -1894,6 +2065,37 @@ extension ASTGenVisitor {
 
   /// E.g.:
   ///   ```
+  ///   @transpose(of: foo(_:), wrt: self)
+  ///   ```
+  func generateTransposeAttr(attribute node: AttributeSyntax) -> BridgedTransposeAttr? {
+    guard let args = node.arguments?.as(DerivativeAttributeArgumentsSyntax.self) else {
+      fatalError("(compiler bug) invalid arguments for @derivative attribute")
+    }
+    guard let originalDecl = self.generateDerivativeOriginalDecl(expr: args.originalDeclName) else {
+      return nil
+    }
+
+    if let accessorToken = args.accessorSpecifier {
+      // TODO: Diagnostics.
+      _ = accessorToken
+      fatalError("(compiler bug) unexpected accessor kind for @transpose attribute")
+    }
+
+    let parameters = self.generate(differentiabilityWithRespectToArgument: args.arguments)
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      baseType: originalDecl.baseType.asNullable,
+      originalName: originalDecl.declName,
+      originalNameLoc: originalDecl.declNameLoc,
+      params: parameters
+    )
+  }
+
+  /// E.g.:
+  ///   ```
   ///   @_unavailableFromAsync
   ///   @_unavailableFromAsync(message: "use fooBar(_:) instead")
   ///   ```
@@ -1918,21 +2120,10 @@ extension ASTGenVisitor {
 
   func generateUnavailableInEmbeddedAttr(attribute node: AttributeSyntax) -> BridgedAvailableAttr? {
     if ctx.langOptsHasFeature(.Embedded) {
-      return BridgedAvailableAttr.createParsed(
+      return BridgedAvailableAttr.createUnavailableInEmbedded(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
-        range: self.generateAttrSourceRange(node),
-        domain: .forEmbedded(),
-        domainLoc: nil,
-        kind: .unavailable,
-        message: "unavailable in embedded Swift",
-        renamed: "",
-        introduced: BridgedVersionTuple(),
-        introducedRange: BridgedSourceRange(),
-        deprecated: BridgedVersionTuple(),
-        deprecatedRange:  BridgedSourceRange(),
-        obsoleted: BridgedVersionTuple(),
-        obsoletedRange: BridgedSourceRange()
+        range: self.generateAttrSourceRange(node)
       )
     } else {
       // For non-Embedded mode, ignore it.
