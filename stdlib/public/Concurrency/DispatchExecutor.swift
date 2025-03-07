@@ -27,6 +27,8 @@ import Swift
 public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
   var threaded = false
 
+  public init() {}
+
   public func run() throws {
     if threaded {
       fatalError("DispatchMainExecutor does not support recursion")
@@ -43,6 +45,7 @@ public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
 
 @available(SwiftStdlib 6.2, *)
 extension DispatchMainExecutor: SerialExecutor {
+
   public func enqueue(_ job: consuming ExecutorJob) {
     _dispatchEnqueueMain(UnownedJob(job))
   }
@@ -112,6 +115,9 @@ extension DispatchMainExecutor: MainExecutor {}
 
 @available(SwiftStdlib 6.2, *)
 public class DispatchTaskExecutor: TaskExecutor, @unchecked Sendable {
+
+  public init() {}
+
   public func enqueue(_ job: consuming ExecutorJob) {
     _dispatchEnqueueGlobal(UnownedJob(job))
   }

@@ -24,6 +24,7 @@ import Swift
 @_silgen_name("swift_task_asyncMainDrainQueueImpl")
 internal func drainMainQueue() {
   try! MainActor.executor.run()
+  _exit(result: 0)
 }
 
 @available(SwiftStdlib 6.2, *)

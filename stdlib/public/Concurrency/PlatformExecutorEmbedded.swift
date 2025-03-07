@@ -12,12 +12,18 @@
 
 import Swift
 
-// ###TODO: Flesh this file out
+@available(SwiftStdlib 6.2, *)
+public struct PlatformExecutorFactory: ExecutorFactory {
+  public static let mainExecutor: any MainExecutor = EmbeddedMainExecutor()
+  public static let defaultExecutor: any TaskExecutor = EmbeddedDefaultExecutor()
+}
 
 // .. Platform Main Executor ...................................................
 
 @available(SwiftStdlib 6.2, *)
-public final class PlatformMainExecutor: MainExecutor, @unchecked Sendable {
+public final class EmbeddedMainExecutor: MainExecutor, @unchecked Sendable {
+
+  public init() {}
 
   public func enqueue(_ job: consuming ExecutorJob) {
   }
@@ -51,7 +57,9 @@ public final class PlatformMainExecutor: MainExecutor, @unchecked Sendable {
 // .. Platform Task Executor ...................................................
 
 @available(SwiftStdlib 6.2, *)
-public final class PlatformDefaultExecutor: TaskExecutor, @unchecked Sendable {
+public final class EmbeddedDefaultExecutor: TaskExecutor, @unchecked Sendable {
+
+  public init() {}
 
   public func enqueue(_ job: consuming ExecutorJob) {
   }
