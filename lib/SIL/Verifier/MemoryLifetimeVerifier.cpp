@@ -732,11 +732,15 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::InjectEnumAddrInst: {
         auto *IEAI = cast<InjectEnumAddrInst>(&I);
         int enumIdx = locations.getLocationIdx(IEAI->getOperand());
-        if (enumIdx >= 0 && injectsNoPayloadCase(IEAI)) {
-          // Again, an injected no-payload case is treated like a "full"
-          // initialization. See initDataflowInBlock().
-          requireBitsClear(bits & nonTrivialLocations, IEAI->getOperand(), &I);
-          locations.setBits(bits, IEAI->getOperand());
+        if (enumIdx >= 0) {
+          if (injectsNoPayloadCase(IEAI)) {
+            // Again, an injected no-payload case is treated like a "full"
+            // initialization. See initDataflowInBlock().
+            requireBitsClear(bits & nonTrivialLocations, IEAI->getOperand(), &I);
+            locations.setBits(bits, IEAI->getOperand());
+          } else {
+            requireBitsSet(bits, IEAI->getOperand(), &I);
+          }
         }
         requireNoStoreBorrowLocation(IEAI->getOperand(), &I);
         break;
