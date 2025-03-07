@@ -72,23 +72,6 @@ import Swift
 %          'ThrowingTaskGroup',
 %        ],
 %        [
-%          '@available(SwiftStdlib 5.7, *)',
-%          '@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")',
-%        ],
-%        ['addTask', 'addTaskUnlessCancelled'],
-%        [
-%          'priority: TaskPriority? = nil',
-%          # throws and ChildTaskResult will be adjusted per task group type
-%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
-%        ],
-%      ),
-%      (
-%        'SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY',
-%        [
-%          'TaskGroup',
-%          'ThrowingTaskGroup',
-%        ],
-%        [
 %          '// version for task to thread model, without priority parameter',
 %        ],
 %        ['addTask', 'addTaskUnlessCancelled'],
