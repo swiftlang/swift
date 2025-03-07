@@ -3233,6 +3233,10 @@ if (-not $SkipBuild) {
     # Build platform: SDK, Redist and XCTest
     Invoke-BuildStep Build-Runtime Android $Arch
     Invoke-BuildStep Build-Dispatch Android $Arch
+
+    # FIXME
+    Get-ChildItem -Path $AndroidX64.SDKInstallRoot -Filter "*.swiftinterface" -Recurse | Remove-Item -Force
+
     Invoke-BuildStep Build-Foundation Android $Arch
     Invoke-BuildStep Build-Sanitizers Android $Arch
     Invoke-BuildStep Build-XCTest Android $Arch
