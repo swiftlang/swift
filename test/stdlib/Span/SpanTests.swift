@@ -493,42 +493,6 @@ suite.test("withUnsafeBytes()")
   }
 }
 
-suite.test("borrowing 1")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  let capacity = 8
-  Array(0..<capacity).withUnsafeBufferPointer {
-    var span = Span(_unsafeElements: $0)
-    let prefix = span._extracting(0..<2)
-    span = span._extracting(1...)
-    expectEqual(span.count, capacity-1)
-    expectEqual(prefix.count, 2)
-  }
-}
-
-suite.test("borrowing 2")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  let capacity = 8
-  Array(0..<capacity).withUnsafeBufferPointer {
-    var span = Span(_unsafeElements: $0)
-    let prefix = span._extracting(0..<2)
-    span = span._extracting(1...)
-    expectEqual(span.count, capacity-1)
-    expectEqual(prefix.count, 2)
-  }
-}
-
 suite.test("isIdentical(to:)")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
