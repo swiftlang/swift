@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_debug.swift -experimental-serialize-debug-info -O -g
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_debug.swift -O -g
 // RUN: llvm-bcanalyzer %t/def_debug.swiftmodule | %FileCheck %s --check-prefix=SIL
 // RUN: %target-swift-frontend -module-name debug -g -emit-sil -I %t %s -O | %FileCheck %s --dump-input=fail
 // RUN: %target-swift-frontend -module-name debug -g -emit-sil -I %t %s | %FileCheck %s --check-prefix=NOOPT --dump-input=fail
@@ -37,3 +37,13 @@ func fooId() {
      */
     let _ = id(1)
 }
+
+// Some functions have debug scopes attached before deserialization, with the
+// SILLocation pointing to an AST node. This AST node is used to retrieve the
+// Decl to perform various checks such as whether the function has opaque
+// ResultType with Availability Conditions. For such functions, make sure we
+// don't overwrite the location with a FilenameAndLocation
+public func test() {
+  let p = testInlineWithOpaque()
+}
+

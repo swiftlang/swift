@@ -62,7 +62,7 @@ func forceHasMemberwiseInit() {
 // CHECK-NOT: return
 // CHECK: function_ref @$sSb22_builtinBooleanLiteralSbBi1__tcfC : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
 // CHECK-NOT: return
-// CHECK: function_ref @$s17property_wrappers7WrapperV5valueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0> // user: %9
+// CHECK: function_ref @$s17property_wrappers7WrapperV5valueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>, loc {{.*}}, scope {{.*}} // user: %9
 // CHECK: return {{%.*}} : $Wrapper<Bool>
 
 // variable initialization expression of HasMemberwiseInit.$y

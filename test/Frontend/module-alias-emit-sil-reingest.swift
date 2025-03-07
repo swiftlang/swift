@@ -30,9 +30,9 @@
 // CHECK: sil @$s4main5drink3Tea4MildVSgyF : $@convention(thin) () -> Optional<Mild> {
 // CHECK: bb0:
 // CHECK: // function_ref brew()
-// CHECK:   %0 = function_ref @$s3Tea4brewAA4MildVSgyF : $@convention(thin) () -> Optional<Mild> // user: %1
-// CHECK:   %1 = apply %0() : $@convention(thin) () -> Optional<Mild> // user: %2
-// CHECK:   return %1 : $Optional<Mild>                     // id: %2
+// CHECK:   %0 = function_ref @$s3Tea4brewAA4MildVSgyF : $@convention(thin) () -> Optional<Mild>, loc {{.*}}, scope {{.*}} // user: %1
+// CHECK:   %1 = apply %0() : $@convention(thin) () -> Optional<Mild>, loc {{.*}}, scope {{.*}} // user: %2
+// CHECK:   return %1 : $Optional<Mild>, loc {{.*}}, scope {{.*}}                     // id: %2
 // CHECK: } // end sil function '$s4main5drink3Tea4MildVSgyF'
 
 // CHECK: // brew()

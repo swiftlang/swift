@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -module-name=test -emit-sil -disable-experimental-serialize-debug-info | %FileCheck %s
 
 // Also do an end-to-end test to check if the generated code is correct.
 // RUN: %empty-directory(%t) 

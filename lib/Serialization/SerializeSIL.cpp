@@ -270,6 +270,7 @@ namespace {
 
     bool ShouldSerializeAll;
     bool SerializeDebugInfoSIL;
+    const PathRemapper &DebuggingOptionsPrefixMap;
 
     void addMandatorySILFunction(const SILFunction *F,
                                  bool emitDeclarationsForOnoneSupport);
@@ -346,9 +347,9 @@ namespace {
 
   public:
     SILSerializer(Serializer &S, llvm::BitstreamWriter &Out, bool serializeAll,
-                  bool serializeDebugInfo)
+                  bool serializeDebugInfo, const PathRemapper &DebuggingOptionsPrefixMap)
         : S(S), Out(Out), ShouldSerializeAll(serializeAll),
-          SerializeDebugInfoSIL(serializeDebugInfo) {}
+          SerializeDebugInfoSIL(serializeDebugInfo), DebuggingOptionsPrefixMap(DebuggingOptionsPrefixMap) {}
 
     void writeSILModule(const SILModule *SILMod);
   };
@@ -1027,7 +1028,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         if (Loc.isValid()) {
           attrs |= 1 << 9;
           auto LC = SM.getPresumedLineAndColumnForLoc(Loc);
-          auto FName = SM.getDisplayNameForLoc(Loc);
+          auto FName = DebuggingOptionsPrefixMap.remapPath(SM.getDisplayNameForLoc(Loc));
           auto FNameID = S.addUniquedStringRef(FName);
 
           ListOfValues.push_back(LC.first);
@@ -1040,7 +1041,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
           auto FNameLoc = RawLoc.getFilenameAndLocation();
           ListOfValues.push_back(FNameLoc->line);
           ListOfValues.push_back(FNameLoc->column);
-          ListOfValues.push_back(S.addUniquedStringRef(FNameLoc->filename));
+          ListOfValues.push_back(S.addUniquedStringRef(DebuggingOptionsPrefixMap.remapPath(FNameLoc->filename)));
         }
       }
 
@@ -3233,7 +3234,7 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
   }
 
   std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
-  FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
+  FNameID = S.addUniquedStringRef(DebuggingOptionsPrefixMap.remapPath(SM.getDisplayNameForLoc(SLoc)));
   SourceLocMap.insert({OpaquePtr, SourceLocMap.size() + 1});
   SourceLocLayout::emitRecord(Out, ScratchRecord,
                               SILAbbrCodes[SourceLocLayout::Code], Row, Column,
@@ -3291,14 +3292,14 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
   // TODO: we can emit SourceLocRef here
   if (SLoc.isValid()) {
     std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
-    FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
+    FNameID = S.addUniquedStringRef(DebuggingOptionsPrefixMap.remapPath(SM.getDisplayNameForLoc(SLoc)));
   } else if (Scope->Loc.isFilenameAndLocation()) {
     // getSourceLoc produces an empty SourceLoc for FilenameAndLocation, so
     // this needs to be handled separately. rdar://25225083.
     auto FNameLoc = Scope->Loc.getFilenameAndLocation();
     Row = FNameLoc->line;
     Column = FNameLoc->column;
-    FNameID = S.addUniquedStringRef(FNameLoc->filename);
+    FNameID = S.addUniquedStringRef(DebuggingOptionsPrefixMap.remapPath(FNameLoc->filename));
   }
 
   DebugScopeMap.insert({Scope, DebugScopeMap.size() + 1});
@@ -3667,7 +3668,11 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     }
   }
 
-  for (auto Fn : FuncsToEmitDebug) {
+  SmallVector<const SILFunction *> FuncsToEmitDebugSorted(FuncsToEmitDebug.begin(), FuncsToEmitDebug.end());
+  llvm::sort(FuncsToEmitDebugSorted, [](const SILFunction *lhs, const SILFunction *rhs) {
+      return lhs->getName() <= rhs->getName();
+      });
+  for (auto Fn : FuncsToEmitDebugSorted) {
     if (FuncsToEmit.count(Fn) == 0) {
       FuncsToEmit[Fn] = true; // emit decl only
       functionWorklist.push_back(Fn);
@@ -3694,6 +3699,6 @@ void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL,
   if (!SILMod)
     return;
 
-  SILSerializer SILSer(*this, Out, serializeAllSIL, serializeDebugInfo);
+  SILSerializer SILSer(*this, Out, serializeAllSIL, serializeDebugInfo, Options.DebuggingOptionsPrefixMap);
   SILSer.writeSILModule(SILMod);
 }

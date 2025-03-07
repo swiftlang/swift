@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-swift-5.9-abi-triple %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-swift-5.9-abi-triple %s -disable-experimental-serialize-debug-info | %FileCheck %s
 
 
 

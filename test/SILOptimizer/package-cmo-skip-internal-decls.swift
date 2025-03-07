@@ -5,7 +5,7 @@
 // RUN: -module-name=Lib -package-name Pkg \
 // RUN: -parse-as-library -emit-module -emit-module-path %t/Lib.swiftmodule -I%t \
 // RUN: -Xfrontend -experimental-package-cmo -Xfrontend -experimental-allow-non-resilient-access \
-// RUN: -O -wmo -enable-library-evolution
+// RUN: -O -wmo -enable-library-evolution -Xfrontend -disable-experimental-serialize-debug-info
 // RUN: %target-sil-opt -sil-print-types %t/Lib.swiftmodule -sil-verify-all -o %t/Lib.sil
 
 // RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -Xllvm -sil-print-types -emit-sil -O %t/main.swift -o %t/Main.sil
@@ -18,7 +18,7 @@
 // RUN: -module-name=Lib -package-name Pkg \
 // RUN: -parse-as-library -emit-module -emit-module-path %t/Lib.swiftmodule -I%t \
 // RUN: -Xfrontend -package-cmo -Xfrontend -allow-non-resilient-access \
-// RUN: -O -wmo -enable-library-evolution
+// RUN: -O -wmo -enable-library-evolution -Xfrontend -disable-experimental-serialize-debug-info
 // RUN: %target-sil-opt -sil-print-types %t/Lib.swiftmodule -sil-verify-all -o %t/Lib2.sil
 // RUN: %FileCheck %s --check-prefixes=CHECK < %t/Lib2.sil
 

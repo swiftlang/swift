@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -disable-experimental-serialize-debug-info | %FileCheck %s
 
 enum MyError: Error {
   case fail

@@ -165,7 +165,7 @@ public final class FinalDerived : Base<Int> {
 
 // CHECK-LABEL: sil private [thunk] [ossa] @$s17vtables_multifile12FinalDerivedC14privateMethod3yySiSgFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyySiFTV : $@convention(method) (Int, @guaranteed FinalDerived) -> () {
 // CHECK: bb0(%0 : $Int, %1 : @guaranteed $FinalDerived):
-// CHECK-NEXT:  [[ARG:%.*]] = enum $Optional<Int>, #Optional.some!enumelt, %0 : $Int // user: %4
+// CHECK-NEXT:  [[ARG:%.*]] = enum $Optional<Int>, #Optional.some!enumelt, %0 : $Int, loc {{.*}}, scope {{.*}} // user: %4
 // CHECK:       [[METHOD:%.*]] = function_ref @$s17vtables_multifile12FinalDerivedC14privateMethod3yySiSgF : $@convention(method) (Optional<Int>, @guaranteed FinalDerived) -> ()
 // CHECK-NEXT:  apply [[METHOD]]([[ARG]], %1) : $@convention(method) (Optional<Int>, @guaranteed FinalDerived) -> ()
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()

@@ -68,8 +68,8 @@ func localCompareExchange() -> (exchanged: Bool, original: Int) {
 //===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: sil {{.*}} @deadAtomic {{.*}} {
-// CHECK:         %0 = tuple ()
-// CHECK-NEXT:    return %0 : $()
+// CHECK:         %[[TUP:.*]] = tuple ()
+// CHECK-NEXT:    return %[[TUP]] : $()
 // CHECK-LABEL: } // end sil function 'deadAtomic'
 @_silgen_name("deadAtomic")
 func deadAtomic() {

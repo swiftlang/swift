@@ -18,6 +18,6 @@ doSomething2()
 
 // OPT: sil @$ss1AVABycfC
 
-// OPT: sil [noinline] @$ss12doSomething3yyxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (){{$}}
+// OPT: sil [noinline] @$ss12doSomething3yyxlF : $@convention(thin) <T> (@in_guaranteed T) -> (){{$}}
 
 callDoSomething3()

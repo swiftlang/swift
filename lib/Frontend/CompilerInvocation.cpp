@@ -2931,6 +2931,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.PrintDebugInfo = true;
   }
 
+  if (!FEOpts.DisableSerializeDebugInfoSIL)
+    Opts.PrintDebugInfo = true;
+
   if (Args.hasArg(OPT_legacy_gsil))
     llvm::WithColor::warning() << "'-gsil' is deprecated, "
                                << "use '-sil-based-debuginfo' instead\n";
