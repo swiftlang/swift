@@ -63,4 +63,11 @@ CxxConstructorTestSuite.test("implicit default ctor") {
   expectNil(instance3.ptr)
 }
 
+CxxConstructorTestSuite.test("MoveConstructorWithOneParamWithDefaultArg") {
+  let instance1 = MoveConstructorWithOneParameterWithDefaultArg(5)
+  let instance2 = instance1
+  let instance3 = MoveConstructorWithOneParameterWithDefaultArg(5)
+  expectTrue(instance2.value + instance3.value >= 10)
+}
+
 runAllTests()

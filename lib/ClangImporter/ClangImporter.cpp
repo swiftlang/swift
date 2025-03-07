@@ -8010,14 +8010,6 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
-static bool hasNonFirstDefaultArg(const clang::CXXConstructorDecl *ctor) {
-  if (ctor->getNumParams() < 2)
-    return false;
-
-  auto lastParam = ctor->parameters().back();
-  return lastParam->hasDefaultArg();
-}
-
 /// Checks if a record provides the required value type lifetime operations
 /// (copy and destroy).
 static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
@@ -8034,7 +8026,8 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
   // struct.
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
     return ctor->isCopyConstructor() && !ctor->isDeleted() &&
-           !hasNonFirstDefaultArg(ctor) &&
+           // FIXME: Support default arguments (rdar://142414553)
+           ctor->getNumParams() == 1 &&
            ctor->getAccess() == clang::AccessSpecifier::AS_public;
   });
 }
@@ -8050,7 +8043,9 @@ static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
     return false;
 
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-    return ctor->isMoveConstructor();
+    return ctor->isMoveConstructor() &&
+           // FIXME: Support default arguments (rdar://142414553)
+           ctor->getNumParams() == 1;
   });
 }
 
@@ -8067,6 +8062,15 @@ static bool hasDestroyTypeOperations(const clang::CXXRecordDecl *decl) {
 static bool hasCustomCopyOrMoveConstructor(const clang::CXXRecordDecl *decl) {
   return decl->hasUserDeclaredCopyConstructor() ||
          decl->hasUserDeclaredMoveConstructor();
+}
+
+static bool
+hasConstructorWithUnsupportedDefaultArgs(const clang::CXXRecordDecl *decl) {
+  return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+    return (ctor->isCopyConstructor() || ctor->isMoveConstructor()) &&
+           // FIXME: Support default arguments (rdar://142414553)
+           ctor->getNumParams() != 1;
+  });
 }
 
 static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
@@ -8123,6 +8127,9 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
         importerImpl->diagnose(loc, diag::api_pattern_attr_ignored,
                                "import_iterator", decl->getNameAsString());
     }
+
+    if (hasConstructorWithUnsupportedDefaultArgs(cxxDecl))
+      return CxxRecordSemanticsKind::UnavailableConstructors;
 
     return CxxRecordSemanticsKind::MissingLifetimeOperation;
   }

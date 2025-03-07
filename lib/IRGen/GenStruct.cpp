@@ -541,20 +541,14 @@ namespace {
                                   FixedTypeInfo, ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
 
-    bool hasNonFirstDefaultArg(const clang::CXXConstructorDecl *ctor) const {
-      if (ctor->getNumParams() < 2)
-        return false;
-
-      auto lastParam = ctor->parameters().back();
-      return lastParam->hasDefaultArg();
-    }
-
     const clang::CXXConstructorDecl *findCopyConstructor() const {
       const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
       for (auto ctor : cxxRecordDecl->ctors()) {
-        if (ctor->isCopyConstructor() && !hasNonFirstDefaultArg(ctor) &&
+        if (ctor->isCopyConstructor() &&
+            // FIXME: Support default arguments (rdar://142414553)
+            ctor->getNumParams() == 1 &&
             ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
           return ctor;
       }
@@ -567,6 +561,8 @@ namespace {
         return nullptr;
       for (auto ctor : cxxRecordDecl->ctors()) {
         if (ctor->isMoveConstructor() &&
+            // FIXME: Support default arguments (rdar://142414553)
+            ctor->getNumParams() == 1 &&
             ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
           return ctor;
       }
