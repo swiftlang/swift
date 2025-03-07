@@ -472,6 +472,8 @@ extension RawSpan {
   /// during the execution of `withUnsafeBytes(_:)`.
   /// Do not store or return the pointer for later use.
   ///
+  /// Note: For an empty `RawSpan`, the closure always receives a `nil` pointer.
+  ///
   /// - Parameter body: A closure with an `UnsafeRawBufferPointer`
   ///   parameter that points to the viewed contiguous storage.
   ///   If `body` has a return value, that value is also

@@ -622,6 +622,8 @@ extension Span where Element: ~Copyable  {
   /// during the execution of `withUnsafeBufferPointer(_:)`.
   /// Do not store or return the pointer for later use.
   ///
+  /// Note: For an empty `Span`, the closure always receives a `nil` pointer.
+  ///
   /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter
   ///   that points to the viewed contiguous storage. If `body` has
   ///   a return value, that value is also used as the return value
@@ -653,6 +655,8 @@ extension Span where Element: BitwiseCopyable {
   /// The buffer pointer passed as an argument to `body` is valid only
   /// during the execution of `withUnsafeBytes(_:)`.
   /// Do not store or return the pointer for later use.
+  ///
+  /// Note: For an empty `Span`, the closure always receives a `nil` pointer.
   ///
   /// - Parameter body: A closure with an `UnsafeRawBufferPointer`
   ///   parameter that points to the viewed contiguous storage.
