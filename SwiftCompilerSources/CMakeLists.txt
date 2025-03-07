@@ -187,7 +187,8 @@ function(add_swift_compiler_modules_library name)
     # The STL in VS 17.10 requires Clang 17 or higher, but bootstrapping generally uses toolchains with older versions
     # versions of Clang. Swift 6 toolchains are the first to include Clang 17, so if we are on Windows and using an
     # earlier toolchain, we need to relax to relax this requirement with ALLOW_COMPILER_AND_STL_VERSION_MISMATCH.
-    if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 6.0)
+    # MSVC 14.43 requires Clang 18 or higher, which is currently not available in any Swift toolchain.
+    if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 6.0 OR MSVC_VERSION VERSION_GREATER_EQUAL 1943)
       list(APPEND swift_compile_options "-Xcc" "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH")
     endif()
 
