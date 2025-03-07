@@ -1715,6 +1715,13 @@ bool WitnessChecker::findBestWitness(
         continue;
 
       if (!isBetterMatch(DC, requirement, matches[bestIdx], matches[i])) {
+        LLVM_DEBUG({
+          llvm::dbgs() << "Ambiguous witnesses:\n";
+          matches[bestIdx].Witness->dumpRef(llvm::dbgs());
+          llvm::dbgs() << "\n";
+          matches[i].Witness->dumpRef(llvm::dbgs());
+          llvm::dbgs() << "\n";
+        });
         isReallyBest = false;
         break;
       }
