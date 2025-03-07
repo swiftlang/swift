@@ -3235,7 +3235,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Dispatch Android $Arch
 
     # FIXME
-    Get-ChildItem -Path $AndroidX64.SDKInstallRoot -Filter "*.swiftinterface" -Recurse | Remove-Item -Force
+    Get-ChildItem -Path "$(Get-TargetProjectBinaryCache $Arch Runtime)\lib\swift" -Filter "*.swiftinterface" -Recurse
 
     Invoke-BuildStep Build-Foundation Android $Arch
     Invoke-BuildStep Build-Sanitizers Android $Arch
