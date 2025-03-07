@@ -943,6 +943,13 @@ if (NOT BOOTSTRAPPING_MODE)
   message(FATAL_ERROR "turning off bootstrapping is not supported anymore")
 endif()
 
+endif()
+
+# Disable bootstrapping when we aren't building SwiftSyntax
+if(NOT SWIFT_BUILD_SWIFT_SYNTAX)
+  set(BOOTSTRAPPING_MODE "OFF")
+endif()
+
 set(SWIFT_RUNTIME_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin")
 set(SWIFT_LIBRARY_OUTPUT_INTDIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")

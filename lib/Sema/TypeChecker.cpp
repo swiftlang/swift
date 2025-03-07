@@ -755,6 +755,7 @@ std::pair<bool, bool> EvaluateIfConditionRequest::evaluate(
     Evaluator &evaluator, SourceFile *sourceFile, SourceRange conditionRange,
     bool shouldEvaluate
 ) const {
+#if SWIFT_BUILD_SWIFT_SYNTAX
   // FIXME: When we migrate to SwiftParser, use the parsed syntax tree.
   ASTContext &ctx = sourceFile->getASTContext();
   auto &sourceMgr = ctx.SourceMgr;
@@ -775,4 +776,7 @@ std::pair<bool, bool> EvaluateIfConditionRequest::evaluate(
   bool isActive = (evalResult & 0x01) != 0;
   bool allowSyntaxErrors = (evalResult & 0x02) != 0;
   return std::pair(isActive, allowSyntaxErrors);
+#else
+  llvm_unreachable("Must not be used in C++-only build");
+#endif
 }

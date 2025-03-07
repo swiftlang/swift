@@ -3474,6 +3474,20 @@ ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
   if (!macroNameRef)
     return status;
 
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+  // If we don't have swift-syntax and therefore have no support for macros,
+  // recognize #isolation as special and route it through
+  // CurrentContextIsolationExpr.
+  if (macroNameRef.getBaseName().userFacingName() == "isolation" &&
+      genericArgs.empty() &&
+      (!argList || argList->empty())) {
+    return makeParserResult(
+      status,
+      new (Context) CurrentContextIsolationExpr(
+          macroNameLoc.getStartLoc(), Type()));
+  }
+#endif
+
   return makeParserResult(
       status,
       MacroExpansionExpr::create(

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !$Embedded
+#if !$Embedded && hasFeature(Macros)
 @DebugDescription
 extension ObjectIdentifier {
   var lldbDescription: String {

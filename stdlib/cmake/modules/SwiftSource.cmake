@@ -886,8 +886,11 @@ function(_compile_swift_files
     # cross-compiling the compiler.
     list(APPEND swift_compiler_tool_dep "swift-frontend${target_suffix}")
 
-    # If we aren't cross compiling, also depend on SwiftMacros.
-    list(APPEND swift_compiler_tool_dep SwiftMacros)
+    # If we aren't cross compiling and have swift-syntax, also depend on
+    # SwiftMacros.
+    if(SWIFT_BUILD_SWIFT_SYNTAX)
+      list(APPEND swift_compiler_tool_dep SwiftMacros)
+    endif()
   endif()
 
   # If there are more than one output files, we assume that they are specified
