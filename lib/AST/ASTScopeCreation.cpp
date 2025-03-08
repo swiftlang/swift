@@ -309,13 +309,22 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
       break;
     }
     case MacroRole::Body: {
-      // Use the end location of the function decl itself as the parentLoc
-      // for the new function body scope. This is different from the end
-      // location of the original source range, which is after the end of the
-      // function decl.
       auto expansion = SF->getMacroExpansion();
-      parentLoc = expansion.getEndLoc();
-      bodyForDecl = cast<AbstractFunctionDecl>(expansion.get<Decl *>());
+      if (expansion.is<Decl *>()) {
+        // Use the end location of the function decl itself as the parentLoc
+        // for the new function body scope. This is different from the end
+        // location of the original source range, which is after the end of the
+        // function decl.
+        bodyForDecl = cast<AbstractFunctionDecl>(expansion.get<Decl *>());
+        parentLoc = expansion.getEndLoc();
+        break;
+      }
+
+      // Otherwise, we have a closure body macro.
+      auto insertionRange = SF->getMacroInsertionRange();
+      parentLoc = insertionRange.End;
+      if (insertionRange.Start != insertionRange.End)
+        parentLoc = parentLoc.getAdvancedLoc(-1);
       break;
     }
     }

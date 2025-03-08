@@ -18,6 +18,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
@@ -2016,6 +2017,29 @@ BraceStmt * AbstractClosureExpr::getBody() const {
   llvm_unreachable("Unknown closure expression");
 }
 
+BraceStmt *ClosureExpr::getExpandedBody() {
+  auto &ctx = getASTContext();
+
+  // Expand a body macro, if there is one.
+  BraceStmt *macroExpandedBody = nullptr;
+  if (auto bufferID = evaluateOrDefault(
+          ctx.evaluator,
+          ExpandBodyMacroRequest{this},
+          std::nullopt)) {
+    CharSourceRange bufferRange = ctx.SourceMgr.getRangeForBuffer(*bufferID);
+    auto bufferStart = bufferRange.getStart();
+    auto module = getParentModule();
+    auto macroSourceFile = module->getSourceFileContainingLocation(bufferStart);
+
+    if (macroSourceFile->getTopLevelItems().size() == 1) {
+      auto stmt = macroSourceFile->getTopLevelItems()[0].dyn_cast<Stmt *>();
+      macroExpandedBody = dyn_cast<BraceStmt>(stmt);
+    }
+  }
+
+  return macroExpandedBody;
+}
+
 bool AbstractClosureExpr::bodyHasExplicitReturnStmt() const {
   return AnyFunctionRef(const_cast<AbstractClosureExpr *>(this))
       .bodyHasExplicitReturnStmt();
@@ -2173,6 +2197,17 @@ void ClosureExpr::setExplicitResultType(Type ty) {
   assert(ty && !ty->hasTypeVariable() && !ty->hasPlaceholder());
   ExplicitResultTypeAndBodyState.getPointer()
       ->setType(MetatypeType::get(ty));
+}
+
+MacroDecl *
+ClosureExpr::getResolvedMacro(CustomAttr *customAttr) {
+  auto &ctx = getASTContext();
+  auto declRef = evaluateOrDefault(
+      ctx.evaluator,
+      ResolveMacroRequest{customAttr, this},
+      ConcreteDeclRef());
+
+  return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
