@@ -214,6 +214,7 @@ split_embedded_sources(
   EMBEDDED UTF32.swift
   EMBEDDED UTF8Span.swift
   EMBEDDED UTF8SpanBits.swift
+  EMBEDDED UTF8SpanComparisons.swift
   EMBEDDED UTF8SpanFundamentals.swift
   EMBEDDED UTF8SpanInternalHelpers.swift
   EMBEDDED UTF8SpanIterators.swift

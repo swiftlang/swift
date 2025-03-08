@@ -56,6 +56,71 @@ if #available(SwiftStdlib 6.1, *) {
       }
     }
   }
+
+  suite.test("UTF8Span/Sequence equal") {
+    // // A string and its canonical equivalent
+    // let testCases: [(String, String?)] = [
+    //   ("abdefg", nil)
+    //   ("café", "cafe\u{301}")
+    // ]
+  }
+
+  suite.test("UTF8Span/canonical equivalence") {
+    // TODO: refactor to be test-case declaration driven, and add more tests...
+
+    let precomposedStr = "café"
+    let decomposedStr = "cafe\u{301}"
+
+    let precomposed = Array(precomposedStr.utf8)
+    let decomposed = Array(decomposedStr.utf8)
+
+    precomposed.withSpan { pre in
+      let utf8Precomposed = try! UTF8Span(validating: pre)
+      decomposed.withSpan { de in
+        let utf8Decomposed = try! UTF8Span(validating: de)
+
+        // print("scalars for \(precomposedStr.unicodeScalars)")
+        // var preScalars = utf8Precomposed.makeUnicodeScalarIterator()
+        // while let s = preScalars.next() {
+        //   print(s)
+        // }
+
+        // print("scalars for \(decomposedStr.unicodeScalars)")
+        // var deScalars = utf8Decomposed.makeUnicodeScalarIterator()
+        // while let s = deScalars.next() {
+        //   print(s)
+        // }
+        
+        expectTrue(utf8Precomposed.isCanonicallyEquivalent(to: utf8Decomposed))
+
+        expectTrue(utf8Precomposed.bytesEqual(to: precomposedStr.utf8))
+        expectFalse(utf8Precomposed.bytesEqual(to: decomposedStr.utf8))
+
+        expectTrue(utf8Decomposed.bytesEqual(to: decomposedStr.utf8))
+        expectFalse(utf8Decomposed.bytesEqual(to: precomposedStr.utf8))
+
+        expectTrue(utf8Precomposed.unicodeScalarsEqual(to: precomposedStr.unicodeScalars))
+        expectFalse(utf8Precomposed.unicodeScalarsEqual(to: decomposedStr.unicodeScalars))
+
+        expectTrue(utf8Decomposed.unicodeScalarsEqual(to: decomposedStr.unicodeScalars))
+        expectFalse(utf8Decomposed.unicodeScalarsEqual(to: precomposedStr.unicodeScalars))
+
+        expectTrue(utf8Precomposed.charactersEqual(to: precomposedStr.characters))
+        expectTrue(utf8Precomposed.charactersEqual(to: decomposedStr.characters))
+
+        expectTrue(utf8Decomposed.charactersEqual(to: decomposedStr.characters))
+        expectTrue(utf8Decomposed.charactersEqual(to: precomposedStr.characters))
+
+
+
+      }
+
+    }
+
+
+  }
+
+
 }
 
 // TODO: Rest of this file is in-progress TODOs

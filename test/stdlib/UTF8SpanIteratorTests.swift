@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift(-enable-experimental-feature Span) -enable-experimental-feature Span %S/Inputs/
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature LifetimeDependence) -enable-experimental-feature Span %S/Inputs/
 
 // REQUIRES: executable_test
 
@@ -119,7 +119,7 @@ if #available(SwiftStdlib 6.1, *) {
       file: String = #file,
       line: UInt = #line
     ) {
-      print("testing: \(s)")
+      // print("testing: \(s)")
       let t = ContentEquivalenceTestCase(
         str: s, loc: .init(SourceLoc(file, line)))
       t.run()
@@ -135,4 +135,40 @@ if #available(SwiftStdlib 6.1, *) {
     test("")
   }
 }
+
+// @available(SwiftStdlib 6.1, *)
+// extension UTF8Span {
+//   func splitOffASCIIPrefix() -> (UTF8Span, UTF8Span) {
+//     if isKnownASCII {
+//       return (self, .init())
+//     }
+//     var splitPoint = 0
+//     while splitPoint < codeUnits.count && codeUnits[unchecked: split] < 0x80 {
+//       splitPoint += 1
+//     }
+
+//   }
+// }
+
+if #available(SwiftStdlib 6.1, *) {
+  suite.test("UTF8Span/whatever") {
+    // var badURLBytes: [UInt8] = []
+    // badURLBytes.append(contentsOf: "http://servername/scripts/..".utf8)
+
+    // // Invalid overlong encoding of "/"
+    // badURLBytes.append(contentsOf: [0xC0, 0xAF])
+
+    // badURLBytes.append(contentsOf: "../winnt/system32/cmd.exe".utf8)
+
+    // // try! UTF8Span(validating: badURLBytes.span)
+
+    // badURLBytes.withSpan {
+    //   try! UTF8Span(validating: $0)
+    // }
+
+
+
+  }
+}
+
 
