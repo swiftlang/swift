@@ -549,7 +549,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::
     (void)foundArgs;
 
     // Use the actual source loc of the
-    auto remark = RemarkMissed("memory", *uccai)
+    auto remark = RemarkAnalysis("memory", *uccai)
                   << "unconditional runtime cast of value with type '"
                   << NV("ValueType", uccai->getSrc()->getType()) << "' to '"
                   << NV("CastType", uccai->getDest()->getType()) << "'";
@@ -571,7 +571,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::
     (void)foundArgs;
 
     // Use the actual source loc of the
-    auto remark = RemarkMissed("memory", *ccabi)
+    auto remark = RemarkAnalysis("memory", *ccabi)
                   << "conditional runtime cast of value with type '"
                   << NV("ValueType", ccabi->getSrc()->getType()) << "' to '"
                   << NV("CastType", ccabi->getDest()->getType()) << "'";
@@ -594,7 +594,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitBeginAccessInst(
 
     // Use the actual source loc of the
     auto remark =
-        RemarkMissed("memory", *bai, SourceLocInferenceBehavior::ForwardScan)
+        RemarkAnalysis("memory", *bai, SourceLocInferenceBehavior::ForwardScan)
         << "begin exclusive access to value of type '"
         << NV("ValueType", bai->getOperand()->getType()) << "'";
     for (auto arg : inferredArgs) {
@@ -618,7 +618,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitEndAccessInst(
     // Use the actual source loc of the begin_access if it works. Otherwise,
     // scan backwards.
     auto remark =
-        RemarkMissed("memory", *eai,
+        RemarkAnalysis("memory", *eai,
                      SourceLocInferenceBehavior::BackwardThenForwardAlwaysInfer,
                      SourceLocPresentationKind::EndRange)
         << "end exclusive access to value of type '"
@@ -641,7 +641,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitStrongRetainInst(
 
     // Retains begin a lifetime scope so we infer scan forward.
     auto remark =
-        RemarkMissed("memory", *sri,
+        RemarkAnalysis("memory", *sri,
                      SourceLocInferenceBehavior::ForwardScanAlwaysInfer)
         << "retain of type '" << NV("ValueType", sri->getOperand()->getType())
         << "'";
@@ -663,7 +663,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitStrongReleaseInst(
     (void)foundArgs;
 
     auto remark =
-        RemarkMissed("memory", *sri,
+        RemarkAnalysis("memory", *sri,
                      SourceLocInferenceBehavior::BackwardThenForwardAlwaysInfer,
                      SourceLocPresentationKind::EndRange)
         << "release of type '" << NV("ValueType", sri->getOperand()->getType())
@@ -685,7 +685,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitRetainValueInst(
     (void)foundArgs;
     // Retains begin a lifetime scope, so we infer scan forwards.
     auto remark =
-        RemarkMissed("memory", *rvi,
+        RemarkAnalysis("memory", *rvi,
                      SourceLocInferenceBehavior::ForwardScanAlwaysInfer)
         << "retain of type '" << NV("ValueType", rvi->getOperand()->getType())
         << "'";
@@ -707,7 +707,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitReleaseValueInst(
 
     // Releases end a lifetime scope so we infer scan backward.
     auto remark =
-        RemarkMissed("memory", *rvi,
+        RemarkAnalysis("memory", *rvi,
                      SourceLocInferenceBehavior::BackwardThenForwardAlwaysInfer)
         << "release of type '" << NV("ValueType", rvi->getOperand()->getType())
         << "'";
@@ -728,7 +728,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocRefInstBase(
           valueToDeclInferrer.infer(ArgumentKeyKind::Note, ari, inferredArgs);
       (void)foundArgs;
       auto resultRemark =
-          RemarkPassed("memory", *ari, SourceLocInferenceBehavior::ForwardScan)
+          RemarkAnalysis("memory", *ari, SourceLocInferenceBehavior::ForwardScan)
           << "stack allocated ref of type '" << NV("ValueType", ari->getType())
           << "'";
       for (auto &arg : inferredArgs)
@@ -745,7 +745,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocRefInstBase(
     (void)foundArgs;
 
     auto resultRemark =
-        RemarkMissed("memory", *ari, SourceLocInferenceBehavior::ForwardScan)
+        RemarkAnalysis("memory", *ari, SourceLocInferenceBehavior::ForwardScan)
         << "heap allocated ref of type '" << NV("ValueType", ari->getType())
         << "'";
     for (auto &arg : inferredArgs)
@@ -775,7 +775,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitAllocBoxInst(
     (void)foundArgs;
 
     auto resultRemark =
-        RemarkMissed("memory", *abi, SourceLocInferenceBehavior::ForwardScan)
+        RemarkAnalysis("memory", *abi, SourceLocInferenceBehavior::ForwardScan)
         << "heap allocated box of type '" << NV("ValueType", abi->getType())
         << "'";
     for (auto &arg : inferredArgs)
@@ -801,6 +801,7 @@ class AssemblyVisionRemarkGenerator : public SILFunctionTransform {
     // If we are supposed to emit remarks, always emit.
     if (bool(langOpts.OptimizationRemarkMissedPattern) ||
         bool(langOpts.OptimizationRemarkPassedPattern) ||
+        bool(langOpts.OptimizationRemarkAnalysisPattern) ||
         fn->getModule().getSILRemarkStreamer())
       return true;
 
