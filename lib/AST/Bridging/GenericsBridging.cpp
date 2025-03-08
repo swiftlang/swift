@@ -101,23 +101,22 @@ RequirementRepr BridgedRequirementRepr::unbridged() const {
   case BridgedRequirementReprKindTypeConstraint:
     return RequirementRepr::getTypeConstraint(
         FirstType.unbridged(), SeparatorLoc.unbridged(), SecondType.unbridged(),
-        /*IsExpansionPattern=*/false);
+        IsExpansionPattern);
   case BridgedRequirementReprKindSameType:
     return RequirementRepr::getSameType(
         FirstType.unbridged(), SeparatorLoc.unbridged(), SecondType.unbridged(),
-        /*IsExpansionPattern=*/false);
+        IsExpansionPattern);
   case BridgedRequirementReprKindLayoutConstraint:
     return RequirementRepr::getLayoutConstraint(
         FirstType.unbridged(), SeparatorLoc.unbridged(),
         {LayoutConstraint.unbridged(), LayoutConstraintLoc.unbridged()},
-        /*IsExpansionPattern=*/false);
+        IsExpansionPattern);
   }
 }
 
-BridgedRequirementRepr
-BridgedRequirementRepr_createTypeConstraint(BridgedTypeRepr cSubject,
-                                            BridgedSourceLoc cColonLoc,
-                                            BridgedTypeRepr cConstraint) {
+BridgedRequirementRepr BridgedRequirementRepr_createTypeConstraint(
+    BridgedTypeRepr cSubject, BridgedSourceLoc cColonLoc,
+    BridgedTypeRepr cConstraint, bool isExpansionPattern) {
   return {
       /*SeparatorLoc=*/cColonLoc,
       /*Kind=*/BridgedRequirementReprKindTypeConstraint,
@@ -125,13 +124,13 @@ BridgedRequirementRepr_createTypeConstraint(BridgedTypeRepr cSubject,
       /*SecondType=*/cConstraint.unbridged(),
       /*LayoutConstraint=*/{},
       /*LayoutConstraintLoc=*/{},
+      /*IsExpansionPattern=*/isExpansionPattern,
   };
 }
 
-BridgedRequirementRepr
-BridgedRequirementRepr_createSameType(BridgedTypeRepr cFirstType,
-                                      BridgedSourceLoc cEqualLoc,
-                                      BridgedTypeRepr cSecondType) {
+BridgedRequirementRepr BridgedRequirementRepr_createSameType(
+    BridgedTypeRepr cFirstType, BridgedSourceLoc cEqualLoc,
+    BridgedTypeRepr cSecondType, bool isExpansionPattern) {
   return {
       /*SeparatorLoc=*/cEqualLoc,
       /*Kind=*/BridgedRequirementReprKindSameType,
@@ -139,12 +138,14 @@ BridgedRequirementRepr_createSameType(BridgedTypeRepr cFirstType,
       /*SecondType=*/cSecondType.unbridged(),
       /*LayoutConstraint=*/{},
       /*LayoutConstraintLoc=*/{},
+      /*IsExpansionPattern=*/isExpansionPattern,
   };
 }
 
 BridgedRequirementRepr BridgedRequirementRepr_createLayoutConstraint(
     BridgedTypeRepr cSubject, BridgedSourceLoc cColonLoc,
-    BridgedLayoutConstraint cLayout, BridgedSourceLoc cLayoutLoc) {
+    BridgedLayoutConstraint cLayout, BridgedSourceLoc cLayoutLoc,
+    bool isExpansionPattern) {
   return {
       /*SeparatorLoc=*/cColonLoc,
       /*Kind=*/BridgedRequirementReprKindLayoutConstraint,
@@ -152,6 +153,7 @@ BridgedRequirementRepr BridgedRequirementRepr_createLayoutConstraint(
       /*SecondType=*/nullptr,
       /*LayoutConstraint=*/cLayout,
       /*LayoutConstraintLoc=*/cLayoutLoc,
+      /*IsExpansionPattern=*/isExpansionPattern,
   };
 }
 

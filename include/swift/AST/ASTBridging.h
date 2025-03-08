@@ -2893,29 +2893,27 @@ struct BridgedRequirementRepr {
   BridgedNullableTypeRepr SecondType;
   BridgedLayoutConstraint LayoutConstraint;
   BridgedSourceLoc LayoutConstraintLoc;
-
-  // TODO: bool IsExpansionPattern;
+  bool IsExpansionPattern;
 
   swift::RequirementRepr unbridged() const;
 };
 
-SWIFT_NAME(
-    "BridgedRequirementRepr.createTypeConstraint(subject:colonLoc:constraint:)")
-BridgedRequirementRepr
-BridgedRequirementRepr_createTypeConstraint(BridgedTypeRepr cSubject,
-                                            BridgedSourceLoc cColonLoc,
-                                            BridgedTypeRepr cConstraint);
-SWIFT_NAME(
-    "BridgedRequirementRepr.createSameType(firstType:equalLoc:secondType:)")
-BridgedRequirementRepr
-BridgedRequirementRepr_createSameType(BridgedTypeRepr cFirstType,
-                                      BridgedSourceLoc cEqualLoc,
-                                      BridgedTypeRepr cSecondType);
+SWIFT_NAME("BridgedRequirementRepr.createTypeConstraint(subject:colonLoc:"
+           "constraint:isExpansionPattern:)")
+BridgedRequirementRepr BridgedRequirementRepr_createTypeConstraint(
+    BridgedTypeRepr cSubject, BridgedSourceLoc cColonLoc,
+    BridgedTypeRepr cConstraint, bool isExpansionPattern);
+SWIFT_NAME("BridgedRequirementRepr.createSameType(firstType:equalLoc:"
+           "secondType:isExpansionPattern:)")
+BridgedRequirementRepr BridgedRequirementRepr_createSameType(
+    BridgedTypeRepr cFirstType, BridgedSourceLoc cEqualLoc,
+    BridgedTypeRepr cSecondType, bool isExpansionPattern);
 SWIFT_NAME("BridgedRequirementRepr.createLayoutConstraint(subject:colonLoc:"
-           "layout:layoutLoc:)")
+           "layout:layoutLoc:isExpansionPattern:)")
 BridgedRequirementRepr BridgedRequirementRepr_createLayoutConstraint(
     BridgedTypeRepr cSubject, BridgedSourceLoc cColonLoc,
-    BridgedLayoutConstraint cLayout, BridgedSourceLoc cLayoutLoc);
+    BridgedLayoutConstraint cLayout, BridgedSourceLoc cLayoutLoc,
+    bool isExpansionPattern);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedGenericTypeParamKind : size_t {
   /// A regular generic type parameter: 'T'

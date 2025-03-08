@@ -189,6 +189,10 @@ extension ASTGenVisitor {
         return handle(self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute)
       case .none where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
+      case .none where attrName == "_functionBuilder":
+        // TODO: Diagnostics. '_functionBuilder' is renamed to 'resultBuilder'
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .resultBuilder))
+
 
       // Simple attributes.
       case .addressableSelf,
@@ -1682,7 +1686,7 @@ extension ASTGenVisitor {
           return nil
         }
 
-        guard let moveAsLike = args.isEmpty ? false : generateConsumingMoveAsLike() else {
+        guard let moveAsLike = args.isEmpty ? false : generateConsumingMovesAsLike() else {
           return nil
         }
 
@@ -1711,7 +1715,7 @@ extension ASTGenVisitor {
           return nil
         }
 
-        guard let moveAsLike = args.isEmpty ? false : generateConsumingMoveAsLike() else {
+        guard let moveAsLike = args.isEmpty ? false : generateConsumingMovesAsLike() else {
           return nil
         }
 
@@ -1738,10 +1742,10 @@ extension ASTGenVisitor {
         }
       }
 
-      func generateConsumingMoveAsLike() -> Bool? {
+      func generateConsumingMovesAsLike() -> Bool? {
         self.generateConsumingPlainIdentifierAttrOption(args: &args) {
           switch $0.rawText {
-          case "moveAsLike":
+          case "movesAsLike":
             return true
           default:
             // TODO: Diagnose.
