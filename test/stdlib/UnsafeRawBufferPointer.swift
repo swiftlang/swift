@@ -578,9 +578,7 @@ UnsafeRawBufferPointerTestSuite.test("load.invalid")
 }
 
 UnsafeRawBufferPointerTestSuite.test("load.unaligned")
-.skip(.custom({ // require SwiftStdlib 5.7
-  if #available(SwiftStdlib 5.7, *) { return false } else { return true }
-}, reason: "Requires stdlib from Swift 5.7"))
+.require(.stdlib_5_7)
 .code {
   guard #available(SwiftStdlib 5.7, *) else { return }
   var data: [UInt8] = [0, 0, 0, .max, .max, .max, .max, 0]
@@ -619,10 +617,7 @@ UnsafeRawBufferPointerTestSuite.test("store.after")
 }
 
 UnsafeRawBufferPointerTestSuite.test("store.unaligned")
-.skip(.custom({
-  if #available(SwiftStdlib 5.7, *) { return false }
-  return true
-}, reason: "Requires Swift 5.7's stdlib"))
+.require(.stdlib_5_7)
 .code {
   let count = MemoryLayout<UInt>.stride * 2
   let p1 = UnsafeMutableRawBufferPointer.allocate(
@@ -648,9 +643,7 @@ UnsafeRawBufferPointerTestSuite.test("store.unaligned")
 UnsafeRawBufferPointerTestSuite.test("store.invalid")
 .skip(.custom({ !_isDebugAssertConfiguration() }, // require debugAssert
               reason: "This tests a debug precondition.."))
-.skip(.custom({ // require SwiftStdlib 5.7
-  if #available(SwiftStdlib 5.7, *) { return false } else { return true }
-}, reason: "Requires stdlib from Swift 5.7"))
+.require(.stdlib_5_7)
 .code {
   let t = "Text that is longer than fits in a small String."
   let p1 = UnsafeMutableRawPointer.allocate(
