@@ -14,8 +14,8 @@ protocol P {
 // CHECK-SAME: ptr @"$s20isolated_conformance1XVMn"
 // CHECK-SAME: ptr @"$s20isolated_conformance1XVyxGAA1PAAWP
 // CHECK-SAME: i32 524288
-// CHECK-SAME: @"symbolic ScM"
-// CHECK-SAME: ptr @"got.$sScMs11GlobalActorsMc"
+// CHECK-SAME: symbolic ScM"
+// CHECK-SAME: $sScMs11GlobalActorsMc"
 @MainActor
 struct X<T>: isolated P {
   func f() { }
