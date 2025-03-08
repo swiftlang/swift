@@ -130,7 +130,7 @@ param
   [string[]] $AndroidSDKs = @(),
   [string[]] $WindowsSDKs = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
-  [string] $ToolchainIdentifier = $(if ($Env:TOOLCHAIN_VERSION) { $Env:TOOLCHAIN_VERSION } else { "$Env:USERNAME.development" }),
+  [string] $ToolchainIdentifier = $(if ($env:TOOLCHAIN_VERSION) { $env:TOOLCHAIN_VERSION } else { "$env:USERNAME.development" }),
   [string] $PinnedBuild = "",
   [ValidatePattern("^[A-Fa-f0-9]{64}$")]
   [string] $PinnedSHA256 = "",
@@ -158,7 +158,7 @@ param
     "ZLib")]
   [string] $BuildTo = "",
   [ValidateSet("AMD64", "ARM64")]
-  [string] $HostArchName = $(if ($Env:PROCESSOR_ARCHITEW6432) { $Env:PROCESSOR_ARCHITEW6432 } else { $Env:PROCESSOR_ARCHITECTURE }),
+  [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }),
   [ValidateSet("Asserts", "NoAsserts")]
   [string] $Variant = "Asserts",
   [switch] $Clean,
@@ -174,14 +174,14 @@ Set-StrictMode -Version 3.0
 
 # Avoid being run in a "Developer" shell since this script launches its own sub-shells targeting
 # different architectures, and these variables cause confusion.
-if ($Env:VSCMD_ARG_HOST_ARCH -or $Env:VSCMD_ARG_TGT_ARCH) {
+if ($env:VSCMD_ARG_HOST_ARCH -or $env:VSCMD_ARG_TGT_ARCH) {
   throw "At least one of VSCMD_ARG_HOST_ARCH and VSCMD_ARG_TGT_ARCH is set, which is incompatible with this script. Likely need to run outside of a Developer shell."
 }
 
 # Prevent elsewhere-installed swift modules from confusing our builds.
 $env:SDKROOT = ""
 
-$BuildArchName = if ($Env:PROCESSOR_ARCHITEW6432) { $Env:PROCESSOR_ARCHITEW6432 } else { $Env:PROCESSOR_ARCHITECTURE }
+$BuildArchName = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 
 if ($PinnedBuild -eq "") {
   switch ($BuildArchName) {
