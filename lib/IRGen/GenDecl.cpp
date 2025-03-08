@@ -2397,6 +2397,11 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
     // types to be referenced directly.
     if (const auto *MD = entity.getSILFunction()->getParentModule())
       isKnownLocal = MD == swiftModule || MD->isStaticLibrary();
+  } else if (entity.isTypeMetadataAccessFunction()) {
+    if (NominalTypeDecl *NTD = entity.getType()->getAnyNominal()) {
+      const ModuleDecl *MD = NTD->getDeclContext()->getParentModule();
+      isKnownLocal = MD == swiftModule || MD->isStaticLibrary();
+    }
   }
 
   bool weakImported = entity.isWeakImported(swiftModule);
