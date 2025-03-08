@@ -50,4 +50,18 @@ public struct StartTaskMacro: BodyMacro {
       """
     ]
   }
+
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor closure: ClosureExprSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    return [
+      """
+      Task {
+      \(closure.statements)
+      }
+      """
+    ]
+  }
 }

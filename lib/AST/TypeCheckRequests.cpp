@@ -2681,19 +2681,17 @@ void ExpandPreambleMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
 //----------------------------------------------------------------------------//
 
 void ExpandBodyMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl->getLoc(),
-                 diag::macro_expand_circular_reference_entity,
-                 "body",
-                 decl->getName());
+  auto fn = std::get<0>(getStorage());
+  diags.diagnose(fn.getLoc(),
+                 diag::macro_expand_circular_reference_unnamed,
+                 "body");
 }
 
 void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl->getLoc(),
-                 diag::macro_expand_circular_reference_entity_through,
-                 "body",
-                 decl->getName());
+  auto fn = std::get<0>(getStorage());
+  diags.diagnose(fn.getLoc(),
+                 diag::macro_expand_circular_reference_unnamed_through,
+                 "body");
 }
 
 //----------------------------------------------------------------------------//

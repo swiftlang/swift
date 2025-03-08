@@ -14,5 +14,15 @@ func sync() {
   await f()
 }
 
+func takeClosure(
+  _ closure: @escaping @Sendable () -> Void
+) {
+  closure()
+}
 
 
+func onClosure() {
+  takeClosure { @StartTask in
+    await f()
+  }
+}
