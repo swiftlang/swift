@@ -1,5 +1,6 @@
 add_subdirectory(InternalShims)
 
+gyb_expand(TaskGroup+addTask.swift.gyb TaskGroup+addTask.swift)
 gyb_expand(Task+startSynchronously.swift.gyb Task+startSynchronously.swift)
 
 add_library(swift_Concurrency
@@ -79,10 +80,10 @@ add_library(swift_Concurrency
   Task+TaskExecutor.swift
   TaskCancellation.swift
   TaskGroup.swift
-  TaskGroup+TaskExecutor.swift
   TaskLocal.swift
   TaskSleep.swift
   TaskSleepDuration.swift
+  "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+startSynchronously.swift")
 
 include(${SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR}.cmake)

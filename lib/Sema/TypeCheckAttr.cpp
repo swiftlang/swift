@@ -5106,7 +5106,10 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
         if (VD->isProtocolRequirement() && !PD->isObjC()) {
           diagnoseAndRemoveAttr(
               const_cast<AvailableAttr *>(attr.getParsedAttr()),
-              diag::unavailable_method_non_objc_protocol);
+              diag::unavailable_method_non_objc_protocol)
+              .warnInSwiftInterface(D->getDeclContext());
+          // Be lenient in interfaces to accomodate @_spi_available, which has
+          // been accepted historically.
           return;
         }
       }
