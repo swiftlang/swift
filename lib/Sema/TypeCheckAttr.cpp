@@ -2338,6 +2338,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
       diagnoseAndRemoveAttr(parsedAttr, diag::spi_available_malformed);
       return;
     }
+
+    if (auto diag =
+            TypeChecker::diagnosticIfDeclCannotBeUnavailable(D, *attr)) {
+      diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr->getParsedAttr()),
+                            *diag);
+      return;
+    }
   }
 
   if (attr->isNoAsync()) {
@@ -5096,23 +5103,10 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   // declaration that is allowed to be unavailable, diagnose.
   if (availabilityConstraint->isUnavailable()) {
     auto attr = availabilityConstraint->getAttr();
-    if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D)) {
-      diagnose(attr.getParsedAttr()->getLocation(), diag.value());
+    if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D, attr)) {
+      diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
+                            *diag);
       return;
-    }
-
-    if (auto *PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        if (VD->isProtocolRequirement() && !PD->isObjC()) {
-          diagnoseAndRemoveAttr(
-              const_cast<AvailableAttr *>(attr.getParsedAttr()),
-              diag::unavailable_method_non_objc_protocol)
-              .warnInSwiftInterface(D->getDeclContext());
-          // Be lenient in interfaces to accomodate @_spi_available, which has
-          // been accepted historically.
-          return;
-        }
-      }
     }
   }
 
@@ -5456,7 +5450,8 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
 }
 
 std::optional<Diagnostic>
-TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
+TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
+                                                 SemanticAvailableAttr attr) {
   auto parentIsUnavailable = [](const Decl *D) -> bool {
     if (auto *parent =
             AvailabilityInference::parentDeclForInferredAvailability(D)) {
@@ -5484,6 +5479,21 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
       return Diagnostic(diag::availability_decl_no_unavailable, D);
   }
 
+  auto DC = D->getDeclContext();
+  if (auto *PD = dyn_cast<ProtocolDecl>(DC)) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->isProtocolRequirement() && !PD->isObjC()) {
+        auto diag = Diagnostic(diag::unavailable_method_non_objc_protocol);
+
+        // Be lenient in interfaces to accomodate @_spi_available, which has
+        // been accepted historically.
+        if (attr.isSPI() || DC->isInSwiftinterface())
+          diag.setBehaviorLimit(DiagnosticBehavior::Warning);
+        return diag;
+      }
+    }
+  }
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (!VD->hasStorageOrWrapsStorage())
       return std::nullopt;
@@ -5491,7 +5501,13 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
     if (parentIsUnavailable(D))
       return std::nullopt;
 
-    // Be lenient in interfaces to accomodate @_spi_available.
+    // @_spi_available does not make the declaration unavailable from the
+    // perspective of the owning module, which is what matters.
+    if (attr.isSPI())
+      return std::nullopt;
+
+    // An unavailable property with storage encountered in a swiftinterface
+    // might have been declared @_spi_available in source.
     if (D->getDeclContext()->isInSwiftinterface())
       return std::nullopt;
 
