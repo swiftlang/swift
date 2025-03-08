@@ -5192,6 +5192,12 @@ ERROR(isolated_any_conversion_to_synchronous_func,none,
 ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
 
+WARNING(implicit_nonstrong_to_strong_capture,none,
+      "%0 capture list item %base1 implicitly captured as strong reference in outer scope",
+      (ReferenceOwnership, const Decl *))
+NOTE(implicit_nonstrong_to_strong_capture_loc,none,
+     "%base0 implicitly captured here",(const Decl *))
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Statements
 //------------------------------------------------------------------------------
