@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -1065,7 +1066,8 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is unavailable or None if this
 /// is allowed.
-std::optional<Diagnostic> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
+std::optional<Diagnostic>
+diagnosticIfDeclCannotBeUnavailable(const Decl *D, SemanticAvailableAttr attr);
 
 /// Checks whether the required range of versions of the compilation's target
 /// platform are available at the given `SourceRange`. If not, `Diagnose` is

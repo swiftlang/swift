@@ -31,6 +31,11 @@ class DeinitUnavailableMacOS {
   deinit {}
 }
 
+class DeinitSPIAvailableMacOS {
+  @_spi_available(macOS, introduced: 50) // expected-error {{deinitializer cannot be marked unavailable with '@available'}}
+  deinit {}
+}
+
 class AvailableAtDeploymentTargetDeinit {
   @available(macOS 50, *)
   deinit {}

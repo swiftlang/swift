@@ -5,12 +5,20 @@
 @available(macOS, unavailable)
 struct UnavailableMacOSStruct {} // expected-note 2 {{'UnavailableMacOSStruct' has been explicitly marked unavailable here}}
 
+@available(iOS, introduced: 8.0)
+@_spi_available(macOS, introduced: 10.9)
+public struct SPIAvailableMacOSStruct {}
+
 @available(*, unavailable)
 public struct UniversallyUnavailableStruct {} // expected-note {{'UniversallyUnavailableStruct' has been explicitly marked unavailable here}}
 
 // Ok, initialization of globals is lazy and boxed.
 @available(macOS, unavailable)
 var unavailableMacOSGlobal: UnavailableMacOSStruct = .init()
+
+@available(iOS, introduced: 8.0)
+@_spi_available(macOS, introduced: 10.9)
+var spiAvailableMacOSGlobal: SPIAvailableMacOSStruct = .init()
 
 @available(*, unavailable)
 var universallyUnavailableGlobal: UniversallyUnavailableStruct = .init()
@@ -21,6 +29,10 @@ struct GoodAvailableStruct {
   var unavailableMacOS: UnavailableMacOSStruct {
     get { UnavailableMacOSStruct() }
   }
+
+  // Ok, storage is available to implementation at runtime.
+  @_spi_available(macOS, introduced: 10.9)
+  var spiAvailableMacOS: SPIAvailableMacOSStruct
 
   // Ok, initialization of static vars is lazy and boxed.
   @available(macOS, unavailable)
@@ -75,4 +87,7 @@ struct BadStruct {
 enum GoodAvailableEnum {
   @available(macOS, unavailable)
   case unavailableMacOS(UnavailableMacOSStruct)
+
+  @_spi_available(macOS, introduced: 10.9)
+  case spiAvailableMacOS(SPIAvailableMacOSStruct)
 }

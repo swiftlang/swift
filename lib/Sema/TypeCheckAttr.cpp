@@ -2338,6 +2338,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
       diagnoseAndRemoveAttr(parsedAttr, diag::spi_available_malformed);
       return;
     }
+
+    if (auto diag =
+            TypeChecker::diagnosticIfDeclCannotBeUnavailable(D, *attr)) {
+      diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr->getParsedAttr()),
+                            *diag);
+      return;
+    }
   }
 
   if (attr->isNoAsync()) {
@@ -5096,9 +5103,9 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   // declaration that is allowed to be unavailable, diagnose.
   if (availabilityConstraint->isUnavailable()) {
     auto attr = availabilityConstraint->getAttr();
-    if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D)) {
+    if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D, attr)) {
       diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
-                            diag.value());
+                            *diag);
       return;
     }
   }
@@ -5443,7 +5450,8 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
 }
 
 std::optional<Diagnostic>
-TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
+TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
+                                                 SemanticAvailableAttr attr) {
   auto parentIsUnavailable = [](const Decl *D) -> bool {
     if (auto *parent =
             AvailabilityInference::parentDeclForInferredAvailability(D)) {
@@ -5479,7 +5487,7 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
 
         // Be lenient in interfaces to accomodate @_spi_available, which has
         // been accepted historically.
-        if (DC->isInSwiftinterface())
+        if (attr.isSPI() || DC->isInSwiftinterface())
           diag.setBehaviorLimit(DiagnosticBehavior::Warning);
         return diag;
       }
@@ -5493,7 +5501,13 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
     if (parentIsUnavailable(D))
       return std::nullopt;
 
-    // Be lenient in interfaces to accomodate @_spi_available.
+    // @_spi_available does not make the declaration unavailable from the
+    // perspective of the owning module, which is what matters.
+    if (attr.isSPI())
+      return std::nullopt;
+
+    // An unavailable property with storage encountered in a swiftinterface
+    // might have been declared @_spi_available in source.
     if (D->getDeclContext()->isInSwiftinterface())
       return std::nullopt;
 
