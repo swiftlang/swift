@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,6 +11,35 @@
 //===----------------------------------------------------------------------===//
 
 /// A fixed-size array.
+///
+/// The `InlineArray` type is a specialized array that stores its elements
+/// contiguously inline, rather than allocating an out-of-line region of memory
+/// with copy-on-write optimization.
+///
+/// Memory Layout
+/// -------------
+///
+/// An *empty* array's size is zero. Its stride and alignment are one byte.
+///
+/// A *nonempty* array's size and stride are equal to the element's stride
+/// multiplied by the number of elements. Its alignment is equal to the
+/// element's alignment.
+///
+///     MemoryLayout<InlineArray<3, UInt16>>.size       //-> 6
+///     MemoryLayout<InlineArray<3, UInt16>>.stride     //-> 6
+///     MemoryLayout<InlineArray<3, UInt16>>.alignment  //-> 2
+///
+/// Literal Initialization
+/// ----------------------
+///
+/// Array literal syntax can be used to initialize an `InlineArray` instance.
+/// A stack-allocated array will do in-place initialization of each element.
+/// The `count` and/or `Element` can be inferred from the array literal.
+///
+///     let a: InlineArray<4, Int> = [1, 2, 4, 8]
+///     let b: InlineArray<_, Int> = [1, 2, 4, 8]
+///     let c: InlineArray<4, _>   = [1, 2, 4, 8]
+///     let d: InlineArray         = [1, 2, 4, 8]
 @available(SwiftStdlib 6.2, *)
 @frozen
 @safe
@@ -29,12 +58,12 @@ extension InlineArray: BitwiseCopyable where Element: BitwiseCopyable {}
 extension InlineArray: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
 //===----------------------------------------------------------------------===//
-// Address & Buffer
+// MARK: - Address & Buffer
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
 extension InlineArray where Element: ~Copyable {
-  /// Returns a read-only pointer to the first element in the vector.
+  /// Returns a pointer to the first element in the array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
@@ -42,7 +71,7 @@ extension InlineArray where Element: ~Copyable {
     unsafe UnsafePointer<Element>(Builtin.unprotectedAddressOfBorrow(self))
   }
 
-  /// Returns a buffer pointer over the entire vector.
+  /// Returns a buffer pointer over the entire array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
@@ -50,7 +79,7 @@ extension InlineArray where Element: ~Copyable {
     unsafe UnsafeBufferPointer<Element>(start: _address, count: count)
   }
 
-  /// Returns a mutable pointer to the first element in the vector.
+  /// Returns a mutable pointer to the first element in the array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
@@ -60,7 +89,7 @@ extension InlineArray where Element: ~Copyable {
     }
   }
 
-  /// Returns a mutable buffer pointer over the entire vector.
+  /// Returns a mutable buffer pointer over the entire array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
@@ -70,7 +99,7 @@ extension InlineArray where Element: ~Copyable {
     }
   }
 
-  /// Returns the given raw pointer, which points at an uninitialized vector
+  /// Converts the given raw pointer, which points at an uninitialized array
   /// instance, to a mutable buffer suitable for initialization.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
@@ -86,26 +115,28 @@ extension InlineArray where Element: ~Copyable {
 }
 
 //===----------------------------------------------------------------------===//
-// Initialization APIs
+// MARK: - Initialization APIs
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
 extension InlineArray where Element: ~Copyable {
-  /// Initializes every element in this vector running the given closure value
-  /// that returns the element to emplace at the given index.
+  /// Initializes every element in this array, by calling the given closure
+  /// for each index.
   ///
-  /// This will call the closure `Count` times, where `Count` is the static
-  /// count of the vector, to initialize every element by passing the closure
+  /// This will call the closure `count` times, where `count` is the static
+  /// count of the array, to initialize every element by passing the closure
   /// the index of the current element being initialized. The closure is allowed
   /// to throw an error at any point during initialization at which point the
-  /// vector will stop initialization, deinitialize every currently initialized
+  /// array will stop initialization, deinitialize every currently initialized
   /// element, and throw the given error back out to the caller.
   ///
   /// - Parameter body: A closure that returns an owned `Element` to emplace at
-  ///                   the passed in index.
+  ///   the passed in index.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of elements in the array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
-  public init<E: Error>(_ body: (Int) throws(E) -> Element) throws(E) {
+  public init<E: Error>(_ body: (Index) throws(E) -> Element) throws(E) {
 #if $BuiltinEmplaceTypedThrows
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
       let buffer = InlineArray<count, Element>._initializationBuffer(
@@ -132,22 +163,23 @@ extension InlineArray where Element: ~Copyable {
 #endif
   }
 
-  /// Initializes every element in this vector by running the closure with the
-  /// passed in first element.
+  /// Initializes every element in this array, by calling the given closure
+  /// for each previously initialized element.
   ///
-  /// This will call the closure 'count' times, where 'count' is the static
-  /// count of the vector, to initialize every element by passing the closure
-  /// an immutable borrow reference to the first element given to the
-  /// initializer. The closure is allowed to throw an error at any point during
-  /// initialization at which point the vector will stop initialization,
-  /// deinitialize every currently initialized element, and throw the given
-  /// error back out to the caller.
+  /// This will call the closure `count - 1` times, where `count` is the static
+  /// count of the array, to initialize every element by passing the closure an
+  /// immutable borrow reference to the previous element. The closure is allowed
+  /// to throw an error at any point during initialization at which point the
+  /// array will stop initialization, deinitialize every currently initialized
+  /// element, and throw the given error back out to the caller.
   ///
-  /// - Parameter first: The first value to insert into the vector which will be
-  ///                    passed to the closure as a borrow.
-  /// - Parameter next: A closure that passes in an immutable borrow reference
-  ///                   of the given first element of the vector which returns
-  ///                   an owned `Element` instance to insert into the vector.
+  /// - Parameters:
+  ///   - first: The first value to emplace into the array.
+  ///   - next: A closure that takes an immutable borrow reference to the
+  ///     previous element, and returns an owned `Element` instance to emplace
+  ///     into the array.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of elements in the array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init<E: Error>(
@@ -178,6 +210,7 @@ extension InlineArray where Element: ~Copyable {
             unsafe buffer.deinitializeElement(at: j)
           }
 
+          // Throw the error we were given back out to the caller.
           throw error
         }
       }
@@ -190,9 +223,11 @@ extension InlineArray where Element: ~Copyable {
 
 @available(SwiftStdlib 6.2, *)
 extension InlineArray where Element: Copyable {
-  /// Initializes every element in this vector to a copy of the given value.
+  /// Initializes every element in this array to a copy of the given value.
   ///
-  /// - Parameter value: The instance to initialize this vector with.
+  /// - Parameter value: The instance to initialize this array with.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of elements in the array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
@@ -205,16 +240,16 @@ extension InlineArray where Element: Copyable {
 }
 
 //===----------------------------------------------------------------------===//
-// Collection APIs
+// MARK: - Collection APIs
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
 extension InlineArray where Element: ~Copyable {
-  /// The type of the container's elements.
+  /// The type of the array's elements.
   @available(SwiftStdlib 6.2, *)
   public typealias Element = Element
 
-  /// A type that represents a position in the collection.
+  /// A type that represents a position in the array.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript
@@ -222,7 +257,7 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   public typealias Index = Int
 
-  /// The number of elements in the collection.
+  // FIXME: Remove when SE-0452 "Integer Generic Parameters" is implemented.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
@@ -230,7 +265,7 @@ extension InlineArray where Element: ~Copyable {
     count
   }
 
-  /// The number of elements in the collection.
+  /// The number of elements in the array.
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
@@ -241,116 +276,96 @@ extension InlineArray where Element: ~Copyable {
     count
   }
 
-  /// The position of the first element in a nonempty collection.
+  /// A Boolean value indicating whether the array is empty.
   ///
-  /// If the collection is empty, `startIndex` is equal to `endIndex`.
+  /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var startIndex: Int {
+  public var isEmpty: Bool {
+    count == 0
+  }
+
+  /// The position of the first element in a nonempty array.
+  ///
+  /// If the array is empty, `startIndex` is equal to `endIndex`.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var startIndex: Index {
     0
   }
 
-  /// The collection's "past the end" position---that is, the position one
-  /// greater than the last valid subscript argument.
+  /// The array's "past the end" position---that is, the position one greater
+  /// than the last valid subscript argument.
   ///
-  /// When you need a range that includes the last element of a collection, use
-  /// the half-open range operator (`..<`) with `endIndex`. The `..<` operator
-  /// creates a range that doesn't include the upper bound, so it's always
-  /// safe to use with `endIndex`. For example:
+  /// If the array is empty, `endIndex` is equal to `startIndex`.
   ///
-  ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let index = numbers.firstIndex(of: 30) {
-  ///         print(numbers[index ..< numbers.endIndex])
-  ///     }
-  ///     // Prints "[30, 40, 50]"
-  ///
-  /// If the collection is empty, `endIndex` is equal to `startIndex`.
+  /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var endIndex: Int {
+  public var endIndex: Index {
     count
   }
 
-  /// The indices that are valid for subscripting the collection, in ascending
-  /// order.
+  /// The indices that are valid for subscripting the array, in ascending order.
   ///
-  /// A collection's `indices` property can hold a strong reference to the
-  /// collection itself, causing the collection to be nonuniquely referenced.
-  /// If you mutate the collection while iterating over its indices, a strong
-  /// reference can result in an unexpected copy of the collection. To avoid
-  /// the unexpected copy, use the `index(after:)` method starting with
-  /// `startIndex` to produce indices instead.
-  ///
-  ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
-  ///     var i = c.startIndex
-  ///     while i != c.endIndex {
-  ///         c[i] /= 5
-  ///         i = c.index(after: i)
-  ///     }
-  ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
+  /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var indices: Range<Int> {
+  public var indices: Range<Index> {
     unsafe Range(_uncheckedBounds: (0, count))
   }
 
   /// Returns the position immediately after the given index.
   ///
-  /// - Parameter i: A valid index of the collection. `i` must be less than
+  /// - Parameter i: A valid index of the array. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index immediately after `i`.
+  ///
+  /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public borrowing func index(after i: Int) -> Int {
+  public borrowing func index(after i: Index) -> Index {
     i &+ 1
   }
 
   /// Returns the position immediately before the given index.
   ///
-  /// - Parameter i: A valid index of the collection. `i` must be greater than
+  /// - Parameter i: A valid index of the array. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
+  ///
+  /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public borrowing func index(before i: Int) -> Int {
+  public borrowing func index(before i: Index) -> Index {
     i &- 1
   }
 
   @_alwaysEmitIntoClient
   @_semantics("fixed_storage.check_index")
   @inline(__always)
-  internal func _checkIndex(_ i: Int) {
+  internal func _checkIndex(_ i: Index) {
     _precondition(indices.contains(i), "Index out of bounds")
   }
 
   /// Accesses the element at the specified position.
   ///
-  /// The following example accesses an element of an array through its
-  /// subscript to print its value:
-  ///
-  ///     var streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
-  ///     print(streets[1])
-  ///     // Prints "Bryant"
-  ///
-  /// You can subscript a collection with any valid index other than the
-  /// collection's end index. The end index refers to the position one past
-  /// the last element of a collection, so it doesn't correspond with an
-  /// element.
-  ///
-  /// - Parameter position: The position of the element to access. `position`
-  ///   must be a valid index of the collection that is not equal to the
-  ///   `endIndex` property.
+  /// - Parameter i: The position of the element to access. `i` must be a valid
+  ///   index of the array that is not equal to the `endIndex` property.
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_addressableSelf
   @_alwaysEmitIntoClient
-  public subscript(_ i: Int) -> Element {
+  public subscript(_ i: Index) -> Element {
     @_transparent
     unsafeAddress {
       _checkIndex(i)
@@ -359,23 +374,47 @@ extension InlineArray where Element: ~Copyable {
 
     @_transparent
     unsafeMutableAddress {
-       _checkIndex(i)
+      _checkIndex(i)
       return unsafe _mutableAddress + i
+    }
+  }
+
+  /// Accesses the element at the specified position.
+  ///
+  /// - Warning: This subscript trades safety for performance. Using an invalid
+  ///   index results in undefined behavior.
+  ///
+  /// - Parameter i: The position of the element to access. `i` must be a valid
+  ///   index of the array that is not equal to the `endIndex` property.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.2, *)
+  @_addressableSelf
+  @_alwaysEmitIntoClient
+  @unsafe
+  public subscript(unchecked i: Index) -> Element {
+    @_transparent
+    unsafeAddress {
+      unsafe _address + i
+    }
+
+    @_transparent
+    unsafeMutableAddress {
+      unsafe _mutableAddress + i
     }
   }
 }
 
 //===----------------------------------------------------------------------===//
-// Swap
+// MARK: - MutableCollection APIs
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
 extension InlineArray where Element: ~Copyable {
-  /// Exchanges the values at the specified indices of the vector.
+  /// Exchanges the values at the specified indices of the array.
   ///
-  /// Both parameters must be valid indices of the vector and not
-  /// equal to `endIndex`. Passing the same index as both `i` and `j` has no
-  /// effect.
+  /// Both parameters must be valid indices of the array and not equal to
+  /// `endIndex`. Passing the same index as both `i` and `j` has no effect.
   ///
   /// - Parameters:
   ///   - i: The index of the first value to swap.
@@ -385,8 +424,8 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public mutating func swapAt(
-    _ i: Int,
-    _ j: Int
+    _ i: Index,
+    _ j: Index
   ) {
     guard i != j else {
       return
@@ -403,44 +442,12 @@ extension InlineArray where Element: ~Copyable {
 }
 
 //===----------------------------------------------------------------------===//
-// Unsafe APIs
+// MARK: - Unsafe APIs
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
 extension InlineArray where Element: ~Copyable {
-  /// Calls a closure with a pointer to the vector's contiguous storage.
-  ///
-  /// Often, the optimizer can eliminate bounds checks within a vector
-  /// algorithm, but when that fails, invoking the same algorithm on the
-  /// buffer pointer passed into your closure lets you trade safety for speed.
-  ///
-  /// The following example shows how you can iterate over the contents of the
-  /// buffer pointer:
-  ///
-  ///     // "[1, 2, 3, 4, 5]"
-  ///     let numbers = InlineArray<5, Int> {
-  ///       $0 + 1
-  ///     }
-  ///
-  ///     let sum = numbers.withUnsafeBufferPointer { buffer -> Int in
-  ///         var result = 0
-  ///         for i in stride(from: buffer.startIndex, to: buffer.endIndex, by: 2) {
-  ///             result += buffer[i]
-  ///         }
-  ///         return result
-  ///     }
-  ///     // 'sum' == 9
-  ///
-  /// The pointer passed as an argument to `body` is valid only during the
-  /// execution of `withUnsafeBufferPointer(_:)`. Do not store or return the
-  /// pointer for later use.
-  ///
-  /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter that
-  ///   points to the contiguous storage for the vector. If `body` has a return
-  ///   value, that value is also used as the return value for the
-  ///   `withUnsafeBufferPointer(_:)` method. The pointer argument is valid only
-  ///   for the duration of the method's execution.
-  /// - Returns: The return value, if any, of the `body` closure parameter.
+  // FIXME: @available(*, deprecated, renamed: "span.withUnsafeBufferPointer(_:)")
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
@@ -450,46 +457,7 @@ extension InlineArray where Element: ~Copyable {
     try unsafe body(_buffer)
   }
 
-  /// Calls the given closure with a pointer to the vector's mutable contiguous
-  /// storage.
-  ///
-  /// Often, the optimizer can eliminate bounds checks within a vector
-  /// algorithm, but when that fails, invoking the same algorithm on the
-  /// buffer pointer passed into your closure lets you trade safety for speed.
-  ///
-  /// The following example shows how modifying the contents of the
-  /// `UnsafeMutableBufferPointer` argument to `body` alters the contents of
-  /// the vector:
-  ///
-  ///     // "[1, 2, 3, 4, 5]"
-  ///     var numbers = InlineArray<5, Int> {
-  ///       $0 + 1
-  ///     }
-  ///
-  ///     numbers.withUnsafeMutableBufferPointer { buffer in
-  ///         for i in stride(from: buffer.startIndex, to: buffer.endIndex - 1, by: 2) {
-  ///             buffer.swapAt(i, i + 1)
-  ///         }
-  ///     }
-  ///
-  ///     print(numbers.description)
-  ///     // Prints "[2, 1, 4, 3, 5]"
-  ///
-  /// The pointer passed as an argument to `body` is valid only during the
-  /// execution of `withUnsafeMutableBufferPointer(_:)`. Do not store or
-  /// return the pointer for later use.
-  ///
-  /// - Warning: Do not rely on anything about the vector that is the target of
-  ///   this method during execution of the `body` closure; it might not
-  ///   appear to have its correct value. Instead, use only the
-  ///   `UnsafeMutableBufferPointer` argument to `body`.
-  ///
-  /// - Parameter body: A closure with an `UnsafeMutableBufferPointer`
-  ///   parameter that points to the contiguous storage for the vector. If
-  ///   `body` has a return value, that value is also used as the return value
-  ///   for the `withUnsafeMutableBufferPointer(_:)` method. The pointer
-  ///   argument is valid only for the duration of the method's execution.
-  /// - Returns: The return value, if any, of the `body` closure parameter.
+  // FIXME: @available(*, deprecated, renamed: "mutableSpan.withUnsafeMutableBufferPointer(_:)")
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
