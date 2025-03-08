@@ -367,10 +367,10 @@ OptionalSomePattern *OptionalSomePattern::create(ASTContext &ctx,
   return new (ctx) OptionalSomePattern(ctx, subPattern, questionLoc);
 }
 
-OptionalSomePattern *
-OptionalSomePattern::createImplicit(ASTContext &ctx, Pattern *subPattern,
-                                    SourceLoc questionLoc) {
-  auto *P = OptionalSomePattern::create(ctx, subPattern, questionLoc);
+OptionalSomePattern *OptionalSomePattern::createImplicit(ASTContext &ctx,
+                                                         Pattern *subPattern) {
+  auto *P = OptionalSomePattern::create(ctx, subPattern,
+                                        /*questionLoc*/ SourceLoc());
   P->setImplicit();
   return P;
 }
