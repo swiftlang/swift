@@ -1349,8 +1349,8 @@ void PrintAST::printAttributes(const Decl *D) {
     if (isa<AccessorDecl>(D)) {
 #define EXCLUDE_ATTR(Class)                                                    \
   Options.ExcludeAttrList.push_back(DeclAttrKind::Class);
-#define CONTEXTUAL_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
-#define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
+#define CONTEXTUAL_DECL_ATTR(X, Class, ...) EXCLUDE_ATTR(Class)
+#define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, ...) EXCLUDE_ATTR(Class)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(X, Class) EXCLUDE_ATTR(Class)
 #include "swift/AST/DeclAttr.def"
     }

@@ -40,36 +40,25 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
-#define DECL_ATTR(_, Id, ...) \
-  static_assert(DeclAttrKind::Id <= DeclAttrKind::Last_DeclAttr); \
-  static_assert(IsTriviallyDestructible<Id##Attr>::value, \
-                "Attrs are BumpPtrAllocated; the destructor is never called");
-#include "swift/AST/DeclAttr.def"
 static_assert(IsTriviallyDestructible<DeclAttributes>::value,
               "DeclAttributes are BumpPtrAllocated; the d'tor is never called");
 
-#define DECL_ATTR(Name, Id, ...)                                                                     \
-static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToAdd) != \
-              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIStableToAdd),     \
-              #Name " needs to specify either ABIBreakingToAdd or ABIStableToAdd");
-#include "swift/AST/DeclAttr.def"
-
-#define DECL_ATTR(Name, Id, ...)                                                                        \
-static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToRemove) != \
-              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIStableToRemove),     \
-              #Name " needs to specify either ABIBreakingToRemove or ABIStableToRemove");
-#include "swift/AST/DeclAttr.def"
-
-#define DECL_ATTR(Name, Id, ...)                                                                     \
-static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIBreakingToAdd) != \
-              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToAdd),     \
-              #Name " needs to specify either APIBreakingToAdd or APIStableToAdd");
-#include "swift/AST/DeclAttr.def"
-
-#define DECL_ATTR(Name, Id, ...)                                                                        \
-static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIBreakingToRemove) != \
-              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToRemove),     \
-              #Name " needs to specify either APIBreakingToRemove or APIStableToRemove");
+#define DECL_ATTR(Name, Id, ...) \
+  static_assert(DeclAttrKind::Id <= DeclAttrKind::Last_DeclAttr); \
+  static_assert(IsTriviallyDestructible<Id##Attr>::value, \
+                "Attrs are BumpPtrAllocated; the destructor is never called"); \
+  static_assert(DeclAttribute::hasOneBehaviorFor##Id( \
+                DeclAttribute::ABIBreakingToAdd | DeclAttribute::ABIStableToAdd), \
+                #Name " needs to specify either ABIBreakingToAdd or ABIStableToAdd"); \
+  static_assert(DeclAttribute::hasOneBehaviorFor##Id( \
+                DeclAttribute::ABIBreakingToRemove | DeclAttribute::ABIStableToRemove), \
+                #Name " needs to specify either ABIBreakingToRemove or ABIStableToRemove"); \
+  static_assert(DeclAttribute::hasOneBehaviorFor##Id( \
+                DeclAttribute::APIBreakingToAdd | DeclAttribute::APIStableToAdd),\
+                #Name " needs to specify either APIBreakingToAdd or APIStableToAdd"); \
+  static_assert(DeclAttribute::hasOneBehaviorFor##Id( \
+                DeclAttribute::APIBreakingToRemove | DeclAttribute::APIStableToRemove), \
+                #Name " needs to specify either APIBreakingToRemove or APIStableToRemove");
 #include "swift/AST/DeclAttr.def"
 
 #define TYPE_ATTR(_, Id)                                                       \
@@ -361,15 +350,15 @@ DeclAttribute *DeclAttribute::createSimple(const ASTContext &context,
 
 /// Returns true if this attribute can appear on the specified decl.
 bool DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D) {
-  if ((getOptions(DK) & OnAnyClangDecl) && D->hasClangNode())
+  if ((getRequirements(DK) & OnAnyClangDecl) && D->hasClangNode())
     return true;
   return canAttributeAppearOnDeclKind(DK, D->getKind());
 }
 
 bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) {
-  auto Options = getOptions(DAK);
+  auto Reqs = getRequirements(DAK);
   switch (DK) {
-#define DECL(Id, Parent) case DeclKind::Id: return (Options & On##Id) != 0;
+#define DECL(Id, Parent) case DeclKind::Id: return (Reqs & On##Id) != 0;
 #include "swift/AST/DeclNodes.def"
   }
   llvm_unreachable("bad DeclKind");
@@ -1713,11 +1702,21 @@ void DeclAttribute::print(llvm::raw_ostream &OS, const Decl *D) const {
   print(P, PrintOptions(), D);
 }
 
-uint64_t DeclAttribute::getOptions(DeclAttrKind DK) {
+uint64_t DeclAttribute::getRequirements(DeclAttrKind DK) {
   switch (DK) {
-#define DECL_ATTR(_, CLASS, OPTIONS, ...)                                      \
+#define DECL_ATTR(_, CLASS, REQUIREMENTS, BEHAVIORS, ...)                      \
   case DeclAttrKind::CLASS:                                                    \
-    return OPTIONS;
+    return REQUIREMENTS;
+#include "swift/AST/DeclAttr.def"
+  }
+  llvm_unreachable("bad DeclAttrKind");
+}
+
+uint64_t DeclAttribute::getBehaviors(DeclAttrKind DK) {
+  switch (DK) {
+#define DECL_ATTR(_, CLASS, REQUIREMENTS, BEHAVIORS, ...)                      \
+  case DeclAttrKind::CLASS:                                                    \
+    return BEHAVIORS;
 #include "swift/AST/DeclAttr.def"
   }
   llvm_unreachable("bad DeclAttrKind");
