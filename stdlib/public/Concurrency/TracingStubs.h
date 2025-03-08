@@ -44,12 +44,13 @@ inline void actor_note_job_queue(HeapObject *actor, Job *first,
 inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
                         AsyncLet *asyncLet, uint8_t jobPriority,
                         bool isChildTask, bool isFuture, bool isGroupChildTask,
-                        bool isAsyncLetTask) {}
+                        bool isAsyncLetTask, bool isDiscardingTask,
+                        bool hasInitialTaskExecutorPreference,
+                        const char* taskName) {}
 
 inline void task_destroy(AsyncTask *task) {}
 
-inline void task_wait(AsyncTask *task, AsyncTask *waitingOn, uintptr_t status) {
-}
+inline void task_wait(AsyncTask *task, AsyncTask *waitingOn, uintptr_t status) {}
 
 inline void task_resume(AsyncTask *task) {}
 

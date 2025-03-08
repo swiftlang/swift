@@ -636,8 +636,7 @@ extension Task where Failure == Never {
       unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     let (task, _) = Builtin.createTask(flags: flags,
-                                       initialSerialExecutor:
-                                         builtinSerialExecutor,
+                                       initialSerialExecutor: builtinSerialExecutor,
                                        operation: operation)
 
     self._task = task
@@ -670,10 +669,14 @@ extension Task where Failure == Never {
   ) {
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: true,
+      inheritContext: true,
+      enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false, isSynchronousStart: false)
+      isDiscardingTask: false,
+      isSynchronousStart: false)
 
     // Create the asynchronous task.
     let (task, _) = Builtin.createAsyncTask(flags, operation)
@@ -701,7 +704,7 @@ extension Task where Failure == Never {
   /// it only makes it impossible for you to explicitly cancel the task.
   ///
   /// - Parameters:
-  ///   - name: The high-level name given for this task
+  ///   - name: The high-level human-readable name given for this task
   ///   - priority: The priority of the task.
   ///     Pass `nil` to use the priority from `Task.currentPriority`.
   ///   - operation: The operation to perform.
@@ -870,7 +873,7 @@ self._task = task
   /// it only makes it impossible for you to explicitly cancel the task.
   ///
   /// - Parameters:
-  ///   - name: The high-level name given for this task
+  ///   - name: The high-level human-readable name given for this task
   ///   - priority: The priority of the task.
   ///     Pass `nil` to use the priority from `Task.currentPriority`.
   ///   - operation: The operation to perform.
@@ -1200,6 +1203,32 @@ extension Task where Failure == Error {
     return Task(task!)
   }
 #endif
+}
+
+// ==== Task Name --------------------------------------------------------------
+
+@available(SwiftStdlib 6.2, *)
+extension Task where Success == Never, Failure == Never {
+
+  /// Returns the human-readable name of the current task,
+  /// if it was set during the tasks' creation.
+  ///
+  /// Tasks can be named during their creation, which can be helpful to identify
+  /// unique tasks which may be created at same source locations, for example:
+  ///
+  ///     func process(items: [Int]) async {
+  ///       await withTaskGroup { group in
+  ///         for item in items {
+  ///           group.addTask(name: "process-\(item)") {
+  ///             await process(item)
+  ///           }
+  ///         }
+  ///       }
+  ///     }
+  @available(SwiftStdlib 6.2, *)
+  public static var name: String? {
+    return _getCurrentTaskNameString()
+  }
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------
@@ -1532,6 +1561,20 @@ func _reportUnexpectedExecutor(_ _filenameStart: Builtin.RawPointer,
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getCurrentThreadPriority")
 func _getCurrentThreadPriority() -> Int
+
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_task_getCurrentTaskName")
+internal func _getCurrentTaskName() -> UnsafePointer<UInt8>?
+
+@available(SwiftStdlib 6.2, *)
+internal func _getCurrentTaskNameString() -> String? {
+  if let stringPtr = _getCurrentTaskName() {
+    String(cString: stringPtr)
+  } else {
+    nil
+  }
+}
+
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.8, *)
