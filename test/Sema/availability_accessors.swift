@@ -569,5 +569,4 @@ struct BadAccessorAvailability<T> {
     @available(swift, introduced: 99) // expected-error {{didSet observer for property cannot be marked unavailable with '@available'}}
     didSet { }
   }
-
 }

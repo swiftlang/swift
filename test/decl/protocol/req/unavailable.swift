@@ -15,8 +15,13 @@ class Foo : Proto {
 // Reject protocols with 'unavailable' requirements
 // if a protocol is not marked @objc.
 protocol NonObjCProto {
-  @available(*,unavailable) func bad() // expected-error {{protocol members can only be marked unavailable in an @objc protocol}} expected-note {{protocol requires function 'bad()'}}
+  @available(*,unavailable) // expected-error {{protocol members can only be marked unavailable in an @objc protocol}}
+  func bad() // expected-note {{protocol requires function 'bad()'}}
+
   func good()
+
+  @_spi_available(macOS, introduced: 10.9) // expected-warning {{protocol members can only be marked unavailable in an @objc protocol}}
+  func kindaBad() // expected-note {{protocol requires function 'kindaBad()'}}
 }
 
 class Bar : NonObjCProto { // expected-error {{type 'Bar' does not conform to protocol 'NonObjCProto'}} expected-note {{add stubs for conformance}}
@@ -115,4 +120,7 @@ protocol UnavailableAssoc {
 
   @available(swift, obsoleted: 99)
   associatedtype A5
+
+  @_spi_available(macOS, introduced: 11) // expected-error {{associated type cannot be marked unavailable with '@available'}}
+  associatedtype A6
 }

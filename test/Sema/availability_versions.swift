@@ -1934,4 +1934,13 @@ struct PropertyObservers {
     @available(macOS, obsoleted: 10.9) // expected-error {{didSet observer for property cannot be marked unavailable with '@available'}}
     didSet { }
   }
+
+  var hasSPIAvailableObservers: Int {
+    @_spi_available(macOS, introduced: 10.9) // expected-error {{willSet observer for property cannot be marked unavailable with '@available'}}
+    willSet { }
+
+    @_spi_available(macOS, introduced: 10.9) // expected-error {{didSet observer for property cannot be marked unavailable with '@available'}}
+    didSet { }
+  }
+
 }
