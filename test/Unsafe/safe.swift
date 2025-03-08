@@ -207,6 +207,8 @@ func moreUnsafeFunc(unsafe: [Int]) {
   // expected-warning@-1{{no unsafe operations occur within 'unsafe' expression}}
 
   _ = unsafe[1]
+
+  _ = "\(unsafe)"
 }
 
 func yetMoreUnsafeFunc(unsafe: () -> Void) {
