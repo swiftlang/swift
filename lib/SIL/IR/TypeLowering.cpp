@@ -3196,19 +3196,17 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
   if (auto *nominal = substType.getAnyNominal()) {
     auto *module = nominal->getModuleContext();
-    if (module) {
-      if (module->isBuiltFromInterface()) {
+    if (module && module->isBuiltFromInterface()) {
         // Don't verify for types in modules built from interfaces; the feature
         // may not have been enabled in them.
         return;
-      }
-      auto *file = dyn_cast_or_null<FileUnit>(module->getModuleScopeContext());
-      if (file && file->getKind() == FileUnitKind::Source) {
-        auto sourceFile = nominal->getParentSourceFile();
-        if (sourceFile && sourceFile->Kind == SourceFileKind::SIL) {
-          // Don't verify for types in SIL files.
-          return;
-        }
+    }
+    auto *file = nominal->getParentSourceFile();
+    if (file && file->getKind() == FileUnitKind::Source) {
+      auto sourceFile = nominal->getParentSourceFile();
+      if (sourceFile && sourceFile->Kind == SourceFileKind::SIL) {
+        // Don't verify for types in SIL files.
+        return;
       }
     }
   }
