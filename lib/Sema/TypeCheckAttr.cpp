@@ -5097,22 +5097,9 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   if (availabilityConstraint->isUnavailable()) {
     auto attr = availabilityConstraint->getAttr();
     if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D)) {
-      diagnose(attr.getParsedAttr()->getLocation(), diag.value());
+      diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
+                            diag.value());
       return;
-    }
-
-    if (auto *PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        if (VD->isProtocolRequirement() && !PD->isObjC()) {
-          diagnoseAndRemoveAttr(
-              const_cast<AvailableAttr *>(attr.getParsedAttr()),
-              diag::unavailable_method_non_objc_protocol)
-              .warnInSwiftInterface(D->getDeclContext());
-          // Be lenient in interfaces to accomodate @_spi_available, which has
-          // been accepted historically.
-          return;
-        }
-      }
     }
   }
 
@@ -5482,6 +5469,21 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
   if (auto *AD = dyn_cast<AccessorDecl>(D)) {
     if (AD->isObservingAccessor())
       return Diagnostic(diag::availability_decl_no_unavailable, D);
+  }
+
+  auto DC = D->getDeclContext();
+  if (auto *PD = dyn_cast<ProtocolDecl>(DC)) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->isProtocolRequirement() && !PD->isObjC()) {
+        auto diag = Diagnostic(diag::unavailable_method_non_objc_protocol);
+
+        // Be lenient in interfaces to accomodate @_spi_available, which has
+        // been accepted historically.
+        if (DC->isInSwiftinterface())
+          diag.setBehaviorLimit(DiagnosticBehavior::Warning);
+        return diag;
+      }
+    }
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {

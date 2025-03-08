@@ -3,10 +3,10 @@
 // REQUIRES: OS=macosx
 
 @available(macOS, unavailable)
-struct UnavailableMacOSStruct {}
+struct UnavailableMacOSStruct {} // expected-note 2 {{'UnavailableMacOSStruct' has been explicitly marked unavailable here}}
 
 @available(*, unavailable)
-public struct UniversallyUnavailableStruct {}
+public struct UniversallyUnavailableStruct {} // expected-note {{'UniversallyUnavailableStruct' has been explicitly marked unavailable here}}
 
 // Ok, initialization of globals is lazy and boxed.
 @available(macOS, unavailable)
@@ -61,15 +61,15 @@ struct GoodUniversallyUnavailableStruct {
 struct BadStruct {
   // expected-error@+1 {{stored properties cannot be marked unavailable with '@available'}}
   @available(macOS, unavailable)
-  var unavailableMacOS: UnavailableMacOSStruct = .init()
+  var unavailableMacOS: UnavailableMacOSStruct = .init() // expected-error {{'UnavailableMacOSStruct' is unavailable in macOS}}
 
   // expected-error@+1 {{stored properties cannot be marked unavailable with '@available'}}
   @available(macOS, unavailable)
-  lazy var lazyUnavailableMacOS: UnavailableMacOSStruct = .init()
+  lazy var lazyUnavailableMacOS: UnavailableMacOSStruct = .init() // expected-error {{'UnavailableMacOSStruct' is unavailable in macOS}}
 
   // expected-error@+1 {{stored properties cannot be marked unavailable with '@available'}}
   @available(*, unavailable)
-  var universallyUnavailable: UniversallyUnavailableStruct = .init()
+  var universallyUnavailable: UniversallyUnavailableStruct = .init() // expected-error {{'UniversallyUnavailableStruct' is unavailable}}
 }
 
 enum GoodAvailableEnum {
