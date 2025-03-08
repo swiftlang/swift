@@ -1392,8 +1392,17 @@ static bool swift_isInConformanceExecutionContextImpl(
     return true;
 
   if (context->globalActorIsolationType) {
-    if (!_swift_task_isCurrentGlobalActorHook)
+    if (!_swift_task_isCurrentGlobalActorHook) {
+#if defined(__wasm__)
+      // FIXME: We don't currently support a concurrency model for WebAssembly,
+      // and the global actor hook isn't getting initialized due to the
+      // lack of __attribute__((constructor)) support. Therefore, we
+      // treat everything "as if" it were on the correct global actor.
+      return true;
+#else
       return false;
+#endif
+    }
 
     // Check whether we are running on this global actor.
     if (!_swift_task_isCurrentGlobalActorHook(
