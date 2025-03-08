@@ -33,3 +33,6 @@ struct S {
     subscript(x: Int) { _ = 1 } // expected-error@:23 {{expected '->' and return type in subscript}}
                                 // expected-note@-1:23 {{insert '->' and return type}}
 }
+
+struct ExpansionRequirementTest<each T> {}
+extension ExpansionRequirementTest where repeat each T == Int {} // expected-error {{same-element requirements are not yet supported}}
