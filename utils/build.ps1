@@ -560,28 +560,30 @@ function Copy-Directory($Src, $Dst) {
 
 function Invoke-Program() {
   [CmdletBinding(PositionalBinding = $false)]
-  param(
+  param
+  (
     [Parameter(Position = 0, Mandatory = $true)]
     [string] $Executable,
-    [switch] $OutNull = $false,
+    [switch] $Silent,
+    [switch] $OutNull,
     [string] $OutFile = "",
     [string] $ErrorFile = "",
     [Parameter(Position = 1, ValueFromRemainingArguments)]
-    [string[]] $Args
+    [string[]] $ExecutableArgs
   )
 
   if ($ToBatch) {
     # Print the invocation in batch file-compatible format
     $OutputLine = "`"$Executable`""
     $ShouldBreakLine = $false
-    for ($i = 0; $i -lt $Args.Length; $i++) {
+    for ($i = 0; $i -lt $ExecutableArgs.Length; $i++) {
       if ($ShouldBreakLine -or $OutputLine.Length -ge 40) {
         $OutputLine += " ^"
         Write-Output $OutputLine
         $OutputLine = "  "
       }
 
-      $Arg = $Args[$i]
+      $Arg = $ExecutableArgs[$i]
       if ($Arg.Contains(" ")) {
         $OutputLine += " `"$Arg`""
       } else {
@@ -594,32 +596,34 @@ function Invoke-Program() {
 
     if ($OutNull) {
       $OutputLine += " > nul"
-    } elseif ($OutFile) {
-      $OutputLine += " > `"$OutFile`""
-    }
-    if ($ErrorFile) {
-      $OutputLine += " 2> `"$ErrorFile`""
+    } elseif ($Silent) {
+      $OutputLine += " *> nul"
+    } else {
+      if ($OutFile) { $OutputLine += " > `"$OutFile`"" }
+      if ($ErrorFile) { $OutputLine += " 2> `"$ErrorFile`"" }
     }
 
     Write-Output $OutputLine
   } else {
     if ($OutNull) {
-      & $Executable @Args | Out-Null
+      & $Executable @ExecutableArgs | Out-Null
+    } elseif ($Silent) {
+      & $Executable @ExecutableArgs *> $null
     } elseif ($OutFile -and $ErrorFile) {
-      & $Executable @Args > $OutFile 2> $ErrorFile
+      & $Executable @ExecutableArgs > $OutFile 2> $ErrorFile
     } elseif ($OutFile) {
-      & $Executable @Args > $OutFile
+      & $Executable @ExecutableArgs > $OutFile
     } elseif ($ErrorFile) {
-      & $Executable @Args 2> $ErrorFile
+      & $Executable @ExecutableArgs 2> $ErrorFile
     } else {
-      & $Executable @Args
+      & $Executable @ExecutableArgs
     }
 
     if ($LastExitCode -ne 0) {
       $ErrorMessage = "Error: $([IO.Path]::GetFileName($Executable)) exited with code $($LastExitCode).`n"
 
       $ErrorMessage += "Invocation:`n"
-      $ErrorMessage += "  $Executable $Args`n"
+      $ErrorMessage += "  $Executable $ExecutableArgs`n"
 
       $ErrorMessage += "Call stack:`n"
       foreach ($Frame in @(Get-PSCallStack)) {
@@ -827,7 +831,7 @@ function Fetch-Dependencies {
 
   function Install-PythonWheel([string] $ModuleName, [string] $WheelFile, [string] $WheelURL, [string] $WheelHash) {
     try {
-      Invoke-Program "$(Get-PythonExecutable)" -c "import $ModuleName" *> $null
+      Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
     } catch {
       DownloadAndVerify $WheelURL "$BinaryCache\python\$WheelFile" $WheelHash
       Write-Output "Installing '$WheelFile' ..."
@@ -838,7 +842,7 @@ function Fetch-Dependencies {
   function Install-PythonModules() {
     # First ensure pip is installed, else bootstrap it
     try {
-      Invoke-Program "$(Get-PythonExecutable)" -m pip *> $null
+      Invoke-Program -Silent "$(Get-PythonExecutable)" -m pip
     } catch {
       Write-Output "Installing pip ..."
       Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m ensurepip -U --default-pip
