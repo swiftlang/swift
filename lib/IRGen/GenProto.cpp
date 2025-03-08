@@ -1617,6 +1617,10 @@ public:
       SILEntries = SILEntries.slice(1);
 
       bool isAsyncRequirement = requirement.hasAsync();
+      bool isCalleeAllocatedCoroutineRequirement =
+          requirement.isCalleeAllocatedCoroutine();
+      assert(!(isAsyncRequirement && isCalleeAllocatedCoroutineRequirement) &&
+             "async yield_once coroutines aren't implemented");
 
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::Method
@@ -1633,8 +1637,12 @@ public:
       llvm::Constant *witness = nullptr;
       if (Func) {
         assert(Func->isAsync() == isAsyncRequirement);
+        assert(Func->isCalleeAllocatedCoroutine() ==
+               isCalleeAllocatedCoroutineRequirement);
         if (Func->isAsync()) {
           witness = IGM.getAddrOfAsyncFunctionPointer(Func);
+        } else if (Func->isCalleeAllocatedCoroutine()) {
+          witness = IGM.getAddrOfCoroFunctionPointer(Func);
         } else {
 
           auto *conformance = dyn_cast<NormalProtocolConformance>(&Conformance);
@@ -1645,8 +1653,8 @@ public:
                 getSelfNominalTypeDecl()->isGenericContext() &&
                 !Func->getLoweredFunctionType()->isCoroutine())
             witness = IGM.getAddrOfWitnessTableProfilingThunk(f, *conformance);
-          else witness = f;
-
+          else
+            witness = f;
         }
       } else {
         // The method is removed by dead method elimination.
@@ -1655,6 +1663,10 @@ public:
           witness = llvm::ConstantExpr::getBitCast(
               IGM.getDeletedAsyncMethodErrorAsyncFunctionPointer(),
               IGM.FunctionPtrTy);
+        } else if (isCalleeAllocatedCoroutineRequirement) {
+          witness = llvm::ConstantExpr::getBitCast(
+              IGM.getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer(),
+              IGM.CoroFunctionPointerPtrTy);
         } else {
           witness = llvm::ConstantExpr::getBitCast(
               IGM.getDeletedMethodErrorFn(), IGM.FunctionPtrTy);
@@ -1670,6 +1682,8 @@ public:
       PointerAuthSchema schema =
           isAsyncRequirement
               ? IGM.getOptions().PointerAuth.AsyncProtocolWitnesses
+          : isCalleeAllocatedCoroutineRequirement
+              ? IGM.getOptions().PointerAuth.CoroProtocolWitnesses
               : IGM.getOptions().PointerAuth.ProtocolWitnesses;
       Table.addSignedPointer(witness, schema, requirement);
 
@@ -2028,6 +2042,8 @@ void ResilientWitnessTableBuilder::collectResilientWitnesses(
     if (Func) {
       if (Func->isAsync())
         witness = IGM.getAddrOfAsyncFunctionPointer(Func);
+      else if (Func->getLoweredFunctionType()->isCalleeAllocatedCoroutine())
+        witness = IGM.getAddrOfCoroFunctionPointer(Func);
       else {
         auto f = IGM.getAddrOfSILFunction(Func, NotForDefinition);
         if (isGenericConformance && IGM.getOptions().UseProfilingMarkerThunks &&
@@ -4373,6 +4389,8 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
 
   auto &schema = fnType->isAsync()
                      ? IGF.getOptions().PointerAuth.AsyncProtocolWitnesses
+                 : fnType->isCalleeAllocatedCoroutine()
+                     ? IGF.getOptions().PointerAuth.CoroProtocolWitnesses
                      : IGF.getOptions().PointerAuth.ProtocolWitnesses;
   auto authInfo = PointerAuthInfo::emit(IGF, schema, slot.getAddress(), member);
 

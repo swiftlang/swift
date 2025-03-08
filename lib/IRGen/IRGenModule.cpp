@@ -1225,6 +1225,14 @@ llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
       LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
 }
 
+llvm::Constant *IRGenModule::
+    getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer() {
+  return getAddrOfLLVMVariableOrGOTEquivalent(
+             LinkEntity::forKnownAsyncFunctionPointer(
+                 "swift_deletedCalleeAllocatedCoroutineMethodError"))
+      .getValue();
+}
+
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr);
 

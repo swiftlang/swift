@@ -605,6 +605,7 @@ struct SILDeclRef {
   }
   
   bool hasAsync() const;
+  bool isCalleeAllocatedCoroutine() const;
 
   /// Return the hash code for the SIL declaration.
   friend llvm::hash_code hash_value(swift::SILDeclRef ref) {

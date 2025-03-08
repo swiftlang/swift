@@ -10931,7 +10931,7 @@ bool AccessorDecl::isRequirementWithSynthesizedDefaultImplementation() const {
   if (!requiresFeatureCoroutineAccessors(getAccessorKind())) {
     return false;
   }
-  if (getStorage()->getOverrideLoc()) {
+  if (!requiresNewWitnessTableEntry()) {
     return false;
   }
   return getStorage()->requiresCorrespondingUnderscoredCoroutineAccessor(
