@@ -6,6 +6,11 @@
 // REQUIRES: swift_feature_IsolatedConformances
 // UNSUPPORTED: back_deployment_runtime
 
+// FIXME: WebAssembly doesn't currently have a good way to install the
+// "isCurrentGlobalActor" hook on which this checking depends. Disable
+// the test for the moment.
+// UNSUPPORTED: wasm
+
 protocol P {
   func f()
 }
