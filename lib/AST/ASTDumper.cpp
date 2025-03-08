@@ -2691,13 +2691,6 @@ namespace {
       printFoot();
     }
 
-    void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD, Label label) {
-      printCommon(PDD, "pound_diagnostic_decl", label);
-      printField(PDD->isError() ? "error" : "warning", Label::always("kind"));
-      printRec(PDD->getMessage(), Label::optional("message"));
-      printFoot();
-    }
-
     void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD, Label label) {
       printCommon(PGD, "precedence_group_decl", label);
       printName(PGD->getName(), Label::optional("name"));

@@ -984,7 +984,7 @@ public:
     DeclAttributes &attributes, bool ifConfigsAreDeclAttrs);
 
   /// Parse a #error or #warning diagnostic.
-  ParserResult<PoundDiagnosticDecl> parseDeclPoundDiagnostic();
+  ParserStatus parseDeclPoundDiagnostic();
 
   /// Parse a #line/#sourceLocation directive.
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation

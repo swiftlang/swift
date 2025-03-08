@@ -1708,9 +1708,6 @@ ERROR(invalid_autoclosure_pointer_conversion,none,
 ERROR(missing_initializer_def,PointsToFirstBadToken,
       "initializer requires a body", ())
 
-WARNING(pound_warning, none, "%0", (StringRef))
-ERROR(pound_error, none, "%0", (StringRef))
-
 // Attributes
 
 ERROR(operator_not_func,none,

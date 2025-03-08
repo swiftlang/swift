@@ -3522,17 +3522,6 @@ void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
   printASTNodes(decl->getBody()->getElements(), /*NeedIndent=*/false);
 }
 
-void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
-  /// TODO: Should we even print #error/#warning?
-  if (PDD->isError()) {
-    Printer << tok::pound_error;
-  } else {
-    Printer << tok::pound_warning;
-  }
-
-  Printer << "(\"" << PDD->getMessage()->getValue() << "\")";
-}
-
 void PrintAST::visitOpaqueTypeDecl(OpaqueTypeDecl *decl) {
   // TODO: If we introduce explicit opaque type decls, print them.
   assert(decl->getName().empty());

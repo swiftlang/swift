@@ -2597,11 +2597,7 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
                         });
       Status |= IfConfigResult;
     } else if (Tok.is(tok::pound_warning) || Tok.is(tok::pound_error)) {
-      auto PoundDiagnosticResult = parseDeclPoundDiagnostic();
-      Status |= PoundDiagnosticResult;
-      if (auto PDD = PoundDiagnosticResult.getPtrOrNull()) {
-        cases.emplace_back(PDD);
-      }
+      Status |= parseDeclPoundDiagnostic();
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeCaseStmtKeyword();

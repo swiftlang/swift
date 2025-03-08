@@ -525,8 +525,6 @@ private:
       SourceRange Braces(PGD->getLBraceLoc(), PGD->getRBraceLoc());
       if (!handleBraces(Braces, ContextLoc))
         return Action::Stop();
-    } else if (isa<PoundDiagnosticDecl>(D)) {
-      // TODO: add paren locations to PoundDiagnosticDecl
     }
 
     return Action::Continue();
@@ -1906,17 +1904,6 @@ private:
         return Ctx;
       }
 
-      return IndentContext {ContextLoc, !OutdentChecker::hasOutdent(SM, D)};
-    }
-
-    if (auto *PDD = dyn_cast<PoundDiagnosticDecl>(D)) {
-      SourceLoc ContextLoc = PDD->getStartLoc();
-      // FIXME: add paren source locations to the AST Node.
-      if (auto *SLE = PDD->getMessage()) {
-        SourceRange MessageRange = SLE->getSourceRange();
-        if (MessageRange.isValid() && overlapsTarget(MessageRange))
-          return IndentContext {ContextLoc, true};
-      }
       return IndentContext {ContextLoc, !OutdentChecker::hasOutdent(SM, D)};
     }
 

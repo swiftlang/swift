@@ -274,5 +274,12 @@ ERROR(bridged_error, none, "%0", (StringRef))
 ERROR(bridged_fatal_error, Fatal, "%0", (StringRef))
 REMARK(bridged_remark, none, "%0", (StringRef))
 
+//------------------------------------------------------------------------------
+// MARK: #warning and #error
+//------------------------------------------------------------------------------
+
+WARNING(pound_warning, none, "%0", (StringRef))
+ERROR(pound_error, none, "%0", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
