@@ -3123,12 +3123,9 @@ public:
   void visitSwitchStmt(SwitchStmt *S, Label label) {
     printCommon(S, "switch_stmt", label);
     printRec(S->getSubjectExpr(), Label::optional("subject_expr"));
-    printList(S->getRawCases(), [&](ASTNode N, Label label) {
-      if (N.is<Stmt*>())
-        printRec(N.get<Stmt*>(), label);
-      else
-        printRec(N.get<Decl*>(), label);
-    }, Label::optional("cases"));
+    printList(
+        S->getCases(), [&](CaseStmt *CS, Label label) { printRec(CS, label); },
+        Label::optional("cases"));
     printFoot();
   }
   void visitCaseStmt(CaseStmt *S, Label label) {

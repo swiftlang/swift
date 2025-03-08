@@ -5657,9 +5657,8 @@ void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
   visit(stmt->getSubjectExpr());
   Printer << " {";
   Printer.printNewline();
-  for (auto N : stmt->getRawCases()) {
-    if (N.is<Stmt*>())
-      visit(cast<CaseStmt>(N.get<Stmt*>()));
+  for (auto *CS : stmt->getCases()) {
+    visit(CS);
     Printer.printNewline();
   }
   indent();

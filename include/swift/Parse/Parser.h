@@ -1969,7 +1969,8 @@ public:
   ParserResult<CaseStmt> parseStmtCatch();
   ParserResult<Stmt> parseStmtForEach(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
-  ParserStatus parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive);
+  ParserStatus parseStmtCases(SmallVectorImpl<CaseStmt *> &cases,
+                              bool IsActive);
   ParserResult<CaseStmt> parseStmtCase(bool IsActive);
   ParserResult<Stmt> parseStmtPoundAssert();
 

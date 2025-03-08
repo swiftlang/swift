@@ -1059,8 +1059,8 @@ private:
         cs.setTargetFor(switchStmt, target);
       }
 
-      for (auto rawCase : switchStmt->getRawCases())
-        elements.push_back(makeElement(rawCase, locator));
+      for (auto &CS : switchStmt->getCases())
+        elements.push_back(makeElement(CS, locator));
     }
 
     createConjunction(elements, locator);
@@ -1963,18 +1963,12 @@ private:
 
     // Visit the raw cases.
     bool limitExhaustivityChecks = false;
-    for (auto rawCase : switchStmt->getRawCases()) {
-      if (auto decl = rawCase.dyn_cast<Decl *>()) {
-        visitDecl(decl);
-        continue;
-      }
-
-      auto caseStmt = cast<CaseStmt>(rawCase.get<Stmt *>());
+    for (auto *CS : switchStmt->getCases()) {
       // Body of the `case` statement can contain a `fallthrough`
       // statement that requires both source and destination
       // `case` preambles to be type-checked, so bodies of `case`
       // statements should be visited after preambles.
-      visitCaseStmtPreamble(caseStmt);
+      visitCaseStmtPreamble(CS);
     }
 
     for (auto *caseStmt : switchStmt->getCases()) {

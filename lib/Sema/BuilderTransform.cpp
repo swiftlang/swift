@@ -585,7 +585,7 @@ protected:
     // type-checked first.
     SmallVector<ASTNode, 4> doBody;
 
-    SmallVector<ASTNode, 4> cases;
+    SmallVector<CaseStmt *, 4> cases;
     SmallVector<Expr *, 4> caseVarRefs;
 
     for (auto *caseStmt : switchStmt->getCases()) {

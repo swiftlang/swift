@@ -2063,15 +2063,12 @@ Stmt *Traversal::visitSwitchStmt(SwitchStmt *S) {
   else
     return nullptr;
 
-  for (auto N : S->getRawCases()) {
-    if (Stmt *aCase = N.dyn_cast<Stmt*>()) {
-      assert(isa<CaseStmt>(aCase));
-      if (Stmt *aStmt = doIt(aCase)) {
-        assert(aCase == aStmt && "switch case remap not supported");
-        (void)aStmt;
-      } else
-        return nullptr;
-    }
+  for (auto *aCase : S->getCases()) {
+    if (Stmt *aStmt = doIt(aCase)) {
+      assert(aCase == aStmt && "switch case remap not supported");
+      (void)aStmt;
+    } else
+      return nullptr;
   }
 
   return S;
