@@ -408,6 +408,7 @@ NODE(DependentGenericInverseConformanceRequirement)
 NODE(Integer)
 NODE(NegativeInteger)
 NODE(DependentGenericParamValueMarker)
+NODE(CoroFunctionPointer)
 
 #undef CONTEXT_NODE
 #undef NODE

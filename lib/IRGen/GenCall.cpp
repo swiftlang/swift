@@ -87,9 +87,7 @@ static std::optional<Size> getCoroutineContextSize(IRGenModule &IGM,
   case SILCoroutineKind::None:
     llvm_unreachable("expand a coroutine");
   case SILCoroutineKind::YieldOnce2:
-    if (!IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce)
-      return std::nullopt;
-    LLVM_FALLTHROUGH;
+    return std::nullopt;
   case SILCoroutineKind::YieldOnce:
     return getYieldOnceCoroutineBufferSize(IGM);
   case SILCoroutineKind::YieldMany:
@@ -387,7 +385,7 @@ irgen::expandCallingConv(IRGenModule &IGM,
   case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
   case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
-    if (isCalleeAllocatedCoro && !IGM.getOptions().EmitYieldOnce2AsYieldOnce)
+    if (isCalleeAllocatedCoro)
       return IGM.SwiftCoroCC;
     if (isAsync)
       return IGM.SwiftAsyncCC;
@@ -578,7 +576,7 @@ namespace {
 
     /// Expand the components of the continuation entrypoint of the
     /// function type.
-    void expandCoroutineContinuationType(bool emitYieldOnce2AsYieldOnce);
+    void expandCoroutineContinuationType();
 
     // Expand the components for the async continuation entrypoint of the
     // function type (the function to be called on returning).
@@ -646,7 +644,7 @@ namespace {
     void expandExternalSignatureTypes();
 
     void expandCoroutineResult(bool forContinuation);
-    void expandCoroutineContinuationParameters(bool emitYieldOnce2AsYieldOnce);
+    void expandCoroutineContinuationParameters();
 
     void addIndirectThrowingResult();
     llvm::Type *getErrorRegisterType();
@@ -886,12 +884,11 @@ void SignatureExpansion::expandCoroutineResult(bool forContinuation) {
                    : llvm::StructType::get(IGM.getLLVMContext(), components);
 }
 
-void SignatureExpansion::expandCoroutineContinuationParameters(
-    bool emitYieldOnce2AsYieldOnce) {
+void SignatureExpansion::expandCoroutineContinuationParameters() {
   // The coroutine context.
   addCoroutineContextParameter();
 
-  if (FnType->isCalleeAllocatedCoroutine() && !emitYieldOnce2AsYieldOnce) {
+  if (FnType->isCalleeAllocatedCoroutine()) {
     // Whether this is an unwind resumption.
     ParamIRTypes.push_back(IGM.CoroAllocatorPtrTy);
   } else {
@@ -1950,12 +1947,10 @@ void SignatureExpansion::expandParameters(
   case SILCoroutineKind::None:
     break;
   case SILCoroutineKind::YieldOnce2:
-    if (!IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      addCoroutineContextParameter();
-      addCoroutineAllocatorParameter();
-      break;
-    }
-    LLVM_FALLTHROUGH;
+    addCoroutineContextParameter();
+    addCoroutineAllocatorParameter();
+
+    break;
   case SILCoroutineKind::YieldOnce:
   case SILCoroutineKind::YieldMany:
     addCoroutineContextParameter();
@@ -2121,10 +2116,9 @@ void SignatureExpansion::expandFunctionType(
   llvm_unreachable("bad abstract calling convention");
 }
 
-void SignatureExpansion::expandCoroutineContinuationType(
-    bool emitYieldOnce2AsYieldOnce) {
+void SignatureExpansion::expandCoroutineContinuationType() {
   expandCoroutineResult(/*for continuation*/ true);
-  expandCoroutineContinuationParameters(emitYieldOnce2AsYieldOnce);
+  expandCoroutineContinuationParameters();
 }
 
 llvm::Type *SignatureExpansion::getErrorRegisterType() {
@@ -2457,8 +2451,7 @@ Signature Signature::forCoroutineContinuation(IRGenModule &IGM,
                                               CanSILFunctionType fnType) {
   assert(fnType->isCoroutine());
   SignatureExpansion expansion(IGM, fnType, FunctionPointerKind(fnType));
-  expansion.expandCoroutineContinuationType(
-      IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce);
+  expansion.expandCoroutineContinuationType();
   return expansion.getSignature();
 }
 
@@ -2768,15 +2761,15 @@ public:
     assert(!coroStaticFrame.isValid());
     assert(!coroAllocator);
 
-    if (IsCalleeAllocatedCoroutine &&
-        !IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+    if (IsCalleeAllocatedCoroutine) {
       llvm::Value *bufferSize32;
       std::tie(calleeFunction, bufferSize32) =
           getCoroFunctionAndSize(IGF, CurCallee.getFunctionPointer());
       auto *bufferSize = IGF.Builder.CreateZExt(bufferSize32, IGF.IGM.SizeTy);
       coroStaticFrame = emitAllocYieldOnce2CoroutineFrame(IGF, bufferSize);
-      // TODO: Optimize allocator kind (e.g. async callers only need to use the
-      //     TaskAllocator if the coroutine is suspended across an await).
+      // TODO: CoroutineAccessors: Optimize allocator kind (e.g. async callers
+      //                           only need to use the TaskAllocator if the
+      //                           coroutine is suspended across an await).
       coroAllocator = emitYieldOnce2CoroutineAllocator(
           IGF, IGF.getDefaultCoroutineAllocatorKind());
     }
@@ -2878,11 +2871,8 @@ public:
     switch (origCalleeType->getCoroutineKind()) {
     case SILCoroutineKind::YieldOnce2:
       // Pass along the coroutine buffer and allocator.
-      if (!IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-        original.transferInto(adjusted, 2);
-        break;
-      }
-      LLVM_FALLTHROUGH;
+      original.transferInto(adjusted, 2);
+      break;
     case SILCoroutineKind::YieldOnce:
     case SILCoroutineKind::YieldMany:
       // Pass along the coroutine buffer.
@@ -4974,10 +4964,8 @@ irgen::getCoroutineResumeFunctionPointerAuth(IRGenModule &IGM,
     return { IGM.getOptions().PointerAuth.YieldManyResumeFunctions,
              PointerAuthEntity::forYieldTypes(fnType) };
   case SILCoroutineKind::YieldOnce2:
-    if (!IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce)
-      return {IGM.getOptions().PointerAuth.YieldOnce2ResumeFunctions,
-              PointerAuthEntity::forYieldTypes(fnType)};
-    LLVM_FALLTHROUGH;
+    return {IGM.getOptions().PointerAuth.YieldOnce2ResumeFunctions,
+            PointerAuthEntity::forYieldTypes(fnType)};
   case SILCoroutineKind::YieldOnce:
     return { IGM.getOptions().PointerAuth.YieldOnceResumeFunctions,
              PointerAuthEntity::forYieldTypes(fnType) };
@@ -5163,13 +5151,11 @@ static llvm::Constant *getCoroAllocWrapperFn(IRGenModule &IGM) {
       /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::SwiftCoro);
 }
 
-void irgen::emitYieldOnce2CoroutineEntry(
-    IRGenFunction &IGF, LinkEntity coroFunction, CanSILFunctionType fnType,
-    NativeCCEntryPointArgumentEmission &emission) {
-  auto *buffer = emission.getCoroutineBuffer();
-  auto cfp = cast<llvm::GlobalVariable>(
-      IGF.IGM.getAddrOfCoroFunctionPointer(coroFunction));
-  llvm::Value *allocator = emission.getCoroutineAllocator();
+void irgen::emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
+                                         CanSILFunctionType fnType,
+                                         llvm::Value *buffer,
+                                         llvm::Value *allocator,
+                                         llvm::GlobalVariable *cfp) {
   IGF.setCoroutineAllocator(allocator);
   auto isSwiftCoroCCAvailable =
       IGF.IGM.SwiftCoroCC == llvm::CallingConv::SwiftCoro;
@@ -5181,6 +5167,15 @@ void irgen::emitYieldOnce2CoroutineEntry(
       IGF, fnType, buffer, llvm::Intrinsic::coro_id_retcon_once_dynamic,
       Size(-1) /*dynamic-to-IRGen size*/, IGF.IGM.getCoroStaticFrameAlignment(),
       {cfp, allocator}, allocFn, deallocFn, {});
+}
+void irgen::emitYieldOnce2CoroutineEntry(
+    IRGenFunction &IGF, LinkEntity coroFunction, CanSILFunctionType fnType,
+    NativeCCEntryPointArgumentEmission &emission) {
+  auto *buffer = emission.getCoroutineBuffer();
+  auto cfp = cast<llvm::GlobalVariable>(
+      IGF.IGM.getAddrOfCoroFunctionPointer(coroFunction));
+  llvm::Value *allocator = emission.getCoroutineAllocator();
+  emitYieldOnce2CoroutineEntry(IGF, fnType, buffer, allocator, cfp);
 }
 
 static Address createOpaqueBufferAlloca(IRGenFunction &IGF,
@@ -5233,10 +5228,6 @@ void irgen::emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF,
 
 void irgen::emitDeallocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
                                                 StackAddress frame) {
-  if (IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-    assert(!frame.isValid());
-    return;
-  }
   assert(frame.isValid());
   emitDeallocCoroStaticFrame(IGF, frame);
 }
@@ -5352,8 +5343,7 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
 
   // Perform the yield.
   llvm::Value *isUnwind = nullptr;
-  if (coroutineType->isCalleeAllocatedCoroutine() &&
-      !IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+  if (coroutineType->isCalleeAllocatedCoroutine()) {
     IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_retcon,
                                     {IGF.IGM.CoroAllocatorPtrTy}, yieldArgs);
     isUnwind = llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0);

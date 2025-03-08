@@ -1842,3 +1842,14 @@ bool SILDeclRef::hasAsync() const {
   }
   return getAbstractClosureExpr()->isBodyAsync();
 }
+
+bool SILDeclRef::isCalleeAllocatedCoroutine() const {
+  if (!hasDecl())
+    return false;
+
+  auto *accessor = dyn_cast<AccessorDecl>(getDecl());
+  if (!accessor)
+    return false;
+
+  return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());
+}

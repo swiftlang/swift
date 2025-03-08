@@ -585,6 +585,11 @@ class LinkEntity {
     /// The pointer is the llvm::Function* for a partial apply forwarder.
     PartialApplyForwarderCoroFunctionPointer,
 
+    /// An coro function pointer to a function which is known to exist whose
+    /// name is known.
+    /// The pointer is a const char* of the name.
+    KnownCoroFunctionPointer,
+
     /// An coro function pointer for a distributed accessor (method or
     /// property).
     /// The pointer is a SILFunction*.
@@ -1550,6 +1555,15 @@ public:
                       declRef.getAbstractFunctionDecl());
     entity.SecondaryPointer =
         reinterpret_cast<void *>(static_cast<uintptr_t>(declRef.kind));
+    return entity;
+  }
+
+  static LinkEntity forKnownCoroFunctionPointer(const char *name) {
+    LinkEntity entity;
+    entity.Pointer = const_cast<char *>(name);
+    entity.SecondaryPointer = nullptr;
+    entity.Data =
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::KnownCoroFunctionPointer));
     return entity;
   }
 

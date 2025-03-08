@@ -438,6 +438,23 @@ public:
 
   bool isAsync() const { return Value & IsAsyncMask; }
 
+  bool isCalleeAllocatedCoroutine() const {
+    switch (getKind()) {
+    case Kind::Method:
+    case Kind::Init:
+    case Kind::Getter:
+    case Kind::Setter:
+    case Kind::ModifyCoroutine:
+    case Kind::ReadCoroutine:
+      return false;
+    case Kind::Read2Coroutine:
+    case Kind::Modify2Coroutine:
+      return true;
+    }
+  }
+
+  bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
+
   uint16_t getExtraDiscriminator() const {
     return (Value >> ExtraDiscriminatorShift);
   }
@@ -648,6 +665,26 @@ public:
   bool isInstance() const { return Value & IsInstanceMask; }
 
   bool isAsync() const { return Value & IsAsyncMask; }
+
+  bool isCalleeAllocatedCoroutine() const {
+    switch (getKind()) {
+    case Kind::BaseProtocol:
+    case Kind::Method:
+    case Kind::Init:
+    case Kind::Getter:
+    case Kind::Setter:
+    case Kind::ReadCoroutine:
+    case Kind::ModifyCoroutine:
+    case Kind::AssociatedTypeAccessFunction:
+    case Kind::AssociatedConformanceAccessFunction:
+      return false;
+    case Kind::Read2Coroutine:
+    case Kind::Modify2Coroutine:
+      return true;
+    }
+  }
+
+  bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
 
   bool isSignedWithAddress() const {
     return getKind() != Kind::BaseProtocol;

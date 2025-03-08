@@ -231,6 +231,10 @@ namespace irgen {
   emitYieldOnce2CoroutineEntry(IRGenFunction &IGF, LinkEntity coroFunction,
                                CanSILFunctionType coroutineType,
                                NativeCCEntryPointArgumentEmission &emission);
+  void emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
+                                    CanSILFunctionType fnType,
+                                    llvm::Value *buffer, llvm::Value *allocator,
+                                    llvm::GlobalVariable *cfp);
 
   Address emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF);
   void emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF, Address buffer);

@@ -3722,7 +3722,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
         reinterpret_cast<void **>(&chainRoot->implementationFunction),
         reinterpret_cast<void *const *>(&previous->implementationFunction),
         replacedFunctionKey->getExtraDiscriminator(),
-        !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+        !replacedFunctionKey->isData(), /*allowNull*/ false);
   }
 
   // First populate the current replacement's chain entry.
@@ -3733,7 +3733,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       reinterpret_cast<void **>(&currentEntry->implementationFunction),
       reinterpret_cast<void *const *>(&chainRoot->implementationFunction),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+      !replacedFunctionKey->isData(), /*allowNull*/ false);
 
   currentEntry->next = chainRoot->next;
 
@@ -3744,7 +3744,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       reinterpret_cast<void **>(&chainRoot->implementationFunction),
       reinterpret_cast<void *>(getReplacementFunction()),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync());
+      !replacedFunctionKey->isData());
 }
 
 void DynamicReplacementDescriptor::disableReplacement() const {
@@ -3769,7 +3769,7 @@ void DynamicReplacementDescriptor::disableReplacement() const {
       reinterpret_cast<void **>(&previous->implementationFunction),
       reinterpret_cast<void *const *>(&thisEntry->implementationFunction),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+      !replacedFunctionKey->isData(), /*allowNull*/ false);
 }
 
 /// An automatic dynamic replacement entry.
