@@ -370,16 +370,14 @@ static bool _checkWitnessTableIsolation(
   const Metadata *type,
   const WitnessTable *wtable,
   llvm::ArrayRef<const void *> conditionalArgs,
-  const Metadata *&globalActorIsolationType,
-  const WitnessTable *&globalActorIsolationWitnessTable
+  ConformanceExecutionContext &context
 );
 
 template<>
 const WitnessTable *
 ProtocolConformanceDescriptor::getWitnessTable(
     const Metadata *type,
-    const Metadata *&globalActorIsolationType,
-    const WitnessTable *&globalActorIsolationWitnessTable
+    ConformanceExecutionContext &context
 ) const {
   // If needed, check the conditional requirements.
   llvm::SmallVector<const void *, 8> conditionalArgs;
@@ -401,8 +399,7 @@ ProtocolConformanceDescriptor::getWitnessTable(
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
         },
-        &globalActorIsolationType,
-        &globalActorIsolationWitnessTable);
+        &context);
     if (error)
       return nullptr;
   }
@@ -419,9 +416,7 @@ ProtocolConformanceDescriptor::getWitnessTable(
   // Check the global-actor isolation for this conformance, combining it with
   // any global-actor isolation determined based on the conditional
   // requirements above.
-  if (_checkWitnessTableIsolation(
-          type, wtable, conditionalArgs, globalActorIsolationType,
-          globalActorIsolationWitnessTable))
+  if (_checkWitnessTableIsolation(type, wtable, conditionalArgs, context))
     return nullptr;
 
   return wtable;
@@ -430,14 +425,12 @@ ProtocolConformanceDescriptor::getWitnessTable(
 ConformanceLookupResult ConformanceLookupResult::fromConformance(
     const Metadata *type,
     const ProtocolConformanceDescriptor *conformanceDescriptor) {
-  const Metadata *globalActorIsolationType = nullptr;
-  const WitnessTable *globalActorIsolationWitnessTable = nullptr;
-  auto wtable = conformanceDescriptor->getWitnessTable(
-      type, globalActorIsolationType, globalActorIsolationWitnessTable);
+  ConformanceExecutionContext context;
+  auto wtable = conformanceDescriptor->getWitnessTable(type, context);
   return {
     wtable,
-    globalActorIsolationType,
-    globalActorIsolationWitnessTable
+    context.globalActorIsolationType,
+    context.globalActorIsolationWitnessTable
   };
 }
 
@@ -449,8 +442,7 @@ static bool _checkWitnessTableIsolation(
   const Metadata *type,
   const WitnessTable *wtable,
   llvm::ArrayRef<const void *> conditionalArgs,
-  const Metadata *&globalActorIsolationType,
-  const WitnessTable *&globalActorIsolationWitnessTable
+  ConformanceExecutionContext &context
 ) {
   // If there's no protocol conformance descriptor, do nothing.
   auto description = wtable->getDescription();
@@ -481,8 +473,8 @@ static bool _checkWitnessTableIsolation(
 
   // If the global actor isolation from this conformance conflicts with
   // the one we already have, fail.
-  if (globalActorIsolationType &&
-      globalActorIsolationType != myGlobalActorIsolationType)
+  if (context.globalActorIsolationType &&
+      context.globalActorIsolationType != myGlobalActorIsolationType)
     return true;
 
   // Dig out the witness table.
@@ -495,8 +487,8 @@ static bool _checkWitnessTableIsolation(
   if (!myWitnessTable)
     return true;
 
-  globalActorIsolationType = myGlobalActorIsolationType;
-  globalActorIsolationWitnessTable = myWitnessTable.witnessTable;
+  context.globalActorIsolationType = myGlobalActorIsolationType;
+  context.globalActorIsolationWitnessTable = myWitnessTable.witnessTable;
   return false;
 }
 
@@ -1323,11 +1315,10 @@ swift_conformsToProtocolMaybeInstantiateSuperclasses(
 }
 
 static const WitnessTable *
-swift_conformsToProtocolCommonIsolatedImpl(
+swift_conformsToProtocolWithExecutionContextImpl(
     const Metadata *const type,
     const ProtocolDescriptor *protocol,
-    const Metadata **globalActorIsolationType,
-    const WitnessTable **globalActorIsolationWitnessTable) {
+    ConformanceExecutionContext *context) {
   ConformanceLookupResult found;
   bool hasUninstantiatedSuperclass;
 
@@ -1350,33 +1341,17 @@ swift_conformsToProtocolCommonIsolatedImpl(
             type, protocol, true /*instantiateSuperclassMetadata*/);
 
   // Check for isolated conformances.
-  if (found.globalActorIsolationType) {
-    // If we were asked to report the global actor isolation, do so.
-    if (globalActorIsolationType) {
-      // If the existing global actor isolation differs from the one we
-      // computed, it's a conflict. Fail.
-      if (*globalActorIsolationType &&
-          *globalActorIsolationType != found.globalActorIsolationType)
-        return nullptr;
+  if (found.globalActorIsolationType && context) {
+    // If the existing global actor isolation differs from the one we
+    // computed, it's a conflict. Fail.
+    if (context->globalActorIsolationType &&
+        context->globalActorIsolationType != found.globalActorIsolationType)
+      return nullptr;
 
-      // Report the global actor isolation.
-      *globalActorIsolationType = found.globalActorIsolationType;
-      if (globalActorIsolationWitnessTable) {
-        *globalActorIsolationWitnessTable =
-            found.globalActorIsolationWitnessTable;
-      }
-    } else {
-      // The concurrency library provides a function to check whether we
-      // are executing on the given global actor.
-      if (!_swift_task_isCurrentGlobalActorHook)
-        return nullptr;
-
-      // Check whether we are running on this global actor.
-      if (!_swift_task_isCurrentGlobalActorHook(
-              found.globalActorIsolationType,
-              found.globalActorIsolationWitnessTable))
-        return nullptr;
-    }
+    // Report the global actor isolation.
+    context->globalActorIsolationType = found.globalActorIsolationType;
+    context->globalActorIsolationWitnessTable =
+        found.globalActorIsolationWitnessTable;
   }
 
   return found.witnessTable;
@@ -1386,8 +1361,8 @@ static const WitnessTable *
 swift_conformsToProtocolCommonImpl(
     const Metadata *const type,
     const ProtocolDescriptor *protocol) {
-  return swift_conformsToProtocolCommonIsolatedImpl(
-      type, protocol, nullptr, nullptr);
+  return swift_conformsToProtocolWithExecutionContextImpl(
+      type, protocol, nullptr);
 }
 
 static const WitnessTable *
@@ -1408,6 +1383,26 @@ swift_conformsToProtocolImpl(const Metadata *const type,
   // swift_conformsToProtocolCommon.
   return swift_conformsToProtocolCommonImpl(
       type, static_cast<const ProtocolDescriptor *>(protocol));
+}
+
+static bool swift_isInConformanceExecutionContextImpl(
+    const Metadata *type,
+    const ConformanceExecutionContext *context) {
+  if (!context)
+    return true;
+
+  if (context->globalActorIsolationType) {
+    if (!_swift_task_isCurrentGlobalActorHook)
+      return false;
+
+    // Check whether we are running on this global actor.
+    if (!_swift_task_isCurrentGlobalActorHook(
+           context->globalActorIsolationType,
+           context->globalActorIsolationWitnessTable))
+      return false;
+  }
+
+  return true;
 }
 
 const ContextDescriptor *
@@ -1569,8 +1564,7 @@ checkGenericRequirement(
     SubstGenericParameterFn substGenericParam,
     SubstDependentWitnessTableFn substWitnessTable,
     llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed,
-    const Metadata **globalActorIsolationType,
-    const WitnessTable **globalActorIsolationWitnessTable) {
+    ConformanceExecutionContext *context) {
   assert(!req.getFlags().isPackRequirement());
 
   // Make sure we understand the requirement we're dealing with.
@@ -1590,8 +1584,7 @@ checkGenericRequirement(
   case GenericRequirementKind::Protocol: {
     const WitnessTable *witnessTable = nullptr;
     if (!_conformsToProtocol(nullptr, subjectType, req.getProtocol(),
-                             &witnessTable, globalActorIsolationType,
-                             globalActorIsolationWitnessTable)) {
+                             &witnessTable, context)) {
       const char *protoName =
           req.getProtocol() ? req.getProtocol().getName() : "<null>";
       return TYPE_LOOKUP_ERROR_FMT(
@@ -1689,8 +1682,7 @@ checkGenericPackRequirement(
     SubstGenericParameterFn substGenericParam,
     SubstDependentWitnessTableFn substWitnessTable,
     llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed,
-    const Metadata **globalActorIsolationType,
-    const WitnessTable **globalActorIsolationWitnessTable) {
+    ConformanceExecutionContext *context) {
   assert(req.getFlags().isPackRequirement());
 
   // Make sure we understand the requirement we're dealing with.
@@ -1717,8 +1709,7 @@ checkGenericPackRequirement(
 
       const WitnessTable *witnessTable = nullptr;
       if (!_conformsToProtocol(nullptr, elt, req.getProtocol(),
-                               &witnessTable, globalActorIsolationType,
-                               globalActorIsolationWitnessTable)) {
+                               &witnessTable, context)) {
         const char *protoName =
             req.getProtocol() ? req.getProtocol().getName() : "<null>";
         return TYPE_LOOKUP_ERROR_FMT(
@@ -2121,7 +2112,7 @@ checkInvertibleRequirements(const Metadata *type,
         [&substFn](const Metadata *type, unsigned index) {
           return substFn.getWitnessTable(type, index);
         },
-        nullptr, nullptr);
+        nullptr);
     if (error)
       return error;
   }
@@ -2136,20 +2127,17 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
     SubstGenericParameterFn substGenericParam,
     SubstGenericParameterOrdinalFn substGenericParamOrdinal,
     SubstDependentWitnessTableFn substWitnessTable,
-    const Metadata **globalActorIsolationType,
-    const WitnessTable **globalActorIsolationWitnessTable) {
+    ConformanceExecutionContext *context) {
   // The suppressed conformances for each generic parameter.
   llvm::SmallVector<InvertibleProtocolSet, 4> allSuppressed;
 
   for (const auto &req : requirements) {
     if (req.getFlags().isPackRequirement()) {
-      auto error = checkGenericPackRequirement(
-          req, extraArguments,
-          substGenericParam,
-          substWitnessTable,
-          allSuppressed,
-          globalActorIsolationType,
-          globalActorIsolationWitnessTable);
+      auto error = checkGenericPackRequirement(req, extraArguments,
+                                               substGenericParam,
+                                               substWitnessTable,
+                                               allSuppressed,
+                                               context);
       if (error)
         return error;
     } else if (req.getFlags().isValueRequirement()) {
@@ -2164,8 +2152,7 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
                                            substGenericParam,
                                            substWitnessTable,
                                            allSuppressed,
-                                           globalActorIsolationType,
-                                           globalActorIsolationWitnessTable);
+                                           context);
       if (error)
         return error;
     }
@@ -2248,6 +2235,9 @@ const Metadata *swift::findConformingSuperclass(
   assert(conformingType);
   return conformingType;
 }
+
+size_t swift::swift_ConformanceExecutionContextSize =
+    sizeof(ConformanceExecutionContext);
 
 #define OVERRIDE_PROTOCOLCONFORMANCE COMPATIBILITY_OVERRIDE
 #include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

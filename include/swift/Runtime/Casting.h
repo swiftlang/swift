@@ -260,17 +260,31 @@ const WitnessTable *
 swift_conformsToProtocolCommon(const Metadata *type,
                                const ProtocolDescriptor *protocol);
 
+/// The size of the ConformanceExecutionContext structure.
+SWIFT_RUNTIME_EXPORT
+size_t swift_ConformanceExecutionContextSize;
+
 /// Check whether a type conforms to a given native Swift protocol. This
 /// is similar to swift_conformsToProtocolCommon, but allows the caller to
-/// capture the global actor isolation of the conformance rather than
-/// checking that the code is currently executing on that global actor.
+/// either capture the execution context (in *context).
 SWIFT_RUNTIME_EXPORT
 const WitnessTable *
-swift_conformsToProtocolCommonIsolated(
+swift_conformsToProtocolWithExecutionContext(
     const Metadata *type,
     const ProtocolDescriptor *protocol,
-    const Metadata **globalActorIsolationType,
-    const WitnessTable **globalActorIsolationWitnessTable);
+    ConformanceExecutionContext *context);
+
+/// Determine whether this function is being executed within the execution
+/// context for a conformance. For example, if the conformance is
+/// isolated to a given global actor, checks whether this code is running on
+/// that global actor's executor.
+///
+/// The context should have been filled in by
+/// swift_conformsToProtocolWithExecutionContext.
+SWIFT_RUNTIME_EXPORT
+bool swift_isInConformanceExecutionContext(
+    const Metadata *type,
+    const ConformanceExecutionContext *context);
 
 } // end namespace swift
 

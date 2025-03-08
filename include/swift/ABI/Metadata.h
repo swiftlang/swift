@@ -2745,6 +2745,10 @@ struct TargetGlobalActorReference {
   TargetRelativeProtocolConformanceDescriptorPointer<Runtime> conformance;
 };
 
+/// Describes the context of a protocol conformance that is relevant when
+/// the conformance is used, such as global actor isolation.
+struct ConformanceExecutionContext;
+
 /// The structure of a protocol conformance.
 ///
 /// This contains enough static information to recover the witness table for a
@@ -2885,15 +2889,12 @@ public:
   /// necessary, or return null if the conformance does not apply to the
   /// type.
   ///
-  /// The globalActorIsolationType will be populated with the type of the global
-  /// actor to which this conformance is isolated, or NULL if this is a
-  /// nonisolated conformances. When it is isolated,
-  /// globalActorIsolationConformance is the conformance of
-  /// globalActorIsolationType to the GlobalActor protocol.
+  /// The context will be populated with any information that needs to be
+  /// checked before this witness table can be used within a given execution
+  /// context.
   const swift::TargetWitnessTable<Runtime> *
   getWitnessTable(const TargetMetadata<Runtime> *type,
-                  const Metadata *&globalActorIsolationType,
-                  const WitnessTable *&globalActorIsolationConformance) const;
+                  ConformanceExecutionContext &context) const;
 
   /// Retrieve the resilient witnesses.
   llvm::ArrayRef<ResilientWitness> getResilientWitnesses() const {

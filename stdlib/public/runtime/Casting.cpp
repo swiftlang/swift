@@ -534,13 +534,11 @@ bool swift::_conformsToProtocol(
     const Metadata *type,
     ProtocolDescriptorRef protocol,
     const WitnessTable **conformance,
-    const Metadata **globalActorIsolationType,
-    const WitnessTable **globalActorIsolationWitnessTable) {
+    ConformanceExecutionContext *context) {
   // Look up the witness table for protocols that need them.
   if (protocol.needsWitnessTable()) {
-    auto witness = swift_conformsToProtocolCommonIsolated(
-        type, protocol.getSwiftProtocol(), globalActorIsolationType,
-        globalActorIsolationWitnessTable);
+    auto witness = swift_conformsToProtocolWithExecutionContext(
+        type, protocol.getSwiftProtocol(), context);
     if (!witness)
       return false;
     if (conformance)
@@ -612,6 +610,22 @@ bool swift::_conformsToProtocol(
   return false;
 }
 
+bool swift::_conformsToProtocolInContext(
+    const OpaqueValue *value,
+    const Metadata *type,
+    ProtocolDescriptorRef protocol,
+    const WitnessTable **conformance) {
+
+  ConformanceExecutionContext context;
+  if (!_conformsToProtocol(value, type, protocol, conformance, &context))
+    return false;
+
+  if (!swift_isInConformanceExecutionContext(type, &context))
+    return false;
+
+  return true;
+}
+
 /// Check whether a type conforms to the given protocols, filling in a
 /// list of conformances.
 static bool _conformsToProtocols(const OpaqueValue *value,
@@ -629,8 +643,8 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   }
 
   for (auto protocol : existentialType->getProtocols()) {
-    if (!_conformsToProtocol(
-            value, type, protocol, conformances, nullptr, nullptr))
+    if (!_conformsToProtocolInContext(
+            value, type, protocol, conformances))
       return false;
     if (conformances != nullptr && protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);
