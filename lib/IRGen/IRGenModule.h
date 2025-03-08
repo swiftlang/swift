@@ -1175,6 +1175,9 @@ public:
                                         bool willBeRelativelyAddressed = false,
                                         bool useOSLogSection = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
+  llvm::Constant *
+  getAddrOfGlobalIdentifierString(StringRef utf8,
+                                  bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfObjCSelectorRef(StringRef selector);
   llvm::Constant *getAddrOfObjCSelectorRef(SILDeclRef method);
   std::string getObjCSelectorName(SILDeclRef method);

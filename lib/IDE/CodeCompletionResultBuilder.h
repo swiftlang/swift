@@ -18,6 +18,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CodeCompletionResult.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -374,6 +375,14 @@ public:
       addTypeAnnotation(Annotation);
   }
 
+  StringRef escapeWithBackticks(StringRef Word,
+                                llvm::SmallString<16> &Escaped) {
+    Escaped.append("`");
+    Escaped.append(Word);
+    Escaped.append("`");
+    return Escaped;
+  }
+
   StringRef escapeKeyword(StringRef Word, bool escapeAllKeywords,
                           llvm::SmallString<16> &EscapedKeyword) {
     EscapedKeyword.clear();
@@ -382,18 +391,16 @@ public:
 #define KEYWORD(kw) .Case(#kw, true)
       shouldEscape = llvm::StringSwitch<bool>(Word)
 #include "swift/AST/TokenKinds.def"
-        .Default(false);
+                         .Default(Lexer::identifierMustAlwaysBeEscaped(Word));
     } else {
-      shouldEscape = !canBeArgumentLabel(Word);
+      shouldEscape = !canBeArgumentLabel(Word) ||
+                     Lexer::identifierMustAlwaysBeEscaped(Word);
     }
 
     if (!shouldEscape)
       return Word;
 
-    EscapedKeyword.append("`");
-    EscapedKeyword.append(Word);
-    EscapedKeyword.append("`");
-    return EscapedKeyword;
+    return escapeWithBackticks(Word, EscapedKeyword);
   }
 
   void addCallParameterColon() {

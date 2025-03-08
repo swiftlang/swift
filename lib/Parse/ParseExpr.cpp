@@ -2170,7 +2170,8 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
     // the syntax for referring to the function pointer (foo(_:)),
     auto escaped = Tok.isEscapedIdentifier();
     auto underscore = Tok.is(tok::kw__) || (escaped && text == "_");
-    if (escaped && !underscore && canBeArgumentLabel(text)) {
+    if (escaped && !underscore && canBeArgumentLabel(text) &&
+        Lexer::isIdentifier(text)) {
       SourceLoc start = Tok.getLoc();
       SourceLoc end = start.getAdvancedLoc(Tok.getLength());
       diagnose(Tok, diag::escaped_parameter_name, text)
