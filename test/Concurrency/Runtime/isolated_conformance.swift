@@ -10,6 +10,7 @@
 // "isCurrentGlobalActor" hook on which this checking depends. Disable
 // the test for the moment.
 // UNSUPPORTED: wasm
+// UNSUPPORTED: CPU=wasm32
 
 protocol P {
   func f()
