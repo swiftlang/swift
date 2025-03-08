@@ -34,10 +34,6 @@ class SwiftDocCRender(product.Product):
     def is_before_build_script_impl_product(cls):
         return False
 
-    @classmethod
-    def is_swiftpm_unified_build_product(cls):
-        return False
-
     def should_build(self, host_target):
         # Swift-DocC-Render is a pre-built, installable artifact.
         return False

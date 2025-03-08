@@ -46,8 +46,8 @@ class SwiftSyntax(product.Product):
         return False
 
     @classmethod
-    def is_swiftpm_unified_build_product(cls):
-        return True
+    def swiftpm_unified_build_product_arena(cls):
+        return 'unified'
 
     def run_swiftsyntax_build_script(self, target, command, additional_params=[]):
         script_path = os.path.join(self.source_dir, 'SwiftSyntaxDevUtils')

@@ -89,13 +89,16 @@ class Product(object):
         return False
 
     @classmethod
-    def is_swiftpm_unified_build_product(cls):
-        """is_swiftpm_unified_build_product -> bool
+    def swiftpm_unified_build_product_arena(cls):
+        """swiftpm_unified_build_product_arena -> Optional[str]
 
-        Whether this product should be built in the unified build of SwiftPM
-        products.
+        If this product should be built in the unified build of SwiftPM
+        products, a name that identifies the build directory for the unified
+        build. This should be 'unified' or 'foundationtests'. Foundation and
+        the rest can't share a unified build because of
+        https://github.com/swiftlang/swift-package-manager/issues/8344
         """
-        return False
+        return None
 
     @classmethod
     def is_nondarwin_only_build_product(cls):

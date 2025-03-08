@@ -893,9 +893,8 @@ class BuildScriptInvocation(object):
     def execute_product_build_steps(self, product_class, host_target):
         product_source = product_class.product_source_name()
         product_name = product_class.product_name()
-        if product_class.is_swiftpm_unified_build_product():
-            build_dir = self.workspace.swiftpm_unified_build_dir(
-                host_target)
+        if arena := product_class.swiftpm_unified_build_product_arena():
+            build_dir = self.workspace.swiftpm_unified_build_dir(arena, host_target)
         else:
             build_dir = self.workspace.build_dir(
                 host_target, product_name)

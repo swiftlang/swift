@@ -19,4 +19,7 @@
    <FileRef location = "group:../../../../swift-tools-support-core"></FileRef>
    <FileRef location = "group:../../../../swiftpm"></FileRef>
    <FileRef location = "group:../../../../yams"></FileRef>
+   <FileRef location = "group:../../../../swift-foundation-icu"></FileRef>
+   <FileRef location = "group:../../../../swift-foundation"></FileRef>
+   <FileRef location = "group:../../../../swift-corelibs-foundation"></FileRef>
 </Workspace>
