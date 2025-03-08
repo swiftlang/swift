@@ -335,6 +335,7 @@ EXPECTED_DEFAULTS = {
     'llvm_install_components': defaults.llvm_install_components(),
     'clean_install_destdir': False,
     'use_linker': None,
+    'enable_new_runtime_build': False,
 }
 
 
@@ -890,4 +891,5 @@ EXPECTED_OPTIONS = [
 
     StrOption('--llvm-install-components'),
     ChoicesOption('--use-linker', dest='use_linker', choices=['gold', 'lld']),
+    EnableOption('--enable-new-runtime-build', dest='enable_new_runtime_build'),
 ]
