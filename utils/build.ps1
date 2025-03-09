@@ -1038,7 +1038,6 @@ function Build-CMakeProject {
     [string[]] $UseMSVCCompilers = @(), # C,CXX
     [string[]] $UseBuiltCompilers = @(), # ASM,C,CXX,Swift
     [string[]] $UsePinnedCompilers = @(), # ASM,C,CXX,Swift
-    [switch] $UseSwiftSwiftDriver = $false,
     [switch] $AddAndroidCMakeEnv = $false,
     [switch] $UseGNUDriver = $false,
     [string] $SwiftSDK = "",
@@ -1076,14 +1075,6 @@ function Build-CMakeProject {
       } else {
         $env:SCCACHE_DIR = $Cache
       }
-    }
-    if ($UseSwiftSwiftDriver) {
-      $env:SWIFT_DRIVER_SWIFT_FRONTEND_EXEC = ([IO.Path]::Combine($CompilersBinaryCache, "bin", "swift-frontend.exe"))
-    }
-
-    # TODO(compnerd) workaround swiftc.exe symlink not existing.
-    if ($UseSwiftSwiftDriver) {
-      Copy-Item -Force ([IO.Path]::Combine($DriverBinaryCache, "bin", "swift-driver.exe")) ([IO.Path]::Combine($DriverBinaryCache, "bin", "swiftc.exe"))
     }
 
     # Add additional defines (unless already present)
@@ -1222,9 +1213,7 @@ function Build-CMakeProject {
     if ($UsePinnedCompilers.Contains("Swift") -Or $UseBuiltCompilers.Contains("Swift")) {
       $SwiftArgs = @()
 
-      if ($UseSwiftSwiftDriver) {
-        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER ([IO.Path]::Combine($DriverBinaryCache, "bin", "swiftc.exe"))
-      } elseif ($UseBuiltCompilers.Contains("Swift")) {
+      if ($UseBuiltCompilers.Contains("Swift")) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", "swiftc.exe"))
       } else {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER (Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath  "swiftc.exe")
@@ -2199,24 +2188,28 @@ function Write-SDKSettingsPlist([Platform]$Platform, $Arch) {
   $SDKSettings | ConvertTo-JSON | Out-FIle -FilePath "$($Arch.SDKInstallRoot)\SDKSettings.json"
 }
 
-function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
-  Isolate-EnvVars {
-    if ($Test) {
-      $Targets = @("default", "ExperimentalTest")
-      $InstallPath = ""
-      $env:CTEST_OUTPUT_ON_FAILURE = "YES"
-    } else {
-      $Targets = @("install")
-      $InstallPath = "$($Arch.SDKInstallRoot)\usr"
+function Build-Dispatch([Platform]$Platform, $Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-corelibs-libdispatch `
+    -Bin (Get-TargetProjectBinaryCache $Arch Dispatch) `
+    -InstallTo "$($Arch.SDKInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX,Swift `
+    -Defines @{
+      ENABLE_SWIFT = "YES";
     }
+}
 
+function Test-Dispatch {
+  Isolate-EnvVars {
+    $env:CTEST_OUTPUT_ON_FAILURE = "YES"
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-libdispatch `
-      -Bin (Get-TargetProjectBinaryCache $Arch Dispatch) `
-      -InstallTo $InstallPath `
-      -Arch $Arch `
-      -Platform $Platform `
-      -BuildTargets $Targets `
+      -Bin (Get-TargetProjectBinaryCache $BuildArch Dispatch) `
+      -Arch $BuildArch `
+      -Platform Windows `
+      -BuildTargets default,ExperimentalTest `
       -UseBuiltCompilers C,CXX,Swift `
       -Defines @{
         ENABLE_SWIFT = "YES";
@@ -2232,79 +2225,67 @@ function Build-Foundation {
     [Platform] $Platform,
     [Parameter(Position = 1, Mandatory = $true)]
     [hashtable] $Arch,
-    [switch] $Static = $false,
-    [switch] $Test = $false
+    [switch] $Static = $false
   )
 
-  if ($Test) {
-    # Foundation tests build via swiftpm rather than CMake
+  $FoundationBinaryCache = if ($Static) {
+    Get-TargetProjectBinaryCache $Arch StaticFoundation
+  } else {
+    Get-TargetProjectBinaryCache $Arch DynamicFoundation
+  }
+
+  Build-CMakeProject `
+    -Src $SourceCache\swift-corelibs-foundation `
+    -Bin $FoundationBinaryCache `
+    -InstallTo $(if ($Static) { "$($Arch.ExperimentalSDKInstallRoot)\usr" } else { "$(Get-SwiftSDK $Platform)\usr" }) `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers ASM,C,CXX,Swift `
+    -SwiftSDK (Get-SwiftSDK $Platform) `
+    -Defines @{
+      BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+      CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+      CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      ENABLE_TESTING = "NO";
+      FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
+      CURL_DIR = "$LibraryRoot\curl-8.9.1\usr\lib\$Platform\$($Arch.LLVMName)\cmake\CURL";
+      LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$($Arch.LLVMName)\cmake\libxml2-2.11.5";
+      ZLIB_LIBRARY = if ($Platform -eq "Windows") {
+        "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$($Arch.LLVMName)\zlibstatic.lib"
+      } else {
+        "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$($Arch.LLVMName)\libz.a"
+      };
+      ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3.1\usr\include";
+      dispatch_DIR = "$(Get-TargetProjectBinaryCache $Arch Dispatch)\cmake\modules";
+      SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
+      _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
+      _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
+      _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
+      SwiftFoundation_MACRO = "$(Get-BuildProjectBinaryCache FoundationMacros)\bin"
+    }
+}
+
+function Test-Foundation {
+  Build-SPMProject `
+    -Action Test `
+    -Src $SourceCache\swift-foundation `
+    -Bin "$BinaryCache\$($BuildArch.LLVMTarget)\FoundationTests" `
+    -Arch $BuildArch
+
+  Isolate-EnvVars {
+    $env:DISPATCH_INCLUDE_PATH="$($BuildArch.SDKInstallRoot)/usr/lib/swift"
+    $env:LIBXML_LIBRARY_PATH="$LibraryRoot/libxml2-2.11.5/usr/lib/Windows/$($BuildArch.LLVMName)"
+    $env:LIBXML_INCLUDE_PATH="$LibraryRoot/libxml2-2.11.5/usr/include/libxml2"
+    $env:ZLIB_LIBRARY_PATH="$LibraryRoot/zlib-1.3.1/usr/lib/Windows/$($BuildArch.LLVMName)"
+    $env:CURL_LIBRARY_PATH="$LibraryRoot/curl-8.9.1/usr/lib/Windows/$($BuildArch.LLVMName)"
+    $env:CURL_INCLUDE_PATH="$LibraryRoot/curl-8.9.1/usr/include"
+
     Build-SPMProject `
       -Action Test `
-      -Src $SourceCache\swift-foundation `
-      -Bin "$BinaryCache\$($Arch.LLVMTarget)\CoreFoundationTests" `
-      -Arch $HostArch
-
-    $ShortArch = $Arch.LLVMName
-    Isolate-EnvVars {
-      $env:DISPATCH_INCLUDE_PATH="$($Arch.SDKInstallRoot)/usr/lib/swift"
-      $env:LIBXML_LIBRARY_PATH="$LibraryRoot/libxml2-2.11.5/usr/lib/$Platform/$ShortArch"
-      $env:LIBXML_INCLUDE_PATH="$LibraryRoot/libxml2-2.11.5/usr/include/libxml2"
-      $env:ZLIB_LIBRARY_PATH="$LibraryRoot/zlib-1.3.1/usr/lib/$Platform/$ShortArch"
-      $env:CURL_LIBRARY_PATH="$LibraryRoot/curl-8.9.1/usr/lib/$Platform/$ShortArch"
-      $env:CURL_INCLUDE_PATH="$LibraryRoot/curl-8.9.1/usr/include"
-      Build-SPMProject `
-        -Action Test `
-        -Src $SourceCache\swift-corelibs-foundation `
-        -Bin "$BinaryCache\$($Arch.LLVMTarget)\FoundationTests" `
-        -Arch $HostArch
-    }
-  } else {
-    $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
-    $FoundationBinaryCache = if ($Static) {
-      Get-TargetProjectBinaryCache $Arch StaticFoundation
-    } else {
-      Get-TargetProjectBinaryCache $Arch DynamicFoundation
-    }
-    $ShortArch = $Arch.LLVMName
-
-    Isolate-EnvVars {
-      $SDKRoot = if ($Platform -eq "Windows") {
-        ""
-      } else {
-        (Get-Variable "${Platform}$($Arch.ShortName)" -ValueOnly).SDKInstallRoot
-      }
-
-      Build-CMakeProject `
-        -Src $SourceCache\swift-corelibs-foundation `
-        -Bin $FoundationBinaryCache `
-        -InstallTo $(if ($Static) { "$($Arch.ExperimentalSDKInstallRoot)\usr" } else { "$($Arch.SDKInstallRoot)\usr" }) `
-        -Arch $Arch `
-        -Platform $Platform `
-        -UseBuiltCompilers ASM,C,CXX,Swift `
-        -SwiftSDK:$SDKRoot `
-        -Defines @{
-          BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
-          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-          CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
-          CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-          ENABLE_TESTING = "NO";
-          FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
-          CURL_DIR = "$LibraryRoot\curl-8.9.1\usr\lib\$Platform\$ShortArch\cmake\CURL";
-          LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\cmake\libxml2-2.11.5";
-          ZLIB_LIBRARY = if ($Platform -eq "Windows") {
-            "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\zlibstatic.lib"
-          } else {
-            "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\libz.a"
-          };
-          ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3.1\usr\include";
-          dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
-          SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
-          _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
-          _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
-          _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
-          SwiftFoundation_MACRO = "$(Get-BuildProjectBinaryCache FoundationMacros)\bin"
-        }
-    }
+      -Src $SourceCache\swift-corelibs-foundation `
+      -Bin "$BinaryCache\$($Arch.LLVMTarget)\SCLFoundationTests" `
+      -Arch $BuildArch
   }
 }
 
@@ -2587,46 +2568,53 @@ function Build-ToolsSupportCore($Arch) {
     }
 }
 
-function Build-LLBuild($Arch, [switch]$Test = $false) {
-  Isolate-EnvVars {
-    if ($Test) {
-      # Build additional llvm executables needed by tests
-      Isolate-EnvVars {
-        Invoke-VsDevShell $HostArch
-        Invoke-Program ninja.exe -C (Get-BuildProjectBinaryCache BuildTools) FileCheck not
-      }
-
-      $Targets = @("default", "test-llbuild")
-      $TestingDefines = @{
-        FILECHECK_EXECUTABLE = ([IO.Path]::Combine((Get-BuildProjectBinaryCache BuildTools), "bin", "FileCheck.exe"));
-        LIT_EXECUTABLE = "$SourceCache\llvm-project\llvm\utils\lit\lit.py";
-      }
-      $env:Path = "$env:Path;$UnixToolsBinDir"
-      $env:AR = ([IO.Path]::Combine((Get-HostProjectBinaryCache Compilers), "bin", "llvm-ar.exe"))
-      $env:CLANG = ([IO.Path]::Combine((Get-HostProjectBinaryCache Compilers), "bin", "clang.exe"))
-      $InstallPath = ""
-    } else {
-      $Targets = @()
-      $TestingDefines = @{}
-      $InstallPath = "$($Arch.ToolchainInstallRoot)\usr"
+function Build-LLBuild($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\llbuild `
+    -Bin (Get-HostProjectBinaryCache LLBuild) `
+    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform Windows `
+    -UseMSVCCompilers CXX `
+    -UseBuiltCompilers Swift `
+    -SwiftSDK (Get-SwiftSDK Windows) `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      LLBUILD_SUPPORT_BINDINGS = "Swift";
+      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
+      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
     }
+}
+
+function Test-LLBuild {
+  # Build additional llvm executables needed by tests
+  Isolate-EnvVars {
+    Invoke-VsDevShell $BuildArch
+    Invoke-Program ninja.exe -C (Get-BuildProjectBinaryCache BuildTools) FileCheck not
+  }
+
+  Isolate-EnvVars {
+    $env:AR = ([IO.Path]::Combine((Get-HostProjectBinaryCache Compilers), "bin", "llvm-ar.exe"))
+    $env:CLANG = ([IO.Path]::Combine((Get-HostProjectBinaryCache Compilers), "bin", "clang.exe"))
+    $env:Path = "$env:Path;$UnixToolsBinDir"
 
     Build-CMakeProject `
       -Src $SourceCache\llbuild `
       -Bin (Get-HostProjectBinaryCache LLBuild) `
-      -InstallTo $InstallPath `
-      -Arch $Arch `
+      -Arch $BuildArch `
       -Platform Windows `
       -UseMSVCCompilers CXX `
       -UseBuiltCompilers Swift `
       -SwiftSDK (Get-SwiftSDK Windows) `
-      -BuildTargets $Targets `
-      -Defines ($TestingDefines + @{
+      -BuildTargets test-llbuild `
+      -Defines @{
         BUILD_SHARED_LIBS = "YES";
+        FILECHECK_EXECUTABLE = ([IO.Path]::Combine((Get-BuildProjectBinaryCache BuildTools), "bin", "FileCheck.exe"));
+        LIT_EXECUTABLE = "$SourceCache\llvm-project\llvm\utils\lit\lit.py";
         LLBUILD_SUPPORT_BINDINGS = "Swift";
         SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
         SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
-      })
+      }
   }
 }
 
@@ -3091,7 +3079,7 @@ function Build-DocC() {
     --product docc
 }
 
-function Test-PackageManager() {
+function Test-PackageManager {
   $SrcDir = if (Test-Path -Path "$SourceCache\swift-package-manager" -PathType Container) {
     "$SourceCache\swift-package-manager"
   } else {
@@ -3101,8 +3089,8 @@ function Test-PackageManager() {
   Build-SPMProject `
     -Action Test `
     -Src $SrcDir `
-    -Bin "$BinaryCache\$($HostArch.LLVMTarget)\PackageManagerTests" `
-    -Arch $HostArch `
+    -Bin "$BinaryCache\$($BuildArch.LLVMTarget)\PackageManagerTests" `
+    -Arch $BuildArch `
     -Xcc "-I$LibraryRoot\sqlite-3.46.0\usr\include" -Xlinker "-L$LibraryRoot\sqlite-3.46.0\usr\lib"
 }
 
@@ -3333,10 +3321,10 @@ if (-not $IsCrossCompiling) {
   }
 
   if ($Test -contains "dispatch") {
-    Build-Dispatch Windows $HostArch -Test
+    Test-Dispatch
   }
   if ($Test -contains "foundation") {
-    Build-Foundation Windows $HostArch -Test
+    Test-Foundation
   }
   if ($Test -contains "xctest") {
     Test-XCTest
@@ -3344,8 +3332,8 @@ if (-not $IsCrossCompiling) {
   if ($Test -contains "testing") {
     Build-Testing Windows $HostArch -Test
   }
-  if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
-  if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
+  if ($Test -contains "llbuild") { Test-LLBuild }
+  if ($Test -contains "swiftpm") { Test-PackageManager }
   if ($Test -contains "swift-format") { Test-Format }
   if ($Test -contains "sourcekit-lsp") { Test-SourceKitLSP }
 }
