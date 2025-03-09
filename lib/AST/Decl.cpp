@@ -1231,6 +1231,10 @@ bool AbstractStorageDecl::isCompileTimeLiteral() const {
   return getAttrs().hasAttribute<CompileTimeLiteralAttr>();
 }
 
+bool AbstractStorageDecl::isConstVal() const {
+  return getAttrs().hasAttribute<ConstValAttr>();
+}
+
 bool AbstractStorageDecl::isTransparent() const {
   return getAttrs().hasAttribute<TransparentAttr>();
 }
