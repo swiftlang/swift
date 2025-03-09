@@ -586,7 +586,7 @@ ModuleDependencyScanner::getNamedSwiftModuleDependencyInfo(
 static void discoverCrossImportOverlayFiles(
     StringRef mainModuleName, ModuleDependenciesCache &cache,
     ASTContext &scanASTContext, llvm::SetVector<Identifier> &newOverlays,
-    std::vector<std::pair<std::string, std::string>> &overlayFiles) {
+    std::set<std::pair<std::string, std::string>> &overlayFiles) {
   auto mainModuleInfo = cache.findKnownDependency(ModuleDependencyID{
       mainModuleName.str(), ModuleDependencyKind::SwiftSource});
 
@@ -1354,7 +1354,7 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
     llvm::function_ref<void(ModuleDependencyID)> action) {
   // Modules explicitly imported. Only these can be secondary module.
   llvm::SetVector<Identifier> newOverlays;
-  std::vector<std::pair<std::string, std::string>> overlayFiles;
+  std::set<std::pair<std::string, std::string>> overlayFiles;
   discoverCrossImportOverlayFiles(mainModuleName, cache, ScanASTContext,
                                   newOverlays, overlayFiles);
 
