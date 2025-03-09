@@ -3073,6 +3073,28 @@ bool TypeChecker::isTypeInferredByTypealias(TypeAliasDecl *typealias,
 //        nominal->getSelfInterfaceType())) {
 //    return true;
 //  }
+//
+
+  // here is my implementation
+  //
+  auto nominalGenericArguments = ((nominal->getDeclaredInterfaceType().getPointer())->getAs<BoundGenericType>())->getGenericArgs();
+  auto typealiasGenericArguments = ((typealias->getUnderlyingType().getPointer())->getAs<BoundGenericType>())->getGenericArgs();
+
+  if (nominalGenericArguments.size() !=typealiasGenericArguments.size()) {
+    //std::cerr << "Error: ArrayRefs must have the same size.\n";
+    return false;
+  }
+
+  for (size_t i=0; i<nominalGenericArguments.size(); i++){
+    auto nominalBoundGenericType = nominalGenericArguments[i];
+    if (auto classTy = dyn_cast<GenericTypeParamType>(nominalBoundGenericType)){
+      auto typealiasBoundGenericType = typealiasGenericArguments[i];
+      if (auto classTy = dyn_cast<StructType>(typealiasBoundGenericType)){
+        return true;
+      }
+    }
+  }
+
 
   return false;
 }
