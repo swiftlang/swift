@@ -13,7 +13,7 @@
 // This file implements semantic analysis for declarations.
 //
 //===----------------------------------------------------------------------===//
-
+#include <type_traits>
 #include "TypeCheckDecl.h"
 #include "CodeSynthesis.h"
 #include "DerivedConformances.h"
@@ -3085,18 +3085,27 @@ bool TypeChecker::isTypeInferredByTypealias(TypeAliasDecl *typealias,
     return false;
   }
 
+  bool supportedInferredType = false;
   for (size_t i=0; i<nominalGenericArguments.size(); i++){
     auto nominalBoundGenericType = nominalGenericArguments[i];
-    if (auto classTy = dyn_cast<GenericTypeParamType>(nominalBoundGenericType)){
-      auto typealiasBoundGenericType = typealiasGenericArguments[i];
-      if (auto classTy = dyn_cast<StructType>(typealiasBoundGenericType)){
-        return true;
-      }
+    auto typealiasBoundGenericType = typealiasGenericArguments[i];
+  if(nominalBoundGenericType.getPointer()->getKind() == typealiasBoundGenericType.getPointer()->getKind() )
+    {
+     continue;
+    }
+
+    if (dyn_cast<GenericTypeParamType>(nominalBoundGenericType) != nullptr && dyn_cast<StructType>(typealiasBoundGenericType) != nullptr)
+    {
+      supportedInferredType = true;
+    }
+    else
+    {
+      supportedInferredType = false;
+      break;
     }
   }
 
-
-  return false;
+  return supportedInferredType;
 }
 
 Type
