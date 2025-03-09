@@ -1099,11 +1099,6 @@ SILType SILType::getLoweredInstanceTypeOfMetatype(SILFunction *function) const {
   return tl.getLoweredType();
 }
 
-MetatypeRepresentation SILType::getRepresentationOfMetatype(SILFunction *function) const {
-  auto metaType = castTo<MetatypeType>();
-  return metaType->getRepresentation();
-}
-
 bool SILType::isOrContainsObjectiveCClass() const {
   return getASTType().findIf([](Type ty) {
     if (ClassDecl *cd = ty->getClassOrBoundGenericClass()) {

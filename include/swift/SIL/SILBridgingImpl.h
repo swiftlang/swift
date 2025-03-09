@@ -450,10 +450,6 @@ bool BridgedType::isBuiltinVector() const {
   return unbridged().isBuiltinVector();
 }
 
-bool BridgedType::isLegalFormalType() const {
-  return unbridged().getASTType()->isLegalFormalType();
-}
-
 BridgedType BridgedType::getBuiltinVectorElementType() const {
   return unbridged().getBuiltinVectorElementType();
 }
@@ -474,11 +470,6 @@ bool BridgedType::isDynamicSelfMetatype() const {
   auto metaType = unbridged().castTo<swift::MetatypeType>();
   swift::Type instTy = metaType->getInstanceType();
   return instTy->is<swift::DynamicSelfType>();
-}
-
-BridgedType::MetatypeRepresentation BridgedType::getRepresentationOfMetatype(BridgedFunction f) const {
-  return BridgedType::MetatypeRepresentation(
-      unbridged().getRepresentationOfMetatype(f.getFunction()));
 }
 
 bool BridgedType::isCalleeConsumedFunction() const {
@@ -614,6 +605,10 @@ bool BridgedOperand::isLifetimeEnding() const { return op->isLifetimeEnding(); }
 
 bool BridgedOperand::canAcceptOwnership(BridgedValue::Ownership ownership) const {
   return op->canAcceptKind(BridgedValue::unbridge(ownership));
+}
+
+bool BridgedOperand::isDeleted() const {
+  return op->getUser() == nullptr;
 }
 
 OptionalBridgedOperand BridgedOperand::getNextUse() const {
@@ -1332,8 +1327,28 @@ BridgedGenericSpecializationInformation BridgedInstruction::ApplyInst_getSpecial
   return {getAs<swift::ApplyInst>()->getSpecializationInfo()};
 }
 
+bool BridgedInstruction::TryApplyInst_getNonAsync() const {
+  return getAs<swift::TryApplyInst>()->isNonAsync();  
+}
+
 BridgedGenericSpecializationInformation BridgedInstruction::TryApplyInst_getSpecializationInfo() const {
   return {getAs<swift::TryApplyInst>()->getSpecializationInfo()};
+}
+
+BridgedDeclRef BridgedInstruction::WitnessMethodInst_getMember() const {
+  return getAs<swift::WitnessMethodInst>()->getMember();
+}
+
+BridgedCanType BridgedInstruction::WitnessMethodInst_getLookupType() const {
+  return getAs<swift::WitnessMethodInst>()->getLookupType();  
+}
+
+BridgedDeclObj BridgedInstruction::WitnessMethodInst_getLookupProtocol() const {
+  return getAs<swift::WitnessMethodInst>()->getLookupProtocol();
+}
+
+BridgedConformance BridgedInstruction::WitnessMethodInst_getConformance() const {
+  return getAs<swift::WitnessMethodInst>()->getConformance();
 }
 
 SwiftInt BridgedInstruction::ObjectInst_getNumBaseElements() const {
@@ -1354,6 +1369,14 @@ bool BridgedInstruction::PartialApplyInst_hasUnknownResultIsolation() const {
 
 bool BridgedInstruction::AllocStackInst_hasDynamicLifetime() const {
   return getAs<swift::AllocStackInst>()->hasDynamicLifetime();
+}
+
+bool BridgedInstruction::AllocStackInst_isFromVarDecl() const {
+  return getAs<swift::AllocStackInst>()->isFromVarDecl();
+}
+
+bool BridgedInstruction::AllocStackInst_usesMoveableValueDebugInfo() const {
+  return getAs<swift::AllocStackInst>()->usesMoveableValueDebugInfo();
 }
 
 bool BridgedInstruction::AllocRefInstBase_isObjc() const {
@@ -1519,12 +1542,36 @@ void BridgedInstruction::CheckedCastBranch_updateSourceFormalTypeFromOperandLowe
   getAs<swift::CheckedCastBranchInst>()->updateSourceFormalTypeFromOperandLoweredType();
 }
 
+BridgedCanType BridgedInstruction::UnconditionalCheckedCast_getSourceFormalType() const {
+  return {getAs<swift::UnconditionalCheckedCastInst>()->getSourceFormalType()};  
+}
+
+BridgedCanType BridgedInstruction::UnconditionalCheckedCast_getTargetFormalType() const {
+  return {getAs<swift::UnconditionalCheckedCastInst>()->getTargetFormalType()};    
+}
+
+BridgedCanType BridgedInstruction::UnconditionalCheckedCastAddr_getSourceFormalType() const {
+  return {getAs<swift::UnconditionalCheckedCastAddrInst>()->getSourceFormalType()};  
+}
+
+BridgedCanType BridgedInstruction::UnconditionalCheckedCastAddr_getTargetFormalType() const {
+  return {getAs<swift::UnconditionalCheckedCastAddrInst>()->getTargetFormalType()};    
+}
+
 BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getSuccessBlock() const {
   return {getAs<swift::CheckedCastBranchInst>()->getSuccessBB()};
 }
 
 BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getFailureBlock() const {
   return {getAs<swift::CheckedCastBranchInst>()->getFailureBB()};
+}
+
+BridgedCanType BridgedInstruction::CheckedCastAddrBranch_getSourceFormalType() const {
+  return {getAs<swift::CheckedCastAddrBranchInst>()->getSourceFormalType()};
+}
+
+BridgedCanType BridgedInstruction::CheckedCastAddrBranch_getTargetFormalType() const {
+  return {getAs<swift::CheckedCastAddrBranchInst>()->getTargetFormalType()};  
 }
 
 BridgedBasicBlock BridgedInstruction::CheckedCastAddrBranch_getSuccessBlock() const {
@@ -1596,13 +1643,27 @@ SwiftInt BridgedInstruction::TypeValueInst_getValue() const {
 //                     VarDeclInst and DebugVariableInst
 //===----------------------------------------------------------------------===//
 
-static_assert(sizeof(std::optional<swift::SILDebugVariable>) <= sizeof(OptionalBridgedSILDebugVariable));
+static_assert(sizeof(swift::SILDebugVariable) <= sizeof(BridgedSILDebugVariable));
 
-static inline
-OptionalBridgedSILDebugVariable bridge(std::optional<swift::SILDebugVariable> &&debugVariable) {
-  OptionalBridgedSILDebugVariable bridgedVar;
-  *reinterpret_cast<std::optional<swift::SILDebugVariable> *>(&bridgedVar.storage) = debugVariable;
-  return bridgedVar;
+BridgedSILDebugVariable::BridgedSILDebugVariable(const swift::SILDebugVariable &var) {
+  new (&storage) swift::SILDebugVariable(var);
+}
+
+BridgedSILDebugVariable::BridgedSILDebugVariable(const BridgedSILDebugVariable &rhs) {
+  new (&storage) swift::SILDebugVariable(rhs.unbridge());
+}
+
+BridgedSILDebugVariable::~BridgedSILDebugVariable() {
+  reinterpret_cast<swift::SILDebugVariable *>(&storage)->~SILDebugVariable();
+}
+
+BridgedSILDebugVariable &BridgedSILDebugVariable::operator=(const BridgedSILDebugVariable &rhs) {
+  *reinterpret_cast<swift::SILDebugVariable *>(&storage) = rhs.unbridge();
+  return *this;
+}
+
+swift::SILDebugVariable BridgedSILDebugVariable::unbridge() const {
+  return *reinterpret_cast<const swift::SILDebugVariable *>(&storage);
 }
 
 OptionalBridgedDeclObj BridgedInstruction::DebugValue_getDecl() const {
@@ -1625,19 +1686,25 @@ OptionalBridgedDeclObj BridgedInstruction::RefElementAddr_getDecl() const {
   return {getAs<swift::RefElementAddrInst>()->getField()};
 }
 
-OptionalBridgedSILDebugVariable
-BridgedInstruction::DebugValue_getVarInfo() const {
-  return bridge(getAs<swift::DebugValueInst>()->getVarInfo());
+bool BridgedInstruction::DebugValue_hasVarInfo() const {
+  return getAs<swift::DebugValueInst>()->getVarInfo().has_value();
+}
+BridgedSILDebugVariable BridgedInstruction::DebugValue_getVarInfo() const {
+  return BridgedSILDebugVariable(getAs<swift::DebugValueInst>()->getVarInfo().value());
 }
 
-OptionalBridgedSILDebugVariable
-BridgedInstruction::AllocStack_getVarInfo() const {
-  return bridge(getAs<swift::AllocStackInst>()->getVarInfo());
+bool BridgedInstruction::AllocStack_hasVarInfo() const {
+  return getAs<swift::AllocStackInst>()->getVarInfo().has_value();
+}
+BridgedSILDebugVariable BridgedInstruction::AllocStack_getVarInfo() const {
+  return BridgedSILDebugVariable(getAs<swift::AllocStackInst>()->getVarInfo().value());
 }
 
-OptionalBridgedSILDebugVariable
-BridgedInstruction::AllocBox_getVarInfo() const {
-  return bridge(getAs<swift::AllocBoxInst>()->getVarInfo());
+bool BridgedInstruction::AllocBox_hasVarInfo() const {
+  return getAs<swift::AllocBoxInst>()->getVarInfo().has_value();
+}
+BridgedSILDebugVariable BridgedInstruction::AllocBox_getVarInfo() const {
+  return BridgedSILDebugVariable(getAs<swift::AllocBoxInst>()->getVarInfo().value());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2052,6 +2119,28 @@ BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType typ
                                    type.unbridged())};
 }
 
+BridgedInstruction BridgedBuilder::createCheckedCastAddrBranch(
+                                        BridgedValue source, BridgedCanType sourceFormalType,
+                                        BridgedValue destination, BridgedCanType targetFormalType,
+                                        BridgedInstruction::CastConsumptionKind consumptionKind,
+                                        BridgedBasicBlock successBlock, BridgedBasicBlock failureBlock) const
+{
+  return {unbridged().createCheckedCastAddrBranch(
+            regularLoc(), (swift::CastConsumptionKind)consumptionKind,
+                          source.getSILValue(), sourceFormalType.unbridged(),
+                          destination.getSILValue(), targetFormalType.unbridged(),
+                          successBlock.unbridged(), failureBlock.unbridged())};
+}
+
+BridgedInstruction BridgedBuilder::createUnconditionalCheckedCastAddr(
+                                        BridgedValue source, BridgedCanType sourceFormalType,
+                                        BridgedValue destination, BridgedCanType targetFormalType) const
+{
+  return {unbridged().createUnconditionalCheckedCastAddr(
+            regularLoc(), source.getSILValue(), sourceFormalType.unbridged(),
+                          destination.getSILValue(), targetFormalType.unbridged())};
+}
+
 BridgedInstruction BridgedBuilder::createLoad(BridgedValue op, SwiftInt ownership) const {
   return {unbridged().createLoad(regularLoc(), op.getSILValue(),
                                  (swift::LoadOwnershipQualifier)ownership)};
@@ -2150,6 +2239,11 @@ BridgedInstruction BridgedBuilder::createEndLifetime(BridgedValue op) const {
   return {unbridged().createEndLifetime(regularLoc(), op.getSILValue())};
 }
 
+BridgedInstruction BridgedBuilder::createDebugValue(BridgedValue op,
+                                                    BridgedSILDebugVariable var) const {
+  return {unbridged().createDebugValue(regularLoc(), op.getSILValue(), var.unbridge())};
+}
+
 BridgedInstruction BridgedBuilder::createDebugStep() const {
   return {unbridged().createDebugStep(regularLoc())};
 }
@@ -2181,6 +2275,14 @@ BridgedInstruction BridgedBuilder::createTryApply(BridgedValue function, Bridged
       arguments.getValues(argValues), normalBB.unbridged(), errorBB.unbridged(), applyOpts, specInfo.data)};
 }
 
+BridgedInstruction BridgedBuilder::createWitnessMethod(BridgedCanType lookupType,
+                                        BridgedConformance conformance,
+                                        BridgedDeclRef member, BridgedType methodType) const {
+  return {unbridged().createWitnessMethod(regularLoc(), lookupType.unbridged(), conformance.unbridged(),
+                                          member.unbridged(), methodType.unbridged())};
+}
+
+
 BridgedInstruction BridgedBuilder::createReturn(BridgedValue op) const {
   return {unbridged().createReturn(regularLoc(), op.getSILValue())};
 }
@@ -2200,6 +2302,14 @@ BridgedInstruction BridgedBuilder::createUncheckedEnumData(BridgedValue enumVal,
 BridgedInstruction BridgedBuilder::createUncheckedTakeEnumDataAddr(BridgedValue enumAddr, SwiftInt caseIdx) const {
   swift::SILValue en = enumAddr.getSILValue();
   return {unbridged().createUncheckedTakeEnumDataAddr(regularLoc(), en, en->getType().getEnumElement(caseIdx))};
+}
+
+BridgedInstruction BridgedBuilder::createInitEnumDataAddr(BridgedValue enumAddr,
+                                                          SwiftInt caseIdx,
+                                                          BridgedType type) const {
+  swift::SILValue en = enumAddr.getSILValue();
+  return {unbridged().createInitEnumDataAddr(regularLoc(), en, en->getType().getEnumElement(caseIdx),
+                                             type.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createEnum(SwiftInt caseIdx, OptionalBridgedValue payload,
@@ -2334,10 +2444,10 @@ BridgedInstruction BridgedBuilder::createInitExistentialMetatype(BridgedValue me
       conformances.pcArray.unbridged<swift::ProtocolConformanceRef>())};
 }
 
-BridgedInstruction BridgedBuilder::createMetatype(BridgedType type,
-                                                  BridgedType::MetatypeRepresentation representation) const {
+BridgedInstruction BridgedBuilder::createMetatype(BridgedCanType instanceType,
+                                                  BridgedASTType::MetatypeRepresentation representation) const {
   auto *mt =
-      swift::MetatypeType::get(type.unbridged().getASTType(),
+      swift::MetatypeType::get(instanceType.unbridged(),
                                (swift::MetatypeRepresentation)representation);
   auto t = swift::SILType::getPrimitiveObjectType(swift::CanType(mt));
   return {unbridged().createMetatype(regularLoc(), t)};

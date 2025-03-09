@@ -119,6 +119,11 @@ private func registerSwiftPasses() {
   registerForSILCombine(ClassifyBridgeObjectInst.self, { run(ClassifyBridgeObjectInst.self, $0) })
   registerForSILCombine(PointerToAddressInst.self,  { run(PointerToAddressInst.self, $0) })
   registerForSILCombine(UncheckedEnumDataInst.self, { run(UncheckedEnumDataInst.self, $0) })
+  registerForSILCombine(WitnessMethodInst.self,     { run(WitnessMethodInst.self, $0) })
+  registerForSILCombine(UnconditionalCheckedCastInst.self, { run(UnconditionalCheckedCastInst.self, $0) })
+  registerForSILCombine(AllocStackInst.self,        { run(AllocStackInst.self, $0) })
+  registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })
+  registerForSILCombine(TryApplyInst.self,          { run(TryApplyInst.self, $0) })
 
   // Test passes
   registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })

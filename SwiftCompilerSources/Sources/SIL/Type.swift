@@ -68,7 +68,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isThickFunction: Bool { bridged.isThickFunction() }
   public var isAsyncFunction: Bool { bridged.isAsyncFunction() }
 
-  public var canBeClass: CanonicalType.TraitResult { astType.canBeClass }
+  public var canBeClass: AST.`Type`.TraitResult { astType.canBeClass }
 
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
 
@@ -81,7 +81,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     !isNoEscapeFunction && isEscapable(in: function)
   }
 
-  /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
+  /// Can only be used if the type is in fact a nominal type.
   public var nominal: NominalTypeDecl? {
     bridged.getNominalOrBoundGenericNominal().getAs(NominalTypeDecl.self)
   }
@@ -104,7 +104,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isBuiltinVector: Bool { bridged.isBuiltinVector() }
   public var builtinVectorElementType: Type { bridged.getBuiltinVectorElementType().type }
 
-  public var isLegalFormalType: Bool { bridged.isLegalFormalType() }
+  public var isLegalFormalType: Bool { astType.isLegalFormalType }
 
   public func isBuiltinInteger(withFixedWidth width: Int) -> Bool {
     bridged.isBuiltinFixedWidthInteger(width)
@@ -128,7 +128,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     function.bridged.getLoweredType(self.bridged).type
   }
 
-  /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
+  /// Can only be used if the type is in fact a nominal type.
   /// Returns nil if the nominal is a resilient type because in this case the complete list
   /// of fields is not known.
   public func getNominalFields(in function: Function) -> NominalFieldsArray? {
@@ -148,18 +148,12 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     return EnumCases(enumType: self, function: function)
   }
 
-  public typealias MetatypeRepresentation = BridgedType.MetatypeRepresentation
-
   public func loweredInstanceTypeOfMetatype(in function: Function) -> Type {
     bridged.getLoweredInstanceTypeOfMetatype(function.bridged).type
   }
 
   public var isDynamicSelfMetatype: Bool {
     bridged.isDynamicSelfMetatype()
-  }
-
-  public func representationOfMetatype(in function: Function) -> MetatypeRepresentation {
-    bridged.getRepresentationOfMetatype(function.bridged)
   }
 
   public var isCalleeConsumedFunction: Bool { bridged.isCalleeConsumedFunction() }

@@ -18,7 +18,7 @@ import ASTBridging
 ///
 /// Substitution maps are primarily used when performing substitutions into any entity that
 /// can reference type parameters and conformances.
-public struct SubstitutionMap: CustomStringConvertible {
+public struct SubstitutionMap: CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedSubstitutionMap
 
   public init(bridged: BridgedSubstitutionMap) {
@@ -27,6 +27,13 @@ public struct SubstitutionMap: CustomStringConvertible {
   
   public init() {
     self.bridged = BridgedSubstitutionMap()
+  }
+  
+  public init(genericSignature: GenericSignature, replacementTypes: [Type]) {
+    let bridgedReplTypes = replacementTypes.map { $0.bridged }
+    self.bridged = bridgedReplTypes.withBridgedArrayRef {
+      return BridgedSubstitutionMap.get(genericSignature.bridged, $0)
+    }
   }
 
   public var description: String {
