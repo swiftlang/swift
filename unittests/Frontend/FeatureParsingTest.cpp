@@ -49,13 +49,13 @@ void swift::PrintTo(const LangOptions::FeatureState &value, std::ostream *os) {
 void swift::PrintTo(const LangOptions::FeatureState::Kind &value,
                     std::ostream *os) {
   switch (value) {
-  case LangOptions::FeatureState::Off:
+  case LangOptions::FeatureState::Kind::Off:
     *os << "Off";
     break;
-  case LangOptions::FeatureState::EnabledForAdoption:
+  case LangOptions::FeatureState::Kind::EnabledForAdoption:
     *os << "EnabledForAdoption";
     break;
-  case LangOptions::FeatureState::Enabled:
+  case LangOptions::FeatureState::Kind::Enabled:
     *os << "Enabled";
     break;
   }

@@ -814,7 +814,7 @@ namespace swift {
 
     /// A wrapper around the feature state enumeration.
     struct FeatureState {
-      enum Kind : uint8_t { Off, EnabledForAdoption, Enabled };
+      enum class Kind : uint8_t { Off, EnabledForAdoption, Enabled };
 
     private:
       Feature feature;

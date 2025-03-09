@@ -23,10 +23,10 @@ static const FeatureWrapper adoptableUpcomingF(Feature::ExistentialAny);
 static const FeatureWrapper experimentalF(Feature::StructLetDestructuring);
 static const FeatureWrapper strictConcurrencyF(Feature::StrictConcurrency);
 
-using FeatureState = LangOptions::FeatureState;
+using FeatureState = LangOptions::FeatureState::Kind;
 
 using IsFeatureEnabledTestCase =
-    ArgParsingTestCase<std::map<Feature, FeatureState::Kind>>;
+    ArgParsingTestCase<std::map<Feature, FeatureState>>;
 
 class IsFeatureEnabledTest
     : public FeatureParsingTest,
