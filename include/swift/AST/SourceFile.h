@@ -53,6 +53,15 @@ enum class RestrictedImportKind {
 /// Import that limits the access level of imported entities.
 using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
 
+/// Language options only for use with a specific SourceFile.
+///
+/// Vended by SourceFile::getLanguageOptions().
+struct SourceFileLangOptions {
+  /// If unset, no value was provided. If a Type, that type is the type of the
+  /// isolation. If set to an empty type, nil was specified explicitly.
+  std::optional<Type> defaultIsolation;
+};
+
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -561,6 +570,9 @@ public:
   void lookupObjCMethods(
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
+
+  /// File level language options.
+  SourceFileLangOptions getLanguageOptions() const;
 
 protected:
   virtual void
