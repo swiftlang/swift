@@ -13,6 +13,8 @@
 @_exported import ucrt // Clang module
 // Extra clang module that's split out from ucrt:
 @_exported import _complex
+@_exported import _stddef
+@_exported import _stdlib
 
 @available(swift, deprecated: 3.0, message: "Please use 'Double.pi' or '.pi' to get the value of correct type and avoid casting.")
 public let M_PI = Double.pi
