@@ -46,8 +46,7 @@ struct Options {
   static func create(_ project: String?) -> (String?) -> (String) -> (String) -> (String?) -> (String?) -> (String?) -> (String?) -> (Bool) -> ([String]) -> Options { fatalError() }
 
   static func evaluate(_ mode: CommandMode) -> Result<Options, ConcreteError> {
-    let defaultBuildDirectory = ""
-    return create // expected-error {{the compiler is unable to type-check this expression in reasonable time}}
+    return create
       <*> mode <| Option(key: "", defaultValue: nil, usage: "")
       <*> mode <| Option(key: "", defaultValue: nil, usage: "")
       <*> mode <| Option(key: "", defaultValue: FileManager.default.currentDirectoryPath, usage: "")
