@@ -1547,6 +1547,14 @@ func _taskIsCurrentExecutor(_ executor: Builtin.Executor) -> Bool
 internal func _taskIsCurrentExecutor(
   executor: Builtin.Executor, flags: UInt64) -> Bool
 
+extension GlobalActor {
+  @available(SwiftStdlib 6.2, *)
+  @_silgen_name("_swift_task_isCurrentGlobalActor")
+  internal static func _taskIsCurrentGlobalActor() -> Bool {
+    let executor = unsafe sharedUnownedExecutor
+    return unsafe _taskIsCurrentExecutor(executor: executor.executor, flags: 0)
+  }
+}
 #endif
 
 @available(SwiftStdlib 5.1, *)
