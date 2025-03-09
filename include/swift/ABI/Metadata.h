@@ -2734,6 +2734,21 @@ struct TargetResilientWitnessesHeader {
 };
 using ResilientWitnessesHeader = TargetResilientWitnessesHeader<InProcess>;
 
+/// Describes a reference to a global actor type and its conformance to the
+/// global actor protocol.
+template<typename Runtime>
+struct TargetGlobalActorReference {
+  /// The type of the global actor.
+  RelativeDirectPointer<const char, /*nullable*/ false> type;
+
+  /// The conformance of the global actor to the GlobalActor protocol.
+  TargetRelativeProtocolConformanceDescriptorPointer<Runtime> conformance;
+};
+
+/// Describes the context of a protocol conformance that is relevant when
+/// the conformance is used, such as global actor isolation.
+struct ConformanceExecutionContext;
+
 /// The structure of a protocol conformance.
 ///
 /// This contains enough static information to recover the witness table for a
@@ -2747,7 +2762,8 @@ struct TargetProtocolConformanceDescriptor final
              GenericPackShapeDescriptor,
              TargetResilientWitnessesHeader<Runtime>,
              TargetResilientWitness<Runtime>,
-             TargetGenericWitnessTable<Runtime>> {
+             TargetGenericWitnessTable<Runtime>,
+             TargetGlobalActorReference<Runtime>> {
 
   using TrailingObjects = swift::ABI::TrailingObjects<
                              TargetProtocolConformanceDescriptor<Runtime>,
@@ -2756,7 +2772,8 @@ struct TargetProtocolConformanceDescriptor final
                              GenericPackShapeDescriptor,
                              TargetResilientWitnessesHeader<Runtime>,
                              TargetResilientWitness<Runtime>,
-                             TargetGenericWitnessTable<Runtime>>;
+                             TargetGenericWitnessTable<Runtime>,
+                             TargetGlobalActorReference<Runtime>>;
   friend TrailingObjects;
 
   template<typename T>
@@ -2871,8 +2888,13 @@ public:
   /// Get the witness table for the specified type, realizing it if
   /// necessary, or return null if the conformance does not apply to the
   /// type.
+  ///
+  /// The context will be populated with any information that needs to be
+  /// checked before this witness table can be used within a given execution
+  /// context.
   const swift::TargetWitnessTable<Runtime> *
-  getWitnessTable(const TargetMetadata<Runtime> *type) const;
+  getWitnessTable(const TargetMetadata<Runtime> *type,
+                  ConformanceExecutionContext &context) const;
 
   /// Retrieve the resilient witnesses.
   llvm::ArrayRef<ResilientWitness> getResilientWitnesses() const {
@@ -2890,6 +2912,32 @@ public:
       return nullptr;
 
     return this->template getTrailingObjects<GenericWitnessTable>();
+  }
+
+  /// Whether this conformance has any conditional requirements that need to
+  /// be evaluated.
+  bool hasGlobalActorIsolation() const {
+    return Flags.hasGlobalActorIsolation();
+  }
+
+  /// Retrieve the global actor type to which this conformance is isolated, if
+  /// any.
+  llvm::StringRef
+  getGlobalActorType() const {
+    if (!Flags.hasGlobalActorIsolation())
+      return llvm::StringRef();
+
+    return Demangle::makeSymbolicMangledNameStringRef(this->template getTrailingObjects<TargetGlobalActorReference<Runtime>>()->type);
+  }
+
+  /// Retrieve the protocol conformance of the global actor type to the
+  /// GlobalActor protocol.
+  const TargetProtocolConformanceDescriptor<Runtime> *
+  getGlobalActorConformance() const {
+    if (!Flags.hasGlobalActorIsolation())
+      return nullptr;
+
+    return this->template getTrailingObjects<TargetGlobalActorReference<Runtime>>()->conformance;
   }
 
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
@@ -2933,6 +2981,10 @@ private:
 
   size_t numTrailingObjects(OverloadToken<GenericWitnessTable>) const {
     return Flags.hasGenericWitnessTable() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<RelativeDirectPointer<const char, /*nullable*/ true>>) const {
+    return Flags.hasGlobalActorIsolation() ? 1 : 0;
   }
 };
 using ProtocolConformanceDescriptor
