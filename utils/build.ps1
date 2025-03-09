@@ -3237,6 +3237,10 @@ if (-not $SkipBuild) {
     # Build platform: SDK, Redist and XCTest
     Invoke-BuildStep Build-Runtime Android $Arch
     Invoke-BuildStep Build-Dispatch Android $Arch
+
+    # FIXME
+    Get-ChildItem -Path "$(Get-TargetProjectBinaryCache $Arch Runtime)\lib\swift" -Filter "*.swiftinterface" -Recurse
+
     Invoke-BuildStep Build-Foundation Android $Arch
     Invoke-BuildStep Build-Sanitizers Android $Arch
     Invoke-BuildStep Build-XCTest Android $Arch
