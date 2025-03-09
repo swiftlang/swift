@@ -850,3 +850,19 @@ bb0(%0 : @owned $T, %1 : @owned $Inner):
   return %8
 }
 
+sil @initfn : $@convention(thin) () -> @out T 
+
+sil [ossa] @inject_enum_case : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<T>
+  %1 = function_ref @initfn : $@convention(thin) () -> @out T 
+  %2 = init_enum_data_addr %0, #Optional.some!enumelt 
+  %3 = apply %1(%2) : $@convention(thin) () -> @out T
+  inject_enum_addr %0, #Optional.some!enumelt
+  destroy_addr %0
+  dealloc_stack %0
+  %10 = tuple ()                                  
+  return %10                                      
+} 
+
+
