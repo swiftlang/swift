@@ -5137,9 +5137,10 @@ static llvm::Constant *getCoroAllocWrapperFn(IRGenModule &IGM) {
         auto *alloca =
             IGF.Builder.IRBuilderBase::CreateAlloca(IGF.IGM.Int8Ty, size);
         alloca->setAlignment(llvm::Align(MaximumAlignment));
-        auto *ret = IGF.Builder.CreateIntrinsic(
-            alloca->getType(), llvm::Intrinsic::coro_return, {alloca});
-        IGF.Builder.CreateRet(ret);
+        auto *retPopless = IGF.Builder.CreateIntrinsic(
+            IGF.IGM.VoidTy, llvm::Intrinsic::ret_popless, {});
+        retPopless->setTailCallKind(llvm::CallInst::TailCallKind::TCK_MustTail);
+        IGF.Builder.CreateRet(alloca);
         IGF.Builder.emitBlock(normalReturn);
         auto *call = IGF.Builder.CreateCall(
             IGF.IGM.getCoroAllocFunctionPointer(), {allocator, size});
