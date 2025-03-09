@@ -6505,13 +6505,13 @@ private:
                                       /*isAlias=*/isa<TypeAliasDecl>(decl)));
     }
 
-    // If the feature is enabled in adoption mode, warn unconditionally.
-    // Otherwise, until Swift 7.
-    if (Ctx.LangOpts.getFeatureState(Feature::ExistentialAny)
-            .isEnabledForAdoption()) {
+    // If `ExistentialAny` is enabled in adoption mode, warn unconditionally.
+    // Otherwise, warn until the feature's coming-of-age language mode.
+    const auto feature = Feature::ExistentialAny;
+    if (Ctx.LangOpts.getFeatureState(feature).isEnabledForAdoption()) {
       diag->limitBehavior(DiagnosticBehavior::Warning);
     } else {
-      diag->warnUntilSwiftVersion(7);
+      diag->warnUntilSwiftVersion(getFeatureLanguageVersion(feature).value());
     }
 
     emitInsertAnyFixit(*diag, T);
