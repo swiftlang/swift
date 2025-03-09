@@ -709,7 +709,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         if (DeclContext *typeContext = DC->getInnermostTypeContext()){
           Type SelfType = typeContext->getSelfInterfaceType();
 
-          if (typeContext->getSelfClassDecl())
+          if (typeContext->getSelfClassDecl() &&
+              !typeContext->getSelfClassDecl()->isForeignReferenceType())
             SelfType = DynamicSelfType::get(SelfType, Context);
           return new (Context)
               TypeExpr(new (Context) SelfTypeRepr(SelfType, Loc));
