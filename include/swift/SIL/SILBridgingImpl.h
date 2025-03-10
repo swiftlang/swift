@@ -402,6 +402,10 @@ bool BridgedType::isClassExistential() const {
   return unbridged().isClassExistentialType();
 }
 
+bool BridgedType::isOptional() const {
+  return unbridged().isOptional();
+}
+
 bool BridgedType::isNoEscapeFunction() const {
   return unbridged().isNoEscapeFunction();
 }
