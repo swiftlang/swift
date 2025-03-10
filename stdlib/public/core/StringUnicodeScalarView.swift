@@ -112,7 +112,9 @@ internal func _utf8Count<U: SIMD>(
   result += _utf8Count(&ptr, base: base, total: count, type: SIMD8<UInt8>.self)
   result += _utf8Count(&ptr, base: base, total: count, type: SIMD4<UInt8>.self)
   result += _utf8Count(&ptr, base: base, total: count, type: SIMD2<UInt8>.self)
-  result += Int(~ptr.loadUnaligned(as: UInt8.self) >> 7)
+  if ptr < (base + count) {
+    result += Int(~ptr.loadUnaligned(as: UInt8.self) >> 7)
+  }
   return result
 }
 #endif
