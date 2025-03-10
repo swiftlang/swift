@@ -6264,10 +6264,11 @@ IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType) {
 }
 
 /// Should we be defining the given helper function?
-static llvm::Function *
-shouldDefineHelper(IRGenModule &IGM, llvm::Constant *fn, bool setIsNoInline,
-                   IRLinkage *linkage,
-                   std::optional<llvm::CallingConv::ID> specialCallingConv) {
+static llvm::Function *shouldDefineHelper(
+    IRGenModule &IGM, llvm::Constant *fn, bool setIsNoInline,
+    IRLinkage *linkage, std::optional<llvm::CallingConv::ID> specialCallingConv,
+    std::optional<llvm::function_ref<void(llvm::AttributeList &)>>
+        transformAttrs) {
   auto *def = dyn_cast<llvm::Function>(fn);
   if (!def) return nullptr;
   if (!def->empty()) return nullptr;
@@ -6282,6 +6283,12 @@ shouldDefineHelper(IRGenModule &IGM, llvm::Constant *fn, bool setIsNoInline,
   def->setCallingConv(specialCallingConv.value_or(IGM.DefaultCC));
   if (setIsNoInline)
     def->addFnAttr(llvm::Attribute::NoInline);
+
+  if (transformAttrs) {
+    auto attrs = def->getAttributes();
+    (*transformAttrs)(attrs);
+    def->setAttributes(attrs);
+  }
   return def;
 }
 
@@ -6298,7 +6305,9 @@ llvm::Constant *IRGenModule::getOrCreateHelperFunction(
     llvm::function_ref<void(IRGenFunction &IGF)> generate, bool setIsNoInline,
     bool forPrologue, bool isPerformanceConstraint,
     IRLinkage *optionalLinkageOverride,
-    std::optional<llvm::CallingConv::ID> specialCallingConv) {
+    std::optional<llvm::CallingConv::ID> specialCallingConv,
+    std::optional<llvm::function_ref<void(llvm::AttributeList &)>>
+        transformAttrs) {
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(resultTy, paramTys, false);
 
@@ -6308,7 +6317,7 @@ llvm::Constant *IRGenModule::getOrCreateHelperFunction(
 
   if (llvm::Function *def =
           shouldDefineHelper(*this, fn, setIsNoInline, optionalLinkageOverride,
-                             specialCallingConv)) {
+                             specialCallingConv, transformAttrs)) {
     IRGenFunction IGF(*this, def, isPerformanceConstraint);
     if (DebugInfo && !forPrologue)
       DebugInfo->emitArtificialFunction(IGF, def);
