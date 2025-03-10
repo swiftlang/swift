@@ -7580,12 +7580,12 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
           }
         }
 
-          // Additionally, a stored property of a non-'Sendable' type can be
-          // explicitly marked 'nonisolated'.
-          if (auto parentDecl = dc->getDeclaredTypeInContext())
-            if (!parentDecl->isSendableType()) {
-              canBeNonisolated = true;
-            }
+        // Additionally, a stored property of a non-'Sendable' type can be
+        // explicitly marked 'nonisolated'.
+        if (auto parentDecl = dc->getDeclaredTypeInContext())
+          if (!parentDecl->isSendableType()) {
+            canBeNonisolated = true;
+          }
 
         // Otherwise, this stored property has to be qualified as 'unsafe'.
         if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
@@ -7658,20 +7658,25 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       }
     }
 
-    // Using 'nonisolated' with lazy properties and wrapped properties is
-    // unsupported, because backing storage is a stored 'var' that is part
-    // of the internal state of the actor which could only be accessed in
-    // actor's isolation context.
-    if (var->hasAttachedPropertyWrapper()) {
-      diagnoseAndRemoveAttr(attr, diag::nonisolated_wrapped_property)
-        .warnUntilSwiftVersionIf(attr->isImplicit(), 6);
-      return;
-    }
+    // Using 'nonisolated' with lazy properties and wrapped properties that are
+    // members of a Sendable types is unsupported, because backing storage is a
+    // stored 'var' that is part of the internal state of the actor which could
+    // only be accessed in actor's isolation context.
+    if (auto parentType = dc->getDeclaredTypeInContext()) {
+      if (parentType->isSendableType()) {
+        if (var->hasAttachedPropertyWrapper()) {
+          diagnoseAndRemoveAttr(attr, diag::nonisolated_wrapped_property,
+                                parentType)
+              .warnUntilSwiftVersionIf(attr->isImplicit(), 6);
+          return;
+        }
 
-    if (var->getAttrs().hasAttribute<LazyAttr>()) {
-      diagnose(attr->getLocation(), diag::nonisolated_lazy)
-        .warnUntilSwiftVersion(6);
-      return;
+        if (var->getAttrs().hasAttribute<LazyAttr>()) {
+          diagnose(attr->getLocation(), diag::nonisolated_lazy, parentType)
+              .warnUntilSwiftVersion(6);
+          return;
+        }
+      }
     }
 
     // nonisolated can not be applied to local properties unless qualified as
