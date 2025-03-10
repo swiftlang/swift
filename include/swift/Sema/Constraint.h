@@ -872,7 +872,7 @@ public:
 
   /// Retrieve the overload choice for an overload-binding constraint.
   OverloadChoice getOverloadChoice() const {
-    assert(Kind == ConstraintKind::BindOverload);
+    ASSERT(Kind == ConstraintKind::BindOverload);
     return *getTrailingObjects<OverloadChoice>();
   }
 
@@ -903,7 +903,7 @@ public:
 
   /// Retrieve the DC in which the overload was used.
   DeclContext *getDeclContext() const {
-    assert(HasDeclContext);
+    ASSERT(HasDeclContext);
     return *getTrailingObjects<DeclContext *>();
   }
 
