@@ -11,6 +11,7 @@
 
 import StdlibUnittest
 
+@available(SwiftStdlib 6.2, *)
 struct TickingClock: Clock {
   struct Duration: DurationProtocol {
     var ticks: Int
@@ -57,6 +58,7 @@ struct TickingClock: Clock {
   private var _now: Instant
   var now: Instant { return _now }
   var minimumResolution: Duration { return Duration(ticks: 1) }
+  var traits: ClockTraits { [.monotonic] }
 
   init() {
     _now = Instant(ticksFromStart: 0)
@@ -87,6 +89,7 @@ struct TickingClock: Clock {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
 struct TockingClock: Clock {
   struct Duration: DurationProtocol {
     var tocks: Int
@@ -133,6 +136,7 @@ struct TockingClock: Clock {
   private var _now: Instant
   var now: Instant { return _now }
   var minimumResolution: Duration { return Duration(tocks: 1) }
+  var traits: ClockTraits { [.monotonic] }
 
   init() {
     _now = Instant(tocksFromStart: 1000)

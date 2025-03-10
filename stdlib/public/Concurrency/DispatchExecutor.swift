@@ -178,8 +178,7 @@ protocol DispatchExecutor: Executor {
 }
 
 /// An enumeration identifying one of the Dispatch-supported clocks
-@available(SwiftStdlib 6.2, *)
-public enum DispatchClockID: CInt {
+enum DispatchClockID: CInt {
   case suspending = 1
   case continuous = 2
 }
@@ -189,23 +188,20 @@ extension DispatchExecutor {
 
   func timestamp<C: Clock>(for instant: C.Instant, clock: C)
     -> (clockID: DispatchClockID, seconds: Int64, nanoseconds: Int64) {
-    let clockID = clock.dispatchClockID
-
-    switch clockID {
-      case .suspending:
-        let dispatchClock: SuspendingClock = .suspending
-        let instant = dispatchClock.convert(instant: instant, from: clock)!
-        let (seconds, attoseconds) = instant._value.components
-        let nanoseconds = attoseconds / 1_000_000_000
-        return (clockID: .suspending,
-                seconds: Int64(seconds),
-                nanoseconds: Int64(nanoseconds))
-      case .continuous:
+    if clock.traits.contains(.continuous) {
         let dispatchClock: ContinuousClock = .continuous
         let instant = dispatchClock.convert(instant: instant, from: clock)!
         let (seconds, attoseconds) = instant._value.components
         let nanoseconds = attoseconds / 1_000_000_000
         return (clockID: .continuous,
+                seconds: Int64(seconds),
+                nanoseconds: Int64(nanoseconds))
+    } else {
+        let dispatchClock: SuspendingClock = .suspending
+        let instant = dispatchClock.convert(instant: instant, from: clock)!
+        let (seconds, attoseconds) = instant._value.components
+        let nanoseconds = attoseconds / 1_000_000_000
+        return (clockID: .suspending,
                 seconds: Int64(seconds),
                 nanoseconds: Int64(nanoseconds))
     }
