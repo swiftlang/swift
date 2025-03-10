@@ -251,7 +251,8 @@ LANGUAGE_FEATURE(NonescapableTypes, /*IsAdoptable=*/false, 446,
 LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, /*IsAdoptable=*/false, 0,
                  "Builtin.emplace typed throws")
 SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
-LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
+LANGUAGE_FEATURE(ValueGenerics, /*IsAdoptable=*/ false, 452,
+                 "Value generics feature (integer generics)")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
