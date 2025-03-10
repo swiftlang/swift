@@ -421,9 +421,9 @@ ClangImporter::getModuleDependencies(Identifier moduleName,
   std::string workingDir = *optionalWorkingDir;
 
   auto lookupModuleOutput =
-      [moduleOutputPath](const ModuleID &MID,
-                        ModuleOutputKind MOK) -> std::string {
-    return moduleCacheRelativeLookupModuleOutput(MID, MOK, moduleOutputPath);
+      [moduleOutputPath](const ModuleDeps &MD,
+                         ModuleOutputKind MOK) -> std::string {
+    return moduleCacheRelativeLookupModuleOutput(MD.ID, MOK, moduleOutputPath);
   };
 
   auto clangModuleDependencies =
@@ -476,9 +476,10 @@ bool ClangImporter::getHeaderDependencies(
     std::string workingDir = *optionalWorkingDir;
     auto moduleOutputPath = cache.getModuleOutputPath();
     auto lookupModuleOutput =
-        [moduleOutputPath](const ModuleID &MID,
+        [moduleOutputPath](const ModuleDeps &MD,
                            ModuleOutputKind MOK) -> std::string {
-      return moduleCacheRelativeLookupModuleOutput(MID, MOK, moduleOutputPath);
+      return moduleCacheRelativeLookupModuleOutput(MD.ID, MOK,
+                                                   moduleOutputPath);
     };
     auto dependencies = clangScanningTool.getTranslationUnitDependencies(
         commandLineArgs, workingDir, cache.getAlreadySeenClangModules(),
