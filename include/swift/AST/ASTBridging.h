@@ -49,6 +49,8 @@ enum class DifferentiabilityKind : uint8_t;
 class Fingerprint;
 class Identifier;
 class IfConfigClauseRangeInfo;
+class GenericSignature;
+class GenericSignatureImpl;
 struct LabeledStmtInfo;
 class LayoutConstraint;
 class LayoutConstraintInfo;
@@ -75,6 +77,8 @@ struct BridgedASTType;
 class BridgedCanType;
 class BridgedASTContext;
 struct BridgedSubstitutionMap;
+struct BridgedGenericSignature;
+struct BridgedConformance;
 class BridgedParameterList;
 enum BridgedPlatformKind : size_t;
 
@@ -2989,33 +2993,51 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
 };
 
 struct BridgedASTType {
-  swift::TypeBase * _Nullable type;
-
-  BRIDGED_INLINE swift::Type unbridged() const;
-  BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanonicalType() const;
-  BRIDGED_INLINE bool hasTypeParameter() const;
-  BRIDGED_INLINE bool isOpenedExistentialWithError() const;
-  BRIDGED_INLINE bool isEscapable() const;
-  BRIDGED_INLINE bool isNoEscape() const;
-  BRIDGED_INLINE bool isInteger() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
-};
-
-class BridgedCanType {
-  swift::TypeBase * _Nullable type;
-
-public:
   enum class TraitResult {
     IsNot,
     CanBe,
     Is
   };
 
+  enum class MetatypeRepresentation {
+    Thin,
+    Thick,
+    ObjC
+  };
+
+  swift::TypeBase * _Nullable type;
+
+  BRIDGED_INLINE swift::Type unbridged() const;
+  BridgedOwnedString getDebugDescription() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanonicalType() const;
+  BRIDGED_INLINE bool isLegalFormalType() const;
+  BRIDGED_INLINE bool hasTypeParameter() const;
+  BRIDGED_INLINE bool hasLocalArchetype() const;
+  BRIDGED_INLINE bool isExistentialArchetype() const;
+  BRIDGED_INLINE bool isExistentialArchetypeWithError() const;
+  BRIDGED_INLINE bool isExistential() const;
+  BRIDGED_INLINE bool isEscapable() const;
+  BRIDGED_INLINE bool isNoEscape() const;
+  BRIDGED_INLINE bool isInteger() const;
+  BRIDGED_INLINE bool isMetatypeType() const;
+  BRIDGED_INLINE bool isExistentialMetatypeType() const;
+  BRIDGED_INLINE TraitResult canBeClass() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;
+  BRIDGED_INLINE MetatypeRepresentation getRepresentationOfMetatype() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getInvocationGenericSignatureOfFunctionType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedASTType fromType, BridgedASTType toType) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;  
+};
+
+class BridgedCanType {
+  swift::TypeBase * _Nullable type;
+
+public:
   BRIDGED_INLINE BridgedCanType(swift::CanType ty);
   BRIDGED_INLINE swift::CanType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getType() const;
-  BRIDGED_INLINE TraitResult canBeClass() const;
 };
 
 struct BridgedASTTypeArray {
@@ -3056,6 +3078,8 @@ struct BridgedConformanceArray {
 struct BridgedSubstitutionMap {
   uint64_t storage[1];
 
+  static SWIFT_IMPORT_UNSAFE BridgedSubstitutionMap get(BridgedGenericSignature genSig,
+                                                        BridgedArrayRef replacementTypes);
   BRIDGED_INLINE BridgedSubstitutionMap(swift::SubstitutionMap map);
   BRIDGED_INLINE swift::SubstitutionMap unbridged() const;
   BRIDGED_INLINE BridgedSubstitutionMap();
@@ -3065,6 +3089,13 @@ struct BridgedSubstitutionMap {
   BRIDGED_INLINE SwiftInt getNumConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance getConformance(SwiftInt index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getReplacementTypes() const;
+};
+
+struct BridgedGenericSignature {
+  const swift::GenericSignatureImpl * _Nullable impl;
+
+  BRIDGED_INLINE swift::GenericSignature unbridged() const;
+  BridgedOwnedString getDebugDescription() const;
 };
 
 struct BridgedFingerprint {

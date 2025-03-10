@@ -163,14 +163,6 @@ BridgedFunction BridgedTestArguments::takeFunction() const {
 }
 
 //===----------------------------------------------------------------------===//
-//                                SILType
-//===----------------------------------------------------------------------===//
-
-static_assert((int)BridgedType::MetatypeRepresentation::Thin == (int)swift::MetatypeRepresentation::Thin);
-static_assert((int)BridgedType::MetatypeRepresentation::Thick == (int)swift::MetatypeRepresentation::Thick);
-static_assert((int)BridgedType::MetatypeRepresentation::ObjC == (int)swift::MetatypeRepresentation::ObjC);
-
-//===----------------------------------------------------------------------===//
 //                                SILFunction
 //===----------------------------------------------------------------------===//
 

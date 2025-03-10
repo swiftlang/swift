@@ -8,6 +8,7 @@
 
 swift_compiler_sources(Optimizer
   SimplifyAllocRefDynamic.swift
+  SimplifyAllocStack.swift
   SimplifyApply.swift
   SimplifyBeginAndLoadBorrow.swift
   SimplifyBeginCOWMutation.swift
@@ -38,4 +39,5 @@ swift_compiler_sources(Optimizer
   SimplifyTuple.swift
   SimplifyTupleExtract.swift
   SimplifyUncheckedEnumData.swift
-  SimplifyValueToBridgeObject.swift)
+  SimplifyValueToBridgeObject.swift
+  SimplifyWitnessMethod.swift)

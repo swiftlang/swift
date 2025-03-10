@@ -296,6 +296,7 @@ extension ApplySite {
 
 public protocol FullApplySite : ApplySite {
   var singleDirectResult: Value? { get }
+  var singleDirectErrorResult: Value? { get }
 }
 
 extension FullApplySite {
