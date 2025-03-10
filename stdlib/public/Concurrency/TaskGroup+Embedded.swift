@@ -37,7 +37,7 @@ extension TaskGroup {
     )
 
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createTask(
       flags: flags,
@@ -70,7 +70,7 @@ extension TaskGroup {
     )
 
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createTask(
       flags: flags,
@@ -103,7 +103,7 @@ extension ThrowingTaskGroup {
     )
 
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createTask(
       flags: flags,
@@ -136,7 +136,7 @@ extension ThrowingTaskGroup {
     )
 
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createTask(
       flags: flags,
@@ -169,7 +169,7 @@ extension DiscardingTaskGroup {
     )
 
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createTask(
       flags: flags,
@@ -202,7 +202,7 @@ extension DiscardingTaskGroup {
     )
 
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createTask(
       flags: flags,
@@ -235,7 +235,7 @@ extension ThrowingDiscardingTaskGroup {
     )
 
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
   
     _ = Builtin.createTask(
       flags: flags,
@@ -268,7 +268,7 @@ extension ThrowingDiscardingTaskGroup {
     )
 
     let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
     _ = Builtin.createTask(
       flags: flags,
