@@ -227,7 +227,7 @@ if ($AndroidSDKs.Length -gt 0) {
 
 if ($Test -contains "*") {
   # Explicitly don't include llbuild yet since tests are known to fail on Windows
-  $Test = @("lld", "lldb", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
+  $Test = @("lld", "lldb", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp", "android")
 }
 
 # Architecture definitions
@@ -2081,21 +2081,28 @@ function Build-CURL([Platform]$Platform, $Arch) {
     })
 }
 
-function Build-Runtime([Platform]$Platform, $Arch) {
+function Build-Runtime([Platform]$Platform, $Arch, [switch]$Test = $false) {
+  $Targets = @("install")
   $PlatformDefines = @{}
   if ($Platform -eq [Platform]::Android) {
     $PlatformDefines += @{
       LLVM_ENABLE_LIBCXX = "YES";
       SWIFT_USE_LINKER = "lld";
-      SWIFT_INCLUDE_TESTS = "NO";
-      SWIFT_INCLUDE_TEST_BINARIES = "NO";
       # Clang[<18] doesn't provide the _Builtin_float module.
       SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT = "YES";
     }
   }
+  if ($Test) {
+    $Targets += @("check-swift-validation-only_non_executable")
+    $PlatformDefines += @{
+      SWIFT_INCLUDE_TESTS = "YES";
+      SWIFT_BUILD_TEST_SUPPORT_MODULES = "YES";
+      LLVM_LIT_ARGS = "-vv";
+    }
+  }
 
   Isolate-EnvVars {
-    $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$(Get-PinnedToolchainRuntime);${env:Path}"
+    $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$(Get-PinnedToolchainRuntime);${env:Path};$UnixToolsBinDir"
 
     $CompilersBinaryCache = if ($IsCrossCompiling) {
       Get-BuildProjectBinaryCache Compilers
@@ -2103,6 +2110,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
       Get-HostProjectBinaryCache Compilers
     }
 
+    $NativeToolsPath = Join-Path -Path $CompilersBinaryCache -ChildPath "bin"
     Build-CMakeProject `
       -Src $SourceCache\swift `
       -Bin (Get-TargetProjectBinaryCache $Arch Runtime) `
@@ -2111,6 +2119,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
       -Platform $Platform `
       -CacheScript $SourceCache\swift\cmake\caches\Runtime-$Platform-$($Arch.LLVMName).cmake `
       -UseBuiltCompilers C,CXX,Swift `
+      -BuildTargets $Targets `
       -Defines ($PlatformDefines + @{
         CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Arch);
         CMAKE_Swift_COMPILER_WORKS = "YES";
@@ -2124,7 +2133,8 @@ function Build-Runtime([Platform]$Platform, $Arch) {
         SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
         SWIFT_ENABLE_SYNCHRONIZATION = "YES";
         SWIFT_ENABLE_VOLATILE = "YES";
-        SWIFT_NATIVE_SWIFT_TOOLS_PATH = (Join-Path -Path $CompilersBinaryCache -ChildPath "bin");
+        SWIFT_NATIVE_LLVM_TOOLS_PATH = $NativeToolsPath;
+        SWIFT_NATIVE_SWIFT_TOOLS_PATH = $NativeToolsPath;
         SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
         SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
         CMAKE_SHARED_LINKER_FLAGS = if ($Platform -eq "Windows") { @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF") } else { @() };
@@ -3211,6 +3221,10 @@ if (-not $SkipBuild) {
 
     # Build platform: SDK, Redist and XCTest
     Invoke-BuildStep Build-Runtime Windows $Arch
+
+    # FIXME(#79839)
+    Get-ChildItem -Path "$($Arch.SDKInstallRoot)\usr\lib\swift\android" -Filter "*.swiftinterface" -Recurse
+
     Invoke-BuildStep Build-Dispatch Windows $Arch
     # FIXME(compnerd) ensure that the _build_ is the first arch and don't rebuild on each arch
     Invoke-BuildStep Build-FoundationMacros -Build Windows $BuildArch
@@ -3236,6 +3250,10 @@ if (-not $SkipBuild) {
 
     # Build platform: SDK, Redist and XCTest
     Invoke-BuildStep Build-Runtime Android $Arch
+
+    # FIXME(#79839)
+    Get-ChildItem -Path "$($Arch.SDKInstallRoot)\usr\lib\swift\android" -Filter "*.swiftinterface" -Recurse
+
     Invoke-BuildStep Build-Dispatch Android $Arch
     Invoke-BuildStep Build-Foundation Android $Arch
     Invoke-BuildStep Build-Sanitizers Android $Arch
@@ -3249,7 +3267,7 @@ if (-not $SkipBuild) {
     }
     Invoke-BuildStep Write-SDKSettingsPlist Android $Arch
 
-    Invoke-BuildStep Build-ExperimentalRuntime -Static Android $Arch
+    #Invoke-BuildStep Build-ExperimentalRuntime -Static Android $Arch
     Invoke-BuildStep Build-Foundation -Static Android $Arch
   }
 
@@ -3330,6 +3348,15 @@ if (-not $IsCrossCompiling) {
       "-TestSwift" = $Test -contains "swift";
     }
     Build-Compilers $HostArch @Tests
+  }
+
+  if ($Test -contains "android") {
+    try {
+      Build-Runtime Android $AndroidX64 -Test
+    } catch {}
+    try {
+      Build-Runtime Android $AndroidARM64 -Test
+    } catch {}
   }
 
   if ($Test -contains "dispatch") {
