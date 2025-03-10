@@ -186,7 +186,11 @@ public:
 
   /// Emit debug metadata for type metadata (for generic types). So meta.
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                        unsigned Depth, unsigned Index, StringRef Name);
+                        GenericTypeParamType *Type);
+
+  /// Emit debug metadata for a (protocol) witness table.
+  void emitWitnessTable(IRGenFunction &IGF, llvm::Value *Metadata,
+                        StringRef Name, ProtocolDecl *protocol);
 
   /// Emit debug info for the IR function parameter holding the size of one or
   /// more parameter / type packs.
