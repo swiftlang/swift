@@ -773,8 +773,8 @@ void swift_task_enqueue(Job *job, SerialExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobal(Job *job);
 
-/// Invoke an executor's `checkIsolated` or otherwise equivalent API,
-/// that will crash if the current executor is NOT the passed executor.
+/// Invoke an executor's `checkIsolated` implementation;
+/// It will crash if the current executor is NOT the passed executor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_checkIsolated(SerialExecutorRef executor);
 
@@ -784,6 +784,15 @@ void swift_task_checkIsolated(SerialExecutorRef executor);
 /// implementation.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_invokeSwiftCheckIsolated(SerialExecutorRef executor);
+
+/// Invoke an executor's `isIsolatingCurrentContext` implementation;
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isIsolatingCurrentContext(SerialExecutorRef executor);
+
+/// Invoke a Swift executor's `isIsolatingCurrentContext` implementation; returns
+/// `true` if it invoked the Swift implementation, `false` otherwise.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor);
 
 /// A count in nanoseconds.
 using JobDelay = unsigned long long;
@@ -1037,6 +1046,10 @@ enum swift_task_is_current_executor_flag : uint64_t {
 
   /// The routine should assert on failure.
   Assert = 0x8,
+
+  /// The routine should use 'isIsolatingCurrentContext' function on the
+  /// 'expected' executor instead of `checkIsolated`.
+  HasIsIsolatingCurrentContext = 0x10,
 };
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
