@@ -1,7 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ValueGenerics 
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: OS=macosx
-// REQUIRES: swift_feature_ValueGenerics
 
 struct A<let N: Int> {} // expected-error {{values in generic types are only available in macOS 99.99.0 or newer}}
                         // expected-note@-1 {{add @available attribute to enclosing generic struct}}
