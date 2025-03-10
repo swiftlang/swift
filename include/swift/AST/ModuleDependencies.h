@@ -990,7 +990,7 @@ public:
   llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
   collectCrossImportOverlayNames(
       ASTContext &ctx, StringRef moduleName,
-      std::vector<std::pair<std::string, std::string>> &overlayFiles) const;
+      std::set<std::pair<std::string, std::string>> &overlayFiles) const;
 };
 
 using ModuleDependencyVector =
