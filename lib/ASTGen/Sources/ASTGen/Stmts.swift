@@ -502,7 +502,7 @@ extension ASTGenVisitor {
   }
 
   func generate(switchCaseList node: SwitchCaseListSyntax) -> BridgedArrayRef {
-    var allBridgedCases: [BridgedASTNode] = []
+    var allBridgedCases: [BridgedCaseStmt] = []
     visitIfConfigElements(node, of: SwitchCaseSyntax.self) { element in
       switch element {
       case .ifConfigDecl(let ifConfigDecl):
@@ -511,10 +511,10 @@ extension ASTGenVisitor {
         return .underlying(switchCase)
       }
     } body: { caseNode in
-      allBridgedCases.append(
-        .stmt(self.generate(switchCase: caseNode).asStmt)
-      )
+      allBridgedCases.append(self.generate(switchCase: caseNode))
     }
+
+    // TODO: Diagnose 'case' after 'default'.
 
     return allBridgedCases.lazy.bridgedArray(in: self)
   }

@@ -780,7 +780,6 @@ public:
     case DeclKind::Accessor:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
-    case DeclKind::PoundDiagnostic:
       return true;
     case DeclKind::OpaqueType:
     case DeclKind::Enum:
@@ -912,7 +911,6 @@ public:
   UNINTERESTING_DECL(MissingMember)
   UNINTERESTING_DECL(Operator)
   UNINTERESTING_DECL(PatternBinding)
-  UNINTERESTING_DECL(PoundDiagnostic)
   UNINTERESTING_DECL(PrecedenceGroup)
   UNINTERESTING_DECL(TopLevelCode)
   UNINTERESTING_DECL(Value)

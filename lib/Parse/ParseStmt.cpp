@@ -2529,7 +2529,7 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
 
   SourceLoc lBraceLoc;
   SourceLoc rBraceLoc;
-  SmallVector<ASTNode, 8> cases;
+  SmallVector<CaseStmt *, 8> cases;
 
   if (Status.isErrorOrHasCompletion()) {
     return makeParserResult(
@@ -2551,9 +2551,7 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
   // We cannot have additional cases after a default clause. Complain on
   // the first offender.
   bool hasDefault = false;
-  for (auto Element : cases) {
-    if (!Element.is<Stmt*>()) continue;
-    auto *CS = cast<CaseStmt>(Element.get<Stmt*>());
+  for (auto *CS : cases) {
     if (hasDefault) {
       diagnose(CS->getLoc(), diag::case_after_default);
       break;
@@ -2572,8 +2570,8 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
                                  /*EndLoc=*/rBraceLoc, Context));
 }
 
-ParserStatus
-Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
+ParserStatus Parser::parseStmtCases(SmallVectorImpl<CaseStmt *> &cases,
+                                    bool IsActive) {
   ParserStatus Status;
   while (Tok.isNot(tok::r_brace, tok::eof,
                    tok::pound_endif, tok::pound_elseif, tok::pound_else)) {
@@ -2586,22 +2584,17 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
       // '#if' in 'case' position can enclose one or more 'case' or 'default'
       // clauses.
       auto IfConfigResult =
-          parseIfConfig(IfConfigContext::SwitchStmt,
-                        [&](bool IsActive) {
-                          SmallVector<ASTNode, 16> elements;
-                          parseStmtCases(elements, IsActive);
+          parseIfConfig(IfConfigContext::SwitchStmt, [&](bool IsActive) {
+            SmallVector<CaseStmt *, 16> elements;
+            parseStmtCases(elements, IsActive);
 
-                          if (IsActive) {
-                            cases.append(elements);
-                          }
-                        });
+            if (IsActive) {
+              cases.append(elements);
+            }
+          });
       Status |= IfConfigResult;
     } else if (Tok.is(tok::pound_warning) || Tok.is(tok::pound_error)) {
-      auto PoundDiagnosticResult = parseDeclPoundDiagnostic();
-      Status |= PoundDiagnosticResult;
-      if (auto PDD = PoundDiagnosticResult.getPtrOrNull()) {
-        cases.emplace_back(PDD);
-      }
+      Status |= parseDeclPoundDiagnostic();
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeCaseStmtKeyword();

@@ -244,11 +244,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return true;
   }
 
-  bool visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
-    // By default, ignore #error/#warning.
-    return false;
-  }
-
   bool visitOperatorDecl(OperatorDecl *OD) {
     return false;
   }
@@ -2068,19 +2063,12 @@ Stmt *Traversal::visitSwitchStmt(SwitchStmt *S) {
   else
     return nullptr;
 
-  for (auto N : S->getRawCases()) {
-    if (Stmt *aCase = N.dyn_cast<Stmt*>()) {
-      assert(isa<CaseStmt>(aCase));
-      if (Stmt *aStmt = doIt(aCase)) {
-        assert(aCase == aStmt && "switch case remap not supported");
-        (void)aStmt;
-      } else
-        return nullptr;
-    } else {
-      assert(isa<PoundDiagnosticDecl>(N.get<Decl*>()));
-      if (doIt(N.get<Decl*>()))
-        return nullptr;
-    }
+  for (auto *aCase : S->getCases()) {
+    if (Stmt *aStmt = doIt(aCase)) {
+      assert(aCase == aStmt && "switch case remap not supported");
+      (void)aStmt;
+    } else
+      return nullptr;
   }
 
   return S;

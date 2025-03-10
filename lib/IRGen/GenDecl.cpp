@@ -2611,7 +2611,6 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
-  case DeclKind::PoundDiagnostic:
   case DeclKind::Macro:
     return;
 
@@ -5794,7 +5793,6 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Missing:
       llvm_unreachable("missing decl in IRGen");
 
-    case DeclKind::PoundDiagnostic:
     case DeclKind::Macro:
       continue;
 
