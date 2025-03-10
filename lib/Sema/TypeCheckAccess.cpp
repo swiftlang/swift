@@ -601,7 +601,6 @@ public:
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
 
-  UNREACHABLE(PoundDiagnostic, "does not have access control")
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
   UNREACHABLE(Missing, "does not have access control")
@@ -1393,7 +1392,6 @@ public:
 #define UNINTERESTING(KIND) \
   void visit##KIND##Decl(KIND##Decl *D) {}
 
-  UNINTERESTING(PoundDiagnostic) // Does not have access control.
   UNINTERESTING(EnumCase) // Handled at the EnumElement level.
   UNINTERESTING(Var) // Handled at the PatternBinding level.
   UNINTERESTING(Destructor) // Always correct.
@@ -2184,7 +2182,6 @@ public:
 
   UNINTERESTING(PrefixOperator) // Does not reference other decls.
   UNINTERESTING(PostfixOperator) // Does not reference other decls.
-  UNINTERESTING(PoundDiagnostic) // Not applicable.
   UNINTERESTING(EnumCase) // Handled at the EnumElement level.
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.

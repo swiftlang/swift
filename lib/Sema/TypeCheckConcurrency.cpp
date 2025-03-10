@@ -5350,7 +5350,6 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
-  case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::Missing:
   case DeclKind::MissingMember:
@@ -7573,7 +7572,6 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::Module:
   case DeclKind::PatternBinding:
   case DeclKind::PostfixOperator:
-  case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::PrefixOperator:
   case DeclKind::TopLevelCode:

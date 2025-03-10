@@ -1644,14 +1644,6 @@ public:
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, switchStmt);
 
-    // Preemptively visit all Decls (#if/#warning/#error) that still exist in
-    // the list of raw cases.
-    for (auto &node : switchStmt->getRawCases()) {
-      if (!node.is<Decl *>())
-        continue;
-      TypeChecker::typeCheckDecl(node.get<Decl *>());
-    }
-
     auto cases = switchStmt->getCases();
     checkSiblingCaseStmts(cases.begin(), cases.end(), CaseParentKind::Switch,
                           limitExhaustivityChecks, subjectType);
