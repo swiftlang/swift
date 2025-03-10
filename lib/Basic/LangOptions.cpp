@@ -295,7 +295,7 @@ bool LangOptions::isCustomConditionalCompilationFlagSet(StringRef Name) const {
 }
 
 bool LangOptions::FeatureState::isEnabled() const {
-  return this->state != FeatureState::Kind::Off;
+  return this->state == FeatureState::Kind::Enabled;
 }
 
 bool LangOptions::FeatureState::isEnabledForAdoption() const {

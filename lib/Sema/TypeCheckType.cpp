@@ -6411,8 +6411,10 @@ private:
       return false;
     }
 
-    // A missing `any` or `some` is always diagnosed if this feature is enabled.
-    if (ctx.LangOpts.hasFeature(Feature::ExistentialAny)) {
+    // A missing `any` or `some` is always diagnosed if this feature not
+    // disabled.
+    auto featureState = ctx.LangOpts.getFeatureState(Feature::ExistentialAny);
+    if (featureState.isEnabled() || featureState.isEnabledForAdoption()) {
       return true;
     }
 
