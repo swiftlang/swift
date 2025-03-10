@@ -12,6 +12,16 @@
 
 import Swift
 
+// N.B. It would be nice to rename this file to ExecutorJob.swift, but when
+//      trying that we hit an error from the API digester claiming that
+//
+//        +Var UnownedJob.context has mangled name changing from
+//          'Swift.UnownedJob.(context in #UNSTABLE ID#) : Builtin.Job' to
+//          'Swift.UnownedJob.(context in #UNSTABLE ID#) : Builtin.Job'
+//
+//      This is odd because `context` is private, so it isn't really part of
+//      the module API.
+
 // TODO: It would be better if some of the functions here could be inlined into
 // the Swift code.  In particular, some of the ones that deal with data held on
 // ExecutorJob.
