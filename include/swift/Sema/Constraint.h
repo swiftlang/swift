@@ -336,6 +336,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
     private llvm::TrailingObjects<Constraint,
                                   TypeVariableType *,
                                   ConstraintFix *,
+                                  ContextualTypeInfo,
                                   OverloadChoice> {
   friend TrailingObjects;
 
@@ -345,7 +346,12 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The kind of restriction placed on this constraint.
   ConversionRestrictionKind Restriction : 8;
 
-  /// Whether we have a fix.
+  /// The number of type variables referenced by this constraint.
+  ///
+  /// The type variables themselves are tail-allocated.
+  unsigned NumTypeVariables : 11;
+
+  /// Whether we have a tail-allocated fix.
   unsigned HasFix : 1;
 
   /// Whether the \c Restriction field is valid.
@@ -375,13 +381,18 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// the rest of the constraint system. Currently only applies to conjunctions.
   unsigned IsIsolated : 1;
 
-  /// The number of type variables referenced by this constraint.
-  ///
-  /// The type variables themselves are tail-allocated.
-  unsigned NumTypeVariables : 11;
-
   /// The kind of function reference, for member references.
   unsigned TheFunctionRefInfo : 3;
+
+  /// The trailing closure matching for an applicable function constraint,
+  /// if any. 0 = None, 1 = Forward, 2 = Backward.
+  unsigned trailingClosureMatching : 2;
+
+  /// For a SyntacticElement constraint, identify whether the result of this
+  /// node is unused.
+  unsigned isDiscarded : 1;
+
+  // 23 bits remaining
 
   union {
     struct {
@@ -433,10 +444,6 @@ class Constraint final : public llvm::ilist_node<Constraint>,
     struct {
       /// The node itself.
       ASTNode Element;
-      /// Contextual information associated with the element (if any).
-      ContextualTypeInfo Context;
-      /// Identifies whether result of this node is unused.
-      bool IsDiscarded;
     } SyntacticElement;
 
     struct {
@@ -447,9 +454,6 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       /// The type being called, primarily a function type, but could
       /// be a metatype, a tuple or a nominal type.
       Type Callee;
-      /// The trailing closure matching for an applicable function constraint,
-      /// if any. 0 = None, 1 = Forward, 2 = Backward.
-      unsigned TrailingClosureMatching : 2;
       /// The declaration context in which the application appears.
       DeclContext *UseDC;
     } Apply;
@@ -525,6 +529,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   size_t numTrailingObjects(OverloadToken<ConstraintFix *>) const {
     return HasFix ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ContextualTypeInfo>) const {
+    return Kind == ConstraintKind::SyntacticElement ? 1 : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<OverloadChoice>) const {
@@ -604,15 +612,15 @@ public:
       DeclContext *useDC, ConstraintLocator *locator);
 
   static Constraint *createSyntacticElement(ConstraintSystem &cs,
-                                              ASTNode node,
-                                              ConstraintLocator *locator,
-                                              bool isDiscarded = false);
+                                            ASTNode node,
+                                            ConstraintLocator *locator,
+                                            bool isDiscarded = false);
 
   static Constraint *createSyntacticElement(ConstraintSystem &cs,
-                                              ASTNode node,
-                                              ContextualTypeInfo context,
-                                              ConstraintLocator *locator,
-                                              bool isDiscarded = false);
+                                            ASTNode node,
+                                            ContextualTypeInfo context,
+                                            ConstraintLocator *locator,
+                                            bool isDiscarded = false);
 
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -903,13 +911,13 @@ public:
   }
 
   ContextualTypeInfo getElementContext() const {
-    assert(Kind == ConstraintKind::SyntacticElement);
-    return SyntacticElement.Context;
+    ASSERT(Kind == ConstraintKind::SyntacticElement);
+    return *getTrailingObjects<ContextualTypeInfo>();
   }
 
   bool isDiscardedElement() const {
     assert(Kind == ConstraintKind::SyntacticElement);
-    return SyntacticElement.IsDiscarded;
+    return isDiscarded;
   }
 
   /// For an applicable function constraint, retrieve the trailing closure
