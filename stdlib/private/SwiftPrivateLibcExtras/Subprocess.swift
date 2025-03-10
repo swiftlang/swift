@@ -24,6 +24,8 @@ import WASILibc
 #elseif os(Windows)
 import CRT
 import WinSDK
+#elseif os(FreeBSD)
+import FreeBSD
 #endif
 
 #if !os(WASI)
