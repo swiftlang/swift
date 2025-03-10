@@ -2558,7 +2558,7 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
   ParserStatus status;
   if (!Context.LangOpts.hasFeature(Feature::LifetimeDependence)) {
     diagnose(loc, diag::requires_experimental_feature, "@lifetime", false,
-             getFeatureName(Feature::LifetimeDependence));
+             Feature::LifetimeDependence.getName());
     status.setIsParseError();
     return status;
   }
@@ -4742,7 +4742,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   case TypeAttrKind::Execution: {
     if (!Context.LangOpts.hasFeature(Feature::ExecutionAttribute)) {
       diagnose(Tok, diag::requires_experimental_feature, "@execution", false,
-               getFeatureName(Feature::ExecutionAttribute));
+               Feature::ExecutionAttribute.getName());
       return makeParserError();
     }
 
@@ -5317,7 +5317,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     if (Tok.isContextualKeyword("sending")) {
       if (!P.Context.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
         P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
-                   false, getFeatureName(Feature::SendingArgsAndResults));
+                   false, Feature::SendingArgsAndResults.getName());
       }
 
       // Only allow for 'sending' to be written once.
@@ -5341,7 +5341,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       if (!P.Context.LangOpts.hasFeature(Feature::LifetimeDependence)) {
         P.diagnose(Tok, diag::requires_experimental_feature,
                    "lifetime dependence specifier", false,
-                   getFeatureName(Feature::LifetimeDependence));
+                   Feature::LifetimeDependence.getName());
       }
       P.consumeToken(); // consume '@'
       auto loc = P.consumeToken(); // consume 'lifetime'
