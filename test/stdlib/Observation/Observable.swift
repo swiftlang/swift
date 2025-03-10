@@ -511,6 +511,28 @@ struct Validator {
       expectEqual(subject.container.id, startId)
     }
 
+    suite.test("weak container observation") {
+      let changed = CapturedState(state: false)
+      var contents: HasIgnoredProperty? = HasIgnoredProperty()
+      class Container {
+        var contents: weak HasIgnoredProperty?
+        init(contents: HasIgnoredProperty) {
+          self.contents = contents
+        }
+      }
+
+      let test = Container(contents: contents!)
+      withObservationTracking {
+        _blackHole(test.contents?.ignored)
+        _blackHole(test.contents?.field)
+      } onChange: {
+        changed.state = true
+      }
+      
+      contents = nil
+      expectEqual(changed.state, true)
+    }
+
     runAllTests()
   }
 }
