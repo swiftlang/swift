@@ -45,7 +45,7 @@ static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
 
 #define BASELINE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)          \
   static bool usesFeature##FeatureName(Decl *decl) { return false; }
-#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
 
 #define UNINTERESTING_FEATURE(FeatureName)                                     \
@@ -550,7 +550,7 @@ void FeatureSet::collectFeaturesUsed(Decl *decl, InsertOrRemove operation) {
 
   // Go through each of the features, checking whether the
   // declaration uses that feature.
-#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   if (CHECK(usesFeature##FeatureName))                                         \
     collectRequiredFeature(Feature::FeatureName, operation);
 #define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)      \
