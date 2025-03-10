@@ -117,7 +117,7 @@ extension String {
       return unsafe (String._uncheckedFromUTF8(
         input, asciiPreScanResult: extraInfo.isASCII
       ), false)
-    case .error(let initialRange):
+    case .error(_, let initialRange):
         return unsafe (repairUTF8(input, firstKnownBrokenRange: initialRange), true)
     }
   }
@@ -139,7 +139,7 @@ extension String {
         newIsASCII: info.isASCII
       )
       return result.asString
-    case .error(let initialRange):
+    case .error(_, let initialRange):
       defer { _fixLifetime(result) }
       //This could be optimized to use excess tail capacity
       return unsafe repairUTF8(result.codeUnits, firstKnownBrokenRange: initialRange)
