@@ -2036,12 +2036,9 @@ namespace {
     }
 
     void markReturnsUnsafeNonescapable(AbstractFunctionDecl *fd) {
-      if (Impl.SwiftContext.LangOpts.hasFeature(Feature::LifetimeDependence)) {
-        fd->getAttrs().add(new (Impl.SwiftContext)
-                               UnsafeNonEscapableResultAttr(/*Implicit=*/true));
-        fd->getAttrs().add(new (Impl.SwiftContext)
-                               UnsafeAttr(/*Implicit=*/true));
-      }
+      fd->getAttrs().add(new (Impl.SwiftContext)
+                             UnsafeNonEscapableResultAttr(/*Implicit=*/true));
+      fd->getAttrs().add(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
     }
 
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
@@ -2417,9 +2414,7 @@ namespace {
       // TODO: builtin "zeroInitializer" does not work with non-escapable
       // types yet. Don't generate an initializer.
       if (hasZeroInitializableStorage && needsEmptyInitializer &&
-          (!Impl.SwiftContext.LangOpts.hasFeature(
-               Feature::LifetimeDependence) ||
-           !isNonEscapable)) {
+          !isNonEscapable) {
         // Add default constructor for the struct if compiling in C mode.
         // If we're compiling for C++:
         // 1. If a default constructor is declared, don't synthesize one.
@@ -4053,21 +4048,29 @@ namespace {
       if (decl->getTemplatedKind() == clang::FunctionDecl::TK_FunctionTemplate)
         return;
 
-      auto &ASTContext = result->getASTContext();
-      if (!ASTContext.LangOpts.hasFeature(Feature::LifetimeDependence))
+      // FIXME: support C functions imported as members.
+      if (result->getImportAsMemberStatus().isImportAsMember() &&
+          !isa<clang::CXXMethodDecl, clang::ObjCMethodDecl>(decl))
         return;
 
+      auto isEscapable = [this](clang::QualType ty) {
+        return evaluateOrDefault(
+                   Impl.SwiftContext.evaluator,
+                   ClangTypeEscapability({ty.getTypePtr(), &Impl}),
+                   CxxEscapability::Unknown) != CxxEscapability::NonEscapable;
+      };
+
+      auto &ASTContext = result->getASTContext();
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, 0,
                                               /*isImmortal*/ true);
-      if (const auto *funDecl = dyn_cast<FuncDecl>(result))
-        if (hasUnsafeAPIAttr(decl) && !funDecl->getResultInterfaceType()->isEscapable()) {
-          lifetimeDependencies.push_back(immortalLifetime);
-          Impl.SwiftContext.evaluator.cacheOutput(
-              LifetimeDependenceInfoRequest{result},
-              Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
-          return;
-        }
+      if (hasUnsafeAPIAttr(decl) && !isEscapable(decl->getReturnType())) {
+        lifetimeDependencies.push_back(immortalLifetime);
+        Impl.SwiftContext.evaluator.cacheOutput(
+            LifetimeDependenceInfoRequest{result},
+            Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
+        return;
+      }
 
       auto retType = decl->getReturnType();
       auto warnForEscapableReturnType = [&] {
@@ -4088,23 +4091,24 @@ namespace {
       SmallBitVector scopedLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector paramHasAnnotation(dependencyVecSize);
       std::map<unsigned, SmallBitVector> inheritedArgDependences;
-      auto processLifetimeBound = [&](unsigned idx, Type ty) {
+      auto processLifetimeBound = [&](unsigned idx, clang::QualType ty) {
         warnForEscapableReturnType();
         paramHasAnnotation[idx] = true;
-        if (ty->isEscapable())
+        if (isEscapable(ty))
           scopedLifetimeParamIndicesForReturn[idx] = true;
         else
           inheritLifetimeParamIndicesForReturn[idx] = true;
       };
       auto processLifetimeCaptureBy =
-          [&](const clang::LifetimeCaptureByAttr *attr, unsigned idx, Type ty) {
+          [&](const clang::LifetimeCaptureByAttr *attr, unsigned idx,
+              clang::QualType ty) {
             // FIXME: support scoped lifetimes. This is not straightforward as
             // const T& is imported as taking a value
             //        and we assume the address of T would not escape. An
             //        annotation in this case contradicts our assumptions. We
             //        should diagnose that, and support this for the non-const
             //        case.
-            if (ty->isEscapable())
+            if (isEscapable(ty))
               return;
             for (auto param : attr->params()) {
               // FIXME: Swift assumes no escaping to globals. We should diagnose
@@ -4130,20 +4134,20 @@ namespace {
           };
       for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
         if (param->hasAttr<clang::LifetimeBoundAttr>())
-          processLifetimeBound(idx, swiftParams->get(idx)->getInterfaceType());
+          processLifetimeBound(idx, param->getType());
         if (const auto *attr = param->getAttr<clang::LifetimeCaptureByAttr>())
-          processLifetimeCaptureBy(attr, idx,
-                                   swiftParams->get(idx)->getInterfaceType());
+          processLifetimeCaptureBy(attr, idx, param->getType());
       }
       if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
-        processLifetimeBound(result->getSelfIndex(),
-                             result->getImplicitSelfDecl()->getInterfaceType());
+        processLifetimeBound(
+            result->getSelfIndex(),
+            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
       if (auto attr =
               getImplicitObjectParamAnnotation<clang::LifetimeCaptureByAttr>(
                   decl))
         processLifetimeCaptureBy(
             attr, result->getSelfIndex(),
-            result->getImplicitSelfDecl()->getInterfaceType());
+            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
 
       for (auto& [idx, inheritedDepVec]: inheritedArgDependences) {
         lifetimeDependencies.push_back(LifetimeDependenceInfo(inheritedDepVec.any() ? IndexSubset::get(Impl.SwiftContext,
@@ -4188,7 +4192,7 @@ namespace {
       }
 
       for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
-        if (swiftParams->get(idx)->getInterfaceType()->isEscapable())
+        if (isEscapable(param->getType()))
           continue;
         if (param->hasAttr<clang::NoEscapeAttr>() || paramHasAnnotation[idx])
           continue;
