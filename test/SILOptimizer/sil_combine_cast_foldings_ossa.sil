@@ -145,9 +145,7 @@ protocol P {}
 //
 // CHECK-LABEL: sil [ossa] @remove_dead_checked_cast :
 // CHECK: bb0(%0 : $*AnyObject):
-// CHECK-NEXT: alloc_stack
 // CHECK-NEXT: destroy_addr %0
-// CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 // CHECK: } // end sil function 'remove_dead_checked_cast'

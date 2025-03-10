@@ -1515,7 +1515,7 @@ static bool canBeRemovedIfResultIsNotUsed(SILFunction *f) {
   return false;
 }
 
-SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
+SILInstruction *SILCombiner::legacyVisitApplyInst(ApplyInst *AI) {
   Builder.setCurrentDebugScope(AI->getDebugScope());
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
@@ -1661,7 +1661,7 @@ isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
   return true;
 }
 
-SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
+SILInstruction *SILCombiner::legacyVisitTryApplyInst(TryApplyInst *AI) {
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
   if (isa<PartialApplyInst>(AI->getCallee()))

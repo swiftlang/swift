@@ -937,8 +937,6 @@ public:
 
   SILType getLoweredInstanceTypeOfMetatype(SILFunction *function) const;
 
-  MetatypeRepresentation getRepresentationOfMetatype(SILFunction *function) const;
-
   bool isOrContainsObjectiveCClass() const;
 
   bool isCalleeConsumedFunction() const {

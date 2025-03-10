@@ -52,10 +52,15 @@ public class Instruction : CustomStringConvertible, Hashable {
   // All operands defined by the operation.
   // Returns the prefix of `operands` that does not include trailing type dependent operands.
   final public var definedOperands: OperandArray {
-    let operands = bridged.getOperands()
+    let allOperands = operands
     let typeOperands = bridged.getTypeDependentOperands()
-    return OperandArray(base: operands.base,
-      count: operands.count - typeOperands.count)
+    return allOperands[0 ..< (allOperands.count - typeOperands.count)]
+  }
+
+  final public var typeDependentOperands: OperandArray {
+    let allOperands = operands
+    let typeOperands = bridged.getTypeDependentOperands()
+    return allOperands[(allOperands.count - typeOperands.count) ..< allOperands.count]
   }
 
   fileprivate var resultCount: Int { 0 }
@@ -484,9 +489,9 @@ extension Instruction {
 }
 
 public protocol DebugVariableInstruction : VarDeclInstruction {
-  typealias DebugVariable = OptionalBridgedSILDebugVariable
+  typealias DebugVariable = BridgedSILDebugVariable
 
-  var debugVariable: DebugVariable { get }
+  var debugVariable: DebugVariable? { get }
 }
 
 /// A meta instruction is an instruction whose location is not interesting as
@@ -503,8 +508,8 @@ final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariable
     bridged.DebugValue_getDecl().getAs(VarDecl.self)
   }
 
-  public var debugVariable: DebugVariable {
-    return bridged.DebugValue_getVarInfo()
+  public var debugVariable: DebugVariable? {
+    return bridged.DebugValue_hasVarInfo() ? bridged.DebugValue_getVarInfo() : nil
   }
 }
 
@@ -513,6 +518,13 @@ final public class DebugStepInst : Instruction {}
 final public class SpecifyTestInst : Instruction {}
 
 final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAddrInstruction {
+  public var sourceFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.UnconditionalCheckedCastAddr_getSourceFormalType())
+  }
+  public var targetFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.UnconditionalCheckedCastAddr_getTargetFormalType())
+  }
+
   public var isTakeOfSrc: Bool { true }
   public var isInitializationOfDest: Bool { true }
   public override var mayTrap: Bool { true }
@@ -1013,6 +1025,13 @@ final public class KeyPathInst : SingleValueInstruction {
 final public
 class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
   public override var mayTrap: Bool { true }
+  
+  public var sourceFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.UnconditionalCheckedCast_getSourceFormalType())
+  }
+  public var targetFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.UnconditionalCheckedCast_getTargetFormalType())
+  }
 }
 
 final public
@@ -1186,6 +1205,7 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
   public var numArguments: Int { bridged.ApplyInst_numArguments() }
 
   public var singleDirectResult: Value? { self }
+  public var singleDirectErrorResult: Value? { nil }
 
   public var isNonThrowing: Bool { bridged.ApplyInst_getNonThrowing() }
   public var isNonAsync: Bool { bridged.ApplyInst_getNonAsync() }
@@ -1205,7 +1225,12 @@ final public class ObjCMethodInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class ObjCSuperMethodInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class WitnessMethodInst : SingleValueInstruction {}
+final public class WitnessMethodInst : SingleValueInstruction {
+  public var member: DeclRef { DeclRef(bridged: bridged.WitnessMethodInst_getMember()) }
+  public var lookupType: CanonicalType { CanonicalType(bridged: bridged.WitnessMethodInst_getLookupType()) }
+  public var lookupProtocol: ProtocolDecl { bridged.WitnessMethodInst_getLookupProtocol().getAs(ProtocolDecl.self) }
+  public var conformance: Conformance { Conformance(bridged: bridged.WitnessMethodInst_getConformance()) }
+}
 
 final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 
@@ -1265,13 +1290,15 @@ public protocol Allocation : SingleValueInstruction { }
 
 final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVariableInstruction, MetaInstruction {
   public var hasDynamicLifetime: Bool { bridged.AllocStackInst_hasDynamicLifetime() }
+  public var isFromVarDecl: Bool { bridged.AllocStackInst_isFromVarDecl() }
+  public var usesMoveableValueDebugInfo: Bool { bridged.AllocStackInst_usesMoveableValueDebugInfo() }
 
   public var varDecl: VarDecl? {
     bridged.AllocStack_getDecl().getAs(VarDecl.self)
   }
 
-  public var debugVariable: DebugVariable {
-    return bridged.AllocStack_getVarInfo()
+  public var debugVariable: DebugVariable? {
+    return bridged.AllocStack_hasVarInfo() ? bridged.AllocStack_getVarInfo() : nil
   }
 
   public var deallocations: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
@@ -1317,8 +1344,8 @@ final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVaria
     bridged.AllocBox_getDecl().getAs(VarDecl.self)
   }
 
-  public var debugVariable: DebugVariable {
-    return bridged.AllocBox_getVarInfo()
+  public var debugVariable: DebugVariable? {
+    return bridged.AllocBox_hasVarInfo() ? bridged.AllocBox_getVarInfo() : nil
   }
 }
 
@@ -1452,6 +1479,7 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var numArguments: Int { bridged.BeginApplyInst_numArguments() }
 
   public var singleDirectResult: Value? { nil }
+  public var singleDirectErrorResult: Value? { nil }
 
   public var token: Value { getResult(index: resultCount - 1) }
 
@@ -1611,7 +1639,9 @@ final public class TryApplyInst : TermInst, FullApplySite {
   public var errorBlock: BasicBlock { successors[1] }
 
   public var singleDirectResult: Value? { normalBlock.arguments[0] }
+  public var singleDirectErrorResult: Value? { errorBlock.arguments[0] }
 
+  public var isNonAsync: Bool { bridged.TryApplyInst_getNonAsync() }
   public var specializationInfo: ApplyInst.SpecializationInfo { bridged.TryApplyInst_getSpecializationInfo() }
 }
 
@@ -1716,6 +1746,13 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
 final public class CheckedCastAddrBranchInst : TermInst {
   public var source: Value { operands[0].value }
   public var destination: Value { operands[1].value }
+
+  public var sourceFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.CheckedCastAddrBranch_getSourceFormalType())
+  }
+  public var targetFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.CheckedCastAddrBranch_getTargetFormalType())
+  }
 
   public var successBlock: BasicBlock { bridged.CheckedCastAddrBranch_getSuccessBlock().block }
   public var failureBlock: BasicBlock { bridged.CheckedCastAddrBranch_getFailureBlock().block }

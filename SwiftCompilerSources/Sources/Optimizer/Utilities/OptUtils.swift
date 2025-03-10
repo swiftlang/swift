@@ -437,6 +437,54 @@ extension Instruction {
       return false
     }
   }
+
+  /// Returns true if `otherInst` is in the same block and dominated by this instruction.
+  /// To be used as simple dominance check if both instructions are most likely located in the same block
+  /// and no DominatorTree is available (like in instruction simplification).
+  func dominatesInSameBlock(_ otherInst: Instruction) -> Bool {
+    if parentBlock != otherInst.parentBlock {
+      return false
+    }
+    // Walk in both directions. This is most efficient if both instructions are located nearby but it's not clear
+    // which one comes first in the block's instruction list.
+    var forwardIter = self
+    var backwardIter = self
+    while let f = forwardIter.next {
+      if f == otherInst {
+        return true
+      }
+      forwardIter = f
+      if let b = backwardIter.previous {
+        if b == otherInst {
+          return false
+        }
+        backwardIter = b
+      }
+    }
+    return false
+  }
+
+  /// If this instruction uses a (single) existential archetype, i.e. it has a type-dependent operand,
+  /// returns the concrete type if it is known.
+  var concreteTypeOfDependentExistentialArchetype: CanonicalType? {
+    // For simplicity only support a single type dependent operand, which is true in most of the cases anyway.
+    if let openArchetypeOp = typeDependentOperands.singleElement,
+       // Match the sequence
+       //   %1 = metatype $T
+       //   %2 = init_existential_metatype %1, any P.Type
+       //   %3 = open_existential_metatype %2 to $@opened(...)
+       //   this_instruction_which_uses $@opened(...)  // type-defs: %3
+       let oemt = openArchetypeOp.value as? OpenExistentialMetatypeInst,
+       let iemt = oemt.operand.value as? InitExistentialMetatypeInst,
+       let mt = iemt.metatype as? MetatypeInst
+    {
+      return mt.type.astType.instanceTypeOfMetatype
+    }
+    // TODO: also handle open_existential_addr and open_existential_ref.
+    // Those cases are currently handled in SILCombine's `propagateConcreteTypeOfInitExistential`.
+    // Eventually we want to replace the SILCombine implementation with this one.
+    return nil
+  }
 }
 
 // Match the pattern:

@@ -244,9 +244,7 @@ public:
 
   /// Instruction visitors.
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
-  SILInstruction *visitApplyInst(ApplyInst *AI);
   SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
-  SILInstruction *visitTryApplyInst(TryApplyInst *AI);
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
@@ -258,7 +256,6 @@ public:
 
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
-  SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
@@ -266,8 +263,6 @@ public:
   SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
   SILInstruction *visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI);
   SILInstruction *visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI);
-  SILInstruction *visitUnconditionalCheckedCastInst(
-                    UnconditionalCheckedCastInst *UCCI);
   SILInstruction *
   visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI);
   SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
@@ -310,6 +305,9 @@ public:
 #define SWIFT_FUNCTION_PASS(ID, TAG, DESCRIPTION)
 #define SWIFT_SILCOMBINE_PASS(INST) \
   SILInstruction *visit##INST(INST *);
+#define SWIFT_SILCOMBINE_PASS_WITH_LEGACY(INST) \
+  SILInstruction *visit##INST(INST *);          \
+  SILInstruction *legacyVisit##INST(INST *);
 #include "swift/SILOptimizer/PassManager/Passes.def"
 
   /// Instruction visitor helpers.
