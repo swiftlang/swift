@@ -575,12 +575,6 @@ struct ASTContext::Implementation {
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
 
-    /// The set of normal protocol conformances.
-    llvm::FoldingSet<NormalProtocolConformance> NormalConformances;
-
-    // The set of self protocol conformances.
-    llvm::DenseMap<ProtocolDecl*, SelfProtocolConformance*> SelfConformances;
-
     /// The set of specialized protocol conformances.
     llvm::FoldingSet<SpecializedProtocolConformance> SpecializedConformances;
 
@@ -597,9 +591,6 @@ struct ASTContext::Implementation {
     /// The set of substitution maps (uniqued by their storage).
     llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
 
-    /// The set of unique AvailabilityContexts (uniqued by their storage).
-    llvm::FoldingSet<AvailabilityContext::Storage> AvailabilityContexts;
-
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
         conformance.~SpecializedProtocolConformance();
@@ -613,11 +604,6 @@ struct ASTContext::Implementation {
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning (default: 4189)
 #endif
-
-      // Call the normal conformance destructors last since they could be
-      // referenced by the other conformance types.
-      for (auto &conformance : NormalConformances)
-        conformance.~NormalProtocolConformance();
     }
 
     size_t getTotalMemory() const;
@@ -645,6 +631,11 @@ struct ASTContext::Implementation {
       AutoDiffDerivativeFunctionIdentifiers;
 
   llvm::FoldingSet<GenericSignatureImpl> GenericSignatures;
+  llvm::FoldingSet<NormalProtocolConformance> NormalConformances;
+  llvm::DenseMap<ProtocolDecl*, SelfProtocolConformance*> SelfConformances;
+
+  /// The set of unique AvailabilityContexts (uniqued by their storage).
+  llvm::FoldingSet<AvailabilityContext::Storage> AvailabilityContexts;
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -720,6 +711,9 @@ ASTContext::Implementation::Implementation()
     : IdentifierTable(Allocator),
       IntrinsicScratchContext(new llvm::LLVMContext()) {}
 ASTContext::Implementation::~Implementation() {
+  for (auto &conformance : NormalConformances)
+    conformance.~NormalProtocolConformance();
+
   for (auto &cleanup : Cleanups)
     cleanup();
 }
@@ -889,6 +883,9 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE_AND_BYTES(SILMoveOnlyWrappedTypes);
   SIZE_AND_BYTES(BuiltinIntegerTypes);
   SIZE_AND_BYTES(OpenedElementEnvironments);
+  SIZE(NormalConformances);
+  SIZE(SelfConformances);
+  SIZE(AvailabilityContexts);
   SIZE_AND_BYTES(ForeignRepresentableCache);
   SIZE(SearchPathsSet);
 
@@ -2912,15 +2909,14 @@ ASTContext::getNormalConformance(Type conformingType,
 
   // Did we already record the normal conformance?
   void *insertPos;
-  auto &normalConformances =
-    getImpl().getArena(AllocationArena::Permanent).NormalConformances;
+  auto &normalConformances = getImpl().NormalConformances;
   if (auto result = normalConformances.FindNodeOrInsertPos(id, insertPos))
     return result;
 
   // Build a new normal protocol conformance.
-  auto result = new (*this, AllocationArena::Permanent)
-      NormalProtocolConformance(conformingType, protocol, loc, dc, state,
-                                options, preconcurrencyLoc);
+  auto result = new (*this) NormalProtocolConformance(
+      conformingType, protocol, loc, dc, state,
+      options, preconcurrencyLoc);
   normalConformances.InsertNode(result, insertPos);
 
   return result;
@@ -2929,12 +2925,11 @@ ASTContext::getNormalConformance(Type conformingType,
 /// Produce a self-conformance for the given protocol.
 SelfProtocolConformance *
 ASTContext::getSelfConformance(ProtocolDecl *protocol) {
-  auto &selfConformances =
-    getImpl().getArena(AllocationArena::Permanent).SelfConformances;
+  auto &selfConformances = getImpl().SelfConformances;
   auto &entry = selfConformances[protocol];
   if (!entry) {
-    entry = new (*this, AllocationArena::Permanent)
-      SelfProtocolConformance(protocol->getDeclaredExistentialType());
+    entry = new (*this) SelfProtocolConformance(
+      protocol->getDeclaredExistentialType());
   }
   return entry;
 }
@@ -3274,6 +3269,9 @@ size_t ASTContext::getTotalMemory() const {
     // getImpl().GenericSignatures ?
     // getImpl().CompoundNames ?
     // getImpl().IntegerTypes ?
+    // getImpl().NormalConformances ?
+    // getImpl().SelfConformances ?
+    // getImpl().AvailabilityContexts
     getImpl().Permanent.getTotalMemory();
 
     Size += getSolverMemory();
@@ -3315,7 +3313,6 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     // FunctionTypes ?
     // UnboundGenericTypes ?
     // BoundGenericTypes ?
-    // NormalConformances ?
     // SpecializedConformances ?
     // InheritedConformances ?
     // BuiltinConformances ?
@@ -3360,14 +3357,11 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
     SIZE_AND_BYTES(OpaqueArchetypeEnvironments);
     SIZE_AND_BYTES(OpenedExistentialEnvironments);
     SIZE(FunctionTypes);
-    SIZE(NormalConformances);
-    SIZE(SelfConformances);
     SIZE(SpecializedConformances);
     SIZE(InheritedConformances);
     SIZE_AND_BYTES(BuiltinConformances);
     SIZE(PackConformances);
     SIZE(SubstitutionMaps);
-    SIZE(AvailabilityContexts);
 
 #undef SIZE
 #undef SIZE_AND_BYTES
@@ -5720,8 +5714,7 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
   AvailabilityContext::Storage::Profile(id, platformRange, isDeprecated,
                                         domainInfos);
 
-  auto &foldingSet =
-      ctx.getImpl().getArena(AllocationArena::Permanent).AvailabilityContexts;
+  auto &foldingSet = ctx.getImpl().AvailabilityContexts;
   void *insertPos;
   auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
   if (existing)
