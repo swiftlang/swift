@@ -2305,12 +2305,16 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     llvm::SmallString<128> SDKResourcePath(Opts.getSDKPath());
     llvm::sys::path::append(
         SDKResourcePath, "usr", "lib",
-        FrontendOpts.UseSharedResourceFolder ? "swift" : "swift_static",
-        getPlatformNameForTriple(Triple));
-    // Check for eg <sdkRoot>/usr/lib/swift/linux/
-    if (llvm::sys::fs::exists(SDKResourcePath)) {
-      llvm::sys::path::remove_filename(SDKResourcePath); // Remove <os> name
+        FrontendOpts.UseSharedResourceFolder ? "swift" : "swift_static");
+    // Check for eg <sdkRoot>/usr/lib/swift/
+    if (llvm::sys::fs::exists(SDKResourcePath))
       Opts.RuntimeResourcePath = SDKResourcePath.str();
+    else {
+      llvm::outs() << "You passed in an external -sdk without a Swift runtime.\n";
+      llvm::outs() << "Either specify a directory containing the runtime libraries with\n";
+      llvm::outs() << "the -resource-dir flag, or use -sysroot instead to point at a C/C++\n";
+      llvm::outs() << "sysroot alone. Falling back to << Opts.RuntimeResourcePath << for\n";
+      llvm::outs() << "the Swift runtime modules and libraries.\n";
     }
   }
 
