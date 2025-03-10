@@ -1087,6 +1087,8 @@ function Build-CMakeProject {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
   }
 
+  $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+
   # Enter the developer command shell early so we can resolve cmake.exe
   # for version checks.
   Isolate-EnvVars {
