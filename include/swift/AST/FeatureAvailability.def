@@ -80,6 +80,7 @@ FEATURE(IsolatedDeinit,                                 (6, 1))
 
 FEATURE(ValueGenericType,                               (6, 2))
 FEATURE(InitRawStructMetadata2,                         (6, 2))
+FEATURE(CustomExecutors,                                (6, 2))
 
 FEATURE(TaskExecutor,                                   FUTURE)
 FEATURE(Differentiation,                                FUTURE)

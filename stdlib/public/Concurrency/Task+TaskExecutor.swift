@@ -457,7 +457,7 @@ extension UnsafeCurrentTask {
   /// means to guarantee the executor remains alive while it is in use.
   @available(SwiftStdlib 6.0, *)
   public var unownedTaskExecutor: UnownedTaskExecutor? {
-    let ref = _getPreferredTaskExecutor()
+    let ref = _getPreferredUnownedTaskExecutor()
     return UnownedTaskExecutor(ref)
   }
 }
@@ -466,7 +466,7 @@ extension UnsafeCurrentTask {
 
 @available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_task_getPreferredTaskExecutor")
-internal func _getPreferredTaskExecutor() -> Builtin.Executor
+internal func _getPreferredUnownedTaskExecutor() -> Builtin.Executor
 
 typealias TaskExecutorPreferenceStatusRecord = UnsafeRawPointer
 
