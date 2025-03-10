@@ -4388,13 +4388,13 @@ int main(int argc, char *argv[]) {
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
 
   for (const auto &featureArg : options::EnableExperimentalFeatures) {
-    if (auto feature = getExperimentalFeature(featureArg)) {
+    if (auto feature = Feature::getExperimentalFeature(featureArg)) {
       InitInvok.getLangOptions().enableFeature(*feature);
     }
   }
 
   for (const auto &featureArg : options::EnableUpcomingFeatures) {
-    if (auto feature = getUpcomingFeature(featureArg)) {
+    if (auto feature = Feature::getUpcomingFeature(featureArg)) {
       InitInvok.getLangOptions().enableFeature(*feature);
     }
   }

@@ -36,29 +36,29 @@ class IsFeatureEnabledTest
 TEST_F(IsFeatureEnabledTest, VerifyTestedFeatures) {
   auto feature = baselineF;
   {
-    ASSERT_FALSE(getUpcomingFeature(feature.name));
-    ASSERT_FALSE(getExperimentalFeature(feature.name));
-    ASSERT_FALSE(isFeatureAdoptable(feature));
+    ASSERT_FALSE(Feature::getUpcomingFeature(feature.name));
+    ASSERT_FALSE(Feature::getExperimentalFeature(feature.name));
+    ASSERT_FALSE(feature.id.isAdoptable());
   }
 
   feature = upcomingF;
   {
-    ASSERT_TRUE(getUpcomingFeature(feature.name));
-    ASSERT_FALSE(isFeatureAdoptable(feature));
+    ASSERT_TRUE(Feature::getUpcomingFeature(feature.name));
+    ASSERT_FALSE(feature.id.isAdoptable());
     ASSERT_LT(defaultLangMode, feature.langMode);
   }
 
   feature = adoptableUpcomingF;
   {
-    ASSERT_TRUE(getUpcomingFeature(feature.name));
-    ASSERT_TRUE(isFeatureAdoptable(feature));
+    ASSERT_TRUE(Feature::getUpcomingFeature(feature.name));
+    ASSERT_TRUE(feature.id.isAdoptable());
     ASSERT_LT(defaultLangMode, feature.langMode);
   }
 
   feature = strictConcurrencyF;
   {
-    ASSERT_TRUE(getUpcomingFeature(feature.name));
-    ASSERT_FALSE(isFeatureAdoptable(feature));
+    ASSERT_TRUE(Feature::getUpcomingFeature(feature.name));
+    ASSERT_FALSE(feature.id.isAdoptable());
     ASSERT_LT(defaultLangMode, feature.langMode);
   }
 
@@ -66,9 +66,9 @@ TEST_F(IsFeatureEnabledTest, VerifyTestedFeatures) {
   {
     // If these tests start failing because `experimentalF` was promoted, swap
     // it for another experimental feature one that is available in production.
-    ASSERT_TRUE(isFeatureAvailableInProduction(feature));
-    ASSERT_TRUE(getExperimentalFeature(feature.name));
-    ASSERT_FALSE(isFeatureAdoptable(feature));
+    ASSERT_TRUE(feature.id.isAvailableInProduction());
+    ASSERT_TRUE(Feature::getExperimentalFeature(feature.name));
+    ASSERT_FALSE(feature.id.isAdoptable());
   }
 }
 
@@ -81,7 +81,7 @@ TEST_P(IsFeatureEnabledTest, ) {
     auto actualState = getLangOptions().getFeatureState(feature);
     auto expectedState = pair.second;
     ASSERT_EQ(actualState, expectedState)
-        << "Feature: " + getFeatureName(feature).str();
+        << "Feature: " + feature.getName().str();
   }
 }
 

@@ -3352,7 +3352,7 @@ static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
     } else {
       first = false;
     }
-    printer << "$" << getFeatureName(feature);
+    printer << "$" << Feature(feature).getName();
   }
 
 #ifndef NDEBUG

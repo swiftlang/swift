@@ -20,9 +20,8 @@ FeatureParsingTest::FeatureParsingTest() : ArgParsingTest() {
   this->langMode = defaultLangMode;
 }
 
-FeatureWrapper::FeatureWrapper(Feature id)
-    : id(id), name(getFeatureName(id).data()) {
-  auto langMode = getFeatureLanguageVersion(id);
+FeatureWrapper::FeatureWrapper(Feature id) : id(id), name(id.getName().data()) {
+  auto langMode = id.getLanguageVersion();
   if (langMode) {
     this->langMode = std::to_string(*langMode);
   }
