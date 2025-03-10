@@ -3455,7 +3455,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
   // Add a row for each label of each case.
   SmallVector<ClauseRow, 8> clauseRows;
-  clauseRows.reserve(S->getRawCases().size());
+  clauseRows.reserve(S->getCases().size());
   bool hasFallthrough = false;
   for (auto caseBlock : S->getCases()) {
     // If the previous block falls through into this block or we have multiple

@@ -114,7 +114,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
   Type enumType = parentDC->getDeclaredTypeInContext();
 
-  SmallVector<ASTNode, 4> cases;
+  SmallVector<CaseStmt *, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     auto *pat = EnumElementPattern::createImplicit(
         enumType, elt, /*subPattern*/ nullptr, /*DC*/ toRawDecl);
@@ -311,8 +311,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   Type enumType = parentDC->getDeclaredTypeInContext();
 
   auto selfDecl = cast<ConstructorDecl>(initDecl)->getImplicitSelfDecl();
-  
-  SmallVector<ASTNode, 4> cases;
+
+  SmallVector<CaseStmt *, 4> cases;
   unsigned Idx = 0;
   for (auto elt : enumDecl->getAllElements()) {
     // First, check case availability. If the case will definitely be

@@ -156,7 +156,6 @@ enum class DescriptiveDeclKind : uint8_t {
   Extension,
   EnumCase,
   TopLevelCode,
-  PoundDiagnostic,
   PatternBinding,
   Var,
   Param,
@@ -837,14 +836,6 @@ protected:
 
     /// Whether there is are lazily-loaded conformances for this extension.
     HasLazyConformances : 1
-  );
-
-  SWIFT_INLINE_BITFIELD(PoundDiagnosticDecl, Decl, 1+1,
-    /// `true` if the diagnostic is an error, `false` if it's a warning.
-    IsError : 1,
-
-    /// Whether this diagnostic has already been emitted.
-    HasBeenEmitted : 1
   );
 
   SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
@@ -2799,52 +2790,6 @@ public:
   }
 };
 
-class StringLiteralExpr;
-
-class PoundDiagnosticDecl : public Decl {
-  SourceLoc StartLoc;
-  SourceLoc EndLoc;
-  StringLiteralExpr *Message;
-  SourceLoc getLocFromSource() const { return StartLoc; }
-  friend class Decl;
-public:
-  PoundDiagnosticDecl(DeclContext *Parent, bool IsError, SourceLoc StartLoc,
-                      SourceLoc EndLoc, StringLiteralExpr *Message)
-    : Decl(DeclKind::PoundDiagnostic, Parent), StartLoc(StartLoc),
-      EndLoc(EndLoc), Message(Message) {
-      Bits.PoundDiagnosticDecl.IsError = IsError;
-      Bits.PoundDiagnosticDecl.HasBeenEmitted = false; 
-    }
-
-  DiagnosticKind getKind() const {
-    return isError() ? DiagnosticKind::Error : DiagnosticKind::Warning;
-  }
-
-  StringLiteralExpr *getMessage() const { return Message; }
-
-  bool isError() const {
-    return Bits.PoundDiagnosticDecl.IsError;
-  }
-
-  bool hasBeenEmitted() const {
-    return Bits.PoundDiagnosticDecl.HasBeenEmitted;
-  }
-
-  void markEmitted() {
-    Bits.PoundDiagnosticDecl.HasBeenEmitted = true;
-  }
-  
-  SourceLoc getEndLoc() const { return EndLoc; };
-  
-  SourceRange getSourceRange() const {
-    return SourceRange(StartLoc, EndLoc);
-  }
-
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::PoundDiagnostic;
-  }
-};
-  
 class OpaqueTypeDecl;
 
 /// ValueDecl - All named decls that are values in the language.  These can

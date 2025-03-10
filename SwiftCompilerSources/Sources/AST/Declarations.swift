@@ -110,8 +110,6 @@ final public class TopLevelCodeDecl: Decl {}
 
 final public class ImportDecl: Decl {}
 
-final public class PoundDiagnosticDecl: Decl {}
-
 final public class PrecedenceGroupDecl: Decl {}
 
 final public class MissingDecl: Decl {}

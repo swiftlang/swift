@@ -251,9 +251,9 @@ BridgedSwitchStmt BridgedSwitchStmt_createParsed(
     BridgedSourceLoc cLBraceLoc, BridgedArrayRef cCases,
     BridgedSourceLoc cRBraceLoc) {
   auto &context = cContext.unbridged();
-  auto cases =
-      context.AllocateTransform<ASTNode>(cCases.unbridged<BridgedASTNode>(),
-                                         [](auto &e) { return e.unbridged(); });
+  SmallVector<CaseStmt *, 16> cases;
+  for (auto cCase : cCases.unbridged<BridgedCaseStmt>())
+    cases.push_back(cCase.unbridged());
   return SwitchStmt::create(cLabelInfo.unbridged(), cSwitchLoc.unbridged(),
                             cSubjectExpr.unbridged(), cLBraceLoc.unbridged(),
                             cases, cRBraceLoc.unbridged(),

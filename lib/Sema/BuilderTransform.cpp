@@ -175,9 +175,6 @@ protected:
 
     if (auto *decl = element.dyn_cast<Decl *>()) {
       switch (decl->getKind()) {
-        // Skip #warning/#error; we'll handle them when applying
-        // the builder.
-      case DeclKind::PoundDiagnostic:
       case DeclKind::PatternBinding:
       case DeclKind::Var:
       case DeclKind::Param:
@@ -588,7 +585,7 @@ protected:
     // type-checked first.
     SmallVector<ASTNode, 4> doBody;
 
-    SmallVector<ASTNode, 4> cases;
+    SmallVector<CaseStmt *, 4> cases;
     SmallVector<Expr *, 4> caseVarRefs;
 
     for (auto *caseStmt : switchStmt->getCases()) {

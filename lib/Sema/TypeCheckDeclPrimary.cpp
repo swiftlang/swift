@@ -4091,16 +4091,6 @@ public:
     llvm_unreachable("TopLevelCodeDecls are handled elsewhere");
   }
   
-  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
-    if (PDD->hasBeenEmitted()) { return; }
-    PDD->markEmitted();
-    Ctx.Diags
-        .diagnose(PDD->getMessage()->getStartLoc(),
-                  PDD->isError() ? diag::pound_error : diag::pound_warning,
-                  PDD->getMessage()->getValue())
-        .highlight(PDD->getMessage()->getSourceRange());
-  }
-
   void visitConstructorDecl(ConstructorDecl *CD) {
     // Force creation of the generic signature.
     (void) CD->getGenericSignature();

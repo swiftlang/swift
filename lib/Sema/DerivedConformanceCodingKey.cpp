@@ -209,7 +209,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
     body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                              SourceLoc());
   } else {
-    SmallVector<ASTNode, 4> cases;
+    SmallVector<CaseStmt *, 4> cases;
     for (auto *elt : elements) {
       auto *pat = EnumElementPattern::createImplicit(enumType, elt,
                                                      /*subPattern*/ nullptr,
@@ -270,7 +270,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
   }
 
   auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
-  SmallVector<ASTNode, 4> cases;
+  SmallVector<CaseStmt *, 4> cases;
   for (auto *elt : elements) {
     // Skip the cases that would return unavailable elements since those can't
     // be instantiated at runtime.

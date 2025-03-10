@@ -172,10 +172,6 @@ public:
     // We only care about the contained VarDecls.
   }
 
-  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *pdd) {
-    // We don't care about diagnostics at this stage.
-  }
-
 private:
   void addAutoDiffDerivativeMethodsIfRequired(AbstractFunctionDecl *AFD,
                                               SILDeclRef::Kind kind) {
