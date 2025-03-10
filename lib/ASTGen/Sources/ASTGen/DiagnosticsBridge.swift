@@ -15,6 +15,11 @@ import BasicBridging
 import SwiftDiagnostics
 import SwiftSyntax
 
+fileprivate struct PerFrontendDiagnosticState {
+  /// The set of categories that were referenced by a diagnostic.
+  var referencedCategories: Set<DiagnosticCategory> = []
+}
+
 fileprivate func emitDiagnosticParts(
   diagnosticEngine: BridgedDiagnosticEngine,
   sourceFileBuffer: UnsafeBufferPointer<UInt8>,
@@ -235,6 +240,7 @@ public func addQueuedSourceFile(
 @_cdecl("swift_ASTGen_addQueuedDiagnostic")
 public func addQueuedDiagnostic(
   queuedDiagnosticsPtr: UnsafeMutableRawPointer,
+  perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
   text: UnsafePointer<UInt8>,
   textLength: Int,
   severity: BridgedDiagnosticSeverity,
@@ -248,6 +254,10 @@ public func addQueuedDiagnostic(
 ) {
   let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(
     to: QueuedDiagnostics.self
+  )
+
+  let diagnosticState = perFrontendDiagnosticStatePtr.assumingMemoryBound(
+    to: PerFrontendDiagnosticState.self
   )
 
   guard let rawPosition = cLoc.getOpaquePointerValue() else {
@@ -375,6 +385,11 @@ public func addQueuedDiagnostic(
     )
   }
 
+  // Note that we referenced this category.
+  if let category {
+    diagnosticState.pointee.referencedCategories.insert(category)
+  }
+
   let textBuffer = UnsafeBufferPointer(start: text, count: textLength)
   let diagnostic = Diagnostic(
     node: node,
@@ -430,4 +445,43 @@ extension String {
 
     return false
   }
+}
+
+@_cdecl("swift_ASTGen_createPerFrontendDiagnosticState")
+public func createPerFrontendDiagnosticState() -> UnsafeMutableRawPointer {
+  let ptr = UnsafeMutablePointer<PerFrontendDiagnosticState>.allocate(capacity: 1)
+  ptr.initialize(to: .init())
+  return UnsafeMutableRawPointer(ptr)
+}
+
+@_cdecl("swift_ASTGen_destroyPerFrontendDiagnosticState")
+public func destroyPerFrontendDiagnosticState(
+  statePtr: UnsafeMutableRawPointer
+) {
+  let state = statePtr.assumingMemoryBound(to: PerFrontendDiagnosticState.self)
+  state.deinitialize(count: 1)
+  state.deallocate()
+}
+
+@_cdecl("swift_ASTGen_renderCategoryFootnotes")
+public func renderCategoryFootnotes(
+  statePtr: UnsafeMutableRawPointer,
+  colorize: Int,
+  renderedStringOutPtr: UnsafeMutablePointer<BridgedStringRef>
+) {
+  let state = statePtr.assumingMemoryBound(to: PerFrontendDiagnosticState.self)
+  let formatter = DiagnosticsFormatter(contextSize: 0, colorize: colorize != 0)
+  var renderedStr = formatter.categoryFootnotes(
+    Array(state.pointee.referencedCategories),
+    leadingText: "\n"
+  )
+
+  if !renderedStr.isEmpty {
+    renderedStr += "\n"
+  }
+
+  renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
+
+  // Clear out categories so we start fresh.
+  state.pointee.referencedCategories = []
 }

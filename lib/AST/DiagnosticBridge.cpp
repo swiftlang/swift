@@ -27,6 +27,7 @@ using namespace swift;
 #if SWIFT_BUILD_SWIFT_SYNTAX
 /// Enqueue a diagnostic with ASTGen's diagnostic rendering.
 static void addQueueDiagnostic(void *queuedDiagnostics,
+                               void *perFrontendState,
                                const DiagnosticInfo &info, SourceManager &SM) {
   llvm::SmallString<256> text;
   {
@@ -69,7 +70,8 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
     documentationPath = info.EducationalNotePaths[0];
 
   // FIXME: Translate Fix-Its.
-  swift_ASTGen_addQueuedDiagnostic(queuedDiagnostics, text.data(), text.size(),
+  swift_ASTGen_addQueuedDiagnostic(queuedDiagnostics, perFrontendState,
+                                   text.data(), text.size(),
                                    severity, info.Loc.getOpaquePointerValue(),
                                    info.Category.data(),
                                    info.Category.size(),
@@ -82,20 +84,25 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
   // argument to `swift_ASTGen_addQueuedDiagnostic` but that requires
   // bridging of `Note` structure and new serialization.
   for (auto *childNote : info.ChildDiagnosticInfo) {
-    addQueueDiagnostic(queuedDiagnostics, *childNote, SM);
+    addQueueDiagnostic(queuedDiagnostics, perFrontendState, *childNote, SM);
   }
 }
 
 void DiagnosticBridge::enqueueDiagnostic(SourceManager &SM,
                                          const DiagnosticInfo &Info,
                                          unsigned innermostBufferID) {
+  // If we didn't have per-frontend state before, create it now.
+  if (!perFrontendState) {
+    perFrontendState = swift_ASTGen_createPerFrontendDiagnosticState();
+  }
+
   // If there are no enqueued diagnostics, or we have hit a non-note
   // diagnostic, flush any enqueued diagnostics and start fresh.
   if (!queuedDiagnostics)
     queuedDiagnostics = swift_ASTGen_createQueuedDiagnostics();
 
   queueBuffer(SM, innermostBufferID);
-  addQueueDiagnostic(queuedDiagnostics, Info, SM);
+  addQueueDiagnostic(queuedDiagnostics, perFrontendState, Info, SM);
 }
 
 void DiagnosticBridge::flush(llvm::raw_ostream &OS, bool includeTrailingBreak,
@@ -118,6 +125,22 @@ void DiagnosticBridge::flush(llvm::raw_ostream &OS, bool includeTrailingBreak,
 
   if (includeTrailingBreak)
     OS << "\n";
+}
+
+void DiagnosticBridge::printCategoryFootnotes(llvm::raw_ostream &os,
+                                              bool forceColors) {
+  if (!perFrontendState)
+    return;
+
+  BridgedStringRef bridgedRenderedString{nullptr, 0};
+  swift_ASTGen_renderCategoryFootnotes(
+      perFrontendState, forceColors ? 1 : 0, &bridgedRenderedString);
+
+  auto renderedString = bridgedRenderedString.unbridged();
+  if (auto renderedData = renderedString.data()) {
+    os.write(renderedData, renderedString.size());
+    swift_ASTGen_freeBridgedString(renderedString);
+  }
 }
 
 void *DiagnosticBridge::getSourceFileSyntax(SourceManager &sourceMgr,
@@ -199,6 +222,10 @@ DiagnosticBridge::getSourceBufferStack(SourceManager &sourceMgr,
 }
 
 DiagnosticBridge::~DiagnosticBridge() {
+  if (perFrontendState) {
+    swift_ASTGen_destroyPerFrontendDiagnosticState(perFrontendState);
+  }
+
   assert(!queuedDiagnostics && "unflushed diagnostics");
   for (const auto &sourceFileSyntax : sourceFileSyntax) {
     swift_ASTGen_destroySourceFile(sourceFileSyntax.second);
