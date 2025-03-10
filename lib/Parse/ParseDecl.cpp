@@ -2570,7 +2570,7 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
   if (!Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
       !Context.SourceMgr.isImportMacroGeneratedLoc(atLoc)) {
     diagnose(loc, diag::requires_experimental_feature, "@lifetime", false,
-             getFeatureName(Feature::LifetimeDependence));
+             Feature::LifetimeDependence.getName());
     status.setIsParseError();
     return status;
   }
@@ -5314,7 +5314,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     if (Tok.isContextualKeyword("sending")) {
       if (!P.Context.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
         P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
-                   false, getFeatureName(Feature::SendingArgsAndResults));
+                   false, Feature::SendingArgsAndResults.getName());
       }
 
       // Only allow for 'sending' to be written once.
@@ -5338,7 +5338,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       if (!P.Context.LangOpts.hasFeature(Feature::LifetimeDependence)) {
         P.diagnose(Tok, diag::requires_experimental_feature,
                    "lifetime dependence specifier", false,
-                   getFeatureName(Feature::LifetimeDependence));
+                   Feature::LifetimeDependence.getName());
       }
       P.consumeToken(); // consume '@'
       auto loc = P.consumeToken(); // consume 'lifetime'

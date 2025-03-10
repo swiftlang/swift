@@ -537,8 +537,8 @@ static bool ShouldIncludeModuleInterfaceArg(const Arg *A) {
   if (!A->getOption().matches(options::OPT_enable_experimental_feature))
     return true;
 
-  if (auto feature = getExperimentalFeature(A->getValue())) {
-    return swift::includeInModuleInterface(*feature);
+  if (auto feature = Feature::getExperimentalFeature(A->getValue())) {
+    return feature->includeInModuleInterface();
   }
 
   return true;
@@ -824,7 +824,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       featureMode = std::nullopt;
     }
 
-    auto feature = getUpcomingFeature(featureName);
+    auto feature = Feature::getUpcomingFeature(featureName);
     if (feature) {
       // Diagnose upcoming features enabled with -enable-experimental-feature.
       if (!isUpcomingFeatureFlag)
@@ -840,7 +840,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       }
 
       // If the feature is also not a recognized experimental feature, skip it.
-      feature = getExperimentalFeature(featureName);
+      feature = Feature::getExperimentalFeature(featureName);
       if (!feature) {
         Diags.diagnose(SourceLoc(), diag::unrecognized_feature, featureName,
                        /*upcoming=*/false);
@@ -850,11 +850,11 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // If the current language mode enables the feature by default then
     // diagnose and skip it.
-    if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
+    if (auto firstVersion = feature->getLanguageVersion()) {
       if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
         Diags.diagnose(SourceLoc(),
                        diag::warning_upcoming_feature_on_by_default,
-                       getFeatureName(*feature), *firstVersion);
+                       feature->getName(), *firstVersion);
         continue;
       }
     }
@@ -862,7 +862,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     // If this is a known experimental feature, allow it in +Asserts
     // (non-release) builds for testing purposes.
     if (Opts.RestrictNonProductionExperimentalFeatures &&
-        !isFeatureAvailableInProduction(*feature)) {
+        !feature->isAvailableInProduction()) {
       Diags.diagnose(SourceLoc(),
                      diag::experimental_not_supported_in_production,
                      featureName);
@@ -872,7 +872,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     if (featureMode) {
       if (isEnableFeatureFlag) {
-        const auto isAdoptable = isFeatureAdoptable(*feature);
+        const auto isAdoptable = feature->isAdoptable();
 
         // Diagnose an invalid mode.
         StringRef validModeName = "adoption";
@@ -1205,7 +1205,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // Add a future feature if it is not already implied by the language version.
   auto addFutureFeatureIfNotImplied = [&](Feature feature) {
     // Check if this feature was introduced already in this language version.
-    if (auto firstVersion = getFeatureLanguageVersion(feature)) {
+    if (auto firstVersion = feature.getLanguageVersion()) {
       if (Opts.isSwiftVersionAtLeast(*firstVersion))
         return;
     }

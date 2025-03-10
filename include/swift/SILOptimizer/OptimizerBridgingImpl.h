@@ -560,7 +560,7 @@ bool BridgedPassContext::enableMergeableTraps() const {
 
 bool BridgedPassContext::hasFeature(BridgedFeature feature) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
-  return mod->getASTContext().LangOpts.hasFeature((swift::Feature)feature);
+  return mod->getASTContext().LangOpts.hasFeature(swift::Feature(feature));
 }
 
 bool BridgedPassContext::enableMoveInoutStackProtection() const {
