@@ -156,7 +156,7 @@ deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
       new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
                       C.getIdentifier("result"), afd);
   {
-    auto resultLoadCall = CallExpr::createImplicit(
+    Expr *resultLoadCall = CallExpr::createImplicit(
         C,
         UnresolvedDotExpr::createImplicit(
             C,
@@ -170,6 +170,9 @@ deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
             C, {Argument(sloc, C.getIdentifier("as"),
                          new (C) DeclRefExpr(ConcreteDeclRef(returnTypeParam),
                                              dloc, implicit))}));
+
+    if (C.LangOpts.hasFeature(Feature::StrictMemorySafety))
+      resultLoadCall = new (C) UnsafeExpr(sloc, resultLoadCall, Type(), true);
 
     auto resultPattern = NamedPattern::createImplicit(C, resultVar);
     auto resultPB = PatternBindingDecl::createImplicit(
