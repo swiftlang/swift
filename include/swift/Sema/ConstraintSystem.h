@@ -6114,6 +6114,12 @@ public:
     return false;
   }
 
+  bool isDisfavored() const {
+    if (auto *decl = getOverloadChoiceDecl(Choice))
+      return decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>();
+    return false;
+  }
+
   bool isBeginningOfPartition() const { return IsBeginningOfPartition; }
 
   // FIXME: All three of the accessors below are required to support

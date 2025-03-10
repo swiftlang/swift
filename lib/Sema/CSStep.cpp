@@ -635,9 +635,30 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   if (choice.isDisabled())
     return skip("disabled");
 
-  // Skip unavailable overloads (unless in diagnostic mode).
-  if (choice.isUnavailable() && !CS.shouldAttemptFixes())
-    return skip("unavailable");
+  if (!CS.shouldAttemptFixes()) {
+    // Skip unavailable overloads.
+    if (choice.isUnavailable())
+      return skip("unavailable");
+
+    // Since the disfavored overloads are always located at the end of
+    // the partition they could be skipped if there was at least one
+    // valid solution for this partition already, because the solution
+    // they produce would always be worse.
+    if (choice.isDisfavored() && LastSolvedChoice) {
+      bool canSkipDisfavored = true;
+      auto &lastScore = LastSolvedChoice->second;
+      for (unsigned i = 0, n = unsigned(SK_DisfavoredOverload) + 1; i != n;
+           ++i) {
+        if (lastScore.Data[i] > 0) {
+          canSkipDisfavored = false;
+          break;
+        }
+      }
+
+      if (canSkipDisfavored)
+        return skip("disfavored");
+    }
+  }
 
   // If the solver already found a solution with a better overload choice that
   // can be unconditionally substituted by the current choice, skip the current
