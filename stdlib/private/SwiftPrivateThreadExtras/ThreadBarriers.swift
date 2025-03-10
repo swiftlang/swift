@@ -23,6 +23,8 @@ import WASILibc
 #elseif os(Windows)
 import CRT
 import WinSDK
+#elseif canImport(FreeBSD)
+import FreeBSD
 #endif
 
 //

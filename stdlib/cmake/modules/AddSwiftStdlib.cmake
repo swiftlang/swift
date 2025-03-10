@@ -146,7 +146,7 @@ function(_add_target_variant_c_compile_link_flags)
   endif()
 
   # Use frame pointers on Linux
-  if("${CFLAGS_SDK}" STREQUAL "LINUX")
+  if("${CFLAGS_SDK}" STREQUAL "LINUX" OR "${CFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND result "-fno-omit-frame-pointer")
   endif()
 

@@ -11,6 +11,8 @@ import _Differentiation
 import Glibc
 #elseif canImport(Android)
 import Android
+#elseif canImport(FreeBSD)
+import FreeBSD
 #else
 import Foundation
 #endif
