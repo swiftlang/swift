@@ -42,14 +42,9 @@ public protocol Clock<Duration>: Sendable {
   func sleep(until deadline: Instant, tolerance: Instant.Duration?) async throws
 #endif
 
-#if !$Embedded
-  /// Choose which Dispatch clock to use with DispatchExecutor
-  ///
-  /// This controls which Dispatch clock is used to enqueue delayed jobs
-  /// when using this Clock.
+  /// The traits associated with this clock instance.
   @available(SwiftStdlib 6.2, *)
-  var dispatchClockID: DispatchClockID { get }
-#endif
+  var traits: ClockTraits { get }
 
   /// Convert a Clock-specific Duration to a Swift Duration
   ///
@@ -138,12 +133,6 @@ extension Clock {
 
 @available(SwiftStdlib 6.2, *)
 extension Clock {
-  #if !$Embedded
-  public var dispatchClockID: DispatchClockID {
-    return .suspending
-  }
-  #endif
-
   // For compatibility, return `nil` if this is not implemented
   public func convert(from duration: Duration) -> Swift.Duration? {
     return nil
@@ -197,6 +186,43 @@ extension Clock {
   }
 }
 #endif
+
+/// Represents traits of a particular Clock implementation.
+///
+/// Clocks may be of a number of different varieties; executors will likely
+/// have specific clocks that they can use to schedule jobs, and will
+/// therefore need to be able to convert timestamps to an appropriate clock
+/// when asked to enqueue a job with a delay or deadline.
+///
+/// Choosing a clock in general requires the ability to tell which of their
+/// clocks best matches the clock that the user is trying to specify a
+/// time or delay in.  Executors are expected to do this on a best effort
+/// basis.
+@available(SwiftStdlib 6.2, *)
+public struct ClockTraits: OptionSet {
+  public let rawValue: Int32
+
+  public init(rawValue: Int32) {
+    self.rawValue = rawValue
+  }
+
+  /// Clocks with this trait continue running while the machine is asleep.
+  public static let continuous = ClockTraits(rawValue: 1 << 0)
+
+  /// Indicates that a clock's time will only ever increase.
+  public static let monotonic = ClockTraits(rawValue: 1 << 1)
+
+  /// Clocks with this trait are tied to "wall time".
+  public static let wallTime = ClockTraits(rawValue: 1 << 2)
+}
+
+extension Clock {
+  /// The traits associated with this clock instance.
+  @available(SwiftStdlib 6.2, *)
+  var traits: ClockTraits {
+    return []
+  }
+}
 
 enum _ClockID: Int32 {
   case continuous = 1
