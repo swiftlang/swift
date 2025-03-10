@@ -54,7 +54,7 @@ internal final class _DefaultGlobalConcurrentExecutor: TaskExecutor {
   private init() {}
 
   public func enqueue(_ job: consuming ExecutorJob) {
-    _enqueueJobGlobal(UnownedJob(job))
+    _enqueueJobGlobal(UnownedJob(job)._context)
   }
 
   public func asUnownedTaskExecutor() -> UnownedTaskExecutor {

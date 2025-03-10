@@ -1253,7 +1253,7 @@ extension Task where Success == Never, Failure == Never {
       let job = _taskCreateNullaryContinuationJob(
           priority: Int(Task.currentPriority.rawValue),
           continuation: continuation)
-      _enqueueJobGlobalDirect(job)
+      _enqueueJobGlobal(job)
     }
   }
 }
@@ -1412,22 +1412,24 @@ func getJobFlags(_ task: Builtin.NativeObject) -> JobFlags
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_enqueueGlobal")
 @usableFromInline
-func _enqueueJobGlobal(_ task: UnownedJob)
+func _enqueueJobGlobal(_ task: Builtin.Job)
 
+@available(SwiftStdlib 6.2, *)
 @usableFromInline
-func _enqueueJobGlobalDirect(_ task: Builtin.Job) {
-  if #available(SwiftStdlib 5.9, *) {
-    _enqueueJobGlobal(UnownedJob(context: task))
-  } else {
-    // Shouldn't ever get here
-    Builtin.unreachable()
-  }
+func _enqueueJobGlobal(_ task: UnownedJob) {
+  _enqueueJobGlobal(task._context)
 }
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_enqueueGlobalWithDelay")
 @usableFromInline
-func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: UnownedJob)
+func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
+
+@available(SwiftStdlib 6.2, *)
+@usableFromInline
+func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: UnownedJob) {
+  return _enqueueJobGlobalWithDelay(delay, task._context)
+}
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_task_enqueueGlobalWithDeadline")

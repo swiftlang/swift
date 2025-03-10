@@ -101,14 +101,14 @@ public protocol Executor: AnyObject, Sendable {
   #endif // !$Embedded
 }
 
-@available(SwiftStdlib 6.2, *)
 extension Executor {
+  @available(SwiftStdlib 6.2, *)
   @usableFromInline
   internal var _isComplexEquality: Bool { false }
 }
 
-@available(SwiftStdlib 6.2, *)
 extension Executor where Self: Equatable {
+  @available(SwiftStdlib 6.2, *)
   @usableFromInline
   internal var _isComplexEquality: Bool { true }
 }
@@ -594,8 +594,8 @@ public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
   Task._defaultExecutor = factory.defaultExecutor
 }
 
-@available(SwiftStdlib 6.2, *)
 extension MainActor {
+  @available(SwiftStdlib 6.2, *)
   static var _executor: (any MainExecutor)? = nil
 
   /// The main executor, which is started implicitly by the `async main`
@@ -603,6 +603,7 @@ extension MainActor {
   ///
   /// Attempting to set this after the first `enqueue` on the main
   /// executor is a fatal error.
+  @available(SwiftStdlib 6.2, *)
   public static var executor: any MainExecutor {
     if _executor == nil {
       _executor = PlatformExecutorFactory.mainExecutor
@@ -611,8 +612,8 @@ extension MainActor {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
 extension Task where Success == Never, Failure == Never {
+  @available(SwiftStdlib 6.2, *)
   static var _defaultExecutor: (any TaskExecutor)? = nil
 
   /// The default or global executor, which is the default place in which
@@ -620,6 +621,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// Attempting to set this after the first `enqueue` on the global
   /// executor is a fatal error.
+  @available(SwiftStdlib 6.2, *)
   public static var defaultExecutor: any TaskExecutor {
     if _defaultExecutor == nil {
       _defaultExecutor = PlatformExecutorFactory.defaultExecutor
@@ -628,10 +630,10 @@ extension Task where Success == Never, Failure == Never {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
 extension Task where Success == Never, Failure == Never {
   /// Get the current executor; this is the executor that the currently
   /// executing task is executing on.
+  @available(SwiftStdlib 6.2, *)
   @_unavailableInEmbedded
   public static var currentExecutor: (any Executor)? {
     if let taskExecutor = _getPreferredTaskExecutor().asTaskExecutor() {
