@@ -1087,6 +1087,14 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
     return getFixedTypeRecursive(simplified, flags, wantRValue);
   }
 
+  if (type->is<OpenedArchetypeType>()) {
+    auto simplified = simplifyType(type);
+    if (simplified.getPointer() == type.getPointer())
+      return type;
+
+    return getFixedTypeRecursive(simplified, flags, wantRValue);
+  }
+
   if (auto typeVar = type->getAs<TypeVariableType>()) {
     if (auto fixed = getFixedType(typeVar))
       return getFixedTypeRecursive(fixed, flags, wantRValue);
