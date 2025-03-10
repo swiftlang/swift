@@ -135,8 +135,15 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
 }
 
 bool ModuleFile::allowCompilerErrors() const {
-  return getContext().LangOpts.AllowModuleWithCompilerErrors ||
-         getContext().ForceAllowModuleWithCompilerErrors;
+  return getContext().LangOpts.AllowModuleWithCompilerErrors;
+}
+
+bool ModuleFile::enableExtendedDeserializationRecovery() const {
+  ASTContext &ctx = getContext();
+  return ctx.LangOpts.EnableDeserializationRecovery &&
+         (allowCompilerErrors() ||
+          ctx.LangOpts.DebuggerSupport ||
+          ctx.ForceExtendedDeserializationRecovery);
 }
 
 Status

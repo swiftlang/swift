@@ -691,6 +691,10 @@ public:
   /// '-experimental-allow-module-with-compiler-errors' is currently enabled).
   bool allowCompilerErrors() const;
 
+  /// Allow recovering from errors that could be unsafe when compiling
+  /// the binary. Useful for the debugger and IDE support tools.
+  bool enableExtendedDeserializationRecovery() const;
+
   /// \c true if this module has incremental dependency information.
   bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }
 
