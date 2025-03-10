@@ -67,7 +67,7 @@ class SwiftFoundationTests(product.Product):
             swift_exec,
             'test',
             '--toolchain', self.install_toolchain_path(host_target),
-            '--configuration', self.configuration(),
+            '--configuration', 'debug',
             '--scratch-path', self.build_dir,
             '--package-path', package_path
         ]
