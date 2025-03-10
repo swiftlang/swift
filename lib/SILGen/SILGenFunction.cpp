@@ -1426,8 +1426,6 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
 
   // If we're using a new enough deployment target, call swift_createExecutors()
   if (ctx.LangOpts.ExecutorFactory) {
-    printf("Executor factory is %s\n", ctx.LangOpts.ExecutorFactory->c_str());
-
     if (!isCreateExecutorsFunctionAvailable(SGM)) {
       ctx.Diags.diagnose(SourceLoc(), diag::executor_factory_not_supported);
     } else {
