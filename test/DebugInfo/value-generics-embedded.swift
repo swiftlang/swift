@@ -1,9 +1,8 @@
-// RUN: %target-swift-frontend %s -target %target-cpu-apple-macos14 -emit-ir -g -enable-experimental-feature ValueGenerics -enable-experimental-feature Embedded -wmo -disable-availability-checking -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macos14 -emit-ir -g -enable-experimental-feature Embedded -wmo -disable-availability-checking -o - | %FileCheck %s
 
 // REQUIRES: OS=macosx
 
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_ValueGenerics
 
 // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "InlineArray",{{.*}}size: 64{{.*}}elements: ![[ELTS:[0-9]+]], runtimeLang: DW_LANG_Swift, templateParams: ![[SLAB_PARAMS:[0-9]+]], identifier: "$es11InlineArrayVy$0_4main8MySpriteVGD", specification:
 // CHECK-DAG: ![[SLAB_PARAMS]] = !{![[COUNT_PARAM:.*]], ![[ELEMENT_PARAM:.*]]}
