@@ -590,7 +590,7 @@ extension Span where Element: ~Copyable {
   public func _extracting(
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
-    let range = Range(
+    let range = unsafe Range(
       _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
     )
     return unsafe _extracting(unchecked: range)
