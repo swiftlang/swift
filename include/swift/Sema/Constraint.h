@@ -336,6 +336,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
     private llvm::TrailingObjects<Constraint,
                                   TypeVariableType *,
                                   ConstraintFix *,
+                                  DeclContext *,
                                   ContextualTypeInfo,
                                   OverloadChoice> {
   friend TrailingObjects;
@@ -353,6 +354,9 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   /// Whether we have a tail-allocated fix.
   unsigned HasFix : 1;
+
+  /// Whether we have a tail-allocated DeclContext.
+  unsigned HasDeclContext : 1;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
@@ -392,7 +396,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// node is unused.
   unsigned isDiscarded : 1;
 
-  // 23 bits remaining
+  // 22 bits remaining
 
   union {
     struct {
@@ -425,20 +429,14 @@ class Constraint final : public llvm::ilist_node<Constraint>,
         /// Used for ValueWitness constraints.
         ValueDecl *Ref;
       } Member;
-
-      /// The DC in which the use appears.
-      DeclContext *UseDC;
     } Member;
 
     /// The set of constraints for a disjunction.
     ArrayRef<Constraint *> Nested;
 
     struct {
-      /// The first type
+      /// The first type.
       Type First;
-
-      /// The DC in which the use appears.
-      DeclContext *UseDC;
     } Overload;
 
     struct {
@@ -454,8 +452,6 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       /// The type being called, primarily a function type, but could
       /// be a metatype, a tuple or a nominal type.
       Type Callee;
-      /// The declaration context in which the application appears.
-      DeclContext *UseDC;
     } Apply;
   };
 
@@ -529,6 +525,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   size_t numTrailingObjects(OverloadToken<ConstraintFix *>) const {
     return HasFix ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<DeclContext *>) const {
+    return HasDeclContext ? 1 : 0;
   }
 
   size_t numTrailingObjects(OverloadToken<ContextualTypeInfo>) const {
@@ -876,20 +876,6 @@ public:
     return *getTrailingObjects<OverloadChoice>();
   }
 
-  /// Retrieve the DC in which the overload was used.
-  DeclContext *getOverloadUseDC() const {
-    assert(Kind == ConstraintKind::BindOverload);
-    return Overload.UseDC;
-  }
-
-  /// Retrieve the DC in which the member was used.
-  DeclContext *getMemberUseDC() const {
-    assert(Kind == ConstraintKind::ValueMember ||
-           Kind == ConstraintKind::UnresolvedValueMember ||
-           Kind == ConstraintKind::ValueWitness);
-    return Member.UseDC;
-  }
-
   FunctionType *getAppliedFunctionType() const {
     assert(Kind == ConstraintKind::ApplicableFunction);
     return Apply.AppliedFn;
@@ -898,11 +884,6 @@ public:
   Type getCalleeType() const {
     assert(Kind == ConstraintKind::ApplicableFunction);
     return Apply.Callee;
-  }
-
-  DeclContext *getApplicationDC() const {
-    assert(Kind == ConstraintKind::ApplicableFunction);
-    return Apply.UseDC;
   }
 
   ASTNode getSyntacticElement() const {
@@ -918,6 +899,12 @@ public:
   bool isDiscardedElement() const {
     assert(Kind == ConstraintKind::SyntacticElement);
     return isDiscarded;
+  }
+
+  /// Retrieve the DC in which the overload was used.
+  DeclContext *getDeclContext() const {
+    assert(HasDeclContext);
+    return *getTrailingObjects<DeclContext *>();
   }
 
   /// For an applicable function constraint, retrieve the trailing closure

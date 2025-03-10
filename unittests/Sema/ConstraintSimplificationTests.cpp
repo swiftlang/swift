@@ -218,7 +218,7 @@ TEST_F(SemaTest, TestInitializerUseDCIsSetCorrectlyInClosure) {
                       ->isLastElement<LocatorPathElt::ConstructorMember>());
 
       for (auto *choice : constraint->getNestedConstraints())
-        ASSERT_EQ(choice->getOverloadUseDC(), closure);
+        ASSERT_EQ(choice->getDeclContext(), closure);
     }
   }
 }
