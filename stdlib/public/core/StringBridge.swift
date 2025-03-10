@@ -597,9 +597,6 @@ extension String {
   @_effects(releasenone)
   public // SPI(Foundation)
   func _bridgeToObjectiveCImpl() -> AnyObject {
-
-    _connectOrphanedFoundationSubclassesIfNeeded()
-
     // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
     if _guts.isSmallASCII {
       let maybeTagged = _guts.asSmall.withUTF8 { bufPtr in
@@ -611,6 +608,8 @@ extension String {
       }
       if let tagged = maybeTagged { return tagged }
     }
+    
+    _connectOrphanedFoundationSubclassesIfNeeded()
 
     if _guts.isSmall {
         // We can't form a tagged pointer String, so grow to a non-small String,
