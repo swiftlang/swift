@@ -63,7 +63,7 @@ public struct PublicNonSendable {
 }
 
 
-nonisolated struct NonisolatedStruct: GloballyIsolated {
+nonisolated struct StructRemovesGlobalActor: GloballyIsolated {
   var x: NonSendable
   var y: Int = 1
 
@@ -105,6 +105,32 @@ struct A: Refined {
   var x: NonSendable
   init(x: NonSendable) {
     self.x = x // okay
+  }
+
+  init() {
+    self.x = NonSendable()
+  }
+
+  func f() {}
+}
+
+@MainActor protocol ExplicitGlobalActor: Refined {}
+
+struct IsolatedStruct: ExplicitGlobalActor {
+  // expected-note@+2 {{main actor isolation inferred from conformance to protocol 'ExplicitGlobalActor'}}
+  // expected-note@+1 {{calls to instance method 'g()' from outside of its actor context are implicitly asynchronous}}
+  func g() {}
+}
+
+struct NonisolatedStruct {
+  func callF() {
+    return A().f() // okay, 'A' is non-isolated.
+  }
+
+  // expected-note@+1 {{add '@MainActor' to make instance method 'callG()' part of global actor 'MainActor'}}
+  func callG() {
+    // expected-error@+1{{call to main actor-isolated instance method 'g()' in a synchronous nonisolated context}}
+    return IsolatedStruct().g()
   }
 }
 
