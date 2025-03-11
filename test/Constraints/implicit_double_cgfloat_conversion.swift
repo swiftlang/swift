@@ -337,19 +337,6 @@ func test_implicit_conversion_clash_with_partial_application_check() {
   }
 }
 
-// rdar://99352676
-// CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion20test_init_validationyyF : $@convention(thin) () -> () {
-func test_init_validation() {
-  class Foo {
-    static let bar = 100.0
-
-    func getBar() -> CGFloat? {
-      return Self.bar
-      // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC : $@convention(method) (Double, @thin CGFloat.Type) -> CGFloat
-    }
-  }
-}
-
 func test_ternary_and_nil_coalescing() {
   func test(_: Double?) {}
 
@@ -403,4 +390,17 @@ func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
 
   var total = 0.0 // This is Double by default
   total += test(CGFloat(v)) + CGFloat(v) // Ok
+}
+
+// rdar://99352676
+// CHECK-LABEL: sil private [ossa] @$s34implicit_double_cgfloat_conversion20test_init_validationyyF3FooL_C6getBar12CoreGraphics7CGFloatVSgyF : $@convention(method) (@guaranteed Foo) -> Optional<CGFloat>
+func test_init_validation() {
+  class Foo {
+    static let bar = 100.0
+
+    func getBar() -> CGFloat? {
+      return Self.bar
+      // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC : $@convention(method) (Double, @thin CGFloat.Type) -> CGFloat
+    }
+  }
 }
