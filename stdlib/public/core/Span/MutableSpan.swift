@@ -224,7 +224,7 @@ extension MutableSpan where Element: ~Copyable & ~Escapable {
 
   @_alwaysEmitIntoClient
   public var indices: Range<Index> {
-    Range(_uncheckedBounds: (0, _count))
+    unsafe Range(_uncheckedBounds: (0, _count))
   }
 }
 
@@ -721,7 +721,7 @@ extension MutableSpan where Element: ~Copyable {
   mutating public func _extracting(
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
-    let range = Range(
+    let range = unsafe Range(
       _uncheckedBounds: (bounds.lowerBound, bounds.upperBound&+1)
     )
     return unsafe _extracting(unchecked: range)
