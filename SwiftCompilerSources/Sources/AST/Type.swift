@@ -93,6 +93,7 @@ extension TypeProperties {
   public var isEscapable: Bool { type.bridged.isEscapable() }
   public var isNoEscape: Bool { type.bridged.isNoEscape() }
   public var isInteger: Bool { type.bridged.isInteger() }
+  public var isOptional: Bool { type.bridged.isOptional() }
   public var isMetatypeType: Bool { type.bridged.isMetatypeType() }
   public var isExistentialMetatypeType: Bool { type.bridged.isExistentialMetatypeType() }
   public var representationOfMetatype: AST.`Type`.MetatypeRepresentation {

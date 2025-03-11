@@ -430,6 +430,10 @@ bool BridgedASTType::isMetatypeType() const {
   return unbridged()->is<swift::AnyMetatypeType>();
 }
 
+bool BridgedASTType::isOptional() const {
+  return unbridged()->getCanonicalType()->isOptional();
+}
+
 bool BridgedASTType::isExistentialMetatypeType() const {
   return unbridged()->is<swift::ExistentialMetatypeType>();
 }

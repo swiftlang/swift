@@ -403,7 +403,8 @@ bool BridgedType::isClassExistential() const {
 }
 
 bool BridgedType::isOptional() const {
-  return unbridged().isOptional();
+  swift::CanType astType = unbridged().getASTType();
+  return astType->isOptional();
 }
 
 bool BridgedType::isNoEscapeFunction() const {
