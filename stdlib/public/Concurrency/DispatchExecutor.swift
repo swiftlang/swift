@@ -87,25 +87,25 @@ extension DispatchMainExecutor: EventableExecutor {
   public func registerEvent(
     handler: @escaping @Sendable () -> ()
   ) -> ExecutorEvent {
-    let source = _createDispatchEvent(handler: handler)
+    let source = unsafe _createDispatchEvent(handler: handler)
 
     // Stash the pointer in the id of the ExecutorEvent struct
-    let eventId = unsafeBitCast(source, to: Int.self)
+    let eventId = unsafe unsafeBitCast(source, to: Int.self)
     return ExecutorEvent(id: eventId)
   }
 
   /// Deregister the given event.
   public func deregister(event: ExecutorEvent) {
     // Extract the source and cancel it
-    let source = unsafeBitCast(event.id, to: OpaquePointer.self)
-    _destroyDispatchEvent(source)
+    let source = unsafe unsafeBitCast(event.id, to: OpaquePointer.self)
+    unsafe _destroyDispatchEvent(source)
   }
 
   /// Notify the executor of an event.
   public func notify(event: ExecutorEvent) {
     // Extract the source, but don't release it
-    let source = unsafeBitCast(event.id, to: OpaquePointer.self)
-    _signalDispatchEvent(source)
+    let source = unsafe unsafeBitCast(event.id, to: OpaquePointer.self)
+    unsafe _signalDispatchEvent(source)
   }
 
 }

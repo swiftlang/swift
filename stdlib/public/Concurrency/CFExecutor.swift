@@ -22,23 +22,23 @@ enum CoreFoundation {
   static let path =
     "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
 
-  static let handle = dlopen(path, RTLD_NOLOAD)
+  static let handle = unsafe dlopen(path, RTLD_NOLOAD)
 
-  static var isPresent: Bool { return handle != nil }
+  static var isPresent: Bool { return unsafe handle != nil }
 
   static func symbol<T>(_ name: String) -> T {
-    guard let result = dlsym(handle, name) else {
+    guard let result = unsafe dlsym(handle, name) else {
       fatalError("Unable to look up \(name) in CoreFoundation")
     }
-    return unsafeBitCast(result, to: T.self)
+    return unsafe unsafeBitCast(result, to: T.self)
   }
 
   static let CFRunLoopRun: @convention(c) () -> () =
     symbol("CFRunLoopRun")
   static let CFRunLoopGetMain: @convention(c) () -> OpaquePointer =
-    symbol("CFRunLoopGetMain")
+    unsafe symbol("CFRunLoopGetMain")
   static let CFRunLoopStop: @convention(c) (OpaquePointer) -> () =
-    symbol("CFRunLoopStop")
+    unsafe symbol("CFRunLoopStop")
 }
 
 // .. Main Executor ............................................................
@@ -51,7 +51,7 @@ public final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
   }
 
   override public func stop() {
-    CoreFoundation.CFRunLoopStop(CoreFoundation.CFRunLoopGetMain())
+    unsafe CoreFoundation.CFRunLoopStop(CoreFoundation.CFRunLoopGetMain())
   }
 
 }

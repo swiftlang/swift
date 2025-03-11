@@ -418,7 +418,7 @@ public protocol TaskExecutor: Executor {
 @available(SwiftStdlib 6.0, *)
 extension TaskExecutor {
   public func asUnownedTaskExecutor() -> UnownedTaskExecutor {
-    UnownedTaskExecutor(ordinary: self)
+    unsafe UnownedTaskExecutor(ordinary: self)
   }
 }
 
@@ -648,11 +648,11 @@ extension Task where Success == Never, Failure == Never {
   @available(SwiftStdlib 6.2, *)
   @_unavailableInEmbedded
   public static var currentExecutor: (any Executor)? {
-    if let taskExecutor = _getPreferredTaskExecutor().asTaskExecutor() {
+    if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
       return taskExecutor
-    } else if let activeExecutor = _getActiveExecutor().asSerialExecutor() {
+    } else if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor() {
       return activeExecutor
-    } else if let taskExecutor = _getCurrentTaskExecutor().asTaskExecutor() {
+    } else if let taskExecutor = unsafe _getCurrentTaskExecutor().asTaskExecutor() {
       return taskExecutor
     }
     return nil
@@ -717,9 +717,9 @@ public struct UnownedSerialExecutor: Sendable {
   @inlinable
   public init<E: SerialExecutor>(_ executor: __shared E) {
     if executor._isComplexEquality {
-      self.executor = Builtin.buildComplexEqualitySerialExecutorRef(executor)
+      unsafe self.executor = Builtin.buildComplexEqualitySerialExecutorRef(executor)
     } else {
-      self.executor = Builtin.buildOrdinarySerialExecutorRef(executor)
+      unsafe self.executor = Builtin.buildOrdinarySerialExecutorRef(executor)
     }
   }
 
@@ -731,12 +731,13 @@ public struct UnownedSerialExecutor: Sendable {
 
   @available(SwiftStdlib 6.2, *)
   public func asSerialExecutor() -> (any SerialExecutor)? {
-    return unsafeBitCast(executor, to: (any SerialExecutor)?.self)
+    return unsafe unsafeBitCast(executor, to: (any SerialExecutor)?.self)
   }
 }
 
 
 @available(SwiftStdlib 6.0, *)
+@unsafe
 @frozen
 public struct UnownedTaskExecutor: Sendable {
   @usableFromInline
@@ -746,28 +747,28 @@ public struct UnownedTaskExecutor: Sendable {
   /// which needs to reach for this from an @_transparent function which prevents @_spi use.
   @available(SwiftStdlib 6.0, *)
   public var _executor: Builtin.Executor {
-    self.executor
+    unsafe self.executor
   }
 
   @inlinable
   public init(_ executor: Builtin.Executor) {
-    self.executor = executor
+    unsafe self.executor = executor
   }
 
   @inlinable
   public init<E: TaskExecutor>(ordinary executor: __shared E) {
-    self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
+    unsafe self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
   }
 
   @available(SwiftStdlib 6.2, *)
   @inlinable
   public init<E: TaskExecutor>(_ executor: __shared E) {
-    self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
+    unsafe self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
   }
 
   @available(SwiftStdlib 6.2, *)
   public func asTaskExecutor() -> (any TaskExecutor)? {
-    return unsafeBitCast(executor, to: (any TaskExecutor)?.self)
+    return unsafe unsafeBitCast(executor, to: (any TaskExecutor)?.self)
   }
 }
 
@@ -869,7 +870,7 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
 @_silgen_name("_task_taskExecutor_getTaskExecutorRef")
 internal func _task_taskExecutor_getTaskExecutorRef<E>(_ taskExecutor: E) -> Builtin.Executor
     where E: TaskExecutor {
-  return taskExecutor.asUnownedTaskExecutor().executor
+  return unsafe taskExecutor.asUnownedTaskExecutor().executor
 }
 
 // Used by the concurrency runtime

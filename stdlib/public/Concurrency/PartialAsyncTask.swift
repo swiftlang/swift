@@ -149,7 +149,7 @@ public struct UnownedJob: Sendable {
   @_alwaysEmitIntoClient
   @inlinable
   public func runSynchronously(on executor: UnownedTaskExecutor) {
-    _swiftJobRunOnTaskExecutor(self, executor)
+    unsafe _swiftJobRunOnTaskExecutor(self, executor)
   }
 
   /// Run this job isolated to the passed in serial executor, while executing it on the specified task executor.
@@ -324,9 +324,10 @@ public struct ExecutorJob: Sendable, ~Copyable {
   /// Returns the result of executing the closure.
   @available(SwiftStdlib 6.2, *)
   public func withUnsafeExecutorPrivateData<R>(body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
-    let base = _jobGetExecutorPrivateData(self.context)
-    let size = 2 * MemoryLayout<OpaquePointer>.stride
-    return try body(UnsafeMutableRawBufferPointer(start: base, count: size))
+    let base = unsafe _jobGetExecutorPrivateData(self.context)
+    let size = unsafe 2 * MemoryLayout<OpaquePointer>.stride
+    return unsafe try body(UnsafeMutableRawBufferPointer(start: base,
+                                                         count: size))
   }
 
   /// Kinds of schedulable jobs
@@ -418,7 +419,7 @@ extension ExecutorJob {
   @_alwaysEmitIntoClient
   @inlinable
   __consuming public func runSynchronously(on executor: UnownedTaskExecutor) {
-    _swiftJobRunOnTaskExecutor(UnownedJob(self), executor)
+    unsafe _swiftJobRunOnTaskExecutor(UnownedJob(self), executor)
   }
 
   /// Run this job isolated to the passed in serial executor, while executing it on the specified task executor.
@@ -476,44 +477,44 @@ extension ExecutorJob {
 
     /// Allocate a specified number of bytes of uninitialized memory.
     public func allocate(capacity: Int) -> UnsafeMutableRawBufferPointer {
-      let base = _jobAllocate(context, capacity)
-      return UnsafeMutableRawBufferPointer(start: base, count: capacity)
+      let base = unsafe _jobAllocate(context, capacity)
+      return unsafe UnsafeMutableRawBufferPointer(start: base, count: capacity)
     }
 
     /// Allocate uninitialized memory for a single instance of type `T`.
     public func allocate<T>(as type: T.Type) -> UnsafeMutablePointer<T> {
-      let base = _jobAllocate(context, MemoryLayout<T>.size)
-      return base.bindMemory(to: type, capacity: 1)
+      let base = unsafe _jobAllocate(context, MemoryLayout<T>.size)
+      return unsafe base.bindMemory(to: type, capacity: 1)
     }
 
     /// Allocate uninitialized memory for the specified number of
     /// instances of type `T`.
     public func allocate<T>(capacity: Int, as type: T.Type)
       -> UnsafeMutableBufferPointer<T> {
-      let base = _jobAllocate(context, MemoryLayout<T>.stride * capacity)
-      let typedBase = base.bindMemory(to: T.self, capacity: capacity)
-      return UnsafeMutableBufferPointer<T>(start: typedBase, count: capacity)
+      let base = unsafe _jobAllocate(context, MemoryLayout<T>.stride * capacity)
+      let typedBase = unsafe base.bindMemory(to: T.self, capacity: capacity)
+      return unsafe UnsafeMutableBufferPointer<T>(start: typedBase, count: capacity)
     }
 
     /// Deallocate previously allocated memory.  Note that the task
     /// allocator is stack disciplined, so if you deallocate a block of
     /// memory, all memory allocated after that block is also deallocated.
     public func deallocate(_ buffer: UnsafeMutableRawBufferPointer) {
-      _jobDeallocate(context, buffer.baseAddress!)
+      unsafe _jobDeallocate(context, buffer.baseAddress!)
     }
 
     /// Deallocate previously allocated memory.  Note that the task
     /// allocator is stack disciplined, so if you deallocate a block of
     /// memory, all memory allocated after that block is also deallocated.
     public func deallocate<T>(_ pointer: UnsafeMutablePointer<T>) {
-      _jobDeallocate(context, UnsafeMutableRawPointer(pointer))
+      unsafe _jobDeallocate(context, UnsafeMutableRawPointer(pointer))
     }
 
     /// Deallocate previously allocated memory.  Note that the task
     /// allocator is stack disciplined, so if you deallocate a block of
     /// memory, all memory allocated after that block is also deallocated.
     public func deallocate<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
-      _jobDeallocate(context, UnsafeMutableRawPointer(buffer.baseAddress!))
+      unsafe _jobDeallocate(context, UnsafeMutableRawPointer(buffer.baseAddress!))
     }
 
   }

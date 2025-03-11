@@ -216,6 +216,7 @@ public struct ClockTraits: OptionSet {
   public static let wallTime = ClockTraits(rawValue: 1 << 2)
 }
 
+@available(SwiftStdlib 6.2, *)
 extension Clock {
   /// The traits associated with this clock instance.
   @available(SwiftStdlib 6.2, *)

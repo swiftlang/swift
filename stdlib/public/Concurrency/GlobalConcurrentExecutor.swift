@@ -62,7 +62,7 @@ internal final class _DefaultGlobalConcurrentExecutor: TaskExecutor {
     // We represent it as the `(0, 0)` ExecutorRef and it is handled properly
     // by the runtime, without having to call through to the
     // `_DefaultGlobalConcurrentExecutor` declared in Swift.
-    UnownedTaskExecutor(_getUndefinedTaskExecutor())
+    unsafe UnownedTaskExecutor(_getUndefinedTaskExecutor())
   }
 }
 

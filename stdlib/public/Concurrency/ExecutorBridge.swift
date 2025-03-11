@@ -130,11 +130,11 @@ fileprivate class DispatchEventHandlerBox {
 @available(SwiftStdlib 6.2, *)
 internal func _createDispatchEvent(handler: @escaping @Sendable () -> ()) -> OpaquePointer {
   let boxed = DispatchEventHandlerBox(handler: handler)
-  let opaqueHandlerBox = Unmanaged.passRetained(boxed).toOpaque()
-  return _createDispatchEventC(
+  let opaqueHandlerBox = unsafe Unmanaged.passRetained(boxed).toOpaque()
+  return unsafe _createDispatchEventC(
     handler: { context in
-      let unmanaged = Unmanaged<DispatchEventHandlerBox>.fromOpaque(context)
-      unmanaged.takeUnretainedValue().handler()
+      let unmanaged = unsafe Unmanaged<DispatchEventHandlerBox>.fromOpaque(context)
+      unsafe unmanaged.takeUnretainedValue().handler()
     },
     context: opaqueHandlerBox
   )
@@ -150,9 +150,9 @@ internal func _getDispatchEventContext(_ event: OpaquePointer) -> UnsafeMutableR
 
 @available(SwiftStdlib 6.2, *)
 internal func _destroyDispatchEvent(_ event: OpaquePointer) {
-  let context = _getDispatchEventContext(event)
-  Unmanaged<DispatchEventHandlerBox>.fromOpaque(context).release()
-  _destroyDispatchEventC(event)
+  let context = unsafe _getDispatchEventContext(event)
+  unsafe Unmanaged<DispatchEventHandlerBox>.fromOpaque(context).release()
+  unsafe _destroyDispatchEventC(event)
 }
 
 @available(SwiftStdlib 6.2, *)

@@ -34,7 +34,7 @@ internal func dontateToGlobalExecutor(
   context: UnsafeMutableRawPointer
 ) {
   if let runnableExecutor = Task.defaultExecutor as? RunLoopExecutor {
-    try! runnableExecutor.run(until: { Bool(condition(context)) })
+    try! runnableExecutor.run(until: { unsafe Bool(condition(context)) })
   } else {
     fatalError("Global executor does not support thread donation")
   }
@@ -43,7 +43,7 @@ internal func dontateToGlobalExecutor(
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_getMainExecutorImpl")
 internal func getMainExecutor() -> UnownedSerialExecutor {
-  return UnownedSerialExecutor(MainActor.executor)
+  return unsafe UnownedSerialExecutor(MainActor.executor)
 }
 
 @available(SwiftStdlib 6.2, *)
