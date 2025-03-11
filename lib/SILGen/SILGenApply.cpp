@@ -3462,11 +3462,9 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
       expr = le->getSubExpr();
     }
     if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
-      if (auto param = dyn_cast<ParamDecl>(dre->getDecl())) {
-        if (VarLocs.count(param)
-            && VarLocs[param].addressable
-            && param->getValueOwnership() == ownership) {
-          auto addr = VarLocs[param].value;
+      if (auto param = dyn_cast<VarDecl>(dre->getDecl())) {
+        if (auto addr = getLocalVariableAddressableBuffer(param, expr,
+                                                          ownership)) {
           return ManagedValue::forBorrowedAddressRValue(addr);
         }
       }
@@ -3577,12 +3575,20 @@ private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType,
             bool isAddressable,
             std::optional<AnyFunctionType::Param> origParam = std::nullopt) {
-    if (isAddressable && origParam) {
+    if (isAddressable) {
       // If the function takes an addressable parameter, and its argument is
       // a reference to an addressable declaration with compatible ownership,
       // forward the address along in-place.
+      ValueOwnership paramOwnership;
+      if (isGuaranteedParameterInCaller(ParamInfos.front().getConvention())) {
+        paramOwnership = ValueOwnership::Shared;
+      } else if (isMutatingParameter(ParamInfos.front().getConvention())) {
+        paramOwnership = ValueOwnership::InOut;
+      } else {
+        paramOwnership = ValueOwnership::Owned;      
+      }
       if (auto addr = SGF.tryEmitAddressableParameterAsAddress(std::move(arg),
-                                             origParam->getValueOwnership())) {
+                                                              paramOwnership)) {
         claimNextParameters(1);
         Args.push_back(addr);
         return;
