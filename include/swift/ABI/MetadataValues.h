@@ -747,6 +747,7 @@ private:
     HasGenericWitnessTableMask = 0x01u << 17,
     IsConformanceOfProtocolMask = 0x01u << 18,
     HasGlobalActorIsolation = 0x01u << 19,
+    HasSerialExecutorIsolationCheckingMode = 0x01u << 20,
 
     NumConditionalPackDescriptorsMask = 0xFFu << 24,
     NumConditionalPackDescriptorsShift = 24
@@ -813,7 +814,15 @@ public:
                                  ? HasGlobalActorIsolation
                                  : 0));
   }
-  
+
+  ConformanceFlags withHasSerialExecutorIsolationCheckingMode(
+                                           bool hasSerialExecutorIsolationCheckingMode) const {
+    return ConformanceFlags((Value & ~HasSerialExecutorIsolationCheckingMode)
+                            | (hasSerialExecutorIsolationCheckingMode
+                                 ? HasSerialExecutorIsolationCheckingMode
+                                 : 0));
+  }
+
   /// Retrieve the type reference kind kind.
   TypeReferenceKind getTypeReferenceKind() const {
     return TypeReferenceKind(
@@ -856,6 +865,10 @@ public:
   /// Does this conformance have a global actor to which it is isolated?
   bool hasGlobalActorIsolation() const {
     return Value & HasGlobalActorIsolation;
+  }
+
+  bool hasSerialExecutorIsolationCheckingMode() const {
+    return Value & HasSerialExecutorIsolationCheckingMode;
   }
 
   /// Retrieve the # of conditional requirements.

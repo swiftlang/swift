@@ -1152,6 +1152,9 @@ public:
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
 
+  /// \returns true if this module is the "_Concurrency" standard library module.
+  bool isConcurrencyModule() const;
+
   /// \returns true if this module has standard substitutions for mangling.
   bool hasStandardSubstitutions() const;
 

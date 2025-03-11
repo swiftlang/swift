@@ -2020,6 +2020,10 @@ bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
 }
 
+bool ModuleDecl::isConcurrencyModule() const {
+  return !getParent() && getName() == getASTContext().getIdentifier("_Concurrency");
+}
+
 bool ModuleDecl::hasStandardSubstitutions() const {
   return !getParent() &&
       (getName() == getASTContext().StdlibModuleName ||
