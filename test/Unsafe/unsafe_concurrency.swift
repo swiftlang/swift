@@ -43,3 +43,15 @@ final class MyExecutor: SerialExecutor {
   func enqueue(_ job: consuming ExecutorJob) { fatalError("boom") }
   @unsafe func asUnownedSerialExecutor() -> UnownedSerialExecutor { fatalError("boom") }
 }
+
+// Ensure that this does not cause a reference cycle.
+public struct TokenSyntax { }
+public struct Syntax { }
+
+open class SyntaxVisitor {
+  open func visit(_ token: TokenSyntax) { }
+}
+
+open class SyntaxAnyVisitor: SyntaxVisitor {
+  override open func visit(_ token: TokenSyntax) { }
+}
