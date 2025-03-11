@@ -1338,8 +1338,8 @@ void ConstraintSystem::shrink(Expr *expr) {
   }
 }
 
-static bool debugConstraintSolverForTarget(ASTContext &C,
-                                           SyntacticElementTarget target) {
+bool constraints::debugConstraintSolverForTarget(
+    ASTContext &C, SyntacticElementTarget target) {
   if (C.TypeCheckerOpts.DebugConstraintSolver)
     return true;
 
