@@ -10,13 +10,13 @@ public let s = S<Int>(t: 0)
 // CHECK-SAME:             templateParams: ![[PARAMS:[0-9]+]]
 // CHECK: ![[PARAMS]] = !{![[INTPARAM:[0-9]+]]}
 // CHECK: ![[INTPARAM]] = !DITemplateTypeParameter(type: ![[INT:[0-9]+]])
-// CHECK: ![[INT]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}}identifier: "$sSiD"
+// CHECK: ![[INT]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}}"$sSiD"
 
 // DWARF-DAG: !DICompositeType(tag: DW_TAG_structure_type, {{.*}}templateParams: ![[PARAMS:[0-9]+]]{{.*}}identifier: "$s18BoundGenericStruct1SVySiGD"{{.*}}specification:
 
 // DWARF-DAG: ![[PARAMS]] = !{![[INTPARAM:[0-9]+]]}
 // DWARF-DAG: ![[INTPARAM]] = !DITemplateTypeParameter(type: ![[INT:[0-9]+]])
-// DWARF-DAG: ![[INT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int", {{.*}}identifier: "$sSiD"
+// DWARF-DAG: ![[INT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int", {{.*}}"$sSiD"
 
 // DWARF-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "S", {{.*}}identifier: "$s18BoundGenericStruct1SVyxGD")
 // DWARF-DAG: !DIDerivedType(tag: DW_TAG_member, name: "t"

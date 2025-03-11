@@ -101,6 +101,7 @@ DebugTypeInfo DebugTypeInfo::getTypeMetadata(swift::Type Ty, Size size,
 
 DebugTypeInfo DebugTypeInfo::getForwardDecl(swift::Type Ty) {
   DebugTypeInfo DbgTy(Ty.getPointer());
+  DbgTy.IsForwardDecl = true;
   return DbgTy;
 }
 
@@ -182,6 +183,8 @@ TypeDecl *DebugTypeInfo::getDecl() const {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
   llvm::errs() << "[";
+  if (isForwardDecl())
+    llvm::errs() << "forward ";
   llvm::errs() << "Alignment " << Align.getValue() << "] ";
   if (auto *Type = getType())
     Type->dump(llvm::errs());
@@ -190,7 +193,8 @@ LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
 
 std::optional<CompletedDebugTypeInfo>
 CompletedDebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
-                                        IRGenModule &IGM) {
+                                        IRGenModule &IGM,
+                                        std::optional<Size::int_type> Size) {
   if (!Ty || Ty->hasTypeParameter())
     return {};
   auto *StorageType = IGM.getStorageTypeForUnlowered(Ty);
@@ -201,6 +205,8 @@ CompletedDebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     Size::int_type Size = FixTy.getFixedSize().getValue() * 8;
     SizeInBits = Size;
+  } else if (Size) {
+    SizeInBits = *Size * 8;
   }
 
   return CompletedDebugTypeInfo::get(
