@@ -859,7 +859,7 @@ public:
 
   /// Whether this is a one-way constraint.
   bool isOneWayConstraint() const {
-    return Kind == ConstraintKind::OneWayEqual;
+    return false;
   }
 
   /// Retrieve the overload choice for an overload-binding constraint.
