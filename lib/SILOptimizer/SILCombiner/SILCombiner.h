@@ -299,8 +299,6 @@ public:
   SILInstruction *visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI);
   SILInstruction *visitCopyAddrInst(CopyAddrInst *CAI);
 
-  SILInstruction *visitKeyPathInst(KeyPathInst *KPI);
-
   SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);
 
 #define PASS(ID, TAG, DESCRIPTION)

@@ -23,6 +23,13 @@ protocol Simplifiable : Instruction {
 
 /// Instructions which can be simplified at -Onone
 protocol OnoneSimplifiable : Simplifiable {
+  func simplifyOnone(_ context: SimplifyContext)
+}
+
+extension OnoneSimplifiable {
+  func simplifyOnone(_ context: SimplifyContext) {
+    simplify(context)
+  }
 }
 
 /// Instructions which can only be simplified at the end of the -Onone pipeline
@@ -39,7 +46,7 @@ let ononeSimplificationPass = FunctionPass(name: "onone-simplification") {
 
   runSimplification(on: function, context, preserveDebugInfo: true) {
     if let i = $0 as? OnoneSimplifiable {
-      i.simplify($1)
+      i.simplifyOnone($1)
     }
   }
 }
@@ -61,7 +68,7 @@ let lateOnoneSimplificationPass = FunctionPass(name: "late-onone-simplification"
     if let i = $0 as? LateOnoneSimplifiable {
       i.simplifyLate($1)
     } else if let i = $0 as? OnoneSimplifiable {
-      i.simplify($1)
+      i.simplifyOnone($1)
     }
   }
 }

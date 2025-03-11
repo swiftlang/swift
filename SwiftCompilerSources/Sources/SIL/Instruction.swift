@@ -1005,6 +1005,22 @@ final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public class KeyPathInst : SingleValueInstruction {
+  public var pattern: KeyPathPattern? {
+    guard bridged.KeyPathInst_hasPattern() else {
+      return nil
+    }
+
+    return KeyPathPattern(bridged: bridged.KeyPathInst_getPattern())
+  }
+
+  public var substitutions: SubstitutionMap {
+    SubstitutionMap(bridged: bridged.KeyPathInst_getSubstitutions())
+  }
+
+  public func dropReferencedPattern() {
+    bridged.KeyPathInst_dropReferencedPattern()
+  }
+
   public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
     var results = BridgedInstruction.KeyPathFunctionResults()
     for componentIdx in 0..<bridged.KeyPathInst_getNumComponents() {

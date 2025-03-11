@@ -23,6 +23,7 @@ add_swift_compiler_module(SIL
     FunctionConvention.swift
     GlobalVariable.swift
     Instruction.swift
+    KeyPath.swift
     Linkage.swift
     Location.swift
     Operand.swift
