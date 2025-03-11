@@ -3865,6 +3865,23 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     return result;
   }
 
+  // Handle opened archetype types.
+  if (auto opened1 = type1->getAs<OpenedArchetypeType>()) {
+    auto opened2 = type2->castTo<OpenedArchetypeType>();
+    assert(opened1->getInterfaceType()->isEqual(opened2->getInterfaceType()) &&
+           opened1->getGenericEnvironment()->getOpenedExistentialUUID() ==
+               opened2->getGenericEnvironment()->getOpenedExistentialUUID());
+
+    auto args1 = opened1->getGenericEnvironment()
+                     ->getOuterSubstitutions()
+                     .getReplacementTypes();
+    auto args2 = opened2->getGenericEnvironment()
+                     ->getOuterSubstitutions()
+                     .getReplacementTypes();
+
+    return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
+  }
+
   // `any Sendable` -> `Any`
   if (matchSendableExistentialToAnyInGenericArgumentPosition(*this, type1,
                                                              type2, locator))
@@ -7332,7 +7349,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case TypeKind::Module:
     case TypeKind::PrimaryArchetype:
-    case TypeKind::OpenedArchetype:
     case TypeKind::PackArchetype:
     case TypeKind::ElementArchetype: {
       // Give `repairFailures` a chance to fix the problem.
@@ -7657,7 +7673,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
       break;
     }
-    
+
+    case TypeKind::OpenedArchetype: {
+      auto opened1 = cast<OpenedArchetypeType>(desugar1);
+      auto opened2 = cast<OpenedArchetypeType>(desugar2);
+      // If they have the same interface type and UUID, two OpenedArchetypeTypes
+      // match if their generic arguments do as well.
+      if (opened1->getInterfaceType()->isEqual(opened2->getInterfaceType()) &&
+          opened1->getGenericEnvironment()->getOpenedExistentialUUID() ==
+              opened2->getGenericEnvironment()->getOpenedExistentialUUID()) {
+        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+      }
+      break;
+    }
+
     case TypeKind::Pack: {
       auto tmpPackLoc = locator.withPathElement(LocatorPathElt::PackType(type1));
       auto packLoc = tmpPackLoc.withPathElement(LocatorPathElt::PackType(type2));

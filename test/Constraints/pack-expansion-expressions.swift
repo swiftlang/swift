@@ -784,3 +784,17 @@ do {
     }
   }
 }
+
+// https://github.com/swiftlang/swift/issues/79623
+do {
+  protocol P<T>: Hashable {
+    associatedtype T
+  }
+
+  struct S<each T> {
+    var x: any P<(repeat each T)>
+    var hashable: AnyHashable {
+      AnyHashable(x)
+    }
+  }
+}
