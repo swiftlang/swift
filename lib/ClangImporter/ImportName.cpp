@@ -1875,7 +1875,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (loc.isMacroID()) {
       StringRef macroName =
           clangSema.getPreprocessor().getImmediateMacroName(loc);
-      if (macroName == "CF_OPTIONS" || macroName == "NS_OPTIONS")
+      if (isCFOptionsMacro(macroName))
         return ImportedName();
     }
   }
