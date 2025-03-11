@@ -669,6 +669,10 @@ ConstraintSystem::SolverState::~SolverState() {
     CS.Options -= ConstraintSystemFlags::DebugConstraints;
   }
 
+  // This statistic is special because it's not a counter; we just update
+  // it in one shot at the end.
+  ASTBytesAllocated = CS.getASTContext().getSolverMemory();
+
   // Write our local statistics back to the overall statistics.
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
   #include "swift/Sema/ConstraintSolverStats.def"
