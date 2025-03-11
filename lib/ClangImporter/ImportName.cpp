@@ -1861,6 +1861,25 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     return result;
   }
 
+  // In C++ language mode, CF_OPTIONS/NS_OPTIONS macro has a different
+  // expansion: instead of a forward-declared enum, it expands into a typedef
+  // that is marked as `__attribute__((availability(swift,unavailable)))`, and
+  // an anonymous enum that inherits from the typedef. The logic above imports
+  // the anonymous enum with the desired name based on the typedef's name. In
+  // addition to that, we should make sure the unavailable typedef isn't
+  // imported into Swift to avoid having two types with the same name, which
+  // cause subtle name lookup issues.
+  if (swiftCtx.LangOpts.EnableCXXInterop &&
+      isUnavailableInSwift(D, nullptr, true)) {
+    auto loc = D->getEndLoc();
+    if (loc.isMacroID()) {
+      StringRef macroName =
+          clangSema.getPreprocessor().getImmediateMacroName(loc);
+      if (macroName == "CF_OPTIONS" || macroName == "NS_OPTIONS")
+        return ImportedName();
+    }
+  }
+
   /// Whether the result is a function name.
   bool isFunction = false;
   bool isInitializer = false;

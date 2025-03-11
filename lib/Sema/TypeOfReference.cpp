@@ -318,7 +318,7 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
                                            expansionVar, openedPackExpansion,
                                            expansionLoc));
 
-  OpenedPackExpansionTypes[openedPackExpansion] = expansionVar;
+  recordOpenedPackExpansionType(openedPackExpansion, expansionVar);
   return expansionVar;
 }
 

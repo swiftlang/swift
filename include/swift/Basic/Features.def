@@ -91,13 +91,13 @@
 #endif
 
 #ifndef SUPPRESSIBLE_LANGUAGE_FEATURE
-#  define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
-  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+  #define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)    \
+    LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #endif
 
 #ifndef OPTIONAL_LANGUAGE_FEATURE
-#  define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
-  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+  #define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)        \
+    LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #endif
 
 // A feature that's both conditionally-suppressible and experimental.
@@ -116,20 +116,55 @@
 #endif
 
 #ifndef CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE
-#  define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
-     LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+  #define CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber,   \
+                                                      Description)             \
+    LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#endif
+
+// An upcoming feature that supports adoption mode.
+//
+// If the feature is source-breaking and provides for a
+// mechanical code migration, it should implement adoption mode.
+//
+// Adoption mode is a feature-oriented code migration mechanism: a mode
+// of operation that should produce compiler warnings with attached
+// fix-its that can be applied to preserve the behavior of the code once
+// the upcoming feature is enacted.
+// These warnings must belong to a diagnostic group named after the
+// feature. Adoption mode itself *and* the fix-its it produces must be
+// source and binary compatible with how the code is compiled when the
+// feature is disabled.
+#ifndef ADOPTABLE_UPCOMING_FEATURE
+  #if defined(UPCOMING_FEATURE)
+    #define ADOPTABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
+      UPCOMING_FEATURE(FeatureName, SENumber, Version)
+  #else
+    #define ADOPTABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
+      LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
+  #endif
+#endif
+
+// See `ADOPTABLE_UPCOMING_FEATURE`.
+#ifndef ADOPTABLE_EXPERIMENTAL_FEATURE
+  #if defined(EXPERIMENTAL_FEATURE)
+    #define ADOPTABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)       \
+      EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
+  #else
+    #define ADOPTABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)       \
+      LANGUAGE_FEATURE(FeatureName, 0, #FeatureName)
+  #endif
 #endif
 
 #ifndef UPCOMING_FEATURE
-#  define UPCOMING_FEATURE(FeatureName, SENumber, Version)   \
-     LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
+  #define UPCOMING_FEATURE(FeatureName, SENumber, Version)                     \
+    LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
 #endif
 
 #ifndef EXPERIMENTAL_FEATURE
-// Warning: setting `AvailableInProd` to `true` on a feature means that the flag
-//          cannot be dropped in the future.
-#  define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)  \
-     LANGUAGE_FEATURE(FeatureName, 0, #FeatureName)
+  // Warning: setting `AvailableInProd` to `true` on a feature means that the
+  // flag cannot be dropped in the future.
+  #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)                   \
+    LANGUAGE_FEATURE(FeatureName, 0, #FeatureName)
 #endif
 
 #ifndef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
@@ -138,8 +173,8 @@
 #endif
 
 #ifndef BASELINE_LANGUAGE_FEATURE
-#  define BASELINE_LANGUAGE_FEATURE(FeatureName, SENumber, Description) \
-  LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+  #define BASELINE_LANGUAGE_FEATURE(FeatureName, SENumber, Description)        \
+    LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #endif
 
 BASELINE_LANGUAGE_FEATURE(AsyncAwait, 296, "async/await")
@@ -162,6 +197,7 @@ BASELINE_LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins")
 BASELINE_LANGUAGE_FEATURE(BuiltinBuildComplexEqualityExecutor, 0, "Executor-building for 'complexEquality executor' builtins")
 BASELINE_LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskOwnedTaskExecutor, 0, "Task create with owned TaskExecutor")
+BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskName, 0, "Task create with a name")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "Task create in task group builtin with extra flags")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroupWithExecutor, 0, "Task create in task group builtin with extra flags")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroup, 0, "Task create in discarding task group builtin, accounting for the Void return type")
@@ -215,6 +251,7 @@ LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
 LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
 LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
 SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
+LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -234,7 +271,7 @@ UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, 6)
 UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 
 // Swift 7
-UPCOMING_FEATURE(ExistentialAny, 335, 7)
+ADOPTABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 
@@ -429,9 +466,6 @@ EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 // Isolated deinit
 SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 
-// Enable values in generic signatures, e.g. <let N: Int>
-EXPERIMENTAL_FEATURE(ValueGenerics, true)
-
 // When a parameter has unspecified isolation, infer it as main actor isolated.
 EXPERIMENTAL_FEATURE(UnspecifiedMeansMainActorIsolated, false)
 
@@ -440,9 +474,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 
 /// modify/read single-yield coroutines always execute code post-yield code
 EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
-
-/// modify/read coroutines use the callee-allocated ABI
-EXPERIMENTAL_FEATURE(CoroutineAccessorsAllocateInCallee, false)
 
 /// When a parameter has unspecified isolation, infer it as main actor isolated.
 EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
@@ -476,6 +507,9 @@ EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
 /// Allow isolated conformances.
 EXPERIMENTAL_FEATURE(IsolatedConformances, true)
 
+/// Allow SwiftSettings
+EXPERIMENTAL_FEATURE(SwiftSettings, false)
+
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
@@ -485,6 +519,8 @@ EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
+#undef ADOPTABLE_UPCOMING_FEATURE
+#undef ADOPTABLE_EXPERIMENTAL_FEATURE
 #undef BASELINE_LANGUAGE_FEATURE
 #undef OPTIONAL_LANGUAGE_FEATURE
 #undef CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE

@@ -931,7 +931,7 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
                  std::function<std::tuple<EnumElementDecl *, BraceStmt *>(
                      EnumElementDecl *, EnumElementDecl *, ArrayRef<VarDecl *>)>
                      createCase) {
-  SmallVector<ASTNode, 4> cases;
+  SmallVector<CaseStmt *, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     // .<elt>(let a0, let a1, ...)
     SmallVector<VarDecl *, 3> payloadVars;

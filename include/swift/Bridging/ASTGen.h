@@ -26,12 +26,22 @@ void swift_ASTGen_addQueuedSourceFile(
     void *_Nonnull sourceFile, const uint8_t *_Nonnull displayNamePtr,
     intptr_t displayNameLength, ssize_t parentID, ssize_t positionInParent);
 void swift_ASTGen_addQueuedDiagnostic(
-    void *_Nonnull queued, const char *_Nonnull text, ptrdiff_t textLength,
+    void *_Nonnull queued, void *_Nonnull state,
+    const char *_Nonnull text, ptrdiff_t textLength,
     BridgedDiagnosticSeverity severity, const void *_Nullable sourceLoc,
+    const char *_Nullable categoryName, ptrdiff_t categoryNameLength,
+    const char *_Nullable documentationPath,
+    ptrdiff_t documentationPathLength,
     const void *_Nullable *_Nullable highlightRanges,
     ptrdiff_t numHighlightRanges);
 void swift_ASTGen_renderQueuedDiagnostics(
     void *_Nonnull queued, ssize_t contextSize, ssize_t colorize,
+    BridgedStringRef *_Nonnull renderedString);
+
+void *_Nonnull swift_ASTGen_createPerFrontendDiagnosticState();
+void swift_ASTGen_destroyPerFrontendDiagnosticState(void * _Nonnull state);
+void swift_ASTGen_renderCategoryFootnotes(
+    void * _Nonnull state, ssize_t colorize,
     BridgedStringRef *_Nonnull renderedString);
 
 // FIXME: Hack because we cannot easily get to the already-parsed source

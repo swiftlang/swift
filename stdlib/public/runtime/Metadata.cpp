@@ -410,7 +410,7 @@ static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
             reinterpret_cast<void **>(&dest[i]),
             reinterpret_cast<void *const *>(&src[i]),
             descriptors[i].Flags.getExtraDiscriminator(),
-            !descriptors[i].Flags.isAsync(),
+            !descriptors[i].Flags.isData(),
             /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
                                  // might be proven unused and null'ed)
       }
@@ -3609,7 +3609,7 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
             reinterpret_cast<void **>(&dest[i]),
             reinterpret_cast<void *const *>(&src[i]),
             descriptors[i].Flags.getExtraDiscriminator(),
-            !descriptors[i].Flags.isAsync(),
+            !descriptors[i].Flags.isData(),
             /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
                                  // might be proven unused and null'ed)
       }
@@ -3659,7 +3659,7 @@ static void initClassVTable(ClassMetadata *self) {
       swift_ptrauth_init_code_or_data(
           &classWords[vtableOffset + i], methodDescription.getImpl(),
           methodDescription.Flags.getExtraDiscriminator(),
-          !methodDescription.Flags.isAsync());
+          !methodDescription.Flags.isData());
     }
   }
 
@@ -3697,10 +3697,9 @@ static void initClassVTable(ClassMetadata *self) {
       auto baseVTable = baseClass->getVTableDescriptor();
       auto offset = (baseVTable->getVTableOffset(baseClass) +
                      (baseMethod - baseClassMethods.data()));
-      swift_ptrauth_init_code_or_data(&classWords[offset],
-                                      descriptor.getImpl(),
+      swift_ptrauth_init_code_or_data(&classWords[offset], descriptor.getImpl(),
                                       baseMethod->Flags.getExtraDiscriminator(),
-                                      !baseMethod->Flags.isAsync());
+                                      !baseMethod->Flags.isData());
     }
   }
 }
@@ -4352,7 +4351,7 @@ swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
 #if SWIFT_PTRAUTH
   // Re-sign the return value without the address.
   unsigned extra = method->Flags.getExtraDiscriminator();
-  if (method->Flags.isAsync()) {
+  if (method->Flags.isData()) {
     return ptrauth_auth_and_resign(
         *methodPtr, ptrauth_key_process_independent_data,
         ptrauth_blend_discriminator(methodPtr, extra),
@@ -6097,7 +6096,7 @@ static void initProtocolWitness(void **slot, void *witness,
   case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_init_code_or_data(slot, witness,
                                     reqt.Flags.getExtraDiscriminator(),
-                                    !reqt.Flags.isAsync());
+                                    !reqt.Flags.isData());
     return;
 
   case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
@@ -6139,7 +6138,7 @@ static void copyProtocolWitness(void **dest, void * const *src,
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
   case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_copy_code_or_data(
-        dest, src, reqt.Flags.getExtraDiscriminator(), !reqt.Flags.isAsync(),
+        dest, src, reqt.Flags.getExtraDiscriminator(), !reqt.Flags.isData(),
         /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
                              // might be proven unused and null'ed)
     return;

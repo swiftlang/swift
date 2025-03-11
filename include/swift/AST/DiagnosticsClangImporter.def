@@ -174,6 +174,10 @@ NOTE(record_not_automatically_importable, none, "record '%0' is not "
                                                 "does this type have reference "
                                                 "semantics?",
      (StringRef, StringRef))
+NOTE(record_unsupported_default_args, none,
+     "copy constructors and move constructors with more than one parameter are "
+     "unavailable in Swift",
+     ())
 
 NOTE(projection_value_not_imported, none, "C++ method '%0' that returns a value "
                                           "of type '%1' is unavailable",

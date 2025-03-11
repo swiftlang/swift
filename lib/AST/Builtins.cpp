@@ -1573,6 +1573,7 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
                                 _existential(_taskExecutor),
                                 /*else*/ _executor))),
                             _nil)),
+          _label("taskName", _defaulted(_optional(_rawPointer), _nil)),
           _label("operation",
                  _sending(_function(_async(_throws(_thick)), _typeparam(0),
                                     _parameters())))),
@@ -1597,6 +1598,7 @@ static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
                                 _existential(_taskExecutor),
                                 /*else*/ _executor))),
                             _nil)),
+          _label("taskName", _defaulted(_optional(_rawPointer), _nil)),
           _label("operation", _sending(_function(_async(_throws(_thick)), _void,
                                                  _parameters())))),
       _tuple(_nativeObject, _rawPointer));

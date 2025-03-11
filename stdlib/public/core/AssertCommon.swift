@@ -163,7 +163,7 @@ internal func _assertionFailure(
   if _isDebugAssertConfiguration() {
     var message = message
     message.withUTF8 { (messageUTF8) -> Void in
-      _embeddedReportFatalErrorInFile(prefix: prefix, message: messageUTF8, file: file, line: line)
+      unsafe _embeddedReportFatalErrorInFile(prefix: prefix, message: messageUTF8, file: file, line: line)
     }
   }
 #endif

@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -enable-builtin-module -enable-experimental-feature ValueGenerics -disable-availability-checking -o - | %FileCheck %s
-
-// REQUIRES: swift_feature_ValueGenerics
+// RUN: %target-swift-frontend %s -emit-ir -g -enable-builtin-module -disable-availability-checking -o - | %FileCheck %s
 
 import Builtin
 

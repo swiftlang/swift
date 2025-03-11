@@ -888,6 +888,11 @@ public:
       llvm::VersionTuple Introduced, llvm::VersionTuple Deprecated,
       llvm::VersionTuple Obsoleted);
 
+  /// Create an `AvailableAttr` for `@_unavailableInEmbedded`.
+  static AvailableAttr *createUnavailableInEmbedded(ASTContext &ctx,
+                                                    SourceLoc AtLoc,
+                                                    SourceRange Range);
+
   AvailableAttr *clone(ASTContext &C, bool implicit) const;
   AvailableAttr *clone(ASTContext &C) const {
     return clone(C, isImplicit());
@@ -3308,9 +3313,13 @@ public:
   /// The source range of the `introduced:` version component.
   SourceRange getIntroducedSourceRange() const { return attr->IntroducedRange; }
 
-  /// Returns the effective availability range for the attribute's `introduced:`
-  /// component (remapping or canonicalizing if necessary).
-  AvailabilityRange getIntroducedRange(const ASTContext &Ctx) const;
+  /// Returns the effective introduction range indicated by this attribute.
+  /// This may correspond to the version specified by the `introduced:`
+  /// component (remapped or canonicalized if necessary) or it may be "always"
+  /// for an attribute indicating availability in a version-less domain. Returns
+  /// `std::nullopt` if the attribute does not indicate introduction.
+  std::optional<AvailabilityRange>
+  getIntroducedRange(const ASTContext &Ctx) const;
 
   /// The version tuple for the `deprecated:` component.
   std::optional<llvm::VersionTuple> getDeprecated() const;
@@ -3318,9 +3327,13 @@ public:
   /// The source range of the `deprecated:` version component.
   SourceRange getDeprecatedSourceRange() const { return attr->DeprecatedRange; }
 
-  /// Returns the effective availability range for the attribute's `deprecated:`
-  /// component (remapping or canonicalizing if necessary).
-  AvailabilityRange getDeprecatedRange(const ASTContext &Ctx) const;
+  /// Returns the effective deprecation range indicated by this attribute.
+  /// This may correspond to the version specified by the `deprecated:`
+  /// component (remapped or canonicalized if necessary) or it may be "always"
+  /// for an unconditional deprecation attribute. Returns `std::nullopt` if the
+  /// attribute does not indicate deprecation.
+  std::optional<AvailabilityRange>
+  getDeprecatedRange(const ASTContext &Ctx) const;
 
   /// The version tuple for the `obsoleted:` component.
   std::optional<llvm::VersionTuple> getObsoleted() const;
@@ -3328,9 +3341,13 @@ public:
   /// The source range of the `obsoleted:` version component.
   SourceRange getObsoletedSourceRange() const { return attr->ObsoletedRange; }
 
-  /// Returns the effective availability range for the attribute's `obsoleted:`
-  /// component (remapping or canonicalizing if necessary).
-  AvailabilityRange getObsoletedRange(const ASTContext &Ctx) const;
+  /// Returns the effective obsoletion range indicated by this attribute.
+  /// This always corresponds to the version specified by the `obsoleted:`
+  /// component (remapped or canonicalized if necessary). Returns `std::nullopt`
+  /// if the attribute does not indicate obsoletion (note that unavailability is
+  /// separate from obsoletion.
+  std::optional<AvailabilityRange>
+  getObsoletedRange(const ASTContext &Ctx) const;
 
   /// Returns the `message:` field of the attribute, or an empty string.
   StringRef getMessage() const { return attr->Message; }

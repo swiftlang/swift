@@ -16,8 +16,10 @@ public protocol P {
   associatedtype A
 
   var s: S { read set }
+  var s2: S { read set }
 }
 
 public protocol Q : P {
   override var s: S { read set }
+  var s2: S { read set }
 }

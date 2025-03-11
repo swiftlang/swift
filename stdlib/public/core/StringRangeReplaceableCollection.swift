@@ -218,7 +218,7 @@ extension String: RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the length of the string.
   public mutating func insert(_ newElement: Character, at i: Index) {
     let i = _guts.validateInclusiveScalarIndex(i)
-    let range = Range(_uncheckedBounds: (i, i))
+    let range = unsafe Range(_uncheckedBounds: (i, i))
     _guts.replaceSubrange(range, with: newElement._str)
   }
 
@@ -243,7 +243,7 @@ extension String: RangeReplaceableCollection {
     contentsOf newElements: S, at i: Index
   ) where S.Element == Character {
     let i = _guts.validateInclusiveScalarIndex(i)
-    let range = Range(_uncheckedBounds: (i, i))
+    let range = unsafe Range(_uncheckedBounds: (i, i))
     _guts.replaceSubrange(range, with: newElements)
   }
 

@@ -439,8 +439,11 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   if (Tok.isContextualKeyword("unsafe") &&
       !(peekToken().isAtStartOfLine() ||
         peekToken().isAny(tok::r_paren, tok::r_brace, tok::r_square,
-                          tok::equal) ||
-        peekToken().is(tok::period))) {
+                          tok::equal, tok::colon, tok::comma, tok::eof) ||
+        (isExprBasic && peekToken().is(tok::l_brace)) ||
+        peekToken().is(tok::period) ||
+        (peekToken().isAny(tok::l_paren, tok::l_square) &&
+         peekToken().getRange().getStart() == Tok.getRange().getEnd()))) {
     Tok.setKind(tok::contextual_keyword);
     SourceLoc unsafeLoc = consumeToken();
     ParserResult<Expr> sub =
@@ -3472,6 +3475,20 @@ ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
       diag::macro_expansion_expr_expected_macro_identifier);
   if (!macroNameRef)
     return status;
+
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+  // If we don't have swift-syntax and therefore have no support for macros,
+  // recognize #isolation as special and route it through
+  // CurrentContextIsolationExpr.
+  if (macroNameRef.getBaseName().userFacingName() == "isolation" &&
+      genericArgs.empty() &&
+      (!argList || argList->empty())) {
+    return makeParserResult(
+      status,
+      new (Context) CurrentContextIsolationExpr(
+          macroNameLoc.getStartLoc(), Type()));
+  }
+#endif
 
   return makeParserResult(
       status,

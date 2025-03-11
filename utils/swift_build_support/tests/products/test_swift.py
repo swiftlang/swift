@@ -72,7 +72,8 @@ class SwiftTestCase(unittest.TestCase):
             swift_freestanding_is_darwin=False,
             build_swift_private_stdlib=True,
             swift_tools_ld64_lto_codegen_only_for_supporting_targets=False,
-            build_stdlib_docs=False)
+            build_stdlib_docs=False,
+            enable_new_runtime_build=False)
 
         # Setup shell
         shell.dry_run = True
@@ -122,7 +123,8 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING=FALSE',
             '-DSWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL=FALSE',
             '-USWIFT_DEBUGINFO_NON_LTO_ARGS',
-            '-DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL=FALSE'
+            '-DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL=FALSE',
+            '-DSWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL=FALSE',
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
 
@@ -157,7 +159,8 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING=FALSE',
             '-DSWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL=FALSE',
             '-USWIFT_DEBUGINFO_NON_LTO_ARGS',
-            '-DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL=FALSE'
+            '-DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL=FALSE',
+            '-DSWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL=FALSE',
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
 

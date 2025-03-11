@@ -219,27 +219,13 @@ func dropQualifierGenerics(_ type: TypeSyntax) -> TypeSyntax {
   }
 }
 
-// The `const` type qualifier used to be encoded as a `_const` suffix on type
-// names (though this causes issues for more complex types). We still drop the
-// suffix here for backwards compatibility with older textual interfaces.
-func dropQualifierSuffix(_ type: TypeSyntax) -> TypeSyntax {
-  guard let identifier = type.as(IdentifierTypeSyntax.self) else { return type }
-  let typename = identifier.name.text
-  if typename.hasSuffix("_const") {
-    return TypeSyntax(identifier.with(\.name, TokenSyntax.identifier(
-      String(typename.dropLast("_const".count))
-    )))
-  }
-  return type
-}
-
 // The generated type names for template instantiations sometimes contain
 // encoded qualifiers for disambiguation purposes. We need to remove those.
 func dropCxxQualifiers(_ type: TypeSyntax) -> TypeSyntax {
   if let attributed = type.as(AttributedTypeSyntax.self) {
     return dropCxxQualifiers(attributed.baseType)
   }
-  return dropQualifierSuffix(dropQualifierGenerics(type))
+  return dropQualifierGenerics(type)
 }
 
 func getPointerMutability(text: String) -> Mutability? {

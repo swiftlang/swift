@@ -516,7 +516,7 @@ SILInstruction *SILCombiner::visitUnconditionalCheckedCastAddrInst(
 
 SILInstruction *
 SILCombiner::
-visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
+legacyVisitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
   CastOpt.optimizeUnconditionalCheckedCastInst(UCCI);
   if (UCCI->isDeleted()) {
     MadeChange = true;

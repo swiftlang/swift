@@ -551,5 +551,5 @@ func _embeddedReportFatalErrorInFile(prefix: StaticString, message: UnsafeBuffer
   print(line, terminator: ": ")
   print(prefix, terminator: "")
   if message.count > 0 { print(": ", terminator: "") }
-  print(message)
+  unsafe print(message)
 }

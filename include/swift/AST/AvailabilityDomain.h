@@ -209,12 +209,23 @@ public:
   /// version ranges.
   bool isVersioned() const;
 
+  /// Returns true if availability of the domain can be refined using
+  /// `@available` attributes and `if #available` queries. If not, then the
+  /// domain's availability is fixed by compilation settings. For example,
+  /// macOS platform availability supports contextual refinement, whereas Swift
+  /// language availability does not.
+  bool supportsContextRefinement() const;
+
   /// Returns true if the domain supports `#available`/`#unavailable` queries.
   bool supportsQueries() const;
 
   /// Returns true if this domain is considered active in the current
   /// compilation context.
   bool isActive(const ASTContext &ctx) const;
+
+  /// Returns true if this domain is a platform domain that is contained by the
+  /// set of active platform-specific domains.
+  bool isActiveForTargetPlatform(const ASTContext &ctx) const;
 
   /// Returns the minimum available range for the attribute's domain. For
   /// example, for the domain of the platform that compilation is targeting,
@@ -323,10 +334,6 @@ class AvailabilityDomainOrIdentifier {
 
   AvailabilityDomainOrIdentifier(Storage storage) : storage(storage) {}
 
-  static AvailabilityDomainOrIdentifier fromOpaque(void *opaque) {
-    return AvailabilityDomainOrIdentifier(Storage::getFromOpaqueValue(opaque));
-  }
-
   std::optional<AvailabilityDomain>
   lookUpInDeclContext(SourceLoc loc, const DeclContext *declContext) const;
 
@@ -385,6 +392,12 @@ public:
   /// members of the original into the given `ASTContext` in case it is
   /// different than the context that the original was created for.
   AvailabilityDomainOrIdentifier copy(ASTContext &ctx) const;
+
+  static AvailabilityDomainOrIdentifier fromOpaque(void *opaque) {
+    return AvailabilityDomainOrIdentifier(Storage::getFromOpaqueValue(opaque));
+  }
+
+  void *getOpaqueValue() const { return storage.getOpaqueValue(); }
 
   void print(llvm::raw_ostream &os) const;
 };

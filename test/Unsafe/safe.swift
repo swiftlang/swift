@@ -179,17 +179,43 @@ enum Color {
 case red
 }
 
+func acceptBools(_: Bool, _: Bool) { }
+
+func acceptBoolsUnsafeLabel(unsafe _: Bool, _: Bool) { }
+
+func unsafe(_: Int) { }
+
 func unsafeFun() {
   var unsafe = true
   unsafe = false
   unsafe.toggle()
   _ = [unsafe]
   _ = { unsafe }
+  acceptBools(unsafe, unsafe)
+  acceptBoolsUnsafeLabel(unsafe: unsafe, unsafe)
 
   let color: Color
   // expected-warning@+1{{no unsafe operations occur within 'unsafe' expression}}
   color = unsafe .red
   _ = color
+
+  if unsafe { }
+}
+
+func moreUnsafeFunc(unsafe: [Int]) {
+  let _: [Int] = unsafe []
+  // expected-warning@-1{{no unsafe operations occur within 'unsafe' expression}}
+
+  _ = unsafe[1]
+
+  _ = "\(unsafe)"
+}
+
+func yetMoreUnsafeFunc(unsafe: () -> Void) {
+  unsafe()
+
+  _ = unsafe ()
+  // expected-warning@-1{{no unsafe operations occur within 'unsafe' expression}}
 }
 
 // @safe suppresses unsafe-type-related diagnostics on an entity

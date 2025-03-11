@@ -101,6 +101,9 @@ class Swift(product.Product):
 
         self._handle_swift_debuginfo_non_lto_args()
 
+        self.cmake_options.extend(
+            self._enable_new_runtime_build)
+
     @classmethod
     def product_source_name(cls):
         """product_source_name() -> str
@@ -287,6 +290,11 @@ updated without updating swift.py?")
     def _enable_stdlib_symbol_graphs(self):
         return [('SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL',
                  self.args.build_stdlib_docs)]
+
+    @property
+    def _enable_new_runtime_build(self):
+        return [('SWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL',
+                 self.args.enable_new_runtime_build)]
 
     def _handle_swift_debuginfo_non_lto_args(self):
         if ('swift_debuginfo_non_lto_args' not in self.args

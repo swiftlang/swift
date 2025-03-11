@@ -1708,9 +1708,6 @@ ERROR(invalid_autoclosure_pointer_conversion,none,
 ERROR(missing_initializer_def,PointsToFirstBadToken,
       "initializer requires a body", ())
 
-WARNING(pound_warning, none, "%0", (StringRef))
-ERROR(pound_error, none, "%0", (StringRef))
-
 // Attributes
 
 ERROR(operator_not_func,none,
@@ -6754,6 +6751,8 @@ WARNING(availability_suggest_platform_name,
         PointsToFirstBadToken, "unrecognized platform name %0;"
         " did you mean '%1'?",
         (Identifier, StringRef))
+WARNING(availability_unsupported_version_number, none,
+        "'%0' is not a supported version number", (llvm::VersionTuple))
 
 WARNING(attr_availability_expected_deprecated_version, none,
        "expected version number with 'deprecated' in '%0' attribute for %1",
@@ -6821,20 +6820,15 @@ NOTE(availability_decl_more_than_enclosing_here, none,
      "enclosing scope requires availability of %0 %1 or newer",
      (AvailabilityDomain, AvailabilityRange))
 
-ERROR(availability_decl_only_version_newer, none,
-      "%0 is only available in %1 %2 or newer",
-      (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
+ERROR(availability_decl_only_in, none,
+      "%0 is only available in %1%select{| %3 or newer}2",
+      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
 
-ERROR(availability_decl_only_version_newer_for_clients, none,
-      "%0 is only available in %1 %2 or newer; clients of %3 may have a lower"
-      " deployment target",
-      (const ValueDecl *, AvailabilityDomain, AvailabilityRange, ModuleDecl *))
-
-WARNING(availability_decl_only_version_newer_for_clients_warn, none,
-        "%0 is only available in %1 %2 or newer; clients of %3 may have a lower"
-        " deployment target",
-        (const ValueDecl *, AvailabilityDomain, AvailabilityRange,
-         ModuleDecl *))
+ERROR(availability_decl_only_in_for_clients, none,
+      "%0 is only available in %1%select{| %3 or newer}2"
+      "%select{|; clients of %4 may have a lower deployment target}2",
+      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange,
+       ModuleDecl *))
 
 ERROR(availability_opaque_types_only_version_newer, none,
       "'some' return types are only available in %0 %1 or newer",
@@ -6882,9 +6876,10 @@ FIXIT(insert_available_attr,
       "@available(%0 %1, *)\n%2",
       (StringRef, StringRef, StringRef))
 
-ERROR(availability_inout_accessor_only_version_newer, none,
-      "cannot pass as inout because %0 is only available in %1 %2 or newer",
-      (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
+ERROR(availability_inout_accessor_only_in, none,
+      "cannot pass as inout because %0 is only available in %1"
+      "%select{| %3 or newer}2",
+      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
 
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
@@ -8253,8 +8248,6 @@ ERROR(value_generic_unexpected,none,
       "using value generic %0 here is not allowed", (Type))
 ERROR(missing_value_generic_type,none,
       "value generic %0 must have an explicit value type declared", (Identifier))
-ERROR(value_generics_missing_feature,none,
-      "value generics require '-enable-experimental-feature ValueGenerics'", ())
 ERROR(availability_value_generic_type_only_version_newer, none,
       "values in generic types are only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
@@ -8375,6 +8368,15 @@ ERROR(invalid_function_conversion_with_non_sendable,none,
 NOTE(type_does_not_conform_to_Sendable,none,
      "type %0 does not conform to 'Sendable' protocol", (Type))
 
+//===----------------------------------------------------------------------===//
+//                            MARK: SwiftSettings
+//===----------------------------------------------------------------------===//
+
+ERROR(swift_settings_invalid_setting, none,
+      "Unrecognized setting passed to #SwiftSettings", ())
+
+ERROR(swift_settings_must_be_top_level, none,
+      "#SwiftSettings can only be invoked as a top level declaration", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

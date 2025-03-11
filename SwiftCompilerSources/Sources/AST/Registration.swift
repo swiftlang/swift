@@ -36,7 +36,6 @@ public func registerAST() {
   registerDecl(ExtensionDecl.self)
   registerDecl(TopLevelCodeDecl.self)
   registerDecl(ImportDecl.self)
-  registerDecl(PoundDiagnosticDecl.self)
   registerDecl(PrecedenceGroupDecl.self)
   registerDecl(MissingDecl.self)
   registerDecl(MissingMemberDecl.self)

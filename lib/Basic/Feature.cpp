@@ -69,6 +69,24 @@ std::optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
   }
 }
 
+bool swift::isFeatureAdoptable(Feature feature) {
+  switch (feature) {
+#define ADOPTABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)
+#define ADOPTABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  case Feature::FeatureName:
+#include "swift/Basic/Features.def"
+    return false;
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#define ADOPTABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)             \
+  case Feature::FeatureName:
+#define ADOPTABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)           \
+  case Feature::FeatureName:
+#include "swift/Basic/Features.def"
+    return true;
+  }
+}
+
 bool swift::includeInModuleInterface(Feature feature) {
   switch (feature) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \

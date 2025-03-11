@@ -195,6 +195,9 @@ public protocol SerialExecutor: Executor {
   @available(SwiftStdlib 6.0, *)
   func checkIsolated()
 
+  @available(SwiftStdlib 6.2, *)
+  func isIsolatingCurrentContext() -> Bool
+
 }
 
 @available(SwiftStdlib 6.0, *)
@@ -207,6 +210,16 @@ extension SerialExecutor {
     #else
     Builtin.int_trap()
     #endif
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension SerialExecutor {
+
+  @available(SwiftStdlib 6.2, *)
+  public func isIsolatingCurrentContext() -> Bool {
+    self.checkIsolated()
+    return true
   }
 }
 
@@ -465,6 +478,13 @@ internal func _task_serialExecutor_isSameExclusiveExecutionContext<E>(current cu
 internal func _task_serialExecutor_checkIsolated<E>(executor: E)
     where E: SerialExecutor {
   executor.checkIsolated()
+}
+
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("_task_serialExecutor_isIsolatingCurrentContext")
+internal func _task_serialExecutor_isIsolatingCurrentContext<E>(executor: E) -> Bool
+    where E: SerialExecutor {
+  return executor.isIsolatingCurrentContext()
 }
 
 /// Obtain the executor ref by calling the executor's `asUnownedSerialExecutor()`.

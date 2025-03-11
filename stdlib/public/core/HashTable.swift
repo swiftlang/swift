@@ -387,6 +387,7 @@ extension _HashTable {
         return unsafe Bucket(word: word, bit: bit)
       }
     }
+    fatalError()
   }
 
   @inlinable
@@ -414,6 +415,7 @@ extension _HashTable {
         return unsafe Bucket(word: word, bit: bit)
       }
     }
+    fatalError()
   }
 }
 

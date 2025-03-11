@@ -829,6 +829,7 @@ public:
   llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialTaskExecutorUnownedPreferenceTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialTaskExecutorOwnedPreferenceTaskOptionRecordTy;
+  llvm::StructType  *SwiftInitialTaskNameTaskOptionRecordTy;
   llvm::StructType  *SwiftResultTypeInfoTaskOptionRecordTy;
   llvm::PointerType *SwiftJobPtrTy;
   llvm::IntegerType *ExecutorFirstTy;
@@ -1521,6 +1522,8 @@ public:
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
   llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
+  llvm::Constant *
+  getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -1659,6 +1662,7 @@ public:
   llvm::Constant *getAddrOfCoroFunctionPointer(SILFunction *function);
   llvm::Constant *defineCoroFunctionPointer(LinkEntity entity,
                                             ConstantInit init);
+  SILFunction *getSILFunctionForCoroFunctionPointer(llvm::Constant *cfp);
 
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
                                          ForDefinition_t forDefinition);

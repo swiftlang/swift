@@ -230,6 +230,26 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Type layout string descriminator.
   PointerAuthSchema TypeLayoutString;
+
+  /// Like SwiftFunctionPointers but for use with CoroFunctionPointer values.
+  PointerAuthSchema CoroSwiftFunctionPointers;
+
+  /// Like SwiftClassMethods but for use with CoroFunctionPointer values.
+  PointerAuthSchema CoroSwiftClassMethods;
+
+  /// Like ProtocolWitnesses but for use with CoroFunctionPointer values.
+  PointerAuthSchema CoroProtocolWitnesses;
+
+  /// Like SwiftClassMethodPointers but for use with CoroFunctionPointer
+  /// values.
+  PointerAuthSchema CoroSwiftClassMethodPointers;
+
+  /// Like SwiftDynamicReplacements but for use with CoroFunctionPointer
+  /// values.
+  PointerAuthSchema CoroSwiftDynamicReplacements;
+
+  /// Like PartialApplyCapture but for use with CoroFunctionPointer values.
+  PointerAuthSchema CoroPartialApplyCapture;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -502,9 +522,6 @@ public:
   // Whether to emit typed malloc during coroutine frame allocation.
   unsigned EmitTypeMallocForCoroFrame : 1;
 
-  // Whether to use the yield_once ABI when emitting yield_once_2 coroutines.
-  unsigned EmitYieldOnce2AsYieldOnce : 1;
-
   // Whether to force emission of a frame for all async functions
   // (LLVM's 'frame-pointer=all').
   unsigned AsyncFramePointerAll : 1;
@@ -621,9 +638,9 @@ public:
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(false),
-        EmitYieldOnce2AsYieldOnce(true), AsyncFramePointerAll(false),
-        UseProfilingMarkerThunks(false), UseCoroCCX8664(false),
-        UseCoroCCArm64(false), DebugInfoForProfiling(false), CmdArgs(),
+        AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
+        UseCoroCCX8664(false), UseCoroCCArm64(false),
+        DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),

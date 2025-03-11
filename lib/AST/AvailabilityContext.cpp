@@ -44,58 +44,94 @@ static bool constrainRange(AvailabilityRange &existing,
   return true;
 }
 
-/// Returns true if `domain` is not already contained in `domainInfos` as an
-/// unavailable domain. Also, removes domains from `unavailableDomains` that are
-/// contained in `domain`.
-static bool shouldConstrainUnavailableDomains(
-    AvailabilityDomain domain,
-    llvm::SmallVectorImpl<AvailabilityContext::DomainInfo> &domainInfos) {
-  bool didRemove = false;
-  for (auto iter = domainInfos.rbegin(), end = domainInfos.rend(); iter != end;
-       ++iter) {
-    auto const &domainInfo = *iter;
-    auto existingDomain = domainInfo.getDomain();
+/// Returns true if `domainInfos` will be constrained by merging the domain
+/// availability represented by `otherDomainInfo`. Additionally, this function
+/// has a couple of side-effects:
+///
+///   - If any existing domain availability ought to be constrained by
+///     `otherDomainInfo` then that value will be updated in place.
+///   - If any existing value in `domainInfos` should be replaced when
+///     `otherDomainInfo` is added, then that existing value is removed
+///     and `otherDomainInfo` is appended to `domainInfosToAdd`.
+///
+static bool constrainDomainInfos(
+    AvailabilityContext::DomainInfo otherDomainInfo,
+    llvm::SmallVectorImpl<AvailabilityContext::DomainInfo> &domainInfos,
+    llvm::SmallVectorImpl<AvailabilityContext::DomainInfo> &domainInfosToAdd) {
+  bool isConstrained = false;
+  bool shouldAdd = true;
+  auto otherDomain = otherDomainInfo.getDomain();
+  auto end = domainInfos.rend();
 
-    if (!domainInfo.isUnavailable())
+  // Iterate over domainInfos in reverse order to allow items to be removed
+  // during iteration.
+  for (auto iter = domainInfos.rbegin(); iter != end; ++iter) {
+    auto &domainInfo = *iter;
+    auto domain = domainInfo.getDomain();
+
+    // We found an existing available range for the domain. Constrain it if
+    // necessary.
+    if (domain == otherDomain) {
+      shouldAdd = false;
+      isConstrained |= domainInfo.constrainRange(otherDomainInfo.getRange());
       continue;
+    }
 
-    // Check if the domain is already unavailable.
-    if (existingDomain.contains(domain)) {
-      ASSERT(!didRemove); // This would indicate that the context is malformed.
+    // Check whether an existing unavailable domain contains the domain that
+    // would be added. If so, there's nothing to do because the availability of
+    // the domain is already as constrained as it can be.
+    if (domainInfo.isUnavailable() && domain.contains(otherDomain)) {
+      DEBUG_ASSERT(!isConstrained);
       return false;
     }
 
-    // Check if the existing domain would be absorbed by the new domain.
-    if (domain.contains(existingDomain)) {
+    // If the domain that will be added is unavailable, check whether the
+    // existing domain is contained within it. If it is, availability for the
+    // existing domain should be removed because it has been superseded.
+    if (otherDomainInfo.isUnavailable() && otherDomain.contains(domain)) {
       domainInfos.erase((iter + 1).base());
-      didRemove = true;
+      isConstrained = true;
     }
   }
 
-  return true;
+  // If the new domain availability isn't already covered by an item in
+  // `domainInfos`, then it needs to be added. Defer adding the new domain
+  // availability until later when the entire set of domain infos can be
+  // re-sorted once.
+  if (shouldAdd) {
+    domainInfosToAdd.push_back(otherDomainInfo);
+    return true;
+  }
+
+  return isConstrained;
 }
 
+/// Constrains `domainInfos` by merging them with `otherDomainInfos`. Returns
+/// true if any changes were made to `domainInfos`.
 static bool constrainDomainInfos(
     llvm::SmallVectorImpl<AvailabilityContext::DomainInfo> &domainInfos,
     llvm::ArrayRef<AvailabilityContext::DomainInfo> otherDomainInfos) {
+  bool isConstrained = false;
   llvm::SmallVector<AvailabilityContext::DomainInfo, 4> domainInfosToAdd;
-
   for (auto otherDomainInfo : otherDomainInfos) {
-    if (otherDomainInfo.isUnavailable())
-      if (shouldConstrainUnavailableDomains(otherDomainInfo.getDomain(),
-                                            domainInfos))
-        domainInfosToAdd.push_back(otherDomainInfo);
+    isConstrained |=
+        constrainDomainInfos(otherDomainInfo, domainInfos, domainInfosToAdd);
   }
 
-  if (domainInfosToAdd.size() < 1)
+  if (!isConstrained)
     return false;
 
-  // Add the candidate domain and then re-sort.
+  // Add the new domains and then re-sort.
   for (auto domainInfo : domainInfosToAdd)
     domainInfos.push_back(domainInfo);
 
   llvm::sort(domainInfos, AvailabilityDomainInfoComparator());
   return true;
+}
+
+bool AvailabilityContext::DomainInfo::constrainRange(
+    const AvailabilityRange &otherRange) {
+  return ::constrainRange(range, otherRange);
 }
 
 AvailabilityContext
@@ -119,6 +155,23 @@ AvailabilityContext::forDeploymentTarget(const ASTContext &ctx) {
 
 AvailabilityRange AvailabilityContext::getPlatformRange() const {
   return storage->platformRange;
+}
+
+std::optional<AvailabilityRange>
+AvailabilityContext::getAvailabilityRange(AvailabilityDomain domain,
+                                          const ASTContext &ctx) const {
+  DEBUG_ASSERT(domain.supportsContextRefinement());
+
+  if (domain.isActiveForTargetPlatform(ctx)) {
+    return storage->platformRange;
+  }
+
+  for (auto domainInfo : storage->getDomainInfos()) {
+    if (domain == domainInfo.getDomain() && !domainInfo.isUnavailable())
+      return domainInfo.getRange();
+  }
+
+  return std::nullopt;
 }
 
 bool AvailabilityContext::isUnavailable() const {
@@ -162,14 +215,30 @@ void AvailabilityContext::constrainWithContext(const AvailabilityContext &other,
 }
 
 void AvailabilityContext::constrainWithPlatformRange(
-    const AvailabilityRange &otherPlatformRange, const ASTContext &ctx) {
-
+    const AvailabilityRange &range, const ASTContext &ctx) {
   auto platformRange = storage->platformRange;
-  if (!constrainRange(platformRange, otherPlatformRange))
+  if (!constrainRange(platformRange, range))
     return;
 
   storage = Storage::get(platformRange, storage->isDeprecated,
                          storage->getDomainInfos(), ctx);
+}
+
+void AvailabilityContext::constrainWithAvailabilityRange(
+    const AvailabilityRange &range, AvailabilityDomain domain,
+    const ASTContext &ctx) {
+
+  if (domain.isActiveForTargetPlatform(ctx)) {
+    constrainWithPlatformRange(range, ctx);
+    return;
+  }
+
+  auto domainInfos = storage->copyDomainInfos();
+  if (!constrainDomainInfos(domainInfos, {DomainInfo(domain, range)}))
+    return;
+
+  storage = Storage::get(storage->platformRange, storage->isDeprecated,
+                         domainInfos, ctx);
 }
 
 void AvailabilityContext::constrainWithUnavailableDomain(
@@ -196,6 +265,9 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
   bool isDeprecated = storage->isDeprecated;
   isConstrained |= constrainBool(isDeprecated, decl->isDeprecated());
 
+  // Compute the availability constraints for the decl when used in this context
+  // and then map those constraints to domain infos. The result will be merged
+  // into the existing domain infos for this context.
   llvm::SmallVector<DomainInfo, 4> declDomainInfos;
   AvailabilityConstraintFlags flags =
       AvailabilityConstraintFlag::SkipEnclosingExtension;
@@ -211,12 +283,13 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
       declDomainInfos.push_back(DomainInfo::unavailable(domain));
       break;
     case AvailabilityConstraint::Reason::PotentiallyUnavailable:
-      DEBUG_ASSERT(domain.isPlatform());
-      if (domain.isPlatform())
-        isConstrained |=
-            constrainRange(platformRange, attr.getIntroducedRange(ctx));
-      // FIXME: [availability] Store other potentially unavailable domains in
-      // domainInfos.
+      if (auto introducedRange = attr.getIntroducedRange(ctx)) {
+        if (domain.isActiveForTargetPlatform(ctx)) {
+          isConstrained |= constrainRange(platformRange, *introducedRange);
+        } else {
+          declDomainInfos.push_back({domain, *introducedRange});
+        }
+      }
       break;
     }
   }
@@ -284,14 +357,36 @@ void AvailabilityContext::print(llvm::raw_ostream &os) const {
 
 void AvailabilityContext::dump() const { print(llvm::errs()); }
 
-bool AvailabilityContext::verify(const ASTContext &ctx) const {
-  // Domain infos must be sorted to ensure folding set node lookups yield
-  // consistent results.
-  if (!llvm::is_sorted(storage->getDomainInfos(),
-                       AvailabilityDomainInfoComparator()))
-    return false;
+bool verifyDomainInfos(
+    llvm::ArrayRef<AvailabilityContext::DomainInfo> domainInfos) {
+  // Checks that the following invariants hold:
+  //   - The domain infos are sorted using AvailabilityDomainInfoComparator.
+  //   - There is not more than one info per-domain.
+  if (domainInfos.empty())
+    return true;
+
+  AvailabilityDomainInfoComparator compare;
+  auto prev = domainInfos.begin();
+  auto next = prev;
+  auto end = domainInfos.end();
+  for (++next; next != end; prev = next, ++next) {
+    const auto &prevInfo = *prev;
+    const auto &nextInfo = *next;
+
+    if (compare(nextInfo, prevInfo))
+      return false;
+
+    // Since the infos are sorted by domain, infos with the same domain should
+    // be adjacent.
+    if (prevInfo.getDomain() == nextInfo.getDomain())
+      return false;
+  }
 
   return true;
+}
+
+bool AvailabilityContext::verify(const ASTContext &ctx) const {
+  return verifyDomainInfos(storage->getDomainInfos());
 }
 
 void AvailabilityContext::Storage::Profile(

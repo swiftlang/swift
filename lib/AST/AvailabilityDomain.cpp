@@ -76,6 +76,19 @@ bool AvailabilityDomain::isVersioned() const {
   }
 }
 
+bool AvailabilityDomain::supportsContextRefinement() const {
+  switch (getKind()) {
+  case Kind::Universal:
+  case Kind::Embedded:
+  case Kind::SwiftLanguage:
+  case Kind::PackageDescription:
+    return false;
+  case Kind::Platform:
+  case Kind::Custom:
+    return true;
+  }
+}
+
 bool AvailabilityDomain::supportsQueries() const {
   switch (getKind()) {
   case Kind::Universal:
@@ -103,6 +116,17 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
     // the future someone might want to define a domain but leave it inactive.
     return true;
   }
+}
+
+bool AvailabilityDomain::isActiveForTargetPlatform(
+    const ASTContext &ctx) const {
+  if (isPlatform()) {
+    if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx)) {
+      auto compatibleDomain = targetDomain->getABICompatibilityDomain();
+      return compatibleDomain.contains(*this);
+    }
+  }
+  return false;
 }
 
 static std::optional<llvm::VersionTuple>
