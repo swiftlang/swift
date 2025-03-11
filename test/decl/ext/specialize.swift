@@ -32,6 +32,21 @@ extension IntFoo where U == Int {
 
 Foo(x: "test", y: 1).hello() // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
 
+
+struct Field<Tag,Value> {
+  let tag: Tag
+  let value: Value
+}
+
+typealias IntField<Tag> = Field<Tag,Int>
+
+extension IntField {
+  func adding(_ value: Int) -> Self {
+    Field(tag: tag, value: self.value + value)
+  }
+}
+
+
 struct MyType<TyA, TyB> {
   var a : TyA, b : TyB
 }
