@@ -5282,7 +5282,10 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
       llvm_unreachable("protocol cannot have erased isolation");
 
     case ActorIsolation::GlobalActor:
-      if (!foundIsolation) {
+      // If we encountered an explicit globally isolated conformance, allow it
+      // to override the nonisolated isolation kind.
+      if (!foundIsolation ||
+          conformance->getSourceKind() == ConformanceEntryKind::Explicit) {
         foundIsolation = {
           protoIsolation,
           IsolationSource(proto, IsolationSource::Conformance)
