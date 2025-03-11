@@ -29,13 +29,12 @@ public:
     this->callback(Info);
   }
 };
-} // end anonymous namespace
 
-static void diagnosticBehaviorTestCase(
-    llvm::function_ref<void(DiagnosticEngine &)> diagnose,
-    llvm::function_ref<void(DiagnosticEngine &, const DiagnosticInfo &)>
-        callback,
-    unsigned expectedNumCallbackCalls) {
+static void
+testCase(llvm::function_ref<void(DiagnosticEngine &)> diagnose,
+         llvm::function_ref<void(DiagnosticEngine &, const DiagnosticInfo &)>
+             callback,
+         unsigned expectedNumCallbackCalls) {
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
 
@@ -55,7 +54,7 @@ static void diagnosticBehaviorTestCase(
 }
 
 TEST(DiagnosticBehavior, WarnUntilSwiftLangMode) {
-  diagnosticBehaviorTestCase(
+  testCase(
       [](DiagnosticEngine &diags) {
         diags.setLanguageVersion(version::Version({5}));
         diags.diagnose(SourceLoc(), diag::error_immediate_mode_missing_stdlib)
@@ -69,7 +68,7 @@ TEST(DiagnosticBehavior, WarnUntilSwiftLangMode) {
       },
       /*expectedNumCallbackCalls=*/1);
 
-  diagnosticBehaviorTestCase(
+  testCase(
       [](DiagnosticEngine &diags) {
         diags.setLanguageVersion(version::Version({4}));
         diags.diagnose(SourceLoc(), diag::error_immediate_mode_missing_stdlib)
@@ -87,7 +86,7 @@ TEST(DiagnosticBehavior, WarnUntilSwiftLangMode) {
       },
       /*expectedNumCallbackCalls=*/1);
 
-  diagnosticBehaviorTestCase(
+  testCase(
       [](DiagnosticEngine &diags) {
         diags.setLanguageVersion(version::Version({4}));
         diags.diagnose(SourceLoc(), diag::error_immediate_mode_missing_stdlib)
@@ -106,3 +105,5 @@ TEST(DiagnosticBehavior, WarnUntilSwiftLangMode) {
       },
       /*expectedNumCallbackCalls=*/1);
 }
+
+} // end anonymous namespace
