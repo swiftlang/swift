@@ -1242,6 +1242,22 @@ extension ContiguousArray {
     return try unsafe body(&inoutBufferPointer)
   }
 
+  @available(SwiftStdlib 6.2, *)
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(/*inout*/borrow self)
+    @_alwaysEmitIntoClient
+    mutating get {
+      _makeMutableAndUnique()
+      // NOTE: We don't have the ability to schedule a call to
+      //       ContiguousArrayBuffer.endCOWMutation().
+      //       rdar://146785284 (lifetime analysis for end of mutation)
+      let pointer = unsafe _buffer.firstElementAddress
+      let count = _buffer.mutableCount
+      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, mutating: &self)
+    }
+  }
+
   @inlinable
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
