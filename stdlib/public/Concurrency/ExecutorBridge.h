@@ -23,15 +23,17 @@ namespace swift {
 extern "C" SWIFT_CC(swift)
 SerialExecutorRef swift_getMainExecutor();
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 extern "C" SWIFT_CC(swift)
-void *swift_createDispatchEvent(void (^handler)());
+void *swift_createDispatchEventC(void (*handler)(void *), void *context);
 
 extern "C" SWIFT_CC(swift)
-void swift_destroyDispatchEvent(void *event);
+void swift_destroyDispatchEventC(void *event);
 
 extern "C" SWIFT_CC(swift)
 void swift_signalDispatchEvent(void *event);
-
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
+ 
 extern "C" SWIFT_CC(swift) __attribute__((noreturn))
 void swift_dispatchMain();
 
