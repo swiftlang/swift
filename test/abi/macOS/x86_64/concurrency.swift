@@ -401,6 +401,13 @@ Added: _$ss27ThrowingDiscardingTaskGroupV05startC28SynchronouslyUnlessCancelled4
 
 Added: _swift_task_startSynchronously
 
+Added: _swift_task_invokeSwiftIsIsolatingCurrentContext
+Added: _swift_task_isIsolatingCurrentContext
+Added: _swift_task_isIsolatingCurrentContext_hook
+Added: _$sScf25isIsolatingCurrentContextSbyFTj
+Added: _$sScf25isIsolatingCurrentContextSbyFTq
+Added: _$sScfsE25isIsolatingCurrentContextSbyF
+
 // add callee-allocated coro entrypoints
 // TODO: CoroutineAccessors: several of these symbols should be in swiftCore
 Added: __swift_coro_malloc_allocator
