@@ -447,10 +447,12 @@ extension Float80: CVarArg, _CVarArgAligned {
 // runtime.
 @_fixed_layout
 @usableFromInline // c-abi
+@unsafe
 final internal class __VaListBuilder {
   #if arch(x86_64) || arch(s390x)
   @frozen // c-abi
   @usableFromInline
+  @safe
   internal struct Header {
     @usableFromInline // c-abi
     internal var gp_offset = CUnsignedInt(0)
@@ -468,21 +470,27 @@ final internal class __VaListBuilder {
   #endif
 
   @usableFromInline // c-abi
+  @safe
   internal var gpRegistersUsed = 0
+
   @usableFromInline // c-abi
+  @safe
   internal var fpRegistersUsed = 0
 
   #if arch(x86_64) || arch(s390x)
   @usableFromInline // c-abi
+  @safe
   final  // Property must be final since it is used by Builtin.addressof.
   internal var header = Header()
   #endif
 
   @usableFromInline // c-abi
+  @safe
   internal var storage: ContiguousArray<Int>
 
 #if !_runtime(_ObjC)
   @usableFromInline // c-abi
+  @safe
   internal var retainer = [CVarArg]()
 #endif
 
@@ -560,9 +568,9 @@ final internal class __VaListBuilder {
   internal func va_list() -> CVaListPointer {
     #if arch(x86_64) || arch(s390x)
       header.reg_save_area = storage._baseAddress
-      header.overflow_arg_area
+      unsafe header.overflow_arg_area
         = storage._baseAddress + _registerSaveWords
-      return CVaListPointer(
+      return unsafe CVaListPointer(
                _fromUnsafeMutablePointer: UnsafeMutableRawPointer(
                  Builtin.addressof(&self.header)))
     #elseif arch(arm64)
