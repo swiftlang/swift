@@ -129,9 +129,15 @@ bool BindingSet::isDelayed() const {
       if (Bindings.empty())
         return true;
 
-
-      if (Bindings[0].BindingType->is<ProtocolType>())
-        return true;
+      if (Bindings[0].BindingType->is<ProtocolType>()) {
+        auto *locator = Bindings[0].getLocator();
+        // If the binding got inferred from a contextual type
+        // this set shouldn't be delayed because there won't
+        // be any other inference sources for this leading-dot
+        // syntax member.
+        if (!locator->findLast<LocatorPathElt::ContextualType>())
+          return true;
+      }
     }
 
     // Since force unwrap preserves l-valueness, resulting
