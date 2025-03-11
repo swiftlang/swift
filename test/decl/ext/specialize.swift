@@ -30,7 +30,7 @@ extension IntFoo where U == Int {
   }
 }
 
-Foo(x: "test", y: 1).hello()
+Foo(x: "test", y: 1).hello() // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
 
 struct MyType<TyA, TyB> {
   var a : TyA, b : TyB
