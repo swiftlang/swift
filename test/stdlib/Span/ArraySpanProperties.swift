@@ -34,6 +34,20 @@ suite.test("Array.span property")
   expectEqual(span[0], a[0])
 }
 
+suite.test("Array.mutableSpan property")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let capacity = 4
+  var a = Array(0..<capacity)
+  var span = a.mutableSpan
+  expectEqual(span.count, capacity)
+  expectEqual(span[0], 0)
+  span[0] = 100
+  _ = consume span
+  expectEqual(a[0], 100)
+}
+
 suite.test("ContiguousArray.span property")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
@@ -47,6 +61,20 @@ suite.test("ContiguousArray.span property")
   let span = a.span
   expectEqual(span.count, capacity)
   expectEqual(span[0], a[0])
+}
+
+suite.test("ContiguousArray.mutableSpan property")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let capacity = 4
+  var a = ContiguousArray(0..<capacity)
+  var span = a.mutableSpan
+  expectEqual(span.count, capacity)
+  expectEqual(span[0], 0)
+  span[0] = 100
+  _ = consume span
+  expectEqual(a[0], 100)
 }
 
 suite.test("ArraySlice.span property")
@@ -71,4 +99,23 @@ suite.test("ArraySlice.span property")
   let i1 = span1.withUnsafeBufferPointer { Int(bitPattern: $0.baseAddress) }
   let i2 = span1.withUnsafeBufferPointer { Int(bitPattern: $0.baseAddress) }
   expectEqual(i1, i2)
+}
+
+suite.test("ArraySlice.mutableSpan property")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let capacity = 4
+  let a = Array(0..<capacity)
+
+  var s = a[...]
+  var span = s.mutableSpan
+  expectEqual(span.count, capacity)
+  expectEqual(span[0], a[0])
+
+  span[0] += 100
+  expectEqual(span[0], a[0]+100)
+
+  _ = consume span
+  expectEqual(s[0], a[0]+100)
 }
