@@ -36,6 +36,7 @@ public protocol Executor: AnyObject, Sendable {
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
+  #if !$Embedded
   // The functions below could have been added to a separate protocol,
   // but doing that would then mean doing an `as?` cast in e.g.
   // enqueueOnGlobalExecutor (in ExecutorBridge.swift), which is
@@ -44,6 +45,7 @@ public protocol Executor: AnyObject, Sendable {
   /// `true` if this is the main executor.
   @available(SwiftStdlib 6.2, *)
   var isMainExecutor: Bool { get }
+  #endif
 
   /// `true` if this Executor supports scheduling.
   ///
@@ -116,10 +118,12 @@ extension Executor where Self: Equatable {
 // Delay support
 extension Executor {
 
+  #if !$Embedded
   // This defaults to `false` so that existing third-party Executor
   // implementations will work as expected.
   @available(SwiftStdlib 6.2, *)
   public var isMainExecutor: Bool { false }
+  #endif
 
   // This defaults to `false` so that existing third-party TaskExecutor
   // implementations will work as expected.
@@ -327,8 +331,10 @@ public protocol SerialExecutor: Executor {
 @available(SwiftStdlib 6.0, *)
 extension SerialExecutor {
 
+  #if !$Embedded
   @available(SwiftStdlib 6.2, *)
   public var isMainExecutor: Bool { return MainActor.executor._isSameExecutor(self) }
+  #endif
 
   @available(SwiftStdlib 6.0, *)
   public func checkIsolated() {
@@ -578,9 +584,11 @@ public protocol MainExecutor: RunLoopExecutor, SerialExecutor, EventableExecutor
 /// executors.
 @available(SwiftStdlib 6.2, *)
 public protocol ExecutorFactory {
+  #if !$Embedded
   /// Constructs and returns the main executor, which is started implicitly
   /// by the `async main` entry point and owns the "main" thread.
   static var mainExecutor: any MainExecutor { get }
+  #endif
 
   /// Constructs and returns the default or global executor, which is the
   /// default place in which we run tasks.
@@ -590,10 +598,13 @@ public protocol ExecutorFactory {
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_createExecutors")
 public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
+  #if !$Embedded
   MainActor._executor = factory.mainExecutor
+  #endif
   Task._defaultExecutor = factory.defaultExecutor
 }
 
+#if !$Embedded
 extension MainActor {
   @available(SwiftStdlib 6.2, *)
   static var _executor: (any MainExecutor)? = nil
@@ -611,6 +622,7 @@ extension MainActor {
     return _executor!
   }
 }
+#endif // !$Embedded
 
 extension Task where Success == Never, Failure == Never {
   @available(SwiftStdlib 6.2, *)
