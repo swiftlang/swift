@@ -449,6 +449,12 @@ void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
 }
 
 SWIFT_CC(swift)
+bool swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
+  return swift_executor_invokeSwiftIsIsolatingCurrentContext(executor);
+}
+
+
+SWIFT_CC(swift)
 SwiftExecutorRef swift_task_getMainExecutorImpl() {
   return swift_executor_ordinary(
            reinterpret_cast<SwiftHeapObject*>(&_dispatch_main_q),
