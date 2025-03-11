@@ -1576,8 +1576,8 @@ internal func _getCurrentTaskName() -> UnsafePointer<UInt8>?
 
 @available(SwiftStdlib 6.2, *)
 internal func _getCurrentTaskNameString() -> String? {
-  if let stringPtr = _getCurrentTaskName() {
-    String(cString: stringPtr)
+  if let stringPtr = unsafe _getCurrentTaskName() {
+    unsafe String(cString: stringPtr)
   } else {
     nil
   }

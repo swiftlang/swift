@@ -3974,7 +3974,8 @@ bool CompilerInvocation::parseArgs(
                      "-Ounchecked");
     }
 
-    if (!LangOpts.EnableAccessControl) {
+    if (!LangOpts.EnableAccessControl &&
+        FrontendOpts.ModuleName != SWIFT_ONONE_SUPPORT) {
       Diags.diagnose(SourceLoc(),
                      diag::command_line_conflicts_with_strict_safety,
                      "-disable-access-control");
