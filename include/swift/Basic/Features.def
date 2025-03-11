@@ -508,6 +508,9 @@ EXPERIMENTAL_FEATURE(ExtensibleEnums, true)
 /// Allow isolated conformances.
 EXPERIMENTAL_FEATURE(IsolatedConformances, true)
 
+/// Allow SwiftSettings
+EXPERIMENTAL_FEATURE(SwiftSettings, false)
+
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 

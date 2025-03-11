@@ -57,6 +57,7 @@ split_embedded_sources(
   EMBEDDED CollectionAlgorithms.swift
   EMBEDDED Comparable.swift
   EMBEDDED CompilerProtocols.swift
+  EMBEDDED SwiftSettings.swift
   EMBEDDED Sendable.swift
   EMBEDDED ContiguousArray.swift
   EMBEDDED ContiguouslyStored.swift
