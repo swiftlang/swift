@@ -553,6 +553,11 @@ BridgedSubstitutionMap BridgedConformance::getSpecializedSubstitutions() const {
   return {specPC->getSubstitutionMap()};
 }
 
+BridgedConformance BridgedConformance::getAssociatedConformance(BridgedASTType assocType, BridgedDeclObj proto) const {
+  return {unbridged().getConcrete()->getAssociatedConformance(assocType.unbridged(),
+                                                              proto.getAs<swift::ProtocolDecl>())};
+}
+
 BridgedConformance BridgedConformanceArray::getAt(SwiftInt index) const {
   return pcArray.unbridged<swift::ProtocolConformanceRef>()[index];
 }
