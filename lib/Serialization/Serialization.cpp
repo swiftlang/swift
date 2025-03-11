@@ -5130,6 +5130,9 @@ public:
         case BuiltinMacroKind::IsolationMacro:
           builtinID = 2;
           break;
+        case BuiltinMacroKind::SwiftSettingsMacro:
+          builtinID = 3;
+          break;
         }
         break;
       }
