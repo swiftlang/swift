@@ -35,7 +35,7 @@ using namespace swift;
 
 LangOptions::LangOptions() {
   // Add all promoted language features
-#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   this->enableFeature(Feature::FeatureName);
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
@@ -295,18 +295,18 @@ bool LangOptions::isCustomConditionalCompilationFlagSet(StringRef Name) const {
 }
 
 bool LangOptions::FeatureState::isEnabled() const {
-  return this->state != FeatureState::Off;
+  return this->state == FeatureState::Kind::Enabled;
 }
 
 bool LangOptions::FeatureState::isEnabledForAdoption() const {
   ASSERT(isFeatureAdoptable(this->feature) &&
          "You forgot to make the feature adoptable!");
 
-  return this->state == FeatureState::EnabledForAdoption;
+  return this->state == FeatureState::Kind::EnabledForAdoption;
 }
 
 LangOptions::FeatureStateStorage::FeatureStateStorage()
-    : states(numFeatures(), FeatureState::Off) {}
+    : states(numFeatures(), FeatureState::Kind::Off) {}
 
 void LangOptions::FeatureStateStorage::setState(Feature feature,
                                                 FeatureState::Kind state) {
@@ -329,7 +329,7 @@ LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
 
   if (auto version = getFeatureLanguageVersion(feature)) {
     if (this->isSwiftVersionAtLeast(*version)) {
-      return FeatureState(feature, FeatureState::Enabled);
+      return FeatureState(feature, FeatureState::Kind::Enabled);
     }
   }
 
@@ -348,7 +348,7 @@ bool LangOptions::hasFeature(Feature feature) const {
 
 bool LangOptions::hasFeature(llvm::StringRef featureName) const {
   auto feature = llvm::StringSwitch<std::optional<Feature>>(featureName)
-#define LANGUAGE_FEATURE(FeatureName, IsAdoptable, SENumber, Description)      \
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
                      .Default(std::nullopt);
@@ -361,14 +361,15 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
 void LangOptions::enableFeature(Feature feature, bool forAdoption) {
   if (forAdoption) {
     ASSERT(isFeatureAdoptable(feature));
-    this->featureStates.setState(feature, FeatureState::EnabledForAdoption);
+    this->featureStates.setState(feature,
+                                 FeatureState::Kind::EnabledForAdoption);
   } else {
-    this->featureStates.setState(feature, FeatureState::Enabled);
+    this->featureStates.setState(feature, FeatureState::Kind::Enabled);
   }
 }
 
 void LangOptions::disableFeature(Feature feature) {
-  this->featureStates.setState(feature, FeatureState::Off);
+  this->featureStates.setState(feature, FeatureState::Kind::Off);
 }
 
 void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
