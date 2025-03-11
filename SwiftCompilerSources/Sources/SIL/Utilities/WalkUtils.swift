@@ -376,19 +376,12 @@ extension ValueDefUseWalker {
       // accordingly.
       switch (urc.type.isOptional, urc.fromInstance.type.isOptional) {
         case (true, false):
-          if walkDownUses(ofValue: urc, path: path.push(.enumCase, index: 0)) == .abortWalk {
-            return .abortWalk
-          }
           return walkDownUses(ofValue: urc, path: path.push(.enumCase, index: 1))
         case (false, true):
-          if let path = path.popIfMatches(.enumCase, index: 0) {
-            if walkDownUses(ofValue: urc, path: path) == .abortWalk {
-              return .abortWalk
-            } else if let path = path.popIfMatches(.enumCase, index: 1) {
-              return walkDownUses(ofValue: urc, path: path)
-            }
+          if let path = path.popIfMatches(.enumCase, index: 1) {
+            return walkDownUses(ofValue: urc, path: path)
           }
-          return .abortWalk
+          return unmatchedPath(value: operand, path: path)
         default:
           return walkDownUses(ofValue: urc, path: path)
       }
@@ -726,20 +719,12 @@ extension ValueUseDefWalker {
       // accordingly.
       switch (urc.type.isOptional, urc.fromInstance.type.isOptional) {
         case (true, false):
-          if let path = path.popIfMatches(.enumCase, index: 0) {
-            if walkUp(value: urc.fromInstance, path: path) == .abortWalk {
-              return .abortWalk
-            } else if let path = path.popIfMatches(.enumCase, index: 1) {
-              return walkUp(value: urc.fromInstance, path: path)
-            }
+          if let path = path.popIfMatches(.enumCase, index: 1) {
+            return walkUp(value: urc.fromInstance, path: path)
           }
-          return .abortWalk
+          return unmatchedPath(value: urc.fromInstance, path: path)
         case (false, true):
-          if walkUp(value: urc.fromInstance, path: path.push(.enumCase, index: 0)) == .abortWalk {
-            return .abortWalk
-          } else {
-            return walkUp(value: urc.fromInstance, path: path.push(.enumCase, index: 1))
-          }
+          return walkUp(value: urc.fromInstance, path: path.push(.enumCase, index: 1))
         default:
           return walkUp(value: urc.fromInstance, path: path)
       }
