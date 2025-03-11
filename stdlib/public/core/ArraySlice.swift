@@ -1300,6 +1300,18 @@ extension ArraySlice {
     return try unsafe body(&inoutBufferPointer)
   }
 
+  @available(SwiftStdlib 6.2, *)
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(/*inout*/borrow self)
+    @_alwaysEmitIntoClient
+    mutating get {
+      _makeMutableAndUnique()
+      let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
+      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      return unsafe _overrideLifetime(span, mutating: &self)
+    }
+  }
+
   @inlinable
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
