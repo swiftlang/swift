@@ -3434,9 +3434,6 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (!DInstLine || (ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
 
-  if (VarInfo.Name == "index")
-    llvm::errs();
-
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
