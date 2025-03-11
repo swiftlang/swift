@@ -55,6 +55,7 @@ class ExecutorBreadcrumb;
 
 struct LValueOptions {
   bool IsNonAccessing = false;
+  bool TryAddressable = false;
 
   /// Derive options for accessing the base of an l-value, given that
   /// applying the derived component might touch the memory.
@@ -63,7 +64,6 @@ struct LValueOptions {
 
     // Assume we're going to access the base.
     copy.IsNonAccessing = false;
-
     return copy;
   }
 
@@ -71,6 +71,12 @@ struct LValueOptions {
   /// applying the derived component will not touch the memory.
   LValueOptions forProjectedBaseLValue() const {
     auto copy = *this;
+    return copy;
+  }
+  
+  LValueOptions withAddressable(bool addressable) const {
+    auto copy = *this;
+    copy.TryAddressable = addressable;
     return copy;
   }
 };
@@ -466,24 +472,81 @@ public:
     /// an inout value, or constant emitted to an alloc_stack).
     SILValue box;
     
-    /// True if the `value` represents the memory location of a value that is
-    /// stable for the lifetimes of any dependencies on that value.
-    bool addressable;
-
-    static VarLoc get(SILValue value, SILValue box = SILValue(),
-                      bool addressable = false) {
-      VarLoc Result;
-      Result.value = value;
-      Result.box = box;
-      Result.addressable = addressable;
-      return Result;
-    }
+    /// What kind of access enforcement should be used to access the variable,
+    /// or `Unknown` if it's known to be immutable.
+    SILAccessEnforcement access;
+    
+    /// A structure used for bookkeeping the on-demand formation and cleanup
+    /// of an addressable representation for an immutable value binding.
+    struct AddressableBuffer {
+      struct State {
+        // If the value needs to be reabstracted to provide an addressable
+        // representation, this SILValue owns the reabstracted representation.
+        SILValue reabstraction = SILValue();
+        // The stack allocation for the addressable representation.
+        SILValue allocStack = SILValue();
+        // The initiation of the in-memory borrow.
+        SILValue storeBorrow = SILValue();
+        
+        State(SILValue reabstraction,
+              SILValue allocStack,
+              SILValue storeBorrow)
+          : reabstraction(reabstraction), allocStack(allocStack),
+            storeBorrow(storeBorrow)
+        {}
+      };
+      
+      std::unique_ptr<State> state = nullptr;
+      
+      // If the variable cleanup is triggered before the addressable
+      // representation is demanded, but the addressable representation
+      // gets demanded later, we save the insertion points where the
+      // representation would be cleaned up so we can backfill them.
+      llvm::SmallVector<SILInstruction*, 1> cleanupPoints;
+      
+      AddressableBuffer() = default;
+      
+      AddressableBuffer(AddressableBuffer &&other)
+        : state(std::move(other.state))
+      {
+        cleanupPoints.swap(other.cleanupPoints);
+      }
+      
+      AddressableBuffer &operator=(AddressableBuffer &&other) {
+        state = std::move(other.state);
+        cleanupPoints.swap(other.cleanupPoints);
+        return *this;
+      }
+      
+      ~AddressableBuffer();
+    };
+    AddressableBuffer addressableBuffer;
+    
+    VarLoc() = default;
+    
+    VarLoc(SILValue value, SILAccessEnforcement access,
+           SILValue box = SILValue())
+      : value(value), box(box), access(access)
+    {}
   };
   
   /// VarLocs - Entries in this map are generated when a PatternBindingDecl is
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
+  
+  /// Establish the scope for the addressable buffer that might be allocated
+  /// for a local variable binding.
+  ///
+  /// This must be enclosed within the scope of the value binding for the
+  /// variable, and cover the scope in which the variable can be referenced.
+  void enterLocalVariableAddressableBufferScope(VarDecl *decl);
+  
+  /// Get a stable address which is suitable for forming dependent pointers
+  /// if possible.
+  SILValue getLocalVariableAddressableBuffer(VarDecl *decl,
+                                             SILLocation loc,
+                                             ValueOwnership ownership);
 
   /// The local auxiliary declarations for the parameters of this function that
   /// need to be emitted inside the next brace statement.
