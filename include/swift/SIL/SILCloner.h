@@ -383,7 +383,7 @@ public:
     return numScalarElements == 1;
   }
 
-  void remapRootOpenedType(CanOpenedArchetypeType archetypeTy) {
+  void remapRootOpenedType(CanExistentialArchetypeType archetypeTy) {
     auto *origEnv = archetypeTy->getGenericEnvironment();
 
     auto genericSig = origEnv->getGenericSignature();

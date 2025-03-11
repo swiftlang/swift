@@ -51,7 +51,7 @@ namespace swift {
   class ValueDecl;
   class Decl;
   class DeclRefExpr;
-  class OpenedArchetypeType;
+  class ExistentialArchetypeType;
   class ParamDecl;
   class Pattern;
   class SubscriptDecl;
@@ -3013,7 +3013,7 @@ public:
 
   /// Retrieve the opened archetype, which can only be referenced
   /// within this expression's subexpression.
-  OpenedArchetypeType *getOpenedArchetype() const;
+  ExistentialArchetypeType *getOpenedArchetype() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OpenExistential;

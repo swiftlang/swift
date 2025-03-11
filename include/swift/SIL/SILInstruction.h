@@ -7773,7 +7773,7 @@ public:
 
   OpenedExistentialAccess getAccessKind() const { return ForAccess; }
 
-  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+  CanExistentialArchetypeType getDefinedOpenedArchetype() const {
     const auto archetype = getOpenedArchetypeOf(getType().getASTType());
     assert(archetype && archetype->isRoot() &&
            "Type should be a root opened archetype");
@@ -7794,7 +7794,7 @@ class OpenExistentialValueInst
                            ValueOwnershipKind forwardingOwnershipKind);
 
 public:
-  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+  CanExistentialArchetypeType getDefinedOpenedArchetype() const {
     const auto archetype = getOpenedArchetypeOf(getType().getASTType());
     assert(archetype && archetype->isRoot() &&
            "Type should be a root opened archetype");
@@ -7815,7 +7815,7 @@ class OpenExistentialRefInst
                          ValueOwnershipKind forwardingOwnershipKind);
 
 public:
-  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+  CanExistentialArchetypeType getDefinedOpenedArchetype() const {
     const auto archetype = getOpenedArchetypeOf(getType().getASTType());
     assert(archetype && archetype->isRoot() &&
            "Type should be a root opened archetype");
@@ -7837,7 +7837,7 @@ class OpenExistentialMetatypeInst
                               SILType ty);
 
 public:
-  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+  CanExistentialArchetypeType getDefinedOpenedArchetype() const {
     const auto archetype = getOpenedArchetypeOf(getType().getASTType());
     assert(archetype && archetype->isRoot() &&
            "Type should be a root opened archetype");
@@ -7858,7 +7858,7 @@ class OpenExistentialBoxInst
                          SILType ty);
 
 public:
-  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+  CanExistentialArchetypeType getDefinedOpenedArchetype() const {
     const auto archetype = getOpenedArchetypeOf(getType().getASTType());
     assert(archetype && archetype->isRoot() &&
            "Type should be a root opened archetype");
@@ -7879,7 +7879,7 @@ class OpenExistentialBoxValueInst
                               ValueOwnershipKind forwardingOwnershipKind);
 
 public:
-  CanOpenedArchetypeType getDefinedOpenedArchetype() const {
+  CanExistentialArchetypeType getDefinedOpenedArchetype() const {
     const auto archetype = getOpenedArchetypeOf(getType().getASTType());
     assert(archetype && archetype->isRoot() &&
            "Type should be a root opened archetype");

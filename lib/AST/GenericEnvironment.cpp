@@ -451,7 +451,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     // FIXME: The existential layout's protocols might differ from the
     // canonicalized set of protocols determined by the generic signature.
     // Before NestedArchetypeType was removed, we used the former when
-    // building a root OpenedArchetypeType, and the latter when building
+    // building a root ExistentialArchetypeType, and the latter when building
     // nested archetypes.
     // For compatibility, continue using the existential layout's version when
     // the interface type is a generic parameter. We should align these at
@@ -462,11 +462,11 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
       for (auto proto : layout.getProtocols())
         protos.push_back(proto);
 
-      result = OpenedArchetypeType::getNew(this, sugaredType, protos,
+      result = ExistentialArchetypeType::getNew(this, sugaredType, protos,
                                            requirements.superclass,
                                            requirements.layout);
     } else {
-      result = OpenedArchetypeType::getNew(this, sugaredType,
+      result = ExistentialArchetypeType::getNew(this, sugaredType,
                                            requirements.protos,
                                            requirements.superclass,
                                            requirements.layout);
@@ -669,7 +669,7 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
     [&](SubstitutableType *type) -> Type {
       auto *archetype = cast<ArchetypeType>(type);
 
-      if (isa<OpenedArchetypeType>(archetype))
+      if (isa<ExistentialArchetypeType>(archetype))
         return archetype;
 
       if (isa<ElementArchetypeType>(archetype)) {

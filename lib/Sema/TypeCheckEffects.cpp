@@ -892,7 +892,7 @@ static Type typeEraseOpenedArchetypes(Type type) {
 
   GenericEnvironment *env = nullptr;
   type.visit([&](Type type) {
-    if (auto opened = dyn_cast<OpenedArchetypeType>(type.getPointer())) {
+    if (auto opened = dyn_cast<ExistentialArchetypeType>(type.getPointer())) {
       env = opened->getGenericEnvironment();
     }
   });

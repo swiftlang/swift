@@ -1474,7 +1474,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator,
     std::optional<TrailingClosureMatching> trailingClosureMatching,
-    SmallVectorImpl<std::pair<TypeVariableType *, OpenedArchetypeType *>>
+    SmallVectorImpl<std::pair<TypeVariableType *, ExistentialArchetypeType *>>
         &openedExistentials) {
   assert(subKind == ConstraintKind::OperatorArgumentConversion ||
          subKind == ConstraintKind::ArgumentConversion);
@@ -1822,7 +1822,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         Type bindingTy;
         std::tie(typeVar, bindingTy) = *typeVarAndBindingTy;
 
-        OpenedArchetypeType *openedArchetype;
+        ExistentialArchetypeType *openedArchetype;
 
         // Open the argument type.
         argTy = argTy.transformRec([&](TypeBase *t) -> std::optional<Type> {
@@ -3866,8 +3866,8 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   }
 
   // Handle opened archetype types.
-  if (auto opened1 = type1->getAs<OpenedArchetypeType>()) {
-    auto opened2 = type2->castTo<OpenedArchetypeType>();
+  if (auto opened1 = type1->getAs<ExistentialArchetypeType>()) {
+    auto opened2 = type2->castTo<ExistentialArchetypeType>();
     assert(opened1->getInterfaceType()->isEqual(opened2->getInterfaceType()) &&
            opened1->getGenericEnvironment()->getOpenedExistentialUUID() ==
                opened2->getGenericEnvironment()->getOpenedExistentialUUID());
@@ -7674,10 +7674,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       break;
     }
 
-    case TypeKind::OpenedArchetype: {
-      auto opened1 = cast<OpenedArchetypeType>(desugar1);
-      auto opened2 = cast<OpenedArchetypeType>(desugar2);
-      // If they have the same interface type and UUID, two OpenedArchetypeTypes
+    case TypeKind::ExistentialArchetype: {
+      auto opened1 = cast<ExistentialArchetypeType>(desugar1);
+      auto opened2 = cast<ExistentialArchetypeType>(desugar2);
+      // If they have the same interface type and UUID, two ExistentialArchetypeTypes
       // match if their generic arguments do as well.
       if (opened1->getInterfaceType()->isEqual(opened2->getInterfaceType()) &&
           opened1->getGenericEnvironment()->getOpenedExistentialUUID() ==
@@ -8368,7 +8368,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::PrimaryArchetype:
-  case TypeKind::OpenedArchetype:
+  case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::PackArchetype:
   case TypeKind::ElementArchetype:
@@ -11637,7 +11637,7 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   // conformance.
   if (baseObjectType->isExistentialType()) {
     baseObjectType =
-        OpenedArchetypeType::get(baseObjectType->getCanonicalType());
+        ExistentialArchetypeType::get(baseObjectType->getCanonicalType());
   }
 
   // Check conformance to the protocol. If it doesn't conform, this constraint
@@ -12017,7 +12017,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       // because if the typealias has type variables then we'd end up
       // opening existential from a type with unresolved generic
       // parameter(s), which CSApply can't currently simplify while
-      // building type-checked AST because `OpenedArchetypeType` doesn't
+      // building type-checked AST because `ExistentialArchetypeType` doesn't
       // propagate flags. Example is as simple as `{ $0.description }`
       // where `$0` is `Error` that inferred from a (generic) typealias.
       if (underlyingTy->isExistentialType() && contextualTy->hasTypeVariable())
@@ -13434,7 +13434,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
     auto *argumentList = getArgumentList(argumentsLoc);
     // The argument type must be convertible to the input type.
-    SmallVector<std::pair<TypeVariableType *, OpenedArchetypeType *>, 2>
+    SmallVector<std::pair<TypeVariableType *, ExistentialArchetypeType *>, 2>
         openedExistentials;
     auto matchCallResult = ::matchCallArguments(
         *this, func2, argumentList, func1->getParams(), func2->getParams(),

@@ -209,7 +209,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
 
   // Archetypes and existentials are only class references if class-bounded.
   case TypeKind::PrimaryArchetype:
-  case TypeKind::OpenedArchetype:
+  case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::PackArchetype:
   case TypeKind::ElementArchetype:
@@ -729,7 +729,7 @@ bool TypeBase::hasTypeRepr() const {
     case TypeKind::TypeVariable:
       return true;
 
-    case TypeKind::OpenedArchetype:
+    case TypeKind::ExistentialArchetype:
     case TypeKind::OpaqueTypeArchetype:
     case TypeKind::GenericFunction:
     case TypeKind::LValue:
@@ -1184,7 +1184,7 @@ bool TypeBase::isExistentialWithError() {
 }
 
 bool TypeBase::isOpenedExistentialWithError() {
-  if (auto archetype = getAs<OpenedArchetypeType>()) {
+  if (auto archetype = getAs<ExistentialArchetypeType>()) {
     auto errorProto = getASTContext().getErrorDecl();
     if (!errorProto) return false;
 
@@ -3484,7 +3484,7 @@ Type ArchetypeType::getExistentialType() const {
   auto *genericEnv = getGenericEnvironment();
 
   // Opened types hold this directly.
-  if (auto *opened = dyn_cast<OpenedArchetypeType>(this)) {
+  if (auto *opened = dyn_cast<ExistentialArchetypeType>(this)) {
     if (opened->isRoot()) {
       return genericEnv->maybeApplyOuterContextSubstitutions(
           genericEnv->getOpenedExistentialType());
@@ -3644,11 +3644,11 @@ SubstitutionMap OpaqueTypeArchetypeType::getSubstitutions() const {
   return Environment->getOuterSubstitutions();
 }
 
-OpenedArchetypeType::OpenedArchetypeType(
+ExistentialArchetypeType::ExistentialArchetypeType(
     GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
     LayoutConstraint layout, RecursiveTypeProperties properties)
-  : LocalArchetypeType(TypeKind::OpenedArchetype,
+  : LocalArchetypeType(TypeKind::ExistentialArchetype,
                        interfaceType->getASTContext(), properties,
                        interfaceType, conformsTo, superclass, layout,
                        environment)
@@ -4310,7 +4310,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
         ->getReferenceCounting();
 
   case TypeKind::PrimaryArchetype:
-  case TypeKind::OpenedArchetype:
+  case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::PackArchetype:
   case TypeKind::ElementArchetype: {
@@ -4551,7 +4551,7 @@ bool TypeBase::hasSimpleTypeRepr() const {
     return false;
 
   case TypeKind::OpaqueTypeArchetype:
-  case TypeKind::OpenedArchetype:
+  case TypeKind::ExistentialArchetype:
     return false;
 
   case TypeKind::PrimaryArchetype: {

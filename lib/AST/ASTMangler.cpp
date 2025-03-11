@@ -396,7 +396,7 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
       sub = sub.transformRec([](Type t) -> std::optional<Type> {
-        if (auto *openedExistential = t->getAs<OpenedArchetypeType>()) {
+        if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
           auto &ctx = openedExistential->getASTContext();
           return GenericTypeParamType::getType(0, 0, ctx);
         }
@@ -432,7 +432,7 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
       sub = sub.transformRec([](Type t) -> std::optional<Type> {
-        if (auto *openedExistential = t->getAs<OpenedArchetypeType>()) {
+        if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
           auto &ctx = openedExistential->getASTContext();
           return GenericTypeParamType::getType(0, 0, ctx);
         }
@@ -1675,7 +1675,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::PrimaryArchetype:
     case TypeKind::PackArchetype:
     case TypeKind::ElementArchetype:
-    case TypeKind::OpenedArchetype:
+    case TypeKind::ExistentialArchetype:
       llvm::errs() << "Cannot mangle free-standing archetype: ";
       tybase->dump(llvm::errs());
       abort();
