@@ -782,7 +782,7 @@ int computeLostVariables(SILFunction *F, FunctionStat &Old, FunctionStat &New) {
     auto &DbgValScope = std::get<0>(Var);
     for (auto &BB : *F) {
       for (auto &I : BB) {
-        if (I.isDebugInstruction()) {
+        if (!I.isDebugInstruction()) {
           auto DbgLoc = I.getDebugLocation();
           auto Scope = DbgLoc.getScope();
           // If the Scope is a child of, or equal to the DbgValScope and is
