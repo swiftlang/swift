@@ -246,6 +246,11 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ExtraClangOptions.push_back("--target=" +
                                                   LangOpts.ClangTarget->str());
   }
+  if (LangOpts.ClangTargetVariant &&
+      !getClangImporterOptions().DirectClangCC1ModuleBuild) {
+    serializationOpts.ExtraClangOptions.push_back("-darwin-target-variant");
+    serializationOpts.ExtraClangOptions.push_back(LangOpts.ClangTargetVariant->str());
+  }
   if (LangOpts.EnableAppExtensionRestrictions) {
     serializationOpts.ExtraClangOptions.push_back("-fapplication-extension");
   }
