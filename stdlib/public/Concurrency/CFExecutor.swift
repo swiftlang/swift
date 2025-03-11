@@ -59,7 +59,8 @@ public final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
 // .. Task Executor ............................................................
 
 @available(SwiftStdlib 6.2, *)
-public final class CFTaskExecutor: DispatchTaskExecutor, @unchecked Sendable {
+public final class CFTaskExecutor: DispatchGlobalTaskExecutor,
+                                   @unchecked Sendable {
 
 }
 

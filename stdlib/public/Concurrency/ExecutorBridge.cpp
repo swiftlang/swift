@@ -22,6 +22,7 @@ using namespace swift;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
 
+extern "C" SWIFT_CC(swift)
 void _swift_exit(int result) {
   exit(result);
 }

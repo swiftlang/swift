@@ -28,7 +28,7 @@ public struct PlatformExecutorFactory: ExecutorFactory {
     if CoreFoundation.isPresent {
       return CFTaskExecutor()
     } else {
-      return DispatchTaskExecutor()
+      return DispatchGlobalTaskExecutor()
     }
   }
 }

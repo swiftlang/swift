@@ -555,7 +555,7 @@ public protocol EventableExecutor {
   /// - handler:  The handler to call when the event fires.
   ///
   /// Returns a new opaque `Event`.
-  func registerEvent(handler: @escaping () -> ()) -> ExecutorEvent
+  func registerEvent(handler: @escaping @Sendable () -> ()) -> ExecutorEvent
 
   /// Deregister the given event.
   ///

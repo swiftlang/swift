@@ -20,7 +20,7 @@ struct SimpleExecutorFactory: ExecutorFactory {
   }
   public static var defaultExecutor: any TaskExecutor {
     print("Creating task executor")
-    return DispatchTaskExecutor()
+    return DispatchGlobalTaskExecutor()
   }
 }
 
@@ -60,7 +60,7 @@ final class SimpleMainExecutor: MainExecutor, @unchecked Sendable {
     shouldStop = true
   }
 
-  func registerEvent(handler: @escaping () -> ()) -> ExecutorEvent {
+  func registerEvent(handler: @escaping @Sendable () -> ()) -> ExecutorEvent {
     return ExecutorEvent(id: 0)
   }
 

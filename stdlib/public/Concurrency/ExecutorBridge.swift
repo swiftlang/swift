@@ -121,14 +121,14 @@ internal func _createDispatchEventC(
 ) -> OpaquePointer
 
 fileprivate class DispatchEventHandlerBox {
-  var handler: () -> ()
-  init(handler: @escaping () -> ()) {
+  var handler: @Sendable () -> ()
+  init(handler: @escaping @Sendable () -> ()) {
     self.handler = handler
   }
 }
 
 @available(SwiftStdlib 6.2, *)
-internal func _createDispatchEvent(handler: @escaping () -> ()) -> OpaquePointer {
+internal func _createDispatchEvent(handler: @escaping @Sendable () -> ()) -> OpaquePointer {
   let boxed = DispatchEventHandlerBox(handler: handler)
   let opaqueHandlerBox = Unmanaged.passRetained(boxed).toOpaque()
   return _createDispatchEventC(

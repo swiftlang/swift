@@ -84,7 +84,9 @@ extension DispatchMainExecutor: SerialExecutor {
 extension DispatchMainExecutor: EventableExecutor {
 
   /// Register a new event with a given handler.
-  public func registerEvent(handler: @escaping () -> ()) -> ExecutorEvent {
+  public func registerEvent(
+    handler: @escaping @Sendable () -> ()
+  ) -> ExecutorEvent {
     let source = _createDispatchEvent(handler: handler)
 
     // Stash the pointer in the id of the ExecutorEvent struct
@@ -114,7 +116,7 @@ extension DispatchMainExecutor: MainExecutor {}
 // .. Task Executor ............................................................
 
 @available(SwiftStdlib 6.2, *)
-public class DispatchTaskExecutor: TaskExecutor, @unchecked Sendable {
+public class DispatchGlobalTaskExecutor: TaskExecutor, @unchecked Sendable {
 
   public init() {}
 
@@ -156,7 +158,7 @@ public class DispatchTaskExecutor: TaskExecutor, @unchecked Sendable {
 /// It is used to help convert instants and durations from arbitrary `Clock`s
 /// to Dispatch's time base.
 @available(SwiftStdlib 6.2, *)
-protocol DispatchExecutor: Executor {
+protocol DispatchExecutorProtocol: Executor {
 
   /// Convert an `Instant` from the specified clock to a tuple identifying
   /// the Dispatch clock and the seconds and nanoseconds components.
@@ -184,7 +186,7 @@ enum DispatchClockID: CInt {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension DispatchExecutor {
+extension DispatchExecutorProtocol {
 
   func timestamp<C: Clock>(for instant: C.Instant, clock: C)
     -> (clockID: DispatchClockID, seconds: Int64, nanoseconds: Int64) {
@@ -218,11 +220,11 @@ extension DispatchExecutor {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension DispatchTaskExecutor: DispatchExecutor {
+extension DispatchGlobalTaskExecutor: DispatchExecutorProtocol {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension DispatchMainExecutor: DispatchExecutor {
+extension DispatchMainExecutor: DispatchExecutorProtocol {
 }
 
 #endif // !$Embedded
