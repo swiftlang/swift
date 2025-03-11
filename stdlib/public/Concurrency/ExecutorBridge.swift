@@ -114,12 +114,46 @@ internal func _dispatchEnqueueWithDeadline(_ global: CBool,
 internal func _dispatchAssertMainQueue()
 
 @available(SwiftStdlib 6.2, *)
-@_silgen_name("swift_createDispatchEvent")
-internal func _createDispatchEvent(handler: @convention(block) @escaping () -> ()) -> OpaquePointer
+@_silgen_name("swift_createDispatchEventC")
+internal func _createDispatchEventC(
+  handler: @convention(c) @escaping (UnsafeMutableRawPointer) -> (),
+  context: UnsafeMutableRawPointer
+) -> OpaquePointer
+
+fileprivate class DispatchEventHandlerBox {
+  var handler: () -> ()
+  init(handler: @escaping () -> ()) {
+    self.handler = handler
+  }
+}
 
 @available(SwiftStdlib 6.2, *)
-@_silgen_name("swift_destroyDispatchEvent")
-internal func _destroyDispatchEvent(_ event: OpaquePointer)
+internal func _createDispatchEvent(handler: @escaping () -> ()) -> OpaquePointer {
+  let boxed = DispatchEventHandlerBox(handler: handler)
+  let opaqueHandlerBox = Unmanaged.passRetained(boxed).toOpaque()
+  return _createDispatchEventC(
+    handler: { context in
+      let unmanaged = Unmanaged<DispatchEventHandlerBox>.fromOpaque(context)
+      unmanaged.takeUnretainedValue().handler()
+    },
+    context: opaqueHandlerBox
+  )
+}
+
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_destroyDispatchEventC")
+internal func _destroyDispatchEventC(_ event: OpaquePointer)
+
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_getDispatchEventContext")
+internal func _getDispatchEventContext(_ event: OpaquePointer) -> UnsafeMutableRawPointer
+
+@available(SwiftStdlib 6.2, *)
+internal func _destroyDispatchEvent(_ event: OpaquePointer) {
+  let context = _getDispatchEventContext(event)
+  Unmanaged<DispatchEventHandlerBox>.fromOpaque(context).release()
+  _destroyDispatchEventC(event)
+}
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_signalDispatchEvent")

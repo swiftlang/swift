@@ -120,22 +120,27 @@ void *swift_job_getExecutorPrivateData(Job *job) {
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
 extern "C" SWIFT_CC(swift)
-void *swift_createDispatchEvent(void (^handler)()) {
+void *swift_createDispatchEventC(void (*handler)(void *), void *context) {
   dispatch_source_t source = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_OR,
                                                     0, 0,
                                                     dispatch_get_main_queue());
-  dispatch_source_set_event_handler(source, handler);
+  dispatch_source_set_event_handler_f(source, handler);
   dispatch_activate(source);
 
   return source;
 }
 
 extern "C" SWIFT_CC(swift)
-void swift_destroyDispatchEvent(void *event) {
+void swift_destroyDispatchEventC(void *event) {
   dispatch_source_t source = (dispatch_source_t)event;
 
   dispatch_source_cancel(source);
   dispatch_release(source);
+}
+
+extern "C" SWIFT_CC(swift)
+void *swift_getDispatchEventContext(void *event) {
+  return dispatch_get_context((dispatch_source_t)event);
 }
 
 extern "C" SWIFT_CC(swift)
