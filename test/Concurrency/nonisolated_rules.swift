@@ -100,6 +100,7 @@ nonisolated struct S1: GloballyIsolated {
 // MARK: - Protocols
 
 nonisolated protocol Refined: GloballyIsolated {}
+nonisolated protocol WhyNot {}
 
 struct A: Refined {
   var x: NonSendable
@@ -116,10 +117,28 @@ struct A: Refined {
 
 @MainActor protocol ExplicitGlobalActor: Refined {}
 
-struct IsolatedStruct: ExplicitGlobalActor {
+struct IsolatedA: ExplicitGlobalActor {
   // expected-note@+2 {{main actor isolation inferred from conformance to protocol 'ExplicitGlobalActor'}}
   // expected-note@+1 {{calls to instance method 'g()' from outside of its actor context are implicitly asynchronous}}
   func g() {}
+}
+
+struct IsolatedB: Refined, ExplicitGlobalActor {
+  // expected-note@+2 {{calls to instance method 'h()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@+1 {{main actor isolation inferred from conformance to protocol 'ExplicitGlobalActor'}}
+  func h() {}
+}
+
+struct IsolatedC: WhyNot, GloballyIsolated {
+  // expected-note@+2 {{calls to instance method 'k()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@+1 {{main actor isolation inferred from conformance to protocol 'GloballyIsolated'}}
+  func k() {}
+}
+
+struct IsolatedCFlipped: GloballyIsolated, WhyNot {
+  // expected-note@+2 {{calls to instance method 'k2()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@+1 {{main actor isolation inferred from conformance to protocol 'GloballyIsolated'}}
+  func k2() {}
 }
 
 struct NonisolatedStruct {
@@ -130,7 +149,25 @@ struct NonisolatedStruct {
   // expected-note@+1 {{add '@MainActor' to make instance method 'callG()' part of global actor 'MainActor'}}
   func callG() {
     // expected-error@+1{{call to main actor-isolated instance method 'g()' in a synchronous nonisolated context}}
-    return IsolatedStruct().g()
+    return IsolatedA().g()
+  }
+
+  // expected-note@+1 {{add '@MainActor' to make instance method 'callH()' part of global actor 'MainActor'}}
+  func callH() {
+    // expected-error@+1 {{call to main actor-isolated instance method 'h()' in a synchronous nonisolated context}}
+    return IsolatedB().h()
+  }
+
+  // expected-note@+1 {{add '@MainActor' to make instance method 'callK()' part of global actor 'MainActor'}}
+  func callK() {
+    // expected-error@+1 {{call to main actor-isolated instance method 'k()' in a synchronous nonisolated context}}
+    return IsolatedC().k()
+  }
+
+  // expected-note@+1 {{add '@MainActor' to make instance method 'callK2()' part of global actor 'MainActor'}}
+  func callK2() {
+    // expected-error@+1 {{call to main actor-isolated instance method 'k2()' in a synchronous nonisolated context}}
+    return IsolatedCFlipped().k2()
   }
 }
 
