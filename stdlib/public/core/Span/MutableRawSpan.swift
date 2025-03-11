@@ -125,7 +125,7 @@ extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
   public var byteOffsets: Range<Int> {
-    .init(_uncheckedBounds: (0, byteCount))
+    unsafe Range(_uncheckedBounds: (0, byteCount))
   }
 }
 
