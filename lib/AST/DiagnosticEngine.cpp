@@ -1429,17 +1429,11 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     }
   }
 
-  llvm::StringRef format;
-  if (includeDiagnosticName) {
-    format =
-        diagnosticStringWithNameFor(diagnostic.getID(), groupID,
-                                    getPrintDiagnosticNamesMode());
-  } else {
-    format = diagnosticStringFor(diagnostic.getID());
-  }
+  auto formatString =
+      getFormatStringForDiagnostic(diagnostic, includeDiagnosticName);
 
   return DiagnosticInfo(diagnostic.getID(), loc, toDiagnosticKind(behavior),
-                        format, diagnostic.getArgs(), Category,
+                        formatString, diagnostic.getArgs(), Category,
                         getDefaultDiagnosticLoc(),
                         /*child note info*/ {}, diagnostic.getRanges(), fixIts,
                         diagnostic.isChildNote());
@@ -1622,7 +1616,7 @@ DiagnosticKind DiagnosticEngine::declaredDiagnosticKindFor(const DiagID id) {
   return storedDiagnosticInfos[(unsigned)id].kind;
 }
 
-llvm::StringRef DiagnosticEngine::diagnosticStringFor(DiagID id) {
+llvm::StringRef DiagnosticEngine::getFormatStringForDiagnostic(DiagID id) {
   llvm::StringRef message = diagnosticStrings[(unsigned)id];
   if (auto localizationProducer = localization.get()) {
     message = localizationProducer->getMessageOr(id, message);
@@ -1630,10 +1624,16 @@ llvm::StringRef DiagnosticEngine::diagnosticStringFor(DiagID id) {
   return message;
 }
 
-llvm::StringRef DiagnosticEngine::diagnosticStringWithNameFor(
-    DiagID id, DiagGroupID groupID,
-    PrintDiagnosticNamesMode printDiagnosticNamesMode) {
-  auto message = diagnosticStringFor(id);
+llvm::StringRef
+DiagnosticEngine::getFormatStringForDiagnostic(const Diagnostic &diagnostic,
+                                               bool includeDiagnosticName) {
+  auto diagID = diagnostic.getID();
+  auto message = getFormatStringForDiagnostic(diagID);
+
+  if (!includeDiagnosticName) {
+    return message;
+  }
+
   auto formatMessageWithName = [&](StringRef message, StringRef name) {
     const int additionalCharsLength = 3; // ' ', '[', ']'
     std::string messageWithName;
@@ -1648,16 +1648,28 @@ llvm::StringRef DiagnosticEngine::diagnosticStringWithNameFor(
   switch (printDiagnosticNamesMode) {
   case PrintDiagnosticNamesMode::None:
     break;
-  case PrintDiagnosticNamesMode::Identifier:
-    message = formatMessageWithName(message, diagnosticIDStringFor(id));
+  case PrintDiagnosticNamesMode::Identifier: {
+    // If this diagnostic is a wrapper for another diagnostic, use the ID of
+    // the wrapped diagnostic.
+    for (const auto &arg : diagnostic.getArgs()) {
+      if (arg.getKind() == DiagnosticArgumentKind::Diagnostic) {
+        diagID = arg.getAsDiagnostic()->ID;
+        break;
+      }
+    }
+
+    message = formatMessageWithName(message, diagnosticIDStringFor(diagID));
     break;
+  }
   case PrintDiagnosticNamesMode::Group:
+    auto groupID = diagnostic.getGroupID();
     if (groupID != DiagGroupID::no_group) {
       message =
           formatMessageWithName(message, getDiagGroupInfoByID(groupID).name);
     }
     break;
   }
+
   return message;
 }
 

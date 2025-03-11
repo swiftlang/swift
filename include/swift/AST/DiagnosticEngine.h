@@ -1530,16 +1530,17 @@ namespace swift {
   public:
     DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
 
-    /// Get a localized format string for a given `DiagID`. If no localization
-    /// available returns the default string for that `DiagID`.
-    llvm::StringRef diagnosticStringFor(DiagID id);
+    /// Get a localized format string for the given `DiagID`. If no localization
+    /// is available, returns the default string.
+    llvm::StringRef getFormatStringForDiagnostic(DiagID id);
 
-    /// Get a localized format string with an optional diagnostic name appended
-    /// to it. The diagnostic name type is defined by
-    /// `PrintDiagnosticNamesMode`.
-    llvm::StringRef diagnosticStringWithNameFor(
-        DiagID id, DiagGroupID groupID,
-        PrintDiagnosticNamesMode printDiagnosticNamesMode);
+    /// Get a localized format string for the given diagnostic. If no
+    /// localization is available, returns the default string.
+    ///
+    /// \param includeDiagnosticName Whether to at all consider embedding the
+    /// name of the diagnostic identifier or group, per the setting.
+    llvm::StringRef getFormatStringForDiagnostic(const Diagnostic &diagnostic,
+                                                 bool includeDiagnosticName);
 
     static llvm::StringRef diagnosticIDStringFor(const DiagID id);
 

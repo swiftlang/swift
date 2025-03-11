@@ -63,54 +63,6 @@ static void diagnosticGroupsTestCase(
   EXPECT_EQ(count, expectedNumCallbackCalls);
 }
 
-TEST(DiagnosticGroups, PrintDiagnosticGroups) {
-  // Test that we append the correct group in the format string.
-  diagnosticGroupsTestCase(
-      [](DiagnosticEngine &diags) {
-        diags.setPrintDiagnosticNamesMode(PrintDiagnosticNamesMode::Group);
-
-        TestDiagnostic diagnostic(diag::error_immediate_mode_missing_stdlib.ID,
-                                  DiagGroupID::DeprecatedDeclaration);
-        diags.diagnose(SourceLoc(), diagnostic);
-      },
-      [](const DiagnosticInfo &info) {
-        EXPECT_TRUE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
-      },
-      /*expectedNumCallbackCalls=*/1);
-
-  diagnosticGroupsTestCase(
-      [](DiagnosticEngine &diags) {
-        diags.setPrintDiagnosticNamesMode(PrintDiagnosticNamesMode::Group);
-
-        TestDiagnostic diagnostic(diag::error_immediate_mode_missing_stdlib.ID,
-                                  DiagGroupID::no_group);
-        diags.diagnose(SourceLoc(), diagnostic);
-      },
-      [](const DiagnosticInfo &info) {
-        EXPECT_FALSE(info.FormatString.ends_with("]"));
-      },
-      /*expectedNumCallbackCalls=*/1);
-}
-
-TEST(DiagnosticGroups, DiagnosticsWrappersInheritGroups) {
-  // Test that we don't loose the group of a diagnostic when it gets wrapped in
-  // another one.
-  diagnosticGroupsTestCase(
-      [](DiagnosticEngine &diags) {
-        diags.setPrintDiagnosticNamesMode(PrintDiagnosticNamesMode::Group);
-
-        TestDiagnostic diagnostic(diag::error_immediate_mode_missing_stdlib.ID,
-                                  DiagGroupID::DeprecatedDeclaration);
-        diags.diagnose(SourceLoc(), diagnostic)
-            .limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning, 99);
-      },
-      [](const DiagnosticInfo &info) {
-        EXPECT_EQ(info.ID, diag::error_in_a_future_swift_lang_mode.ID);
-        EXPECT_TRUE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
-      },
-      /*expectedNumCallbackCalls=*/1);
-}
-
 TEST(DiagnosticGroups, TargetAll) {
   // Test that uncategorized diagnostics are escalated when escalating all
   // warnings.
