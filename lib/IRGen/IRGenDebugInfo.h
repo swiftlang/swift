@@ -126,7 +126,8 @@ public:
   /// \param Fn The IR representation of the function.
   /// \param Rep The calling convention of the function.
   /// \param Ty The signature of the function.
-  llvm::DISubprogram *emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
+  llvm::DISubprogram *emitFunction(const SILDebugScope *DS,
+                                   llvm::Function *Fn, // DEBUG emitFunction
                                    SILFunctionTypeRepresentation Rep,
                                    SILType Ty, DeclContext *DeclCtx = nullptr,
                                    GenericEnvironment *GE = nullptr);
@@ -137,17 +138,19 @@ public:
   /// Convenience function useful for functions without any source
   /// location. Internally calls emitFunction, emits a debug
   /// scope, and finally sets it using setCurrentLoc.
-  inline void emitArtificialFunction(IRGenFunction &IGF, llvm::Function *Fn,
-                                     SILType SILTy = SILType()) {
+  inline void emitArtificialFunction(
+      IRGenFunction &IGF,
+      llvm::Function *Fn, // DEBUG is a destructor a artificial function
+      SILType SILTy = SILType()) {
     emitArtificialFunction(IGF.Builder, Fn, SILTy);
   }
 
   void emitArtificialFunction(IRBuilder &Builder,
                               llvm::Function *Fn, SILType SILTy = SILType());
 
-  inline void emitOutlinedFunction(IRGenFunction &IGF,
-                                   llvm::Function *Fn,
-                                   StringRef outlinedFromName) {
+  inline void
+  emitOutlinedFunction(IRGenFunction &IGF, // DEBUG what is an outlined function
+                       llvm::Function *Fn, StringRef outlinedFromName) {
     emitOutlinedFunction(IGF.Builder, Fn, outlinedFromName);
   }
 
