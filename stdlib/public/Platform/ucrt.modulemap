@@ -24,6 +24,19 @@ module _complex [system] [no_undeclared_includes] {
   export *
 }
 
+module _fenv [system] [no_undeclared_includes] {
+  use corecrt
+  use _float
+  header "fenv.h"
+  export *
+}
+
+module _float [system] [no_undeclared_includes] {
+  use corecrt
+  header "float.h"
+  export *
+}
+
 module _stddef [system] [no_undeclared_includes] {
   header "stddef.h"
   export *
@@ -40,6 +53,8 @@ module ucrt [system] {
 
   module C {
     export _complex
+    export _fenv
+    export _float
     export _stddef
     export _stdlib
 
@@ -50,16 +65,6 @@ module ucrt [system] {
 
     module errno {
       header "errno.h"
-      export *
-    }
-
-    module fenv {
-      header "fenv.h"
-      export *
-    }
-
-    module float {
-      header "float.h"
       export *
     }
 
@@ -86,13 +91,11 @@ module ucrt [system] {
     module stdio {
       header "stdio.h"
       export *
+    }
 
-      // NOTE(compnerd) this is a horrible workaround for the fact that
-      // Microsoft has fully inlined nearly all of the printf family of
-      // functions in the headers which results in the definitions being elided
-      // resulting in undefined symbols.  The legacy_stdio_definitions provides
-      // out-of-line definitions for these functions.
-      link "legacy_stdio_definitions"
+    module stdlib {
+      header "stdlib.h"
+      export *
     }
 
     module string {

@@ -13,6 +13,9 @@
 @_exported import ucrt // Clang module
 // Extra clang module that's split out from ucrt:
 @_exported import _complex
+@_exported import _fenv
+@_exported import _float
+@_exported import _malloc
 @_exported import _stddef
 @_exported import _stdlib
 
