@@ -916,8 +916,8 @@ private:
         assert(Range.getByteLength() > 1);
         if (Range.str().front() == '`') {
           assert(Range.getByteLength() > 3);
-          assert(Range.str().consume_front("`_") ||
-                 Range.str().consume_front("`$"));
+          assert(Range.str().starts_with("`_") ||
+                 Range.str().starts_with("`$"));
           auto AfterBacktick = Loc.getAdvancedLoc(2);
           reportRef(Wrapped, AfterBacktick, Info, std::nullopt);
         } else {
