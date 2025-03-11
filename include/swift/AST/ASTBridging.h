@@ -3023,6 +3023,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isInteger() const;
   BRIDGED_INLINE bool isMetatypeType() const;
   BRIDGED_INLINE bool isExistentialMetatypeType() const;
+  BRIDGED_INLINE bool isOptional() const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;
