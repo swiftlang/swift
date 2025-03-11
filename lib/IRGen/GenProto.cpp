@@ -959,6 +959,13 @@ namespace {
     }
 
     void addAssociatedConformance(const AssociatedConformance &req) {
+      if (req.getAssociation()->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+          !req.getAssociatedRequirement()->requiresClass()) {
+        // If it's not a class protocol, the associated type can never be used to create
+        // an existential. Therefore this witness entry is never used at runtime
+        // in embedded swift.
+        return;
+      }
       Entries.push_back(WitnessTableEntry::forAssociatedConformance(req));
     }
 
@@ -1748,6 +1755,14 @@ public:
       (void)entry;
       SILEntries = SILEntries.slice(1);
 
+      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+          !requirement.getAssociatedRequirement()->requiresClass()) {
+        // If it's not a class protocol, the associated type can never be used to create
+        // an existential. Therefore this witness entry is never used at runtime
+        // in embedded swift.
+        return;
+      }
+
       auto associate =
         ConformanceInContext.getAssociatedType(
           requirement.getAssociation())->getCanonicalType();
@@ -1775,7 +1790,10 @@ public:
       if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
         // In Embedded Swift associated-conformance entries simply point to the witness table
         // of the associated conformance.
-        llvm::Constant *witnessEntry = IGM.getAddrOfWitnessTable(associatedConformance.getConcrete());
+        ProtocolConformanceRef assocConf =
+          SILWT->getConformance()->getAssociatedConformance(requirement.getAssociation(),
+                                                            requirement.getAssociatedRequirement());
+        llvm::Constant *witnessEntry = IGM.getAddrOfWitnessTable(assocConf.getConcrete());
         auto &schema = IGM.getOptions().PointerAuth
                           .ProtocolAssociatedTypeWitnessTableAccessFunctions;
         Table.addSignedPointer(witnessEntry, schema, requirement);
@@ -3734,7 +3752,7 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
 
   // In Embedded Swift, only class-bound wtables are allowed.
   if (srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-    assert(proto->requiresClass());
+    ASSERT(proto->requiresClass());
   }
 
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)
