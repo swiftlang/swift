@@ -326,3 +326,37 @@ struct TestUnary {
     }
   }
 }
+
+// Prevent non-optional overload of `??` to be favored when all initializers are failable.
+
+class A {}
+class B {}
+
+protocol P {
+  init()
+}
+
+extension P {
+  init?(v: A) { self.init() }
+}
+
+struct V : P {
+  init() {}
+
+  @_disfavoredOverload
+  init?(v: B?) {}
+
+  // Important to keep this to make sure that disabled constraints
+  // are handled properly.
+  init<T: Collection>(other: T) where T.Element == Character {}
+}
+
+class TestFailableOnly {
+  var v: V?
+
+  func test(defaultB: B) {
+    guard let _ = self.v ?? V(v: defaultB) else { // OK (no warnings)
+      return
+    }
+  }
+}
