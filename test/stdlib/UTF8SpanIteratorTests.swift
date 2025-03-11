@@ -26,18 +26,70 @@ extension UTF8Span {
   }
 }
 
+
 // 
 @available(SwiftStdlib 6.1, *)
 struct ContentEquivalenceTestCase {
   var str: String
   var loc: SourceLocStack
+}
+
+@available(SwiftStdlib 6.1, *)
+extension ContentEquivalenceTestCase {
+  func expectStart(
+    _ scalars: inout UTF8Span.UnicodeScalarIterator
+  ) {
+    let firstScalar = str.unicodeScalars.first
+    expectEqual(0, scalars.currentCodeUnitOffset, stackTrace: loc)
+    expectNil(scalars.previous(), stackTrace: loc)
+    expectEqual(firstScalar, scalars.next(), stackTrace: loc)
+    expectEqual(firstScalar, scalars.previous(), stackTrace: loc)
+    expectNil(scalars.previous(), stackTrace: loc)
+  }
+
+  func expectEnd(
+    _ scalars: inout UTF8Span.UnicodeScalarIterator
+  ) {
+    let lastScalar = str.unicodeScalars.last
+    expectEqual(scalars.currentCodeUnitOffset, scalars.codeUnits.count, stackTrace: loc)
+    expectNil(scalars.next(), stackTrace: loc)
+    expectEqual(lastScalar, scalars.previous(), stackTrace: loc)
+    expectEqual(lastScalar, scalars.next(), stackTrace: loc)
+    expectNil(scalars.next(), stackTrace: loc)
+  }
+
+  func expectStart(
+    _ chars: inout UTF8Span.CharacterIterator
+  ) {
+    let firstChar = str.first
+    expectEqual(0, chars.currentCodeUnitOffset, stackTrace: loc)
+    expectNil(chars.previous(), stackTrace: loc)
+    expectEqual(firstChar, chars.next(), stackTrace: loc)
+    expectEqual(firstChar, chars.previous(), stackTrace: loc)
+    expectNil(chars.previous(), stackTrace: loc)
+  }
+
+  func expectEnd(
+    _ chars: inout UTF8Span.CharacterIterator
+  ) {
+    let lastChar = str.last
+    expectEqual(chars.currentCodeUnitOffset, chars.codeUnits.count, stackTrace: loc)
+    expectNil(chars.next(), stackTrace: loc)
+    expectEqual(lastChar, chars.previous(), stackTrace: loc)
+    expectEqual(lastChar, chars.next(), stackTrace: loc)
+    expectNil(chars.next(), stackTrace: loc)
+  }
+
 
   func withUTF8Span<R>(_ f: (UTF8Span) throws -> R) rethrows -> R {
     try Array(str.utf8).withSpan { span in 
       try f(try! UTF8Span(validating: span))
     }
   }
+}
 
+@available(SwiftStdlib 6.1, *)
+extension ContentEquivalenceTestCase {
   func testBytes() {
     let otherBytes = Array((str+"abc").utf8)
 
@@ -60,6 +112,7 @@ struct ContentEquivalenceTestCase {
         expectEqual(scalar, stringIter.next(), stackTrace: loc)
       }
       expectNil(stringIter.next(), stackTrace: loc)
+      expectEnd(&utf8SpanIter)
 
       // Test backwards
       var stringRevIter = str.unicodeScalars.reversed().makeIterator()
@@ -67,11 +120,33 @@ struct ContentEquivalenceTestCase {
         expectEqual(scalar, stringRevIter.next(), stackTrace: loc)
       }
       expectNil(stringRevIter.next(), stackTrace: loc)
+      expectStart(&utf8SpanIter)
 
-      // TODO: test various skip(by) API
+      let numElements = str.unicodeScalars.count
+      let lastElement = str.unicodeScalars.last
+      let firstElement = str.unicodeScalars.first
+
+      expectEqual(numElements, utf8SpanIter.skipForward(by: Int.max))
+      expectEnd(&utf8SpanIter)
+      expectEqual(numElements, utf8SpanIter.skipBack(by: Int.max))
+      expectStart(&utf8SpanIter)
+      expectEqual(numElements, utf8SpanIter.skipForward(by: numElements))
+      expectEnd(&utf8SpanIter)
+      expectEqual(numElements, utf8SpanIter.skipBack(by: numElements))
+      expectStart(&utf8SpanIter)
+
+      if numElements > 0 {
+        expectStart(&utf8SpanIter)
+        expectEqual(numElements-1, utf8SpanIter.skipForward(by: numElements-1))
+        expectEqual(lastElement, utf8SpanIter.next())
+        expectEnd(&utf8SpanIter)
+
+        expectEqual(numElements-1, utf8SpanIter.skipBack(by: numElements-1))
+        expectEqual(firstElement, utf8SpanIter.previous())
+        expectStart(&utf8SpanIter)
+      }
 
       // TODO: test reset variants
-
       // TODO: test prefix/suffix
 
     }
@@ -86,6 +161,7 @@ struct ContentEquivalenceTestCase {
         expectEqual(char, stringIter.next(), stackTrace: loc)
       }
       expectNil(stringIter.next(), stackTrace: loc)
+      expectEnd(&utf8SpanIter)
 
       // Test backwards
       var stringRevIter = str.reversed().makeIterator()
@@ -93,12 +169,34 @@ struct ContentEquivalenceTestCase {
         expectEqual(char, stringRevIter.next(), stackTrace: loc)
       }
       expectNil(stringRevIter.next(), stackTrace: loc)
+      expectStart(&utf8SpanIter)
 
+      let numElements = str.count
+      let lastElement = str.last
+      let firstElement = str.first
 
-      // TODO: test various skip(by) API
+      expectEqual(numElements, utf8SpanIter.skipForward(by: Int.max))
+      expectEnd(&utf8SpanIter)
+      expectEqual(numElements, utf8SpanIter.skipBack(by: Int.max))
+      expectStart(&utf8SpanIter)
+      expectEqual(numElements, utf8SpanIter.skipForward(by: numElements))
+      expectEnd(&utf8SpanIter)
+      expectEqual(numElements, utf8SpanIter.skipBack(by: numElements))
+      expectStart(&utf8SpanIter)
 
+      if numElements > 0 {
+        expectStart(&utf8SpanIter)
+        expectEqual(numElements-1, utf8SpanIter.skipForward(by: numElements-1))
+        expectEqual(lastElement, utf8SpanIter.next())
+        expectEnd(&utf8SpanIter)
+
+        expectEqual(numElements-1, utf8SpanIter.skipBack(by: numElements-1))
+        expectEqual(firstElement, utf8SpanIter.previous())
+        expectStart(&utf8SpanIter)
+      }
 
       // TODO: test reset variants
+      // TODO: test prefix/suffix
     }
   }
 
@@ -125,14 +223,21 @@ if #available(SwiftStdlib 6.1, *) {
       t.run()
     }
 
+    test("")
+    test("a")
+    test("á")
+    test("a\u{301}")
+    test("🧟‍♀️")
     test("abc")
-    test("abcde\u{301}")
     test("abcde\u{301}")
     test("abéÏ𓀀")
     test("012345678901234567890")
     test("abéÏ012345678901234567890𓀀")
     test("😀😃🤢🤮👩🏿‍🎤🧛🏻‍♂️🧛🏻‍♂️👩‍👩‍👦‍👦")
-    test("")
+    test("defghijklmnopqrstuvwxyz")
+    test("ab🧟‍♀️de\u{301}bytés")
+    test("ab🧟‍♀️de\u{301}🧟‍♀️")
+    test("ab🧟‍♀️de🧟‍♀️\u{301}")
   }
 }
 

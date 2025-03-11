@@ -66,7 +66,9 @@ if #available(SwiftStdlib 6.1, *) {
   }
 
   suite.test("UTF8Span/canonical equivalence") {
+
     // TODO: refactor to be test-case declaration driven, and add more tests...
+    //   `(normalized: String, variants: [String], lessThan: String, greaterThan: String)`
 
     let precomposedStr = "café"
     let decomposedStr = "cafe\u{301}"
@@ -111,7 +113,9 @@ if #available(SwiftStdlib 6.1, *) {
         expectTrue(utf8Decomposed.charactersEqual(to: decomposedStr.characters))
         expectTrue(utf8Decomposed.charactersEqual(to: precomposedStr.characters))
 
-
+        // Equivalence means no-one is less than the other
+        expectFalse(utf8Decomposed.isCanonicallyLessThan(utf8Precomposed))
+        expectFalse(utf8Precomposed.isCanonicallyLessThan(utf8Decomposed))
 
       }
 
