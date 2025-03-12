@@ -4719,6 +4719,11 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
 bool ValueDecl::isUsableFromInline() const {
   assert(getFormalAccess() < AccessLevel::Public);
 
+  // ABI decls share the access level of their API decl.
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->isUsableFromInline();
+
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
       getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
       getAttrs().hasAttribute<InlinableAttr>())
