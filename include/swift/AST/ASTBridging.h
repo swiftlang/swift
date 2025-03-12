@@ -388,7 +388,7 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool Destructor_isIsolated() const;
 };
 
-enum ENUM_EXTENSIBILITY_ATTR(open) BridgedASTNodeKind : uint8_t {
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedASTNodeKind : uint8_t {
   BridgedASTNodeKindExpr,
   BridgedASTNodeKindStmt,
   BridgedASTNodeKindDecl
@@ -2323,6 +2323,13 @@ BridgedPoundAvailableInfo BridgedPoundAvailableInfo_createParsed(
     BridgedSourceLoc cLParenLoc, BridgedArrayRef cSpecs,
     BridgedSourceLoc cRParenLoc, bool isUnavailability);
 
+SWIFT_NAME("BridgedStmtConditionElement.createHasSymbol(_:poundLoc:lParenLoc:"
+           "symbol:rParenLoc:)")
+BridgedStmtConditionElement BridgedStmtConditionElement_createHasSymbol(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedSourceLoc cLParenLoc, BridgedNullableExpr cSymbolExpr,
+    BridgedSourceLoc cRParenLoc);
+
 struct BridgedCaseLabelItemInfo {
   SWIFT_NAME("isDefault")
   bool IsDefault;
@@ -2424,6 +2431,11 @@ BridgedIfStmt BridgedIfStmt_createParsed(
     BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
     BridgedSourceLoc cIfLoc, BridgedArrayRef cConds, BridgedBraceStmt cThen,
     BridgedSourceLoc cElseLoc, BridgedNullableStmt cElse);
+
+SWIFT_NAME("BridgedPoundAssertStmt.createParsed(_:range:condition:message:)")
+BridgedPoundAssertStmt BridgedPoundAssertStmt_createParsed(
+    BridgedASTContext cContext, BridgedSourceRange cRange,
+    BridgedExpr cConditionExpr, BridgedStringRef cMessage);
 
 SWIFT_NAME("BridgedRepeatWhileStmt.createParsed(_:labelInfo:repeatLoc:cond:"
            "whileLoc:body:)")
@@ -3109,6 +3121,15 @@ struct BridgedFingerprint {
 
   BRIDGED_INLINE swift::Fingerprint unbridged() const;
 };
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedPoundKeyword : uint8_t {
+#define POUND_KEYWORD(NAME) BridgedPoundKeyword_##NAME,
+#include "swift/AST/TokenKinds.def"
+  BridgedPoundKeyword_None,
+};
+
+SWIFT_NAME("BridgedPoundKeyword.init(from:)")
+BridgedPoundKeyword BridgedPoundKeyword_fromString(BridgedStringRef cStr);
 
 //===----------------------------------------------------------------------===//
 // MARK: #if handling

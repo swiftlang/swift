@@ -72,11 +72,6 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl? {
-    // TODO: Set semicolon loc.
-    generate(decl: node.decl)
-  }
-
   func generateIdentifierDeclNameAndLoc(_ node: TokenSyntax) -> (identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc)? {
     guard node.presence == .present else {
       return nil
@@ -483,7 +478,7 @@ extension ASTGenVisitor {
         let brace = BridgedBraceStmt.createParsed(
           self.ctx,
           lBraceLoc: leftBrace,
-          elements: self.generate(codeBlockItemList: codeBlock),
+          elements: self.generate(codeBlockItemList: codeBlock).lazy.bridgedArray(in: self),
           rBraceLoc: rightBrace
         )
         accessor.setParsedBody(brace)
@@ -836,9 +831,16 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   func generate(macroExpansionDecl node: MacroExpansionDeclSyntax) -> BridgedMacroExpansionDecl {
+    switch self.maybeGenerateBuiltinPound(macroExpansionDecl: node) {
+    case .generated(_):
+      fatalError("(compiler bug) builtin pound keywords should be handled elsewhere")
+    case .ignored:
+      // Fallback to MacroExpansionDecl.
+      break
+    }
+
     let attrs = self.generateDeclAttributes(node, allowStatic: true)
     let info = self.generate(freestandingMacroExpansion: node)
-
     let decl = BridgedMacroExpansionDecl.createParsed(
       self.declContext,
       poundLoc: info.poundLoc,
@@ -1059,6 +1061,29 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
+  func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl? {
+    if let node = node.decl.as(MacroExpansionDeclSyntax.self) {
+      switch self.maybeGenerateBuiltinPound(macroExpansionDecl: node) {
+      case .generated(let generated?):
+        switch generated.kind {
+        case .decl:
+          // Actually unreachable as no builtin pound emits a declaration.
+          return generated.castToDecl()
+        case .stmt, .expr:
+          // TODO: Diagnose
+          fatalError("builtin pound keyword in declaration member block")
+          //return nil
+        }
+      case .generated(nil):
+        return nil
+      case .ignored:
+        // Fallback to normal macro expansion.
+        break
+      }
+    }
+    return self.generate(decl: node.decl)
+  }
+
   @inline(__always)
   func generate(memberBlockItemList node: MemberBlockItemListSyntax) -> [BridgedDecl] {
     var allMembers: [BridgedDecl] = []
@@ -1068,8 +1093,8 @@ extension ASTGenVisitor {
       }
 
       return .underlying(element)
-    } body: { member in
-      guard let member = self.generate(decl: member.decl) else {
+    } body: { node in
+      guard let member = self.generate(memberBlockItem: node) else {
         return
       }
       // TODO: Set semicolon loc.
