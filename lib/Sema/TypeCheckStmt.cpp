@@ -2764,12 +2764,6 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
 
 BraceStmt *PreCheckClosureBodyRequest::evaluate(Evaluator &evaluator,
                                                 ClosureExpr *closure) const {
-  // If this closure has an attached body macro, expand it now before
-  // type checking the body.
-  if (auto *expandedBody = closure->getExpandedBody()) {
-    closure->setBody(expandedBody);
-  }
-
   auto *body = closure->getBody();
 
   // If we have a single statement 'return', synthesize 'return ()' to ensure
