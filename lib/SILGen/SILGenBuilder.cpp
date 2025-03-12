@@ -1228,17 +1228,3 @@ ManagedValue SILGenBuilder::borrowObjectRValue(SILGenFunction &SGF,
   }
   return SGF.emitFormalEvaluationManagedBeginBorrow(loc, value);
 }
-
-ManagedValue SILGenBuilder::createHopToMainActorIfNeededThunk(
-    SILLocation loc, ManagedValue op, SubstitutionMap substitutionMap) {
-  if (op.getOwnershipKind() == OwnershipKind::None) {
-    auto *thunkedFunc = createHopToMainActorIfNeededThunk(
-        loc, op.forward(getSILGenFunction()), substitutionMap);
-    return SGF.emitManagedRValueWithCleanup(thunkedFunc);
-  }
-
-  CleanupCloner cloner(*this, op);
-  auto *thunkedFunc = createHopToMainActorIfNeededThunk(
-      loc, op.forward(getSILGenFunction()), substitutionMap);
-  return cloner.clone(thunkedFunc);
-}

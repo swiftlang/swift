@@ -2859,9 +2859,6 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       switch (nextChar()) {
       case 'I':
         return createWithChild(Node::Kind::SILThunkIdentity, popNode(isEntity));
-      case 'H':
-        return createWithChild(Node::Kind::SILThunkHopToMainActorIfNeeded,
-                               popNode(isEntity));
       default:
         return nullptr;
       }
