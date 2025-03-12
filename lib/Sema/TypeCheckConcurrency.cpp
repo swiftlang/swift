@@ -2677,7 +2677,6 @@ namespace {
                 });
 
             if (!nonSendableTypes.empty()) {
-              auto &ctx = dc->getASTContext();
               {
                 auto diag = ctx.Diags.diagnose(
                     funcConv->getLoc(),
@@ -2710,8 +2709,7 @@ namespace {
             if (!safeToDropGlobalActor(dc, fromActor, toType,
                                        getImmediateApply())) {
               // otherwise, it's not a safe cast.
-              dc->getASTContext()
-                  .Diags
+              ctx.Diags
                   .diagnose(funcConv->getLoc(),
                             diag::converting_func_loses_global_actor, fromType,
                             toType, fromActor)
@@ -2879,10 +2877,9 @@ namespace {
             isolation->second == ActorIsolation::Nonisolated) {
           requiredIsolation[dc] = refinedIsolation;
         } else if (isolation->second != refinedIsolation) {
-          dc->getASTContext().Diags.diagnose(
-              requiredIsolationLoc,
-              diag::conflicting_default_argument_isolation,
-              isolation->second, refinedIsolation);
+          ctx.Diags.diagnose(requiredIsolationLoc,
+                             diag::conflicting_default_argument_isolation,
+                             isolation->second, refinedIsolation);
           requiredIsolation.clear();
           return true;
         }
@@ -2930,7 +2927,6 @@ namespace {
     /// Check closure captures for Sendable violations.
     void checkLocalCaptures(AnyFunctionRef localFunc) {
       auto *dc = getDeclContext();
-      ASTContext &ctx = dc->getASTContext();
 
       auto *closure = localFunc.getAbstractClosureExpr();
       auto *explicitClosure = dyn_cast_or_null<ClosureExpr>(closure);
@@ -3081,8 +3077,6 @@ namespace {
     }
 
     ActorIsolation computeRequiredIsolation(Expr *expr) {
-      auto &ctx = getDeclContext()->getASTContext();
-
       if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues))
         requiredIsolationLoc = expr->getLoc();
 
@@ -3581,7 +3575,6 @@ namespace {
     ///
     /// \returns true if we diagnosed the entity, \c false otherwise.
     bool diagnoseReferenceToUnsafeGlobal(ValueDecl *value, SourceLoc loc) {
-      auto &ctx = value->getASTContext();
       switch (ctx.LangOpts.StrictConcurrencyLevel) {
       case StrictConcurrency::Minimal:
       case StrictConcurrency::Targeted:
@@ -4124,10 +4117,9 @@ namespace {
 
     /// Check whether there are _unsafeInheritExecutor_ workarounds in the
     /// given _Concurrency module.
-    static bool hasUnsafeInheritExecutorWorkarounds(
-        DeclContext *dc, SourceLoc loc
-      ) {
-      ASTContext &ctx = dc->getASTContext();
+    static bool hasUnsafeInheritExecutorWorkarounds(ASTContext &ctx,
+                                                    DeclContext *dc,
+                                                    SourceLoc loc) {
       Identifier name =
           ctx.getIdentifier("_unsafeInheritExecutor_withUnsafeContinuation");
       NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
@@ -4158,7 +4150,7 @@ namespace {
         diag.limitBehaviorIf(inConcurrencyModule, DiagnosticBehavior::Warning);
 
         if (!inConcurrencyModule &&
-            !hasUnsafeInheritExecutorWorkarounds(func, func->getLoc())) {
+            !hasUnsafeInheritExecutorWorkarounds(ctx, func, func->getLoc())) {
           diag.limitBehavior(DiagnosticBehavior::Warning);
         }
 
@@ -4777,7 +4769,6 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
     if (useIsolation == defIsolation)
       return false;
 
-    auto &ctx = useContext->getASTContext();
     bool regionIsolationEnabled =
         ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation);
     
