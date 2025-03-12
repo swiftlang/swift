@@ -439,13 +439,13 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(_ bounds: Range<Int>) -> Self {
+  mutating public func extracting(_ bounds: Range<Int>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
       "Index range out of bounds"
     )
-    return unsafe _extracting(unchecked: bounds)
+    return unsafe extracting(unchecked: bounds)
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -466,7 +466,7 @@ extension MutableRawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(unchecked bounds: Range<Int>) -> Self {
+  mutating public func extracting(unchecked bounds: Range<Int>) -> Self {
     let newStart = unsafe _pointer?.advanced(by: bounds.lowerBound)
     let newSpan = unsafe Self(_unchecked: newStart, byteCount: bounds.count)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
@@ -487,10 +487,10 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(
+  mutating public func extracting(
     _ bounds: some RangeExpression<Int>
   ) -> Self {
-    _extracting(bounds.relative(to: byteOffsets))
+    extracting(bounds.relative(to: byteOffsets))
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -511,11 +511,11 @@ extension MutableRawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(unchecked bounds: ClosedRange<Int>) -> Self {
+  mutating public func extracting(unchecked bounds: ClosedRange<Int>) -> Self {
     let range = unsafe Range(
       _uncheckedBounds: (bounds.lowerBound, bounds.upperBound+1)
     )
-    return unsafe _extracting(unchecked: range)
+    return unsafe extracting(unchecked: range)
   }
 
   /// Constructs a new span over all the items of this span.
@@ -529,7 +529,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(_: UnboundedRange) -> Self {
+  mutating public func extracting(_: UnboundedRange) -> Self {
     let newSpan = unsafe Self(_unchecked: _start(), byteCount: _count)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
@@ -556,7 +556,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(first maxLength: Int) -> Self {
+  mutating public func extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, byteCount)
     let newSpan = unsafe Self(_unchecked: _pointer, byteCount: newCount)
@@ -579,7 +579,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(droppingLast k: Int) -> Self {
+  mutating public func extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, byteCount)
     let newCount = byteCount &- droppedCount
@@ -604,7 +604,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(last maxLength: Int) -> Self {
+  mutating public func extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, byteCount)
     let newStart = unsafe _pointer?.advanced(by: byteCount &- newCount)
@@ -628,7 +628,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(droppingFirst k: Int) -> Self {
+  mutating public func extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
     let newStart = unsafe _pointer?.advanced(by: droppedCount)
