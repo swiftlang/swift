@@ -364,6 +364,41 @@ public:
 
     /// The opposite of ABIBreakingToRemove
     ABIStableToRemove = 1ull << 15,
+
+    /// Attribute should not be used in an \c \@abi attribute. Use for
+    /// attributes which cannot affect mangled names, even indirectly, and
+    /// which either don't affect ABI or where ABI-only declarations get their
+    /// behavior from their API counterpart.
+    ForbiddenInABIAttr = 1ull << 16,
+
+    /// Attribute can be used without restrictions in an \c \@abi attribute.
+    /// Use for attributes which affect mangled names but otherwise don't alter
+    /// the ABI, or ones where the \c ABIDeclChecker manually implements
+    /// special checking logic (e.g. because several different attributes
+    /// contribute to the same aspect of ABI in some complicated way).
+    UnconstrainedInABIAttr = 1ull << 17,
+
+    /// Attribute can be used in an \c \@abi attribute, but must match
+    /// equivalent on API decl. Use for attributes which affect both mangled
+    /// names and other parts of the ABI such that the declaration can only be
+    /// valid if they match. 
+    EquivalentInABIAttr = 1ull << 18,
+
+    /// Attribute can be used in an \c \@abi attribute, but must match
+    /// equivalent on API decl; if omitted, API decl's attribute will be 
+    /// cloned. Use where you would want to use \c EquivalentInABIAttr but 
+    /// repeating the attribute is judged too burdensome.
+    InferredInABIAttr = 1ull << 19,
+
+    /// Use for attributes which are \em only valid on declarations that cannot
+    /// have an \c @abi attribute, such as \c ImportDecl .
+    UnreachableInABIAttr = 1ull << 20,
+  };
+
+  enum : uint64_t {
+    InABIAttrMask = ForbiddenInABIAttr | UnconstrainedInABIAttr
+                  | EquivalentInABIAttr | InferredInABIAttr
+                  | UnreachableInABIAttr
   };
 
   LLVM_READNONE
