@@ -57,10 +57,9 @@ func escapedDollarFunc() {
 }
 
 func escapedDollarAnd() {
-  // FIXME: Bad diagnostics.
-  `$0` = 1 // expected-error {{expected expression}}
-  `$$` = 2
-  `$abc` = 3
+  `$0` = 1 // expected-error {{cannot find '$0' in scope}}
+  `$$` = 2 // expected-error {{cannot find '$$' in scope}}
+  `$abc` = 3 // expected-error {{cannot find '$abc' in scope}}
 }
 
 // Test that we disallow user-defined $-prefixed identifiers. However, the error
@@ -123,3 +122,5 @@ let _ = S().$café // Okay
 // https://github.com/apple/swift/issues/55538
 infix operator $ // expected-error{{'$' is considered an identifier and must not appear within an operator name}}
 infix operator `$` // expected-error{{'$' is considered an identifier and must not appear within an operator name}}
+
+func `$declareEscapedWithDollar`() { } // expected-error{{cannot declare entity named '$declareEscapedWithDollar'}}

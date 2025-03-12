@@ -1553,7 +1553,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
               StringRef nameText = name.getName().getString(buffer);
               bool shouldEscape =
                   !name.getName().isSpecial() &&
-                  (escapeKeywordInContext(nameText, PrintNameContext::Normal) ||
+                  (escapeIdentifierInContext(name.getName().getBaseIdentifier(),
+                                             PrintNameContext::Normal) ||
                    nameText == "$");
               Printer << "(";
               if (shouldEscape)

@@ -6429,6 +6429,14 @@ ERROR(objc_enum_case_multi,none,
 ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
+ERROR(objc_name_not_valid_identifier,none,
+      "'@objc' %0 name is not a valid Objective-C identifier",
+      (DescriptiveDeclKind))
+ERROR(objc_cannot_infer_name_raw_identifier,none,
+      "cannot infer '@objc' %0 name because the Swift name is not a valid "
+      "Objective-C identifier; specify the name in '@objc' explicitly",
+      (DescriptiveDeclKind))
+
 // If you change this, also change enum ObjCReason
 #define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|in an @objc @implementation extension of a class (without final or @nonobjc)|marked @objc by an access note}"
 
