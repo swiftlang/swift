@@ -1099,12 +1099,15 @@ findConformanceWithDyld(ConformanceState &C, const Metadata *type,
     }
     break;
   }
-  case _dyld_protocol_conformance_result_kind_found_witness_table:
+  case _dyld_protocol_conformance_result_kind_found_witness_table: {
     // If we found a witness table then we're done.
     DYLD_CONFORMANCES_LOG("DYLD found witness table %p for conformance to %s",
                           dyldResult.value, protocol->Name.get());
-    return std::make_tuple(reinterpret_cast<const WitnessTable *>(dyldResult.value), nullptr,
-            false);
+    auto result = ConformanceLookupResult{
+        reinterpret_cast<const WitnessTable *>(dyldResult.value), nullptr,
+        nullptr};
+    return std::make_tuple(result, nullptr, false);
+  }
   case _dyld_protocol_conformance_result_kind_not_found:
     // If nothing is found, then we'll proceed with checking the runtime's
     // caches and scanning conformance records.
