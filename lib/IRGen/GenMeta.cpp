@@ -30,8 +30,10 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
@@ -679,8 +681,9 @@ namespace {
     }
     
     void addName() {
-      B.addRelativeAddress(IGM.getAddrOfGlobalString(M->getABIName().str(),
-                                           /*willBeRelativelyAddressed*/ true));
+      B.addRelativeAddress(IGM.getAddrOfGlobalIdentifierString(
+          M->getABIName().str(),
+          /*willBeRelativelyAddressed*/ true));
     }
     
     bool isUniqueDescriptor() {
@@ -914,7 +917,7 @@ namespace {
     }
 
     void addName() {
-      auto nameStr = IGM.getAddrOfGlobalString(Proto->getName().str(),
+      auto nameStr = IGM.getAddrOfGlobalIdentifierString(Proto->getName().str(),
                                            /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(nameStr);
     }
@@ -1253,7 +1256,7 @@ namespace {
     }
 
     void addAssociatedTypeNames() {
-      std::string AssociatedTypeNames;
+      llvm::SmallString<256> AssociatedTypeNames;
 
       auto &pi = IGM.getProtocolInfo(Proto,
                                      ProtocolInfoKind::RequirementSignature);
@@ -1262,7 +1265,13 @@ namespace {
         if (entry.isAssociatedType()) {
           if (!AssociatedTypeNames.empty())
             AssociatedTypeNames += ' ';
-          AssociatedTypeNames += entry.getAssociatedType()->getName().str();
+
+          Identifier name = entry.getAssociatedType()->getName();
+          if (name.mustAlwaysBeEscaped()) {
+            Mangle::Mangler::appendRawIdentifierForRuntime(name.str(), AssociatedTypeNames);
+          } else {
+            AssociatedTypeNames += name.str();
+          }
         }
       }
 
@@ -1288,6 +1297,7 @@ namespace {
       MetadataInitialization;
 
     StringRef UserFacingName;
+    bool IsCxxSpecializedTemplate;
     std::optional<TypeImportInfo<std::string>> ImportInfo;
 
     using super::IGM;
@@ -1432,6 +1442,7 @@ namespace {
     void computeIdentity() {
       // Remember the user-facing name.
       UserFacingName = Type->getName().str();
+      IsCxxSpecializedTemplate = false;
 
       // For related entities, set the original type name as the ABI name
       // and remember the related entity tag.
@@ -1452,9 +1463,11 @@ namespace {
         // that each specialization gets its own metadata. A class template
         // specialization's Swift name will always be the mangled name, so just
         // use that.
-        if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
+        if (auto spec =
+                dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl)) {
           abiName = Type->getName().str();
-        else
+          IsCxxSpecializedTemplate = true;
+        } else
           abiName = clangDecl->getQualifiedNameAsString();
 
         // Typedefs and compatibility aliases that have been promoted to
@@ -1484,7 +1497,12 @@ namespace {
 
     void addName() {
       SmallString<32> name;
-      name += UserFacingName;
+      if (!IsCxxSpecializedTemplate &&
+          Lexer::identifierMustAlwaysBeEscaped(UserFacingName)) {
+        Mangle::Mangler::appendRawIdentifierForRuntime(UserFacingName, name);
+      } else {
+        name += UserFacingName;
+      }
 
       // Collect the import info if present.
       if (ImportInfo) {
@@ -1499,7 +1517,7 @@ namespace {
       }
       
       auto nameStr = IGM.getAddrOfGlobalString(name,
-                                           /*willBeRelativelyAddressed*/ true);
+                                               /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(nameStr);
     }
       

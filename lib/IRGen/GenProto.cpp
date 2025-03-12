@@ -3752,7 +3752,7 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
 
   // In Embedded Swift, only class-bound wtables are allowed.
   if (srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-    ASSERT(proto->requiresClass());
+    assert(proto->requiresClass());
   }
 
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)

@@ -913,10 +913,18 @@ private:
     // report an occurrence of `foo` in `_foo` and '$foo').
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (auto *Wrapped = VD->getOriginalWrappedProperty()) {
-        assert(Range.getByteLength() > 1 &&
-               (Range.str().front() == '_' || Range.str().front() == '$'));
-        auto AfterDollar = Loc.getAdvancedLoc(1);
-        reportRef(Wrapped, AfterDollar, Info, std::nullopt);
+        assert(Range.getByteLength() > 1);
+        if (Range.str().front() == '`') {
+          assert(Range.getByteLength() > 3);
+          assert(Range.str().starts_with("`_") ||
+                 Range.str().starts_with("`$"));
+          auto AfterBacktick = Loc.getAdvancedLoc(2);
+          reportRef(Wrapped, AfterBacktick, Info, std::nullopt);
+        } else {
+          assert(Range.str().front() == '_' || Range.str().front() == '$');
+          auto AfterDollar = Loc.getAdvancedLoc(1);
+          reportRef(Wrapped, AfterDollar, Info, std::nullopt);
+        }
       }
     }
 

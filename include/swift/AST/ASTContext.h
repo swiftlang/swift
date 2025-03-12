@@ -614,6 +614,10 @@ public:
   /// are the real (physical) module names on disk.
   void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
 
+  /// Adds a given alias to the map of Identifiers between module aliases and
+  /// their actual names.
+  void addModuleAlias(StringRef moduleAlias, StringRef realName);
+
   /// Look up option used in \c getRealModuleName when module aliasing is applied.
   enum class ModuleAliasLookupOption {
     alwaysRealName,

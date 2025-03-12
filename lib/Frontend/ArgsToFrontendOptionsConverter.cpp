@@ -936,9 +936,12 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
     // it should be called only once
     options.ModuleAliasMap.clear();
 
-    auto validate = [&options, &diags](StringRef value, bool allowModuleName) -> bool
-    {
-      if (!allowModuleName) {
+    // validatingModuleName should be true if validating the alias target (an
+    // actual module name), or true if validating the alias name (which can be
+    // an escaped identifier).
+    auto validate = [&options, &diags](StringRef value,
+                                       bool validatingModuleName) -> bool {
+      if (!validatingModuleName) {
         if (value == options.ModuleName ||
             value == options.ModuleABIName ||
             value == options.ModuleLinkName ||
@@ -947,7 +950,8 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
           return false;
         }
       }
-      if (!Lexer::isIdentifier(value)) {
+      if ((validatingModuleName && !Lexer::isIdentifier(value)) ||
+          !Lexer::isValidAsEscapedIdentifier(value)) {
         diags.diagnose(SourceLoc(), diag::error_bad_module_name, value, false);
         return false;
       }
