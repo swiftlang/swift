@@ -2413,11 +2413,11 @@ TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc loc,
   return new (ctx) TypeValueExpr(loc, paramDecl);
 }
 
-OpenedArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
+ExistentialArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   auto type = getOpaqueValue()->getType()->getRValueType();
   while (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
-  return type->castTo<OpenedArchetypeType>();
+  return type->castTo<ExistentialArchetypeType>();
 }
 
 KeyPathExpr::KeyPathExpr(SourceLoc startLoc, Expr *parsedRoot,

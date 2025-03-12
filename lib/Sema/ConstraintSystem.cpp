@@ -857,14 +857,14 @@ ConstraintLocator *ConstraintSystem::getOpenOpaqueLocator(
       { LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl) }, 0);
 }
 
-std::pair<Type, OpenedArchetypeType *>
+std::pair<Type, ExistentialArchetypeType *>
 ConstraintSystem::openAnyExistentialType(Type type,
                                          ConstraintLocator *locator) {
-  Type result = OpenedArchetypeType::getAny(type);
+  Type result = ExistentialArchetypeType::getAny(type);
   Type t = result;
   while (t->is<MetatypeType>())
     t = t->getMetatypeInstanceType();
-  auto *opened = t->castTo<OpenedArchetypeType>();
+  auto *opened = t->castTo<ExistentialArchetypeType>();
 
   recordOpenedExistentialType(locator, opened);
 
@@ -872,7 +872,7 @@ ConstraintSystem::openAnyExistentialType(Type type,
 }
 
 void ConstraintSystem::recordOpenedExistentialType(
-    ConstraintLocator *locator, OpenedArchetypeType *opened) {
+    ConstraintLocator *locator, ExistentialArchetypeType *opened) {
   bool inserted = OpenedExistentialTypes.insert({locator, opened}).second;
   ASSERT(inserted);
 

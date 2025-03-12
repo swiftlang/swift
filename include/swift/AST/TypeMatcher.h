@@ -310,7 +310,7 @@ private:
         }
       }
 
-      // FIXME: Once OpenedArchetypeType stores substitutions, do something
+      // FIXME: Once ExistentialArchetypeType stores substitutions, do something
       // similar to the above.
 
       if (firstArchetype->isEqual(secondType))

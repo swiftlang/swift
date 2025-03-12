@@ -75,7 +75,7 @@ class GenericSignatureBuilder;
 class Identifier;
 class InOutType;
 class OpaqueTypeDecl;
-class OpenedArchetypeType;
+class ExistentialArchetypeType;
 class PackExpansionType;
 class PackType;
 enum class ParamSpecifier : uint8_t;
@@ -114,6 +114,9 @@ enum class TypeKind : uint8_t {
 #define TYPE_RANGE(Id, FirstId, LastId) \
   First_##Id##Type = FirstId, Last_##Id##Type = LastId,
 #include "swift/AST/TypeNodes.def"
+  // For backward compatibility in LLDB sources.
+  // TODO: remove this once OpenedArchetype is renamed in LLDB sources.
+  OpenedArchetype = ExistentialArchetype
 };
 
 enum : unsigned {
@@ -6971,7 +6974,7 @@ protected:
 
 public:
   static bool classof(const TypeBase *type) {
-    return type->getKind() == TypeKind::OpenedArchetype ||
+    return type->getKind() == TypeKind::ExistentialArchetype ||
            type->getKind() == TypeKind::ElementArchetype;
   }
 };
@@ -6979,8 +6982,8 @@ BEGIN_CAN_TYPE_WRAPPER(LocalArchetypeType, ArchetypeType)
 END_CAN_TYPE_WRAPPER(LocalArchetypeType, ArchetypeType)
 
 /// An archetype that represents the dynamic type of an opened existential.
-class OpenedArchetypeType final : public LocalArchetypeType,
-    private ArchetypeTrailingObjects<OpenedArchetypeType>
+class ExistentialArchetypeType final : public LocalArchetypeType,
+    private ArchetypeTrailingObjects<ExistentialArchetypeType>
 {
   friend TrailingObjects;
   friend ArchetypeType;
@@ -6991,7 +6994,7 @@ class OpenedArchetypeType final : public LocalArchetypeType,
   ///
   /// This is only invoked by the generic environment when mapping the
   /// interface type into context.
-  static CanTypeWrapper<OpenedArchetypeType>
+  static CanTypeWrapper<ExistentialArchetypeType>
   getNew(GenericEnvironment *environment, Type interfaceType,
          ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
          LayoutConstraint layout);
@@ -7001,7 +7004,7 @@ public:
   /// of an existential value.
   ///
   /// \param existential The existential type to open.
-  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential);
+  static CanTypeWrapper<ExistentialArchetypeType> get(CanType existential);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
@@ -7014,18 +7017,18 @@ public:
   static Type getAny(Type existential);
 
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::OpenedArchetype;
+    return T->getKind() == TypeKind::ExistentialArchetype;
   }
   
 private:
-  OpenedArchetypeType(GenericEnvironment *environment, Type interfaceType,
+  ExistentialArchetypeType(GenericEnvironment *environment, Type interfaceType,
                       ArrayRef<ProtocolDecl *> conformsTo,
                       Type superclass,
                       LayoutConstraint layout,
                       RecursiveTypeProperties properties);
 };
-BEGIN_CAN_TYPE_WRAPPER(OpenedArchetypeType, LocalArchetypeType)
-END_CAN_TYPE_WRAPPER(OpenedArchetypeType, LocalArchetypeType)
+BEGIN_CAN_TYPE_WRAPPER(ExistentialArchetypeType, LocalArchetypeType)
+END_CAN_TYPE_WRAPPER(ExistentialArchetypeType, LocalArchetypeType)
 
 /// A wrapper around a shape type to use in ArchetypeTrailingObjects
 /// for PackArchetypeType.
@@ -7111,7 +7114,7 @@ const Type *ArchetypeType::getSubclassTrailingObjects() const {
   if (auto opaqueTy = dyn_cast<OpaqueTypeArchetypeType>(this)) {
     return opaqueTy->getTrailingObjects<Type>();
   }
-  if (auto openedTy = dyn_cast<OpenedArchetypeType>(this)) {
+  if (auto openedTy = dyn_cast<ExistentialArchetypeType>(this)) {
     return openedTy->getTrailingObjects<Type>();
   }
   if (auto childTy = dyn_cast<PackArchetypeType>(this)) {

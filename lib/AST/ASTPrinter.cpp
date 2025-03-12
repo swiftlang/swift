@@ -1115,12 +1115,12 @@ public:
     if (Options.TransformContext) {
       Type CurrentType = Options.TransformContext->getBaseType();
       if (CurrentType && CurrentType->hasArchetype()) {
-        // OpenedArchetypeTypes get replaced by a GenericTypeParamType without a
+        // ExistentialArchetypeTypes get replaced by a GenericTypeParamType without a
         // name in mapTypeOutOfContext. The GenericTypeParamType has no children
         // so we can't use it for TypeTransformContext.
-        // To work around this, replace the OpenedArchetypeType with the type of
+        // To work around this, replace the ExistentialArchetypeType with the type of
         // the protocol itself.
-        if (auto *Opened = CurrentType->getAs<OpenedArchetypeType>()) {
+        if (auto *Opened = CurrentType->getAs<ExistentialArchetypeType>()) {
           assert(Opened->isRoot());
           CurrentType = Opened->getExistentialType();
         }
@@ -7115,7 +7115,7 @@ public:
     visit(T->getObjectType());
   }
 
-  void visitOpenedArchetypeType(OpenedArchetypeType *T) {
+  void visitExistentialArchetypeType(ExistentialArchetypeType *T) {
     if (Options.PrintForSIL) {
       auto *env = T->getGenericEnvironment();
 

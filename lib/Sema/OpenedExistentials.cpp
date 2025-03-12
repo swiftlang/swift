@@ -913,10 +913,10 @@ Type swift::typeEraseOpenedArchetypesFromEnvironment(
         return t->hasOpenedExistential();
       },
       /*predicateFn=*/[](Type t) {
-        return t->is<OpenedArchetypeType>();
+        return t->is<ExistentialArchetypeType>();
       },
       /*eraseFn=*/[&](Type t, TypePosition currPos) {
-        auto *openedTy = t->castTo<OpenedArchetypeType>();
+        auto *openedTy = t->castTo<ExistentialArchetypeType>();
         if (openedTy->getGenericEnvironment() == env)
           return openedTy->getExistentialType();
 
