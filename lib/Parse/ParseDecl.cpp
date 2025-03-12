@@ -2912,10 +2912,13 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     consumeAttributeLParen();
 
-    if (Tok.is(tok::code_complete) && CodeCompletionCallbacks) {
-      CodeCompletionCallbacks->completeDeclAttrParam(
-          ParameterizedDeclAttributeKind::AccessControl, 0, false);
+    if (Tok.is(tok::code_complete)) {
+      if (CodeCompletionCallbacks) {
+        CodeCompletionCallbacks->completeDeclAttrParam(
+            ParameterizedDeclAttributeKind::AccessControl, 0, false);
+      }
       consumeToken(tok::code_complete);
+      return makeParserCodeCompletionStatus();
     }
     
     // Parse the subject.
@@ -2926,18 +2929,24 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       
       const Token &Tok2 = peekToken();
       
-      if (CodeCompletionCallbacks) {
-        if (Tok.is(tok::code_complete)) {
+      if (Tok.is(tok::code_complete)) {
+        if (CodeCompletionCallbacks) {
           CodeCompletionCallbacks->completeDeclAttrParam(
               ParameterizedDeclAttributeKind::AccessControl, 0, false);
-          consumeToken(tok::code_complete);
-        } else if (Tok2.is(tok::code_complete) && Tok.is(tok::identifier) &&
-                   !Tok.isContextualDeclKeyword()) {
-          consumeToken(tok::identifier);
-          CodeCompletionCallbacks->completeDeclAttrParam(
-              ParameterizedDeclAttributeKind::AccessControl, 0, false);
-          consumeToken(tok::code_complete);
         }
+        consumeToken(tok::code_complete);
+        return makeParserCodeCompletionStatus();
+      }
+      
+      if (Tok2.is(tok::code_complete) && Tok.is(tok::identifier) &&
+                 !Tok.isContextualDeclKeyword()) {
+        consumeToken(tok::identifier);
+        if (CodeCompletionCallbacks) {
+          CodeCompletionCallbacks->completeDeclAttrParam(
+              ParameterizedDeclAttributeKind::AccessControl, 0, false);
+        }
+        consumeToken(tok::code_complete);
+        return makeParserCodeCompletionStatus();
       }
       
       // Minimal recovery: if there's a single token and then an r_paren,
