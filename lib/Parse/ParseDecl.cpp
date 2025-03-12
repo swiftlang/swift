@@ -2473,8 +2473,9 @@ Parser::parseMacroRoleAttribute(
 /// \returns \c None if an error was diagnosed; \c Identifier() if the argument list was permissibly
 ///          omitted; the identifier written by the user otherwise.
 static std::optional<Identifier> parseSingleAttrOptionImpl(
-    Parser &P, SourceLoc Loc, SourceRange &AttrRange, StringRef AttrName,
-    DeclAttrKind DK, bool allowOmitted, DiagRef nonIdentifierDiagnostic) {
+    Parser &P, SourceLoc Loc, SourceRange &AttrRange, StringRef AttrName, DeclAttrKind DK,
+    ParserStatus &Status, bool allowOmitted, DiagRef nonIdentifierDiagnostic,
+    llvm::function_ref<void()> codeCompletionCallback = {}) {
   SWIFT_DEFER {
     AttrRange = SourceRange(Loc, P.PreviousLoc);
   };
@@ -2484,19 +2485,32 @@ static std::optional<Identifier> parseSingleAttrOptionImpl(
     if (allowOmitted)
       return Identifier();
     
+    Status.setIsParseError();
     P.diagnose(Loc, diag::attr_expected_lparen, AttrName, isDeclModifier);
     return std::nullopt;
   }
 
   P.consumeAttributeLParen();
+  
+  if (P.Tok.is(tok::code_complete)) {
+    Status.setHasCodeCompletion();
+    codeCompletionCallback();
+  }
 
   StringRef parsedName = P.Tok.getText();
   if (!P.consumeIf(tok::identifier)) {
+    Status.setIsParseError();
     P.diagnose(Loc, nonIdentifierDiagnostic);
     return std::nullopt;
   }
   
+  if (P.Tok.is(tok::code_complete)) {
+    Status.setHasCodeCompletion();
+    codeCompletionCallback();
+  }
+  
   if (!P.consumeIf(tok::r_paren)) {
+    Status.setIsParseError();
     P.diagnose(Loc, diag::attr_expected_rparen, AttrName, isDeclModifier);
     return std::nullopt;
   }
@@ -2590,11 +2604,11 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
 /// \returns \c None if an error was diagnosed; \c Identifier() if the argument list was permissibly
 ///          omitted; the identifier written by the user otherwise.
 static std::optional<Identifier>
-parseSingleAttrOptionIdentifier(Parser &P, SourceLoc Loc,
+parseSingleAttrOptionIdentifier(Parser &P, SourceLoc Loc, ParserStatus &Status,
                                 SourceRange &AttrRange, StringRef AttrName,
                                 DeclAttrKind DK, bool allowOmitted = false) {
   return parseSingleAttrOptionImpl(
-             P, Loc, AttrRange, AttrName, DK, allowOmitted,
+             P, Loc, AttrRange, AttrName, DK, Status, allowOmitted,
              {diag::attr_expected_option_identifier, {AttrName}});
 }
 
@@ -2616,13 +2630,17 @@ template <typename R>
 static std::optional<R>
 parseSingleAttrOption(Parser &P, SourceLoc Loc, SourceRange &AttrRange,
                       StringRef AttrName, DeclAttrKind DK,
+                      ParserStatus& Status,
                       ArrayRef<std::pair<Identifier, R>> options,
-                      std::optional<R> valueIfOmitted = std::nullopt) {
+                      std::optional<R> valueIfOmitted = std::nullopt,
+                      llvm::function_ref<void()> codeCompletionCallback = {}) {
   auto parsedIdentifier = parseSingleAttrOptionImpl(
-             P, Loc, AttrRange,AttrName, DK,
+             P, Loc, AttrRange, AttrName, DK, Status,
              /*allowOmitted=*/valueIfOmitted.has_value(),
              {diag::attr_expected_option_such_as,
-              {AttrName, options.front().first.str()}});
+             {AttrName, options.front().first.str()}},
+             codeCompletionCallback);
+
   if (!parsedIdentifier)
     return std::nullopt;
 
@@ -2755,8 +2773,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
 
   case DeclAttrKind::Inline: {
+    ParserStatus optionStatus;
     auto kind = parseSingleAttrOption<InlineKind>(
-        *this, Loc, AttrRange, AttrName, DK, {
+        *this, Loc, AttrRange, AttrName, DK, optionStatus, {
           { Context.Id_never,   InlineKind::Never },
           { Context.Id__always, InlineKind::Always }
         });
@@ -2770,8 +2789,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
 
   case DeclAttrKind::Optimize: {
+    ParserStatus optionStatus;
     auto optMode = parseSingleAttrOption<OptimizationMode>(
-        *this, Loc, AttrRange, AttrName, DK, {
+        *this, Loc, AttrRange, AttrName, DK, optionStatus, {
           { Context.Id_speed, OptimizationMode::ForSpeed },
           { Context.Id_size,  OptimizationMode::ForSize },
           { Context.Id_none,  OptimizationMode::NoOptimization }
@@ -2786,8 +2806,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
 
   case DeclAttrKind::Exclusivity: {
+    ParserStatus optionStatus;
     auto mode = parseSingleAttrOption<ExclusivityAttr::Mode>(
-           *this, Loc, AttrRange, AttrName, DK, {
+           *this, Loc, AttrRange, AttrName, DK, optionStatus, {
              { Context.Id_checked, ExclusivityAttr::Mode::Checked },
              { Context.Id_unchecked, ExclusivityAttr::Mode::Unchecked }
            });
@@ -2807,11 +2828,19 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     if (Kind == ReferenceOwnership::Unowned) {
       // Parse an optional specifier after unowned.
+      ParserStatus optionStatus;
       Kind = parseSingleAttrOption<ReferenceOwnership>(
-          *this, Loc, AttrRange, AttrName, DK, {
+          *this, Loc, AttrRange, AttrName, DK, optionStatus, {
             { Context.Id_unsafe, ReferenceOwnership::Unmanaged },
             { Context.Id_safe,   ReferenceOwnership::Unowned }
-          }, ReferenceOwnership::Unowned)
+          }, ReferenceOwnership::Unowned,
+          [&] () {
+            if (CodeCompletionCallbacks) {
+              CodeCompletionCallbacks->completeDeclAttrParam(
+                  ParameterizedDeclAttributeKind::Unowned, 0, false);
+              consumeToken(tok::code_complete);
+            }
+          })
             // Recover from errors by going back to Unowned.
             .value_or(ReferenceOwnership::Unowned);
     }
@@ -2827,8 +2856,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
 
   case DeclAttrKind::NonSendable: {
+    ParserStatus optionStatus;
     auto kind = parseSingleAttrOption<NonSendableKind>(
-        *this, Loc, AttrRange, AttrName, DK, {
+        *this, Loc, AttrRange, AttrName, DK, optionStatus, {
           { Context.Id_assumed, NonSendableKind::Assumed }
         }, NonSendableKind::Specific);
     if (!kind)
@@ -2882,11 +2912,34 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     consumeAttributeLParen();
 
+    if (Tok.is(tok::code_complete) && CodeCompletionCallbacks) {
+      CodeCompletionCallbacks->completeDeclAttrParam(
+          ParameterizedDeclAttributeKind::AccessControl, 0, false);
+      consumeToken(tok::code_complete);
+    }
+    
     // Parse the subject.
     if (Tok.isContextualKeyword("set")) {
       consumeToken();
     } else {
       diagnose(Loc, diag::attr_access_expected_set, AttrName);
+      
+      const Token &Tok2 = peekToken();
+      
+      if (CodeCompletionCallbacks) {
+        if (Tok.is(tok::code_complete)) {
+          CodeCompletionCallbacks->completeDeclAttrParam(
+              ParameterizedDeclAttributeKind::AccessControl, 0, false);
+          consumeToken(tok::code_complete);
+        } else if (Tok2.is(tok::code_complete) && Tok.is(tok::identifier) &&
+                   !Tok.isContextualDeclKeyword()) {
+          consumeToken(tok::identifier);
+          CodeCompletionCallbacks->completeDeclAttrParam(
+              ParameterizedDeclAttributeKind::AccessControl, 0, false);
+          consumeToken(tok::code_complete);
+        }
+      }
+      
       // Minimal recovery: if there's a single token and then an r_paren,
       // consume them both. If there's just an r_paren, consume that.
       if (!consumeIf(tok::r_paren)) {
@@ -3155,8 +3208,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DeclAttrKind::SwiftNativeObjCRuntimeBase: {
     SourceRange range;
-    auto name = parseSingleAttrOptionIdentifier(*this, Loc, range, AttrName,
-                                                DK);
+    ParserStatus optionStatus;
+    auto name = parseSingleAttrOptionIdentifier(*this, Loc, optionStatus, range,
+                                                AttrName, DK);
     if (!name)
       return makeParserSuccess();
 
@@ -3448,7 +3502,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
   case DeclAttrKind::ObjCImplementation: {
     SourceRange range;
-    auto name = parseSingleAttrOptionIdentifier(*this, Loc, range, AttrName, DK,
+    ParserStatus optionStatus;
+    auto name = parseSingleAttrOptionIdentifier(*this, Loc, optionStatus, range, AttrName, DK,
                                                 /*allowOmitted=*/true);
     if (!name)
       return makeParserSuccess();
@@ -3460,8 +3515,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
   case DeclAttrKind::ObjCRuntimeName: {
     SourceRange range;
+    ParserStatus optionStatus;
     auto name =
-        parseSingleAttrOptionIdentifier(*this, Loc, range, AttrName, DK);
+        parseSingleAttrOptionIdentifier(*this, Loc, optionStatus, range, AttrName, DK);
     if (!name)
       return makeParserSuccess();
 
@@ -3618,8 +3674,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DeclAttrKind::ProjectedValueProperty: {
     SourceRange range;
+    ParserStatus optionStatus;
     auto name =
-        parseSingleAttrOptionIdentifier(*this, Loc, range, AttrName, DK);
+        parseSingleAttrOptionIdentifier(*this, Loc, optionStatus, range, AttrName, DK);
     if (!name)
       return makeParserSuccess();
 
@@ -3719,9 +3776,17 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DeclAttrKind::Nonisolated: {
     std::optional<bool> isUnsafe(false);
     if (EnableParameterizedNonisolated) {
+      ParserStatus optionStatus;
       isUnsafe =
           parseSingleAttrOption<bool>(*this, Loc, AttrRange, AttrName, DK,
-                                      {{Context.Id_unsafe, true}}, *isUnsafe);
+                                      optionStatus, {{Context.Id_unsafe, true}},
+                                      *isUnsafe, [&] () {
+            if (CodeCompletionCallbacks) {
+              CodeCompletionCallbacks->completeDeclAttrParam(
+                  ParameterizedDeclAttributeKind::Nonisolated, 0, false);
+              consumeToken(tok::code_complete);
+            }
+          });
       if (!isUnsafe) {
         return makeParserSuccess();
       }
@@ -3920,8 +3985,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
 
   case DeclAttrKind::Execution: {
+    ParserStatus optionStatus;
     auto behavior = parseSingleAttrOption<ExecutionKind>(
-        *this, Loc, AttrRange, AttrName, DK,
+        *this, Loc, AttrRange, AttrName, DK, optionStatus,
         {{Context.Id_concurrent, ExecutionKind::Concurrent},
          {Context.Id_caller, ExecutionKind::Caller}});
     if (!behavior)
