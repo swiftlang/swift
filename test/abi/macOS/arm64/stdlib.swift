@@ -826,6 +826,14 @@ Added: _$ss14MutableRawSpanVMa
 Added: _$ss14MutableRawSpanVMn
 Added: _$ss14MutableRawSpanVN
 
+// span and mutableSpan properties
+Added: _$sSa4spans4SpanVyxGvpMV
+Added: _$sSa11mutableSpans07MutableB0VyxGvr
+Added: _$ss10ArraySliceV4spans4SpanVyxGvpMV
+Added: _$ss10ArraySliceV11mutableSpans07MutableD0VyxGvr
+Added: _$ss15ContiguousArrayV4spans4SpanVyxGvpMV
+Added: _$ss15ContiguousArrayV11mutableSpans07MutableD0VyxGvr
+
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
 Added: _$ss13_SwiftifyExprO6returnyA2BmFWC
