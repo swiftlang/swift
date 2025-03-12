@@ -723,7 +723,14 @@ final internal class __VaListBuilder {
   internal var retainer = [CVarArg]()
 #endif
 
-  internal static var alignedStorageForEmptyVaLists: Double = 0
+  // Some code will call a variadic function without passing variadic parameters
+  // where the function will still attempt to read variadic parameters. For
+  // example, calling printf with an arbitrary string as the format string. This
+  // is inherently unsound, but we'll try to be nice to such code by giving it
+  // 64 bytes of zeroes in that case.
+  internal static var alignedStorageForEmptyVaLists:
+     (Double, Double, Double, Double, Double, Double, Double, Double)
+         = (0, 0, 0, 0, 0, 0, 0, 0)
 }
 
 #endif
