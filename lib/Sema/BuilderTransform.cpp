@@ -959,6 +959,9 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
     return nullptr;
 
   ConstraintSystemOptions options = ConstraintSystemFlags::AllowFixes;
+  if (debugConstraintSolverForTarget(ctx, target))
+    options |= ConstraintSystemFlags::DebugConstraints;
+
   auto resultInterfaceTy = func->getResultInterfaceType();
   auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
 

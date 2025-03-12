@@ -6510,6 +6510,9 @@ bool isResultBuilderMethodReference(ASTContext &, UnresolvedDotExpr *);
 unsigned getNumApplications(bool hasAppliedSelf,
                             FunctionRefInfo functionRefInfo);
 
+/// Determine whether the debug output is enabled for the given target.
+bool debugConstraintSolverForTarget(ASTContext &C,
+                                    SyntacticElementTarget target);
 } // end namespace constraints
 
 template<typename ...Args>
