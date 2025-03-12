@@ -971,11 +971,17 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   }
 
   case MacroRole::Body: {
-    if (target.is<Expr *>()) {
+    if (auto *expr = target.dyn_cast<Expr *>()) {
+      ASSERT(isa<ClosureExpr>(expr));
+
+      auto *closure = cast<ClosureExpr>(expr);
       // A closure body macro expansion replaces the full source
-      // range of the closure.
+      // range of the closure body starting from `in` and ending right
+      // before the closing brace.
       return Lexer::getCharSourceRangeFromSourceRange(
-          sourceMgr, target.getSourceRange());
+          sourceMgr, SourceRange(Lexer::getLocForEndOfToken(
+                                     sourceMgr, closure->getInLoc()),
+                                 closure->getEndLoc()));
     }
 
     SourceLoc afterDeclLoc =
