@@ -573,7 +573,7 @@ ERROR(dont_enable_interop_and_compat,none,
       "'-cxx-interoperability-mode'; remove '-enable-experimental-cxx-interop'", ())
 
 NOTE(valid_cxx_interop_modes,none,
-      "valid arguments to '-cxx-interoperability-mode=' are %0", (StringRef))
+      "valid arguments to '%0' are %1", (StringRef, StringRef))
 NOTE(swift_will_maintain_compat,none,
      "Swift will maintain source compatibility for imported APIs based on the "
      "selected compatibility mode, so updating the Swift compiler will not "
