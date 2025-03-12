@@ -8950,11 +8950,8 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
       attachMacro = true;
     }
     bool returnHasLifetimeInfo = false;
-    bool lifetimeDependenceOn =
-        SwiftContext.LangOpts.hasFeature(Feature::LifetimeDependence);
     if (SwiftDeclConverter::getImplicitObjectParamAnnotation<
-            clang::LifetimeBoundAttr>(ClangDecl) &&
-        lifetimeDependenceOn) {
+            clang::LifetimeBoundAttr>(ClangDecl)) {
       printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
                                        true);
       returnHasLifetimeInfo = true;
@@ -8976,8 +8973,7 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
         printer.printNonEscaping(index);
         paramHasLifetimeInfo = true;
       }
-      if (clangParam->hasAttr<clang::LifetimeBoundAttr>() &&
-          lifetimeDependenceOn) {
+      if (clangParam->hasAttr<clang::LifetimeBoundAttr>()) {
         printer.printLifetimeboundReturn(
             index, !paramHasBoundsInfo &&
                        swiftParam->getInterfaceType()->isEscapable());
