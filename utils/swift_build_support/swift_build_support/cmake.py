@@ -267,14 +267,18 @@ class CMake(object):
         if not os.path.isdir(cmake_build_dir):
             os.makedirs(cmake_build_dir)
 
-        cwd = os.getcwd()
-        os.chdir(cmake_build_dir)
-        build_jobs = self.args.build_jobs or multiprocessing.cpu_count()
-        shell.call_without_sleeping([cmake_bootstrap, '--no-qt-gui',
-                                     '--parallel=%s' % build_jobs, '--',
-                                     '-DCMAKE_USE_OPENSSL=OFF'], echo=True)
-        shell.call_without_sleeping(['make', '-j%s' % build_jobs],
-                                    echo=True)
+        print("--- Bootstrap Local CMake ---", flush=True)
+        from swift_build_support.swift_build_support.utils \
+            import log_time_in_scope
+        with log_time_in_scope("Bootstrap Local CMake"):
+            cwd = os.getcwd()
+            os.chdir(cmake_build_dir)
+            build_jobs = self.args.build_jobs or multiprocessing.cpu_count()
+            shell.call_without_sleeping([cmake_bootstrap, '--no-qt-gui',
+                                         '--parallel=%s' % build_jobs, '--',
+                                         '-DCMAKE_USE_OPENSSL=OFF'], echo=True)
+            shell.call_without_sleeping(['make', '-j%s' % build_jobs],
+                                        echo=True)
         os.chdir(cwd)
         return os.path.join(cmake_build_dir, 'bin', 'cmake')
 
