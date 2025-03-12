@@ -1253,7 +1253,18 @@ extension Task where Success == Never, Failure == Never {
       let job = _taskCreateNullaryContinuationJob(
           priority: Int(Task.currentPriority.rawValue),
           continuation: continuation)
+
+      #if !$Embedded
+      if #available(SwiftStdlib 6.2, *) {
+        let executor = Task.currentExecutor ?? Task.defaultExecutor
+
+        executor.enqueue(ExecutorJob(context: job))
+      } else {
+        _enqueueJobGlobal(job)
+      }
+      #else
       _enqueueJobGlobal(job)
+      #endif
     }
   }
 }

@@ -25,6 +25,8 @@ import Swift
 
 @available(SwiftStdlib 6.2, *)
 public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
+  public typealias AsSchedulable = DispatchMainExecutor
+
   var threaded = false
 
   public init() {}
@@ -52,8 +54,13 @@ extension DispatchMainExecutor: SerialExecutor {
 
   public var isMainExecutor: Bool { true }
 
-  public var supportsScheduling: Bool { true }
+  public func checkIsolated() {
+    _dispatchAssertMainQueue()
+  }
+}
 
+@available(SwiftStdlib 6.2, *)
+extension DispatchMainExecutor: SchedulableExecutor {
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 at instant: C.Instant,
                                 tolerance: C.Duration? = nil,
@@ -73,10 +80,6 @@ extension DispatchMainExecutor: SerialExecutor {
                                  CLongLong(tolSec), CLongLong(tolNanosec),
                                  clockID.rawValue,
                                  UnownedJob(job))
-  }
-
-  public func checkIsolated() {
-    _dispatchAssertMainQueue()
   }
 }
 
@@ -116,7 +119,10 @@ extension DispatchMainExecutor: MainExecutor {}
 // .. Task Executor ............................................................
 
 @available(SwiftStdlib 6.2, *)
-public class DispatchGlobalTaskExecutor: TaskExecutor, @unchecked Sendable {
+public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
+                                         @unchecked Sendable {
+
+  public typealias AsSchedulable = DispatchGlobalTaskExecutor
 
   public init() {}
 
@@ -125,8 +131,6 @@ public class DispatchGlobalTaskExecutor: TaskExecutor, @unchecked Sendable {
   }
 
   public var isMainExecutor: Bool { false }
-
-  public var supportsScheduling: Bool { true }
 
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 at instant: C.Instant,

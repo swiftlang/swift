@@ -16,6 +16,13 @@ import Swift
 @available(SwiftStdlib 5.1, *)
 public protocol Executor: AnyObject, Sendable {
 
+  /// This Executor type as a schedulable executor.
+  ///
+  /// If the conforming type also conforms to `SchedulableExecutor`, then this is
+  /// bound to `Self`. Otherwise, it is an uninhabited type (such as Never).
+  @available(SwiftStdlib 6.2, *)
+  associatedtype AsSchedulable: SchedulableExecutor = SchedulableExecutorNever
+
   // Since lack move-only type support in the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY configuration
   // Do not deprecate the UnownedJob enqueue in that configuration just yet - as we cannot introduce the replacements.
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -46,16 +53,25 @@ public protocol Executor: AnyObject, Sendable {
   @available(SwiftStdlib 6.2, *)
   var isMainExecutor: Bool { get }
   #endif
+}
 
-  /// `true` if this Executor supports scheduling.
-  ///
-  /// This will default to false.  If you attempt to use the delayed
-  /// enqueuing functions on an executor that does not support scheduling,
-  /// the default executor will be used to do the scheduling instead,
-  /// unless the default executor does not support scheduling in which
-  /// case you will get a fatal error.
-  @available(SwiftStdlib 6.2, *)
-  var supportsScheduling: Bool { get }
+/// Uninhabited class type to indicate we don't support scheduling.
+@available(SwiftStdlib 6.2, *)
+public class SchedulableExecutorNever {
+  private init(_ n: Never) {}
+}
+
+@available(SwiftStdlib 6.2, *)
+extension SchedulableExecutorNever: SchedulableExecutor, @unchecked Sendable {
+
+  public func enqueue(_ job: consuming ExecutorJob) {
+    fatalError("This should never be reached")
+  }
+
+}
+
+@available(SwiftStdlib 6.2, *)
+public protocol SchedulableExecutor: Executor where Self.AsSchedulable == Self {
 
   #if !$Embedded
 
@@ -101,6 +117,24 @@ public protocol Executor: AnyObject, Sendable {
                          clock: C)
 
   #endif // !$Embedded
+
+}
+
+extension Executor {
+  /// Return this executable as a SchedulableExecutor, or nil if that is
+  /// unsupported.
+  @available(SwiftStdlib 6.2, *)
+  var asSchedulable: AsSchedulable? {
+    #if !$Embedded
+    if Self.self == AsSchedulable.self {
+      return _identityCast(self, to: AsSchedulable.self)
+    } else {
+      return nil
+    }
+    #else
+    return nil
+    #endif
+  }
 }
 
 extension Executor {
@@ -115,7 +149,6 @@ extension Executor where Self: Equatable {
   internal var _isComplexEquality: Bool { true }
 }
 
-// Delay support
 extension Executor {
 
   #if !$Embedded
@@ -125,10 +158,11 @@ extension Executor {
   public var isMainExecutor: Bool { false }
   #endif
 
-  // This defaults to `false` so that existing third-party TaskExecutor
-  // implementations will work as expected.
-  @available(SwiftStdlib 6.2, *)
-  public var supportsScheduling: Bool { false }
+}
+
+// Delay support
+@available(SwiftStdlib 6.2, *)
+extension SchedulableExecutor {
 
   #if !$Embedded
 
@@ -137,10 +171,6 @@ extension Executor {
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
-    if !supportsScheduling {
-      fatalError("Executor \(self) does not support scheduling")
-    }
-
     // If you crash here with a mutual recursion, it's because you didn't
     // implement one of these two functions
     enqueue(job, at: clock.now.advanced(by: delay),
@@ -152,10 +182,6 @@ extension Executor {
                                 at instant: C.Instant,
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
-    if !supportsScheduling {
-      fatalError("Executor \(self) does not support scheduling")
-    }
-
     // If you crash here with a mutual recursion, it's because you didn't
     // implement one of these two functions
     enqueue(job, after: clock.now.duration(to: instant),
@@ -493,9 +519,9 @@ public protocol RunLoopExecutor: Executor {
   ///
   /// Parameters:
   ///
-  /// - until condition: A closure that returns `true` if the run loop should
-  ///                    stop.
-  func run(until condition: () -> Bool) throws
+  /// - condition: A closure that returns `true` if the run loop should
+  ///              stop.
+  func runUntil(_ condition: () -> Bool) throws
 
   /// Signal to the run loop to stop running and return.
   ///
@@ -517,9 +543,7 @@ extension RunLoopExecutor {
 }
 
 
-/// Represents an event; we don't want to allocate, so we can't use
-/// a protocol here and use `any Event`.  Instead of doing that, wrap
-/// an `Int` (which is pointer-sized) in a `struct`.
+/// Represents an event registered with an `EventableExecutor`.
 @available(SwiftStdlib 6.2, *)
 public struct ExecutorEvent: Identifiable, Comparable, Sendable {
   public typealias ID = Int
@@ -645,15 +669,55 @@ extension Task where Success == Never, Failure == Never {
 extension Task where Success == Never, Failure == Never {
   /// Get the current executor; this is the executor that the currently
   /// executing task is executing on.
+  ///
+  /// This will return, in order of preference:
+  ///
+  ///   1. The custom executor associated with an `Actor` on which we are
+  ///      currently running, or
+  ///   2. The preferred executor for the currently executing `Task`, or
+  ///   3. The task executor for the current thread
+  ///
+  ///  If none of these exist, this property will be `nil`.
   @available(SwiftStdlib 6.2, *)
   @_unavailableInEmbedded
   public static var currentExecutor: (any Executor)? {
-    if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
-      return taskExecutor
-    } else if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor() {
+    if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor() {
       return activeExecutor
+    } else if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
+      return taskExecutor
     } else if let taskExecutor = unsafe _getCurrentTaskExecutor().asTaskExecutor() {
       return taskExecutor
+    }
+    return nil
+  }
+
+  /// Get the preferred executor for the current `Task`, if any.
+  @available(SwiftStdlib 6.2, *)
+  public static var preferredExecutor: (any TaskExecutor)? {
+    if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
+      return taskExecutor
+    }
+    return nil
+  }
+
+  /// Get the current *schedulable* executor, if any.
+  ///
+  /// This follows the same logic as `currentExecutor`, except that it ignores
+  /// any executor that isn't a `SchedulableExecutor`.
+  @available(SwiftStdlib 6.2, *)
+  @_unavailableInEmbedded
+  public static var currentSchedulableExecutor: (any SchedulableExecutor)? {
+    if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor(),
+       let schedulable = activeExecutor.asSchedulable {
+      return schedulable
+    }
+    if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor(),
+       let schedulable = taskExecutor.asSchedulable {
+      return schedulable
+    }
+    if let taskExecutor = unsafe _getCurrentTaskExecutor().asTaskExecutor(),
+       let schedulable = taskExecutor.asSchedulable {
+      return schedulable
     }
     return nil
   }

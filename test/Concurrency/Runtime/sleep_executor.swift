@@ -20,15 +20,13 @@ actor MyActor {
 }
 
 @available(SwiftStdlib 6.2, *)
-final class TestExecutor: TaskExecutor, @unchecked Sendable {
+final class TestExecutor: TaskExecutor, SchedulableExecutor @unchecked Sendable {
   public func enqueue(_ _job: consuming ExecutorJob) {
     let job = UnownedJob(_job)
     DispatchQueue.main.async {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
   }
-
-  public var supportsScheduling: Bool { true}
 
   public func enqueue<C: Clock>(_ _job: consuming ExecutorJob,
                                 after delay: C.Duration,

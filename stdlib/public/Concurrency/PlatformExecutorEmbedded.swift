@@ -31,8 +31,6 @@ public final class EmbeddedMainExecutor: MainExecutor, @unchecked Sendable {
   // We can't implement enqueue<C: Clock> in Embedde Swift because we aren't
   // allowed to have generics in an existential there.
 
-  public var supportsScheduling: Bool { false }
-
   public func run() throws {
   }
 
@@ -63,10 +61,5 @@ public final class EmbeddedDefaultExecutor: TaskExecutor, @unchecked Sendable {
 
   public func enqueue(_ job: consuming ExecutorJob) {
   }
-
-  // We can't implement enqueue<C: Clock> in Embedde Swift because we aren't
-  // allowed to have generics in an existential there.
-
-  public var supportsScheduling: Bool { false }
 
 }

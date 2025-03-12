@@ -200,9 +200,9 @@ extension Clock {
 /// basis.
 @available(SwiftStdlib 6.2, *)
 public struct ClockTraits: OptionSet {
-  public let rawValue: Int32
+  public let rawValue: UInt32
 
-  public init(rawValue: Int32) {
+  public init(rawValue: UInt32) {
     self.rawValue = rawValue
   }
 

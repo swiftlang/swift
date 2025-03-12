@@ -55,14 +55,14 @@ extension Task where Success == Never, Failure == Never {
               }
 
               if #available(SwiftStdlib 6.2, *) {
-                let executor = Task.currentExecutor ?? Task.defaultExecutor
+                let executor = Task.currentSchdulableExecutor ?? Task.defaultExecutor.asSchedulable
                 let job = ExecutorJob(context: Builtin.convertTaskToJob(sleepTask))
 
                 #if !$Embedded
-                executor.enqueue(job,
-                                 at: instant,
-                                 tolerance: tolerance,
-                                 clock: clock)
+                executor!.enqueue(job,
+                                  at: instant,
+                                  tolerance: tolerance,
+                                  clock: clock)
                 #endif
               } else {
                 // Since we're building the new version of the stdlib,
