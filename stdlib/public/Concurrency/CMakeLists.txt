@@ -245,13 +245,13 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     list(GET list 2 triple)
 
     if (SWIFT_HOST_VARIANT STREQUAL "linux")
-      if((NOT "${mod}" MATCHES "-linux-gnu$") AND (NOT "${arch}" MATCHES "^wasm"))
+      if((NOT "${mod}" MATCHES "-linux-gnu$") AND (NOT "${mod}" MATCHES "-wasip1"))
         continue()
       endif()
       set(extra_c_compile_flags)
       set(extra_swift_compile_flags)
     elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
-      if((NOT "${mod}" MATCHES "-macos$") AND (NOT "${arch}" MATCHES "^wasm"))
+      if((NOT "${mod}" MATCHES "-macos$") AND (NOT "${mod}" MATCHES "-wasip1"))
         continue()
       endif()
       if("${mod}" MATCHES "riscv")
@@ -260,8 +260,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       if("${mod}" MATCHES "armv6m")
         continue()
       endif()
-      set(extra_c_compile_flags -D__MACH__ -D__APPLE__ -ffreestanding -stdlib=libc++)
-      set(extra_swift_compile_flags -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding)
+
+      if("${mod}" MATCHES "-macos$")
+        set(extra_c_compile_flags -D__MACH__ -D__APPLE__ -ffreestanding -stdlib=libc++)
+        set(extra_swift_compile_flags -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding)
+      endif()
     endif()
 
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
@@ -304,7 +307,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       COMPONENT "stdlib"
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
-    set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+
+    if(NOT "${arch}" MATCHES "wasm32")
+      set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+    elseif("${mod}" MATCHES "-wasip1$")
+      target_compile_options(embedded-concurrency-${mod} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--sysroot=${SWIFT_WASI_SYSROOT_PATH}>)
+    endif()
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
 
     # lib/swift/embedded/<triple>/libswift_ConcurrencyDefaultExecutor.a
