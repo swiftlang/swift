@@ -396,7 +396,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
           .highlight(SourceRange(ArgumentLoc));
       if (Tok.is(tok::code_complete) && CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeDeclAttrParam(
-            CustomSyntaxAttributeKind::Available, ParamIndex,
+            ParameterizedDeclAttributeKind::Available, ParamIndex,
             /*HasLabel=*/false);
         consumeToken(tok::code_complete);
       } else {
@@ -737,7 +737,7 @@ bool Parser::parseAvailability(
       !(Tok.isAnyOperator() && Tok.getText() == "*")) {
     if (Tok.is(tok::code_complete) && CodeCompletionCallbacks) {
       CodeCompletionCallbacks->completeDeclAttrParam(
-          CustomSyntaxAttributeKind::Available, 0, /*HasLabel=*/false);
+          ParameterizedDeclAttributeKind::Available, 0, /*HasLabel=*/false);
       consumeToken(tok::code_complete);
     }
     diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
@@ -993,7 +993,7 @@ Parser::parseStorageRestrictionsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
             }
           }
           this->CodeCompletionCallbacks->completeDeclAttrParam(
-              CustomSyntaxAttributeKind::StorageRestrictions,
+              ParameterizedDeclAttributeKind::StorageRestrictions,
               static_cast<int>(completionKind), /*HasLabel=*/false);
         }
       } else if (parseIdentifier(propertyName, propertyNameLoc,
@@ -1026,7 +1026,7 @@ Parser::parseStorageRestrictionsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
       if (consumeIf(tok::code_complete)) {
         if (this->CodeCompletionCallbacks) {
           this->CodeCompletionCallbacks->completeDeclAttrParam(
-              CustomSyntaxAttributeKind::StorageRestrictions,
+              ParameterizedDeclAttributeKind::StorageRestrictions,
               static_cast<int>(StorageRestrictionsCompletionKind::Label),
               /*HasLabel=*/false);
         }
@@ -2214,11 +2214,11 @@ std::optional<MacroRole> getMacroRole(StringRef roleName) {
       .Default(std::nullopt);
 }
 
-static CustomSyntaxAttributeKind getCustomSyntaxAttributeKind(bool isAttached) {
+static ParameterizedDeclAttributeKind getParameterizedDeclAttributeKind(bool isAttached) {
   if (isAttached) {
-    return CustomSyntaxAttributeKind::AttachedMacro;
+    return ParameterizedDeclAttributeKind::AttachedMacro;
   } else {
-    return CustomSyntaxAttributeKind::FreestandingMacro;
+    return ParameterizedDeclAttributeKind::FreestandingMacro;
   }
 }
 
@@ -2265,13 +2265,13 @@ Parser::parseMacroRoleAttribute(
             sawRole = true;
             if (this->CodeCompletionCallbacks) {
               this->CodeCompletionCallbacks->completeDeclAttrParam(
-                  getCustomSyntaxAttributeKind(isAttached), 0,
+                  getParameterizedDeclAttributeKind(isAttached), 0,
                   /*HasLabel=*/false);
             }
           } else if (!sawNames) {
             if (this->CodeCompletionCallbacks) {
               this->CodeCompletionCallbacks->completeDeclAttrParam(
-                  getCustomSyntaxAttributeKind(isAttached), 1,
+                  getParameterizedDeclAttributeKind(isAttached), 1,
                   /*HasLabel=*/false);
             }
           }
@@ -2373,7 +2373,7 @@ Parser::parseMacroRoleAttribute(
           status.setHasCodeCompletionAndIsError();
           if (this->CodeCompletionCallbacks) {
             this->CodeCompletionCallbacks->completeDeclAttrParam(
-                getCustomSyntaxAttributeKind(isAttached), 1, /*HasLabel=*/true);
+                getParameterizedDeclAttributeKind(isAttached), 1, /*HasLabel=*/true);
           }
         } else if (parseIdentifier(introducedNameKind, introducedNameKindLoc,
                                    diag::macro_attribute_unknown_argument_form,

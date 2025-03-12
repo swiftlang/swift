@@ -32,7 +32,7 @@ enum class ObjCSelectorContext {
 /// Attributes that have syntax which can't be modelled using a function call.
 /// This can't be \c DeclAttrKind because '@freestandig' and '@attached' have
 /// the same attribute kind but take different macro roles as arguemnts.
-enum class CustomSyntaxAttributeKind {
+enum class ParameterizedDeclAttributeKind {
   Available,
   FreestandingMacro,
   AttachedMacro,
@@ -228,7 +228,7 @@ public:
   /// @available.
   /// If `HasLabel` is `true`, then the argument already has a label specified,
   /// e.g. we're completing after `names: ` in a macro declaration.
-  virtual void completeDeclAttrParam(CustomSyntaxAttributeKind DK, int Index,
+  virtual void completeDeclAttrParam(ParameterizedDeclAttributeKind DK, int Index,
                                      bool HasLabel){};
 
   /// Complete 'async' and 'throws' at effects specifier position.
