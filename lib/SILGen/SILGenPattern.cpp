@@ -1430,7 +1430,8 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
               MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
               MarkUnresolvedNonCopyableValueInst::IsStrict);
 
-  SGF.VarLocs[var] = SILGenFunction::VarLoc::get(bindValue.getValue());
+  SGF.VarLocs[var] = SILGenFunction::VarLoc(bindValue.getValue(),
+                                            SILAccessEnforcement::Unknown);
 }
 
 /// Evaluate a guard expression and, if it returns false, branch to
@@ -3168,8 +3169,9 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
           }
 
           // Ok, we found a match. Update the VarLocs for the case block.
-          auto v = SGF.VarLocs[vd];
-          SGF.VarLocs[expected] = v;
+          auto &v = SGF.VarLocs[vd];
+          SGF.VarLocs[expected]
+            = SILGenFunction::VarLoc(v.value, v.access, v.box);
 
           // Emit a debug description for the variable, nested within a scope
           // for the pattern match.
@@ -3831,7 +3833,7 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
         continue;
       }
 
-      auto varLoc = VarLocs[var];
+      auto &varLoc = VarLocs[var];
       SILValue value = varLoc.value;
 
       if (value->getType().isAddressOnly(F)) {
@@ -3894,8 +3896,8 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
             }
 
             // Ok, we found a match. Update the VarLocs for the case block.
-            auto v = VarLocs[vd];
-            VarLocs[expected] = v;
+            auto &v = VarLocs[vd];
+            VarLocs[expected] = VarLoc(v.value, v.access, v.box);
 
             // Emit a debug description of the incoming arg, nested within the scope
             // for the pattern match.

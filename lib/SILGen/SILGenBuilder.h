@@ -477,6 +477,10 @@ public:
                                     ManagedValue base,
                                     MarkDependenceKind dependencekind);
 
+  SILValue emitBeginAccess(SILLocation loc, SILValue address,
+                           SILAccessKind kind,
+                           SILAccessEnforcement enforcement);
+
   ManagedValue createOpaqueBorrowBeginAccess(SILLocation loc,
                                              ManagedValue address);
   ManagedValue createOpaqueConsumeBeginAccess(SILLocation loc,

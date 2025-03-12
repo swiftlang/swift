@@ -1081,6 +1081,18 @@ public:
 };
 }
 
+SILValue
+SILGenBuilder::emitBeginAccess(SILLocation loc,
+                               SILValue address,
+                               SILAccessKind kind,
+                               SILAccessEnforcement enforcement) {
+  auto access = createBeginAccess(loc, address,
+                                  kind, enforcement,
+                                  /*no nested conflict*/ false, false);
+  SGF.Cleanups.pushCleanup<EndAccessCleanup>(access);
+  return access;
+}
+
 ManagedValue
 SILGenBuilder::createOpaqueBorrowBeginAccess(SILLocation loc,
                                              ManagedValue address) {
