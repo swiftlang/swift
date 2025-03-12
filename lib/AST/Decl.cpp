@@ -1343,12 +1343,6 @@ bool Decl::isStdlibDecl() const {
          DC->getParentModule()->isStdlibModule();
 }
 
-bool Decl::isConcurrencyLibDecl() const {
-  DeclContext *DC = getDeclContext();
-  return DC->isModuleScopeContext() &&
-         DC->getParentModule()->isConcurrencyModule();
-}
-
 LifetimeAnnotation Decl::getLifetimeAnnotationFromAttributes() const {
   auto &attrs = getAttrs();
   if (attrs.hasAttribute<EagerMoveAttr>())

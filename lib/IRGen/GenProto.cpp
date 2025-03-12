@@ -2474,44 +2474,18 @@ namespace {
 
       ConformanceFlags UpdatedFlags = Flags;
       if (proto->isSpecificProtocol(swift::KnownProtocolKind::SerialExecutor)) {
-//        fprintf(stderr, "[%s:%d](%s) ADDING FLAGS TO CONFORMANCE SINCE IT IS SERIAL EXEC\n", __FILE__, __LINE__, __FUNCTION__);
-//        conf->dump();
-
         conf->forEachValueWitness([&](const ValueDecl *req,
                                       Witness witness) {
           bool nameMatch = witness.getDecl()->getBaseIdentifier() == C.Id_isIsolatingCurrentContext;
-//          fprintf(stderr, "[%s:%d](%s) WITNESS ---- compare name '%s' = %d\n", __FILE__, __LINE__, __FUNCTION__,
-//                  witness.getDecl()->getBaseIdentifier().str(), nameMatch);
-
           if (nameMatch) {
-//            fprintf(stderr, "[%s:%d](%s) WITNESS ----\n", __FILE__, __LINE__, __FUNCTION__);
-//            witness.dump();
-//            fprintf(stderr, "[%s:%d](%s) -\n", __FILE__, __LINE__, __FUNCTION__);
-//            witness.getDecl()->dumpRef();
-//            fprintf(stderr, "[%s:%d](%s) -\n", __FILE__, __LINE__, __FUNCTION__);
-//            witness.getDecl()->dump();
-//
-//            fprintf(stderr, "[%s:%d](%s) WITNESS is inside stdlib? %d\n", __FILE__, __LINE__, __FUNCTION__,
-//                    witness.getDecl()->isStdlibDecl());
-//
-//            fprintf(stderr, "[%s:%d](%s) WITNESS is inside _Concurrency? %d\n", __FILE__, __LINE__, __FUNCTION__,
-//                    witness.getDecl()->isConcurrencyLibDecl());
-
             if (DeclContext *NominalOrExtension = witness.getDecl()->getDeclContext()) {
               ModuleDecl *witnessParentModule = NominalOrExtension->getParentModule();
-//              fprintf(stderr, "[%s:%d](%s) context is::::: %s\n", __FILE__, __LINE__, __FUNCTION__,
-//                      witnessParentModule->getNameStr().str().c_str());
-
               // If the witness is NOT the default implementation in the _Concurrency library,
               // we should record that this is an user provided implementation and we should call it.
-              bool hasUserDefinedIsIsolatingCurrentContext =
+              bool hasNonDefaultIsIsolatingCurrentContext =
                   !witnessParentModule->isConcurrencyModule();
-              if (hasUserDefinedIsIsolatingCurrentContext)
-                fprintf(stderr, "[%s:%d](%s) WITNESS ADD FLAG [%s][%s]>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", __FILE__, __LINE__, __FUNCTION__,
-                        witnessParentModule->getNameStr().str().c_str(),
-                        witness.getDecl()->getBaseIdentifier().str().str().c_str());
-              UpdatedFlags = UpdatedFlags.withHasSerialExecutorIsolationCheckingMode(
-                  hasUserDefinedIsIsolatingCurrentContext);
+              UpdatedFlags = UpdatedFlags.withHasNonDefaultSerialExecutorIsIsolatingCurrentContext(
+                            hasNonDefaultIsIsolatingCurrentContext);
             }
           }
         });

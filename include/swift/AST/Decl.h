@@ -1332,9 +1332,6 @@ public:
   /// Check if this is a declaration defined at the top level of the Swift module
   bool isStdlibDecl() const;
 
-  /// Check if this is a declaration defined at the top level of the _Concurrency module
-  bool isConcurrencyLibDecl() const;
-
   /// The effective lifetime resulting from the decorations on the declaration.
   ///
   /// Usually, this, not getLifetimeAnnotationFromAttributes should be used.

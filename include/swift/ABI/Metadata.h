@@ -2745,21 +2745,6 @@ struct TargetGlobalActorReference {
   TargetRelativeProtocolConformanceDescriptorPointer<Runtime> conformance;
 };
 
-enum class SerialExecutorIsolationCheckingModeKind : uint8_t {
-  None,
-  ImplementedCheckIsolated,
-  ImplementedIsIsolatingCurrentContext,
-};
-
-/// TODO:
-template<typename Runtime>
-struct TargetSerialExecutorIsolationCheckingMode {
-  /// The type of the global actor.
-  RelativeDirectPointer<SerialExecutorIsolationCheckingModeKind, /*nullable*/ false> implementedKind;
-
-  TargetRelativeProtocolConformanceDescriptorPointer<Runtime> conformance;
-};
-
 /// Describes the context of a protocol conformance that is relevant when
 /// the conformance is used, such as global actor isolation.
 struct ConformanceExecutionContext;
@@ -2778,8 +2763,7 @@ struct TargetProtocolConformanceDescriptor final
              TargetResilientWitnessesHeader<Runtime>,
              TargetResilientWitness<Runtime>,
              TargetGenericWitnessTable<Runtime>,
-             TargetGlobalActorReference<Runtime>,
-             TargetSerialExecutorIsolationCheckingMode<Runtime>> {
+             TargetGlobalActorReference<Runtime>> {
 
   using TrailingObjects = swift::ABI::TrailingObjects<
                              TargetProtocolConformanceDescriptor<Runtime>,
@@ -2789,8 +2773,7 @@ struct TargetProtocolConformanceDescriptor final
                              TargetResilientWitnessesHeader<Runtime>,
                              TargetResilientWitness<Runtime>,
                              TargetGenericWitnessTable<Runtime>,
-                             TargetGlobalActorReference<Runtime>,
-                             TargetSerialExecutorIsolationCheckingMode<Runtime>>;
+                             TargetGlobalActorReference<Runtime>>;
   friend TrailingObjects;
 
   template<typename T>
@@ -2947,16 +2930,12 @@ public:
     return Demangle::makeSymbolicMangledNameStringRef(this->template getTrailingObjects<TargetGlobalActorReference<Runtime>>()->type);
   }
 
-  bool hasSerialExecutorIsolationCheckingMode() const {
-    return Flags.hasSerialExecutorIsolationCheckingMode();
-  }
-
-  SerialExecutorIsolationCheckingModeKind
-  getSerialExecutorIsolationCheckingModeKind() const {
-    if (!Flags.hasGlobalActorIsolation())
-      return SerialExecutorIsolationCheckingModeKind::None;
-
-    return this->template getTrailingObjects<TargetGlobalActorReference<Runtime>>()->implementedKind;
+  /// True if this is a conformance to 'SerialExecutor' which has a non-default
+  /// (i.e. not the stdlib's default implementation) witness. This means that
+  /// the developer has implemented this method explicitly and we should prefer
+  /// calling it.
+  bool hasNonDefaultSerialExecutorIsIsolatingCurrentContext() const {
+    return Flags.hasNonDefaultSerialExecutorIsIsolatingCurrentContext();
   }
 
   /// Retrieve the protocol conformance of the global actor type to the
@@ -3013,14 +2992,7 @@ private:
   }
 
   size_t numTrailingObjects(OverloadToken<RelativeDirectPointer<const char, /*nullable*/ true>>) const {
-    auto num = 0;
-    if (Flags.hasGlobalActorIsolation()) {
-      num += 1;
-    }
-    if (Flags.hasSerialExecutorIsolationCheckingMode()) {
-      num += 1;
-    }
-    return num;
+    return Flags.hasGlobalActorIsolation() ? 1 : 0;
   }
 };
 using ProtocolConformanceDescriptor

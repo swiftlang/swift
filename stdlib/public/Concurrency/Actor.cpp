@@ -429,25 +429,20 @@ swift_task_is_current_executor_flag swift_bincompat_selectDefaultIsCurrentExecut
       // Remove the assert option which is what would cause the "crash" mode
       options = swift_task_is_current_executor_flag(
         options & ~swift_task_is_current_executor_flag::Assert);
-      SWIFT_TASK_DEBUG_LOG("executor checking: SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE = %s => NONE; options = %d",
-                         modeStr, options);
-    } else if (strcmp(modeStr, "IsIsolatingCurrentContext") == 0) {
+    } else if (strcmp(modeStr, "isIsolatingCurrentContext") == 0) {
       options = swift_task_is_current_executor_flag(
         options | swift_task_is_current_executor_flag::UseIsIsolatingCurrentContext);
       // When we're using the isIsolatingCurrentContext we don't want to use crashing APIs,
       // so disable it explicitly.
       options = swift_task_is_current_executor_flag(
         options & ~swift_task_is_current_executor_flag::Assert);
-      SWIFT_TASK_DEBUG_LOG("executor checking: SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE = %s => 6.2; options = %d", modeStr, options);
     } else if (strcmp(modeStr, "crash") == 0 ||
                strcmp(modeStr, "swift6") == 0) {
       options = swift_task_is_current_executor_flag(
         options | swift_task_is_current_executor_flag::Assert);
-      SWIFT_TASK_DEBUG_LOG("executor checking: SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE = %s => 6.9; options = %d", modeStr, options);
-    } // else { // else, just use the platform detected mode
+    } // else, just use the platform detected mode
   } // no override, use the default mode
 
-  _swift_task_debug_dumpIsCurrentExecutorFlags("options after env var override", options);
   return options;
 }
 
@@ -470,19 +465,12 @@ extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
 static swift_task_is_current_executor_flag
 _getIsolationCheckingOptionsFromExecutorWitnessTable(const SerialExecutorWitnessTable *_wtable) {
   const WitnessTable* wtable = reinterpret_cast<const WitnessTable*>(_wtable);
-
-  SWIFT_TASK_DEBUG_LOG("executor checking: check witness table: %p", wtable);
   auto description = wtable->getDescription();
   if (!description) {
-    SWIFT_TASK_DEBUG_LOG("executor checking: no wtable.description! %s", "");
     return swift_task_is_current_executor_flag::None;
   }
 
-  bool useIsIsolated = description->hasSerialExecutorIsolationCheckingMode();
-  SWIFT_TASK_DEBUG_LOG("executor checking: wtable asSerialExecutorIsolationCheckingMode = %d",
-                       useIsIsolated);
-
-  if (useIsIsolated) {
+  if (description->hasNonDefaultSerialExecutorIsIsolatingCurrentContext()) {
     // The specific executor has implemented `isIsolatingCurrentContext` and
     // we do not have to call `checkIsolated`.
     return swift_task_is_current_executor_flag::UseIsIsolatingCurrentContext;
@@ -698,11 +686,7 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
 static void swift_task_setDefaultExecutorCheckingFlags(void *context) {
   auto *options = static_cast<swift_task_is_current_executor_flag *>(context);
 
-  SWIFT_TASK_DEBUG_LOG("executor checking: swift_task_setDefaultExecutorCheckingFlags = %d", nullptr);
   auto modeOverride = swift_bincompat_selectDefaultIsCurrentExecutorCheckingMode();
-  _swift_task_debug_dumpIsCurrentExecutorFlags("BASE", *options);
-  _swift_task_debug_dumpIsCurrentExecutorFlags("override", modeOverride);
-  SWIFT_TASK_DEBUG_LOG("executor checking: use legacy mode = %d", modeOverride);
   if (modeOverride != swift_task_is_current_executor_flag::None) {
     *options = modeOverride;
   }
