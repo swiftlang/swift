@@ -475,9 +475,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 /// modify/read single-yield coroutines always execute code post-yield code
 EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
 
-/// When a parameter has unspecified isolation, infer it as main actor isolated.
-EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
-
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 
