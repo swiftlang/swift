@@ -2,7 +2,6 @@
 // RUN: %target-swift-emit-silgen %s -enable-experimental-feature ExecutionAttribute -enable-experimental-feature AsyncCallerExecution | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 // REQUIRES: swift_feature_ExecutionAttribute
 // REQUIRES: swift_feature_AsyncCallerExecution
 
