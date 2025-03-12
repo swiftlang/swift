@@ -36,7 +36,7 @@ class ASTContext;
 class GenericTypeParamType;
 class OpaqueTypeDecl;
 class ElementArchetypeType;
-class OpenedArchetypeType;
+class ExistentialArchetypeType;
 class PackArchetypeType;
 class PackExpansionType;
 class SILModule;

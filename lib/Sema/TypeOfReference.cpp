@@ -1641,7 +1641,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     }
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype =
-        OpenedArchetypeType::get(baseObjTy->getCanonicalType());
+        ExistentialArchetypeType::get(baseObjTy->getCanonicalType());
     recordOpenedExistentialType(getConstraintLocator(locator), openedArchetype);
     baseOpenedTy = openedArchetype;
   }
@@ -2058,8 +2058,8 @@ void ConstraintSystem::bindOverloadType(
       increaseScore(SK_KeyPathSubscript, locator);
 
       auto boundTypeVar = boundType->castTo<TypeVariableType>();
-      auto constraints = getConstraintGraph().gatherConstraints(
-          boundTypeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
+      auto constraints = getConstraintGraph().gatherNearbyConstraints(
+          boundTypeVar,
           [](Constraint *constraint) {
             return constraint->getKind() == ConstraintKind::ApplicableFunction;
           });

@@ -383,7 +383,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       {
         FormalEvaluationScope scope(SGF);
 
-        auto underlyingValueTy = OpenedArchetypeType::get(ctx.TheAnyType);
+        auto underlyingValueTy = ExistentialArchetypeType::get(ctx.TheAnyType);
 
         auto underlyingValueAddr = SGF.emitOpenExistential(
             loc, ManagedValue::forTrivialAddressRValue(continuationAddr),

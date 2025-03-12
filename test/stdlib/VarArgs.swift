@@ -172,6 +172,20 @@ func test_varArgs6() {
 }
 test_varArgs6()
 
+func test_varArgs7() {
+#if canImport(Darwin) && arch(arm64)
+  // Test a workaround for format specifiers and no arguments. We supply eight
+  // words of zeroed memory to give this predictable behavior.
+  my_printf("No parameters: %ld %ld %ld %ld %ld %ld %ld %ld\n")
+#else
+  // va_list is more complicated on other targets so that behavior is not the
+  // same, skip the test by doing a fake print of the expected output.
+  my_printf("No parameters: 0 0 0 0 0 0 0 0\n")
+#endif
+  // CHECK: No parameters: 0 0 0 0 0 0 0 0
+}
+test_varArgs7()
+
 
 // CHECK: done.
 my_printf("done.")

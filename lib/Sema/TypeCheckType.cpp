@@ -3028,7 +3028,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
         MakeAbstractConformanceForGenericType());
 
     archetypeType = env->mapTypeIntoContext(interfaceType);
-    ASSERT(archetypeType->is<OpenedArchetypeType>());
+    ASSERT(archetypeType->is<ExistentialArchetypeType>());
   }
 
   return archetypeType;

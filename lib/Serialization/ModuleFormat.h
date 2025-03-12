@@ -1357,8 +1357,8 @@ namespace decls_block {
     TypeIDField              // interface type
   );
 
-  TYPE_LAYOUT(OpenedArchetypeTypeLayout,
-    OPENED_ARCHETYPE_TYPE,
+  TYPE_LAYOUT(ExistentialArchetypeTypeLayout,
+    EXISTENTIAL_ARCHETYPE_TYPE,
     TypeIDField,              // the interface type
     GenericEnvironmentIDField // generic environment ID
   );

@@ -163,6 +163,14 @@ StringRef getCommonPluralPrefix(StringRef singular, StringRef plural);
 /// Returns the underlying integer type of an enum. If clang treats the type as
 /// an elaborated type, an unwrapped type is returned.
 const clang::Type *getUnderlyingType(const clang::EnumDecl *decl);
+
+inline bool isCFOptionsMacro(StringRef macroName) {
+  return llvm::StringSwitch<bool>(macroName)
+      .Case("CF_OPTIONS", true)
+      .Case("NS_OPTIONS", true)
+      .Default(false);
+}
+
 }
 }
 

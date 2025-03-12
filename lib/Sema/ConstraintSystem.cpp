@@ -267,8 +267,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Activate the constraints affected by a change to this type variable.
-  auto gatheringKind = ConstraintGraph::GatheringKind::AllMentions;
-  for (auto *constraint : CG.gatherConstraints(typeVar, gatheringKind))
+  for (auto *constraint : CG.gatherAllConstraints(typeVar))
     if (!constraint->isActive())
       activateConstraint(constraint);
 }
@@ -858,14 +857,14 @@ ConstraintLocator *ConstraintSystem::getOpenOpaqueLocator(
       { LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl) }, 0);
 }
 
-std::pair<Type, OpenedArchetypeType *>
+std::pair<Type, ExistentialArchetypeType *>
 ConstraintSystem::openAnyExistentialType(Type type,
                                          ConstraintLocator *locator) {
-  Type result = OpenedArchetypeType::getAny(type);
+  Type result = ExistentialArchetypeType::getAny(type);
   Type t = result;
   while (t->is<MetatypeType>())
     t = t->getMetatypeInstanceType();
-  auto *opened = t->castTo<OpenedArchetypeType>();
+  auto *opened = t->castTo<ExistentialArchetypeType>();
 
   recordOpenedExistentialType(locator, opened);
 
@@ -873,7 +872,7 @@ ConstraintSystem::openAnyExistentialType(Type type,
 }
 
 void ConstraintSystem::recordOpenedExistentialType(
-    ConstraintLocator *locator, OpenedArchetypeType *opened) {
+    ConstraintLocator *locator, ExistentialArchetypeType *opened) {
   bool inserted = OpenedExistentialTypes.insert({locator, opened}).second;
   ASSERT(inserted);
 

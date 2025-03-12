@@ -381,11 +381,10 @@ public:
   /// files?
   bool IgnoreAdjacentModules = false;
 
-  /// Override to accept reading errors from swiftmodules and being generally
-  /// more tolerant to inconsistencies. This is enabled for
-  /// index-while-building as it runs last and it can afford to read an AST
-  /// with inconsistencies.
-  bool ForceAllowModuleWithCompilerErrors = false;
+  /// Accept recovering from more issues at deserialization, even if it can
+  /// lead to an inconsistent state. This is enabled for index-while-building
+  /// as it runs last and it can afford to read an AST with inconsistencies.
+  bool ForceExtendedDeserializationRecovery = false;
 
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;

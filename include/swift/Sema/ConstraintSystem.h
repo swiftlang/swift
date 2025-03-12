@@ -1554,7 +1554,7 @@ public:
   llvm::DenseMap<ConstraintLocator *, ArrayRef<OpenedType>> OpenedTypes;
 
   /// The opened existential type for a given locator.
-  llvm::DenseMap<ConstraintLocator *, OpenedArchetypeType *>
+  llvm::DenseMap<ConstraintLocator *, ExistentialArchetypeType *>
     OpenedExistentialTypes;
 
   llvm::DenseMap<PackExpansionType *, TypeVariableType *>
@@ -2420,7 +2420,7 @@ private:
 
   /// A mapping from constraint locators to the opened existential archetype
   /// used for the 'self' of an existential type.
-  llvm::SmallDenseMap<ConstraintLocator *, OpenedArchetypeType *, 4>
+  llvm::SmallDenseMap<ConstraintLocator *, ExistentialArchetypeType *, 4>
       OpenedExistentialTypes;
 
   llvm::SmallDenseMap<PackExpansionType *, TypeVariableType *, 4>
@@ -3380,12 +3380,12 @@ public:
   /// Open the given existential type or existential metatype, recording the
   /// opened archetype in the constraint system and returning both the opened
   /// type and opened archetype.
-  std::pair<Type, OpenedArchetypeType *>
+  std::pair<Type, ExistentialArchetypeType *>
   openAnyExistentialType(Type type, ConstraintLocator *locator);
 
   /// Update OpenedExistentials and record a change in the trail.
   void recordOpenedExistentialType(ConstraintLocator *locator,
-                                   OpenedArchetypeType *opened);
+                                   ExistentialArchetypeType *opened);
 
   /// Retrieve the generic environment for the opened element of a given pack
   /// expansion, or \c nullptr if no environment was recorded yet.
@@ -6510,6 +6510,9 @@ bool isResultBuilderMethodReference(ASTContext &, UnresolvedDotExpr *);
 unsigned getNumApplications(bool hasAppliedSelf,
                             FunctionRefInfo functionRefInfo);
 
+/// Determine whether the debug output is enabled for the given target.
+bool debugConstraintSolverForTarget(ASTContext &C,
+                                    SyntacticElementTarget target);
 } // end namespace constraints
 
 template<typename ...Args>

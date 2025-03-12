@@ -2160,7 +2160,7 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   auto &existentialTL = SGF.getTypeLowering(E->getType());
   auto concreteFormalType = E->getSubExpr()->getType()->getCanonicalType();
 
-  auto archetype = OpenedArchetypeType::getAny(E->getType()->getCanonicalType());
+  auto archetype = ExistentialArchetypeType::getAny(E->getType()->getCanonicalType());
   AbstractionPattern abstractionPattern(archetype);
   auto &concreteTL = SGF.getTypeLowering(abstractionPattern,
                                          concreteFormalType);
@@ -3204,11 +3204,11 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   if (baseType->isAnyExistentialType()) {
     // Use the opened archetype from the AST for a protocol member, or make a
     // new one (which we'll upcast immediately below) for a class member.
-    OpenedArchetypeType *opened;
+    ExistentialArchetypeType *opened;
     if (storage->getDeclContext()->getSelfClassDecl()) {
-      opened = OpenedArchetypeType::get(baseType);
+      opened = ExistentialArchetypeType::get(baseType);
     } else {
-      opened = subs.getReplacementTypes()[0]->castTo<OpenedArchetypeType>();
+      opened = subs.getReplacementTypes()[0]->castTo<ExistentialArchetypeType>();
     }
 
     FormalEvaluationScope scope(subSGF);
@@ -3656,7 +3656,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
     // Open an existential lvalue, if necessary.
     if (baseType->isAnyExistentialType()) {
-      auto opened = subs.getReplacementTypes()[0]->castTo<OpenedArchetypeType>();
+      auto opened = subs.getReplacementTypes()[0]->castTo<ExistentialArchetypeType>();
       baseType = opened->getCanonicalType();
       lv = subSGF.emitOpenExistentialLValue(loc, std::move(lv),
                                             CanArchetypeType(opened),

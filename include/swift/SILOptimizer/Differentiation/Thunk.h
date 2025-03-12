@@ -27,7 +27,7 @@ class SILOptFunctionBuilder;
 class SILModule;
 class SILLocation;
 class SILValue;
-class OpenedArchetypeType;
+class ExistentialArchetypeType;
 class GenericEnvironment;
 class SubstitutionMap;
 class ArchetypeType;

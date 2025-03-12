@@ -255,7 +255,7 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
   FormalEvaluationScope scope(*this);
 
   if (inputType->isAnyExistentialType()) {
-    CanType openedType = OpenedArchetypeType::getAny(inputType)
+    CanType openedType = ExistentialArchetypeType::getAny(inputType)
         ->getCanonicalType();
     SILType loweredOpenedType = getLoweredType(openedType);
 
@@ -704,7 +704,7 @@ ManagedValue Transform::transform(ManagedValue v,
 
     auto layout = instanceType.getExistentialLayout();
     if (layout.getSuperclass()) {
-      CanType openedType = OpenedArchetypeType::getAny(inputSubstType)
+      CanType openedType = ExistentialArchetypeType::getAny(inputSubstType)
           ->getCanonicalType();
       SILType loweredOpenedType = SGF.getLoweredType(openedType);
 

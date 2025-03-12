@@ -770,7 +770,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       }
     };
 
-    auto Entry = found->second;
+    auto &Entry = found->second;
     auto val = Entry.value;
 
     switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {

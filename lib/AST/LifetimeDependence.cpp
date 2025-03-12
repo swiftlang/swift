@@ -23,6 +23,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceManager.h"
 
 namespace swift {
 
@@ -576,7 +577,8 @@ LifetimeDependenceInfo::infer(AbstractFunctionDecl *afd) {
     }
   }
 
-  if (!ctx.LangOpts.hasFeature(Feature::LifetimeDependence)) {
+  if (!ctx.LangOpts.hasFeature(Feature::LifetimeDependence) &&
+      !ctx.SourceMgr.isImportMacroGeneratedLoc(returnLoc)) {
     diags.diagnose(returnLoc, diag::lifetime_dependence_feature_required);
     return std::nullopt;
   }

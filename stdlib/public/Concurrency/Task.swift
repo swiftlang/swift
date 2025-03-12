@@ -1541,7 +1541,7 @@ func _taskIsCurrentExecutor(_ executor: Builtin.Executor) -> Bool
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_isCurrentExecutorWithFlags")
 @usableFromInline
 internal func _taskIsCurrentExecutor(
@@ -1669,7 +1669,7 @@ internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owne
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
 
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.2, *)
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _taskIsOnMainActor() -> Bool {
@@ -1688,7 +1688,7 @@ internal func _taskIsOnMainActor() -> Bool {
 /// and that includes an error return value. So we cannot accept throwing
 /// functions here.
 @_alwaysEmitIntoClient
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.2, *)
 public func _taskRunOnMainActor(operation: @escaping @MainActor () -> ()) {
   typealias YesActor = @MainActor () -> ()
   typealias NoActor = () -> ()

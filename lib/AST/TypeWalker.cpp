@@ -258,7 +258,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
-  bool visitOpenedArchetypeType(OpenedArchetypeType *opened) {
+  bool visitExistentialArchetypeType(ExistentialArchetypeType *opened) {
     auto *env = opened->getGenericEnvironment();
     for (auto arg : env->getOuterSubstitutions().getReplacementTypes()) {
       if (doIt(arg)) {

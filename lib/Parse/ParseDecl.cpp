@@ -31,6 +31,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Bridging/ASTGen.h"
@@ -2556,7 +2557,8 @@ parseLifetimeDescriptor(Parser &P,
 ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
                                                           SourceLoc loc) {
   ParserStatus status;
-  if (!Context.LangOpts.hasFeature(Feature::LifetimeDependence)) {
+  if (!Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
+      !Context.SourceMgr.isImportMacroGeneratedLoc(atLoc)) {
     diagnose(loc, diag::requires_experimental_feature, "@lifetime", false,
              getFeatureName(Feature::LifetimeDependence));
     status.setIsParseError();

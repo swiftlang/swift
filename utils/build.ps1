@@ -1045,9 +1045,9 @@ function Build-CMakeProject {
 
   if ($ToBatch) {
     Write-Output ""
-    Write-Output "echo Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
+    Write-Output "echo Building '$Src' to '$Bin' ..."
   } else {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' ..."
   }
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
@@ -1369,7 +1369,7 @@ function Build-CMakeProject {
   }
 
   if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.LLVMName)' in $($Stopwatch.Elapsed)"
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
     Write-Host ""
   }
 
@@ -1411,9 +1411,9 @@ function Build-SPMProject {
 
   if ($ToBatch) {
     Write-Output ""
-    Write-Output "echo $ActionForOutput '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
+    Write-Output "echo $ActionForOutput '$Src' to '$Bin' ..."
   } else {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] $ActionForOutput '$Src' to '$Bin' for arch '$($Arch.LLVMName)'..."
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] $ActionForOutput '$Src' to '$Bin' ..."
   }
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
@@ -1461,7 +1461,7 @@ function Build-SPMProject {
   }
 
   if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' for arch '$($Arch.LLVMName)' in $($Stopwatch.Elapsed)"
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
     Write-Host ""
   }
 
@@ -1687,6 +1687,12 @@ function Build-Compilers() {
       $SwiftFlags += @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
     }
 
+    # Limit the number of parallel links to avoid OOM when debug info is enabled
+    $DebugOptions = @{}
+    if ($DebugInfo) {
+      $DebugOptions = @{ SWIFT_PARALLEL_LINK_JOBS = "4"; }
+    }
+
     New-Item -ItemType SymbolicLink -Path "$BinaryCache\$($HostArch.LLVMTarget)\compilers" -Target "$BinaryCache\5" -ErrorAction Ignore
     Build-CMakeProject `
       -Src $SourceCache\llvm-project\llvm `
@@ -1737,7 +1743,7 @@ function Build-Compilers() {
         SWIFT_STDLIB_ASSERTIONS = "NO";
         SWIFTSYNTAX_ENABLE_ASSERTIONS = "NO";
         "cmark-gfm_DIR" = "$($Arch.ToolchainInstallRoot)\usr\lib\cmake";
-      })
+      } + $DebugOptions)
   }
 
   $Settings = @{
@@ -3211,8 +3217,8 @@ if (-not $SkipBuild) {
       Invoke-BuildStep Build-ExperimentalRuntime -Static Android $Arch
       Invoke-BuildStep Build-Foundation -Static Android $Arch
 
-      Copy-File "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.a" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Arch.LLVMName)\"
-      Copy-File "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.so" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Arch.LLVMName)\"
+      Move-Item "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.a" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Arch.LLVMName)\"
+      Move-Item "$(Get-SwiftSDK Android)\usr\lib\swift\android\*.so" "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Arch.LLVMName)\"
     }
     Install-Platform Android $AndroidSDKArchs
     Invoke-BuildStep Write-PlatformInfoPlist Android

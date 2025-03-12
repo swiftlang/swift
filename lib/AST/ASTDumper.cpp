@@ -6105,8 +6105,8 @@ namespace {
 
       printFoot();
     }
-    void visitOpenedArchetypeType(OpenedArchetypeType *T, Label label) {
-      printArchetypeCommon(T, "opened_archetype_type", label);
+    void visitExistentialArchetypeType(ExistentialArchetypeType *T, Label label) {
+      printArchetypeCommon(T, "existential_archetype_type", label);
 
       auto *env = T->getGenericEnvironment();
       printFieldQuoted(env->getOpenedExistentialUUID(),

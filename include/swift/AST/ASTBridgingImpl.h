@@ -403,7 +403,7 @@ bool BridgedASTType::hasLocalArchetype() const {
 }
 
 bool BridgedASTType::isExistentialArchetype() const {
-  return unbridged()->is<swift::OpenedArchetypeType>();
+  return unbridged()->is<swift::ExistentialArchetypeType>();
 }
 
 bool BridgedASTType::isExistentialArchetypeWithError() const {
@@ -428,6 +428,10 @@ bool BridgedASTType::isInteger() const {
 
 bool BridgedASTType::isMetatypeType() const {
   return unbridged()->is<swift::AnyMetatypeType>();
+}
+
+bool BridgedASTType::isOptional() const {
+  return unbridged()->getCanonicalType()->isOptional();
 }
 
 bool BridgedASTType::isExistentialMetatypeType() const {
@@ -551,6 +555,11 @@ BridgedConformance BridgedConformance::getInheritedConformance() const {
 BridgedSubstitutionMap BridgedConformance::getSpecializedSubstitutions() const {
   auto *specPC = swift::cast<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
   return {specPC->getSubstitutionMap()};
+}
+
+BridgedConformance BridgedConformance::getAssociatedConformance(BridgedASTType assocType, BridgedDeclObj proto) const {
+  return {unbridged().getConcrete()->getAssociatedConformance(assocType.unbridged(),
+                                                              proto.getAs<swift::ProtocolDecl>())};
 }
 
 BridgedConformance BridgedConformanceArray::getAt(SwiftInt index) const {

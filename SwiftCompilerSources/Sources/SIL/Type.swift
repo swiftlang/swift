@@ -63,6 +63,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isFunction: Bool { bridged.isFunction() }
   public var isMetatype: Bool { bridged.isMetatype() }
   public var isClassExistential: Bool { bridged.isClassExistential() }
+  public var isOptional: Bool { astType.isOptional }
   public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
   public var containsNoEscapeFunction: Bool { bridged.containsNoEscapeFunction() }
   public var isThickFunction: Bool { bridged.isThickFunction() }

@@ -1474,7 +1474,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator,
     std::optional<TrailingClosureMatching> trailingClosureMatching,
-    SmallVectorImpl<std::pair<TypeVariableType *, OpenedArchetypeType *>>
+    SmallVectorImpl<std::pair<TypeVariableType *, ExistentialArchetypeType *>>
         &openedExistentials) {
   assert(subKind == ConstraintKind::OperatorArgumentConversion ||
          subKind == ConstraintKind::ArgumentConversion);
@@ -1822,7 +1822,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         Type bindingTy;
         std::tie(typeVar, bindingTy) = *typeVarAndBindingTy;
 
-        OpenedArchetypeType *openedArchetype;
+        ExistentialArchetypeType *openedArchetype;
 
         // Open the argument type.
         argTy = argTy.transformRec([&](TypeBase *t) -> std::optional<Type> {
@@ -3863,6 +3863,23 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     }
 
     return result;
+  }
+
+  // Handle opened archetype types.
+  if (auto opened1 = type1->getAs<ExistentialArchetypeType>()) {
+    auto opened2 = type2->castTo<ExistentialArchetypeType>();
+    assert(opened1->getInterfaceType()->isEqual(opened2->getInterfaceType()) &&
+           opened1->getGenericEnvironment()->getOpenedExistentialUUID() ==
+               opened2->getGenericEnvironment()->getOpenedExistentialUUID());
+
+    auto args1 = opened1->getGenericEnvironment()
+                     ->getOuterSubstitutions()
+                     .getReplacementTypes();
+    auto args2 = opened2->getGenericEnvironment()
+                     ->getOuterSubstitutions()
+                     .getReplacementTypes();
+
+    return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
   }
 
   // `any Sendable` -> `Any`
@@ -7332,7 +7349,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case TypeKind::Module:
     case TypeKind::PrimaryArchetype:
-    case TypeKind::OpenedArchetype:
     case TypeKind::PackArchetype:
     case TypeKind::ElementArchetype: {
       // Give `repairFailures` a chance to fix the problem.
@@ -7657,7 +7673,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
       break;
     }
-    
+
+    case TypeKind::ExistentialArchetype: {
+      auto opened1 = cast<ExistentialArchetypeType>(desugar1);
+      auto opened2 = cast<ExistentialArchetypeType>(desugar2);
+      // If they have the same interface type and UUID, two ExistentialArchetypeTypes
+      // match if their generic arguments do as well.
+      if (opened1->getInterfaceType()->isEqual(opened2->getInterfaceType()) &&
+          opened1->getGenericEnvironment()->getOpenedExistentialUUID() ==
+              opened2->getGenericEnvironment()->getOpenedExistentialUUID()) {
+        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+      }
+      break;
+    }
+
     case TypeKind::Pack: {
       auto tmpPackLoc = locator.withPathElement(LocatorPathElt::PackType(type1));
       auto packLoc = tmpPackLoc.withPathElement(LocatorPathElt::PackType(type2));
@@ -8339,7 +8368,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::PrimaryArchetype:
-  case TypeKind::OpenedArchetype:
+  case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::PackArchetype:
   case TypeKind::ElementArchetype:
@@ -11608,7 +11637,7 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   // conformance.
   if (baseObjectType->isExistentialType()) {
     baseObjectType =
-        OpenedArchetypeType::get(baseObjectType->getCanonicalType());
+        ExistentialArchetypeType::get(baseObjectType->getCanonicalType());
   }
 
   // Check conformance to the protocol. If it doesn't conform, this constraint
@@ -11988,7 +12017,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       // because if the typealias has type variables then we'd end up
       // opening existential from a type with unresolved generic
       // parameter(s), which CSApply can't currently simplify while
-      // building type-checked AST because `OpenedArchetypeType` doesn't
+      // building type-checked AST because `ExistentialArchetypeType` doesn't
       // propagate flags. Example is as simple as `{ $0.description }`
       // where `$0` is `Error` that inferred from a (generic) typealias.
       if (underlyingTy->isExistentialType() && contextualTy->hasTypeVariable())
@@ -13089,7 +13118,7 @@ retry_after_fail:
         // Determine the type that this choice will have.
         Type choiceType = getEffectiveOverloadType(
             constraint->getLocator(), choice, /*allowMembers=*/true,
-            constraint->getOverloadUseDC());
+            constraint->getDeclContext());
         if (!choiceType) {
           hasUnhandledConstraints = true;
           return true;
@@ -13405,7 +13434,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
     auto *argumentList = getArgumentList(argumentsLoc);
     // The argument type must be convertible to the input type.
-    SmallVector<std::pair<TypeVariableType *, OpenedArchetypeType *>, 2>
+    SmallVector<std::pair<TypeVariableType *, ExistentialArchetypeType *>, 2>
         openedExistentials;
     auto matchCallResult = ::matchCallArguments(
         *this, func2, argumentList, func1->getParams(), func2->getParams(),
@@ -15953,8 +15982,8 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
   if (!typeVar)
     return;
 
-  auto constraints = CG.gatherConstraints(
-      typeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
+  auto constraints = CG.gatherNearbyConstraints(
+      typeVar,
       [&keyPathExpr](Constraint *constraint) -> bool {
         if (constraint->getKind() != ConstraintKind::KeyPath)
           return false;
@@ -16335,7 +16364,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyApplicableFnConstraint(
         constraint.getAppliedFunctionType(), constraint.getCalleeType(),
         constraint.getTrailingClosureMatching(),
-        constraint.getApplicationDC(), /*flags=*/std::nullopt,
+        constraint.getDeclContext(), /*flags=*/std::nullopt,
         constraint.getLocator());
 
   case ConstraintKind::DynamicCallableApplicableFunction:
@@ -16382,7 +16411,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),
                     constraint.getOverloadChoice(),
-                    constraint.getOverloadUseDC());
+                    constraint.getDeclContext());
     return SolutionKind::Solved;
 
   case ConstraintKind::SubclassOf:
@@ -16429,7 +16458,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::UnresolvedValueMember:
     return simplifyMemberConstraint(
         constraint.getKind(), constraint.getFirstType(), constraint.getMember(),
-        constraint.getSecondType(), constraint.getMemberUseDC(),
+        constraint.getSecondType(), constraint.getDeclContext(),
         constraint.getFunctionRefInfo(),
         /*outerAlternatives=*/{},
         /*flags*/ std::nullopt, constraint.getLocator());
@@ -16438,7 +16467,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyValueWitnessConstraint(
         constraint.getKind(), constraint.getFirstType(),
         constraint.getRequirement(), constraint.getSecondType(),
-        constraint.getMemberUseDC(), constraint.getFunctionRefInfo(),
+        constraint.getDeclContext(), constraint.getFunctionRefInfo(),
         /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::Defaultable:

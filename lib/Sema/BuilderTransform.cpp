@@ -959,6 +959,9 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
     return nullptr;
 
   ConstraintSystemOptions options = ConstraintSystemFlags::AllowFixes;
+  if (debugConstraintSolverForTarget(ctx, target))
+    options |= ConstraintSystemFlags::DebugConstraints;
+
   auto resultInterfaceTy = func->getResultInterfaceType();
   auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
 
@@ -1326,7 +1329,8 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
   dc->lookupQualified(
       builderType, DeclNameRef(fnName),
       builderType->getAnyNominal()->getLoc(),
-      NL_QualifiedDefault | NL_ProtocolMembers, foundDecls);
+      NL_QualifiedDefault | NL_ProtocolMembers | NL_IgnoreMissingImports,
+      foundDecls);
   for (auto decl : foundDecls) {
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       // Function must be static.

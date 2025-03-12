@@ -747,7 +747,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
   if (nativeType->isExistentialType()) {
-    auto openedType = OpenedArchetypeType::get(nativeType);
+    auto openedType = ExistentialArchetypeType::get(nativeType);
 
     FormalEvaluationScope scope(SGF);
 

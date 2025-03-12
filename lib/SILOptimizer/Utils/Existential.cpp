@@ -217,13 +217,13 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
   }
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
@@ -232,7 +232,7 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     auto Ty = Open->getType().getASTType();
     while (auto Metatype = dyn_cast<MetatypeType>(Ty))
       Ty = Metatype.getInstanceType();
-    OpenedArchetype = cast<OpenedArchetypeType>(Ty);
+    OpenedArchetype = cast<ExistentialArchetypeType>(Ty);
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
   }
@@ -285,7 +285,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
 /// ConcreteTypeDef to the definition of that type.
 void ConcreteExistentialInfo::initializeConcreteTypeDef(
     SILInstruction *typeConversionInst) {
-  if (!isa<OpenedArchetypeType>(ConcreteType))
+  if (!isa<ExistentialArchetypeType>(ConcreteType))
     return;
 
   assert(isValid());
