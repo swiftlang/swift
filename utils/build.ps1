@@ -212,9 +212,11 @@ $WiXVersion = "4.0.6"
 $UnixToolsBinDir = "$env:SystemDrive\Program Files\Git\usr\bin"
 
 if ($Android -and ($AndroidSDKs.Length -eq 0)) {
-  # Enable all android SDKs by default.
-  $AndroidSDKs = @("aarch64","armv7","i686","x86_64")
+  # By default, build and test the arm64 Android SDK. That choice might change
+  # once we can run executable tests in CI.
+  $AndroidSDKs = @("aarch64")
 }
+
 # Work around limitations of cmd passing in array arguments via powershell.exe -File
 if ($AndroidSDKs.Length -eq 1) { $AndroidSDKs = $AndroidSDKs[0].Split(",") }
 if ($WindowsSDKs.Length -eq 1) { $WindowsSDKs = $WindowsSDKs[0].Split(",") }
