@@ -2222,6 +2222,9 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
       -UseBuiltCompilers C,CXX,Swift `
       -Defines @{
         ENABLE_SWIFT = "YES";
+        INSTALL_BLOCK_HEADERS_DIR = "$(Get-SwiftSDK $Platform)\usr\include\Block";
+        INSTALL_DISPATCH_HEADERS_DIR = "$(Get-SwiftSDK $Platform)\usr\include\dispatch";
+        INSTALL_OS_HEADERS_DIR = "$(Get-SwiftSDK $Platform)\usr\include\os";
       }
   }
 }
@@ -2429,7 +2432,7 @@ function Write-PlatformInfoPlist([Platform] $Platform) {
 # to the final platform root, following the installer layout.
 function Install-Platform([Platform]$Platform, $Archs) {
   # Copy SDK header files
-  foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims")) {
+  foreach ($Module in ("_foundation_unicode", "_FoundationCShims")) {
     $ModuleDirectory = "$(Get-SwiftSDK $Platform)\usr\lib\swift\$Module"
     if (Test-Path $ModuleDirectory) {
       Move-Directory $ModuleDirectory "$(Get-SwiftSDK $Platform)\usr\include\"
