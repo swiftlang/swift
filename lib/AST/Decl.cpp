@@ -4445,6 +4445,14 @@ ValueDecl::getObjCRuntimeName(bool skipIsObjCResolution) const {
   return std::nullopt;
 }
 
+std::optional<ObjCSelector>
+Decl::getExplicitObjCName(bool allowInvalid) const {
+  auto objcAttr = getAttrs().getAttribute<ObjCAttr>(allowInvalid);
+  if (objcAttr && !objcAttr->isNameImplicit())
+    return objcAttr->getName();
+  return std::nullopt;
+}
+
 bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
   // Only makes sense for a requirement of an @objc protocol.
   auto proto = cast<ProtocolDecl>(requirement->getDeclContext());
@@ -4457,9 +4465,8 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
 
   // If there is already an @objc attribute with an explicit name, we
   // can't infer a name (it's already there).
-  if (auto objcAttr = getAttrs().getAttribute<ObjCAttr>()) {
-    if (objcAttr->hasName() && !objcAttr->isNameImplicit())
-      return false;
+  if (getExplicitObjCName().has_value()) {
+    return false;
   }
 
   // If the nominal type doesn't conform to the protocol at all, we

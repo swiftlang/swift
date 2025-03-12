@@ -1193,11 +1193,9 @@ getOverriddenSwiftProtocolObjCName(const ValueDecl *decl,
     return std::nullopt;
 
   // If there is an 'objc' attribute with a name, use that name.
-  if (auto objc = proto->getAttrs().getAttribute<ObjCAttr>()) {
-    if (auto name = objc->getName()) {
-      llvm::SmallString<4> buffer;
-      return std::string(name->getString(buffer));
-    }
+  if (auto objcName = proto->getExplicitObjCName()) {
+    llvm::SmallString<4> buffer;
+    return std::string(objcName->getString(buffer));
   }
 
   return std::nullopt;

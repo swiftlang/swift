@@ -6279,11 +6279,7 @@ static bool hasExplicitObjCName(ClassDecl *classDecl) {
   if (classDecl->getAttrs().hasAttribute<ObjCRuntimeNameAttr>())
     return true;
 
-  auto objcAttr = classDecl->getAttrs().getAttribute<ObjCAttr>();
-  if (!objcAttr)
-    return false;
-
-  return objcAttr->hasName() && !objcAttr->isNameImplicit();
+  return classDecl->getExplicitObjCName().has_value();
 }
 
 /// Check if the name of a class might be unstable, and if so, emit a

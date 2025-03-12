@@ -1454,9 +1454,8 @@ public:
     // We only report runtime name for classes and protocols with an explicitly
     // defined ObjC name, i.e. those that have @objc("SomeName")
     if (D && (isa<ClassDecl>(D) || isa<ProtocolDecl>(D))) {
-      auto *ObjCNameAttr = D->getAttrs().getAttribute<ObjCAttr>();
-      if (ObjCNameAttr && ObjCNameAttr->hasName())
-        return ObjCNameAttr->getName()->getString(Buf);
+      if (auto objcName = D->getExplicitObjCName())
+        return objcName->getString(Buf);
     }
     return StringRef();
   }

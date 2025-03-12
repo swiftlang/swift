@@ -1041,6 +1041,10 @@ public:
   /// from source code.
   void attachParsedAttrs(DeclAttributes attrs);
 
+  /// Retrieve the custom name in the \c @objc attribute, if present.
+  std::optional<ObjCSelector>
+  getExplicitObjCName(bool allowInvalid = false) const;
+
   /// True if this declaration provides an implementation for an imported
   /// Objective-C declaration. This implies various restrictions and special
   /// behaviors for it and, if it's an extension, its members.
