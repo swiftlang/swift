@@ -20,6 +20,7 @@ module _malloc [system] [no_undeclared_includes] {
 
 module _complex [system] [no_undeclared_includes] {
   use corecrt
+  use std
   header "complex.h"
   export *
 }
