@@ -490,7 +490,13 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
       clang::CASOptions(),
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
-      /* SharedFS */ nullptr);
+      /* SharedFS */ nullptr,
+      // ScanningOptimizations::Default excludes the current working
+      // directory optimization. Clang needs to communicate with
+      // the build system to handle the optimization safely.
+      // Swift can handle the working directory optimizaiton
+      // already so it is safe to turn on all optimizations.
+      clang::tooling::dependencies::ScanningOptimizations::All);
   SharedFilesystemCache.emplace();
 }
 
@@ -748,7 +754,11 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       ClangScanningFormat,
       Instance.getInvocation().getCASOptions().CASOpts,
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
-      UseClangIncludeTree ? nullptr : CacheFS);
+      UseClangIncludeTree ? nullptr : CacheFS,
+      // The current working directory optimization (off by default)
+      // should not impact CAS. We set the optization to all to be
+      // consistent with the non-CAS case.
+      clang::tooling::dependencies::ScanningOptimizations::All);
 
   return false;
 }
