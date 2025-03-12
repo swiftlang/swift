@@ -22,11 +22,11 @@ class CWithNonIsolated: P {
 actor SomeActor { }
 
 // Isolated conformances need a global-actor-constrained type.
-class CNonIsolated: isolated P { // expected-error{{isolated conformance is only permitted on global-actor-isolated types}}
+class CNonIsolated: @MainActor P { // expected-error{{isolated conformance is only permitted on global-actor-isolated types}}
   func f() { }
 }
 
-extension SomeActor: isolated P { // expected-error{{isolated conformance is only permitted on global-actor-isolated types}}
+extension SomeActor: @MainActor P { // expected-error{{isolated conformance is only permitted on global-actor-isolated types}}
   nonisolated func f() { }
 }
 
@@ -35,14 +35,14 @@ struct SomeGlobalActor {
   static let shared = SomeActor()
 }
 
-// Isolation of the function needs to match that of the enclosing type.
+// Isolation of the conformance needs to match that of the enclosing type.
 @MainActor
-class CMismatchedIsolation: isolated P {
+class CMismatchedIsolation: @SomeGlobalActor P {
   @SomeGlobalActor func f() { } // expected-error{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot be used to satisfy nonisolated requirement from protocol 'P'}}
 }
 
 @MainActor
-class C: isolated P {
+class C: @MainActor P {
   func f() { } // okay
 }
 
@@ -69,18 +69,18 @@ struct SMissingIsolationViaWrapper: Q {
 }
 
 @SomeGlobalActor
-class C2: isolated P {
+class C2: @SomeGlobalActor P {
   func f() { }
 }
 
 @MainActor
-struct S: isolated Q {
+struct S: @MainActor Q {
   typealias A = C
 }
 
 // expected-error@+2{{main actor-isolated conformance of 'SMismatchedActors' to 'Q' cannot depend on global actor 'SomeGlobalActor'-isolated conformance of 'C2' to 'P'}}
 @MainActor
-struct SMismatchedActors: isolated Q {
+struct SMismatchedActors: @MainActor Q {
   typealias A = C2
 }
 

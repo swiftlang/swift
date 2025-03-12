@@ -546,6 +546,9 @@ class NormalProtocolConformance : public RootProtocolConformance,
   /// NominalTypeDecl that declared the conformance.
   DeclContext *Context;
 
+  /// The global actor isolation for this conformance, if there is one.
+  TypeExpr *globalActorIsolation = nullptr;
+
   NormalProtocolConformance *ImplyingConformance = nullptr;
 
   /// The mapping of individual requirements in the protocol over to
@@ -593,6 +596,7 @@ public:
     Bits.NormalProtocolConformance.HasComputedAssociatedConformances = false;
     Bits.NormalProtocolConformance.SourceKind =
         unsigned(ConformanceEntryKind::Explicit);
+    globalActorIsolation = options.getGlobalActorIsolationType();
   }
 
   /// Get the protocol being conformed to.
@@ -634,7 +638,8 @@ public:
   void setInvalid() { Bits.NormalProtocolConformance.IsInvalid = true; }
 
   ProtocolConformanceOptions getOptions() const {
-    return ProtocolConformanceOptions(Bits.NormalProtocolConformance.Options);
+    return ProtocolConformanceOptions(Bits.NormalProtocolConformance.Options,
+                                      globalActorIsolation);
   }
 
   /// Whether this is an "unchecked" conformance.
@@ -669,9 +674,14 @@ public:
     return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
   }
 
-  /// Whether this is an isolated conformance.
-  bool isIsolated() const {
-    return getOptions().contains(ProtocolConformanceFlags::Isolated);
+  /// Whether this is a global-actor isolated conformance.
+  bool isGlobalActorIsolated() const {
+    return getOptions().contains(
+        ProtocolConformanceFlags::GlobalActorIsolated);
+  }
+
+  TypeExpr *getGlobalActorIsolation() const {
+    return globalActorIsolation;
   }
 
   /// Retrieve the location of `@preconcurrency`, if there is one and it is

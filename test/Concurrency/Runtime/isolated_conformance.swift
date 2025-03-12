@@ -17,7 +17,7 @@ protocol P {
 }
 
 @MainActor
-class MyClass: isolated P {
+class MyClass: @MainActor P {
   func f() {
     print("MyClass.f()")
 

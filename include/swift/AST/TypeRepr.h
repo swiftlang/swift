@@ -154,6 +154,10 @@ public:
   /// or return an invalid source location if there is no such attribute.
   SourceLoc findAttrLoc(TypeAttrKind kind) const;
 
+  /// Find a custom attribute within this type, or return NULL if there is
+  /// no such attribute.
+  CustomAttr *findCustomAttr() const;
+
   /// Is this type grammatically a type-simple?
   inline bool isSimple() const; // bottom of this file
 

@@ -161,6 +161,20 @@ SourceLoc TypeRepr::findAttrLoc(TypeAttrKind kind) const {
   return SourceLoc();
 }
 
+CustomAttr *TypeRepr::findCustomAttr() const {
+  auto typeRepr = this;
+  while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+    for (auto attr : attrTypeRepr->getAttrs()) {
+      if (auto typeAttr = attr.dyn_cast<CustomAttr*>())
+        return typeAttr;
+    }
+
+    typeRepr = attrTypeRepr->getTypeRepr();
+  }
+
+  return nullptr;
+}
+
 DeclRefTypeRepr::DeclRefTypeRepr(TypeReprKind K, DeclNameRef Name,
                                  DeclNameLoc NameLoc, unsigned NumGenericArgs,
                                  bool HasAngleBrackets)

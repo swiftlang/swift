@@ -475,6 +475,25 @@ public:
   bool isCached() const { return true; }
 };
 
+class ConformanceIsolationRequest :
+    public SimpleRequest<ConformanceIsolationRequest,
+                         ActorIsolation(ProtocolConformance *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ActorIsolation
+  evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const;
+
+public:
+  // Caching.
+  bool isCached() const;
+};
+
 /// Determine whether the given declaration is 'final'.
 class IsFinalRequest :
     public SimpleRequest<IsFinalRequest,

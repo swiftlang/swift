@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 924; // ExtensibleEnums feature
+const uint16_t SWIFTMODULE_VERSION_MINOR = 925; // isolated conformances
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2086,6 +2086,7 @@ namespace decls_block {
     BCVBR<5>, // value mapping count
     BCVBR<5>, // requirement signature conformance count
     BCVBR<5>, // options
+    TypeIDField, // global actor isolation of conformance
     BCArray<DeclIDField>
     // The array contains requirement signature conformances, then
     // type witnesses, then value witnesses.

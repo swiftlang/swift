@@ -1369,6 +1369,22 @@ void AssociatedConformanceRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
+// ConformanceIsolationRequest computation.
+//----------------------------------------------------------------------------//
+bool ConformanceIsolationRequest::isCached() const {
+  // We only want to cache for global-actor-isolated conformances. For
+  // everything else, which is nearly every conformance, this request quickly
+  // returns "nonisolated" so there is no point in caching it.
+  auto conformance = std::get<0>(getStorage());
+  auto rootNormal =
+      dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
+  if (!rootNormal)
+    return false;
+
+  return rootNormal->isGlobalActorIsolated();
+}
+
+//----------------------------------------------------------------------------//
 // HasCircularInheritedProtocolsRequest computation.
 //----------------------------------------------------------------------------//
 

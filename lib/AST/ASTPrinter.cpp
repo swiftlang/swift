@@ -7915,8 +7915,7 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
   if (auto superclassTy = genericSig->getSuperclassBound(
         proto->getSelfInterfaceType())) {
     Results.emplace_back(TypeLoc::withoutLoc(superclassTy),
-                         ProtocolConformanceOptions(),
-                         /*isPreconcurrency=*/false);
+                         ProtocolConformanceOptions());
   }
 
   InvertibleProtocolSet inverses = InvertibleProtocolSet::allKnown();

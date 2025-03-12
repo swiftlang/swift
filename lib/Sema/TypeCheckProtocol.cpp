@@ -2544,7 +2544,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
 
   // Complain if the conformance is isolated but the conforming type is
   // not global-actor-isolated.
-  if (conformance->isIsolated()) {
+  if (conformance->isGlobalActorIsolated()) {
     auto enclosingNominal = DC->getSelfNominalTypeDecl();
     if (!enclosingNominal ||
         !getActorIsolation(enclosingNominal).isGlobalActor()) {
@@ -3403,7 +3403,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     // If the conformance itself is isolated, and the witness isolation
     // matches the enclosing type's isolation, treat this as being in the
     // same concurrency domain.
-    if (Conformance->isIsolated() &&
+    if (Conformance->isGlobalActorIsolated() &&
         refResult.isolation.isGlobalActor() &&
         isolationMatchesEnclosingType(
             refResult.isolation, DC->getSelfNominalTypeDecl())) {
@@ -3592,7 +3592,8 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     // Another way to address the issue is to mark the conformance as
     // "isolated" or "@preconcurrency".
     if (Conformance->getSourceKind() == ConformanceEntryKind::Explicit &&
-        !Conformance->isIsolated() && !Conformance->isPreconcurrency() &&
+        !Conformance->isGlobalActorIsolated() &&
+        !Conformance->isPreconcurrency() &&
         !suggestedPreconcurrencyOrIsolated &&
         !requirementIsolation.isActorIsolated()) {
       if (Context.LangOpts.hasFeature(Feature::IsolatedConformances)) {
@@ -5237,7 +5238,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
             [&](ProtocolConformance *isolatedConformance) {
               // If the conformance we're checking isn't isolated at all, it
               // needs "isolated".
-              if (!conformance->isIsolated()) {
+              if (!conformance->isGlobalActorIsolated()) {
                 ctx.Diags.diagnose(
                     conformance->getLoc(),
                     diag::nonisolated_conformance_depends_on_isolated_conformance,

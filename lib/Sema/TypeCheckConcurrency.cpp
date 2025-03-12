@@ -7869,19 +7869,45 @@ bool swift::diagnoseNonSendableFromDeinit(
 }
 
 ActorIsolation swift::getConformanceIsolation(ProtocolConformance *conformance) {
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, ConformanceIsolationRequest{conformance},
+      ActorIsolation());
+}
+
+ActorIsolation
+ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const {
   auto rootNormal =
       dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
   if (!rootNormal)
     return ActorIsolation::forNonisolated(false);
 
-  if (!rootNormal->isIsolated())
+  if (!rootNormal->isGlobalActorIsolated())
     return ActorIsolation::forNonisolated(false);
 
-  auto nominal = rootNormal->getDeclContext()->getSelfNominalTypeDecl();
-  if (!nominal)
-    return ActorIsolation::forNonisolated(false);
+  auto globalActorTypeExpr = rootNormal->getGlobalActorIsolation();
+  assert(globalActorTypeExpr && "global actor type is out-of-sync");
 
-  return getActorIsolation(nominal);
+  // If we don't already have a resolved global actor type, resolve it now.
+  Type globalActorType = globalActorTypeExpr->getInstanceType();
+  if (!globalActorType) {
+    const auto resolution = TypeResolution::forInterface(
+        rootNormal->getDeclContext(), std::nullopt,
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr,
+        /*packElementOpener*/ nullptr);
+    globalActorType = resolution.resolveType(globalActorTypeExpr->getTypeRepr());
+    if (!globalActorType)
+      return ActorIsolation::forNonisolated(false);
+
+    // Cache the resolved type.
+    globalActorTypeExpr->setType(MetatypeType::get(globalActorType));
+  }
+
+  // FIXME: Make sure the type actually is a global actor type, map it into
+  // context, etc.
+
+  return ActorIsolation::forGlobalActor(globalActorType);
 }
 
 namespace {
@@ -7919,7 +7945,7 @@ namespace {
       if (!normal)
         return false;
 
-      if (!normal->isIsolated())
+      if (!normal->isGlobalActorIsolated())
         return false;
 
       auto conformanceIsolation = getConformanceIsolation(concrete);

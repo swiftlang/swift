@@ -1927,6 +1927,27 @@ void Serializer::writeLocalNormalProtocolConformance(
       data.push_back(witness.getEnterIsolation().has_value() ? 1 : 0);
   }, /*useResolver=*/true);
 
+  // Figure out the isolation of the conformance.
+  Type globalActorType;
+  auto isolation = evaluateOrDefault(
+      getASTContext().evaluator,
+      ConformanceIsolationRequest{conformance}, swift::ActorIsolation());
+  switch (isolation) {
+  case swift::ActorIsolation::Unspecified:
+  case swift::ActorIsolation::Nonisolated:
+    break;
+
+  case swift::ActorIsolation::GlobalActor:
+    globalActorType = isolation.getGlobalActor();
+    break;
+
+  case swift::ActorIsolation::ActorInstance:
+  case swift::ActorIsolation::NonisolatedUnsafe:
+  case swift::ActorIsolation::Erased:
+  case swift::ActorIsolation::CallerIsolationInheriting:
+    llvm_unreachable("Conformances cannot have this kind of isolation");
+  }
+
   unsigned abbrCode
     = DeclTypeAbbrCodes[NormalProtocolConformanceLayout::Code];
   auto ownerID = addDeclContextRef(conformance->getDeclContext());
@@ -1937,6 +1958,7 @@ void Serializer::writeLocalNormalProtocolConformance(
                                               numValueWitnesses,
                                               numSignatureConformances,
                                               conformance->getOptions().toRaw(),
+                                              addTypeRef(globalActorType),
                                               data);
 }
 
@@ -4104,9 +4126,14 @@ public:
       uint64_t typeRef = S.addTypeRef(inherited.getType());
       uint64_t originalTypeRef = typeRef;
 
-      // Encode options in the low bits;
+      // Encode options in the low bits.
+      // Note that we drop the global actor isolation bit, because we don't
+      // serialize this information. This information is available in the
+      // conformance itself.
+      auto inheritedOptions =
+        inherited.getOptions() - ProtocolConformanceFlags::GlobalActorIsolated;
       typeRef = (typeRef << NumProtocolConformanceOptions) |
-                inherited.getOptions().toRaw();
+                inheritedOptions.toRaw();
 
       // Encode "suppressed" in the next bit.
       typeRef = (typeRef << 1) | (inherited.isSuppressed() ? 0x01 : 0x00);

@@ -3495,6 +3495,13 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     return false;
   };
 
+  // If we're in an inheritance clause, check for a global actor.
+  if (options.is(TypeResolverContext::Inherited)) {
+    CustomAttr *customAttr = nullptr;
+    (void)resolveGlobalActor(repr->getLoc(), options,
+                             customAttr, attrs);
+  }
+
   if (handleInheritedOnly(claim<UncheckedTypeAttr>(attrs)) ||
       handleInheritedOnly(claim<PreconcurrencyTypeAttr>(attrs)) ||
       handleInheritedOnly(claim<UnsafeTypeAttr>(attrs)))
