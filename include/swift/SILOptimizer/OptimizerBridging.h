@@ -412,6 +412,16 @@ BridgedDynamicCastResult classifyDynamicCastBridged(BridgedInstruction inst);
 void verifierError(BridgedStringRef message, OptionalBridgedInstruction atInstruction, OptionalBridgedArgument atArgument);
 
 //===----------------------------------------------------------------------===//
+//                     KeyPathPattern Specialization
+//===----------------------------------------------------------------------===//
+
+SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+OptionalBridgedFunction
+BridgedKeyPathPattern_trySpecializeAccessor(BridgedPassContext context,
+                                            BridgedFunction accessor,
+                                            BridgedSubstitutionMap substitutions);
+
+//===----------------------------------------------------------------------===//
 //                          Pass registration
 //===----------------------------------------------------------------------===//
 

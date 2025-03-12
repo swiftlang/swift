@@ -398,6 +398,10 @@ bool BridgedASTType::hasTypeParameter() const {
   return unbridged()->hasTypeParameter();
 }
 
+bool BridgedASTType::hasArchetype() const {
+  return unbridged()->hasArchetype();
+}
+
 bool BridgedASTType::hasLocalArchetype() const {
   return unbridged()->hasLocalArchetype();
 }
@@ -448,6 +452,14 @@ BridgedASTType BridgedASTType::getInstanceTypeOfMetatype() const {
 
 BridgedASTType::MetatypeRepresentation BridgedASTType::getRepresentationOfMetatype() const {
   return MetatypeRepresentation(unbridged()->getAs<swift::AnyMetatypeType>()->getRepresentation());
+}
+
+bool BridgedASTType::hasGenericArguments() const {
+  return unbridged()->is<swift::BoundGenericType>();
+}
+
+BridgedASTTypeArray BridgedASTType::getGenericArguments() const {
+  return {unbridged()->castTo<swift::BoundGenericType>()->getGenericArgs()};
 }
 
 BridgedGenericSignature BridgedASTType::getInvocationGenericSignatureOfFunctionType() const {

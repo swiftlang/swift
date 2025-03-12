@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
+import OptimizerBridging
 
 extension KeyPathInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
@@ -84,8 +86,143 @@ fileprivate func trySpecialize(_ inst: KeyPathInst, _ context: SimplifyContext) 
   }
 
   for component in pattern.components {
-    if !component.subscriptIndices.empty() {
+    if !component.subscriptIndices.isEmpty {
       return
     }
   }
+
+  let kpTy = inst.keyPathType
+
+  guard let genericArgs = kpTy.genericArguments else {
+    return
+  }
+
+  let rootTy = genericArgs[0].canonical
+  let valueTy = genericArgs[1].canonical
+
+  // Both 'Root' and 'Value' must be completely concrete.
+  if rootTy.hasArchetype || valueTy.hasArchetype {
+    return
+  }
+
+  var specializedComponents: [KeyPathPattern.Component] = []
+  specializedComponents.reserveCapacity(pattern.components.count)
+
+  for component in pattern.components {
+    let specializedComponentTy = component.componentType.subst(with: subs)
+
+    switch component.kind {
+    case .gettableProperty,
+         .settableProperty:
+      let getter = component.computedPropertyGetter
+      guard let specializedGetter = specializeKeyPathAccessor(
+        context,
+        getter,
+        subs
+      ) else {
+        return
+      }
+
+      if component.kind == .gettableProperty {
+        let component = KeyPathPattern.Component.forComputedGettableProperty(
+          component.computedPropertyId,
+          specializedGetter,
+          component.subscriptIndices,
+          component.subscriptIndexEquals,
+          component.subscriptIndexHash,
+          component.externalDecl,
+          component.externalSubstitutions,
+          specializedComponentTy
+        )
+
+        specializedComponents.append(component)
+        continue
+      }
+
+      let setter = component.computedPropertySetter
+      guard let specializedSetter = specializeKeyPathAccessor(
+        context,
+        setter,
+        subs
+      ) else {
+        return
+      }
+
+      let component = KeyPathPattern.Component.forComputedSettableProperty(
+        component.computedPropertyId,
+        specializedGetter,
+        specializedSetter,
+        component.subscriptIndices,
+        component.subscriptIndexEquals,
+        component.subscriptIndexHash,
+        component.externalDecl,
+        component.externalSubstitutions,
+        specializedComponentTy
+      )
+
+      specializedComponents.append(component)
+
+    case .storedProperty:
+      let component = KeyPathPattern.Component.forStoredProperty(
+        component.storedProperty,
+        specializedComponentTy
+      )
+
+      specializedComponents.append(component)
+
+    case .tupleElement:
+      let component = KeyPathPattern.Component.forTupleElement(
+        component.tupleIndex,
+        specializedComponentTy
+      )
+
+      specializedComponents.append(component)
+
+    case .optionalChain,
+         .optionalForce,
+         .optionalWrap:
+      let component = KeyPathPattern.Component.forOptional(
+        component.kind,
+        specializedComponentTy
+      )
+
+      specializedComponents.append(component)
+    }
+  }
+
+  let specializedPattern = KeyPathPattern(
+    inst.parentFunction,
+    rootTy,
+    valueTy,
+    specializedComponents,
+    pattern.objcString
+  )
+
+  var values: [Value] = []
+  values.reserveCapacity(inst.operands.count)
+
+  for operand in inst.operands {
+    values.append(operand.value)
+  }
+
+  let builder = Builder(after: inst, context)
+  let newKp = builder.createKeyPath(
+    pattern: specializedPattern,
+    values: values,
+    keyPathType: inst.type
+  )
+
+  inst.replace(with: newKp, context)
+}
+
+fileprivate func specializeKeyPathAccessor(
+  _ context: SimplifyContext,
+  _ accessor: Function,
+  _ substitutions: SubstitutionMap
+) -> Function? {
+  BridgedKeyPathPattern_trySpecializeAccessor(
+    context._bridged,
+    accessor.bridged,
+    substitutions.bridged
+  ).function
 }

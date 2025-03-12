@@ -23,6 +23,24 @@ public struct KeyPathPattern {
   public init(bridged: BridgedKeyPathPattern) {
     self.bridged = bridged
   }
+
+  public init(
+    _ function: Function,
+    _ rootTy: CanonicalType,
+    _ valueTy: CanonicalType,
+    _ components: [KeyPathPattern.Component],
+    _ objcString: StringRef
+  ) {
+    self.bridged = components.withBridgedArrayRef {
+      BridgedKeyPathPattern_create(
+        function.bridged,
+        rootTy.bridged,
+        valueTy.bridged,
+        $0,
+        objcString._bridged
+      )
+    }
+  }
 }
 
 extension KeyPathPattern {
@@ -45,6 +63,92 @@ extension KeyPathPattern {
 
     public init(bridged: BridgedKeyPathPatternComponent) {
       self.bridged = bridged
+    }
+
+    public static func forComputedGettableProperty(
+      _ computedPropertyId: ComputedPropertyId,
+      _ getter: Function,
+      _ indices: BridgedArrayRef,
+      _ indicesEquals: Function?,
+      _ indicesHash: Function?,
+      _ externalDecl: AbstractStorageDecl?,
+      _ externalSubstitutions: SubstitutionMap,
+      _ componentTy: CanonicalType
+    ) -> Component {
+      Component(
+        bridged: BridgedKeyPathPatternComponent_forComputedGettableProperty(
+          computedPropertyId.bridged,
+          getter.bridged,
+          indices,
+          indicesEquals.bridged,
+          indicesHash.bridged,
+          externalDecl.bridged,
+          externalSubstitutions.bridged,
+          componentTy.bridged
+        )
+      )
+    }
+
+    public static func forComputedSettableProperty(
+      _ computedPropertyId: ComputedPropertyId,
+      _ getter: Function,
+      _ setter: Function,
+      _ indices: BridgedArrayRef,
+      _ indicesEquals: Function?,
+      _ indicesHash: Function?,
+      _ externalDecl: AbstractStorageDecl?,
+      _ externalSubstitutions: SubstitutionMap,
+      _ componentTy: CanonicalType
+    ) -> Component {
+      Component(
+        bridged:  BridgedKeyPathPatternComponent_forComputedSettableProperty(
+          computedPropertyId.bridged,
+          getter.bridged,
+          setter.bridged,
+          indices,
+          indicesEquals.bridged,
+          indicesHash.bridged,
+          externalDecl.bridged,
+          externalSubstitutions.bridged,
+          componentTy.bridged
+        )
+      )
+    }
+
+    public static func forStoredProperty(
+      _ property: VarDecl,
+      _ componentTy: CanonicalType
+    ) -> Component {
+      Component(
+        bridged: BridgedKeyPathPatternComponent_forStoredProperty(
+          property.bridged,
+          componentTy.bridged
+        )
+      )
+    }
+
+    public static func forTupleElement(
+      _ index: Int,
+      _ componentTy: CanonicalType
+    ) -> Component {
+      Component(
+        bridged: BridgedKeyPathPatternComponent_forTupleElement(
+          index,
+          componentTy.bridged
+        )
+      )
+    }
+
+    public static func forOptional(
+      _ kind: Kind,
+      _ componentTy: CanonicalType
+    ) -> Component {
+      Component(
+        bridged: BridgedKeyPathPatternComponent_forOptional(
+          kind.bridged,
+          componentTy.bridged
+        )
+      )
     }
   }
 }
@@ -100,15 +204,15 @@ extension KeyPathPattern.Component {
     bridged.getSubscriptIndices()
   }
 
-  public var subscriptIndexEquals: Function {
+  public var subscriptIndexEquals: Function? {
     bridged.getSubscriptIndexEquals().function
   }
 
-  public var subscriptIndexHash: Function {
+  public var subscriptIndexHash: Function? {
     bridged.getSubscriptIndexHash().function
   }
 
-  public var externalDecl: AbstractStorageDecl {
+  public var externalDecl: AbstractStorageDecl? {
     bridged.getExternalDecl().getAs(AbstractStorageDecl.self)
   }
 

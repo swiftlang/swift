@@ -2992,6 +2992,15 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   BridgedBuiltinIsolationMacro,
 };
 
+struct BridgedASTTypeArray {
+  BridgedArrayRef typeArray;
+
+  SwiftInt getCount() const { return SwiftInt(typeArray.Length); }
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedASTType getAt(SwiftInt index) const;
+};
+
 struct BridgedASTType {
   enum class TraitResult {
     IsNot,
@@ -3012,6 +3021,7 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanonicalType() const;
   BRIDGED_INLINE bool isLegalFormalType() const;
   BRIDGED_INLINE bool hasTypeParameter() const;
+  BRIDGED_INLINE bool hasArchetype() const;
   BRIDGED_INLINE bool hasLocalArchetype() const;
   BRIDGED_INLINE bool isExistentialArchetype() const;
   BRIDGED_INLINE bool isExistentialArchetypeWithError() const;
@@ -3025,6 +3035,8 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;
   BRIDGED_INLINE MetatypeRepresentation getRepresentationOfMetatype() const;
+  BRIDGED_INLINE bool hasGenericArguments() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getGenericArguments() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getInvocationGenericSignatureOfFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedASTType fromType, BridgedASTType toType) const;
@@ -3038,15 +3050,6 @@ public:
   BRIDGED_INLINE BridgedCanType(swift::CanType ty);
   BRIDGED_INLINE swift::CanType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getType() const;
-};
-
-struct BridgedASTTypeArray {
-  BridgedArrayRef typeArray;
-
-  SwiftInt getCount() const { return SwiftInt(typeArray.Length); }
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-  BridgedASTType getAt(SwiftInt index) const;
 };
 
 struct BridgedConformance {

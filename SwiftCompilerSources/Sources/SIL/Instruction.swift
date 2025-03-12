@@ -1005,6 +1005,10 @@ final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public class KeyPathInst : SingleValueInstruction {
+  public var keyPathType: CanonicalType {
+    CanonicalType(bridged: bridged.KeyPathInst_getKeyPathType())
+  }
+
   public var pattern: KeyPathPattern? {
     guard bridged.KeyPathInst_hasPattern() else {
       return nil

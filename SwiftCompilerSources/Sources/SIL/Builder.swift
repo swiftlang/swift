@@ -601,4 +601,21 @@ public struct Builder {
     let convertFunction = bridged.createConvertEscapeToNoEscape(originalFunction.bridged, resultType.bridged, isLifetimeGuaranteed)
     return notifyNew(convertFunction.getAs(ConvertEscapeToNoEscapeInst.self))
   }
+
+  public func createKeyPath(
+    pattern: KeyPathPattern,
+    substitutions: SubstitutionMap = SubstitutionMap(),
+    values: [Value],
+    keyPathType: Type
+  ) -> KeyPathInst {
+    return values.withBridgedValues {
+      let kpi = bridged.createKeyPath(
+        pattern.bridged,
+        substitutions.bridged,
+        $0,
+        keyPathType.bridged
+      )
+      return notifyNew(kpi.getAs(KeyPathInst.self))
+    }
+  }
 }

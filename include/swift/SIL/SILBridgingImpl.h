@@ -742,6 +742,10 @@ BridgedLocation BridgedLocation::getArtificialUnreachableLocation() {
 //                                BridgedFunction
 //===----------------------------------------------------------------------===//
 
+BridgedDeclObj BridgedFunction::getSwiftModule() const {
+  return getFunction()->getModule().getSwiftModule();
+}
+
 swift::SILFunction * _Nonnull BridgedFunction::getFunction() const {
   return static_cast<swift::SILFunction *>(obj);
 }
@@ -1522,6 +1526,10 @@ void BridgedInstruction::KeyPathInst_getReferencedFunctions(SwiftInt componentId
     }, [](swift::SILDeclRef) {});
 }
 
+BridgedCanType BridgedInstruction::KeyPathInst_getKeyPathType() const {
+  return {getAs<swift::KeyPathInst>()->getKeyPathType()->getCanonicalType()};
+}
+
 bool BridgedInstruction::KeyPathInst_hasPattern() const {
   return getAs<swift::KeyPathInst>()->getPattern() != nullptr;
 }
@@ -2023,7 +2031,20 @@ BridgedKeyPathPatternComponentArray BridgedKeyPathPattern::components() const {
 }
 
 BridgedStringRef BridgedKeyPathPattern::getObjCString() const {
-  return {pattern->getObjCString()};
+  return pattern->getObjCString();
+}
+
+SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+BridgedKeyPathPattern
+BridgedKeyPathPattern_create(BridgedFunction function, BridgedCanType rootTy,
+                             BridgedCanType valueTy, BridgedArrayRef components,
+                             BridgedStringRef objcString) {
+  return {swift::KeyPathPattern::get(function.getFunction()->getModule(),
+                                     /* genericSignature */ nullptr,
+                                     rootTy.unbridged(),
+                                     valueTy.unbridged(),
+                                     components.unbridged<swift::KeyPathPatternComponent>(),
+                                     objcString.unbridged())};
 }
 
 //===----------------------------------------------------------------------===//
@@ -2077,11 +2098,11 @@ BridgedKeyPathPatternComponent::Kind BridgedKeyPathPatternComponent::getKind() c
 }
 
 BridgedCanType BridgedKeyPathPatternComponent::getComponentType() const {
-  return {unbridged().getComponentType()};
+  return unbridged().getComponentType();
 }
 
 BridgedDeclObj BridgedKeyPathPatternComponent::getStoredPropertyDecl() const {
-  return {unbridged().getStoredPropertyDecl()};
+  return unbridged().getStoredPropertyDecl();
 }
 
 SwiftInt BridgedKeyPathPatternComponent::getTupleIndex() const {
@@ -2089,35 +2110,104 @@ SwiftInt BridgedKeyPathPatternComponent::getTupleIndex() const {
 }
 
 BridgedKeyPathPatternComponent::ComputedPropertyId BridgedKeyPathPatternComponent::getComputedPropertyId() const {
-  return {unbridged().getComputedPropertyId()};
+  return unbridged().getComputedPropertyId();
 }
 
 BridgedFunction BridgedKeyPathPatternComponent::getComputedPropertyGetter() const {
-  return {unbridged().getComputedPropertyGetter()};
+  return unbridged().getComputedPropertyGetter();
 }
 
 BridgedFunction BridgedKeyPathPatternComponent::getComputedPropertySetter() const {
-  return {unbridged().getComputedPropertySetter()};
+  return unbridged().getComputedPropertySetter();
 }
 
 BridgedArrayRef BridgedKeyPathPatternComponent::getSubscriptIndices() const {
-  return {unbridged().getSubscriptIndices()};
+  return unbridged().getSubscriptIndices();
 }
 
-BridgedFunction BridgedKeyPathPatternComponent::getSubscriptIndexEquals() const {
+OptionalBridgedFunction BridgedKeyPathPatternComponent::getSubscriptIndexEquals() const {
   return {unbridged().getSubscriptIndexEquals()};
 }
 
-BridgedFunction BridgedKeyPathPatternComponent::getSubscriptIndexHash() const {
+OptionalBridgedFunction BridgedKeyPathPatternComponent::getSubscriptIndexHash() const {
   return {unbridged().getSubscriptIndexHash()};
 }
 
-BridgedDeclObj BridgedKeyPathPatternComponent::getExternalDecl() const {
+OptionalBridgedDeclObj BridgedKeyPathPatternComponent::getExternalDecl() const {
   return {unbridged().getExternalDecl()};
 }
 
 BridgedSubstitutionMap BridgedKeyPathPatternComponent::getExternalSubstitutions() const {
-  return {unbridged().getExternalSubstitutions()};
+  return unbridged().getExternalSubstitutions();
+}
+
+SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+BridgedKeyPathPatternComponent
+BridgedKeyPathPatternComponent_forComputedGettableProperty(
+    BridgedKeyPathPatternComponent::ComputedPropertyId computedPropertyId,
+    BridgedFunction getter,
+    BridgedArrayRef indices,
+    OptionalBridgedFunction indicesEquals,
+    OptionalBridgedFunction indicesHash,
+    OptionalBridgedDeclObj externalDecl,
+    BridgedSubstitutionMap externalSubstitutions,
+    BridgedCanType componentTy) {
+  return swift::KeyPathPatternComponent::forComputedGettableProperty(
+      computedPropertyId.unbridged(),
+      getter.getFunction(),
+      indices.unbridged<swift::KeyPathPatternComponent::Index>(),
+      indicesEquals.getFunction(),
+      indicesHash.getFunction(),
+      llvm::cast_or_null<swift::AbstractStorageDecl>(
+          static_cast<swift::Decl *>(externalDecl.obj)),
+      externalSubstitutions.unbridged(),
+      componentTy.unbridged());
+}
+
+SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+BridgedKeyPathPatternComponent
+BridgedKeyPathPatternComponent_forComputedSettableProperty(
+    BridgedKeyPathPatternComponent::ComputedPropertyId computedPropertyId,
+    BridgedFunction getter,
+    BridgedFunction setter,
+    BridgedArrayRef indices,
+    OptionalBridgedFunction indicesEquals,
+    OptionalBridgedFunction indicesHash,
+    OptionalBridgedDeclObj externalDecl,
+    BridgedSubstitutionMap externalSubstitutions,
+    BridgedCanType componentTy) {
+  return swift::KeyPathPatternComponent::forComputedSettableProperty(
+      computedPropertyId.unbridged(),
+      getter.getFunction(),
+      setter.getFunction(),
+      indices.unbridged<swift::KeyPathPatternComponent::Index>(),
+      indicesEquals.getFunction(),
+      indicesHash.getFunction(),
+      llvm::cast_or_null<swift::AbstractStorageDecl>(
+          static_cast<swift::Decl *>(externalDecl.obj)),
+      externalSubstitutions.unbridged(),
+      componentTy.unbridged());
+}
+
+BridgedKeyPathPatternComponent
+BridgedKeyPathPatternComponent_forStoredProperty(BridgedDeclObj property,
+                                                 BridgedCanType componentTy) {
+  return swift::KeyPathPatternComponent::forStoredProperty(
+      llvm::cast<swift::VarDecl>(property.unbridged()), componentTy.unbridged());
+}
+
+BridgedKeyPathPatternComponent
+BridgedKeyPathPatternComponent_forTupleElement(SwiftInt index,
+                                               BridgedCanType componentTy) {
+  return swift::KeyPathPatternComponent::forTupleElement(index,
+                                                         componentTy.unbridged());
+}
+
+BridgedKeyPathPatternComponent
+BridgedKeyPathPatternComponent_forOptional(BridgedKeyPathPatternComponent::Kind kind,
+                                           BridgedCanType componentTy) {
+  return swift::KeyPathPatternComponent::forOptional(
+      (swift::KeyPathPatternComponent::Kind)kind, componentTy.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2616,6 +2706,16 @@ return {unbridged().createConvertFunction(regularLoc(), originalFunction.getSILV
 
 BridgedInstruction BridgedBuilder::createConvertEscapeToNoEscape(BridgedValue originalFunction, BridgedType resultType, bool isLifetimeGuaranteed) const {
   return {unbridged().createConvertEscapeToNoEscape(regularLoc(), originalFunction.getSILValue(), resultType.unbridged(), isLifetimeGuaranteed)};
+}
+
+BridgedInstruction BridgedBuilder::createKeyPath(BridgedKeyPathPattern pattern,
+                                                 BridgedSubstitutionMap subs,
+                                                 BridgedValueArray values,
+                                                 BridgedType keyPathTy) const {
+  llvm::SmallVector<swift::SILValue, 16> argValues;
+  auto builder = unbridged();
+  return {builder.createKeyPath(regularLoc(), pattern.pattern, subs.unbridged(),
+      values.getValues(argValues), keyPathTy.unbridged())};
 }
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
