@@ -49,7 +49,7 @@ namespace swift {
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found opened archetype or empty type otherwise.
-CanOpenedArchetypeType getOpenedArchetypeOf(CanType Ty);
+CanExistentialArchetypeType getOpenedArchetypeOf(CanType Ty);
 CanLocalArchetypeType getLocalArchetypeOf(CanType Ty);
 
 /// How an existential type container is represented.

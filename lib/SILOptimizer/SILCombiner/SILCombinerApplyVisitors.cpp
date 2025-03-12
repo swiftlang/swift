@@ -802,7 +802,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     /// and that the protocol type has a sole conformance, then we can propagate
     /// concrete type for it as well.
     ArchetypeType *archetypeTy;
-    if (isa<OpenedArchetypeType>(SwiftArgType) &&
+    if (isa<ExistentialArchetypeType>(SwiftArgType) &&
         (archetypeTy = dyn_cast<ArchetypeType>(SwiftArgType)) &&
         (archetypeTy->getConformsTo().size() == 1)) {
       PD = archetypeTy->getConformsTo()[0];
@@ -979,7 +979,7 @@ static bool canReplaceCopiedArg(FullApplySite Apply, SILValue Arg,
 /// for the argument at \p SkipArgIdx, contain an opened archetype rooted
 /// on \p RootOA.
 static bool applyInvolvesOpenedArchetypeWithRoot(FullApplySite Apply,
-                                                 OpenedArchetypeType *RootOA,
+                                                 ExistentialArchetypeType *RootOA,
                                                  unsigned SkipArgIdx) {
   auto *env = RootOA->getGenericEnvironment();
 
@@ -1116,7 +1116,7 @@ SILValue SILCombiner::canCastArg(FullApplySite Apply,
                                  const OpenedArchetypeInfo &OAI,
                                  const ConcreteExistentialInfo &CEI,
                                  unsigned ArgIdx) {
-  if (!CEI.ConcreteValue || isa<OpenedArchetypeType>(CEI.ConcreteType) ||
+  if (!CEI.ConcreteValue || isa<ExistentialArchetypeType>(CEI.ConcreteType) ||
       !CEI.ConcreteValue->getType().isAddress())
     return SILValue();
 
@@ -1378,7 +1378,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
 
   // If the lookup type is not an opened existential type,
   // it cannot be made more concrete.
-  if (!isa<OpenedArchetypeType>(WMI->getLookupType()))
+  if (!isa<ExistentialArchetypeType>(WMI->getLookupType()))
     return nullptr;
 
   // Try to derive the concrete type and the related conformance of self and

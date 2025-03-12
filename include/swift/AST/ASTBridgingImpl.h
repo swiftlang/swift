@@ -403,7 +403,7 @@ bool BridgedASTType::hasLocalArchetype() const {
 }
 
 bool BridgedASTType::isExistentialArchetype() const {
-  return unbridged()->is<swift::OpenedArchetypeType>();
+  return unbridged()->is<swift::ExistentialArchetypeType>();
 }
 
 bool BridgedASTType::isExistentialArchetypeWithError() const {

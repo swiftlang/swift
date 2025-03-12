@@ -926,7 +926,7 @@ public:
           FormalEvaluationScope scope(SGF);
 
           auto underlyingValueTy =
-              OpenedArchetypeType::get(ctx.TheAnyType);
+              ExistentialArchetypeType::get(ctx.TheAnyType);
 
           auto underlyingValueAddr = SGF.emitOpenExistential(
               loc, ManagedValue::forTrivialAddressRValue(continuationAddr),

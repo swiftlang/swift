@@ -2375,7 +2375,7 @@ bool swift::specializeWitnessMethodInst(WitnessMethodInst *wm) {
   SILModule &m = f->getModule();
 
   CanType astType = wm->getLookupType();
-  if (!isa<OpenedArchetypeType>(astType))
+  if (!isa<ExistentialArchetypeType>(astType))
     return false;
 
   if (wm->isSpecialized())

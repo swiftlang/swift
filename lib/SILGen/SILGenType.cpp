@@ -913,7 +913,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
                                           ProtocolConformanceRef(conformance));
 
   // Open the protocol type.
-  auto openedType = OpenedArchetypeType::get(
+  auto openedType = ExistentialArchetypeType::get(
       protocol->getDeclaredExistentialType()->getCanonicalType());
   auto openedConf = ProtocolConformanceRef::forAbstract(openedType, protocol);
 

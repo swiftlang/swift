@@ -5680,13 +5680,13 @@ public:
                                            sigID, interfaceTypeID);
   }
 
-  void visitOpenedArchetypeType(const OpenedArchetypeType *archetypeTy) {
+  void visitExistentialArchetypeType(const ExistentialArchetypeType *archetypeTy) {
     using namespace decls_block;
     auto interfaceTypeID = S.addTypeRef(archetypeTy->getInterfaceType());
     auto genericEnvID = S.addGenericEnvironmentRef(
         archetypeTy->getGenericEnvironment());
-    unsigned abbrCode = S.DeclTypeAbbrCodes[OpenedArchetypeTypeLayout::Code];
-    OpenedArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+    unsigned abbrCode = S.DeclTypeAbbrCodes[ExistentialArchetypeTypeLayout::Code];
+    ExistentialArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                           interfaceTypeID, genericEnvID);
   }
 
@@ -6239,7 +6239,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<MetatypeTypeLayout>();
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
   registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();
-  registerDeclTypeAbbr<OpenedArchetypeTypeLayout>();
+  registerDeclTypeAbbr<ExistentialArchetypeTypeLayout>();
   registerDeclTypeAbbr<ElementArchetypeTypeLayout>();
   registerDeclTypeAbbr<OpaqueArchetypeTypeLayout>();
   registerDeclTypeAbbr<PackArchetypeTypeLayout>();
