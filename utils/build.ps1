@@ -2450,8 +2450,7 @@ function Install-Platform([Platform]$Platform, $Archs) {
         Copy-File "$($Arch.XCTestInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\libXCTest.so" "$XCTestInstallRoot\usr\lib\$($Arch.BinaryDir)\"
       }
     }
-    Copy-File "$($Arch.XCTestInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\$($Arch.LLVMName)\XCTest.swiftmodule" "$XCTestInstallRoot\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\XCTest.swiftmodule\$($Arch.LLVMTarget).swiftmodule"
-    Copy-File "$($Arch.XCTestInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\$($Arch.LLVMName)\XCTest.swiftdoc" "$XCTestInstallRoot\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\XCTest.swiftmodule\$($Arch.LLVMTarget).swiftdoc"
+    Copy-Directory "$($Arch.XCTestInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\XCTest.swiftmodule" "$XCTestInstallRoot\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\"
 
     # Copy Testing
     $SwiftTestingInstallRoot = [IO.Path]::Combine((Get-PlatformRoot $Platform), "Developer", "Library", "Testing-development")
