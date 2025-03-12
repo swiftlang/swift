@@ -4025,7 +4025,8 @@ public:
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
 
     // Add the @_hasStorage attribute if this var has storage.
-    if (var->hasStorage())
+    // (Unless it's an ABI-only decl--they shouldn't have a HasStorageAttr.)
+    if (var->hasStorage() && ABIDeclCounterpartID == 0)
       AddAttribute(new (ctx) HasStorageAttr(/*isImplicit:*/true));
 
     {
