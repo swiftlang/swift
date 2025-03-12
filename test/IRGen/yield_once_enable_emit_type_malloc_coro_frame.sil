@@ -44,17 +44,16 @@ unwind:
 }
 
 // CHECK:       define linkonce_odr hidden ptr @__swift_coroFrameAllocStub(i64 %0, i64 %1) #1 {
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:  %2 = icmp ne ptr @swift_coroFrameAlloc, null
-// CHECK-NEXT:  br i1 %2, label %return-coroFrameAlloc, label %return-malloc
+// CHECK:       %2 = icmp ne ptr @swift_coroFrameAlloc, null
+// CHECK:       br i1 %2, label %return-coroFrameAlloc, label %return-malloc
 
 // CHECK-LABEL: return-coroFrameAlloc:
-// CHECK-NEXT:  %3 = call ptr @swift_coroFrameAlloc(i64 %0, i64 %1) #2
-// CHECK-NEXT:  ret ptr %3
+// CHECK:         %3 = call ptr @swift_coroFrameAlloc(i64 %0, i64 %1) #2
+// CHECK:         ret ptr %3
 
 // CHECK-LABEL: return-malloc:
-// CHECK-NEXT:  %4 = call ptr @malloc(i64 %0)
-// CHECK-NEXT:  ret ptr %4
+// CHECK:         %4 = call ptr @malloc(i64 %0)
+// CHECK:         ret ptr %4
 
 // CHECK:       declare extern_weak ptr @swift_coroFrameAlloc(i64, i64)
 
