@@ -8332,8 +8332,8 @@ ERROR(isolated_conformance_mismatch_with_associated_isolation,none,
       "%0 conformance of %1 to %2 cannot depend on %3 conformance of %4 to %5",
       (ActorIsolation, Type, DeclName, ActorIsolation, Type, DeclName))
 NOTE(add_isolated_to_conformance,none,
-     "add 'isolated' to the %0 conformance to restrict it to %1 code",
-    (DeclName, ActorIsolation))
+     "add '%0' to the %1 conformance to restrict it to %2 code",
+    (StringRef, DeclName, ActorIsolation))
 ERROR(isolated_conformance_with_sendable,none,
       "isolated conformance of %0 to %1 cannot be used to satisfy conformance "
       "requirement for a %select{`Sendable`|`SendableMetatype`}2 type "

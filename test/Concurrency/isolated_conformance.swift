@@ -12,7 +12,7 @@ protocol P {
 // ----------------------------------------------------------------------------
 
 // expected-note@+3{{add '@preconcurrency' to the 'P' conformance to defer isolation checking to run time}}{{25-25=@preconcurrency }}
-// expected-note@+2{{add 'isolated' to the 'P' conformance to restrict it to main actor-isolated code}}{{25-25=isolated }}
+// expected-note@+2{{add '@MainActor' to the 'P' conformance to restrict it to main actor-isolated code}}{{25-25=@MainActor }}
 @MainActor
 class CWithNonIsolated: P {
   func f() { } // expected-error{{main actor-isolated instance method 'f()' cannot be used to satisfy nonisolated requirement from protocol 'P'}}
