@@ -137,6 +137,7 @@ param
   [string] $PinnedVersion = "",
   [ValidateSet("Asserts", "NoAsserts")]
   [string] $PinnedToolchainVariant = "Asserts",
+  [ValidatePattern('^\d+(\.\d+)*$')]
   [string] $PythonVersion = "3.9.10",
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
   [string] $AndroidNDKVersion = "r27c",
@@ -327,6 +328,42 @@ $BuildArch = switch ($BuildArchName) {
   "AMD64" { $ArchX64 }
   "ARM64" { $ArchARM64 }
   default { throw "Unsupported processor architecture" }
+}
+
+$KnownPythons = @{
+  "3.9.10" = @{
+    AMD64 = @{
+      URL = "https://www.nuget.org/api/v2/package/python/3.9.10";
+      SHA256 = "ac43b491e9488ac926ed31c5594f0c9409a21ecbaf99dc7a93f8c7b24cf85867";
+    };
+    ARM64 = @{
+      URL = "https://www.nuget.org/api/v2/package/pythonarm64/3.9.10";
+      SHA256 = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69";
+    };
+  }
+}
+
+$PythonWheels = @{
+  "packaging" = @{
+    File = "packaging-24.1-py3-none-any.whl";
+    URL = "https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl";
+    SHA256 = "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124";
+  };
+  "distutils" = @{
+    File = "setuptools-75.1.0-py3-none-any.whl";
+    URL = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl";
+    SHA256 = "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2";
+  };
+  "psutil" = @{
+    File = "psutil-6.1.0-cp37-abi3-win_amd64.whl";
+    URL = "https://files.pythonhosted.org/packages/11/91/87fa6f060e649b1e1a7b19a4f5869709fbf750b7c8c262ee776ec32f3028/psutil-6.1.0-cp37-abi3-win_amd64.whl";
+    SHA256 = "a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be";
+  };
+  "unittest2" = @{
+    File = "unittest2-1.1.0-py2.py3-none-any.whl";
+    URL = "https://files.pythonhosted.org/packages/72/20/7f0f433060a962200b7272b8c12ba90ef5b903e218174301d0abfd523813/unittest2-1.1.0-py2.py3-none-any.whl";
+    SHA256 = "13f77d0875db6d9b435e1d4f41e74ad4cc2eb6e1d5c824996092b3430f088bb8";
+  };
 }
 
 $KnownNDKs = @{
@@ -808,63 +845,52 @@ function Fetch-Dependencies {
   New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
   Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain
 
-  function Install-Python([string] $ArchName) {
-    $Python = @{
-      AMD64 = @{
-        URL = "https://www.nuget.org/api/v2/package/python/$PythonVersion";
-        SHA256 = "ac43b491e9488ac926ed31c5594f0c9409a21ecbaf99dc7a93f8c7b24cf85867";
-      };
-      ARM64 = @{
-        URL = "https://www.nuget.org/api/v2/package/pythonarm64/$PythonVersion";
-        SHA256 = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69";
-      }
+  function Get-KnownPython([string] $ArchName) {
+    if (-not $KnownPythons.ContainsKey($PythonVersion)) {
+      throw "Unknown python version: $PythonVersion"
     }
+    return $KnownPythons[$PythonVersion].$ArchName
+  }
 
-    DownloadAndVerify $Python[$ArchName].URL "$BinaryCache\Python$ArchName-$PythonVersion.zip" $Python[$ArchName].SHA256
+  function Install-Python([string] $ArchName) {
+    $Python = Get-KnownPython $ArchName
+    DownloadAndVerify $Python.URL "$BinaryCache\Python$ArchName-$PythonVersion.zip" $Python.SHA256
     if (-not $ToBatch) {
       Extract-ZipFile Python$ArchName-$PythonVersion.zip "$BinaryCache" Python$ArchName-$PythonVersion
     }
   }
 
-  function Install-PythonWheel([string] $ModuleName, [string] $WheelFile, [string] $WheelURL, [string] $WheelHash) {
-    try {
-      Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
-    } catch {
-      DownloadAndVerify $WheelURL "$BinaryCache\python\$WheelFile" $WheelHash
-      Write-Output "Installing '$WheelFile' ..."
-      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install "$BinaryCache\python\$WheelFile" --disable-pip-version-check
-    }
-  }
-
-  function Install-PythonModules() {
-    # First ensure pip is installed, else bootstrap it
+  function Install-PIPIfNeeded() {
     try {
       Invoke-Program -Silent "$(Get-PythonExecutable)" -m pip
     } catch {
       Write-Output "Installing pip ..."
       Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m ensurepip -U --default-pip
+    } finally {
+      Write-Output "pip installed."
     }
+  }
 
-    # 'packaging' is required for building LLVM 18+
-    Install-PythonWheel 'packaging' 'packaging-24.1-py3-none-any.whl' `
-      'https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl' `
-      '5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124'
+  function Install-PythonWheel([string] $ModuleName) {
+    try {
+      Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
+    } catch {
+      $Wheel = $PythonWheels[$ModuleName]
+      DownloadAndVerify $Wheel.URL "$BinaryCache\python\$($Wheel.File)" $Wheel.SHA256
+      Write-Output "Installing '$($Wheel.File)' ..."
+      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install "$BinaryCache\python\$($Wheel.File)" --disable-pip-version-check
+    } finally {
+      Write-Output "$ModuleName installed."
+    }
+  }
 
-    # 'setuptools' provides 'distutils' module for Python 3.12+, required for SWIG support
-    Install-PythonWheel 'distutils' 'setuptools-75.1.0-py3-none-any.whl' `
-      'https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl' `
-      '35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2'
-
+  function Install-PythonModules() {
+    Install-PIPIfNeeded
+    Install-PythonWheel "packaging" # For building LLVM 18+
+    Install-PythonWheel "distutils" # Required for SWIG support
     if ($Test -contains "lldb") {
-      # 'psutil' is required for testing LLDB
-      Install-PythonWheel 'psutil' 'psutil-6.1.0-cp37-abi3-win_amd64.whl' `
-        'https://files.pythonhosted.org/packages/11/91/87fa6f060e649b1e1a7b19a4f5869709fbf750b7c8c262ee776ec32f3028/psutil-6.1.0-cp37-abi3-win_amd64.whl' `
-        'a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be'
-
-      # 'unittest2' is required for testing LLDB
-      Install-PythonWheel 'unittest2' 'unittest2-1.1.0-py2.py3-none-any.whl' `
-        'https://files.pythonhosted.org/packages/72/20/7f0f433060a962200b7272b8c12ba90ef5b903e218174301d0abfd523813/unittest2-1.1.0-py2.py3-none-any.whl' `
-        '13f77d0875db6d9b435e1d4f41e74ad4cc2eb6e1d5c824996092b3430f088bb8'
+      Install-PythonWheel "psutil" # Required for testing LLDB
+      Install-PythonWheel "unittest2" # Required for testing LLDB
     }
   }
 
