@@ -173,13 +173,13 @@ protocol Collection<T> {
 struct TestParameterizedProtocol<T> : Collection {
   typealias T = T
 
-  let x : Collection<T> // expected-warning {{use of protocol 'Collection<T>' as a type must be written 'any Collection<T>'}}
+  let x : Collection<T> // expected-warning {{use of protocol 'Collection' as a type must be written 'any Collection'}}
 }
 
 func acceptAny(_: Collection<Int>) {}
-// expected-warning@-1 {{use of protocol 'Collection<Int>' as a type must be written 'any Collection<Int>'}}
+// expected-warning@-1 {{use of protocol 'Collection' as a type must be written 'any Collection'}}
 func returnsAny() -> Collection<Int> {}
-// expected-warning@-1 {{use of protocol 'Collection<Int>' as a type must be written 'any Collection<Int>'}}
+// expected-warning@-1 {{use of protocol 'Collection' as a type must be written 'any Collection'}}
 
 func testInvalidAny() {
   struct S: HasAssoc {
@@ -374,8 +374,8 @@ func testAnyFixIt() {
   let _: Optional<HasAssoc>
   // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{19-28=any ~Copyable}}
   let _: Optional<~Copyable>
-  // FIXME: No fix-it + generic argument not diagnosed.
-  // expected-warning@+1 {{use of protocol 'HasAssocGeneric<any HasAssoc>' as a type must be written 'any HasAssocGeneric<any HasAssoc>'}}{{none}}
+  // expected-warning@+2:10 {{use of protocol 'HasAssocGeneric' as a type must be written 'any HasAssocGeneric'}}{{10-35=any HasAssocGeneric<HasAssoc>}}
+  // expected-warning@+1:26 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{26-34=any HasAssoc}}
   let _: HasAssocGeneric<HasAssoc>
   // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{14-22=any HasAssoc}}
   let _: S.G<HasAssoc>
@@ -407,8 +407,8 @@ func testAnyFixIt() {
   // expected-warning@+2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{13-21=any HasAssoc}}
   // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{10-37=any ~G<HasAssoc>.Copyable_Alias}}
   let _: ~G<HasAssoc>.Copyable_Alias
-  // FIXME: No fix-it + generic argument not diagnosed.
-  // expected-warning@+1 {{use of 'HasAssocGeneric<any HasAssoc>' as a type must be written 'any HasAssocGeneric<any HasAssoc>}}{{none}}
+  // expected-warning@+2:12 {{use of 'S.HasAssocGeneric_Alias' (aka 'HasAssocGeneric') as a type must be written 'any S.HasAssocGeneric_Alias' (aka 'any HasAssocGeneric')}} {{10-43=any S.HasAssocGeneric_Alias<HasAssoc>}}
+  // expected-warning@+1:34 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{34-42=any HasAssoc}}
   let _: S.HasAssocGeneric_Alias<HasAssoc>
   // FIXME: No diagnostic.
   let _: HasAssoc.Int_Alias
@@ -543,6 +543,8 @@ func testAnyFixIt() {
 
   // expected-error@+1 {{optional 'any' type must be written '(any HasAssoc)?'}}{{10-23=(any HasAssoc)?}}
   let _: any HasAssoc?
+  // expected-error@+1:10 {{optional 'any' type must be written '(any HasAssocGeneric<Int>)?'}}{{10-35=(any HasAssocGeneric<Int>)?}}
+  let _: any HasAssocGeneric<Int>?
   // FIXME: Better recovery
   // expected-error@+1 {{type '(any Copyable)?' cannot be suppressed}}
   let _: any ~Copyable?
