@@ -490,13 +490,26 @@ $WindowsSDKArchs = @($WindowsSDKs | ForEach-Object {
 # Build functions
 function Invoke-BuildStep([string] $Name) {
   if ($Summary) {
+    # TODO: Replace hacky introspection of $Args with Platform object.
+    $BuildStepPlatform = "Windows"
+    $BuildStepArch = "(n/a)"
     $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    foreach ($Arg in $Args) {
+      switch ($Arg.GetType().Name) {
+        "Hashtable" {
+          if ($Arg.ContainsKey("LLVMName")) { $BuildStepArch = $Arg["LLVMName"] }
+        }
+        "string" {
+          if ($Arg -eq "Windows" -or $Arg -eq "Android") { $BuildStepPlatform = $Arg }
+        }
+      }
+    }
   }
 
   & $Name @Args
 
   if ($Summary) {
-    Add-TimingData $BuildArch.LLVMName "Windows" ($Name -replace "Build-","") $Stopwatch.Elapsed
+    Add-TimingData $BuildStepArch $BuildStepPlatform ($Name -replace "Build-","") $Stopwatch.Elapsed
   }
   if ($Name.Replace("Build-", "") -eq $BuildTo) {
     exit 0
