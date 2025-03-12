@@ -88,8 +88,8 @@ extension X {
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s7asmname21abi_ABIAttrPublic_vars5Int64Vvs"
 // CHECK: define hidden swiftcc i64 @"$s7asmname23abi_ABIAttrInternal_vars5Int64Vvg"
 // CHECK: define hidden swiftcc void @"$s7asmname23abi_ABIAttrInternal_vars5Int64Vvs"
-// CHECK: define internal swiftcc i64 @"$s7asmname22abi_ABIAttrPrivate_vars5Int64Vvg"
-// CHECK: define internal swiftcc void @"$s7asmname22abi_ABIAttrPrivate_vars5Int64Vvs"
+// CHECK: define internal swiftcc i64 @"$s7asmname22abi_ABIAttrPrivate_var33_{{[0-9A-F]+}}LLs5Int64Vvg"
+// CHECK: define internal swiftcc void @"$s7asmname22abi_ABIAttrPrivate_var33_{{[0-9A-F]+}}LLs5Int64Vvs"
 
 @abi(func abi_ABIAttrGenericNonSendableToSendable<T>(_ value: T) -> T)
 public func api_ABIAttrGenericNonSendableToSendable<T: Sendable>(_ value: T) -> T { return value }
