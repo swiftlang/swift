@@ -114,6 +114,7 @@ target_link_libraries(swift_Concurrency PRIVATE
   $<$<BOOL:${BUILD_SHARED_LIBS}>:swiftThreading>
   $<$<PLATFORM_ID:Windows>:Synchronization>
   $<$<PLATFORM_ID:Windows>:mincore>
+  $<$<PLATFORM_ID:Darwin>:c++>
   # Link to the runtime that we are just building.
   swiftCore
   $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt>)
