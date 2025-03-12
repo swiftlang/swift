@@ -2257,6 +2257,28 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
           dc, expansion->getExpansionInfo(), roles);
     }
   } else {
+    if (isa<ClosureExpr>(dc) && roles.contains(MacroRole::Body)) {
+      // The closures are type-checked after macros are expanded
+      // which means that macro cannot reference any declarations
+      // from inner or outer closures as its arguments.
+      //
+      // For example:
+      // `_: (Int) -> Void = { x in { @Macro(x) in ... }() }`
+      //
+      // `x` is not going to be type-checked at macro expansion
+      // time and cannot be referenced by `@Macro`.
+      //
+      // Let's walk up declaration contexts until we find first
+      // non-closure one. This means that we can support a local
+      // declaration that is defined inside of a closure because
+      // they are separately checked after outer ones are already
+      // processed.
+      while ((dc = dc->getParent())) {
+        if (!isa<AbstractClosureExpr>(dc))
+          break;
+      }
+    }
+
     SourceRange genericArgsRange = macroRef.getGenericArgsRange();
     macroExpansion = MacroExpansionExpr::create(
       dc, macroRef.getSigilLoc(),
