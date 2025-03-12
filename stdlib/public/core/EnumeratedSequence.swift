@@ -115,7 +115,7 @@ extension EnumeratedSequence: Collection where Base: Collection {
     @_alwaysEmitIntoClient
     init(base: Base.Index, offset: Int) {
       self.base = base
-      self.offset = offset
+      self._offset = offset
     }
   }
 
@@ -150,7 +150,7 @@ extension EnumeratedSequence: Collection where Base: Collection {
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   func _offset(of index: Index) -> Int {
-    index.base == _base.endIndex ? _base.count : index.offset
+    index.base == _base.endIndex ? _base.count : index._offset
   }
 
   @available(SwiftStdlib 6.1, *)
@@ -159,21 +159,21 @@ extension EnumeratedSequence: Collection where Base: Collection {
     if start.base == _base.endIndex || end.base == _base.endIndex {
       return _base.distance(from: start.base, to: end.base)
     } else {
-      return end.offset - start.offset
+      return end._offset - start._offset
     }
   }
 
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   public func index(after index: Index) -> Index {
-    Index(base: _base.index(after: index.base), offset: index.offset + 1)
+    Index(base: _base.index(after: index.base), offset: index._offset + 1)
   }
 
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
     let index = _base.index(i.base, offsetBy: distance)
-    let offset = distance >= 0 ? i.offset : _offset(of: i)
+    let offset = distance >= 0 ? i._offset : _offset(of: i)
     return Index(base: index, offset: offset + distance)
   }
 
@@ -187,24 +187,24 @@ extension EnumeratedSequence: Collection where Base: Collection {
     guard let index = _base.index(
       i.base,
       offsetBy: distance,
-      limitedBy: limit
+      limitedBy: limit.base
     ) else {
       return nil
     }
 
-    let offset = distance >= 0 ? i.offset : _offset(of: i)
+    let offset = distance >= 0 ? i._offset : _offset(of: i)
     return Index(base: index, offset: offset + distance)
   }
 
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
-  public subscript(_ position: Int) -> Element {
+  public subscript(_ position: Index) -> Element {
     _precondition(
       _base.startIndex <= position.base && position.base < _base.endIndex,
       "Index out of bounds"
     )
 
-    return (position.offset, _base[position.base])
+    return (position._offset, _base[position.base])
   }
 }
 
@@ -212,7 +212,7 @@ extension EnumeratedSequence: Collection where Base: Collection {
 extension EnumeratedSequence.Index: Comparable {
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
-  public static ==(lhs: Self, rhs: Self) -> Bool {
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
     lhs.base == rhs.base
   }
 
@@ -224,7 +224,7 @@ extension EnumeratedSequence.Index: Comparable {
 }
 
 @available(SwiftStdlib 6.1, *)
-extension EnumeratedSequence: BidirectionalCollection where Base: BidirectionalCollection {
+extension EnumeratedSequence: BidirectionalCollection where Base: BidirectionalCollection & RandomAccessCollection {
   @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   public func index(before index: Index) -> Index {
