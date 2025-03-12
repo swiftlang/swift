@@ -342,6 +342,92 @@ $KnownNDKs = @{
   }
 }
 
+enum OS {
+  Windows
+  Android
+}
+
+$KnownPlatforms = @{
+  WindowsARM64 = [PSCustomObject]@{
+    OS = [OS]::Windows;
+    Triple = "aarch64-unknown-windows-msvc";
+    Architecture = [PSCustomObject]@{
+      VSName = "arm64";
+      CMakeName = "ARM64";
+      LLVMName = "aarch64";
+    };
+    BinaryDir = "bin64a";
+    Cache = @{};
+  };
+
+  WindowsX64 = [PSCustomObject]@{
+    OS = [OS]::Windows;
+    Triple = "x86_64-unknown-windows-msvc";
+    Architecture = [PSCustomObject]@{
+      VSName = "amd64";
+      CMakeName = "AMD64";
+      LLVMName = "x86_64";
+    };
+    BinaryDir = "bin64";
+    Cache = @{};
+  };
+
+  WindowsX86  = [PSCustomObject]@{
+    OS = [OS]::Windows;
+    Triple = "i686-unknown-windows-msvc";
+    Architecture = [PSCustomObject]@{
+      VSName = "x86";
+      CMakeName = "i686";
+      LLVMName = "i686";
+    };
+    BinaryDir = "bin32";
+    Cache = @{};
+  };
+
+  AndroidARMv7 = [PSCustomObject]@{
+    OS = [OS]::Android;
+    Triple = "armv7-unknown-linux-androideabi${AndroidAPILevel}";
+    Architecture = [PSCustomObject]@{
+      CMakeName = "armv7-a";
+      LLVMName = "armv7";
+    };
+    BinaryDir = "bin32a";
+    Cache = @{};
+  };
+
+  AndroidARM64 = [PSCustomObject]@{
+    OS = [OS]::Android;
+    Triple = "aarch64-unknown-linux-android${AndroidAPILevel}";
+    Architecture = [PSCustomObject]@{
+      CMakeName = "aarch64";
+      LLVMName = "aarch64";
+    };
+    BinaryDir = "bin64a";
+    Cache = @{};
+  };
+
+  AndroidX86 = [PSCustomObject]@{
+    OS = [OS]::Android;
+    Triple = "i686-unknown-linux-android${AndroidAPILevel}";
+    Architecture = [PSCustomObject]@{
+      CMakeName = "i686";
+      LLVMName = "i686";
+    };
+    BinaryDir = "bin32";
+    Cache = @{};
+  };
+
+  AndroidX64 = [PSCustomObject]@{
+    OS = [OS]::Android;
+    Triple = "x86_64-unknown-linux-android${AndroidAPILevel}";
+    Architecture = [PSCustomObject]@{
+      CMakeName = "x86_64";
+      LLVMName = "x86_64";
+    };
+    BinaryDir = "bin64";
+    Cache = @{};
+  };
+}
 
 $IsCrossCompiling = $HostArchName -ne $BuildArchName
 
