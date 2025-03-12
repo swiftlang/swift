@@ -416,3 +416,6 @@ Added: _swift_coro_alloc
 Added: _swift_coro_dealloc
 Added: _swift_coro_getGlobalAllocator
 Added: _swift_task_dealloc_through
+
+// SwiftSettings
+Added: _$ss12SwiftSettingVsE16defaultIsolationyABScA_pXpSgFZ
