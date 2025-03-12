@@ -645,13 +645,13 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(_ bounds: Range<Index>) -> Self {
+  mutating public func extracting(_ bounds: Range<Index>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
       "Index range out of bounds"
     )
-    return unsafe _extracting(unchecked: bounds)
+    return unsafe extracting(unchecked: bounds)
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -672,7 +672,7 @@ extension MutableSpan where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(unchecked bounds: Range<Index>) -> Self {
+  mutating public func extracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
     let newSpan = unsafe Self(_unchecked: newStart, count: bounds.count)
@@ -694,10 +694,10 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(
+  mutating public func extracting(
     _ bounds: some RangeExpression<Index>
   ) -> Self {
-    _extracting(bounds.relative(to: indices))
+    extracting(bounds.relative(to: indices))
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -718,13 +718,13 @@ extension MutableSpan where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(
+  mutating public func extracting(
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
     let range = unsafe Range(
       _uncheckedBounds: (bounds.lowerBound, bounds.upperBound&+1)
     )
-    return unsafe _extracting(unchecked: range)
+    return unsafe extracting(unchecked: range)
   }
 
   /// Constructs a new span over all the items of this span.
@@ -738,7 +738,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(_: UnboundedRange) -> Self {
+  mutating public func extracting(_: UnboundedRange) -> Self {
     let newSpan = unsafe Self(_unchecked: _start(), count: _count)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
@@ -765,7 +765,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(first maxLength: Int) -> Self {
+  mutating public func extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
     let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
@@ -788,7 +788,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(droppingLast k: Int) -> Self {
+  mutating public func extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let newCount = count &- droppedCount
@@ -813,7 +813,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(last maxLength: Int) -> Self {
+  mutating public func extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, count)
     let offset = (count &- newCount) * MemoryLayout<Element>.stride
@@ -838,7 +838,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(borrow self)
-  mutating public func _extracting(droppingFirst k: Int) -> Self {
+  mutating public func extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let offset = droppedCount * MemoryLayout<Element>.stride

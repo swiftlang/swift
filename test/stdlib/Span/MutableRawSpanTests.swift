@@ -214,7 +214,7 @@ suite.test("unsafeLoadUnaligned(as:)")
   a.withUnsafeMutableBytes {
     var span = MutableRawSpan(_unsafeBytes: $0)
 
-    let suffix = span._extracting(droppingFirst: 2)
+    let suffix = span.extracting(droppingFirst: 2)
     let u0 = suffix.unsafeLoadUnaligned(as: UInt64.self)
     expectEqual(u0 & 0xff, 2)
     expectEqual(u0.byteSwapped & 0xff, 9)
@@ -350,7 +350,7 @@ suite.test("update(fromContentsOf:) (contiguous memory)")
   expectEqual(a.elementsEqual(0..<capacity), true)
 }
 
-suite.test("_extracting()")
+suite.test("extracting()")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -363,25 +363,25 @@ suite.test("_extracting()")
   b.withUnsafeMutableBytes {
     var span = MutableRawSpan(_unsafeBytes: $0)
 
-    var sub = span._extracting(0..<2)
+    var sub = span.extracting(0..<2)
     expectEqual(sub.byteCount, 2)
     expectEqual(sub.unsafeLoad(as: UInt8.self), 0)
 
-    sub = span._extracting(..<2)
+    sub = span.extracting(..<2)
     expectEqual(sub.byteCount, 2)
     expectEqual(sub.unsafeLoad(as: UInt8.self), 0)
 
-    sub = span._extracting(...)
+    sub = span.extracting(...)
     expectEqual(sub.byteCount, 4)
     expectEqual(sub.unsafeLoad(as: UInt8.self), 0)
 
-    sub = span._extracting(2...)
+    sub = span.extracting(2...)
     expectEqual(sub.byteCount, 2)
     expectEqual(sub.unsafeLoad(as: UInt8.self), 2)
   }
 }
 
-suite.test("_extracting(unchecked:)")
+suite.test("extracting(unchecked:)")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -393,14 +393,14 @@ suite.test("_extracting(unchecked:)")
   var b = (0..<capacity).map(UInt8.init)
   b.withUnsafeMutableBytes {
     var span = MutableRawSpan(_unsafeBytes: $0.prefix(8))
-    let beyond = span._extracting(unchecked: 16...23)
+    let beyond = span.extracting(unchecked: 16...23)
     expectEqual(beyond.byteCount, 8)
     let fromBeyond = beyond.unsafeLoad(as: UInt8.self)
     expectEqual(fromBeyond, 16)
   }
 }
 
-suite.test("_extracting prefixes")
+suite.test("extracting prefixes")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -415,19 +415,19 @@ suite.test("_extracting prefixes")
     var span = MutableRawSpan(_unsafeBytes: $0)
     expectEqual(span.byteCount, capacity)
 
-    prefix = span._extracting(first: 1)
+    prefix = span.extracting(first: 1)
     expectEqual(prefix.unsafeLoad(as: UInt8.self), 0)
 
-    prefix = span._extracting(first: capacity)
+    prefix = span.extracting(first: capacity)
     expectEqual(
       prefix.unsafeLoad(fromByteOffset: capacity-1, as: UInt8.self),
       UInt8(capacity-1)
     )
 
-    prefix = span._extracting(droppingLast: capacity)
+    prefix = span.extracting(droppingLast: capacity)
     expectEqual(prefix.isEmpty, true)
 
-    prefix = span._extracting(droppingLast: 1)
+    prefix = span.extracting(droppingLast: 1)
     expectEqual(
       prefix.unsafeLoad(fromByteOffset: capacity-2, as: UInt8.self),
       UInt8(capacity-2)
@@ -438,12 +438,12 @@ suite.test("_extracting prefixes")
     let b = UnsafeMutableRawBufferPointer(start: nil, count: 0)
     var span = MutableRawSpan(_unsafeBytes: b)
     expectEqual(span.byteCount, b.count)
-    expectEqual(span._extracting(first: 1).byteCount, b.count)
-    expectEqual(span._extracting(droppingLast: 1).byteCount, b.count)
+    expectEqual(span.extracting(first: 1).byteCount, b.count)
+    expectEqual(span.extracting(droppingLast: 1).byteCount, b.count)
   }
 }
 
-suite.test("_extracting suffixes")
+suite.test("extracting suffixes")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -458,19 +458,19 @@ suite.test("_extracting suffixes")
     var span = MutableRawSpan(_unsafeBytes: $0)
     expectEqual(span.byteCount, capacity)
 
-    prefix = span._extracting(last: capacity)
+    prefix = span.extracting(last: capacity)
     expectEqual(prefix.unsafeLoad(as: UInt8.self), 0)
 
-    prefix = span._extracting(last: capacity-1)
+    prefix = span.extracting(last: capacity-1)
     expectEqual(prefix.unsafeLoad(as: UInt8.self), 1)
 
-    prefix = span._extracting(last: 1)
+    prefix = span.extracting(last: 1)
     expectEqual(prefix.unsafeLoad(as: UInt8.self), UInt8(capacity-1))
 
-    prefix = span._extracting(droppingFirst: capacity)
+    prefix = span.extracting(droppingFirst: capacity)
     expectTrue(prefix.isEmpty)
 
-    prefix = span._extracting(droppingFirst: 1)
+    prefix = span.extracting(droppingFirst: 1)
     expectEqual(prefix.unsafeLoad(as: UInt8.self), 1)
   }
 
@@ -478,7 +478,7 @@ suite.test("_extracting suffixes")
     let b = UnsafeMutableRawBufferPointer(start: nil, count: 0)
     var span = MutableRawSpan(_unsafeBytes: b)
     expectEqual(span.byteCount, b.count)
-    expectEqual(span._extracting(last: 1).byteCount, b.count)
-    expectEqual(span._extracting(droppingFirst: 1).byteCount, b.count)
+    expectEqual(span.extracting(last: 1).byteCount, b.count)
+    expectEqual(span.extracting(droppingFirst: 1).byteCount, b.count)
   }
 }

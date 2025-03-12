@@ -573,7 +573,7 @@ suite.test("swapAt")
   expectEqual(array, (0..<count).reversed())
 }
 
-suite.test("_extracting()")
+suite.test("extracting()")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -586,25 +586,25 @@ suite.test("_extracting()")
   b.withUnsafeMutableBufferPointer {
     var span = MutableSpan(_unsafeElements: $0)
 
-    var sub = span._extracting(0..<2)
+    var sub = span.extracting(0..<2)
     expectEqual(sub.count, 2)
     expectEqual(sub[0], 0)
 
-    sub = span._extracting(..<2)
+    sub = span.extracting(..<2)
     expectEqual(sub.count, 2)
     expectEqual(sub[0], 0)
 
-    sub = span._extracting(...)
+    sub = span.extracting(...)
     expectEqual(sub.count, 4)
     expectEqual(sub[0], 0)
 
-    sub = span._extracting(2...)
+    sub = span.extracting(2...)
     expectEqual(sub.count, 2)
     expectEqual(sub[0], 2)
   }
 }
 
-suite.test("_extracting(unchecked:)")
+suite.test("extracting(unchecked:)")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -616,14 +616,14 @@ suite.test("_extracting(unchecked:)")
   var b = (0..<capacity).map(UInt8.init)
   b.withUnsafeMutableBufferPointer {
     var span = MutableSpan(_unsafeElements: $0.prefix(8))
-    let beyond = span._extracting(unchecked: 16...23)
+    let beyond = span.extracting(unchecked: 16...23)
     expectEqual(beyond.count, 8)
     let fromBeyond = beyond[0]
     expectEqual(fromBeyond, 16)
   }
 }
 
-suite.test("_extracting prefixes")
+suite.test("extracting prefixes")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -638,16 +638,16 @@ suite.test("_extracting prefixes")
     var span = MutableSpan(_unsafeElements: $0)
     expectEqual(span.count, capacity)
 
-    prefix = span._extracting(first: 1)
+    prefix = span.extracting(first: 1)
     expectEqual(prefix[0], 0)
 
-    prefix = span._extracting(first: capacity)
+    prefix = span.extracting(first: capacity)
     expectEqual(prefix[capacity-1], UInt8(capacity-1))
 
-    prefix = span._extracting(droppingLast: capacity)
+    prefix = span.extracting(droppingLast: capacity)
     expectEqual(prefix.isEmpty, true)
 
-    prefix = span._extracting(droppingLast: 1)
+    prefix = span.extracting(droppingLast: 1)
     expectEqual(prefix[capacity-2], UInt8(capacity-2))
   }
 
@@ -655,12 +655,12 @@ suite.test("_extracting prefixes")
     let b = UnsafeMutableBufferPointer<Int>(start: nil, count: 0)
     var span = MutableSpan(_unsafeElements: b)
     expectEqual(span.count, b.count)
-    expectEqual(span._extracting(first: 1).count, b.count)
-    expectEqual(span._extracting(droppingLast: 1).count, b.count)
+    expectEqual(span.extracting(first: 1).count, b.count)
+    expectEqual(span.extracting(droppingLast: 1).count, b.count)
   }
 }
 
-suite.test("_extracting suffixes")
+suite.test("extracting suffixes")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -675,19 +675,19 @@ suite.test("_extracting suffixes")
     var span = MutableSpan(_unsafeElements: $0)
     expectEqual(span.count, capacity)
 
-    suffix = span._extracting(last: capacity)
+    suffix = span.extracting(last: capacity)
     expectEqual(suffix[0], 0)
 
-    suffix = span._extracting(last: capacity-1)
+    suffix = span.extracting(last: capacity-1)
     expectEqual(suffix[0], 1)
 
-    suffix = span._extracting(last: 1)
+    suffix = span.extracting(last: 1)
     expectEqual(suffix[0], UInt8(capacity-1))
 
-    suffix = span._extracting(droppingFirst: capacity)
+    suffix = span.extracting(droppingFirst: capacity)
     expectTrue(suffix.isEmpty)
 
-    suffix = span._extracting(droppingFirst: 1)
+    suffix = span.extracting(droppingFirst: 1)
     expectEqual(suffix[0], 1)
   }
 
@@ -695,7 +695,7 @@ suite.test("_extracting suffixes")
     let b = UnsafeMutableBufferPointer<ObjectIdentifier>(start: nil, count: 0)
     var span = MutableSpan(_unsafeElements: b)
     expectEqual(span.count, b.count)
-    expectEqual(span._extracting(last: 1).count, b.count)
-    expectEqual(span._extracting(droppingFirst: 1).count, b.count)
+    expectEqual(span.extracting(last: 1).count, b.count)
+    expectEqual(span.extracting(droppingFirst: 1).count, b.count)
   }
 }
