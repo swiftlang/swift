@@ -43,6 +43,8 @@ public:
   AvailabilityRange getRange() const { return range; }
   bool isUnavailable() const { return range.isKnownUnreachable(); }
 
+  bool constrainRange(const AvailabilityRange &range);
+
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddPointer(domain.getOpaqueValue());
     range.getRawVersionRange().Profile(ID);

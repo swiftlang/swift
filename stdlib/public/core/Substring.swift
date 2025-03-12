@@ -621,7 +621,9 @@ extension Substring: CustomDebugStringConvertible {
 
 extension Substring: LosslessStringConvertible {
   public init(_ content: String) {
-    let range = Range(_uncheckedBounds: (content.startIndex, content.endIndex))
+    let range = unsafe Range(
+      _uncheckedBounds: (content.startIndex, content.endIndex)
+    )
     self.init(_unchecked: Slice(base: content, bounds: range))
   }
 }
@@ -767,7 +769,7 @@ extension Substring {
     // scalar aligned.
     let lower = content._wholeGuts.scalarAlign(content.startIndex)
     let upper = content._wholeGuts.scalarAlign(content.endIndex)
-    let bounds = Range(_uncheckedBounds: (lower, upper))
+    let bounds = unsafe Range(_uncheckedBounds: (lower, upper))
     self.init(_unchecked: content._wholeGuts, bounds: bounds)
   }
 }
@@ -922,7 +924,7 @@ extension Substring {
     // scalar aligned.
     let lower = content._wholeGuts.scalarAlign(content.startIndex)
     let upper = content._wholeGuts.scalarAlign(content.endIndex)
-    let bounds = Range(_uncheckedBounds: (lower, upper))
+    let bounds = unsafe Range(_uncheckedBounds: (lower, upper))
     self.init(_unchecked: content._wholeGuts, bounds: bounds)
   }
 }
@@ -965,7 +967,9 @@ extension Substring {
     internal init(_ base: String.UnicodeScalarView, _bounds: Range<Index>) {
       let start = base._guts.scalarAlign(_bounds.lowerBound)
       let end = base._guts.scalarAlign(_bounds.upperBound)
-      _slice = Slice(base: base, bounds: Range(_uncheckedBounds: (start, end)))
+      _slice = Slice(
+        base: base, bounds: unsafe Range(_uncheckedBounds: (start, end))
+      )
     }
   }
 }
@@ -1233,7 +1237,7 @@ extension String {
     // we don't need to compare against the `endIndex` -- those aren't nearly as
     // critical.
     if r.lowerBound._encodedOffset == 0 {
-      r = Range(_uncheckedBounds:
+      r = unsafe Range(_uncheckedBounds:
         (r.lowerBound._characterAligned, r.upperBound))
     }
 

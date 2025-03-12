@@ -687,12 +687,15 @@ public:
   static OptionalSomePattern *create(ASTContext &ctx, Pattern *subPattern,
                                      SourceLoc questionLoc);
 
-  static OptionalSomePattern *
-  createImplicit(ASTContext &ctx, Pattern *subPattern,
-                 SourceLoc questionLoc = SourceLoc());
+  static OptionalSomePattern *createImplicit(ASTContext &ctx,
+                                             Pattern *subPattern);
 
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
+
   SourceRange getSourceRange() const {
+    if (QuestionLoc.isInvalid())
+      return SubPattern->getSourceRange();
+
     return SourceRange(SubPattern->getStartLoc(), QuestionLoc);
   }
 

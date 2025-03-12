@@ -2078,10 +2078,6 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   (void)SILProperty::create(M, /*serializedKind*/ 0, decl, component);
 }
 
-void SILGenModule::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
-  // Nothing to do for #error/#warning; they've already been emitted.
-}
-
 void SILGenModule::emitSourceFile(SourceFile *sf) {
   // Type-check the file if we haven't already.
   performTypeChecking(*sf);

@@ -645,7 +645,7 @@ Pattern *ResolvePatternRequest::evaluate(Evaluator &evaluator, Pattern *P,
 
     // "if let" implicitly looks inside of an optional, so wrap it in an
     // OptionalSome pattern.
-    P = OptionalSomePattern::createImplicit(Context, P, P->getEndLoc());
+    P = OptionalSomePattern::createImplicit(Context, P);
   }
 
   return P;
@@ -1029,7 +1029,7 @@ static NullablePtr<Pattern> simplifyToBoolPattern(ASTContext &Ctx,
   if (auto wrappedType = patternTy->getOptionalObjectType()) {
     if (auto P =
             simplifyToBoolPattern(Ctx, EP, BLE, wrappedType).getPtrOrNull()) {
-      auto OP = OptionalSomePattern::createImplicit(Ctx, P, P->getEndLoc());
+      auto OP = OptionalSomePattern::createImplicit(Ctx, P);
       OP->setType(patternTy);
       return OP;
     }
@@ -1475,8 +1475,7 @@ Pattern *TypeChecker::coercePatternToType(
             if (lookupEnumMemberElement(dc,
                                         baseType->lookThroughAllOptionalTypes(),
                                         EEP->getName(), EEP->getLoc())) {
-              P = OptionalSomePattern::createImplicit(Context, EEP,
-                                                      EEP->getEndLoc());
+              P = OptionalSomePattern::createImplicit(Context, EEP);
               return coercePatternToType(
                   pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
                   options, tryRewritePattern);

@@ -2125,9 +2125,6 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleDecl should not show up here");
 
-  case DeclKind::PoundDiagnostic:
-    return false;
-
   case DeclKind::EnumCase:
   case DeclKind::Macro:
   case DeclKind::MacroExpansion:
@@ -5133,6 +5130,9 @@ public:
         case BuiltinMacroKind::IsolationMacro:
           builtinID = 2;
           break;
+        case BuiltinMacroKind::SwiftSettingsMacro:
+          builtinID = 3;
+          break;
         }
         break;
       }
@@ -5197,10 +5197,6 @@ public:
 
   void visitImportDecl(const ImportDecl *) {
     llvm_unreachable("import decls should not be serialized");
-  }
-
-  void visitPoundDiagnosticDecl(const PoundDiagnosticDecl *) {
-    llvm_unreachable("#warning/#error declarations should not be serialized");
   }
 
   void visitEnumCaseDecl(const EnumCaseDecl *) {
@@ -6882,7 +6878,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
     for (auto D : fileDecls) {
       if (isa<ImportDecl>(D) || isa<MacroExpansionDecl>(D) ||
-          isa<PoundDiagnosticDecl>(D) || isa<TopLevelCodeDecl>(D)) {
+          isa<TopLevelCodeDecl>(D)) {
         continue;
       }
 

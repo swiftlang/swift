@@ -1,8 +1,7 @@
 
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift_feature_LifetimeDependence
 
-// RUN: %target-swift-frontend %s -enable-experimental-cxx-interop -I %S/Inputs -Xcc -std=c++20 -swift-version 5 -module-name main -disable-availability-checking -typecheck -enable-experimental-feature LifetimeDependence -plugin-path %swift-plugin-dir -dump-macro-expansions -verify -strict-memory-safety 2>&1 | %FileCheck --match-full-lines %s
+// RUN: %target-swift-frontend %s -enable-experimental-cxx-interop -I %S/Inputs -Xcc -std=c++20 -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -verify -strict-memory-safety 2>&1 | %FileCheck --match-full-lines %s
 
 // FIXME swift-ci linux tests do not support std::span
 // UNSUPPORTED: OS=linux-gnu

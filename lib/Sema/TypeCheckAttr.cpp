@@ -2338,6 +2338,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
       diagnoseAndRemoveAttr(parsedAttr, diag::spi_available_malformed);
       return;
     }
+
+    if (auto diag =
+            TypeChecker::diagnosticIfDeclCannotBeUnavailable(D, *attr)) {
+      diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr->getParsedAttr()),
+                            *diag);
+      return;
+    }
   }
 
   if (attr->isNoAsync()) {
@@ -2396,23 +2403,24 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
 
   // The remaining diagnostics are only for attributes with introduced versions
   // for specific platforms.
-  if (!attr->isPlatformSpecific() || !attr->getIntroduced().has_value())
+  auto introducedRange = attr->getIntroducedRange(Ctx);
+  if (!attr->isPlatformSpecific() || !introducedRange)
     return;
 
   // Find the innermost enclosing declaration with an availability
   // range annotation and ensure that this attribute's available version range
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
-  std::optional<AvailabilityRange> EnclosingAnnotatedRange;
-  AvailabilityRange AttrRange = attr->getIntroducedRange(Ctx);
+  std::optional<AvailabilityRange> enclosingIntroducedRange;
 
   if (auto *parent = getEnclosingDeclForDecl(D)) {
     if (auto enclosingAvailable =
             getSemanticAvailableRangeDeclAndAttr(parent)) {
       SemanticAvailableAttr enclosingAttr = enclosingAvailable->first;
       const Decl *enclosingDecl = enclosingAvailable->second;
-      EnclosingAnnotatedRange.emplace(enclosingAttr.getIntroducedRange(Ctx));
-      if (!AttrRange.isContainedIn(*EnclosingAnnotatedRange)) {
+      enclosingIntroducedRange = enclosingAttr.getIntroducedRange(Ctx);
+      if (enclosingIntroducedRange &&
+          !introducedRange->isContainedIn(*enclosingIntroducedRange)) {
         auto limit = DiagnosticBehavior::Unspecified;
         if (D->isImplicit()) {
           // Incorrect availability for an implicit declaration is likely a
@@ -2433,10 +2441,10 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           diagnose(enclosingDecl->getLoc(),
                    diag::availability_implicit_decl_here,
                    D->getDescriptiveKind(), Ctx.getTargetAvailabilityDomain(),
-                   AttrRange);
+                   *introducedRange);
         diagnose(enclosingDecl->getLoc(),
                  diag::availability_decl_more_than_enclosing_here,
-                 Ctx.getTargetAvailabilityDomain(), *EnclosingAnnotatedRange);
+                 Ctx.getTargetAvailabilityDomain(), *enclosingIntroducedRange);
       }
     }
   }
@@ -5095,20 +5103,10 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   // declaration that is allowed to be unavailable, diagnose.
   if (availabilityConstraint->isUnavailable()) {
     auto attr = availabilityConstraint->getAttr();
-    if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D)) {
-      diagnose(attr.getParsedAttr()->getLocation(), diag.value());
+    if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D, attr)) {
+      diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
+                            *diag);
       return;
-    }
-
-    if (auto *PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        if (VD->isProtocolRequirement() && !PD->isObjC()) {
-          diagnoseAndRemoveAttr(
-              const_cast<AvailableAttr *>(attr.getParsedAttr()),
-              diag::unavailable_method_non_objc_protocol);
-          return;
-        }
-      }
     }
   }
 
@@ -5452,7 +5450,8 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
 }
 
 std::optional<Diagnostic>
-TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
+TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
+                                                 SemanticAvailableAttr attr) {
   auto parentIsUnavailable = [](const Decl *D) -> bool {
     if (auto *parent =
             AvailabilityInference::parentDeclForInferredAvailability(D)) {
@@ -5480,6 +5479,21 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
       return Diagnostic(diag::availability_decl_no_unavailable, D);
   }
 
+  auto DC = D->getDeclContext();
+  if (auto *PD = dyn_cast<ProtocolDecl>(DC)) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->isProtocolRequirement() && !PD->isObjC()) {
+        auto diag = Diagnostic(diag::unavailable_method_non_objc_protocol);
+
+        // Be lenient in interfaces to accomodate @_spi_available, which has
+        // been accepted historically.
+        if (attr.isSPI() || DC->isInSwiftinterface())
+          diag.setBehaviorLimit(DiagnosticBehavior::Warning);
+        return diag;
+      }
+    }
+  }
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (!VD->hasStorageOrWrapsStorage())
       return std::nullopt;
@@ -5487,7 +5501,13 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
     if (parentIsUnavailable(D))
       return std::nullopt;
 
-    // Be lenient in interfaces to accomodate @_spi_available.
+    // @_spi_available does not make the declaration unavailable from the
+    // perspective of the owning module, which is what matters.
+    if (attr.isSPI())
+      return std::nullopt;
+
+    // An unavailable property with storage encountered in a swiftinterface
+    // might have been declared @_spi_available in source.
     if (D->getDeclContext()->isInSwiftinterface())
       return std::nullopt;
 

@@ -736,6 +736,9 @@ extension ASTGenVisitor {
           additionalTrailingClosures: nil
         )
       ).asExpr
+
+    case .method(_):
+      fatalError("unimplemented")
     }
   }
 

@@ -61,6 +61,11 @@ public struct Conformance: CustomStringConvertible, NoReflectionChildren {
     assert(isSpecialized)
     return SubstitutionMap(bridged: bridged.getSpecializedSubstitutions())
   }
+
+  public func getAssociatedConformance(ofAssociatedType assocType: Type, to proto: ProtocolDecl) -> Conformance {
+    assert(isConcrete)
+    return bridged.getAssociatedConformance(assocType.bridged, proto.bridged).conformance
+  }
 }
 
 public struct ConformanceArray : RandomAccessCollection, CustomReflectable {

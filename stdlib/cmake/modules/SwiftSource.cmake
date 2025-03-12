@@ -856,7 +856,12 @@ function(_compile_swift_files
   if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     set(HOST_EXECUTABLE_SUFFIX .exe)
   endif()
-  if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+  if(NOT SWIFT_ENABLE_SWIFT_IN_SWIFT)
+    # This is only for bootstrapping purposes. The just-built Swift is very
+    # limited and only built for the builder to build the next stages with
+    # hosttools.
+    set(swift_compiler_tool "${Swift_BINARY_DIR}/bin/swiftc")
+  elseif(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
     if(SWIFT_PREBUILT_SWIFT)
       set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc${HOST_EXECUTABLE_SUFFIX}")
     elseif(CMAKE_Swift_COMPILER)
@@ -886,8 +891,10 @@ function(_compile_swift_files
     # cross-compiling the compiler.
     list(APPEND swift_compiler_tool_dep "swift-frontend${target_suffix}")
 
-    # If we aren't cross compiling, also depend on SwiftMacros.
-    list(APPEND swift_compiler_tool_dep SwiftMacros)
+    if(SWIFT_ENABLE_SWIFT_IN_SWIFT)
+      # If we aren't cross compiling, also depend on SwiftMacros.
+      list(APPEND swift_compiler_tool_dep SwiftMacros)
+    endif()
   endif()
 
   # If there are more than one output files, we assume that they are specified

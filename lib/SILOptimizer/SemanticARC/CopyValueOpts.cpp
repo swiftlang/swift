@@ -388,6 +388,11 @@ static bool isUseBetweenInstAndBlockEnd(
 static bool tryJoinIfDestroyConsumingUseInSameBlock(
     SemanticARCOptVisitor &ctx, CopyValueInst *cvi, DestroyValueInst *dvi,
     SILValue operand, Operand *singleCVIConsumingUse) {
+  // Pointer escapes propagate values ways that may not be discoverable.
+  // If \p cvi or \p operand has escaped, then do not optimize.
+  if (findPointerEscape(cvi) || findPointerEscape(operand)) {
+    return false;
+  }
   // First see if our destroy_value is in between singleCVIConsumingUse and the
   // end of block. If this is not true, then we know the destroy_value must be
   // /before/ our singleCVIConsumingUse meaning that by joining the lifetimes,
@@ -516,12 +521,6 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
             return !visitedInsts.count(endScopeUse->getUser());
           }))
         return false;
-  }
-  // Check whether the uses considered immediately above are all effectively
-  // instantaneous uses. Pointer escapes propagate values ways that may not be
-  // discoverable.
-  if (findPointerEscape(operand)) {
-    return false;
   }
 
   // Ok, we now know that we can eliminate this value.

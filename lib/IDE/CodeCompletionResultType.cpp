@@ -393,11 +393,16 @@ static TypeRelation calculateTypeRelation(Type Ty, Type ExpectedTy,
     return TypeRelation::Unknown;
   }
 
-  // Equality/Conversion of GenericTypeParameterType won't account for
-  // requirements – ignore them
-  if (!Ty->hasTypeParameter() && !ExpectedTy->hasTypeParameter()) {
-    if (Ty->isEqual(ExpectedTy))
-      return TypeRelation::Convertible;
+  ASSERT(!Ty->hasUnboundGenericType() && !ExpectedTy->hasUnboundGenericType());
+  ASSERT(!ExpectedTy->hasTypeParameter());
+
+  if (Ty->isEqual(ExpectedTy))
+    return TypeRelation::Convertible;
+
+  // FIXME: We ought to be opening generic parameters present in completion
+  // results for generic decls, and mapping into context types for non-generic
+  // decls. For now, avoid attempting to compare.
+  if (!Ty->hasTypeParameter()) {
     bool isAny = false;
     isAny |= ExpectedTy->isAny();
     isAny |= ExpectedTy->is<ArchetypeType>() &&

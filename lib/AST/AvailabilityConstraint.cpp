@@ -140,27 +140,36 @@ static std::optional<AvailabilityConstraint>
 getAvailabilityConstraintForAttr(const Decl *decl,
                                  const SemanticAvailableAttr &attr,
                                  const AvailabilityContext &context) {
+  // Is the decl unconditionally unavailable?
   if (attr.isUnconditionallyUnavailable())
     return AvailabilityConstraint::unconditionallyUnavailable(attr);
 
   auto &ctx = decl->getASTContext();
-  auto deploymentRange = attr.getDomain().getDeploymentRange(ctx);
+  auto domain = attr.getDomain();
+  auto deploymentRange = domain.getDeploymentRange(ctx);
 
-  auto obsoletedRange = attr.getObsoletedRange(ctx);
-  if (deploymentRange && deploymentRange->isContainedIn(obsoletedRange))
-    return AvailabilityConstraint::obsoleted(attr);
-
-  AvailabilityRange introducedRange = attr.getIntroducedRange(ctx);
-
-  // FIXME: [availability] Expand this to cover custom versioned domains
-  if (attr.isPlatformSpecific()) {
-    if (!context.getPlatformRange().isContainedIn(introducedRange))
-      return AvailabilityConstraint::potentiallyUnavailable(attr);
-  } else if (deploymentRange &&
-             !deploymentRange->isContainedIn(introducedRange)) {
-    return AvailabilityConstraint::unavailableForDeployment(attr);
+  // Is the decl obsoleted in the deployment context?
+  if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
+    if (deploymentRange && deploymentRange->isContainedIn(*obsoletedRange))
+      return AvailabilityConstraint::obsoleted(attr);
   }
 
+  // Is the decl not yet introduced in the local context?
+  if (auto introducedRange = attr.getIntroducedRange(ctx)) {
+    if (domain.supportsContextRefinement()) {
+      auto availableRange = context.getAvailabilityRange(domain, ctx);
+      if (!availableRange || !availableRange->isContainedIn(*introducedRange))
+        return AvailabilityConstraint::potentiallyUnavailable(attr);
+
+      return std::nullopt;
+    }
+
+    // Is the decl not yet introduced in the deployment context?
+    if (deploymentRange && !deploymentRange->isContainedIn(*introducedRange))
+      return AvailabilityConstraint::unavailableForDeployment(attr);
+  }
+
+  // FIXME: [availability] Model deprecation as an availability constraint.
   return std::nullopt;
 }
 

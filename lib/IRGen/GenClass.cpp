@@ -3093,6 +3093,8 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto fnPtr = emitVTableSlotLoad(IGF, slot, method, signature);
     auto &schema = methodType->isAsync()
                        ? IGF.getOptions().PointerAuth.AsyncSwiftClassMethods
+                   : methodType->isCalleeAllocatedCoroutine()
+                       ? IGF.getOptions().PointerAuth.CoroSwiftClassMethods
                        : IGF.getOptions().PointerAuth.SwiftClassMethods;
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
@@ -3103,8 +3105,16 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
                                            signature.getType()->getPointerTo());
     llvm::Constant *secondaryValue = nullptr;
+    auto *accessor = dyn_cast<AccessorDecl>(method.getDecl());
     if (cast<AbstractFunctionDecl>(method.getDecl())->hasAsync()) {
       auto *silFn = IGF.IGM.getSILFunctionForAsyncFunctionPointer(
+          methodInfo.getDirectImpl());
+      secondaryValue = cast<llvm::Constant>(
+          IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition));
+    } else if (accessor &&
+               requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
+      assert(methodType->isCalleeAllocatedCoroutine());
+      auto *silFn = IGF.IGM.getSILFunctionForCoroFunctionPointer(
           methodInfo.getDirectImpl());
       secondaryValue = cast<llvm::Constant>(
           IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition));

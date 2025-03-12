@@ -270,9 +270,9 @@ struct BlueActor {
 // CHECK:       [[R:%[0-9]+]] = apply [[GETTER]]([[REDMT]]) : $@convention(method) (@thin RedActor.Type) -> @owned RedActorImpl
 // CHECK:       [[REDEXE:%[0-9]+]] = begin_borrow [[R]] : $RedActorImpl
 // CHECK:       hop_to_executor [[REDEXE]] : $RedActorImpl
+// CHECK-NEXT:  end_borrow [[REDEXE]]
       // ---- now invoke redFn, hop back to Blue, and clean-up ----
 // CHECK-NEXT:  {{%[0-9]+}} = apply [[CALLEE]]([[ARG]]) : $@convention(thin) (Int) -> ()
-// CHECK-NEXT:  end_borrow [[REDEXE]] : $RedActorImpl
 // CHECK-NEXT:  destroy_value [[R]] : $RedActorImpl
 // CHECK-NEXT:  hop_to_executor [[BLUEEXE]] : $BlueActorImpl
 // CHECK:       end_borrow [[BLUEEXE]] : $BlueActorImpl
@@ -287,8 +287,8 @@ struct BlueActor {
 // CHECK-NEXT:    hop_to_executor [[GENERIC_EXEC]] :
 // CHECK:         [[BORROW:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $RedActorImpl
 // CHECK-NEXT:    hop_to_executor [[BORROW]] : $RedActorImpl
-// CHECK-NEXT:    {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(thin) (Int) -> ()
 // CHECK-NEXT:    end_borrow [[BORROW]] : $RedActorImpl
+// CHECK-NEXT:    {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(thin) (Int) -> ()
 // CHECK-NEXT:    destroy_value
 // CHECK-NEXT:    hop_to_executor [[GENERIC_EXEC]]
 // CHECK: } // end sil function '$s4test20unspecifiedAsyncFuncyyYaF'
@@ -315,6 +315,7 @@ func anotherUnspecifiedAsyncFunc(_ red : RedActorImpl) async {
 // CHECK: hop_to_executor [[GENERIC_EXEC]] :
 // CHECK: function_ref @$s4test8RedActorV6sharedAA0bC4ImplCvgZ
 // CHECK: hop_to_executor [[RED:%[0-9]+]] : $RedActorImpl
+// CHECK-NEXT: end_borrow [[RED]]
 // CHECK-NEXT: begin_borrow
 // CHECK-NEXT: apply
 // CHECK:      hop_to_executor [[GENERIC_EXEC:%[0-9]+]] : $Optional<Builtin.Executor>
@@ -464,10 +465,37 @@ func asyncWithUnsafeInheritance_hopback() async {
   // CHECK-NEXT: [[ACTOR:%.*]] = apply [[ACTOR_GETTER]]([[METATYPE]])
   // CHECK-NEXT: [[BORROWED_ACTOR:%.*]] = begin_borrow [[ACTOR]]
   // CHECK-NEXT: hop_to_executor [[BORROWED_ACTOR]]
-  // CHECK-NEXT: apply [[FN]]({{%.*}})
   // CHECK-NEXT: end_borrow [[BORROWED_ACTOR]]
+  // CHECK-NEXT: apply [[FN]]({{%.*}})
   // CHECK-NEXT: destroy_value [[ACTOR]]
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
   await redFn(0)
+}
+
+// Previously we would break Ownership SSA when passing a below since when we
+// emitted the hop_to_executor, we would unnecessarily borrow a over the entire
+// apply (we only needed it to call hop_to_executor). This would cause an OSSA
+// violation since we are going to consume it as part of calling Klass's
+// initializer.
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test40validateHopToExecutorLifetimeShortEnoughyyYaF : $@convention(thin) @async () -> () {
+// CHECK: hop_to_executor %0
+// CHECK: [[ACTOR:%.*]] = init_existential_ref {{%.*}}
+// CHECK: [[INIT_FN:%.*]] = function_ref @$s4test40validateHopToExecutorLifetimeShortEnoughyyYaF5KlassL_C2onADScA_pYi_tcfC : $@convention(method) (@sil_isolated @owned any Actor, @thick Klass.Type) -> @owned Klass
+// CHECK: [[BORROW:%.*]] = begin_borrow [[ACTOR]]
+// CHECK: hop_to_executor [[BORROW]]
+// CHECK: end_borrow [[BORROW]]
+// CHECK: apply [[INIT_FN]]([[ACTOR]],
+// CHECK: hop_to_executor %0
+// CHECK: } // end sil function '$s4test40validateHopToExecutorLifetimeShortEnoughyyYaF'
+func validateHopToExecutorLifetimeShortEnough() async {
+  class Klass {
+    init(
+      on isolation: isolated Actor,
+    ) { }
+  }
+
+  let a = MyActor()
+  _ = await Klass(on: a)
 }

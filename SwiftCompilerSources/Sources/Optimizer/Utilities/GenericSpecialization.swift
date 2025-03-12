@@ -144,11 +144,14 @@ func specializeWitnessTable(forConformance conformance: Conformance,
     case .associatedType(let requirement, let witness):
       let substType = witness.subst(with: conformance.specializedSubstitutions)
       return .associatedType(requirement: requirement, witness: substType)
-    case .associatedConformance(let requirement, let proto, let witness):
-      if witness.isSpecialized {
-        specializeWitnessTable(forConformance: witness, errorLocation: errorLocation, context, notifyNewWitnessTable)
+    case .associatedConformance(let requirement, let proto, _):
+      let concreteAssociateConf = conformance.getAssociatedConformance(ofAssociatedType: requirement.type, to: proto)
+      if concreteAssociateConf.isSpecialized {
+        specializeWitnessTable(forConformance: concreteAssociateConf,
+                               errorLocation: errorLocation,
+                               context, notifyNewWitnessTable)
       }
-      return .associatedConformance(requirement: requirement, protocol: proto, witness: witness)
+      return .associatedConformance(requirement: requirement, protocol: proto, witness: concreteAssociateConf)
     }
   }
   let newWT = context.createWitnessTable(entries: newEntries,conformance: conformance,

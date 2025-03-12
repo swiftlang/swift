@@ -103,13 +103,16 @@ import CxxStdlib
 // CHECK-NO-LIFETIMES: test.swift:6:32: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
 public func noAnnotations() -> View {
     // CHECK: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
+    // CHECK-NO-LIFETIMES: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
     f(nil)
     // CHECK: nonescapable.h:20:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
+    // CHECK-NO-LIFETIMES: nonescapable.h:20:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
     // No duplicate warning for f2:
     // CHECK-NOT: nonescapable.h:20
     f2(nil, nil)
     // CHECK: nonescapable.h:24:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated
     // CHECK: nonescapable.h:24:6: error: cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership
+    // CHECK-NO-LIFETIMES: nonescapable.h:24:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated
     // CHECK-NO-LIFETIMES: nonescapable.h:24:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
     g(nil)
     h1(nil)
@@ -144,8 +147,6 @@ public func noAnnotations() -> View {
     // CHECK-NO-LIFETIMES: nonescapable.h:77:12: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
     l2();
     return View()
-    // CHECK-NO-LIFETIMES: nonescapable.h:5:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-    // CHECK-NO-LIFETIMES: nonescapable.h:6:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
 }
 
 public func test3(_ x: inout View) {

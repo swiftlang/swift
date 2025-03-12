@@ -3865,6 +3865,23 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     return result;
   }
 
+  // Handle opened archetype types.
+  if (auto opened1 = type1->getAs<OpenedArchetypeType>()) {
+    auto opened2 = type2->castTo<OpenedArchetypeType>();
+    assert(opened1->getInterfaceType()->isEqual(opened2->getInterfaceType()) &&
+           opened1->getGenericEnvironment()->getOpenedExistentialUUID() ==
+               opened2->getGenericEnvironment()->getOpenedExistentialUUID());
+
+    auto args1 = opened1->getGenericEnvironment()
+                     ->getOuterSubstitutions()
+                     .getReplacementTypes();
+    auto args2 = opened2->getGenericEnvironment()
+                     ->getOuterSubstitutions()
+                     .getReplacementTypes();
+
+    return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
+  }
+
   // `any Sendable` -> `Any`
   if (matchSendableExistentialToAnyInGenericArgumentPosition(*this, type1,
                                                              type2, locator))
@@ -7332,7 +7349,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case TypeKind::Module:
     case TypeKind::PrimaryArchetype:
-    case TypeKind::OpenedArchetype:
     case TypeKind::PackArchetype:
     case TypeKind::ElementArchetype: {
       // Give `repairFailures` a chance to fix the problem.
@@ -7657,7 +7673,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
       break;
     }
-    
+
+    case TypeKind::OpenedArchetype: {
+      auto opened1 = cast<OpenedArchetypeType>(desugar1);
+      auto opened2 = cast<OpenedArchetypeType>(desugar2);
+      // If they have the same interface type and UUID, two OpenedArchetypeTypes
+      // match if their generic arguments do as well.
+      if (opened1->getInterfaceType()->isEqual(opened2->getInterfaceType()) &&
+          opened1->getGenericEnvironment()->getOpenedExistentialUUID() ==
+              opened2->getGenericEnvironment()->getOpenedExistentialUUID()) {
+        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+      }
+      break;
+    }
+
     case TypeKind::Pack: {
       auto tmpPackLoc = locator.withPathElement(LocatorPathElt::PackType(type1));
       auto packLoc = tmpPackLoc.withPathElement(LocatorPathElt::PackType(type2));
@@ -13089,7 +13118,7 @@ retry_after_fail:
         // Determine the type that this choice will have.
         Type choiceType = getEffectiveOverloadType(
             constraint->getLocator(), choice, /*allowMembers=*/true,
-            constraint->getOverloadUseDC());
+            constraint->getDeclContext());
         if (!choiceType) {
           hasUnhandledConstraints = true;
           return true;
@@ -15953,8 +15982,8 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
   if (!typeVar)
     return;
 
-  auto constraints = CG.gatherConstraints(
-      typeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
+  auto constraints = CG.gatherNearbyConstraints(
+      typeVar,
       [&keyPathExpr](Constraint *constraint) -> bool {
         if (constraint->getKind() != ConstraintKind::KeyPath)
           return false;
@@ -16335,7 +16364,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyApplicableFnConstraint(
         constraint.getAppliedFunctionType(), constraint.getCalleeType(),
         constraint.getTrailingClosureMatching(),
-        constraint.getApplicationDC(), /*flags=*/std::nullopt,
+        constraint.getDeclContext(), /*flags=*/std::nullopt,
         constraint.getLocator());
 
   case ConstraintKind::DynamicCallableApplicableFunction:
@@ -16382,7 +16411,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),
                     constraint.getOverloadChoice(),
-                    constraint.getOverloadUseDC());
+                    constraint.getDeclContext());
     return SolutionKind::Solved;
 
   case ConstraintKind::SubclassOf:
@@ -16429,7 +16458,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::UnresolvedValueMember:
     return simplifyMemberConstraint(
         constraint.getKind(), constraint.getFirstType(), constraint.getMember(),
-        constraint.getSecondType(), constraint.getMemberUseDC(),
+        constraint.getSecondType(), constraint.getDeclContext(),
         constraint.getFunctionRefInfo(),
         /*outerAlternatives=*/{},
         /*flags*/ std::nullopt, constraint.getLocator());
@@ -16438,7 +16467,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyValueWitnessConstraint(
         constraint.getKind(), constraint.getFirstType(),
         constraint.getRequirement(), constraint.getSecondType(),
-        constraint.getMemberUseDC(), constraint.getFunctionRefInfo(),
+        constraint.getDeclContext(), constraint.getFunctionRefInfo(),
         /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::Defaultable:

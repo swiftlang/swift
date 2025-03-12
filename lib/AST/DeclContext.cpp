@@ -1747,6 +1747,7 @@ bool DeclContext::isAlwaysAvailableConformanceContext() const {
 
   auto &ctx = getASTContext();
 
+  // FIXME: [availability] Query AvailabilityContext, not platform range.
   AvailabilityRange conformanceAvailability{
       AvailabilityInference::availableRange(ext)};
 

@@ -90,7 +90,7 @@ internal enum _PtrAuth {
   static func blend(pointer: UnsafeRawPointer,
                     discriminator: UInt64) -> UInt64 {
     return UInt64(Builtin.int_ptrauth_blend(
-                    UInt64(unsafe UInt(bitPattern: pointer))._value,
+                    UInt64(UInt(bitPattern: pointer))._value,
                     discriminator._value))
   }
 
@@ -101,7 +101,7 @@ internal enum _PtrAuth {
                    key: Key,
                    discriminator: UInt64) -> UnsafeRawPointer {
     let bitPattern = UInt64(Builtin.int_ptrauth_sign(
-      UInt64(unsafe UInt(bitPattern: pointer))._value,
+      UInt64(UInt(bitPattern: pointer))._value,
       key._value._value,
       discriminator._value))
 
@@ -118,7 +118,7 @@ internal enum _PtrAuth {
                                 newKey: Key,
                                 newDiscriminator: UInt64) -> UnsafeRawPointer {
     let bitPattern = UInt64(Builtin.int_ptrauth_resign(
-      UInt64(unsafe UInt(bitPattern: pointer))._value,
+      UInt64(UInt(bitPattern: pointer))._value,
       oldKey._value._value,
       oldDiscriminator._value,
       newKey._value._value,

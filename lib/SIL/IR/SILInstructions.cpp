@@ -3176,7 +3176,7 @@ KeyPathInst::create(SILDebugLocation Loc,
                     ArrayRef<SILValue> Args,
                     SILType Ty,
                     SILFunction &F) {
-  assert(Args.size() == Pattern->getNumOperands()
+  ASSERT(Args.size() == Pattern->getNumOperands()
          && "number of key path args doesn't match pattern");
 
   SmallVector<SILValue, 8> allOperands(Args.begin(), Args.end());

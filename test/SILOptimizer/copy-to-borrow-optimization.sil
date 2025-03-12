@@ -2156,3 +2156,49 @@ bb0(%0 : $*MultiPayload):
   return %2
 }
 
+// CHECK-LABEL: sil [ossa] @duplicate_lifetime_end1 :
+// CHECK:         load_borrow %0
+// CHECK:       } // end sil function 'duplicate_lifetime_end1'
+sil [ossa] @duplicate_lifetime_end1 : $@convention(thin) (@in_guaranteed (C, Optional<C>)) -> () {
+bb0(%0 : $*(C, Optional<C>)):
+  %1 = load [copy] %0
+  (%2, %3) = destructure_tuple %1
+  switch_enum %3, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%4 : @owned $C):
+  destroy_value %2
+  destroy_value %4
+  br bb3
+
+bb2:
+  debug_value %2
+  destroy_value %2
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @duplicate_lifetime_end2 :
+// CHECK:         load_borrow %0
+// CHECK:       } // end sil function 'duplicate_lifetime_end2'
+sil [ossa] @duplicate_lifetime_end2 : $@convention(thin) (@in_guaranteed (C, Optional<C>)) -> () {
+bb0(%0 : $*(C, Optional<C>)):
+  %1 = load [copy] %0
+  (%2, %3) = destructure_tuple %1
+  switch_enum %3, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%4 : @owned $C):
+  destroy_value %2
+  destroy_value %4
+  br bb3
+
+bb2:
+  destroy_value %2
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}

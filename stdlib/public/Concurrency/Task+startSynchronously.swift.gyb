@@ -49,6 +49,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   /// created using ``Task/init``.
   ///
   /// - Parameters:
+  ///   - name: The high-level human-readable name given for this task
   ///   - priority: The priority of the task.
   ///     Pass `nil` to use the ``Task/basePriority`` of the current task (if there is one).
   ///   - operation: the operation to be run immediately upon entering the task.
@@ -56,6 +57,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   @available(SwiftStdlib 6.2, *)
   @discardableResult
   public static func startSynchronously(
+    name: String? = nil,
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture _ operation: __owned sending @escaping () async throws -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
@@ -70,9 +72,27 @@ extension Task where Failure == ${FAILURE_TYPE} {
       isSynchronousStart: true
     )
 
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-    _startTaskSynchronously(task)
-    return Task<Success, ${FAILURE_TYPE}>(task)
+    var task: Builtin.NativeObject?
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      task =
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+    }
+    #endif
+    if task == nil {
+      // either no task name was set, or names are unsupported
+      task = Builtin.createTask(
+        flags: flags,
+        operation: operation).0
+    }
+
+    _startTaskSynchronously(task!)
+    return Task<Success, ${FAILURE_TYPE}>(task!)
   }
 }
 %end
@@ -147,6 +167,7 @@ extension ${GROUP_TYPE} {
   /// created using ``${GROUP_TYPE}/addTask``.
   @available(SwiftStdlib 6.2, *)
   public func ${METHOD_NAME}( // in ${GROUP_TYPE}
+    name: String? = nil,
     priority: TaskPriority? = nil,
     ${OPERATION_PARAM}
   ) {
@@ -225,7 +246,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
 // Internal Runtime Functions --------------------------------------------------
 
 @_silgen_name("swift_task_startOnMainActor")
-fileprivate func _startTaskOnMainActor(_ task: Builtin.NativeObject)
+internal func _startTaskOnMainActor(_ task: Builtin.NativeObject)
 
 @_silgen_name("swift_task_startSynchronously")
-fileprivate func _startTaskSynchronously(_ task: Builtin.NativeObject)
+internal func _startTaskSynchronously(_ task: Builtin.NativeObject)

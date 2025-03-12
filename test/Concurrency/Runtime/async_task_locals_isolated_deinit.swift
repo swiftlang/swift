@@ -51,6 +51,7 @@ actor ActorNoOp {
     self.group = group
     self.probe = Probe(expectedNumber: expectedNumber, group: group)
     self.probe.probeExpectedExecutor = self.unownedExecutor
+    _fixLifetime(self)
   }
 
   isolated deinit {

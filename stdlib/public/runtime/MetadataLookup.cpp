@@ -1053,9 +1053,17 @@ _findContextDescriptor(Demangle::NodePointer node,
   return foundContext;
 }
 
-void swift::_swift_registerConcurrencyStandardTypeDescriptors(
-    const ConcurrencyStandardTypeDescriptors *descriptors) {
+/// Function to check whether we're currently running on the given global
+/// actor.
+bool (* __ptrauth_swift_is_global_actor_function SWIFT_CC(swift)
+        swift::_swift_task_isCurrentGlobalActorHook)(
+    const Metadata *, const WitnessTable *);
+
+void swift::_swift_registerConcurrencyRuntime(
+    const ConcurrencyStandardTypeDescriptors *descriptors,
+    IsCurrentGlobalActor isCurrentGlobalActor) {
   concurrencyDescriptors = descriptors;
+  _swift_task_isCurrentGlobalActorHook = isCurrentGlobalActor;
 }
 
 #pragma mark Protocol descriptor cache
@@ -1594,7 +1602,8 @@ _gatherGenericParameters(const ContextDescriptor *context,
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
-        });
+        },
+        nullptr);
     if (error)
       return *error;
 
@@ -2035,7 +2044,8 @@ public:
         },
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("never called");
-        });
+        },
+        nullptr);
     if (error)
       return *error;
 
@@ -3048,7 +3058,8 @@ swift_distributed_getWitnessTables(GenericEnvironmentDescriptor *genericEnv,
       },
       [&substFn](const Metadata *type, unsigned index) {
         return substFn.getWitnessTable(type, index);
-      });
+      },
+      nullptr);
 
   if (error) {
     return {/*ptr=*/nullptr, -1};
@@ -3722,7 +3733,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
         reinterpret_cast<void **>(&chainRoot->implementationFunction),
         reinterpret_cast<void *const *>(&previous->implementationFunction),
         replacedFunctionKey->getExtraDiscriminator(),
-        !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+        !replacedFunctionKey->isData(), /*allowNull*/ false);
   }
 
   // First populate the current replacement's chain entry.
@@ -3733,7 +3744,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       reinterpret_cast<void **>(&currentEntry->implementationFunction),
       reinterpret_cast<void *const *>(&chainRoot->implementationFunction),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+      !replacedFunctionKey->isData(), /*allowNull*/ false);
 
   currentEntry->next = chainRoot->next;
 
@@ -3744,7 +3755,7 @@ void DynamicReplacementDescriptor::enableReplacement() const {
       reinterpret_cast<void **>(&chainRoot->implementationFunction),
       reinterpret_cast<void *>(getReplacementFunction()),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync());
+      !replacedFunctionKey->isData());
 }
 
 void DynamicReplacementDescriptor::disableReplacement() const {
@@ -3769,7 +3780,7 @@ void DynamicReplacementDescriptor::disableReplacement() const {
       reinterpret_cast<void **>(&previous->implementationFunction),
       reinterpret_cast<void *const *>(&thisEntry->implementationFunction),
       replacedFunctionKey->getExtraDiscriminator(),
-      !replacedFunctionKey->isAsync(), /*allowNull*/ false);
+      !replacedFunctionKey->isData(), /*allowNull*/ false);
 }
 
 /// An automatic dynamic replacement entry.

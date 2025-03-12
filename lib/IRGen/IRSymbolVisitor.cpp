@@ -121,6 +121,11 @@ public:
 
     if (declRef.getAbstractFunctionDecl()->hasAsync())
       addLinkEntity(LinkEntity::forAsyncFunctionPointer(entity));
+
+    auto *accessor = dyn_cast<AccessorDecl>(declRef.getAbstractFunctionDecl());
+    if (accessor &&
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind()))
+      addLinkEntity(LinkEntity::forCoroFunctionPointer(entity));
   }
 
   void addDynamicFunction(AbstractFunctionDecl *AFD,

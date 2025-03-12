@@ -599,7 +599,7 @@ extension Unicode {
       while i < buffer.endIndex {
         let (next, n) = unsafe _decodeScalar(buffer, startingAt: i)
         if hasBreak(before: next) {
-          return Range(_uncheckedBounds: (i, i &+ n))
+          return unsafe Range(_uncheckedBounds: (i, i &+ n))
         }
         i &+= n
       }

@@ -447,10 +447,12 @@ extension Float80: CVarArg, _CVarArgAligned {
 // runtime.
 @_fixed_layout
 @usableFromInline // c-abi
+@unsafe
 final internal class __VaListBuilder {
   #if arch(x86_64) || arch(s390x)
   @frozen // c-abi
   @usableFromInline
+  @safe
   internal struct Header {
     @usableFromInline // c-abi
     internal var gp_offset = CUnsignedInt(0)
@@ -468,21 +470,27 @@ final internal class __VaListBuilder {
   #endif
 
   @usableFromInline // c-abi
+  @safe
   internal var gpRegistersUsed = 0
+
   @usableFromInline // c-abi
+  @safe
   internal var fpRegistersUsed = 0
 
   #if arch(x86_64) || arch(s390x)
   @usableFromInline // c-abi
+  @safe
   final  // Property must be final since it is used by Builtin.addressof.
   internal var header = Header()
   #endif
 
   @usableFromInline // c-abi
+  @safe
   internal var storage: ContiguousArray<Int>
 
 #if !_runtime(_ObjC)
   @usableFromInline // c-abi
+  @safe
   internal var retainer = [CVarArg]()
 #endif
 
@@ -560,9 +568,9 @@ final internal class __VaListBuilder {
   internal func va_list() -> CVaListPointer {
     #if arch(x86_64) || arch(s390x)
       header.reg_save_area = storage._baseAddress
-      header.overflow_arg_area
+      unsafe header.overflow_arg_area
         = storage._baseAddress + _registerSaveWords
-      return CVaListPointer(
+      return unsafe CVaListPointer(
                _fromUnsafeMutablePointer: UnsafeMutableRawPointer(
                  Builtin.addressof(&self.header)))
     #elseif arch(arm64)
@@ -715,7 +723,14 @@ final internal class __VaListBuilder {
   internal var retainer = [CVarArg]()
 #endif
 
-  internal static var alignedStorageForEmptyVaLists: Double = 0
+  // Some code will call a variadic function without passing variadic parameters
+  // where the function will still attempt to read variadic parameters. For
+  // example, calling printf with an arbitrary string as the format string. This
+  // is inherently unsound, but we'll try to be nice to such code by giving it
+  // 64 bytes of zeroes in that case.
+  internal static var alignedStorageForEmptyVaLists:
+     (Double, Double, Double, Double, Double, Double, Double, Double)
+         = (0, 0, 0, 0, 0, 0, 0, 0)
 }
 
 #endif

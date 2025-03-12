@@ -2144,12 +2144,9 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   case SILCoroutineKind::None:
     break;
   case SILCoroutineKind::YieldOnce2:
-    if (!IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      emitYieldOnce2CoroutineEntry(
-          IGF, LinkEntity::forSILFunction(IGF.CurSILFn), funcTy, *emission);
-      break;
-    }
-    LLVM_FALLTHROUGH;
+    emitYieldOnce2CoroutineEntry(IGF, LinkEntity::forSILFunction(IGF.CurSILFn),
+                                 funcTy, *emission);
+    break;
   case SILCoroutineKind::YieldOnce:
     emitYieldOnceCoroutineEntry(IGF, funcTy, *emission);
     break;
@@ -2617,8 +2614,7 @@ void IRGenSILFunction::emitSILFunction() {
   if (isAsyncFn) {
     IGM.noteSwiftAsyncFunctionDef();
   }
-  if (funcTy->isCalleeAllocatedCoroutine() &&
-      !IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
+  if (funcTy->isCalleeAllocatedCoroutine()) {
     emitCoroFunctionPointer(IGM, CurFn, LinkEntity::forSILFunction(CurSILFn));
   }
 
@@ -3748,19 +3744,21 @@ static void emitBuiltinStackDealloc(IRGenSILFunction &IGF,
 
 static void emitBuiltinCreateAsyncTask(IRGenSILFunction &IGF,
                                        swift::BuiltinInst *i) {
-  assert(i->getOperandValues().size() == 6 &&
-         "createAsyncTask needs 6 operands");
+  assert(i->getOperandValues().size() == 7 &&
+         "createAsyncTask needs 7 operands");
   auto flags = IGF.getLoweredSingletonExplosion(i->getOperand(0));
   auto serialExecutor = IGF.getLoweredOptionalExplosion(i->getOperand(1));
   auto taskGroup = IGF.getLoweredOptionalExplosion(i->getOperand(2));
   auto taskExecutorUnowned = IGF.getLoweredOptionalExplosion(i->getOperand(3));
   auto taskExecutorOwned = IGF.getLoweredOptionalExplosion(i->getOperand(4));
-  Explosion taskFunction = IGF.getLoweredExplosion(i->getOperand(5));
+  //   %11 = enum $Optional<UnsafeRawBufferPointer>, #Optional.some!enumelt, %10 : $UnsafeRawBufferPointer // user: %20
+  auto taskName = IGF.getLoweredOptionalExplosion(i->getOperand(5));
+  Explosion taskFunction = IGF.getLoweredExplosion(i->getOperand(6));
 
   auto taskAndContext =
     emitTaskCreate(IGF, flags, serialExecutor, taskGroup,
                    taskExecutorUnowned, taskExecutorOwned,
-                   taskFunction, i->getSubstitutions());
+                   taskName,  taskFunction, i->getSubstitutions());
   Explosion out;
   out.add(taskAndContext.first);
   out.add(taskAndContext.second);
@@ -3885,19 +3883,15 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   case SILCoroutineKind::None:
     break;
 
-  case SILCoroutineKind::YieldOnce2:
-    if (!IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      assert(calleeFP.getKind().isCoroFunctionPointer());
-      auto frame = emission->getCoroStaticFrame();
-      auto *allocator = emission->getCoroAllocator();
-      llArgs.add(frame.getAddress().getAddress());
-      llArgs.add(allocator);
-      coroImpl = {CoroutineState::CalleeAllocated{frame, allocator}};
-
-      break;
-    }
-    LLVM_FALLTHROUGH;
-
+  case SILCoroutineKind::YieldOnce2: {
+    assert(calleeFP.getKind().isCoroFunctionPointer());
+    auto frame = emission->getCoroStaticFrame();
+    auto *allocator = emission->getCoroAllocator();
+    llArgs.add(frame.getAddress().getAddress());
+    llArgs.add(allocator);
+    coroImpl = {CoroutineState::CalleeAllocated{frame, allocator}};
+    break;
+  }
   case SILCoroutineKind::YieldOnce:
     coroutineBuffer = emitAllocYieldOnceCoroutineBuffer(*this);
     coroImpl = {CoroutineState::HeapAllocated{*coroutineBuffer}};
@@ -4802,8 +4796,8 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
   auto pointerAuth = PointerAuthInfo::emit(*this, schemaAndEntity.first,
                                            coroutine.getBuffer().getAddress(),
                                            schemaAndEntity.second);
-  auto callee = FunctionPointer::createSigned(i->getOrigCalleeType(),
-                                              continuation, pointerAuth, sig);
+  auto callee = FunctionPointer::createSigned(
+      FunctionPointerKind::BasicKind::Function, continuation, pointerAuth, sig);
 
   llvm::CallInst *call = nullptr;
   if (coroutine.isCalleeAllocated()) {
@@ -6592,10 +6586,6 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
     return;
   }
   if (isaResultOf<BeginApplyInst>(i->getOperand())) {
-    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      // This is a no-op when using the classic retcon.once lowering.
-      return;
-    }
     auto *mvi = getAsResultOf<BeginApplyInst>(i->getOperand());
     auto *bai = cast<BeginApplyInst>(mvi->getParent());
     const auto &coroutine = getLoweredCoroutine(bai->getTokenResult());
@@ -8153,6 +8143,12 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
       fnPtr = IGM.getAddrOfAsyncFunctionPointer(
           LinkEntity::forDispatchThunk(member));
       fnPtr = llvm::ConstantExpr::getBitCast(fnPtr, fnPtrType);
+    } else if (fnType->isCalleeAllocatedCoroutine()) {
+      secondaryValue = fnPtr;
+      auto *fnPtrType = fnPtr->getType();
+      fnPtr = IGM.getAddrOfCoroFunctionPointer(
+          LinkEntity::forDispatchThunk(member));
+      fnPtr = llvm::ConstantExpr::getBitCast(fnPtr, fnPtrType);
     }
 
     auto sig = IGM.getSignature(fnType);
@@ -8375,6 +8371,8 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
 
     auto &schema = methodType->isAsync()
                        ? getOptions().PointerAuth.AsyncSwiftClassMethodPointers
+                   : methodType->isCalleeAllocatedCoroutine()
+                       ? getOptions().PointerAuth.CoroSwiftClassMethodPointers
                        : getOptions().PointerAuth.SwiftClassMethodPointers;
     auto authInfo =
       PointerAuthInfo::emit(*this, schema, /*storageAddress=*/nullptr, method);
@@ -8446,6 +8444,11 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
     if (methodType->isAsync()) {
       auto *fnPtrType = fnPtr->getType();
       fnPtr = IGM.getAddrOfAsyncFunctionPointer(
+          LinkEntity::forDispatchThunk(method));
+      fnPtr = llvm::ConstantExpr::getBitCast(fnPtr, fnPtrType);
+    } else if (methodType->isCalleeAllocatedCoroutine()) {
+      auto *fnPtrType = fnPtr->getType();
+      fnPtr = IGM.getAddrOfCoroFunctionPointer(
           LinkEntity::forDispatchThunk(method));
       fnPtr = llvm::ConstantExpr::getBitCast(fnPtr, fnPtrType);
     }

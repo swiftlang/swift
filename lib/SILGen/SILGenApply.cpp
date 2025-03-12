@@ -5809,6 +5809,14 @@ RValue SILGenFunction::emitApply(
   if (implicitActorHopTarget) {
     assert(F.isAsync() && "cannot hop_to_executor in a non-async func!");
 
+    // We need to scope this strongly to ensure that the lifetime of the loaded
+    // executor ends before the apply in case we are passing the executor as an
+    // owned parameter to the apply.
+    //
+    // This can occur in situations where we borrow the executor for
+    // hop_to_executor and then pass the executor as an owned isolated parameter
+    // to an initializer.
+    FormalEvaluationScope hopToExecutorScope(*this);
     SILValue executor;
     switch (*implicitActorHopTarget) {
     case ActorIsolation::ActorInstance:

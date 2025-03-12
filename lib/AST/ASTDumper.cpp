@@ -2691,13 +2691,6 @@ namespace {
       printFoot();
     }
 
-    void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD, Label label) {
-      printCommon(PDD, "pound_diagnostic_decl", label);
-      printField(PDD->isError() ? "error" : "warning", Label::always("kind"));
-      printRec(PDD->getMessage(), Label::optional("message"));
-      printFoot();
-    }
-
     void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD, Label label) {
       printCommon(PGD, "precedence_group_decl", label);
       printName(PGD->getName(), Label::optional("name"));
@@ -3130,12 +3123,9 @@ public:
   void visitSwitchStmt(SwitchStmt *S, Label label) {
     printCommon(S, "switch_stmt", label);
     printRec(S->getSubjectExpr(), Label::optional("subject_expr"));
-    printList(S->getRawCases(), [&](ASTNode N, Label label) {
-      if (N.is<Stmt*>())
-        printRec(N.get<Stmt*>(), label);
-      else
-        printRec(N.get<Decl*>(), label);
-    }, Label::optional("cases"));
+    printList(
+        S->getCases(), [&](CaseStmt *CS, Label label) { printRec(CS, label); },
+        Label::optional("cases"));
     printFoot();
   }
   void visitCaseStmt(CaseStmt *S, Label label) {
@@ -4945,8 +4935,18 @@ public:
   void visitAvailableAttr(AvailableAttr *Attr, Label label) {
     printCommon(Attr, "available_attr", label);
 
-    printFieldRaw([&](auto &out) { Attr->getDomainOrIdentifier().print(out); },
-                  Label::always("domain"));
+    printFlag(Attr->isGroupMember(), "group_member");
+    printFlag(Attr->isGroupedWithWildcard(), "group_with_wildcard");
+    printFlag(Attr->isGroupTerminator(), "group_terminator");
+
+    auto domainOrIdentifier = Attr->getDomainOrIdentifier();
+    if (domainOrIdentifier.isDomain()) {
+      printFieldRaw([&](auto &out) { domainOrIdentifier.getAsDomain()->print(out); },
+                    Label::always("domain"));
+    } else {
+      printFlag(domainOrIdentifier.isResolved(), "resolved");
+      printField(*domainOrIdentifier.getAsIdentifier(), Label::always("domainIdentifier"));
+    }
 
     switch (Attr->getKind()) {
     case swift::AvailableAttr::Kind::Default:

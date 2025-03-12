@@ -64,3 +64,16 @@ public enum EnumWithAssociatedValues {
   @available(macOS 51, *)
   case introducedAtDeploymentWithAssoc(Int)
 }
+
+// CHECK-LABEL: public protocol Proto
+public protocol Proto {
+  // CHECK:      @available(macOS 99, *)
+  // CHECK-NEXT: func reqIntroducedAfterDeployment()
+  @available(macOS 99, *)
+  func reqIntroducedAfterDeployment()
+
+  // CHECK:      @available(macOS, unavailable)
+  // CHECK-NEXT: func reqIntroducedAsSPIAfterDeployment()
+  @_spi_available(macOS 99, *)
+  func reqIntroducedAsSPIAfterDeployment()
+}

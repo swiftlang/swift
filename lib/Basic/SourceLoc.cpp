@@ -865,3 +865,15 @@ bool SourceManager::encloses(SourceRange enclosing, SourceRange inner) const {
   return containsLoc(enclosing, inner.Start) &&
       isAtOrBefore(inner.End, enclosing.End);
 }
+
+bool SourceManager::isImportMacroGeneratedLoc(SourceLoc loc) {
+  if (loc.isInvalid())
+    return false;
+
+  auto buffer = findBufferContainingLoc(loc);
+  auto genInfo = getGeneratedSourceInfo(buffer);
+  if (genInfo && genInfo->macroName == "_SwiftifyImport")
+    return true;
+
+  return false;
+}

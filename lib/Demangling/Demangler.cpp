@@ -155,6 +155,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
     case Node::Kind::HasSymbolQuery:
+    case Node::Kind::CoroFunctionPointer:
       return true;
     default:
       return false;
@@ -3134,6 +3135,8 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       switch (nextChar()) {
       case 'b': return createNode(Node::Kind::BackDeploymentThunk);
       case 'B': return createNode(Node::Kind::BackDeploymentFallback);
+      case 'c':
+        return createNode(Node::Kind::CoroFunctionPointer);
       case 'S': return createNode(Node::Kind::HasSymbolQuery);
       default:
         return nullptr;

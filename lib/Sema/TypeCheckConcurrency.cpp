@@ -5350,7 +5350,6 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
-  case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::Missing:
   case DeclKind::MissingMember:
@@ -5753,28 +5752,59 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
 
   // If we are supposed to infer main actor isolation by default for entities
   // within our module, make our default isolation main actor.
-  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated) &&
-      value->getModuleContext() == ctx.MainModule) {
-
-    // Default global actor isolation does not apply to any declarations
-    // within actors and distributed actors.
-    bool inActorContext = false;
-    auto *dc = value->getInnermostDeclContext();
-    while (dc && !inActorContext) {
-      if (auto *nominal = dc->getSelfNominalTypeDecl()) {
-        inActorContext = nominal->isAnyActor();
+  if (value->getModuleContext() == ctx.MainModule) {
+    auto globalActorHelper = [&](Type globalActor)
+        -> std::optional<std::tuple<InferredActorIsolation, ValueDecl *,
+                                    std::optional<ActorIsolation>>> {
+      // Default global actor isolation does not apply to any declarations
+      // within actors and distributed actors.
+      bool inActorContext = false;
+      auto *dc = value->getInnermostDeclContext();
+      while (dc && !inActorContext) {
+        if (auto *nominal = dc->getSelfNominalTypeDecl()) {
+          inActorContext = nominal->isAnyActor();
+        }
+        dc = dc->getParent();
       }
-      dc = dc->getParent();
+
+      if (!inActorContext) {
+        // FIXME: deinit should be implicitly MainActor too.
+        if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
+            isa<AbstractStorageDecl>(value) || isa<FuncDecl>(value) ||
+            isa<ConstructorDecl>(value)) {
+          return {
+              {{ActorIsolation::forGlobalActor(globalActor), {}}, nullptr, {}}};
+        }
+      }
+
+      return {};
+    };
+
+    // Otherwise, see if we have one specified by our file unit.
+    bool ignoreUnspecifiedMeansMainActorIsolated = false;
+    if (ctx.LangOpts.hasFeature(Feature::SwiftSettings)) {
+      if (auto *sourceFile = value->getDeclContext()->getParentSourceFile()) {
+        auto options = sourceFile->getLanguageOptions();
+        if (auto isolation = options.defaultIsolation) {
+          if (*isolation) {
+            auto result = globalActorHelper(*options.defaultIsolation);
+            if (result)
+              return *result;
+          } else {
+            // If we found a nil type, then we know we should ignore unspecified
+            // means main actor isolated.
+            ignoreUnspecifiedMeansMainActorIsolated = true;
+          }
+        }
+      }
     }
 
-    if (!inActorContext) {
-      // FIXME: deinit should be implicitly MainActor too.
-      if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
-          isa<AbstractStorageDecl>(value) || isa<FuncDecl>(value) ||
-          isa<ConstructorDecl>(value)) {
-        return {{ActorIsolation::forMainActor(ctx), {}}, nullptr, {}};
-      }
-    }
+    // If we are required to use main actor... just use that.
+    if (!ignoreUnspecifiedMeansMainActorIsolated &&
+        ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated))
+      if (auto result =
+              globalActorHelper(ctx.getMainActorType()->mapTypeOutOfContext()))
+        return *result;
   }
 
   // If we have an async function... by default we inherit isolation.
@@ -7573,7 +7603,6 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::Module:
   case DeclKind::PatternBinding:
   case DeclKind::PostfixOperator:
-  case DeclKind::PoundDiagnostic:
   case DeclKind::PrecedenceGroup:
   case DeclKind::PrefixOperator:
   case DeclKind::TopLevelCode:

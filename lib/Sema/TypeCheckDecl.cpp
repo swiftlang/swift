@@ -2416,7 +2416,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
-  case DeclKind::PoundDiagnostic:
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::Module:

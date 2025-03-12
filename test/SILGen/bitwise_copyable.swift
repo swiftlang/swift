@@ -3,11 +3,9 @@
 // RUN:     -emit-silgen                               \
 // RUN:     -target %target-swift-5.1-abi-triple       \
 // RUN:     -enable-experimental-feature Sensitive     \
-// RUN:     -enable-experimental-feature ValueGenerics \
 // RUN:     -enable-builtin-module
 
 // REQUIRES: swift_feature_Sensitive
-// REQUIRES: swift_feature_ValueGenerics
 
 // REQUIRES: asserts
 

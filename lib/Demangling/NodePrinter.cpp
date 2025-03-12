@@ -657,6 +657,7 @@ private:
     case Node::Kind::ObjectiveCProtocolSymbolicReference:
     case Node::Kind::DependentGenericInverseConformanceRequirement:
     case Node::Kind::DependentGenericParamValueMarker:
+    case Node::Kind::CoroFunctionPointer:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -3478,6 +3479,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << signedValue;
     return nullptr;
   }
+  case Node::Kind::CoroFunctionPointer:
+    Printer << "coro function pointer to ";
+    return nullptr;
   }
 
   printer_unreachable("bad node kind!");

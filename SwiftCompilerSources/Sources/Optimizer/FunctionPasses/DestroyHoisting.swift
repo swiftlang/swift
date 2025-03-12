@@ -88,8 +88,12 @@ private func optimize(value: Value, _ context: FunctionPassContext) {
     return
   }
 
-  var hoistableDestroys = selectHoistableDestroys(of: value, context)
+  var (foundDestroys, hoistableDestroys) = selectHoistableDestroys(of: value, context)
   defer { hoistableDestroys.deinitialize() }
+
+  guard foundDestroys else {
+    return
+  }
 
   guard var minimalLiverange = InstructionRange(withLiverangeOf: value, ignoring: hoistableDestroys, context) else {
     return
@@ -99,12 +103,13 @@ private func optimize(value: Value, _ context: FunctionPassContext) {
   hoistDestroys(of: value, toEndOf: minimalLiverange, restrictingTo: &hoistableDestroys, context)
 }
 
-private func selectHoistableDestroys(of value: Value, _ context: FunctionPassContext) -> InstructionSet {
+private func selectHoistableDestroys(of value: Value, _ context: FunctionPassContext) -> (Bool, InstructionSet) {
   // Also includes liveranges of copied values and values stored to memory.
   var forwardExtendedLiverange = InstructionRange(withForwardExtendedLiverangeOf: value, context)
   defer { forwardExtendedLiverange.deinitialize() }
 
   let deadEndBlocks = context.deadEndBlocks
+  var foundDestroys = false
   var hoistableDestroys = InstructionSet(context)
 
   for use in value.uses {
@@ -114,10 +119,11 @@ private func selectHoistableDestroys(of value: Value, _ context: FunctionPassCon
        // TODO: once we have complete OSSA lifetimes we don't need to handle dead-end blocks.
        !deadEndBlocks.isDeadEnd(destroy.parentBlock)
     {
+      foundDestroys = true
       hoistableDestroys.insert(destroy)
     }
   }
-  return hoistableDestroys
+  return (foundDestroys, hoistableDestroys)
 }
 
 private func hoistDestroys(of value: Value,

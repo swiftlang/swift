@@ -67,9 +67,9 @@ func print(_ buf: UnsafeBufferPointer<UInt8>, terminator: StaticString = "\n") {
   for c in buf {
     putchar(CInt(c))
   }
-  var p = terminator.utf8Start
-  while p.pointee != 0 {
-    putchar(CInt(p.pointee))
+  var p = unsafe terminator.utf8Start
+  while unsafe p.pointee != 0 {
+    unsafe putchar(CInt(p.pointee))
     p += 1
   }
 }

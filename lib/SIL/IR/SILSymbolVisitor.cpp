@@ -543,7 +543,7 @@ public:
     auto *accessor = dyn_cast<AccessorDecl>(AFD);
     if (accessor &&
         requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
-      addCoroFunctionPointer(SILDeclRef(AFD));
+      addCoroFunctionPointer(SILDeclRef(accessor));
     }
 
     // Skip non objc compatible methods or non-public methods.
@@ -780,7 +780,6 @@ public:
     case DeclKind::Accessor:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
-    case DeclKind::PoundDiagnostic:
       return true;
     case DeclKind::OpaqueType:
     case DeclKind::Enum:
@@ -842,6 +841,11 @@ public:
               llvm::dyn_cast_or_null<AbstractFunctionDecl>(declRef.getDecl());
           if (decl && decl->hasBody()) {
             Visitor.addFunction(declRef);
+            auto *accessor = dyn_cast<AccessorDecl>(decl);
+            if (accessor && requiresFeatureCoroutineAccessors(
+                                accessor->getAccessorKind())) {
+              Visitor.addCoroFunctionPointer(SILDeclRef(accessor));
+            }
           }
         }
 
@@ -907,7 +911,6 @@ public:
   UNINTERESTING_DECL(MissingMember)
   UNINTERESTING_DECL(Operator)
   UNINTERESTING_DECL(PatternBinding)
-  UNINTERESTING_DECL(PoundDiagnostic)
   UNINTERESTING_DECL(PrecedenceGroup)
   UNINTERESTING_DECL(TopLevelCode)
   UNINTERESTING_DECL(Value)

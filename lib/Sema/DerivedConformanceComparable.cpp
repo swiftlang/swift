@@ -103,7 +103,7 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
   auto enumDecl = cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal());
 
   SmallVector<ASTNode, 8> statements;
-  SmallVector<ASTNode, 4> cases;
+  SmallVector<CaseStmt *, 4> cases;
   unsigned elementCount = 0; // need this as `getAllElements` returns a generator
 
   // For each enum element, generate a case statement matching a pair containing

@@ -206,9 +206,11 @@ namespace irgen {
     FunctionPointerKind(SpecialKind kind)
       : value(unsigned(kind) + SpecialOffset) {}
     FunctionPointerKind(CanSILFunctionType fnType)
-      : FunctionPointerKind(fnType->isAsync()
-                              ? BasicKind::AsyncFunctionPointer
-                              : BasicKind::Function) {}
+        : FunctionPointerKind(fnType->isAsync()
+                                  ? BasicKind::AsyncFunctionPointer
+                              : fnType->isCalleeAllocatedCoroutine()
+                                  ? BasicKind::CoroFunctionPointer
+                                  : BasicKind::Function) {}
 
     static FunctionPointerKind defaultSync() {
       return BasicKind::Function;

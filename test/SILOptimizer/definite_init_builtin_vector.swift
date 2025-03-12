@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -emit-sil -disable-experimental-parser-round-trip -disable-availability-checking -enable-experimental-feature ValueGenerics -enable-experimental-feature BuiltinModule %s
+// RUN: %target-swift-frontend -emit-sil -disable-experimental-parser-round-trip -disable-availability-checking -enable-experimental-feature BuiltinModule %s
 
 // REQUIRES: swift_feature_BuiltinModule
-// REQUIRES: swift_feature_ValueGenerics
 
 import Builtin
 

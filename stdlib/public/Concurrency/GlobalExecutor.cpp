@@ -63,10 +63,10 @@
 using namespace swift;
 
 extern "C" SWIFT_CC(swift)
-    void _task_serialExecutor_checkIsolated(
-        HeapObject *executor,
-        const Metadata *selfType,
-        const SerialExecutorWitnessTable *wtable);
+void _task_serialExecutor_checkIsolated(
+    HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
 
 SWIFT_CC(swift)
 bool swift::swift_task_invokeSwiftCheckIsolated(SerialExecutorRef executor)
@@ -84,6 +84,29 @@ bool swift::swift_task_invokeSwiftCheckIsolated(SerialExecutorRef executor)
 extern "C" bool _swift_task_invokeSwiftCheckIsolated_c(SwiftExecutorRef executor)
 {
   return swift_task_invokeSwiftCheckIsolated(*reinterpret_cast<SerialExecutorRef *>(&executor));
+}
+
+
+extern "C" SWIFT_CC(swift)
+bool _task_serialExecutor_isIsolatingCurrentContext(
+    HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
+
+SWIFT_CC(swift)
+bool swift::swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor)
+{
+  if (!executor.hasSerialExecutorWitnessTable())
+    return false;
+
+  return _task_serialExecutor_isIsolatingCurrentContext(
+        executor.getIdentity(), swift_getObjectType(executor.getIdentity()),
+        executor.getSerialExecutorWitnessTable());
+}
+
+extern "C" bool _swift_task_invokeSwiftIsIsolatingCurrentContext_c(SwiftExecutorRef executor)
+{
+  return swift_task_invokeSwiftIsIsolatingCurrentContext(*reinterpret_cast<SerialExecutorRef *>(&executor));
 }
 
 extern "C" void _swift_job_run_c(SwiftJob *job, SwiftExecutorRef executor)

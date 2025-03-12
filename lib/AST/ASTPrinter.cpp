@@ -1,7 +1,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -3522,17 +3522,6 @@ void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
   printASTNodes(decl->getBody()->getElements(), /*NeedIndent=*/false);
 }
 
-void PrintAST::visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
-  /// TODO: Should we even print #error/#warning?
-  if (PDD->isError()) {
-    Printer << tok::pound_error;
-  } else {
-    Printer << tok::pound_warning;
-  }
-
-  Printer << "(\"" << PDD->getMessage()->getValue() << "\")";
-}
-
 void PrintAST::visitOpaqueTypeDecl(OpaqueTypeDecl *decl) {
   // TODO: If we introduce explicit opaque type decls, print them.
   assert(decl->getName().empty());
@@ -4721,6 +4710,9 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
         case BuiltinMacroKind::IsolationMacro:
           Printer << "IsolationMacro";
           break;
+        case BuiltinMacroKind::SwiftSettingsMacro:
+          Printer << "SwiftSettingsMacro";
+          break;
         }
         break;
 
@@ -5668,9 +5660,8 @@ void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
   visit(stmt->getSubjectExpr());
   Printer << " {";
   Printer.printNewline();
-  for (auto N : stmt->getRawCases()) {
-    if (N.is<Stmt*>())
-      visit(cast<CaseStmt>(N.get<Stmt*>()));
+  for (auto *CS : stmt->getCases()) {
+    visit(CS);
     Printer.printNewline();
   }
   indent();

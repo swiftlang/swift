@@ -771,7 +771,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
       C, StaticSpellingKind::None, indexPat, /*InitExpr*/ nullptr, funcDecl);
 
   unsigned index = 0;
-  SmallVector<ASTNode, 4> cases;
+  SmallVector<CaseStmt *, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     if (auto *unavailableElementCase =
             DerivedConformance::unavailableEnumElementCaseStmt(enumType, elt,

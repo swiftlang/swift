@@ -1198,6 +1198,11 @@ ManglingError Remangler::mangleAsyncFunctionPointer(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleCoroFunctionPointer(Node *node, unsigned depth) {
+  Buffer << "Twc";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDeallocator(Node *node, EntityContext &ctx,
                                            unsigned depth) {
   return mangleSimpleEntity(node, 'F', "D", ctx, depth + 1);

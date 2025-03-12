@@ -923,6 +923,24 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
     opts.RelativeProtocolWitnessTable = PointerAuthSchema(
         dataKey, /*address*/ false, Discrimination::Constant,
         SpecialPointerAuthDiscriminators::RelativeProtocolWitnessTable);
+
+  opts.CoroSwiftFunctionPointers =
+      PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Type);
+
+  opts.CoroSwiftClassMethods =
+      PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
+  opts.CoroProtocolWitnesses =
+      PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
+  opts.CoroSwiftClassMethodPointers =
+      PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Decl);
+
+  opts.CoroSwiftDynamicReplacements =
+      PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
+  opts.CoroPartialApplyCapture =
+      PointerAuthSchema(nonABIDataKey, /*address*/ true, Discrimination::Decl);
 }
 
 std::unique_ptr<llvm::TargetMachine>

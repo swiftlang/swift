@@ -122,7 +122,6 @@ EXPECTED_DEFAULTS = {
     'swiftsyntax_verify_generated_files': False,
     'swiftsyntax_enable_rawsyntax_validation': False,
     'swiftsyntax_enable_test_fuzzing': False,
-    'swiftsyntax_lint': False,
     'install_playgroundsupport': False,
     'install_sourcekitlsp': False,
     'install_swiftformat': False,
@@ -336,6 +335,7 @@ EXPECTED_DEFAULTS = {
     'llvm_install_components': defaults.llvm_install_components(),
     'clean_install_destdir': False,
     'use_linker': None,
+    'enable_new_runtime_build': False,
 }
 
 
@@ -669,8 +669,6 @@ EXPECTED_OPTIONS = [
                  dest='swiftsyntax_enable_rawsyntax_validation'),
     EnableOption('--swiftsyntax-enable-test-fuzzing',
                  dest='swiftsyntax_enable_test_fuzzing'),
-    EnableOption('--swiftsyntax-lint',
-                 dest='swiftsyntax_lint'),
     EnableOption('--install-swiftpm', dest='install_swiftpm'),
     EnableOption('--install-swift-driver', dest='install_swift_driver'),
     EnableOption('--install-sourcekit-lsp', dest='install_sourcekitlsp'),
@@ -893,4 +891,5 @@ EXPECTED_OPTIONS = [
 
     StrOption('--llvm-install-components'),
     ChoicesOption('--use-linker', dest='use_linker', choices=['gold', 'lld']),
+    EnableOption('--enable-new-runtime-build', dest='enable_new_runtime_build'),
 ]

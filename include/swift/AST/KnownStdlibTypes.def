@@ -101,4 +101,6 @@ KNOWN_STDLIB_TYPE_DECL(Result, NominalTypeDecl, 2)
 
 KNOWN_STDLIB_TYPE_DECL(InlineArray, NominalTypeDecl, 2)
 
+KNOWN_STDLIB_TYPE_DECL(SwiftSetting, NominalTypeDecl, 0)
+
 #undef KNOWN_STDLIB_TYPE_DECL

@@ -981,9 +981,7 @@ CastsTests.test("Recursive AnyHashable") {
 // https://github.com/apple/swift/issues/56987
 #if _runtime(_ObjC)
 CastsTests.test("Do not overuse __SwiftValue")
-.skip(.custom({
-  if #available(SwiftStdlib 5.9, *) { return false } else { return true }
-}, reason: "Requires stdlib from Swift 5.9 or later"))
+.require(.stdlib_5_9)
 .code {
   struct Bar {}
   // This used to succeed because of overeager __SwiftValue

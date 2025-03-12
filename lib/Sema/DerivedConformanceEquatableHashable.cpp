@@ -69,7 +69,7 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   assert(!cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal())->hasCases());
 
   SmallVector<ASTNode, 1> statements;
-  SmallVector<ASTNode, 0> cases;
+  SmallVector<CaseStmt *, 0> cases;
 
   // switch (a, b) { }
   auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true,
@@ -163,7 +163,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto enumDecl = cast<EnumDecl>(aParam->getInterfaceType()->getAnyNominal());
 
   SmallVector<ASTNode, 6> statements;
-  SmallVector<ASTNode, 4> cases;
+  SmallVector<CaseStmt *, 4> cases;
   unsigned elementCount = 0;
 
   // For each enum element, generate a case statement matching a pair containing
@@ -687,7 +687,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
 
   unsigned index = 0;
-  SmallVector<ASTNode, 4> cases;
+  SmallVector<CaseStmt *, 4> cases;
 
   // For each enum element, generate a case statement that binds the associated
   // values so that they can be fed to the hasher.

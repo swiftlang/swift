@@ -419,3 +419,38 @@ bb6:
   %15 = tuple ()
   return %15
 }
+
+// CHECK-LABEL: sil [ossa] @copy_from_limited_liferange : 
+// CHECK:         switch_enum
+// CHECK-LABEL: } // end sil function 'copy_from_limited_liferange'
+sil [ossa] @copy_from_limited_liferange : $@convention(thin) (Builtin.Int1, @guaranteed C) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @guaranteed $C):
+  %2 = begin_borrow [lexical] %1
+  cond_br %0, bb1, bb2
+
+bb1:
+  %4 = copy_value %2
+  %5 = enum $Optional<C>, #Optional.some!enumelt, %4
+  br bb3(%5)
+
+bb2:
+  %7 = enum $Optional<C>, #Optional.none!enumelt
+  br bb3(%7)
+
+bb3(%9 : @owned $Optional<C>):
+  end_borrow %2
+  switch_enum %9, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb4
+
+bb4:
+  br bb6
+
+bb5(%13 : @owned $C):
+  destroy_value %13
+  br bb6
+
+bb6:
+  %16 = tuple ()
+  return %16
+}
+
+

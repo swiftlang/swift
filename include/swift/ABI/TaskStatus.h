@@ -109,7 +109,7 @@ public:
 
 /// A status record which states that a task has a task group.
 ///
-/// A record always is a specific `TaskGroupImpl`.
+/// A record always is an instance of a `TaskGroupBase` subclass.
 ///
 /// This record holds references to all the non-completed children of
 /// the task group.  It may also hold references to completed children
@@ -322,6 +322,22 @@ public:
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::TaskExecutorPreference;
+  }
+};
+
+class TaskNameStatusRecord : public TaskStatusRecord {
+private:
+  const char *Name;
+
+public:
+  TaskNameStatusRecord(const char *name)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskName),
+        Name(name) {}
+
+  const char *getName() { return Name; }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::TaskName;
   }
 };
 

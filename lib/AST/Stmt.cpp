@@ -940,19 +940,10 @@ CaseStmt *CaseStmt::findNextCaseStmt() const {
 }
 
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
-                               Expr *SubjectExpr,
-                               SourceLoc LBraceLoc,
-                               ArrayRef<ASTNode> Cases,
-                               SourceLoc RBraceLoc,
-                               SourceLoc EndLoc,
-                               ASTContext &C) {
-#ifndef NDEBUG
-  for (auto N : Cases)
-    assert((N.is<Stmt*>() && isa<CaseStmt>(N.get<Stmt*>())) ||
-           (N.is<Decl*>() && (isa<PoundDiagnosticDecl>(N.get<Decl*>()))));
-#endif
-
-  void *p = C.Allocate(totalSizeToAlloc<ASTNode>(Cases.size()),
+                               Expr *SubjectExpr, SourceLoc LBraceLoc,
+                               ArrayRef<CaseStmt *> Cases, SourceLoc RBraceLoc,
+                               SourceLoc EndLoc, ASTContext &C) {
+  void *p = C.Allocate(totalSizeToAlloc<CaseStmt *>(Cases.size()),
                        alignof(SwitchStmt));
   SwitchStmt *theSwitch = ::new (p) SwitchStmt(LabelInfo, SwitchLoc,
                                                SubjectExpr, LBraceLoc,
@@ -960,7 +951,7 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                                EndLoc);
 
   std::uninitialized_copy(Cases.begin(), Cases.end(),
-                          theSwitch->getTrailingObjects<ASTNode>());
+                          theSwitch->getTrailingObjects<CaseStmt *>());
   for (auto *caseStmt : theSwitch->getCases())
     caseStmt->setParentStmt(theSwitch);
 

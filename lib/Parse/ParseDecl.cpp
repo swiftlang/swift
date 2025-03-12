@@ -31,6 +31,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Bridging/ASTGen.h"
@@ -2556,7 +2557,8 @@ parseLifetimeDescriptor(Parser &P,
 ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
                                                           SourceLoc loc) {
   ParserStatus status;
-  if (!Context.LangOpts.hasFeature(Feature::LifetimeDependence)) {
+  if (!Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
+      !Context.SourceMgr.isImportMacroGeneratedLoc(atLoc)) {
     diagnose(loc, diag::requires_experimental_feature, "@lifetime", false,
              getFeatureName(Feature::LifetimeDependence));
     status.setIsParseError();
@@ -4299,13 +4301,8 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   if (!DK && Tok.getText() == UNAVAILABLE_IN_EMBEDDED_ATTRNAME) {
     SourceLoc attrLoc = consumeToken();
     if (Context.LangOpts.hasFeature(Feature::Embedded)) {
-      StringRef Message = "unavailable in embedded Swift", Renamed;
-      auto attr = new (Context) AvailableAttr(
-          AtLoc, SourceRange(AtLoc, attrLoc), AvailabilityDomain::forEmbedded(),
-          SourceLoc(), AvailableAttr::Kind::Unavailable, Message, Renamed,
-          llvm::VersionTuple(), SourceRange(), llvm::VersionTuple(),
-          SourceRange(), llvm::VersionTuple(), SourceRange(),
-          /*Implicit=*/false, /*IsSPI=*/false);
+      auto attr = AvailableAttr::createUnavailableInEmbedded(
+          Context, AtLoc, SourceRange(AtLoc, attrLoc));
       Attributes.add(attr);
     }
     return makeParserSuccess();
@@ -6057,10 +6054,7 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
     return makeParserSuccess();
   }
   if (Tok.isAny(tok::pound_warning, tok::pound_error)) {
-    auto Result = parseDeclPoundDiagnostic();
-    if (Result.isNonNull())
-      Handler(Result.get());
-    return Result;
+    return parseDeclPoundDiagnostic();
   }
 
   // Note that we're parsing a declaration.
@@ -7094,10 +7088,9 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   return DCC.fixupParserResult(status, ext);
 }
 
-ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
+ParserStatus Parser::parseDeclPoundDiagnostic() {
   bool isError = Tok.is(tok::pound_error);
-  SourceLoc startLoc = 
-    consumeToken(isError ? tok::pound_error : tok::pound_warning);
+  consumeToken(isError ? tok::pound_error : tok::pound_warning);
 
   SourceLoc lParenLoc = Tok.getLoc();
   bool hadLParen = consumeIf(tok::l_paren);
@@ -7129,7 +7122,6 @@ ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
 
   auto messageExpr = string.get();
 
-  SourceLoc rParenLoc = Tok.getLoc();
   bool hadRParen = consumeIf(tok::r_paren);
 
   if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
@@ -7169,11 +7161,16 @@ ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
     return makeParserError();
   }
 
-  ParserStatus Status;
-  return makeParserResult(Status,
-    new (Context) PoundDiagnosticDecl(CurDeclContext, isError,
-                                      startLoc, rParenLoc,
-                                      cast<StringLiteralExpr>(messageExpr)));
+  if (!InInactiveClauseEnvironment) {
+    Diags
+        .diagnose(messageExpr->getStartLoc(),
+                  isError ? diag::pound_error : diag::pound_warning,
+                  cast<StringLiteralExpr>(messageExpr)->getValue())
+        .highlight(messageExpr->getSourceRange());
+  }
+
+  // '#error' and '#warning' don't create an AST node.
+  return makeParserSuccess();
 }
 
 ParserStatus Parser::parseLineDirective(bool isLine) {

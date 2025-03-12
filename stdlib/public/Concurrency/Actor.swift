@@ -103,6 +103,16 @@ public macro isolation<T>() -> T = Builtin.IsolationMacro
 @attached(body)
 public macro StartTask() =
   #externalMacro(module: "SwiftMacros", type: "StartTaskMacro")
+
+// NOTE: We put SwiftSetting under $Macro since #SwiftSettings() is a macro.
+@available(SwiftStdlib 9999, *)
+extension SwiftSetting {
+  /// Force the current module to use the passed in defaultIsolation instead of
+  /// the default isolation.
+  @available(SwiftStdlib 9999, *)
+  public static func defaultIsolation(_ actor: Actor.Type?) -> SwiftSetting { SwiftSetting() }
+}
+
 #endif
 
 #if $IsolatedAny

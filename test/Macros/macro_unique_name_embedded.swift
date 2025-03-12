@@ -1,6 +1,7 @@
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: OS=macosx
+// REQUIRES: embedded_stdlib
 
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t

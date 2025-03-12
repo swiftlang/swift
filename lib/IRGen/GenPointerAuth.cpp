@@ -193,6 +193,8 @@ static const PointerAuthSchema &getFunctionPointerSchema(IRGenModule &IGM,
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     if (fnType->isAsync()) {
       return options.AsyncSwiftFunctionPointers;
+    } else if (fnType->isCalleeAllocatedCoroutine()) {
+      return options.CoroSwiftFunctionPointers;
     }
 
     return options.SwiftFunctionPointers;

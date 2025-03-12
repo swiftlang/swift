@@ -3625,8 +3625,8 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitKeyPathInst(KeyPathInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   SmallVector<SILValue, 4> opValues;
-  for (auto &op : Inst->getAllOperands())
-    opValues.push_back(getOpValue(op.get()));
+  for (Operand *op : Inst->getRealOperands())
+    opValues.push_back(getOpValue(op->get()));
 
   recordClonedInstruction(Inst,
                           getBuilder().createKeyPath(

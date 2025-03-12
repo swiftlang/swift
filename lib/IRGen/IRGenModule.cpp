@@ -750,6 +750,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     SwiftTaskOptionRecordTy, // Base option record
     SwiftExecutorTy,         // Executor
   });
+  SwiftInitialTaskNameTaskOptionRecordTy =
+      createStructType(*this, "swift.task_name_task_option", {
+    SwiftTaskOptionRecordTy, // Base option record
+    Int8PtrTy,               // Task name string (char*)
+  });
   SwiftJobTy = createStructType(*this, "swift.job", {
     RefCountedStructTy,   // object header
     Int8PtrTy, Int8PtrTy, // SchedulerPrivate
@@ -1218,6 +1223,14 @@ llvm::Constant *swift::getRuntimeFn(
 llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
   return getAddrOfLLVMVariableOrGOTEquivalent(
       LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
+}
+
+llvm::Constant *IRGenModule::
+    getDeletedCalleeAllocatedCoroutineMethodErrorAsyncFunctionPointer() {
+  return getAddrOfLLVMVariableOrGOTEquivalent(
+             LinkEntity::forKnownAsyncFunctionPointer(
+                 "swift_deletedCalleeAllocatedCoroutineMethodError"))
+      .getValue();
 }
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);

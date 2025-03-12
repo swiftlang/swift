@@ -139,7 +139,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
   Type ExpectedCallType;
   if (auto ArgLoc = S.getConstraintSystem().getArgumentLocator(ParentCall)) {
     if (auto FuncArgApplyInfo = S.getFunctionArgApplyInfo(ArgLoc)) {
-      Type ParamType = FuncArgApplyInfo->getParamInterfaceType();
+      Type ParamType = FuncArgApplyInfo->getParamType();
       ExpectedCallType = S.simplifyTypeForCodeCompletion(ParamType);
     }
   }

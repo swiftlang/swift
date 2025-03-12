@@ -438,6 +438,23 @@ public:
 
   bool isAsync() const { return Value & IsAsyncMask; }
 
+  bool isCalleeAllocatedCoroutine() const {
+    switch (getKind()) {
+    case Kind::Method:
+    case Kind::Init:
+    case Kind::Getter:
+    case Kind::Setter:
+    case Kind::ModifyCoroutine:
+    case Kind::ReadCoroutine:
+      return false;
+    case Kind::Read2Coroutine:
+    case Kind::Modify2Coroutine:
+      return true;
+    }
+  }
+
+  bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
+
   uint16_t getExtraDiscriminator() const {
     return (Value >> ExtraDiscriminatorShift);
   }
@@ -649,6 +666,26 @@ public:
 
   bool isAsync() const { return Value & IsAsyncMask; }
 
+  bool isCalleeAllocatedCoroutine() const {
+    switch (getKind()) {
+    case Kind::BaseProtocol:
+    case Kind::Method:
+    case Kind::Init:
+    case Kind::Getter:
+    case Kind::Setter:
+    case Kind::ReadCoroutine:
+    case Kind::ModifyCoroutine:
+    case Kind::AssociatedTypeAccessFunction:
+    case Kind::AssociatedConformanceAccessFunction:
+      return false;
+    case Kind::Read2Coroutine:
+    case Kind::Modify2Coroutine:
+      return true;
+    }
+  }
+
+  bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
+
   bool isSignedWithAddress() const {
     return getKind() != Kind::BaseProtocol;
   }
@@ -709,6 +746,7 @@ private:
     HasResilientWitnessesMask = 0x01u << 16,
     HasGenericWitnessTableMask = 0x01u << 17,
     IsConformanceOfProtocolMask = 0x01u << 18,
+    HasGlobalActorIsolation = 0x01u << 19,
 
     NumConditionalPackDescriptorsMask = 0xFFu << 24,
     NumConditionalPackDescriptorsShift = 24
@@ -768,6 +806,14 @@ public:
                                  : 0));
   }
   
+  ConformanceFlags withHasGlobalActorIsolation(
+                                           bool hasGlobalActorIsolation) const {
+    return ConformanceFlags((Value & ~HasGlobalActorIsolation)
+                            | (hasGlobalActorIsolation
+                                 ? HasGlobalActorIsolation
+                                 : 0));
+  }
+  
   /// Retrieve the type reference kind kind.
   TypeReferenceKind getTypeReferenceKind() const {
     return TypeReferenceKind(
@@ -806,7 +852,12 @@ public:
   bool isConformanceOfProtocol() const {
     return Value & IsConformanceOfProtocolMask;
   }
-  
+
+  /// Does this conformance have a global actor to which it is isolated?
+  bool hasGlobalActorIsolation() const {
+    return Value & HasGlobalActorIsolation;
+  }
+
   /// Retrieve the # of conditional requirements.
   unsigned getNumConditionalRequirements() const {
     return (Value & NumConditionalRequirementsMask)
@@ -1718,6 +1769,10 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Isolated deinit body function pointer
   const uint16_t DeinitWorkFunction = 0x8438; // = 33848
+
+  /// IsCurrentGlobalActor function used between the Swift runtime and
+  /// concurrency runtime.
+  const uint16_t IsCurrentGlobalActorFunction = 0xd1b8; // = 53688
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -2737,6 +2792,7 @@ public:
     // 27 is currently unused
     Task_IsAsyncLetTask                   = 28,
     Task_HasInitialTaskExecutorPreference = 29,
+    Task_HasInitialTaskName               = 30,
   };
   // clang-format on
 
@@ -2773,6 +2829,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInitialTaskExecutorPreference,
                                 task_hasInitialTaskExecutorPreference,
                                 task_setHasInitialTaskExecutorPreference)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInitialTaskName,
+                                task_hasInitialTaskName,
+                                task_setHasInitialTaskName)
 };
 
 /// Kinds of task status record.
@@ -2802,6 +2861,9 @@ enum class TaskStatusRecordKind : uint8_t {
   /// enqueued on.
   TaskExecutorPreference = 5,
 
+  /// A human-readable task name.
+  TaskName = 6,
+
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,
   Private_RecordLock = 192
@@ -2825,6 +2887,8 @@ enum class TaskOptionRecordKind : uint8_t {
   /// Set the initial task executor preference of the task.
   InitialTaskExecutorUnowned = 5,
   InitialTaskExecutorOwned = 6,
+  // Set a human-readable task name.
+  InitialTaskName = 7,
   /// Request a child task for swift_task_run_inline.
   RunInline = UINT8_MAX,
 };

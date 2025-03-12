@@ -1051,6 +1051,11 @@ ManglingError Remangler::mangleAsyncFunctionPointer(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleCoroFunctionPointer(Node *node, unsigned depth) {
+  Buffer << "Twc";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDependentAssociatedTypeRef(Node *node,
                                                           unsigned depth) {
   RETURN_IF_ERROR(mangleIdentifier(node->getFirstChild(), depth));
@@ -1836,6 +1841,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::BackDeploymentThunk:
       case Node::Kind::BackDeploymentFallback:
       case Node::Kind::HasSymbolQuery:
+      case Node::Kind::CoroFunctionPointer:
         mangleInReverseOrder = true;
         break;
       default:

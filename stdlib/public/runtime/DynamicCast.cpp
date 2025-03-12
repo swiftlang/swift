@@ -1384,7 +1384,8 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   }
 
   for (auto protocol : existentialType->getProtocols()) {
-    if (!swift::_conformsToProtocol(value, type, protocol, conformances))
+    if (!swift::_conformsToProtocolInContext(
+             value, type, protocol, conformances))
       return false;
     if (conformances != nullptr && protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);
@@ -1866,6 +1867,7 @@ static DynamicCastResult tryCastToExtendedExistential(
                                                      allGenericArgsVec.data());
     // Verify the requirements in the requirement signature against the
     // arguments from the source value.
+    ConformanceExecutionContext context;
     auto requirementSig = destExistentialShape->getRequirementSignature();
     auto error = swift::_checkGenericRequirements(
         requirementSig.getParams(),
@@ -1879,8 +1881,12 @@ static DynamicCastResult tryCastToExtendedExistential(
         },
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("Resolution of witness tables is not supported");
-        });
+        },
+        &context);
     if (error)
+      return DynamicCastResult::Failure;
+
+    if (!swift_isInConformanceExecutionContext(selfType, &context))
       return DynamicCastResult::Failure;
   }
 

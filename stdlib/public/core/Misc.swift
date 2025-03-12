@@ -172,6 +172,15 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
   try fn()
 }
 
+@available(SwiftStdlib 9999, *)
+@usableFromInline internal var swift_deletedCalleeAllocatedCoroutineMethodError: () {
+  // TODO: CoroutineAccessors: Change to read from _read.
+  @_silgen_name("swift_deletedCalleeAllocatedCoroutineMethodError")
+  _read {
+    fatalError("Fatal error: Call of deleted method")
+  }
+}
+
 /// A type whose values can be implicitly or explicitly copied.
 ///
 /// Conforming to this protocol indicates that a type's value can be copied;

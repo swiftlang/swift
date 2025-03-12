@@ -2168,7 +2168,7 @@ void index::indexModule(ModuleDecl *module, IndexDataConsumer &consumer) {
     return;
   }
 
-  llvm::SaveAndRestore<bool> S(ctx.ForceAllowModuleWithCompilerErrors, true);
+  llvm::SaveAndRestore<bool> S(ctx.ForceExtendedDeserializationRecovery, true);
 
   IndexSwiftASTWalker walker(consumer, ctx);
   walker.visitModule(*module);

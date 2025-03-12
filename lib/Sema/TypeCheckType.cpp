@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -46,6 +46,7 @@
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/EnumMap.h"
+#include "swift/Basic/FixedBitSet.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -6410,8 +6411,10 @@ private:
       return false;
     }
 
-    // A missing `any` or `some` is always diagnosed if this feature is enabled.
-    if (ctx.LangOpts.hasFeature(Feature::ExistentialAny)) {
+    // A missing `any` or `some` is always diagnosed if this feature not
+    // disabled.
+    auto featureState = ctx.LangOpts.getFeatureState(Feature::ExistentialAny);
+    if (featureState.isEnabled() || featureState.isEnabledForAdoption()) {
       return true;
     }
 
@@ -6504,7 +6507,15 @@ private:
                                       /*isAlias=*/isa<TypeAliasDecl>(decl)));
     }
 
-    diag->warnUntilSwiftVersion(7);
+    // If `ExistentialAny` is enabled in adoption mode, warn unconditionally.
+    // Otherwise, warn until the feature's coming-of-age language mode.
+    const auto feature = Feature::ExistentialAny;
+    if (Ctx.LangOpts.getFeatureState(feature).isEnabledForAdoption()) {
+      diag->limitBehavior(DiagnosticBehavior::Warning);
+    } else {
+      diag->warnUntilSwiftVersion(getFeatureLanguageVersion(feature).value());
+    }
+
     emitInsertAnyFixit(*diag, T);
   }
 

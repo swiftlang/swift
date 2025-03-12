@@ -295,6 +295,12 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
 bool PrintingDiagnosticConsumer::finishProcessing() {
   // If there's an in-flight snippet, flush it.
   flush(false);
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // Print out footnotes for any category that was referenced.
+  DiagBridge.printCategoryFootnotes(Stream, ForceColors);
+#endif
+
   return false;
 }
 

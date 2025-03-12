@@ -11,10 +11,10 @@ struct Available50 {}
 struct Available51 {}
 
 @available(macOS, unavailable)
-struct UnavailableOnMacOS {}
+struct UnavailableOnMacOS {} // expected-note {{'UnavailableOnMacOS' has been explicitly marked unavailable here}}
 
 @available(*, unavailable)
-struct UnavailableUnconditionally {}
+struct UnavailableUnconditionally {} // expected-note {{'UnavailableUnconditionally' has been explicitly marked unavailable here}}
 
 var alwaysAvailableVar: AlwaysAvailable = .init() // Ok
 
@@ -28,7 +28,7 @@ var availableOn50Var: Available50 = .init() // Ok
 var potentiallyUnavailableVar: Available51 = .init()
 
 @available(macOS, unavailable) // expected-error {{global variable cannot be marked unavailable with '@available' in script mode}}
-var unavailableOnMacOSVar: UnavailableOnMacOS = .init()
+var unavailableOnMacOSVar: UnavailableOnMacOS = .init() // expected-error {{'UnavailableOnMacOS' is unavailable in macOS}}
 
 @available(*, unavailable) // expected-error {{global variable cannot be marked unavailable with '@available' in script mode}}
-var unconditionallyUnavailableVar: UnavailableUnconditionally = .init()
+var unconditionallyUnavailableVar: UnavailableUnconditionally = .init() // expected-error {{'UnavailableUnconditionally' is unavailable}}

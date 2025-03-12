@@ -2148,6 +2148,8 @@ static llvm::Value *emitPartialApplicationForwarder(
         subIGF,
         origType->isAsync()
             ? IGM.getOptions().PointerAuth.AsyncPartialApplyCapture
+        : origType->isCalleeAllocatedCoroutine()
+            ? IGM.getOptions().PointerAuth.CoroPartialApplyCapture
             : IGM.getOptions().PointerAuth.PartialApplyCapture,
         lastCapturedFieldPtr, PointerAuthEntity::Special::PartialApplyCapture);
 
@@ -2158,10 +2160,7 @@ static llvm::Value *emitPartialApplicationForwarder(
     // It comes out of the context as an i8*. Cast to the function type.
     fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
 
-    return FunctionPointer::createSigned(
-        origType->isAsync() ? FunctionPointer::Kind::AsyncFunctionPointer
-                            : FunctionPointer::Kind::Function,
-        fnPtr, authInfo, origSig);
+    return FunctionPointer::createSigned(origType, fnPtr, authInfo, origSig);
   }();
 
   if (origType->isAsync())
@@ -2565,6 +2564,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
         if (auto &schema =
                 origType->isAsync()
                     ? IGF.getOptions().PointerAuth.AsyncPartialApplyCapture
+                : origType->isCalleeAllocatedCoroutine()
+                    ? IGF.getOptions().PointerAuth.CoroPartialApplyCapture
                     : IGF.getOptions().PointerAuth.PartialApplyCapture) {
           auto schemaAuthInfo = PointerAuthInfo::emit(
               IGF, schema, fieldAddr.getAddress(),
