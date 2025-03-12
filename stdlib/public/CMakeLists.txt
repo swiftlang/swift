@@ -218,6 +218,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
   if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "wasm32    wasm32-unknown-none-wasm    wasm32-unknown-none-wasm"
+      "wasm32    wasm32-unknown-wasip1-wasm  wasm32-unknown-wasip1-wasm"
       "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
     )
   endif()
@@ -226,7 +227,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "avr  avr-none-none-elf    avr-none-none-elf"
     )
-  endif()  
+  endif()
 endif()
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
