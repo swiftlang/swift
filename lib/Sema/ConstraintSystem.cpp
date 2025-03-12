@@ -267,8 +267,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Activate the constraints affected by a change to this type variable.
-  auto gatheringKind = ConstraintGraph::GatheringKind::AllMentions;
-  for (auto *constraint : CG.gatherConstraints(typeVar, gatheringKind))
+  for (auto *constraint : CG.gatherAllConstraints(typeVar))
     if (!constraint->isActive())
       activateConstraint(constraint);
 }
