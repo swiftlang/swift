@@ -1679,7 +1679,9 @@ AbstractionPattern::isFunctionParamAddressable(TypeConverter &TC,
     auto type = getType();
     
     if (type->isTypeParameter() || type->is<ArchetypeType>()) {
-      return false;
+      // If the function abstraction pattern is completely opaque, assume we
+      // may need to preserve the address for dependencies.
+      return true;    
     }
   
     auto fnTy = cast<AnyFunctionType>(getType());
