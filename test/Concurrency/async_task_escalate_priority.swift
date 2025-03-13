@@ -30,11 +30,11 @@ func expectEqual(_ l: TaskPriority, _ r: TaskPriority,
   precondition(l == r, "Priority [\(l)] did not equal \(r) @ \(file):\(line)(\(function))")
 }
 
-func loopUntil(priority: TaskPriority) async {
+func loopUntil(priority: TaskPriority, file: String = #fileID, line: UInt = #line) async {
   var loops = 10
   var currentPriority = Task.currentPriority
   while (currentPriority != priority) {
-    print("Current priority = \(currentPriority) != \(priority)")
+    print("[\(file):\(line)] Current priority = \(currentPriority) != \(priority)")
     await Task.sleep(1_000_000)
     currentPriority = Task.currentPriority
     loops -= 1
@@ -97,7 +97,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
 
         // Wait till child runs and asks to be escalated
         sem1.wait()
-        Task.escalatePriority(task, to: .default)
+        task.escalatePriority(to: .default)
         sem2.wait()
       }
       await basicTask_escalateWhenTaskIsRunning()
@@ -119,8 +119,10 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
 
             await loopUntil(priority: .default)
             print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
-          } onPriorityEscalated: { newPriority in
+          } onPriorityEscalated: { oldPriority, newPriority in
             print("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)")
+            print("in onPriorityEscalated oldPriority = \(oldPriority)")
+            precondition(oldPriority == .background, "old Priority was: \(oldPriority)")
             print("in onPriorityEscalated newPriority = \(newPriority)")
             precondition(newPriority == .default)
             semEscalated.signal()
@@ -134,7 +136,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
         // Wait till child runs and asks to be escalated
         sem1.wait()
         task.cancel() // just checking the records don't stomp onto each other somehow
-        Task.escalatePriority(task, to: .default)
+        task.escalatePriority(to: .default)
         semEscalated.wait()
         sem2.wait()
       }
@@ -162,8 +164,10 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
             await loopUntil(priority: .high)
             print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
             semEscalatedHigh.signal()
-          } onPriorityEscalated: { newPriority in
+          } onPriorityEscalated: { oldPriority, newPriority in
             print("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)") // caller priority
+            print("in onPriorityEscalated oldPriority = \(oldPriority)")
+            precondition(oldPriority == .medium, "old Priority was: \(oldPriority)")
             print("in onPriorityEscalated newPriority = \(newPriority)")
             semEscalatedInHandler.signal()
           }
@@ -172,10 +176,10 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
 
         // Wait till child runs and asks to be escalated
         sem1.wait()
-        Task.escalatePriority(task, to: .medium)
+        task.escalatePriority(to: .medium)
         semEscalatedMedium.wait()
 
-        Task.escalatePriority(task, to: .high)
+        task.escalatePriority(to: .high)
         semEscalatedHigh.wait()
 
         // we got escalated twice
@@ -196,8 +200,10 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
             sem1.signal()
             await loopUntil(priority: .default)
             print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
-          } onPriorityEscalated: { newPriority in
+          } onPriorityEscalated: { oldPriority, newPriority in
             print("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)")
+            print("in onPriorityEscalated oldPriority = \(oldPriority)")
+            precondition(oldPriority == .background, "old Priority was: \(oldPriority)")
             print("in onPriorityEscalated newPriority = \(newPriority)")
             precondition(newPriority == .default)
             semEscalated.signal()
@@ -209,7 +215,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
           await withTaskPriorityEscalationHandler {
             await loopUntil(priority: .default)
             print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
-          } onPriorityEscalated: { newPriority in
+          } onPriorityEscalated: { oldPriority, newPriority in
             fatalError("Task was already escalated earlier, no escalation triggered here")
           }
 
@@ -221,7 +227,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
         // Wait till child runs and asks to be escalated
         sem1.wait()
         task.cancel() // just checking the records don't stomp onto each other somehow
-        Task.escalatePriority(task, to: .default)
+        task.escalatePriority(to: .default)
         semEscalated.wait()
         sem2.wait()
       }

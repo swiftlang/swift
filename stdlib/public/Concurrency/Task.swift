@@ -1430,7 +1430,7 @@ func _enqueueJobGlobalWithDeadline(_ seconds: Int64, _ nanoseconds: Int64,
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_addPriorityEscalationHandler")
 func _taskAddPriorityEscalationHandler(
-  handler: (UInt8) -> Void
+  handler: (UInt8, UInt8) -> Void
 ) -> UnsafeRawPointer /*EscalationNotificationStatusRecord*/
 
 @usableFromInline
