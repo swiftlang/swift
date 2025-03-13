@@ -59,16 +59,6 @@ final class SimpleMainExecutor: MainExecutor, @unchecked Sendable {
   func stop() {
     shouldStop = true
   }
-
-  func registerEvent(handler: @escaping @Sendable () -> ()) -> ExecutorEvent {
-    return ExecutorEvent(id: 0)
-  }
-
-  func deregister(event: ExecutorEvent) {
-  }
-
-  func notify(event: ExecutorEvent) {
-  }
 }
 
 @available(SwiftStdlib 6.2, *)

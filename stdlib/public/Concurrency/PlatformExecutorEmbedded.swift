@@ -34,20 +34,10 @@ public final class EmbeddedMainExecutor: MainExecutor, @unchecked Sendable {
   public func run() throws {
   }
 
-  public func run(until condition: () -> Bool) throws {
+  public func runUntil(_ condition: () -> Bool) throws {
   }
 
   public func stop() {
-  }
-
-  public func registerEvent(handler: @escaping () -> ()) -> ExecutorEvent {
-    return ExecutorEvent(id: 0)
-  }
-
-  public func deregister(event: ExecutorEvent) {
-  }
-
-  public func notify(event: ExecutorEvent) {
   }
 
 }

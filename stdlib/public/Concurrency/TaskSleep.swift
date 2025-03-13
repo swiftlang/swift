@@ -30,8 +30,6 @@ extension Task where Success == Never, Failure == Never {
 
       if #available(SwiftStdlib 6.2, *) {
         let executor = Task.currentSchedulableExecutor
-          ?? Task.defaultExecutor.asSchdulable
-
         #if !$Embedded
         executor!.enqueue(ExecutorJob(context: job),
                           after: .nanoseconds(duration),
@@ -272,7 +270,6 @@ extension Task where Success == Never, Failure == Never {
 
               if #available(SwiftStdlib 6.2, *) {
                 let executor = Task.currentSchedulableExecutor
-                  ?? Task.defaultExecutor.asSchedulable
                 let job = ExecutorJob(context: Builtin.convertTaskToJob(sleepTask))
                 #if !$Embedded
                 executor!.enqueue(job,

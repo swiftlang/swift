@@ -32,18 +32,6 @@ public class PlatformMainExecutor: MainExecutor, @unchecked Sendable {
     fatalError("There is no main executor implementation for this platform")
   }
 
-  public func registerEvent(handler: @escaping () -> ()) -> ExecutorEvent {
-    fatalError("There is no main executor implementation for this platform")
-  }
-
-  public func deregister(event: ExecutorEvent) {
-    fatalError("There is no main executor implementation for this platform")
-  }
-
-  public func notify(event: ExecutorEvent) {
-    fatalError("There is no main executor implementation for this platform")
-  }
-
 }
 
 // .. Platform Default Executor ................................................

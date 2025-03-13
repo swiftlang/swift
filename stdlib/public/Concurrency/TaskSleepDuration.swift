@@ -55,7 +55,7 @@ extension Task where Success == Never, Failure == Never {
               }
 
               if #available(SwiftStdlib 6.2, *) {
-                let executor = Task.currentSchdulableExecutor ?? Task.defaultExecutor.asSchedulable
+                let executor = Task.currentSchedulableExecutor
                 let job = ExecutorJob(context: Builtin.convertTaskToJob(sleepTask))
 
                 #if !$Embedded

@@ -20,7 +20,11 @@ actor MyActor {
 }
 
 @available(SwiftStdlib 6.2, *)
-final class TestExecutor: TaskExecutor, SchedulableExecutor @unchecked Sendable {
+final class TestExecutor: TaskExecutor, SchedulableExecutor, @unchecked Sendable {
+  var asSchedulable: SchedulableExecutor? {
+    return self
+  }
+
   public func enqueue(_ _job: consuming ExecutorJob) {
     let job = UnownedJob(_job)
     DispatchQueue.main.async {

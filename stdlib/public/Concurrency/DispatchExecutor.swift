@@ -25,8 +25,6 @@ import Swift
 
 @available(SwiftStdlib 6.2, *)
 public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
-  public typealias AsSchedulable = DispatchMainExecutor
-
   var threaded = false
 
   public init() {}
@@ -61,6 +59,10 @@ extension DispatchMainExecutor: SerialExecutor {
 
 @available(SwiftStdlib 6.2, *)
 extension DispatchMainExecutor: SchedulableExecutor {
+  public var asSchedulable: SchedulableExecutor? {
+    return self
+  }
+
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 at instant: C.Instant,
                                 tolerance: C.Duration? = nil,
@@ -84,36 +86,6 @@ extension DispatchMainExecutor: SchedulableExecutor {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension DispatchMainExecutor: EventableExecutor {
-
-  /// Register a new event with a given handler.
-  public func registerEvent(
-    handler: @escaping @Sendable () -> ()
-  ) -> ExecutorEvent {
-    let source = unsafe _createDispatchEvent(handler: handler)
-
-    // Stash the pointer in the id of the ExecutorEvent struct
-    let eventId = unsafe unsafeBitCast(source, to: Int.self)
-    return ExecutorEvent(id: eventId)
-  }
-
-  /// Deregister the given event.
-  public func deregister(event: ExecutorEvent) {
-    // Extract the source and cancel it
-    let source = unsafe unsafeBitCast(event.id, to: OpaquePointer.self)
-    unsafe _destroyDispatchEvent(source)
-  }
-
-  /// Notify the executor of an event.
-  public func notify(event: ExecutorEvent) {
-    // Extract the source, but don't release it
-    let source = unsafe unsafeBitCast(event.id, to: OpaquePointer.self)
-    unsafe _signalDispatchEvent(source)
-  }
-
-}
-
-@available(SwiftStdlib 6.2, *)
 extension DispatchMainExecutor: MainExecutor {}
 
 // .. Task Executor ............................................................
@@ -121,9 +93,6 @@ extension DispatchMainExecutor: MainExecutor {}
 @available(SwiftStdlib 6.2, *)
 public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
                                          @unchecked Sendable {
-
-  public typealias AsSchedulable = DispatchGlobalTaskExecutor
-
   public init() {}
 
   public func enqueue(_ job: consuming ExecutorJob) {

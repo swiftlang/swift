@@ -16,13 +16,6 @@ import Swift
 @available(SwiftStdlib 5.1, *)
 public protocol Executor: AnyObject, Sendable {
 
-  /// This Executor type as a schedulable executor.
-  ///
-  /// If the conforming type also conforms to `SchedulableExecutor`, then this is
-  /// bound to `Self`. Otherwise, it is an uninhabited type (such as Never).
-  @available(SwiftStdlib 6.2, *)
-  associatedtype AsSchedulable: SchedulableExecutor = SchedulableExecutorNever
-
   // Since lack move-only type support in the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY configuration
   // Do not deprecate the UnownedJob enqueue in that configuration just yet - as we cannot introduce the replacements.
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -55,23 +48,8 @@ public protocol Executor: AnyObject, Sendable {
   #endif
 }
 
-/// Uninhabited class type to indicate we don't support scheduling.
 @available(SwiftStdlib 6.2, *)
-public class SchedulableExecutorNever {
-  private init(_ n: Never) {}
-}
-
-@available(SwiftStdlib 6.2, *)
-extension SchedulableExecutorNever: SchedulableExecutor, @unchecked Sendable {
-
-  public func enqueue(_ job: consuming ExecutorJob) {
-    fatalError("This should never be reached")
-  }
-
-}
-
-@available(SwiftStdlib 6.2, *)
-public protocol SchedulableExecutor: Executor where Self.AsSchedulable == Self {
+public protocol SchedulableExecutor: Executor {
 
   #if !$Embedded
 
@@ -123,17 +101,13 @@ public protocol SchedulableExecutor: Executor where Self.AsSchedulable == Self {
 extension Executor {
   /// Return this executable as a SchedulableExecutor, or nil if that is
   /// unsupported.
+  ///
+  /// Executors that implement SchedulableExecutor should provide their
+  /// own copy of this method, which will allow the compiler to avoid a
+  /// potentially expensive runtime cast.
   @available(SwiftStdlib 6.2, *)
-  var asSchedulable: AsSchedulable? {
-    #if !$Embedded
-    if Self.self == AsSchedulable.self {
-      return _identityCast(self, to: AsSchedulable.self)
-    } else {
-      return nil
-    }
-    #else
-    return nil
-    #endif
+  var asSchedulable: SchedulableExecutor? {
+    return self as? SchedulableExecutor
   }
 }
 
@@ -536,63 +510,9 @@ public protocol RunLoopExecutor: Executor {
 @available(SwiftStdlib 6.2, *)
 extension RunLoopExecutor {
 
-  public func run(until condition: () -> Bool) throws {
+  public func runUntil(_ condition: () -> Bool) throws {
     fatalError("run(until condition:) not supported on this executor")
   }
-
-}
-
-
-/// Represents an event registered with an `EventableExecutor`.
-@available(SwiftStdlib 6.2, *)
-public struct ExecutorEvent: Identifiable, Comparable, Sendable {
-  public typealias ID = Int
-
-  public var id: Self.ID
-
-  public init(id: Self.ID) {
-    self.id = id
-  }
-
-  public static func < (lhs: Self, rhs: Self) -> Bool {
-    return lhs.id < rhs.id
-  }
-  public static func == (lhs: Self, rhs: Self) -> Bool {
-    return lhs.id == rhs.id
-  }
-}
-
-
-/// An executor that has support for coalesced events.
-@available(SwiftStdlib 6.2, *)
-public protocol EventableExecutor {
-
-  /// Register a new event with a given handler.
-  ///
-  /// Notifying the executor of the event will cause the executor to
-  /// execute the handler, however the executor is free to coalesce multiple
-  /// event notifications, and is also free to execute the handler at a time
-  /// of its choosing.
-  ///
-  /// Parameters
-  ///
-  /// - handler:  The handler to call when the event fires.
-  ///
-  /// Returns a new opaque `Event`.
-  func registerEvent(handler: @escaping @Sendable () -> ()) -> ExecutorEvent
-
-  /// Deregister the given event.
-  ///
-  /// After this function returns, there will be no further executions of the
-  /// handler for the given event.
-  func deregister(event: ExecutorEvent)
-
-  /// Notify the executor of an event.
-  ///
-  /// This will trigger, at some future point, the execution of the associated
-  /// event handler.  Prior to that time, multiple calls to `notify` may be
-  /// coalesced and result in a single invocation of the event handler.
-  func notify(event: ExecutorEvent)
 
 }
 
@@ -600,7 +520,7 @@ public protocol EventableExecutor {
 /// The main executor must conform to these three protocols; we have to
 /// make this a protocol for compatibility with Embedded Swift.
 @available(SwiftStdlib 6.2, *)
-public protocol MainExecutor: RunLoopExecutor, SerialExecutor, EventableExecutor {
+public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 }
 
 
@@ -717,6 +637,9 @@ extension Task where Success == Never, Failure == Never {
     }
     if let taskExecutor = unsafe _getCurrentTaskExecutor().asTaskExecutor(),
        let schedulable = taskExecutor.asSchedulable {
+      return schedulable
+    }
+    if let schedulable = defaultExecutor.asSchedulable {
       return schedulable
     }
     return nil
