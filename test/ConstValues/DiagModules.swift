@@ -17,4 +17,4 @@ public func foo() -> Int {
 import MyModule
 
 @const let constGlobal1: Int = foo()
-// expected-error@-1 {{@const let should be initialized with a compile-time value}}
+// expected-error@-1 {{@const value should be initialized with a compile-time value}}

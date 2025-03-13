@@ -1,5 +1,6 @@
 // Constant values should be able to call "const" functions from other modules
 // REQUIRES: swift_feature_CompileTimeValues
+// REQUIRES: rdar146953110
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 

@@ -3,11 +3,11 @@
 // RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -verify -enable-experimental-feature CompileTimeValues
 
 @const let a: Bool = Bool.random()
-// expected-error@-1 {{@const let should be initialized with a compile-time value}}
+// expected-error@-1 {{@const value should be initialized with a compile-time value}}
 
 func foo() -> Int {
 	return 42 * Int.random(in: 0 ..< 10)
 }
 
 @const let b: Int = foo()
-// expected-error@-1 {{@const let should be initialized with a compile-time value}}
+// expected-error@-1 {{@const value should be initialized with a compile-time value}}

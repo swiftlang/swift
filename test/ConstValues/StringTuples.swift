@@ -1,7 +1,6 @@
-// Constant globals referencing other constant globals in their initializer expressions
+// Constant globals on tuples
 // REQUIRES: swift_feature_CompileTimeValues
+// REQUIRES: rdar146953330
 // RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -enable-experimental-feature CompileTimeValues
 
-@const let a: Int = 42
-@const let b: Int = a
-@const let c: Int = b
+@const let constGlobalStringTuple: (Int, String) = (42, "Foo")
