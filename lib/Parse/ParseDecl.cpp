@@ -2837,7 +2837,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
           [&] () {
             if (CodeCompletionCallbacks) {
               CodeCompletionCallbacks->completeDeclAttrParam(
-                  ParameterizedDeclAttributeKind::Unowned, 0, false);
+                  ParameterizedDeclAttributeKind::Unowned, 0, /*HasLabel=*/false);
               consumeToken(tok::code_complete);
             }
           })
@@ -2928,15 +2928,6 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       diagnose(Loc, diag::attr_access_expected_set, AttrName);
       
       const Token &Tok2 = peekToken();
-      
-      if (Tok.is(tok::code_complete)) {
-        if (CodeCompletionCallbacks) {
-          CodeCompletionCallbacks->completeDeclAttrParam(
-              ParameterizedDeclAttributeKind::AccessControl, 0, false);
-        }
-        consumeToken(tok::code_complete);
-        return makeParserCodeCompletionStatus();
-      }
       
       if (Tok2.is(tok::code_complete) && Tok.is(tok::identifier) &&
                  !Tok.isContextualDeclKeyword()) {
