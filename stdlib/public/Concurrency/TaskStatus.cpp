@@ -793,9 +793,11 @@ void AsyncTask::pushInitialTaskName(const char* _taskName) {
       this, sizeof(class TaskNameStatusRecord));
 
   // TODO: Copy the string maybe into the same allocation at an offset or retain the swift string?
+  auto taskNameLen = strlen(_taskName);
   char* taskNameCopy = reinterpret_cast<char*>(
-      _swift_task_alloc_specific(this, strlen(_taskName) + 1/*null terminator*/));
-  (void) strcpy(/*dst=*/taskNameCopy, /*src=*/_taskName);
+      _swift_task_alloc_specific(this, taskNameLen + 1/*null terminator*/));
+  (void) strncpy(/*dst=*/taskNameCopy, /*src=*/_taskName, taskNameLen);
+  taskNameCopy[taskNameLen] = '\0'; // make sure we null-terminate
 
   auto record =
       ::new (allocation) TaskNameStatusRecord(taskNameCopy);
