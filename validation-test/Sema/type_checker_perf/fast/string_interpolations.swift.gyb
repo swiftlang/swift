@@ -1,0 +1,26 @@
+// RUN: %scale-test --begin 1 --end 10 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts,no_asan
+
+struct MyString {
+}
+
+extension MyString: ExpressibleByStringLiteral {
+  init(stringLiteral value: String) {}
+}
+
+func +(_: MyString, _: MyString) -> MyString {}
+
+func test(_: @autoclosure () -> String) {}
+func test(_: () -> String) {}
+func test(_: Character) {}
+
+func test(names: [String]) {
+  var resultString = ""
+  for name in names {
+    test("\(name)"
+%for i in range(0, N):
+      + "\(name)"
+%end
+      + "\(name)")
+  }
+}
