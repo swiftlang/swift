@@ -1668,6 +1668,15 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(triple);
   }
 
+  if (LangOpts.ClangTargetVariant.has_value()) {
+    genericSubInvocation.getLangOptions().ClangTargetVariant = LangOpts.ClangTargetVariant;
+    auto variantTriple = ArgSaver.save(genericSubInvocation.getLangOptions()
+      .ClangTargetVariant->getTriple());
+    assert(!variantTriple.empty());
+    GenericArgs.push_back("-clang-target-variant");
+    GenericArgs.push_back(variantTriple);
+  }
+
   // Inherit the target SDK name and version
   if (!LangOpts.SDKName.empty()) {
     genericSubInvocation.getLangOptions().SDKName = LangOpts.SDKName;

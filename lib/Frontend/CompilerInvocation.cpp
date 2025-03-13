@@ -1472,9 +1472,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // necessary because the textual interface hardcoded the proper target triple
   // to use. Inferring -clang-target there will always give us the default
   // target triple.
-  if (const Arg *A = Args.getLastArg(OPT_clang_target)) {
+  if (const Arg *A = Args.getLastArg(OPT_clang_target))
     Opts.ClangTarget = llvm::Triple(A->getValue());
-  }
+  if (const Arg *A = Args.getLastArg(OPT_clang_target_variant))
+    Opts.ClangTargetVariant = llvm::Triple(A->getValue());
 
   Opts.setCxxInteropFromArgs(Args, Diags);
 
