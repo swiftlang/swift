@@ -616,6 +616,20 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     });
   };
 
+  auto containsTypesButDependant = [&](Type type) -> bool {
+    DependentMemberType *cachedDP = nullptr;
+    return type.findIf([&](Type type) -> bool {
+      if (auto *GP = type->getAs<GenericTypeParamType>()) {
+        if (cachedDP && !cachedDP->getBase()->isEqual(GP))
+          return findParam(GP);
+        return cachedDP == nullptr && findParam(GP);
+      }
+      if (auto *DP = type->getAs<DependentMemberType>())
+        cachedDP = DP;
+      return false;
+    });
+  };
+
   // Anchor of this default expression i.e. function, subscript
   // or enum case.
   auto *anchor = cast<ValueDecl>(DC->getParent()->getAsDecl());
@@ -634,7 +648,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     for (unsigned i : indices(anchorTy->getParams())) {
       const auto &param = anchorTy->getParams()[i];
 
-      if (containsTypes(param.getPlainType()))
+      if (containsTypesButDependant(param.getPlainType()))
         affectedParams.push_back(i);
     }
 
