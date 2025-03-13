@@ -358,7 +358,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - bytes: An existing `RawSpan`, which will define both this
   ///            `Span`'s lifetime and the memory it represents.
   @_alwaysEmitIntoClient
-  @lifetime(bytes)
+  @lifetime(copy bytes)
   public init(_bytes bytes: consuming RawSpan) {
     let rawBuffer = unsafe UnsafeRawBufferPointer(
       start: bytes._pointer, count: bytes.byteCount
@@ -509,7 +509,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(_ bounds: Range<Index>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
@@ -536,7 +536,7 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
@@ -560,7 +560,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(
     _ bounds: some RangeExpression<Index>
   ) -> Self {
@@ -584,7 +584,7 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
@@ -604,7 +604,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(_: UnboundedRange) -> Self {
     self
   }
@@ -730,7 +730,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
@@ -752,7 +752,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
@@ -775,7 +775,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, count)
@@ -802,7 +802,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)

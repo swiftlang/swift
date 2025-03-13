@@ -364,7 +364,7 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(_ bounds: Range<Int>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
@@ -391,7 +391,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(unchecked bounds: Range<Int>) -> Self {
     let newStart = unsafe _pointer?.advanced(by: bounds.lowerBound)
     let newSpan = unsafe RawSpan(_unchecked: newStart, byteCount: bounds.count)
@@ -412,7 +412,7 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
     _extracting(bounds.relative(to: byteOffsets))
   }
@@ -434,7 +434,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(
     unchecked bounds: ClosedRange<Int>
   ) -> Self {
@@ -454,7 +454,7 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(_: UnboundedRange) -> Self {
     self
   }
@@ -509,7 +509,7 @@ extension RawSpan {
   /// - Returns: A typed span viewing these bytes as instances of `T`.
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   consuming public func _unsafeView<T: BitwiseCopyable>(
     as type: T.Type
   ) -> Span<T> {
@@ -689,7 +689,7 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, byteCount)
@@ -711,7 +711,7 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
@@ -735,7 +735,7 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, byteCount)
@@ -761,7 +761,7 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(self)
+  @lifetime(copy self)
   public func _extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
