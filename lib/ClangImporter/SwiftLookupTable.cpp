@@ -350,6 +350,11 @@ void SwiftLookupTable::addCategory(clang::ObjCCategoryDecl *category) {
   Categories.push_back(category);
 }
 
+void SwiftLookupTable::addAvailabilityDomainDecl(StringRef name,
+                                                 clang::VarDecl *decl) {
+  AvailabilityDomains.insert({name, StoredSingleEntry(decl)});
+}
+
 bool SwiftLookupTable::resolveUnresolvedEntries(
     SmallVectorImpl<SingleEntry> &unresolved) {
   // Common case: nothing left to resolve.
@@ -710,6 +715,17 @@ SwiftLookupTable::lookupGlobalsAsMembers(SerializedSwiftName baseName,
   if (!storedContext) return { };
 
   return lookupGlobalsAsMembersImpl(baseName, *storedContext);
+}
+
+clang::VarDecl *SwiftLookupTable::lookupAvailabilityDomainDecl(StringRef name) {
+  // FIXME: [availability] Remove this once Clang has a lookup table.
+  auto result = AvailabilityDomains.find(name);
+  if (result == AvailabilityDomains.end())
+    return nullptr;
+
+  auto &entry = result->second;
+  DEBUG_ASSERT(entry.isASTNodeEntry());
+  return static_cast<clang::VarDecl *>(entry.getASTNode());
 }
 
 SmallVector<SwiftLookupTable::SingleEntry, 4>
@@ -1868,9 +1884,9 @@ SwiftNameLookupExtension::hashExtension(ExtensionHashBuilder &HBuilder) const {
 void importer::addEntryToLookupTable(SwiftLookupTable &table,
                                      clang::NamedDecl *named,
                                      NameImporter &nameImporter) {
+  auto &clangContext = nameImporter.getClangContext();
   clang::PrettyStackTraceDecl trace(
-      named, named->getLocation(),
-      nameImporter.getClangContext().getSourceManager(),
+      named, named->getLocation(), clangContext.getSourceManager(),
       "while adding SwiftName lookup table entries for clang declaration");
 
   // Determine whether this declaration is suppressed in Swift.
@@ -2008,6 +2024,16 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
       if (isa<clang::CXXMethodDecl>(usingShadowDecl->getTargetDecl()))
         addEntryToLookupTable(table, usingShadowDecl, nameImporter);
     }
+  }
+
+  // If this decl represents an availability domain, add it to the lookup table
+  // as one.
+  // FIXME: [availability] Remove this once Clang has a lookup table.
+  if (auto varDecl = dyn_cast<clang::VarDecl>(named)) {
+    auto mutableVar = const_cast<clang::VarDecl *>(varDecl);
+    auto domainInfo = clangContext.getFeatureAvailInfo(mutableVar);
+    if (!domainInfo.first.empty())
+      table.addAvailabilityDomainDecl(domainInfo.first, mutableVar);
   }
 }
 

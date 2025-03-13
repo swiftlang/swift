@@ -970,6 +970,12 @@ public:
                          const ModuleDecl *importedModule,
                          llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
+  /// Finds the custom availability domain defined by this module with the
+  /// given identifier and if one exists adds it to results.
+  void
+  lookupAvailabilityDomains(Identifier identifier,
+                            SmallVectorImpl<AvailabilityDomain> &results) const;
+
   // Is \p attr accessible as an explicitly imported SPI from this module?
   bool isImportedAsSPI(const SpecializeAttr *attr,
                        const ValueDecl *targetDecl) const;
@@ -1233,11 +1239,6 @@ public:
   /// Returns the language version that was used to compile this module.
   /// An empty `Version` is returned if the information is not available.
   version::Version getLanguageVersionBuiltWith() const;
-
-  /// Returns the custom availability domain defined by this module with the
-  /// given identifier, if one exists.
-  std::optional<AvailabilityDomain>
-  getAvailabilityDomainForIdentifier(Identifier identifier) const;
 
   void setAvailabilityDomains(const AvailabilityDomainMap &&map) {
     AvailabilityDomains = std::move(map);
