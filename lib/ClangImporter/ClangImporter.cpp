@@ -8671,8 +8671,8 @@ bool importer::declIsCxxOnly(const Decl *decl) {
   if (auto *clangDecl = decl->getClangDecl()) {
     return llvm::TypeSwitch<const clang::Decl *, bool>(clangDecl)
         .template Case<const clang::NamespaceAliasDecl>(
-            [](auto _) { return true; })
-        .template Case<const clang::NamespaceDecl>([](auto _) { return true; })
+            [](auto) { return true; })
+        .template Case<const clang::NamespaceDecl>([](auto) { return true; })
         // For the issues this filter function was trying to resolve at its
         // time of writing, it suffices to only filter out namespaces. But
         // there are many other kinds of clang::Decls that only appear in C++.
@@ -8680,8 +8680,8 @@ bool importer::declIsCxxOnly(const Decl *decl) {
         // non-trivial structs, and scoped enums; but it is not obvious for
         // other kinds of decls, e.g., an enum member or some variable.
         //
-        // TODO: enumerate those kinds in a precise and robust way
-        .Default([&](auto _) { return false; });
+        // TODO: enumerate those kinds in a more precise and robust way
+        .Default([](auto) { return false; });
   }
   return false;
 }
