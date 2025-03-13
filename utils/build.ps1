@@ -830,7 +830,7 @@ function Get-Dependencies {
   }
 
   DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
-  Extract-ZipFile WiX-$($WiX.Version).zip $BinaryCache WiX-$($WiX.Version)
+  Expand-ZipFile WiX-$($WiX.Version).zip $BinaryCache WiX-$($WiX.Version)
 
   if ($SkipBuild) { return }
 
