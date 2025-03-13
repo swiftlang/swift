@@ -623,8 +623,10 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   // Check whether generic parameters are only mentioned once in
   // the anchor's signature.
   {
-    auto anchorTy = anchor->getInterfaceType()->castTo<GenericFunctionType>();
-
+    auto anchorTy = anchor->getInterfaceType()->castTo<AnyFunctionType>();
+    
+    if (anchor->hasCurriedSelf())
+      anchorTy = anchorTy->getResult()->castTo<AnyFunctionType>();
     // Reject if generic parameters are used in multiple different positions
     // in the parameter list.
 
