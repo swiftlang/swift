@@ -151,13 +151,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // and `differentiable_function` instructions.
   P.addDifferentiation();
 
-  // Only run semantic arc opts if we are optimizing and if mandatory semantic
-  // arc opts is explicitly enabled.
-  //
-  // NOTE: Eventually this pass will be split into a mandatory/more aggressive
-  // pass. This will happen when OSSA is no longer eliminated before the
-  // optimizer pipeline is run implying we can put a pass that requires OSSA
-  // there.
   const auto &Options = P.getOptions();
   P.addClosureLifetimeFixup();
 

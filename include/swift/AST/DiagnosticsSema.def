@@ -8354,6 +8354,10 @@ ERROR(attr_execution_only_on_async,none,
       "cannot use '@execution' on non-async %kind0",
       (ValueDecl *))
 
+ERROR(attr_execution_only_on_async_closure,none,
+      "cannot use '@execution' on non-async closure",
+      ())
+
 ERROR(attr_execution_type_attr_only_on_async,none,
       "cannot use '@execution' on non-async function type",
       ())

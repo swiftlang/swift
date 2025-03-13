@@ -1533,6 +1533,11 @@ def clang_target : Separate<["-"], "clang-target">,
   Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Separately set the target we should use for internal Clang instance">;
+def clang_target_variant : Separate<["-"], "clang-target-variant">,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Separately set the target we should use for internal Clang instance"
+           " for the 'zippered' code for macCatalyst">;
 
 def disable_clang_target : Flag<["-"], "disable-clang-target">,
   Flags<[NewDriverOnlyOption]>,

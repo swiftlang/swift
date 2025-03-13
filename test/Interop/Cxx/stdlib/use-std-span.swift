@@ -659,10 +659,10 @@ StdSpanTestSuite.test("Span as arg to generic func") {
   accessSpanAsSomeGenericParam(sspan)
 }
 
-StdSpanTestSuite.test("Convert between Swift and C++ span types") {
-  guard #available(SwiftStdlib 6.1, *) else {
-    return
-  }
+StdSpanTestSuite.test("Convert between Swift and C++ span types")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
   do {
     var arr: [Int32] = [1, 2, 3]
     arr.withUnsafeMutableBufferPointer{ ubpointer in

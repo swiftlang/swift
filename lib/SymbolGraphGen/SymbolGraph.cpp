@@ -141,7 +141,7 @@ SymbolGraph::getSubHeadingDeclarationFragmentsPrintOptions() const {
   Options.PrintOverrideKeyword = false;
   Options.PrintGenericRequirements = false;
 
-#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE)                              \
+#define DECL_ATTR(SPELLING, CLASS, ...)                                        \
   Options.ExcludeAttrList.push_back(DeclAttrKind::CLASS);
 #define TYPE_ATTR(X, C) Options.ExcludeAttrList.push_back(TypeAttrKind::C);
 #include "swift/AST/DeclAttr.def"

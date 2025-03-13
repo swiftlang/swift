@@ -2542,6 +2542,16 @@ namespace {
             return FunctionTypeIsolation::forGlobalActor(actorType);
         }
 
+        if (auto *execution =
+                closure->getAttrs().getAttribute<ExecutionAttr>()) {
+          switch (execution->getBehavior()) {
+          case ExecutionKind::Caller:
+            return FunctionTypeIsolation::forNonIsolatedCaller();
+          case ExecutionKind::Concurrent:
+            return FunctionTypeIsolation::forNonIsolated();
+          }
+        }
+
         return FunctionTypeIsolation::forNonIsolated();
       }();
       extInfo = extInfo.withIsolation(isolation);

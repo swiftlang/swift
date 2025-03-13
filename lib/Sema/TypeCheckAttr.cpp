@@ -2005,7 +2005,7 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     // Otherwise, this attribute cannot be applied to this declaration.  If the
     // attribute is only valid on one kind of declaration (which is pretty
     // common) give a specific helpful error.
-    auto PossibleDeclKinds = attr->getOptions() & DeclAttribute::OnAnyDecl;
+    auto PossibleDeclKinds = attr->getRequirements() & DeclAttribute::OnAnyDecl;
     StringRef OnlyKind;
     switch (PossibleDeclKinds) {
     case DeclAttribute::OnAccessor:    OnlyKind = "accessor"; break;
@@ -8240,6 +8240,44 @@ public:
 
   void visitSendableAttr(SendableAttr *attr) {
     // Nothing else to check.
+  }
+
+  void visitExecutionAttr(ExecutionAttr *attr) {
+    if (!ctx.LangOpts.hasFeature(Feature::ExecutionAttribute)) {
+      visitDeclAttribute(attr);
+      return;
+    }
+
+    // `@execution(...)` implies `async`.
+    if (closure->hasExplicitResultType() &&
+        closure->getAsyncLoc().isInvalid()) {
+      ctx.Diags
+          .diagnose(attr->getLocation(),
+                    diag::attr_execution_only_on_async_closure)
+          .fixItRemove(attr->getRangeWithAt());
+      attr->setInvalid();
+    }
+
+    if (auto actorType = getExplicitGlobalActor(closure)) {
+      ctx.Diags
+          .diagnose(
+              attr->getLocation(),
+              diag::attr_execution_type_attr_incompatible_with_global_isolation,
+              actorType)
+          .fixItRemove(attr->getRangeWithAt());
+      attr->setInvalid();
+    }
+
+    if (auto *paramList = closure->getParameters()) {
+      if (llvm::any_of(*paramList, [](auto *P) { return P->isIsolated(); })) {
+        ctx.Diags
+            .diagnose(
+                attr->getLocation(),
+                diag::attr_execution_type_attr_incompatible_with_isolated_param)
+            .fixItRemove(attr->getRangeWithAt());
+        attr->setInvalid();
+      }
+    }
   }
 
   void visitNonisolatedAttr(NonisolatedAttr *attr) {
