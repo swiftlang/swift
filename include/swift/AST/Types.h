@@ -114,9 +114,6 @@ enum class TypeKind : uint8_t {
 #define TYPE_RANGE(Id, FirstId, LastId) \
   First_##Id##Type = FirstId, Last_##Id##Type = LastId,
 #include "swift/AST/TypeNodes.def"
-  // For backward compatibility in LLDB sources.
-  // TODO: remove this once OpenedArchetype is renamed in LLDB sources.
-  OpenedArchetype = ExistentialArchetype
 };
 
 enum : unsigned {
