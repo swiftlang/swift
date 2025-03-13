@@ -42,6 +42,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
+#include "llvm/ADT/bit.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -264,7 +265,7 @@ private:
   };
 
 public:
-  enum DeclAttrOptions : uint64_t {
+  enum DeclAttrRequirements : uint64_t {
     // There is one entry for each DeclKind, and some higher level buckets
     // below. These are used in Attr.def to control which kinds of declarations
     // an attribute can be attached to.
@@ -303,71 +304,80 @@ public:
 #include "swift/AST/DeclNodes.def"
     ,
 
+    /// Whether this attribute is valid on additional decls in ClangImporter.
+    OnAnyClangDecl = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 1),
+  };
+
+  static_assert(
+      (unsigned(DeclKindIndex::Last_Decl) + 1) < 64,
+      "Overflow decl attr requirement bitfields");
+  
+  enum DeclAttrBehaviors : uint64_t {
+    /// Whether this attribute is only valid when concurrency is enabled.
+    ConcurrencyOnly = 1ull << 0,
+    
     /// True if multiple instances of this attribute are allowed on a single
     /// declaration.
-    AllowMultipleAttributes = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 1),
+    AllowMultipleAttributes = 1ull << 1,
 
     /// True if this is a decl modifier - i.e., that it should not be spelled
     /// with an @.
-    DeclModifier = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 2),
+    DeclModifier = 1ull << 2,
 
     /// True if this is a long attribute that should be printed on its own line.
     ///
     /// Currently has no effect on DeclModifier attributes.
-    LongAttribute = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 3),
+    LongAttribute = 1ull << 3,
 
     /// True if this shouldn't be serialized.
-    NotSerialized = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 4),
+    NotSerialized = 1ull << 4,
     
     /// True if this attribute is only valid when parsing a .sil file.
-    SILOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 5),
+    SILOnly = 1ull << 5,
 
     /// The attribute should be reported by parser as unknown.
-    RejectByParser = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 6),
+    RejectByParser = 1ull << 6,
 
-    /// Whether client code cannot use the attribute.
-    UserInaccessible = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 7),
+    /// Whether client code cannot use the attribute. Hides it in code completion.
+    UserInaccessible = 1ull << 7,
 
     /// Whether adding this attribute can break API
-    APIBreakingToAdd = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 8),
+    APIBreakingToAdd = 1ull << 8,
 
     /// Whether removing this attribute can break API
-    APIBreakingToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 9),
+    APIBreakingToRemove = 1ull << 9,
 
     /// Whether adding this attribute can break ABI
-    ABIBreakingToAdd = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 10),
+    ABIBreakingToAdd = 1ull << 10,
 
     /// Whether removing this attribute can break ABI
-    ABIBreakingToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 11),
+    ABIBreakingToRemove = 1ull << 11,
 
     /// The opposite of APIBreakingToAdd
-    APIStableToAdd = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 12),
+    APIStableToAdd = 1ull << 12,
 
     /// The opposite of APIBreakingToRemove
-    APIStableToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 13),
+    APIStableToRemove = 1ull << 13,
 
     /// The opposite of ABIBreakingToAdd
-    ABIStableToAdd = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 14),
+    ABIStableToAdd = 1ull << 14,
 
     /// The opposite of ABIBreakingToRemove
-    ABIStableToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 15),
-
-    /// Whether this attribute is only valid when concurrency is enabled.
-    ConcurrencyOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 16),
-
-    /// Whether this attribute is valid on additional decls in ClangImporter.
-    OnAnyClangDecl = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 17),
+    ABIStableToRemove = 1ull << 15,
   };
 
-  static_assert(
-      (unsigned(DeclKindIndex::Last_Decl) + 17) < 64,
-      "Overflow decl attr options bitfields");
+  LLVM_READNONE
+  static uint64_t getRequirements(DeclAttrKind DK);
+
+  uint64_t getRequirements() const {
+    return getRequirements(getKind());
+  }
 
   LLVM_READNONE
-  static uint64_t getOptions(DeclAttrKind DK);
+  static uint64_t getBehaviors(DeclAttrKind DK);
 
-  uint64_t getOptions() const {
-    return getOptions(getKind());
+  uint64_t getBehaviors() const {
+    return getBehaviors(getKind());
   }
 
   /// Prints this attribute (if applicable), returning `true` if anything was
@@ -433,74 +443,74 @@ public:
   /// Returns true if multiple instances of an attribute kind
   /// can appear on a declaration.
   static bool allowMultipleAttributes(DeclAttrKind DK) {
-    return getOptions(DK) & AllowMultipleAttributes;
+    return getBehaviors(DK) & AllowMultipleAttributes;
   }
 
   bool isLongAttribute() const {
     return isLongAttribute(getKind());
   }
   static bool isLongAttribute(DeclAttrKind DK) {
-    return getOptions(DK) & LongAttribute;
+    return getBehaviors(DK) & LongAttribute;
   }
 
   static bool shouldBeRejectedByParser(DeclAttrKind DK) {
-    return getOptions(DK) & RejectByParser;
+    return getBehaviors(DK) & RejectByParser;
   }
 
   static bool isSilOnly(DeclAttrKind DK) {
-    return getOptions(DK) & SILOnly;
+    return getBehaviors(DK) & SILOnly;
   }
 
   static bool isConcurrencyOnly(DeclAttrKind DK) {
-    return getOptions(DK) & ConcurrencyOnly;
+    return getBehaviors(DK) & ConcurrencyOnly;
   }
 
   static bool isUserInaccessible(DeclAttrKind DK) {
-    return getOptions(DK) & UserInaccessible;
+    return getBehaviors(DK) & UserInaccessible;
   }
 
   static bool isAddingBreakingABI(DeclAttrKind DK) {
-    return getOptions(DK) & ABIBreakingToAdd;
+    return getBehaviors(DK) & ABIBreakingToAdd;
   }
 
-#define DECL_ATTR(_, CLASS, OPTIONS, ...)                                                         \
-  static constexpr bool isOptionSetFor##CLASS(DeclAttrOptions Bit) {                              \
-    return (OPTIONS) & Bit;                                                                       \
+#define DECL_ATTR(_, CLASS, REQUIREMENTS, BEHAVIORS, ...)                      \
+  static constexpr bool hasOneBehaviorFor##CLASS(uint64_t Mask) {              \
+    return llvm::has_single_bit((BEHAVIORS) & Mask);                           \
   }
 #include "swift/AST/DeclAttr.def"
 
   static bool isAddingBreakingAPI(DeclAttrKind DK) {
-    return getOptions(DK) & APIBreakingToAdd;
+    return getBehaviors(DK) & APIBreakingToAdd;
   }
 
   static bool isRemovingBreakingABI(DeclAttrKind DK) {
-    return getOptions(DK) & ABIBreakingToRemove;
+    return getBehaviors(DK) & ABIBreakingToRemove;
   }
   static bool isRemovingBreakingAPI(DeclAttrKind DK) {
-    return getOptions(DK) & APIBreakingToRemove;
+    return getBehaviors(DK) & APIBreakingToRemove;
   }
 
   bool isDeclModifier() const {
     return isDeclModifier(getKind());
   }
   static bool isDeclModifier(DeclAttrKind DK) {
-    return getOptions(DK) & DeclModifier;
+    return getBehaviors(DK) & DeclModifier;
   }
 
   static bool isOnParam(DeclAttrKind DK) {
-    return getOptions(DK) & OnParam;
+    return getRequirements(DK) & OnParam;
   }
 
   static bool isOnFunc(DeclAttrKind DK) {
-    return getOptions(DK) & OnFunc;
+    return getRequirements(DK) & OnFunc;
   }
 
   static bool isOnClass(DeclAttrKind DK) {
-    return getOptions(DK) & OnClass;
+    return getRequirements(DK) & OnClass;
   }
 
   static bool isNotSerialized(DeclAttrKind DK) {
-    return getOptions(DK) & NotSerialized;
+    return getBehaviors(DK) & NotSerialized;
   }
   bool isNotSerialized() const {
     return isNotSerialized(getKind());

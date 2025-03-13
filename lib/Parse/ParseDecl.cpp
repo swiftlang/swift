@@ -2656,7 +2656,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
 
   // If this is a SIL-only attribute, reject it.
-  if ((DeclAttribute::getOptions(DK) & DeclAttribute::SILOnly) != 0 &&
+  if ((DeclAttribute::getBehaviors(DK) & DeclAttribute::SILOnly) != 0 &&
       !isInSILMode()) {
     diagnose(Loc, diag::only_allowed_in_sil, AttrName);
     DiscardAttribute = true;
