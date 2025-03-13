@@ -392,18 +392,37 @@ function Add-TimingData {
     Arch = $Arch
     Platform = $Platform
     "Build Step" = $BuildStep
-    "Elapsed Time" = $ElapsedTime.ToString()
+    "Elapsed Time" = $ElapsedTime
   })
 }
 
 function Write-Summary {
   Write-Host "Summary:" -ForegroundColor Cyan
 
-  # Sort timing data by elapsed time (descending)
-  $TimingData `
-    | Select-Object "Build Step",Platform,Arch,"Elapsed Time" `
-    | Sort-Object -Descending -Property "Elapsed Time" `
-    | Format-Table -AutoSize
+  # Calculate the total time using TimeSpan.Add()
+  $TotalTime = [TimeSpan]::Zero
+  foreach ($Datum in $TimingData) {
+    $TotalTime = $TotalTime.Add($Datum."Elapsed Time")
+  }
+
+  # Sort the data without the total row
+  $SortedData = $TimingData |
+    Select-Object "Build Step",Platform,Arch,"Elapsed Time" |
+    Sort-Object -Descending -Property "Elapsed Time"
+
+  # Create the total row
+  $TotalRow = [PSCustomObject]@{
+    "Build Step" = "TOTAL"
+    Platform = ""
+    Arch = ""
+    "Elapsed Time" = $TotalTime
+  }
+
+  # Combine sorted data and total row
+  $DisplayData = @($SortedData) + $TotalRow
+
+  # Display the combined data
+  $DisplayData | Format-Table -AutoSize
 }
 
 function Get-AndroidNDK {
