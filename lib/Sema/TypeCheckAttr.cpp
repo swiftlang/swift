@@ -8222,6 +8222,44 @@ public:
     // Nothing else to check.
   }
 
+  void visitExecutionAttr(ExecutionAttr *attr) {
+    if (!ctx.LangOpts.hasFeature(Feature::ExecutionAttribute)) {
+      visitDeclAttribute(attr);
+      return;
+    }
+
+    // `@execution(...)` implies `async`.
+    if (closure->hasExplicitResultType() &&
+        closure->getAsyncLoc().isInvalid()) {
+      ctx.Diags
+          .diagnose(attr->getLocation(),
+                    diag::attr_execution_only_on_async_closure)
+          .fixItRemove(attr->getRangeWithAt());
+      attr->setInvalid();
+    }
+
+    if (auto actorType = getExplicitGlobalActor(closure)) {
+      ctx.Diags
+          .diagnose(
+              attr->getLocation(),
+              diag::attr_execution_type_attr_incompatible_with_global_isolation,
+              actorType)
+          .fixItRemove(attr->getRangeWithAt());
+      attr->setInvalid();
+    }
+
+    if (auto *paramList = closure->getParameters()) {
+      if (llvm::any_of(*paramList, [](auto *P) { return P->isIsolated(); })) {
+        ctx.Diags
+            .diagnose(
+                attr->getLocation(),
+                diag::attr_execution_type_attr_incompatible_with_isolated_param)
+            .fixItRemove(attr->getRangeWithAt());
+        attr->setInvalid();
+      }
+    }
+  }
+
   void visitNonisolatedAttr(NonisolatedAttr *attr) {
     if (attr->isUnsafe() ||
         !ctx.LangOpts.hasFeature(Feature::ClosureIsolation)) {
