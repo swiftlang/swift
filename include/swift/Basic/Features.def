@@ -253,6 +253,7 @@ LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
 SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
 LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
 LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
+LANGUAGE_FEATURE(SendableCompletionHandlers, 463, "Objective-C completion handler parameters are imported as @Sendable")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -342,10 +343,6 @@ EXPERIMENTAL_FEATURE(ForwardModeDifferentiation, false)
 /// Whether to enable experimental `AdditiveArithmetic` derived
 /// conformances.
 EXPERIMENTAL_FEATURE(AdditiveArithmeticDerivedConformances, false)
-
-/// Whether Objective-C completion handler parameters are imported as
-/// @Sendable.
-EXPERIMENTAL_FEATURE(SendableCompletionHandlers, false)
 
 /// Enables opaque type erasure without also enabling implict dynamic
 EXPERIMENTAL_FEATURE(OpaqueTypeErasure, true)
