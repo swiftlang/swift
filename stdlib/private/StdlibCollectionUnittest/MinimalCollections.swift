@@ -1763,7 +1763,7 @@ public struct MinimalBidirectionalRandomAccessCollection<T> : BidirectionalColle
     }
   }
 
-  public subscript(bounds: Range<MinimalIndex>) -> Slice<MinimalBidirectionalCollection<T>> {
+  public subscript(bounds: Range<MinimalIndex>) -> Slice<MinimalBidirectionalRandomAccessCollection<T>> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
       return Slice(base: self, bounds: bounds)
