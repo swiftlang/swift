@@ -3574,12 +3574,12 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     // Another way to address the issue is to mark the conformance as
     // isolated to the global actor or "@preconcurrency".
     if (Conformance->getSourceKind() == ConformanceEntryKind::Explicit &&
-        !Conformance->getIsolation().isGlobalActor() &&
+        !Conformance->isIsolated() &&
         !Conformance->isPreconcurrency() &&
         !suggestedPreconcurrencyOrIsolated &&
-        !requirementIsolation.isActorIsolated() &&
-        refResult.isolation.isGlobalActor()) {
-      if (Context.LangOpts.hasFeature(Feature::IsolatedConformances)) {
+        !requirementIsolation.isActorIsolated()) {
+      if (Context.LangOpts.hasFeature(Feature::IsolatedConformances) &&
+          refResult.isolation.isGlobalActor()) {
         std::string globalActorStr = "@" +
             refResult.isolation.getGlobalActor().getString();
         Context.Diags.diagnose(Conformance->getProtocolNameLoc(),

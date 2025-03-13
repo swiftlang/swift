@@ -7913,10 +7913,13 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
     return ActorIsolation::forGlobalActor(globalActorType);
   }
 
-  // In a context where we are inferring @MainActor, if the conforming type
-  // is on the main actor, then the conformance is, too.
   auto dc = rootNormal->getDeclContext();
   ASTContext &ctx = dc->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::IsolatedConformances))
+    return ActorIsolation::forNonisolated(false);
+
+  // In a context where we are inferring @MainActor, if the conforming type
+  // is on the main actor, then the conformance is, too.
   auto nominal = dc->getSelfNominalTypeDecl();
   if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated) &&
       nominal) {
