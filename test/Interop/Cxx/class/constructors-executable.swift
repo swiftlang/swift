@@ -2,8 +2,8 @@
 //
 // REQUIRES: executable_test
 
-import StdlibUnittest
 import Constructors
+import StdlibUnittest
 
 var CxxConstructorTestSuite = TestSuite("CxxConstructors")
 
@@ -86,6 +86,12 @@ CxxConstructorTestSuite.test("ImportStaticFactoryAsInitializer") {
   expectEqual(z3.param2, 3)
   let v = Value(x: 2)
   expectEqual(v.getX(), 2)
+}
+
+ForeignRefCtorSuite.test("SynthesizeAndImportStaticFactoryAsInitializer") {
+  let x = DefaultCtor.CxxRefTy()
+  // TODO: make this non optional
+  expectEqual(x!.val, 2)
 }
 
 runAllTests()
