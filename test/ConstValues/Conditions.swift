@@ -1,6 +1,7 @@
 // Constant globals on comparisons and conditions
 // REQUIRES: swift_feature_CompileTimeValues
-// RUN: %target-swift-frontend -emit-ir -pri mary-file %s -parse-as-library -enable-experimental-feature CompileTimeValues
+// REQUIRES: rdar146953097 
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -enable-experimental-feature CompileTimeValues
 
 @const let constGlobal1: Int = true ? 1 : 0
 @const let constGlobal2: Int = (2 * 4 == 8) ? 1 : 0

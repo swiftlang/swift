@@ -1,5 +1,6 @@
 // Constant globals should "work" when referencing C-imported constants
 // REQUIRES: swift_feature_CompileTimeValues
+// REQUIRES: rdar146952876
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
