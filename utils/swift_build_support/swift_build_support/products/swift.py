@@ -10,6 +10,8 @@
 #
 # ----------------------------------------------------------------------------
 
+import os
+
 from build_swift.build_swift.constants import SWIFT_REPO_NAME
 
 from . import cmark
@@ -18,6 +20,7 @@ from . import libcxx
 from . import llvm
 from . import product
 from . import staticswiftlinux
+from . import wasisysroot
 from ..cmake import CMakeOptions
 
 
@@ -96,13 +99,13 @@ class Swift(product.Product):
         self.cmake_options.extend(
             self._swift_tools_ld64_lto_codegen_only_for_supporting_targets)
 
-        self.cmake_options.extend(
-            self._enable_experimental_parser_validation)
+        self.cmake_options.extend(self._enable_experimental_parser_validation)
 
         self._handle_swift_debuginfo_non_lto_args()
 
-        self.cmake_options.extend(
-            self._enable_new_runtime_build)
+        self.cmake_options.extend(self._enable_new_runtime_build)
+
+        self.cmake_options.extend(self._wasi_sysroot_path)
 
     @classmethod
     def product_source_name(cls):
@@ -296,6 +299,15 @@ updated without updating swift.py?")
         return [('SWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL',
                  self.args.enable_new_runtime_build)]
 
+    @property
+    def _wasi_sysroot_path(self):
+        return [('SWIFT_WASI_SYSROOT_PATH:PATH',
+                 self._get_wasi_sysroot_path("wasm32-wasi"))]
+
+    def _get_wasi_sysroot_path(self, target_triple):
+        build_root = os.path.dirname(self.build_dir)
+        return wasisysroot.WASILibc.sysroot_install_path(build_root, target_triple)
+
     def _handle_swift_debuginfo_non_lto_args(self):
         if ('swift_debuginfo_non_lto_args' not in self.args
                 or self.args.swift_debuginfo_non_lto_args is None):
@@ -314,4 +326,5 @@ updated without updating swift.py?")
                 earlyswiftdriver.EarlySwiftDriver,
                 llvm.LLVM,
                 staticswiftlinux.StaticSwiftLinuxConfig,
-                libcxx.LibCXX]
+                libcxx.LibCXX,
+                wasisysroot.WASILibc,]

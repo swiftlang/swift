@@ -265,6 +265,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         set(extra_c_compile_flags -D__MACH__ -D__APPLE__ -ffreestanding -stdlib=libc++)
         set(extra_swift_compile_flags -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding)
       endif()
+
+      if("${mod}" MATCHES "-wasip1")
+        set(extra_c_compile_flags "-I${SWIFT_WASI_SYSROOT_PATH}/include/c++/v1" "-I${SWIFT_WASI_SYSROOT_PATH}/include/wasm32-wasi")
+      endif()
     endif()
 
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
@@ -310,8 +314,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
     if(NOT "${arch}" MATCHES "wasm32")
       set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
-    elseif("${mod}" MATCHES "-wasip1$")
-      target_compile_options(embedded-concurrency-${mod} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--sysroot=${SWIFT_WASI_SYSROOT_PATH}>)
     endif()
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
 
