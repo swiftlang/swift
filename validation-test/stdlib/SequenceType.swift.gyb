@@ -275,7 +275,7 @@ SequenceTypeTests.test("enumerated()/Sequence") {
 }
 
 SequenceTypeTests.test("enumerated()/Collection") {
-  guard #available(SwiftStdlib 6.1, *) else { return }
+  guard #available(SwiftStdlib 6.2, *) else { return }
 
   typealias Element = (offset: Int, element: OpaqueValue<Int>)
   func compareElements(_ lhs: Element, rhs: Element) -> Bool {
@@ -300,7 +300,7 @@ SequenceTypeTests.test("enumerated()/Collection") {
 }
 
 SequenceTypeTests.test("enumerated()/BidirectionalCollection") {
-  guard #available(SwiftStdlib 6.1, *) else { return }
+  guard #available(SwiftStdlib 6.2, *) else { return }
 
   typealias Element = (offset: Int, element: OpaqueValue<Int>)
   func compareElements(_ lhs: Element, rhs: Element) -> Bool {
@@ -312,7 +312,7 @@ SequenceTypeTests.test("enumerated()/BidirectionalCollection") {
       elements: test.sequence.map(OpaqueValue.init))
     var result = s.enumerated()
     expectType(
-      EnumeratedSequence<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self,
+      EnumeratedSequence<MinimalBidirectionalRandomAccessCollection<OpaqueValue<Int>>>.self,
       &result)
 
     checkBidirectionalCollection(
@@ -325,7 +325,7 @@ SequenceTypeTests.test("enumerated()/BidirectionalCollection") {
 }
 
 SequenceTypeTests.test("enumerated()/RandomAccessCollection") {
-  guard #available(SwiftStdlib 6.1, *) else { return }
+  guard #available(SwiftStdlib 6.2, *) else { return }
 
   typealias Element = (offset: Int, element: OpaqueValue<Int>)
   func compareElements(_ lhs: Element, rhs: Element) -> Bool {
