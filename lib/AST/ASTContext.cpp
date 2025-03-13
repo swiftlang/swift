@@ -637,6 +637,9 @@ struct ASTContext::Implementation {
   /// The set of unique AvailabilityContexts (uniqued by their storage).
   llvm::FoldingSet<AvailabilityContext::Storage> AvailabilityContexts;
 
+  /// The set of unique custom availability domains.
+  llvm::FoldingSet<CustomAvailabilityDomain> CustomAvailabilityDomains;
+
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
   llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>
@@ -886,6 +889,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE(NormalConformances);
   SIZE(SelfConformances);
   SIZE(AvailabilityContexts);
+  SIZE(CustomAvailabilityDomains);
   SIZE_AND_BYTES(ForeignRepresentableCache);
   SIZE(SearchPathsSet);
 
@@ -5733,6 +5737,27 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
   std::uninitialized_copy(
       domainInfos.begin(), domainInfos.end(),
       newNode->getTrailingObjects<AvailabilityContext::DomainInfo>());
+  foldingSet.InsertNode(newNode, insertPos);
+
+  return newNode;
+}
+
+const CustomAvailabilityDomain *
+CustomAvailabilityDomain::get(StringRef name, ModuleDecl *mod, Kind kind,
+                              const ASTContext &ctx) {
+  auto identifier = ctx.getIdentifier(name);
+  llvm::FoldingSetNodeID id;
+  CustomAvailabilityDomain::Profile(id, identifier, mod, kind);
+
+  auto &foldingSet = ctx.getImpl().CustomAvailabilityDomains;
+  void *insertPos;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  void *mem = ctx.Allocate(sizeof(CustomAvailabilityDomain),
+                           alignof(CustomAvailabilityDomain));
+  auto *newNode = ::new (mem) CustomAvailabilityDomain(identifier, mod, kind);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
