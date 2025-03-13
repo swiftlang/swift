@@ -600,7 +600,7 @@ extension Task where Success == Never, Failure == Never {
   ///  If none of these exist, this property will be `nil`.
   @available(SwiftStdlib 6.2, *)
   @_unavailableInEmbedded
-  public static var currentExecutor: (any Executor)? {
+  public static var currentExecutor: any Executor {
     if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor() {
       return activeExecutor
     } else if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
@@ -608,7 +608,7 @@ extension Task where Success == Never, Failure == Never {
     } else if let taskExecutor = unsafe _getCurrentTaskExecutor().asTaskExecutor() {
       return taskExecutor
     }
-    return nil
+    return defaultExecutor
   }
 
   /// Get the preferred executor for the current `Task`, if any.
