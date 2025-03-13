@@ -391,7 +391,7 @@ function Add-TimingData {
     [Parameter(Mandatory)]
     [string] $Arch,
     [Parameter(Mandatory)]
-    [string] $Platform,
+    [Platform] $Platform,
     [Parameter(Mandatory)]
     [string] $BuildStep,
     [Parameter(Mandatory)]
