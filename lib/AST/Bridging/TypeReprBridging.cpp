@@ -141,6 +141,12 @@ BridgedOwnershipTypeRepr BridgedOwnershipTypeRepr_createParsed(
       base.unbridged(), unbridge(cSpecifier), cSpecifierLoc.unbridged());
 }
 
+BridgedPlaceholderTypeRepr
+BridgedPlaceholderTypeRepr_createParsed(BridgedASTContext cContext,
+                                        BridgedSourceLoc cLoc) {
+  return new (cContext.unbridged()) PlaceholderTypeRepr(cLoc.unbridged());
+}
+
 BridgedProtocolTypeRepr
 BridgedProtocolTypeRepr_createParsed(BridgedASTContext cContext,
                                      BridgedTypeRepr baseType,

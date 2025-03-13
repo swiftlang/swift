@@ -70,3 +70,6 @@ struct SomeGlobalActor {
 typealias SomeGlobalActorIsolated = @SomeGlobalActor () -> Void
 typealias TestSpecifiers<Value, Result, E> = (inout sending Value) throws(E) -> sending Result where Value: ~Copyable, Result: ~Copyable, E: Error
 typealias TestSpecifierAndAttr<T> = (__owned @Sendable @escaping () async -> T) -> T
+
+let globalOptionalInt: _? = 42
+let optionalIntArray: Array<_> = [42]

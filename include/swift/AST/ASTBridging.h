@@ -2696,6 +2696,11 @@ BridgedOwnershipTypeRepr BridgedOwnershipTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr base,
     BridgedParamSpecifier cSpecifier, BridgedSourceLoc cSpecifierLoc);
 
+SWIFT_NAME("BridgedPlaceholderTypeRepr.createParsed(_:loc:)")
+BridgedPlaceholderTypeRepr
+BridgedPlaceholderTypeRepr_createParsed(BridgedASTContext cContext,
+                                        BridgedSourceLoc cLoc);
+
 SWIFT_NAME("BridgedProtocolTypeRepr.createParsed(_:base:protocolKeywordLoc:)")
 BridgedProtocolTypeRepr
 BridgedProtocolTypeRepr_createParsed(BridgedASTContext cContext,

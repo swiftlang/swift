@@ -70,6 +70,17 @@ extension ASTGenVisitor {
     if node.name.keywordKind == .Any && node.genericArgumentClause == nil {
       return BridgedCompositionTypeRepr.createEmpty(self.ctx, anyKeywordLoc: loc).asTypeRepr
     }
+    if node.name.rawText == "_" {
+      guard node.genericArgumentClause == nil else {
+        // TODO: Diagnose.
+        fatalError()
+        // return BridgedErrorTypeRepr.create()
+      }
+      return BridgedPlaceholderTypeRepr.createParsed(
+        self.ctx,
+        loc: loc
+      ).asTypeRepr
+    }
 
     let id = self.generateIdentifier(node.name)
 
