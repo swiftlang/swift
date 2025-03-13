@@ -2,7 +2,7 @@
 
 func markUsed<T>(_ t: T) {}
 
-// CHECK-DAG: ![[INTTYPE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int", {{.*}})
+// CHECK-DAG: ![[INTTYPE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}}"$sSiD"
 
 public class DWARF {
 // CHECK-DAG: ![[BASE:.*]] = !DICompositeType({{.*}}identifier: "$ss6UInt32VD"
