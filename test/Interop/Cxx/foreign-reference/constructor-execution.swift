@@ -22,4 +22,10 @@ ForeignRefCtorSuite.test("ImportStaticFactoryAsInitializer") {
   expectEqual(z3.param2, 3)
 }
 
+ForeignRefCtorSuite.test("SynthesizeAndImportStaticFactoryAsInitializer") {
+  let x = DefaultCtor.CxxRefTy()
+  // TODO: make this non optional   
+  expectEqual(x!.val, 2)
+}
+
 runAllTests()

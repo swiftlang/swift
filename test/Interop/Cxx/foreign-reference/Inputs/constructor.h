@@ -40,3 +40,23 @@ inline void release(ImportWithCtor * _Nonnull x) {
   if (!--x->value)
     delete x;
 }
+
+namespace DefaultCtor {
+  struct 
+    __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:retain")))
+    __attribute__((swift_attr("release:release")))
+  CxxRefTy{
+    public:
+    int val = 2;
+    // TODO: resolve the conflict b/w swift_name("init()") and synthesized function
+    // __attribute__((swift_name("init()")))
+    // __attribute__((swift_attr("returns_retained")))
+    // static CxxRefTy * _Nonnull returnsCxxRefTy() {
+    //   return new CxxRefTy{};
+    // }
+  };
+}
+
+void retain(DefaultCtor::CxxRefTy * _Nonnull v) {};
+void release(DefaultCtor::CxxRefTy * _Nonnull v) {};

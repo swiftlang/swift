@@ -2486,13 +2486,113 @@ namespace {
         ctors.push_back(valueCtor);
       }
 
-      // Do not allow Swift to construct foreign reference types (at least, not
-      // yet).
       if (isa<StructDecl>(result)) {
+        // For c++ value types, import all the constructors
         for (auto ctor : ctors) {
           // Add ctors directly as they cannot always be looked up from the
           // clang decl (some are synthesized by Swift).
           result->addMember(ctor);
+        }
+      } else if (isa<ClassDecl>(result)) {
+        // For C++ foreign reference types, generate a static factory method to
+        // construct the object and import it as a Swift initializer.
+
+        // TODO: better/safer way to do this casting
+        clang::CXXRecordDecl *cxxRecordDecl =
+            (clang::CXXRecordDecl *)cast<clang::CXXRecordDecl>(decl);
+
+        ASTContext &ctx = result->getASTContext();
+        clang::ASTContext &clangCtx = cxxRecordDecl->getASTContext();
+
+        // Creating a name for the new synthesized function
+        clang::IdentifierTable &idents = clangCtx.Idents;
+        clang::IdentifierInfo *generatedFuncName =
+            &idents.get(("returns" + cxxRecordDecl->getNameAsString()).c_str());
+
+        // Creating the return type for the synthesized function to be the
+        // pointe to cxxRecordDecl
+        clang::QualType cxxRecordTy = clangCtx.getRecordType(cxxRecordDecl);
+        clang::QualType cxxRecordPtrTy = clangCtx.getPointerType(cxxRecordTy);
+        // TODO/DOUBT: How to add `_Nonnull` as a qualifier on cxxRecordPtrTy
+        // return type ??
+
+        // Creating the type for the synthesized function
+        clang::FunctionProtoType::ExtProtoInfo EPI;
+        clang::QualType generatedFuncTy =
+            clangCtx.getFunctionType(cxxRecordPtrTy, {}, EPI);
+
+        clang::CXXMethodDecl *generatedCxxMethodDecl =
+            clang::CXXMethodDecl::Create(
+                clangCtx, cxxRecordDecl, clang::SourceLocation(),
+                clang::DeclarationNameInfo(generatedFuncName,
+                                           clang::SourceLocation()),
+                generatedFuncTy, nullptr, clang::SC_Static, false, true,
+                clang::ConstexprSpecKind::Unspecified, clang::SourceLocation());
+
+        // Create and attach "returns_retained" attribute to synthesized method
+        clang::SwiftAttrAttr *returnsRetainedAttr =
+            clang::SwiftAttrAttr::Create(clangCtx, "returns_retained");
+        generatedCxxMethodDecl->addAttr(returnsRetainedAttr);
+        generatedCxxMethodDecl->setAccess(clang::AccessSpecifier::AS_public);
+
+        // Getting the default constructor
+        clang::CXXConstructorDecl *ctorDecl = nullptr;
+        for (clang::CXXConstructorDecl *ctor : cxxRecordDecl->ctors()) {
+          if (ctor->isDefaultConstructor() && !ctor->isDeleted()) {
+            ctorDecl = ctor;
+            break;
+          }
+        }
+
+        if (ctorDecl) {
+          // Build the constructor expression using the default constructor decl
+          clang::ExprResult generatedConstructExpr =
+              Impl.getClangSema().BuildCXXConstructExpr(
+                  clang::SourceLocation(), cxxRecordTy, ctorDecl, false,
+                  clang::MultiExprArg(), false, false, false,
+                  true, // TODO: fix the propagation of this zeroinit flag to
+                        // BuildCXXNew
+                  clang::CXXConstructionKind::Complete, clang::SourceRange());
+
+          if (!generatedConstructExpr.isInvalid()) {
+            // Build the new expr by passing the constructor expression as an
+            // initializer
+            clang::ExprResult generatedNewExprResult =
+                Impl.getClangSema().BuildCXXNew(
+                    clang::SourceRange(), false, clang::SourceLocation(), {},
+                    clang::SourceLocation(), clang::SourceRange(), cxxRecordTy,
+                    clangCtx.getTrivialTypeSourceInfo(cxxRecordTy),
+                    std::nullopt, clang::SourceRange(),
+                    generatedConstructExpr.get());
+
+            if (!generatedNewExprResult.isInvalid()) {
+              // synthesizing the body of the generatedCxxMethodDecl
+              clang::CXXNewExpr *generatedNewExpr =
+                  cast<clang::CXXNewExpr>(generatedNewExprResult.get());
+              clang::ReturnStmt *generatedRetStmt = clang::ReturnStmt::Create(
+                  clangCtx, clang::SourceLocation(), generatedNewExpr, nullptr);
+              clang::CompoundStmt *generatedFuncBody =
+                  clang::CompoundStmt::Create(
+                      clangCtx, {generatedRetStmt}, clang::FPOptionsOverride(),
+                      clang::SourceLocation(), clang::SourceLocation());
+              generatedCxxMethodDecl->setBody(generatedFuncBody);
+
+              // Getting the appropriate decl context
+              DeclBaseName initBaseName = DeclBaseName::createConstructor();
+              DeclName importedInitName(ctx, initBaseName,
+                                        llvm::ArrayRef<Identifier>{});
+              EffectiveClangContext effectiveContext(
+                  generatedCxxMethodDecl->getDeclContext()->getRedeclContext());
+              auto dc = Impl.importDeclContextOf(decl, effectiveContext);
+
+              // Importing the synthesised method as Swift initializer and
+              // adding it to result class
+              Decl *importedInitDecl = importGlobalAsInitializer(
+                  generatedCxxMethodDecl, importedInitName, dc,
+                  CtorInitializerKind::Designated, std::nullopt);
+              result->addMember(importedInitDecl);
+            }
+          }
         }
       }
 
