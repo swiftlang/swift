@@ -1529,7 +1529,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.setCxxInteropFromArgs(Args, Diags);
   if (!Args.hasArg(options::OPT_formal_cxx_interoperability_mode))
     ModuleInterfaceOpts.PublicFlags.IgnorableFlags +=
-        printFormalCxxInteropVersion(Opts) + " ";
+        " " + printFormalCxxInteropVersion(Opts);
 
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
