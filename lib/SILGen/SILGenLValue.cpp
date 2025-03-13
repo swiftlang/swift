@@ -1357,10 +1357,12 @@ static bool areCertainlyEqualArgumentLists(const ArgumentList *l1,
 }
 
 static LValueOptions getBaseOptions(LValueOptions options,
-                                    AccessStrategy strategy) {
+                                    AccessStrategy strategy,
+                                    bool tryAddressable) {
   return (strategy.getKind() == AccessStrategy::Storage
             ? options.forProjectedBaseLValue()
-            : options.forComputedBaseLValue());
+            : options.forComputedBaseLValue())
+    .withAddressable(tryAddressable);
 }
 
 static ArgumentSource emitBaseValueForAccessor(SILGenFunction &SGF,
@@ -3099,17 +3101,30 @@ public:
         /*useOldABI=*/false);
 
     auto baseFormalType = getBaseFormalType(e->getBase());
+    CanType formalRValueType = getSubstFormalRValueType(e);
+    AbstractionPattern orig = AbstractionPattern::getInvalid();
+    bool addressable = false;
+    // If the access produces a dependent value, and the base is addressable,
+    // then
+    if (!formalRValueType->isEscapable()
+        && SGF.getTypeLowering(baseFormalType)
+              .getRecursiveProperties()
+              .isAddressableForDependencies()) {
+      addressable = true;
+      orig = AbstractionPattern::getOpaque();
+    }
+
     LValue lv = visit(
         e->getBase(),
         getBaseAccessKind(SGF.SGM, var, accessKind, strategy, baseFormalType,
                           /*for borrow*/ true),
-        getBaseOptions(options, strategy));
+        getBaseOptions(options, strategy, addressable));
     std::optional<ActorIsolation> actorIso;
     if (e->isImplicitlyAsync())
       actorIso = getActorIsolation(var);
     lv.addMemberVarComponent(SGF, e, var, e->getMember().getSubstitutions(),
                              options, e->isSuper(), accessKind, strategy,
-                             getSubstFormalRValueType(e),
+                             formalRValueType,
                              false /*is on self parameter*/, actorIso);
 
     SGF.SGM.noteMemberRefExpr(e);
@@ -3163,12 +3178,52 @@ public:
   }
 };
 
+static ValueOwnership mapAddressableValueOwnership(SGFAccessKind accessKind) {
+  switch (accessKind) {
+  case SGFAccessKind::IgnoredRead:
+  case SGFAccessKind::BorrowedAddressRead:
+  case SGFAccessKind::BorrowedObjectRead:
+  case SGFAccessKind::OwnedAddressRead:
+  case SGFAccessKind::OwnedObjectRead:
+    return ValueOwnership::Shared;
+
+  case SGFAccessKind::Write:
+  case SGFAccessKind::OwnedAddressConsume:
+  case SGFAccessKind::OwnedObjectConsume:
+  case SGFAccessKind::ReadWrite:
+    return ValueOwnership::InOut;
+  }
+  llvm_unreachable("covered switch");
+
+}
+
 LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
                               LValueOptions options, AbstractionPattern orig) {
   // First see if we have an lvalue type. If we do, then quickly handle that and
   // return.
   if (e->getType()->is<LValueType>() || e->isSemanticallyInOutExpr()) {
     return visitRecInOut(*this, e, accessKind, options, orig);
+  }
+  
+  // If the component wants an addressable base, see whether we can provide
+  // one.
+  if (options.TryAddressable) {
+    auto ownership = mapAddressableValueOwnership(accessKind);
+    if (auto addressable
+          = SGF.tryEmitAddressableParameterAsAddress(e, ownership)) {
+      LValue lv;
+      auto typeData = LValueTypeData{
+        accessKind,
+        AbstractionPattern::getOpaque(),
+        getSubstFormalRValueType(e),
+        addressable.getType().getASTType(),
+      };
+      lv.add<ValueComponent>(addressable,
+                             std::nullopt,
+                             typeData,
+                             /*rvalue*/ ownership != ValueOwnership::InOut);
+      return lv;
+    }
   }
   
   // If the base is a load of a noncopyable type (or, eventually, when we have
@@ -3981,18 +4036,32 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
     }
   }
   
+  CanType substFormalRValueType = getSubstFormalRValueType(e);
+  CanType baseTy = getBaseFormalType(e->getBase());
+  AbstractionPattern orig = AbstractionPattern::getInvalid();
+  bool addressable = false;
+  // If the access produces a dependent value, and the base is addressable-for-
+  // dependencies, then request an addressable base.
+  if (!substFormalRValueType->isEscapable()
+      && SGF.getTypeLowering(baseTy)
+            .getRecursiveProperties()
+            .isAddressableForDependencies()) {
+    addressable = true;
+    orig = AbstractionPattern::getOpaque();
+  }
+  
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(SGF.SGM, var, accessKind, strategy,
-                                         getBaseFormalType(e->getBase()),
+                                         baseTy,
                                          /* for borrow */ false),
-                       getBaseOptions(options, strategy));
+                       getBaseOptions(options, strategy, addressable),
+                       orig);
   assert(lv.isValid());
 
   std::optional<ActorIsolation> actorIso;
   if (e->isImplicitlyAsync())
     actorIso = getActorIsolation(var);
 
-  CanType substFormalRValueType = getSubstFormalRValueType(e);
   lv.addMemberVarComponent(SGF, e, var, e->getMember().getSubstitutions(),
                            options, e->isSuper(), accessKind, strategy,
                            substFormalRValueType, isOnSelfParameter, actorIso);
@@ -4160,7 +4229,6 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
   auto subs = e->getDecl().getSubstitutions();
 
-
   auto accessSemantics = e->getAccessSemantics();
   auto strategy = decl->getAccessStrategy(
       accessSemantics, getFormalAccessKind(accessKind),
@@ -4189,11 +4257,26 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
     }
   }
 
+  auto baseTy = getBaseFormalType(e->getBase());
+  CanType formalRValueType = getSubstFormalRValueType(e);
+  AbstractionPattern orig = AbstractionPattern::getInvalid();
+  bool addressable = false;
+  // If the access produces a dependent value, and the base is addressable,
+  // then
+  if (!formalRValueType->isEscapable()
+      && SGF.getTypeLowering(baseTy)
+            .getRecursiveProperties()
+            .isAddressableForDependencies()) {
+    addressable = true;
+    orig = AbstractionPattern::getOpaque();
+  }
+
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(SGF.SGM, decl, accessKind, strategy,
-                                         getBaseFormalType(e->getBase()),
+                                         baseTy,
                                          /*for borrow*/ false),
-                       getBaseOptions(options, strategy));
+                       getBaseOptions(options, strategy, addressable),
+                       orig);
   assert(lv.isValid());
 
   // Now that the base components have been resolved, check the isolation for
@@ -4205,7 +4288,6 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   auto *argList = e->getArgs();
   auto indices = SGF.prepareSubscriptIndices(e, decl, subs, strategy, argList);
 
-  CanType formalRValueType = getSubstFormalRValueType(e);
   lv.addMemberSubscriptComponent(SGF, e, decl, subs,
                                  options, e->isSuper(), accessKind, strategy,
                                  formalRValueType, std::move(indices),
