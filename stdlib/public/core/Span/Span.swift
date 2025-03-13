@@ -84,7 +84,7 @@ public struct Span<Element: ~Copyable & ~Escapable>
 }
 
 @available(SwiftStdlib 6.2, *)
-extension Span: @unchecked Sendable where Element: Sendable {}
+extension Span: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
 @available(SwiftStdlib 6.2, *)
 extension Span where Element: ~Copyable {
