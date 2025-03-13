@@ -327,6 +327,8 @@ public:
                              llvm::MDNode *FPMathTag = nullptr) {
     assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on call");
     assert(!isTrapIntrinsic(Callee) && "Use CreateNonMergeableTrap");
+    // DEBUG this is where the call is created for Clang funcs
+    // TODO look for CreateCall funcs
     auto Call = IRBuilderBase::CreateCall(FTy, Callee, Args, Name, FPMathTag);
     setCallingConvUsingCallee(Call);
     return Call;

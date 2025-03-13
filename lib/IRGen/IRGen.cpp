@@ -1294,7 +1294,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
     IGM.addLinkLibraries();
 
     // Okay, emit any definitions that we suddenly need.
-    irgen.emitLazyDefinitions();
+    irgen.emitLazyDefinitions(); // DEBUG does not emit anything
 
     // Register our info with the runtime if needed.
     if (Opts.UseJIT) {
@@ -1331,7 +1331,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
       IGM.addLinkLibrary(linkLib);
     });
 
-    if (!IGM.finalize())
+    if (!IGM.finalize()) // DEBUG this is the function we need
       return GeneratedModule::null();
 
     setModuleFlags(IGM);

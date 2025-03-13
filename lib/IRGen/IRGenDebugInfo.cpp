@@ -508,7 +508,8 @@ private:
 
 public:
   llvm::MDNode *createInlinedAt(const SILDebugScope *DS) {
-    auto *CS = DS->InlinedCallSite;
+    auto *CS =
+        DS->InlinedCallSite; // DEBUG maybe this shouldn't return nullptr?
     if (!CS)
       return nullptr;
 
@@ -3082,11 +3083,12 @@ llvm::DISubprogram *IRGenDebugInfoImpl::emitFunction(SILFunction &SILFn,
                       SILFn.getLoweredType(), SILFn.getDeclContext());
 }
 
-llvm::DISubprogram *
-IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
-                                 SILFunctionTypeRepresentation Rep,
-                                 SILType SILTy, DeclContext *DeclCtx,
-                                 StringRef outlinedFromName) {
+llvm::DISubprogram *IRGenDebugInfoImpl::emitFunction(
+    const SILDebugScope *DS, llvm::Function *Fn,
+    SILFunctionTypeRepresentation Rep, SILType SILTy, DeclContext *DeclCtx,
+    StringRef
+        outlinedFromName) { // DEBUG adds !dbg to the function header and adds
+                            // DEBUG the necessary !dbg locations to the end of the IR
   auto Cached = ScopeCache.find(DS);
   if (Cached != ScopeCache.end()) {
     auto SP = cast<llvm::DISubprogram>(Cached->second);

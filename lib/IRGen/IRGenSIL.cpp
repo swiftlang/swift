@@ -2717,7 +2717,7 @@ void IRGenSILFunction::emitSILFunction() {
 
   while (SILBasicBlock *bb = workQueue.pop()) {
     // Emit the block.
-    visitSILBasicBlock(bb);
+    visitSILBasicBlock(bb); // DEBUG here we visit the body of the function
 
 #ifndef NDEBUG
     // Assert that the current IR IP (if valid) is immediately prior
@@ -2773,7 +2773,8 @@ void IRGenSILFunction::estimateStackSize() {
   }
 }
 
-void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
+void IRGenSILFunction::visitSILBasicBlock(
+    SILBasicBlock *BB) { // DEBUG visits all the instructions
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
   Builder.SetInsertPoint(llBB);
@@ -3119,7 +3120,8 @@ static bool mayDirectlyCallAsync(SILFunction *fn) {
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
-  auto fn = i->getInitiallyReferencedFunction();
+  auto fn = i->getInitiallyReferencedFunction(); 
+  // DEBUG get the synthesized func with the correct name
   PrettyStackTraceSILFunction entry("lowering reference to", fn);
 
   auto fnType = fn->getLoweredFunctionType();

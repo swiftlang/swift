@@ -18,4 +18,8 @@ struct IMMORTAL_REF CppReceiver {
   virtual void callMe(Passed str) = 0;
 };
 
+// struct SomeType {
+//   int value;
+// };
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_DEBUG_INFO_H

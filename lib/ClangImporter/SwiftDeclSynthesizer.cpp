@@ -2173,9 +2173,9 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
         clangCtx, param, false, type, clang::ExprValueKind::VK_LValue,
         clang::SourceLocation()));
   }
-  auto memberCall = clangSema.BuildCallExpr(
-      nullptr, memberExpr, clang::SourceLocation(), args,
-      clang::SourceLocation());
+  auto memberCall =
+      clangSema.BuildCallExpr(nullptr, memberExpr, clang::SourceLocation(),
+                              args, clang::SourceLocation());
   if (!memberCall.isUsable())
     return nullptr;
   auto returnStmt =
@@ -2189,7 +2189,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     return nullptr;
 
   newMethod->setBody(returnStmt);
-  return newMethod;
+  return newMethod; // DEBUG newMethod->getName() is the synthesizedVirtualCall
 }
 
 FuncDecl *
@@ -2281,7 +2281,7 @@ FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
 
   auto result = dyn_cast_or_null<FuncDecl>(
       ctx.getClangModuleLoader()->importDeclDirectly(newMethod));
-  return result;
+  return result; 
 }
 
 // MARK: C++ operators

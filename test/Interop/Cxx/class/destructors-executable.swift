@@ -4,8 +4,13 @@
 
 import DebugInfo
 
-
 @available(macOS 13.3, *)
 func test(d: CppReceiver, s: Passed) {
   d.callMe(s)
 }
+
+// func someFunc() {
+//   _ = SomeType(value: 1)
+// }
+
+// someFunc()

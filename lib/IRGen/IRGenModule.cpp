@@ -2106,7 +2106,7 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
 }
 
 bool IRGenModule::finalize() {
-  const char *ModuleHashVarName = "llvm.swift_module_hash";
+  const char *ModuleHashVarName = "llvm.swift_module_hash"; 
   if (IRGen.Opts.OutputKind == IRGenOutputKind::ObjectFile &&
       !Module.getGlobalVariable(ModuleHashVarName) &&
       !getSILModule().getOptions().StopOptimizationAfterSerialization) {
@@ -2144,10 +2144,10 @@ bool IRGenModule::finalize() {
   // Finalize Swift debug info before running Clang codegen, because it may
   // delete the llvm module.
   if (DebugInfo)
-    DebugInfo->finalize();
+    DebugInfo->finalize(); // DEBUG <-
 
   // Finalize clang IR-generation.
-  finalizeClangCodeGen();
+  finalizeClangCodeGen(); // DEBUG the body of our function is generated here
 
   // If that failed, report failure up and skip the final clean-up.
   if (!ClangCodeGen->GetModule())
