@@ -8319,6 +8319,12 @@ public:
     auto *decl = declRef.getDecl();
     if (auto *macro = dyn_cast_or_null<MacroDecl>(decl)) {
       if (macro->getMacroRoles().contains(MacroRole::Body)) {
+        if (!ctx.LangOpts.hasFeature(Feature::ClosureBodyMacro)) {
+          ctx.Diags.diagnose(
+              attr->getLocation(),
+              diag::experimental_closure_body_macro);
+        }
+
         // Function body macros are allowed on closures.
         return;
       }
