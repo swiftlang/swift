@@ -44,11 +44,9 @@ final class TestExecutor: TaskExecutor, SchedulableExecutor, @unchecked Sendable
     let nanoseconds = attoseconds / 1_000_000_000
 
     // Get a Dispatch time
-    let deadline = DispatchTime.now().advanced(
-      by: .seconds(Int(seconds))
-    ).advanced(
-      by: .nanoseconds(Int(nanoseconds))
-    )
+    let deadline = DispatchTime.now()
+      + .seconds(Int(seconds))
+      + .nanoseconds(Int(nanoseconds))
 
     let job = UnownedJob(_job)
     DispatchQueue.main.asyncAfter(deadline: deadline) {
