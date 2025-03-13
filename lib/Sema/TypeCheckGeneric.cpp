@@ -938,7 +938,7 @@ void TypeChecker::diagnoseRequirementFailure(
             .IsolatedConformanceProto->isSpecificProtocol(
               KnownProtocolKind::SendableMetatype),
           req.getFirstType(),
-          getConformanceIsolation(isolatedConformance));
+          isolatedConformance->getIsolation());
       diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
       break;
     }

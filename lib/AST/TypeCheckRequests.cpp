@@ -1381,7 +1381,18 @@ bool ConformanceIsolationRequest::isCached() const {
   if (!rootNormal)
     return false;
 
-  return rootNormal->isGlobalActorIsolated();
+  if (rootNormal->globalActorIsolation)
+    return true;
+
+  // If we might infer conformance isolation, then we should cache the result.
+  auto dc = rootNormal->getDeclContext();
+  auto nominal = dc->getSelfNominalTypeDecl();
+  if (nominal &&
+      ((isa<ClassDecl>(nominal) && cast<ClassDecl>(nominal)->isActor()) ||
+       nominal->getSemanticAttrs().hasAttribute<NonisolatedAttr>()))
+    return false;
+
+  return true;
 }
 
 //----------------------------------------------------------------------------//

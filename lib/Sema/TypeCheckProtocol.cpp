@@ -2543,7 +2543,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   }
 
   // Complain if the global-actor-isolated conformances are not enabled.
-  if (conformance->isGlobalActorIsolated() &&
+  if (conformance->isIsolated() &&
       !Context.LangOpts.hasFeature(Feature::IsolatedConformances)) {
     Context.Diags.diagnose(
         ComplainLoc, diag::isolated_conformance_experimental_feature);
@@ -3382,17 +3382,19 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     }
 
     return std::nullopt;
-  case ActorReferenceResult::EntersActor:
+  case ActorReferenceResult::EntersActor: {
     // If the conformance itself is isolated to the same isolation domain as
     // the witness, treat this as being in the same concurrency domain.
-    if (Conformance->isGlobalActorIsolated() &&
-        refResult.isolation == getConformanceIsolation(Conformance)) {
+    auto conformanceIsolation = Conformance->getIsolation();
+    if (conformanceIsolation.isGlobalActor() &&
+        refResult.isolation == conformanceIsolation) {
       sameConcurrencyDomain = true;
       isIsolatedConformance = true;
     }
 
     // Handled below.
     break;
+  }
   }
 
   // Keep track of what modifiers are missing from the requirement and witness,
@@ -3572,7 +3574,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     // Another way to address the issue is to mark the conformance as
     // isolated to the global actor or "@preconcurrency".
     if (Conformance->getSourceKind() == ConformanceEntryKind::Explicit &&
-        !Conformance->isGlobalActorIsolated() &&
+        !Conformance->getIsolation().isGlobalActor() &&
         !Conformance->isPreconcurrency() &&
         !suggestedPreconcurrencyOrIsolated &&
         !requirementIsolation.isActorIsolated() &&
@@ -5218,20 +5220,22 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
       }
 
       if (!diagnosedIsolatedConformanceIssue) {
+        auto outerIsolation = conformance->getIsolation();
         bool foundIssue = ProtocolConformanceRef(assocConf)
           .forEachIsolatedConformance(
             [&](ProtocolConformance *isolatedConformance) {
+              auto innerIsolation = isolatedConformance->getIsolation();
+
               // If the conformance we're checking isn't isolated at all, it
               // needs "isolated".
-              if (!conformance->isGlobalActorIsolated()) {
-                auto isolation = getConformanceIsolation(isolatedConformance);
+              if (!outerIsolation.isGlobalActor()) {
                 std::string globalActorStr = "@" +
-                    isolation.getGlobalActor().getString();
+                innerIsolation.getGlobalActor().getString();
                 ctx.Diags.diagnose(
                     conformance->getLoc(),
                     diag::nonisolated_conformance_depends_on_isolated_conformance,
                     typeInContext, conformance->getProtocol()->getName(),
-                    getConformanceIsolation(isolatedConformance),
+                    innerIsolation,
                     isolatedConformance->getType(),
                     isolatedConformance->getProtocol()->getName(),
                     globalActorStr
@@ -5243,8 +5247,6 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
 
               // The conformance is isolated, but we need it to have the same
               // isolation as the other isolated conformance we found.
-              auto outerIsolation = getConformanceIsolation(conformance);
-              auto innerIsolation = getConformanceIsolation(isolatedConformance);
               if (outerIsolation != innerIsolation) {
                 ctx.Diags.diagnose(
                     conformance->getLoc(),

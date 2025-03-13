@@ -406,7 +406,7 @@ bool ProtocolConformanceRef::forEachIsolatedConformance(
   auto concrete = getConcrete();
   if (auto normal =
           dyn_cast<NormalProtocolConformance>(concrete->getRootConformance())) {
-    if (normal->isGlobalActorIsolated()) {
+    if (normal->isIsolated()) {
       if (body(concrete))
         return true;
     }

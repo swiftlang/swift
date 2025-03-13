@@ -240,6 +240,14 @@ public:
   /// Otherwise a new conformance will be created.
   ProtocolConformance *getCanonicalConformance();
 
+  /// Determine the actor isolation of this conformance.
+  ActorIsolation getIsolation() const;
+
+  /// Determine whether this conformance is isolated to an actor.
+  bool isIsolated() const {
+    return getIsolation().isActorIsolated();
+  }
+
   /// Return true if the conformance has a witness for the given associated
   /// type.
   bool hasTypeWitness(AssociatedTypeDecl *assocType) const;
@@ -529,6 +537,7 @@ class NormalProtocolConformance : public RootProtocolConformance,
 {
   friend class ValueWitnessRequest;
   friend class TypeWitnessRequest;
+  friend class ConformanceIsolationRequest;
 
   /// The protocol being conformed to.
   ProtocolDecl *Protocol;
@@ -572,6 +581,9 @@ class NormalProtocolConformance : public RootProtocolConformance,
   friend class ASTContext;
 
   void resolveLazyInfo() const;
+
+  /// Set up global actor isolation for this conformance.
+  void setGlobalActorIsolation(Type globalActorType);
 
 public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
@@ -672,16 +684,6 @@ public:
   /// Whether this is an preconcurrency conformance.
   bool isPreconcurrency() const {
     return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
-  }
-
-  /// Whether this is a global-actor isolated conformance.
-  bool isGlobalActorIsolated() const {
-    return getOptions().contains(
-        ProtocolConformanceFlags::GlobalActorIsolated);
-  }
-
-  TypeExpr *getGlobalActorIsolation() const {
-    return globalActorIsolation;
   }
 
   /// Retrieve the location of `@preconcurrency`, if there is one and it is

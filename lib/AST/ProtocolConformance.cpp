@@ -474,6 +474,17 @@ void NormalProtocolConformance::resolveLazyInfo() const {
   loader->finishNormalConformance(mutableThis, LoaderContextData);
 }
 
+void NormalProtocolConformance::setGlobalActorIsolation(Type globalActorType) {
+  ASTContext &ctx = getDeclContext()->getASTContext();
+  if (globalActorIsolation)
+    globalActorIsolation->setType(MetatypeType::get(globalActorType));
+  else
+    globalActorIsolation = TypeExpr::createImplicit(globalActorType, ctx);
+
+  Bits.NormalProtocolConformance.Options |=
+      static_cast<unsigned>(ProtocolConformanceFlags::GlobalActorIsolated);
+}
+
 void NormalProtocolConformance::setLazyLoader(LazyConformanceLoader *loader,
                                               uint64_t contextData) {
   assert(!Loader && "already has a loader");

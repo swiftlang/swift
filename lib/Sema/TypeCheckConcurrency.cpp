@@ -7868,8 +7868,9 @@ bool swift::diagnoseNonSendableFromDeinit(
                                 var->getDescriptiveKind(), var->getName());
 }
 
-ActorIsolation swift::getConformanceIsolation(ProtocolConformance *conformance) {
-  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
+ActorIsolation ProtocolConformance::getIsolation() const {
+  ASTContext &ctx = getDeclContext()->getASTContext();
+  auto conformance = const_cast<ProtocolConformance *>(this);
   return evaluateOrDefault(
       ctx.evaluator, ConformanceIsolationRequest{conformance},
       ActorIsolation());
@@ -7882,10 +7883,10 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
   if (!rootNormal)
     return ActorIsolation::forNonisolated(false);
 
-  if (!rootNormal->isGlobalActorIsolated())
+  if (!rootNormal->globalActorIsolation)
     return ActorIsolation::forNonisolated(false);
 
-  auto globalActorTypeExpr = rootNormal->getGlobalActorIsolation();
+  auto globalActorTypeExpr = rootNormal->globalActorIsolation;
   assert(globalActorTypeExpr && "global actor type is out-of-sync");
 
   // If we don't already have a resolved global actor type, resolve it now.
@@ -7945,11 +7946,9 @@ namespace {
       if (!normal)
         return false;
 
-      if (!normal->isGlobalActorIsolated())
-        return false;
-
-      auto conformanceIsolation = getConformanceIsolation(concrete);
-      if (conformanceIsolation == getContextIsolation())
+      auto conformanceIsolation = concrete->getIsolation();
+      if (!conformanceIsolation.isGlobalActor() ||
+          conformanceIsolation == getContextIsolation())
         return true;
 
       badIsolatedConformances.push_back(concrete);
@@ -7966,7 +7965,7 @@ namespace {
       auto firstConformance = badIsolatedConformances.front();
       ctx.Diags.diagnose(
           loc, diag::isolated_conformance_wrong_domain,
-          getConformanceIsolation(firstConformance),
+          firstConformance->getIsolation(),
           firstConformance->getType(),
           firstConformance->getProtocol()->getName(),
           getContextIsolation());

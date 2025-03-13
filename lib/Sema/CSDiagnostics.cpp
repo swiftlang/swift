@@ -9568,7 +9568,7 @@ bool DisallowedIsolatedConformance::diagnoseAsError() {
   emitDiagnostic(diag::isolated_conformance_with_sendable_simple,
                  conformance->getType(),
                  conformance->getProtocol()->getName(),
-                 getConformanceIsolation(conformance));
+                 conformance->getIsolation());
 
   auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!selectedOverload)
