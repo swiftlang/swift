@@ -2472,13 +2472,42 @@ namespace {
         ctors.push_back(valueCtor);
       }
 
-      // Do not allow Swift to construct foreign reference types (at least, not
-      // yet).
       if (isa<StructDecl>(result)) {
         for (auto ctor : ctors) {
           // Add ctors directly as they cannot always be looked up from the
           // clang decl (some are synthesized by Swift).
           result->addMember(ctor);
+        }
+      } else {
+        if (Impl.SwiftContext.LangOpts.hasFeature(
+                Feature::CXXForeignReferenceTypeInitializers)) {
+          assert(
+              isa<ClassDecl>(result) &&
+              "Expected result to be a ClassDecl as it cannot be a StructDecl");
+          // When we add full support for C foreign reference types then we
+          // should synthesize static factories for them as well
+          if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+            bool hasUserProvidedStaticFactory =
+                llvm::any_of(cxxRecordDecl->methods(), [](const auto *method) {
+                  return method->isStatic() &&
+                         llvm::any_of(method->template specific_attrs<
+                                          clang::SwiftNameAttr>(),
+                                      [](const auto *attr) {
+                                        return attr->getName().str().find(
+                                                   "init") != std::string::npos;
+                                      });
+                });
+            if (!hasUserProvidedStaticFactory) {
+              if (auto generatedCxxMethodDecl = SwiftDeclSynthesizer::
+                      synthesizeStaticFactoryForCXXForeignRef(
+                          cxxRecordDecl, cxxRecordDecl->getASTContext(),
+                          Impl.getClangSema())) {
+                if (Decl *importedInitDecl =
+                        VisitCXXMethodDecl(generatedCxxMethodDecl))
+                  result->addMember(importedInitDecl);
+              }
+            }
+          }
         }
       }
 

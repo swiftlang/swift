@@ -1,9 +1,10 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -disable-availability-checking)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -cxx-interoperability-mode=default -Xfrontend -enable-experimental-feature -Xfrontend CXXForeignReferenceTypeInitializers -Xfrontend -disable-availability-checking)
 //
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_CXXForeignReferenceTypeInitializers
 
-import StdlibUnittest
 import Constructors
+import StdlibUnittest
 
 var CxxConstructorTestSuite = TestSuite("CxxConstructors")
 
@@ -86,6 +87,22 @@ CxxConstructorTestSuite.test("ImportStaticFactoryAsInitializer") {
   expectEqual(z3.param2, 3)
   let v = Value(x: 2)
   expectEqual(v.getX(), 2)
+}
+
+CxxConstructorTestSuite.test("SynthesizeAndImportStaticFactoryAsInitializer") {
+  let x1 = TrivialCtor.CxxRefTy()
+  expectEqual(x1.val, 1)
+  x1.val = 2
+  expectEqual(x1.val, 2)
+
+  let x2 = UserProvidedDefaultCtor.CxxRefTy()
+  expectEqual(x2.val, 2)
+
+  let x3 = UserProvidedStaticFactory.CxxRefTy()
+  expectEqual(x3.val, 2)
+
+  let x4 = UserProvidedStaticFactory.CxxRefTy(3)
+  expectEqual(x4.val, 3)
 }
 
 runAllTests()
