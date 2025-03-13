@@ -467,6 +467,13 @@ void ASTPrinter::printEscapedStringLiteral(StringRef str) {
   printTextImpl(escapeBuf.str());
 }
 
+// Returns true if the given declaration is backed by a C++ template
+// specialization.
+static bool isSpecializedCxxDecl(const Decl *D) {
+  return D->hasClangNode() &&
+         isa<clang::ClassTemplateSpecializationDecl>(D->getClangDecl());
+}
+
 void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name,
                               PrintNameContext Context) {
   if (isa<GenericTypeParamDecl>(RefTo)) {
@@ -477,7 +484,7 @@ void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name,
     Context = PrintNameContext::ClassDynamicSelf;
   }
 
-  printName(Name, Context);
+  printName(Name, Context, isSpecializedCxxDecl(RefTo));
 }
 
 void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
@@ -576,20 +583,25 @@ ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
 }
 
 /// Determine whether to escape the given keyword in the given context.
-bool swift::escapeKeywordInContext(
-    StringRef keyword,
-    PrintNameContext context
-) {
+bool swift::escapeIdentifierInContext(Identifier name, PrintNameContext context,
+                                      bool isSpecializedCxxTemplate) {
+  StringRef keyword = name.str();
   bool isKeyword = llvm::StringSwitch<bool>(keyword)
 #define KEYWORD(KW) \
       .Case(#KW, true)
 #include "swift/AST/TokenKinds.def"
       .Default(false);
 
+  // NB: ClangImporter synthesizes C++ template specializations with Identifiers
+  // that contain the full type signature; e.g., a type named literally
+  // `X<Y, Z>`. These would normally be interpreted as raw identifiers and
+  // escaped with backticks, but we need to avoid that for those specific decls.
+
   switch (context) {
   case PrintNameContext::Normal:
   case PrintNameContext::Attribute:
-    return isKeyword;
+    return isKeyword ||
+           (!isSpecializedCxxTemplate && name.mustAlwaysBeEscaped());
   case PrintNameContext::Keyword:
   case PrintNameContext::IntroducerKeyword:
     return false;
@@ -599,18 +611,21 @@ bool swift::escapeKeywordInContext(
     return isKeyword && keyword != "Self";
 
   case PrintNameContext::TypeMember:
-    return isKeyword || !canBeMemberName(keyword);
+    return isKeyword || !canBeMemberName(keyword) ||
+           (!isSpecializedCxxTemplate && name.mustAlwaysBeEscaped());
 
   case PrintNameContext::FunctionParameterExternal:
   case PrintNameContext::FunctionParameterLocal:
   case PrintNameContext::TupleElement:
-    return !canBeArgumentLabel(keyword);
+    return !canBeArgumentLabel(keyword) ||
+           (!isSpecializedCxxTemplate && name.mustAlwaysBeEscaped());
   }
 
   llvm_unreachable("Unhandled PrintNameContext in switch.");
 }
 
-void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
+void ASTPrinter::printName(Identifier Name, PrintNameContext Context,
+                           bool IsSpecializedCxxTemplate) {
   callPrintNamePre(Context);
 
   if (Name.empty()) {
@@ -619,12 +634,13 @@ void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
     return;
   }
 
-  bool shouldEscapeKeyword = escapeKeywordInContext(Name.str(), Context);
+  bool shouldEscapeIdentifier =
+      escapeIdentifierInContext(Name, Context, IsSpecializedCxxTemplate);
 
-  if (shouldEscapeKeyword)
+  if (shouldEscapeIdentifier)
     *this << "`";
   *this << Name.str();
-  if (shouldEscapeKeyword)
+  if (shouldEscapeIdentifier)
     *this << "`";
 
   printNamePost(Context);
@@ -1333,8 +1349,8 @@ void PrintAST::printAttributes(const Decl *D) {
     if (isa<AccessorDecl>(D)) {
 #define EXCLUDE_ATTR(Class)                                                    \
   Options.ExcludeAttrList.push_back(DeclAttrKind::Class);
-#define CONTEXTUAL_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
-#define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
+#define CONTEXTUAL_DECL_ATTR(X, Class, ...) EXCLUDE_ATTR(Class)
+#define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, ...) EXCLUDE_ATTR(Class)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(X, Class) EXCLUDE_ATTR(Class)
 #include "swift/AST/DeclAttr.def"
     }
@@ -3635,12 +3651,16 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
   } else {
     Printer.printIntroducerKeyword("enum", Options, " ");
     printContextIfNeeded(decl);
-    recordDeclLoc(decl,
-      [&]{
-        Printer.printName(decl->getName(), getTypeMemberPrintNameContext(decl));
-      }, [&]{ // Signature
-        printGenericDeclGenericParams(decl);
-      });
+    recordDeclLoc(
+        decl,
+        [&] {
+          Printer.printName(decl->getName(),
+                            getTypeMemberPrintNameContext(decl),
+                            isSpecializedCxxDecl(decl));
+        },
+        [&] { // Signature
+          printGenericDeclGenericParams(decl);
+        });
     printInherited(decl);
     printDeclGenericRequirements(decl);
   }
@@ -3662,12 +3682,16 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
   } else {
     Printer.printIntroducerKeyword("struct", Options, " ");
     printContextIfNeeded(decl);
-    recordDeclLoc(decl,
-      [&]{
-        Printer.printName(decl->getName(), getTypeMemberPrintNameContext(decl));
-      }, [&]{ // Signature
-        printGenericDeclGenericParams(decl);
-      });
+    recordDeclLoc(
+        decl,
+        [&] {
+          Printer.printName(decl->getName(),
+                            getTypeMemberPrintNameContext(decl),
+                            isSpecializedCxxDecl(decl));
+        },
+        [&] { // Signature
+          printGenericDeclGenericParams(decl);
+        });
     printInherited(decl);
     printDeclGenericRequirements(decl);
   }
@@ -3690,12 +3714,16 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
     Printer.printIntroducerKeyword(
         decl->isExplicitActor() ? "actor" : "class", Options, " ");
     printContextIfNeeded(decl);
-    recordDeclLoc(decl,
-      [&]{
-        Printer.printName(decl->getName(), getTypeMemberPrintNameContext(decl));
-      }, [&]{ // Signature
-        printGenericDeclGenericParams(decl);
-      });
+    recordDeclLoc(
+        decl,
+        [&] {
+          Printer.printName(decl->getName(),
+                            getTypeMemberPrintNameContext(decl),
+                            isSpecializedCxxDecl(decl));
+        },
+        [&] { // Signature
+          printGenericDeclGenericParams(decl);
+        });
 
     printInherited(decl);
     printDeclGenericRequirements(decl);

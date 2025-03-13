@@ -280,10 +280,12 @@ CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name,
   ASSERT(mod);
 }
 
-CustomAvailabilityDomain *
-CustomAvailabilityDomain::create(const ASTContext &ctx, StringRef name,
-                                 ModuleDecl *mod, Kind kind) {
-  return new (ctx) CustomAvailabilityDomain(ctx.getIdentifier(name), mod, kind);
+void CustomAvailabilityDomain::Profile(llvm::FoldingSetNodeID &ID,
+                                       Identifier name, ModuleDecl *mod,
+                                       Kind kind) {
+  ID.AddPointer(name.getAsOpaquePointer());
+  ID.AddPointer(mod);
+  ID.AddInteger(static_cast<unsigned>(kind));
 }
 
 static std::optional<AvailabilityDomain>

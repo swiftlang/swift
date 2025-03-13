@@ -1668,6 +1668,15 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back(triple);
   }
 
+  if (LangOpts.ClangTargetVariant.has_value()) {
+    genericSubInvocation.getLangOptions().ClangTargetVariant = LangOpts.ClangTargetVariant;
+    auto variantTriple = ArgSaver.save(genericSubInvocation.getLangOptions()
+      .ClangTargetVariant->getTriple());
+    assert(!variantTriple.empty());
+    GenericArgs.push_back("-clang-target-variant");
+    GenericArgs.push_back(variantTriple);
+  }
+
   // Inherit the target SDK name and version
   if (!LangOpts.SDKName.empty()) {
     genericSubInvocation.getLangOptions().SDKName = LangOpts.SDKName;
@@ -2102,11 +2111,9 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   BuildArgs.push_back("-module-name");
   BuildArgs.push_back(moduleName);
 
-  // FIXME: Hack for Darwin.swiftmodule, which cannot be rebuilt with C++
-  // interop enabled by the Swift CI because it uses an old host SDK.
   // FIXME: Hack for CoreGraphics.swiftmodule, which cannot be rebuilt because
   // of a CF_OPTIONS bug (rdar://142762174).
-  if (moduleName == "Darwin" || moduleName == "CoreGraphics") {
+  if (moduleName == "CoreGraphics") {
     subInvocation.getLangOptions().EnableCXXInterop = false;
     subInvocation.getLangOptions().cxxInteropCompatVersion = {};
     BuildArgs.erase(llvm::remove_if(BuildArgs,
@@ -2183,6 +2190,14 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   return action(info);
 }
 
+static void addModuleAliasesFromExplicitSwiftModuleMap(
+    ASTContext &Ctx, llvm::StringMap<std::string> ModuleAliases) {
+  for (auto &entry : ModuleAliases) {
+    Ctx.addModuleAlias(/*moduleAlias=*/entry.getKey(),
+                       /*realModule=*/entry.getValue());
+  }
+}
+
 struct ExplicitSwiftModuleLoader::Implementation {
   ASTContext &Ctx;
   llvm::BumpPtrAllocator Allocator;
@@ -2192,6 +2207,7 @@ struct ExplicitSwiftModuleLoader::Implementation {
   void parseSwiftExplicitModuleMap(StringRef fileName) {
     ExplicitModuleMapParser parser(Allocator);
     llvm::StringMap<ExplicitClangModuleInputInfo> ExplicitClangModuleMap;
+    llvm::StringMap<std::string> ModuleAliases;
     // Load the input file.
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
         llvm::MemoryBuffer::getFile(fileName);
@@ -2203,7 +2219,7 @@ struct ExplicitSwiftModuleLoader::Implementation {
 
     auto hasError = parser.parseSwiftExplicitModuleMap(
         (*fileBufOrErr)->getMemBufferRef(), ExplicitModuleMap,
-        ExplicitClangModuleMap);
+        ExplicitClangModuleMap, ModuleAliases);
 
     if (hasError)
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
@@ -2230,6 +2246,7 @@ struct ExplicitSwiftModuleLoader::Implementation {
                 .str());
       }
     }
+    addModuleAliasesFromExplicitSwiftModuleMap(Ctx, ModuleAliases);
   }
 
   void addCommandLineExplicitInputs(
@@ -2462,6 +2479,7 @@ struct ExplicitCASModuleLoader::Implementation {
   void parseSwiftExplicitModuleMap(StringRef ID) {
     ExplicitModuleMapParser parser(Allocator);
     llvm::StringMap<ExplicitClangModuleInputInfo> ExplicitClangModuleMap;
+    llvm::StringMap<std::string> ModuleAliases;
     auto buf = loadBuffer(ID);
     if (!buf) {
       Ctx.Diags.diagnose(SourceLoc(), diag::error_cas,
@@ -2477,7 +2495,8 @@ struct ExplicitCASModuleLoader::Implementation {
         llvm::MemoryBuffer::getFile(ID);
 
     auto hasError = parser.parseSwiftExplicitModuleMap(
-        (*buf)->getMemBufferRef(), ExplicitModuleMap, ExplicitClangModuleMap);
+        (*buf)->getMemBufferRef(), ExplicitModuleMap, ExplicitClangModuleMap,
+        ModuleAliases);
 
     if (hasError)
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
@@ -2516,6 +2535,7 @@ struct ExplicitCASModuleLoader::Implementation {
         extraClangArgs.push_back(*cachePath);
       }
     }
+    addModuleAliasesFromExplicitSwiftModuleMap(Ctx, ModuleAliases);
   }
 
   void addCommandLineExplicitInputs(

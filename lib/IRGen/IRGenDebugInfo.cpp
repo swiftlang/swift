@@ -1326,11 +1326,19 @@ private:
       }
     }
 
+    // Recursive types such as `class A<B> { let a : A<A<B>> }` would produce an
+    // infinite chain of expansions for the type of `a`. Break these cycles by
+    // emitting any bound generics that still have type parameters as forward
+    // declarations.
+    if (Type->hasTypeParameter() || Type->hasPrimaryArchetype())
+      return createOpaqueStructWithSizedContainer(
+          Scope, Decl ? Decl->getNameStr() : "", File, Line, SizeInBits,
+          AlignInBits, Flags, MangledName, collectGenericParams(Type, true),
+          UnsubstitutedDITy);
+
     // Create the substituted type.
-    auto *OpaqueType =
-        createStructType(Type, Decl, Scope, File, Line, SizeInBits, AlignInBits,
-                         Flags, MangledName, UnsubstitutedDITy);
-    return OpaqueType;
+    return createStructType(Type, Decl, Scope, File, Line, SizeInBits,
+                            AlignInBits, Flags, MangledName, UnsubstitutedDITy);
   }
 
   /// Create debug information for an enum with a raw type (enum E : Int {}).
@@ -1411,6 +1419,11 @@ private:
         PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoContext(PayloadTy);
         auto &TI = IGM.getTypeInfoForUnlowered(PayloadTy);
         ElemDbgTy = CompletedDebugTypeInfo::getFromTypeInfo(PayloadTy, TI, IGM);
+        // FIXME: This is not correct, but seems to be the only way to emit
+        // children for opaque-sized payload-carrying enums.
+        if (!ElemDbgTy)
+          ElemDbgTy =
+              CompletedDebugTypeInfo::getFromTypeInfo(PayloadTy, TI, IGM, 0);
         if (!ElemDbgTy) {
           // Without complete type info we can only create a forward decl.
           return DBuilder.createForwardDecl(
@@ -1511,9 +1524,9 @@ private:
   }
 
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy) {
-    DebugTypeInfo BlandDbgTy(Ty, DbgTy.getAlignment(),
-                             DbgTy.hasDefaultAlignment(),
-                             DbgTy.isMetadataType(), DbgTy.isFixedBuffer());
+    DebugTypeInfo BlandDbgTy(
+        Ty, DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(), false,
+        DbgTy.isFixedBuffer(), DbgTy.getNumExtraInhabitants());
     return getOrCreateType(BlandDbgTy);
   }
 
@@ -1525,8 +1538,8 @@ private:
   /// Collect the type parameters of a bound generic type. This is needed to
   /// anchor any typedefs that may appear in parameters so they can be
   /// resolved in the debugger without needing to query the Swift module.
-  llvm::DINodeArray
-  collectGenericParams(NominalOrBoundGenericNominalType *BGT, bool AsForwardDeclarations = false) {
+  llvm::DINodeArray collectGenericParams(NominalOrBoundGenericNominalType *BGT,
+                                         bool AsForwardDeclarations = false) {
 
     // Collect the generic args from the type and its parent.
     std::vector<Type> GenericArgs;
@@ -2164,7 +2177,8 @@ private:
       unsigned FwdDeclLine = 0;
 
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
-        if (EnumTy->isSpecialized())
+        if (EnumTy->isSpecialized() && !EnumTy->hasTypeParameter() &&
+            !EnumTy->hasPrimaryArchetype())
           return createSpecializedEnumType(EnumTy, Decl, MangledName,
                                            SizeInBits, AlignInBits, Scope, File,
                                            FwdDeclLine, Flags);
@@ -2561,7 +2575,7 @@ private:
         if (DbgTy.getType()->getKind() != swift::TypeKind::TypeAlias) {
           // A type with the same canonical type already exists, emit a typedef.
           // This extra step is necessary to break out of loops: We don't
-          // canoncialize types before mangling to preserver sugared types. But
+          // canoncialize types before mangling to preserve sugared types. But
           // some types can also have different equivalent non-canonical
           // representations with no sugar involved, for example a type
           // recursively that appears iniside itself. To deal with the latter we
@@ -2577,6 +2591,19 @@ private:
           UID = llvm::MDString::get(IGM.getLLVMContext(), Mangled.Sugared);
         }
         // Fall through and create the sugared type.
+      } else if (auto *AliasTy =
+                     llvm::dyn_cast<TypeAliasType>(DbgTy.getType())) {
+        // An alias type, but the mangler failed to produce a sugared type, just
+        // return the desugared type.
+        llvm::DIType *Desugared =
+            getOrCreateDesugaredType(AliasTy->getSinglyDesugaredType(), DbgTy);
+        StringRef Name;
+        if (auto *AliasDecl = AliasTy->getDecl())
+          Name = AliasDecl->getName().str();
+        if (!Name.empty())
+          return DBuilder.createTypedef(Desugared, Name, MainFile, 0,
+                                        updateScope(Scope, DbgTy));
+        return Desugared;
       } else if (llvm::Metadata *CachedTy = DIRefMap.lookup(UID)) {
         auto *DITy = cast<llvm::DIType>(CachedTy);
         assert(sanityCheckCachedType(DbgTy, DITy));
@@ -2594,13 +2621,14 @@ private:
     // If this is a forward decl, create one for this mangled name and don't
     // cache it.
     if (!isa<PrimaryArchetypeType>(DbgTy.getType()) &&
-        (DbgTy.isFixedBuffer() || !completeType(DbgTy))) {
+        !isa<TypeAliasType>(DbgTy.getType()) &&
+        (DbgTy.isForwardDecl() || DbgTy.isFixedBuffer() ||
+         !completeType(DbgTy))) {
       // In LTO type uniquing is performed based on the UID. Forward
       // declarations may not have a unique ID to avoid a forward declaration
       // winning over a full definition.
       auto *FwdDecl = DBuilder.createReplaceableCompositeType(
           llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, 0, 0,
-
           llvm::dwarf::DW_LANG_Swift);
       FwdDeclTypes.emplace_back(
           std::piecewise_construct, std::make_tuple(MangledName),
@@ -3433,9 +3461,6 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   // Self is always an artificial argument, so are variables without location.
   if (!DInstLine || (ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
-
-  if (VarInfo.Name == "index")
-    llvm::errs();
 
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
   if (Artificial || DITy->isArtificial() || DITy == InternalType)

@@ -478,8 +478,6 @@ $sxq_IyXd_D ---> @callee_unowned (@in_cxx A) -> (@unowned B)
 $s2hi1SV1iSivx ---> hi.S.i.modify2 : Swift.Int
 $s2hi1SV1iSivy ---> hi.S.i.read2 : Swift.Int
 $s2hi1SVIetMIy_TC  ---> coroutine continuation prototype for @escaping @convention(thin) @convention(method) @yield_once_2 (@unowned hi.S) -> ()
-$s4mainAAyyycAA1CCFTTI ---> identity thunk of main.main(main.C) -> () -> ()
-$s4mainAAyyycAA1CCFTTH ---> hop to main actor thunk of main.main(main.C) -> () -> ()
 
 $s4main4SlabVy$1_SiG ---> main.Slab<2, Swift.Int>
 $s$n3_SSBV ---> Builtin.FixedArray<-4, Swift.String>
@@ -489,3 +487,9 @@ $s7ToolKit10TypedValueOACs5Error_pIgHTnTrzo_A2CsAD_pIegHiTrzr_TR ---> {T:} reabs
 $s16sending_mangling16NonSendableKlassCACIegTiTr_A2CIegTxTo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed (@in sending sending_mangling.NonSendableKlass) -> sending (@out sending_mangling.NonSendableKlass) to @escaping @callee_guaranteed (@owned sending sending_mangling.NonSendableKlass) -> sending (@owned sending_mangling.NonSendableKlass)
 $s3red7MyActorC3runyxxyYaKYCXEYaKlFZ ---> static red.MyActor.run<A>(@execution(caller) () async throws -> A) async throws -> A
 $s5thing1PP1sAA1SVvxTwc ---> coro function pointer to thing.P.s.modify2 : thing.S
+
+_$s15raw_identifiers0020foospace_liaADEDGcjayyF ---> raw_identifiers.`foo space`() -> ()
+_$s15raw_identifiers0018_3times_pgaIGJCFbhayyF ---> raw_identifiers.`3 times`() -> ()
+_$s15raw_identifiers0019test_yeaIIBCEapkagayyF ---> raw_identifiers.`test +`() -> ()
+_$s15raw_identifiers0020pathfoo_yuEHaaCiJskayyF ---> raw_identifiers.`path://foo`() -> ()
+_$s15raw_identifiers10FontWeightO009_100_FpEpdyyFZ ---> static raw_identifiers.FontWeight.`100`() -> ()

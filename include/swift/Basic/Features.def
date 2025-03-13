@@ -252,6 +252,7 @@ LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
 LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
 SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
 LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
+LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -474,9 +475,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 
 /// modify/read single-yield coroutines always execute code post-yield code
 EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
-
-/// When a parameter has unspecified isolation, infer it as main actor isolated.
-EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
 
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)

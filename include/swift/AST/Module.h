@@ -351,7 +351,7 @@ private:
   bool BypassResilience = false;
 
   using AvailabilityDomainMap =
-      llvm::SmallDenseMap<Identifier, CustomAvailabilityDomain *>;
+      llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *>;
   AvailabilityDomainMap AvailabilityDomains;
 
 public:

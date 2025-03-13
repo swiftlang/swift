@@ -246,6 +246,11 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ExtraClangOptions.push_back("--target=" +
                                                   LangOpts.ClangTarget->str());
   }
+  if (LangOpts.ClangTargetVariant &&
+      !getClangImporterOptions().DirectClangCC1ModuleBuild) {
+    serializationOpts.ExtraClangOptions.push_back("-darwin-target-variant");
+    serializationOpts.ExtraClangOptions.push_back(LangOpts.ClangTargetVariant->str());
+  }
   if (LangOpts.EnableAppExtensionRestrictions) {
     serializationOpts.ExtraClangOptions.push_back("-fapplication-extension");
   }
@@ -1390,11 +1395,11 @@ bool CompilerInstance::createFilesForMainModule(
 static void configureAvailabilityDomains(const ASTContext &ctx,
                                          const FrontendOptions &opts,
                                          ModuleDecl *mainModule) {
-  llvm::SmallDenseMap<Identifier, CustomAvailabilityDomain *> domainMap;
+  llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *> domainMap;
   auto createAndInsertDomain = [&](const std::string &name,
                                    CustomAvailabilityDomain::Kind kind) {
-    auto *domain = CustomAvailabilityDomain::create(
-        ctx, name, mainModule, CustomAvailabilityDomain::Kind::Enabled);
+    auto *domain = CustomAvailabilityDomain::get(
+        name, mainModule, CustomAvailabilityDomain::Kind::Enabled, ctx);
     bool inserted = domainMap.insert({domain->getName(), domain}).second;
     ASSERT(inserted); // Domains must be unique.
   };

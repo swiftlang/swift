@@ -16,7 +16,7 @@
 // =============================================================================
 
 extension UnsafeRawBufferPointer {
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public var storage: RawSpan {
     @lifetime(borrow self)
     get {
@@ -26,24 +26,24 @@ extension UnsafeRawBufferPointer {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 func read(_ span: RawSpan) {}
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 func testUBPStorage(ubp: UnsafeRawBufferPointer) {
   // 'span' is valid within the lexical scope of variable 'ubp', which is the entire function.
   let span = ubp.storage
   read(span)
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 @lifetime(borrow ubp)
 func testUBPStorageReturn(ubp: UnsafeRawBufferPointer) -> RawSpan {
   // 'storage' can be returned since the function's return value also has a dependence on 'ubp'.
   return ubp.storage
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 @lifetime(borrow ubp)
 func testUBPStorageCopy(ubp: UnsafeRawBufferPointer) -> RawSpan {
   let localBuffer = ubp
@@ -52,7 +52,7 @@ func testUBPStorageCopy(ubp: UnsafeRawBufferPointer) -> RawSpan {
                              // expected-note  @-2{{this use causes the lifetime-dependent value to escape}}
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 func testUBPStorageEscape(array: [Int64]) {
   var span = RawSpan()
   array.withUnsafeBytes {

@@ -475,6 +475,14 @@ CompletionLookup::makeResultBuilder(CodeCompletionResultKind kind,
 void CompletionLookup::addValueBaseName(CodeCompletionResultBuilder &Builder,
                                         DeclBaseName Name) {
   auto NameStr = Name.userFacingName();
+  if (Name.mustAlwaysBeEscaped()) {
+    // Names that are raw identifiers must always be escaped regardless of
+    // their position.
+    SmallString<16> buffer;
+    Builder.addBaseName(Builder.escapeWithBackticks(NameStr, buffer));
+    return;
+  }
+
   bool shouldEscapeKeywords;
   if (Name.isSpecial()) {
     // Special names (i.e. 'init') are always displayed as its user facing
@@ -495,6 +503,16 @@ void CompletionLookup::addValueBaseName(CodeCompletionResultBuilder &Builder,
   } else {
     SmallString<16> buffer;
     Builder.addBaseName(Builder.escapeKeyword(NameStr, true, buffer));
+  }
+}
+
+void CompletionLookup::addIdentifier(CodeCompletionResultBuilder &Builder,
+                                     Identifier Name) {
+  if (Name.mustAlwaysBeEscaped()) {
+    SmallString<16> buffer;
+    Builder.addBaseName(Builder.escapeWithBackticks(Name.str(), buffer));
+  } else {
+    Builder.addBaseName(Name.str());
   }
 }
 
@@ -1550,7 +1568,7 @@ void CompletionLookup::addConstructorCall(const ConstructorDecl *CD,
       addLeadingDot(Builder);
       Builder.addBaseName("init");
     } else if (!addName.empty()) {
-      Builder.addBaseName(addName.str());
+      addIdentifier(Builder, addName);
     } else {
       Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
     }
@@ -1712,7 +1730,7 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
                         getSemanticContext(NTD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(NTD);
   addLeadingDot(Builder);
-  Builder.addBaseName(NTD->getName().str());
+  addValueBaseName(Builder, NTD->getBaseName());
 
   // Substitute the base type for a nested type if needed.
   auto nominalTy = getTypeOfMember(NTD, dynamicLookupInfo);
@@ -1745,7 +1763,7 @@ void CompletionLookup::addTypeAliasRef(const TypeAliasDecl *TAD,
                         getSemanticContext(TAD, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(TAD);
   addLeadingDot(Builder);
-  Builder.addBaseName(TAD->getName().str());
+  addValueBaseName(Builder, TAD->getBaseName());
 
   // Substitute the base type for a nested typealias if needed.
   auto ty = getTypeOfMember(TAD, dynamicLookupInfo);
@@ -1769,7 +1787,7 @@ void CompletionLookup::addGenericTypeParamRef(
                         getSemanticContext(GP, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(GP);
   addLeadingDot(Builder);
-  Builder.addBaseName(GP->getName().str());
+  addValueBaseName(Builder, GP->getBaseName());
   addTypeAnnotation(Builder, GP->getDeclaredInterfaceType());
 }
 
@@ -1781,7 +1799,7 @@ void CompletionLookup::addAssociatedTypeRef(
                         getSemanticContext(AT, Reason, dynamicLookupInfo));
   Builder.setAssociatedDecl(AT);
   addLeadingDot(Builder);
-  Builder.addBaseName(AT->getName().str());
+  addValueBaseName(Builder, AT->getBaseName());
   if (Type T = getAssociatedTypeType(AT))
     addTypeAnnotation(Builder, T);
 }
@@ -1792,7 +1810,7 @@ void CompletionLookup::addPrecedenceGroupRef(PrecedenceGroupDecl *PGD) {
   CodeCompletionResultBuilder builder =
       makeResultBuilder(CodeCompletionResultKind::Declaration, semanticContext);
 
-  builder.addBaseName(PGD->getName().str());
+  addIdentifier(builder, PGD->getName());
   builder.setAssociatedDecl(PGD);
 }
 

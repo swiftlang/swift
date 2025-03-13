@@ -1521,7 +1521,7 @@ public:
                                  MemoryReader::ReadBytesResult &ptr) {
     // Read the full base descriptor if it's bigger than what we have so far.
     if (sizeof(DescriptorTy) > sizeof(TargetContextDescriptor<Runtime>)) {
-      ptr = Reader->readObj<DescriptorTy>(address);
+      ptr = Reader->template readObj<DescriptorTy>(address);
       if (!ptr)
         return false;
     }

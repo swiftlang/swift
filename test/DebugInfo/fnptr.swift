@@ -27,8 +27,8 @@ func main() -> Int64 {
     // CHECK-DAG: ![[BAZPTR]] = !DIDerivedType(tag: DW_TAG_pointer_type,{{.*}} baseType: ![[BAZT:[0-9]+]]
     // CHECK-DAG: ![[BAZT]] = !DISubroutineType(types: ![[BAZARGS:.*]])
     // CHECK-DAG: ![[BAZARGS]] = !{![[INT:.*]], ![[FLOAT:.*]]}
-    // CHECK-DAG: ![[INT]] = {{.*}}identifier: "$ss5Int64VD"
-    // CHECK-DAG: ![[FLOAT]] = {{.*}}identifier: "$sSfD"
+    // CHECK-DAG: ![[INT]] = {{.*}}"$ss5Int64VD"
+    // CHECK-DAG: ![[FLOAT]] = {{.*}}"$sSfD"
     var baz_fnptr = baz
     baz_fnptr(2.89)
 

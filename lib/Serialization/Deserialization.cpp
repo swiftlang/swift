@@ -8588,9 +8588,9 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
       auto unconsumedError =
         consumeExpectedError(conformance.takeError());
       if (unconsumedError) {
-        // Ignore if allowing errors, it's just doing a best effort to produce
-        // *some* module anyway.
-        if (allowCompilerErrors())
+        // Ignore when we're not building a binary, it's just doing a best
+        // effort to produce *some* module anyway.
+        if (enableExtendedDeserializationRecovery())
           diagnoseAndConsumeError(std::move(unconsumedError));
         else
           fatal(std::move(unconsumedError));

@@ -1123,7 +1123,7 @@ public:
 
   static LinkEntity forProtocolWitnessTable(const ProtocolConformance *C) {
     if (isEmbedded(C)) {
-      ASSERT(C->getProtocol()->requiresClass());
+      assert(C->getProtocol()->requiresClass());
     }
 
     LinkEntity entity;

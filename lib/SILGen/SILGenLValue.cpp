@@ -4040,8 +4040,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   CanType baseTy = getBaseFormalType(e->getBase());
   AbstractionPattern orig = AbstractionPattern::getInvalid();
   bool addressable = false;
-  // If the access produces a dependent value, and the base is addressable,
-  // then
+  // If the access produces a dependent value, and the base is addressable-for-
+  // dependencies, then request an addressable base.
   if (!substFormalRValueType->isEscapable()
       && SGF.getTypeLowering(baseTy)
             .getRecursiveProperties()

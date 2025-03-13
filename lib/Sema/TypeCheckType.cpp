@@ -915,22 +915,7 @@ static Type applyGenericArguments(Type type,
       argTys.push_back(argTy);
     }
 
-    auto parameterized =
-        ParameterizedProtocolType::get(ctx, protoType, argTys);
-
-    // FIXME: Can this not be done in ExistentialTypeSyntaxChecker?
-    if (resolution.getOptions().isConstraintImplicitExistential() &&
-        !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
-      diags
-          .diagnose(loc, diag::existential_requires_any, parameterized,
-                    ExistentialType::get(parameterized),
-                    /*isAlias=*/isa<TypeAliasType>(type.getPointer()))
-          .warnUntilSwiftVersion(7);
-
-      return ErrorType::get(ctx);
-    }
-
-    return parameterized;
+    return ParameterizedProtocolType::get(ctx, protoType, argTys);
   }
   
   // Builtins have special handling.

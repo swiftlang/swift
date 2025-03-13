@@ -54,29 +54,6 @@ getThunkFunctionType(ThunkInst::Kind kind, CanSILFunctionType inputFunctionType,
         inputFunctionType->getInvocationSubstitutions(),
         inputFunctionType->getASTContext());
   }
-  case ThunkInst::Kind::HopToMainActorIfNeeded: {
-    // Our thunk type is a thin function that takes the input function type and
-    // the input function type's parameters.
-    llvm::SmallVector<SILParameterInfo, 8> newParameters;
-    for (SILParameterInfo p : inputFunctionType->getParameters()) {
-      newParameters.push_back(p);
-    }
-    newParameters.push_back(SILParameterInfo(
-        inputFunctionType, ParameterConvention::Direct_Guaranteed));
-
-    SILExtInfoBuilder builder;
-    builder = builder.withRepresentation(SILFunctionTypeRepresentation::Thin)
-                  .withAsync(inputFunctionType->isAsync());
-    return SILFunctionType::get(
-        inputFunctionType->getInvocationGenericSignature(), builder.build(),
-        inputFunctionType->getCoroutineKind(),
-        ParameterConvention::Direct_Unowned, newParameters,
-        inputFunctionType->getYields(), inputFunctionType->getResults(),
-        inputFunctionType->getOptionalErrorResult(),
-        inputFunctionType->getPatternSubstitutions(),
-        inputFunctionType->getInvocationSubstitutions(),
-        inputFunctionType->getASTContext());
-  }
   }
 
   llvm_unreachable("Covered switch isn't covered?!");
@@ -393,153 +370,6 @@ SILFunction *IdentityLowering::createThunk() const {
 }
 
 //===----------------------------------------------------------------------===//
-//                     MARK: Hop To Main Actor If Needed
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct HopToMainActorIfNeededThunkBodyBuilder : ThunkBodyBuilder {
-  HopToMainActorIfNeededThunkBodyBuilder(SILFunction *fn)
-      : ThunkBodyBuilder(fn) {}
-
-  void generate();
-
-  SILValue adjustCalleeType(FunctionRefInst *runOnMainActor, SILValue callee);
-};
-
-} // namespace
-
-SILValue HopToMainActorIfNeededThunkBodyBuilder::adjustCalleeType(
-    FunctionRefInst *runOnMainActor, SILValue originalCallee) {
-  SILValue callee = originalCallee;
-  auto calleeType = callee->getType().castTo<SILFunctionType>();
-
-  // If our original function is thin. Convert it to be a thick function.
-  if (calleeType->getRepresentation() == SILFunctionTypeRepresentation::Thin) {
-    auto extInfoBuilder = calleeType->getExtInfo().intoBuilder();
-    auto extInfo =
-        extInfoBuilder.withRepresentation(SILFunctionTypeRepresentation::Thick)
-            .build();
-    calleeType = calleeType->getWithExtInfo(extInfo);
-    callee = builder.createThinToThickFunction(
-        getLoc(), callee, SILType::getPrimitiveObjectType(calleeType));
-  }
-
-  return callee;
-}
-
-void HopToMainActorIfNeededThunkBodyBuilder::generate() {
-  createEntryBlockArguments();
-
-  assert(thunkArguments.size() == 1 && "We only support no thunk arguments");
-
-  // Create a function ref for _runOnMainActor. We have to use link all to
-  // ensure that we link in the closures we create so that hop to main executor
-  // lowering runs on them.
-  StringLiteral value = "$ss19_taskRunOnMainActor9operationyyyScMYcc_tF";
-  auto *function =
-      builder.getModule().loadFunction(value, SILModule::LinkingMode::LinkAll);
-  assert(function && "Cannot find runOnMainActor");
-
-  // Create the function ref.
-  auto *fri = builder.createFunctionRef(getLoc(), function);
-
-  callThunkedFunction(fri, {adjustCalleeType(fri, thunkArguments.back())});
-}
-
-namespace {
-
-struct HopToMainActorIfNeededLowering {
-  SILOptFunctionBuilder &funcBuilder;
-  ThunkInst *ti;
-
-  // The number of thunks emitted into the function. Just an easy way to give
-  // multiple thunks in a function a unique name for prototyping purposes.
-  unsigned &thunkCount;
-
-  HopToMainActorIfNeededLowering(SILOptFunctionBuilder &funcBuilder,
-                                 ThunkInst *ti, unsigned &thunkCount)
-      : funcBuilder(funcBuilder), ti(ti), thunkCount(thunkCount) {}
-
-  void lower() &&;
-
-  void invalidate() {
-    ti->eraseFromParent();
-    ti = nullptr;
-  };
-
-  ~HopToMainActorIfNeededLowering() {
-    assert(!ti && "Did not call consuming method to destroy value");
-  }
-
-  SILFunction *createThunk() const;
-};
-
-} // namespace
-
-void HopToMainActorIfNeededLowering::lower() && {
-  SWIFT_DEFER { invalidate(); };
-
-  // Create the thunk.
-  auto *thunk = createThunk();
-
-  SILBuilderWithScope builder(ti);
-  SingleValueInstruction *thunkValue =
-      builder.createFunctionRef(ti->getLoc(), thunk);
-
-  thunkValue = builder.createPartialApply(
-      ti->getLoc(), thunkValue, ti->getSubstitutionMap(), ti->getOperand(),
-      ParameterConvention::Direct_Guaranteed);
-
-  ti->replaceAllUsesWith(thunkValue);
-}
-
-SILFunction *HopToMainActorIfNeededLowering::createThunk() const {
-  // Our type is going to be the result of the function.
-  auto inputFuncType = ti->getOperand()->getType().getAs<SILFunctionType>();
-
-  // We need to add our input type as a parameter and have our result type as
-  // the result of the function type.
-  GenericSignature genericSig;
-  auto thunkType =
-      getThunkFunctionType(ti->getThunkKind(), inputFuncType, ti->getModule());
-
-  Mangle::ASTMangler mangler(ti->getModule().getASTContext());
-  auto name = mangler.mangleSILThunkKind(
-      ti->getFunction()->getName(), ThunkInst::Kind::HopToMainActorIfNeeded);
-
-  auto *fn = funcBuilder.getOrCreateSharedFunction(
-      RegularLocation::getAutoGeneratedLocation(), name, thunkType,
-      IsBare_t::IsNotBare, IsTransparent_t::IsNotTransparent,
-      SerializedKind_t::IsNotSerialized, ProfileCounter(), IsThunk_t::IsThunk,
-      IsDynamicallyReplaceable_t::IsNotDynamic,
-      IsDistributed_t::IsNotDistributed,
-      IsRuntimeAccessible_t::IsNotRuntimeAccessible);
-
-  // If we already have a body, we already generated a thunk for this
-  // function. Just return it.
-  if (!fn->empty())
-    return fn;
-
-  // These are only generated when not in Ownership SSA. Turn off Ownership SSA
-  // so that SILBuilder and other utilities do the right thing and so we can
-  // avoid having to run ownership lowering.
-  fn->setOwnershipEliminated();
-
-  // Set up our generic environment to be the same as our original function.
-  fn->setGenericEnvironment(ti->getFunction()->getGenericEnvironment());
-
-  // Move the thunk to be right before the generated function to ease FileCheck.
-  fn->getModule().moveBefore(ti->getFunction()->getIterator(), fn);
-
-  // Generate the body of the function.
-  HopToMainActorIfNeededThunkBodyBuilder thunkBodyBuilder(fn);
-  thunkBodyBuilder.generate();
-
-  return fn;
-}
-
-//===----------------------------------------------------------------------===//
 //                         MARK: Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
@@ -578,13 +408,6 @@ class ThunkLoweringPass : public SILModuleTransform {
             llvm_unreachable("Should never see an invalid kind");
           case ThunkInst::Kind::Identity: {
             IdentityLowering lowering(funcBuilder, ti, thunkCount);
-            std::move(lowering).lower();
-            createdThunk = true;
-            continue;
-          }
-          case ThunkInst::Kind::HopToMainActorIfNeeded: {
-            HopToMainActorIfNeededLowering lowering(funcBuilder, ti,
-                                                    thunkCount);
             std::move(lowering).lower();
             createdThunk = true;
             continue;

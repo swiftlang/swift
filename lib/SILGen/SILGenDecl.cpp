@@ -680,12 +680,12 @@ public:
 namespace {
 
 static void deallocateAddressable(SILGenFunction &SGF,
-                                  SILLocation l,
-                                  SILGenFunction::VarLoc &loc) {
-  SGF.B.createEndBorrow(l, loc.addressableBuffer.state->storeBorrow);
-  SGF.B.createDeallocStack(l, loc.addressableBuffer.state->allocStack);
-  if (loc.addressableBuffer.state->reabstraction) {
-    SGF.B.createDestroyValue(l, loc.addressableBuffer.state->reabstraction);
+                SILLocation l,
+                const SILGenFunction::VarLoc::AddressableBuffer::State &state) {
+  SGF.B.createEndBorrow(l, state.storeBorrow);
+  SGF.B.createDeallocStack(l, state.allocStack);
+  if (state.reabstraction) {
+    SGF.B.createDestroyValue(l, state.reabstraction);
   }
 }
 
@@ -704,9 +704,9 @@ public:
     }
     auto &loc = found->second;
     
-    if (loc.addressableBuffer.state) {
+    if (auto &state = loc.addressableBuffer.state) {
       // The addressable buffer was forced, so clean it up now.
-      deallocateAddressable(SGF, l, loc);
+      deallocateAddressable(SGF, l, *state);
     } else {
       // Remember this insert location in case we need to force the addressable
       // buffer later.
@@ -2364,11 +2364,9 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
     }
   };
 
-  auto &loc = VarLocs[vd];
-
   // For a heap variable, the box is responsible for the value. We just need
   // to give up our retain count on it.
-  if (auto boxValue = loc.box) {
+  if (auto boxValue = VarLocs[vd].box) {
     if (!getASTContext().SILOpts.supportsLexicalLifetimes(getModule())) {
       emitDestroy(boxValue);
       return;
@@ -2384,7 +2382,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
 
   // For 'let' bindings, we emit a release_value or destroy_addr, depending on
   // whether we have an address or not.
-  SILValue Val = loc.value;
+  SILValue Val = VarLocs[vd].value;
 
   if (Val->getType().isAddress()) {
     B.createDestroyAddr(silLoc, Val);
@@ -2475,21 +2473,24 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
     return SILValue();
   }
   
-  auto &varLoc = foundVarLoc->second;
+  auto value = foundVarLoc->second.value;
+  auto access = foundVarLoc->second.access;
+  auto *state = foundVarLoc->second.addressableBuffer.state.get();
+  
   SILType fullyAbstractedTy = getLoweredType(AbstractionPattern::getOpaque(),
                                      decl->getTypeInContext()->getRValueType());
   
   // Check whether the bound value is inherently suitable for addressability.
   // It must already be in memory and fully abstracted.
-  if (varLoc.value->getType().isAddress()
-      && fullyAbstractedTy.getASTType()==varLoc.value->getType().getASTType()) {
-    SILValue address = varLoc.value;
+  if (value->getType().isAddress()
+      && fullyAbstractedTy.getASTType() == value->getType().getASTType()) {
+    SILValue address = value;
     // Begin an access if the address is mutable.
-    if (varLoc.access != SILAccessEnforcement::Unknown) {
+    if (access != SILAccessEnforcement::Unknown) {
       address = B.emitBeginAccess(curLoc, address,
         ownership == ValueOwnership::InOut ? SILAccessKind::Modify
                                            : SILAccessKind::Read,
-        varLoc.access);
+        access);
     }
     return address;
   }
@@ -2497,14 +2498,14 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   // We can't retroactively introduce a reabstracted representation for a
   // mutable binding (since we would now have two mutable memory locations
   // representing the same value).
-  if (varLoc.access != SILAccessEnforcement::Unknown) {
+  if (access != SILAccessEnforcement::Unknown) {
     return SILValue();
   }
   
   assert(ownership == ValueOwnership::Shared);
   
   // Check whether the in-memory representation has already been forced.
-  if (auto &state = varLoc.addressableBuffer.state) {
+  if (state) {
     return state->storeBorrow;
   }
   
@@ -2512,46 +2513,50 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   SILValue reabstraction, allocStack, storeBorrow;
   {
     SavedInsertionPointRAII save(B);
-    B.setInsertionPoint(varLoc.value->getNextInstruction());
-    auto declarationLoc = varLoc.value->getDefiningInsertionPoint()->getLoc();
+    B.setInsertionPoint(value->getNextInstruction());
+    auto declarationLoc = value->getDefiningInsertionPoint()->getLoc();
     
     // Reabstract if necessary.
-    auto value = varLoc.value;
+    auto newValue = value;
     reabstraction = SILValue();
-    if (value->getType().getASTType() != fullyAbstractedTy.getASTType()){
+    if (newValue->getType().getASTType() != fullyAbstractedTy.getASTType()){
       auto reabstracted = emitSubstToOrigValue(curLoc,
         ManagedValue::forBorrowedRValue(value),
         AbstractionPattern::getOpaque(),
         decl->getTypeInContext()->getCanonicalType(),
         SGFContext());
       reabstraction = reabstracted.forward(*this);
-      value = reabstraction;
+      newValue = reabstraction;
     }
     // TODO: reabstract
-    allocStack = B.createAllocStack(declarationLoc, value->getType(),
+    allocStack = B.createAllocStack(declarationLoc, newValue->getType(),
                                     std::nullopt,
                                     DoesNotHaveDynamicLifetime,
                                     IsNotLexical,
                                     IsNotFromVarDecl,
                                     DoesNotUseMoveableValueDebugInfo,
                                     /*skipVarDeclAssert*/ true);
-    storeBorrow = B.createStoreBorrow(declarationLoc, value, allocStack);
+    storeBorrow = B.createStoreBorrow(declarationLoc, newValue, allocStack);
   }
   
   // Record the addressable representation.
-  varLoc.addressableBuffer.state
+  auto &addressableBuffer = VarLocs[decl].addressableBuffer;
+  addressableBuffer.state
     = std::make_unique<VarLoc::AddressableBuffer::State>(reabstraction,
                                                          allocStack,
                                                          storeBorrow);
+  auto *newState = addressableBuffer.state.get();
 
   // Emit cleanups on any paths where we previously would have cleaned up
   // the addressable representation if it had been forced earlier.
-  for (SILInstruction *cleanupPoint : varLoc.addressableBuffer.cleanupPoints) {
+  decltype(addressableBuffer.cleanupPoints) cleanupPoints;
+  cleanupPoints.swap(addressableBuffer.cleanupPoints);
+  
+  for (SILInstruction *cleanupPoint : cleanupPoints) {
     SavedInsertionPointRAII insertCleanup(B, cleanupPoint);
-    deallocateAddressable(*this, cleanupPoint->getLoc(), varLoc);
+    deallocateAddressable(*this, cleanupPoint->getLoc(), *newState);
     cleanupPoint->eraseFromParent();
   }
-  varLoc.addressableBuffer.cleanupPoints.clear();
   
   return storeBorrow;
 }
