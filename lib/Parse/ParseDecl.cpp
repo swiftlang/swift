@@ -5691,33 +5691,61 @@ bool swift::isKeywordPossibleDeclStart(const LangOptions &options,
 }
 
 static bool
-isParenthesizedModifier(Parser &P, StringRef name,
-                        std::initializer_list<StringRef> allowedArguments) {
+consumeIfParenthesizedModifier(Parser &P, StringRef name,
+                               std::initializer_list<StringRef> allowedArguments) {
   assert((P.Tok.getText() == name) && P.peekToken().is(tok::l_paren) &&
          "Invariant violated");
 
   // Look ahead to parse the parenthesized expression.
-  Parser::BacktrackingScope Backtrack(P);
+  Parser::CancellableBacktrackingScope backtrack(P);
   P.consumeToken(tok::identifier);
   P.consumeToken(tok::l_paren);
+  
+  const Token &Tok2 = P.peekToken();
+  if (P.consumeIf(tok::code_complete)) {
+    // If a code complete token is present, recover from missing/incorrect argument and missing '('
+    P.consumeIf(tok::identifier);
+    P.consumeIf(tok::r_paren);
+    backtrack.cancelBacktrack();
+    return true;
+  }
+  
+  if (P.Tok.is(tok::identifier) && !P.Tok.isContextualDeclKeyword() && Tok2.is(tok::code_complete)) {
+    P.consumeToken(tok::identifier);
+    P.consumeToken(tok::code_complete);
+    
+    // If a code complete is present with a non-keyword token before it, recover from missing/incorrect argument and missing '('
+    if (!P.Tok.isContextualDeclKeyword()) {
+      P.consumeIf(tok::identifier);
+    }
+    P.consumeIf(tok::r_paren);
+    backtrack.cancelBacktrack();
+    return true;
+  }
 
   const bool argumentIsAllowed =
       std::find(allowedArguments.begin(), allowedArguments.end(),
                 P.Tok.getText()) != allowedArguments.end();
-  return argumentIsAllowed && P.Tok.is(tok::identifier) &&
-         P.peekToken().is(tok::r_paren);
+  
+  if (argumentIsAllowed && P.Tok.is(tok::identifier) &&
+      P.peekToken().is(tok::r_paren)) {
+    backtrack.cancelBacktrack();
+    return true;
+  }
+  
+  return false;
 }
 
 /// Given a current token of 'unowned', check to see if it is followed by a
-/// "(safe)" or "(unsafe)" specifier.
-static bool isParenthesizedUnowned(Parser &P) {
-  return isParenthesizedModifier(P, "unowned", {"safe", "unsafe"});
+/// "(safe)" or "(unsafe)" specifier and consumes if it is.
+static bool consumeIfParenthesizedUnowned(Parser &P) {
+  return consumeIfParenthesizedModifier(P, "unowned", {"safe", "unsafe"});
 }
 
 /// Given a current token of 'nonisolated', check to see if it is followed by an
-/// "(unsafe)" specifier.
-static bool isParenthesizedNonisolated(Parser &P) {
-  return isParenthesizedModifier(P, "nonisolated", {"unsafe"});
+/// "(unsafe)" specifier and consumes if it is.
+static bool consumeIfParenthesizedNonisolated(Parser &P) {
+  return consumeIfParenthesizedModifier(P, "nonisolated", {"unsafe"});
 }
 
 static void skipAttribute(Parser &P) {
@@ -5878,27 +5906,21 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
   // If it might be, we do some more digging.
 
   // If this is 'unowned', check to see if it is valid.
-  if (Tok.getText() == "unowned" && Tok2.is(tok::l_paren) &&
-      isParenthesizedUnowned(*this)) {
+  if (Tok.getText() == "unowned" && Tok2.is(tok::l_paren)) {
     Parser::BacktrackingScope Backtrack(*this);
-    consumeToken(tok::identifier);
-    consumeToken(tok::l_paren);
-    consumeToken(tok::identifier);
-    consumeToken(tok::r_paren);
-    return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
-                              /*hadAttrsOrModifiers=*/true);
+    if (consumeIfParenthesizedUnowned(*this)) {
+      return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
+                                /*hadAttrsOrModifiers=*/true);
+    }
   }
 
   // If this is 'nonisolated', check to see if it is valid.
-  if (Tok.isContextualKeyword("nonisolated") && Tok2.is(tok::l_paren) &&
-      isParenthesizedNonisolated(*this)) {
+  if (Tok.isContextualKeyword("nonisolated") && Tok2.is(tok::l_paren)) {
     BacktrackingScope backtrack(*this);
-    consumeToken(tok::identifier);
-    consumeToken(tok::l_paren);
-    consumeToken(tok::identifier);
-    consumeToken(tok::r_paren);
-    return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
-                              /*hadAttrsOrModifiers=*/true);
+    if (consumeIfParenthesizedNonisolated(*this)) {
+      return isStartOfSwiftDecl(/*allowPoundIfAttributes=*/false,
+                                /*hadAttrsOrModifiers=*/true);
+    }
   }
 
   if (Tok.isContextualKeyword("actor")) {
