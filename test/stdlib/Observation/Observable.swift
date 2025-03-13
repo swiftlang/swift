@@ -515,7 +515,7 @@ struct Validator {
       let changed = CapturedState(state: false)
       var contents: HasIgnoredProperty? = HasIgnoredProperty()
       class Container {
-        var contents: weak HasIgnoredProperty?
+        weak var contents: HasIgnoredProperty?
         init(contents: HasIgnoredProperty) {
           self.contents = contents
         }
