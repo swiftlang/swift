@@ -1125,7 +1125,9 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
     // reference to the dependencyStatusRecord or its contents, once we have
     // published it in the ActiveTaskStatus since someone else could
     // concurrently made us runnable.
-    dependencyStatusRecord->performEscalationAction(newStatus.getStoredPriority());
+    dependencyStatusRecord->performEscalationAction(
+        oldStatus.getStoredPriority(), // FIXME: is this right?
+        newStatus.getStoredPriority());
 
     // Always add the dependency status record
     return true;

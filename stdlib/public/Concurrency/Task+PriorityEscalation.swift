@@ -17,7 +17,7 @@ import Swift
 
 @available(SwiftStdlib 6.2, *)
 extension Task {
-  /// Escalate the task `priority` of the passed in task to the `newPriority`.
+  /// Manually escalate the task `priority` of this task to the `newPriority`.
   ///
   /// - Warning: This API should rarely be used, and instead you can rely on
   ///   structured concurrency and implicit priority escalation which happens
@@ -43,8 +43,8 @@ extension Task {
   ///   - task: the task which to escalate the priority of
   ///   - newPriority: the new priority the task should continue executing on
   @available(SwiftStdlib 6.2, *)
-  public static func escalatePriority(_ task: Task, to newPriority: TaskPriority) {
-    _taskEscalate(task._task, newPriority: newPriority.rawValue)
+  public func escalatePriority(to newPriority: TaskPriority) {
+    _taskEscalate(self._task, newPriority: newPriority.rawValue)
   }
 }
 
@@ -76,8 +76,8 @@ extension UnsafeCurrentTask {
   ///   - task: the task which to escalate the priority of
   ///   - newPriority: the new priority the task should continue executing on
   @available(SwiftStdlib 6.2, *)
-  public static func escalatePriority(_ task: UnsafeCurrentTask, to newPriority: TaskPriority) {
-    unsafe _taskEscalate(task._task, newPriority: newPriority.rawValue)
+  public func escalatePriority(to newPriority: TaskPriority) {
+    unsafe _taskEscalate(self._task, newPriority: newPriority.rawValue)
   }
 }
 
@@ -107,14 +107,14 @@ extension UnsafeCurrentTask {
 @available(SwiftStdlib 6.2, *)
 public func withTaskPriorityEscalationHandler<T, E>(
   operation: () async throws(E) -> T,
-  onPriorityEscalated handler: @Sendable (TaskPriority) -> Void,
+  onPriorityEscalated handler: @Sendable (TaskPriority, TaskPriority) -> Void,
   isolation: isolated (any Actor)? = #isolation
 ) async throws(E) -> T {
   // NOTE: We have to create the closure beforehand as otherwise it seems
   // the task-local allocator may be used and we end up violating stack-discipline
   // when releasing the handler closure vs. the record.
-  let handler0: (UInt8) -> Void = {
-    handler(TaskPriority(rawValue: $0))
+  let handler0: @Sendable (UInt8, UInt8) -> Void = {
+    handler(TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
   }
   let record = unsafe _taskAddPriorityEscalationHandler(handler: handler0)
   defer { unsafe _taskRemovePriorityEscalationHandler(record: record) }
