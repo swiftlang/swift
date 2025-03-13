@@ -1929,10 +1929,7 @@ void Serializer::writeLocalNormalProtocolConformance(
 
   // Figure out the isolation of the conformance.
   Type globalActorType;
-  auto isolation = evaluateOrDefault(
-      getASTContext().evaluator,
-      ConformanceIsolationRequest{conformance}, swift::ActorIsolation());
-  switch (isolation) {
+  switch (auto isolation = conformance->getIsolation()) {
   case swift::ActorIsolation::Unspecified:
   case swift::ActorIsolation::Nonisolated:
     break;

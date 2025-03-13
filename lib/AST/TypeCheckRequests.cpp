@@ -1381,6 +1381,11 @@ bool ConformanceIsolationRequest::isCached() const {
   if (!rootNormal)
     return false;
 
+  // We know this is nonisolated.
+  if (rootNormal->getOptions().contains(ProtocolConformanceFlags::Nonisolated))
+    return false;
+
+  // Explicit global actor isolation needs to be checked.
   if (rootNormal->globalActorIsolation)
     return true;
 

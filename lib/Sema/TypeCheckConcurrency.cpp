@@ -7878,37 +7878,56 @@ ActorIsolation ProtocolConformance::getIsolation() const {
 
 ActorIsolation
 ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const {
+  // Only normal protocol conformances can be isolated.
   auto rootNormal =
       dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
   if (!rootNormal)
     return ActorIsolation::forNonisolated(false);
 
-  if (!rootNormal->globalActorIsolation)
+  // If the conformance is explicitly non-isolated, report that.
+  if (rootNormal->getOptions().contains(ProtocolConformanceFlags::Nonisolated))
     return ActorIsolation::forNonisolated(false);
 
-  auto globalActorTypeExpr = rootNormal->globalActorIsolation;
-  assert(globalActorTypeExpr && "global actor type is out-of-sync");
+  // If there is an explicitly-specified global actor on the isolation,
+  // resolve it and report it.
+  if (auto globalActorTypeExpr = rootNormal->globalActorIsolation) {
+    // If we don't already have a resolved global actor type, resolve it now.
+    Type globalActorType = globalActorTypeExpr->getInstanceType();
+    if (!globalActorType) {
+      const auto resolution = TypeResolution::forInterface(
+          rootNormal->getDeclContext(), std::nullopt,
+          /*unboundTyOpener*/ nullptr,
+          /*placeholderHandler*/ nullptr,
+          /*packElementOpener*/ nullptr);
+      globalActorType = resolution.resolveType(globalActorTypeExpr->getTypeRepr());
+      if (!globalActorType)
+        return ActorIsolation::forNonisolated(false);
 
-  // If we don't already have a resolved global actor type, resolve it now.
-  Type globalActorType = globalActorTypeExpr->getInstanceType();
-  if (!globalActorType) {
-    const auto resolution = TypeResolution::forInterface(
-        rootNormal->getDeclContext(), std::nullopt,
-        /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr,
-        /*packElementOpener*/ nullptr);
-    globalActorType = resolution.resolveType(globalActorTypeExpr->getTypeRepr());
-    if (!globalActorType)
-      return ActorIsolation::forNonisolated(false);
+      // Cache the resolved type.
+      globalActorTypeExpr->setType(MetatypeType::get(globalActorType));
+    }
 
-    // Cache the resolved type.
-    globalActorTypeExpr->setType(MetatypeType::get(globalActorType));
+    // FIXME: Make sure the type actually is a global actor type, map it into
+    // context, etc.
+
+    return ActorIsolation::forGlobalActor(globalActorType);
   }
 
-  // FIXME: Make sure the type actually is a global actor type, map it into
-  // context, etc.
+  // In a context where we are inferring @MainActor, if the conforming type
+  // is on the main actor, then the conformance is, too.
+  auto dc = rootNormal->getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  auto nominal = dc->getSelfNominalTypeDecl();
+  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated) &&
+      nominal) {
+    auto nominalIsolation = getActorIsolation(nominal);
+    if (nominalIsolation.isMainActor()) {
+      rootNormal->setGlobalActorIsolation(nominalIsolation.getGlobalActor());
+      return nominalIsolation;
+    }
+  }
 
-  return ActorIsolation::forGlobalActor(globalActorType);
+  return ActorIsolation::forNonisolated(false);
 }
 
 namespace {

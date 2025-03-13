@@ -151,8 +151,13 @@ SourceLoc TypeRepr::findAttrLoc(TypeAttrKind kind) const {
   while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
     for (auto attr : attrTypeRepr->getAttrs()) {
       if (auto typeAttr = attr.dyn_cast<TypeAttribute*>())
-        if (typeAttr->getKind() == kind)
-          return typeAttr->getStartLoc();
+        if (typeAttr->getKind() == kind) {
+          auto startLoc = typeAttr->getStartLoc();
+          if (startLoc.isValid())
+            return startLoc;
+
+          return typeAttr->getAttrLoc();
+        }
     }
 
     typeRepr = attrTypeRepr->getTypeRepr();
