@@ -9,7 +9,7 @@
 // RUN: %empty-directory(%t/lib)
 // RUN: %target-swift-emit-module-interface(%t/lib/shim.swiftinterface) %t/shim.swift -module-name shim -I %t/include
 // RUN: %FileCheck %t/shim.swift < %t/lib/shim.swiftinterface
-// RUN: %swift-frontend %t/program.swift -typecheck -verify -cxx-interoperability-mode=default -I %t/include -I %t/lib
+// RUN: %target-swift-frontend %t/program.swift -typecheck -verify -cxx-interoperability-mode=default -I %t/include -I %t/lib
 
 //--- include/module.modulemap
 // A Clang module which will first be compiled in C mode, and then later compiled in C++ mode
