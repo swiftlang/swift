@@ -308,7 +308,7 @@ SequenceTypeTests.test("enumerated()/BidirectionalCollection") {
   }
 
   for test in enumerateTests {
-    let s = MinimalBidirectionalCollection<OpaqueValue<Int>>(
+    let s = MinimalBidirectionalRandomAccessCollection<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
     var result = s.enumerated()
     expectType(
