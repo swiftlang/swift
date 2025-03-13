@@ -1,6 +1,6 @@
-// REQUIRES: swift_swift_parser, swift_feature_ConcurrencySyntaxSugar
+// REQUIRES: swift_swift_parser, swift_feature_ConcurrencySyntaxSugar, swift_feature_ClosureBodyMacro
 
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -enable-experimental-feature ConcurrencySyntaxSugar -language-mode 6 %s -dump-macro-expansions 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -enable-experimental-feature ConcurrencySyntaxSugar -enable-experimental-feature ClosureBodyMacro -language-mode 6 %s -dump-macro-expansions 2>&1 | %FileCheck %s
 
 func f() async {}
 
