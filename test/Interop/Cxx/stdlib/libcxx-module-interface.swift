@@ -11,6 +11,9 @@
 // This test is specific to libc++ and therefore only runs on Darwin platforms.
 // REQUIRES: OS=macosx || OS=ios
 
+// Since this test runs check-libcxx-version, it requires execution.
+// REQUIRES: executable_test
+
 // CHECK-STD: import CxxStdlib.iosfwd
 // CHECK-STD: import CxxStdlib.string
 
