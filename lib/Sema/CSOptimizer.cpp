@@ -500,7 +500,9 @@ static Type inferTypeOfArithmeticOperatorChain(DeclContext *dc, ASTNode node) {
             }
 
             literals.insert(defaultTy);
-            return Action::Continue(expr);
+            // String interpolation expressions have `TapExpr`
+            // as their children, no reason to walk them.
+            return Action::SkipChildren(expr);
           }
         }
       }
