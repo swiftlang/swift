@@ -75,3 +75,21 @@ struct InfersMainActor : P {
 struct IsolatedType {
   @execution(concurrent) func test() async {}
 }
+
+_ = { @execution(caller) in // Ok
+}
+
+_ = { @execution(concurrent) in // Ok
+}
+
+_ = { @MainActor @execution(concurrent) in
+  // expected-error@-1 {{cannot use '@execution' because function type is isolated to a global actor 'MainActor'}}
+}
+
+_ = { @execution(concurrent) () -> Int in
+  // expected-error@-1 {{'@execution' on non-async closure}}
+}
+
+_ = { @execution(caller) (x: isolated (any Actor)?) in
+  // expected-error@-1 {{cannot use '@execution' together with an isolated parameter}}
+}
