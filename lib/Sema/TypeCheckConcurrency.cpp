@@ -4642,7 +4642,7 @@ namespace {
     }
 
     // Attempt to resolve the global actor type of a closure.
-    Type resolveGlobalActorType(AbstractClosureExpr *ACE) {
+    Type resolveGlobalActorType(AbstractClosureExpr *ACE) const {
       // Check whether the closure's type has a global actor already.
       if (Type closureType = getType(ACE)) {
         if (auto closureFnType = closureType->getAs<FunctionType>()) {
@@ -4664,91 +4664,92 @@ namespace {
     ///
     /// This function assumes that enclosing closures have already had their
     /// isolation checked.
-    ActorIsolation determineClosureIsolation(
-        AbstractClosureExpr *closure) {
-      bool preconcurrency = false;
-
-      if (auto explicitClosure = dyn_cast<ClosureExpr>(closure))
-        preconcurrency = explicitClosure->isIsolatedByPreconcurrency();
-
-      // If the closure specifies a global actor, use it.
-      if (Type globalActor = resolveGlobalActorType(closure)) {
-        return ActorIsolation::forGlobalActor(globalActor)
-          .withPreconcurrency(preconcurrency);
-      }
-
-      if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
-        if (auto *attr =
-                explicitClosure->getAttrs().getAttribute<NonisolatedAttr>();
-            attr && ctx.LangOpts.hasFeature(Feature::ClosureIsolation)) {
-          return ActorIsolation::forNonisolated(attr->isUnsafe())
-              .withPreconcurrency(preconcurrency);
-        }
-      }
-
-      // If a closure has an isolated parameter, it is isolated to that
-      // parameter.
-      for (auto param : *closure->getParameters()) {
-        if (param->isIsolated())
-          return ActorIsolation::forActorInstanceCapture(param)
-              .withPreconcurrency(preconcurrency);
-      }
-
-      // If we have a closure that acts as an isolation inference boundary, then
-      // we return that it is non-isolated.
-      //
-      // NOTE: Since we already checked for global actor isolated things, we
-      // know that all Sendable closures must be nonisolated. That is why it is
-      // safe to rely on this path to handle Sendable closures.
-      if (isIsolationInferenceBoundaryClosure(
-              closure, /*canInheritActorContext*/true))
-        return ActorIsolation::forNonisolated(/*unsafe=*/false)
-            .withPreconcurrency(preconcurrency);
-
-      // A non-Sendable closure gets its isolation from its context.
-      auto parentIsolation = getActorIsolationOfContext(
-          closure->getParent(), getClosureActorIsolation);
-      preconcurrency |= parentIsolation.preconcurrency();
-
-      // We must have parent isolation determined to get here.
-      switch (parentIsolation) {
-      case ActorIsolation::CallerIsolationInheriting:
-      case ActorIsolation::Nonisolated:
-      case ActorIsolation::NonisolatedUnsafe:
-      case ActorIsolation::Unspecified:
-        return ActorIsolation::forNonisolated(parentIsolation ==
-                                              ActorIsolation::NonisolatedUnsafe)
-            .withPreconcurrency(preconcurrency);
-
-      case ActorIsolation::Erased:
-        llvm_unreachable("context cannot have erased isolation");
-
-      case ActorIsolation::GlobalActor: {
-        Type globalActor = closure->mapTypeIntoContext(
-            parentIsolation.getGlobalActor()->mapTypeOutOfContext());
-        return ActorIsolation::forGlobalActor(globalActor)
-            .withPreconcurrency(preconcurrency);
-      }
-
-      case ActorIsolation::ActorInstance: {
-        if (checkIsolatedCapture) {
-          if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
-            return ActorIsolation::forActorInstanceCapture(param)
-                .withPreconcurrency(preconcurrency);
-        } else {
-          // If we don't have capture information during code completion, assume
-          // that the closure captures the `isolated` parameter from the parent
-          // context.
-          return parentIsolation;
-        }
-
-        return ActorIsolation::forNonisolated(/*unsafe=*/false)
-            .withPreconcurrency(preconcurrency);
-      }
-    }
-    }
-
+    ActorIsolation
+    determineClosureIsolation(AbstractClosureExpr *closure) const;
   };
+} // end anonymous namespace
+
+ActorIsolation ActorIsolationChecker::determineClosureIsolation(
+    AbstractClosureExpr *closure) const {
+  bool preconcurrency = false;
+
+  ActorIsolation isolation = [&] {
+    if (auto explicitClosure = dyn_cast<ClosureExpr>(closure))
+      preconcurrency = explicitClosure->isIsolatedByPreconcurrency();
+
+    // If the closure specifies a global actor, use it.
+    if (Type globalActor = resolveGlobalActorType(closure)) {
+      return ActorIsolation::forGlobalActor(globalActor);
+    }
+
+    if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+      if (auto *attr =
+              explicitClosure->getAttrs().getAttribute<NonisolatedAttr>();
+          attr && ctx.LangOpts.hasFeature(Feature::ClosureIsolation)) {
+        return ActorIsolation::forNonisolated(attr->isUnsafe());
+      }
+    }
+
+    // If a closure has an isolated parameter, it is isolated to that
+    // parameter.
+    for (auto param : *closure->getParameters()) {
+      if (param->isIsolated())
+        return ActorIsolation::forActorInstanceCapture(param);
+    }
+
+    // If we have a closure that acts as an isolation inference boundary, then
+    // we return that it is non-isolated.
+    //
+    // NOTE: Since we already checked for global actor isolated things, we
+    // know that all Sendable closures must be nonisolated. That is why it is
+    // safe to rely on this path to handle Sendable closures.
+    if (isIsolationInferenceBoundaryClosure(closure,
+                                            /*canInheritActorContext=*/true))
+      return ActorIsolation::forNonisolated(/*unsafe=*/false);
+
+    // A non-Sendable closure gets its isolation from its context.
+    auto parentIsolation = getActorIsolationOfContext(
+        closure->getParent(), getClosureActorIsolation);
+    preconcurrency |= parentIsolation.preconcurrency();
+
+    // We must have parent isolation determined to get here.
+    switch (parentIsolation) {
+    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
+    case ActorIsolation::Unspecified:
+      return ActorIsolation::forNonisolated(
+          parentIsolation == ActorIsolation::NonisolatedUnsafe);
+
+    case ActorIsolation::Erased:
+      llvm_unreachable("context cannot have erased isolation");
+
+    case ActorIsolation::GlobalActor: {
+      Type globalActor = closure->mapTypeIntoContext(
+          parentIsolation.getGlobalActor()->mapTypeOutOfContext());
+      return ActorIsolation::forGlobalActor(globalActor);
+    }
+
+    case ActorIsolation::ActorInstance: {
+      if (checkIsolatedCapture) {
+        if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
+          return ActorIsolation::forActorInstanceCapture(param);
+      } else {
+        // If we don't have capture information during code completion, assume
+        // that the closure captures the `isolated` parameter from the parent
+        // context.
+        return parentIsolation;
+      }
+
+      return ActorIsolation::forNonisolated(/*unsafe=*/false);
+    }
+    }
+  }();
+
+  // Apply computed preconcurrency.
+  isolation = isolation.withPreconcurrency(preconcurrency);
+
+  return isolation;
 }
 
 bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
