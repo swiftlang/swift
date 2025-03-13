@@ -206,9 +206,15 @@ public:
       if (!firstElem) {
         result += ", ";
       }
-      if (source.getParsedLifetimeDependenceKind() ==
-          ParsedLifetimeDependenceKind::Scope) {
+      switch (source.getParsedLifetimeDependenceKind()) {
+      case ParsedLifetimeDependenceKind::Scope:
         result += "borrow ";
+        break;
+      case ParsedLifetimeDependenceKind::Inherit:
+        result += "copy ";
+        break;
+      default:
+        break;
       }
       result += source.getString();
       firstElem = false;
