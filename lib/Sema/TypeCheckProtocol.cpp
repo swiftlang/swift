@@ -2542,20 +2542,11 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
-  // Complain if the conformance is isolated but the conforming type is
-  // not global-actor-isolated.
-  if (conformance->isGlobalActorIsolated()) {
-    auto enclosingNominal = DC->getSelfNominalTypeDecl();
-    if (!enclosingNominal ||
-        !getActorIsolation(enclosingNominal).isGlobalActor()) {
-      Context.Diags.diagnose(
-          ComplainLoc, diag::isolated_conformance_not_global_actor_isolated);
-    }
-    
-    if (!Context.LangOpts.hasFeature(Feature::IsolatedConformances)) {
-      Context.Diags.diagnose(
-          ComplainLoc, diag::isolated_conformance_experimental_feature);
-    }
+  // Complain if the global-actor-isolated conformances are not enabled.
+  if (conformance->isGlobalActorIsolated() &&
+      !Context.LangOpts.hasFeature(Feature::IsolatedConformances)) {
+    Context.Diags.diagnose(
+        ComplainLoc, diag::isolated_conformance_experimental_feature);
   }
   
   bool allowImpliedConditionalConformance = false;
@@ -3330,14 +3321,6 @@ static bool hasExplicitGlobalActorAttr(ValueDecl *decl) {
   return !globalActorAttr->first->isImplicit();
 }
 
-/// Determine whether the given actor isolation matches that of the enclosing
-/// type.
-static bool isolationMatchesEnclosingType(
-    ActorIsolation isolation, NominalTypeDecl *nominal) {
-  auto nominalIsolation = getActorIsolation(nominal);
-  return isolation == nominalIsolation;
-}
-
 std::optional<ActorIsolation>
 ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
                                         ValueDecl *witness,
@@ -3400,13 +3383,10 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
 
     return std::nullopt;
   case ActorReferenceResult::EntersActor:
-    // If the conformance itself is isolated, and the witness isolation
-    // matches the enclosing type's isolation, treat this as being in the
-    // same concurrency domain.
+    // If the conformance itself is isolated to the same isolation domain as
+    // the witness, treat this as being in the same concurrency domain.
     if (Conformance->isGlobalActorIsolated() &&
-        refResult.isolation.isGlobalActor() &&
-        isolationMatchesEnclosingType(
-            refResult.isolation, DC->getSelfNominalTypeDecl())) {
+        refResult.isolation == getConformanceIsolation(Conformance)) {
       sameConcurrencyDomain = true;
       isIsolatedConformance = true;
     }
@@ -5244,14 +5224,19 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
               // If the conformance we're checking isn't isolated at all, it
               // needs "isolated".
               if (!conformance->isGlobalActorIsolated()) {
+                auto isolation = getConformanceIsolation(isolatedConformance);
+                std::string globalActorStr = "@" +
+                    isolation.getGlobalActor().getString();
                 ctx.Diags.diagnose(
                     conformance->getLoc(),
                     diag::nonisolated_conformance_depends_on_isolated_conformance,
                     typeInContext, conformance->getProtocol()->getName(),
                     getConformanceIsolation(isolatedConformance),
                     isolatedConformance->getType(),
-                    isolatedConformance->getProtocol()->getName()
-               ).fixItInsert(conformance->getProtocolNameLoc(), "isolated ");
+                    isolatedConformance->getProtocol()->getName(),
+                    globalActorStr
+               ).fixItInsert(conformance->getProtocolNameLoc(),
+                             globalActorStr + " ");
 
                 return true;
               }

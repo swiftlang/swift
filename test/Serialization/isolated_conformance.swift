@@ -12,5 +12,5 @@ func acceptMyProtocol(_: some MyProtocol) { }
 
 nonisolated func f(mc: MyClass) {
   acceptMyProtocol(mc)
-  // expected-error@-1{{main actor-isolated isolated conformance of 'MyClass' to 'MyProtocol' cannot be used in nonisolated context}}
+  // expected-error@-1{{main actor-isolated conformance of 'MyClass' to 'MyProtocol' cannot be used in nonisolated context}}
 }
