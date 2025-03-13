@@ -14,3 +14,9 @@ public class MyClass { }
 extension MyClass: @MainActor MyProtocol {
   @MainActor public func f() { }
 }
+
+extension MyClass: nonisolated Equatable {
+  nonisolated public static func ==(lhs: MyClass, rhs: MyClass) -> Bool {
+    false
+  }
+}
