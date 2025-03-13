@@ -100,7 +100,7 @@ private:
   using InlineDomainPtr =
       llvm::PointerEmbeddedInt<uint32_t, InlineDomain::ReprBits>;
   using Storage =
-      llvm::PointerUnion<CustomAvailabilityDomain *, InlineDomainPtr>;
+      llvm::PointerUnion<const CustomAvailabilityDomain *, InlineDomainPtr>;
   Storage storage;
 
   AvailabilityDomain(Kind kind)
@@ -111,7 +111,8 @@ private:
   AvailabilityDomain(PlatformKind platform)
       : storage(InlineDomain(Kind::Platform, platform).asInteger()) {};
 
-  AvailabilityDomain(CustomAvailabilityDomain *domain) : storage(domain) {};
+  AvailabilityDomain(const CustomAvailabilityDomain *domain)
+      : storage(domain) {};
 
   AvailabilityDomain(Storage storage) : storage(storage) {};
 
@@ -122,9 +123,9 @@ private:
                : std::nullopt;
   }
 
-  CustomAvailabilityDomain *getCustomDomain() const {
+  const CustomAvailabilityDomain *getCustomDomain() const {
     ASSERT(isCustom());
-    return storage.get<CustomAvailabilityDomain *>();
+    return storage.get<const CustomAvailabilityDomain *>();
   }
 
 public:
@@ -152,7 +153,7 @@ public:
     return AvailabilityDomain(Kind::Embedded);
   }
 
-  static AvailabilityDomain forCustom(CustomAvailabilityDomain *domain) {
+  static AvailabilityDomain forCustom(const CustomAvailabilityDomain *domain) {
     return AvailabilityDomain(domain);
   }
 
@@ -294,7 +295,7 @@ struct StableAvailabilityDomainComparator {
 };
 
 /// Represents an availability domain that has been defined in a module.
-class CustomAvailabilityDomain : public ASTAllocated<CustomAvailabilityDomain> {
+class CustomAvailabilityDomain : public llvm::FoldingSetNode {
 public:
   enum class Kind {
     /// A domain that is known to be enabled at compile time.
@@ -313,12 +314,20 @@ private:
   CustomAvailabilityDomain(Identifier name, ModuleDecl *mod, Kind kind);
 
 public:
-  static CustomAvailabilityDomain *create(const ASTContext &ctx, StringRef name,
-                                          ModuleDecl *mod, Kind kind);
+  static const CustomAvailabilityDomain *get(StringRef name, ModuleDecl *mod,
+                                             Kind kind, const ASTContext &ctx);
 
   Identifier getName() const { return name; }
   Kind getKind() const { return kind; }
   ModuleDecl *getModule() const { return mod; }
+
+  /// Uniquing for `ASTContext`.
+  static void Profile(llvm::FoldingSetNodeID &ID, Identifier name,
+                      ModuleDecl *mod, Kind kind);
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, name, mod, kind);
+  }
 };
 
 /// Represents either a resolved availability domain or an identifier written

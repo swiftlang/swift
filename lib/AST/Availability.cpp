@@ -738,7 +738,6 @@ Decl::getAvailableAttrForPlatformIntroduction(bool checkExtension) const {
 }
 
 AvailabilityRange AvailabilityInference::availableRange(const Decl *D) {
-  // ALLANXXX
   if (auto attr = D->getAvailableAttrForPlatformIntroduction())
     return attr->getIntroducedRange(D->getASTContext())
         .value_or(AvailabilityRange::alwaysAvailable());
