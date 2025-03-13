@@ -7686,17 +7686,6 @@ static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
          });
 }
 
-// TODO: Move all these utility functions in a new file ClangImporterUtils.h
-// rdar://138803759
-static bool hasImmortalAtts(const clang::RecordDecl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "retain:immortal" ||
-                    swiftAttr->getAttribute() == "release:immortal";
-           return false;
-         });
-}
-
 // Is this a pointer to a foreign reference type.
 bool importer::isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType type) {
   if (!type->isPointerType())
@@ -7708,7 +7697,7 @@ bool importer::isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType 
     return false;
 
   return hasImportAsRefAttr(pointeeType->getDecl()) &&
-         !hasImmortalAtts(pointeeType->getDecl());
+         !hasImmortalAttrs(pointeeType->getDecl());
 }
 
 static bool hasDiamondInheritanceRefType(const clang::CXXRecordDecl *decl) {
