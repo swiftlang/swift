@@ -238,8 +238,6 @@ $ArchX64 = @{
   LLVMTarget = "x86_64-unknown-windows-msvc";
   CMakeName = "AMD64";
   BinaryDir = "bin64";
-  XCTestInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\XCTest-development";
-  SwiftTestingInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\Testing-development";
   ToolchainInstallRoot = "$BinaryCache\x64\toolchains\$ProductVersion+$Variant";
   Cache = @{};
 }
@@ -251,8 +249,6 @@ $ArchX86 = @{
   LLVMTarget = "i686-unknown-windows-msvc";
   CMakeName = "i686";
   BinaryDir = "bin32";
-  XCTestInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\XCTest-development";
-  SwiftTestingInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\Testing-development";
   Cache = @{};
 }
 
@@ -263,9 +259,7 @@ $ArchARM64 = @{
   LLVMTarget = "aarch64-unknown-windows-msvc";
   CMakeName = "ARM64";
   BinaryDir = "bin64a";
-  XCTestInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\XCTest-development";
   ToolchainInstallRoot = "$BinaryCache\arm64\toolchains\$ProductVersion+$Variant";
-  SwiftTestingInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\Testing-development";
   Cache = @{};
 }
 
@@ -276,8 +270,6 @@ $AndroidARM64 = @{
   LLVMName = "aarch64";
   LLVMTarget = "aarch64-unknown-linux-android$AndroidAPILevel";
   ShortName = "arm64";
-  XCTestInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\Library\XCTest-development";
-  SwiftTestingInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\Library\Testing-development";
   Cache = @{};
 }
 
@@ -288,8 +280,6 @@ $AndroidARMv7 = @{
   LLVMName = "armv7";
   LLVMTarget = "armv7-unknown-linux-androideabi$AndroidAPILevel";
   ShortName = "armv7";
-  XCTestInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\Library\XCTest-development";
-  SwiftTestingInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\Library\Testing-development";
   Cache = @{};
 }
 
@@ -300,8 +290,6 @@ $AndroidX86 = @{
   LLVMName = "i686";
   LLVMTarget = "i686-unknown-linux-android$AndroidAPILevel";
   ShortName = "x86";
-  XCTestInstallRoot = "$BinaryCache\x86\Android.platform\Developer\Library\XCTest-development";
-  SwiftTestingInstallRoot = "$BinaryCache\x86\Android.platform\Developer\Library\Testing-development";
   Cache = @{};
 }
 
@@ -312,8 +300,6 @@ $AndroidX64 = @{
   LLVMName = "x86_64";
   LLVMTarget = "x86_64-unknown-linux-android$AndroidAPILevel";
   ShortName = "x64";
-  XCTestInstallRoot = "$BinaryCache\x64\Android.platform\Developer\Library\XCTest-development";
-  SwiftTestingInstallRoot = "$BinaryCache\x64\Android.platform\Developer\Library\Testing-development";
   Cache = @{};
 }
 
@@ -2384,15 +2370,18 @@ function Build-XCTest([Platform]$Platform, $Arch) {
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-xctest `
     -Bin $(Get-TargetProjectBinaryCache $Arch XCTest) `
-    -InstallTo "$($Arch.XCTestInstallRoot)\usr" `
+    -InstallTo "$([IO.Path]::Combine((Get-PlatformRoot $Platform), "Developer", "Library", "XCTest-development", "usr"))" `
     -Arch $Arch `
     -Platform $Platform `
     -UseBuiltCompilers Swift `
     -Defines @{
+      BUILD_SHARED_LIBS = "YES";
       CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
+      CMAKE_INSTALL_BINDIR = $Arch.BinaryDir;
       ENABLE_TESTING = "NO";
       dispatch_DIR = $(Get-TargetProjectCMakeModules $Arch Dispatch);
       Foundation_DIR = $(Get-TargetProjectCMakeModules $Arch DynamicFoundation);
+      XCTest_INSTALL_NESTED_SUBDIR = "YES";
     }
 }
 
@@ -2424,18 +2413,20 @@ function Build-Testing([Platform]$Platform, $Arch) {
   Build-CMakeProject `
     -Src $SourceCache\swift-testing `
     -Bin (Get-TargetProjectBinaryCache $Arch Testing) `
-    -InstallTo "$($Arch.SwiftTestingInstallRoot)\usr" `
+    -InstallTo "$([IO.Path]::Combine((Get-PlatformRoot $Platform), "Developer", "Library", "Testing-development", "usr"))" `
     -Arch $Arch `
     -Platform $Platform `
     -UseBuiltCompilers C,CXX,Swift `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_BUILD_WITH_INSTALL_RPATH = "YES";
+      CMAKE_INSTALL_BINDIR = $Arch.BinaryDir;
       dispatch_DIR = (Get-TargetProjectCMakeModules $Arch Dispatch);
       Foundation_DIR = (Get-TargetProjectCMakeModules $Arch DynamicFoundation);
       # TODO: ensure that host and target platform match
       SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
       SwiftTesting_MACRO = "$(Get-BuildProjectBinaryCache TestingMacros)\TestingMacros.dll";
+      SwiftTesting_INSTALL_NESTED_SUBDIR = "YES";
     }
 }
 
@@ -2473,32 +2464,6 @@ function Install-Platform([Platform]$Platform, $Archs) {
         Copy-File $_.FullName "$PlatformResources\$($_.BaseName).swiftmodule\$(Get-ModuleTriple $Arch)$($_.Extension)"
       }
     }
-
-    # Copy XCTest
-    $XCTestInstallRoot = [IO.Path]::Combine((Get-PlatformRoot $Platform), "Developer", "Library", "XCTest-development")
-    switch ($Platform) {
-      Windows {
-        Copy-File "$($Arch.XCTestInstallRoot)\usr\bin\XCTest.dll" "$XCTestInstallRoot\usr\$($Arch.BinaryDir)\"
-        Copy-File "$($Arch.XCTestInstallRoot)\usr\lib\swift\windows\XCTest.lib" "$XCTestInstallRoot\usr\lib\swift\windows\$($Arch.LLVMName)\"
-      }
-      default {
-        Copy-File "$($Arch.XCTestInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\libXCTest.so" "$XCTestInstallRoot\usr\lib\$($Arch.BinaryDir)\"
-      }
-    }
-    Copy-Directory "$($Arch.XCTestInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\XCTest.swiftmodule" "$XCTestInstallRoot\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\"
-
-    # Copy Testing
-    $SwiftTestingInstallRoot = [IO.Path]::Combine((Get-PlatformRoot $Platform), "Developer", "Library", "Testing-development")
-    switch ($Platform) {
-      Windows {
-        Copy-File "$($Arch.SwiftTestingInstallRoot)\usr\bin\Testing.dll" "$SwiftTestingInstallRoot\usr\$($Arch.BinaryDir)\"
-        Copy-File "$($Arch.SwiftTestingInstallRoot)\usr\lib\swift\windows\Testing.lib" "$SwiftTestingInstallRoot\usr\lib\swift\windows\$($Arch.LLVMName)\"
-      }
-      default {
-        Copy-File "$($Arch.SwiftTestingInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\libTesting.so" "$SwiftTestingInstallRoot\usr\lib\$($Arch.BinaryDir)\"
-      }
-    }
-    Copy-Directory "$($Arch.SwiftTestingInstallRoot)\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\Testing.swiftmodule" "$SwiftTestingInstallRoot\usr\lib\swift\$($Platform.ToString().ToLowerInvariant())\"
   }
 }
 
