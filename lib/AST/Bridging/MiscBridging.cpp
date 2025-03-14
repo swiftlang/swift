@@ -149,3 +149,14 @@ BridgedOwnedString BridgedGenericSignature::getDebugDescription() const {
   unbridged().print(os);
   return BridgedOwnedString(str);
 }
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedPoundKeyword
+//===----------------------------------------------------------------------===//
+
+BridgedPoundKeyword BridgedPoundKeyword_fromString(BridgedStringRef cStr) {
+  return llvm::StringSwitch<BridgedPoundKeyword>(cStr.unbridged())
+#define POUND_KEYWORD(NAME) .Case(#NAME, BridgedPoundKeyword_##NAME)
+#include "swift/AST/TokenKinds.def"
+      .Default(BridgedPoundKeyword_None);
+}

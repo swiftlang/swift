@@ -58,5 +58,7 @@ func testPoundIf() {
     // pass
   } else if #unavailable(macOS 80) {
     // pass
+  } else if #_hasSymbol(Int.self) { // expected-warning {{struct 'Int' is not a weakly linked declaration}}
+    // pass
   }
 }
