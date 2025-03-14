@@ -71,6 +71,51 @@ if(_output)
     "Copy ${StdlibSources}/Info.plist.in] -> Core/Info.plist.in Failed: ${_output}")
 endif()
 
+# Copy Windows clang overlays
+message(STATUS "modulemap[${StdlibSources}/Windows/ucrt.modulemap] -> Overlay/Windows/clang")
+file(COPY_FILE
+  "${StdlibSources}/public/Platform/ucrt.modulemap"                 # From
+  "${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/clang/ucrt.modulemap"  # To
+  RESULT _output
+  ONLY_IF_DIFFERENT)
+if(_output)
+  message(SEND_ERROR
+    "Copy ${StdlibSources}/public/Platform/ucrt.modulemap -> Overlay/Windows/clang/ucrt.modulemap Failed: ${_output}")
+endif()
+
+message(STATUS "modulemap[${StdlibSources}/Windows/winsdk.modulemap] -> Overlay/Windows/clang")
+file(COPY_FILE
+  "${StdlibSources}/public/Platform/winsdk.modulemap"                 # From
+  "${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/clang/winsdk.modulemap"  # To
+  RESULT _output
+  ONLY_IF_DIFFERENT)
+if(_output)
+  message(SEND_ERROR
+    "Copy ${StdlibSources}/public/Platform/winsdk.modulemap -> Overlay/Windows/clang/winsdk.modulemap Failed: ${_output}")
+endif()
+
+message(STATUS "modulemap[${StdlibSources}/Windows/vcruntime.modulemap] -> Overlay/Windows/clang")
+file(COPY_FILE
+  "${StdlibSources}/public/Platform/vcruntime.modulemap"                # From
+  "${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/clang/vcruntime.modulemap" # To
+  RESULT _output
+  ONLY_IF_DIFFERENT)
+if(_output)
+  message(SEND_ERROR
+    "Copy ${StdlibSources}/public/Platform/vcruntime.modulemap -> Overlay/Windows/clang/vcruntime.modulemap Failed: ${_output}")
+endif()
+
+message(STATUS "APINotes[${StdlibSources}/Windows/vcruntime.apinotes] -> Overlay/Windows/clang")
+file(COPY_FILE
+  "${StdlibSources}/public/Platform/vcruntime.apinotes"                 # From
+  "${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/clang/vcruntime.apinotes"  # To
+  RESULT _output
+  ONLY_IF_DIFFERENT)
+if(_output)
+  message(SEND_ERROR
+    "Copy ${StdlibSources}/public/Platform/vcruntime.apinotes -> Overlay/Windows/clang/vcruntime.modulemap Failed: ${_output}")
+endif()
+
 set(CoreLibs
   LLVMSupport
   SwiftShims
@@ -89,6 +134,30 @@ set(CoreLibs
 foreach(library ${CoreLibs})
   copy_library_sources(${library} "public" "Core")
 endforeach()
+
+message(STATUS "CRT[${StdlibSources}/public/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/CRT")
+foreach(file ucrt.swift Platform.swift POSIXError.swift TiocConstants.swift tgmath.swift.gyb)
+  file(COPY_FILE
+    "${StdlibSources}/public/Platform/${file}"
+    "${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/CRT/${file}"
+    RESULT _output
+    ONLY_IF_DIFFERENT)
+  if(_output)
+    message(SEND_ERROR
+      "Copy Platform/${file} -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/CRT/${file} Failed: ${_output}")
+  endif()
+endforeach()
+
+message(STATUS "WinSDK[${StdlibSources}/public/Windows] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK")
+file(COPY_FILE
+  "${StdlibSources}/public/Windows/WinSDK.swift"
+  "${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK/WinSDK.swift"
+  RESULT _output
+  ONLY_IF_DIFFERENT)
+if(_output)
+  message(SEND_ERROR
+    "Copy Windows/WinSDK.swift -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK/WinSDK.swift Failed: ${_output}")
+endif()
 
 # TODO: Add source directories for the platform overlays, supplemental
 # libraries, and test support libraries.
