@@ -2910,7 +2910,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeDeclAttrParam(
-            ParameterizedDeclAttributeKind::AccessControl, 0, false);
+            ParameterizedDeclAttributeKind::AccessControl, 0, /*HasLabel=*/false);
         consumeToken(tok::code_complete);
       }
       return makeParserSuccess();
@@ -3765,7 +3765,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
                                       *isUnsafe, [&] () {
             if (CodeCompletionCallbacks) {
               CodeCompletionCallbacks->completeDeclAttrParam(
-                  ParameterizedDeclAttributeKind::Nonisolated, 0, false);
+                  ParameterizedDeclAttributeKind::Nonisolated, 0, /*HasLabel=*/false);
               consumeToken(tok::code_complete);
             }
           });
