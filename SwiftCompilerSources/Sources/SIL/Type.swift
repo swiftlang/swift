@@ -99,14 +99,10 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     GenericSignature(bridged: bridged.getInvocationGenericSignatureOfFunctionType())
   }
 
-  // compiling bridged.getFunctionTypeWithNoEscape crashes the 5.10 Windows compiler
-  // TODO: https://github.com/apple/swift/issues/73253
-  #if !os(Windows)
-    // Returns a new SILFunctionType with changed "escapeness".
-    public func getFunctionType(withNoEscape: Bool) -> Type {
-      bridged.getFunctionTypeWithNoEscape(withNoEscape).type
-    }
-  #endif
+  // Returns a new SILFunctionType with changed "escapeness".
+  public func getFunctionType(withNoEscape: Bool) -> Type {
+    bridged.getFunctionTypeWithNoEscape(withNoEscape).type
+  }
 
   //===--------------------------------------------------------------------===//
   //                           Aggregates
