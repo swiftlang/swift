@@ -252,7 +252,10 @@ extension Result where Success: ~Copyable {
   }
 }
 
-extension Result where Success: ~Copyable & ~Escapable {
+extension Result where Success: ~Copyable {
+  // FIXME: This should allow ~Escapable Success types
+  // (https://forums.swift.org/t/se-0465-standard-library-primitives-for-nonescapable-types/78310/5)
+
   /// Returns a new result, mapping any failure value using the given
   /// transformation and unwrapping the produced result.
   ///
