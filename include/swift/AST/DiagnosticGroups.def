@@ -26,6 +26,7 @@ GROUP(DeprecatedDeclaration, "deprecated-declaration.md")
 GROUP(StrictMemorySafety, "strict-memory-safety.md")
 GROUP(UnknownWarningGroup, "unknown-warning-group.md")
 GROUP(PreconcurrencyImport, "preconcurrency-import.md")
+GROUP(AsyncCallerExecution, "async-caller-execution.md")
 GROUP(StrictLanguageFeatures, "strict-language-features.md")
 GROUP(ExistentialAny, "existential-any.md")
 

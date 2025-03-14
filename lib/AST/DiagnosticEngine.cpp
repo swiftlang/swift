@@ -398,6 +398,42 @@ InFlightDiagnostic &InFlightDiagnostic::fixItAddImport(StringRef ModuleName) {
   return *this;
 }
 
+InFlightDiagnostic &
+InFlightDiagnostic::fixItInsertAttribute(SourceLoc L,
+                                         const DeclAttribute *Attr) {
+  return fixItInsert(L, "%0 ", {Attr});
+}
+
+InFlightDiagnostic &
+InFlightDiagnostic::fixItAddAttribute(const DeclAttribute *Attr,
+                                      const ClosureExpr *E) {
+  ASSERT(!E->isImplicit());
+
+  SourceLoc insertionLoc;
+
+  if (auto *paramList = E->getParameters()) {
+    // HACK: Don't set insertion loc to param list start loc if it's equal to
+    // closure start loc (meaning it's implicit).
+    // FIXME: Don't set the start loc of an implicit param list, or put an
+    // isImplicit bit on ParameterList.
+    if (paramList->getStartLoc() != E->getStartLoc()) {
+      insertionLoc = paramList->getStartLoc();
+    }
+  }
+
+  if (insertionLoc.isInvalid()) {
+    insertionLoc = E->getInLoc();
+  }
+
+  if (insertionLoc.isValid()) {
+    return fixItInsert(insertionLoc, "%0 ", {Attr});
+  } else {
+    insertionLoc = E->getBody()->getLBraceLoc();
+    ASSERT(insertionLoc.isValid());
+    return fixItInsertAfter(insertionLoc, " %0 in ", {Attr});
+  }
+}
+
 InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
                                                       SourceRange R2) {
   assert(IsActive && "Cannot modify an inactive diagnostic");

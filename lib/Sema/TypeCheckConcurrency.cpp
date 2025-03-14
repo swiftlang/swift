@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckConcurrency.h"
+#include "AsyncCallerExecutionMigration.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckInvertible.h"
@@ -4751,6 +4752,11 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
   // Apply computed preconcurrency.
   isolation = isolation.withPreconcurrency(preconcurrency);
 
+  if (ctx.LangOpts.getFeatureState(Feature::AsyncCallerExecution)
+          .isEnabledForAdoption()) {
+    warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, closure, isolation);
+  }
+
   return isolation;
 }
 
@@ -5842,8 +5848,8 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
   return {{ActorIsolation::forUnspecified(), {}}, nullptr, {}};
 }
 
-InferredActorIsolation ActorIsolationRequest::evaluate(
-    Evaluator &evaluator, ValueDecl *value) const {
+static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
+                                                    ValueDecl *value) {
   // If this declaration has actor-isolated "self", it's isolated to that
   // actor.
   if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {
@@ -6226,6 +6232,20 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
     addAttributesForActorIsolation(value, defaultIsolation.isolation);
   }
   return defaultIsolation;
+}
+
+InferredActorIsolation ActorIsolationRequest::evaluate(Evaluator &evaluator,
+                                                       ValueDecl *value) const {
+  const auto inferredIsolation = computeActorIsolation(evaluator, value);
+
+  auto &ctx = value->getASTContext();
+  if (ctx.LangOpts.getFeatureState(Feature::AsyncCallerExecution)
+          .isEnabledForAdoption()) {
+    warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, value,
+                                                  inferredIsolation.isolation);
+  }
+
+  return inferredIsolation;
 }
 
 bool HasIsolatedSelfRequest::evaluate(
