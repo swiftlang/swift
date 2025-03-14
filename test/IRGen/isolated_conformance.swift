@@ -17,6 +17,6 @@ protocol P {
 // CHECK-SAME: ScM
 // CHECK-SAME: $sScMs11GlobalActorsMc"
 @MainActor
-struct X<T>: isolated P {
+struct X<T>: @MainActor P {
   func f() { }
 }

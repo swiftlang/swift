@@ -1806,16 +1806,20 @@ private:
   /// This is true in cases like ~Copyable but not (P & ~Copyable).
   bool IsSuppressed : 1;
 
+  /// The global actor isolation provided (for a conformance).
+  TypeExpr *globalActorIsolationType = nullptr;
+
 public:
   InheritedEntry(const TypeLoc &typeLoc);
 
   InheritedEntry(const TypeLoc &typeLoc, ProtocolConformanceOptions options,
                  bool isSuppressed = false)
       : TypeLoc(typeLoc), RawOptions(options.toRaw()),
-        IsSuppressed(isSuppressed) {}
+        IsSuppressed(isSuppressed),
+        globalActorIsolationType(options.getGlobalActorIsolationType()) {}
 
   ProtocolConformanceOptions getOptions() const {
-    return ProtocolConformanceOptions(RawOptions);
+    return ProtocolConformanceOptions(RawOptions, globalActorIsolationType);
   }
 
   bool isUnchecked() const {
@@ -1827,8 +1831,12 @@ public:
   bool isPreconcurrency() const {
     return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
   }
-  bool isIsolated() const {
-    return getOptions().contains(ProtocolConformanceFlags::Isolated);
+  bool isNonisolated() const {
+    return getOptions().contains(ProtocolConformanceFlags::Nonisolated);
+  }
+
+  TypeExpr *getGlobalActorIsolationType() const {
+    return globalActorIsolationType;
   }
 
   ExplicitSafety getExplicitSafety() const {

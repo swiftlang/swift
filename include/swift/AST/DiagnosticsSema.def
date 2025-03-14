@@ -8319,31 +8319,28 @@ ERROR(attr_abi_incompatible_with_silgen_name,none,
 //===----------------------------------------------------------------------===//
 // MARK: Isolated conformances
 //===----------------------------------------------------------------------===//
-ERROR(isolated_conformance_not_global_actor_isolated,none,
-      "isolated conformance is only permitted on global-actor-isolated types",
-      ())
 ERROR(isolated_conformance_experimental_feature,none,
       "isolated conformances require experimental feature "
       " 'IsolatedConformances'", ())
 ERROR(nonisolated_conformance_depends_on_isolated_conformance,none,
-      "conformance of %0 to %1 depends on %2 conformance of %3 to %4; mark it as 'isolated'",
-      (Type, DeclName, ActorIsolation, Type, DeclName))
+      "conformance of %0 to %1 depends on %2 conformance of %3 to %4; mark it as '%5'",
+      (Type, DeclName, ActorIsolation, Type, DeclName, StringRef))
 ERROR(isolated_conformance_mismatch_with_associated_isolation,none,
       "%0 conformance of %1 to %2 cannot depend on %3 conformance of %4 to %5",
       (ActorIsolation, Type, DeclName, ActorIsolation, Type, DeclName))
 NOTE(add_isolated_to_conformance,none,
-     "add 'isolated' to the %0 conformance to restrict it to %1 code",
-    (DeclName, ActorIsolation))
+     "add '%0' to the %1 conformance to restrict it to %2 code",
+    (StringRef, DeclName, ActorIsolation))
 ERROR(isolated_conformance_with_sendable,none,
-      "isolated conformance of %0 to %1 cannot be used to satisfy conformance "
+      "%4 conformance of %0 to %1 cannot be used to satisfy conformance "
       "requirement for a %select{`Sendable`|`SendableMetatype`}2 type "
-      "parameter %3", (Type, DeclName, bool, Type))
+      "parameter %3", (Type, DeclName, bool, Type, ActorIsolation))
 ERROR(isolated_conformance_with_sendable_simple,none,
-      "isolated conformance of %0 to %1 cannot be used to satisfy conformance "
-      "requirement for a `Sendable` type parameter ",
-      (Type, DeclName))
+      "%2 conformance of %0 to %1 cannot be used to satisfy "
+      "conformance requirement for a `Sendable` type parameter ",
+      (Type, DeclName, ActorIsolation))
 ERROR(isolated_conformance_wrong_domain,none,
-      "%0 isolated conformance of %1 to %2 cannot be used in %3 context",
+      "%0 conformance of %1 to %2 cannot be used in %3 context",
       (ActorIsolation, Type, DeclName, ActorIsolation))
 
 //===----------------------------------------------------------------------===//

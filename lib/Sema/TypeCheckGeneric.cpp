@@ -13,6 +13,7 @@
 // This file implements support for generics.
 //
 //===----------------------------------------------------------------------===//
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -936,7 +937,8 @@ void TypeChecker::diagnoseRequirementFailure(
           reqFailureInfo
             .IsolatedConformanceProto->isSpecificProtocol(
               KnownProtocolKind::SendableMetatype),
-          req.getFirstType());
+          req.getFirstType(),
+          isolatedConformance->getIsolation());
       diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
       break;
     }
