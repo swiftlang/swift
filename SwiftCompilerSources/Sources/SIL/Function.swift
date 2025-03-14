@@ -145,6 +145,14 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public enum SerializedKind {
     case notSerialized, serialized, serializedForPackage
+
+    public var bridged: BridgedFunction.SerializedKind {
+      switch self {
+      case .notSerialized: return .IsNotSerialized
+      case .serialized: return .IsSerialized
+      case .serializedForPackage: return .IsSerializedForPackage
+      }
+    }
   }
 
   public var serializedKind: SerializedKind {
@@ -153,14 +161,6 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case .IsSerialized: return .serialized
     case .IsSerializedForPackage: return .serializedForPackage
     @unknown default: fatalError()
-    }
-  }
-
-  private func serializedKindBridged(_ arg: SerializedKind) -> BridgedFunction.SerializedKind {
-    switch arg {
-    case .notSerialized: return .IsNotSerialized
-    case .serialized: return .IsSerialized
-    case .serializedForPackage: return .IsSerializedForPackage
     }
   }
 
@@ -187,7 +187,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   }
 
   public func hasValidLinkageForFragileRef(_ kind: SerializedKind) -> Bool {
-    bridged.hasValidLinkageForFragileRef(serializedKindBridged(kind))
+    bridged.hasValidLinkageForFragileRef(kind.bridged)
   }
 
   public enum ThunkKind {
@@ -566,6 +566,12 @@ extension BridgedFunction {
 
 extension OptionalBridgedFunction {
   public var function: Function? { obj.getAs(Function.self) }
+}
+
+extension Optional where Wrapped == Function {
+  public var bridged: OptionalBridgedFunction {
+    OptionalBridgedFunction(obj: self?.bridged.obj)
+  }
 }
 
 public extension SideEffects.GlobalEffects {

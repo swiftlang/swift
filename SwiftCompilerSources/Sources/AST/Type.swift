@@ -86,6 +86,7 @@ extension TypeProperties {
 
   public var isLegalFormalType: Bool { type.bridged.isLegalFormalType() }
   public var hasTypeParameter: Bool { type.bridged.hasTypeParameter() }
+  public var hasArchetype: Bool { type.bridged.hasArchetype() }
   public var hasLocalArchetype: Bool { type.bridged.hasLocalArchetype() }
   public var isExistentialArchetype: Bool { type.bridged.isExistentialArchetype() }
   public var isExistentialArchetypeWithError: Bool { type.bridged.isExistentialArchetypeWithError() }
@@ -106,6 +107,14 @@ extension TypeProperties {
   public var canBeClass: Type.TraitResult { type.bridged.canBeClass().result }
 
   public var anyNominal: NominalTypeDecl? { type.bridged.getAnyNominal().getAs(NominalTypeDecl.self) }
+
+  public var genericArguments: TypeArray? {
+    guard type.bridged.hasGenericArguments() else {
+      return nil
+    }
+
+    return TypeArray(bridged: type.bridged.getGenericArguments())
+  }
 
   /// Performas a global conformance lookup for this type for `protocol`.
   /// It checks conditional requirements.

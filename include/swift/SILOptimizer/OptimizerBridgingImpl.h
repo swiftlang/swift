@@ -26,7 +26,9 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -585,6 +587,34 @@ static_assert((int)BridgedPassContext::SILStage::Lowered == (int)swift::SILStage
 static_assert((int)BridgedPassContext::AssertConfiguration::Debug == (int)swift::SILOptions::Debug);
 static_assert((int)BridgedPassContext::AssertConfiguration::Release == (int)swift::SILOptions::Release);
 static_assert((int)BridgedPassContext::AssertConfiguration::Unchecked == (int)swift::SILOptions::Unchecked);
+
+//===----------------------------------------------------------------------===//
+//                     KeyPathPattern Specialization
+//===----------------------------------------------------------------------===//
+
+SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+OptionalBridgedFunction
+BridgedKeyPathPattern_trySpecializeAccessor(BridgedPassContext context,
+                                            BridgedFunction accessor,
+                                            BridgedSubstitutionMap substitutions) {
+  auto function = accessor.getFunction();
+  auto reInfo = swift::ReabstractionInfo(function->getModule().getSwiftModule(),
+                                         function->getModule().isWholeModule(),
+                                         swift::ApplySite(),
+                                         function,
+                                         substitutions.unbridged(),
+                                         function->getSerializedKind(),
+                                         /* convertIndirectToDirect */ false,
+                                         /* dropMetatypeArgs */ false);
+
+  auto transform = context.invocation->getTransform();
+  auto funcBuilder = swift::SILOptFunctionBuilder(*transform);
+  auto gfs = swift::GenericFuncSpecializer(funcBuilder, function,
+                                           substitutions.unbridged(),
+                                           reInfo);
+
+  return {gfs.trySpecialization()};
+}
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

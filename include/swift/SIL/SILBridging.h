@@ -482,6 +482,7 @@ struct BridgedFunction {
   SWIFT_NAME("init(obj:)")
   BridgedFunction(SwiftObject obj) : obj(obj) {}
   BridgedFunction() {}
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SILFunction * _Nonnull getFunction() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   BridgedOwnedString getDebugDescription() const;
@@ -629,6 +630,108 @@ struct BridgedSILDebugVariable {
   BRIDGED_INLINE BridgedSILDebugVariable &operator=(const BridgedSILDebugVariable &rhs);
   BRIDGED_INLINE swift::SILDebugVariable unbridge() const;
 };
+
+struct BridgedKeyPathPatternComponent {
+  uint64_t storage[12];
+
+  enum class Kind {
+    StoredProperty,
+    GettableProperty,
+    SettableProperty,
+    TupleElement,
+    OptionalChain,
+    OptionalForce,
+    OptionalWrap,
+  };
+
+  struct ComputedPropertyId {
+    uint64_t storage[4];
+
+    BRIDGED_INLINE ComputedPropertyId(swift::KeyPathPatternComponent::ComputedPropertyId entry);
+    BRIDGED_INLINE swift::KeyPathPatternComponent::ComputedPropertyId unbridged() const;
+  };
+
+  BRIDGED_INLINE BridgedKeyPathPatternComponent(swift::KeyPathPatternComponent entry);
+  BRIDGED_INLINE swift::KeyPathPatternComponent unbridged() const;
+
+  BRIDGED_INLINE Kind getKind() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getComponentType() const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getStoredPropertyDecl() const;
+
+  BRIDGED_INLINE SwiftInt getTupleIndex() const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE ComputedPropertyId getComputedPropertyId() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getComputedPropertyGetter() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getComputedPropertySetter() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArrayRef getSubscriptIndices() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getSubscriptIndexEquals() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getSubscriptIndexHash() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getExternalDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getExternalSubstitutions() const;
+};
+
+struct BridgedKeyPathPatternComponentArray {
+  BridgedArrayRef components;
+
+  BRIDGED_INLINE SwiftInt count() const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedKeyPathPatternComponent at(SwiftInt i) const;
+};
+
+struct BridgedKeyPathPattern {
+  swift::KeyPathPattern * _Nonnull pattern;
+
+  BridgedKeyPathPatternComponentArray components() const;
+  BridgedStringRef getObjCString() const;
+};
+
+SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+BridgedKeyPathPattern
+BridgedKeyPathPattern_create(BridgedFunction function, BridgedCanType rootTy,
+                             BridgedCanType valueTy, BridgedArrayRef components,
+                             BridgedStringRef objcString);
+
+SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+BridgedKeyPathPatternComponent
+BridgedKeyPathPatternComponent_forComputedGettableProperty(
+    BridgedKeyPathPatternComponent::ComputedPropertyId computedPropertyId,
+    BridgedFunction getter,
+    BridgedArrayRef indices,
+    OptionalBridgedFunction indicesEquals,
+    OptionalBridgedFunction indicesHash,
+    OptionalBridgedDeclObj externalDecl,
+    BridgedSubstitutionMap externalSubstitutions,
+    BridgedCanType componentTy);
+
+SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+BridgedKeyPathPatternComponent
+BridgedKeyPathPatternComponent_forComputedSettableProperty(
+    BridgedKeyPathPatternComponent::ComputedPropertyId computedPropertyId,
+    BridgedFunction getter,
+    BridgedFunction setter,
+    BridgedArrayRef indices,
+    OptionalBridgedFunction indicesEquals,
+    OptionalBridgedFunction indicesHash,
+    OptionalBridgedDeclObj externalDecl,
+    BridgedSubstitutionMap externalSubstitutions,
+    BridgedCanType componentTy);
+
+SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+BridgedKeyPathPatternComponent
+BridgedKeyPathPatternComponent_forStoredProperty(BridgedDeclObj property,
+                                                 BridgedCanType componentTy);
+
+SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+BridgedKeyPathPatternComponent
+BridgedKeyPathPatternComponent_forTupleElement(SwiftInt index,
+                                               BridgedCanType componentTy);
+
+SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+BridgedKeyPathPatternComponent
+BridgedKeyPathPatternComponent_forOptional(BridgedKeyPathPatternComponent::Kind kind,
+                                           BridgedCanType componentTy);
 
 struct BridgedInstruction {
   SwiftObject obj;
@@ -815,6 +918,11 @@ struct BridgedInstruction {
   BRIDGED_INLINE void TermInst_replaceBranchTarget(BridgedBasicBlock from, BridgedBasicBlock to) const;
   BRIDGED_INLINE SwiftInt KeyPathInst_getNumComponents() const;
   BRIDGED_INLINE void KeyPathInst_getReferencedFunctions(SwiftInt componentIdx, KeyPathFunctionResults * _Nonnull results) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType KeyPathInst_getKeyPathType() const;
+  BRIDGED_INLINE bool KeyPathInst_hasPattern() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedKeyPathPattern KeyPathInst_getPattern() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap KeyPathInst_getSubstitutions() const;
+  BRIDGED_INLINE void KeyPathInst_dropReferencedPattern() const;
   BRIDGED_INLINE void GlobalAddrInst_clearToken() const;
   BRIDGED_INLINE bool GlobalValueInst_isBare() const;
   BRIDGED_INLINE void GlobalValueInst_setIsBare() const;
@@ -1252,6 +1360,12 @@ struct BridgedBuilder{
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createConvertFunction(BridgedValue originalFunction, BridgedType resultType, bool withoutActuallyEscaping) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createConvertEscapeToNoEscape(BridgedValue originalFunction, BridgedType resultType, bool isLifetimeGuaranteed) const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedInstruction createKeyPath(BridgedKeyPathPattern pattern,
+                                   BridgedSubstitutionMap subs,
+                                   BridgedValueArray values,
+                                   BridgedType keyPathTy) const;
 
   SWIFT_IMPORT_UNSAFE void destroyCapturedArgs(BridgedInstruction partialApply) const;
 };
