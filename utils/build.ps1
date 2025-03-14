@@ -375,6 +375,37 @@ $IsCrossCompiling = $HostArchName -ne $BuildArchName
 
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
 
+function Add-TimingData {
+  param
+  (
+    [Parameter(Mandatory)]
+    [string] $Arch,
+    [Parameter(Mandatory)]
+    [Platform] $Platform,
+    [Parameter(Mandatory)]
+    [string] $BuildStep,
+    [Parameter(Mandatory)]
+    [System.TimeSpan] $ElapsedTime
+  )
+
+  $TimingData.Add([PSCustomObject]@{
+    Arch = $Arch
+    Platform = $Platform
+    "Build Step" = $BuildStep
+    "Elapsed Time" = $ElapsedTime.ToString()
+  })
+}
+
+function Write-Summary {
+  Write-Host "Summary:" -ForegroundColor Cyan
+
+  # Sort timing data by elapsed time (descending)
+  $TimingData `
+    | Select-Object "Build Step",Platform,Arch,"Elapsed Time" `
+    | Sort-Object -Descending -Property "Elapsed Time" `
+    | Format-Table -AutoSize
+}
+
 function Get-AndroidNDK {
   $NDK = $KnownNDKs[$AndroidNDKVersion]
   if (-not $NDK) { throw "Unsupported Android NDK version" }
@@ -447,8 +478,29 @@ $WindowsSDKArchs = @($WindowsSDKs | ForEach-Object {
 })
 
 # Build functions
-function Invoke-BuildStep([string]$Name) {
+function Invoke-BuildStep([string] $Name) {
+  if ($Summary) {
+    # TODO: Replace hacky introspection of $Args with Platform object.
+    $BuildStepPlatform = "Windows"
+    $BuildStepArch = "(n/a)"
+    $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    foreach ($Arg in $Args) {
+      switch ($Arg.GetType().Name) {
+        "Hashtable" {
+          if ($Arg.ContainsKey("LLVMName")) { $BuildStepArch = $Arg["LLVMName"] }
+        }
+        "string" {
+          if ($Arg -eq "Windows" -or $Arg -eq "Android") { $BuildStepPlatform = $Arg }
+        }
+      }
+    }
+  }
+
   & $Name @Args
+
+  if ($Summary) {
+    Add-TimingData $BuildStepArch $BuildStepPlatform ($Name -replace "Build-","") $Stopwatch.Elapsed
+  }
   if ($Name.Replace("Build-", "") -eq $BuildTo) {
     exit 0
   }
@@ -721,6 +773,7 @@ function Invoke-VsDevShell($Arch) {
 }
 
 function Get-Dependencies {
+  Write-Host "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Fetch-Dependencies ..." -ForegroundColor Cyan
   $ProgressPreference = "SilentlyContinue"
 
   $WebClient = New-Object Net.WebClient
@@ -936,12 +989,7 @@ function Get-Dependencies {
     Write-Host ""
   }
   if ($Summary) {
-    $TimingData.Add([PSCustomObject]@{
-      Arch = $BuildArch.LLVMName
-      Platform = 'Windows'
-      Checkout = 'Get-Dependencies'
-      "Elapsed Time" = $Stopwatch.Elapsed.ToString()
-    })
+    Add-TimingData $BuildArch.LLVMName "Windows" "Get-Dependencies" $Stopwatch.Elapsed
   }
 }
 
@@ -1387,15 +1435,6 @@ function Build-CMakeProject {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
     Write-Host ""
   }
-
-  if ($Summary) {
-    $TimingData.Add([PSCustomObject]@{
-      Arch = $Arch.LLVMName
-      Platform = $Platform
-      Checkout = $Src.Replace($SourceCache, '')
-      "Elapsed Time" = $Stopwatch.Elapsed.ToString()
-    })
-  }
 }
 
 enum SPMBuildAction {
@@ -1481,12 +1520,7 @@ function Build-SPMProject {
   }
 
   if ($Summary) {
-    $TimingData.Add([PSCustomObject]@{
-      Arch = $Arch.LLVMName
-      Checkout = $Src.Replace($SourceCache, '')
-      Platform = "Windows"
-      "Elapsed Time" = $Stopwatch.Elapsed.ToString()
-    })
+    Add-TimingData $BuildArch.LLVMName "Windows" $Src.Replace($SourceCache, '') $Stopwatch.Elapsed
   }
 }
 
@@ -3318,6 +3352,6 @@ if (-not $IsCrossCompiling) {
   exit 1
 } finally {
   if ($Summary) {
-    $TimingData | Select-Object Platform,Arch,Checkout,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
+    Write-Summary
   }
 }
