@@ -6200,8 +6200,32 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       ClangDirectLookupRequest({recordDecl, recordDecl->getClangDecl(), name}),
       {});
 
-  // Find the results that are actually a member of "recordDecl".
+  // The set of declarations we found.
   TinyPtrVector<ValueDecl *> result;
+  auto addResult = [&result, name](ValueDecl *imported) {
+    result.push_back(imported);
+
+    // Expand any macros introduced by the Clang importer.
+    imported->visitAuxiliaryDecls([&](Decl *decl) {
+      auto valueDecl = dyn_cast<ValueDecl>(decl);
+      if (!valueDecl)
+        return;
+
+      // Bail out if the auxiliary decl was not produced by a macro.
+      auto module = decl->getDeclContext()->getParentModule();
+      auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
+      if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+        return;
+
+      // Only produce results that match the requested name.
+      if (!valueDecl->getName().matchesRef(name))
+        return;
+
+      result.push_back(valueDecl);
+    });
+  };
+
+  // Find the results that are actually a member of "recordDecl".
   ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
   for (auto foundEntry : directResults) {
     auto found = foundEntry.get<clang::NamedDecl *>();
@@ -6236,7 +6260,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       if (!imported)
         continue;
     }
-    result.push_back(cast<ValueDecl>(imported));
+
+    addResult(cast<ValueDecl>(imported));
   }
 
   if (inheritance) {
@@ -6255,7 +6280,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       if (!imported)
         continue;
 
-      result.push_back(cast<ValueDecl>(imported));
+      addResult(imported);
     }
   }
 
@@ -6304,7 +6329,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           if (foundNameArities.count(getArity(foundInBase)))
             continue;
 
-          result.push_back(foundInBase);
+          addResult(foundInBase);
         }
       }
     }
