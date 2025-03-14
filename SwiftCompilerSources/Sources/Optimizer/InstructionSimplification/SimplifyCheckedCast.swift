@@ -70,15 +70,12 @@ private extension UnconditionalCheckedCastInst {
   // Note that init_existential_metatype is better than unconditional_checked_cast because it does not need
   // to do any runtime casting.
   func tryOptimizeCastToExistentialMetatype(_ context: SimplifyContext) {
-    guard targetFormalType.isExistentialMetatypeType,
-          sourceFormalType.isMetatypeType,
-          !sourceFormalType.isExistentialMetatypeType
-    else {
+    guard targetFormalType.isExistentialMetatype, sourceFormalType.isMetatype else {
       return
     }
     
     let instanceTy = targetFormalType.instanceTypeOfMetatype
-    guard let nominal = instanceTy.anyNominal,
+    guard let nominal = instanceTy.nominal,
           let proto = nominal as? ProtocolDecl
     else {
       return

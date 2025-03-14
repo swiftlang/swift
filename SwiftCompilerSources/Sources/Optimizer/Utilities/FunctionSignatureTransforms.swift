@@ -148,7 +148,7 @@ private func removeMetatypArguments(in specializedFunction: Function, _ context:
     if funcArg.type.isRemovableMetatype(in: specializedFunction) {
       // Rematerialize the metatype value in the entry block.
       let builder = Builder(atBeginOf: entryBlock, context)
-      let instanceType = funcArg.type.astType.instanceTypeOfMetatype
+      let instanceType = funcArg.type.canonicalType.instanceTypeOfMetatype
       let metatype = builder.createMetatype(ofInstanceType: instanceType, representation: .thick)
       funcArg.uses.replaceAll(with: metatype, context)
       entryBlock.eraseArgument(at: funcArgIdx, context)
@@ -232,7 +232,7 @@ private func replace(apply: FullApplySite, to specializedCallee: Function, _ con
 private extension Type {
   func isRemovableMetatype(in function: Function) -> Bool {
     if isMetatype {
-      if astType.representationOfMetatype == .thick {
+      if representationOfMetatype == .thick {
         let instanceTy = loweredInstanceTypeOfMetatype(in: function)
         // For structs and enums we know the metatype statically.
         return instanceTy.isStruct || instanceTy.isEnum

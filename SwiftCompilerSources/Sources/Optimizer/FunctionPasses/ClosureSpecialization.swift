@@ -1127,7 +1127,7 @@ private extension PartialApplyInst {
     if self.numArguments == 1, 
        let fun = self.referencedFunction,
        fun.thunkKind == .reabstractionThunk || fun.thunkKind == .thunk,
-       self.arguments[0].type.isFunction,
+       self.arguments[0].type.isLoweredFunction,
        self.arguments[0].type.isReferenceCounted(in: self.parentFunction) || self.callee.type.isThickFunction
     {
       return true

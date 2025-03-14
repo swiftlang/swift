@@ -30,7 +30,8 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public let bridged: BridgedASTType
 
-  public var type: Type { self }
+  // Needed to conform to TypeProperties
+  public var rawType: Type { self }
 
   public init?(bridgedOrNil: BridgedASTType) {
     if bridgedOrNil.type == nil {
@@ -46,6 +47,17 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
   public var canonical: CanonicalType { CanonicalType(bridged: bridged.getCanonicalType()) }
 
   public var instanceTypeOfMetatype: Type { Type(bridged: bridged.getInstanceTypeOfMetatype()) }
+
+  public var superClassType: Type? {
+    precondition(isClass)
+    let bridgedSuperClassTy = bridged.getSuperClassType()
+    if bridgedSuperClassTy.type != nil {
+      return Type(bridged: bridgedSuperClassTy)
+    }
+    return nil
+  }
+
+  public var builtinVectorElementType: Type { Type(bridged: bridged.getBuiltinVectorElementType()) }
 
   public func subst(with substitutionMap: SubstitutionMap) -> Type {
     return Type(bridged: bridged.subst(substitutionMap.bridged))
@@ -63,49 +75,123 @@ public struct CanonicalType: TypeProperties, CustomStringConvertible, NoReflecti
 
   public init(bridged: BridgedCanType) { self.bridged = bridged }
 
-  public var type: Type { Type(bridged: bridged.getType()) }
+  public var rawType: Type { Type(bridged: bridged.getRawType()) }
 
-  public var instanceTypeOfMetatype: CanonicalType { type.instanceTypeOfMetatype.canonical }
-  
+  public var instanceTypeOfMetatype: CanonicalType { rawType.instanceTypeOfMetatype.canonical }
+
+  public var superClassType: CanonicalType? { rawType.superClassType?.canonical }
+
+  public var builtinVectorElementType: CanonicalType { rawType.builtinVectorElementType.canonical }
+
   public func subst(with substitutionMap: SubstitutionMap) -> CanonicalType {
-    return type.subst(with: substitutionMap).canonical
+    return rawType.subst(with: substitutionMap).canonical
   }
 
   public func subst(type: CanonicalType, with targetType: CanonicalType) -> CanonicalType {
-    return self.type.subst(type: type.type, with: targetType.type).canonical
+    return self.rawType.subst(type: type.rawType, with: targetType.rawType).canonical
   }
 }
 
-/// Contains common properties of AST.Type and AST.CanonicalType
+/// Implements the common members of `AST.Type`, `AST.CanonicalType` and `SIL.Type`.
 public protocol TypeProperties {
-  var type: Type { get }
+  var rawType: Type { get }
 }
 
 extension TypeProperties {
-  public var description: String { String(taking: type.bridged.getDebugDescription()) }
+  public var description: String { String(taking: rawType.bridged.getDebugDescription()) }
 
-  public var isLegalFormalType: Bool { type.bridged.isLegalFormalType() }
-  public var hasTypeParameter: Bool { type.bridged.hasTypeParameter() }
-  public var hasLocalArchetype: Bool { type.bridged.hasLocalArchetype() }
-  public var isExistentialArchetype: Bool { type.bridged.isExistentialArchetype() }
-  public var isExistentialArchetypeWithError: Bool { type.bridged.isExistentialArchetypeWithError() }
-  public var isExistential: Bool { type.bridged.isExistential() }
-  public var isEscapable: Bool { type.bridged.isEscapable() }
-  public var isNoEscape: Bool { type.bridged.isNoEscape() }
-  public var isInteger: Bool { type.bridged.isInteger() }
-  public var isOptional: Bool { type.bridged.isOptional() }
-  public var isMetatypeType: Bool { type.bridged.isMetatypeType() }
-  public var isExistentialMetatypeType: Bool { type.bridged.isExistentialMetatypeType() }
+  //===--------------------------------------------------------------------===//
+  //                      Checks for different kinds of types
+  //===--------------------------------------------------------------------===//
+
+  public var isBuiltinInteger: Bool { rawType.bridged.isBuiltinInteger() }
+
+  public func isBuiltinInteger(withFixedWidth width: Int) -> Bool {
+    rawType.bridged.isBuiltinFixedWidthInteger(width)
+  }
+
+  public var isBuiltinFloat: Bool { rawType.bridged.isBuiltinFloat() }
+  public var isBuiltinVector: Bool { rawType.bridged.isBuiltinVector() }
+
+  public var isClass: Bool {
+    if let nominal = nominal, nominal is ClassDecl {
+      return true
+    }
+    return false
+  }
+
+  public var isStruct: Bool {
+    if let nominal = nominal, nominal is StructDecl {
+      return true
+    }
+    return false
+  }
+
+  public var isEnum: Bool  {
+    if let nominal = nominal, nominal is EnumDecl {
+      return true
+    }
+    return false
+  }
+
+  public var isTuple: Bool { rawType.bridged.isTuple() }
+  public var isFunction: Bool { rawType.bridged.isFunction() }
+  public var isExistentialArchetype: Bool { rawType.bridged.isExistentialArchetype() }
+  public var isExistentialArchetypeWithError: Bool { rawType.bridged.isExistentialArchetypeWithError() }
+  public var isExistential: Bool { rawType.bridged.isExistential() }
+  public var isClassExistential: Bool { rawType.bridged.isClassExistential() }
+  public var isUnownedStorageType: Bool { return rawType.bridged.isUnownedStorageType() }
+  public var isMetatype: Bool { rawType.bridged.isMetatypeType() }
+  public var isExistentialMetatype: Bool { rawType.bridged.isExistentialMetatypeType() }
+  public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
+
+  /// True if this is the type which represents an integer literal used in a type position.
+  /// For example `N` in `struct T<let N: Int> {}`
+  public var isInteger: Bool { rawType.bridged.isInteger() }
+
+  public var canBeClass: Type.TraitResult { rawType.bridged.canBeClass().result }
+
+  /// True if this the nominal type `Swift.Optional`.
+  public var isOptional: Bool { rawType.bridged.isOptional() }
+
+  /// True if this type is a value type (struct/enum) that defines a `deinit`.
+  public var isValueTypeWithDeinit: Bool {
+    if let nominal = nominal, nominal.valueTypeDestructor != nil {
+      return true
+    }
+    return false
+  }
+
+  //===--------------------------------------------------------------------===//
+  //                             Type properties
+  //===--------------------------------------------------------------------===//
+
+  public var isLegalFormalType: Bool { rawType.bridged.isLegalFormalType() }
+  public var hasArchetype: Bool { rawType.bridged.hasArchetype() }
+  public var hasTypeParameter: Bool { rawType.bridged.hasTypeParameter() }
+  public var hasLocalArchetype: Bool { rawType.bridged.hasLocalArchetype() }
+  public var isEscapable: Bool { rawType.bridged.isEscapable() }
+  public var isNoEscape: Bool { rawType.bridged.isNoEscape() }
+
   public var representationOfMetatype: AST.`Type`.MetatypeRepresentation {
-    type.bridged.getRepresentationOfMetatype().representation
-  }
-  public var invocationGenericSignatureOfFunctionType: GenericSignature {
-    GenericSignature(bridged: type.bridged.getInvocationGenericSignatureOfFunctionType())
+    rawType.bridged.getRepresentationOfMetatype().representation
   }
 
-  public var canBeClass: Type.TraitResult { type.bridged.canBeClass().result }
+  /// Assumes this is a nominal type. Returns a substitution map that sends each
+  /// generic parameter of the declaration's generic signature to the corresponding
+  /// generic argument of this nominal type.
+  ///
+  /// Eg: Array<Int> ---> { Element := Int }
+  public var contextSubstitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged: rawType.bridged.getContextSubstitutionMap())
+  }
 
-  public var anyNominal: NominalTypeDecl? { type.bridged.getAnyNominal().getAs(NominalTypeDecl.self) }
+  // True if this type has generic parameters or it is in a context (e.g. an outer type) which has generic parameters.
+  public var isGenericAtAnyLevel: Bool { rawType.bridged.isGenericAtAnyLevel() }
+
+  public var nominal: NominalTypeDecl? {
+    rawType.bridged.getNominalOrBoundGenericNominal().getAs(NominalTypeDecl.self)
+  }
 
   /// Performas a global conformance lookup for this type for `protocol`.
   /// It checks conditional requirements.
@@ -118,7 +204,7 @@ extension TypeProperties {
   /// Returns an invalid conformance if the search failed, otherwise an
   /// abstract, concrete or pack conformance, depending on the lookup type.
   public func checkConformance(to protocol: ProtocolDecl) -> Conformance {
-    return Conformance(bridged: type.bridged.checkConformance(`protocol`.bridged))
+    return Conformance(bridged: rawType.bridged.checkConformance(`protocol`.bridged))
   }
 }
 
@@ -174,6 +260,6 @@ extension Type: Equatable {
 
 extension CanonicalType: Equatable {
   public static func ==(lhs: CanonicalType, rhs: CanonicalType) -> Bool { 
-    lhs.type == rhs.type
+    lhs.rawType == rhs.rawType
   }
 }
