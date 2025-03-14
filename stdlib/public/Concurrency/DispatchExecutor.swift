@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !$Embedded
+#if !$Embedded && !os(WASI)
 
 import Swift
 
@@ -200,4 +200,4 @@ extension DispatchGlobalTaskExecutor: DispatchExecutorProtocol {
 extension DispatchMainExecutor: DispatchExecutorProtocol {
 }
 
-#endif // !$Embedded
+#endif // !$Embedded && !os(WASI)

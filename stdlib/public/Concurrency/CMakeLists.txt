@@ -93,9 +93,12 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   linker-support/magic-symbols-for-install-name.c
 )
 
-set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
-  DispatchGlobalExecutor.cpp
+set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES)
+if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
+  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
+    DispatchGlobalExecutor.cpp
   )
+endif()
 
 set(LLVM_OPTIONAL_SOURCES
   CooperativeGlobalExecutor.cpp
@@ -168,9 +171,11 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   TaskSleepDuration.swift
   DispatchExecutor.swift
   CFExecutor.swift
+  DummyExecutor.swift
   PlatformExecutorDarwin.swift
   PlatformExecutorLinux.swift
   PlatformExecutorWindows.swift
+  PlatformExecutorWASI.swift
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !SWIFT_CONCURRENCY_EMBEDDED
+#if SWIFT_CONCURRENCY_USES_DISPATCH
 #include <dispatch/dispatch.h>
 #endif
 
@@ -119,38 +119,7 @@ void *swift_job_getExecutorPrivateData(Job *job) {
   return &job->SchedulerPrivate[0];
 }
 
-#if !SWIFT_CONCURRENCY_EMBEDDED
-extern "C" SWIFT_CC(swift)
-void *swift_createDispatchEventC(void (*handler)(void *), void *context) {
-  dispatch_source_t source = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_OR,
-                                                    0, 0,
-                                                    dispatch_get_main_queue());
-  dispatch_source_set_event_handler_f(source, handler);
-  dispatch_activate(source);
-
-  return source;
-}
-
-extern "C" SWIFT_CC(swift)
-void swift_destroyDispatchEventC(void *event) {
-  dispatch_source_t source = (dispatch_source_t)event;
-
-  dispatch_source_cancel(source);
-  dispatch_release(source);
-}
-
-extern "C" SWIFT_CC(swift)
-void *swift_getDispatchEventContext(void *event) {
-  return dispatch_get_context((dispatch_source_t)event);
-}
-
-extern "C" SWIFT_CC(swift)
-void swift_signalDispatchEvent(void *event) {
-  dispatch_source_t source = (dispatch_source_t)event;
-
-  dispatch_source_merge_data(source, 1);
-}
-
+#if SWIFT_CONCURRENCY_USES_DISPATCH
 extern "C" SWIFT_CC(swift) __attribute__((noreturn))
 void swift_dispatchMain() {
   dispatch_main();
@@ -160,7 +129,6 @@ extern "C" SWIFT_CC(swift)
 void swift_dispatchAssertMainQueue() {
   dispatch_assert_queue(dispatch_get_main_queue());
 }
-
-#endif // !SWIFT_CONCURRENCY_EMBEDDED
+#endif // SWIFT_CONCURRENCY_ENABLE_DISPATCH
 
 #pragma clang diagnostic pop
