@@ -478,7 +478,7 @@ extension Instruction {
        let iemt = oemt.operand.value as? InitExistentialMetatypeInst,
        let mt = iemt.metatype as? MetatypeInst
     {
-      return mt.type.astType.instanceTypeOfMetatype
+      return mt.type.canonicalType.instanceTypeOfMetatype
     }
     // TODO: also handle open_existential_addr and open_existential_ref.
     // Those cases are currently handled in SILCombine's `propagateConcreteTypeOfInitExistential`.
@@ -899,7 +899,9 @@ func getGlobalInitialization(
   return nil
 }
 
-func canDynamicallyCast(from sourceType: Type, to destType: Type, in function: Function, sourceTypeIsExact: Bool) -> Bool? {
+func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalType,
+                        in function: Function, sourceTypeIsExact: Bool
+) -> Bool? {
   switch classifyDynamicCastBridged(sourceType.bridged, destType.bridged, function.bridged, sourceTypeIsExact) {
     case .willSucceed: return true
     case .maySucceed:  return nil

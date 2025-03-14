@@ -403,7 +403,7 @@ enum class BridgedDynamicCastResult {
   willFail
 };
 
-BridgedDynamicCastResult classifyDynamicCastBridged(BridgedType sourceTy, BridgedType destTy,
+BridgedDynamicCastResult classifyDynamicCastBridged(BridgedCanType sourceTy, BridgedCanType destTy,
                                                     BridgedFunction function,
                                                     bool sourceTypeIsExact);
 

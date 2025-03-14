@@ -179,7 +179,7 @@ private extension AllocStackInst {
   ///   use %3
   /// ```
   func optimizeExistential(_ context: SimplifyContext) -> Bool {
-    guard type.astType.isExistential || type.astType.isExistentialArchetype,
+    guard type.isExistential || type.isExistentialArchetype,
           let concreteFormalType = getConcreteTypeOfExistential()
     else {
       return false
@@ -266,7 +266,7 @@ private extension AllocStackInst {
     }
     let concreteType: CanonicalType
     if let initExistential {
-      assert(self.type.astType.isExistential)
+      assert(self.type.isExistential)
       if let cft = initExistential.concreteTypeOfDependentExistentialArchetype {
         // Case 1: We will replace the alloc_stack of an existential with the concrete type.
         //         `alloc_stack $any P` -> `alloc_stack $ConcreteType`
@@ -281,9 +281,9 @@ private extension AllocStackInst {
         }
         // Case 2: We will replace the alloc_stack of an existential with the existential archetype.
         //         `alloc_stack $any P` -> `alloc_stack $@opened("...")`
-        concreteType = initExistential.type.astType
+        concreteType = initExistential.type.canonicalType
       }
-    } else if self.type.astType.isExistentialArchetype, let cft = self.concreteTypeOfDependentExistentialArchetype {
+    } else if self.type.isExistentialArchetype, let cft = self.concreteTypeOfDependentExistentialArchetype {
       // Case 3: We will replace the alloc_stack of an existential archetype with the concrete type:
       //         `alloc_stack $@opened("...")` -> `alloc_stack $ConcreteType`
       concreteType = cft

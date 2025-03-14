@@ -193,12 +193,12 @@ private extension BuiltinInst {
       return
     }
 
-    guard type.astType.representationOfMetatype == .thick else {
+    guard type.representationOfMetatype == .thick else {
       return
     }
     
     let builder = Builder(before: self, context)
-    let newMetatype = builder.createMetatype(ofInstanceType: type.astType.instanceTypeOfMetatype,
+    let newMetatype = builder.createMetatype(ofInstanceType: type.canonicalType.instanceTypeOfMetatype,
                                              representation: .thin)
     operands[argument].set(to: newMetatype, context)
   }
@@ -269,13 +269,11 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
     return nil
   }
 
-  let lhsMetatype = lhsExistential.metatype.type
-  let rhsMetatype = rhsExistential.metatype.type
-  if lhsMetatype.isDynamicSelfMetatype != rhsMetatype.isDynamicSelfMetatype {
+  let lhsTy = lhsExistential.metatype.type.canonicalType.instanceTypeOfMetatype
+  let rhsTy = rhsExistential.metatype.type.canonicalType.instanceTypeOfMetatype
+  if lhsTy.isDynamicSelf != rhsTy.isDynamicSelf {
     return nil
   }
-  let lhsTy = lhsMetatype.loweredInstanceTypeOfMetatype(in: function)
-  let rhsTy = rhsMetatype.loweredInstanceTypeOfMetatype(in: function)
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.
@@ -288,12 +286,18 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
     //   ((Int, Int) -> ())
     //   (((Int, Int)) -> ())
     //
-    if lhsMetatype == rhsMetatype {
+    if lhsTy == rhsTy {
       return true
     }
     // Comparing types of different classes which are in a sub-class relation is not handled by the
     // cast optimizer (below).
     if lhsTy.isClass && rhsTy.isClass && lhsTy.nominal != rhsTy.nominal {
+      return false
+    }
+
+    // Failing function casts are not supported by the cast optimizer (below).
+    // (Reason: "Be conservative about function type relationships we may add in the future.")
+    if lhsTy.isFunction && rhsTy.isFunction && lhsTy != rhsTy && !lhsTy.hasArchetype && !rhsTy.hasArchetype {
       return false
     }
   }

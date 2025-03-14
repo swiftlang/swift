@@ -264,23 +264,6 @@ public:
     });
   }
 
-  bool isBuiltinInteger() const {
-    return is<BuiltinIntegerType>();
-  }
-
-  bool isBuiltinFixedWidthInteger(unsigned width) const {
-    BuiltinIntegerType *bi = getAs<BuiltinIntegerType>();
-    return bi && bi->isFixedWidth(width);
-  }
-
-  bool isBuiltinFloat() const {
-    return is<BuiltinFloatType>();
-  }
-
-  bool isBuiltinVector() const {
-    return is<BuiltinVectorType>();
-  }
-
   bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
 
   SILType getBuiltinVectorElementType() const {
@@ -936,8 +919,6 @@ public:
   }
 
   SILType getLoweredInstanceTypeOfMetatype(SILFunction *function) const;
-
-  bool isOrContainsObjectiveCClass() const;
 
   bool isCalleeConsumedFunction() const {
     auto funcTy = castTo<SILFunctionType>();

@@ -1099,18 +1099,6 @@ SILType SILType::getLoweredInstanceTypeOfMetatype(SILFunction *function) const {
   return tl.getLoweredType();
 }
 
-bool SILType::isOrContainsObjectiveCClass() const {
-  return getASTType().findIf([](Type ty) {
-    if (ClassDecl *cd = ty->getClassOrBoundGenericClass()) {
-      if (cd->isForeign() || cd->getObjectModel() == ReferenceCounting::ObjC)
-        return true;
-    }
-    if (ty->is<ProtocolCompositionType>())
-      return true;
-    return false;
-  });
-}
-
 static bool hasImmortalAttr(NominalTypeDecl *nominal) {
   if (auto *semAttr = nominal->getAttrs().getAttribute<SemanticsAttr>()) {
     if (semAttr->Value == semantics::ARC_IMMORTAL) {
