@@ -143,22 +143,22 @@ private extension FullApplySite {
     // Note that an opened existential value is address only, so it cannot be a direct result anyway
     // (but it can be once we have opaque values).
     // Also don't support things like direct `Array<@opened("...")>` return values.
-    if let singleDirectResult, singleDirectResult.type.astType.hasLocalArchetype {
+    if let singleDirectResult, singleDirectResult.type.hasLocalArchetype {
       return false
     }
-    if let singleDirectErrorResult, singleDirectErrorResult.type.astType.hasLocalArchetype {
+    if let singleDirectErrorResult, singleDirectErrorResult.type.hasLocalArchetype {
       return false
     }
 
     return arguments.allSatisfy { value in
-      let astTy = value.type.astType
+      let type = value.type
       // Allow three cases:
              // case 1. the argument _is_ the existential archetype
-      return astTy.isExistentialArchetype ||
+      return type.isExistentialArchetype ||
              // case 2. the argument _is_ a metatype of the existential archetype
-             (astTy.isMetatypeType && astTy.instanceTypeOfMetatype.isExistentialArchetype) ||
+             (type.isMetatype && type.canonicalType.instanceTypeOfMetatype.isExistentialArchetype) ||
              // case 3. the argument has nothing to do with the existential archetype (or any other local archetype)
-             !astTy.hasLocalArchetype
+             !type.hasLocalArchetype
     }
   }
 
@@ -167,19 +167,18 @@ private extension FullApplySite {
     _ context: SimplifyContext
   ) -> [Value] {
     let newArgs = arguments.map { (arg) -> Value in
-      let argTy = arg.type.astType
-      if argTy.isExistentialArchetype {
+      if arg.type.isExistentialArchetype {
         // case 1. the argument _is_ the existential archetype:
         //         just insert an address cast to satisfy type equivalence.
         let builder = Builder(before: self, context)
         let concreteSILType = concreteType.loweredType(in: self.parentFunction)
         return builder.createUncheckedAddrCast(from: arg, to: concreteSILType.addressType)
       }
-      if argTy.isMetatypeType, argTy.instanceTypeOfMetatype.isExistentialArchetype {
+      if arg.type.isMetatype, arg.type.canonicalType.instanceTypeOfMetatype.isExistentialArchetype {
         // case 2. the argument _is_ a metatype of the existential archetype:
         //         re-create the metatype with the concrete type.
         let builder = Builder(before: self, context)
-        return builder.createMetatype(ofInstanceType: concreteType, representation: argTy.representationOfMetatype)
+        return builder.createMetatype(ofInstanceType: concreteType, representation: arg.type.representationOfMetatype)
       }
       // case 3. the argument has nothing to do with the existential archetype (or any other local archetype)
       return arg
@@ -194,9 +193,9 @@ private extension FullApplySite {
     let openedArcheType = substitutionMap.replacementTypes.first(where: { $0.isExistentialArchetype })!
 
     let newReplacementTypes = substitutionMap.replacementTypes.map {
-      return $0 == openedArcheType ? concreteType.type : $0
+      return $0 == openedArcheType ? concreteType.rawType : $0
     }
-    let genSig = callee.type.astType.invocationGenericSignatureOfFunctionType
+    let genSig = callee.type.invocationGenericSignatureOfFunction
     return SubstitutionMap(genericSignature: genSig, replacementTypes: newReplacementTypes)
   }
 }

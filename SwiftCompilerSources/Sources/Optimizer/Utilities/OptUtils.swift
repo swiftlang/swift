@@ -478,7 +478,7 @@ extension Instruction {
        let iemt = oemt.operand.value as? InitExistentialMetatypeInst,
        let mt = iemt.metatype as? MetatypeInst
     {
-      return mt.type.astType.instanceTypeOfMetatype
+      return mt.type.canonicalType.instanceTypeOfMetatype
     }
     // TODO: also handle open_existential_addr and open_existential_ref.
     // Those cases are currently handled in SILCombine's `propagateConcreteTypeOfInitExistential`.
