@@ -98,7 +98,7 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
 @available(SwiftStdlib 5.3, *)
 @_silgen_name("swift_getMangledTypeName")
 @_preInverseGenerics
-public func _getMangledTypeName(_ type: any ~Copyable.Type)
+public func _getMangledTypeName(_ type: any (~Copyable & ~Escapable).Type)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the mangled name for a given type.
@@ -106,7 +106,7 @@ public func _getMangledTypeName(_ type: any ~Copyable.Type)
 @_unavailableInEmbedded
 @_preInverseGenerics
 public // SPI
-func _mangledTypeName(_ type: any ~Copyable.Type) -> String? {
+func _mangledTypeName(_ type: any (~Copyable & ~Escapable).Type) -> String? {
   let (stringPtr, count) = unsafe _getMangledTypeName(type)
   guard count > 0 else {
     return nil
