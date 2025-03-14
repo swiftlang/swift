@@ -616,20 +616,6 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     });
   };
 
-  auto containsTypesButDependant = [&](Type type) -> bool {
-    DependentMemberType *cachedDP = nullptr;
-    return type.findIf([&](Type type) -> bool {
-      if (auto *GP = type->getAs<GenericTypeParamType>()) {
-        if (cachedDP && !cachedDP->getBase()->isEqual(GP))
-          return findParam(GP);
-        return cachedDP == nullptr && findParam(GP);
-      }
-      if (auto *DP = type->getAs<DependentMemberType>())
-        cachedDP = DP;
-      return false;
-    });
-  };
-
   // Anchor of this default expression i.e. function, subscript
   // or enum case.
   auto *anchor = cast<ValueDecl>(DC->getParent()->getAsDecl());
@@ -641,6 +627,34 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     
     if (anchor->hasCurriedSelf())
       anchorTy = anchorTy->getResult()->castTo<AnyFunctionType>();
+    
+    auto containsTypesButDependent = [&](Type type) -> bool {
+
+      class Walker: public TypeWalker {
+        llvm::function_ref<TypeVariableType *(GenericTypeParamType *)> findParamFn;
+      public:
+        explicit Walker(llvm::function_ref<TypeVariableType *(GenericTypeParamType *)> findParam) : findParamFn(findParam) {}
+
+        Action walkToTypePre(Type ty) override {
+          if (auto *GP = ty->getAs<GenericTypeParamType>()) {
+            if (findParamFn(GP)) {
+              return Action::Stop;
+            }
+          }
+          if (auto *DMT = ty->getAs<DependentMemberType>()) {
+            if (auto *baseGP = DMT->getBase()->getAs<GenericTypeParamType>()) {
+              if (findParamFn(baseGP)) {
+                return Action::SkipNode;
+              }
+            }
+          }
+          return Action::Continue;
+        }
+      };
+
+      return type.walk(Walker(findParam));
+    };
+    
     // Reject if generic parameters are used in multiple different positions
     // in the parameter list.
 
@@ -648,7 +662,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     for (unsigned i : indices(anchorTy->getParams())) {
       const auto &param = anchorTy->getParams()[i];
 
-      if (containsTypesButDependant(param.getPlainType()))
+      if (containsTypesButDependent(param.getPlainType()))
         affectedParams.push_back(i);
     }
 
