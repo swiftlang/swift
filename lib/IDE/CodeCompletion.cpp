@@ -461,8 +461,6 @@ void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
 
 void CodeCompletionCallbacksImpl::completeDeclAttrParam(
     ParameterizedDeclAttributeKind DK, int Index, bool HasLabel) {
-  assert(P.Tok.is(tok::code_complete));
-  
   Kind = CompletionKind::AttributeDeclParen;
   AttrKind = DK;
   AttrParamIndex = Index;
