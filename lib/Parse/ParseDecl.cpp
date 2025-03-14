@@ -2504,11 +2504,6 @@ static std::optional<Identifier> parseSingleAttrOptionImpl(
     return std::nullopt;
   }
   
-  if (P.Tok.is(tok::code_complete)) {
-    Status.setHasCodeCompletion();
-    codeCompletionCallback();
-  }
-  
   if (!P.consumeIf(tok::r_paren)) {
     Status.setIsParseError();
     P.diagnose(Loc, diag::attr_expected_rparen, AttrName, isDeclModifier);
@@ -2926,20 +2921,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       consumeToken();
     } else {
       diagnose(Loc, diag::attr_access_expected_set, AttrName);
-      
-      const Token &Tok2 = peekToken();
-      
-      if (Tok2.is(tok::code_complete) && Tok.is(tok::identifier) &&
-                 !Tok.isContextualDeclKeyword()) {
-        consumeToken(tok::identifier);
-        if (CodeCompletionCallbacks) {
-          CodeCompletionCallbacks->completeDeclAttrParam(
-              ParameterizedDeclAttributeKind::AccessControl, 0, false);
-        }
-        consumeToken(tok::code_complete);
-        return makeParserCodeCompletionStatus();
-      }
-      
+
       // Minimal recovery: if there's a single token and then an r_paren,
       // consume them both. If there's just an r_paren, consume that.
       if (!consumeIf(tok::r_paren)) {
