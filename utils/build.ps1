@@ -401,14 +401,22 @@ function Write-Summary {
 
   # Calculate the total time using TimeSpan.Add()
   $TotalTime = [TimeSpan]::Zero
-  foreach ($Datum in $TimingData) {
-    $TotalTime = $TotalTime.Add($Datum."Elapsed Time")
+  foreach ($Entry in $TimingData) {
+    $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
   }
 
-  # Sort the data without the total row
-  $SortedData = $TimingData |
-    Select-Object "Build Step",Platform,Arch,"Elapsed Time" |
-    Sort-Object -Descending -Property "Elapsed Time"
+  # Calculate percentages and sort the data without the total row
+  $SortedData = $TimingData | ForEach-Object {
+    $Percentage = [math]::Round(($_.("Elapsed Time").TotalSeconds / $TotalTime.TotalSeconds) * 100, 1)
+
+    [PSCustomObject]@{
+      "Build Step" = $_."Build Step"
+      Platform = $_.Platform
+      Arch = $_.Arch
+      "Elapsed Time" = $_."Elapsed Time"
+      "%" = "$Percentage%"
+    }
+  } | Sort-Object -Descending -Property "Elapsed Time"
 
   # Create the total row
   $TotalRow = [PSCustomObject]@{
@@ -416,6 +424,7 @@ function Write-Summary {
     Platform = ""
     Arch = ""
     "Elapsed Time" = $TotalTime
+    "%" = "100.0%"
   }
 
   # Combine sorted data and total row
