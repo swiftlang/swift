@@ -110,3 +110,8 @@ func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String
 
 @Remote
 func f(a: Int, b: String) async throws -> String
+
+@freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+struct TestArbitrary {
+  #bitwidthNumberedStructs("MyIntOne")
+}

@@ -176,7 +176,7 @@ BridgedDeclBaseName
 BridgedDeclBaseName_createIdentifier(BridgedIdentifier identifier);
 
 class BridgedDeclNameRef {
-  void *_Nonnull opaque;
+  void *_Nullable opaque;
 
 public:
   BRIDGED_INLINE BridgedDeclNameRef();
