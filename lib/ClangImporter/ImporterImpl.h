@@ -1914,6 +1914,7 @@ void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 /// Add command-line arguments common to all imports of Clang code.
 void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
                                   ASTContext &ctx,
+                                  bool requiresBuiltinHeadersInSystemModules,
                                   bool ignoreClangTarget);
 
 /// Finds a particular kind of nominal by looking through typealiases.
