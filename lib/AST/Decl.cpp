@@ -1766,8 +1766,7 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 }
 
 InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
-    : InheritedEntry(typeLoc, ProtocolConformanceOptions(),
-                     /*isPreconcurrency=*/false) {
+    : InheritedEntry(typeLoc, ProtocolConformanceOptions()) {
   if (auto typeRepr = typeLoc.getTypeRepr()) {
     if (typeRepr->findAttrLoc(TypeAttrKind::Unchecked).isValid())
       setOption(ProtocolConformanceFlags::Unchecked);
@@ -1777,8 +1776,19 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
       setOption(ProtocolConformanceFlags::Unsafe);
     if (typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency).isValid())
       setOption(ProtocolConformanceFlags::Preconcurrency);
-    if (typeRepr->findAttrLoc(TypeAttrKind::Isolated).isValid())
-      setOption(ProtocolConformanceFlags::Isolated);
+    if (typeRepr->findAttrLoc(TypeAttrKind::Nonisolated).isValid())
+      setOption(ProtocolConformanceFlags::Nonisolated);
+
+    // Dig out the custom attribute that should be the global actor isolation.
+    if (auto customAttr = typeRepr->findCustomAttr()) {
+      if (!customAttr->hasArgs()) {
+        if (auto customAttrTypeExpr = customAttr->getTypeExpr()) {
+          globalActorIsolationType = customAttrTypeExpr;
+          RawOptions |= static_cast<unsigned>(
+                ProtocolConformanceFlags::GlobalActorIsolated);
+        }
+      }
+    }
   }
 }
 

@@ -18,6 +18,7 @@
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
+#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -269,6 +270,9 @@ struct ASTContext::Implementation {
   ~Implementation();
 
   llvm::BumpPtrAllocator Allocator; // used in later initializations
+
+  /// The global cache of side tables for random things.
+  GlobalCache globalCache;
 
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
@@ -748,6 +752,10 @@ inline ASTContext::Implementation &ASTContext::getImpl() const {
   auto offset = llvm::alignAddr((void *)sizeof(*this),
                                 llvm::Align(alignof(Implementation)));
   return *reinterpret_cast<Implementation*>(pointer + offset);
+}
+
+ASTContext::GlobalCache &ASTContext::getGlobalCache() const {
+  return getImpl().globalCache;
 }
 
 void ASTContext::operator delete(void *Data) throw() {

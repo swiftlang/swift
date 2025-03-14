@@ -1018,12 +1018,15 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   DeclContextID contextID;
   unsigned valueCount, typeCount, conformanceCount;
   unsigned rawOptions;
+  TypeID globalActorTypeID;
   ArrayRef<uint64_t> rawIDs;
 
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
                                               valueCount, conformanceCount,
-                                              rawOptions, rawIDs);
+                                              rawOptions,
+                                              globalActorTypeID,
+                                              rawIDs);
 
   auto doOrError = MF.getDeclContextChecked(contextID);
   if (!doOrError)
@@ -1042,10 +1045,19 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
 
   PrettyStackTraceDecl traceTo("... to", proto);
 
+  auto globalActorTypeOrError = MF.getTypeChecked(globalActorTypeID);
+  if (!globalActorTypeOrError)
+    return globalActorTypeOrError.takeError();
+  auto globalActorType = globalActorTypeOrError.get();
+
+  TypeExpr *globalActorTypeExpr = nullptr;
+  if (globalActorType)
+    globalActorTypeExpr = TypeExpr::createImplicit(globalActorType, ctx);
+
   auto conformance = ctx.getNormalConformance(
       conformingType, proto, SourceLoc(), dc,
       ProtocolConformanceState::Incomplete,
-      ProtocolConformanceOptions(rawOptions));
+      ProtocolConformanceOptions(rawOptions, globalActorTypeExpr));
 
   if (conformance->isConformanceOfProtocol()) {
     auto &C = dc->getASTContext();
@@ -3345,8 +3357,8 @@ class DeclDeserializer {
 
       // The next bits are the protocol conformance options.
       // Update the mask below whenever this changes.
-      static_assert(NumProtocolConformanceOptions == 5);
-      ProtocolConformanceOptions options(rawID & 0x1F);
+      static_assert(NumProtocolConformanceOptions == 6);
+      ProtocolConformanceOptions options(rawID & 0x3F, /*global actor*/nullptr);
       rawID = rawID >> NumProtocolConformanceOptions;
 
       TypeID typeID = rawID;
@@ -8658,6 +8670,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   DeclID protoID;
   DeclContextID contextID;
+  TypeID globalActorTypeID;
   unsigned valueCount, typeCount, conformanceCount, rawOptions;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
@@ -8670,7 +8683,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   NormalProtocolConformanceLayout::readRecord(
       scratch, protoID, contextID, typeCount, valueCount, conformanceCount,
-      rawOptions, rawIDs);
+      rawOptions, globalActorTypeID, rawIDs);
 
   const ProtocolDecl *proto = conformance->getProtocol();
 

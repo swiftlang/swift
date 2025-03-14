@@ -7868,20 +7868,73 @@ bool swift::diagnoseNonSendableFromDeinit(
                                 var->getDescriptiveKind(), var->getName());
 }
 
-ActorIsolation swift::getConformanceIsolation(ProtocolConformance *conformance) {
+ActorIsolation ProtocolConformance::getIsolation() const {
+  ASTContext &ctx = getDeclContext()->getASTContext();
+  auto conformance = const_cast<ProtocolConformance *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, ConformanceIsolationRequest{conformance},
+      ActorIsolation());
+}
+
+ActorIsolation
+ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const {
+  // Only normal protocol conformances can be isolated.
   auto rootNormal =
       dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
   if (!rootNormal)
     return ActorIsolation::forNonisolated(false);
 
-  if (!rootNormal->isIsolated())
+  // If the conformance is explicitly non-isolated, report that.
+  if (rootNormal->getOptions().contains(ProtocolConformanceFlags::Nonisolated))
     return ActorIsolation::forNonisolated(false);
 
-  auto nominal = rootNormal->getDeclContext()->getSelfNominalTypeDecl();
-  if (!nominal)
+  // If there is an explicitly-specified global actor on the isolation,
+  // resolve it and report it.
+  if (auto globalActorTypeExpr = rootNormal->getExplicitGlobalActorIsolation()) {
+    // If we don't already have a resolved global actor type, resolve it now.
+    Type globalActorType = globalActorTypeExpr->getInstanceType();
+    if (!globalActorType) {
+      const auto resolution = TypeResolution::forInterface(
+          rootNormal->getDeclContext(), std::nullopt,
+          /*unboundTyOpener*/ nullptr,
+          /*placeholderHandler*/ nullptr,
+          /*packElementOpener*/ nullptr);
+      globalActorType = resolution.resolveType(globalActorTypeExpr->getTypeRepr());
+      if (!globalActorType)
+        return ActorIsolation::forNonisolated(false);
+
+      // Cache the resolved type.
+      globalActorTypeExpr->setType(MetatypeType::get(globalActorType));
+    }
+
+    // FIXME: Make sure the type actually is a global actor type, map it into
+    // context, etc.
+
+    return ActorIsolation::forGlobalActor(globalActorType);
+  }
+
+  auto dc = rootNormal->getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::IsolatedConformances))
     return ActorIsolation::forNonisolated(false);
 
-  return getActorIsolation(nominal);
+  // If the protocol itself is isolated, don't infer isolation for the
+  // conformance.
+  if (getActorIsolation(rootNormal->getProtocol()).isActorIsolated())
+    return ActorIsolation::forNonisolated(false);
+
+  // In a context where we are inferring @MainActor, if the conforming type
+  // is on the main actor, then the conformance is, too.
+  auto nominal = dc->getSelfNominalTypeDecl();
+  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated) &&
+      nominal) {
+    auto nominalIsolation = getActorIsolation(nominal);
+    if (nominalIsolation.isMainActor()) {
+      return nominalIsolation;
+    }
+  }
+
+  return ActorIsolation::forNonisolated(false);
 }
 
 namespace {
@@ -7919,11 +7972,9 @@ namespace {
       if (!normal)
         return false;
 
-      if (!normal->isIsolated())
-        return false;
-
-      auto conformanceIsolation = getConformanceIsolation(concrete);
-      if (conformanceIsolation == getContextIsolation())
+      auto conformanceIsolation = concrete->getIsolation();
+      if (!conformanceIsolation.isGlobalActor() ||
+          conformanceIsolation == getContextIsolation())
         return true;
 
       badIsolatedConformances.push_back(concrete);
@@ -7940,7 +7991,7 @@ namespace {
       auto firstConformance = badIsolatedConformances.front();
       ctx.Diags.diagnose(
           loc, diag::isolated_conformance_wrong_domain,
-          getConformanceIsolation(firstConformance),
+          firstConformance->getIsolation(),
           firstConformance->getType(),
           firstConformance->getProtocol()->getName(),
           getContextIsolation());

@@ -147,7 +147,7 @@ protected:
     SWIFT_INLINE_BITFIELD_EMPTY(RootProtocolConformance, ProtocolConformance);
 
     SWIFT_INLINE_BITFIELD_FULL(NormalProtocolConformance, RootProtocolConformance,
-                               1+1+1+
+                               1+1+1+1+1+
                                bitmax(NumProtocolConformanceOptions,8)+
                                bitmax(NumProtocolConformanceStateBits,8)+
                                bitmax(NumConformanceEntryKindBits,8),
@@ -161,6 +161,12 @@ protected:
       /// this conformance.
       IsPreconcurrencyEffectful : 1,
 
+      /// Whether the computed actor isolation is nonisolated.
+      IsComputedNonisolated : 1,
+
+      /// Whether there is an explicit global actor specified for this
+      /// conformance.
+      HasExplicitGlobalActor : 1,
       : NumPadBits,
 
       /// Options.
@@ -239,6 +245,14 @@ public:
   /// If the current conformance is canonical already, it will be returned.
   /// Otherwise a new conformance will be created.
   ProtocolConformance *getCanonicalConformance();
+
+  /// Determine the actor isolation of this conformance.
+  ActorIsolation getIsolation() const;
+
+  /// Determine whether this conformance is isolated to an actor.
+  bool isIsolated() const {
+    return getIsolation().isActorIsolated();
+  }
 
   /// Return true if the conformance has a witness for the given associated
   /// type.
@@ -529,6 +543,7 @@ class NormalProtocolConformance : public RootProtocolConformance,
 {
   friend class ValueWitnessRequest;
   friend class TypeWitnessRequest;
+  friend class ConformanceIsolationRequest;
 
   /// The protocol being conformed to.
   ProtocolDecl *Protocol;
@@ -570,6 +585,20 @@ class NormalProtocolConformance : public RootProtocolConformance,
 
   void resolveLazyInfo() const;
 
+  /// Retrieve the explicitly-specified global actor isolation.
+  TypeExpr *getExplicitGlobalActorIsolation() const;
+
+  // Record the explicitly-specified global actor isolation.
+  void setExplicitGlobalActorIsolation(TypeExpr *typeExpr);
+
+  bool isComputedNonisolated() const {
+    return Bits.NormalProtocolConformance.IsComputedNonisolated;
+  }
+
+  void setComputedNonnisolated(bool value = true) {
+    Bits.NormalProtocolConformance.IsComputedNonisolated = value;
+  }
+
 public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                             SourceLoc loc, DeclContext *dc,
@@ -593,6 +622,9 @@ public:
     Bits.NormalProtocolConformance.HasComputedAssociatedConformances = false;
     Bits.NormalProtocolConformance.SourceKind =
         unsigned(ConformanceEntryKind::Explicit);
+    Bits.NormalProtocolConformance.IsComputedNonisolated = false;
+    Bits.NormalProtocolConformance.HasExplicitGlobalActor = false;
+    setExplicitGlobalActorIsolation(options.getGlobalActorIsolationType());
   }
 
   /// Get the protocol being conformed to.
@@ -634,7 +666,8 @@ public:
   void setInvalid() { Bits.NormalProtocolConformance.IsInvalid = true; }
 
   ProtocolConformanceOptions getOptions() const {
-    return ProtocolConformanceOptions(Bits.NormalProtocolConformance.Options);
+    return ProtocolConformanceOptions(Bits.NormalProtocolConformance.Options,
+                                      getExplicitGlobalActorIsolation());
   }
 
   /// Whether this is an "unchecked" conformance.
@@ -667,11 +700,6 @@ public:
   /// Whether this is an preconcurrency conformance.
   bool isPreconcurrency() const {
     return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
-  }
-
-  /// Whether this is an isolated conformance.
-  bool isIsolated() const {
-    return getOptions().contains(ProtocolConformanceFlags::Isolated);
   }
 
   /// Retrieve the location of `@preconcurrency`, if there is one and it is

@@ -154,8 +154,10 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
         options |= ProtocolConformanceFlags::Preconcurrency;
       if (getUnsafeLoc().isValid())
         options |= ProtocolConformanceFlags::Unsafe;
-      if (getIsolatedLoc().isValid())
-        options |= ProtocolConformanceFlags::Isolated;
+      if (getNonisolatedLoc().isValid())
+        options |= ProtocolConformanceFlags::Nonisolated;
+      if (attributes.globalActorType)
+        options.setGlobalActorIsolation(attributes.globalActorType);
       return options;
     }
 
@@ -211,9 +213,9 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
       return attributes.unsafeLoc;
     }
 
-    /// The location of the @isolated attribute, if any.
-    SourceLoc getIsolatedLoc() const {
-      return attributes.isolatedLoc;
+    /// The location of the isolated modifier, if any.
+    SourceLoc getNonisolatedLoc() const {
+      return attributes.nonisolatedLoc;
     }
 
     /// For an inherited conformance, retrieve the class declaration

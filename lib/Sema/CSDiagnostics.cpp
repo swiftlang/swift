@@ -16,6 +16,7 @@
 
 #include "CSDiagnostics.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "TypoCorrection.h"
@@ -9566,7 +9567,8 @@ bool IncorrectInlineArrayLiteralCount::diagnoseAsError() {
 bool DisallowedIsolatedConformance::diagnoseAsError() {
   emitDiagnostic(diag::isolated_conformance_with_sendable_simple,
                  conformance->getType(),
-                 conformance->getProtocol()->getName());
+                 conformance->getProtocol()->getName(),
+                 conformance->getIsolation());
 
   auto selectedOverload = getCalleeOverloadChoiceIfAvailable(getLocator());
   if (!selectedOverload)

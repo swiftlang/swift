@@ -94,11 +94,6 @@
 using namespace swift;
 using namespace irgen;
 
-namespace swift {
-  // FIXME: Move this on to ProtocolConformance?
-  ActorIsolation getConformanceIsolation(ProtocolConformance *conformance);
-}
-
 namespace {
 
 /// A class for computing how to pass arguments to a polymorphic
@@ -2238,10 +2233,11 @@ namespace {
     void addFlags() {
       // Miscellaneous flags.
       if (auto conf = dyn_cast<NormalProtocolConformance>(Conformance)) {
+        auto isolation = conf->getIsolation();
         Flags = Flags.withIsRetroactive(conf->isRetroactive());
         Flags = Flags.withIsSynthesizedNonUnique(conf->isSynthesizedNonUnique());
         Flags = Flags.withIsConformanceOfProtocol(conf->isConformanceOfProtocol());
-        Flags = Flags.withHasGlobalActorIsolation(conf->isIsolated());
+        Flags = Flags.withHasGlobalActorIsolation(isolation.isGlobalActor());
       } else {
         Flags = Flags.withIsRetroactive(false)
                      .withIsSynthesizedNonUnique(false);
@@ -2435,13 +2431,11 @@ namespace {
         return;
 
       auto normal = cast<NormalProtocolConformance>(Conformance);
-      assert(normal->isIsolated());
       auto nominal = normal->getDeclContext()->getSelfNominalTypeDecl();
 
       // Add global actor type.
       auto sig = nominal->getGenericSignatureOfContext();
-      auto isolation = getConformanceIsolation(
-          const_cast<RootProtocolConformance *>(Conformance));
+      auto isolation = Conformance->getIsolation();
       assert(isolation.isGlobalActor());
       Type globalActorType = isolation.getGlobalActor();
       auto globalActorTypeName = IGM.getTypeRef(

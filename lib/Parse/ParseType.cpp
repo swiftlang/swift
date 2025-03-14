@@ -413,6 +413,15 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     return makeParserCodeCompletionResult<TypeRepr>(ET);
   }
 
+  // "nonisolated" for attribute lists.
+  if (reason == ParseTypeReason::InheritanceClause &&
+      Tok.isContextualKeyword("nonisolated")) {
+    SourceLoc nonisolatedLoc = consumeToken();
+    parsedAttributeList.Attributes.push_back(
+        TypeAttribute::createSimple(Context, TypeAttrKind::Nonisolated,
+                                    SourceLoc(), nonisolatedLoc));
+  }
+
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
   SourceLoc substitutedLoc;

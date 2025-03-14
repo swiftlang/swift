@@ -279,6 +279,14 @@ public:
   struct Implementation;
   Implementation &getImpl() const;
 
+  struct GlobalCache;
+
+  /// Retrieve a reference to the global cache within this ASTContext,
+  /// which is a place where we can stash side tables without having to
+  /// recompile the world every time we add a side table. See
+  /// "swift/AST/ASTContextGlobalCache.h"
+  GlobalCache &getGlobalCache() const;
+
   friend ConstraintCheckerArenaRAII;
 
   void operator delete(void *Data) throw();
