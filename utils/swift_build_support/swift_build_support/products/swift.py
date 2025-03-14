@@ -105,8 +105,6 @@ class Swift(product.Product):
 
         self.cmake_options.extend(self._enable_new_runtime_build)
 
-        self.cmake_options.extend(self._wasi_sysroot_path)
-
     @classmethod
     def product_source_name(cls):
         """product_source_name() -> str
@@ -298,15 +296,6 @@ updated without updating swift.py?")
     def _enable_new_runtime_build(self):
         return [('SWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL',
                  self.args.enable_new_runtime_build)]
-
-    @property
-    def _wasi_sysroot_path(self):
-        return [('SWIFT_WASI_SYSROOT_PATH:PATH',
-                 self._get_wasi_sysroot_path("wasm32-wasi"))]
-
-    def _get_wasi_sysroot_path(self, target_triple):
-        build_root = os.path.dirname(self.build_dir)
-        return wasisysroot.WASILibc.sysroot_install_path(build_root, target_triple)
 
     def _handle_swift_debuginfo_non_lto_args(self):
         if ('swift_debuginfo_non_lto_args' not in self.args

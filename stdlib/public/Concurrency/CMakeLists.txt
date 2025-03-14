@@ -224,6 +224,11 @@ elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
 elseif(SWIFT_HOST_VARIANT STREQUAL "windows") # For now, don't build embedded Concurrency on Windows
   set(SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY FALSE)
 endif()
+
+message(STATUS "SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB is ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB}")
+message(STATUS "SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY is ${SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY}")
+message(STATUS "EMBEDDED_STDLIB_TARGET_TRIPLES is ${EMBEDDED_STDLIB_TARGET_TRIPLES}")
+
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY)
   add_custom_target(embedded-concurrency)
   add_dependencies(embedded-libraries embedded-concurrency)
@@ -266,9 +271,19 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         set(extra_swift_compile_flags -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding)
       endif()
 
+    elseif (SWIFT_HOST_VARIANT STREQUAL "wasi")
+      message(STATUS "SWIFT_WASI_SYSROOT_PATH is ${SWIFT_WASI_SYSROOT_PATH}")
+      message(STATUS "mod is ${mod}")
       if("${mod}" MATCHES "-wasip1")
-        set(extra_c_compile_flags "-I${SWIFT_WASI_SYSROOT_PATH}/include/c++/v1" "-I${SWIFT_WASI_SYSROOT_PATH}/include/wasm32-wasi")
+        set(extra_c_compile_flags "-I${SWIFT_WASI_SYSROOT_PATH}/include/c++/v1")
+        if(${SWIFT_WASI_SYSROOT_PATH} MATCHES "threads")
+          list(APPEND extra_c_compile_flags "-I${SWIFT_WASI_SYSROOT_PATH}/include/wasm32-wasip1-threads")
+        else()
+          list(APPEND extra_c_compile_flags "-I${SWIFT_WASI_SYSROOT_PATH}/include/wasm32-wasi")
+        endif()
       endif()
+
+      message(STATUS "extra_c_compile_flags is ${extra_c_compile_flags}")
     endif()
 
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
