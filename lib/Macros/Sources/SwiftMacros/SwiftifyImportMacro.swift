@@ -168,6 +168,13 @@ enum Mutability {
   case Mutable
 }
 
+func getUnattributedType(_ type: TypeSyntax) -> TypeSyntax {
+  if let attributedType = type.as(AttributedTypeSyntax.self) {
+    return attributedType.baseType.trimmed
+  }
+  return type.trimmed
+}
+
 func getTypeName(_ type: TypeSyntax) throws -> TokenSyntax {
   switch type.kind {
   case .memberType:
@@ -410,7 +417,7 @@ struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
     -> (FunctionSignatureSyntax, Bool) {
     var types = argTypes
-    let typeName = try getTypeName(oldType).text
+    let typeName = getUnattributedType(oldType).description
     guard let desugaredType = typeMappings[typeName] else {
       throw DiagnosticError(
         "unable to desugar type with name '\(typeName)'", node: node)
@@ -426,7 +433,7 @@ struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
     var args = pointerArgs
-    let typeName = try getTypeName(oldType).text
+    let typeName = getUnattributedType(oldType).description
     assert(args[index] == nil)
     args[index] = ExprSyntax("\(raw: typeName)(\(raw: name))")
     return try base.buildFunctionCall(args)
@@ -446,7 +453,7 @@ struct CxxSpanReturnThunkBuilder: BoundsCheckedThunkBuilder {
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
     -> (FunctionSignatureSyntax, Bool) {
     assert(returnType == nil)
-    let typeName = try getTypeName(signature.returnClause!.type).text
+    let typeName = getUnattributedType(signature.returnClause!.type).description
     guard let desugaredType = typeMappings[typeName] else {
       throw DiagnosticError(
         "unable to desugar type with name '\(typeName)'", node: node)
@@ -923,19 +930,15 @@ public struct SwiftifyImportMacro: PeerMacro {
       return []
     }
     var result : [ParamInfo] = []
-    let process = { type, expr, orig in
-      do {
-        let typeName = try getTypeName(type).text
-        if let desugaredType = typeMappings[typeName] {
-          if let unqualifiedDesugaredType = getUnqualifiedStdName(desugaredType) {
-            if unqualifiedDesugaredType.starts(with: "span<") {
-              result.append(CxxSpan(pointerIndex: expr, nonescaping: false,
-                dependencies: [], typeMappings: typeMappings, original: orig))
-            }
+    let process : (TypeSyntax, SwiftifyExpr, SyntaxProtocol) throws -> () = { type, expr, orig in
+      let typeName = getUnattributedType(type).description
+      if let desugaredType = typeMappings[typeName] {
+        if let unqualifiedDesugaredType = getUnqualifiedStdName(desugaredType) {
+          if unqualifiedDesugaredType.starts(with: "span<") {
+            result.append(CxxSpan(pointerIndex: expr, nonescaping: false,
+              dependencies: [], typeMappings: typeMappings, original: orig))
           }
         }
-      } catch is DiagnosticError {
-        // type doesn't match expected pattern
       }
     }
     for (idx, param) in signature.parameterClause.parameters.enumerated() {

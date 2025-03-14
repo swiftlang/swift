@@ -121,4 +121,9 @@ inline ConstSpanOfInt mixedFuncWithSafeWrapper7(const int * __counted_by(len) p,
   return ConstSpanOfInt(p, len);
 }
 
+struct SpanWithoutTypeAlias {
+  std::span<const int> bar() [[clang::lifetimebound]];
+  void foo(std::span<const int> s [[clang::noescape]]);
+};
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H
