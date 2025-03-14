@@ -7918,6 +7918,11 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
   if (!ctx.LangOpts.hasFeature(Feature::IsolatedConformances))
     return ActorIsolation::forNonisolated(false);
 
+  // If the protocol itself is isolated, don't infer isolation for the
+  // conformance.
+  if (getActorIsolation(rootNormal->getProtocol()).isActorIsolated())
+    return ActorIsolation::forNonisolated(false);
+
   // In a context where we are inferring @MainActor, if the conforming type
   // is on the main actor, then the conformance is, too.
   auto nominal = dc->getSelfNominalTypeDecl();

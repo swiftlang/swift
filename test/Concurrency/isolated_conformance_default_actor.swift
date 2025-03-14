@@ -9,6 +9,11 @@ protocol P {
   func f() // expected-note{{mark the protocol requirement 'f()' 'async' to allow actor-isolated conformances}}
 }
 
+@MainActor
+protocol Q {
+  func g()
+}
+
 class CImplicitMainActorNonisolatedConformance: nonisolated P {
   func f() { } // error: explicitly nonisolated conformance
 }
@@ -23,6 +28,15 @@ class CImplicitMainActor: P {
   func f() { } // okay! conformance above is isolated
 }
 
+// If the protocol itself is isolated, don't do anything.
+extension CExplicitMainActor: Q {
+  func g() { }
+}
+
+extension CImplicitMainActor: Q {
+  func g() { }
+}
+
 // expected-note@+2{{add '@preconcurrency' to the 'P' conformance to defer isolation checking to run time}}
 // expected-note@+1{{add '@MainActor' to the 'P' conformance to restrict it to main actor-isolated code}}
 nonisolated class CNonIsolated: P {
@@ -30,6 +44,7 @@ nonisolated class CNonIsolated: P {
 }
 
 func acceptSendablePMeta<T: Sendable & P>(_: T.Type) { }
+func acceptSendableQMeta<T: Sendable & Q>(_: T.Type) { }
 
 nonisolated func testConformancesFromNonisolated() {
   let _: any P = CExplicitMainActor() // expected-error{{main actor-isolated conformance of 'CExplicitMainActor' to 'P' cannot be used in nonisolated context}}
@@ -37,4 +52,8 @@ nonisolated func testConformancesFromNonisolated() {
 
   let _: any P = CNonIsolated()
   let _: any P = CImplicitMainActorNonisolatedConformance()
+
+  // Okay, these are nonisolated conformances.
+  let _: any Q = CExplicitMainActor()
+  let _: any Q = CImplicitMainActor()
 }
