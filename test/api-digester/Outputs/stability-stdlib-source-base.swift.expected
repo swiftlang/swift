@@ -331,7 +331,7 @@ Func Optional.flatMap(_:) is now without rethrows
 Func Optional.map(_:) has generic signature change from <Wrapped, U> to <Wrapped, E, U where E : Swift.Error, U : ~Copyable>
 Func Optional.map(_:) is now without rethrows
 Func Result.flatMap(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
-Func Result.flatMapError(_:) has generic signature change from <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error> to <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error, Success : ~Copyable, Success : ~Escapable>
+Func Result.flatMapError(_:) has generic signature change from <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error> to <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error, Success : ~Copyable>
 Func Result.flatMapError(_:) has self access kind changing from NonMutating to Consuming
 Func Result.map(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
 Func Result.mapError(_:) has generic signature change from <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error> to <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error, Success : ~Copyable, Success : ~Escapable>
