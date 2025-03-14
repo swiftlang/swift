@@ -2,11 +2,11 @@
 
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUNx: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature SafeInteropWrappers -print-module -module-to-print=Method -source-filename=x | %FileCheck %s
+// RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature SafeInteropWrappers -print-module -module-to-print=Method -source-filename=x | %FileCheck %s
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default -enable-experimental-feature SafeInteropWrappers %t/method.swift -dump-macro-expansions -typecheck -verify
 
 // CHECK: @_alwaysEmitIntoClient 
-// CHECK:  public mutating func bar(_ p: UnsafeMutableBufferPointer<Int32>)
+// CHECK-SAME: public mutating func bar(_ p: UnsafeMutableBufferPointer<Float>)
 
 //--- Inputs/module.modulemap
 module Method {
