@@ -184,7 +184,12 @@ $env:SDKROOT = ""
 
 $BuildArchName = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 
-if ($PinnedBuild -eq "") {
+# Validate that if one is set all are set.
+if (($PinnedBuild -or $PinnedSHA256 -or $PinnedVersion) -and -not ($PinnedBuild -and $PinnedSHA256 -and $PinnedVersion)) {
+  throw "If any of PinnedBuild, PinnedSHA256, or PinnedVersion is set, all three must be set."
+}
+
+if (-not $PinnedBuild) {
   switch ($BuildArchName) {
     "AMD64" {
       $PinnedBuild = "https://download.swift.org/swift-6.0.3-release/windows10/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-windows10.exe"
