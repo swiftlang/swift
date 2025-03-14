@@ -220,7 +220,7 @@ public struct ClockTraits: OptionSet {
 extension Clock {
   /// The traits associated with this clock instance.
   @available(SwiftStdlib 6.2, *)
-  var traits: ClockTraits {
+  public var traits: ClockTraits {
     return []
   }
 }
