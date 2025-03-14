@@ -25,6 +25,10 @@
 import Darwin
 @preconcurrency import Dispatch
 
+func p(_ message: String, file: String = #fileID, line: UInt = #line) {
+  print("[:\(line)] \(message)")
+}
+
 func expectEqual(_ l: TaskPriority, _ r: TaskPriority,
                  function: String = #function, file: String = #fileID, line: UInt = #line) {
   precondition(l == r, "Priority [\(l)] did not equal \(r) @ \(file):\(line)(\(function))")
@@ -34,7 +38,7 @@ func loopUntil(priority: TaskPriority, file: String = #fileID, line: UInt = #lin
   var loops = 10
   var currentPriority = Task.currentPriority
   while (currentPriority != priority) {
-    print("[\(file):\(line)] Current priority = \(currentPriority) != \(priority)")
+    p("[\(file):\(line)] Current priority = \(currentPriority) != \(priority)")
     await Task.sleep(1_000_000)
     currentPriority = Task.currentPriority
     loops -= 1
@@ -50,7 +54,7 @@ func print(_ s: String = "") {
 
 func expectedBasePri(priority: TaskPriority) -> TaskPriority {
   let basePri = Task.basePriority!
-  print("Testing basePri matching expected pri - \(basePri) == \(priority)")
+  p("Testing basePri matching expected pri - \(basePri) == \(priority)")
   expectEqual(basePri, priority)
   withUnsafeCurrentTask { unsafeTask in
     guard let unsafeTask else {
@@ -65,7 +69,7 @@ func expectedBasePri(priority: TaskPriority) -> TaskPriority {
 
 func expectedEscalatedPri(priority: TaskPriority) -> TaskPriority {
   let curPri = Task.currentPriority
-  print("Testing escalated matching expected pri - \(curPri) == \(priority)")
+  p("Testing escalated matching expected pri - \(curPri) == \(priority)")
   expectEqual(curPri, priority)
 
   return curPri
@@ -111,25 +115,25 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
           let _ = expectedBasePri(priority: .background)
 
           await withTaskPriorityEscalationHandler {
-            print("in withTaskPriorityEscalationHandler, Task.currentPriority = \(Task.currentPriority)")
+            p("in withTaskPriorityEscalationHandler, Task.currentPriority = \(Task.currentPriority)")
 
             // Wait until task is running before asking to be escalated
             sem1.signal()
             sleep(1)
 
             await loopUntil(priority: .default)
-            print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
+            p("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
           } onPriorityEscalated: { oldPriority, newPriority in
-            print("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)")
-            print("in onPriorityEscalated oldPriority = \(oldPriority)")
+            p("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)")
+            p("in onPriorityEscalated oldPriority = \(oldPriority)")
             precondition(oldPriority == .background, "old Priority was: \(oldPriority)")
-            print("in onPriorityEscalated newPriority = \(newPriority)")
-            precondition(newPriority == .default)
+            p("in onPriorityEscalated newPriority = \(newPriority)")
+            precondition(newPriority == .default, "new Priority was: \(newPriority)")
             semEscalated.signal()
           }
 
-          print("Current priority = \(Task.currentPriority)")
-          print("after withTaskPriorityEscalationHandler")
+          p("Current priority = \(Task.currentPriority)")
+          p("after withTaskPriorityEscalationHandler")
           sem2.signal()
         }
 
@@ -152,26 +156,25 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
           let _ = expectedBasePri(priority: .background)
 
           await withTaskPriorityEscalationHandler {
-            print("in withTaskPriorityEscalationHandler, Task.currentPriority = \(Task.currentPriority)")
+            p("in withTaskPriorityEscalationHandler, Task.currentPriority = \(Task.currentPriority)")
             sem1.signal()
 
-            print("in withTaskPriorityEscalationHandler, wait for escalation -> \(TaskPriority.medium)")
+            p("in withTaskPriorityEscalationHandler, wait for escalation -> \(TaskPriority.medium)")
             await loopUntil(priority: .medium)
-            print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
+            p("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
             semEscalatedMedium.signal()
 
-            print("in withTaskPriorityEscalationHandler, wait for escalation -> \(TaskPriority.high)")
+            p("in withTaskPriorityEscalationHandler, wait for escalation -> \(TaskPriority.high)")
             await loopUntil(priority: .high)
-            print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
+            p("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
             semEscalatedHigh.signal()
           } onPriorityEscalated: { oldPriority, newPriority in
-            print("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)") // caller priority
-            print("in onPriorityEscalated oldPriority = \(oldPriority)")
-            precondition(oldPriority == .medium, "old Priority was: \(oldPriority)")
-            print("in onPriorityEscalated newPriority = \(newPriority)")
+            p("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)") // caller priority
+            p("in onPriorityEscalated oldPriority = \(oldPriority)")
+            p("in onPriorityEscalated newPriority = \(newPriority)")
             semEscalatedInHandler.signal()
           }
-          print("after withTaskPriorityEscalationHandler")
+          p("after withTaskPriorityEscalationHandler")
         }
 
         // Wait till child runs and asks to be escalated
@@ -185,7 +188,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
         // we got escalated twice
         semEscalatedInHandler.wait()
       }
-      await triggerTwice_escalateToMediumAndThenAgainToHigh()
+      triggerTwice_escalateToMediumAndThenAgainToHigh()
 
       func dontTriggerInAlreadyEscalatedTask() {
         let sem1 = DispatchSemaphore(value: 0)
@@ -196,16 +199,16 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
           let _ = expectedBasePri(priority: .background)
 
           await withTaskPriorityEscalationHandler {
-            print("in withTaskPriorityEscalationHandler, Task.currentPriority = \(Task.currentPriority)")
+            p("in withTaskPriorityEscalationHandler, Task.currentPriority = \(Task.currentPriority)")
             sem1.signal()
             await loopUntil(priority: .default)
-            print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
+            p("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
           } onPriorityEscalated: { oldPriority, newPriority in
-            print("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)")
-            print("in onPriorityEscalated oldPriority = \(oldPriority)")
+            p("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)")
+            p("in onPriorityEscalated oldPriority = \(oldPriority)")
             precondition(oldPriority == .background, "old Priority was: \(oldPriority)")
-            print("in onPriorityEscalated newPriority = \(newPriority)")
-            precondition(newPriority == .default)
+            p("in onPriorityEscalated newPriority = \(newPriority)")
+            precondition(newPriority == .default, "new Priority was: \(newPriority)")
             semEscalated.signal()
           }
 
@@ -214,13 +217,13 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
 
           await withTaskPriorityEscalationHandler {
             await loopUntil(priority: .default)
-            print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
+            p("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
           } onPriorityEscalated: { oldPriority, newPriority in
             fatalError("Task was already escalated earlier, no escalation triggered here")
           }
 
-          print("Current priority = \(Task.currentPriority)")
-          print("after withTaskPriorityEscalationHandler")
+          p("Current priority = \(Task.currentPriority)")
+          p("after withTaskPriorityEscalationHandler")
           sem2.signal()
         }
 
@@ -231,7 +234,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
         semEscalated.wait()
         sem2.wait()
       }
-      await dontTriggerInAlreadyEscalatedTask()
+      dontTriggerInAlreadyEscalatedTask()
     }
 
     await top_level.value
