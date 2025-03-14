@@ -899,7 +899,9 @@ func getGlobalInitialization(
   return nil
 }
 
-func canDynamicallyCast(from sourceType: Type, to destType: Type, in function: Function, sourceTypeIsExact: Bool) -> Bool? {
+func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalType,
+                        in function: Function, sourceTypeIsExact: Bool
+) -> Bool? {
   switch classifyDynamicCastBridged(sourceType.bridged, destType.bridged, function.bridged, sourceTypeIsExact) {
     case .willSucceed: return true
     case .maySucceed:  return nil

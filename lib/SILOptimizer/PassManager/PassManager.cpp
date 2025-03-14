@@ -2120,7 +2120,7 @@ bool BeginApply_canInline(BridgedInstruction beginApply) {
   return swift::SILInliner::canInlineBeginApply(beginApply.getAs<BeginApplyInst>());
 }
 
-BridgedDynamicCastResult classifyDynamicCastBridged(BridgedType sourceTy, BridgedType destTy,
+BridgedDynamicCastResult classifyDynamicCastBridged(BridgedCanType sourceTy, BridgedCanType destTy,
                                                     BridgedFunction function,
                                                     bool sourceTypeIsExact) {
   static_assert((int)DynamicCastFeasibility::WillSucceed == (int)BridgedDynamicCastResult::willSucceed);
@@ -2129,8 +2129,8 @@ BridgedDynamicCastResult classifyDynamicCastBridged(BridgedType sourceTy, Bridge
 
   return static_cast<BridgedDynamicCastResult>(
     classifyDynamicCast(function.getFunction()->getModule().getSwiftModule(),
-                        sourceTy.unbridged().getASTType(),
-                        destTy.unbridged().getASTType(),
+                        sourceTy.unbridged(),
+                        destTy.unbridged(),
                         sourceTypeIsExact));
 }
 
