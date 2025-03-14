@@ -604,6 +604,11 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
+  /// The mapping from C++ namespaces (represented as {parent, name}) to
+  /// the Swift enum declaration that describes them.
+  llvm::DenseMap<std::pair<const DeclContext *, Identifier>, EnumDecl *>
+    ImportedNamespaces;
+
   // Caches used by ObjCInterfaceAndImplementationRequest.
   llvm::DenseMap<Decl *, Decl *> ImplementationsByInterface;
   llvm::DenseMap<Decl *, llvm::TinyPtrVector<Decl*>> InterfacesByImplementation;

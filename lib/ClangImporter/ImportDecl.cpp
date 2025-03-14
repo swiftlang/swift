@@ -1152,11 +1152,17 @@ namespace {
       return nullptr;
     }
 
-    Decl *VisitNamespaceDecl(const clang::NamespaceDecl *decl) {
-      DeclContext *dc = nullptr;
+    /// C++ namespaces are modeled as Swift enums. This operation returns the
+    /// enum itself, which will be nested within the general "imported header
+    /// unit" rather than a specific module, because namespaces can be freely
+    /// defined anywhere.
+    ///
+    /// This operation can return NULL, if the namespace itself isn't imported.
+    EnumDecl *getSwiftEnumForCxxNamespace(const clang::NamespaceDecl *decl) {
       // Do not import namespace declarations marked as 'swift_private'.
       if (decl->hasAttr<clang::SwiftPrivateAttr>())
         return nullptr;
+
       // Workaround for os module declaring `namespace os` on Darwin, causing
       // name lookup issues. That namespace only declares utility functions that
       // are not supposed to be used from Swift, so let's just not import the
@@ -1165,42 +1171,50 @@ namespace {
           decl->getOwningModule() &&
           decl->getOwningModule()->getTopLevelModuleName() == "os")
         return nullptr;
-      // If this is a top-level namespace, don't put it in the module we're
-      // importing, put it in the "__ObjC" module that is implicitly imported.
-      if (!decl->getParent()->isNamespace())
+
+      // Find the enclosing context.
+      DeclContext *dc;
+      if (auto parentNamespace = dyn_cast<clang::NamespaceDecl>(decl->getParent())) {
+        // The enum for this namespace will be nested within the enum of its
+        // parent namespace.
+        auto parentEnum = getSwiftEnumForCxxNamespace(parentNamespace);
+        if (!parentEnum)
+          return nullptr;
+
+        dc = parentEnum;
+      } else {
+        // If this is a top-level namespace, put it in the "__ObjC" module
+        // that is implicitly imported.
         dc = Impl.ImportedHeaderUnit;
-      else {
-        // This is a nested namespace, so just lookup it's parent normally.
-        auto parentNS = cast<clang::NamespaceDecl>(decl->getParent());
-        auto parent =
-            Impl.importDecl(parentNS, getVersion(), /*UseCanonicalDecl*/ false);
-        // The parent namespace might not be imported if it's `swift_private`.
-        if (!parent)
-            return nullptr;
-        dc = cast<EnumDecl>(parent);
       }
 
+      // Figure out the name of this entity.
       ImportedName importedName;
       std::tie(importedName, std::ignore) = importFullName(decl);
       // If we don't have a name for this declaration, bail. We can't import it.
       if (!importedName)
         return nullptr;
 
+      Identifier name = importedName.getBaseIdentifier(Impl.SwiftContext);
+
+      // Check whether we already have an enum for this declaration.
+      EnumDecl *&cachedEnumDecl = Impl.ImportedNamespaces[{dc, name}];
+      if (cachedEnumDecl)
+        return cachedEnumDecl;
+
       auto *enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
           decl, AccessLevel::Public, Impl.importSourceLoc(decl->getBeginLoc()),
-          importedName.getBaseIdentifier(Impl.SwiftContext),
-          Impl.importSourceLoc(decl->getLocation()), std::nullopt, nullptr, dc);
+          name, Impl.importSourceLoc(decl->getLocation()), std::nullopt,
+          nullptr, dc);
+
+      // Update the cache.
+      cachedEnumDecl = enumDecl;
+
       // TODO: we only have this for the sid effect of calling
       // "FirstDeclAndLazyMembers.setInt(true)".
       // This should never actually try to use Impl as the member loader,
       // that should all be done via requests.
       enumDecl->setMemberLoader(&Impl, 0);
-
-      // Only import one enum for all redecls of a namespace. Because members
-      // are loaded lazily, we can cache all the redecls to prevent the creation
-      // of multiple enums.
-      for (auto redecl : decl->redecls())
-        Impl.ImportedDecls[{redecl, getVersion()}] = enumDecl;
 
       for (auto redecl : decl->redecls()) {
         // Because a namespaces's decl context is the bridging header, make sure
@@ -1211,6 +1225,10 @@ namespace {
       }
 
       return enumDecl;
+    }
+
+    Decl *VisitNamespaceDecl(const clang::NamespaceDecl *decl) {
+      return getSwiftEnumForCxxNamespace(decl);
     }
 
     Decl *VisitUsingDirectiveDecl(const clang::UsingDirectiveDecl *decl) {
