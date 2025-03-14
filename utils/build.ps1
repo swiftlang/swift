@@ -399,39 +399,33 @@ function Add-TimingData {
 function Write-Summary {
   Write-Host "Summary:" -ForegroundColor Cyan
 
-  # Calculate the total time using TimeSpan.Add()
   $TotalTime = [TimeSpan]::Zero
   foreach ($Entry in $TimingData) {
     $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
   }
 
-  # Calculate percentages and sort the data without the total row
   $SortedData = $TimingData | ForEach-Object {
     $Percentage = [math]::Round(($_.("Elapsed Time").TotalSeconds / $TotalTime.TotalSeconds) * 100, 1)
-
+    $FormattedTime = "{0:hh\:mm\:ss\.ff}" -f $_."Elapsed Time"
     [PSCustomObject]@{
       "Build Step" = $_."Build Step"
       Platform = $_.Platform
       Arch = $_.Arch
-      "Elapsed Time" = $_."Elapsed Time"
+      "Elapsed Time" = $FormattedTime
       "%" = "$Percentage%"
     }
-  } | Sort-Object -Descending -Property "Elapsed Time"
+  } | Sort-Object -Descending -Property "%"
 
-  # Create the total row
+  $FormattedTotalTime = "{0:hh\:mm\:ss\.ff}" -f $TotalTime
   $TotalRow = [PSCustomObject]@{
     "Build Step" = "TOTAL"
     Platform = ""
     Arch = ""
-    "Elapsed Time" = $TotalTime
+    "Elapsed Time" = $FormattedTotalTime
     "%" = "100.0%"
   }
 
-  # Combine sorted data and total row
-  $DisplayData = @($SortedData) + $TotalRow
-
-  # Display the combined data
-  $DisplayData | Format-Table -AutoSize
+  @($SortedData) + $TotalRow | Format-Table -AutoSize
 }
 
 function Get-AndroidNDK {
