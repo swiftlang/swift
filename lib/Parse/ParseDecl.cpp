@@ -5718,8 +5718,8 @@ consumeIfParenthesizedModifier(Parser &P, StringRef name,
       std::find(allowedArguments.begin(), allowedArguments.end(),
                 P.Tok.getText()) != allowedArguments.end();
   
-  if (argumentIsAllowed && P.Tok.is(tok::identifier) &&
-      P.peekToken().is(tok::r_paren)) {
+  if (argumentIsAllowed && P.consumeIf(tok::identifier) &&
+      P.consumeIf(tok::r_paren)) {
     backtrack.cancelBacktrack();
     return true;
   }
