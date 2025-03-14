@@ -2021,7 +2021,7 @@ bool ModuleDecl::isStdlibModule() const {
 }
 
 bool ModuleDecl::isConcurrencyModule() const {
-  return !getParent() && getName() == getASTContext().getIdentifier("_Concurrency");
+  return !getParent() && getName() == getASTContext().Id_Concurrency;
 }
 
 bool ModuleDecl::hasStandardSubstitutions() const {
@@ -4283,11 +4283,6 @@ struct SwiftSettingsWalker : ASTWalker {
 
 } // namespace
 
-static bool isConcurrencyModule(DeclContext *dc) {
-  auto *m = dc->getParentModule();
-  return !m->getParent() && m->getName() == m->getASTContext().Id_Concurrency;
-}
-
 bool SwiftSettingsWalker::isSwiftSettingsMacroExpr(
     MacroExpansionExpr *macroExpr) {
   // First make sure we actually have a macro with the name SwiftSettings.
@@ -4404,7 +4399,8 @@ SwiftSettingsWalker::patternMatchDefaultIsolationMainActor(CallExpr *callExpr) {
   if (!nomDecl)
     return CanType();
   auto *nomDeclDC = nomDecl->getDeclContext();
-  if (!nomDeclDC->isModuleScopeContext() || !isConcurrencyModule(nomDeclDC))
+  auto *nomDeclModule = nomDecl->getParentModule();
+  if (!nomDeclDC->isModuleScopeContext() || !nomDeclModule->isConcurrencyModule())
     return CanType();
 
   return nomDecl->getDeclaredType()->getCanonicalType();

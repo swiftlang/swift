@@ -748,12 +748,12 @@ private:
     IsConformanceOfProtocolMask = 0x01u << 18,
     HasGlobalActorIsolation = 0x01u << 19,
 
-    // NOTE: This is currently specialized to detecting a non-default
-    // implementation of the 'SerialExecutor/isIsolatingCurrentContext' method,
-    // however the pattern of detecting "has non-default impl of ..." may be
-    // generalized if we would like it to; we could store another trailing object
-    // after the HasGlobalActorIsolation one, and use that to record which
-    // requirement has the non-default implementation that we need to special handle.
+    // Used to detect if this is a conformance to SerialExecutor that has
+    // an user defined implementation of 'isIsolatingCurrentContext'. This
+    // requirement is special in the sense that if a non-default impl is present
+    // we will avoid calling the `checkIsolated` method which would lead to a
+    // crash. In other words, this API "soft replaces" 'checkIsolated' so we
+    // must at runtime the presence of a non-default implementation.
     HasNonDefaultSerialExecutorIsIsolatingCurrentContext = 0x01u << 20,
 
     NumConditionalPackDescriptorsMask = 0xFFu << 24,

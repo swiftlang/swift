@@ -2479,11 +2479,10 @@ namespace {
           bool nameMatch = witness.getDecl()->getBaseIdentifier() == C.Id_isIsolatingCurrentContext;
           if (nameMatch) {
             if (DeclContext *NominalOrExtension = witness.getDecl()->getDeclContext()) {
-              ModuleDecl *witnessParentModule = NominalOrExtension->getParentModule();
               // If the witness is NOT the default implementation in the _Concurrency library,
               // we should record that this is an user provided implementation and we should call it.
               bool hasNonDefaultIsIsolatingCurrentContext =
-                  !witnessParentModule->isConcurrencyModule();
+                  !NominalOrExtension->getParentModule()->isConcurrencyModule();
               UpdatedFlags = UpdatedFlags.withHasNonDefaultSerialExecutorIsIsolatingCurrentContext(
                             hasNonDefaultIsIsolatingCurrentContext);
             }
