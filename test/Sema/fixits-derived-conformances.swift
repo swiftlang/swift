@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-module -emit-library -module-name Types %S/Inputs/fixits-derived-conformances-multifile.swift -o %t/%target-library-name(Types)
-// RUN: %swift -typecheck -target %target-triple -I %t -verify %s
+// RUN: %target-typecheck-verify-swift %s -I %t
 
 import Types
 
