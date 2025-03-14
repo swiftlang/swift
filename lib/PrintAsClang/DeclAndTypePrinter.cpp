@@ -32,6 +32,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
@@ -45,6 +46,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
@@ -475,6 +477,17 @@ private:
     os << "@end\n";
   }
 
+  static bool isClangPOD(const NominalTypeDecl *ntd) {
+    auto clangDecl = ntd->getClangDecl();
+    if (!clangDecl)
+      return false;
+    if (const auto *rd = dyn_cast<clang::RecordDecl>(clangDecl)) {
+      return !isa<clang::CXXRecordDecl>(rd) ||
+             cast<clang::CXXRecordDecl>(rd)->isPOD();
+    }
+    return false;
+  }
+
   void visitEnumDeclCxx(EnumDecl *ED) {
     assert(owningPrinter.outputLang == OutputLanguageMode::Cxx);
 
@@ -588,7 +601,9 @@ private:
             assert(objectTypeDecl != nullptr || paramType->isOptional());
 
             if (objectTypeDecl &&
-                owningPrinter.typeMapping.getKnownCxxTypeInfo(objectTypeDecl)) {
+                (owningPrinter.typeMapping.getKnownCxxTypeInfo(
+                     objectTypeDecl) ||
+                 isClangPOD(objectTypeDecl))) {
               outOfLineOS << "    " << types[paramType] << " result;\n";
               outOfLineOS << "    "
                              "memcpy(&result, payloadFromDestruction, "
@@ -755,8 +770,9 @@ private:
                   assert(objectTypeDecl != nullptr || paramType->isOptional());
 
                   if (objectTypeDecl &&
-                      owningPrinter.typeMapping.getKnownCxxTypeInfo(
-                          objectTypeDecl)) {
+                      (owningPrinter.typeMapping.getKnownCxxTypeInfo(
+                           objectTypeDecl) ||
+                       isClangPOD(objectTypeDecl))) {
                     outOfLineOS
                         << "    memcpy(result._getOpaquePointer(), &val, "
                            "sizeof(val));\n";
