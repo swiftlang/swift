@@ -478,7 +478,8 @@ public:
 class ConformanceIsolationRequest :
     public SimpleRequest<ConformanceIsolationRequest,
                          ActorIsolation(ProtocolConformance *),
-                         RequestFlags::Cached> {
+                         RequestFlags::SeparatelyCached |
+                         RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -490,8 +491,10 @@ private:
   evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const;
 
 public:
-  // Caching.
-  bool isCached() const;
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<ActorIsolation> getCachedResult() const;
+  void cacheResult(ActorIsolation result) const;
 };
 
 /// Determine whether the given declaration is 'final'.

@@ -408,7 +408,8 @@ SWIFT_REQUEST(TypeChecker, ConformanceHasEffectRequest,
               bool(EffectKind, ProtocolConformanceRef),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ConformanceIsolationRequest,
-              ActorIsolation(ProtocolConformance *), Cached,
+              ActorIsolation(ProtocolConformance *),
+              SeparatelyCached | SplitCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveTypeRequest,
               Type (const TypeResolution *, TypeRepr *, GenericParamList *),

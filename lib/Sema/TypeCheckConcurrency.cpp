@@ -7890,7 +7890,7 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
 
   // If there is an explicitly-specified global actor on the isolation,
   // resolve it and report it.
-  if (auto globalActorTypeExpr = rootNormal->globalActorIsolation) {
+  if (auto globalActorTypeExpr = rootNormal->getExplicitGlobalActorIsolation()) {
     // If we don't already have a resolved global actor type, resolve it now.
     Type globalActorType = globalActorTypeExpr->getInstanceType();
     if (!globalActorType) {
@@ -7925,7 +7925,6 @@ ConformanceIsolationRequest::evaluate(Evaluator &evaluator, ProtocolConformance 
       nominal) {
     auto nominalIsolation = getActorIsolation(nominal);
     if (nominalIsolation.isMainActor()) {
-      rootNormal->setGlobalActorIsolation(nominalIsolation.getGlobalActor());
       return nominalIsolation;
     }
   }

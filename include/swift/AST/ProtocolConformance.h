@@ -147,7 +147,7 @@ protected:
     SWIFT_INLINE_BITFIELD_EMPTY(RootProtocolConformance, ProtocolConformance);
 
     SWIFT_INLINE_BITFIELD_FULL(NormalProtocolConformance, RootProtocolConformance,
-                               1+1+1+
+                               1+1+1+1+1+
                                bitmax(NumProtocolConformanceOptions,8)+
                                bitmax(NumProtocolConformanceStateBits,8)+
                                bitmax(NumConformanceEntryKindBits,8),
@@ -161,6 +161,12 @@ protected:
       /// this conformance.
       IsPreconcurrencyEffectful : 1,
 
+      /// Whether the computed actor isolation is nonisolated.
+      IsComputedNonisolated : 1,
+
+      /// Whether there is an explicit global actor specified for this
+      /// conformance.
+      HasExplicitGlobalActor : 1,
       : NumPadBits,
 
       /// Options.
@@ -555,9 +561,6 @@ class NormalProtocolConformance : public RootProtocolConformance,
   /// NominalTypeDecl that declared the conformance.
   DeclContext *Context;
 
-  /// The global actor isolation for this conformance, if there is one.
-  TypeExpr *globalActorIsolation = nullptr;
-
   NormalProtocolConformance *ImplyingConformance = nullptr;
 
   /// The mapping of individual requirements in the protocol over to
@@ -582,8 +585,19 @@ class NormalProtocolConformance : public RootProtocolConformance,
 
   void resolveLazyInfo() const;
 
-  /// Set up global actor isolation for this conformance.
-  void setGlobalActorIsolation(Type globalActorType);
+  /// Retrieve the explicitly-specified global actor isolation.
+  TypeExpr *getExplicitGlobalActorIsolation() const;
+
+  // Record the explicitly-specified global actor isolation.
+  void setExplicitGlobalActorIsolation(TypeExpr *typeExpr);
+
+  bool isComputedNonisolated() const {
+    return Bits.NormalProtocolConformance.IsComputedNonisolated;
+  }
+
+  void setComputedNonnisolated(bool value = true) {
+    Bits.NormalProtocolConformance.IsComputedNonisolated = value;
+  }
 
 public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
@@ -608,7 +622,9 @@ public:
     Bits.NormalProtocolConformance.HasComputedAssociatedConformances = false;
     Bits.NormalProtocolConformance.SourceKind =
         unsigned(ConformanceEntryKind::Explicit);
-    globalActorIsolation = options.getGlobalActorIsolationType();
+    Bits.NormalProtocolConformance.IsComputedNonisolated = false;
+    Bits.NormalProtocolConformance.HasExplicitGlobalActor = false;
+    setExplicitGlobalActorIsolation(options.getGlobalActorIsolationType());
   }
 
   /// Get the protocol being conformed to.
@@ -651,7 +667,7 @@ public:
 
   ProtocolConformanceOptions getOptions() const {
     return ProtocolConformanceOptions(Bits.NormalProtocolConformance.Options,
-                                      globalActorIsolation);
+                                      getExplicitGlobalActorIsolation());
   }
 
   /// Whether this is an "unchecked" conformance.

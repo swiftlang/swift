@@ -1371,7 +1371,8 @@ void AssociatedConformanceRequest::cacheResult(
 //----------------------------------------------------------------------------//
 // ConformanceIsolationRequest computation.
 //----------------------------------------------------------------------------//
-bool ConformanceIsolationRequest::isCached() const {
+std::optional<ActorIsolation>
+ConformanceIsolationRequest::getCachedResult() const {
   // We only want to cache for global-actor-isolated conformances. For
   // everything else, which is nearly every conformance, this request quickly
   // returns "nonisolated" so there is no point in caching it.
@@ -1379,25 +1380,29 @@ bool ConformanceIsolationRequest::isCached() const {
   auto rootNormal =
       dyn_cast<NormalProtocolConformance>(conformance->getRootConformance());
   if (!rootNormal)
-    return false;
+    return ActorIsolation::forNonisolated(false);
 
-  // We know this is nonisolated.
-  if (rootNormal->getOptions().contains(ProtocolConformanceFlags::Nonisolated))
-    return false;
+  // Was actor isolation non-isolated?
+  if (rootNormal->isComputedNonisolated())
+    return ActorIsolation::forNonisolated(false);
 
-  // Explicit global actor isolation needs to be checked.
-  if (rootNormal->globalActorIsolation)
-    return true;
+  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  return ctx.evaluator.getCachedNonEmptyOutput(*this);
+}
 
-  // If we might infer conformance isolation, then we should cache the result.
-  auto dc = rootNormal->getDeclContext();
-  auto nominal = dc->getSelfNominalTypeDecl();
-  if (nominal &&
-      ((isa<ClassDecl>(nominal) && cast<ClassDecl>(nominal)->isActor()) ||
-       nominal->getSemanticAttrs().hasAttribute<NonisolatedAttr>()))
-    return false;
+void ConformanceIsolationRequest::cacheResult(ActorIsolation result) const {
+  auto conformance = std::get<0>(getStorage());
+  auto rootNormal =
+      cast<NormalProtocolConformance>(conformance->getRootConformance());
 
-  return true;
+  // Common case: conformance is nonisolated.
+  if (result.isNonisolated()) {
+    rootNormal->setComputedNonnisolated();
+    return;
+  }
+
+  ASTContext &ctx = rootNormal->getDeclContext()->getASTContext();
+  ctx.evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 
 //----------------------------------------------------------------------------//

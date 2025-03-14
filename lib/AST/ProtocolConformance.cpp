@@ -17,6 +17,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "ConformanceLookupTable.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DistributedDecl.h"
@@ -474,22 +475,31 @@ void NormalProtocolConformance::resolveLazyInfo() const {
   loader->finishNormalConformance(mutableThis, LoaderContextData);
 }
 
-void NormalProtocolConformance::setGlobalActorIsolation(Type globalActorType) {
-  ASTContext &ctx = getDeclContext()->getASTContext();
-  if (globalActorIsolation)
-    globalActorIsolation->setType(MetatypeType::get(globalActorType));
-  else
-    globalActorIsolation = TypeExpr::createImplicit(globalActorType, ctx);
-
-  Bits.NormalProtocolConformance.Options |=
-      static_cast<unsigned>(ProtocolConformanceFlags::GlobalActorIsolated);
-}
-
 void NormalProtocolConformance::setLazyLoader(LazyConformanceLoader *loader,
                                               uint64_t contextData) {
   assert(!Loader && "already has a loader");
   Loader = loader;
   LoaderContextData = contextData;
+}
+
+TypeExpr *NormalProtocolConformance::getExplicitGlobalActorIsolation() const {
+  if (!Bits.NormalProtocolConformance.HasExplicitGlobalActor)
+    return nullptr;
+
+  ASTContext &ctx = getDeclContext()->getASTContext();
+  return ctx.getGlobalCache().conformanceExplicitGlobalActorIsolation[this];
+}
+
+void
+NormalProtocolConformance::setExplicitGlobalActorIsolation(TypeExpr *typeExpr) {
+  if (!typeExpr) {
+    Bits.NormalProtocolConformance.HasExplicitGlobalActor = false;
+    return;
+  }
+
+  Bits.NormalProtocolConformance.HasExplicitGlobalActor = true;
+  ASTContext &ctx = getDeclContext()->getASTContext();
+  ctx.getGlobalCache().conformanceExplicitGlobalActorIsolation[this] = typeExpr;
 }
 
 namespace {
