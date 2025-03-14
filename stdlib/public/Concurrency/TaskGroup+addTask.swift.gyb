@@ -36,7 +36,7 @@ import Swift
 %        ],
 %        ['addTask', 'addTaskUnlessCancelled'],
 %        [
-%          'name: String? = nil',
+%          'name: String?',
 %          'executorPreference taskExecutor: (any TaskExecutor)? = nil',
 %          'priority: TaskPriority? = nil',
 %          # throws and ChildTaskResult will be adjusted per task group type

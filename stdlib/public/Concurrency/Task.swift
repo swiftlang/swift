@@ -651,7 +651,7 @@ extension Task where Failure == Never {
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
-    name: String? = nil,
+    name: String?,
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async -> Success
   ) {
@@ -662,7 +662,7 @@ extension Task where Failure == Never {
   @_alwaysEmitIntoClient
   @available(SwiftStdlib 6.2, *)
   public init(
-    name: String? = nil,
+    name: String?,
     // TaskExecutor is unavailable in embedded
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping () async -> Success
@@ -712,7 +712,7 @@ extension Task where Failure == Never {
   @_alwaysEmitIntoClient
   @available(SwiftStdlib 6.2, *)
   public init(
-    name: String? = nil,
+    name: String?,
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async -> Success
   ) {
@@ -824,7 +824,7 @@ extension Task where Failure == Error {
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
-    name: String? = nil,
+    name: String?,
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
 ) {
@@ -835,7 +835,7 @@ extension Task where Failure == Error {
   @_alwaysEmitIntoClient
   @available(SwiftStdlib 6.2, *)
   public init(
-    name: String? = nil,
+    name: String?,
     // TaskExecutor is unavailable in embedded
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping () async throws -> Success
@@ -881,7 +881,7 @@ self._task = task
   @_alwaysEmitIntoClient
   @available(SwiftStdlib 6.2, *)
   public init(
-    name: String? = nil,
+    name: String?,
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
 ) {
@@ -991,7 +991,7 @@ extension Task where Failure == Never {
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public static func detached(
-    name: String? = nil,
+    name: String?,
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> Success
   ) -> Task<Success, Failure> {
@@ -1022,7 +1022,7 @@ extension Task where Failure == Never {
   @discardableResult
   @_alwaysEmitIntoClient
   public static func detached(
-    name: String? = nil,
+    name: String?,
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> Success
   ) -> Task<Success, Failure> {
@@ -1132,7 +1132,7 @@ extension Task where Failure == Error {
   @_alwaysEmitIntoClient
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public static func detached(
-    name: String? = nil,
+    name: String?,
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> Success
   ) -> Task<Success, Failure> {
@@ -1164,7 +1164,7 @@ extension Task where Failure == Error {
   @discardableResult
   @_alwaysEmitIntoClient
   public static func detached(
-    name: String? = nil,
+    name: String?,
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async throws -> Success
   ) -> Task<Success, Failure> {
