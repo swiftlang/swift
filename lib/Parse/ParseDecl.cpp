@@ -2911,9 +2911,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       if (CodeCompletionCallbacks) {
         CodeCompletionCallbacks->completeDeclAttrParam(
             ParameterizedDeclAttributeKind::AccessControl, 0, false);
+        consumeToken(tok::code_complete);
       }
-      consumeToken(tok::code_complete);
-      return makeParserCodeCompletionStatus();
+      return makeParserSuccess();
     }
     
     // Parse the subject.
