@@ -58,73 +58,112 @@ struct ASTGenVisitor {
   }
 
   func generate(sourceFile node: SourceFileSyntax) -> [BridgedASTNode] {
-    var out = [BridgedASTNode]()
-    let isTopLevel = self.declContext.isModuleScopeContext
+    // If not top-level, no need for 'TopLevelCodeDecl' treatment.
+    if !self.declContext.isModuleScopeContext {
+      return self.generate(codeBlockItemList: node.statements)
+    } else {
+      return self.generateTopLevel(codeBlockItemList: node.statements)
+    }
+  }
 
+  func generateTopLevel(codeBlockItem node: CodeBlockItemSyntax) -> BridgedASTNode? {
+    let parentDC = self.declContext
+
+    func maybeTopLevelCodeDecl(body: () -> BridgedASTNode?) -> BridgedASTNode? {
+      let topLevelDecl: BridgedTopLevelCodeDecl = BridgedTopLevelCodeDecl.create(self.ctx, declContext: self.declContext)
+      guard let astNode = withDeclContext(topLevelDecl.asDeclContext, body) else {
+        return nil
+      }
+
+      if astNode.kind == .decl {
+        // If a decl is generated, discard the TopLevelCodeDecl.
+        return astNode
+      }
+
+      // Diagnose top-level code in non-script files.
+      if !declContext.parentSourceFile.isScriptMode {
+        switch astNode.kind {
+        case .stmt:
+          self.diagnose(.illegalTopLevelStmt(node))
+        case .expr:
+          self.diagnose(.illegalTopLevelExpr(node))
+        case .decl:
+          fatalError("unreachable")
+        }
+      }
+
+      let bodyRange = self.generateImplicitBraceRange(node)
+      let body = BridgedBraceStmt.createImplicit(
+        self.ctx,
+        lBraceLoc: bodyRange.start,
+        element: astNode,
+        rBraceLoc: bodyRange.end
+      )
+      topLevelDecl.setBody(body: body)
+      return .decl(topLevelDecl.asDecl)
+    }
+
+    switch node.item {
+    case .decl(let node):
+      if let node = node.as(MacroExpansionDeclSyntax.self) {
+        return maybeTopLevelCodeDecl {
+          switch self.maybeGenerateBuiltinPound(freestandingMacroExpansion: node) {
+          case .generated(let generated):
+            return generated
+          case .ignored:
+            /// If it is actually a macro expansion decl, it should use the parent DC.
+            return self.withDeclContext(parentDC) {
+              return .decl(self.generate(macroExpansionDecl: node).asDecl)
+            }
+          }
+        }
+      }
+      // Regular 'decl' nodes never be a stmt or expr. No top-level code treatment.
+      return self.generate(decl: node).map { .decl($0) }
+
+    case .expr(let node):
+      return maybeTopLevelCodeDecl {
+        if let node = node.as(MacroExpansionExprSyntax.self) {
+          switch self.maybeGenerateBuiltinPound(freestandingMacroExpansion: node) {
+          case .generated(let generated):
+            return generated
+          case .ignored:
+            // Let regular 'self.generate(expr:)' generate the macro expansions.
+            break
+          }
+        }
+        return .expr(self.generate(expr: node))
+      }
+
+    case .stmt(let node):
+      return maybeTopLevelCodeDecl {
+        return .stmt(self.generate(stmt: node))
+      }
+    }
+  }
+
+  func generateTopLevel(codeBlockItemList node: CodeBlockItemListSyntax) -> [BridgedASTNode] {
+    var out = [BridgedASTNode]()
     visitIfConfigElements(
-      node.statements,
+      node,
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { element in
-
-      func generateStmtOrExpr(_ body: () -> BridgedASTNode) -> BridgedASTNode {
-        if !isTopLevel {
-          return body()
-        }
-
-        let topLevelDecl = BridgedTopLevelCodeDecl.create(self.ctx, declContext: self.declContext)
-        let astNode = withDeclContext(topLevelDecl.asDeclContext) {
-          body()
-        }
-
-        // Diagnose top level code in non-script file.
-        if (!declContext.parentSourceFile.isScriptMode) {
-          switch element.item {
-          case .stmt:
-            self.diagnose(.illegalTopLevelStmt(element))
-          case .expr:
-            self.diagnose(.illegalTopLevelExpr(element))
-          case .decl:
-            fatalError("unreachable")
-          }
-        }
-
-        let bodyRange = self.generateImplicitBraceRange(element)
-        let body = BridgedBraceStmt.createImplicit(
-          self.ctx,
-          lBraceLoc: bodyRange.start,
-          element: astNode,
-          rBraceLoc: bodyRange.end
-        )
-        topLevelDecl.setBody(body: body)
-        return .decl(topLevelDecl.asDecl)
+      guard let item = self.generateTopLevel(codeBlockItem: element) else {
+        return
       }
+      out.append(item)
 
-      // TODO: Set semicolon loc.
-      switch element.item {
-      case .decl(let node):
-        if let d = self.generate(decl: node) {
+      // Hoist 'VarDecl' to the block.
+      if item.kind == .decl {
+        withBridgedSwiftClosure { ptr in
+          let d = ptr!.load(as: BridgedDecl.self)
           out.append(.decl(d))
-
-          // Hoist 'VarDecl' to the top-level.
-          withBridgedSwiftClosure { ptr in
-            let hoisted = ptr!.load(as: BridgedDecl.self)
-            out.append(.decl(hoisted))
-          } call: { handle in
-            d.forEachDeclToHoist(handle)
-          }
+        } call: { handle in
+          item.castToDecl().forEachDeclToHoist(handle)
         }
-      case .stmt(let node):
-        out.append(generateStmtOrExpr {
-          .stmt(self.generate(stmt: node))
-        })
-      case .expr(let node):
-        out.append(generateStmtOrExpr {
-          .expr(self.generate(expr: node))
-        })
       }
     }
-
     return out
   }
 }

@@ -2201,7 +2201,8 @@ extension ASTGenVisitor {
       return extractRawText(segments).bridged
     }
     // TODO: Diagnose.
-    return nil
+    fatalError("expected string literal without interpolation")
+    // return nil
   }
 
   /// Convenient method for processing an attribute with `LabeledExprListSyntax`.

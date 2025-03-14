@@ -12,7 +12,7 @@
 
 import ASTBridging
 import SwiftDiagnostics
-@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
 
 protocol DoStmtOrExprSyntax {
   var doKeyword: TokenSyntax { get }
@@ -70,16 +70,34 @@ extension ASTGenVisitor {
     // TODO: Set semicolon loc.
     switch node.item {
     case .decl(let node):
+      if let node = node.as(MacroExpansionDeclSyntax.self) {
+        switch self.maybeGenerateBuiltinPound(macroExpansionDecl: node) {
+        case .generated(let generated):
+          return generated
+        case .ignored:
+          // Fallback to normal macro expansion.
+          break
+        }
+      }
       return self.generate(decl: node).map { .decl($0) }
     case .stmt(let node):
       return .stmt(self.generate(stmt: node))
     case .expr(let node):
+      if let node = node.as(MacroExpansionExprSyntax.self) {
+        switch self.maybeGenerateBuiltinPound(freestandingMacroExpansion: node) {
+        case .generated(let generated):
+          return generated
+        case .ignored:
+          // Fallback to normal macro expansion.
+          break
+        }
+      }
       return .expr(self.generate(expr: node))
     }
   }
 
   @inline(__always)
-  func generate(codeBlockItemList node: CodeBlockItemListSyntax) -> BridgedArrayRef {
+  func generate(codeBlockItemList node: CodeBlockItemListSyntax) -> [BridgedASTNode] {
     var allItems: [BridgedASTNode] = []
     visitIfConfigElements(
       node,
@@ -102,7 +120,7 @@ extension ASTGenVisitor {
       }
     }
 
-    return allItems.lazy.bridgedArray(in: self)
+    return allItems
   }
 
   /// Function that splits a code block item into either an #if or the item.
@@ -121,19 +139,47 @@ extension ASTGenVisitor {
     BridgedBraceStmt.createParsed(
       self.ctx,
       lBraceLoc: self.generateSourceLoc(node.leftBrace),
-      elements: self.generate(codeBlockItemList: node.statements),
+      elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
       rBraceLoc: self.generateSourceLoc(node.rightBrace)
     )
   }
 
+  func generateHasSymbolStmtCondition(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedStmtConditionElement {
+    var args = node.arguments[...]
+    let symbol: BridgedExpr?
+    if let arg = args.popFirst() {
+      symbol = self.generate(expr: arg.expression)
+      if arg.label != nil {
+        // TODO: Diagnose
+        fatalError("unexpected label")
+      }
+      if !args.isEmpty {
+        // TODO: Diagnose
+        fatalError("extra args")
+      }
+    } else {
+      symbol = nil
+    }
+    return .createHasSymbol(
+      self.ctx,
+      poundLoc: self.generateSourceLoc(node.pound),
+      lParenLoc: self.generateSourceLoc(node.leftParen),
+      symbol: symbol.asNullable,
+      rParenLoc: self.generateSourceLoc(node.rightParen)
+    )
+  }
+
   func generate(conditionElement node: ConditionElementSyntax) -> BridgedStmtConditionElement {
-    // FIXME: _hasSymbol is not implemented in SwiftSyntax/SwiftParser.
     switch node.condition {
     case .availability(let node):
       return .createPoundAvailable(
         info: self.generate(availabilityCondition: node)
       )
     case .expression(let node):
+      if let node = node.as(MacroExpansionExprSyntax.self),
+         node.macroName.rawText == "_hasSymbol" {
+        return generateHasSymbolStmtCondition(macroExpansionExpr: node)
+      }
       return .createBoolean(
         expr: self.generate(expr: node)
       )
@@ -487,7 +533,7 @@ extension ASTGenVisitor {
     let body = BridgedBraceStmt.createParsed(
       self.ctx,
       lBraceLoc: nil,
-      elements: self.generate(codeBlockItemList: node.statements),
+      elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
       rBraceLoc: nil
     )
 

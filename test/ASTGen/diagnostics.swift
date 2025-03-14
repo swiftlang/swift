@@ -36,3 +36,18 @@ struct S {
 
 struct ExpansionRequirementTest<each T> {}
 extension ExpansionRequirementTest where repeat each T == Int {} // expected-error {{same-element requirements are not yet supported}}
+
+
+#warning("this is a warning") // expected-warning {{this is a warning}}
+
+func testDiagnosticInFunc() {
+  #error("this is an error") // expected-error {{this is an error}}
+}
+
+class TestDiagnosticInNominalTy {
+  #error("this is an error member") // expected-error {{this is an error member}}
+}
+
+#if FLAG_NOT_ENABLED
+  #error("error in inactive") // no diagnostis
+#endif
