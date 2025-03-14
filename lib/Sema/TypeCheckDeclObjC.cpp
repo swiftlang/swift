@@ -3889,12 +3889,27 @@ private:
       diagnoseVTableUse(cand);
       return;
 
-    case MatchOutcome::WrongSendability:
+    case MatchOutcome::WrongSendability: {
+      auto concurrencyLevel = req->getASTContext().LangOpts.StrictConcurrencyLevel;
+
+      DiagnosticBehavior behavior;
+      switch (concurrencyLevel) {
+      case StrictConcurrency::Complete:
+        behavior = DiagnosticBehavior::Warning;
+        break;
+
+      case StrictConcurrency::Targeted:
+      case StrictConcurrency::Minimal:
+        behavior = DiagnosticBehavior::Ignore;
+        break;
+      }
+
       diagnose(cand, diag::objc_implementation_sendability_mismatch, cand,
                getMemberType(cand), getMemberType(req))
-          .limitBehaviorWithPreconcurrency(DiagnosticBehavior::Warning,
+          .limitBehaviorWithPreconcurrency(behavior,
                                            /*preconcurrency*/ true);
       return;
+    }
 
     case MatchOutcome::WrongImplicitObjCName:
     case MatchOutcome::WrongExplicitObjCName: {
