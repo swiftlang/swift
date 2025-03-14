@@ -1399,6 +1399,12 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
+
+  // `@execution(...)` attribute is only valid on asynchronous function types.
+  if (expr->getAttrs().hasAttribute<ExecutionAttr>()) {
+    async = true;
+  }
+
   if (throws || async) {
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())

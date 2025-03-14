@@ -18,6 +18,7 @@
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
+#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -269,6 +270,9 @@ struct ASTContext::Implementation {
   ~Implementation();
 
   llvm::BumpPtrAllocator Allocator; // used in later initializations
+
+  /// The global cache of side tables for random things.
+  GlobalCache globalCache;
 
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
@@ -637,6 +641,9 @@ struct ASTContext::Implementation {
   /// The set of unique AvailabilityContexts (uniqued by their storage).
   llvm::FoldingSet<AvailabilityContext::Storage> AvailabilityContexts;
 
+  /// The set of unique custom availability domains.
+  llvm::FoldingSet<CustomAvailabilityDomain> CustomAvailabilityDomains;
+
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
   llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>
@@ -745,6 +752,10 @@ inline ASTContext::Implementation &ASTContext::getImpl() const {
   auto offset = llvm::alignAddr((void *)sizeof(*this),
                                 llvm::Align(alignof(Implementation)));
   return *reinterpret_cast<Implementation*>(pointer + offset);
+}
+
+ASTContext::GlobalCache &ASTContext::getGlobalCache() const {
+  return getImpl().globalCache;
 }
 
 void ASTContext::operator delete(void *Data) throw() {
@@ -886,6 +897,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE(NormalConformances);
   SIZE(SelfConformances);
   SIZE(AvailabilityContexts);
+  SIZE(CustomAvailabilityDomains);
   SIZE_AND_BYTES(ForeignRepresentableCache);
   SIZE(SearchPathsSet);
 
@@ -5733,6 +5745,27 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
   std::uninitialized_copy(
       domainInfos.begin(), domainInfos.end(),
       newNode->getTrailingObjects<AvailabilityContext::DomainInfo>());
+  foldingSet.InsertNode(newNode, insertPos);
+
+  return newNode;
+}
+
+const CustomAvailabilityDomain *
+CustomAvailabilityDomain::get(StringRef name, ModuleDecl *mod, Kind kind,
+                              const ASTContext &ctx) {
+  auto identifier = ctx.getIdentifier(name);
+  llvm::FoldingSetNodeID id;
+  CustomAvailabilityDomain::Profile(id, identifier, mod, kind);
+
+  auto &foldingSet = ctx.getImpl().CustomAvailabilityDomains;
+  void *insertPos;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+
+  void *mem = ctx.Allocate(sizeof(CustomAvailabilityDomain),
+                           alignof(CustomAvailabilityDomain));
+  auto *newNode = ::new (mem) CustomAvailabilityDomain(identifier, mod, kind);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;

@@ -82,6 +82,17 @@ do {
   // expected-error@-1 {{cannot convert value of type '(@execution(caller) () async -> ()).Type' to expected argument type '(@isolated(any) () async -> Void).Type'}}
 }
 
+do {
+  let _: () -> Void = { @execution(concurrent) in
+    // expected-error@-1 {{invalid conversion from 'async' function of type '() async -> Void' to synchronous function type '() -> Void'}}
+  }
+
+  func test(_: () -> Void) {}
+
+  test { @execution(caller) in
+    // expected-error@-1 {{cannot pass function of type '@execution(caller) () async -> ()' to parameter expecting synchronous function type}}
+  }
+}
 
 // Converting to `@execution(caller)` function
 class NonSendable {}

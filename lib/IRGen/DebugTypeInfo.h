@@ -48,6 +48,7 @@ protected:
   bool DefaultAlignment = true;
   bool IsMetadataType = false;
   bool IsFixedBuffer = false;
+  bool IsForwardDecl = false;
 
 public:
   DebugTypeInfo() = default;
@@ -100,6 +101,7 @@ public:
   bool isMetadataType() const { return IsMetadataType; }
   bool hasDefaultAlignment() const { return DefaultAlignment; }
   bool isFixedBuffer() const { return IsFixedBuffer; }
+  bool isForwardDecl() const { return IsForwardDecl; }
   std::optional<uint32_t> getNumExtraInhabitants() const {
     return NumExtraInhabitants;
   }
@@ -127,7 +129,8 @@ public:
   }
 
   static std::optional<CompletedDebugTypeInfo>
-  getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IRGenModule &IGM);
+  getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IRGenModule &IGM,
+                  std::optional<Size::int_type> SizeInBits = {});
 
   Size::int_type getSizeInBits() const { return SizeInBits; }
 };

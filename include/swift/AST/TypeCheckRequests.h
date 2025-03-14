@@ -475,6 +475,28 @@ public:
   bool isCached() const { return true; }
 };
 
+class ConformanceIsolationRequest :
+    public SimpleRequest<ConformanceIsolationRequest,
+                         ActorIsolation(ProtocolConformance *),
+                         RequestFlags::SeparatelyCached |
+                         RequestFlags::SplitCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ActorIsolation
+  evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<ActorIsolation> getCachedResult() const;
+  void cacheResult(ActorIsolation result) const;
+};
+
 /// Determine whether the given declaration is 'final'.
 class IsFinalRequest :
     public SimpleRequest<IsFinalRequest,

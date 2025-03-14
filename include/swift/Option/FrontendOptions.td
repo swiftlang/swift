@@ -315,6 +315,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
     Joined<["-"], "enable-destroy-hoisting=">,
     HelpText<"Whether to enable destroy hoisting">,
     MetaVarName<"true|false">;
+  def formal_cxx_interoperability_mode :
+    Joined<["-"], "formal-cxx-interoperability-mode=">,
+    HelpText<"What version of C++ interoperability a textual interface was originally generated with">,
+    MetaVarName<"<cxx-interop-version>|off">;
 }
 
 // Flags that are saved into module interfaces

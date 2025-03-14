@@ -148,6 +148,7 @@ namespace swift {
     /// The lowering triple may result in multiple versions of the same Clang
     /// modules being built.
     std::optional<llvm::Triple> ClangTarget;
+    std::optional<llvm::Triple> ClangTargetVariant;
 
     /// The SDK version, if known.
     std::optional<llvm::VersionTuple> SDKVersion;
@@ -327,6 +328,10 @@ namespace swift {
     /// The C++ interoperability source compatibility version. Defaults
     /// to the Swift language version.
     version::Version cxxInteropCompatVersion;
+
+    /// What version of C++ interoperability a textual interface was originally
+    /// generated with (if at all).
+    std::optional<version::Version> FormalCxxInteropMode;
 
     void setCxxInteropFromArgs(llvm::opt::ArgList &Args,
                                swift::DiagnosticEngine &Diags);
@@ -794,6 +799,8 @@ namespace swift {
         hashValue = llvm::hash_combine(hashValue, TargetVariant.value().str());
       if (ClangTarget.has_value())
         hashValue = llvm::hash_combine(hashValue, ClangTarget.value().str());
+      if (ClangTargetVariant.has_value())
+        hashValue = llvm::hash_combine(hashValue, ClangTargetVariant.value().str());
       if (SDKVersion.has_value())
         hashValue = llvm::hash_combine(hashValue, SDKVersion.value().getAsString());
       if (VariantSDKVersion.has_value())

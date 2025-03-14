@@ -534,6 +534,12 @@ public:
   ///
   static std::optional<DeclAttrKind> getAttrKindFromString(StringRef Str);
 
+  SWIFT_DEBUG_DUMPER(dump(const ASTContext &ctx));
+  void dump(llvm::raw_ostream &out, const ASTContext &ctx) const;
+
+  SWIFT_DEBUG_DUMPER(dump(const DeclContext *dc));
+  void dump(llvm::raw_ostream &out, const DeclContext *dc) const;
+
   static DeclAttribute *createSimple(const ASTContext &context,
                                      DeclAttrKind kind, SourceLoc atLoc,
                                      SourceLoc attrLoc);
@@ -3058,7 +3064,10 @@ public:
   const BackDeployedAttr *getBackDeployed(const ASTContext &ctx,
                                           bool forTargetVariant) const;
 
-  SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
+  SWIFT_DEBUG_DUMPER(dump(const ASTContext &ctx));
+  SWIFT_DEBUG_DUMPER(dump(const DeclContext *dc));
+
+  SWIFT_DEBUG_DUMPER(print(const Decl *D = nullptr));
   void print(ASTPrinter &Printer, const PrintOptions &Options,
              const Decl *D = nullptr) const;
   static void print(ASTPrinter &Printer, const PrintOptions &Options,

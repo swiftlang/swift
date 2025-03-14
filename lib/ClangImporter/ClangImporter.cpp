@@ -94,6 +94,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Casting.h"
@@ -866,6 +867,8 @@ importer::addCommonInvocationArguments(
       // Passing the -target-variant along to clang causes clang's
       // CodeGenerator to emit zippered .o files.
       invocationArgStrs.push_back("-darwin-target-variant");
+      if (ctx.LangOpts.ClangTargetVariant.has_value() && !ignoreClangTarget)
+        variantTriple = ctx.LangOpts.ClangTargetVariant.value();
       invocationArgStrs.push_back(variantTriple->str());
     }
 
@@ -1202,8 +1205,11 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     }
 
     // If clang target is ignored, using swift target.
-    if (ignoreClangTarget)
+    if (ignoreClangTarget) {
       CI->getTargetOpts().Triple = ctx.LangOpts.Target.str();
+      if (ctx.LangOpts.TargetVariant.has_value())
+        CI->getTargetOpts().DarwinTargetVariantTriple = ctx.LangOpts.TargetVariant->str();
+    }
 
     // Forward the index store path. That information is not passed to scanner
     // and it is cached invariant so we don't want to re-scan if that changed.
@@ -8664,4 +8670,23 @@ importer::getPrivateFileIDAttrs(const clang::Decl *decl) {
   }
 
   return files;
+}
+
+bool importer::declIsCxxOnly(const Decl *decl) {
+  if (auto *clangDecl = decl->getClangDecl()) {
+    return llvm::TypeSwitch<const clang::Decl *, bool>(clangDecl)
+        .template Case<const clang::NamespaceAliasDecl>(
+            [](auto) { return true; })
+        .template Case<const clang::NamespaceDecl>([](auto) { return true; })
+        // For the issues this filter function was trying to resolve at its
+        // time of writing, it suffices to only filter out namespaces. But
+        // there are many other kinds of clang::Decls that only appear in C++.
+        // This is obvious for some decls, e.g., templates, using directives,
+        // non-trivial structs, and scoped enums; but it is not obvious for
+        // other kinds of decls, e.g., an enum member or some variable.
+        //
+        // TODO: enumerate those kinds in a more precise and robust way
+        .Default([](auto) { return false; });
+  }
+  return false;
 }

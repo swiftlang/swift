@@ -3209,6 +3209,7 @@ void CompletionLookup::getTypeAttributeKeywordCompletions(
       switch (Kind) {
       case TypeAttrKind::Retroactive:
       case TypeAttrKind::Preconcurrency:
+      case TypeAttrKind::Nonisolated:
       case TypeAttrKind::Unchecked:
       case TypeAttrKind::Unsafe:
         // These attributes are only available in inheritance clasuses.

@@ -53,6 +53,7 @@ extension ASTGenVisitor {
         .preconcurrency,
         .local,
         .noMetadata,
+        .nonisolated,
         .packGuaranteed,
         .packInout,
         .packOut,
