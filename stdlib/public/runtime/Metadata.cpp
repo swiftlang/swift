@@ -41,6 +41,7 @@
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
 #include "swift/Threading/Mutex.h"
+#include "swift/Threading/ThreadSanitizer.h"
 #include "llvm/ADT/StringExtras.h"
 #include <algorithm>
 #include <cctype>
@@ -7977,10 +7978,28 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
           Tag);
     }
 
+    // If we allocated a new page, then we need to do a store-release to ensure
+    // the initialization writes are properly ordered when viewed from other
+    // threads that read from the new page. If we did not allocate a new page,
+    // then we need a load-consume to cover the other side of that.
+    std::memory_order successOrder = allocatedNewPage
+                                         ? std::memory_order_release
+                                         : SWIFT_MEMORY_ORDER_CONSUME;
+
     // Swap in the new state.
     if (AllocationPool.compare_exchange_weak(curState, newState,
-                                             std::memory_order_relaxed,
+                                             successOrder,
                                              std::memory_order_relaxed)) {
+      // If the program is using Thread Sanitizer, it can't see our memory
+      // ordering, so inform it manually. TSan will track the consume ordering
+      // in __swift_instantiateConcreteTypeFromMangledName so we register the
+      // correct ordering with threads that get a metadata pointer from a cache
+      // variable too.
+      if (allocatedNewPage)
+        swift::tsan::release(&AllocationPool);
+      else
+        swift::tsan::acquire(&AllocationPool);
+
       // If that succeeded, we've successfully allocated.
       __msan_allocated_memory(allocation, sizeWithHeader);
       __asan_unpoison_memory_region(allocation, sizeWithHeader);
