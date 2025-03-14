@@ -757,6 +757,15 @@ AccessLevel convertClangAccess(clang::AccessSpecifier access);
 /// and should be parsed using swift::SourceFile::FileIDStr::parse().
 SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
 getPrivateFileIDAttrs(const clang::Decl *decl);
+
+/// Use some heuristics to determine whether the clang::Decl associated with
+/// \a decl would not exist without C++ interop.
+///
+/// For instance, a namespace is C++-only, but a plain struct is valid in both
+/// C and C++.
+///
+/// Returns false if \a decl was not imported by ClangImporter.
+bool declIsCxxOnly(const Decl *decl);
 } // namespace importer
 
 struct ClangInvocationFileMapping {
