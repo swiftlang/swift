@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SPAN_COMPATIBILITY_STUB
+import Swift
+#endif
+
 /// `RawSpan` represents a contiguous region of memory
 /// which contains initialized bytes.
 ///
