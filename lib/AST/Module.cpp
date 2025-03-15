@@ -1090,6 +1090,18 @@ void ModuleDecl::lookupImportedSPIGroups(
   FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
 }
 
+void ModuleDecl::lookupAvailabilityDomains(
+    Identifier identifier,
+    llvm::SmallVectorImpl<AvailabilityDomain> &results) const {
+  auto iter = AvailabilityDomains.find(identifier);
+  if (iter != AvailabilityDomains.end()) {
+    results.push_back(AvailabilityDomain::forCustom(iter->getSecond()));
+    return;
+  }
+
+  FORWARD(lookupAvailabilityDomains, (identifier, results));
+}
+
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
                               OptionSet<ModuleLookupFlags> Flags,
                               SmallVectorImpl<ValueDecl*> &result) const {
@@ -4170,15 +4182,6 @@ version::Version ModuleDecl::getLanguageVersionBuiltWith() const {
   }
 
   return version::Version();
-}
-
-std::optional<AvailabilityDomain>
-ModuleDecl::getAvailabilityDomainForIdentifier(Identifier identifier) const {
-  auto iter = AvailabilityDomains.find(identifier);
-  if (iter == AvailabilityDomains.end())
-    return std::nullopt;
-
-  return AvailabilityDomain::forCustom(iter->getSecond());
 }
 
 //===----------------------------------------------------------------------===//

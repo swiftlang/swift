@@ -288,21 +288,6 @@ void CustomAvailabilityDomain::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddInteger(static_cast<unsigned>(kind));
 }
 
-static std::optional<AvailabilityDomain>
-getAvailabilityDomainForName(Identifier identifier,
-                             const DeclContext *declContext) {
-  if (auto builtinDomain = AvailabilityDomain::builtinDomainForString(
-          identifier.str(), declContext))
-    return builtinDomain;
-
-  auto &ctx = declContext->getASTContext();
-  if (auto customDomain =
-          ctx.MainModule->getAvailabilityDomainForIdentifier(identifier))
-    return customDomain;
-
-  return std::nullopt;
-}
-
 std::optional<AvailabilityDomain>
 AvailabilityDomainOrIdentifier::lookUpInDeclContext(
     SourceLoc loc, const DeclContext *declContext) const {
@@ -312,7 +297,13 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
   auto &diags = ctx.Diags;
   std::optional<AvailabilityDomain> domain;
   auto identifier = getAsIdentifier().value();
-  domain = getAvailabilityDomainForName(identifier, declContext);
+
+  llvm::SmallVector<AvailabilityDomain> results;
+  declContext->lookupAvailabilityDomains(identifier, results);
+  if (results.size() > 0) {
+    // FIXME: [availability] Diagnose ambiguity if necessary.
+    domain = results.front();
+  }
 
   if (!domain) {
     auto domainString = identifier.str();
