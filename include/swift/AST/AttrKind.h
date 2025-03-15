@@ -145,6 +145,8 @@ enum class DeclAttrKind : unsigned {
 #include "swift/AST/DeclAttr.def"
 };
 
+StringRef getDeclAttrKindID(DeclAttrKind kind);
+
 enum : unsigned {
   NumDeclAttrKinds = static_cast<unsigned>(DeclAttrKind::Last_DeclAttr) + 1,
   NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1),

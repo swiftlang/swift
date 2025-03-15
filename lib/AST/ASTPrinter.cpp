@@ -1284,6 +1284,15 @@ void PrintAST::printAttributes(const Decl *D) {
   // for each decl They cannot be shared across different decls.
   assert(Options.ExcludeCustomAttrList.empty());
 
+  // If there is an `@abi` attr, we need to print it first so that it isn't
+  // affected by subsequent mutation of `Options.ExcludeAttrList`.
+  if (auto abiAttr = attrs.getAttribute<ABIAttr>()) {
+    if (Options.PrintImplicitAttrs && !Options.excludeAttr(abiAttr)) {
+      abiAttr->print(Printer, Options, D);
+      Options.ExcludeAttrList.push_back(DeclAttrKind::ABI);
+    }
+  }
+
   if (Options.PrintSyntheticSILGenName
         && !D->getAttrs().hasAttribute<SILGenNameAttr>()) {
     if (canPrintSyntheticSILGenName(D)) {
@@ -1334,7 +1343,8 @@ void PrintAST::printAttributes(const Decl *D) {
     // Add SPIs to both private and package interfaces
     if (!Options.printPublicInterface() &&
         DeclAttribute::canAttributeAppearOnDeclKind(
-            DeclAttrKind::SPIAccessControl, D->getKind())) {
+            DeclAttrKind::SPIAccessControl, D->getKind()) &&
+        !Options.excludeAttrKind(DeclAttrKind::SPIAccessControl)) {
       interleave(D->getSPIGroups(),
              [&](Identifier spiName) {
                Printer.printAttrName("_spi", true);
@@ -1358,7 +1368,7 @@ void PrintAST::printAttributes(const Decl *D) {
     // If the declaration is implicitly @objc, print the attribute now.
     if (auto VD = dyn_cast<ValueDecl>(D)) {
       if (VD->isObjC() && !isa<EnumElementDecl>(VD) &&
-          !attrs.hasAttribute<ObjCAttr>()) {
+          !attrs.hasAttribute<ObjCAttr>() && ABIRoleInfo(D).providesAPI()) {
         Printer.printAttrName("@objc");
         Printer << " ";
       }

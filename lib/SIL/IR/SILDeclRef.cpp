@@ -451,6 +451,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   using Kind = SILDeclRef::Kind;
 
   auto *d = constant.getDecl();
+  ASSERT(ABIRoleInfo(d).providesAPI() && "getLinkageLimit() for ABI decl?");
 
   // Back deployment thunks and fallbacks are emitted into the client.
   if (constant.backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
@@ -1266,6 +1267,9 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::Func:
     if (auto *ACE = getAbstractClosureExpr())
       return mangler.mangleClosureEntity(ACE, SKind);
+
+    ASSERT(ABIRoleInfo(getDecl()).providesAPI()
+              && "SILDeclRef mangling ABI decl directly?");
 
     // As a special case, functions can have manually mangled names.
     // Use the SILGen name only for the original non-thunked, non-curried entry
