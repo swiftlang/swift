@@ -1545,6 +1545,7 @@ func _taskIsCurrentExecutor(_ executor: Builtin.Executor) -> Bool
 internal func _taskIsCurrentExecutor(
   executor: Builtin.Executor, flags: UInt64) -> Bool
 
+@available(SwiftStdlib 6.2, *)
 extension GlobalActor {
   @available(SwiftStdlib 6.2, *)
   @_silgen_name("_swift_task_isCurrentGlobalActor")
