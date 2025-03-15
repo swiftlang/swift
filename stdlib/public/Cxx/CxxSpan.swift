@@ -23,6 +23,7 @@ internal func unsafeBitCast<T: ~Escapable, U>(
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
+@lifetime(copy dependent)
 public func _unsafeRemoveLifetime<T: ~Copyable & ~Escapable>(_ dependent: consuming T) -> T {
   dependent
 }
@@ -91,6 +92,7 @@ extension Span {
   @_alwaysEmitIntoClient
   @unsafe
   @_unsafeNonescapableResult
+  @lifetime(borrow span)
   public init<T: CxxSpan<Element>>(
     _unsafeCxxSpan span: borrowing T,
   ) {
