@@ -15,13 +15,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
+#include "TypeCheckType.h"
+#include "AsyncCallerExecutionMigration.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
-#include "TypeCheckProtocol.h"
-#include "TypeCheckType.h"
-#include "TypoCorrection.h"
 #include "TypeCheckInvertible.h"
+#include "TypeCheckProtocol.h"
+#include "TypeChecker.h"
+#include "TypoCorrection.h"
 
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
@@ -4217,6 +4218,14 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       case ExecutionKind::Caller:
         isolation = FunctionTypeIsolation::forNonIsolatedCaller();
         break;
+      }
+    }
+  } else {
+    if (ctx.LangOpts.getFeatureState(Feature::AsyncCallerExecution)
+            .isEnabledForAdoption()) {
+      // Diagnose only in the interface stage, which is run once.
+      if (inStage(TypeResolutionStage::Interface)) {
+        warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, repr, isolation);
       }
     }
   }

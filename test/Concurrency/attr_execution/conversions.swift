@@ -1,6 +1,5 @@
 // RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-experimental-feature ExecutionAttribute
 
-// REQUIRES: asserts
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_ExecutionAttribute
 

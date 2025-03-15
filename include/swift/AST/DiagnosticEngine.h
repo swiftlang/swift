@@ -44,6 +44,7 @@ class Type;
 
 namespace swift {
   class ConstructorDecl;
+  class ClosureExpr;
   class Decl;
   class DeclAttribute;
   class DiagnosticEngine;
@@ -900,7 +901,17 @@ namespace swift {
     InFlightDiagnostic &fixItInsertAfter(SourceLoc L, StringRef Str) {
       return fixItInsertAfter(L, "%0", {Str});
     }
-    
+
+    /// Add a fix-it suggesting to insert the given attribute at the given
+    /// location.
+    InFlightDiagnostic &fixItInsertAttribute(SourceLoc L,
+                                             const DeclAttribute *Attr);
+
+    /// Add a fix-it suggesting to add the given attribute to the given
+    /// closure.
+    InFlightDiagnostic &fixItAddAttribute(const DeclAttribute *Attr,
+                                          const ClosureExpr *E);
+
     /// Add a token-based removal fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItRemove(SourceRange R);
