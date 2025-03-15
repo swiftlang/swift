@@ -267,39 +267,53 @@ class CMake(object):
         if not os.path.isdir(cmake_build_dir):
             os.makedirs(cmake_build_dir)
 
-        cwd = os.getcwd()
-        os.chdir(cmake_build_dir)
-        build_jobs = self.args.build_jobs or multiprocessing.cpu_count()
-        shell.call_without_sleeping([cmake_bootstrap, '--no-qt-gui',
-                                     '--parallel=%s' % build_jobs, '--',
-                                     '-DCMAKE_USE_OPENSSL=OFF'], echo=True)
-        shell.call_without_sleeping(['make', '-j%s' % build_jobs],
-                                    echo=True)
+        print("--- Bootstrap Local CMake ---", flush=True)
+        from swift_build_support.swift_build_support.utils \
+            import log_time_in_scope
+        with log_time_in_scope("Bootstrap Local CMake"):
+            cwd = os.getcwd()
+            os.chdir(cmake_build_dir)
+            build_jobs = self.args.build_jobs or multiprocessing.cpu_count()
+            shell.call_without_sleeping([cmake_bootstrap, '--no-qt-gui',
+                                         '--parallel=%s' % build_jobs, '--',
+                                         '-DCMAKE_USE_OPENSSL=OFF'], echo=True)
+            shell.call_without_sleeping(['make', '-j%s' % build_jobs],
+                                        echo=True)
         os.chdir(cwd)
         return os.path.join(cmake_build_dir, 'bin', 'cmake')
 
-    # For Linux and FreeBSD only, determine the version of the installed
-    # CMake compared to the source and build the source if necessary.
-    # Returns the path to the cmake binary.
-    def check_cmake_version(self, source_root, build_root):
-        if not platform.system() in ["Linux", "FreeBSD"]:
-            return
+    # Get the path to CMake to use for the build
+    # This function will not build CMake for Apple platforms.
+    # For other platforms, this builds CMake if a new enough version is not
+    # available.
+    def get_cmake_path(self, source_root, build_root):
+        if platform.system() == 'Darwin':
+            return self.toolchain.cmake
 
         cmake_source_dir = os.path.join(source_root, 'cmake')
-        # If the source is not checked out then don't attempt to build cmake.
         if not os.path.isdir(cmake_source_dir):
-            return
+            return self.toolchain.cmake
 
-        cmake_binary = 'cmake'
-        try:
-            if self.args.cmake is not None:
-                cmake_binary = self.args.cmake
-        except AttributeError:
-            cmake_binary = 'cmake'
+        cmake_required_version = self.cmake_source_version(cmake_source_dir)
 
-        installed_ver = self.installed_cmake_version(cmake_binary)
-        if installed_ver >= self.cmake_source_version(cmake_source_dir):
-            return
-        else:
-            # Build CMake from source and return the path to the executable.
-            return self.build_cmake(source_root, build_root)
+        # If we have already built a CMake, see if that is new enough. If it is,
+        # we don't need to build it again. This is a good indication that the
+        # system either doesn't have a CMake installed or it wasn't new enough
+        # so prefer our built CMake first.
+        cmake_built_path = os.path.join(build_root,
+                                        f'cmake-{self.args.host_target}',
+                                        'bin', 'cmake')
+        if os.path.isfile(cmake_built_path):
+            cmake_built_version = self.installed_cmake_version(cmake_built_path)
+            if cmake_built_version >= cmake_required_version:
+                return cmake_built_path
+
+        # If we already have a new enough CMake installed on the system, use it
+        if self.toolchain.cmake is not None:
+            cmake_installed_version = self.installed_cmake_version(self.toolchain.cmake)
+            if cmake_installed_version >= cmake_required_version:
+                return self.toolchain.cmake
+
+        # The pre-installed CMake isn't new enough. Build one from our sources
+        # and return the path to that.
+        return self.build_cmake(source_root, build_root)

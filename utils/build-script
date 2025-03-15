@@ -695,16 +695,16 @@ def main_normal():
     if args.cmake is not None:
         toolchain.cmake = args.cmake
 
-    cmake = CMake(args=args, toolchain=toolchain)
-    # Check the CMake version is sufficient on Linux and build from source
-    # if not.
-    cmake_path = cmake.check_cmake_version(SWIFT_SOURCE_ROOT, SWIFT_BUILD_ROOT)
-    if cmake_path is not None:
-        toolchain.cmake = cmake_path
-        args.cmake = cmake_path
-
     # Preprocess the arguments to apply defaults.
     apply_default_arguments(toolchain, args)
+
+    # Create the build script invocation.
+    invocation = build_script_invocation.BuildScriptInvocation(toolchain, args)
+
+    cmake = CMake(args=args, toolchain=toolchain)
+    toolchain.cmake = cmake.get_cmake_path(source_root=SWIFT_SOURCE_ROOT,
+                                           build_root=SWIFT_BUILD_ROOT)
+    args.cmake = toolchain.cmake
 
     # Validate the arguments.
     validate_arguments(toolchain, args)
@@ -715,9 +715,6 @@ def main_normal():
         # --start-server will fail if the server is already running.
         # Capture the output because we don't want to see the stats.
         shell.capture([toolchain.sccache, "--show-stats"])
-
-    # Create the build script invocation.
-    invocation = build_script_invocation.BuildScriptInvocation(toolchain, args)
 
     # Sanitize the runtime environment.
     initialize_runtime_environment()
