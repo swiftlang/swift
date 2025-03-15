@@ -174,8 +174,12 @@ extension ManagedBuffer where Element: ~Copyable {
 }
 
 extension ManagedBuffer {
+  @abi(
+    final func withUnsafeMutablePointerToHeader<R>(
+      _ body: (UnsafeMutablePointer<Header>) throws -> R
+    ) rethrows -> R
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss13ManagedBufferC32withUnsafeMutablePointerToHeaderyqd__qd__SpyxGKXEKlF")
   @usableFromInline
   internal final func __legacy_withUnsafeMutablePointerToHeader<R>(
     _ body: (UnsafeMutablePointer<Header>) throws -> R
@@ -183,8 +187,12 @@ extension ManagedBuffer {
     return try unsafe withUnsafeMutablePointers { (v, _) in return try unsafe body(v) }
   }
 
+  @abi(
+    final func withUnsafeMutablePointerToElements<R>(
+      _ body: (UnsafeMutablePointer<Element>) throws -> R
+    ) rethrows -> R
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss13ManagedBufferC34withUnsafeMutablePointerToElementsyqd__qd__Spyq_GKXEKlF")
   @usableFromInline
   internal final func __legacy_withUnsafeMutablePointerToElements<R>(
     _ body: (UnsafeMutablePointer<Element>) throws -> R
@@ -192,8 +200,14 @@ extension ManagedBuffer {
     return try unsafe withUnsafeMutablePointers { return try unsafe body($1) }
   }
 
+  @abi(
+    final func withUnsafeMutablePointers<R>(
+      _ body: (
+        UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>
+      ) throws -> R
+    ) rethrows -> R
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss13ManagedBufferC25withUnsafeMutablePointersyqd__qd__SpyxG_Spyq_GtKXEKlF")
   @usableFromInline
   internal final func __legacy_withUnsafeMutablePointers<R>(
     _ body: (
@@ -473,27 +487,41 @@ extension ManagedBufferPointer where Element: ~Copyable {
   }
 }
 
-extension ManagedBufferPointer {
+extension ManagedBufferPointer /* where Element: Copyable */ {
+  @abi(
+    func withUnsafeMutablePointerToHeader<R>(
+      _ body: (UnsafeMutablePointer<Header>) throws -> R
+    ) rethrows -> R
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss20ManagedBufferPointerV017withUnsafeMutableC8ToHeaderyqd__qd__SpyxGKXEKlF")
   @usableFromInline
-  internal func withUnsafeMutablePointerToHeader<R>(
+  internal func __rethrows_withUnsafeMutablePointerToHeader<R>(
     _ body: (UnsafeMutablePointer<Header>) throws -> R
   ) rethrows -> R {
     try unsafe withUnsafeMutablePointers { (v, _) in try unsafe body(v) }
   }
 
+  @abi(
+    func withUnsafeMutablePointerToElements<R>(
+      _ body: (UnsafeMutablePointer<Element>) throws -> R
+    ) rethrows -> R
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss20ManagedBufferPointerV017withUnsafeMutableC10ToElementsyqd__qd__Spyq_GKXEKlF")
   @usableFromInline
-  internal func withUnsafeMutablePointerToElements<R>(
+  internal func __rethrows_withUnsafeMutablePointerToElements<R>(
     _ body: (UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
     try unsafe withUnsafeMutablePointers { (_, v) in try unsafe body(v) }
   }
 
+  @abi(
+    func withUnsafeMutablePointers<R>(
+      _ body: (
+        UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>
+      ) throws -> R
+    ) rethrows -> R
+  )
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss20ManagedBufferPointerV25withUnsafeMutablePointersyqd__qd__SpyxG_Spyq_GtKXEKlF")
   @usableFromInline
   internal func withUnsafeMutablePointers<R>(
     _ body: (
