@@ -8661,6 +8661,12 @@ class ABIDeclChecker : public ASTComparisonVisitor<ABIDeclChecker> {
     }
   };
 
+  GenericSignature getGenericSignature(Decl *decl) {
+    if (auto genericCtx = decl->getAsGenericContext())
+      return genericCtx->getGenericSignature();
+    return GenericSignature();
+  }
+
 public:
   ABIDeclChecker(ASTContext &ctx, AttributeChecker &parentChecker,
                  ABIAttr *abiAttr)
@@ -8804,6 +8810,8 @@ public:
 
     didDiagnose |= checkType(apiNorm.getPlainType(), abiNorm.getPlainType(),
                              apiTypeLoc, abiTypeLoc,
+                             getGenericSignature(apiDecl),
+                             getGenericSignature(abiDecl),
                              TypeOrigin::forParameter(abi));
 
     auto declKind = api->isSelfParameter() ? apiDecl->getDescriptiveKind()
@@ -8907,6 +8915,8 @@ public:
 
       didDiagnose |= checkType(apiThrowType, abiThrowType,
                                api.throwsLoc, abi.throwsLoc,
+                               getGenericSignature(apiDecl),
+                               getGenericSignature(abiDecl),
                                TypeOrigin::forThrowsEffect());
     }
 
@@ -9057,10 +9067,9 @@ public:
   bool visitDecl(Decl *api, Decl *abi) {
     bool didDiagnose = checkAttrs(api->getAttrs(), abi->getAttrs(), api, abi);
 
-    if (auto apiGenericCtx = api->getAsGenericContext()) {
-      auto abiGenericCtx = abi->getAsGenericContext();
-      didDiagnose |= checkGenericSignature(apiGenericCtx->getGenericSignature(),
-                                           abiGenericCtx->getGenericSignature(),
+    if (api->getAsGenericContext()) {
+      didDiagnose |= checkGenericSignature(getGenericSignature(api),
+                                           getGenericSignature(abi),
                                            api, abi);
     }
     
@@ -9142,6 +9151,7 @@ public:
                      abi->getResultInterfaceType(),
                      api->getResultTypeSourceRange().Start,
                      abi->getResultTypeSourceRange().Start,
+                     getGenericSignature(api), getGenericSignature(abi),
                      TypeOrigin::forResult());
   }
 
@@ -9159,6 +9169,7 @@ public:
 
     if (checkType(api->getValueInterfaceType(), abi->getValueInterfaceType(),
                   getTypeLoc(api), getTypeLoc(abi),
+                  getGenericSignature(api), getGenericSignature(abi),
                   TypeOrigin::forUnspecified()))
       return true;
 
@@ -9398,10 +9409,11 @@ public:
   // MARK: @abi checking - types
 
   bool checkType(Type api, Type abi, SourceLoc apiLoc, SourceLoc abiLoc,
+                 GenericSignature apiSig, GenericSignature abiSig,
                  TypeOrigin origin) {
     if (!api.isNull() && !abi.isNull()) {
-      Type apiNorm = normalizeType(api);
-      Type abiNorm = normalizeType(abi);
+      Type apiNorm = normalizeType(api->getReducedType(apiSig));
+      Type abiNorm = normalizeType(abi->getReducedType(abiSig));
       if (apiNorm->isEqual(abiNorm)) {
         return false;
       }
