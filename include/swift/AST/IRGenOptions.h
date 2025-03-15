@@ -272,6 +272,9 @@ public:
   /// well-formed?
   unsigned Verify : 1;
 
+  /// Whether to verify after every optimizer change.
+  unsigned VerifyEach : 1;
+
   OptimizationMode OptMode;
 
   /// Which sanitizer is turned on.
@@ -580,7 +583,7 @@ public:
 
   IRGenOptions()
       : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
-        Verify(true), OptMode(OptimizationMode::NotSet),
+        Verify(true), VerifyEach(false), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
         SanitizeAddressUseODRIndicator(false), SanitizerUseStableABI(false),
