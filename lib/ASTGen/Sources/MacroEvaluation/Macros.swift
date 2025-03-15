@@ -589,7 +589,7 @@ func expandAttachedMacro(
     let declarationNode = findSyntaxNodeInSourceFile(
       sourceFilePtr: declarationSourceFilePtr,
       sourceLocationPtr: declarationSourceLocPointer,
-      type: DeclSyntax.self
+      type: Syntax.self
     )
   else {
     return 1
@@ -657,7 +657,7 @@ func expandAttachedMacroImpl(
   customAttrSourceFilePtr: UnsafePointer<ExportedSourceFile>,
   customAttrNode: AttributeSyntax,
   declarationSourceFilePtr: UnsafePointer<ExportedSourceFile>,
-  attachedTo declarationNode: DeclSyntax,
+  attachedTo declarationNode: Syntax,
   parentDeclSourceFilePtr: UnsafePointer<ExportedSourceFile>?,
   parentDeclNode: DeclSyntax?
 ) -> String? {
@@ -689,7 +689,7 @@ func expandAttachedMacroImpl(
   )!
 
   let declSyntax = PluginMessage.Syntax(
-    syntax: Syntax(declarationNode),
+    syntax: declarationNode,
     in: declarationSourceFilePtr
   )!
 

@@ -4305,6 +4305,8 @@ public:
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *S) { Body = S; }
 
+  BraceStmt *getExpandedBody();
+
   DeclAttributes &getAttrs() { return Attributes; }
   const DeclAttributes &getAttrs() const { return Attributes; }
 
@@ -4421,6 +4423,10 @@ public:
     assert(hasExplicitResultType() && "No explicit result type");
     return ExplicitResultTypeAndBodyState.getPointer()->getTypeRepr();
   }
+
+  /// Returns the resolved macro for the given custom attribute
+  /// attached to this closure expression.
+  MacroDecl *getResolvedMacro(CustomAttr *customAttr);
 
   /// Determine whether the closure has a single expression for its
   /// body.
