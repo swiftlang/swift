@@ -765,12 +765,13 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
 
 ModuleDependenciesCache::ModuleDependenciesCache(
     SwiftDependencyScanningService &globalScanningService,
-    std::string mainScanModuleName, std::string moduleOutputPath,
-    std::string scannerContextHash)
+    const std::string &mainScanModuleName, const std::string &moduleOutputPath,
+    const std::string &sdkModuleOutputPath, const std::string &scannerContextHash)
     : globalScanningService(globalScanningService),
       mainScanModuleName(mainScanModuleName),
       scannerContextHash(scannerContextHash),
       moduleOutputPath(moduleOutputPath),
+      sdkModuleOutputPath(sdkModuleOutputPath),
       scanInitializationTime(std::chrono::system_clock::now()) {
   for (auto kind = ModuleDependencyKind::FirstKind;
        kind != ModuleDependencyKind::LastKind; ++kind)

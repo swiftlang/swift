@@ -2890,6 +2890,18 @@ void setOutputPath(ResultTy &resolvedOutputPath, const StringRef &moduleName,
                    const CompilerInvocation &CI, const ArgListTy &extraArgs) {
   auto &outputPath = resolvedOutputPath.outputPath;
   outputPath = CI.getClangModuleCachePath();
+ 
+  // Dependency-scanner-specific module output path handling
+  if ((CI.getFrontendOptions().RequestedAction ==
+       FrontendOptions::ActionType::ScanDependencies)) {
+    if (!sdkPath.empty() &&
+        hasPrefix(llvm::sys::path::begin(interfacePath.str()), llvm::sys::path::end(interfacePath.str()),
+                  llvm::sys::path::begin(sdkPath), llvm::sys::path::end(sdkPath)))
+      outputPath = CI.getFrontendOptions().ExplicitSDKModulesOutputPath;
+    else
+      outputPath = CI.getFrontendOptions().ExplicitModulesOutputPath;
+  }
+
   llvm::sys::path::append(outputPath, moduleName);
   outputPath.append("-");
   auto hashStart = outputPath.size();
