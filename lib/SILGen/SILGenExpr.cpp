@@ -4599,11 +4599,21 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
 }
 
 static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
-                              SGFContext C) {
+                                     SGFContext C) {
   ArgumentScope scope(SGF, E);
 
   auto iaTy = E->getType()->castTo<BoundGenericType>();
   auto loweredIAType = SGF.getLoweredType(iaTy);
+
+  // If this is an empty InlineArray literal and it's loadable, then create an
+  // empty tuple value and just bitcast it for the loaded value. Address only
+  // empty inline arrays will just have an empty 'alloc_stack'.
+  if (E->getNumElements() == 0 && !loweredIAType.isAddressOnly(SGF.F)) {
+    auto emptyTuple = ManagedValue::forRValueWithoutOwnership(SGF.emitEmptyTuple(E));
+    auto inlineArray = SGF.B.createUncheckedBitCast(E, emptyTuple, loweredIAType);
+    return scope.popPreservingValue(RValue(SGF, E, inlineArray));
+  }
+
   auto elementType = iaTy->getGenericArgs()[1]->getCanonicalType();
   auto loweredElementType = SGF.getLoweredType(elementType);
   auto &eltTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(), elementType);
