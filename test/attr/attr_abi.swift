@@ -164,6 +164,8 @@ struct SubscriptArity {
 // Throws effect checking
 //
 
+enum MyError: Error {}
+
 @abi(func throws00(_: () throws -> Void))
 func throws00(_: () throws -> Void) {}
 
@@ -172,6 +174,9 @@ func throws10(_: () throws -> Void) {}
 
 @abi(func throws20(_: () throws -> Void) rethrows) // expected-error {{cannot give 'throws20' the ABI of a global function which can throw}}
 func throws20(_: () throws -> Void) {}
+
+@abi(func throws30(_: () throws -> Void) throws(MyError)) // expected-error {{cannot give 'throws30' the ABI of a global function which can throw}}
+func throws30(_: () throws -> Void) {}
 
 @abi(func throws01(_: () throws -> Void)) // expected-error {{cannot give 'throws01' the ABI of a global function which cannot throw}}
 func throws01(_: () throws -> Void) throws {}
@@ -182,6 +187,9 @@ func throws11(_: () throws -> Void) throws {}
 @abi(func throws21(_: () throws -> Void) rethrows)
 func throws21(_: () throws -> Void) throws {}
 
+@abi(func throws31(_: () throws -> Void) throws(MyError)) // expected-error {{thrown type 'MyError' in '@abi' should match 'any Error'}}
+func throws31(_: () throws -> Void) throws {} // expected-note@:37 {{should match type here}}
+
 @abi(func throws02(_: () throws -> Void)) // expected-error {{cannot give 'throws02' the ABI of a global function which cannot throw}}
 func throws02(_: () throws -> Void) rethrows {}
 
@@ -190,6 +198,21 @@ func throws12(_: () throws -> Void) rethrows {}
 
 @abi(func throws22(_: () throws -> Void) rethrows)
 func throws22(_: () throws -> Void) rethrows {}
+
+@abi(func throws32(_: () throws -> Void) throws(MyError)) // expected-error {{thrown type 'MyError' in '@abi' should match 'any Error'}}
+func throws32(_: () throws -> Void) rethrows {} // expected-note@:37 {{should match type here}}
+
+@abi(func throws03(_: () throws -> Void)) // expected-error {{cannot give 'throws03' the ABI of a global function which cannot throw}}
+func throws03(_: () throws -> Void) throws(MyError) {}
+
+@abi(func throws13(_: () throws -> Void) throws) // expected-error {{thrown type 'any Error' in '@abi' should match 'MyError'}}
+func throws13(_: () throws -> Void) throws(MyError) {} // expected-note@:37 {{should match type here}}
+
+@abi(func throws23(_: () throws -> Void) rethrows) // expected-error {{thrown type 'any Error' in '@abi' should match 'MyError'}}
+func throws23(_: () throws -> Void) throws(MyError) {} // expected-note@:37 {{should match type here}}
+
+@abi(func throws33(_: () throws -> Void) throws(MyError))
+func throws33(_: () throws -> Void) throws(MyError) {}
 
 @abi(var throws00Var: Int)
 var throws00Var: Int { get { fatalError() } }

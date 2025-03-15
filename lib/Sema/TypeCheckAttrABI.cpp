@@ -453,14 +453,25 @@ public:
   bool checkEffects(DeclEffects api, DeclEffects abi, Decl *apiDecl,
                     Decl *abiDecl) {
     bool didDiagnose = false;
+
     // Do the declarations match in throwing behavior? We don't care about
     // `throws` vs. `rethrows` here, just whether callers will account for an
     // error return.
-    if (api.anyContains(EffectKind::Throws) != abi.anyContains(EffectKind::Throws)) {
+    bool apiThrows = api.anyContains(EffectKind::Throws);
+    bool abiThrows = abi.anyContains(EffectKind::Throws);
+
+    if (apiThrows != abiThrows) {
       diagnoseAndRemoveAttr(abiAttr, diag::attr_abi_mismatched_throws,
-                            apiDecl, /*abiCanThrow=*/abi.anyContains(EffectKind::Throws));
+                            apiDecl, /*abiCanThrow=*/abiThrows);
       didDiagnose = true;
-      // FIXME: Typed throws?
+    } else if (apiThrows && abiThrows) {
+      // If both throw, make sure the throw types are compatible.
+      auto apiThrowType = api.effectiveThrownType.value_or(ctx.getNeverType());
+      auto abiThrowType = abi.effectiveThrownType.value_or(ctx.getNeverType());
+
+      didDiagnose |= checkType(apiThrowType, abiThrowType,
+                               api.throwsLoc, abi.throwsLoc,
+                               TypeOrigin::forThrowsEffect());
     }
 
     // Do the declarations match in async-ness?
