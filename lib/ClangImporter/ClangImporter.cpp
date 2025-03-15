@@ -960,6 +960,11 @@ importer::addCommonInvocationArguments(
       }
     }
   }
+
+  for (auto &overlay : searchPathOpts.VFSOverlayFiles) {
+    invocationArgStrs.push_back("-ivfsoverlay");
+    invocationArgStrs.push_back(overlay);
+  }
 }
 
 bool ClangImporter::canReadPCH(StringRef PCHFilename) {
@@ -1274,6 +1279,11 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
 
   // Clear clang debug flags.
   CI->getCodeGenOpts().DwarfDebugFlags.clear();
+
+  // Pass along the VFS overlays
+  for (auto &File : ctx.SearchPathOpts.VFSOverlayFiles) {
+    CI->getHeaderSearchOpts().VFSOverlayFiles.push_back(File);
+  }
 
   return CI->getCC1CommandLine();
 }
