@@ -488,7 +488,7 @@ private:
 
   /// A mapping from availability domain name strings to their corresponding
   /// declarations.
-  llvm::SmallDenseMap<StringRef, StoredSingleEntry> AvailabilityDomains;
+  llvm::SmallDenseMap<StringRef, clang::VarDecl *> AvailabilityDomains;
 
   /// A mapping from stored contexts to the set of global declarations that
   /// are mapped to members within that context.
