@@ -7,5 +7,5 @@ func availableInArctic() { }
 func availableInMediterranean() { }
 
 func testOtherClangDecls() {
-  available_in_baltic()
+  available_in_baltic() // expected-error {{'available_in_baltic()' is only available in Baltic}}
 }

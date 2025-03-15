@@ -10,11 +10,10 @@
 import Oceans // re-exports Rivers
 
 func testClangDecls() {
-  // FIXME: [availability] These references should be diagnosed as unavailable
-  available_in_arctic()
-  unavailable_in_pacific()
-  available_in_colorado_river_delta()
-  available_in_colorado()
+  available_in_arctic() // expected-error {{'available_in_arctic()' is only available in Arctic}}
+  unavailable_in_pacific() // expected-error {{'unavailable_in_pacific()' is unavailable}}
+  available_in_colorado_river_delta() // expected-error {{'available_in_colorado_river_delta()' is only available in Pacific}}
+  available_in_colorado() // expected-error {{'available_in_colorado()' is only available in Colorado}}
   available_in_baltic() // expected-error {{cannot find 'available_in_baltic' in scope}}
 }
 
