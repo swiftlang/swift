@@ -220,6 +220,40 @@ var throws00Var: Int { get { fatalError() } }
 @abi(var throws11Var: Int)
 var throws11Var: Int { get throws { fatalError() } }
 
+enum ErsatzResult<Success, Failure: Error> {}
+
+extension ErsatzResult where Failure == Swift.Error {
+  // The `where` clause makes `throws(Failure)` equivalent to `throws`.
+
+  // Similar to Swift.Result.init(__untyped_throws_catching:)
+  @abi(
+    init(
+      catching body: () throws -> Success
+    )
+  )
+  init(
+    __untyped_throws_catching body: () throws(Failure) -> Success
+  ) {}
+
+  @abi(func get() throws -> Success)
+  func __untyped_throws_get() throws(Failure) -> Success { fatalError() }
+}
+
+extension ErsatzResult {
+  // Should not be allowed, as `Failure` is still generic
+  @abi(
+    init(
+      unconstrainedCatching body: () throws -> Success // expected-error {{parameter 'body' type '() throws -> Success' in '@abi' should match '() throws(Failure) -> Success'}}
+    )
+  )
+  init(
+    __untyped_throws_catching_bad body: () throws(Failure) -> Success // expected-note {{should match type here}}
+  ) {}
+
+  @abi(func unconstrainedGet() throws -> Success) // expected-error @:32 {{thrown type 'any Error' in '@abi' should match 'Failure'}}
+  func __untyped_throws_get_bad() throws(Failure) -> Success { fatalError() } // expected-note {{should match type here}}
+}
+
 //
 // Async effect checking
 //
@@ -998,20 +1032,6 @@ func testNormalProtocols(
 func testNormalProtocolsGeneric<A: CustomStringConvertible, B>( // expected-note {{should match type here}}
   _: A, _: B
 ) {}
-
-enum ErsatzResult<Success, Failure: Error> {}
-extension ErsatzResult where Failure == Swift.Error {
-  // Similar to Swift.Result.init(__untyped_throws_catching:)
-  // FIXME: The where clause makes this ABI-compatible, but we can't tell that.
-  @abi(
-    init(
-      catching body: () throws -> Success // expected-error {{parameter 'body' type '() throws -> Success' in '@abi' should match '() throws(Failure) -> Success'}}
-    )
-  )
-  init(
-    __untyped_throws_catching body: () throws(Failure) -> Success // expected-note {{should match type here}}
-  ) {}
-}
 
 //
 // Static/Instance and interactions with `final`
