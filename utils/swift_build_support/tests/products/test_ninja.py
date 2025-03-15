@@ -18,8 +18,6 @@ import tempfile
 import unittest
 from io import StringIO
 
-from build_swift.build_swift.wrappers import xcrun
-
 from swift_build_support import shell
 from swift_build_support.products import Ninja
 from swift_build_support.targets import StdlibDeploymentTarget
@@ -90,37 +88,15 @@ class NinjaTestCase(unittest.TestCase):
 
         ninja_build.build()
 
-        expect_env = ""
-        if platform.system() == "Darwin":
-            expect_env = (
-                "env "
-                "'CFLAGS=-isysroot {sysroot}' "
-                "CXX={cxx} "
-                "'LDFLAGS=-isysroot {sysroot}' "
-            ).format(
-                cxx=self.toolchain.cxx,
-                sysroot=xcrun.sdk_path('macosx')
-            )
-        elif self.toolchain.cxx:
-            expect_env = (
-                "env "
-                "CXX={cxx} "
-            ).format(
-                cxx=self.toolchain.cxx,
-            )
-
-        self.assertEqual(self.stdout.getvalue(), """\
-+ rm -rf {build_dir}
-+ cp -r {source_dir} {build_dir}
-+ pushd {build_dir}
-+ {expect_env}{python} configure.py --bootstrap
-+ popd
-""".format(source_dir=self._platform_quote(
-            self.workspace.source_dir('ninja')),
-           build_dir=self._platform_quote(
-            self.workspace.build_dir('build', 'ninja')),
-           expect_env=expect_env,
-           python=self._platform_quote(sys.executable)))
+        self.assertEqual(self.stdout.getvalue(), f"""\
++ {self.toolchain.cmake} \
+-S {self.workspace.source_dir('ninja')} \
+-B {self.workspace.build_dir('build', 'ninja')} \
+-DCMAKE_BUILD_TYPE=Release \
+-DCMAKE_C_COMPILER=/path/to/cc \
+-DCMAKE_CXX_COMPILER=/path/to/cxx
++ {self.toolchain.cmake} --build {self.workspace.build_dir('build', 'ninja')}
+""")
 
     def _platform_quote(self, path):
         if platform.system() == 'Windows':
