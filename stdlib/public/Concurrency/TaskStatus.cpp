@@ -1047,6 +1047,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
 
 /// Perform any escalation actions required by the given record.
 static void performEscalationAction(TaskStatusRecord *record,
+                                    JobPriority oldPriority,
                                     JobPriority newPriority) {
   switch (record->getKind()) {
   // Child tasks need to be recursively escalated.
@@ -1067,15 +1068,17 @@ static void performEscalationAction(TaskStatusRecord *record,
   case TaskStatusRecordKind::EscalationNotification:  {
     auto notification =
       cast<EscalationNotificationStatusRecord>(record);
-    notification->run(newPriority);
+    SWIFT_TASK_DEBUG_LOG("[Dependency] Trigger task escalation handler record %p, escalate from %#x to %#x",
+                         record, oldPriority, newPriority);
+    notification->run(oldPriority, newPriority);
     return;
   }
 
   case TaskStatusRecordKind::TaskDependency: {
     auto dependencyRecord = cast<TaskDependencyStatusRecord>(record);
-    SWIFT_TASK_DEBUG_LOG("[Dependency] Escalating a task dependency record %p to %#x",
-                    record, newPriority);
-    dependencyRecord->performEscalationAction(newPriority);
+    SWIFT_TASK_DEBUG_LOG("[Dependency] Escalating a task dependency record %p from %#x to %#x",
+                    record, oldPriority, newPriority);
+    dependencyRecord->performEscalationAction(oldPriority, newPriority);
     return;
   }
 
@@ -1101,17 +1104,17 @@ static void performEscalationAction(TaskStatusRecord *record,
 SWIFT_CC(swift)
 JobPriority
 static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
-
   SWIFT_TASK_DEBUG_LOG("Escalating %p to %#zx priority", task, newPriority);
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+  auto oldPriority = oldStatus.getStoredPriority();
   auto newStatus = oldStatus;
 
   while (true) {
     // Fast path: check that the stored priority is already at least
     // as high as the desired priority.
-    if (oldStatus.getStoredPriority() >= newPriority) {
-      SWIFT_TASK_DEBUG_LOG("Task is already at %#zx priority", oldStatus.getStoredPriority());
-      return oldStatus.getStoredPriority();
+    if (oldPriority >= newPriority) {
+      SWIFT_TASK_DEBUG_LOG("Task is already at %#zx priority", oldPriority);
+      return oldPriority;
     }
 
     if (oldStatus.isRunning() || oldStatus.isEnqueued()) {
@@ -1145,8 +1148,11 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     taskStatus = (ActiveTaskStatus *) &task->_private()._status();
     executionLock = (dispatch_lock_t *) ((char*)taskStatus + ActiveTaskStatus::executionLockOffset());
 
-    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is running on %#x to %#x", task, newStatus.currentExecutionLockOwner(), newPriority);
-    swift_dispatch_lock_override_start_with_debounce(executionLock, newStatus.currentExecutionLockOwner(), (qos_class_t) newPriority);
+    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is running on %#x from %#x to %#x",
+                         task, newStatus.currentExecutionLockOwner(),
+                         oldPriority, newPriority);
+    swift_dispatch_lock_override_start_with_debounce(
+        executionLock, newStatus.currentExecutionLockOwner(), (qos_class_t) newPriority);
 #endif
   } else if (newStatus.isEnqueued()) {
     //  Task is not running, it's enqueued somewhere waiting to be run
@@ -1165,7 +1171,8 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     return newStatus.getStoredPriority();
   }
 
-  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
+  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended from %#x to %#x",
+                       task, oldPriority, newPriority);
   // We must have at least one record - the task dependency one.
   assert(newStatus.getInnermostRecord() != NULL);
 
@@ -1173,14 +1180,15 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     // We know that none of the escalation actions will recursively
     // modify the task status record list by adding or removing task records
     for (auto cur: status.records()) {
-      performEscalationAction(cur, newPriority);
+      performEscalationAction(cur, oldPriority, newPriority);
     }
   });
 
   return newStatus.getStoredPriority();
 }
 
-void TaskDependencyStatusRecord::performEscalationAction(JobPriority newPriority) {
+void TaskDependencyStatusRecord::performEscalationAction(
+    JobPriority oldPriority, JobPriority newPriority) {
   switch (this->DependencyKind) {
     case WaitingOnTask:
       SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent task %p noted in %p record",
@@ -1202,8 +1210,8 @@ void TaskDependencyStatusRecord::performEscalationAction(JobPriority newPriority
         this->DependentOn.TaskGroup, this);
       break;
     case EnqueuedOnExecutor:
-      SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent executor %p noted in %p record",
-        this->DependentOn.Executor, this);
+      SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent executor %p noted in %p record from %#x to %#x",
+        this->DependentOn.Executor, this, oldPriority, newPriority);
       swift_executor_escalate(this->DependentOn.Executor, this->WaitingTask, newPriority);
       break;
   }
