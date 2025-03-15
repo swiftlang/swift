@@ -198,14 +198,15 @@ activePlatformDomainForDecl(const Decl *decl) {
 
 static void getAvailabilityConstraintsForDecl(
     llvm::SmallVector<AvailabilityConstraint, 4> &constraints, const Decl *decl,
-    const AvailabilityContext &context) {
+    const AvailabilityContext &context, AvailabilityConstraintFlags flags) {
   auto &ctx = decl->getASTContext();
   auto activePlatformDomain = activePlatformDomainForDecl(decl);
+  bool includeAllDomains =
+      flags.contains(AvailabilityConstraintFlag::IncludeAllDomains);
 
-  for (auto attr :
-       decl->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+  for (auto attr : decl->getSemanticAvailableAttrs(includeAllDomains)) {
     auto domain = attr.getDomain();
-    if (domain.isPlatform() && activePlatformDomain &&
+    if (!includeAllDomains && domain.isPlatform() && activePlatformDomain &&
         !activePlatformDomain->contains(domain))
       continue;
 
@@ -234,7 +235,7 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
 
   decl = decl->getAbstractSyntaxDeclForAttributes();
 
-  getAvailabilityConstraintsForDecl(constraints, decl, context);
+  getAvailabilityConstraintsForDecl(constraints, decl, context, flags);
 
   if (flags.contains(AvailabilityConstraintFlag::SkipEnclosingExtension))
     return constraints;
@@ -251,7 +252,7 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
 
   auto parent = AvailabilityInference::parentDeclForInferredAvailability(decl);
   if (auto extension = dyn_cast_or_null<ExtensionDecl>(parent))
-    getAvailabilityConstraintsForDecl(constraints, extension, context);
+    getAvailabilityConstraintsForDecl(constraints, extension, context, flags);
 
   return constraints;
 }
