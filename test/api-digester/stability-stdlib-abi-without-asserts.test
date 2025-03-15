@@ -837,4 +837,21 @@ Struct EnumeratedSequence has added a conformance to an existing protocol Bidire
 Struct EnumeratedSequence has added a conformance to an existing protocol Collection
 Struct EnumeratedSequence has added a conformance to an existing protocol RandomAccessCollection
 
+Accessor Optional._unsafelyUnwrappedUnchecked.Get() has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Escapable>
+Accessor Optional._unsafelyUnwrappedUnchecked.Get() has mangled name changing from 'Swift.Optional._unsafelyUnwrappedUnchecked.getter : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>._unsafelyUnwrappedUnchecked.getter : A'
+Var Optional._unsafelyUnwrappedUnchecked has mangled name changing from 'Swift.Optional._unsafelyUnwrappedUnchecked : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>._unsafelyUnwrappedUnchecked : A'
+Var Optional._unsafelyUnwrappedUnchecked is now with @_preInverseGenerics
+Accessor UnsafeBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
+Accessor UnsafeBufferPointer.indices.Get() has mangled name changing from 'Swift.UnsafeBufferPointer.indices.getter : Swift.Range<Swift.Int>' to '(extension in Swift):Swift.UnsafeBufferPointer< where A: ~Swift.Copyable>.indices.getter : Swift.Range<Swift.Int>'
+Var UnsafeBufferPointer.indices has mangled name changing from 'Swift.UnsafeBufferPointer.indices : Swift.Range<Swift.Int>' to '(extension in Swift):Swift.UnsafeBufferPointer< where A: ~Swift.Copyable>.indices : Swift.Range<Swift.Int>'
+Var UnsafeBufferPointer.indices is now with @_preInverseGenerics
+Accessor UnsafeMutableBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
+Accessor UnsafeMutableBufferPointer.indices.Get() has mangled name changing from 'Swift.UnsafeMutableBufferPointer.indices.getter : Swift.Range<Swift.Int>' to '(extension in Swift):Swift.UnsafeMutableBufferPointer< where A: ~Swift.Copyable>.indices.getter : Swift.Range<Swift.Int>'
+Var UnsafeMutableBufferPointer.indices has mangled name changing from 'Swift.UnsafeMutableBufferPointer.indices : Swift.Range<Swift.Int>' to '(extension in Swift):Swift.UnsafeMutableBufferPointer< where A: ~Swift.Copyable>.indices : Swift.Range<Swift.Int>'
+Var UnsafeMutableBufferPointer.indices is now with @_preInverseGenerics
+Constructor ObjectIdentifier.init(_:) has been removed
+Func !=(_:_:) has been removed
+Func ==(_:_:) has been removed
+Func type(of:) has been removed
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
