@@ -360,3 +360,26 @@ class TestFailableOnly {
     }
   }
 }
+
+do {
+  @_disfavoredOverload
+  func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) async throws {}
+  func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found this candidate}}
+  func test(over: Int, other: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found this candidate}}
+
+  func performLocal(v: Int, block: @escaping (Int) throws -> Void) async throws {
+    try await test(over: v, block: block) // expected-error {{ambiguous use of 'test'}}
+  }
+
+  // The hack applied only to `OverloadedDeclRefExpr`s.
+  struct MemberTest {
+    @_disfavoredOverload
+    func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) async throws {}
+    func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) throws {}
+    func test(over: Int, other: String = "", block: @escaping (Int) throws -> Void) throws {}
+
+    func performMember(v: Int, block: @escaping (Int) throws -> Void) async throws {
+      try await test(over: v, block: block) // Ok
+    }
+  }
+}
