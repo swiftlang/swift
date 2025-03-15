@@ -156,7 +156,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
   std::optional<ModuleDependencyInfo> Result;
   std::error_code code = astDelegate.runInSubContext(
       realModuleName.str(), moduleInterfacePath.str(), sdkPath,
-      StringRef(), SourceLoc(),
+      Ctx.SearchPathOpts.getSysRoot(), StringRef(), SourceLoc(),
       [&](ASTContext &Ctx, ModuleDecl *mainMod, ArrayRef<StringRef> BaseArgs,
           StringRef Hash, StringRef UserModVer) {
         assert(mainMod);
