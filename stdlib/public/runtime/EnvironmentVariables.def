@@ -126,11 +126,11 @@ VARIABLE(SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE, string, "",
          "legacy 'nocrash' behavior until adopting code has been adjusted. "
          "It is possible to force the use of Swift 6.2's "
          "isIsolatingCurrentContext instead of checkIsolated by passing "
-         " the 'swift6.2' configuration value. "
+         " the 'isIsolatingCurrentContext' configuration value. "
          "Legal values are: "
          " 'legacy' (Legacy behavior), "
          " 'swift6' (Swift 6.0-6.1 behavior)"
-         " 'swift6.2' (Swift 6.2 behavior)")
+         " 'isIsolatingCurrentContext' (Swift 6.2 behavior)")
 
 VARIABLE(SWIFT_DUMP_ACCESSIBLE_FUNCTIONS, bool, false,
          "Dump a listing of all 'AccessibleFunctionRecord's upon first access. "

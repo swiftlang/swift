@@ -1023,6 +1023,7 @@ bool swift_task_isCurrentExecutor(SerialExecutorRef executor);
 /// this could be a pointer to a different enum instance if we need it to be.
 enum swift_task_is_current_executor_flag : uint64_t {
   /// We aren't passing any flags.
+  /// Effectively this is a backwards compatible mode.
   None = 0x0,
 
   /// This is not used today, but is just future ABI reservation.
@@ -1047,9 +1048,15 @@ enum swift_task_is_current_executor_flag : uint64_t {
   /// The routine should assert on failure.
   Assert = 0x8,
 
+  /// The routine MUST NOT assert on failure.
+  /// Even at the cost of not calling 'checkIsolated' if it is available.
+  MustNotAssert = 0x10,
+
   /// The routine should use 'isIsolatingCurrentContext' function on the
   /// 'expected' executor instead of `checkIsolated`.
-  HasIsIsolatingCurrentContext = 0x10,
+  ///
+  /// This is a variant of `MustNotAssert`
+  UseIsIsolatingCurrentContext = 0x20,
 };
 
 SWIFT_EXPORT_FROM(swift_Concurrency)

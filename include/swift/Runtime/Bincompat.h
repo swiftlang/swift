@@ -80,7 +80,7 @@ bool useLegacySwiftObjCHashing();
 /// - if not available, it will invoke the the *crashing* 'checkIsolated'
 ///
 /// This can be overridden by using `SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=1`
-/// or `SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=crash|nocrash|swift6|swift6.2`
+/// or `SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=crash|nocrash|swift6|isIsolatingCurrentContext`
 SWIFT_RUNTIME_STDLIB_SPI
 bool swift_bincompat_useLegacyNonCrashingExecutorChecks();
 
