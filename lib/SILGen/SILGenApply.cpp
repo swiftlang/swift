@@ -554,6 +554,19 @@ public:
         subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()), l);
   }
 
+  static Callee formCallee(SILGenFunction &SGF, AbstractFunctionDecl *decl,
+                           CanType protocolSelfType, SILDeclRef declRef,
+                           SubstitutionMap subs, SILLocation loc) {
+    if (isa<ProtocolDecl>(decl->getDeclContext())) {
+      return Callee::forWitnessMethod(SGF, protocolSelfType, declRef, subs,
+                                      loc);
+    } else if (getMethodDispatch(decl) == MethodDispatch::Class) {
+      return Callee::forClassMethod(SGF, declRef, subs, loc);
+    } else {
+      return Callee::forDirect(SGF, declRef, subs, loc);
+    }
+  }
+
   Callee(Callee &&) = default;
   Callee &operator=(Callee &&) = default;
 
@@ -6656,16 +6669,8 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
   }
 
   // Form the callee.
-  std::optional<Callee> callee;
-  if (isa<ProtocolDecl>(ctor->getDeclContext())) {
-    callee.emplace(Callee::forWitnessMethod(
-        *this, selfMetaVal.getType().getASTType(),
-        initRef, subs, loc));
-  } else if (getMethodDispatch(ctor) == MethodDispatch::Class) {
-    callee.emplace(Callee::forClassMethod(*this, initRef, subs, loc));
-  } else {
-    callee.emplace(Callee::forDirect(*this, initRef, subs, loc));
-  }
+  std::optional<Callee> callee = Callee::formCallee(
+      *this, ctor, selfMetaVal.getType().getASTType(), initRef, subs, loc);
 
   auto substFormalType = callee->getSubstFormalType();
   auto resultType = cast<FunctionType>(substFormalType.getResult()).getResult();
@@ -7232,29 +7237,34 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
   outVals.swap(argValues);
 }
 
-PreparedArguments
-SILGenFunction::prepareSubscriptIndices(SILLocation loc,
-                                        SubscriptDecl *subscript,
-                                        SubstitutionMap subs,
-                                        AccessStrategy strategy,
-                                        ArgumentList *argList) {
-  // TODO: use the real abstraction pattern from the accessor(s) in the
-  // strategy.
-  // Currently we use the substituted type so that we can reconstitute these
-  // as RValues.
-  Type interfaceType = subscript->getInterfaceType();
+CanFunctionType SILGenFunction::prepareStorageType(ValueDecl *decl,
+                                                   SubstitutionMap subs) {
+  auto computeSubstitutedType = [&](Type interfaceType) -> CanFunctionType {
+    if (subs) {
+      if (auto genericFnType = interfaceType->getAs<GenericFunctionType>()) {
+        return cast<FunctionType>(
+            genericFnType->substGenericArgs(subs)->getCanonicalType());
+      }
+    }
+    return cast<FunctionType>(interfaceType->getCanonicalType());
+  };
+  Type interfaceType;
+  if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
+    // TODO: Use the real abstraction pattern from the accessor(s) in the
+    // strategy. Currently, the substituted type is used to reconstitute these
+    // as RValues.
+    interfaceType = subscript->getInterfaceType();
+  } else if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    interfaceType =
+        func->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
+  }
+  return computeSubstitutedType(interfaceType);
+}
 
-  CanFunctionType substFnType;
-  if (subs)
-    substFnType = cast<FunctionType>(interfaceType
-                                       ->castTo<GenericFunctionType>()
-                                       ->substGenericArgs(subs)
-                                       ->getCanonicalType());
-  else
-    substFnType = cast<FunctionType>(interfaceType
-                                       ->getCanonicalType());
-
-
+PreparedArguments SILGenFunction::prepareIndices(SILLocation loc,
+                                                 CanFunctionType substFnType,
+                                                 AccessStrategy strategy,
+                                                 ArgumentList *argList) {
   AbstractionPattern origFnType(substFnType);
 
   // Prepare the unevaluated index expression.
@@ -7285,14 +7295,14 @@ SILGenFunction::prepareSubscriptIndices(SILLocation loc,
   return result;
 }
 
-SILDeclRef SILGenModule::getAccessorDeclRef(AccessorDecl *accessor,
-                                            ResilienceExpansion expansion) {
-  auto declRef = SILDeclRef(accessor, SILDeclRef::Kind::Func);
+SILDeclRef SILGenModule::getFuncDeclRef(FuncDecl *funcDecl,
+                                        ResilienceExpansion expansion) {
+  auto declRef = SILDeclRef(funcDecl, SILDeclRef::Kind::Func);
 
-  if (requiresBackDeploymentThunk(accessor, expansion))
+  if (requiresBackDeploymentThunk(funcDecl, expansion))
     return declRef.asBackDeploymentKind(SILDeclRef::BackDeploymentKind::Thunk);
 
-  return declRef.asForeign(requiresForeignEntryPoint(accessor));
+  return declRef.asForeign(requiresForeignEntryPoint(funcDecl));
 }
 
 /// Emit a call to a getter.
@@ -7374,6 +7384,80 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   emission.addCallSite(loc, std::move(values));
   // ()
   emission.apply();
+}
+
+/// Emit a call to a keypath method
+RValue SILGenFunction::emitRValueForKeyPathMethod(
+    SILLocation loc, ManagedValue base, CanType baseType,
+    AbstractFunctionDecl *method, Type methodTy, PreparedArguments &&methodArgs,
+    SubstitutionMap subs, SGFContext C) {
+  FormalEvaluationScope writebackScope(*this);
+
+  RValue selfRValue(*this, loc, baseType, base);
+  ArgumentSource selfArg(loc, std::move(selfRValue));
+
+  std::optional<Callee> callee =
+      Callee::formCallee(*this, method, selfArg.getSubstRValueType(),
+                         SILDeclRef(method), subs, loc);
+
+  CallEmission emission(*this, std::move(*callee), std::move(writebackScope));
+  emission.addSelfParam(loc, std::move(selfArg),
+                        callee->getSubstFormalType().getParams()[0]);
+  emission.addCallSite(loc, std::move(methodArgs));
+
+  return emission.apply(C);
+}
+
+/// Emit a call to an unapplied keypath method.
+RValue SILGenFunction::emitUnappliedKeyPathMethod(
+    SILLocation loc, ManagedValue base, CanType baseType,
+    AbstractFunctionDecl *method, Type methodTy, PreparedArguments &&methodArgs,
+    SubstitutionMap subs, SGFContext C) {
+  FormalEvaluationScope writebackScope(*this);
+
+  RValue selfRValue(*this, loc, baseType, base);
+  ArgumentSource selfArg(loc, std::move(selfRValue));
+
+  std::optional<Callee> callee =
+      Callee::formCallee(*this, method, selfArg.getSubstRValueType(),
+                         SILDeclRef(method), subs, loc);
+
+  SILValue methodRef;
+  if (callee) {
+    SILDeclRef calleeMethod = callee->getMethodName();
+    auto &constantInfo =
+        SGM.Types.getConstantInfo(F.getTypeExpansionContext(), calleeMethod);
+    SILType methodTy = constantInfo.getSILType();
+
+    switch (callee->kind) {
+    case Callee::Kind::StandaloneFunction: {
+      SILFunction *silMethod = SGM.getFunction(calleeMethod, NotForDefinition);
+      methodRef = B.createFunctionRef(loc, silMethod);
+      break;
+    }
+    case Callee::Kind::ClassMethod: {
+      methodRef =
+          B.createClassMethod(loc, base.getValue(), calleeMethod, methodTy);
+      break;
+    }
+    case Callee::Kind::WitnessMethod: {
+      CanType protocolSelfType = baseType->getCanonicalType();
+      ProtocolDecl *protocol = cast<ProtocolDecl>(method->getDeclContext());
+      ProtocolConformanceRef conformance =
+          subs.lookupConformance(protocolSelfType, protocol);
+      methodRef = B.createWitnessMethod(loc, protocolSelfType, conformance,
+                                        calleeMethod, methodTy);
+      break;
+    }
+    default:
+      llvm_unreachable("Unhandled callee kind for unapplied key path method.");
+    }
+  }
+
+  auto partialMV = B.createPartialApply(loc, methodRef, subs, base,
+                                        ParameterConvention::Direct_Guaranteed);
+  CanType partialType = methodTy->getCanonicalType();
+  return RValue(*this, loc, partialType, partialMV);
 }
 
 /// Emit a call to an addressor.
@@ -7900,15 +7984,11 @@ SILGenFunction::emitDynamicSubscriptGetterApply(SILLocation loc,
                 emitManagedRValueWithCleanup(optResult, optTL));
 }
 
-SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
-    SILLocation loc, SubscriptDecl *subscript,
-    SubstitutionMap subs, ArgumentList *argList) {
-  Type interfaceType = subscript->getInterfaceType();
-  CanFunctionType substFnType =
-      subs ? cast<FunctionType>(interfaceType->castTo<GenericFunctionType>()
-                                    ->substGenericArgs(subs)
-                                    ->getCanonicalType())
-           : cast<FunctionType>(interfaceType->getCanonicalType());
+SmallVector<ManagedValue, 4>
+SILGenFunction::emitKeyPathOperands(SILLocation loc, ValueDecl *decl,
+                                    SubstitutionMap subs,
+                                    ArgumentList *argList) {
+  auto substFnType = prepareStorageType(decl, subs);
   AbstractionPattern origFnType(substFnType);
   auto fnType =
       getLoweredType(origFnType, substFnType).castTo<SILFunctionType>()
@@ -7920,10 +8000,9 @@ SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
                      ClaimedParamsRef(fnType->getParameters()), argValues,
                      delayedArgs, ForeignInfo{});
 
-  auto prepared =
-      prepareSubscriptIndices(loc, subscript, subs,
-                              // Strategy doesn't matter
-                              AccessStrategy::getStorage(), argList);
+  auto prepared = prepareIndices(loc, substFnType,
+                                 // Strategy doesn't matter
+                                 AccessStrategy::getStorage(), argList);
   emitter.emitPreparedArgs(std::move(prepared), origFnType);
 
   if (!delayedArgs.empty())

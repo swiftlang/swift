@@ -1298,6 +1298,9 @@ public:
                                        diag::extraneous_address_of);
             diag.fixItExchange(expr->getLoc(), lastInnerParenLoc);
           }
+          if (!parents.empty() && isa<KeyPathExpr>(parents[0]))
+            diags.diagnose(expr->getStartLoc(),
+                           diag::cannot_pass_inout_arg_to_keypath_method);
           return finish(true, expr);
         }
 
@@ -2454,9 +2457,9 @@ void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
           SE->getSelfLoc()));
         expr = SE->getSubExpr();
       } else if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-        // .foo
-        components.push_back(KeyPathExpr::Component::forUnresolvedProperty(
-            UDE->getName(), UDE->getLoc()));
+        // .foo, .foo() or .foo(val value: Int)
+        components.push_back(KeyPathExpr::Component::forUnresolvedMember(
+            UDE->getName(), UDE->getFunctionRefInfo(), UDE->getLoc()));
 
         expr = UDE->getBase();
       } else if (auto CCE = dyn_cast<CodeCompletionExpr>(expr)) {
@@ -2492,6 +2495,11 @@ void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
         (void)outermostExpr;
         assert(OEE == outermostExpr);
         expr = OEE->getSubExpr();
+      } else if (auto AE = dyn_cast<ApplyExpr>(expr)) {
+        // foo(), foo(val value: Int) or unapplied foo
+        components.push_back(KeyPathExpr::Component::forUnresolvedApply(
+            getASTContext(), AE->getArgs()));
+        expr = AE->getFn();
       } else {
         if (emitErrors) {
           // \(<expr>) may be an attempt to write a string interpolation outside

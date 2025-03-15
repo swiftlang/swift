@@ -3099,7 +3099,8 @@ public:
       break;
     }
     case KeyPathPatternComponent::Kind::GettableProperty:
-    case KeyPathPatternComponent::Kind::SettableProperty: {
+    case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method: {
       *this << (kind == KeyPathPatternComponent::Kind::GettableProperty
                   ? "gettable_property $" : "settable_property $")
             << component.getComponentType() << ", "
@@ -3124,29 +3125,27 @@ public:
       }
       }
       *this << ", getter ";
-      component.getComputedPropertyGetter()->printName(PrintState.OS);
+      component.getComputedPropertyForGettable()->printName(PrintState.OS);
       *this << " : "
-            << component.getComputedPropertyGetter()->getLoweredType();
+            << component.getComputedPropertyForGettable()->getLoweredType();
       if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
         *this << ", setter ";
-        component.getComputedPropertySetter()->printName(PrintState.OS);
+        component.getComputedPropertyForSettable()->printName(PrintState.OS);
         *this << " : "
-              << component.getComputedPropertySetter()->getLoweredType();
+              << component.getComputedPropertyForSettable()->getLoweredType();
       }
-      
-      if (!component.getSubscriptIndices().empty()) {
+
+      if (!component.getArguments().empty()) {
         *this << ", indices ";
-        printComponentIndices(component.getSubscriptIndices());
+        printComponentIndices(component.getArguments());
         *this << ", indices_equals ";
-        component.getSubscriptIndexEquals()->printName(PrintState.OS);
-        *this << " : "
-              << component.getSubscriptIndexEquals()->getLoweredType();
+        component.getIndexEquals()->printName(PrintState.OS);
+        *this << " : " << component.getIndexEquals()->getLoweredType();
         *this << ", indices_hash ";
-        component.getSubscriptIndexHash()->printName(PrintState.OS);
-        *this << " : "
-              << component.getSubscriptIndexHash()->getLoweredType();
+        component.getIndexHash()->printName(PrintState.OS);
+        *this << " : " << component.getIndexHash()->getLoweredType();
       }
-      
+
       if (auto external = component.getExternalDecl()) {
         *this << ", external #";
         printValueDecl(external, PrintState.OS);

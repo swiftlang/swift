@@ -368,6 +368,8 @@ $sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufCSu_SiTg5 ---> generic specializat
 $s4test7genFuncyyx_q_tr0_lFSi_SbTtt1g5 ---> generic specialization <Swift.Int, Swift.Bool> of test.genFunc<A, B>(A, B) -> ()
 $sSD5IndexVy__GD ---> $sSD5IndexVy__GD
 $s4test3StrCACycfC ---> {T:$s4test3StrCACycfc} test.Str.__allocating_init() -> test.Str
+@$s8keypaths1KV3valACSi_tcfcACmTkmu : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type) -> @out @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int, K>)
+@$s8keypaths1KVACycfcACmTkMA : $@convention(keypath_accessor_getter) (@in_guaranteed @thick K.Type) -> @out K)
 $s18keypaths_inlinable13KeypathStructV8computedSSvpACTKq  ---> key path getter for keypaths_inlinable.KeypathStruct.computed : Swift.String : keypaths_inlinable.KeypathStruct, serialized
 $s18resilient_protocol24ResilientDerivedProtocolPxAA0c4BaseE0Tn --> associated conformance descriptor for resilient_protocol.ResilientDerivedProtocol.A: resilient_protocol.ResilientBaseProtocol
 $s3red4testyAA3ResOyxSayq_GAEs5ErrorAAq_sAFHD1__HCg_GADyxq_GsAFR_r0_lF ---> red.test<A, B where B: Swift.Error>(red.Res<A, B>) -> red.Res<A, [B]>

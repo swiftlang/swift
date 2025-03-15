@@ -2499,7 +2499,7 @@ KeyPathExpr::setComponents(ASTContext &C,
 
 std::optional<unsigned> KeyPathExpr::findComponentWithSubscriptArg(Expr *arg) {
   for (auto idx : indices(getComponents())) {
-    if (auto *args = getComponents()[idx].getSubscriptArgs()) {
+    if (auto *args = getComponents()[idx].getArgs()) {
       if (args->findArgumentExpr(arg))
         return idx;
     }
@@ -2554,13 +2554,14 @@ KeyPathExpr::Component::Component(
     DeclNameOrRef decl, ArgumentList *argList,
     ArrayRef<ProtocolConformanceRef> indexHashables, Kind kind, Type type,
     SourceLoc loc)
-    : Decl(decl), SubscriptArgList(argList), KindValue(kind),
-      ComponentType(type), Loc(loc) {
-  assert(kind == Kind::Subscript || kind == Kind::UnresolvedSubscript);
+    : Decl(decl), ArgList(argList), KindValue(kind), ComponentType(type),
+      Loc(loc) {
+  assert(kind == Kind::Subscript || kind == Kind::UnresolvedSubscript ||
+         kind == Kind::UnresolvedApply || kind == Kind::Apply);
   assert(argList);
   assert(argList->size() == indexHashables.size() || indexHashables.empty());
-  SubscriptHashableConformancesData = indexHashables.empty()
-    ? nullptr : indexHashables.data();
+  HashableConformancesData =
+      indexHashables.empty() ? nullptr : indexHashables.data();
 }
 
 SingleValueStmtExpr *SingleValueStmtExpr::create(ASTContext &ctx, Stmt *S,

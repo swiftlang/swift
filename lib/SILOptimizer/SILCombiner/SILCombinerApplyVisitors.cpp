@@ -423,6 +423,7 @@ bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
       break;
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method:
       // We cannot predict the offset of fields in resilient types, because it's
       // unknown if a resilient field is a computed or stored property.
       if (component.getExternalDecl())
