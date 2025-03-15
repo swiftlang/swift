@@ -371,10 +371,9 @@ static ValueDecl *isViableOverloadChoice(ConstraintSystem &cs,
     }
   }
 
-  // If disjunction choice is unavailable or disfavored we cannot
+  // If disjunction choice is unavailable we cannot
   // do anything with it.
-  if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>() ||
-      cs.isDeclUnavailable(decl, locator))
+  if (cs.isDeclUnavailable(decl, locator))
     return nullptr;
 
   return decl;
@@ -621,8 +620,13 @@ static void findFavoredChoicesBasedOnArity(
   forEachDisjunctionChoice(
       cs, disjunction,
       [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
-        if (isVariadicGenericOverload(decl))
+        if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
+          return;
+
+        if (isVariadicGenericOverload(decl)) {
           hasVariadicGenerics = true;
+          return;
+        }
 
         if (overloadType->getNumParams() == argumentList->size() ||
             llvm::count_if(*getParameterList(decl), [](auto *param) {
@@ -661,7 +665,8 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
           return false;
 
         return isa<ProtocolDecl>(decl->getDeclContext()) ||
-               isVariadicGenericOverload(decl);
+               (!decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>() &&
+                isVariadicGenericOverload(decl));
       }))
     return std::nullopt;
 
@@ -721,6 +726,9 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
       cs, disjunction,
       [&argumentType, &favoredChoices, &argument](
           Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
+        if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
+          return;
+
         if (overloadType->getNumParams() != 1)
           return;
 
