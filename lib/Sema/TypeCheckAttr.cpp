@@ -8616,6 +8616,51 @@ class ABIDeclChecker : public ASTComparisonVisitor<ABIDeclChecker> {
     return fixItReplaceKeywords(diag, charRange, newText);
   }
 
+  class TypeOrigin {
+  public:
+    // Cases must be kept in sync with DiagnosticsSema TYPE_ORIGIN
+    enum class Kind : uint8_t {
+      Unspecified = 0,
+      Parameter = 1,
+      SelfParameter = 2,
+      Result = 3,
+      ThrowsEffect = 4,
+    };
+
+  private:
+    llvm::PointerIntPair<Decl *, 3, Kind> declAndKind;
+
+    TypeOrigin(Decl *decl, Kind kind)
+      : declAndKind(decl, kind) {}
+
+  public:
+    static TypeOrigin forUnspecified() {
+      return TypeOrigin(nullptr, Kind::Unspecified);
+    }
+
+    static TypeOrigin forParameter(ParamDecl *paramDecl) {
+      return TypeOrigin(paramDecl,
+                        paramDecl->isSelfParameter() ? Kind::SelfParameter
+                                                     : Kind::Parameter);
+    }
+    
+    static TypeOrigin forResult() {
+      return TypeOrigin(nullptr, Kind::Result);
+    }
+
+    static TypeOrigin forThrowsEffect() {
+      return TypeOrigin(nullptr, Kind::ThrowsEffect);
+    }
+
+    Kind getKind() const {
+      return declAndKind.getInt();
+    }
+
+    Decl *getDecl() const {
+      return declAndKind.getPointer();
+    }
+  };
+
 public:
   ABIDeclChecker(ASTContext &ctx, AttributeChecker &parentChecker,
                  ABIAttr *abiAttr)
@@ -8653,8 +8698,10 @@ public:
                            ParameterTypeFlags abiOrig,
                            Type apiType, Type abiType,
                            SourceLoc apiTypeLoc, SourceLoc abiTypeLoc,
-                           DescriptiveDeclKind declKind,
-                           bool isSelfParam) {
+                           TypeOrigin origin) {
+    // Some keywords are spelled differently for a `self` parameter.
+    bool isSelfParam = origin.getKind() == TypeOrigin::Kind::SelfParameter;
+
     bool didDiagnose = false;
 
     auto noteShouldMatch = [&](bool isModifier) {
@@ -8691,7 +8738,8 @@ public:
       ctx.Diags.diagnose(abiTypeLoc, diag::attr_abi_mismatched_param_modifier,
                          getSpelling(abiOrig.getOwnershipSpecifier()),
                          getSpelling(apiOrig.getOwnershipSpecifier()),
-                         /*isModifier=*/true, declKind);
+                         /*isModifier=*/true, unsigned(origin.getKind()),
+                         origin.getDecl());
       noteShouldMatch(/*isModifier=*/true);
       didDiagnose = true;
     }
@@ -8700,7 +8748,8 @@ public:
       ctx.Diags.diagnose(abiTypeLoc, diag::attr_abi_mismatched_param_modifier,
                          abiOrig.isNoDerivative() ? "noDerivative" : "",
                          apiOrig.isNoDerivative() ? "noDerivative" : "",
-                         /*isModifier=*/false, declKind);
+                         /*isModifier=*/false, unsigned(origin.getKind()),
+                         origin.getDecl());
       noteShouldMatch(/*isModifier=*/false);
       didDiagnose = true;
     }
@@ -8710,7 +8759,8 @@ public:
       ctx.Diags.diagnose(abiTypeLoc, diag::attr_abi_mismatched_param_modifier,
                          abiOrig.isAddressable() ? spelling : "",
                          apiOrig.isAddressable() ? spelling : "",
-                         /*isModifier=*/false, declKind);
+                         /*isModifier=*/false, unsigned(origin.getKind()),
+                         origin.getDecl());
       noteShouldMatch(/*isModifier=*/false);
       didDiagnose = true;
     }
@@ -8718,6 +8768,7 @@ public:
     if (!didDiagnose && api != abi) {
       // Flag difference not otherwise diagnosed. This is a fallback diagnostic.
       ctx.Diags.diagnose(abiTypeLoc, diag::attr_abi_mismatched_type,
+                         unsigned(origin.getKind()), origin.getDecl(),
                          abiType, apiType);
       ctx.Diags.diagnose(apiTypeLoc, diag::attr_abi_should_match_type_here);
       didDiagnose = true;
@@ -8752,7 +8803,8 @@ public:
     SourceLoc abiTypeLoc = getTypeLoc(abi, abiDecl);
 
     didDiagnose |= checkType(apiNorm.getPlainType(), abiNorm.getPlainType(),
-                             apiTypeLoc, abiTypeLoc);
+                             apiTypeLoc, abiTypeLoc,
+                             TypeOrigin::forParameter(abi));
 
     auto declKind = api->isSelfParameter() ? apiDecl->getDescriptiveKind()
                                            : DescriptiveDeclKind::Param;
@@ -8764,7 +8816,7 @@ public:
                                        apiNorm.getPlainType(),
                                        abiNorm.getPlainType(),
                                        apiTypeLoc, abiTypeLoc,
-                                       declKind, api->isSelfParameter());
+                                       TypeOrigin::forParameter(abi));
 
     didDiagnose |= checkAttrs(api->getAttrs(), abi->getAttrs(), api, abi);
 
@@ -9078,7 +9130,8 @@ public:
     return checkType(api->getResultInterfaceType(),
                      abi->getResultInterfaceType(),
                      api->getResultTypeSourceRange().Start,
-                     abi->getResultTypeSourceRange().Start);
+                     abi->getResultTypeSourceRange().Start,
+                     TypeOrigin::forResult());
   }
 
   bool visitConstructorDecl(ConstructorDecl *api, ConstructorDecl *abi) {
@@ -9094,7 +9147,8 @@ public:
       return true;
 
     if (checkType(api->getValueInterfaceType(), abi->getValueInterfaceType(),
-                  getTypeLoc(api), getTypeLoc(abi)))
+                  getTypeLoc(api), getTypeLoc(abi),
+                  TypeOrigin::forUnspecified()))
       return true;
 
     return false;
@@ -9332,7 +9386,8 @@ public:
 
   // MARK: @abi checking - types
 
-  bool checkType(Type api, Type abi, SourceLoc apiLoc, SourceLoc abiLoc) {
+  bool checkType(Type api, Type abi, SourceLoc apiLoc, SourceLoc abiLoc,
+                 TypeOrigin origin) {
     if (!api.isNull() && !abi.isNull()) {
       Type apiNorm = normalizeType(api);
       Type abiNorm = normalizeType(abi);
@@ -9341,7 +9396,8 @@ public:
       }
     }
 
-    ctx.Diags.diagnose(abiLoc, diag::attr_abi_mismatched_type, abi, api);
+    ctx.Diags.diagnose(abiLoc, diag::attr_abi_mismatched_type,
+                       unsigned(origin.getKind()), origin.getDecl(), abi, api);
     ctx.Diags.diagnose(apiLoc, diag::attr_abi_should_match_type_here);
     return true;
   }
