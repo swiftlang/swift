@@ -310,6 +310,7 @@ target_link_libraries(swiftCore
     swiftStdlibStubs
     swiftThreading
     $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>
+    $<$<PLATFORM_ID:Darwin>:c++>
   PUBLIC
     swiftShims)
 target_link_options(swiftCore PRIVATE
