@@ -603,7 +603,7 @@ extension ASTGenVisitor {
     switch text {
     case "reverse": return .reverse
     case "wrt", "withRespectTo": return .normal
-    case "_liner": return .linear
+    case "_linear": return .linear
     case "_forward": return .forward
     default: return .nonDifferentiable
     }
