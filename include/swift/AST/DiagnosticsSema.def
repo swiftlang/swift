@@ -5898,11 +5898,13 @@ ERROR(nonisolated_actor_sync_init,none,
       "'nonisolated' on an actor's synchronous initializer is invalid",
       ())
 ERROR(nonisolated_wrapped_property,none,
-      "'nonisolated' is not supported on properties with property wrappers",
-      ())
+      "'nonisolated' can not be applied to a property with property wrapper "
+      "that is a member of a 'Sendable' type %0",
+      (Type))
 ERROR(nonisolated_lazy,none,
-      "'nonisolated' is not supported on lazy properties",
-      ())
+      "'nonisolated' can not be applied to a lazy property "
+      "that is a member of a 'Sendable' type %0",
+      (Type))
 
 ERROR(non_sendable_from_deinit,none,
         "cannot access %1 %2 with a non-sendable type %0 from nonisolated deinit",

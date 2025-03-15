@@ -67,5 +67,5 @@ actor Pumpkin: NSObject {}
 
 actor Bad {
   @objc nonisolated lazy var invalid = 0
-  // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+  // expected-warning@-1 {{'nonisolated' can not be applied to a lazy property that is a member of a 'Sendable' type 'Bad'; this is an error in the Swift 6 language mode}}
 }
