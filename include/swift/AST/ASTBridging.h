@@ -317,6 +317,10 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedEndianness : size_t {
   EndianBig,
 };
 
+SWIFT_NAME("getter:BridgedASTContext.langOptsAttachCommentsToDecls(self:)")
+bool BridgedASTContext_langOptsAttachCommentsToDecls(
+    BridgedASTContext cContext);
+
 SWIFT_NAME("getter:BridgedASTContext.langOptsTargetEndianness(self:)")
 BridgedEndianness BridgedASTContext_langOptsTargetEndianness(BridgedASTContext cContext);
 

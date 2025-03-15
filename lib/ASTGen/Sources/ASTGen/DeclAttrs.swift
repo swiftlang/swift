@@ -30,14 +30,20 @@ extension ASTGenVisitor {
     var staticLoc: BridgedSourceLoc = nil
 
     // Comments.
-    if let firstTok = node.firstToken(viewMode: .sourceAccurate) {
+    COMMENT: if
+      self.ctx.langOptsAttachCommentsToDecls,
+      let firstTok = node.firstToken(viewMode: .sourceAccurate)
+    {
       var pos = firstTok.position
       for p in firstTok.leadingTrivia {
         switch p {
-        case .docLineComment, .docBlockComment:
-          let range = self.generateCharSourceRange(start: pos, length: p.sourceLength)
+        // 'RawDocCommentAttr' takes the range '[start of any comments, start of the token text)'.
+        case .docLineComment, .docBlockComment, .lineComment, .blockComment:
+          let commentLength = firstTok.positionAfterSkippingLeadingTrivia.utf8Offset - pos.utf8Offset
+          let range = self.generateCharSourceRange(start: pos, length: SourceLength(utf8Length: commentLength))
           let attr = BridgedRawDocCommentAttr.createParsed(self.ctx, range: range)
           attrs.add(attr.asDeclAttribute)
+          break COMMENT
         default:
           break
         }
