@@ -15,7 +15,7 @@
         "swift-async-algorithms": {
             "remote": { "id": "apple/swift-async-algorithms" } },
         "swift-atomics": {
-            "remote": { "id": "apple/swift-atomics" } },       
+            "remote": { "id": "apple/swift-atomics" } },
         "swift-collections": {
             "remote": { "id": "apple/swift-collections" } },
         "swift-crypto": {
@@ -29,7 +29,7 @@
         "swift-log": {
             "remote": { "id": "apple/swift-log" } },
         "swift-numerics": {
-            "remote": { "id": "apple/swift-numerics" } },        
+            "remote": { "id": "apple/swift-numerics" } },
         "swift-toolchain-sqlite": {
             "remote": { "id": "swiftlang/swift-toolchain-sqlite" } },
         "swift-tools-support-core": {
@@ -47,9 +47,9 @@
         "swift-corelibs-xctest": {
             "remote": { "id": "swiftlang/swift-corelibs-xctest" } },
         "swift-corelibs-foundation": {
-            "remote": { "id": "swiftlang/swift-corelibs-foundation" } },  
+            "remote": { "id": "swiftlang/swift-corelibs-foundation" } },
         "swift-foundation-icu": {
-            "remote": { "id": "swiftlang/swift-foundation-icu" } },  
+            "remote": { "id": "swiftlang/swift-foundation-icu" } },
         "swift-foundation": {
             "remote": { "id": "swiftlang/swift-foundation" } },
         "swift-corelibs-libdispatch": {
@@ -158,7 +158,7 @@
                 "swift-corelibs-libdispatch": "main",
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
-                "ninja": "v1.11.1",
+                "ninja": "v1.12.1",
                 "cmake": "v3.30.2",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",

@@ -1639,13 +1639,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ ! "${SKIP_BUILD_WASM}" ]]; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_WASI_SYSROOT_PATH:STRING="${WASI_SYSROOT}"
-                    )
-                fi
-
                 if [[ $(is_cross_tools_host ${host}) && "${host}" == "openbsd-"* && -n "${OPENBSD_USE_TOOLCHAIN_FILE}" ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -2503,7 +2496,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   cmake_options=(
                     -DENABLE_SWIFT=YES
                     ${cmake_options[@]}
-                    
+
                     -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
                     -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
