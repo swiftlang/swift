@@ -393,6 +393,12 @@ extension ASTGenVisitor {
       return .modify
     case .`init`:
       return .`init`
+    case .read:
+      precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
+      return .read2
+    case .modify:
+      precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'modify' accessor should only be parsed with 'CoroutineAccessors' feature")
+      return .modify2
     default:
       self.diagnose(.unknownAccessorSpecifier(specifier))
       return nil
