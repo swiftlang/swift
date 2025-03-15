@@ -596,6 +596,12 @@ def disable_swift_specific_llvm_optzns : Flag<["-"], "disable-swift-specific-llv
 def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
   HelpText<"Don't run the LLVM IR verifier.">;
 
+def enable_llvm_verify_each : Flag<["-"], "enable-llvm-verify-each">,
+  HelpText<"Run the LLVM IR verifier after every pass.">;
+
+def disable_llvm_verify_each : Flag<["-"], "disable-llvm-verify-each">,
+  HelpText<"Don't run the LLVM IR verifier after every pass.">;
+
 def disable_llvm_value_names : Flag<["-"], "disable-llvm-value-names">,
   HelpText<"Don't add names to local values in LLVM IR">;
 
