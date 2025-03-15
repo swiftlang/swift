@@ -105,9 +105,9 @@ func test_various_situations_converting_to_double() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion31test_conversions_with_optionals1vy12CoreGraphics7CGFloatVSg_tF : $@convention(thin) (Optional<CGFloat>) -> () {
 func test_conversions_with_optionals(v: CGFloat?) {
-  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion31test_conversions_with_optionals1vy12CoreGraphics7CGFloatVSg_tFAFyKXEfu_
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC : $@convention(method) (CGFloat, @thin Double.Type) -> Double
   let _: Double = (v ?? 0)
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion31test_conversions_with_optionals1vy12CoreGraphics7CGFloatVSg_tFSdyKXEfu_
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion48test_static_members_are_contextually_convertibleyyF : $@convention(thin) () -> () {
