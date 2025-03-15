@@ -410,3 +410,39 @@ bb2(%error : @owned $any Error):
   destroy_value [dead_end] %nonescaping_nothrower : $@noescape @callee_guaranteed () -> (Int, @error any Error) 
   unreachable                                     
 } 
+
+
+sil @nonthrowing : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> ()
+sil @throwsfn : $@convention(thin) () -> ((), @error any Error) 
+ 
+// Ensure no ownership verification error
+// CHECK-LABEL: sil [ossa] @testRethrowing : {{.*}} {
+// CHECK:         [[NOTHROWER:%[^,]+]] = function_ref @nothrower
+// CHECK:         [[THICK_NOTHROWER:%[^,]+]] = thin_to_thick_function [[NOTHROWER]]
+// CHECK:         [[THROWING_NOTHROWER:%[^,]+]] = convert_function [[THICK_NOTHROWER]]
+// CHECK:         [[NOTHROWER_COPY:%[^,]+]] = copy_value [[THROWING_NOTHROWER]]
+// CHECK:       {{bb[0-9]+}}
+// CHECK:         destroy_value [[NOTHROWER_COPY]]
+// CHECK:       {{bb[0-9]+}}
+// CHECK:         destroy_value [[NOTHROWER_COPY]]
+// CHECK-LABEL: } // end sil function 'testRethrowing'
+sil [ossa] @testRethrowing : $@convention(thin) () -> ((), @error any Error) {
+bb0:
+  %nothrower = function_ref @nothrower : $@convention(thin) () -> Int 
+  %thick_nothrower = thin_to_thick_function %nothrower : $@convention(thin) () -> Int to $@callee_guaranteed () -> Int 
+  %throwing_nothrower = convert_function %thick_nothrower : $@callee_guaranteed () -> Int to $@callee_guaranteed () -> (Int, @error any Error) 
+  %nonescaping_nothrower = convert_escape_to_noescape [not_guaranteed] %throwing_nothrower : $@callee_guaranteed () -> (Int, @error any Error) to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+  %throwsfnref = function_ref @throwsfn : $@convention(thin) () -> ((), @error any Error) 
+  try_apply %throwsfnref() : $@convention(thin) () -> ((), @error any Error), normal bb1, error bb2
+
+bb1(%arg : $()):
+  %nonthrower = function_ref @nonthrowing : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> () 
+  apply %nonthrower(%nonescaping_nothrower) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> () 
+  destroy_value %nonescaping_nothrower : $@noescape @callee_guaranteed () -> (Int, @error any Error) 
+  %8 = tuple ()                                   
+  return %8 : $()                                 
+
+bb2(%error : @owned $any Error):
+  destroy_value %nonescaping_nothrower : $@noescape @callee_guaranteed () -> (Int, @error any Error) 
+  throw %error
+} 

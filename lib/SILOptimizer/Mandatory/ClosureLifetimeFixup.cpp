@@ -1063,6 +1063,11 @@ static bool tryExtendLifetimeToLastUse(
             deadEndBlocks->isDeadEnd(builder.getInsertionPoint()->getParent()));
         builder.createDestroyValue(loc, closureCopy, DontPoisonRefs, isDeadEnd);
       });
+
+  // Closure User may not be post-dominating the previously created copy_value.
+  // Create destroy_value at leaking blocks.
+
+  endLifetimeAtLeakingBlocks(closureCopy, {singleUser->getParent()}, deadEndBlocks);
   /*
   llvm::errs() << "after lifetime extension of\n";
   escapingClosure->dump();

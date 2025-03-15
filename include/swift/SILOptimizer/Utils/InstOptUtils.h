@@ -580,7 +580,8 @@ SILValue makeValueAvailable(SILValue value, SILBasicBlock *inBlock);
 /// use blocks inside a loop relative to \p value. The client must create
 /// separate copies for any uses within the loop.
 void endLifetimeAtLeakingBlocks(SILValue value,
-                                ArrayRef<SILBasicBlock *> userBBs);
+                                ArrayRef<SILBasicBlock *> userBBs,
+                                DeadEndBlocks *deadEndBlocks = nullptr);
 
 /// Given a forwarding instruction, eliminate it if all of its users are debug
 /// instructions and ownership uses.
