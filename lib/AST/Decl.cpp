@@ -10823,6 +10823,9 @@ AccessorDecl *AccessorDecl::createParsed(
 
       newParams.push_back(param);
     }
+
+    if (isa<SendingTypeRepr>(SD->getElementTypeRepr()))
+      accessor->setSendingResult();
   }
   accessor->setParameters(
       ParameterList::create(ctx, paramsStart, newParams, paramsEnd));
