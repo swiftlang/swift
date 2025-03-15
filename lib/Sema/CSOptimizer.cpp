@@ -92,11 +92,10 @@ static DeclContext *getDisjunctionDC(Constraint *disjunction) {
   auto *choice = disjunction->getNestedConstraints()[0];
   switch (choice->getKind()) {
   case ConstraintKind::BindOverload:
-    return choice->getOverloadUseDC();
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
-    return choice->getMemberUseDC();
+    return choice->getDeclContext();
   default:
     return nullptr;
   }
@@ -366,7 +365,7 @@ static ValueDecl *isViableOverloadChoice(ConstraintSystem &cs,
   // we might end up favoring an overload that would be diagnosed
   // as unavailable later.
   if (cs.getASTContext().LangOpts.hasFeature(Feature::MemberImportVisibility)) {
-    if (auto *useDC = constraint->getOverloadUseDC()) {
+    if (auto *useDC = constraint->getDeclContext()) {
       if (!useDC->isDeclImported(decl))
         return nullptr;
     }
@@ -535,9 +534,8 @@ NullablePtr<Constraint> getApplicableFnConstraint(ConstraintGraph &CG,
   if (!boundVar)
     return nullptr;
 
-  auto constraints = CG.gatherConstraints(
-      boundVar, ConstraintGraph::GatheringKind::EquivalenceClass,
-      [](Constraint *constraint) {
+  auto constraints =
+      CG.gatherNearbyConstraints(boundVar, [](Constraint *constraint) {
         return constraint->getKind() == ConstraintKind::ApplicableFunction;
       });
 
@@ -563,7 +561,7 @@ void forEachDisjunctionChoice(
 
     Type overloadType = cs.getEffectiveOverloadType(
         disjunction->getLocator(), constraint->getOverloadChoice(),
-        /*allowMembers=*/true, constraint->getOverloadUseDC());
+        /*allowMembers=*/true, constraint->getDeclContext());
 
     if (!overloadType || !overloadType->is<FunctionType>())
       continue;
