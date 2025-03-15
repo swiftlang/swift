@@ -612,7 +612,7 @@ public:
 
   void getAttributeDeclCompletions(bool IsInSil, std::optional<DeclKind> DK);
 
-  void getAttributeDeclParamCompletions(CustomSyntaxAttributeKind AttrKind,
+  void getAttributeDeclParamCompletions(ParameterizedDeclAttributeKind AttrKind,
                                         int ParamIndex, bool HasLabel);
 
   void getTypeAttributeKeywordCompletions(CompletionKind completionKind);

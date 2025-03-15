@@ -3103,9 +3103,19 @@ void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
 }
 
 void CompletionLookup::getAttributeDeclParamCompletions(
-    CustomSyntaxAttributeKind AttrKind, int ParamIndex, bool HasLabel) {
+    ParameterizedDeclAttributeKind AttrKind, int ParamIndex, bool HasLabel) {
   switch (AttrKind) {
-  case CustomSyntaxAttributeKind::Available:
+  case ParameterizedDeclAttributeKind::Unowned:
+    addDeclAttrParamKeyword("safe", /*Parameters=*/{}, "", false);
+    addDeclAttrParamKeyword("unsafe", /*Parameters=*/{}, "", false);
+    break;
+  case ParameterizedDeclAttributeKind::Nonisolated:
+    addDeclAttrParamKeyword("unsafe", /*Parameters=*/{}, "", false);
+    break;
+  case ParameterizedDeclAttributeKind::AccessControl:
+    addDeclAttrParamKeyword("set", /*Parameters=*/{}, "", false);
+    break;
+  case ParameterizedDeclAttributeKind::Available:
     if (ParamIndex == 0) {
       addDeclAttrParamKeyword("*", /*Parameters=*/{}, "Platform", false);
 
@@ -3126,15 +3136,15 @@ void CompletionLookup::getAttributeDeclParamCompletions(
                               "Specify version number", true);
     }
     break;
-  case CustomSyntaxAttributeKind::FreestandingMacro:
-  case CustomSyntaxAttributeKind::AttachedMacro:
+  case ParameterizedDeclAttributeKind::FreestandingMacro:
+  case ParameterizedDeclAttributeKind::AttachedMacro:
     switch (ParamIndex) {
     case 0:
       for (auto role : getAllMacroRoles()) {
         bool isRoleSupported = isMacroSupported(role, Ctx);
-        if (AttrKind == CustomSyntaxAttributeKind::FreestandingMacro) {
+        if (AttrKind == ParameterizedDeclAttributeKind::FreestandingMacro) {
           isRoleSupported &= isFreestandingMacro(role);
-        } else if (AttrKind == CustomSyntaxAttributeKind::AttachedMacro) {
+        } else if (AttrKind == ParameterizedDeclAttributeKind::AttachedMacro) {
           isRoleSupported &= isAttachedMacro(role);
         }
         if (isRoleSupported) {
@@ -3162,7 +3172,7 @@ void CompletionLookup::getAttributeDeclParamCompletions(
       break;
     }
     break;
-  case CustomSyntaxAttributeKind::StorageRestrictions: {
+  case ParameterizedDeclAttributeKind::StorageRestrictions: {
     bool suggestInitializesLabel = false;
     bool suggestAccessesLabel = false;
     bool suggestArgument = false;
@@ -3296,7 +3306,7 @@ void CompletionLookup::getPrecedenceGroupCompletions(
 void CompletionLookup::getPoundAvailablePlatformCompletions() {
 
   // The platform names should be identical to those in @available.
-  getAttributeDeclParamCompletions(CustomSyntaxAttributeKind::Available, 0,
+  getAttributeDeclParamCompletions(ParameterizedDeclAttributeKind::Available, 0,
                                    /*HasLabel=*/false);
 }
 
