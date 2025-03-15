@@ -193,6 +193,10 @@ extension ASTGenVisitor {
         fatalError("unimplemented")
       case .unavailableFromAsync:
         return handle(self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute)
+      case .reasync:
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .atReasync))
+      case .rethrows:
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .atRethrows))
       case .none where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
       case .none where attrName == "_functionBuilder":
@@ -329,11 +333,10 @@ extension ASTGenVisitor {
         .clangImporterSynthesizedType,
         .forbidSerializingReference,
         .custom,
-        .setterAccess,
-        .rethrows,
-        .reasync:
-        // TODO: Diagnose or fallback to custom attributes?
-        return
+        .setterAccess:
+        assert(BridgedDeclAttribute.shouldBeRejectedByParser(attrKind))
+        // Fall back to CustomAttr.
+        break
 
       case .none:
         // Fall back to CustomAttr.

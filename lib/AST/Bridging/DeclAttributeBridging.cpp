@@ -101,6 +101,13 @@ BridgedDeclAttribute BridgedDeclAttribute_createSimple(
                                      cAtLoc.unbridged(), cAttrLoc.unbridged());
 }
 
+bool BridgedDeclAttribute_shouldBeRejectedByParser(BridgedDeclAttrKind cKind) {
+  auto optKind = unbridged(cKind);
+  if (!optKind)
+    return false;
+  return DeclAttribute::shouldBeRejectedByParser(*optKind);
+}
+
 bool BridgedDeclAttribute_isDeclModifier(BridgedDeclAttrKind cKind) {
   auto optKind = unbridged(cKind);
   if (!optKind)

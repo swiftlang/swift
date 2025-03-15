@@ -847,6 +847,9 @@ struct BridgedDeclAttributes {
   BRIDGED_INLINE swift::DeclAttributes unbridged() const;
 };
 
+SWIFT_NAME("BridgedDeclAttribute.shouldBeRejectedByParser(_:)")
+bool BridgedDeclAttribute_shouldBeRejectedByParser(BridgedDeclAttrKind cKind);
+
 SWIFT_NAME("BridgedDeclAttribute.isDeclModifier(_:)")
 bool BridgedDeclAttribute_isDeclModifier(BridgedDeclAttrKind cKind);
 
