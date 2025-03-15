@@ -598,7 +598,7 @@ namespace swift {
     bool EnableRequirementMachineOpaqueArchetypes = false;
 
     /// Enable implicit lifetime dependence for ~Escapable return types.
-    bool EnableExperimentalLifetimeDependenceInference = true;
+    bool EnableExperimentalLifetimeDependenceInference = false;
 
     /// Skips decls that cannot be referenced externally.
     bool SkipNonExportableDecls = false;

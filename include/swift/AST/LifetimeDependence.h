@@ -227,32 +227,6 @@ class LifetimeDependenceInfo {
 
   unsigned targetIndex;
 
-  static LifetimeDependenceInfo getForIndex(AbstractFunctionDecl *afd,
-                                            unsigned targetIndex,
-                                            unsigned sourceIndex,
-                                            LifetimeDependenceKind kind);
-
-  /// Builds LifetimeDependenceInfo from @lifetime attribute
-  static std::optional<ArrayRef<LifetimeDependenceInfo>>
-  fromLifetimeAttribute(AbstractFunctionDecl *afd);
-
-  /// Infer LifetimeDependenceInfo on result
-  static std::optional<LifetimeDependenceInfo> infer(AbstractFunctionDecl *afd);
-
-  /// Infer LifetimeDependenceInfo on setter
-  static std::optional<LifetimeDependenceInfo>
-  inferSetter(AbstractFunctionDecl *afd);
-
-  /// Infer LifetimeDependenceInfo on mutating self
-  static std::optional<LifetimeDependenceInfo>
-  inferMutatingSelf(AbstractFunctionDecl *afd);
-
-  /// Builds LifetimeDependenceInfo from SIL function type
-  static std::optional<LifetimeDependenceInfo>
-  fromDependsOn(LifetimeDependentTypeRepr *lifetimeDependentRepr,
-                unsigned targetIndex, ArrayRef<SILParameterInfo> params,
-                DeclContext *dc);
-
 public:
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
@@ -350,8 +324,8 @@ public:
 
   /// Builds LifetimeDependenceInfo from SIL
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
-  get(FunctionTypeRepr *funcRepr, ArrayRef<SILParameterInfo> params,
-      ArrayRef<SILResultInfo> results, DeclContext *dc);
+  getFromSIL(FunctionTypeRepr *funcRepr, ArrayRef<SILParameterInfo> params,
+             ArrayRef<SILResultInfo> results, DeclContext *dc);
 
   bool operator==(const LifetimeDependenceInfo &other) const {
     return this->isImmortal() == other.isImmortal() &&
