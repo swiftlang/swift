@@ -862,7 +862,7 @@ DECL_ATTR(abi, ABI,
 DECL_ATTR_FEATURE_REQUIREMENT(ABI, ABIAttribute)
 
 DECL_ATTR(execution, Execution,
-  OnFunc,
+  OnAbstractFunction,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   166)
 DECL_ATTR_FEATURE_REQUIREMENT(Execution, ExecutionAttribute)
