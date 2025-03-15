@@ -166,7 +166,7 @@ extension ASTGenVisitor {
     return BridgedMagicIdentifierLiteralExpr.createParsed(
       self.ctx,
       kind: kind,
-      loc: self.generateSourceLoc(node.macroName)
+      loc: self.generateSourceLoc(node.pound)
     )
   }
 
