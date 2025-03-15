@@ -146,7 +146,7 @@ public func withTaskExecutorPreference<T, Failure>(
   }
 
   let taskExecutorBuiltin: Builtin.Executor =
-      taskExecutor.asUnownedTaskExecutor().executor
+    unsafe taskExecutor.asUnownedTaskExecutor().executor
 
   let record = unsafe _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
@@ -177,7 +177,7 @@ public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
   }
 
   let taskExecutorBuiltin: Builtin.Executor =
-    taskExecutor.asUnownedTaskExecutor().executor
+    unsafe taskExecutor.asUnownedTaskExecutor().executor
 
   let record = unsafe _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
@@ -457,8 +457,8 @@ extension UnsafeCurrentTask {
   /// means to guarantee the executor remains alive while it is in use.
   @available(SwiftStdlib 6.0, *)
   public var unownedTaskExecutor: UnownedTaskExecutor? {
-    let ref = _getPreferredTaskExecutor()
-    return UnownedTaskExecutor(ref)
+    let ref = _getPreferredUnownedTaskExecutor()
+    return unsafe UnownedTaskExecutor(ref)
   }
 }
 
@@ -466,7 +466,7 @@ extension UnsafeCurrentTask {
 
 @available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_task_getPreferredTaskExecutor")
-internal func _getPreferredTaskExecutor() -> Builtin.Executor
+internal func _getPreferredUnownedTaskExecutor() -> Builtin.Executor
 
 typealias TaskExecutorPreferenceStatusRecord = UnsafeRawPointer
 

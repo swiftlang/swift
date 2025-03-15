@@ -27,7 +27,19 @@ extension Task where Success == Never, Failure == Never {
       let job = _taskCreateNullaryContinuationJob(
           priority: Int(Task.currentPriority.rawValue),
           continuation: continuation)
-      _enqueueJobGlobalWithDelay(duration, job)
+
+      if #available(SwiftStdlib 6.2, *) {
+        let executor = Task.currentSchedulableExecutor
+        #if !$Embedded
+        executor!.enqueue(ExecutorJob(context: job),
+                          after: .nanoseconds(duration),
+                          clock: .continuous)
+        #endif
+      } else {
+        // Since we're building the new version of the stdlib, we should
+        // never get here.
+        Builtin.unreachable()
+      }
     }
   }
 
@@ -255,8 +267,19 @@ extension Task where Success == Never, Failure == Never {
               let (sleepTask, _) = Builtin.createAsyncTask(sleepTaskFlags) {
                 unsafe onSleepWake(token)
               }
-              _enqueueJobGlobalWithDelay(
-                  duration, Builtin.convertTaskToJob(sleepTask))
+
+              if #available(SwiftStdlib 6.2, *) {
+                let executor = Task.currentSchedulableExecutor
+                let job = ExecutorJob(context: Builtin.convertTaskToJob(sleepTask))
+                #if !$Embedded
+                executor!.enqueue(job,
+                                  after: .nanoseconds(duration),
+                                  clock: .continuous)
+                #endif
+              } else {
+                // Shouldn't be able to get here
+                Builtin.unreachable()
+              }
               return
 
             case .activeContinuation, .finished:
