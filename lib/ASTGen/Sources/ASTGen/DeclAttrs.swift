@@ -204,6 +204,7 @@ extension ASTGenVisitor {
         .borrowed,
         .compilerInitialized,
         .constVal,
+        .constInitialized,
         .dynamicCallable,
         .eagerMove,
         .exported,
