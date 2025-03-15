@@ -8089,7 +8089,7 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 
 
 //------------------------------------------------------------------------------
-// MARK: Lifetime Dependence Diagnostics
+// MARK: Lifetime Dependence Syntax
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_invalid_param_name, none,
@@ -8108,34 +8108,15 @@ ERROR(lifetime_dependence_cannot_use_kind, none,
 ERROR(lifetime_dependence_cannot_use_parsed_scoped_consuming, none,
       "invalid use of scoped lifetime dependence with consuming ownership",
       ())
-ERROR(lifetime_dependence_cannot_use_inferred_scoped_consuming, none,
-      "invalid use of lifetime dependence on an Escapable parameter with "
-      "consuming ownership",
-      ())
-ERROR(lifetime_dependence_invalid_self_ownership, none,
-      "invalid scoped lifetime dependence on an Escapable self with consuming "
-      "ownership",
-      ())
 ERROR(lifetime_dependence_only_on_function_method_init_result, none,
       "lifetime dependence specifiers may only be used on result of "
        "functions, methods, initializers", ())
-ERROR(lifetime_dependence_invalid_type, none,
-      "lifetime dependence can only be specified on ~Escapable types", ())
-ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
-      "cannot infer lifetime dependence %0, multiple parameters qualifiy as a candidate", (StringRef))
- ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
-       "cannot infer lifetime dependence%0, no parameters found that are either "
-       "~Escapable or Escapable with a borrowing ownership", (StringRef))
- ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
-       "expected nil or self as return values in an initializer with "
-       "lifetime dependent specifiers",
+ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
+      "expected 'nil' or 'self' as return values in an initializer with "
+      "lifetime dependent specifiers",
        ())
- ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
-       "lifetime dependence specifiers cannot be applied to tuple elements", ())
- ERROR(lifetime_dependence_method_escapable_bitwisecopyable_self, none,
-       "cannot infer lifetime dependence on a self which is BitwiseCopyable & "
-       "Escapable",
-       ())
+ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
+      "lifetime dependence specifiers cannot be applied to tuple elements", ())
 ERROR(lifetime_dependence_immortal_conflict_name, none,
       "conflict between the parameter name and 'immortal' contextual keyword", ())
 ERROR(lifetime_dependence_function_type, none,
@@ -8144,18 +8125,75 @@ ERROR(lifetime_dependence_function_type, none,
 ERROR(lifetime_dependence_immortal_alone, none,
       "cannot specify any other dependence source along with immortal", ())
 ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
-      "invalid lifetime dependence on a source of Escapable type, use borrow "
-      "dependence instead",
-      ())
+      "cannot copy the lifetime of an Escapable type, use "
+      "'@lifetime(borrow %0)' instead",
+      (StringRef))
 ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
       "invalid use of borrow dependence with consuming ownership",
       ())
+ERROR(lifetime_dependence_cannot_use_parsed_borrow_inout, none,
+      "invalid use of borrow dependence on the same inout parameter",
+      ())
 ERROR(lifetime_dependence_duplicate_target, none,
       "invalid duplicate target lifetime dependencies on function", ())
+ERROR(lifetime_parameter_requires_inout, none,
+      "lifetime-dependent parameter must be 'inout'", (Identifier))
 
-ERROR(lifetime_dependence_feature_required, none,
-      "returning ~Escapable type requires '-enable-experimental-feature "
-      "LifetimeDependence'", ())
+//------------------------------------------------------------------------------
+// MARK: Lifetime Dependence Requirements
+//------------------------------------------------------------------------------
+
+ERROR(lifetime_dependence_feature_required_return, none,
+      "%0 with a ~Escapable result requires "
+      "'-enable-experimental-feature LifetimeDependence'", (StringRef))
+ERROR(lifetime_dependence_feature_required_mutating, none,
+      "%0 with ~Escapable 'self' requires "
+      "'-enable-experimental-feature LifetimeDependence'", (StringRef))
+ERROR(lifetime_dependence_feature_required_inout, none,
+      "%0 with a ~Escapable 'inout' parameter requires "
+      "'-enable-experimental-feature LifetimeDependence'",
+      // arg list is interchangable with lifetime_dependence_cannot_infer_inout
+      (StringRef, Identifier))
+
+ERROR(lifetime_dependence_cannot_infer_return, none,
+      "%0 with a ~Escapable result requires '@lifetime(...)'", (StringRef))
+ERROR(lifetime_dependence_cannot_infer_mutating, none,
+      "%0 with a ~Escapable 'self' requires '@lifetime(self: ...)'", (StringRef))
+ERROR(lifetime_dependence_cannot_infer_inout, none,
+      "%0 with a ~Escapable 'inout' parameter requires '@lifetime(%1: ...)'",
+      (StringRef, Identifier))
+
+//------------------------------------------------------------------------------
+// MARK: Lifetime Dependence Inference - refinements to the requirements above
+//------------------------------------------------------------------------------
+
+ERROR(lifetime_dependence_cannot_infer_return_no_param, none,
+      "%0 with a ~Escapable result needs a parameter to depend on",
+      (StringRef))
+NOTE(lifetime_dependence_cannot_infer_return_immortal, none,
+     "'@lifetime(immortal)' can be used to indicate that values produced by "
+     "this initializer have no lifetime dependencies", ())
+ERROR(lifetime_dependence_cannot_infer_bitwisecopyable, none,
+      "cannot infer lifetime dependence on %0 because '%1' is BitwiseCopyable, "
+      "specify '@lifetime(borrow self)'",
+      (StringRef, StringRef))
+ERROR(lifetime_dependence_cannot_infer_kind, none,
+      "cannot infer the lifetime dependence scope on %0 with a ~Escapable "
+      "parameter, specify '@lifetime(borrow %1)' or '@lifetime(copy %1)'",
+      (StringRef, StringRef))
+ERROR(lifetime_dependence_cannot_infer_scope_ownership, none,
+      "cannot borrow the lifetime of '%0', which has consuming ownership on %1",
+      (StringRef, StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: Lifetime Dependence Experimental Inference
+//------------------------------------------------------------------------------
+
+ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
+      "cannot infer lifetime dependence%0, no parameters found that are either "
+      "~Escapable or Escapable with a borrowing ownership", (StringRef))
+ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
+      "cannot infer lifetime dependence%0, multiple parameters qualify as a candidate", (StringRef))
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Sending
