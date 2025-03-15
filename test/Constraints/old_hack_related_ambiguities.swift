@@ -360,3 +360,14 @@ class TestFailableOnly {
     }
   }
 }
+
+do {
+  @_disfavoredOverload
+  func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) async throws {}
+  func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) throws {}
+  func test(over: Int, other: String = "", block: @escaping (Int) throws -> Void) throws {}
+
+  func perform(v: Int, block: @escaping (Int) throws -> Void) async throws {
+    try await test(over: v, block: block) // Ok
+  }
+}

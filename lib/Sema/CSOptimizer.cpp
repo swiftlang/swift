@@ -371,10 +371,9 @@ static ValueDecl *isViableOverloadChoice(ConstraintSystem &cs,
     }
   }
 
-  // If disjunction choice is unavailable or disfavored we cannot
+  // If disjunction choice is unavailable we cannot
   // do anything with it.
-  if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>() ||
-      cs.isDeclUnavailable(decl, locator))
+  if (cs.isDeclUnavailable(decl, locator))
     return nullptr;
 
   return decl;
