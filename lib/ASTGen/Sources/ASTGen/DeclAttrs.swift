@@ -1246,12 +1246,19 @@ extension ASTGenVisitor {
         // E.g. 'named(foo())', use the callee to generate the name.
         arg = call.calledExpression
       }
-      guard let arg = arg.as(DeclReferenceExprSyntax.self) else {
-        // TODO: Diagnose.
-        return nil
+
+      if let arg = arg.as(DeclReferenceExprSyntax.self) {
+        name = self.generateDeclNameRef(declReferenceExpr: arg).name
+      } else if arg.is(DiscardAssignmentExprSyntax.self) {
+        name = BridgedDeclNameRef.createParsed(.createIdentifier(self.ctx.getIdentifier("_")))
+      } else {
+        // TODO: Diagnose
+        fatalError("expected name")
+        //return nil
       }
-      name = self.generateDeclNameRef(declReferenceExpr: arg).name
+
       if arguments.count >= 2 {
+        fatalError("unexpected arguments")
         // TODO: Diagnose.
       }
 
