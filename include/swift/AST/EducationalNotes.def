@@ -104,6 +104,30 @@ EDUCATIONAL_NOTES(actor_isolated_call,
 EDUCATIONAL_NOTES(actor_isolated_call_decl,
                   "actor-isolated-call.md")
 
+EDUCATIONAL_NOTES(non_sendable_param_in_witness,
+                  "Actor-isolation-violations-in-protocol-conformances-and-overrides.md")
+EDUCATIONAL_NOTES(non_sendable_param_in_override,
+                  "Actor-isolation-violations-in-protocol-conformances-and-overrides.md")
+EDUCATIONAL_NOTES(non_sendable_result_in_witness,
+                  "Actor-isolation-violations-in-protocol-conformances-and-overrides.md")
+EDUCATIONAL_NOTES(non_sendable_result_in_override,
+                  "Actor-isolation-violations-in-protocol-conformances-and-overrides.md")
+EDUCATIONAL_NOTES(non_sendable_property_in_witness,
+                  "Actor-isolation-violations-in-protocol-conformances-and-overrides.md")
+EDUCATIONAL_NOTES(non_sendable_property_in_override,
+                  "Actor-isolation-violations-in-protocol-conformances-and-overrides.md")
+
+EDUCATIONAL_NOTES(non_sendable_property_exits_actor,
+                  "Getting-non-sendable-values-out-of-actors.md")
+
+EDUCATIONAL_NOTES(actor_isolated_witness,
+                  "Actors-can't-conform-to-global-actor-protocols.md")
+
+EDUCATIONAL_NOTES(non_sendable_result_in_objc,
+                  "Non-sendable-types-and-Objective-C-interoperability.md")
+EDUCATIONAL_NOTES(non_sendable_property_in_objc,
+                  "Non-sendable-types-and-Objective-C-interoperability.md")
+
 EDUCATIONAL_NOTES(error_in_swift_lang_mode,
                   "error-in-future-swift-version.md")
 
