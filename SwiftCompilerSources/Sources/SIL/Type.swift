@@ -61,11 +61,19 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
 
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
 
-  // Note that invalid types are not considered Escapable. This makes it difficult to make any assumptions about
-  // nonescapable types.
+  /// Return true if this type conforms to Escapable.
+  ///
+  /// Note: invalid types are non-Escapable, so take care not to make assumptions about non-Escapable types.
   public func isEscapable(in function: Function) -> Bool {
     bridged.isEscapable(function.bridged)
   }
+
+  /// Return true if this type conforms to Escapable and is not a noescape function type.
+  ///
+  /// Warning: may return true for (source-level) non-escaping closures. After SILGen, all partial_apply instructions
+  /// have an escaping function type. ClosureLifetimeFixup only changes them to noescape function type if they are
+  /// promoted to [on_stack]. But regardless of stack promotion, a non-escaping closure value's lifetime is constrained
+  /// by the lifetime of its captures. Use Value.mayEscape instead to check for this case.
   public func mayEscape(in function: Function) -> Bool {
     !isNoEscapeFunction && isEscapable(in: function)
   }
@@ -170,16 +178,6 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
       return cases.contains { $0.payload?.aggregateIsOrContains(otherType, in: function) ?? false }
     }
     return false
-  }
-}
-
-extension Value {
-  public var isEscapable: Bool {
-    type.objectType.isEscapable(in: parentFunction)
-  }
-
-  public var mayEscape: Bool {
-    type.objectType.mayEscape(in: parentFunction)
   }
 }
 

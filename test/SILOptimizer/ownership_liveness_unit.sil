@@ -43,6 +43,9 @@ struct NE: ~Escapable {
   init(object: borrowing C) { self.object = copy object }
 }
 
+sil [ossa] @useCAddress : $@convention(thin) (@inout_aliasable C) -> ()
+
+
 // =============================================================================
 // LinearLiveness
 // =============================================================================
@@ -1946,6 +1949,54 @@ bb1(%reborrow2 : @reborrow $D):
   end_borrow %borrow1 : $C
   %99 = tuple()
   return %99 : $()
+}
+
+// CHECK-LABEL: partial_apply_noescape_onheap: interior_liveness_swift with: %box, true
+// CHECK: Interior liveness with inner uses:   %{{.*}} = alloc_box ${ var C }
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow [lexical] %{{.*}} : ${ var C }
+// CHECK-NEXT: Pointer escape:   %{{.*}} = partial_apply [callee_guaranteed] %{{.*}}(%{{.*}}) : $@convention(thin) (@inout_aliasable C) -> ()
+// CHECK-NEXT: begin:      %{{.*}} = alloc_box ${ var C }
+// CHECK-NEXT: ends:       destroy_value %{{.*}} : ${ var C }
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  end_borrow %{{.*}} : ${ var C }
+// CHECK-NEXT:             %{{.*}} = partial_apply [callee_guaranteed] %{{.*}}(%{{.*}}) : $@convention(thin) (@inout_aliasable C) -> ()
+// CHECK-NEXT:             %{{.*}} = project_box %{{.*}} : ${ var C }, 0
+// CHECK-NEXT:             %{{.*}} = begin_borrow [lexical] %3 : ${ var C }
+// CHECK-NEXT: last user:   destroy_value %3 : ${ var C }
+// CHECK-NEXT: partial_apply_noescape_onheap: interior_liveness_swift with: %box, true
+sil [ossa] @partial_apply_noescape_onheap : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb2, bb1
+
+bb1:
+  %1 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  br bb4(%1)
+
+bb2:
+  %box = alloc_box ${ var C }
+  %borrow = begin_borrow [lexical] %box
+  specify_test "interior_liveness_swift %box true"
+  %adr = project_box %borrow : ${ var C }, 0
+  br bb3
+
+bb3:
+  %f = function_ref @useCAddress : $@convention(thin) (@inout_aliasable C) -> ()
+  %pa1 = partial_apply [callee_guaranteed] %f(%adr) : $@convention(thin) (@inout_aliasable C) -> ()
+  %pa2 = copy_value %pa1
+  %pane = convert_escape_to_noescape %pa2 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %enum = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %pa2
+  end_borrow %borrow
+  destroy_value %box
+  destroy_value %pa1
+  destroy_value %pane
+  br bb4(%enum)
+
+bb4(%phi : @owned $Optional<@callee_guaranteed () -> ()>):
+  // ClosureLifetimeFixup destroys closures after destroying its addressable captures:
+  // this is bad OSSA but still accepted as valid until ClosureLifetimeFixup is rewritten.
+  destroy_value %phi
+  %r = tuple ()
+  return %r
 }
 
 // =============================================================================

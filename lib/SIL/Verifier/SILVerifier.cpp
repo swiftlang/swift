@@ -2202,6 +2202,9 @@ public:
     require(resultInfo->getExtInfo().hasContext(),
             "result of closure cannot have a thin function type");
 
+    require(PAI->getType().isNoEscapeFunction() == PAI->isOnStack(),
+            "closure must be on stack to have a noescape function type");
+
     // We rely on all indirect captures to be in the argument list.
     require(PAI->getCallee()->getType().isObject(),
             "Closure callee must not be an address type.");
