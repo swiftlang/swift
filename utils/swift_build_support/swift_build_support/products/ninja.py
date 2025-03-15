@@ -15,11 +15,8 @@ Ninja build
 # ----------------------------------------------------------------------------
 
 import os.path
-import platform
-import sys
 
 from build_swift.build_swift import cache_utils
-from build_swift.build_swift.wrappers import xcrun
 
 from . import product
 from .. import shell
@@ -55,29 +52,11 @@ class NinjaBuilder(product.ProductBuilder):
     def build(self):
         if os.path.exists(self.ninja_bin_path):
             return
-
-        env = None
-        if platform.system() == "Darwin":
-            sysroot = xcrun.sdk_path("macosx")
-            assert sysroot is not None
-            env = {
-                "CXX": shell._quote(self.toolchain.cxx),
-                "CFLAGS": (
-                    "-isysroot {sysroot}"
-                ).format(sysroot=shell._quote(sysroot)),
-                "LDFLAGS": (
-                    "-isysroot {sysroot}"
-                ).format(sysroot=shell._quote(sysroot)),
-            }
-        elif self.toolchain.cxx:
-            env = {
-                "CXX": shell._quote(self.toolchain.cxx),
-            }
-
-        # Ninja can only be built in-tree.  Copy the source tree to the build
-        # directory.
-        shell.rmtree(self.build_dir)
-        shell.copytree(self.source_dir, self.build_dir, ignore_pattern=".git")
-        with shell.pushd(self.build_dir):
-            shell.call([sys.executable, 'configure.py', '--bootstrap'],
-                       env=env)
+        shell.call([
+            self.toolchain.cmake,
+            "-S", self.source_dir,
+            "-B", self.build_dir,
+            "-DCMAKE_BUILD_TYPE=Release",
+            f"-DCMAKE_C_COMPILER={self.toolchain.cc}",
+            f"-DCMAKE_CXX_COMPILER={self.toolchain.cxx}"])
+        shell.call([self.toolchain.cmake, "--build", self.build_dir])
