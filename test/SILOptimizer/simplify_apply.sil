@@ -139,3 +139,29 @@ bb0(%0 : $Int):
   return %11
 }
 
+sil [_semantics "array.conditional_cast"] @cast_int_array : $@convention(thin) (@guaranteed Array<Int>) -> @owned Optional<Array<Int>>
+sil [_semantics "array.conditional_cast"] @cast_any_int_array : $@convention(thin) (@guaranteed Array<Any>) -> @owned Optional<Array<Int>>
+
+// CHECK-LABEL: sil [ossa] @remove_array_cast :
+// CHECK:         %1 = copy_value %0
+// CHECK:         %2 = enum $Optional<Array<Int>>, #Optional.some!enumelt, %1
+// CHECK:         return %2
+// CHECK:       } // end sil function 'remove_array_cast'
+sil [ossa] @remove_array_cast : $@convention(thin) (@guaranteed Array<Int>) -> @owned Optional<Array<Int>> {
+bb0(%0 : @guaranteed $Array<Int>):
+  %1 = function_ref @cast_int_array : $@convention(thin) (@guaranteed Array<Int>) -> @owned Optional<Array<Int>>
+  %2 = apply %1(%0) : $@convention(thin) (@guaranteed Array<Int>) -> @owned Optional<Array<Int>>
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_array_cast :
+// CHECK:         %2 = apply
+// CHECK:         return %2
+// CHECK:       } // end sil function 'dont_remove_array_cast'
+sil [ossa] @dont_remove_array_cast : $@convention(thin) (@guaranteed Array<Any>) -> @owned Optional<Array<Int>> {
+bb0(%0 : @guaranteed $Array<Any>):
+  %1 = function_ref @cast_any_int_array : $@convention(thin) (@guaranteed Array<Any>) -> @owned Optional<Array<Int>>
+  %2 = apply %1(%0) : $@convention(thin) (@guaranteed Array<Any>) -> @owned Optional<Array<Int>>
+  return %2
+}
+
