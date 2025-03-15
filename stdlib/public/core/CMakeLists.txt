@@ -76,6 +76,7 @@ split_embedded_sources(
   EMBEDDED DropWhile.swift
     NORMAL Dump.swift
   EMBEDDED EmptyCollection.swift
+  EMBEDDED EnumeratedSequence.swift
   EMBEDDED Equatable.swift
   EMBEDDED ErrorType.swift
   EMBEDDED ExistentialCollection.swift

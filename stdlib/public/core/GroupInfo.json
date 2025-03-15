@@ -96,6 +96,7 @@
       ],
       "Lazy Views": [
         "Algorithm.swift",
+        "EnumeratedSequence.swift",
         "Flatten.swift",
         "FlatMap.swift",
         "Map.swift",
