@@ -176,9 +176,10 @@ extension ASTGenVisitor {
   }
 
   func generate(missingType node: MissingTypeSyntax) -> BridgedTypeRepr {
+    let loc = self.generateSourceLoc(node.previousToken(viewMode: .sourceAccurate))
     return BridgedErrorTypeRepr.create(
       self.ctx,
-      range: self.generateSourceRange(node)
+      range: BridgedSourceRange(start: loc, end: loc)
     ).asTypeRepr
   }
 

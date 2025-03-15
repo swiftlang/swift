@@ -74,8 +74,8 @@ extension ASTGenVisitor {
       return self.generate(macroExpansionExpr: node)
     case .memberAccessExpr(let node):
       return self.generate(memberAccessExpr: node)
-    case .missingExpr:
-      fatalError("unimplemented")
+    case .missingExpr(let node):
+      return self.generate(missingExpr: node)
     case .nilLiteralExpr(let node):
       return self.generate(nilLiteralExpr: node).asExpr
     case .optionalChainingExpr(let node):
@@ -929,6 +929,14 @@ extension ASTGenVisitor {
         nameLoc: nameAndLoc.loc
       ).asExpr
     }
+  }
+
+  func generate(missingExpr node: MissingExprSyntax) -> BridgedExpr {
+    let loc = self.generateSourceLoc(node.previousToken(viewMode: .sourceAccurate))
+    return BridgedErrorExpr.create(
+      self.ctx,
+      loc: BridgedSourceRange(start: loc, end: loc)
+    ).asExpr
   }
 
   func generate(genericSpecializationExpr node: GenericSpecializationExprSyntax) -> BridgedUnresolvedSpecializeExpr {

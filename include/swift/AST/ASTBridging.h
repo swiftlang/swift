@@ -2790,6 +2790,9 @@ SWIFT_NAME("BridgedAnyPattern.createParsed(_:loc:)")
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cLoc);
 
+SWIFT_NAME("BridgedAnyPattern.createImplicit(_:)")
+BridgedAnyPattern BridgedAnyPattern_createImplicit(BridgedASTContext cContext);
+
 SWIFT_NAME("BridgedBindingPattern.createParsed(_:keywordLoc:isLet:subPattern:)")
 BridgedBindingPattern
 BridgedBindingPattern_createParsed(BridgedASTContext cContext,
