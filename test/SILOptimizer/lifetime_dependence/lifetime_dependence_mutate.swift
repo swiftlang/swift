@@ -27,7 +27,7 @@ internal func _overrideLifetime<
 /// the `source` argument.
 @_unsafeNonescapableResult
 @_transparent
-@lifetime(source)
+@lifetime(copy source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -91,7 +91,10 @@ struct MutableSpan : ~Escapable, ~Copyable {
     }
   }
 
-  var iterator: Iter { Iter(base: base, count: count) }
+  var iterator: Iter {
+    @lifetime(copy self)
+    get { Iter(base: base, count: count) }
+  }
 }
 
 extension Array where Element == Int {

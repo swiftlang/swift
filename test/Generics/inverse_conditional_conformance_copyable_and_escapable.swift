@@ -1,4 +1,8 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-swift-frontend \
+// RUN:   -enable-experimental-feature LifetimeDependence  \
+// RUN:   -typecheck -verify %s
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct C_C1<T: ~Copyable>: ~Copyable {}
 extension C_C1: Copyable where T: Copyable {}

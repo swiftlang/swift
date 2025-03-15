@@ -33,7 +33,7 @@ internal func _overrideLifetime<
 /// the `source` argument.
 @_unsafeNonescapableResult
 @_transparent
-@lifetime(source)
+@lifetime(copy source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -83,6 +83,7 @@ public struct Span<T>: ~Escapable {
 }
 
 extension Span {
+  @lifetime(copy self)
   consuming func dropFirst() -> Span<T> {
     let nextPointer = self.base.flatMap { $0 + 1 }
     let local = Span(base: nextPointer, count: self.count - 1)
@@ -91,6 +92,7 @@ extension Span {
 }
 
 extension Span {
+  @lifetime(copy self)
   mutating func droppingPrefix(length: Int) -> /* */ Span<T> {
     let oldBase = base
     let result = Span(base: oldBase, count: length)
@@ -231,6 +233,7 @@ struct Outer {
 
 func parse(_ span: Span<Int>) {}
 
+@lifetime(copy arg)
 func copySpan<T>(_ arg: Span<T>) -> /* */ Span<T> { arg }
 
 @lifetime(borrow arg)
@@ -600,12 +603,3 @@ func testBorrowedAddressableIntReturn(arg: Holder) -> Span<Int> {
 } // todo-note  {{this use causes the lifetime-dependent value to escape}}
 
 */
-
-
-// =============================================================================
-// Parameter dependencies
-// =============================================================================
-
-// rdar://146401190 ([nonescapable] implement non-inout parameter dependencies)
-@lifetime(span: borrow holder)
-func testParameterDep(holder: Holder, span: Span<Int>) {}  // expected-error {{lifetime-dependent parameter must be 'inout'}}

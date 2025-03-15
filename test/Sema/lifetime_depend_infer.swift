@@ -107,7 +107,7 @@ struct EscapableTrivialSelf {
 
   mutating func mutatingMethodOneParam(_: Int) -> NEImmortal { NEImmortal() } // expected-error{{a mutating method with a ~Escapable result requires '@lifetime(...)'}}
 
-  @lifetime(borrow self)
+  @lifetime(self)
   mutating func mutatingMethodOneParamLifetime(_: Int) -> NEImmortal { NEImmortal() }
 
   @lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(borrow self)' instead}}
@@ -135,7 +135,7 @@ struct EscapableNonTrivialSelf {
 
   func mutatingMethodNoParam() -> NEImmortal { NEImmortal() }
 
-  @lifetime(borrow self)
+  @lifetime(self)
   mutating func mutatingMethodNoParamLifetime() -> NEImmortal { NEImmortal() }
 
   @lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@lifetime(borrow self)' instead}}
@@ -329,6 +329,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       yield ne
     }
 
+    @lifetime(borrow self)
     _modify {
       yield &ne
     }
@@ -407,7 +408,7 @@ struct NonescapableSelfAccessors: ~Escapable {
   }
 }
 
-struct NoncopyableSelfAccessors: ~Copyable & ~Escapable { // expected-error{{cannot infer the lifetime dependence scope on an implicit initializer with a ~Escapable parameter, specify '@lifetime(borrow ne)' or '@lifetime(copy ne)'}}
+struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
   var ne: NE
 
   var neComputed: NE {
@@ -425,6 +426,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable { // expected-error{{can
       yield ne
     }
 
+    @lifetime(borrow self)
     _modify {
       yield &ne
     }

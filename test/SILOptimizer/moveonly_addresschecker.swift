@@ -64,11 +64,13 @@ struct TestCoroAccessorOfCoroAccessor<T : ~Escapable> : ~Copyable & ~Escapable {
   var t: T
 
   var inner: TestCoroAccessorOfCoroAccessor<T> {
+    @lifetime(copy self)
     _read {
       fatalError()
     }
   }
   var outer: TestCoroAccessorOfCoroAccessor<T> {
+    @lifetime(copy self)
     _read {
       yield inner
     }

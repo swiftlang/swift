@@ -32,7 +32,7 @@ struct X {
   func myFunc5() -> SpanOfInt {}
 }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(span)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
 // CHECK-NEXT: func myFunc(_ span: Span<CInt>) -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _unsafeRemoveLifetime(Span(_unsafeCxxSpan: myFunc(SpanOfInt(span))))
 // CHECK-NEXT: }
@@ -42,12 +42,12 @@ struct X {
 // CHECK-NEXT:     return unsafe _unsafeRemoveLifetime(Span(_unsafeCxxSpan: myFunc2(vec)))
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(span1, span2)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span1, copy span2)
 // CHECK-NEXT: func myFunc3(_ span1: Span<CInt>, _ span2: Span<CInt>) -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _unsafeRemoveLifetime(Span(_unsafeCxxSpan: myFunc3(SpanOfInt(span1), SpanOfInt(span2))))
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec, span)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec, copy span)
 // CHECK-NEXT: func myFunc4(_ vec: borrowing VecOfInt, _ span: Span<CInt>) -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _unsafeRemoveLifetime(Span(_unsafeCxxSpan: myFunc4(vec, SpanOfInt(span))))
 // CHECK-NEXT: }
