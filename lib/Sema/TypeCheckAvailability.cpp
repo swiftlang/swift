@@ -28,6 +28,7 @@
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -95,88 +96,6 @@ ExportContext::ExportContext(DeclContext *DC,
   Exported = exported;
   Implicit = implicit;
   Reason = unsigned(ExportabilityReason::General);
-}
-
-bool swift::isExported(const ValueDecl *VD) {
-  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-    return false;
-  if (VD->isObjCMemberImplementation())
-    return false;
-
-  // Is this part of the module's API or ABI?
-  AccessScope accessScope =
-      VD->getFormalAccessScope(nullptr,
-                               /*treatUsableFromInlineAsPublic*/true);
-  if (accessScope.isPublic())
-    return true;
-
-  // Is this a stored property in a @frozen struct or class?
-  if (auto *property = dyn_cast<VarDecl>(VD))
-    if (property->isLayoutExposedToClients())
-      return true;
-
-  return false;
-}
-
-static bool hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
-  auto nominal = ED->getExtendedNominal();
-  if (!nominal)
-    return false;
-
-  // Extensions of protocols cannot introduce additional conformances.
-  if (isa<ProtocolDecl>(nominal))
-    return false;
-
-  auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
-  for (const ProtocolDecl *PD : protocols) {
-    AccessScope scope =
-        PD->getFormalAccessScope(/*useDC*/ nullptr,
-                                 /*treatUsableFromInlineAsPublic*/ true);
-    if (scope.isPublic())
-      return true;
-  }
-
-  return false;
-}
-
-bool swift::isExported(const ExtensionDecl *ED) {
-  // An extension can only be exported if it extends an exported type.
-  if (auto *NTD = ED->getExtendedNominal()) {
-    if (!isExported(NTD))
-      return false;
-  }
-
-  // If there are any exported members then the extension is exported.
-  for (const Decl *D : ED->getMembers()) {
-    if (isExported(D))
-      return true;
-  }
-
-  // If the extension declares a conformance to a public protocol then the
-  // extension is exported.
-  if (hasConformancesToPublicProtocols(ED))
-    return true;
-
-  return false;
-}
-
-bool swift::isExported(const Decl *D) {
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    return isExported(VD);
-  }
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
-      if (auto *VD = PBD->getAnchoringVarDecl(i))
-        return isExported(VD);
-    }
-
-    return false;
-  }
-  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    return isExported(ED);
-  }
-
-  return true;
 }
 
 template<typename Fn>
@@ -4803,12 +4722,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       !isa<ExtensionDecl>(decl->getDeclContext())) return;
 
   if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
-    // decl should be either a ValueDecl or an ExtensionDecl.
-    auto extended = extension->getExtendedNominal();
-    if (!extended || !extended->getFormalAccessScope().isPublic())
-      return;
-
-    // Skip extensions without public members or conformances.
+    // Skip extensions when none of their members need availability.
     auto members = extension->getMembers();
     auto hasMembers = std::any_of(members.begin(), members.end(),
                                   [](const Decl *D) -> bool {
@@ -4818,10 +4732,8 @@ void swift::checkExplicitAvailability(Decl *decl) {
       return false;
     });
 
-    auto hasProtocols = hasConformancesToPublicProtocols(extension);
-
-    if (!hasMembers && !hasProtocols) return;
-
+    if (!hasMembers && !isExported(extension))
+      return;
   } else if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
     // Check the first var instead.
     if (pbd->getNumPatternEntries() == 0)

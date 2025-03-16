@@ -22,6 +22,7 @@
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 // FIXME: [availability] Remove this when possible
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -1081,4 +1082,86 @@ swift::abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
   }
 
   return ConcreteSyntaxDecl;
+}
+
+bool swift::isExported(const Decl *D) {
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    return isExported(VD);
+  }
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
+      if (auto *VD = PBD->getAnchoringVarDecl(i))
+        return isExported(VD);
+    }
+
+    return false;
+  }
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    return isExported(ED);
+  }
+
+  return true;
+}
+
+bool swift::isExported(const ValueDecl *VD) {
+  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return false;
+  if (VD->isObjCMemberImplementation())
+    return false;
+
+  // Is this part of the module's API or ABI?
+  AccessScope accessScope =
+      VD->getFormalAccessScope(nullptr,
+                               /*treatUsableFromInlineAsPublic*/ true);
+  if (accessScope.isPublic())
+    return true;
+
+  // Is this a stored property in a @frozen struct or class?
+  if (auto *property = dyn_cast<VarDecl>(VD))
+    if (property->isLayoutExposedToClients())
+      return true;
+
+  return false;
+}
+
+static bool hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
+  auto nominal = ED->getExtendedNominal();
+  if (!nominal)
+    return false;
+
+  // Extensions of protocols cannot introduce additional conformances.
+  if (isa<ProtocolDecl>(nominal))
+    return false;
+
+  auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
+  for (const ProtocolDecl *PD : protocols) {
+    AccessScope scope =
+        PD->getFormalAccessScope(/*useDC*/ nullptr,
+                                 /*treatUsableFromInlineAsPublic*/ true);
+    if (scope.isPublic())
+      return true;
+  }
+
+  return false;
+}
+
+bool swift::isExported(const ExtensionDecl *ED) {
+  // An extension can only be exported if it extends an exported type.
+  if (auto *NTD = ED->getExtendedNominal()) {
+    if (!isExported(NTD))
+      return false;
+  }
+
+  // If there are any exported members then the extension is exported.
+  for (const Decl *D : ED->getMembers()) {
+    if (isExported(D))
+      return true;
+  }
+
+  // If the extension declares a conformance to a public protocol then the
+  // extension is exported.
+  if (hasConformancesToPublicProtocols(ED))
+    return true;
+
+  return false;
 }

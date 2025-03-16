@@ -26,6 +26,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"

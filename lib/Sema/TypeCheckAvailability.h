@@ -202,12 +202,6 @@ public:
   std::optional<ExportabilityReason> getExportabilityReason() const;
 };
 
-/// Check if a declaration is exported as part of a module's external interface.
-/// This includes public and @usableFromInline decls.
-bool isExported(const ValueDecl *VD);
-bool isExported(const ExtensionDecl *ED);
-bool isExported(const Decl *D);
-
 /// Diagnose uses of unavailable declarations in expressions.
 void diagnoseExprAvailability(const Expr *E, DeclContext *DC);
 
