@@ -26,7 +26,7 @@ _ = f0(1)
 f1(f0(1))
 f1(identity(1))
 
-f0(x) // expected-error{{no exact matches in call to global function 'f0'}}
+f0(x) // expected-error{{ambiguous use of 'f0'; cannot convert argument of type 'X' to any of potential types 'Float', 'Int'}}
 
 _ = f + 1
 _ = f2(i)
@@ -244,7 +244,7 @@ func test_autoclosure1(ia: [Int]) {
 // rdar://problem/64368545 - failed to produce diagnostic (hole propagated to func result without recording a fix)
 func test_no_hole_propagation() {
   func test(withArguments arguments: [String]) -> String {
-    return arguments.reduce(0, +) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+    return arguments.reduce(0, +) // expected-error {{cannot convert argument of type 'Int' to expected argument type 'String' for 'reduce'}}
   }
 }
 

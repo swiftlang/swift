@@ -54,7 +54,7 @@ class DefaultValue {
   static func foo(_ a: Int, _ b: Int = 1) {}
   static func foo(_ a: Int, _ b: Int = 1, _ c: Int = 2) {}
 }
-DefaultValue.foo(1.0, 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+DefaultValue.foo(1.0, 1) // expected-error {{cannot convert argument of type 'Double' to expected argument type 'Int'}}
 
 
 class Variadic {
@@ -152,7 +152,8 @@ do {
   func f1(_ u: String) -> Double {} // expected-note 2 {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
   func f2(_ u: Int) {}
 
-  f2(f1(1 as Double)) // expected-error {{no exact matches in call to local function 'f1'}}
+  f2(f1(1 as Double))
+  // expected-error@-1 {{ambiguous use of 'f1'; cannot convert argument of type 'Double' to any of potential types 'Int', 'String'}}
   f1(1 as Double) as Int // expected-error {{no exact matches in call to local function 'f1'}}
 }
 do {
@@ -188,4 +189,35 @@ do {
 
   let _ = i16 -- i16
   // expected-error@-1 {{ambiguous use of operator '--'}}
+}
+
+// https://github.com/swiftlang/swift/issues/79999
+do {
+  func foo(_ a: Int) -> [Int] { [] }
+
+  // TODO: fix fall through case on diagnoseForAmbiguity.
+  // These are falling all the way through diagnoseAmbiguity, but should get caught
+  let _ = foo(-)
+  // expected-error@-1 {{failed to produce diagnostic for expression}}
+
+  for _ in foo(-) {}
+  // expected-error@-1 {{failed to produce diagnostic for expression}}
+
+  func test() -> Int {}
+  func test() -> String {}
+  
+  func other(_: Int32) {}
+
+  // TODO: as above but slightly different case
+  other(test())
+  // expected-error@-1 {{failed to produce diagnostic for expression}}
+}
+
+do {
+  func test(_: Int) {} // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
+  func test(_: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
+
+  func compute() -> Double { 0 }
+  
+  test(compute()) // expected-error {{ambiguous use of 'test'; cannot convert argument of type 'Double' to any of potential types 'Int', 'String'}}
 }

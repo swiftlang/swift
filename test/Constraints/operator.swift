@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// Unrelated files /stdlib/public/core/Equatable.swift ..Array ..Comparable ..Pointer ..FloatingPoint .. Stride
 
 // https://github.com/apple/swift/issues/43735
 // Test constraint simplification of chains of binary operators.
@@ -282,10 +283,11 @@ func rdar60727310() {
 }
 
 // https://github.com/apple/swift/issues/54877
-// FIXME: Bad diagnostic.
+// FIXME: Note could produce more information about type derivation for T.
+// Note: The number of types is 43 or 45 depending on which std library
 func f_54877(_ e: Error) {
-  func foo<T>(_ a: T, _ op: ((T, T) -> Bool)) {}
-  foo(e, ==) // expected-error {{failed to produce diagnostic for expression}}
+  func foo<T>(_ a: T, _ op: ((T, T) -> Bool)) {} // expected-note {{candidate expects value of type '()' for parameter #1 (got 'any Error')}}
+  foo(e, ==) // expected-error {{ambiguous use of 'foo'; cannot convert argument of type 'any Error' to any of potential }}
 }
 
 // rdar://problem/62054241 - Swift compiler crashes when passing < as the sort function in sorted(by:) and the type of the array is not comparable

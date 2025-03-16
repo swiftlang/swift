@@ -22,7 +22,9 @@ class UIView {
 }
 
 // Invalid expression, because there is no one-argument form of reduce()
-
+/// TODO: investigate how to encode more of the new cannot select diagnostic as CI vs local difference
+/// means that the number of overloads is not consistent ... message is
+/// cannot select between {N} function types for expected argument type 'CGFloat' for 'reduce'
 class SomeViewController: UIViewController {
     private func updatePreferredContentSize() {
         preferredContentSize = CGSize(
@@ -30,6 +32,7 @@ class SomeViewController: UIViewController {
             height: (view.subviews.map { $0.frame.height }
               .reduce(+)
               // expected-error@-1 {{missing argument for parameter #2 in call}}
+              // expected-error@-2 {{cannot select between }}
               ?? 0) + 20.0
         )
     }

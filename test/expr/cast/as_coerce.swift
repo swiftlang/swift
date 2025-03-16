@@ -195,7 +195,6 @@ do {
   (fn as (Int, Bool) -> Void)(i, i) // expected-error {{cannot convert value of type '(Int) -> ()' to type '(Int, Bool) -> Void' in coercion}}
   // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
   (fn as (String) -> Void)(i) // expected-error {{no exact matches in reference to local function 'fn'}}
-  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
 
   // Extraneous parameters.
   (fn as () -> Void)() // expected-error {{no exact matches in reference to local function 'fn'}}

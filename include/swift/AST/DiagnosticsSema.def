@@ -5031,8 +5031,64 @@ WARNING(use_of_void_pointer,none,
 "Unsafe%0Pointer<Void> has been replaced by Unsafe%0RawPointer", (StringRef))
 
 // Ambiguities
+ERROR(incorrect_argument_for_call,none,
+      "cannot convert argument of type %1 to expected argument type %2 for %0",
+      (DeclNameRef, Type, Type))
+ERROR(incorrect_argument_for_init,none,
+      "cannot convert argument of type %0 to expected argument type %1 for initializer",
+      (Type, Type))
+ERROR(incorrect_operand_for_op,none,
+      "cannot convert value of type %1 to expected %0 operand type %2",
+      (DeclNameRef, Type, Type))
+ERROR(incorrect_function_for_call,none,
+      "cannot select between %select{function types %3|%2}1 for expected argument type %4 for %0",
+      (DeclNameRef, bool, StringRef, StringRef, Type))
+ERROR(unsupported_closure_argument,none,
+      "closure argument %select{with type%2|}1 passed to %0, which expects %3",
+      (DeclNameRef, bool, Type, Type))
+ERROR(incorrect_function_for_init,none,
+      "cannot select between %select{function types %2|%1}0 for expected argument type %3 for initializer",
+      (bool, StringRef, StringRef, Type))
+ERROR(incorrect_function_operand_for_op,none,
+      "cannot select between %select{function types %3|%2}1 for expected %0 operand type %4",
+      (DeclNameRef, bool, StringRef, StringRef, Type))
+ERROR(unsupported_closure_arg_options,none,
+      "closure argument with %select{possible types %4|%3}2 passed to %0, which expects %3",
+      (DeclNameRef, bool, StringRef, StringRef, Type))
+ERROR(ambiguous_decl_ref_types,none,
+       "ambiguous use of %0; cannot convert argument of type %1 to any of potential %select{types %4|%3}2",
+       (DeclNameRef, Type, bool, StringRef, StringRef))
+ERROR(ambiguous_decl_ref_function_types,none,
+       "ambiguous use of %0; cannot select argument %select{between potential function types %3|%2}1 to any of expected %select{%types %6|%5}4",
+       (DeclNameRef, bool, StringRef, StringRef, bool, StringRef, StringRef))
+ERROR(unsupported_closure_arg_to_options,none,
+       "closure argument %select{|with type %2}1passed to %0, which expects %select{potential types %5|%4}3",
+       (DeclNameRef, bool, Type, bool, StringRef, StringRef))
+ERROR(cannot_match_expr_pattern_with_options,none,
+       "cannot match given pattern expression type %0 with expected %select{potential types %3|%2}1",
+       (Type, bool, StringRef, StringRef))
+ERROR(ambiguous_operator_ref_types,none,
+      "ambiguous use of operator %0; cannot convert value of type %1 to any of potential types %2",
+       (DeclNameRef, Type, StringRef))
+ERROR(ambiguous_decl_ref_unknown,none,
+      "ambiguous use of %0; cannot select between potential%1 types %2",
+      (DeclNameRef, StringRef, StringRef))
+ERROR(ambiguous_operator_ref_unknown,none,
+      "ambiguous use of operator %0; cannot select between potential%1 types %2",
+      (DeclNameRef, StringRef, StringRef))
+ERROR(ambiguous_initializer_unknown,none,
+      "ambiguous use of initializer; cannot determine which initializer for potential types %0",
+      (StringRef))
 ERROR(ambiguous_decl_ref,none,
       "ambiguous use of %0", (DeclNameRef))
+ERROR(ambiguous_init,none,
+      "ambiguous use of initializer; cannot convert argument of type %0 to any of potential %select{types %3|%2}1",
+      (Type, bool, StringRef, StringRef))
+ERROR(ambiguous_function_init,none,
+      "ambiguous use of initializer; cannot select argument of potential %select{function types %2|%1}0 to any of potential expected %select{types %5|%4}3",
+      (bool, StringRef, StringRef, bool, StringRef, StringRef))
+NOTE(ambiguous_because_no_candidates_were_found,none,
+     "no candidates found for specified argument %0", (DeclNameRef))
 ERROR(ambiguous_operator_ref,none,
       "ambiguous use of operator %0", (DeclNameRef))
 NOTE(ambiguous_because_of_trailing_closure,none,
