@@ -199,10 +199,20 @@ extension ASTGenVisitor {
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .atRethrows))
       case .none where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
+
+      // Renamed attributes.
       case .none where attrName == "_functionBuilder":
         // TODO: Diagnostics. '_functionBuilder' is renamed to 'resultBuilder'
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .resultBuilder))
-
+      case .none where attrName == "_inlineable":
+        // TODO: Diagnose.
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .inlinable))
+      case .none where attrName == "inlineable":
+        // TODO: Diagnose.
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .inlinable))
+      case .none where attrName == "_versioned":
+        // TODO: Diagnose.
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .usableFromInline))
 
       // Simple attributes.
       case .addressableSelf,
