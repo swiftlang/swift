@@ -877,7 +877,7 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAvailableAttrKind {
 
 SWIFT_NAME("BridgedAvailableAttr.createParsed(_:atLoc:range:domainIdentifier:"
            "domainLoc:kind:message:renamed:introduced:introducedRange:"
-           "deprecated:deprecatedRange:obsoleted:obsoletedRange:)")
+           "deprecated:deprecatedRange:obsoleted:obsoletedRange:isSPI:)")
 BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedIdentifier cDomainIdentifier,
@@ -885,7 +885,8 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedStringRef cMessage, BridgedStringRef cRenamed,
     BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
     BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
-    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange);
+    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange,
+    bool isSPI);
 
 SWIFT_NAME("BridgedAvailableAttr.createUnavailableInEmbedded(_:atLoc:range:)")
 BridgedAvailableAttr

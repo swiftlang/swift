@@ -126,7 +126,7 @@ extension ASTGenVisitor {
       case .allowFeatureSuppression:
         return handle(self.generateAllowFeatureSuppressionAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
       case .available:
-        return self.generateAvailableAttr(attribute: node).forEach { handle($0.asDeclAttribute) }
+        return self.generateAvailableAttr(attribute: node, attrName: attrName).forEach { handle($0.asDeclAttribute) }
       case .backDeployed:
         return self.generateBackDeployedAttr(attribute: node).forEach { handle($0.asDeclAttribute) }
       case .cDecl:
@@ -180,7 +180,7 @@ extension ASTGenVisitor {
       case .silGenName:
         return handle(self.generateSILGenNameAttr(attribute: node)?.asDeclAttribute)
       case .specialize:
-        return handle(self.generateSpecializeAttr(attribute: node)?.asDeclAttribute)
+        return handle(self.generateSpecializeAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
       case .spiAccessControl:
         return handle(self.generateSPIAccessControlAttr(attribute: node)?.asDeclAttribute)
       case .storageRestrictions:
@@ -501,7 +501,7 @@ extension ASTGenVisitor {
   ///   @available(macOS 10.12, iOS 13, *)
   ///   @available(macOS, introduced: 10.12)
   ///   ```
-  func generateAvailableAttr(attribute node: AttributeSyntax) -> [BridgedAvailableAttr] {
+  func generateAvailableAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> [BridgedAvailableAttr] {
     guard let args = node.arguments else {
       self.diagnose(.expectedArgumentsInAttribute(node))
       return []
@@ -514,6 +514,7 @@ extension ASTGenVisitor {
     return self.generateAvailableAttr(
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
+      attrName: attrName,
       args: args
     )
   }
@@ -1881,7 +1882,7 @@ extension ASTGenVisitor {
   ///   ```
   ///   @_specialize(exporeted: true, T == Int)
   ///   ```
-  func generateSpecializeAttr(attribute node: AttributeSyntax) -> BridgedSpecializeAttr? {
+  func generateSpecializeAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedSpecializeAttr? {
     guard
       var args = node.arguments?.as(SpecializeAttributeArgumentListSyntax.self)?[...]
     else {
@@ -1912,6 +1913,7 @@ extension ASTGenVisitor {
             start: arg.availabilityArguments.firstToken(viewMode: .all)!,
             end: arg.semicolon
           ),
+          attrName: attrName,
           args: arg.availabilityArguments
         )
       case .labeledSpecializeArgument(let arg):

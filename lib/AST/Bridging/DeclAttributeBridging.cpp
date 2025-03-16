@@ -143,7 +143,8 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedStringRef cMessage, BridgedStringRef cRenamed,
     BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
     BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
-    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange) {
+    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange,
+    bool isSPI) {
 
   return new (cContext.unbridged())
       AvailableAttr(cAtLoc.unbridged(), cRange.unbridged(),
@@ -153,7 +154,7 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsed(
                     cDeprecated.unbridged(), cDeprecatedRange.unbridged(),
                     cObsoleted.unbridged(), cObsoletedRange.unbridged(),
                     /*Implicit=*/false,
-                    /*IsSPI=*/false);
+                    /*IsSPI=*/isSPI);
 }
 
 BridgedAvailableAttr

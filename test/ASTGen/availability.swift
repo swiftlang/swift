@@ -62,3 +62,8 @@ func testPoundIf() {
     // pass
   }
 }
+
+public class ClassWithMembers {
+  @_spi_available(macOS 10.15, *)
+  public func spiFunc() {}
+}
