@@ -26,7 +26,7 @@ _ = f0(1)
 f1(f0(1))
 f1(identity(1))
 
-f0(x) // expected-error{{no exact matches in call to global function 'f0'}}
+f0(x) // expected-error{{ambiguous use of 'f0'; cannot convert value of type 'X' to any of potential types Float, Int}}
 
 _ = f + 1
 _ = f2(i)

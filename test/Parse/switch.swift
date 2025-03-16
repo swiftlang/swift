@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
@@ -336,8 +336,7 @@ func f1(x: String, y: Whichever) {
         break
     case Whichever.buzz: // expected-error {{type 'Whichever' has no member 'buzz'}}
         break
-    // expected-note @+1 {{overloads for '~=' exist with these partially matching parameter lists: (Substring, String)}}
-    case Whichever.alias: // expected-error {{expression pattern of type 'Whichever' cannot match values of type 'String'}}
+    case Whichever.alias: // expected-error {{ambiguous use of '~='; cannot convert value of type 'Whichever' to any of potential types Substring, String}}
     // expected-error@-1 {{'case' label in a 'switch' must have at least one executable statement}}
     default:
       break

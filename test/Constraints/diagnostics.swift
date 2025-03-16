@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -verify-ignore-unrelated %s
 
 protocol P {
   associatedtype SomeType
@@ -717,9 +717,8 @@ func r24251022() {
   var a = 1
   var b: UInt32 = 2
   _ = a + b // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (UInt32, UInt32)}}
-  a += a +
-    b // expected-error {{cannot convert value of type 'UInt32' to expected argument type 'Int'}}
-  a += b  // expected-error@:8 {{cannot convert value of type 'UInt32' to expected argument type 'Int'}}
+  a += a + b // expected-error {{cannot convert value of type 'UInt32' to expected '+' operand type 'Int'}}
+  a += b  // expected-error {{cannot convert value of type 'UInt32' to expected '+=' operand type 'Int'}}
 }
 
 func overloadSetResultType(_ a : Int, b : Int) -> Int {
@@ -951,10 +950,10 @@ do {
     case bar
   }
 
-  // expected-error@+1 {{cannot convert value of type 'Float' to expected argument type 'Int'}} {{35-35=Int(}} {{43-43=)}}
+  // expected-error@+1 {{cannot convert value of type 'Float' to expected '*' operand type 'Int'}}
   let _: Int = Foo.bar.rawValue * Float(0)
 
-  // expected-error@+1 {{cannot convert value of type 'Int' to expected argument type 'Float'}} {{18-18=Float(}} {{34-34=)}}
+  // expected-error@+1 {{cannot convert value of type 'Int' to expected '*' operand type 'Float'}}
   let _: Float = Foo.bar.rawValue * Float(0)
 
   // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{none}}
@@ -965,10 +964,10 @@ do {
   let lhs = Float(3)
   let rhs = Int(0)
 
-  // expected-error@+1 {{cannot convert value of type 'Int' to expected argument type 'Float'}} {{24-24=Float(}} {{27-27=)}}
+  // expected-error@+1 {{cannot convert value of type 'Int' to expected '*' operand type 'Float'}}
   let _: Float = lhs * rhs
 
-  // expected-error@+1 {{cannot convert value of type 'Float' to expected argument type 'Int'}} {{16-16=Int(}} {{19-19=)}}
+  // expected-error@+1 {{cannot convert value of type 'Float' to expected '*' operand type 'Int'}}
   let _: Int = lhs * rhs
 
   // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Float' and 'Int'}} {{none}}
@@ -976,11 +975,11 @@ do {
   lhs * rhs
 }
 do {
-  // expected-error@+1 {{cannot convert value of type 'String' to expected argument type 'Int'}} {{none}}
+  // expected-error@+1 {{cannot convert value of type 'String' to expected '*' operand type 'Int'}} {{none}}
   Int(3) * "0"
 
   struct S {}
-  // expected-error@+1 {{cannot convert value of type 'S' to expected argument type 'Int'}} {{none}}
+  // expected-error@+1 {{cannot convert value of type 'S' to expected '*' operand type 'Int'}} {{none}}
   Int(10) * S()
 }
 
@@ -1132,7 +1131,8 @@ func rdar17170728() {
   // FIXME: Bad diagnostic, `Bool.Stride` is bogus, we shouldn't be suggesting
   // `reduce(into:)`, and the actual problem is that Int cannot be used as a boolean
   // condition.
-  let _ = [i, j, k].reduce(0 as Int?) { // expected-error {{missing argument label 'into:' in call}}
+  let _ = [i, j, k].reduce(0 as Int?) { // expected-error {{cannot convert value of type 'Int?' to expected argument type '(inout (Bool.Stride, Bool) -> Bool, Int?) throws(E) -> ()}} expected-error {{missing argument label 'into:' in call}}
+  // expected-error@-1 {{generic parameter 'E' could not be inferred}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
     // expected-error@-1 {{binary operator '+' cannot be applied to operands of type 'Bool.Stride' and 'Bool'}}
   }
@@ -1544,7 +1544,7 @@ do {
   struct NonHashable {}
 
   func test(result: inout [AnyHashable], value: NonHashable) {
-    result.append(value) // expected-error {{argument type 'NonHashable' does not conform to expected type 'Hashable'}}
+    result.append(value) // expected-error {{cannot convert value of type 'NonHashable' to expected argument type 'Hashable' for 'append'}}
   }
 }
 

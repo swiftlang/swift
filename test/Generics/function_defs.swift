@@ -97,7 +97,7 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(_ ovl: Ovl, ovl2: Ovl,
   a = ovl2.f2(17)
   a = ovl2.f1(a)
 
-  other.f1(a) // expected-error{{no exact matches in call to instance method 'f1'}}
+  other.f1(a) // expected-error{{ambiguous use of 'f1'; cannot convert value of type 'Ovl.A' to any of potential types OtherOvl.A, OtherOvl.B}}
 
   // Overloading based on context
   var f3i : (Int) -> Int = ovl.f3

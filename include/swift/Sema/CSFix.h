@@ -49,6 +49,7 @@ class ConstraintLocatorBuilder;
 enum class ConversionRestrictionKind;
 enum ScoreKind: unsigned int;
 class Solution;
+class SolutionDiff;
 struct MemberLookupResult;
 
 /// Describes the kind of fix to apply to the given constraint before
@@ -566,9 +567,8 @@ public:
   using CommonFixesArray =
       ArrayRef<std::pair<const Solution *, const ConstraintFix *>>;
 
-  virtual bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const {
-    return false;
-  }
+  virtual bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                                    const SolutionDiff &diff) const;
 
   template <typename E>
   bool directlyAt() const {
@@ -609,9 +609,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /* {
+  // / return diagnose(*commonFixes.front().first);
+  }*/
 
   static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclNameRef member,
                                     Type memberBaseType,
@@ -632,9 +633,11 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
+  /*{
     return diagnose(*commonFixes.front().first);
-  }
+  }*/
 
   /// Assess the impact this fix is going to have at the given location.
   static unsigned assessImpact(ConstraintSystem &cs,
@@ -675,7 +678,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
 
   static RelabelArguments *create(ConstraintSystem &cs,
                                   llvm::ArrayRef<Identifier> correctLabels,
@@ -706,7 +710,8 @@ public:
   Type lhsType() const { return LHS; }
   Type rhsType() const { return RHS; }
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff& diff) const override;
 
   bool diagnose(const Solution &solution,
                 bool asNote = false) const override = 0;
@@ -875,7 +880,8 @@ public:
     return ConstraintFix::coalesceAndDiagnose(solution, secondaryFixes, asNote);
   }
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
@@ -898,9 +904,10 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &_) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static TreatArrayLiteralAsDictionary *attempt(ConstraintSystem &cs,
                                                 Type dictionaryTy, Type arrayTy,
@@ -1268,9 +1275,11 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
+  /*{
     return diagnose(*commonFixes.front().first);
-  }
+  }*/
 
   static RemoveUnwrap *create(ConstraintSystem &cs, Type baseType,
                               ConstraintLocator *locator);
@@ -1319,9 +1328,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static UsePropertyWrapper *create(ConstraintSystem &cs, VarDecl *wrapped,
                                     bool usingProjection, Type base,
@@ -1353,9 +1363,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static UseWrappedValue *create(ConstraintSystem &cs, VarDecl *propertyWrapper,
                                  Type base, Type wrapper,
@@ -1382,9 +1393,10 @@ public:
     return "allow invalid property wrapper type";
   }
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
@@ -1464,7 +1476,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
 
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
                                         DeclNameRef member, bool alreadyDiagnosed,
@@ -1521,7 +1534,8 @@ public:
 
   DeclNameRef getMemberName() const { return Name; }
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
 };
 
 class AllowMemberRefOnExistential final : public AllowInvalidMemberRef {
@@ -1719,7 +1733,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
 };
 
 
@@ -1802,9 +1817,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static AddMissingArguments *create(ConstraintSystem &cs,
                                      ArrayRef<SynthesizedArg> synthesizedArgs,
@@ -1850,9 +1866,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                                      const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   /// FIXME(diagnostics): Once `resolveDeclRefExpr` is gone this
   /// logic would be obsolete.
@@ -1899,7 +1916,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
 
   bool isEqual(const ConstraintFix *other) const;
 
@@ -1928,9 +1946,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
                                          ValueDecl *member, DeclNameRef name,
@@ -2091,7 +2110,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
 
   /// Determine whether give reference requires a fix and produce one.
   static AllowInvalidRefInKeyPath *forRef(ConstraintSystem &cs, Type baseType,
@@ -2339,9 +2359,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static DefaultGenericArgument *create(ConstraintSystem &cs,
                                         GenericTypeParamType *param,
@@ -2445,7 +2466,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
 
   static IgnoreAssignmentDestinationType *create(ConstraintSystem &cs,
                                                  Type sourceTy, Type destTy,
@@ -2527,6 +2549,9 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
+
   static AllowArgumentMismatch *create(ConstraintSystem &cs, Type argType,
                                        Type paramType,
                                        ConstraintLocator *locator);
@@ -2602,9 +2627,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static UseRawValue *create(ConstraintSystem &cs, Type rawReprType,
                              Type expectedType, ConstraintLocator *locator);
@@ -2650,9 +2676,11 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
+  /*{
+  //  return diagnose(*commonFixes.front().first);
+  //}*/
 
   static RemoveInvalidCall *create(ConstraintSystem &cs,
                                    ConstraintLocator *locator);
@@ -2678,6 +2706,9 @@ public:
   std::string getName() const override;
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
 
   static TreatEphemeralAsNonEphemeral *
   create(ConstraintSystem &cs, ConstraintLocator *locator, Type srcType,
@@ -2709,9 +2740,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static AllowSendingMismatch *create(ConstraintSystem &cs, Type srcType,
                                       Type dstType, ConstraintLocator *locator);
@@ -2738,9 +2770,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static SpecifyBaseTypeForContextualMember *
   create(ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator);
@@ -2759,9 +2792,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static SpecifyClosureParameterType *create(ConstraintSystem &cs,
                                              ConstraintLocator *locator);
@@ -2782,9 +2816,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static SpecifyClosureReturnType *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
@@ -2942,9 +2977,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static SpecifyKeyPathRootType *create(ConstraintSystem &cs,
                                         ConstraintLocator *locator);
@@ -3057,9 +3093,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static IgnoreInvalidResultBuilderBody *create(ConstraintSystem &cs,
                                                 ConstraintLocator *locator);
@@ -3104,9 +3141,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static IgnoreInvalidASTNode *create(ConstraintSystem &cs,
                                       ConstraintLocator *locator);
@@ -3128,9 +3166,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static IgnoreUnresolvedPatternVar *
   create(ConstraintSystem &cs, Pattern *pattern, ConstraintLocator *locator);
@@ -3155,9 +3194,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static IgnoreInvalidPatternInExpr *
   create(ConstraintSystem &cs, Pattern *pattern, ConstraintLocator *locator);
@@ -3179,9 +3219,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static SpecifyContextualTypeForNil *create(ConstraintSystem & cs,
                                              ConstraintLocator * locator);
@@ -3202,9 +3243,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static IgnoreInvalidPlaceholder *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
@@ -3225,9 +3267,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static SpecifyTypeForPlaceholder *create(ConstraintSystem &cs,
                                            ConstraintLocator *locator);
@@ -3248,9 +3291,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static AllowRefToInvalidDecl *create(ConstraintSystem &cs,
                                        ConstraintLocator *locator);
@@ -3439,9 +3483,10 @@ public:
     return "allow invalid static member reference on a protocol metatype";
   }
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //      return diagnose(*commonFixes.front().first);
+      }*/
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
@@ -3587,9 +3632,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //                                      return diagnose(*commonFixes.front().first);
+                                      }*/
 
   static RenameConflictingPatternVariables *
   create(ConstraintSystem &cs, Type expectedTy, ArrayRef<VarDecl *> conflicts,
@@ -3613,9 +3659,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static MacroMissingPound *
   create(ConstraintSystem &cs, MacroDecl *macro,
@@ -3696,9 +3743,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static AllowValueExpansionWithoutPackReferences *
   create(ConstraintSystem &cs, ConstraintLocator *locator);
@@ -3723,9 +3771,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static IgnoreMissingEachKeyword *
   create(ConstraintSystem &cs, Type valuePackTy, ConstraintLocator *locator);
@@ -3755,9 +3804,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static AllowInvalidMemberReferenceInInitAccessor *
   create(ConstraintSystem &cs, DeclNameRef memberName,
@@ -3786,9 +3836,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static AllowConcreteTypeSpecialization *
   create(ConstraintSystem &cs, Type concreteTy, ValueDecl *decl,
@@ -3816,9 +3867,10 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; /*{
+  //  return diagnose(*commonFixes.front().first);
+  }*/
 
   static AllowFunctionSpecialization *
   create(ConstraintSystem &cs, ValueDecl *decl, ConstraintLocator *locator);
@@ -3839,9 +3891,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
 
   static IgnoreOutOfPlaceThenStmt *create(ConstraintSystem &cs,
                                           ConstraintLocator *locator);
@@ -3874,9 +3925,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
 
   static IgnoreGenericSpecializationArityMismatch *
   create(ConstraintSystem &cs, ValueDecl *decl, unsigned numParams,
@@ -3950,9 +4000,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override; 
 
   static TooManyDynamicMemberLookups *
   create(ConstraintSystem &cs, DeclNameRef name, ConstraintLocator *locator);
@@ -3978,9 +4027,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
-    return diagnose(*commonFixes.front().first);
-  }
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes,
+                            const SolutionDiff &diff) const override;
 
   static IgnoreIsolatedConformance *create(ConstraintSystem &cs,
                                            ConstraintLocator *locator,

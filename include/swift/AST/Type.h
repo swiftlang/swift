@@ -347,6 +347,8 @@ public:
   std::string getString(const PrintOptions &PO = PrintOptions(),
                         NonRecursivePrintOptions OPO = std::nullopt) const;
 
+  std::string getTypeListAsString(ArrayRef<CanType> types, const PrintOptions &PO = PrintOptions()) const;
+
   /// Return the name of the type, adding parens in cases where
   /// appending or prepending text to the result would cause that text
   /// to be appended to only a portion of the returned type. For

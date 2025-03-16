@@ -362,11 +362,11 @@ takeVoidVoidFn { () -> Void in
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
 func f19997471(_ x: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1 (got 'T')}}
-func f19997471(_ x: Int) {}    // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'T')}}
+func f19997471(_ x: Int) {} // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'T')}}
 
 func someGeneric19997471<T>(_ x: T) {
   takeVoidVoidFn {
-    f19997471(x) // expected-error {{no exact matches in call to global function 'f19997471'}}
+    f19997471(x) // expected-error {{ambiguous use of 'f19997471'; cannot convert value of type 'T' to any of potential types String, Int}}
   }
 }
 
@@ -1256,11 +1256,11 @@ do {
 
 do {
   func test(_: Int, _: Int) {}
-  // expected-note@-1 {{closure passed to parameter of type 'Int' that does not accept a closure}}
+  // expected-note@-1 {{candidate expects value of type 'Int' for parameter #2 (got '_')}}
   func test(_: Int, _: String) {}
-  // expected-note@-1 {{closure passed to parameter of type 'String' that does not accept a closure}}
+  // expected-note@-1 {{candidate expects value of type 'String' for parameter #2 (got '_')}}
 
-  test(42) { // expected-error {{no exact matches in call to local function 'test'}}
+  test(42) { // expected-error {{ambiguous use of 'test'; cannot convert value of type '_' to any of potential types Int, String}}
     print($0)
   }
 }

@@ -95,9 +95,9 @@ _ = b as! Derived
 //  are special cased in the library.
 Int(i) // expected-warning{{unused}}
 _ = i as Int
-Z(z) // expected-error{{no exact matches in call to initializer}}
+Z(z) // expected-error{{ambiguous use of initializer; cannot convert value of type 'Z' to any of potential types Unicode.Scalar, String}}
 
-Z.init(z)  // expected-error {{no exact matches in call to initializer}}
+Z.init(z)  // expected-error {{ambiguous use of initializer; cannot convert value of type 'Z' to any of potential types Unicode.Scalar, String}}
 
 
 _ = z as Z

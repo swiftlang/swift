@@ -8292,6 +8292,20 @@ AnyFunctionType::getParamListAsString(ArrayRef<AnyFunctionType::Param> Params,
   return std::string(OS.str());
 }
 
+std::string Type::getTypeListAsString(ArrayRef<CanType> types, const PrintOptions &PO) const {
+  SmallString<32> Scratch;
+  llvm::raw_svector_ostream OS(Scratch);
+  StreamPrinter Printer(OS);
+  TypePrinter TP(Printer, PO);
+  for(auto type : types) {
+    TP.visit(type);
+    OS << ", ";
+  }
+  auto result = std::string(OS.str());
+  result = result.substr(0, result.size() -2);
+  return result;
+}
+
 void LayoutConstraintInfo::print(raw_ostream &OS,
                                  const PrintOptions &PO) const {
   StreamPrinter Printer(OS);

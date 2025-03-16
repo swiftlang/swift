@@ -103,10 +103,10 @@ func testIS1() -> Int { return 0 }
 let _: String = testIS1() // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
 
 func insertA<T>(array : inout [T], elt : T) {
-  array.append(T.self); // expected-error {{cannot convert value of type 'T.Type' to expected argument type 'T'}}
+  array.append(T.self); // expected-error {{cannot convert value of type 'T.Type' to expected argument type 'T' for 'append'}}
 
   // FIXME: Kind of weird
-  array.append(T); // expected-error {{cannot convert value of type 'T.Type' to expected argument type 'T'}}
+  array.append(T); // expected-error {{cannot convert value of type 'T.Type' to expected argument type 'T' for 'append'}}
 }
 
 extension Array {
