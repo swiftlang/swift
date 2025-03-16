@@ -4588,7 +4588,7 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
   auto *PD = protocols.front();
 
   auto contextAvailability =
-      TypeChecker::availabilityAtLocation(expr->getLoc(), dc);
+      AvailabilityContext::forLocation(expr->getLoc(), dc);
   auto refinedAvailability =
       AvailabilityContext::forPlatformRange(
         AvailabilityRange::alwaysAvailable(), ctx);
@@ -4600,8 +4600,7 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
     assert(eraser && "Failed to resolve eraser type!");
 
     auto *nominal = eraser->getAnyNominal();
-    auto nominalAvailability =
-        TypeChecker::availabilityForDeclSignature(nominal);
+    auto nominalAvailability = AvailabilityContext::forDeclSignature(nominal);
 
     if (contextAvailability.isContainedIn(nominalAvailability) &&
         nominalAvailability.isContainedIn(refinedAvailability)) {

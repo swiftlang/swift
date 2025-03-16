@@ -2694,7 +2694,7 @@ bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
   if (!ctx.supportsVersionedAvailability())
     return true;
 
-  auto modifyAvailability = TypeChecker::availabilityAtLocation({}, accessor);
+  auto modifyAvailability = AvailabilityContext::forLocation({}, accessor);
   auto featureAvailability = ctx.getCoroutineAccessorsRuntimeAvailability();
   // If accessor was introduced only after the feature was, there's no old ABI
   // to maintain.

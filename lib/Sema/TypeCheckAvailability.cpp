@@ -169,7 +169,7 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
   auto *DC = D->getInnermostDeclContext();
   auto fragileKind = DC->getFragileFunctionKind();
   auto loc = D->getLoc();
-  auto availabilityContext = TypeChecker::availabilityAtLocation(loc, DC);
+  auto availabilityContext = AvailabilityContext::forLocation(loc, DC);
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   computeExportContextBits(Ctx, D, &spi, &implicit);
@@ -187,7 +187,7 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   auto &Ctx = DC->getASTContext();
 
   auto fragileKind = DC->getFragileFunctionKind();
-  auto availabilityContext = TypeChecker::availabilityAtLocation(loc, DC);
+  auto availabilityContext = AvailabilityContext::forLocation(loc, DC);
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   forEachOuterDecl(
@@ -288,75 +288,11 @@ static bool shouldTreatDeclContextAsAsyncForDiagnostics(const DeclContext *DC) {
   return DC->isAsyncContext();
 }
 
-AvailabilityContext
-TypeChecker::availabilityAtLocation(SourceLoc loc, const DeclContext *DC,
-                                    const AvailabilityScope **MostRefined) {
-  SourceFile *SF;
-  if (loc.isValid())
-    SF = DC->getParentModule()->getSourceFileContainingLocation(loc);
-  else
-    SF = DC->getParentSourceFile();
-  auto &Context = DC->getASTContext();
-
-  // If our source location is invalid (this may be synthesized code), climb
-  // the decl context hierarchy until we find a location that is valid,
-  // collecting availability ranges on the way up.
-  // We will combine the version ranges from these annotations
-  // with the scope for the valid location to overapproximate the running
-  // OS versions at the original source location.
-  // Because we are climbing DeclContexts we will miss availability scopes in
-  // synthesized code that are introduced by AST elements that are themselves
-  // not DeclContexts, such as  #available(..) and property declarations.
-  // That is, a reference with an invalid location that is contained
-  // inside a #available() and with no intermediate DeclContext will not be
-  // refined. For now, this is fine -- but if we ever synthesize #available(),
-  // this will be a real problem.
-
-  // We can assume we are running on at least the minimum inlining target.
-  auto baseAvailability = AvailabilityContext::forInliningTarget(Context);
-  auto isInvalidLoc = [SF](SourceLoc loc) {
-    return SF ? loc.isInvalid() : true;
-  };
-  while (DC && isInvalidLoc(loc)) {
-    const Decl *D = DC->getInnermostDeclarationDeclContext();
-    if (!D)
-      break;
-
-    baseAvailability.constrainWithDecl(D);
-    loc = D->getLoc();
-    DC = D->getDeclContext();
-  }
-
-  if (!SF || loc.isInvalid())
-    return baseAvailability;
-
-  auto *rootScope = AvailabilityScope::getOrBuildForSourceFile(*SF);
-  if (!rootScope)
-    return baseAvailability;
-
-  AvailabilityScope *scope = rootScope->findMostRefinedSubContext(loc, Context);
-  if (!scope)
-    return baseAvailability;
-
-  if (MostRefined) {
-    *MostRefined = scope;
-  }
-
-  auto availability = scope->getAvailabilityContext();
-  availability.constrainWithContext(baseAvailability, Context);
-  return availability;
-}
-
-AvailabilityContext
-TypeChecker::availabilityForDeclSignature(const Decl *decl) {
-  return TypeChecker::availabilityAtLocation(decl->getLoc(),
-                                             decl->getInnermostDeclContext());
-}
-
 AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
     SourceLoc loc, const DeclContext *DC,
     const AvailabilityScope **MostRefined) {
-  return availabilityAtLocation(loc, DC, MostRefined).getPlatformRange();
+  return AvailabilityContext::forLocation(loc, DC, MostRefined)
+      .getPlatformRange();
 }
 
 /// A class that walks the AST to find the innermost (i.e., deepest) node that
@@ -1831,8 +1767,7 @@ swift::getUnsatisfiedAvailabilityConstraint(const Decl *decl,
                                             const DeclContext *referenceDC,
                                             SourceLoc referenceLoc) {
   return getAvailabilityConstraintsForDecl(
-             decl,
-             TypeChecker::availabilityAtLocation(referenceLoc, referenceDC))
+             decl, AvailabilityContext::forLocation(referenceLoc, referenceDC))
       .getPrimaryConstraint();
 }
 
