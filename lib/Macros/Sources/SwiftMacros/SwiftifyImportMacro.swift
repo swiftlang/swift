@@ -1084,9 +1084,13 @@ public struct SwiftifyImportMacro: PeerMacro {
     }
     var args : [LabeledExprSyntax] = []
     for dependence in returnDependencies {
-      if (dependence.type == .borrow) {
+      switch dependence.type {
+      case .borrow:
         args.append(LabeledExprSyntax(expression: 
-          DeclReferenceExprSyntax(baseName: TokenSyntax("borrow"))))
+                                        DeclReferenceExprSyntax(baseName: TokenSyntax("borrow"))))
+      case .copy:
+        args.append(LabeledExprSyntax(expression:
+                                        DeclReferenceExprSyntax(baseName: TokenSyntax("copy"))))
       }
       args.append(LabeledExprSyntax(expression: 
         DeclReferenceExprSyntax(baseName: TokenSyntax(tryGetParamName(funcDecl, dependence.dependsOn))!),
