@@ -164,10 +164,6 @@ public:
 
   AvailabilityContext getAvailability() const { return Availability; }
 
-  AvailabilityRange getAvailabilityRange() const {
-    return Availability.getPlatformRange();
-  }
-
   /// If not 'None', the context has the inlinable function body restriction.
   FragileFunctionKind getFragileFunctionKind() const { return FragileKind; }
 
@@ -187,10 +183,6 @@ public:
   /// If true, the context is exported and cannot reference SPI declarations
   /// or declarations from `@_implementationOnly` imports.
   bool isExported() const { return Exported; }
-
-  /// If true, the context is part of a deprecated declaration and can
-  /// reference other deprecated declarations without warning.
-  bool isDeprecated() const { return Availability.isDeprecated(); }
 
   /// If true, the context can only reference exported declarations, either
   /// because it is the signature context of an exported declaration, or

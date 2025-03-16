@@ -1904,7 +1904,7 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     isDefaultWitness = isa<ProtocolDecl>(nominal);
   if (isDefaultWitness && match.Witness->isDeprecated() &&
       !requirement->isDeprecated()) {
-    auto conformanceContext = ExportContext::forConformance(DC, Proto);
+    auto conformanceContext = AvailabilityContext::forDeclSignature(DC->getInnermostDeclarationDeclContext());
     if (!conformanceContext.isDeprecated()) {
       return RequirementCheck(CheckKind::DefaultWitnessDeprecated);
     }

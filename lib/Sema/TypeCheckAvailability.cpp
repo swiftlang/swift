@@ -1488,18 +1488,19 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
   if (!Attr)
     return;
 
+  auto Availability = Where.getAvailability();
+
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
-  if (Where.isDeprecated()) {
+  if (Availability.isDeprecated()) {
     return;
   }
 
   auto *ReferenceDC = Where.getDeclContext();
   auto &Context = ReferenceDC->getASTContext();
   if (!Context.LangOpts.DisableAvailabilityChecking) {
-    AvailabilityRange RunningOSVersions = Where.getAvailabilityRange();
-    if (RunningOSVersions.isKnownUnreachable()) {
+    if (Availability.getPlatformRange().isKnownUnreachable()) {
       // Suppress a deprecation warning if the availability checking machinery
       // thinks the reference program location will not execute on any
       // deployment target for the current platform.
@@ -1567,18 +1568,19 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
   if (!attr)
     return false;
 
+  auto availability = where.getAvailability();
+
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
-  if (where.isDeprecated()) {
+  if (availability.isDeprecated()) {
     return false;
   }
 
   auto *dc = where.getDeclContext();
   auto &ctx = dc->getASTContext();
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
-    AvailabilityRange runningOSVersion = where.getAvailabilityRange();
-    if (runningOSVersion.isKnownUnreachable()) {
+    if (availability.getPlatformRange().isKnownUnreachable()) {
       // Suppress a deprecation warning if the availability checking machinery
       // thinks the reference program location will not execute on any
       // deployment target for the current platform.
