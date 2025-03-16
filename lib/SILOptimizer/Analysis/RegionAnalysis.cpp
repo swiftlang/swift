@@ -2539,11 +2539,13 @@ public:
     auto trackableDest = tryToTrackValue(dest);
     if (!trackableDest)
       return;
+    if (requireOperands) {
+      builder.addRequire(trackableDest->getRepresentative().getValue());
+    }
     for (Operand *op : srcCollection) {
       if (auto trackableSrc = tryToTrackValue(op->get())) {
         if (requireOperands) {
           builder.addRequire(trackableSrc->getRepresentative().getValue());
-          builder.addRequire(trackableDest->getRepresentative().getValue());
         }
         builder.addMerge(trackableDest->getRepresentative().getValue(), op);
       }
