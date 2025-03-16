@@ -1031,14 +1031,6 @@ bool isAvailabilitySafeForConformance(
     const ValueDecl *witness, const DeclContext *dc,
     AvailabilityRange &requiredAvailability);
 
-/// Returns an over-approximation of the range of operating system versions
-/// that could the passed-in location could be executing upon for
-/// the target platform. If MostRefined != nullptr, set to the most-refined
-/// scope found while approximating.
-AvailabilityRange overApproximateAvailabilityAtLocation(
-    SourceLoc loc, const DeclContext *DC,
-    const AvailabilityScope **MostRefined = nullptr);
-
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
 /// or None if this is allowed.
@@ -1055,7 +1047,7 @@ diagnosticIfDeclCannotBeUnavailable(const Decl *D, SemanticAvailableAttr attr);
 /// platform are available at the given `SourceRange`. If not, `Diagnose` is
 /// invoked.
 bool checkAvailability(SourceRange ReferenceRange,
-                       AvailabilityRange RequiredAvailability,
+                       AvailabilityRange PlatformRange,
                        const DeclContext *ReferenceDC,
                        llvm::function_ref<InFlightDiagnostic(AvailabilityDomain,
                                                              AvailabilityRange)>
@@ -1065,7 +1057,7 @@ bool checkAvailability(SourceRange ReferenceRange,
 /// platform are available at the given `SourceRange`. If not, `Diag` is
 /// emitted.
 bool checkAvailability(SourceRange ReferenceRange,
-                       AvailabilityRange RequiredAvailability,
+                       AvailabilityRange PlatformRange,
                        Diag<AvailabilityDomain, AvailabilityRange> Diag,
                        const DeclContext *ReferenceDC);
 

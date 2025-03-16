@@ -1732,7 +1732,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   requirementInfo.constrainWith(infoForConformingDecl);
 
   AvailabilityRange infoForProtocolDecl =
-      overApproximateAvailabilityAtLocation(proto->getLoc(), proto);
+      AvailabilityContext::forDeclSignature(proto).getPlatformRange();
 
   witnessInfo.constrainWith(infoForProtocolDecl);
   requirementInfo.constrainWith(infoForProtocolDecl);

@@ -288,13 +288,6 @@ static bool shouldTreatDeclContextAsAsyncForDiagnostics(const DeclContext *DC) {
   return DC->isAsyncContext();
 }
 
-AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
-    SourceLoc loc, const DeclContext *DC,
-    const AvailabilityScope **MostRefined) {
-  return AvailabilityContext::forLocation(loc, DC, MostRefined)
-      .getPlatformRange();
-}
-
 /// A class that walks the AST to find the innermost (i.e., deepest) node that
 /// contains a target SourceRange and matches a particular criterion.
 /// This class finds the innermost nodes of interest by walking
@@ -689,8 +682,8 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     return false;
 
   const AvailabilityScope *scope = nullptr;
-  (void)TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
-                                                           ReferenceDC, &scope);
+  (void)AvailabilityContext::forLocation(ReferenceRange.Start, ReferenceDC,
+                                         &scope);
   if (!scope)
     return false;
 
@@ -866,7 +859,7 @@ static void diagnosePotentialUnavailability(
 // FIXME: [availability] Should this take an AvailabilityContext instead of
 // AvailabilityRange?
 bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
-                                    AvailabilityRange RequiredAvailability,
+                                    AvailabilityRange PlatformRange,
                                     const DeclContext *ReferenceDC,
                                     llvm::function_ref<InFlightDiagnostic(
                                         AvailabilityDomain, AvailabilityRange)>
@@ -880,11 +873,12 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
     return false;
 
   auto availabilityAtLocation =
-      TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
-                                                         ReferenceDC);
-  if (!availabilityAtLocation.isContainedIn(RequiredAvailability)) {
+      AvailabilityContext::forLocation(ReferenceRange.Start, ReferenceDC)
+          .getPlatformRange();
+
+  if (!availabilityAtLocation.isContainedIn(PlatformRange)) {
     diagnosePotentialUnavailability(ReferenceRange, Diagnose, ReferenceDC,
-                                    domain, RequiredAvailability);
+                                    domain, PlatformRange);
     return true;
   }
 
@@ -892,12 +886,12 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
 }
 
 bool TypeChecker::checkAvailability(
-    SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
+    SourceRange ReferenceRange, AvailabilityRange PlatformRange,
     Diag<AvailabilityDomain, AvailabilityRange> Diag,
     const DeclContext *ReferenceDC) {
   auto &Diags = ReferenceDC->getASTContext().Diags;
   return TypeChecker::checkAvailability(
-      ReferenceRange, RequiredAvailability, ReferenceDC,
+      ReferenceRange, PlatformRange, ReferenceDC,
       [&](AvailabilityDomain domain, AvailabilityRange range) {
         return Diags.diagnose(ReferenceRange.Start, Diag, domain, range);
       });

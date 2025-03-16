@@ -5210,8 +5210,8 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
         if (auto depMemberType = depTy->getAs<DependentMemberType>()) {
           auto assocType = depMemberType->getAssocType();
           availability.intersectWith(
-              TypeChecker::overApproximateAvailabilityAtLocation(
-                  assocType->getLoc(), assocType->getDeclContext()));
+              AvailabilityContext::forDeclSignature(assocType)
+                  .getPlatformRange());
         }
 
         diagnoseConformanceAvailability(
