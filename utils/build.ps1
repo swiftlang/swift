@@ -397,18 +397,40 @@ function Add-TimingData {
     Arch = $Arch
     Platform = $Platform
     "Build Step" = $BuildStep
-    "Elapsed Time" = $ElapsedTime.ToString()
+    "Elapsed Time" = $ElapsedTime
   })
 }
 
 function Write-Summary {
   Write-Host "Summary:" -ForegroundColor Cyan
 
-  # Sort timing data by elapsed time (descending)
-  $TimingData `
-    | Select-Object "Build Step",Platform,Arch,"Elapsed Time" `
-    | Sort-Object -Descending -Property "Elapsed Time" `
-    | Format-Table -AutoSize
+  $TotalTime = [TimeSpan]::Zero
+  foreach ($Entry in $TimingData) {
+    $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
+  }
+
+  $SortedData = $TimingData | ForEach-Object {
+    $Percentage = [math]::Round(($_.("Elapsed Time").TotalSeconds / $TotalTime.TotalSeconds) * 100, 1)
+    $FormattedTime = "{0:hh\:mm\:ss\.ff}" -f $_."Elapsed Time"
+    [PSCustomObject]@{
+      "Build Step" = $_."Build Step"
+      Platform = $_.Platform
+      Arch = $_.Arch
+      "Elapsed Time" = $FormattedTime
+      "%" = "$Percentage%"
+    }
+  } | Sort-Object -Descending -Property "%"
+
+  $FormattedTotalTime = "{0:hh\:mm\:ss\.ff}" -f $TotalTime
+  $TotalRow = [PSCustomObject]@{
+    "Build Step" = "TOTAL"
+    Platform = ""
+    Arch = ""
+    "Elapsed Time" = $FormattedTotalTime
+    "%" = "100.0%"
+  }
+
+  @($SortedData) + $TotalRow | Format-Table -AutoSize
 }
 
 function Get-AndroidNDK {
