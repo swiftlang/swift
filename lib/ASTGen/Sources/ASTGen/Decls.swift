@@ -820,9 +820,11 @@ extension ASTGenVisitor {
       paramList: self.generate(functionParameterClause: node.signature.parameterClause, for: .macro),
       arrowLoc: self.generateSourceLoc(node.signature.returnClause?.arrow),
       resultType: self.generate(type: node.signature.returnClause?.type),
-      definition: self.generate(expr: node.definition?.value)
+      definition: self.generate(expr: node.definition?.value),
+      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
+
     return decl;
   }
 }

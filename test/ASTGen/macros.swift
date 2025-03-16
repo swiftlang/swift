@@ -146,3 +146,10 @@ struct S3 {
     self._x = MyWrapperThingy(storage: x)
   }
 }
+
+protocol MyType {
+  associatedtype Value
+  associatedtype Entity
+}
+@attached(peer, names: named(bar))
+macro Wrapper<Value>(get: (Value.Entity) async throws -> Value.Value) = #externalMacro(module: "MacroDefinition", type: "WrapperMacro") where Value: MyType

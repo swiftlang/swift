@@ -1602,13 +1602,15 @@ BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
 
 SWIFT_NAME(
     "BridgedMacroDecl.createParsed(_:declContext:macroKeywordLoc:name:nameLoc:"
-    "genericParamList:paramList:arrowLoc:resultType:definition:)")
+    "genericParamList:paramList:arrowLoc:resultType:definition:"
+    "genericWhereClause:)")
 BridgedMacroDecl BridgedMacroDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cMacroLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList cGenericParams,
     BridgedParameterList cParams, BridgedSourceLoc cArrowLoc,
-    BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition);
+    BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition,
+    BridgedNullableTrailingWhereClause genericWhereClause);
 
 SWIFT_NAME("BridgedMacroExpansionDecl.createParsed(_:poundLoc:macroNameRef:"
            "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")
