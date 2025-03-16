@@ -293,11 +293,12 @@ BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(
       resultType.unbridged());
 }
 
-BridgedNamedOpaqueReturnTypeRepr
-BridgedNamedOpaqueReturnTypeRepr_createParsed(BridgedASTContext cContext,
-                                              BridgedTypeRepr baseTy) {
+BridgedNamedOpaqueReturnTypeRepr BridgedNamedOpaqueReturnTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr baseTy,
+    BridgedGenericParamList genericParams) {
   ASTContext &context = cContext.unbridged();
-  return new (context) NamedOpaqueReturnTypeRepr(baseTy.unbridged(), nullptr);
+  return new (context)
+      NamedOpaqueReturnTypeRepr(baseTy.unbridged(), genericParams.unbridged());
 }
 
 BridgedOpaqueReturnTypeRepr

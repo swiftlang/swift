@@ -266,8 +266,9 @@ extension ASTGenVisitor {
   }
 
   func generate(namedOpaqueReturnType node: NamedOpaqueReturnTypeSyntax) -> BridgedNamedOpaqueReturnTypeRepr {
+    let genericParams = self.generate(genericParameterClause: node.genericParameterClause)
     let baseTy = generate(type: node.type)
-    return .createParsed(self.ctx, base: baseTy)
+    return .createParsed(self.ctx, base: baseTy, genericParamList: genericParams)
   }
 
   func generate(someOrAnyType node: SomeOrAnyTypeSyntax) -> BridgedTypeRepr {
