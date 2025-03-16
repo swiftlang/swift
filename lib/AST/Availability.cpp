@@ -22,6 +22,7 @@
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 // FIXME: [availability] Remove this when possible
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -382,7 +383,7 @@ static std::optional<SemanticAvailableAttr>
 getDeclAvailableAttrForPlatformIntroduction(const Decl *D) {
   std::optional<SemanticAvailableAttr> bestAvailAttr;
 
-  D = abstractSyntaxDeclForAvailableAttribute(D);
+  D = D->getAbstractSyntaxDeclForAttributes();
 
   for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
     if (!attr.isPlatformSpecific() || !attr.getIntroduced())
@@ -1053,32 +1054,84 @@ bool ASTContext::supportsVersionedAvailability() const {
   return minimumAvailableOSVersionForTriple(LangOpts.Target).has_value();
 }
 
-// FIXME: Rename abstractSyntaxDeclForAvailableAttribute since it's useful
-// for more attributes than `@available`.
-const Decl *
-swift::abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
-  // This function needs to be kept in sync with its counterpart,
-  // concreteSyntaxDeclForAvailableAttribute().
+bool swift::isExported(const Decl *D) {
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    return isExported(VD);
+  }
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
+      if (auto *VD = PBD->getAnchoringVarDecl(i))
+        return isExported(VD);
+    }
 
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(ConcreteSyntaxDecl)) {
-    // Existing @available attributes in the AST are attached to VarDecls
-    // rather than PatternBindingDecls, so we return the first VarDecl for
-    // the pattern binding declaration.
-    // This is safe, even though there may be multiple VarDecls, because
-    // all parsed attribute that appear in the concrete syntax upon on the
-    // PatternBindingDecl are added to all of the VarDecls for the pattern
-    // binding.
-    for (auto index : range(PBD->getNumPatternEntries())) {
-      if (auto VD = PBD->getAnchoringVarDecl(index))
-        return VD;
-    }
-  } else if (auto *ECD = dyn_cast<EnumCaseDecl>(ConcreteSyntaxDecl)) {
-    // Similar to the PatternBindingDecl case above, we return the
-    // first EnumElementDecl.
-    if (auto *Elem = ECD->getFirstElement()) {
-      return Elem;
-    }
+    return false;
+  }
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    return isExported(ED);
   }
 
-  return ConcreteSyntaxDecl;
+  return true;
+}
+
+bool swift::isExported(const ValueDecl *VD) {
+  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return false;
+  if (VD->isObjCMemberImplementation())
+    return false;
+
+  // Is this part of the module's API or ABI?
+  AccessScope accessScope =
+      VD->getFormalAccessScope(nullptr,
+                               /*treatUsableFromInlineAsPublic*/ true);
+  if (accessScope.isPublic())
+    return true;
+
+  // Is this a stored property in a @frozen struct or class?
+  if (auto *property = dyn_cast<VarDecl>(VD))
+    if (property->isLayoutExposedToClients())
+      return true;
+
+  return false;
+}
+
+static bool hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
+  auto nominal = ED->getExtendedNominal();
+  if (!nominal)
+    return false;
+
+  // Extensions of protocols cannot introduce additional conformances.
+  if (isa<ProtocolDecl>(nominal))
+    return false;
+
+  auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
+  for (const ProtocolDecl *PD : protocols) {
+    AccessScope scope =
+        PD->getFormalAccessScope(/*useDC*/ nullptr,
+                                 /*treatUsableFromInlineAsPublic*/ true);
+    if (scope.isPublic())
+      return true;
+  }
+
+  return false;
+}
+
+bool swift::isExported(const ExtensionDecl *ED) {
+  // An extension can only be exported if it extends an exported type.
+  if (auto *NTD = ED->getExtendedNominal()) {
+    if (!isExported(NTD))
+      return false;
+  }
+
+  // If there are any exported members then the extension is exported.
+  for (const Decl *D : ED->getMembers()) {
+    if (isExported(D))
+      return true;
+  }
+
+  // If the extension declares a conformance to a public protocol then the
+  // extension is exported.
+  if (hasConformancesToPublicProtocols(ED))
+    return true;
+
+  return false;
 }

@@ -1824,7 +1824,7 @@ static bool isAvailabilitySafeForOverride(ValueDecl *override,
 
   // Allow overrides that are not as available as the base decl as long as the
   // override is as available as its context.
-  auto availabilityContext = TypeChecker::availabilityForDeclSignature(
+  auto availabilityContext = AvailabilityContext::forDeclSignature(
       override->getDeclContext()->getSelfNominalTypeDecl());
 
   return availabilityContext.getPlatformRange().isContainedIn(overrideInfo);

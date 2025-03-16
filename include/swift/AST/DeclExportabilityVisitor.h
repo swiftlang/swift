@@ -178,6 +178,18 @@ public:
 
 #undef UNINTERESTING
 };
+
+/// Check if a declaration is exported as part of a module's external interface.
+/// This includes public and @usableFromInline decls.
+/// FIXME: This is legacy that should be subsumed by `DeclExportabilityVisitor`
+bool isExported(const Decl *D);
+
+/// A specialization of `isExported` for `ValueDecl`.
+bool isExported(const ValueDecl *VD);
+
+/// A specialization of `isExported` for `ExtensionDecl`.
+bool isExported(const ExtensionDecl *ED);
+
 } // end namespace swift
 
 #endif

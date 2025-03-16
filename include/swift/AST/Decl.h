@@ -1510,6 +1510,16 @@ public:
   /// Returns true if this declaration has any `@backDeployed` attributes.
   bool hasBackDeployedAttr() const;
 
+  /// Return the declaration upon which the attributes for this declaration
+  /// would appear in concrete syntax. This function is necessary because for
+  /// semantic analysis, the parser attaches attributes to declarations other
+  /// than those on which they, concretely, appear.
+  const Decl *getConcreteSyntaxDeclForAttributes() const;
+
+  /// Return the declaration to which the parser actually attaches attributes in
+  /// the abstract syntax tree (see `getConcreteSyntaxDeclForAttributes()`).
+  const Decl *getAbstractSyntaxDeclForAttributes() const;
+
   /// Apply the specified function to decls that should be placed _next_ to
   /// this decl when constructing AST.
   void forEachDeclToHoist(llvm::function_ref<void(Decl *)> callback) const;

@@ -21,7 +21,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AttrKind.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -3159,7 +3158,7 @@ bool Decl::isSPI() const {
 }
 
 ArrayRef<Identifier> Decl::getSPIGroups() const {
-  const Decl *D = abstractSyntaxDeclForAvailableAttribute(this);
+  const Decl *D = getAbstractSyntaxDeclForAttributes();
 
   if (!isa<ValueDecl>(D) &&
       !isa<ExtensionDecl>(D))
