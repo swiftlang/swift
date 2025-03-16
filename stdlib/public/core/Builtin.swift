@@ -1048,9 +1048,14 @@ public func withoutActuallyEscaping<ClosureType, ResultType, Failure>(
   Builtin.unreachable()
 }
 
-@_silgen_name("$ss23withoutActuallyEscaping_2doq_x_q_xKXEtKr0_lF")
+@abi(
+  func withoutActuallyEscaping<ClosureType, ResultType>(
+    _ closure: ClosureType,
+    do body: (_ escapingClosure: ClosureType) throws -> ResultType
+  ) throws -> ResultType
+)
 @usableFromInline
-func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
+func __rethrows_withoutActuallyEscaping<ClosureType, ResultType>(
   _ closure: ClosureType,
   do body: (_ escapingClosure: ClosureType) throws -> ResultType
 ) throws -> ResultType {
@@ -1079,9 +1084,14 @@ public func _openExistential<ExistentialType, ContainedType, ResultType, Failure
   Builtin.unreachable()
 }
 
+@abi(
+  func _openExistential<ExistentialType, ContainedType, ResultType>(
+    _ existential: ExistentialType,
+    do body: (_ escapingClosure: ContainedType) throws -> ResultType
+  ) throws -> ResultType
+)
 @usableFromInline
-@_silgen_name("$ss16_openExistential_2doq0_x_q0_q_KXEtKr1_lF")
-func __abi_openExistential<ExistentialType, ContainedType, ResultType>(
+func __rethrows_openExistential<ExistentialType, ContainedType, ResultType>(
   _ existential: ExistentialType,
   do body: (_ escapingClosure: ContainedType) throws -> ResultType
 ) throws -> ResultType {
