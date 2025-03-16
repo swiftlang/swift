@@ -15,7 +15,7 @@ let _: Set = [kBlue, Pet.dogcow]    // expected-error {{type 'Any' cannot confor
 
 let s: Set<Pet> = []                // construct an empty, type-annotated set
 let _ = s.contains(Pet.goat)        // query the empty set using a key
-let _ = s.contains(kTwo)            // expected-error {{cannot convert value of type 'Int' to expected argument type 'Pet'}}
+let _ = s.contains(kTwo)            // expected-error {{cannot convert argument of type 'Int' to expected argument type 'Pet' for 'contains'}}
 
 // Untyped enums can be used interchangeably with integers
 let _: Set = [kFour, kTwo]          // construct a set from untyped enum
