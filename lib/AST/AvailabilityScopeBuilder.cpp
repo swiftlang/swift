@@ -34,7 +34,7 @@ using namespace swift;
 /// that is active.
 // FIXME: [availability] De-duplicate this with TypeCheckAvailability.cpp.
 static bool hasActiveAvailableAttribute(const Decl *decl, ASTContext &ctx) {
-  decl = abstractSyntaxDeclForAvailableAttribute(decl);
+  decl = decl->getAbstractSyntaxDeclForAttributes();
 
   for (auto attr : decl->getSemanticAvailableAttrs()) {
     if (attr.isActive(ctx))
@@ -48,36 +48,6 @@ static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
                                                ASTContext &ctx) {
   return scope->getPlatformAvailabilityRange().isContainedIn(
       AvailabilityRange::forDeploymentTarget(ctx));
-}
-
-/// Given a declaration that allows availability attributes in the abstract
-/// syntax tree, return the declaration upon which the declaration would
-/// appear in concrete syntax. This function is necessary because for semantic
-/// analysis, the parser attaches attributes to declarations other
-/// than those on which they, concretely, appear. For these declarations (enum
-/// cases and variable declarations) a Fix-It for an added availability
-/// attribute should be suggested for the appropriate concrete location.
-// FIXME: [availability] De-duplicate this with TypeCheckAvailability.cpp.
-static const Decl *
-concreteSyntaxDeclForAvailableAttribute(const Decl *abstractSyntaxDecl) {
-  // This function needs to be kept in sync with its counterpart,
-  // abstractSyntaxDeclForAvailableAttribute().
-
-  // The source range for VarDecls does not include 'var ' (and, in any
-  // event, multiple variables can be introduced with a single 'var'),
-  // so suggest adding an attribute to the PatterningBindingDecl instead.
-  if (auto *vd = dyn_cast<VarDecl>(abstractSyntaxDecl)) {
-    if (auto *pbd = vd->getParentPatternBinding())
-      return pbd;
-  }
-
-  // Similarly suggest applying the Fix-It to the parent enum case rather than
-  // the enum element.
-  if (auto *ee = dyn_cast<EnumElementDecl>(abstractSyntaxDecl)) {
-    return ee->getParentCase();
-  }
-
-  return abstractSyntaxDecl;
 }
 
 namespace {
@@ -282,7 +252,7 @@ private:
   bool shouldSkipDecl(Decl *decl) const {
     // Only visit a node that has a corresponding concrete syntax node if we are
     // already walking that concrete syntax node.
-    auto *concreteDecl = concreteSyntaxDeclForAvailableAttribute(decl);
+    auto *concreteDecl = decl->getConcreteSyntaxDeclForAttributes();
     if (concreteDecl != decl) {
       if (ConcreteDeclStack.empty() || ConcreteDeclStack.back() != concreteDecl)
         return true;
@@ -323,7 +293,7 @@ private:
 
     // If this decl is the concrete syntax decl for some abstract syntax decl,
     // push it onto the stack so that the abstract syntax decls may be visited.
-    auto *abstractDecl = abstractSyntaxDeclForAvailableAttribute(decl);
+    auto *abstractDecl = decl->getAbstractSyntaxDeclForAttributes();
     if (abstractDecl != decl) {
       ConcreteDeclStack.push_back(decl);
     }
@@ -425,7 +395,7 @@ private:
 
     // Don't introduce for abstract syntax nodes that have separate concrete
     // syntax nodes. The scope will be introduced for the concrete node instead.
-    if (concreteSyntaxDeclForAvailableAttribute(decl) != decl)
+    if (decl->getConcreteSyntaxDeclForAttributes() != decl)
       return nullptr;
 
     // Declarations with explicit availability attributes always get a scope.
@@ -456,7 +426,7 @@ private:
     auto effectiveIntroduction = AvailabilityRange::alwaysAvailable();
 
     // Availability attributes are found abstract syntax decls.
-    decl = abstractSyntaxDeclForAvailableAttribute(decl);
+    decl = decl->getAbstractSyntaxDeclForAttributes();
 
     // As a special case, extension decls are treated as effectively as
     // available as the nominal type they extend, up to the deployment target.

@@ -94,15 +94,6 @@ public:
       AvailabilityDomain &domain, llvm::VersionTuple &platformVer);
 };
 
-// FIXME: This should become a utility on Decl.
-
-/// Given a declaration upon which an availability attribute would appear in
-/// concrete syntax, return a declaration to which the parser
-/// actually attaches the attribute in the abstract syntax tree. We use this
-/// function to determine whether the concrete syntax already has an
-/// availability attribute.
-const Decl *abstractSyntaxDeclForAvailableAttribute(const Decl *D);
-
 } // end namespace swift
 
 #endif

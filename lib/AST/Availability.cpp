@@ -383,7 +383,7 @@ static std::optional<SemanticAvailableAttr>
 getDeclAvailableAttrForPlatformIntroduction(const Decl *D) {
   std::optional<SemanticAvailableAttr> bestAvailAttr;
 
-  D = abstractSyntaxDeclForAvailableAttribute(D);
+  D = D->getAbstractSyntaxDeclForAttributes();
 
   for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
     if (!attr.isPlatformSpecific() || !attr.getIntroduced())
@@ -1052,36 +1052,6 @@ AvailabilityRange ASTContext::getSwiftAvailability(unsigned major,
 
 bool ASTContext::supportsVersionedAvailability() const {
   return minimumAvailableOSVersionForTriple(LangOpts.Target).has_value();
-}
-
-// FIXME: Rename abstractSyntaxDeclForAvailableAttribute since it's useful
-// for more attributes than `@available`.
-const Decl *
-swift::abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
-  // This function needs to be kept in sync with its counterpart,
-  // concreteSyntaxDeclForAvailableAttribute().
-
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(ConcreteSyntaxDecl)) {
-    // Existing @available attributes in the AST are attached to VarDecls
-    // rather than PatternBindingDecls, so we return the first VarDecl for
-    // the pattern binding declaration.
-    // This is safe, even though there may be multiple VarDecls, because
-    // all parsed attribute that appear in the concrete syntax upon on the
-    // PatternBindingDecl are added to all of the VarDecls for the pattern
-    // binding.
-    for (auto index : range(PBD->getNumPatternEntries())) {
-      if (auto VD = PBD->getAnchoringVarDecl(index))
-        return VD;
-    }
-  } else if (auto *ECD = dyn_cast<EnumCaseDecl>(ConcreteSyntaxDecl)) {
-    // Similar to the PatternBindingDecl case above, we return the
-    // first EnumElementDecl.
-    if (auto *Elem = ECD->getFirstElement()) {
-      return Elem;
-    }
-  }
-
-  return ConcreteSyntaxDecl;
 }
 
 bool swift::isExported(const Decl *D) {

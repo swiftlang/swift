@@ -232,7 +232,7 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
   if (isa<GenericTypeParamDecl>(decl))
     return DeclAvailabilityConstraints();
 
-  decl = abstractSyntaxDeclForAvailableAttribute(decl);
+  decl = decl->getAbstractSyntaxDeclForAttributes();
 
   getAvailabilityConstraintsForDecl(constraints, decl, context);
 

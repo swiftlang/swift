@@ -52,10 +52,6 @@
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
-// FIXME: [availability] De-duplicate this with AvailabilityScopeBuilder.cpp.
-static const Decl *
-concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl);
-
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 static bool diagnoseExplicitUnavailability(
@@ -249,7 +245,7 @@ ExportContext::getExportabilityReason() const {
 /// that is active.
 // FIXME: [availability] De-duplicate this with AvailabilityScopeBuilder.cpp.
 static bool hasActiveAvailableAttribute(const Decl *D, ASTContext &ctx) {
-  D = abstractSyntaxDeclForAvailableAttribute(D);
+  D = D->getAbstractSyntaxDeclForAttributes();
 
   for (auto Attr : D->getSemanticAvailableAttrs()) {
     if (Attr.isActive(ctx))
@@ -545,35 +541,6 @@ static const Decl *findContainingDeclaration(SourceRange ReferenceRange,
   return nullptr;
 }
 
-/// Given a declaration that allows availability attributes in the abstract
-/// syntax tree, return the declaration upon which the declaration would
-/// appear in concrete syntax. This function is necessary because for semantic
-/// analysis, the parser attaches attributes to declarations other
-/// than those on which they, concretely, appear. For these declarations (enum
-/// cases and variable declarations) a Fix-It for an added availability
-/// attribute should be suggested for the appropriate concrete location.
-static const Decl *
-concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl) {
-  // This function needs to be kept in sync with its counterpart,
-  // abstractSyntaxDeclForAvailableAttribute().
-
-  // The source range for VarDecls does not include 'var ' (and, in any
-  // event, multiple variables can be introduced with a single 'var'),
-  // so suggest adding an attribute to the PatterningBindingDecl instead.
-  if (auto *VD = dyn_cast<VarDecl>(AbstractSyntaxDecl)) {
-    if (auto *PBD = VD->getParentPatternBinding())
-      return PBD;
-  }
-
-  // Similarly suggest applying the Fix-It to the parent enum case rather than
-  // the enum element.
-  if (auto *EE = dyn_cast<EnumElementDecl>(AbstractSyntaxDecl)) {
-    return EE->getParentCase();
-  }
-
-  return AbstractSyntaxDecl;
-}
-
 /// Given a declaration, return a better related declaration for which
 /// to suggest an @available fixit, or the original declaration
 /// if no such related declaration exists.
@@ -584,7 +551,7 @@ static const Decl *relatedDeclForAvailabilityFixit(const Decl *D) {
     D = accessor->getStorage();
   }
 
-  return abstractSyntaxDeclForAvailableAttribute(D);
+  return D->getAbstractSyntaxDeclForAttributes();
 }
 
 /// Walk the DeclContext hierarchy starting from D to find a declaration
@@ -749,7 +716,7 @@ static void fixAvailabilityForDecl(
   // syntax to suggest the Fix-It may differ from the declaration to which
   // we attach availability attributes in the abstract syntax tree during
   // parsing.
-  const Decl *ConcDecl = concreteSyntaxDeclForAvailableAttribute(D);
+  const Decl *ConcDecl = D->getConcreteSyntaxDeclForAttributes();
 
   // To avoid exposing the pattern binding declaration to the user, get the
   // descriptive kind from one of the VarDecls.
