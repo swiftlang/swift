@@ -1642,6 +1642,24 @@ function Write-PList {
       -OutFile $Path
 }
 
+function Load-LitTestOverrides($Filename) {
+  function Select-LitTestOverrides($Prefix) {
+    $MatchingLines = Get-Content $Filename | Select-String -Pattern "`^${Prefix}.*$"
+    return $MatchingLines | ForEach-Object { ($_ -replace $Prefix,"").Trim() }
+  }
+
+  $TestsToXFail = Select-LitTestOverrides "xfail"
+  Write-Host "TestsToXFail=$TestsToXFail"
+  if ($TestsToXFail -and $TestsToXFail.Length -ne 0) {
+    $env:LIT_XFAIL = $TestsToXFail -join ";"
+  }
+  $TestsToSkip = Select-LitTestOverrides "skip"
+  Write-Host "TestsToSkip=$TestsToSkip"
+  if ($TestsToSkip -and $TestsToSkip.Length -gt 0) {
+    $env:LIT_FILTER_OUT = "($($TestsToSkip -join '|'))"
+  }
+}
+
 function Build-Compilers() {
   [CmdletBinding(PositionalBinding = $false)]
   param
@@ -1681,19 +1699,8 @@ function Build-Compilers() {
       if ($TestLLDB) {
         $Targets += @("check-lldb")
 
-        function Select-LitTestOverrides {
-          param([string] $TestStatus)
-
-          $MatchingLines=(Get-Content $PSScriptRoot/windows-llvm-lit-test-overrides.txt | Select-String -Pattern "`^${TestStatus}.*$")
-          $TestNames=$MatchingLines | ForEach-Object { ($_ -replace $TestStatus,"").Trim() }
-          return $TestNames
-        }
-
-        # Override some test results with llvm-lit.
-        $TestsToXFail=Select-LitTestOverrides "xfail"
-        $TestsToSkip=Select-LitTestOverrides "skip"
-        $env:LIT_XFAIL=$TestsToXFail -join ";"
-        $env:LIT_FILTER_OUT="($($TestsToSkip -join '|'))"
+        # Override test filter for known issues in downstream LLDB
+        Load-LitTestOverrides $PSScriptRoot/windows-llvm-lit-test-overrides.txt
 
         # Transitive dependency of _lldb.pyd
         $RuntimeBinaryCache = Get-TargetProjectBinaryCache $Arch Runtime
@@ -2143,8 +2150,6 @@ function Build-Runtime([Platform]$Platform, $Arch) {
     $PlatformDefines += @{
       LLVM_ENABLE_LIBCXX = "YES";
       SWIFT_USE_LINKER = "lld";
-      SWIFT_INCLUDE_TESTS = "NO";
-      SWIFT_INCLUDE_TEST_BINARIES = "NO";
       # Clang[<18] doesn't provide the _Builtin_float module.
       SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT = "YES";
     }
@@ -2185,6 +2190,40 @@ function Build-Runtime([Platform]$Platform, $Arch) {
         SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
         CMAKE_SHARED_LINKER_FLAGS = if ($Platform -eq "Windows") { @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF") } else { @() };
       })
+  }
+}
+
+function Test-Runtime([Platform]$Platform, $Arch) {
+  if ($IsCrossCompiling) {
+    throw "Swift runtime tests are not supported when cross-compiling"
+  }
+  if (-not (Test-Path (Get-TargetProjectBinaryCache $Arch Runtime))) {
+    throw "Swift runtime tests are supposed to reconfigure the existing build"
+  }
+  $CompilersBinaryCache = Get-HostProjectBinaryCache Compilers
+  if (-not (Test-Path "$CompilersBinaryCache\bin\FileCheck.exe")) {
+    # These will exist if we test any of llvm/clang/lldb/lld/swift as well
+    throw "LIT test utilities not found in $CompilersBinaryCache\bin"
+  }
+
+  Invoke-IsolatingEnvVars {
+    # Filter known issues when testing on Windows
+    Load-LitTestOverrides $PSScriptRoot/windows-swift-android-lit-test-overrides.txt
+    $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$(Get-PinnedToolchainRuntime);${env:Path};$UnixToolsBinDir"
+    Build-CMakeProject `
+      -Src $SourceCache\swift `
+      -Bin (Get-TargetProjectBinaryCache $Arch Runtime) `
+      -Arch $Arch `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -BuildTargets check-swift-validation-only_non_executable `
+      -Defines @{
+        SWIFT_INCLUDE_TESTS = "YES";
+        SWIFT_INCLUDE_TEST_BINARIES = "YES";
+        SWIFT_BUILD_TEST_SUPPORT_MODULES = "YES";
+        SWIFT_NATIVE_LLVM_TOOLS_PATH = Join-Path -Path $CompilersBinaryCache -ChildPath "bin";
+        LLVM_LIT_ARGS = "-vv";
+      }
   }
 }
 
@@ -3327,6 +3366,12 @@ if (-not $IsCrossCompiling) {
   if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
   if ($Test -contains "swift-format") { Test-Format }
   if ($Test -contains "sourcekit-lsp") { Test-SourceKitLSP }
+
+  if ($Test -contains "swift") {
+    foreach ($Arch in $AndroidSDKArchs) {
+      Test-Runtime Android $Arch
+    }
+  }
 }
 
 # Custom exception printing for more detailed exception information
