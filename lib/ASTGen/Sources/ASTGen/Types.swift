@@ -426,7 +426,7 @@ extension ASTGenVisitor {
       type = BridgedSendingTypeRepr.createParsed(
         self.ctx,
         base: type,
-        specifierLoc: constLoc
+        specifierLoc: sendingLoc
       ).asTypeRepr
     }
 
