@@ -1049,14 +1049,6 @@ AvailabilityRange overApproximateAvailabilityAtLocation(
     SourceLoc loc, const DeclContext *DC,
     const AvailabilityScope **MostRefined = nullptr);
 
-/// Walk the AST to build the tree of AvailabilityScopes.
-void buildAvailabilityScopes(SourceFile &SF);
-
-/// Build the hierarchy of AvailabilityScopes for the entire
-/// source file, if it has not already been built. Returns the root
-/// AvailabilityScope for the source file.
-AvailabilityScope *getOrBuildAvailabilityScope(SourceFile *SF);
-
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
 /// or None if this is allowed.
