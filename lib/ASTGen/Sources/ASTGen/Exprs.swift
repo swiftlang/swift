@@ -738,7 +738,7 @@ extension ASTGenVisitor {
       ).asExpr
 
     case .method(_):
-      fatalError("unimplemented")
+      fatalError("unimplemented (method keypath)")
     }
   }
 

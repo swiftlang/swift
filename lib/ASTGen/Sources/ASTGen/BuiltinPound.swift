@@ -195,10 +195,10 @@ extension ASTGenVisitor {
   }
 
   func generateObjCSelectorExpr(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedObjCSelectorExpr {
-    fatalError("unimplemented")
+    fatalError("unimplemented (objc selector)")
   }
 
   func generateObjCKeyPathExpr(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedKeyPathExpr {
-    fatalError("unimplemented")
+    fatalError("unimplemented (objc keypath)")
   }
 }

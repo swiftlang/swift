@@ -302,7 +302,7 @@ extension ASTGenVisitor {
       // Modifers.
       case .accessControl:
         // TODO: Diagnose and generateAccessControl().
-        fatalError("unimplemented")
+        fatalError("unimplemented (access control modifier parsed as attributes)")
       case .nonisolated:
         // TODO: Diagnose.
         return handle(self.generateNonisolatedAttr(attribute: node)?.asDeclAttribute)
