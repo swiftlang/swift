@@ -288,13 +288,6 @@ static bool shouldTreatDeclContextAsAsyncForDiagnostics(const DeclContext *DC) {
   return DC->isAsyncContext();
 }
 
-AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
-    SourceLoc loc, const DeclContext *DC,
-    const AvailabilityScope **MostRefined) {
-  return AvailabilityContext::forLocation(loc, DC, MostRefined)
-      .getPlatformRange();
-}
-
 /// A class that walks the AST to find the innermost (i.e., deepest) node that
 /// contains a target SourceRange and matches a particular criterion.
 /// This class finds the innermost nodes of interest by walking
@@ -689,8 +682,8 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     return false;
 
   const AvailabilityScope *scope = nullptr;
-  (void)TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
-                                                           ReferenceDC, &scope);
+  (void)AvailabilityContext::forLocation(ReferenceRange.Start, ReferenceDC,
+                                         &scope);
   if (!scope)
     return false;
 
@@ -866,7 +859,7 @@ static void diagnosePotentialUnavailability(
 // FIXME: [availability] Should this take an AvailabilityContext instead of
 // AvailabilityRange?
 bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
-                                    AvailabilityRange RequiredAvailability,
+                                    AvailabilityRange PlatformRange,
                                     const DeclContext *ReferenceDC,
                                     llvm::function_ref<InFlightDiagnostic(
                                         AvailabilityDomain, AvailabilityRange)>
@@ -880,11 +873,12 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
     return false;
 
   auto availabilityAtLocation =
-      TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
-                                                         ReferenceDC);
-  if (!availabilityAtLocation.isContainedIn(RequiredAvailability)) {
+      AvailabilityContext::forLocation(ReferenceRange.Start, ReferenceDC)
+          .getPlatformRange();
+
+  if (!availabilityAtLocation.isContainedIn(PlatformRange)) {
     diagnosePotentialUnavailability(ReferenceRange, Diagnose, ReferenceDC,
-                                    domain, RequiredAvailability);
+                                    domain, PlatformRange);
     return true;
   }
 
@@ -892,12 +886,12 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
 }
 
 bool TypeChecker::checkAvailability(
-    SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
+    SourceRange ReferenceRange, AvailabilityRange PlatformRange,
     Diag<AvailabilityDomain, AvailabilityRange> Diag,
     const DeclContext *ReferenceDC) {
   auto &Diags = ReferenceDC->getASTContext().Diags;
   return TypeChecker::checkAvailability(
-      ReferenceRange, RequiredAvailability, ReferenceDC,
+      ReferenceRange, PlatformRange, ReferenceDC,
       [&](AvailabilityDomain domain, AvailabilityRange range) {
         return Diags.diagnose(ReferenceRange.Start, Diag, domain, range);
       });
@@ -1494,18 +1488,19 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
   if (!Attr)
     return;
 
+  auto Availability = Where.getAvailability();
+
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
-  if (Where.isDeprecated()) {
+  if (Availability.isDeprecated()) {
     return;
   }
 
   auto *ReferenceDC = Where.getDeclContext();
   auto &Context = ReferenceDC->getASTContext();
   if (!Context.LangOpts.DisableAvailabilityChecking) {
-    AvailabilityRange RunningOSVersions = Where.getAvailabilityRange();
-    if (RunningOSVersions.isKnownUnreachable()) {
+    if (Availability.getPlatformRange().isKnownUnreachable()) {
       // Suppress a deprecation warning if the availability checking machinery
       // thinks the reference program location will not execute on any
       // deployment target for the current platform.
@@ -1573,18 +1568,19 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
   if (!attr)
     return false;
 
+  auto availability = where.getAvailability();
+
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
-  if (where.isDeprecated()) {
+  if (availability.isDeprecated()) {
     return false;
   }
 
   auto *dc = where.getDeclContext();
   auto &ctx = dc->getASTContext();
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
-    AvailabilityRange runningOSVersion = where.getAvailabilityRange();
-    if (runningOSVersion.isKnownUnreachable()) {
+    if (availability.getPlatformRange().isKnownUnreachable()) {
       // Suppress a deprecation warning if the availability checking machinery
       // thinks the reference program location will not execute on any
       // deployment target for the current platform.

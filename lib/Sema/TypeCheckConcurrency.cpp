@@ -220,9 +220,8 @@ bool IsDefaultActorRequest::evaluate(
     auto customExecutorAvailability =
         ctx.getConcurrencyDistributedActorWithCustomExecutorAvailability();
 
-    auto actorAvailability = TypeChecker::overApproximateAvailabilityAtLocation(
-        classDecl->getStartLoc(),
-        classDecl);
+    auto actorAvailability =
+        AvailabilityContext::forDeclSignature(classDecl).getPlatformRange();
 
     if (!actorAvailability.isContainedIn(customExecutorAvailability)) {
       // Any 'distributed actor' declared with availability lower than the
@@ -1510,8 +1509,7 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
     AvailabilityRange requirementInfo =
         AvailabilityInference::availableRange(moveOnlyEnqueueRequirement);
     AvailabilityRange declInfo =
-        TypeChecker::overApproximateAvailabilityAtLocation(
-            nominal->getLoc(), dyn_cast<DeclContext>(nominal));
+        AvailabilityContext::forDeclSignature(nominal).getPlatformRange();
     canRemoveOldDecls = declInfo.isContainedIn(requirementInfo);
   }
 

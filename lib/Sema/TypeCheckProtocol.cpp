@@ -1904,7 +1904,7 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     isDefaultWitness = isa<ProtocolDecl>(nominal);
   if (isDefaultWitness && match.Witness->isDeprecated() &&
       !requirement->isDeprecated()) {
-    auto conformanceContext = ExportContext::forConformance(DC, Proto);
+    auto conformanceContext = AvailabilityContext::forDeclSignature(DC->getInnermostDeclarationDeclContext());
     if (!conformanceContext.isDeprecated()) {
       return RequirementCheck(CheckKind::DefaultWitnessDeprecated);
     }
@@ -5210,8 +5210,8 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
         if (auto depMemberType = depTy->getAs<DependentMemberType>()) {
           auto assocType = depMemberType->getAssocType();
           availability.intersectWith(
-              TypeChecker::overApproximateAvailabilityAtLocation(
-                  assocType->getLoc(), assocType->getDeclContext()));
+              AvailabilityContext::forDeclSignature(assocType)
+                  .getPlatformRange());
         }
 
         diagnoseConformanceAvailability(
