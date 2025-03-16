@@ -867,6 +867,15 @@ BridgedTransposeAttr BridgedTransposeAttr_createParsed(
       params);
 }
 
+BridgedTypeEraserAttr BridgedTypeEraserAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedTypeExpr cTypeExpr
+
+) {
+  return TypeEraserAttr::create(cContext.unbridged(), cAtLoc.unbridged(),
+                                cRange.unbridged(), cTypeExpr.unbridged());
+}
+
 BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedStringRef cMessage) {

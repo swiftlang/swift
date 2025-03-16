@@ -259,3 +259,8 @@ struct LayoutOuter {
 @rethrows protocol RethrowingProtocol {
   func source() throws
 }
+
+@_typeEraser(AnyEraser) protocol EraserProto {}
+struct AnyEraser: EraserProto {
+  init<T: EraserProto>(erasing: T) {}
+}

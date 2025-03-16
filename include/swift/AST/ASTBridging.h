@@ -1375,6 +1375,11 @@ BridgedTransposeAttr BridgedTransposeAttr_createParsed(
     BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
     BridgedArrayRef cParams);
 
+SWIFT_NAME("BridgedTypeEraserAttr.createParsed(_:atLoc:range:typeExpr:)")
+BridgedTypeEraserAttr BridgedTypeEraserAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedTypeExpr cTypeExpr);
+
 SWIFT_NAME(
     "BridgedUnavailableFromAsyncAttr.createParsed(_:atLoc:range:message:)")
 BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(

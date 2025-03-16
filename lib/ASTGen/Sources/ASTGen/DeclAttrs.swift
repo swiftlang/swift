@@ -190,7 +190,7 @@ extension ASTGenVisitor {
       case .transpose:
         return handle(self.generateTransposeAttr(attribute: node)?.asDeclAttribute)
       case .typeEraser:
-        fatalError("unimplemented")
+        return handle(self.generateTypeEraserAttr(attribute: node)?.asDeclAttribute)
       case .unavailableFromAsync:
         return handle(self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute)
       case .reasync:
@@ -2121,6 +2121,33 @@ extension ASTGenVisitor {
       originalName: originalDecl.declName,
       originalNameLoc: originalDecl.declNameLoc,
       params: parameters
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @_typeEraser(MyProtocol)
+  ///   ```
+  func generateTypeEraserAttr(attribute node: AttributeSyntax) -> BridgedTypeEraserAttr? {
+    // FIXME: Should be normal LabeledExprListSyntax arguments.
+    // FIXME: Error handling
+    let type: BridgedTypeRepr? = self.generateSingleAttrOption(attribute: node, { token in
+      let nameLoc = self.generateIdentifierAndSourceLoc(token)
+      return BridgedUnqualifiedIdentTypeRepr.createParsed(
+        self.ctx,
+        loc: nameLoc.sourceLoc,
+        name: nameLoc.identifier
+      ).asTypeRepr
+    })
+    guard let type else {
+      return nil
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      typeExpr: .createParsed(self.ctx, type: type)
     )
   }
 
