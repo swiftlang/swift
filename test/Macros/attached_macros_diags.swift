@@ -67,7 +67,7 @@ struct TestMacroArgs {
 
   @m2(10.0) struct Args3 {}
 
-  @m2("") struct Args4 {} // expected-error{{no exact matches in call to macro 'm2'}}
+  @m2("") struct Args4 {} // expected-error{{cannot convert argument #1 with type 'String' to any of 'Double', 'Int' in call to 'm2'}}
 
   @m2(Nested.x) struct Args5 {}
 

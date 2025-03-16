@@ -15,7 +15,7 @@ struct Handler {
 struct Reply: Codable {}
 
 func test() -> Handler {
-  Handler { (request: Request) in // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
+  Handler { (request: Request) in // expected-error {{function value passed to 'init' as argument #1 could be any of '(Request) -> (Int, Int)', '(Request) -> Int' but '(Connection) -> Bool' is expected}}
     request.accept { (_: Int) -> Reply? in
       Reply()
     }
