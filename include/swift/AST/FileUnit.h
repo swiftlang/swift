@@ -126,6 +126,14 @@ public:
                             const ModuleDecl *importedModule,
                             llvm::SmallSetVector<Identifier, 4> &spiGroups) const {};
 
+  /// Find all availability domains defined in this module with the given
+  /// identifier.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  virtual void lookupAvailabilityDomains(
+      Identifier identifier,
+      SmallVectorImpl<AvailabilityDomain> &results) const {};
+
   virtual std::optional<Fingerprint>
   loadFingerprint(const IterableDeclContext *IDC) const {
     return std::nullopt;

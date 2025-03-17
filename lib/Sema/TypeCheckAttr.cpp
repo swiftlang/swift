@@ -257,7 +257,7 @@ private:
 
 public:
   void visitExecutionAttr(ExecutionAttr *attr) {
-    auto *F = dyn_cast<FuncDecl>(D);
+    auto *F = dyn_cast<AbstractFunctionDecl>(D);
     if (!F)
       return;
 
@@ -5089,7 +5089,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   auto availabilityContext = AvailabilityContext::forDeploymentTarget(Ctx);
   if (auto parent =
           AvailabilityInference::parentDeclForInferredAvailability(D)) {
-    auto parentAvailability = TypeChecker::availabilityForDeclSignature(parent);
+    auto parentAvailability = AvailabilityContext::forDeclSignature(parent);
     availabilityContext.constrainWithContext(parentAvailability, Ctx);
   }
 
@@ -5235,7 +5235,7 @@ void AttributeChecker::checkBackDeployedAttrs(
     if (Ctx.LangOpts.DisableAvailabilityChecking)
       continue;
 
-    auto availability = TypeChecker::availabilityAtLocation(
+    auto availability = AvailabilityContext::forLocation(
         D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.

@@ -1,15 +1,19 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend-dump-parse -enable-experimental-feature ParserASTGen \
+// RUN:   -enable-experimental-feature NamedOpaqueTypes \
 // RUN:   | %sanitize-address > %t/astgen.ast
 // RUN: %target-swift-frontend-dump-parse \
+// RUN:   -enable-experimental-feature NamedOpaqueTypes \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen \
+// RUN:   -enable-experimental-feature NamedOpaqueTypes
 
 // REQUIRES: swift_feature_ParserASTGen
+// REQUIRES: swift_feature_NamedOpaqueTypes
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -70,3 +74,8 @@ struct SomeGlobalActor {
 typealias SomeGlobalActorIsolated = @SomeGlobalActor () -> Void
 typealias TestSpecifiers<Value, Result, E> = (inout sending Value) throws(E) -> sending Result where Value: ~Copyable, Result: ~Copyable, E: Error
 typealias TestSpecifierAndAttr<T> = (__owned @Sendable @escaping () async -> T) -> T
+
+let globalOptionalInt: _? = 42
+let optionalIntArray: Array<_> = [42]
+
+func testNamedOpaqueReturnTy() -> <T> T { return () }

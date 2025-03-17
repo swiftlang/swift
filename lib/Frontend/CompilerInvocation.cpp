@@ -3331,6 +3331,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_llvm_verify))
     Opts.Verify = false;
 
+  Opts.VerifyEach = Args.hasFlag(OPT_enable_llvm_verify_each,
+                                 OPT_disable_llvm_verify_each, Opts.VerifyEach);
+
   Opts.EmitStackPromotionChecks |= Args.hasArg(OPT_stack_promotion_checks);
   if (const Arg *A = Args.getLastArg(OPT_stack_promotion_limit)) {
     unsigned limit;

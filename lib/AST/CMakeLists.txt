@@ -31,6 +31,7 @@ add_swift_host_library(swiftAST STATIC
   AvailabilityContext.cpp
   AvailabilityDomain.cpp
   AvailabilityScope.cpp
+  AvailabilityScopeBuilder.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
   CaptureInfo.cpp

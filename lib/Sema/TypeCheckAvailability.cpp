@@ -28,6 +28,7 @@
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -50,9 +51,6 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
-
-static const Decl *
-concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl);
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
@@ -95,88 +93,6 @@ ExportContext::ExportContext(DeclContext *DC,
   Exported = exported;
   Implicit = implicit;
   Reason = unsigned(ExportabilityReason::General);
-}
-
-bool swift::isExported(const ValueDecl *VD) {
-  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-    return false;
-  if (VD->isObjCMemberImplementation())
-    return false;
-
-  // Is this part of the module's API or ABI?
-  AccessScope accessScope =
-      VD->getFormalAccessScope(nullptr,
-                               /*treatUsableFromInlineAsPublic*/true);
-  if (accessScope.isPublic())
-    return true;
-
-  // Is this a stored property in a @frozen struct or class?
-  if (auto *property = dyn_cast<VarDecl>(VD))
-    if (property->isLayoutExposedToClients())
-      return true;
-
-  return false;
-}
-
-static bool hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
-  auto nominal = ED->getExtendedNominal();
-  if (!nominal)
-    return false;
-
-  // Extensions of protocols cannot introduce additional conformances.
-  if (isa<ProtocolDecl>(nominal))
-    return false;
-
-  auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
-  for (const ProtocolDecl *PD : protocols) {
-    AccessScope scope =
-        PD->getFormalAccessScope(/*useDC*/ nullptr,
-                                 /*treatUsableFromInlineAsPublic*/ true);
-    if (scope.isPublic())
-      return true;
-  }
-
-  return false;
-}
-
-bool swift::isExported(const ExtensionDecl *ED) {
-  // An extension can only be exported if it extends an exported type.
-  if (auto *NTD = ED->getExtendedNominal()) {
-    if (!isExported(NTD))
-      return false;
-  }
-
-  // If there are any exported members then the extension is exported.
-  for (const Decl *D : ED->getMembers()) {
-    if (isExported(D))
-      return true;
-  }
-
-  // If the extension declares a conformance to a public protocol then the
-  // extension is exported.
-  if (hasConformancesToPublicProtocols(ED))
-    return true;
-
-  return false;
-}
-
-bool swift::isExported(const Decl *D) {
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    return isExported(VD);
-  }
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
-      if (auto *VD = PBD->getAnchoringVarDecl(i))
-        return isExported(VD);
-    }
-
-    return false;
-  }
-  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    return isExported(ED);
-  }
-
-  return true;
 }
 
 template<typename Fn>
@@ -253,7 +169,7 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
   auto *DC = D->getInnermostDeclContext();
   auto fragileKind = DC->getFragileFunctionKind();
   auto loc = D->getLoc();
-  auto availabilityContext = TypeChecker::availabilityAtLocation(loc, DC);
+  auto availabilityContext = AvailabilityContext::forLocation(loc, DC);
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   computeExportContextBits(Ctx, D, &spi, &implicit);
@@ -271,7 +187,7 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   auto &Ctx = DC->getASTContext();
 
   auto fragileKind = DC->getFragileFunctionKind();
-  auto availabilityContext = TypeChecker::availabilityAtLocation(loc, DC);
+  auto availabilityContext = AvailabilityContext::forLocation(loc, DC);
   bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   forEachOuterDecl(
@@ -327,8 +243,9 @@ ExportContext::getExportabilityReason() const {
 
 /// Returns true if there is any availability attribute on the declaration
 /// that is active.
+// FIXME: [availability] De-duplicate this with AvailabilityScopeBuilder.cpp.
 static bool hasActiveAvailableAttribute(const Decl *D, ASTContext &ctx) {
-  D = abstractSyntaxDeclForAvailableAttribute(D);
+  D = D->getAbstractSyntaxDeclForAttributes();
 
   for (auto Attr : D->getSemanticAvailableAttrs()) {
     if (Attr.isActive(ctx))
@@ -336,12 +253,6 @@ static bool hasActiveAvailableAttribute(const Decl *D, ASTContext &ctx) {
   }
 
   return false;
-}
-
-static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
-                                               ASTContext &ctx) {
-  return scope->getPlatformAvailabilityRange().isContainedIn(
-      AvailabilityRange::forDeploymentTarget(ctx));
 }
 
 static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
@@ -375,1215 +286,6 @@ static bool shouldTreatDeclContextAsAsyncForDiagnostics(const DeclContext *DC) {
         return shouldTreatDeclContextAsAsyncForDiagnostics(DC->getParent());
 
   return DC->isAsyncContext();
-}
-
-namespace {
-
-/// A class to walk the AST to build the availability scope tree.
-class AvailabilityScopeBuilder : private ASTWalker {
-
-  ASTContext &Context;
-
-  /// Represents an entry in a stack of active availability scopes. The stack is
-  /// used to facilitate building the availability scope tree structure. A new
-  /// scope is pushed onto this stack before visiting children whenever the
-  /// current AST node requires a new context and the scope is then popped
-  /// post-visitation.
-  struct ContextInfo {
-    AvailabilityScope *Scope;
-
-    /// The AST node. This node can be null (ParentTy()),
-    /// indicating that custom logic elsewhere will handle removing
-    /// the context when needed.
-    ParentTy ScopeNode;
-
-    bool ContainedByDeploymentTarget;
-  };
-  std::vector<ContextInfo> ContextStack;
-
-  llvm::SmallVector<const Decl *, 4> ConcreteDeclStack;
-
-  /// Represents an entry in a stack of pending decl body availability scopes.
-  /// Scopes in this stack should be pushed onto \p ContextStack when
-  /// \p BodyStmt is encountered.
-  struct DeclBodyContextInfo {
-    Decl *Decl;
-    llvm::DenseMap<ASTNode, AvailabilityScope *> BodyScopes;
-  };
-  std::vector<DeclBodyContextInfo> DeclBodyContextStack;
-
-  std::vector<const DeclContext *> DeclContextStack;
-
-  AvailabilityScope *getCurrentScope() {
-    return ContextStack.back().Scope;
-  }
-
-  const DeclContext *getCurrentDeclContext() const {
-    assert(!DeclContextStack.empty());
-    return DeclContextStack.back();
-  }
-
-  bool isCurrentScopeContainedByDeploymentTarget() {
-    return ContextStack.back().ContainedByDeploymentTarget;
-  }
-
-  const AvailabilityContext constrainCurrentAvailabilityWithPlatformRange(
-      const AvailabilityRange &platformRange) {
-    auto availability = getCurrentScope()->getAvailabilityContext();
-    availability.constrainWithPlatformRange(platformRange, Context);
-    return availability;
-  }
-
-  void pushContext(AvailabilityScope *Scope, ParentTy PopAfterNode) {
-    ContextInfo Info;
-    Info.Scope = Scope;
-    Info.ScopeNode = PopAfterNode;
-
-    if (!ContextStack.empty() && isCurrentScopeContainedByDeploymentTarget()) {
-      assert(computeContainedByDeploymentTarget(Scope, Context) &&
-             "incorrectly skipping computeContainedByDeploymentTarget()");
-      Info.ContainedByDeploymentTarget = true;
-    } else {
-      Info.ContainedByDeploymentTarget =
-          computeContainedByDeploymentTarget(Scope, Context);
-    }
-
-    ContextStack.push_back(Info);
-  }
-
-  void pushDeclBodyContext(
-      Decl *D, llvm::SmallVector<std::pair<ASTNode, AvailabilityScope *>, 4>
-                   NodesAndScopes) {
-    DeclBodyContextInfo Info;
-    Info.Decl = D;
-    for (auto NodeAndScope : NodesAndScopes) {
-      Info.BodyScopes.insert(NodeAndScope);
-    }
-
-    DeclBodyContextStack.push_back(Info);
-  }
-
-  const char *stackTraceAction() const {
-    return "building availabilty scope for";
-  }
-
-  friend class swift::ExpandChildAvailabilityScopesRequest;
-
-public:
-  AvailabilityScopeBuilder(AvailabilityScope *Scope, ASTContext &Context)
-      : Context(Context) {
-    assert(Scope);
-    pushContext(Scope, ParentTy());
-    DeclContextStack.push_back(Scope->getIntroductionNode().getDeclContext());
-  }
-
-  void build(Decl *D) {
-    PrettyStackTraceDecl trace(stackTraceAction(), D);
-    unsigned StackHeight = ContextStack.size();
-    D->walk(*this);
-    assert(ContextStack.size() == StackHeight);
-    (void)StackHeight;
-  }
-
-  void build(Stmt *S) {
-    PrettyStackTraceStmt trace(Context, stackTraceAction(), S);
-    unsigned StackHeight = ContextStack.size();
-    S->walk(*this);
-    assert(ContextStack.size() == StackHeight);
-    (void)StackHeight;
-  }
-
-  void build(Expr *E) {
-    PrettyStackTraceExpr trace(Context, stackTraceAction(), E);
-    unsigned StackHeight = ContextStack.size();
-    E->walk(*this);
-    assert(ContextStack.size() == StackHeight);
-    (void)StackHeight;
-  }
-
-private:
-  MacroWalking getMacroWalkingBehavior() const override {
-    // Expansion buffers will have their type availability scopes built lazily.
-    return MacroWalking::Arguments;
-  }
-
-  SequenceWalking getSequenceWalkingBehavior() const override {
-    // Since availability scopes may be built at arbitrary times, the builder
-    // may encounter ASTs where SequenceExprs still exist and have not been
-    // folded, or it may encounter folded SequenceExprs that have not been
-    // removed from the AST. When folded exprs are encountered, its important
-    // to avoid walking into the same AST nodes twice.
-    return SequenceWalking::OnlyWalkFirstOperatorWhenFolded;
-  }
-
-  /// Check whether this declaration is within a macro expansion buffer that
-  /// will have its own availability scope that will be lazily expanded.
-  bool isDeclInMacroExpansion(Decl *decl) const override {
-    // If it's not in a macro expansion relative to its context, it's not
-    // considered to be in a macro expansion.
-    if (!decl->isInMacroExpansionInContext())
-      return false;
-
-    auto module = decl->getDeclContext()->getParentModule();
-    auto *declFile = module->getSourceFileContainingLocation(decl->getLoc());
-    if (!declFile)
-      return false;
-
-    // Look for a parent context that implies that we are producing an
-    // availability scope for this expansion.
-    for (auto iter = ContextStack.rbegin(), endIter = ContextStack.rend();
-         iter != endIter; ++iter) {
-      const auto &context = *iter;
-      if (auto scope = context.Scope) {
-        // If the context is the same source file, don't treat it as an
-        // expansion.
-        auto introNode = scope->getIntroductionNode();
-        switch (scope->getReason()) {
-        case AvailabilityScope::Reason::Root:
-          if (auto contextFile = introNode.getAsSourceFile())
-            if (declFile == contextFile)
-              return false;
-
-          break;
-
-        case AvailabilityScope::Reason::Decl:
-        case AvailabilityScope::Reason::DeclImplicit:
-          // If the context is a declaration, check whether the declaration
-          // is in the same source file as this declaration.
-          if (auto contextDecl = introNode.getAsDecl()) {
-            if (decl == contextDecl)
-              return false;
-
-            auto contextModule =
-                contextDecl->getDeclContext()->getParentModule();
-            SourceLoc contextDeclLoc = contextDecl->getLoc();
-            auto contextDeclFile =
-                contextModule->getSourceFileContainingLocation(contextDeclLoc);
-            if (declFile == contextDeclFile)
-              return false;
-          }
-          break;
-
-        case AvailabilityScope::Reason::IfStmtThenBranch:
-        case AvailabilityScope::Reason::IfStmtElseBranch:
-        case AvailabilityScope::Reason::ConditionFollowingAvailabilityQuery:
-        case AvailabilityScope::Reason::GuardStmtFallthrough:
-        case AvailabilityScope::Reason::GuardStmtElseBranch:
-        case AvailabilityScope::Reason::WhileStmtBody:
-          // Nothing to check here.
-          break;
-        }
-      }
-    }
-
-    return true;
-  }
-
-  bool shouldSkipDecl(Decl *D) const {
-    // Only visit a node that has a corresponding concrete syntax node if we are
-    // already walking that concrete syntax node.
-    auto *concreteDecl = concreteSyntaxDeclForAvailableAttribute(D);
-    if (concreteDecl != D) {
-      if (ConcreteDeclStack.empty() || ConcreteDeclStack.back() != concreteDecl)
-        return true;
-    }
-
-    return false;
-  }
-
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    PrettyStackTraceDecl trace(stackTraceAction(), D);
-
-    // Implicit decls don't have source locations so they cannot have a scope.
-    // However, some implicit nodes contain non-implicit nodes (e.g. defer
-    // blocks) so we must continue through them.
-    if (!D->isImplicit()) {
-      if (shouldSkipDecl(D))
-        return Action::SkipNode();
-
-      // The AST of this decl may not be ready to traverse yet if it hasn't been
-      // full typechecked. If that's the case, we leave a placeholder node in
-      // the tree to indicate that the subtree should be expanded lazily when it
-      // needs to be traversed.
-      if (buildLazyContextForDecl(D))
-        return Action::SkipNode();
-
-      // Adds in a scope that covers the entire declaration.
-      if (auto DeclScope = getNewContextForSignatureOfDecl(D)) {
-        pushContext(DeclScope, D);
-      }
-
-      // Create scopes that cover only the body of the declaration.
-      buildContextsForBodyOfDecl(D);
-    }
-
-    if (auto *DC = dyn_cast<DeclContext>(D)) {
-      DeclContextStack.push_back(DC);
-    }
-
-    // If this decl is the concrete syntax decl for some abstract syntax decl,
-    // push it onto the stack so that the abstract syntax decls may be visited.
-    auto *abstractDecl = abstractSyntaxDeclForAvailableAttribute(D);
-    if (abstractDecl != D) {
-      ConcreteDeclStack.push_back(D);
-    }
-    return Action::Continue();
-  }
-
-  PostWalkAction walkToDeclPost(Decl *D) override {
-    if (!ConcreteDeclStack.empty() && ConcreteDeclStack.back() == D) {
-      ConcreteDeclStack.pop_back();
-    }
-
-    if (auto *DC = dyn_cast<DeclContext>(D)) {
-      assert(DeclContextStack.back() == DC);
-      DeclContextStack.pop_back();
-    }
-
-    while (ContextStack.back().ScopeNode.getAsDecl() == D) {
-      ContextStack.pop_back();
-    }
-
-    while (!DeclBodyContextStack.empty() &&
-           DeclBodyContextStack.back().Decl == D) {
-      // All pending body scopes should have been consumed.
-      assert(DeclBodyContextStack.back().BodyScopes.empty());
-      DeclBodyContextStack.pop_back();
-    }
-
-    return Action::Continue();
-  }
-
-  bool shouldBuildLazyContextForDecl(Decl *D) {
-    // Skip functions that have unparsed bodies on an initial descent to avoid
-    // eagerly parsing bodies unnecessarily.
-    if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (afd->hasBody() && !afd->isBodySkipped() &&
-          !afd->getBody(/*canSynthesize=*/false))
-        return true;
-    }
-
-    // Pattern binding declarations may have attached property wrappers that
-    // get expanded from macros attached to the parent declaration. We must
-    // not eagerly expand the attached property wrappers to avoid request
-    // cycles.
-    if (isa<PatternBindingDecl>(D)) {
-      return true;
-    }
-
-    if (isa<ExtensionDecl>(D)) {
-      return true;
-    }
-
-    return false;
-  }
-
-  /// For declarations that were previously skipped prepare the AST before
-  /// building out scopes.
-  void prepareDeclForLazyExpansion(Decl *D) {
-    if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      (void)AFD->getBody(/*canSynthesize*/ true);
-    }
-  }
-
-  /// Constructs a placeholder scope that should be expanded later. This is
-  /// useful for postponing unnecessary work (and request triggers) when
-  /// initally building out the scope subtree under a declaration. Lazy nodes
-  /// constructed here will be expanded by ExpandChildAvailabilityScopesRequest.
-  /// Returns true if a node was created.
-  bool buildLazyContextForDecl(Decl *D) {
-    // Check whether the current scope is already a lazy placeholder. If it is,
-    // we should try to expand it rather than creating a new placeholder.
-    auto currentScope = getCurrentScope();
-    if (currentScope->getNeedsExpansion() && currentScope->getDeclOrNull() == D)
-      return false;
-
-    if (!shouldBuildLazyContextForDecl(D))
-      return false;
-
-    // If we've made it this far then we've identified a declaration that
-    // requires lazy expansion later.
-    auto lazyScope = AvailabilityScope::createForDeclImplicit(
-        Context, D, currentScope, currentScope->getAvailabilityContext(),
-        refinementSourceRangeForDecl(D));
-    lazyScope->setNeedsExpansion(true);
-    return true;
-  }
-
-  /// Returns a new context to be introduced for the declaration, or nullptr
-  /// if no new context should be introduced.
-  AvailabilityScope *getNewContextForSignatureOfDecl(Decl *D) {
-    if (!isa<ValueDecl>(D) &&
-        !isa<EnumCaseDecl>(D) &&
-        !isa<ExtensionDecl>(D) &&
-        !isa<MacroExpansionDecl>(D) &&
-        !isa<PatternBindingDecl>(D))
-      return nullptr;
-
-    // Only introduce for an AbstractStorageDecl if it is not local. We
-    // introduce for the non-local case because these may have getters and
-    // setters (and these may be synthesized, so they might not even exist yet).
-    if (isa<AbstractStorageDecl>(D) && D->getDeclContext()->isLocalContext())
-      return nullptr;
-
-    // Don't introduce for abstract syntax nodes that have separate concrete
-    // syntax nodes. The scope will be introduced for the concrete node instead.
-    if (concreteSyntaxDeclForAvailableAttribute(D) != D)
-      return nullptr;
-
-    // Declarations with explicit availability attributes always get a scope.
-    if (hasActiveAvailableAttribute(D, Context)) {
-      return AvailabilityScope::createForDecl(
-          Context, D, getCurrentScope(),
-          getEffectiveAvailabilityForDeclSignature(D),
-          refinementSourceRangeForDecl(D));
-    }
-
-    // Declarations without explicit availability attributes get a scope if they
-    // are effectively less available than the surrounding context. For example,
-    // an internal property in a public struct can be effectively less available
-    // than the containing struct decl because the internal property will only
-    // be accessed by code running at the deployment target or later.
-    auto CurrentAvailability = getCurrentScope()->getAvailabilityContext();
-    auto EffectiveAvailability = getEffectiveAvailabilityForDeclSignature(D);
-    if (CurrentAvailability != EffectiveAvailability)
-      return AvailabilityScope::createForDeclImplicit(
-          Context, D, getCurrentScope(), EffectiveAvailability,
-          refinementSourceRangeForDecl(D));
-
-    return nullptr;
-  }
-
-  const AvailabilityContext
-  getEffectiveAvailabilityForDeclSignature(const Decl *D) {
-    auto EffectiveIntroduction = AvailabilityRange::alwaysAvailable();
-
-    // Availability attributes are found abstract syntax decls.
-    D = abstractSyntaxDeclForAvailableAttribute(D);
-
-    // As a special case, extension decls are treated as effectively as
-    // available as the nominal type they extend, up to the deployment target.
-    // This rule is a convenience for library authors who have written
-    // extensions without specifying availabilty on the extension itself.
-    if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-      auto ET = ED->getExtendedType();
-      if (ET && !hasActiveAvailableAttribute(D, Context)) {
-        EffectiveIntroduction.intersectWith(
-            swift::AvailabilityInference::inferForType(ET));
-
-        // We want to require availability to be specified on extensions of
-        // types that would be potentially unavailable to the module containing
-        // the extension, so limit the effective availability to the deployment
-        // target.
-        EffectiveIntroduction.unionWith(
-            AvailabilityRange::forDeploymentTarget(Context));
-      }
-    }
-
-    if (shouldConstrainSignatureToDeploymentTarget(D))
-      EffectiveIntroduction.intersectWith(
-          AvailabilityRange::forDeploymentTarget(Context));
-
-    auto availability = getCurrentScope()->getAvailabilityContext();
-    availability.constrainWithDeclAndPlatformRange(D, EffectiveIntroduction);
-    return availability;
-  }
-
-  /// Checks whether the entire declaration, including its signature, should be
-  /// constrained to the deployment target. Generally public API declarations
-  /// are not constrained since they appear in the interface of the module and
-  /// may be consumed by clients with lower deployment targets, but there are
-  /// some exceptions.
-  bool shouldConstrainSignatureToDeploymentTarget(const Decl *D) {
-    if (isCurrentScopeContainedByDeploymentTarget())
-      return false;
-
-    // A declaration inside of a local context always inherits the availability
-    // of the parent.
-    if (D->getDeclContext()->isLocalContext())
-      return false;
-
-    // As a convenience, explicitly unavailable decls are constrained to the
-    // deployment target. There's not much benefit to checking these decls at a
-    // lower availability version floor since they can't be invoked by clients.
-    if (getCurrentScope()->getAvailabilityContext().isUnavailable() ||
-        D->isUnavailable())
-      return true;
-
-    // To remain compatible with a lot of existing SPIs that are declared
-    // without availability attributes, constrain them to the deployment target
-    // too.
-    if (D->isSPI())
-      return true;
-
-    return !::isExported(D);
-  }
-
-  /// Returns the source range which should be refined by declaration. This
-  /// provides a convenient place to specify the refined range when it is
-  /// different than the declaration's source range.
-  SourceRange refinementSourceRangeForDecl(Decl *D) {
-    // We require a valid range in order to be able to query for the scope
-    // corresponding to a given SourceLoc.
-    // If this assert fires, it means we have probably synthesized an implicit
-    // declaration without location information. The appropriate fix is
-    // probably to gin up a source range for the declaration when synthesizing
-    // it.
-    assert(D->getSourceRange().isValid());
-
-    auto &Context = D->getASTContext();
-    SourceRange Range;
-    if (auto *storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
-      // Use the declaration's availability for the context when checking
-      // the bodies of its accessors.
-      Range = storageDecl->getSourceRange();
-
-      // HACK: For synthesized trivial accessors we may have not a valid
-      // location for the end of the braces, so in that case we will fall back
-      // to using the range for the storage declaration. The right fix here is
-      // to update AbstractStorageDecl::addTrivialAccessors() to take brace
-      // locations and have callers of that method provide appropriate source
-      // locations.
-      SourceRange BracesRange = storageDecl->getBracesRange();
-      if (BracesRange.isValid()) {
-        Range.widen(BracesRange);
-      }
-    } else {
-      Range = D->getSourceRangeIncludingAttrs();
-    }
-
-    Range.End = Lexer::getLocForEndOfToken(Context.SourceMgr, Range.End);
-    return Range;
-  }
-
-  /// Enumerate the AST nodes and their corresponding source ranges for
-  /// the body (or bodies) of the given declaration.
-  void enumerateBodyRanges(
-     Decl *decl,
-     llvm::function_ref<void(Decl *decl, ASTNode body, SourceRange)> acceptBody
-  ) {
-    // Top level code always uses the deployment target.
-    if (auto tlcd = dyn_cast<TopLevelCodeDecl>(decl)) {
-      if (auto bodyStmt = tlcd->getBody()) {
-        acceptBody(tlcd, bodyStmt, refinementSourceRangeForDecl(tlcd));
-      }
-      return;
-    }
-
-    // For functions, provide the body source range.
-    if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (!afd->isImplicit()) {
-        if (auto body = afd->getBody(/*canSynthesize*/ false)) {
-          acceptBody(afd, body, afd->getBodySourceRange());
-        }
-      }
-      return;
-    }
-
-    // Pattern binding declarations have initial values that are their
-    // bodies.
-    if (auto *pbd = dyn_cast<PatternBindingDecl>(decl)) {
-      for (unsigned index : range(pbd->getNumPatternEntries())) {
-        auto var = pbd->getAnchoringVarDecl(index);
-        if (!var)
-          continue;
-
-        auto *initExpr = pbd->getInit(index);
-        if (initExpr && !initExpr->isImplicit()) {
-          assert(initExpr->getSourceRange().isValid());
-
-          // Create a scope for the init written in the source.
-          acceptBody(var, initExpr, initExpr->getSourceRange());
-        }
-      }
-      return;
-    }
-  }
-
-  // Creates an implicit decl scope specifying the deployment target for
-  // `range` in decl `D`.
-  AvailabilityScope *
-  createImplicitDeclContextForDeploymentTarget(Decl *D, SourceRange range) {
-    const AvailabilityContext Availability =
-        constrainCurrentAvailabilityWithPlatformRange(
-            AvailabilityRange::forDeploymentTarget(Context));
-    return AvailabilityScope::createForDeclImplicit(
-        Context, D, getCurrentScope(), Availability, range);
-  }
-
-  /// Determine whether the body of the given declaration has
-  /// deployment-target availability.
-  static bool bodyIsDeploymentTarget(Decl *decl) {
-    if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-      return afd->getResilienceExpansion() != ResilienceExpansion::Minimal;
-    }
-
-    if (auto var = dyn_cast<VarDecl>(decl)) {
-      // Var decls may have associated pattern binding decls or property
-      // wrappers with init expressions. Those expressions need to be
-      // constrained to the deployment target unless they are exposed to
-      // clients.
-      return var->hasInitialValue() && !var->isInitExposedToClients();
-    }
-
-    return true;
-  }
-
-  void buildContextsForBodyOfDecl(Decl *D) {
-    // Are we already constrained by the deployment target and the declaration
-    // doesn't explicitly allow unsafe constructs in its definition, adding
-    // new contexts won't change availability.
-    if (isCurrentScopeContainedByDeploymentTarget())
-      return;
-
-    // Enumerate all of the body scopes to apply availability.
-    llvm::SmallVector<std::pair<ASTNode, AvailabilityScope *>, 4>
-        nodesAndScopes;
-    enumerateBodyRanges(D, [&](Decl *decl, ASTNode body, SourceRange range) {
-      auto availability = getCurrentScope()->getAvailabilityContext();
-
-      // Apply deployment-target availability if appropriate for this body.
-      if (!isCurrentScopeContainedByDeploymentTarget() &&
-          bodyIsDeploymentTarget(decl)) {
-        availability.constrainWithPlatformRange(
-             AvailabilityRange::forDeploymentTarget(Context), Context);
-      }
-
-      nodesAndScopes.push_back({
-          body,
-          AvailabilityScope::createForDeclImplicit(
-              Context, decl, getCurrentScope(), availability, range)
-      });
-    });
-
-    if (nodesAndScopes.size() > 0)
-      pushDeclBodyContext(D, nodesAndScopes);
-
-    if (!isCurrentScopeContainedByDeploymentTarget()) {
-      // Pattern binding declarations can have children corresponding to property
-      // wrappers, which we handle separately.
-      if (auto *pbd = dyn_cast<PatternBindingDecl>(D)) {
-        // Ideally any init expression would be returned by `getInit()` above.
-        // However, for property wrappers it doesn't get populated until
-        // typechecking completes (which is too late). Instead, we find the
-        // the property wrapper attribute and use its source range to create a
-        // scope for the initializer expression.
-        //
-        // FIXME: Since we don't have an expression here, we can't build out its
-        // scope. If the Expr that will eventually be created contains a closure
-        // expression, then it might have AST nodes that need to be refined. For
-        // example, property wrapper initializers that takes block arguments
-        // are not handled correctly because of this (rdar://77841331).
-        if (auto firstVar = pbd->getAnchoringVarDecl(0)) {
-          if (firstVar->hasInitialValue() &&
-              !firstVar->isInitExposedToClients()) {
-            for (auto *wrapper : firstVar->getAttachedPropertyWrappers()) {
-              createImplicitDeclContextForDeploymentTarget(firstVar,
-                                                           wrapper->getRange());
-            }
-          }
-        }
-      }
-    }
-  }
-
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    PrettyStackTraceStmt trace(Context, stackTraceAction(), S);
-
-    if (consumeDeclBodyContextIfNecessary(S)) {
-      return Action::Continue(S);
-    }
-
-    if (auto *IS = dyn_cast<IfStmt>(S)) {
-      buildIfStmtRefinementContext(IS);
-      return Action::SkipNode(S);
-    }
-
-    if (auto *RS = dyn_cast<GuardStmt>(S)) {
-      buildGuardStmtRefinementContext(RS);
-      return Action::SkipNode(S);
-    }
-
-    if (auto *WS = dyn_cast<WhileStmt>(S)) {
-      buildWhileStmtRefinementContext(WS);
-      return Action::SkipNode(S);
-    }
-
-    return Action::Continue(S);
-  }
-
-  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
-    // If we have multiple guard statements in the same block
-    // then we may have multiple availability scopes to pop
-    // after walking that block.
-    while (!ContextStack.empty() &&
-           ContextStack.back().ScopeNode.getAsStmt() == S) {
-      ContextStack.pop_back();
-    }
-
-    return Action::Continue(S);
-  }
-
-  /// Attempts to consume a scope from the `BodyScopes` of the top of
-  /// `DeclBodyContextStack`. Returns \p true if a scope was pushed.
-  template <typename T>
-  bool consumeDeclBodyContextIfNecessary(T Body) {
-    if (DeclBodyContextStack.empty())
-      return false;
-
-    auto &Info = DeclBodyContextStack.back();
-    auto Iter = Info.BodyScopes.find(Body);
-    if (Iter == Info.BodyScopes.end())
-      return false;
-
-    pushContext(Iter->getSecond(), Body);
-    Info.BodyScopes.erase(Iter);
-    return true;
-  }
-
-  /// Builds the availability scope hierarchy for the IfStmt if the guard
-  /// introduces a new scope for the Then branch.
-  /// There is no need for the caller to explicitly traverse the children
-  /// of this node.
-  void buildIfStmtRefinementContext(IfStmt *IS) {
-    std::optional<AvailabilityRange> ThenRange;
-    std::optional<AvailabilityRange> ElseRange;
-    std::tie(ThenRange, ElseRange) =
-        buildStmtConditionRefinementContext(IS->getCond());
-
-    if (ThenRange.has_value()) {
-      // Create a new context for the Then branch and traverse it in that new
-      // context.
-      auto AvailabilityContext =
-          constrainCurrentAvailabilityWithPlatformRange(ThenRange.value());
-      auto *ThenScope = AvailabilityScope::createForIfStmtThen(
-          Context, IS, getCurrentDeclContext(), getCurrentScope(),
-          AvailabilityContext);
-      AvailabilityScopeBuilder(ThenScope, Context).build(IS->getThenStmt());
-    } else {
-      build(IS->getThenStmt());
-    }
-
-    Stmt *ElseStmt = IS->getElseStmt();
-    if (!ElseStmt)
-      return;
-
-    // Refine the else branch if we're given a version range for that branch.
-    // For now, if present, this will only be the empty range, indicating
-    // that the branch is dead. We use it to suppress potential unavailability
-    // and deprecation diagnostics on code that definitely will not run with
-    // the current platform and minimum deployment target.
-    // If we add a more precise version range lattice (i.e., one that can
-    // support "<") we should create non-empty contexts for the Else branch.
-    if (ElseRange.has_value()) {
-      // Create a new context for the Then branch and traverse it in that new
-      // context.
-      auto AvailabilityContext =
-          constrainCurrentAvailabilityWithPlatformRange(ElseRange.value());
-      auto *ElseScope = AvailabilityScope::createForIfStmtElse(
-          Context, IS, getCurrentDeclContext(), getCurrentScope(),
-          AvailabilityContext);
-      AvailabilityScopeBuilder(ElseScope, Context).build(ElseStmt);
-    } else {
-      build(IS->getElseStmt());
-    }
-  }
-
-  /// Builds the availability scopes for the WhileStmt if the guard
-  /// introduces a new availability scope for the body branch.
-  /// There is no need for the caller to explicitly traverse the children
-  /// of this node.
-  void buildWhileStmtRefinementContext(WhileStmt *WS) {
-    std::optional<AvailabilityRange> BodyRange =
-        buildStmtConditionRefinementContext(WS->getCond()).first;
-
-    if (BodyRange.has_value()) {
-      // Create a new context for the body and traverse it in the new
-      // context.
-      auto AvailabilityContext =
-          constrainCurrentAvailabilityWithPlatformRange(BodyRange.value());
-      auto *BodyScope = AvailabilityScope::createForWhileStmtBody(
-          Context, WS, getCurrentDeclContext(), getCurrentScope(),
-          AvailabilityContext);
-      AvailabilityScopeBuilder(BodyScope, Context).build(WS->getBody());
-    } else {
-      build(WS->getBody());
-    }
-  }
-
-  /// Builds the availability scopes for the GuardStmt and pushes
-  /// the fallthrough scope onto the scope stack so that subsequent
-  /// AST elements in the same scope are analyzed in the context of the
-  /// fallthrough scope.
-  void buildGuardStmtRefinementContext(GuardStmt *GS) {
-    // 'guard' statements fall through if all of the
-    // guard conditions are true, so we refine the range after the require
-    // until the end of the enclosing block.
-    // if ... {
-    //   guard available(...) else { return } <-- Refined range starts here
-    //   ...
-    // } <-- Refined range ends here
-    //
-    // This is slightly tricky because, unlike our other control constructs,
-    // the refined region is not lexically contained inside the construct
-    // introducing the availability scope.
-    std::optional<AvailabilityRange> FallthroughRange;
-    std::optional<AvailabilityRange> ElseRange;
-    std::tie(FallthroughRange, ElseRange) =
-        buildStmtConditionRefinementContext(GS->getCond());
-
-    if (Stmt *ElseBody = GS->getBody()) {
-      if (ElseRange.has_value()) {
-        auto AvailabilityContext =
-            constrainCurrentAvailabilityWithPlatformRange(ElseRange.value());
-        auto *TrueScope = AvailabilityScope::createForGuardStmtElse(
-            Context, GS, getCurrentDeclContext(), getCurrentScope(),
-            AvailabilityContext);
-
-        AvailabilityScopeBuilder(TrueScope, Context).build(ElseBody);
-      } else {
-        build(ElseBody);
-      }
-    }
-
-    auto *ParentBrace = dyn_cast<BraceStmt>(Parent.getAsStmt());
-    assert(ParentBrace && "Expected parent of GuardStmt to be BraceStmt");
-    if (!FallthroughRange.has_value())
-      return;
-
-    // Create a new context for the fallthrough.
-    auto FallthroughAvailability =
-        constrainCurrentAvailabilityWithPlatformRange(FallthroughRange.value());
-    auto *FallthroughScope = AvailabilityScope::createForGuardStmtFallthrough(
-        Context, GS, ParentBrace, getCurrentDeclContext(), getCurrentScope(),
-        FallthroughAvailability);
-
-    pushContext(FallthroughScope, ParentBrace);
-  }
-
-  /// Build the availability scopes for a StmtCondition and return a pair
-  /// of optional version ranges, the first for the true branch and the second
-  /// for the false branch. A value of None for a given branch indicates that
-  /// the branch does not introduce a new scope.
-  std::pair<std::optional<AvailabilityRange>,
-            std::optional<AvailabilityRange>>
-  buildStmtConditionRefinementContext(StmtCondition Cond) {
-    if (Context.LangOpts.DisableAvailabilityChecking)
-      return {};
-
-    // Any availability scopes introduced in the statement condition
-    // will end at the end of the last condition element.
-    StmtConditionElement LastElement = Cond.back();
-
-    // Keep track of how many nested availability scopes we have pushed on
-    // the scope stack so we can pop them when we're done building the
-    // scope for the StmtCondition.
-    unsigned NestedCount = 0;
-
-    // Tracks the potential version range when the condition is false.
-    auto FalseFlow = AvailabilityRange::neverAvailable();
-
-    AvailabilityScope *StartingScope = getCurrentScope();
-
-    // Tracks if we're refining for availability or unavailability.
-    std::optional<bool> isUnavailability = std::nullopt;
-
-    for (StmtConditionElement Element : Cond) {
-      AvailabilityScope *CurrentScope = getCurrentScope();
-      AvailabilityRange CurrentInfo =
-          CurrentScope->getPlatformAvailabilityRange();
-
-      // If the element is not a condition, walk it in the current scope.
-      if (Element.getKind() != StmtConditionElement::CK_Availability) {
-
-        // Assume any condition element that is not a #available() can
-        // potentially be false, so conservatively combine the version
-        // range of the current context with the accumulated false flow
-        // of all other conjuncts.
-        FalseFlow.unionWith(CurrentInfo);
-
-        Element.walk(*this);
-        continue;
-      }
-
-      // #available query: introduce a new availability scope for the statement
-      // condition elements following it.
-      auto *Query = Element.getAvailability();
-
-      if (isUnavailability == std::nullopt) {
-        isUnavailability = Query->isUnavailability();
-      } else if (isUnavailability != Query->isUnavailability()) {
-        // Mixing availability with unavailability in the same statement will
-        // cause the false flow's version range to be ambiguous. Report it.
-        //
-        // Technically we can support this by not refining ambiguous flows,
-        // but there are currently no legitimate cases where one would have
-        // to mix availability with unavailability.
-        Context.Diags.diagnose(Query->getLoc(),
-                               diag::availability_cannot_be_mixed);
-        break;
-      }
-
-      // If this query expression has no queries, we will not introduce a new
-      // availability scope. We do not diagnose here: a diagnostic will already
-      // have been emitted by the parser.
-      // For #unavailable, empty queries are valid as wildcards are implied.
-      if (!Query->isUnavailability() && Query->getQueries().empty())
-        continue;
-
-      auto Spec = bestActiveSpecForQuery(Query);
-      if (!Spec) {
-        // We couldn't find an appropriate spec for the current platform,
-        // so rather than refining, emit a diagnostic and just use the current
-        // scope.
-        Context.Diags.diagnose(
-            Query->getLoc(), diag::availability_query_required_for_platform,
-            platformString(targetPlatform(Context.LangOpts)));
-
-        continue;
-      }
-
-      AvailabilityRange NewConstraint = contextForSpec(*Spec, false);
-      Query->setAvailableRange(
-          contextForSpec(*Spec, true).getRawVersionRange());
-
-      // When compiling zippered for macCatalyst, we need to collect both
-      // a macOS version (the target version) and an iOS/macCatalyst version
-      // (the target-variant). These versions will both be passed to a runtime
-      // entrypoint that will check either the macOS version or the iOS
-      // version depending on the kind of process this code is loaded into.
-      if (Context.LangOpts.TargetVariant) {
-        auto VariantSpec =
-            bestActiveSpecForQuery(Query, /*ForTargetVariant*/ true);
-        if (VariantSpec) {
-          VersionRange VariantRange =
-              contextForSpec(*VariantSpec, true).getRawVersionRange();
-          Query->setVariantAvailableRange(VariantRange);
-        }
-      }
-
-      if (Spec->isWildcard()) {
-        // The wildcard spec '*' represents the minimum deployment target, so
-        // there is no need to create an availability scope for this query.
-        // Further, we won't diagnose for useless #available() conditions
-        // where * matched on this platform -- presumably those conditions are
-        // needed for some other platform.
-        continue;
-      }
-
-      // If the explicitly-specified (via #availability) version range for the
-      // current scope is completely contained in the range for the spec, then
-      // a version query can never be false, so the spec is useless.
-      // If so, report this.
-      auto ExplicitRange = CurrentScope->getExplicitAvailabilityRange();
-      if (ExplicitRange && ExplicitRange->isContainedIn(NewConstraint)) {
-        // Unavailability scopes are always "useless" from a symbol
-        // availability point of view, so only useless availability specs are
-        // reported.
-        if (isUnavailability.value()) {
-          continue;
-        }
-        DiagnosticEngine &Diags = Context.Diags;
-        if (CurrentScope->getReason() != AvailabilityScope::Reason::Root) {
-          PlatformKind BestPlatform = targetPlatform(Context.LangOpts);
-
-          auto Domain = Spec->getDomain();
-          // If possible, try to report the diagnostic in terms for the
-          // platform the user uttered in the '#available()'. For a platform
-          // that inherits availability from another platform it may be
-          // different from the platform specified in the target triple.
-          if (Domain.getPlatformKind() != PlatformKind::none)
-            BestPlatform = Domain.getPlatformKind();
-          Diags.diagnose(Query->getLoc(),
-                         diag::availability_query_useless_enclosing_scope,
-                         platformString(BestPlatform));
-          Diags.diagnose(CurrentScope->getIntroductionLoc(),
-                         diag::availability_query_useless_enclosing_scope_here);
-        }
-      }
-
-      if (CurrentInfo.isContainedIn(NewConstraint)) {
-        // No need to actually create the availability scope if we know it is
-        // useless.
-        continue;
-      }
-
-      // If the #available() is not useless then there is potential false flow,
-      // so join the false flow with the potential versions of the current
-      // context.
-      // We could be more precise here if we enriched the lattice to include
-      // ranges of the form [x, y).
-      FalseFlow.unionWith(CurrentInfo);
-
-      auto ConstrainedAvailability =
-          constrainCurrentAvailabilityWithPlatformRange(NewConstraint);
-      auto *Scope = AvailabilityScope::createForConditionFollowingQuery(
-          Context, Query, LastElement, getCurrentDeclContext(), CurrentScope,
-          ConstrainedAvailability);
-
-      pushContext(Scope, ParentTy());
-      ++NestedCount;
-    }
-
-    std::optional<AvailabilityRange> FalseRefinement = std::nullopt;
-    // The version range for the false branch should never have any versions
-    // that weren't possible when the condition started evaluating.
-    assert(
-        FalseFlow.isContainedIn(StartingScope->getPlatformAvailabilityRange()));
-
-    // If the starting version range is not completely contained in the
-    // false flow version range then it must be the case that false flow range
-    // is strictly smaller than the starting range (because the false flow
-    // range *is* contained in the starting range), so we should introduce a
-    // new availability scope for the false flow.
-    if (!StartingScope->getPlatformAvailabilityRange().isContainedIn(
-            FalseFlow)) {
-      FalseRefinement = FalseFlow;
-    }
-
-    auto makeResult =
-        [isUnavailability](std::optional<AvailabilityRange> TrueRefinement,
-                           std::optional<AvailabilityRange> FalseRefinement) {
-          if (isUnavailability.has_value() && isUnavailability.value()) {
-            // If this is an unavailability check, invert the result.
-            return std::make_pair(FalseRefinement, TrueRefinement);
-          }
-          return std::make_pair(TrueRefinement, FalseRefinement);
-        };
-
-    if (NestedCount == 0)
-      return makeResult(std::nullopt, FalseRefinement);
-
-    AvailabilityScope *NestedScope = getCurrentScope();
-    while (NestedCount-- > 0)
-      ContextStack.pop_back();
-
-    assert(getCurrentScope() == StartingScope);
-
-    return makeResult(NestedScope->getPlatformAvailabilityRange(),
-                      FalseRefinement);
-  }
-
-  /// Return the best active spec for the target platform or nullptr if no
-  /// such spec exists.
-  std::optional<SemanticAvailabilitySpec>
-  bestActiveSpecForQuery(PoundAvailableInfo *available,
-                         bool forTargetVariant = false) {
-    std::optional<SemanticAvailabilitySpec> FoundWildcardSpec;
-    std::optional<SemanticAvailabilitySpec> BestSpec;
-
-    for (auto Spec :
-         available->getSemanticAvailabilitySpecs(getCurrentDeclContext())) {
-      if (Spec.isWildcard()) {
-        FoundWildcardSpec = Spec;
-        continue;
-      }
-
-      auto Domain = Spec.getDomain();
-      if (!Domain.isPlatform())
-        continue;
-
-      // FIXME: This is not quite right: we want to handle AppExtensions
-      // properly. For example, on the OSXApplicationExtension platform
-      // we want to chose the OS X spec unless there is an explicit
-      // OSXApplicationExtension spec.
-      auto Platform = Domain.getPlatformKind();
-      if (isPlatformActive(Platform, Context.LangOpts, forTargetVariant,
-                           /* ForRuntimeQuery */ true)) {
-
-        if (!BestSpec ||
-            inheritsAvailabilityFromPlatform(
-                Platform, BestSpec->getDomain().getPlatformKind())) {
-          BestSpec = Spec;
-        }
-      }
-    }
-
-    if (BestSpec)
-      return BestSpec;
-
-    // If we have reached this point, we found no spec for our target, so
-    // we return the other spec ('*'), if we found it, or nullptr, if not.
-    if (FoundWildcardSpec) {
-      return FoundWildcardSpec;
-    } else if (available->isUnavailability()) {
-      // For #unavailable, imply the presence of a wildcard.
-      SourceLoc Loc = available->getRParenLoc();
-      return AvailabilitySpec::createWildcard(Context, Loc);
-    } else {
-      return std::nullopt;
-    }
-  }
-
-  /// Return the availability context for the given spec.
-  AvailabilityRange contextForSpec(SemanticAvailabilitySpec Spec,
-                                   bool GetRuntimeContext) {
-    if (Spec.isWildcard()) {
-      return AvailabilityRange::alwaysAvailable();
-    }
-
-    llvm::VersionTuple Version =
-        (GetRuntimeContext ? Spec.getRuntimeVersion() : Spec.getVersion());
-
-    return AvailabilityRange(Version);
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    (void)consumeDeclBodyContextIfNecessary(E);
-
-    if (auto CE = dyn_cast<ClosureExpr>(E)) {
-      DeclContextStack.push_back(CE);
-    }
-
-    return Action::Continue(E);
-  }
-
-  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-    if (ContextStack.back().ScopeNode.getAsExpr() == E) {
-      ContextStack.pop_back();
-    }
-
-    if (auto *CE = dyn_cast<ClosureExpr>(E)) {
-      assert(DeclContextStack.back() == CE);
-      DeclContextStack.pop_back();
-    }
-
-    return Action::Continue(E);
-  }
-};
-
-} // end anonymous namespace
-
-void TypeChecker::buildAvailabilityScopes(SourceFile &SF) {
-  switch (SF.Kind) {
-  case SourceFileKind::SIL:
-    // SIL doesn't support availability queries.
-    return;
-  case SourceFileKind::MacroExpansion:
-  case SourceFileKind::DefaultArgument:
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-  case SourceFileKind::Interface:
-    break;
-  }
-  ASTContext &Context = SF.getASTContext();
-
-  // If there's already a root node, then we're done.
-  if (SF.getAvailabilityScope())
-    return;
-
-  // The root availability scope reflects the fact that all parts of
-  // the source file are guaranteed to be executing on at least the minimum
-  // platform version for inlining.
-  auto AvailabilityContext = AvailabilityContext::forInliningTarget(Context);
-  AvailabilityScope *RootScope =
-      AvailabilityScope::createForSourceFile(&SF, AvailabilityContext);
-  SF.setAvailabilityScope(RootScope);
-
-  // Build availability scopes, if necessary, for all declarations starting
-  // with StartElem.
-  AvailabilityScopeBuilder Builder(RootScope, Context);
-  for (auto item : SF.getTopLevelItems()) {
-    if (auto decl = item.dyn_cast<Decl *>())
-      Builder.build(decl);
-    else if (auto expr = item.dyn_cast<Expr *>())
-      Builder.build(expr);
-    else if (auto stmt = item.dyn_cast<Stmt *>())
-      Builder.build(stmt);
-  }
-}
-
-AvailabilityScope *TypeChecker::getOrBuildAvailabilityScope(SourceFile *SF) {
-  AvailabilityScope *scope = SF->getAvailabilityScope();
-  if (!scope) {
-    buildAvailabilityScopes(*SF);
-    scope = SF->getAvailabilityScope();
-  }
-
-  return scope;
-}
-
-evaluator::SideEffect ExpandChildAvailabilityScopesRequest::evaluate(
-    Evaluator &evaluator, AvailabilityScope *parentScope) const {
-  assert(parentScope->getNeedsExpansion());
-  if (auto decl = parentScope->getDeclOrNull()) {
-    ASTContext &ctx = decl->getASTContext();
-    AvailabilityScopeBuilder builder(parentScope, ctx);
-    builder.prepareDeclForLazyExpansion(decl);
-    builder.build(decl);
-  }
-  return evaluator::SideEffect();
-}
-
-AvailabilityContext
-TypeChecker::availabilityAtLocation(SourceLoc loc, const DeclContext *DC,
-                                    const AvailabilityScope **MostRefined) {
-  SourceFile *SF;
-  if (loc.isValid())
-    SF = DC->getParentModule()->getSourceFileContainingLocation(loc);
-  else
-    SF = DC->getParentSourceFile();
-  auto &Context = DC->getASTContext();
-
-  // If our source location is invalid (this may be synthesized code), climb
-  // the decl context hierarchy until we find a location that is valid,
-  // collecting availability ranges on the way up.
-  // We will combine the version ranges from these annotations
-  // with the scope for the valid location to overapproximate the running
-  // OS versions at the original source location.
-  // Because we are climbing DeclContexts we will miss availability scopes in
-  // synthesized code that are introduced by AST elements that are themselves
-  // not DeclContexts, such as  #available(..) and property declarations.
-  // That is, a reference with an invalid location that is contained
-  // inside a #available() and with no intermediate DeclContext will not be
-  // refined. For now, this is fine -- but if we ever synthesize #available(),
-  // this will be a real problem.
-
-  // We can assume we are running on at least the minimum inlining target.
-  auto baseAvailability = AvailabilityContext::forInliningTarget(Context);
-  auto isInvalidLoc = [SF](SourceLoc loc) {
-    return SF ? loc.isInvalid() : true;
-  };
-  while (DC && isInvalidLoc(loc)) {
-    const Decl *D = DC->getInnermostDeclarationDeclContext();
-    if (!D)
-      break;
-
-    baseAvailability.constrainWithDecl(D);
-    loc = D->getLoc();
-    DC = D->getDeclContext();
-  }
-
-  if (!SF || loc.isInvalid())
-    return baseAvailability;
-
-  AvailabilityScope *rootScope = getOrBuildAvailabilityScope(SF);
-  if (!rootScope)
-    return baseAvailability;
-
-  AvailabilityScope *scope = rootScope->findMostRefinedSubContext(loc, Context);
-  if (!scope)
-    return baseAvailability;
-
-  if (MostRefined) {
-    *MostRefined = scope;
-  }
-
-  auto availability = scope->getAvailabilityContext();
-  availability.constrainWithContext(baseAvailability, Context);
-  return availability;
-}
-
-AvailabilityContext
-TypeChecker::availabilityForDeclSignature(const Decl *decl) {
-  return TypeChecker::availabilityAtLocation(decl->getLoc(),
-                                             decl->getInnermostDeclContext());
-}
-
-AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
-    SourceLoc loc, const DeclContext *DC,
-    const AvailabilityScope **MostRefined) {
-  return availabilityAtLocation(loc, DC, MostRefined).getPlatformRange();
 }
 
 /// A class that walks the AST to find the innermost (i.e., deepest) node that
@@ -1768,35 +470,6 @@ static const Decl *findContainingDeclaration(SourceRange ReferenceRange,
   return nullptr;
 }
 
-/// Given a declaration that allows availability attributes in the abstract
-/// syntax tree, return the declaration upon which the declaration would
-/// appear in concrete syntax. This function is necessary because for semantic
-/// analysis, the parser attaches attributes to declarations other
-/// than those on which they, concretely, appear. For these declarations (enum
-/// cases and variable declarations) a Fix-It for an added availability
-/// attribute should be suggested for the appropriate concrete location.
-static const Decl *
-concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl) {
-  // This function needs to be kept in sync with its counterpart,
-  // abstractSyntaxDeclForAvailableAttribute().
-
-  // The source range for VarDecls does not include 'var ' (and, in any
-  // event, multiple variables can be introduced with a single 'var'),
-  // so suggest adding an attribute to the PatterningBindingDecl instead.
-  if (auto *VD = dyn_cast<VarDecl>(AbstractSyntaxDecl)) {
-    if (auto *PBD = VD->getParentPatternBinding())
-      return PBD;
-  }
-
-  // Similarly suggest applying the Fix-It to the parent enum case rather than
-  // the enum element.
-  if (auto *EE = dyn_cast<EnumElementDecl>(AbstractSyntaxDecl)) {
-    return EE->getParentCase();
-  }
-
-  return AbstractSyntaxDecl;
-}
-
 /// Given a declaration, return a better related declaration for which
 /// to suggest an @available fixit, or the original declaration
 /// if no such related declaration exists.
@@ -1807,7 +480,7 @@ static const Decl *relatedDeclForAvailabilityFixit(const Decl *D) {
     D = accessor->getStorage();
   }
 
-  return abstractSyntaxDeclForAvailableAttribute(D);
+  return D->getAbstractSyntaxDeclForAttributes();
 }
 
 /// Walk the DeclContext hierarchy starting from D to find a declaration
@@ -1972,7 +645,7 @@ static void fixAvailabilityForDecl(
   // syntax to suggest the Fix-It may differ from the declaration to which
   // we attach availability attributes in the abstract syntax tree during
   // parsing.
-  const Decl *ConcDecl = concreteSyntaxDeclForAvailableAttribute(D);
+  const Decl *ConcDecl = D->getConcreteSyntaxDeclForAttributes();
 
   // To avoid exposing the pattern binding declaration to the user, get the
   // descriptive kind from one of the VarDecls.
@@ -2009,8 +682,8 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     return false;
 
   const AvailabilityScope *scope = nullptr;
-  (void)TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
-                                                           ReferenceDC, &scope);
+  (void)AvailabilityContext::forLocation(ReferenceRange.Start, ReferenceDC,
+                                         &scope);
   if (!scope)
     return false;
 
@@ -2186,7 +859,7 @@ static void diagnosePotentialUnavailability(
 // FIXME: [availability] Should this take an AvailabilityContext instead of
 // AvailabilityRange?
 bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
-                                    AvailabilityRange RequiredAvailability,
+                                    AvailabilityRange PlatformRange,
                                     const DeclContext *ReferenceDC,
                                     llvm::function_ref<InFlightDiagnostic(
                                         AvailabilityDomain, AvailabilityRange)>
@@ -2200,11 +873,12 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
     return false;
 
   auto availabilityAtLocation =
-      TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
-                                                         ReferenceDC);
-  if (!availabilityAtLocation.isContainedIn(RequiredAvailability)) {
+      AvailabilityContext::forLocation(ReferenceRange.Start, ReferenceDC)
+          .getPlatformRange();
+
+  if (!availabilityAtLocation.isContainedIn(PlatformRange)) {
     diagnosePotentialUnavailability(ReferenceRange, Diagnose, ReferenceDC,
-                                    domain, RequiredAvailability);
+                                    domain, PlatformRange);
     return true;
   }
 
@@ -2212,12 +886,12 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
 }
 
 bool TypeChecker::checkAvailability(
-    SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
+    SourceRange ReferenceRange, AvailabilityRange PlatformRange,
     Diag<AvailabilityDomain, AvailabilityRange> Diag,
     const DeclContext *ReferenceDC) {
   auto &Diags = ReferenceDC->getASTContext().Diags;
   return TypeChecker::checkAvailability(
-      ReferenceRange, RequiredAvailability, ReferenceDC,
+      ReferenceRange, PlatformRange, ReferenceDC,
       [&](AvailabilityDomain domain, AvailabilityRange range) {
         return Diags.diagnose(ReferenceRange.Start, Diag, domain, range);
       });
@@ -2814,18 +1488,19 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
   if (!Attr)
     return;
 
+  auto Availability = Where.getAvailability();
+
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
-  if (Where.isDeprecated()) {
+  if (Availability.isDeprecated()) {
     return;
   }
 
   auto *ReferenceDC = Where.getDeclContext();
   auto &Context = ReferenceDC->getASTContext();
   if (!Context.LangOpts.DisableAvailabilityChecking) {
-    AvailabilityRange RunningOSVersions = Where.getAvailabilityRange();
-    if (RunningOSVersions.isKnownUnreachable()) {
+    if (Availability.getPlatformRange().isKnownUnreachable()) {
       // Suppress a deprecation warning if the availability checking machinery
       // thinks the reference program location will not execute on any
       // deployment target for the current platform.
@@ -2893,18 +1568,19 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
   if (!attr)
     return false;
 
+  auto availability = where.getAvailability();
+
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
-  if (where.isDeprecated()) {
+  if (availability.isDeprecated()) {
     return false;
   }
 
   auto *dc = where.getDeclContext();
   auto &ctx = dc->getASTContext();
   if (!ctx.LangOpts.DisableAvailabilityChecking) {
-    AvailabilityRange runningOSVersion = where.getAvailabilityRange();
-    if (runningOSVersion.isKnownUnreachable()) {
+    if (availability.getPlatformRange().isKnownUnreachable()) {
       // Suppress a deprecation warning if the availability checking machinery
       // thinks the reference program location will not execute on any
       // deployment target for the current platform.
@@ -3087,8 +1763,7 @@ swift::getUnsatisfiedAvailabilityConstraint(const Decl *decl,
                                             const DeclContext *referenceDC,
                                             SourceLoc referenceLoc) {
   return getAvailabilityConstraintsForDecl(
-             decl,
-             TypeChecker::availabilityAtLocation(referenceLoc, referenceDC))
+             decl, AvailabilityContext::forLocation(referenceLoc, referenceDC))
       .getPrimaryConstraint();
 }
 
@@ -4803,12 +3478,7 @@ void swift::checkExplicitAvailability(Decl *decl) {
       !isa<ExtensionDecl>(decl->getDeclContext())) return;
 
   if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
-    // decl should be either a ValueDecl or an ExtensionDecl.
-    auto extended = extension->getExtendedNominal();
-    if (!extended || !extended->getFormalAccessScope().isPublic())
-      return;
-
-    // Skip extensions without public members or conformances.
+    // Skip extensions when none of their members need availability.
     auto members = extension->getMembers();
     auto hasMembers = std::any_of(members.begin(), members.end(),
                                   [](const Decl *D) -> bool {
@@ -4818,10 +3488,8 @@ void swift::checkExplicitAvailability(Decl *decl) {
       return false;
     });
 
-    auto hasProtocols = hasConformancesToPublicProtocols(extension);
-
-    if (!hasMembers && !hasProtocols) return;
-
+    if (!hasMembers && !isExported(extension))
+      return;
   } else if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
     // Check the first var instead.
     if (pbd->getNumPatternEntries() == 0)

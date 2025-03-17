@@ -70,6 +70,17 @@ extension ASTGenVisitor {
     if node.name.keywordKind == .Any && node.genericArgumentClause == nil {
       return BridgedCompositionTypeRepr.createEmpty(self.ctx, anyKeywordLoc: loc).asTypeRepr
     }
+    if node.name.rawText == "_" {
+      guard node.genericArgumentClause == nil else {
+        // TODO: Diagnose.
+        fatalError()
+        // return BridgedErrorTypeRepr.create()
+      }
+      return BridgedPlaceholderTypeRepr.createParsed(
+        self.ctx,
+        loc: loc
+      ).asTypeRepr
+    }
 
     let id = self.generateIdentifier(node.name)
 
@@ -165,9 +176,10 @@ extension ASTGenVisitor {
   }
 
   func generate(missingType node: MissingTypeSyntax) -> BridgedTypeRepr {
+    let loc = self.generateSourceLoc(node.previousToken(viewMode: .sourceAccurate))
     return BridgedErrorTypeRepr.create(
       self.ctx,
-      range: self.generateSourceRange(node)
+      range: BridgedSourceRange(start: loc, end: loc)
     ).asTypeRepr
   }
 
@@ -255,8 +267,9 @@ extension ASTGenVisitor {
   }
 
   func generate(namedOpaqueReturnType node: NamedOpaqueReturnTypeSyntax) -> BridgedNamedOpaqueReturnTypeRepr {
+    let genericParams = self.generate(genericParameterClause: node.genericParameterClause)
     let baseTy = generate(type: node.type)
-    return .createParsed(self.ctx, base: baseTy)
+    return .createParsed(self.ctx, base: baseTy, genericParamList: genericParams)
   }
 
   func generate(someOrAnyType node: SomeOrAnyTypeSyntax) -> BridgedTypeRepr {
@@ -415,7 +428,7 @@ extension ASTGenVisitor {
       type = BridgedSendingTypeRepr.createParsed(
         self.ctx,
         base: type,
-        specifierLoc: constLoc
+        specifierLoc: sendingLoc
       ).asTypeRepr
     }
 

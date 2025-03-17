@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend -O -enable-ossa-modules -Xllvm -sil-print-types -emit-sil -Xllvm -sil-verify-force-analysis-around-pass=devirtualizer -Xllvm -sil-disable-pass=function-signature-opts %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx
 
 //===----------------------------------------------------------------------===//
 // testReturnSelf: Call to a protocol extension method with
@@ -159,14 +158,14 @@ func takesA<T: ProtoA>(_ type: T.Type) -> T? {
 }
 
 public struct SomeStruct: ProtoB {
-  var x = 27
+  var x: Int64 = 27
   public init() {}
 }
 
 // CHECK-LABEL: sil @$s37sil_combine_concrete_existential_ossa16createSomeStructAA0gH0VSgyF :
 // CHECK:         [[L:%.*]] = integer_literal $Builtin.Int64, 27
-// CHECK-NEXT:    [[I:%.*]] = struct $Int ([[L]] : $Builtin.Int64)
-// CHECK-NEXT:    [[S:%.*]] = struct $SomeStruct ([[I]] : $Int)
+// CHECK-NEXT:    [[I:%.*]] = struct $Int64 ([[L]] : $Builtin.Int64)
+// CHECK-NEXT:    [[S:%.*]] = struct $SomeStruct ([[I]] : $Int64)
 // CHECK-NEXT:    [[O:%.*]] = enum $Optional<SomeStruct>, #Optional.some!enumelt, [[S]] : $SomeStruct
 // CHECK-NEXT:    return [[O]] : $Optional<SomeStruct>
 // CHECK:       } // end sil function '$s37sil_combine_concrete_existential_ossa16createSomeStructAA0gH0VSgyF'

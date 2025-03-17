@@ -166,7 +166,7 @@ extension ASTGenVisitor {
     return BridgedMagicIdentifierLiteralExpr.createParsed(
       self.ctx,
       kind: kind,
-      loc: self.generateSourceLoc(node.macroName)
+      loc: self.generateSourceLoc(node.pound)
     )
   }
 
@@ -195,10 +195,10 @@ extension ASTGenVisitor {
   }
 
   func generateObjCSelectorExpr(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedObjCSelectorExpr {
-    fatalError("unimplemented")
+    fatalError("unimplemented (objc selector)")
   }
 
   func generateObjCKeyPathExpr(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedKeyPathExpr {
-    fatalError("unimplemented")
+    fatalError("unimplemented (objc keypath)")
   }
 }

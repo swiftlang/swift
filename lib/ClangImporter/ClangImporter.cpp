@@ -4103,6 +4103,39 @@ void ClangModuleUnit::lookupObjCMethods(
   }
 }
 
+void ClangModuleUnit::lookupAvailabilityDomains(
+    Identifier identifier, SmallVectorImpl<AvailabilityDomain> &results) const {
+  auto lookupTable = owner.findLookupTable(clangModule);
+  if (!lookupTable)
+    return;
+
+  auto varDecl = lookupTable->lookupAvailabilityDomainDecl(identifier.str());
+  if (!varDecl)
+    return;
+
+  auto featureInfo = getClangASTContext().getFeatureAvailInfo(varDecl);
+  if (featureInfo.first.empty())
+    return;
+
+  auto getDomainKind = [](clang::FeatureAvailKind featureAvailKind) {
+    switch (featureAvailKind) {
+    case clang::FeatureAvailKind::None:
+      llvm_unreachable("unexpected kind");
+    case clang::FeatureAvailKind::Available:
+      return CustomAvailabilityDomain::Kind::Enabled;
+    case clang::FeatureAvailKind::Unavailable:
+      return CustomAvailabilityDomain::Kind::Disabled;
+    case clang::FeatureAvailKind::Dynamic:
+      return CustomAvailabilityDomain::Kind::Dynamic;
+    }
+  };
+
+  auto domain = AvailabilityDomain::forCustom(CustomAvailabilityDomain::get(
+      featureInfo.first, getParentModule(),
+      getDomainKind(featureInfo.second.Kind), getASTContext()));
+  results.push_back(domain);
+}
+
 void ClangModuleUnit::collectLinkLibraries(
     ModuleDecl::LinkLibraryCallback callback) const {
   if (!clangModule)

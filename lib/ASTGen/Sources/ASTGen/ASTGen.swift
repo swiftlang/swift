@@ -128,9 +128,17 @@ struct ASTGenVisitor {
           case .generated(let generated):
             return generated
           case .ignored:
-            // Let regular 'self.generate(expr:)' generate the macro expansions.
             break
           }
+
+          // In non-script files, macro expansion at top-level must be a decl.
+          if !declContext.parentSourceFile.isScriptMode {
+            return withDeclContext(parentDC) {
+              return .decl(self.generateMacroExpansionDecl(macroExpansionExpr: node).asDecl)
+            }
+          }
+
+          // Otherwise, let regular 'self.generate(expr:)' generate the macro expansions.
         }
         return .expr(self.generate(expr: node))
       }

@@ -7,6 +7,7 @@
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   | %sanitize-address > %t/astgen.ast
@@ -18,6 +19,7 @@
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
 
@@ -32,8 +34,10 @@
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only
 
+// REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
@@ -250,3 +254,13 @@ struct LayoutOuter {
   }
 }
 @_rawLayout(like: LayoutOuter.Nested<Int>) struct TypeExprTest: ~Copyable {}
+
+@reasync protocol ReasyncProtocol {}
+@rethrows protocol RethrowingProtocol {
+  func source() throws
+}
+
+@_typeEraser(AnyEraser) protocol EraserProto {}
+struct AnyEraser: EraserProto {
+  init<T: EraserProto>(erasing: T) {}
+}

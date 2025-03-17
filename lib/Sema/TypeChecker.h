@@ -1031,32 +1031,6 @@ bool isAvailabilitySafeForConformance(
     const ValueDecl *witness, const DeclContext *dc,
     AvailabilityRange &requiredAvailability);
 
-/// Returns the most refined `AvailabilityContext` for the given location.
-/// If `MostRefined` is not `nullptr`, it will be set to the most refined scope
-/// that contains the given location.
-AvailabilityContext
-availabilityAtLocation(SourceLoc loc, const DeclContext *DC,
-                       const AvailabilityScope **MostRefined = nullptr);
-
-/// Returns the availability context of the signature of the given declaration.
-AvailabilityContext availabilityForDeclSignature(const Decl *decl);
-
-/// Returns an over-approximation of the range of operating system versions
-/// that could the passed-in location could be executing upon for
-/// the target platform. If MostRefined != nullptr, set to the most-refined
-/// scope found while approximating.
-AvailabilityRange overApproximateAvailabilityAtLocation(
-    SourceLoc loc, const DeclContext *DC,
-    const AvailabilityScope **MostRefined = nullptr);
-
-/// Walk the AST to build the tree of AvailabilityScopes.
-void buildAvailabilityScopes(SourceFile &SF);
-
-/// Build the hierarchy of AvailabilityScopes for the entire
-/// source file, if it has not already been built. Returns the root
-/// AvailabilityScope for the source file.
-AvailabilityScope *getOrBuildAvailabilityScope(SourceFile *SF);
-
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
 /// or None if this is allowed.
@@ -1073,7 +1047,7 @@ diagnosticIfDeclCannotBeUnavailable(const Decl *D, SemanticAvailableAttr attr);
 /// platform are available at the given `SourceRange`. If not, `Diagnose` is
 /// invoked.
 bool checkAvailability(SourceRange ReferenceRange,
-                       AvailabilityRange RequiredAvailability,
+                       AvailabilityRange PlatformRange,
                        const DeclContext *ReferenceDC,
                        llvm::function_ref<InFlightDiagnostic(AvailabilityDomain,
                                                              AvailabilityRange)>
@@ -1083,7 +1057,7 @@ bool checkAvailability(SourceRange ReferenceRange,
 /// platform are available at the given `SourceRange`. If not, `Diag` is
 /// emitted.
 bool checkAvailability(SourceRange ReferenceRange,
-                       AvailabilityRange RequiredAvailability,
+                       AvailabilityRange PlatformRange,
                        Diag<AvailabilityDomain, AvailabilityRange> Diag,
                        const DeclContext *ReferenceDC);
 

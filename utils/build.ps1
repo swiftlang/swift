@@ -184,7 +184,12 @@ $env:SDKROOT = ""
 
 $BuildArchName = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 
-if ($PinnedBuild -eq "") {
+# Validate that if one is set all are set.
+if (($PinnedBuild -or $PinnedSHA256 -or $PinnedVersion) -and -not ($PinnedBuild -and $PinnedSHA256 -and $PinnedVersion)) {
+  throw "If any of PinnedBuild, PinnedSHA256, or PinnedVersion is set, all three must be set."
+}
+
+if (-not $PinnedBuild) {
   switch ($BuildArchName) {
     "AMD64" {
       $PinnedBuild = "https://download.swift.org/swift-6.0.3-release/windows10/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-windows10.exe"
@@ -210,11 +215,9 @@ $msbuild = "$VSInstallRoot\MSBuild\Current\Bin\$BuildArchName\MSBuild.exe"
 $UnixToolsBinDir = "$env:SystemDrive\Program Files\Git\usr\bin"
 
 if ($Android -and ($AndroidSDKs.Length -eq 0)) {
-  # By default, build and test the arm64 Android SDK. That choice might change
-  # once we can run executable tests in CI.
-  $AndroidSDKs = @("aarch64")
+  # Enable all android SDKs by default.
+  $AndroidSDKs = @("aarch64","armv7","i686","x86_64")
 }
-
 # Work around limitations of cmd passing in array arguments via powershell.exe -File
 if ($AndroidSDKs.Length -eq 1) { $AndroidSDKs = $AndroidSDKs[0].Split(",") }
 if ($WindowsSDKs.Length -eq 1) { $WindowsSDKs = $WindowsSDKs[0].Split(",") }
@@ -392,18 +395,40 @@ function Add-TimingData {
     Arch = $Arch
     Platform = $Platform
     "Build Step" = $BuildStep
-    "Elapsed Time" = $ElapsedTime.ToString()
+    "Elapsed Time" = $ElapsedTime
   })
 }
 
 function Write-Summary {
   Write-Host "Summary:" -ForegroundColor Cyan
 
-  # Sort timing data by elapsed time (descending)
-  $TimingData `
-    | Select-Object "Build Step",Platform,Arch,"Elapsed Time" `
-    | Sort-Object -Descending -Property "Elapsed Time" `
-    | Format-Table -AutoSize
+  $TotalTime = [TimeSpan]::Zero
+  foreach ($Entry in $TimingData) {
+    $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
+  }
+
+  $SortedData = $TimingData | ForEach-Object {
+    $Percentage = [math]::Round(($_.("Elapsed Time").TotalSeconds / $TotalTime.TotalSeconds) * 100, 1)
+    $FormattedTime = "{0:hh\:mm\:ss\.ff}" -f $_."Elapsed Time"
+    [PSCustomObject]@{
+      "Build Step" = $_."Build Step"
+      Platform = $_.Platform
+      Arch = $_.Arch
+      "Elapsed Time" = $FormattedTime
+      "%" = "$Percentage%"
+    }
+  } | Sort-Object -Descending -Property "%"
+
+  $FormattedTotalTime = "{0:hh\:mm\:ss\.ff}" -f $TotalTime
+  $TotalRow = [PSCustomObject]@{
+    "Build Step" = "TOTAL"
+    Platform = ""
+    Arch = ""
+    "Elapsed Time" = $FormattedTotalTime
+    "%" = "100.0%"
+  }
+
+  @($SortedData) + $TotalRow | Format-Table -AutoSize
 }
 
 function Get-AndroidNDK {
@@ -1637,6 +1662,24 @@ function Write-PList {
       -OutFile $Path
 }
 
+function Load-LitTestOverrides($Filename) {
+  function Select-LitTestOverrides($Prefix) {
+    $MatchingLines = Get-Content $Filename | Select-String -Pattern "`^${Prefix}.*$"
+    return $MatchingLines | ForEach-Object { ($_ -replace $Prefix,"").Trim() }
+  }
+
+  $TestsToXFail = Select-LitTestOverrides "xfail"
+  Write-Host "TestsToXFail=$TestsToXFail"
+  if ($TestsToXFail -and $TestsToXFail.Length -ne 0) {
+    $env:LIT_XFAIL = $TestsToXFail -join ";"
+  }
+  $TestsToSkip = Select-LitTestOverrides "skip"
+  Write-Host "TestsToSkip=$TestsToSkip"
+  if ($TestsToSkip -and $TestsToSkip.Length -gt 0) {
+    $env:LIT_FILTER_OUT = "($($TestsToSkip -join '|'))"
+  }
+}
+
 function Build-Compilers() {
   [CmdletBinding(PositionalBinding = $false)]
   param
@@ -1676,19 +1719,8 @@ function Build-Compilers() {
       if ($TestLLDB) {
         $Targets += @("check-lldb")
 
-        function Select-LitTestOverrides {
-          param([string] $TestStatus)
-
-          $MatchingLines=(Get-Content $PSScriptRoot/windows-llvm-lit-test-overrides.txt | Select-String -Pattern "`^${TestStatus}.*$")
-          $TestNames=$MatchingLines | ForEach-Object { ($_ -replace $TestStatus,"").Trim() }
-          return $TestNames
-        }
-
-        # Override some test results with llvm-lit.
-        $TestsToXFail=Select-LitTestOverrides "xfail"
-        $TestsToSkip=Select-LitTestOverrides "skip"
-        $env:LIT_XFAIL=$TestsToXFail -join ";"
-        $env:LIT_FILTER_OUT="($($TestsToSkip -join '|'))"
+        # Override test filter for known issues in downstream LLDB
+        Load-LitTestOverrides $PSScriptRoot/windows-llvm-lit-test-overrides.txt
 
         # Transitive dependency of _lldb.pyd
         $RuntimeBinaryCache = Get-TargetProjectBinaryCache $Arch Runtime
@@ -2138,8 +2170,6 @@ function Build-Runtime([Platform]$Platform, $Arch) {
     $PlatformDefines += @{
       LLVM_ENABLE_LIBCXX = "YES";
       SWIFT_USE_LINKER = "lld";
-      SWIFT_INCLUDE_TESTS = "NO";
-      SWIFT_INCLUDE_TEST_BINARIES = "NO";
       # Clang[<18] doesn't provide the _Builtin_float module.
       SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT = "YES";
     }
@@ -2183,6 +2213,40 @@ function Build-Runtime([Platform]$Platform, $Arch) {
   }
 }
 
+function Test-Runtime([Platform]$Platform, $Arch) {
+  if ($IsCrossCompiling) {
+    throw "Swift runtime tests are not supported when cross-compiling"
+  }
+  if (-not (Test-Path (Get-TargetProjectBinaryCache $Arch Runtime))) {
+    throw "Swift runtime tests are supposed to reconfigure the existing build"
+  }
+  $CompilersBinaryCache = Get-HostProjectBinaryCache Compilers
+  if (-not (Test-Path "$CompilersBinaryCache\bin\FileCheck.exe")) {
+    # These will exist if we test any of llvm/clang/lldb/lld/swift as well
+    throw "LIT test utilities not found in $CompilersBinaryCache\bin"
+  }
+
+  Invoke-IsolatingEnvVars {
+    # Filter known issues when testing on Windows
+    Load-LitTestOverrides $PSScriptRoot/windows-swift-android-lit-test-overrides.txt
+    $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$(Get-PinnedToolchainRuntime);${env:Path};$UnixToolsBinDir"
+    Build-CMakeProject `
+      -Src $SourceCache\swift `
+      -Bin (Get-TargetProjectBinaryCache $Arch Runtime) `
+      -Arch $Arch `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -BuildTargets check-swift-validation-only_non_executable `
+      -Defines @{
+        SWIFT_INCLUDE_TESTS = "YES";
+        SWIFT_INCLUDE_TEST_BINARIES = "YES";
+        SWIFT_BUILD_TEST_SUPPORT_MODULES = "YES";
+        SWIFT_NATIVE_LLVM_TOOLS_PATH = Join-Path -Path $CompilersBinaryCache -ChildPath "bin";
+        LLVM_LIT_ARGS = "-vv";
+      }
+  }
+}
+
 function Build-ExperimentalRuntime {
   [CmdletBinding(PositionalBinding = $false)]
   param
@@ -2217,7 +2281,10 @@ function Build-ExperimentalRuntime {
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Arch);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.ToString();
         dispatch_DIR = "$(Get-TargetProjectBinaryCache $Arch Dispatch)\cmake\modules";
       }
   }
@@ -3322,6 +3389,12 @@ if (-not $IsCrossCompiling) {
   if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
   if ($Test -contains "swift-format") { Test-Format }
   if ($Test -contains "sourcekit-lsp") { Test-SourceKitLSP }
+
+  if ($Test -contains "swift") {
+    foreach ($Arch in $AndroidSDKArchs) {
+      Test-Runtime Android $Arch
+    }
+  }
 }
 
 # Custom exception printing for more detailed exception information

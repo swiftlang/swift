@@ -50,7 +50,7 @@ extension ASTGenVisitor {
     case .labeledStmt(let node):
       return self.generate(labeledStmt: node)
     case .missingStmt:
-      fatalError("unimplemented")
+      fatalError("unimplemented (missing statement)")
     case .repeatStmt(let node):
       return self.generate(repeatStmt: node).asStmt
     case .returnStmt(let node):
@@ -234,7 +234,7 @@ extension ASTGenVisitor {
           // FIXME: Implement.
           // For `if let foo.bar {`, diagnose and convert it to `if let _ =  foo.bar`
           // For `if let (a, b) {`, diagnose it and create an error expression.
-          fatalError("unimplemented")
+          fatalError("unimplemented (optional binding recovery)")
         }
       }
       return .createPatternBinding(

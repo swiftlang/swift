@@ -176,7 +176,7 @@ BridgedDeclBaseName
 BridgedDeclBaseName_createIdentifier(BridgedIdentifier identifier);
 
 class BridgedDeclNameRef {
-  void *_Nonnull opaque;
+  void *_Nullable opaque;
 
 public:
   BRIDGED_INLINE BridgedDeclNameRef();
@@ -316,6 +316,10 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedEndianness : size_t {
   EndianLittle,
   EndianBig,
 };
+
+SWIFT_NAME("getter:BridgedASTContext.langOptsAttachCommentsToDecls(self:)")
+bool BridgedASTContext_langOptsAttachCommentsToDecls(
+    BridgedASTContext cContext);
 
 SWIFT_NAME("getter:BridgedASTContext.langOptsTargetEndianness(self:)")
 BridgedEndianness BridgedASTContext_langOptsTargetEndianness(BridgedASTContext cContext);
@@ -843,6 +847,9 @@ struct BridgedDeclAttributes {
   BRIDGED_INLINE swift::DeclAttributes unbridged() const;
 };
 
+SWIFT_NAME("BridgedDeclAttribute.shouldBeRejectedByParser(_:)")
+bool BridgedDeclAttribute_shouldBeRejectedByParser(BridgedDeclAttrKind cKind);
+
 SWIFT_NAME("BridgedDeclAttribute.isDeclModifier(_:)")
 bool BridgedDeclAttribute_isDeclModifier(BridgedDeclAttrKind cKind);
 
@@ -870,7 +877,7 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAvailableAttrKind {
 
 SWIFT_NAME("BridgedAvailableAttr.createParsed(_:atLoc:range:domainIdentifier:"
            "domainLoc:kind:message:renamed:introduced:introducedRange:"
-           "deprecated:deprecatedRange:obsoleted:obsoletedRange:)")
+           "deprecated:deprecatedRange:obsoleted:obsoletedRange:isSPI:)")
 BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedIdentifier cDomainIdentifier,
@@ -878,7 +885,8 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedStringRef cMessage, BridgedStringRef cRenamed,
     BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
     BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
-    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange);
+    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange,
+    bool isSPI);
 
 SWIFT_NAME("BridgedAvailableAttr.createUnavailableInEmbedded(_:atLoc:range:)")
 BridgedAvailableAttr
@@ -1368,6 +1376,11 @@ BridgedTransposeAttr BridgedTransposeAttr_createParsed(
     BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
     BridgedArrayRef cParams);
 
+SWIFT_NAME("BridgedTypeEraserAttr.createParsed(_:atLoc:range:typeExpr:)")
+BridgedTypeEraserAttr BridgedTypeEraserAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedTypeExpr cTypeExpr);
+
 SWIFT_NAME(
     "BridgedUnavailableFromAsyncAttr.createParsed(_:atLoc:range:message:)")
 BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
@@ -1590,13 +1603,15 @@ BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
 
 SWIFT_NAME(
     "BridgedMacroDecl.createParsed(_:declContext:macroKeywordLoc:name:nameLoc:"
-    "genericParamList:paramList:arrowLoc:resultType:definition:)")
+    "genericParamList:paramList:arrowLoc:resultType:definition:"
+    "genericWhereClause:)")
 BridgedMacroDecl BridgedMacroDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cMacroLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList cGenericParams,
     BridgedParameterList cParams, BridgedSourceLoc cArrowLoc,
-    BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition);
+    BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition,
+    BridgedNullableTrailingWhereClause genericWhereClause);
 
 SWIFT_NAME("BridgedMacroExpansionDecl.createParsed(_:poundLoc:macroNameRef:"
            "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")
@@ -2696,6 +2711,11 @@ BridgedOwnershipTypeRepr BridgedOwnershipTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr base,
     BridgedParamSpecifier cSpecifier, BridgedSourceLoc cSpecifierLoc);
 
+SWIFT_NAME("BridgedPlaceholderTypeRepr.createParsed(_:loc:)")
+BridgedPlaceholderTypeRepr
+BridgedPlaceholderTypeRepr_createParsed(BridgedASTContext cContext,
+                                        BridgedSourceLoc cLoc);
+
 SWIFT_NAME("BridgedProtocolTypeRepr.createParsed(_:base:protocolKeywordLoc:)")
 BridgedProtocolTypeRepr
 BridgedProtocolTypeRepr_createParsed(BridgedASTContext cContext,
@@ -2727,10 +2747,11 @@ BridgedTupleTypeRepr BridgedTupleTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedArrayRef elements,
     BridgedSourceLoc cLParenLoc, BridgedSourceLoc cRParenLoc);
 
-SWIFT_NAME("BridgedNamedOpaqueReturnTypeRepr.createParsed(_:base:)")
-BridgedNamedOpaqueReturnTypeRepr
-BridgedNamedOpaqueReturnTypeRepr_createParsed(BridgedASTContext cContext,
-                                              BridgedTypeRepr baseTy);
+SWIFT_NAME(
+    "BridgedNamedOpaqueReturnTypeRepr.createParsed(_:base:genericParamList:)")
+BridgedNamedOpaqueReturnTypeRepr BridgedNamedOpaqueReturnTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr baseTy,
+    BridgedGenericParamList genericParams);
 
 SWIFT_NAME("BridgedOpaqueReturnTypeRepr.createParsed(_:someKeywordLoc:base:)")
 BridgedOpaqueReturnTypeRepr
@@ -2769,6 +2790,9 @@ BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern);
 SWIFT_NAME("BridgedAnyPattern.createParsed(_:loc:)")
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cLoc);
+
+SWIFT_NAME("BridgedAnyPattern.createImplicit(_:)")
+BridgedAnyPattern BridgedAnyPattern_createImplicit(BridgedASTContext cContext);
 
 SWIFT_NAME("BridgedBindingPattern.createParsed(_:keywordLoc:isLet:subPattern:)")
 BridgedBindingPattern

@@ -587,7 +587,7 @@ Generate a backtrace for the parent process.
           // If the output path is a directory, generate a filename
           let name = target!.name
           let pid = target!.pid
-          var now = timespec(tv_sec: 0, tv_nsec: 0)
+          let now = timespec(tv_sec: 0, tv_nsec: 0)
 
           let ext: String
           switch args.format {

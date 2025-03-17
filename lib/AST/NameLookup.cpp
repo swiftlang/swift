@@ -2893,6 +2893,21 @@ void DeclContext::lookupAllObjCMethods(
     results.end());
 }
 
+void DeclContext::lookupAvailabilityDomains(
+    Identifier identifier, SmallVectorImpl<AvailabilityDomain> &results) const {
+  if (auto builtinDomain =
+          AvailabilityDomain::builtinDomainForString(identifier.str(), this)) {
+    results.push_back(*builtinDomain);
+    return;
+  }
+
+  // FIXME: [availability] Find the file/module scope decl context and look up
+  // the domain in that context using a request to cache the results.
+  for (auto import : namelookup::getAllImports(this)) {
+    import.importedModule->lookupAvailabilityDomains(identifier, results);
+  }
+}
+
 /// Given a set of type declarations, find all of the nominal type declarations
 /// that they reference, looking through typealiases as appropriate.
 static TinyPtrVector<NominalTypeDecl *>

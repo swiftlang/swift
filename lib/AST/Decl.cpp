@@ -634,6 +634,54 @@ bool Decl::hasBackDeployedAttr() const {
   return false;
 }
 
+const Decl *Decl::getConcreteSyntaxDeclForAttributes() const {
+  // This function needs to be kept in sync with its counterpart,
+  // getAbstractSyntaxDeclForAttributes().
+
+  // The source range for VarDecls does not include 'var ' (and, in any
+  // event, multiple variables can be introduced with a single 'var'),
+  // so suggest adding an attribute to the PatterningBindingDecl instead.
+  if (auto *vd = dyn_cast<VarDecl>(this)) {
+    if (auto *pbd = vd->getParentPatternBinding())
+      return pbd;
+  }
+
+  // Similarly suggest applying the Fix-It to the parent enum case rather than
+  // the enum element.
+  if (auto *ee = dyn_cast<EnumElementDecl>(this)) {
+    return ee->getParentCase();
+  }
+
+  return this;
+}
+
+const Decl *Decl::getAbstractSyntaxDeclForAttributes() const {
+  // This function needs to be kept in sync with its counterpart,
+  // getConcreteSyntaxDeclForAttributes().
+
+  if (auto *pbd = dyn_cast<PatternBindingDecl>(this)) {
+    // @available attributes in the AST are attached to VarDecls
+    // rather than PatternBindingDecls, so we return the first VarDecl for
+    // the pattern binding declaration.
+    // This is safe, even though there may be multiple VarDecls, because
+    // all parsed attribute that appear in the concrete syntax upon on the
+    // PatternBindingDecl are added to all of the VarDecls for the pattern
+    // binding.
+    for (auto index : range(pbd->getNumPatternEntries())) {
+      if (auto vd = pbd->getAnchoringVarDecl(index))
+        return vd;
+    }
+  } else if (auto *ecd = dyn_cast<EnumCaseDecl>(this)) {
+    // Similar to the PatternBindingDecl case above, we return the
+    // first EnumElementDecl.
+    if (auto *element = ecd->getFirstElement()) {
+      return element;
+    }
+  }
+
+  return this;
+}
+
 void Decl::forEachDeclToHoist(llvm::function_ref<void(Decl *)> callback) const {
   switch (getKind()) {
   case DeclKind::TopLevelCode: {
