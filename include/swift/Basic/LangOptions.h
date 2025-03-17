@@ -816,8 +816,9 @@ namespace swift {
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
 
   public:
+    //==========================================================================
     // MARK: Features
-    // =========================================================================
+    //==========================================================================
 
     /// A wrapper around the feature state enumeration.
     struct FeatureState {

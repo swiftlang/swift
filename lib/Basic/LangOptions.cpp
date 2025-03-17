@@ -295,18 +295,17 @@ bool LangOptions::isCustomConditionalCompilationFlagSet(StringRef Name) const {
 }
 
 bool LangOptions::FeatureState::isEnabled() const {
-  return this->state == FeatureState::Kind::Enabled;
+  return state == FeatureState::Kind::Enabled;
 }
 
 bool LangOptions::FeatureState::isEnabledForAdoption() const {
-  ASSERT(isFeatureAdoptable(this->feature) &&
-         "You forgot to make the feature adoptable!");
+  ASSERT(feature.isAdoptable() && "You forgot to make the feature adoptable!");
 
-  return this->state == FeatureState::Kind::EnabledForAdoption;
+  return state == FeatureState::Kind::EnabledForAdoption;
 }
 
 LangOptions::FeatureStateStorage::FeatureStateStorage()
-    : states(numFeatures(), FeatureState::Kind::Off) {}
+    : states(Feature::getNumFeatures(), FeatureState::Kind::Off) {}
 
 void LangOptions::FeatureStateStorage::setState(Feature feature,
                                                 FeatureState::Kind state) {
@@ -323,12 +322,12 @@ LangOptions::FeatureStateStorage::getState(Feature feature) const {
 }
 
 LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
-  auto state = this->featureStates.getState(feature);
+  auto state = featureStates.getState(feature);
   if (state.isEnabled())
     return state;
 
-  if (auto version = getFeatureLanguageVersion(feature)) {
-    if (this->isSwiftVersionAtLeast(*version)) {
+  if (auto version = feature.getLanguageVersion()) {
+    if (isSwiftVersionAtLeast(*version)) {
       return FeatureState(feature, FeatureState::Kind::Enabled);
     }
   }
@@ -340,7 +339,7 @@ bool LangOptions::hasFeature(Feature feature) const {
   if (this->featureStates.getState(feature).isEnabled())
     return true;
 
-  if (auto version = getFeatureLanguageVersion(feature))
+  if (auto version = feature.getLanguageVersion())
     return isSwiftVersionAtLeast(*version);
 
   return false;
@@ -360,12 +359,12 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
 
 void LangOptions::enableFeature(Feature feature, bool forAdoption) {
   if (forAdoption) {
-    ASSERT(isFeatureAdoptable(feature));
-    this->featureStates.setState(feature,
-                                 FeatureState::Kind::EnabledForAdoption);
-  } else {
-    this->featureStates.setState(feature, FeatureState::Kind::Enabled);
+    ASSERT(feature.isAdoptable());
+    featureStates.setState(feature, FeatureState::Kind::EnabledForAdoption);
+    return;
   }
+
+  featureStates.setState(feature, FeatureState::Kind::Enabled);
 }
 
 void LangOptions::disableFeature(Feature feature) {
