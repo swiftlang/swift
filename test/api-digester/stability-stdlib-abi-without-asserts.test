@@ -837,6 +837,10 @@ Struct EnumeratedSequence has added a conformance to an existing protocol Bidire
 Struct EnumeratedSequence has added a conformance to an existing protocol Collection
 Struct EnumeratedSequence has added a conformance to an existing protocol RandomAccessCollection
 
+Accessor Optional.unsafelyUnwrapped.Get() has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Escapable>
+Accessor Optional.unsafelyUnwrapped.Get() has mangled name changing from 'Swift.Optional.unsafelyUnwrapped.getter : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>.unsafelyUnwrapped.getter : A'
+Var Optional.unsafelyUnwrapped has mangled name changing from 'Swift.Optional.unsafelyUnwrapped : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>.unsafelyUnwrapped : A'
+Var Optional.unsafelyUnwrapped is now with @_preInverseGenerics
 Accessor Optional._unsafelyUnwrappedUnchecked.Get() has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Escapable>
 Accessor Optional._unsafelyUnwrappedUnchecked.Get() has mangled name changing from 'Swift.Optional._unsafelyUnwrappedUnchecked.getter : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>._unsafelyUnwrappedUnchecked.getter : A'
 Var Optional._unsafelyUnwrappedUnchecked has mangled name changing from 'Swift.Optional._unsafelyUnwrappedUnchecked : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>._unsafelyUnwrappedUnchecked : A'
