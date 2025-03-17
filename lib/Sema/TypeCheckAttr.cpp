@@ -257,7 +257,7 @@ private:
 
 public:
   void visitExecutionAttr(ExecutionAttr *attr) {
-    auto *F = dyn_cast<FuncDecl>(D);
+    auto *F = dyn_cast<AbstractFunctionDecl>(D);
     if (!F)
       return;
 
