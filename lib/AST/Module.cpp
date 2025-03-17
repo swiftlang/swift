@@ -4345,7 +4345,7 @@ SwiftSettingsWalker::getSwiftSettingArgDecl(Argument arg) {
     return {};
 
   // Now lookup our swiftSettingDecl.
-  NominalTypeDecl *swiftSettingsDecl;
+  NominalTypeDecl *swiftSettingsDecl = nullptr;
   {
     SmallVector<ValueDecl *, 1> decls;
     ctx.lookupInSwiftModule("SwiftSetting", decls);
