@@ -572,15 +572,15 @@ static bool constraintIndicatesRuntimeUnavailability(
   }
 }
 
-/// Computes the `SemanticDeclAvailability` value for `decl`.
-static SemanticDeclAvailability getSemanticDeclAvailability(const Decl *decl) {
+/// Computes the `DeclRuntimeAvailability` value for `decl`.
+static DeclRuntimeAvailability getDeclRuntimeAvailability(const Decl *decl) {
   // Don't trust unavailability on declarations from Clang modules.
   if (isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext()))
-    return SemanticDeclAvailability::PotentiallyAvailable;
+    return DeclRuntimeAvailability::PotentiallyAvailable;
 
   // Check whether the decl is unavailable at all.
   if (!decl->isUnavailable())
-    return SemanticDeclAvailability::PotentiallyAvailable;
+    return DeclRuntimeAvailability::PotentiallyAvailable;
 
   auto &ctx = decl->getASTContext();
   auto compatibilityDomains = availabilityDomainsForABICompatibility(ctx);
@@ -624,37 +624,37 @@ static SemanticDeclAvailability getSemanticDeclAvailability(const Decl *decl) {
 
     // Either every compatibility domain has been proven unavailable or this
     // constraint proves runtime unavailability on its own.
-    return SemanticDeclAvailability::AlwaysUnavailableABICompatible;
+    return DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
   }
 
-  return SemanticDeclAvailability::PotentiallyAvailable;
+  return DeclRuntimeAvailability::PotentiallyAvailable;
 }
 
-SemanticDeclAvailability
-SemanticDeclAvailabilityRequest::evaluate(Evaluator &evaluator,
-                                          const Decl *decl) const {
-  auto inherited = SemanticDeclAvailability::PotentiallyAvailable;
+DeclRuntimeAvailability
+DeclRuntimeAvailabilityRequest::evaluate(Evaluator &evaluator,
+                                         const Decl *decl) const {
+  auto inherited = DeclRuntimeAvailability::PotentiallyAvailable;
   if (auto *parent =
           AvailabilityInference::parentDeclForInferredAvailability(decl)) {
     inherited = evaluateOrDefault(
-        evaluator, SemanticDeclAvailabilityRequest{parent}, inherited);
+        evaluator, DeclRuntimeAvailabilityRequest{parent}, inherited);
   }
 
   // If the inherited semantic availability is already maximally unavailable
   // then skip computing unavailability for this declaration.
-  if (inherited == SemanticDeclAvailability::AlwaysUnavailableABICompatible)
-    return SemanticDeclAvailability::AlwaysUnavailableABICompatible;
+  if (inherited == DeclRuntimeAvailability::AlwaysUnavailableABICompatible)
+    return DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
 
-  auto availability = getSemanticDeclAvailability(decl);
+  auto availability = getDeclRuntimeAvailability(decl);
   return std::max(inherited, availability);
 }
 
 bool Decl::isUnreachableAtRuntime() const {
   auto availability = evaluateOrDefault(
-      getASTContext().evaluator, SemanticDeclAvailabilityRequest{this},
-      SemanticDeclAvailability::PotentiallyAvailable);
+      getASTContext().evaluator, DeclRuntimeAvailabilityRequest{this},
+      DeclRuntimeAvailability::PotentiallyAvailable);
   return availability ==
-         SemanticDeclAvailability::AlwaysUnavailableABICompatible;
+         DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
 }
 
 static UnavailableDeclOptimization

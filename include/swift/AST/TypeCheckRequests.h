@@ -4134,7 +4134,7 @@ public:
 ///
 /// The elements of this enumeration must be ordered from most available to
 /// least available.
-enum class SemanticDeclAvailability : uint8_t {
+enum class DeclRuntimeAvailability : uint8_t {
   /// The decl is potentially available at runtime. If it is unavailable at
   /// compile time in the current module, it may still be considered available
   /// at compile time by other modules with different settings. For example, a
@@ -4155,9 +4155,9 @@ enum class SemanticDeclAvailability : uint8_t {
   AlwaysUnavailableABICompatible,
 };
 
-class SemanticDeclAvailabilityRequest
-    : public SimpleRequest<SemanticDeclAvailabilityRequest,
-                           SemanticDeclAvailability(const Decl *decl),
+class DeclRuntimeAvailabilityRequest
+    : public SimpleRequest<DeclRuntimeAvailabilityRequest,
+                           DeclRuntimeAvailability(const Decl *decl),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4165,8 +4165,8 @@ public:
 private:
   friend SimpleRequest;
 
-  SemanticDeclAvailability evaluate(Evaluator &evaluator,
-                                    const Decl *decl) const;
+  DeclRuntimeAvailability evaluate(Evaluator &evaluator,
+                                   const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
