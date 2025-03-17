@@ -640,11 +640,11 @@ extension _StringGuts {
     nextScalar: (Int) -> (scalar: Unicode.Scalar, end: Int)?
   ) -> Int {
     _internalInvariant(index < endIndex._encodedOffset)
-    return _nextBoundary(startingAt: index, nextScalar: nextScalar)
+    return _nextGraphemeClusterBoundary(startingAt: index, nextScalar: nextScalar)
   }
 }
 
-fileprivate func _nextBoundary(
+internal func _nextGraphemeClusterBoundary(
   startingAt index: Int,
   nextScalar: (Int) -> (scalar: Unicode.Scalar, end: Int)?
 ) -> Int {
@@ -668,21 +668,21 @@ fileprivate func _nextBoundary(
 }
 
 extension _StringGuts {
-  // Returns the stride of the grapheme cluster ending at offset `index`.
-  //
-  // This method uses `previousScalar` to looks back in the string as far as
-  // necessary to find a correct grapheme cluster boundary, whether or not
-  // `index` happens to be on a boundary itself.
   fileprivate func previousBoundary(
     endingAt index: Int,
     previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
   ) -> Int {
-    _previousBoundary(endingAt: index, previousScalar: previousScalar)
+    _previousGraphemeClusterBoundary(endingAt: index, previousScalar: previousScalar)
   }
 
 }
 
-fileprivate func _previousBoundary(
+// Returns the stride of the grapheme cluster ending at offset `index`.
+//
+// This method uses `previousScalar` to looks back in the string as far as
+// necessary to find a correct grapheme cluster boundary, whether or not
+// `index` happens to be on a boundary itself.
+internal func _previousGraphemeClusterBoundary(
   endingAt index: Int,
   previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
 ) -> Int {
