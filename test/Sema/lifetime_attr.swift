@@ -59,3 +59,7 @@ do {
     t[keyPath: \.v2] // expected-error {{key path cannot refer to nonescapable type 'Test'}} expected-error {{key path cannot refer to nonescapable type 'NE'}}
   }
 }
+
+// rdar://146401190 ([nonescapable] implement non-inout parameter dependencies)
+@lifetime(span: borrow holder)
+func testParameterDep(holder: Holder, span: Span<Int>) {}  // expected-error {{lifetime-dependent parameter must be 'inout'}}
