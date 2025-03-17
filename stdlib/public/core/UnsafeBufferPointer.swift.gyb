@@ -256,6 +256,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   public var endIndex: Int { count }
 
   @inlinable
+  @safe
   @_preInverseGenerics
   public var indices: Range<Int> {
     // Not checked because init forbids negative count.
