@@ -1475,11 +1475,6 @@ public:
   /// extension) that makes it unavailable.
   std::optional<SemanticAvailableAttr> getUnavailableAttr() const;
 
-  /// Returns true if the decl is effectively always unavailable in the current
-  /// compilation context. This query differs from \c isUnavailable() because it
-  /// takes the availability of parent declarations into account.
-  bool isSemanticallyUnavailable() const;
-
   /// Returns true if code associated with this declaration should be considerd
   /// unreachable at runtime because the declaration is unavailable in all
   /// execution contexts in which the code may run. This result takes the

@@ -1933,7 +1933,7 @@ checkOverrideUnavailability(ValueDecl *override, ValueDecl *base) {
   if (auto *overrideParent = override->getDeclContext()->getAsDecl()) {
     // If the parent of the override is unavailable, then the unavailability of
     // the override decl is irrelevant.
-    if (overrideParent->isSemanticallyUnavailable())
+    if (AvailabilityContext::forDeclSignature(overrideParent).isUnavailable())
       return {OverrideUnavailabilityStatus::Ignored, std::nullopt};
   }
 
