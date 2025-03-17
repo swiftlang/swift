@@ -58,6 +58,8 @@ internal func _overrideLifetime<
   dependent
 }
 
+struct NotEscapable: ~Escapable {}
+
 // Lifetime dependence semantics by example.
 public struct Span<T>: ~Escapable {
   private var base: UnsafePointer<T>?
@@ -273,6 +275,14 @@ struct Container<T> {
   var owner: AnyObject
   let pointer: UnsafeMutablePointer<T>
   let count: Int
+}
+
+// Dependence on an empty initialized value should be scoped to variable decl.
+@lifetime(copy x)
+func f(x: NotEscapable) -> NotEscapable {
+  let local = NotEscapable() // expected-error {{lifetime-dependent variable 'local' escapes its scope}}
+  // expected-note @-1{{it depends on the lifetime of this parent value}}
+  return local // expected-note {{this use causes the lifetime-dependent value to escape}}
 }
 
 // =============================================================================
