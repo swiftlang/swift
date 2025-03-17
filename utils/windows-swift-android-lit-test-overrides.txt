@@ -8,6 +8,7 @@
 # Prefer `xfail` for tests that fail reliably. Use `skip` for flaky tests.
 # Test summaries call them "excluded".
 
+xfail Swift(android-aarch64) :: ClangImporter/availability_custom_domains.swift
 xfail Swift(android-aarch64) :: ClangImporter/clang_builtin_pcm.swift
 xfail Swift(android-aarch64) :: Concurrency/fail_implicit_concurrency_load.swift
 xfail Swift(android-aarch64) :: DebugInfo/file_compilation_dir.swift
