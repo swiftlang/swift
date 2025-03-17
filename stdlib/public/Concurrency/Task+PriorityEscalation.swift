@@ -110,12 +110,22 @@ public func withTaskPriorityEscalationHandler<T, E>(
   onPriorityEscalated handler: @Sendable (TaskPriority, TaskPriority) -> Void,
   isolation: isolated (any Actor)? = #isolation
 ) async throws(E) -> T {
-  // NOTE: We have to create the closure beforehand as otherwise it seems
-  // the task-local allocator may be used and we end up violating stack-discipline
-  // when releasing the handler closure vs. the record.
-  let handler0: @Sendable (UInt8, UInt8) -> Void = {
-    handler(TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
-  }
+  return try await __withTaskPriorityEscalationHandler0(
+    operation: operation,
+    onPriorityEscalated: {
+      handler(TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
+    })
+}
+
+// Method necessary in order to avoid the handler0 to be destroyed too eagerly.
+@available(SwiftStdlib 6.2, *)
+@inlinable
+@inline(__always)
+func __withTaskPriorityEscalationHandler0<T, E>(
+  operation: () async throws(E) -> T,
+  onPriorityEscalated handler0: @Sendable (UInt8, UInt8) -> Void,
+  isolation: isolated (any Actor)? = #isolation
+) async throws(E) -> T {
   let record = unsafe _taskAddPriorityEscalationHandler(handler: handler0)
   defer { unsafe _taskRemovePriorityEscalationHandler(record: record) }
 

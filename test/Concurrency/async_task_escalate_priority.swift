@@ -85,7 +85,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
 
     let top_level = Task.detached { /* To detach from main actor when running work */
 
-      func basicTask_escalateWhenTaskIsRunning() async {
+      func basicTask_escalateWhenTaskIsRunning() {
         let sem1 = DispatchSemaphore(value: 0)
         let sem2 = DispatchSemaphore(value: 0)
         let task = Task(priority: .background) {
@@ -104,7 +104,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
         task.escalatePriority(to: .default)
         sem2.wait()
       }
-      await basicTask_escalateWhenTaskIsRunning()
+      basicTask_escalateWhenTaskIsRunning()
 
       func triggerTaskEscalationHandler() {
         let sem1 = DispatchSemaphore(value: 0)
@@ -144,7 +144,7 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
         semEscalated.wait()
         sem2.wait()
       }
-      await triggerTaskEscalationHandler()
+      triggerTaskEscalationHandler()
 
       func triggerTwice_escalateToMediumAndThenAgainToHigh() {
         let sem1 = DispatchSemaphore(value: 0)
