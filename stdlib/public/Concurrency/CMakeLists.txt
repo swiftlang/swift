@@ -267,14 +267,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       endif()
 
     elseif (SWIFT_HOST_VARIANT STREQUAL "wasi")
-      if("${mod}" MATCHES "-wasip1")
-        set(extra_c_compile_flags "-I${SWIFT_WASI_SYSROOT_PATH}/include/c++/v1")
-        if(${SWIFT_WASI_SYSROOT_PATH} MATCHES "threads")
-          list(APPEND extra_c_compile_flags "-I${SWIFT_WASI_SYSROOT_PATH}/include/wasm32-wasip1-threads")
-        else()
-          list(APPEND extra_c_compile_flags "-I${SWIFT_WASI_SYSROOT_PATH}/include/wasm32-wasi")
-        endif()
-      endif()
+      set(extra_c_compile_flags)
+      set(extra_swift_compile_flags)
     endif()
 
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
