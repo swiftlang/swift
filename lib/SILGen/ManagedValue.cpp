@@ -211,7 +211,8 @@ ManagedValue ManagedValue::materialize(SILGenFunction &SGF,
   auto temporary = SGF.emitTemporaryAllocation(loc, getType());
   bool hadCleanup = hasCleanup();
 
-  if (hadCleanup) {
+  if (hadCleanup || (getValue()->getOwnershipKind() == OwnershipKind::None &&
+                     !getType().isTrivial(&SGF.getFunction()))) {
     SGF.B.emitStoreValueOperation(loc, forward(SGF), temporary,
                                   StoreOwnershipQualifier::Init);
 
