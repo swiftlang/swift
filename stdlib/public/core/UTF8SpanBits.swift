@@ -75,7 +75,7 @@ extension UTF8Span {
         if s.value < 0x300 {
           continue
         }
-        TODO("Refactor and adapt _StringGutsSlice._fastNFCCheck()")
+        UNSUPPORTED("NFC quick check (pending internal refactoring)")
       }
       self._countAndFlags |= Self._nfcBit
       return true

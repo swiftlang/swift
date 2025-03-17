@@ -57,15 +57,31 @@ extension UTF8Span {
   public func isCanonicallyEquivalent(
     to other: UTF8Span
   ) -> Bool {
-    self._str == other._str
+    self._withUnsafeBufferPointer { selfBufPtr in
+      other._withUnsafeBufferPointer { otherBufPtr in
+        _stringCompareFastUTF8(
+          selfBufPtr,
+          otherBufPtr,
+          expecting: .equal,
+          bothNFC: self.isKnownNFC && other.isKnownNFC)
+      }
+    }
   }
 
-  /// Whether `self` orders less than `other` under Unicode Canonical 
+  /// Whether `self` orders less than `other` under Unicode Canonical
   /// Equivalence using normalized code-unit order (in NFC).
   public func isCanonicallyLessThan(
     _ other: UTF8Span
   ) -> Bool {
-    self._str < other._str
+    self._withUnsafeBufferPointer { selfBufPtr in
+      other._withUnsafeBufferPointer { otherBufPtr in
+        _stringCompareFastUTF8(
+          selfBufPtr,
+          otherBufPtr,
+          expecting: .less,
+          bothNFC: self.isKnownNFC && other.isKnownNFC)
+      }
+    }
   }
 }
 

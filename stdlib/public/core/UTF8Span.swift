@@ -166,23 +166,22 @@ extension UTF8Span {
 
 }
 
-
-func TODO(_ message: String) -> Never {
-  fatalError("TODO: \(message)")
+func UNSUPPORTED(_ message: String) -> Never {
+  fatalError("UNSUPPORTED: \(message)")
 }
 
 // TODO(toolchain): decide if we rebase on top of Guillaume's work
 @available(SwiftStdlib 6.1, *)
 extension String {
   public var utf8Span: UTF8Span {
-    TODO("Decide whether to rebase on top of Span PR or wait for merge")
+    UNSUPPORTED("utf8Span property pending compiler fixes")
   }
 }
 
 @available(SwiftStdlib 6.1, *)
 extension Substring {
   public var utf8Span: UTF8Span {
-    TODO("Decide whether to rebase on top of Span PR or wait for merge")
+    UNSUPPORTED("utf8Span property pending compiler fixes")
   }
 }
 
