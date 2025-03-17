@@ -18,7 +18,6 @@ from . import libcxx
 from . import llvm
 from . import product
 from . import staticswiftlinux
-from . import wasisysroot
 from ..cmake import CMakeOptions
 
 
@@ -97,11 +96,13 @@ class Swift(product.Product):
         self.cmake_options.extend(
             self._swift_tools_ld64_lto_codegen_only_for_supporting_targets)
 
-        self.cmake_options.extend(self._enable_experimental_parser_validation)
+        self.cmake_options.extend(
+            self._enable_experimental_parser_validation)
 
         self._handle_swift_debuginfo_non_lto_args()
 
-        self.cmake_options.extend(self._enable_new_runtime_build)
+        self.cmake_options.extend(
+            self._enable_new_runtime_build)
 
     @classmethod
     def product_source_name(cls):
@@ -313,5 +314,4 @@ updated without updating swift.py?")
                 earlyswiftdriver.EarlySwiftDriver,
                 llvm.LLVM,
                 staticswiftlinux.StaticSwiftLinuxConfig,
-                libcxx.LibCXX,
-                wasisysroot.WASILibc,]
+                libcxx.LibCXX]
