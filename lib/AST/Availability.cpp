@@ -541,8 +541,10 @@ std::optional<SemanticAvailableAttr> Decl::getUnavailableAttr() const {
   return std::nullopt;
 }
 
+/// Returns the mutually exclusive root platform domains that must all be
+/// unavailable in order for a declaration to be unavailable at runtime.
 static llvm::SmallSetVector<AvailabilityDomain, 2>
-availabilityDomainsForABICompatibility(const ASTContext &ctx) {
+getRootTargetDomains(const ASTContext &ctx) {
   llvm::SmallSetVector<AvailabilityDomain, 2> domains;
 
   // Regardless of target platform, binaries built for Embedded do not require
@@ -551,10 +553,10 @@ availabilityDomainsForABICompatibility(const ASTContext &ctx) {
     return domains;
 
   if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx))
-    domains.insert(targetDomain->getABICompatibilityDomain());
+    domains.insert(targetDomain->getRootDomain());
 
   if (auto variantDomain = AvailabilityDomain::forTargetVariantPlatform(ctx))
-    domains.insert(variantDomain->getABICompatibilityDomain());
+    domains.insert(variantDomain->getRootDomain());
 
   return domains;
 }
@@ -584,8 +586,8 @@ computeDeclRuntimeAvailability(const Decl *decl) {
     return DeclRuntimeAvailability::PotentiallyAvailable;
 
   auto &ctx = decl->getASTContext();
-  auto compatibilityDomains = availabilityDomainsForABICompatibility(ctx);
-  auto potentiallyAvailableDomains = compatibilityDomains;
+  auto rootTargetDomains = getRootTargetDomains(ctx);
+  auto remainingTargetDomains = rootTargetDomains;
 
   AvailabilityConstraintFlags flags;
 
@@ -606,20 +608,19 @@ computeDeclRuntimeAvailability(const Decl *decl) {
 
     // Check whether the constraint is from a relevant domain.
     auto domain = constraint.getDomain();
-    bool isCompabilityDomainDescendant =
-        llvm::find_if(compatibilityDomains,
-                      [&domain](AvailabilityDomain compatibilityDomain) {
-                        return compatibilityDomain.contains(domain);
-                      }) != compatibilityDomains.end();
+    bool isTargetDomain = rootTargetDomains.contains(domain);
 
-    if (!domain.isActive(ctx) && !isCompabilityDomainDescendant)
+    if (!domain.isActive(ctx) && !isTargetDomain)
       continue;
 
-    if (isCompabilityDomainDescendant) {
+    if (!domain.isRoot())
+      continue;
+
+    if (isTargetDomain) {
       // If the decl is still potentially available in some compatibility
       // domain, keep looking at the remaining constraints.
-      potentiallyAvailableDomains.remove(domain);
-      if (!potentiallyAvailableDomains.empty())
+      remainingTargetDomains.remove(domain);
+      if (!remainingTargetDomains.empty())
         continue;
     }
 

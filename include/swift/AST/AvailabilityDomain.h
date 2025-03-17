@@ -251,10 +251,14 @@ public:
   /// universal domain (`*`) is the bottom element.
   bool contains(const AvailabilityDomain &other) const;
 
-  /// Returns the root availability domain that this domain must be compatible
-  /// with. For example, macCatalyst and visionOS must both be ABI compatible
-  /// with iOS. The compatible domain must contain this domain.
-  AvailabilityDomain getABICompatibilityDomain() const;
+  /// Returns true for domains that are not contained by any domain other than
+  /// the universal domain.
+  bool isRoot() const;
+
+  /// Returns the root availability domain that contains this domain (see
+  /// `isRoot()`). For example, macCatalyst and visionOS are both ultimately
+  /// descendants of the iOS domain.
+  AvailabilityDomain getRootDomain() const;
 
   bool operator==(const AvailabilityDomain &other) const {
     return storage.getOpaqueValue() == other.storage.getOpaqueValue();
