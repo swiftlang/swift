@@ -4128,26 +4128,36 @@ public:
   void cacheResult(ValueDecl *value) const;
 };
 
-enum class SemanticDeclAvailability : uint8_t {
-  /// The decl is potentially available in some contexts and/or under certain
-  /// deployment conditions.
+/// Describes the runtime availability of a declaration, which is a
+/// classification of whether a decl can be used at runtime (as opposed to
+/// compile time).
+///
+/// The elements of this enumeration must be ordered from most available to
+/// least available.
+enum class DeclRuntimeAvailability : uint8_t {
+  /// The decl is potentially available at runtime. If it is unavailable at
+  /// compile time in the current module, it may still be considered available
+  /// at compile time by other modules with different settings. For example, a
+  /// decl that is obsolete in Swift 5 is still available to other modules that
+  /// are compiled for an earlier language mode.
   PotentiallyAvailable,
 
-  /// The decl is always unavailable in the current compilation context.
-  /// However, it may still be used at runtime by other modules with different
-  /// settings. For example a decl that is obsolete in Swift 5 is still
-  /// available to other modules compiled for an earlier language mode.
-  ConditionallyUnavailable,
-
-  /// The decl is universally unavailable. For example, when compiling for macOS
-  /// a decl with `@available(macOS, unavailable)` can never be used (except in
-  /// contexts that are also completely unavailable on macOS).
-  CompletelyUnavailable,
+  /// The decl is always unavailable at compile time in the current module and
+  /// all other modules, but it is still required to be present at load time to
+  /// maintain ABI compatibility. For example, when compiling for macOS a decl
+  /// with an `@available(macOS, unavailable)` attribute can never be invoked,
+  /// except in contexts that are also completely unavailable on macOS. This
+  /// means the declaration is unreachable by execution at runtime, but the
+  /// decl's symbols may still have been strongly linked by other binaries built
+  /// by older versions of the compiler which may have emitted unavailable code
+  /// with strong references. To preserve ABI stability, the decl must still be
+  /// emitted.
+  AlwaysUnavailableABICompatible,
 };
 
-class SemanticDeclAvailabilityRequest
-    : public SimpleRequest<SemanticDeclAvailabilityRequest,
-                           SemanticDeclAvailability(const Decl *decl),
+class DeclRuntimeAvailabilityRequest
+    : public SimpleRequest<DeclRuntimeAvailabilityRequest,
+                           DeclRuntimeAvailability(const Decl *decl),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4155,8 +4165,8 @@ public:
 private:
   friend SimpleRequest;
 
-  SemanticDeclAvailability evaluate(Evaluator &evaluator,
-                                    const Decl *decl) const;
+  DeclRuntimeAvailability evaluate(Evaluator &evaluator,
+                                   const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
