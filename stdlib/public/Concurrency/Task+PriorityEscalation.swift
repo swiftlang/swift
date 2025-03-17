@@ -119,8 +119,7 @@ public func withTaskPriorityEscalationHandler<T, E>(
 
 // Method necessary in order to avoid the handler0 to be destroyed too eagerly.
 @available(SwiftStdlib 6.2, *)
-@inlinable
-@inline(__always)
+@_alwaysEmitIntoClient
 func __withTaskPriorityEscalationHandler0<T, E>(
   operation: () async throws(E) -> T,
   onPriorityEscalated handler0: @Sendable (UInt8, UInt8) -> Void,
