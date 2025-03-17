@@ -40,7 +40,7 @@ void _swift_task_checkIsolatedSwift(HeapObject *executor,
                                     const SerialExecutorWitnessTable *witnessTable);
 
 extern "C" SWIFT_CC(swift)
-void _swift_task_isIsolatingCurrentContextSwift(
+bool _swift_task_isIsolatingCurrentContextSwift(
   HeapObject *executor,
   const Metadata *executorType,
   const SerialExecutorWitnessTable *witnessTable
@@ -75,7 +75,7 @@ void swift_task_checkIsolatedImpl(SerialExecutorRef executor) {
 }
 
 extern "C" SWIFT_CC(swift)
-void swift_task_isIsolatingCurrentContextImpl(SerialExecutorRef executor) {
+bool swift_task_isIsolatingCurrentContextImpl(SerialExecutorRef executor) {
   HeapObject *identity = executor.getIdentity();
 
   // We might be being called with an actor rather than a "proper"

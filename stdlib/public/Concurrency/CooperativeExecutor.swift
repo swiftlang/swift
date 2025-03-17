@@ -12,6 +12,7 @@
 
 import Swift
 
+@available(SwiftStdlib 6.2, *)
 extension ExecutorJob {
   fileprivate var cooperativeExecutorTimestamp: CooperativeExecutor.Timestamp {
     get {
@@ -33,6 +34,7 @@ extension ExecutorJob {
 
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
+@available(SwiftStdlib 6.2, *)
 class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   var waitQueue: PriorityQueue<UnownedJob>
@@ -112,6 +114,7 @@ class CooperativeExecutor: Executor, @unchecked Sendable {
   public var asSchedulable: any SchedulableExecutor { self }
 }
 
+@available(SwiftStdlib 6.2, *)
 extension CooperativeExecutor: SchedulableExecutor {
   var currentTime: Timestamp {
     var now: Timestamp = .zero
@@ -133,6 +136,7 @@ extension CooperativeExecutor: SchedulableExecutor {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
 extension CooperativeExecutor: RunLoopExecutor {
   public func run() throws {
     try runUntil { false }
@@ -177,8 +181,11 @@ extension CooperativeExecutor: RunLoopExecutor {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
 extension CooperativeExecutor: SerialExecutor {}
 
+@available(SwiftStdlib 6.2, *)
 extension CooperativeExecutor: TaskExecutor {}
 
+@available(SwiftStdlib 6.2, *)
 extension CooperativeExecutor: MainExecutor {}

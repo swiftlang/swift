@@ -192,7 +192,7 @@ void swift_sleep(
     // for sleeps less than 15ms, Windows does a delay koop internally,
     // which is acceptable here.
     if (dwMsec > 15)
-      deMsec += 15;
+      dwMsec += 15;
 
     (void)SleepEx(dwMsec, TRUE);
     (void)QueryInterruptTimePrecise(&now);

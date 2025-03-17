@@ -1425,8 +1425,7 @@ func getJobFlags(_ task: Builtin.NativeObject) -> JobFlags
 @usableFromInline
 func _enqueueJobGlobal(_ task: Builtin.Job)
 
-@available(SwiftStdlib 6.2, *)
-@usableFromInline
+@available(SwiftStdlib 5.9, *)
 func _enqueueJobGlobal(_ task: UnownedJob) {
   _enqueueJobGlobal(task._context)
 }
@@ -1436,8 +1435,7 @@ func _enqueueJobGlobal(_ task: UnownedJob) {
 @usableFromInline
 func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 
-@available(SwiftStdlib 6.2, *)
-@usableFromInline
+@available(SwiftStdlib 5.9, *)
 func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: UnownedJob) {
   return _enqueueJobGlobalWithDelay(delay, task._context)
 }

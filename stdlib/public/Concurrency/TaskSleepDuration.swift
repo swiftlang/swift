@@ -16,10 +16,14 @@ import Swift
 fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
   -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64) {
   var clockID: _ClockID
-  if clock.traits.contains(.continuous) {
-    clockID = .continuous
+  if #available(SwiftStdlib 6.2, *) {
+    if clock.traits.contains(.continuous) {
+      clockID = .continuous
+    } else {
+      clockID = .suspending
+    }
   } else {
-    clockID = .suspending
+    Builtin.unreachable()
   }
 
   var seconds: Int64 = 0
@@ -28,7 +32,13 @@ fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
                   nanoseconds: &nanoseconds,
                   clock: clockID.rawValue)
 
-  let delta = clock.convert(from: clock.now.duration(to: instant))!
+  let delta: Swift.Duration
+  if #available(SwiftStdlib 6.2, *) {
+    delta = clock.convert(from: clock.now.duration(to: instant))!
+  } else {
+    Builtin.unreachable()
+  }
+
   let (deltaSeconds, deltaAttoseconds) = delta.components
   let deltaNanoseconds = deltaAttoseconds / 1_000_000_000
   seconds += deltaSeconds
@@ -84,18 +94,20 @@ extension Task where Success == Never, Failure == Never {
                 unsafe onSleepWake(token)
               }
 
-              let job = ExecutorJob(context: Builtin.convertTaskToJob(sleepTask))
+              let job = Builtin.convertTaskToJob(sleepTask)
 
               if #available(SwiftStdlib 6.2, *) {
                 #if !$Embedded
                 if let executor = Task.currentSchedulableExecutor {
-                  executor.enqueue(job,
+                  executor.enqueue(ExecutorJob(context: job),
                                    at: instant,
                                    tolerance: tolerance,
                                    clock: clock)
                   return
                 }
                 #endif
+              } else {
+                Builtin.unreachable()
               }
 
               // If there is no current schedulable executor, fall back to
@@ -104,19 +116,27 @@ extension Task where Success == Never, Failure == Never {
                                                               clock: clock)
               let toleranceSeconds: Int64
               let toleranceNanoseconds: Int64
-              if let tolerance = tolerance,
-                 let components = clock.convert(from: tolerance)?.components {
-                toleranceSeconds = components.seconds
-                toleranceNanoseconds = components.attoseconds / 1_000_000_000
+              if #available(SwiftStdlib 6.2, *) {
+                if let tolerance = tolerance,
+                   let components = clock.convert(from: tolerance)?.components {
+                  toleranceSeconds = components.seconds
+                  toleranceNanoseconds = components.attoseconds / 1_000_000_000
+                } else {
+                  toleranceSeconds = 0
+                  toleranceNanoseconds = -1
+                }
               } else {
-                toleranceSeconds = 0
-                toleranceNanoseconds = -1
+                Builtin.unreachable()
               }
 
-              _enqueueJobGlobalWithDeadline(
+              if #available(SwiftStdlib 5.9, *) {
+                _enqueueJobGlobalWithDeadline(
                   seconds, nanoseconds,
                   toleranceSeconds, toleranceNanoseconds,
-                  clockID.rawValue, UnownedJob(job))
+                  clockID.rawValue, UnownedJob(context: job))
+              } else {
+                Builtin.unreachable()
+              }
               return
 
             case .activeContinuation, .finished:

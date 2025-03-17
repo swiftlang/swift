@@ -270,12 +270,12 @@ extension Task where Success == Never, Failure == Never {
                 unsafe onSleepWake(token)
               }
 
-              let job = ExecutorJob(context:
-                                      Builtin.convertTaskToJob(sleepTask))
+              let job = Builtin.convertTaskToJob(sleepTask)
+
               if #available(SwiftStdlib 6.2, *) {
                 #if !$Embedded
                 if let executor = Task.currentSchedulableExecutor {
-                  executor.enqueue(job,
+                  executor.enqueue(ExecutorJob(context: job),
                                    after: .nanoseconds(duration),
                                    clock: .continuous)
                   return
@@ -285,7 +285,7 @@ extension Task where Success == Never, Failure == Never {
 
               // If there is no current schedulable executor, fall back to
               // _enqueueJobGlobalWithDelay()
-              _enqueueJobGlobalWithDelay(duration, UnownedJob(job))
+              _enqueueJobGlobalWithDelay(duration, job)
               return
 
             case .activeContinuation, .finished:
