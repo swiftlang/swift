@@ -572,8 +572,9 @@ static bool constraintIndicatesRuntimeUnavailability(
   }
 }
 
-/// Computes the `DeclRuntimeAvailability` value for `decl`.
-static DeclRuntimeAvailability getDeclRuntimeAvailability(const Decl *decl) {
+/// Computes the `DeclRuntimeAvailability` value for `decl` in isolation.
+static DeclRuntimeAvailability
+computeDeclRuntimeAvailability(const Decl *decl) {
   // Don't trust unavailability on declarations from Clang modules.
   if (isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext()))
     return DeclRuntimeAvailability::PotentiallyAvailable;
@@ -630,30 +631,34 @@ static DeclRuntimeAvailability getDeclRuntimeAvailability(const Decl *decl) {
   return DeclRuntimeAvailability::PotentiallyAvailable;
 }
 
+/// Determines the `DeclRuntimeAvailability` value for `decl` via
+/// `DeclRuntimeAvailabilityRequest`.
+static DeclRuntimeAvailability getDeclRuntimeAvailability(const Decl *decl) {
+  return evaluateOrDefault(decl->getASTContext().evaluator,
+                           DeclRuntimeAvailabilityRequest{decl},
+                           DeclRuntimeAvailability::PotentiallyAvailable);
+}
+
 DeclRuntimeAvailability
 DeclRuntimeAvailabilityRequest::evaluate(Evaluator &evaluator,
                                          const Decl *decl) const {
   auto inherited = DeclRuntimeAvailability::PotentiallyAvailable;
   if (auto *parent =
           AvailabilityInference::parentDeclForInferredAvailability(decl)) {
-    inherited = evaluateOrDefault(
-        evaluator, DeclRuntimeAvailabilityRequest{parent}, inherited);
+    inherited = getDeclRuntimeAvailability(parent);
   }
 
-  // If the inherited semantic availability is already maximally unavailable
+  // If the inherited runtime availability is already maximally unavailable
   // then skip computing unavailability for this declaration.
   if (inherited == DeclRuntimeAvailability::AlwaysUnavailableABICompatible)
     return DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
 
-  auto availability = getDeclRuntimeAvailability(decl);
+  auto availability = computeDeclRuntimeAvailability(decl);
   return std::max(inherited, availability);
 }
 
 bool Decl::isUnreachableAtRuntime() const {
-  auto availability = evaluateOrDefault(
-      getASTContext().evaluator, DeclRuntimeAvailabilityRequest{this},
-      DeclRuntimeAvailability::PotentiallyAvailable);
-  return availability ==
+  return getDeclRuntimeAvailability(this) >=
          DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
 }
 
@@ -666,13 +671,15 @@ getEffectiveUnavailableDeclOptimization(ASTContext &ctx) {
 }
 
 bool Decl::isAvailableDuringLowering() const {
-  // Unconditionally unavailable declarations should be skipped during lowering
-  // when -unavailable-decl-optimization=complete is specified.
+  auto availability = getDeclRuntimeAvailability(this);
+
   if (getEffectiveUnavailableDeclOptimization(getASTContext()) !=
       UnavailableDeclOptimization::Complete)
     return true;
 
-  return !isUnreachableAtRuntime();
+  // All unreachable declarations should be skipped during lowering
+  // when -unavailable-decl-optimization=complete is specified.
+  return availability < DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
 }
 
 bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
