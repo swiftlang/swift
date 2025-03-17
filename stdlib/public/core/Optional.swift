@@ -320,7 +320,7 @@ extension Optional where Wrapped: ~Copyable {
   }
 }
 
-extension Optional {
+extension Optional where Wrapped: ~Escapable {
   /// The wrapped value of this instance, unwrapped without checking whether
   /// the instance is `nil`.
   ///
@@ -345,12 +345,14 @@ extension Optional {
   ///   will never be equal to `nil` and only after you've tried using the
   ///   postfix `!` operator.
   @inlinable
+  @_preInverseGenerics
   @unsafe
   public var unsafelyUnwrapped: Wrapped {
-    // FIXME: Generalize this for ~Escapable wrapped types. Unfortunately this
-    // currently hides it from C++ interop, breaking the stdlib overlay.
-    // (rdar://145800780)
+    // FIXME: Generalize this for ~Copyable wrapped types. Note that the current
+    // implementation is copying the value, so that generalization will need to
+    // be emitted into clients -- `@_preInverseGenerics` will not cut it.
     @inline(__always)
+    @lifetime(copy self)
     get {
       if let x = self {
         return x
