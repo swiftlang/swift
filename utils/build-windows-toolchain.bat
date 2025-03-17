@@ -75,6 +75,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
+  -AndroidSDKs aarch64 ^
   %SkipPackagingArg% ^
   %TestArg% ^
   -Stage %PackageRoot% ^
