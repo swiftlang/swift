@@ -6068,12 +6068,6 @@ ERROR(nonisolated_local_var,none,
 ERROR(nonisolated_actor_sync_init,none,
       "'nonisolated' on an actor's synchronous initializer is invalid",
       ())
-ERROR(nonisolated_wrapped_property,none,
-      "'nonisolated' is not supported on properties with property wrappers",
-      ())
-ERROR(nonisolated_lazy,none,
-      "'nonisolated' is not supported on lazy properties",
-      ())
 
 ERROR(non_sendable_from_deinit,none,
         "cannot access %kind1 with a non-Sendable type %0 from nonisolated "
