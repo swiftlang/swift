@@ -13,6 +13,7 @@
 import Swift
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(SwiftStdlib 5.7, *)
 fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
   -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64) {
   var clockID: _ClockID
