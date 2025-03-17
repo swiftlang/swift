@@ -7,6 +7,9 @@
 // REQUIRES: swift_feature_CustomAvailability
 // UNSUPPORTED: OS=windows-msvc
 
+// https://github.com/swiftlang/swift/issues/80058
+// UNSUPPORTED: OS=linux-android
+
 import Oceans // re-exports Rivers
 
 func testClangDecls() {
