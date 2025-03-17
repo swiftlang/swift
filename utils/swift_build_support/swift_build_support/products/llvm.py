@@ -310,6 +310,10 @@ class LLVM(cmake_product.CMakeProduct):
         llvm_cmake_options.define(
             'RUNTIMES_CMAKE_ARGS',
             LLVM.compute_cmake_args_for_runtimes(host_target))
+        if system() == "Darwin":
+            llvm_cmake_options.define('LLVM_BUILTIN_TARGETS', 'arm64-apple-darwin')
+            llvm_cmake_options.define('LLVM_RUNTIME_TARGETS', 'arm64-apple-darwin')
+            llvm_cmake_options.define('RUNTIMES_BUILD_ALLOW_DARWIN', 'ON')
 
         if self.args.build_embedded_stdlib and system() == "Darwin":
             # Ask for Mach-O cross-compilation builtins (for Embedded Swift)
