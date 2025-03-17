@@ -232,15 +232,15 @@ private func sllConsumedResults(
 
   return results.flatMap { result in
     switch result {
-    case .lookInMembers(let lookInMembers):
+    case .lookForMembers(let syntax):
       return [
         ConsumedLookupResult(
           rawName: "",
-          position: lookInMembers.lookupMembersPosition,
+          position: (syntax.asProtocol(SyntaxProtocol.self) as! LookInMembersScopeSyntax).lookupMembersPosition,
           flags: .shouldLookInMembers
         )
       ]
-    case .lookInGenericParametersOfExtendedType(let extensionDecl):
+    case .lookForGenericParameters(let extensionDecl):
       return [
         ConsumedLookupResult(
           rawName: "",
@@ -248,7 +248,7 @@ private func sllConsumedResults(
           flags: .ignoreNextFromHere
         )
       ]
-    case .mightIntroduceDollarIdentifiers(let closure):
+    case .lookForImplicitClosureParameters(let closure):
       return [
         ConsumedLookupResult(
           rawName: "",
@@ -263,7 +263,7 @@ private func sllConsumedResults(
         {
           // If lookup started from inside function attributes, don't reverse.
           return result.names.map { name in
-            ConsumedLookupResult(rawName: name.identifier?.name ?? "", position: name.position, flags: [])
+            ConsumedLookupResult(rawName: name.identifier.name, position: name.position, flags: [])
           }
         } else if parent.is(FunctionDeclSyntax.self) || parent.is(SubscriptDeclSyntax.self)
           || result.scope.range.contains(lookupToken.position)
@@ -271,7 +271,7 @@ private func sllConsumedResults(
           // If a result from function generic parameter clause or lookup started within it, reverse introduced names.
           return result.names.reversed().map { name in
             ConsumedLookupResult(
-              rawName: name.identifier?.name ?? "",
+              rawName: name.identifier.name,
               position: name.position,
               flags: .placementRearranged
             )
@@ -282,7 +282,7 @@ private func sllConsumedResults(
           // If lookup started from nominal type inheritance clause, reverse introduced names.
           return result.names.reversed().map { name in
             ConsumedLookupResult(
-              rawName: name.identifier?.name ?? "",
+              rawName: name.identifier.name,
               position: name.position,
               flags: .placementRearranged
             )
@@ -293,7 +293,7 @@ private func sllConsumedResults(
           // If lookup from inside the parent initializer decl, reverse introduced names.
           return result.names.reversed().map { name in
             ConsumedLookupResult(
-              rawName: name.identifier?.name ?? "",
+              rawName: name.identifier.name,
               position: name.position,
               flags: .placementRearranged
             )
@@ -304,7 +304,7 @@ private func sllConsumedResults(
           // If lookup started from inside type alias initializer, reverse introduced names.
           return result.names.reversed().map { name in
             ConsumedLookupResult(
-              rawName: name.identifier?.name ?? "",
+              rawName: name.identifier.name,
               position: name.position,
               flags: .placementRearranged
             )
@@ -313,15 +313,15 @@ private func sllConsumedResults(
 
         // No flags or reorderings to perform.
         return result.names.map { name in
-          ConsumedLookupResult(rawName: name.identifier?.name ?? "", position: name.position, flags: [])
+          ConsumedLookupResult(rawName: name.identifier.name, position: name.position, flags: [])
         }
       } else {
         return result.names.map { name in
           // If a Self name not from protocol declaration, should be omitted if no match is found.
-          let shouldBeOmitted = name.identifier?.name == "Self" ? !result.scope.is(ProtocolDeclSyntax.self) : false
+          let shouldBeOmitted = name.identifier.name == "Self" ? !result.scope.is(ProtocolDeclSyntax.self) : false
 
           return ConsumedLookupResult(
-            rawName: name.identifier?.name ?? "",
+            rawName: name.identifier.name,
             position: name.position,
             flags: shouldBeOmitted ? [.shouldBeOptionallyOmitted] : []
           )
