@@ -206,10 +206,17 @@ extension ASTGenVisitor {
       differentiabilityLoc = nil
     }
 
-    // Only 'reverse' is supported today.
-    guard differentiability == .reverse else {
+    // Only 'reverse' is formally supported today. '_linear' works for testing
+    // purposes. '_forward' is rejected.
+    switch differentiability {
+    case .normal, .nonDifferentiable:
       // TODO: Diagnose
       fatalError("Only @differentiable(reverse) is supported")
+    case .forward:
+      // TODO: Diagnose
+      fatalError("Only @differentiable(reverse) is supported")
+    case .reverse, .linear:
+      break
     }
 
     return .createParsed(

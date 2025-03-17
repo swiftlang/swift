@@ -85,6 +85,11 @@ func testUnaryExprs() async throws {
   let bar = copy foo
   let baz = consume foo
 }
+func throwsFunc() throws -> Int { 1 }
+func testOptionalTry() {
+  let _ = try! 1 + throwsFunc()
+  let _ = try? throwsFunc() + throwsFunc()
+}
 
 func testRepeatEach<each T>(_ t: repeat each T) -> (repeat each T) {
   return (repeat each t)

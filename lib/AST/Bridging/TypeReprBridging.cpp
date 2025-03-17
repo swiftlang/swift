@@ -141,6 +141,12 @@ BridgedOwnershipTypeRepr BridgedOwnershipTypeRepr_createParsed(
       base.unbridged(), unbridge(cSpecifier), cSpecifierLoc.unbridged());
 }
 
+BridgedPlaceholderTypeRepr
+BridgedPlaceholderTypeRepr_createParsed(BridgedASTContext cContext,
+                                        BridgedSourceLoc cLoc) {
+  return new (cContext.unbridged()) PlaceholderTypeRepr(cLoc.unbridged());
+}
+
 BridgedProtocolTypeRepr
 BridgedProtocolTypeRepr_createParsed(BridgedASTContext cContext,
                                      BridgedTypeRepr baseType,
@@ -287,11 +293,12 @@ BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(
       resultType.unbridged());
 }
 
-BridgedNamedOpaqueReturnTypeRepr
-BridgedNamedOpaqueReturnTypeRepr_createParsed(BridgedASTContext cContext,
-                                              BridgedTypeRepr baseTy) {
+BridgedNamedOpaqueReturnTypeRepr BridgedNamedOpaqueReturnTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr baseTy,
+    BridgedGenericParamList genericParams) {
   ASTContext &context = cContext.unbridged();
-  return new (context) NamedOpaqueReturnTypeRepr(baseTy.unbridged(), nullptr);
+  return new (context)
+      NamedOpaqueReturnTypeRepr(baseTy.unbridged(), genericParams.unbridged());
 }
 
 BridgedOpaqueReturnTypeRepr

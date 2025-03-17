@@ -393,6 +393,12 @@ extension ASTGenVisitor {
       return .modify
     case .`init`:
       return .`init`
+    case .read:
+      precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
+      return .read2
+    case .modify:
+      precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'modify' accessor should only be parsed with 'CoroutineAccessors' feature")
+      return .modify2
     default:
       self.diagnose(.unknownAccessorSpecifier(specifier))
       return nil
@@ -820,9 +826,11 @@ extension ASTGenVisitor {
       paramList: self.generate(functionParameterClause: node.signature.parameterClause, for: .macro),
       arrowLoc: self.generateSourceLoc(node.signature.returnClause?.arrow),
       resultType: self.generate(type: node.signature.returnClause?.type),
-      definition: self.generate(expr: node.definition?.value)
+      definition: self.generate(expr: node.definition?.value),
+      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
+
     return decl;
   }
 }
@@ -855,6 +863,21 @@ extension ASTGenVisitor {
 
     return decl
   }
+
+  func generateMacroExpansionDecl(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedMacroExpansionDecl {
+    let info = self.generate(freestandingMacroExpansion: node)
+    return .createParsed(
+      self.declContext,
+      poundLoc: info.poundLoc,
+      macroNameRef: info.macroNameRef,
+      macroNameLoc: info.macroNameLoc,
+      leftAngleLoc: info.leftAngleLoc,
+      genericArgs: info.genericArgs,
+      rightAngleLoc: info.rightAngleLoc,
+      args: info.arguments
+    )
+  }
+
 }
 
 // MARK: - OperatorDecl

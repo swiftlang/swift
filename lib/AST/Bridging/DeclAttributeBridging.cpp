@@ -101,6 +101,13 @@ BridgedDeclAttribute BridgedDeclAttribute_createSimple(
                                      cAtLoc.unbridged(), cAttrLoc.unbridged());
 }
 
+bool BridgedDeclAttribute_shouldBeRejectedByParser(BridgedDeclAttrKind cKind) {
+  auto optKind = unbridged(cKind);
+  if (!optKind)
+    return false;
+  return DeclAttribute::shouldBeRejectedByParser(*optKind);
+}
+
 bool BridgedDeclAttribute_isDeclModifier(BridgedDeclAttrKind cKind) {
   auto optKind = unbridged(cKind);
   if (!optKind)
@@ -136,7 +143,8 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedStringRef cMessage, BridgedStringRef cRenamed,
     BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
     BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
-    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange) {
+    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange,
+    bool isSPI) {
 
   return new (cContext.unbridged())
       AvailableAttr(cAtLoc.unbridged(), cRange.unbridged(),
@@ -146,7 +154,7 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsed(
                     cDeprecated.unbridged(), cDeprecatedRange.unbridged(),
                     cObsoleted.unbridged(), cObsoletedRange.unbridged(),
                     /*Implicit=*/false,
-                    /*IsSPI=*/false);
+                    /*IsSPI=*/isSPI);
 }
 
 BridgedAvailableAttr
@@ -858,6 +866,15 @@ BridgedTransposeAttr BridgedTransposeAttr_createParsed(
       DeclNameRefWithLoc{cOriginalName.unbridged(), cOriginalNameLoc.unbridged(),
                          /*AccessorKind=*/std::nullopt},
       params);
+}
+
+BridgedTypeEraserAttr BridgedTypeEraserAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedTypeExpr cTypeExpr
+
+) {
+  return TypeEraserAttr::create(cContext.unbridged(), cAtLoc.unbridged(),
+                                cRange.unbridged(), cTypeExpr.unbridged());
 }
 
 BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(

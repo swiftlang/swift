@@ -74,8 +74,8 @@ extension ASTGenVisitor {
       return self.generate(macroExpansionExpr: node)
     case .memberAccessExpr(let node):
       return self.generate(memberAccessExpr: node)
-    case .missingExpr:
-      fatalError("unimplemented")
+    case .missingExpr(let node):
+      return self.generate(missingExpr: node)
     case .nilLiteralExpr(let node):
       return self.generate(nilLiteralExpr: node).asExpr
     case .optionalChainingExpr(let node):
@@ -738,7 +738,7 @@ extension ASTGenVisitor {
       ).asExpr
 
     case .method(_):
-      fatalError("unimplemented")
+      fatalError("unimplemented (method keypath)")
     }
   }
 
@@ -931,6 +931,14 @@ extension ASTGenVisitor {
     }
   }
 
+  func generate(missingExpr node: MissingExprSyntax) -> BridgedExpr {
+    let loc = self.generateSourceLoc(node.previousToken(viewMode: .sourceAccurate))
+    return BridgedErrorExpr.create(
+      self.ctx,
+      loc: BridgedSourceRange(start: loc, end: loc)
+    ).asExpr
+  }
+
   func generate(genericSpecializationExpr node: GenericSpecializationExprSyntax) -> BridgedUnresolvedSpecializeExpr {
     let base = self.generate(expr: node.expression)
     let generics = node.genericArgumentClause
@@ -1098,6 +1106,18 @@ extension ASTGenVisitor {
     var elements: [BridgedExpr] = []
     elements.reserveCapacity(node.elements.count)
 
+    // If the left-most sequence expr is a 'try', hoist it up to turn
+    // '(try x) + y' into 'try (x + y)'. This is necessary to do in the
+    // ASTGen because 'try' nodes are represented in the ASTScope tree
+    // to look up catch nodes. The scope tree must be syntactic because
+    // it's constructed before sequence folding happens during preCheckExpr.
+    // Otherwise, catch node lookup would find the incorrect catch node for
+    // 'try x + y' at the source location for 'y'.
+    //
+    // 'try' has restrictions for where it can appear within a sequence
+    // expr. This is still diagnosed in TypeChecker::foldSequence.
+    let firstTryExprSyntax = node.elements.first?.as(TryExprSyntax.self)
+
     var iter = node.elements.makeIterator()
     while let node = iter.next() {
       switch node.as(ExprSyntaxEnum.self) {
@@ -1124,15 +1144,24 @@ extension ASTGenVisitor {
       case .unresolvedTernaryExpr(let node):
         elements.append(self.generate(unresolvedTernaryExpr: node).asExpr)
       default:
-        // Operand.
-        elements.append(self.generate(expr: node))
+        if let firstTryExprSyntax, node.id == firstTryExprSyntax.id {
+          elements.append(self.generate(expr: firstTryExprSyntax.expression))
+        } else {
+          elements.append(self.generate(expr: node))
+        }
       }
     }
 
-    return BridgedSequenceExpr.createParsed(
+    let seqExpr = BridgedSequenceExpr.createParsed(
       self.ctx,
       exprs: elements.lazy.bridgedArray(in: self)
     ).asExpr
+
+    if let firstTryExprSyntax {
+      return self.generate(tryExpr: firstTryExprSyntax, overridingSubExpr: seqExpr)
+    } else {
+      return seqExpr
+    }
   }
 
   func generate(subscriptCallExpr node: SubscriptCallExprSyntax, postfixIfConfigBaseExpr: BridgedExpr? = nil) -> BridgedSubscriptExpr {
@@ -1164,9 +1193,9 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(tryExpr node: TryExprSyntax) -> BridgedExpr {
+  func generate(tryExpr node: TryExprSyntax, overridingSubExpr: BridgedExpr? = nil) -> BridgedExpr {
     let tryLoc = self.generateSourceLoc(node.tryKeyword)
-    let subExpr = self.generate(expr: node.expression)
+    let subExpr = overridingSubExpr ?? self.generate(expr: node.expression)
 
     switch node.questionOrExclamationMark {
     case nil:
