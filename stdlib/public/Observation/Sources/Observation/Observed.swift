@@ -13,6 +13,7 @@
 import Observation
 #endif
 import Synchronization
+import _Concurrency
 
 /// An asychronous sequence generated from a closure that tracks the transactional changes of `@Observable` types.
 ///
@@ -99,9 +100,8 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     }
   }
   
-  let isolation: (any Actor)?
   let state: SharedState<State>
-  let work: @Sendable () throws(Failure) -> Element?
+  let emit: @isolated(any) @Sendable () throws(Failure) -> Element?
   
   /// Constructs an asynchronous sequence for a given closure by tracking changes of `@Observable` types.
   ///
@@ -118,42 +118,27 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
   ///     - emit: A closure to generate an element for the sequence.
   ///
   public init(
-    isolation: isolated (any Actor)? = #isolation,
-    @_inheritActorContext _ emit: @Sendable @escaping () throws(Failure) -> Element?
+    @_inheritActorContext _ emit: @escaping @isolated(any) @Sendable () throws(Failure) -> Element?
   ) {
-    self.isolation = isolation
-    self.work = { () throws(Failure) -> Element? in
-      if let isolation {
-        do {
-          return try isolation.assumeIsolated { _ in
-            try emit()
-          }
-        } catch {
-          throw error as! Failure
-        }
-      } else {
-        return try emit()
-      }
-    }
+    self.emit = emit
     self.state = SharedState(State())
   }
   
   public struct Iterator: AsyncIteratorProtocol {
-    let isolation: (any Actor)?
     // the state ivar serves two purposes:
     // 1) to store a critical region of state of the mutations
     // 2) to idenitify the termination of _this_ sequence
     var state: SharedState<State>?
-    let work: @Sendable () throws(Failure) -> Element?
+    let emit: @isolated(any) @Sendable () throws(Failure) -> Element?
     
     // this is the primary implementation of the tracking
     // it is bound to be called on the specified isolation of the construction
-    fileprivate static func trackEmission(isolation trackingIsolation: isolated (any Actor)?, state: SharedState<State>, work: @escaping @Sendable () throws(Failure) -> Element?) throws(Failure) -> Element? {
+    fileprivate static func trackEmission(isolation trackingIsolation: isolated (any Actor)?, state: SharedState<State>, emit: @escaping @isolated(any) @Sendable () throws(Failure) -> Element?) throws(Failure) -> Element? {
       // this ferries in an intermediate form with Result to skip over `withObservationTracking` not handling errors being thrown
       // particularly this case is that the error is also an iteration state transition data point (it terminates the sequence)
       // so we need to hold that to get a chance to catch and clean-up
       let result = withObservationTracking {
-        Result(catching: work)
+        Result(catching: emit)
       } onChange: { [state] in
         // resume all cases where the awaiting continuations are awaiting a willSet
         State.emitWillChange(state)
@@ -171,6 +156,19 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
       }
     }
     
+    fileprivate mutating func trackEmission(isolation iterationIsolation: isolated (any Actor)?, state: SharedState<State>) async throws(Failure) -> Element? {
+      guard !Task.isCancelled else {
+        // the task was cancelled while awaiting a willChange so ensure a proper termination
+        return try terminate()
+      }
+      // start by directly tracking the emission via a withObservation tracking on the isolation specified fro mthe init
+      guard let element = try await Iterator.trackEmission(isolation: emit.isolation, state: state, emit: emit) else {
+        // the user returned a nil from the closure so terminate the sequence
+        return try terminate()
+      }
+      return element
+    }
+    
     public mutating func next(isolation iterationIsolation: isolated (any Actor)? = #isolation) async throws(Failure) -> Element? {
       // early exit if the sequence is terminal already
       guard let state else { return nil }
@@ -179,13 +177,7 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
         // either the tracking has never yet started at all and we need to prime the pump
         // or the tracking has already started and we are going to await a change
         if State.startTracking(state) {
-          guard !Task.isCancelled else { return nil }
-          // start by directly tracking the emission via a withObservation tracking on the isolation specified fro mthe init
-          guard let element = try await Iterator.trackEmission(isolation: isolation, state: state, work: work) else {
-            // the user returned a nil from the closure so terminate the sequence
-            return try terminate()
-          }
-          return element
+          return try await trackEmission(isolation: iterationIsolation, state: state)
         } else {
           // set up an id for this generation
           let id = State.generation(state)
@@ -200,18 +192,7 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
             // ensure to clean out our continuation uon cancellation
             State.cancel(state, id: id)
           }
-          
-          guard !Task.isCancelled else {
-            // the task was cancelled while awaiting a willChange so ensure a proper termination
-            return try terminate()
-          }
-          
-          // re-prime the pump for the observation tracking
-          guard let element = try await Iterator.trackEmission(isolation: isolation, state: state, work: work) else {
-            // again ensure the user can terminate by returning nil
-            return try terminate()
-          }
-          return element
+          return try await trackEmission(isolation: iterationIsolation, state: state)
         }
       } catch {
         // the user threw a failure in the closure so propigate that outwards and terminate the sequence
@@ -221,6 +202,6 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
   }
   
   public func makeAsyncIterator() -> Iterator {
-    Iterator(isolation: isolation, state: state, work: work)
+    Iterator(state: state, emit: emit)
   }
 }
