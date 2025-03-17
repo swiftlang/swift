@@ -640,59 +640,76 @@ extension _StringGuts {
     nextScalar: (Int) -> (scalar: Unicode.Scalar, end: Int)?
   ) -> Int {
     _internalInvariant(index < endIndex._encodedOffset)
+    return _nextBoundary(startingAt: index, nextScalar: nextScalar)
+  }
+}
 
-    // Note: If `index` in't already on a boundary, then starting with an empty
-    // state here sometimes leads to this method returning results that diverge
-    // from the true breaks in the string.
-    var state = _GraphemeBreakingState()
-    var (scalar, index) = nextScalar(index)!
+fileprivate func _nextBoundary(
+  startingAt index: Int,
+  nextScalar: (Int) -> (scalar: Unicode.Scalar, end: Int)?
+) -> Int {
 
-    while true {
-      guard let (scalar2, nextIndex) = nextScalar(index) else { break }
-      if state.shouldBreak(between: scalar, and: scalar2) {
-        break
-      }
-      index = nextIndex
-      scalar = scalar2
+  // Note: If `index` in't already on a boundary, then starting with an empty
+  // state here sometimes leads to this method returning results that diverge
+  // from the true breaks in the string.
+  var state = _GraphemeBreakingState()
+  var (scalar, index) = nextScalar(index)!
+
+  while true {
+    guard let (scalar2, nextIndex) = nextScalar(index) else { break }
+    if state.shouldBreak(between: scalar, and: scalar2) {
+      break
     }
-
-    return index
+    index = nextIndex
+    scalar = scalar2
   }
 
+  return index
+}
+
+extension _StringGuts {
   // Returns the stride of the grapheme cluster ending at offset `index`.
   //
   // This method uses `previousScalar` to looks back in the string as far as
   // necessary to find a correct grapheme cluster boundary, whether or not
   // `index` happens to be on a boundary itself.
-  internal func previousBoundary(
+  fileprivate func previousBoundary(
     endingAt index: Int,
     previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
   ) -> Int {
-    // FIXME: This requires potentially arbitrary lookback in each iteration,
-    // leading to quadratic behavior in some edge cases. Ideally lookback should
-    // only be done once per cluster (or in the case of RI sequences, once per
-    // flag sequence). One way to avoid most quadratic behavior is to replace
-    // this implementation with a scheme that first searches backwards for a
-    // safe point then iterates forward using the regular `shouldBreak` until we
-    // reach `index`, as recommended in section 6.4 of TR#29.
-    //
-    // https://www.unicode.org/reports/tr29/#Random_Access
-
-    var (scalar2, index) = previousScalar(index)!
-
-    while true {
-      guard let (scalar1, previousIndex) = previousScalar(index) else { break }
-      if _shouldBreakWithLookback(
-        between: scalar1, and: scalar2, at: index, with: previousScalar
-      ) {
-        break
-      }
-      index = previousIndex
-      scalar2 = scalar1
-    }
-
-    return index
+    _previousBoundary(endingAt: index, previousScalar: previousScalar)
   }
+
+}
+
+fileprivate func _previousBoundary(
+  endingAt index: Int,
+  previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
+) -> Int {
+  // FIXME: This requires potentially arbitrary lookback in each iteration,
+  // leading to quadratic behavior in some edge cases. Ideally lookback should
+  // only be done once per cluster (or in the case of RI sequences, once per
+  // flag sequence). One way to avoid most quadratic behavior is to replace
+  // this implementation with a scheme that first searches backwards for a
+  // safe point then iterates forward using the regular `shouldBreak` until we
+  // reach `index`, as recommended in section 6.4 of TR#29.
+  //
+  // https://www.unicode.org/reports/tr29/#Random_Access
+
+  var (scalar2, index) = previousScalar(index)!
+
+  while true {
+    guard let (scalar1, previousIndex) = previousScalar(index) else { break }
+    if _shouldBreakWithLookback(
+      between: scalar1, and: scalar2, at: index, with: previousScalar
+    ) {
+      break
+    }
+    index = previousIndex
+    scalar2 = scalar1
+  }
+
+  return index
 }
 
 extension _GraphemeBreakingState {
