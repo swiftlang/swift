@@ -10,8 +10,6 @@
 #
 # ----------------------------------------------------------------------------
 
-import os
-
 from build_swift.build_swift.constants import SWIFT_REPO_NAME
 
 from . import cmark
