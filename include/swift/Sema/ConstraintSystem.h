@@ -3627,16 +3627,6 @@ public:
         });
   }
 
-  bool
-  hasConversionRestriction(Type type1, Type type2,
-                           ConversionRestrictionKind restrictionKind) const {
-    auto restriction =
-        ConstraintRestrictions.find({type1.getPointer(), type2.getPointer()});
-    return restriction == ConstraintRestrictions.end()
-               ? false
-               : restriction->second == restrictionKind;
-  }
-
   /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
   /// constraint system, return the decl that it references.
   ValueDecl *findResolvedMemberRef(ConstraintLocator *locator);
