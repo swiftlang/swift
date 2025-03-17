@@ -131,10 +131,11 @@ extension UnsafeRawPointer {
     _internalInvariant((0..<end).contains(i))
     _internalInvariant(_isScalarAligned(i))
 
-    // TODO: call internals instead
-    let str = _str(i..<end)
-    let nextIdx = str.index(after: str.startIndex)
-    return i + str.utf8.distance(from: str.startIndex, to: nextIdx)
+    return _nextGraphemeClusterBoundary(startingAt: i) { idx in
+      guard idx < end else { return nil }
+      let (scalar, end) = _decodeScalar(startingAt: idx)
+      return (scalar, end)
+    }
   }
 
   // @usableFromInline
@@ -144,10 +145,11 @@ extension UnsafeRawPointer {
   ) -> Int {
     _internalInvariant(_isScalarAligned(i))
 
-    // TODO: call internals instead
-    let str = _str(0..<i)
-    let prevIdx = str.index(before: str.endIndex)
-    return str.utf8.distance(from: str.startIndex, to: prevIdx)
+    return _previousGraphemeClusterBoundary(endingAt: i) { idx in
+      guard idx > 0 else { return nil }
+      let (scalar, prior) = _decodeScalar(endingAt: idx)
+      return (scalar, prior)
+    }
   }
 
   // @usableFromInline
