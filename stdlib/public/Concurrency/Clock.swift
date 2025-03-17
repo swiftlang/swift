@@ -243,3 +243,9 @@ internal func _getClockRes(
   seconds: UnsafeMutablePointer<Int64>,
   nanoseconds: UnsafeMutablePointer<Int64>,
   clock: CInt)
+
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_sleep")
+internal func _sleep(
+  seconds: Int64,
+  nanoseconds: Int64)

@@ -15,7 +15,7 @@ import Swift
 // .. Main Executor ............................................................
 
 @available(SwiftStdlib 6.2, *)
-public class DummyMainExecutor: MainExecutor, @unchecked Sendable {
+public final class DummyMainExecutor: MainExecutor, @unchecked Sendable {
   public init() {}
 
   public func run() throws {
@@ -40,7 +40,7 @@ public class DummyMainExecutor: MainExecutor, @unchecked Sendable {
 // .. Task Executor ............................................................
 
 @available(SwiftStdlib 6.2, *)
-public class DummyTaskExecutor: TaskExecutor, @unchecked Sendable {
+public final class DummyTaskExecutor: TaskExecutor, @unchecked Sendable {
   public init() {}
 
   public func enqueue(_ job: consuming ExecutorJob) {

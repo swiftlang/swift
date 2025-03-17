@@ -10,16 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(WASI)
-
 import Swift
 
-// The default executors for now are Dispatch-based
+// This platform uses a single, global, CooperativeExecutor
 @available(SwiftStdlib 6.2, *)
 public struct PlatformExecutorFactory: ExecutorFactory {
-  public static let mainExecutor: any MainExecutor = DummyMainExecutor()
-  public static let defaultExecutor: any TaskExecutor
-    = DummyTaskExecutor()
+  static let executor = CooperativeExecutor()
+  public static let mainExecutor: any MainExecutor { executor }
+  public static let defaultExecutor: any TaskExecutor { executor }
 }
-
-#endif // os(WASI)

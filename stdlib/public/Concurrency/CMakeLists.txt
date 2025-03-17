@@ -93,18 +93,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   linker-support/magic-symbols-for-install-name.c
 )
 
-set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES)
-if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
-  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
-    DispatchGlobalExecutor.cpp
-  )
-endif()
-
-set(LLVM_OPTIONAL_SOURCES
-  CooperativeGlobalExecutor.cpp
-  DispatchGlobalExecutor.cpp
-)
-
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Actor.swift
   AsyncLet.swift
@@ -133,6 +121,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   GlobalActor.swift
   GlobalConcurrentExecutor.swift
   MainActor.swift
+  PriorityQueue.swift
   SourceCompatibilityShims.swift
   Task.swift
   Task+PriorityEscalation.swift
@@ -169,21 +158,44 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   ContinuousClock.swift
   SuspendingClock.swift
   TaskSleepDuration.swift
-  DispatchExecutor.swift
-  CFExecutor.swift
   DummyExecutor.swift
+  CooperativeExecutor.swift
   PlatformExecutorDarwin.swift
   PlatformExecutorLinux.swift
   PlatformExecutorWindows.swift
-  PlatformExecutorWASI.swift
 )
 
-set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
-  ExecutorImpl.swift
-)
+set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES)
+set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES)
+if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
+  set(SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES
+    DispatchGlobalExecutor.cpp
+  )
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+    DispatchExecutor.swift
+    CFExecutor.swift
+    ExecutorImpl.swift
+  )
+elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
+  set(SWIFT_RUNTIME_CONCURRENCYU_NONEMBEDDED_SWIFT_SOURCES
+    ExecutorImpl.swift
+    PlatformExecutorCooperative.swift
+    )
+else()
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+    ExecutorImpl.swift
+    PlatformExecutorNone.swift
+  )
+endif()
 
 set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
-  PlatformExecutorEmbedded.swift
+  PlatformExecutorNone.swift
+  )
+
+set(LLVM_OPTIONAL_SOURCES
+  DispatchGlobalExecutor.cpp
+  CooperativeGlobalExecutor.cpp
+  DispatchGlobalExecutor.cpp
 )
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB

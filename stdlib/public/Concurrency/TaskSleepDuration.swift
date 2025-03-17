@@ -13,6 +13,36 @@
 import Swift
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
+  -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64) {
+  var clockID: _ClockID
+  if clock.traits.contains(.continuous) {
+    clockID = .continuous
+  } else {
+    clockID = .suspending
+  }
+
+  var seconds: Int64 = 0
+  var nanoseconds: Int64 = 0
+  unsafe _getTime(seconds: &seconds,
+                  nanoseconds: &nanoseconds,
+                  clock: clockID.rawValue)
+
+  let delta = clock.convert(from: clock.now.duration(to: instant))!
+  let (deltaSeconds, deltaAttoseconds) = delta.components
+  let deltaNanoseconds = deltaAttoseconds / 1_000_000_000
+  seconds += deltaSeconds
+  nanoseconds += deltaNanoseconds
+  if nanoseconds > 1_000_000_000 {
+    seconds += 1
+    nanoseconds -= 1_000_000_000
+  }
+
+  return (clockID: clockID,
+          seconds: Int64(seconds),
+          nanoseconds: Int64(nanoseconds))
+}
+
 @available(SwiftStdlib 5.7, *)
 @_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
@@ -54,21 +84,39 @@ extension Task where Success == Never, Failure == Never {
                 unsafe onSleepWake(token)
               }
 
-              if #available(SwiftStdlib 6.2, *) {
-                let executor = Task.currentSchedulableExecutor
-                let job = ExecutorJob(context: Builtin.convertTaskToJob(sleepTask))
+              let job = ExecutorJob(context: Builtin.convertTaskToJob(sleepTask))
 
+              if #available(SwiftStdlib 6.2, *) {
                 #if !$Embedded
-                executor!.enqueue(job,
-                                  at: instant,
-                                  tolerance: tolerance,
-                                  clock: clock)
+                if let executor = Task.currentSchedulableExecutor {
+                  executor.enqueue(job,
+                                   at: instant,
+                                   tolerance: tolerance,
+                                   clock: clock)
+                  return
+                }
                 #endif
-              } else {
-                // Since we're building the new version of the stdlib,
-                // we should never get here
-                Builtin.unreachable()
               }
+
+              // If there is no current schedulable executor, fall back to
+              // calling _enqueueJobGlobalWithDeadline().
+              let (clockID, seconds, nanoseconds) = timestamp(for: instant,
+                                                              clock: clock)
+              let toleranceSeconds: Int64
+              let toleranceNanoseconds: Int64
+              if let tolerance = tolerance,
+                 let components = clock.convert(from: tolerance)?.components {
+                toleranceSeconds = components.seconds
+                toleranceNanoseconds = components.attoseconds / 1_000_000_000
+              } else {
+                toleranceSeconds = 0
+                toleranceNanoseconds = -1
+              }
+
+              _enqueueJobGlobalWithDeadline(
+                  seconds, nanoseconds,
+                  toleranceSeconds, toleranceNanoseconds,
+                  clockID.rawValue, UnownedJob(job))
               return
 
             case .activeContinuation, .finished:

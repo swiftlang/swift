@@ -12,37 +12,8 @@
 
 import Swift
 
-// .. Platform Main Executor ...................................................
-
-/// `PlatformMainExecutor` is used during program start-up and also for any
-/// `@MainActor` code.  It implements `SerialExecutor`, `RunLoopExecutor` and
-/// `EventableExecutor`.
 @available(SwiftStdlib 6.2, *)
-public class PlatformMainExecutor: MainExecutor, @unchecked Sendable {
-
-  public func run() throws {
-    fatalError("There is no main executor implementation for this platform")
-  }
-
-  public func stop() {
-    fatalError("There is no main executor implementation for this platform")
-  }
-
-  public func enqueue(_ job: consuming ExecutorJob) {
-    fatalError("There is no main executor implementation for this platform")
-  }
-
-}
-
-// .. Platform Default Executor ................................................
-
-/// `PlatformDefaultExecutor` is the default executor for non-`@MainActor`
-/// tasks.  It implements `TaskExecutor` only.
-@available(SwiftStdlib 6.2, *)
-public class PlatformDefaultExecutor: TaskExecutor, @unchecked Sendable {
-
-  public func enqueue(_ job: consuming ExecutorJob) {
-    fatalError("There is no default executor implementation for this platform")
-  }
-
+public struct PlatformExecutorFactory: ExecutorFactory {
+  public static let mainExecutor: any MainExecutor = DummyMainExecutor()
+  public static let defaultExecutor: any TaskExecutor = DummyTaskExecutor()
 }

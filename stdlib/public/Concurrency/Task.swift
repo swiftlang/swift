@@ -1256,7 +1256,7 @@ extension Task where Success == Never, Failure == Never {
 
       #if !$Embedded
       if #available(SwiftStdlib 6.2, *) {
-        let executor = Task.currentExecutor ?? Task.defaultExecutor
+        let executor = Task.currentExecutor
 
         executor.enqueue(ExecutorJob(context: job))
       } else {
