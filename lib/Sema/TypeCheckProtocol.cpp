@@ -1885,7 +1885,8 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
       }
 
       if (auto adoptingNominal = DC->getSelfNominalTypeDecl()) {
-        if (adoptingNominal->isSemanticallyUnavailable())
+        if (AvailabilityContext::forDeclSignature(adoptingNominal)
+                .isUnavailable())
           return true;
       }
 

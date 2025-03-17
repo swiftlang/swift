@@ -541,9 +541,9 @@ std::optional<SemanticAvailableAttr> Decl::getUnavailableAttr() const {
   return std::nullopt;
 }
 
-static llvm::SmallVector<AvailabilityDomain, 2>
+static llvm::SmallSetVector<AvailabilityDomain, 2>
 availabilityDomainsForABICompatibility(const ASTContext &ctx) {
-  llvm::SmallVector<AvailabilityDomain, 2> domains;
+  llvm::SmallSetVector<AvailabilityDomain, 2> domains;
 
   // Regardless of target platform, binaries built for Embedded do not require
   // compatibility.
@@ -551,112 +551,110 @@ availabilityDomainsForABICompatibility(const ASTContext &ctx) {
     return domains;
 
   if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx))
-    domains.push_back(targetDomain->getABICompatibilityDomain());
-  
+    domains.insert(targetDomain->getABICompatibilityDomain());
+
   if (auto variantDomain = AvailabilityDomain::forTargetVariantPlatform(ctx))
-    domains.push_back(variantDomain->getABICompatibilityDomain());
+    domains.insert(variantDomain->getABICompatibilityDomain());
 
   return domains;
 }
 
-/// Returns true if \p decl is proven to be unavailable for all platforms that
-/// external modules interacting with this module could target. A declaration
-/// that is not proven to be unavailable in this way could be reachable at
-/// runtime, even if it is unavailable to all code in this module.
-static bool isUnavailableForAllABICompatiblePlatforms(const Decl *decl) {
+static bool constraintIndicatesRuntimeUnavailability(
+    const AvailabilityConstraint &constraint, const ASTContext &ctx) {
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnconditionallyUnavailable: {
+    return true;
+  }
+  case AvailabilityConstraint::Reason::UnavailableForDeployment:
+  case AvailabilityConstraint::Reason::Obsoleted:
+  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+    return false;
+  }
+}
+
+/// Computes the `DeclRuntimeAvailability` value for `decl`.
+static DeclRuntimeAvailability getDeclRuntimeAvailability(const Decl *decl) {
   // Don't trust unavailability on declarations from Clang modules.
   if (isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext()))
-    return false;
+    return DeclRuntimeAvailability::PotentiallyAvailable;
+
+  // Check whether the decl is unavailable at all.
+  if (!decl->isUnavailable())
+    return DeclRuntimeAvailability::PotentiallyAvailable;
 
   auto &ctx = decl->getASTContext();
-  llvm::SmallVector<AvailabilityDomain, 2> compatibilityDomains =
-      availabilityDomainsForABICompatibility(ctx);
+  auto compatibilityDomains = availabilityDomainsForABICompatibility(ctx);
+  auto potentiallyAvailableDomains = compatibilityDomains;
 
-  llvm::SmallSet<AvailabilityDomain, 8> unavailableDescendantDomains;
-  llvm::SmallSet<AvailabilityDomain, 8> availableDescendantDomains;
+  AvailabilityConstraintFlags flags;
 
-  // Build up the collection of relevant available and unavailable platform
-  // domains by looking at all the @available attributes. Along the way, we
-  // may find an attribute that makes the declaration universally unavailable
-  // in which case platform availability is irrelevant.
-  for (auto attr : decl->getSemanticAvailableAttrs(/*includeInactive=*/true)) {
-    auto domain = attr.getDomain();
+  // Semantic availability was already computed separately for any enclosing
+  // extension.
+  flags |= AvailabilityConstraintFlag::SkipEnclosingExtension;
+
+  // FIXME: [availability] Inactive domains have to be included because iOS
+  // availability is considered inactive when compiling a zippered module.
+  flags |= AvailabilityConstraintFlag::IncludeAllDomains;
+
+  auto constraints = getAvailabilityConstraintsForDecl(
+      decl, AvailabilityContext::forInliningTarget(ctx), flags);
+
+  for (auto constraint : constraints) {
+    if (!constraintIndicatesRuntimeUnavailability(constraint, ctx))
+      continue;
+
+    // Check whether the constraint is from a relevant domain.
+    auto domain = constraint.getDomain();
     bool isCompabilityDomainDescendant =
         llvm::find_if(compatibilityDomains,
                       [&domain](AvailabilityDomain compatibilityDomain) {
                         return compatibilityDomain.contains(domain);
                       }) != compatibilityDomains.end();
 
+    if (!domain.isActive(ctx) && !isCompabilityDomainDescendant)
+      continue;
+
     if (isCompabilityDomainDescendant) {
-      // Record the whether the descendant domain is marked available
-      // or unavailable. Unavailability overrides availability.
-      if (attr.isUnconditionallyUnavailable()) {
-        availableDescendantDomains.erase(domain);
-        unavailableDescendantDomains.insert(domain);
-      } else if (!unavailableDescendantDomains.contains(domain)) {
-        availableDescendantDomains.insert(domain);
-      }
-    } else if (attr.isActive(ctx)) {
-      // The declaration is always unavailable if an active attribute from a
-      // domain outside the compatibility hierarchy indicates unavailability.
-      if (attr.isUnconditionallyUnavailable())
-        return true;
+      // If the decl is still potentially available in some compatibility
+      // domain, keep looking at the remaining constraints.
+      potentiallyAvailableDomains.remove(domain);
+      if (!potentiallyAvailableDomains.empty())
+        continue;
     }
+
+    // Either every compatibility domain has been proven unavailable or this
+    // constraint proves runtime unavailability on its own.
+    return DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
   }
 
-  // If there aren't any compatibility domains to check and we didn't find any
-  // other active attributes that make the declaration unavailable, then it must
-  // be available.
-  if (compatibilityDomains.empty())
-    return false;
-
-  // Verify that the declaration has been marked unavailable in every
-  // compatibility domain.
-  for (auto compatibilityDomain : compatibilityDomains) {
-    if (!unavailableDescendantDomains.contains(compatibilityDomain))
-      return false;
-  }
-  
-  // Verify that there aren't any explicitly available descendant domains.
-  if (availableDescendantDomains.size() > 0)
-    return false;
-
-  return true;
+  return DeclRuntimeAvailability::PotentiallyAvailable;
 }
 
-SemanticDeclAvailability
-SemanticDeclAvailabilityRequest::evaluate(Evaluator &evaluator,
-                                          const Decl *decl) const {
-  auto inherited = SemanticDeclAvailability::PotentiallyAvailable;
+DeclRuntimeAvailability
+DeclRuntimeAvailabilityRequest::evaluate(Evaluator &evaluator,
+                                         const Decl *decl) const {
+  auto inherited = DeclRuntimeAvailability::PotentiallyAvailable;
   if (auto *parent =
           AvailabilityInference::parentDeclForInferredAvailability(decl)) {
     inherited = evaluateOrDefault(
-        evaluator, SemanticDeclAvailabilityRequest{parent}, inherited);
+        evaluator, DeclRuntimeAvailabilityRequest{parent}, inherited);
   }
 
-  if (inherited == SemanticDeclAvailability::CompletelyUnavailable ||
-      isUnavailableForAllABICompatiblePlatforms(decl))
-    return SemanticDeclAvailability::CompletelyUnavailable;
+  // If the inherited semantic availability is already maximally unavailable
+  // then skip computing unavailability for this declaration.
+  if (inherited == DeclRuntimeAvailability::AlwaysUnavailableABICompatible)
+    return DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
 
-  if (inherited == SemanticDeclAvailability::ConditionallyUnavailable ||
-      decl->isUnavailable())
-    return SemanticDeclAvailability::ConditionallyUnavailable;
-
-  return SemanticDeclAvailability::PotentiallyAvailable;
-}
-
-bool Decl::isSemanticallyUnavailable() const {
-  auto availability = evaluateOrDefault(
-      getASTContext().evaluator, SemanticDeclAvailabilityRequest{this},
-      SemanticDeclAvailability::PotentiallyAvailable);
-  return availability != SemanticDeclAvailability::PotentiallyAvailable;
+  auto availability = getDeclRuntimeAvailability(decl);
+  return std::max(inherited, availability);
 }
 
 bool Decl::isUnreachableAtRuntime() const {
   auto availability = evaluateOrDefault(
-      getASTContext().evaluator, SemanticDeclAvailabilityRequest{this},
-      SemanticDeclAvailability::PotentiallyAvailable);
-  return availability == SemanticDeclAvailability::CompletelyUnavailable;
+      getASTContext().evaluator, DeclRuntimeAvailabilityRequest{this},
+      DeclRuntimeAvailability::PotentiallyAvailable);
+  return availability ==
+         DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
 }
 
 static UnavailableDeclOptimization
@@ -859,8 +857,6 @@ std::optional<llvm::VersionTuple> SemanticAvailableAttr::getIntroduced() const {
 
 std::optional<AvailabilityRange>
 SemanticAvailableAttr::getIntroducedRange(const ASTContext &Ctx) const {
-  DEBUG_ASSERT(getDomain().isActive(Ctx));
-
   auto *attr = getParsedAttr();
   if (!attr->getRawIntroduced().has_value()) {
     // For versioned domains, an "introduced:" version is always required to
@@ -899,8 +895,6 @@ std::optional<llvm::VersionTuple> SemanticAvailableAttr::getDeprecated() const {
 
 std::optional<AvailabilityRange>
 SemanticAvailableAttr::getDeprecatedRange(const ASTContext &Ctx) const {
-  DEBUG_ASSERT(getDomain().isActive(Ctx));
-
   auto *attr = getParsedAttr();
   if (!attr->getRawDeprecated().has_value()) {
     // Regardless of the whether the domain supports versions or not, an
@@ -930,8 +924,6 @@ std::optional<llvm::VersionTuple> SemanticAvailableAttr::getObsoleted() const {
 
 std::optional<AvailabilityRange>
 SemanticAvailableAttr::getObsoletedRange(const ASTContext &Ctx) const {
-  DEBUG_ASSERT(getDomain().isActive(Ctx));
-
   auto *attr = getParsedAttr();
 
   // Obsoletion always requires a version.
