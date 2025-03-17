@@ -563,15 +563,34 @@ getRootTargetDomains(const ASTContext &ctx) {
 
 static bool constraintIndicatesRuntimeUnavailability(
     const AvailabilityConstraint &constraint, const ASTContext &ctx) {
+  std::optional<CustomAvailabilityDomain::Kind> customDomainKind;
+  if (auto customDomain = constraint.getDomain().getCustomDomain())
+    customDomainKind = customDomain->getKind();
+
   switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnconditionallyUnavailable: {
+  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+    if (customDomainKind)
+      return customDomainKind == CustomAvailabilityDomain::Kind::Enabled;
     return true;
-  }
-  case AvailabilityConstraint::Reason::UnavailableForDeployment:
   case AvailabilityConstraint::Reason::Obsoleted:
+  case AvailabilityConstraint::Reason::UnavailableForDeployment:
+    return false;
   case AvailabilityConstraint::Reason::PotentiallyUnavailable:
+    if (customDomainKind)
+      return customDomainKind == CustomAvailabilityDomain::Kind::Disabled;
     return false;
   }
+}
+
+/// Returns true if a decl that is unavailable in the given domain must still be
+/// emitted to preserve load time ABI compatibility.
+static bool
+domainRequiresABICompatibleUnavailableDecls(AvailabilityDomain domain,
+                                            const ASTContext &ctx) {
+  // FIXME: [availability] Restrict ABI compatible unavailable decls to modules
+  // compiled with macOS, iOS, watchOS, tvOS, or visionOS target triples. For
+  // other targets, unavailable code should always be stripped from binaries.
+  return domain.isUniversal() || domain.isPlatform();
 }
 
 /// Computes the `DeclRuntimeAvailability` value for `decl` in isolation.
@@ -579,10 +598,6 @@ static DeclRuntimeAvailability
 computeDeclRuntimeAvailability(const Decl *decl) {
   // Don't trust unavailability on declarations from Clang modules.
   if (isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext()))
-    return DeclRuntimeAvailability::PotentiallyAvailable;
-
-  // Check whether the decl is unavailable at all.
-  if (!decl->isUnavailable())
     return DeclRuntimeAvailability::PotentiallyAvailable;
 
   auto &ctx = decl->getASTContext();
@@ -595,41 +610,67 @@ computeDeclRuntimeAvailability(const Decl *decl) {
   // extension.
   flags |= AvailabilityConstraintFlag::SkipEnclosingExtension;
 
-  // FIXME: [availability] Inactive domains have to be included because iOS
-  // availability is considered inactive when compiling a zippered module.
+  // FIXME: [availability] Replace IncludeAllDomains with a RuntimeAvailability
+  // flag that includes the target variant constraints and keeps all constraints
+  // from active platforms.
   flags |= AvailabilityConstraintFlag::IncludeAllDomains;
 
   auto constraints = getAvailabilityConstraintsForDecl(
       decl, AvailabilityContext::forInliningTarget(ctx), flags);
 
+  // First, collect the unavailable domains from the constraints.
+  llvm::SmallVector<AvailabilityDomain, 8> unavailableDomains;
   for (auto constraint : constraints) {
-    if (!constraintIndicatesRuntimeUnavailability(constraint, ctx))
+    if (constraintIndicatesRuntimeUnavailability(constraint, ctx))
+      unavailableDomains.push_back(constraint.getDomain());
+  }
+
+  // Check whether there are any available attributes that would make the
+  // decl available in descendants of the unavailable domains.
+  for (auto attr :
+       decl->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    auto domain = attr.getDomain();
+    if (llvm::is_contained(unavailableDomains, domain))
       continue;
 
-    // Check whether the constraint is from a relevant domain.
-    auto domain = constraint.getDomain();
-    bool isTargetDomain = rootTargetDomains.contains(domain);
+    llvm::erase_if(unavailableDomains, [domain](auto unavailableDomain) {
+      return unavailableDomain.contains(domain);
+    });
+  }
 
+  // Check the remaining unavailable domains to see if the requirements for
+  // runtime unreachability are met.
+  auto result = DeclRuntimeAvailability::PotentiallyAvailable;
+  for (auto domain : unavailableDomains) {
+    // Check whether the constraint is from a relevant domain.
+    bool isTargetDomain = rootTargetDomains.contains(domain);
     if (!domain.isActive(ctx) && !isTargetDomain)
       continue;
 
     if (!domain.isRoot())
       continue;
 
+    // We've found an unavailable target domain. If all the target domains are
+    // unavailable then the decl is unreachable at runtime.
     if (isTargetDomain) {
-      // If the decl is still potentially available in some compatibility
-      // domain, keep looking at the remaining constraints.
       remainingTargetDomains.remove(domain);
-      if (!remainingTargetDomains.empty())
-        continue;
+      if (remainingTargetDomains.empty())
+        result = DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
+
+      continue;
     }
 
-    // Either every compatibility domain has been proven unavailable or this
-    // constraint proves runtime unavailability on its own.
-    return DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
+    // We've found a single unavailable domain that alone proves the decl is
+    // unreachable at runtime. It may still be required at load time, though.
+    if (domainRequiresABICompatibleUnavailableDecls(domain, ctx)) {
+      result = DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
+      continue;
+    }
+
+    return DeclRuntimeAvailability::AlwaysUnavailable;
   }
 
-  return DeclRuntimeAvailability::PotentiallyAvailable;
+  return result;
 }
 
 /// Determines the `DeclRuntimeAvailability` value for `decl` via
@@ -651,8 +692,8 @@ DeclRuntimeAvailabilityRequest::evaluate(Evaluator &evaluator,
 
   // If the inherited runtime availability is already maximally unavailable
   // then skip computing unavailability for this declaration.
-  if (inherited == DeclRuntimeAvailability::AlwaysUnavailableABICompatible)
-    return DeclRuntimeAvailability::AlwaysUnavailableABICompatible;
+  if (inherited == DeclRuntimeAvailability::AlwaysUnavailable)
+    return DeclRuntimeAvailability::AlwaysUnavailable;
 
   auto availability = computeDeclRuntimeAvailability(decl);
   return std::max(inherited, availability);
@@ -676,7 +717,7 @@ bool Decl::isAvailableDuringLowering() const {
 
   if (getEffectiveUnavailableDeclOptimization(getASTContext()) !=
       UnavailableDeclOptimization::Complete)
-    return true;
+    return availability < DeclRuntimeAvailability::AlwaysUnavailable;
 
   // All unreachable declarations should be skipped during lowering
   // when -unavailable-decl-optimization=complete is specified.

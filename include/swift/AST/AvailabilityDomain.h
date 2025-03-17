@@ -123,11 +123,6 @@ private:
                : std::nullopt;
   }
 
-  const CustomAvailabilityDomain *getCustomDomain() const {
-    ASSERT(isCustom());
-    return storage.get<const CustomAvailabilityDomain *>();
-  }
-
 public:
   AvailabilityDomain() {}
 
@@ -206,6 +201,14 @@ public:
     return PlatformKind::none;
   }
 
+  /// If the domain represents a user-defined domain, returns the metadata for
+  /// the domain. Returns `nullptr` otherwise.
+  const CustomAvailabilityDomain *getCustomDomain() const {
+    if (isCustom())
+      return storage.get<const CustomAvailabilityDomain *>();
+    return nullptr;
+  }
+
   /// Returns true if availability for this domain can be specified in terms of
   /// version ranges.
   bool isVersioned() const;
@@ -228,11 +231,11 @@ public:
   /// set of active platform-specific domains.
   bool isActiveForTargetPlatform(const ASTContext &ctx) const;
 
-  /// Returns the minimum available range for the attribute's domain. For
+  /// Returns the domain's minimum available range for type checking. For
   /// example, for the domain of the platform that compilation is targeting,
-  /// this will be the deployment target. For the Swift language domain, this
-  /// will be the language mode for compilation. For domains which have don't
-  /// have a "deployment target", this returns `std::nullopt`.
+  /// this version is specified with the `-target` option. For the Swift
+  /// language domain, it is specified with the `-swift-version` option. Returns
+  /// `std::nullopt` for domains which have don't have a "deployment target".
   std::optional<AvailabilityRange>
   getDeploymentRange(const ASTContext &ctx) const;
 
