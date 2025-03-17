@@ -1639,6 +1639,8 @@ private:
   void loadAllMembersOfRecordDecl(NominalTypeDecl *swiftDecl,
                                   const clang::RecordDecl *clangRecord,
                                   ClangInheritanceInfo inheritance);
+  void loadAllMembersOfNamespace(IterableDeclContext *swiftIDC,
+                                 const clang::NamespaceDecl *clangNamespace);
 
   void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
                            Decl *D, DeclContext *DC,

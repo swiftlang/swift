@@ -2054,18 +2054,23 @@ bool ExtensionDecl::isInSameDefiningModule() const {
     if (!typeAlterName.empty()) {
       // Case I: type and extension are both moved from somewhere else
       return typeAlterName == extensionAlterName;
-    } else {
-      // Case II: extension alone was moved from somewhere else
-      return extensionAlterName == decl->getParentModule()->getNameStr();
     }
+
+    // Case II: extension alone was moved from somewhere else
+    return extensionAlterName == decl->getParentModule()->getNameStr();
   } else {
     if (!typeAlterName.empty()) {
       // Case III: extended type alone was moved from somewhere else
       return typeAlterName == getParentModule()->getNameStr();
-    } else {
-      // Case IV: neither of type and extension was moved from somewhere else
-      return getParentModule() == decl->getParentModule();
     }
+
+    // Case IV: C++ namespace is imported as an extension.
+    if (isa_and_nonnull<clang::NamespaceDecl>(getClangDecl())) {
+      return true;
+    }
+
+    // Case V: neither of type and extension was moved from somewhere else
+    return getParentModule() == decl->getParentModule();
   }
 }
 

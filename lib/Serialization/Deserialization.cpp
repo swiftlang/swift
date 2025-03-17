@@ -2137,6 +2137,19 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         }
       }
     }
+
+    // The type we're looking for might be a C++ namespace. Namespaces can have
+    // many definitions scattered across different modules, which are
+    // represented as extensions to a single type defined in the global __C
+    // module. Check whether there is a namespace with the given name.
+    if (values.empty() && importedFromClang && isType &&
+        getContext().LangOpts.EnableCXXInterop) {
+      if (auto namespaceDecl =
+              importer::lookupAnyVisibleNamespace(baseModule, name)) {
+        values.push_back(namespaceDecl);
+      }
+    }
+
     break;
   }
       

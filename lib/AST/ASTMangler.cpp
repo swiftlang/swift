@@ -2594,9 +2594,15 @@ void ASTMangler::appendContext(const DeclContext *ctx,
     return;
   }
 
-  case DeclContextKind::ExtensionDecl:
-    appendExtension(cast<ExtensionDecl>(ctx), base, useModuleName);
+  case DeclContextKind::ExtensionDecl: {
+    auto ext = cast<ExtensionDecl>(ctx);
+    if (isa_and_nonnull<clang::NamespaceDecl>(ext->getClangDecl())) {
+      appendContext(ext->getSelfEnumDecl(), base, useModuleName);
+    } else {
+      appendExtension(ext, base, useModuleName);
+    }
     return;
+  }
 
   case DeclContextKind::AbstractClosureExpr:
     return appendClosureEntity(cast<AbstractClosureExpr>(ctx));
@@ -2978,6 +2984,7 @@ void ASTMangler::appendExtension(const ExtensionDecl* ext,
   // Perform extension mangling
   appendAnyGenericType(decl);
   appendModule(ext->getParentModule(), useModuleName);
+
   // If the extension is constrained, mangle the generic signature that
   // constrains it.
   if (!sigParts.isNull()) {

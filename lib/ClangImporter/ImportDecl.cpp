@@ -1174,10 +1174,10 @@ namespace {
 
       // Find the enclosing context.
       DeclContext *dc;
-      if (auto parentNamespace = dyn_cast<clang::NamespaceDecl>(decl->getParent())) {
+      if (auto parentNS = dyn_cast<clang::NamespaceDecl>(decl->getParent())) {
         // The enum for this namespace will be nested within the enum of its
         // parent namespace.
-        auto parentEnum = getSwiftEnumForCxxNamespace(parentNamespace);
+        auto parentEnum = getSwiftEnumForCxxNamespace(parentNS);
         if (!parentEnum)
           return nullptr;
 
@@ -1216,19 +1216,36 @@ namespace {
       // that should all be done via requests.
       enumDecl->setMemberLoader(&Impl, 0);
 
-      for (auto redecl : decl->redecls()) {
-        // Because a namespaces's decl context is the bridging header, make sure
-        // we add them to the bridging header lookup table.
-        addEntryToLookupTable(*Impl.BridgingHeaderLookupTable,
-                              const_cast<clang::NamespaceDecl *>(redecl),
-                              Impl.getNameImporter());
-      }
-
       return enumDecl;
     }
 
     Decl *VisitNamespaceDecl(const clang::NamespaceDecl *decl) {
-      return getSwiftEnumForCxxNamespace(decl);
+      // Dig out the enum declaration corresponding to this namespace.
+      auto enumDecl = getSwiftEnumForCxxNamespace(decl);
+      if (!enumDecl)
+        return nullptr;
+
+      auto dc = Impl.importDeclContextOf(decl, decl->getDeclContext());
+      if (!dc)
+        return nullptr;
+
+      while (isa<ExtensionDecl>(dc))
+        dc = dc->getParent();
+
+      // Create an extension of the enum that corresponds to this specific
+      // namespace definition.
+      auto loc = Impl.importSourceLoc(decl->getBeginLoc());
+      auto result = ExtensionDecl::create(
+          Impl.SwiftContext, loc, nullptr, { }, dc, nullptr, decl);
+      Impl.SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{result},
+                                              enumDecl->getDeclaredType());
+      Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{result},
+                                              std::move(enumDecl));
+
+      // Record the extension.
+      enumDecl->addExtension(result);
+      result->setMemberLoader(&Impl, 0);
+      return result;
     }
 
     Decl *VisitUsingDirectiveDecl(const clang::UsingDirectiveDecl *decl) {
@@ -2177,8 +2194,17 @@ namespace {
         return importCompatibilityTypeAlias(decl, importedName,
                                             *correctSwiftName);
 
-      auto dc =
-          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
+      EffectiveClangContext clangContext =
+          importedName.getEffectiveContext();
+      if (const auto *ctsd =
+              dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
+        if (auto primaryTemplate = ctsd->getSpecializedTemplate()) {
+          clangContext = EffectiveClangContext(
+              primaryTemplate->getDeclContext());
+        }
+      }
+
+      auto dc = Impl.importDeclContextOf(decl, clangContext);
       if (!dc) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(
@@ -10089,6 +10115,43 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
 }
 
 void
+ClangImporter::Implementation::loadAllMembersOfNamespace(
+    IterableDeclContext *swiftIDC,
+    const clang::NamespaceDecl *clangNamespace) {
+  // All of the members of this namespace.
+  llvm::SmallVector<Decl *, 16> members;
+
+  // Only the extensions of imported namespaces have any real members. The
+  // uniqued enum declarations are effectively empty.
+  auto ext = dyn_cast<ExtensionDecl>(swiftIDC);
+  if (!ext)
+    return;
+
+  // Import all of the members of the namespace.
+  for (auto clangDecl : clangNamespace->decls()) {
+    auto namedClangDecl = dyn_cast<clang::NamedDecl>(clangDecl);
+    if (!namedClangDecl)
+      continue;
+
+    // Ignore namespaces.
+    if (isa<clang::NamespaceDecl>(namedClangDecl))
+      continue;
+
+    // If the Clang entry isn't visible, ignore it.
+    if (!isVisibleClangEntry(namedClangDecl))
+      continue;
+
+    insertMembersAndAlternates(namedClangDecl, members, ext);
+  }
+
+  // Add the members to the extension.
+  for (auto member : members) {
+    if (!isa<AccessorDecl>(member))
+      ext->addMember(member);
+  }
+}
+
+void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
   FrontendStatsTracer tracer(D->getASTContext().Stats,
@@ -10131,9 +10194,11 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     return;
   }
 
-  if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
-    // Namespace members will only be loaded lazily.
-    cast<EnumDecl>(D)->setHasLazyMembers(true);
+  if (auto namespaceDecl = dyn_cast_or_null<clang::NamespaceDecl>(
+          D->getClangDecl())) {
+    loadAllMembersOfNamespace(IDC, namespaceDecl);
+    if (IDC) // Set member deserialization status
+      IDC->setDeserializedMembers(true);
     return;
   }
 

@@ -114,6 +114,9 @@ importer::getClangSubmoduleForDecl(const clang::Decl *D,
     actual = maybeDefinition.value();
     if (!actual && !allowForwardDeclaration)
       return std::nullopt;
+  } else if (isa<clang::NamespaceDecl>(D)) {
+    // Keep namespace definitions separate.
+    actual = D;
   }
 
   if (!actual)

@@ -757,6 +757,12 @@ AccessLevel convertClangAccess(clang::AccessSpecifier access);
 /// and should be parsed using swift::SourceFile::FileIDStr::parse().
 SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
 getPrivateFileIDAttrs(const clang::Decl *decl);
+
+/// Look for a C++ namespace with the given name. Any visible definition of
+/// the namespace will suffice for this query, which will create the
+/// enumeration representing the namespace.
+EnumDecl *lookupAnyVisibleNamespace(ModuleDecl *module, DeclBaseName name);
+
 } // namespace importer
 
 struct ClangInvocationFileMapping {
