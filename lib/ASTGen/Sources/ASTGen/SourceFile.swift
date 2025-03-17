@@ -77,6 +77,8 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.CoroutineAccessors, to: .coroutineAccessors)
     mapFeature(.ValueGenerics, to: .valueGenerics)
     mapFeature(.ABIAttribute, to: .abiAttribute)
+    // TODO: mapFeature(.KeypathWithMethodMembers, to: .keypathWithMethodMembers)
+    mapFeature(.OldOwnershipOperatorSpellings, to: .oldOwnershipOperatorSpellings)
   }
 }
 
