@@ -107,3 +107,19 @@ strings.forEach { string, expected in
     }
   }
 }
+
+strings.forEach { string, expected in
+  suite.test("Span from Bridged String Substring: \(expected)")
+  .require(.stdlib_6_2).code {
+    guard #available(SwiftStdlib 6.2, *) else { return }
+
+    let bridged = String(string).dropFirst()
+    let utf8 = bridged.utf8
+    let span = utf8.span
+    let expected = expected.dropFirst()
+    expectEqual(span.count, expected.utf8.count)
+    for (i,j) in zip(span.indices, expected.utf8.indices) {
+      expectEqual(span[i], expected.utf8[j])
+    }
+  }
+}
