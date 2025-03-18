@@ -667,6 +667,8 @@ ERROR(expr_keypath_generic_type,none,
       "key path cannot refer to generic type %0", (Identifier))
 ERROR(expr_keypath_noncopyable_type,none,
       "key path cannot refer to noncopyable type %0", (Type))
+ERROR(expr_keypath_nonescapable_type,none,
+      "key path cannot refer to nonescapable type %0", (Type))
 ERROR(expr_keypath_not_property,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %kind0",
       (const ValueDecl *, bool))

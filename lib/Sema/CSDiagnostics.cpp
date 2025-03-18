@@ -689,6 +689,11 @@ bool MissingConformanceFailure::diagnoseAsError() {
         emitDiagnostic(diag::expr_keypath_noncopyable_type, nonConformingType);
         return true;
       }
+
+      if (P->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+        emitDiagnostic(diag::expr_keypath_nonescapable_type, nonConformingType);
+        return true;
+      }
     }
   }
 
