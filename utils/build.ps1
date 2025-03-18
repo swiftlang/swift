@@ -2283,25 +2283,31 @@ function Write-SDKSettingsPlist([Platform]$Platform, $Arch) {
   $SDKSettings | ConvertTo-JSON | Out-FIle -FilePath "$(Get-SwiftSDK $Platform)\SDKSettings.json"
 }
 
-function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
-  Invoke-IsolatingEnvVars {
-    if ($Test) {
-      $Targets = @("default", "ExperimentalTest")
-      $InstallPath = ""
-      $env:CTEST_OUTPUT_ON_FAILURE = "YES"
-    } else {
-      $Targets = @("install")
-      $InstallPath = "$(Get-SwiftSDK $Platform)\usr"
+function Build-Dispatch([Platform]$Platform, $Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-corelibs-libdispatch `
+    -Bin (Get-ProjectBinaryCache $Arch Dispatch) `
+    -InstallTo "$(Get-SwiftSDK $Platform)\usr" `
+    -Arch $Arch `
+    -Platform $Platform `
+    -SwiftSDK (Get-SwiftSDK $Platform) `
+    -UseBuiltCompilers C,CXX,Swift `
+    -Defines @{
+      ENABLE_SWIFT = "YES";
     }
+}
+
+function Test-Dispatch {
+  Invoke-IsolatingEnvVars {
+    $env:CTEST_OUTPUT_ON_FAILURE = "YES"
 
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-libdispatch `
-      -Bin (Get-ProjectBinaryCache $Arch Dispatch) `
-      -InstallTo $InstallPath `
-      -Arch $Arch `
-      -Platform $Platform `
-      -BuildTargets $Targets `
-      -SwiftSDK (Get-SwiftSDK $Platform) `
+      -Bin (Get-ProjectBinaryCache $BuildArch Dispatch) `
+      -Arch $BuildArch `
+      -Platform Windows `
+      -SwiftSDK (Get-SwiftSDK Windows) `
+      -BuildTargets default,ExperimentalTest `
       -UseBuiltCompilers C,CXX,Swift `
       -Defines @{
         ENABLE_SWIFT = "YES";
@@ -3287,9 +3293,7 @@ if (-not $IsCrossCompiling) {
     Build-Compilers $HostArch @Tests
   }
 
-  if ($Test -contains "dispatch") {
-    Build-Dispatch Windows $HostArch -Test
-  }
+  if ($Test -contains "dispatch") { Test-Dispatch }
   if ($Test -contains "foundation") { Test-Foundation }
   if ($Test -contains "xctest") { Test-XCTest }
   if ($Test -contains "testing") { Test-Testing }
