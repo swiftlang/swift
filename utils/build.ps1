@@ -2474,6 +2474,10 @@ function Build-Testing([Platform]$Platform, $Arch) {
     }
 }
 
+function Test-Testing {
+  throw "testing Testing is not supported"
+}
+
 function Write-PlatformInfoPlist([Platform] $Platform) {
   $Settings = @{
     DefaultProperties = @{
@@ -3296,9 +3300,7 @@ if (-not $IsCrossCompiling) {
   if ($Test -contains "xctest") {
     Test-XCTest
   }
-  if ($Test -contains "testing") {
-    Build-Testing Windows $HostArch -Test
-  }
+  if ($Test -contains "testing") { Test-Testing }
   if ($Test -contains "llbuild") { Test-LLBuild }
   if ($Test -contains "swiftpm") { Test-PackageManager }
   if ($Test -contains "swift-format") { Test-Format }
