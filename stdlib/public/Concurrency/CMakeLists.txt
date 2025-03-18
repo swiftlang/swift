@@ -177,7 +177,7 @@ if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
     ExecutorImpl.swift
   )
 elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
-  set(SWIFT_RUNTIME_CONCURRENCYU_NONEMBEDDED_SWIFT_SOURCES
+  set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
     ExecutorImpl.swift
     PlatformExecutorCooperative.swift
     )

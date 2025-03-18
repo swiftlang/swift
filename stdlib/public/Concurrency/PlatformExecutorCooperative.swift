@@ -16,6 +16,6 @@ import Swift
 @available(SwiftStdlib 6.2, *)
 public struct PlatformExecutorFactory: ExecutorFactory {
   static let executor = CooperativeExecutor()
-  public static let mainExecutor: any MainExecutor { executor }
-  public static let defaultExecutor: any TaskExecutor { executor }
+  public static var mainExecutor: any MainExecutor { executor }
+  public static var defaultExecutor: any TaskExecutor { executor }
 }
