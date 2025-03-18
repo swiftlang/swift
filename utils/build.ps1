@@ -2177,7 +2177,7 @@ function Test-Runtime([Platform]$Platform, $Arch) {
   if ($IsCrossCompiling) {
     throw "Swift runtime tests are not supported when cross-compiling"
   }
-  if (-not (Test-Path (Get-TargetProjectBinaryCache $Arch Runtime))) {
+  if (-not (Test-Path (Get-ProjectBinaryCache $Arch Runtime))) {
     throw "Swift runtime tests are supposed to reconfigure the existing build"
   }
   $CompilersBinaryCache = Get-HostProjectBinaryCache Compilers
@@ -2192,7 +2192,7 @@ function Test-Runtime([Platform]$Platform, $Arch) {
     $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$(Get-PinnedToolchainRuntime);${env:Path};$UnixToolsBinDir"
     Build-CMakeProject `
       -Src $SourceCache\swift `
-      -Bin (Get-TargetProjectBinaryCache $Arch Runtime) `
+      -Bin (Get-ProjectBinaryCache $Arch Runtime) `
       -Arch $Arch `
       -Platform $Platform `
       -UseBuiltCompilers C,CXX,Swift `
