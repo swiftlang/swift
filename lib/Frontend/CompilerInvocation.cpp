@@ -2462,24 +2462,48 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
 static bool
 ParseDiagnosticVerifierArgs(std::optional<DiagnosticVerifierOptions> &Opts,
-                            ArgList &Args) {
+                            ArgList &Args, DiagnosticEngine &Diags,
+                            llvm::opt::OptTable &Table) {
   using namespace options;
 
   const bool verify = Args.hasArg(OPT_verify);
   const bool applyFixes = Args.hasArg(OPT_verify_apply_fixes);
+  const bool ignoreUnknown = Args.hasArg(OPT_verify_ignore_unknown);
+
+  auto additionalFilePathArgs = Args.filtered(OPT_verify_additional_file);
+  auto additionalPrefixArgs = Args.filtered(OPT_verify_additional_prefix);
 
   if (!verify && !applyFixes) {
+    if (ignoreUnknown) {
+      Diags.diagnose(
+          SourceLoc(), diag::ignoring_option_requires_option,
+          Table.getOption(OPT_verify_ignore_unknown).getPrefixedName(),
+          Table.getOption(OPT_verify).getPrefixedName());
+    }
+    if (!additionalFilePathArgs.empty()) {
+      Diags.diagnose(
+          SourceLoc(), diag::ignoring_option_requires_option,
+          Table.getOption(OPT_verify_additional_file).getPrefixedName(),
+          Table.getOption(OPT_verify).getPrefixedName());
+    }
+    if (!additionalPrefixArgs.empty()) {
+      Diags.diagnose(
+          SourceLoc(), diag::ignoring_option_requires_option,
+          Table.getOption(OPT_verify_additional_prefix).getPrefixedName(),
+          Table.getOption(OPT_verify).getPrefixedName());
+    }
+
     return false;
   }
 
   DiagnosticVerifierOptions verifierOpts;
 
   verifierOpts.ApplyFixes = applyFixes;
-  verifierOpts.IgnoreUnknown = Args.hasArg(OPT_verify_ignore_unknown);
+  verifierOpts.IgnoreUnknown = ignoreUnknown;
 
-  for (auto *arg : Args.filtered(OPT_verify_additional_file))
+  for (auto *arg : additionalFilePathArgs)
     verifierOpts.AdditionalFilePaths.emplace_back(arg->getValue());
-  for (auto *arg : Args.filtered(OPT_verify_additional_prefix))
+  for (auto *arg : additionalPrefixArgs)
     verifierOpts.AdditionalPrefixes.emplace_back(arg->getValue());
 
   Opts = std::move(verifierOpts);
@@ -3922,6 +3946,7 @@ bool CompilerInvocation::parseArgs(
   unsigned MissingIndex;
   unsigned MissingCount;
   std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
+
   llvm::opt::InputArgList ParsedArgs =
       Table->ParseArgs(Args, MissingIndex, MissingCount, FrontendOption);
   if (MissingCount) {
@@ -3941,7 +3966,8 @@ bool CompilerInvocation::parseArgs(
   // Parse options that control diagnostic behavior as early as possible, so
   // that they can influence the behavior of diagnostics emitted during the
   // rest of parsing.
-  if (ParseDiagnosticVerifierArgs(DiagnosticVerifierOpts, ParsedArgs)) {
+  if (ParseDiagnosticVerifierArgs(DiagnosticVerifierOpts, ParsedArgs, Diags,
+                                  *Table)) {
     return true;
   }
   if (ParseDiagnosticArgs(DiagnosticOpts, ParsedArgs, Diags)) {
