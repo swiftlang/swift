@@ -2579,46 +2579,53 @@ function Build-ToolsSupportCore($Arch) {
     }
 }
 
-function Build-LLBuild($Arch, [switch]$Test = $false) {
-  Invoke-IsolatingEnvVars {
-    if ($Test) {
-      # Build additional llvm executables needed by tests
-      Invoke-IsolatingEnvVars {
-        Invoke-VsDevShell $BuildArch
-        Invoke-Program ninja.exe -C (Get-ProjectBinaryCache $BuildArch BuildTools) FileCheck not
-      }
-
-      $Targets = @("default", "test-llbuild")
-      $TestingDefines = @{
-        FILECHECK_EXECUTABLE = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildArch BuildTools), "bin", "FileCheck.exe"));
-        LIT_EXECUTABLE = "$SourceCache\llvm-project\llvm\utils\lit\lit.py";
-      }
-      $env:Path = "$env:Path;$UnixToolsBinDir"
-      $env:AR = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildArch Compilers), "bin", "llvm-ar.exe"))
-      $env:CLANG = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildArch Compilers), "bin", "clang.exe"))
-      $InstallPath = ""
-    } else {
-      $Targets = @()
-      $TestingDefines = @{}
-      $InstallPath = "$($Arch.ToolchainInstallRoot)\usr"
+function Build-LLBuild($Arch) {
+  Build-CMakeProject `
+    -Src $SourceCache\llbuild `
+    -Bin (Get-ProjectBinaryCache $Arch LLBuild) `
+    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform Windows `
+    -UseMSVCCompilers CXX `
+    -UseBuiltCompilers Swift `
+    -SwiftSDK (Get-SwiftSDK Windows) `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      LLBUILD_SUPPORT_BINDINGS = "Swift";
+      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
+      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
     }
+}
+
+function Test-LLBuild {
+  # Build additional llvm executables needed by tests
+  Invoke-IsolatingEnvVars {
+    Invoke-VsDevShell $BuildArch
+    Invoke-Program ninja.exe -C (Get-ProjectBinaryCache $BuildArch BuildTools) FileCheck not
+  }
+
+  Invoke-IsolatingEnvVars {
+    $env:Path = "$env:Path;$UnixToolsBinDir"
+    $env:AR = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildArch Compilers), "bin", "llvm-ar.exe"))
+    $env:CLANG = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildArch Compilers), "bin", "clang.exe"))
 
     Build-CMakeProject `
       -Src $SourceCache\llbuild `
-      -Bin (Get-ProjectBinaryCache $Arch LLBuild) `
-      -InstallTo $InstallPath `
-      -Arch $Arch `
+      -Bin (Get-ProjectBinaryCache $BuildArch LLBuild) `
+      -Arch $BuildArch `
       -Platform Windows `
       -UseMSVCCompilers CXX `
       -UseBuiltCompilers Swift `
       -SwiftSDK (Get-SwiftSDK Windows) `
-      -BuildTargets $Targets `
-      -Defines ($TestingDefines + @{
+      -BuildTargets default,test-llbuild `
+      -Defines = @{
         BUILD_SHARED_LIBS = "YES";
+        FILECHECK_EXECUTABLE = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildArch BuildTools), "bin", "FileCheck.exe"));
+        LIT_EXECUTABLE = "$SourceCache\llvm-project\llvm\utils\lit\lit.py";
         LLBUILD_SUPPORT_BINDINGS = "Swift";
         SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
         SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
-      })
+      }
   }
 }
 
@@ -3292,7 +3299,7 @@ if (-not $IsCrossCompiling) {
   if ($Test -contains "testing") {
     Build-Testing Windows $HostArch -Test
   }
-  if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
+  if ($Test -contains "llbuild") { Test-LLBuild }
   if ($Test -contains "swiftpm") { Test-PackageManager }
   if ($Test -contains "swift-format") { Test-Format }
   if ($Test -contains "sourcekit-lsp") { Test-SourceKitLSP }
