@@ -485,7 +485,7 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExecutionAttribute, false)
 
 /// Functions with nonisolated isolation inherit their isolation from the
 /// calling context.
-EXPERIMENTAL_FEATURE(AsyncCallerExecution, false)
+ADOPTABLE_EXPERIMENTAL_FEATURE(AsyncCallerExecution, false)
 
 /// Allow custom availability domains to be defined and referenced.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)

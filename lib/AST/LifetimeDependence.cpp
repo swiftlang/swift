@@ -50,6 +50,7 @@ getLifetimeDependenceFor(ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
 std::string LifetimeDependenceInfo::getString() const {
   std::string lifetimeDependenceString = "@lifetime(";
   auto addressable = getAddressableIndices();
+  auto condAddressable = getConditionallyAddressableIndices();
   
   auto getSourceString = [&](IndexSubset *bitvector, StringRef kind) {
     std::string result;
@@ -61,7 +62,11 @@ std::string LifetimeDependenceInfo::getString() const {
         }
         result += kind;
         if (addressable && addressable->contains(i)) {
-          result += "address ";
+          if (condAddressable && condAddressable->contains(i)) {
+            result += "address_for_deps ";
+          } else {
+            result += "address ";
+          }
         }
         result += std::to_string(i);
         isFirstSetBit = false;
@@ -452,6 +457,7 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromDependsOn(
   SmallBitVector inheritLifetimeParamIndices(capacity);
   SmallBitVector scopeLifetimeParamIndices(capacity);
   SmallBitVector addressableLifetimeParamIndices(capacity);
+  SmallBitVector conditionallyAddressableLifetimeParamIndices(capacity);
 
   auto updateLifetimeDependenceInfo = [&](LifetimeDescriptor descriptor,
                                           unsigned paramIndexToSet,
@@ -494,8 +500,16 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromDependsOn(
       if (updateLifetimeDependenceInfo(source, index, paramConvention)) {
         return std::nullopt;
       }
-      if (source.isAddressable()) {
+      switch (source.isAddressable()) {
+      case LifetimeDescriptor::IsNotAddressable:
+        break;
+      case LifetimeDescriptor::IsConditionallyAddressable:
+        conditionallyAddressableLifetimeParamIndices.set(index);
         addressableLifetimeParamIndices.set(index);
+        break;
+      case LifetimeDescriptor::IsAddressable:
+        addressableLifetimeParamIndices.set(index);
+        break;
       }
       break;
     }
@@ -523,6 +537,9 @@ std::optional<LifetimeDependenceInfo> LifetimeDependenceInfo::fromDependsOn(
       /*isImmortal*/ false,
       addressableLifetimeParamIndices.any()
           ? IndexSubset::get(ctx, addressableLifetimeParamIndices)
+          : nullptr,
+      conditionallyAddressableLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, conditionallyAddressableLifetimeParamIndices)
           : nullptr);
 }
 

@@ -1182,10 +1182,15 @@ class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}
 final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
 
-  /// WARNING: isOnStack incorrectly returns false for all closures prior to ClosureLifetimeFixup, even if they need to
-  /// be diagnosed as on-stack closures. Use has mayEscape instead.
+  /// Warning: isOnStack returns false for all closures prior to ClosureLifetimeFixup, even if they capture on-stack
+  /// addresses and need to be diagnosed as non-escaping closures. Use mayEscape to determine whether a closure is
+  /// non-escaping prior to ClosureLifetimeFixup.
   public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
 
+  // Warning: ClosureLifetimeFixup does not promote all non-escaping closures to on-stack. When that promotion fails, it
+  // creates a fake destroy of the closure after the captured values that the closure depends on. This is invalid OSSA,
+  // so OSSA utilities need to bail-out when isOnStack is false even if hasNoescapeCapture is true to avoid encoutering
+  // an invalid nested lifetime.
   public var mayEscape: Bool { !isOnStack && !hasNoescapeCapture }
 
   /// True if this closure captures anything nonescaping.
