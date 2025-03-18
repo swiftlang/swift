@@ -12,22 +12,75 @@
 
 import Swift
 
+// Store the Timestamp in the executor private data, if it will fit; otherwise,
+// use the allocator to allocate space for it and stash a pointer in the private
+// data area.
 @available(SwiftStdlib 6.2, *)
 extension ExecutorJob {
-  fileprivate var cooperativeExecutorTimestamp: CooperativeExecutor.Timestamp {
+  fileprivate var cooperativeExecutorTimestampIsIndirect: Bool {
+    return MemoryLayout<(Int, Int)>.size
+      < MemoryLayout<CooperativeExecutor.Timestamp>.size
+  }
+
+  fileprivate var cooperativeExecutorTimestampPointer: UnsafeMutablePointer<CooperativeExecutor.Timestamp> {
     get {
+      assert(cooperativeExecutorTimestampIsIndirect)
       return unsafe withUnsafeExecutorPrivateData {
-        return unsafe $0.assumingMemoryBound(
-          to: CooperativeExecutor.Timestamp.self
-        )[0]
+        unsafe $0.withMemoryRebound(to: UnsafeMutablePointer<CooperativeExecutor.Timestamp>.self) {
+          return unsafe $0[0]
+        }
       }
     }
     set {
+      assert(cooperativeExecutorTimestampIsIndirect)
       unsafe withUnsafeExecutorPrivateData {
-        unsafe $0.withMemoryRebound(to: CooperativeExecutor.Timestamp.self) {
+        unsafe $0.withMemoryRebound(to: UnsafeMutablePointer<CooperativeExecutor.Timestamp>.self) {
           unsafe $0[0] = newValue
         }
       }
+    }
+  }
+
+  fileprivate var cooperativeExecutorTimestamp: CooperativeExecutor.Timestamp {
+    get {
+      if cooperativeExecutorTimestampIsIndirect {
+        let ptr = unsafe cooperativeExecutorTimestampPointer
+        return unsafe ptr.pointee
+      } else {
+        return unsafe withUnsafeExecutorPrivateData {
+          return unsafe $0.assumingMemoryBound(
+            to: CooperativeExecutor.Timestamp.self
+          )[0]
+        }
+      }
+    }
+    set {
+      if cooperativeExecutorTimestampIsIndirect {
+        let ptr = unsafe cooperativeExecutorTimestampPointer
+        unsafe ptr.pointee = newValue
+     } else {
+        unsafe withUnsafeExecutorPrivateData {
+          unsafe $0.withMemoryRebound(to: CooperativeExecutor.Timestamp.self) {
+            unsafe $0[0] = newValue
+          }
+        }
+      }
+    }
+  }
+
+  fileprivate mutating func setupCooperativeExecutorTimestamp() {
+    // If a Timestamp won't fit, allocate
+    if cooperativeExecutorTimestampIsIndirect {
+      let ptr = unsafe allocator!.allocate(as: CooperativeExecutor.Timestamp.self)
+      unsafe self.cooperativeExecutorTimestampPointer = ptr
+    }
+  }
+
+  fileprivate mutating func clearCooperativeExecutorTimestamp() {
+    // If a Timestamp won't fit, deallocate
+    if cooperativeExecutorTimestampIsIndirect {
+      let ptr = unsafe self.cooperativeExecutorTimestampPointer
+      unsafe allocator!.deallocate(ptr)
     }
   }
 }
@@ -131,6 +184,7 @@ extension CooperativeExecutor: SchedulableExecutor {
     let duration = Duration(from: clock.convert(from: delay)!)
     let deadline = self.currentTime + duration
 
+    job.setupCooperativeExecutorTimestamp()
     job.cooperativeExecutorTimestamp = deadline
     waitQueue.push(UnownedJob(job))
   }
@@ -150,6 +204,8 @@ extension CooperativeExecutor: RunLoopExecutor {
       while let job = waitQueue.pop(when: {
                                       ExecutorJob($0).cooperativeExecutorTimestamp <= now
                                     }) {
+        var theJob = ExecutorJob(job)
+        theJob.clearCooperativeExecutorTimestamp()
         runQueue.push(job)
       }
 
