@@ -557,6 +557,9 @@ public:
   /// Pretty-print the SILBasicBlock.
   void dump() const;
 
+  /// Pretty-print the SILBasicBlock with Debug Info.
+  void dump(bool DebugInfo) const;
+
   /// Pretty-print the SILBasicBlock with the designated stream.
   void print(llvm::raw_ostream &OS) const;
 
