@@ -1178,13 +1178,6 @@ extension _StringObject {
     if isSmall { return smallIsASCII }
     return _countAndFlags.isASCII
   }
-  
-  @_alwaysEmitIntoClient
-  @inline(__always) // Swift 6.2
-  internal var isNullTerminated: Bool {
-    if isSmall { return true }
-    return _countAndFlags.isNullTerminated
-  }
 
   @inline(__always)
   internal var isNFC: Bool {
@@ -1261,7 +1254,7 @@ extension _StringObject {
     // Small strings nul-terminate when spilling for contiguous access
     if isSmall { return true }
 
-    return largeFastIsTailAllocated || isNullTerminated
+    return largeFastIsTailAllocated || _countAndFlags.isNullTerminated
   }
 }
 
