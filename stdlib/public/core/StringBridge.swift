@@ -669,6 +669,21 @@ internal func _SwiftCreateBridgedString_DoNotCall(
 ) -> String? {
   switch unsafe validateUTF8(buffer) {
   case .success(let extraInfo):
+    return unsafe String(
+      _StringGuts(nullTerminatedImmortal: buffer, isASCII: extraInfo.isASCII)
+    )
+  default:
+    return nil
+  }
+}
+
+@available(SwiftStdlib 6.1, *)
+@_spi(Foundation) public func _SwiftCreateNonTerminatedImmortalString_ForFoundation(
+  buffer: UnsafeBufferPointer<UInt8>,
+  isASCII: Bool
+) -> String? {
+  switch unsafe validateUTF8(buffer) {
+  case .success(let extraInfo):
     return unsafe String(_StringGuts(buffer, isASCII: extraInfo.isASCII))
   default:
     return nil

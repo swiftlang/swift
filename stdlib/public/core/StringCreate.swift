@@ -390,7 +390,8 @@ extension String {
           isASCII: isASCII,
           isNFC: isASCII,
           isNativelyStored: false,
-          isTailAllocated: false
+          isTailAllocated: false,
+          isKnownNullTerminated: false
         )
       )
     }

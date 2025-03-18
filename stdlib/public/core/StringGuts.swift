@@ -49,6 +49,16 @@ extension _StringGuts {
   internal init(_ smol: _SmallString) {
     self.init(_StringObject(smol))
   }
+  
+  @inlinable @inline(__always)
+  internal init(
+    nullTerminatedImmortal bufPtr: UnsafeBufferPointer<UInt8>,
+    isASCII: Bool
+  ) {
+    unsafe self.init(
+      _StringObject(nullTerminatedImmortal: bufPtr, isASCII: isASCII)
+    )
+  }
 
   @inlinable @inline(__always)
   internal init(_ bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
