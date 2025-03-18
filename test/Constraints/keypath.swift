@@ -318,3 +318,24 @@ extension Collection {
 func keypathToFunctionWithOptional() {
   _ = Array("").prefix(1...4, while: \.isNumber) // Ok
 }
+
+func test_new_key_path_type_requirements() {
+  struct V: ~Copyable {
+  }
+
+  struct S: ~Copyable {
+    var x: Int
+    var v: V
+  }
+
+  _ = \S.x // expected-error {{key path cannot refer to noncopyable type 'S'}}
+  _ = \S.v
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
+  // expected-error@-2 {{key path cannot refer to noncopyable type 'V'}}
+
+  func test<R>(_: KeyPath<R, Int>) {} // expected-note {{'where R: Copyable' is implicit here}}
+
+  test(\S.x)
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
+  // expected-error@-2 {{local function 'test' requires that 'S' conform to 'Copyable'}}
+}

@@ -945,7 +945,9 @@ func testKeyPathHole() {
 
   func f(_ i: Int) {}
   f(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{6-6=<#Root#>}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<Root, Value>' to expected argument type 'Int'}}
   f(\.x.y) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{6-6=<#Root#>}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<Root, Value>' to expected argument type 'Int'}}
 
 func provideValueButNotRoot<T>(_ fn: (T) -> String) {} // expected-note 2 {{in call to function 'provideValueButNotRoot'}}
   provideValueButNotRoot(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
