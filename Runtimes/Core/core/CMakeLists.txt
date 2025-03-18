@@ -313,8 +313,16 @@ target_link_libraries(swiftCore
     $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>
   PUBLIC
     swiftShims)
-target_link_options(swiftCore PRIVATE
-  -nostartfiles)
+target_link_options(swiftCore PUBLIC
+  $<$<LINK_LANGUAGE:Swift>:-nostartfiles>)
+string(TOLOWER "${SwiftCore_OBJECT_FORMAT}" SwiftCore_OBJECT_FORMAT_lc)
+if("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "elf")
+  target_link_libraries(swiftCore INTERFACE
+    swiftrt$<$<BOOL:NO>:>)
+elseif("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "coff")
+  target_link_libraries(swiftCore INTERFACE
+    swiftrt$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:T>)
+endif()
 if(NOT POLICY CMP0157)
   target_compile_options(swiftCore PRIVATE
     $<TARGET_OBJECTS:swiftRuntime>
