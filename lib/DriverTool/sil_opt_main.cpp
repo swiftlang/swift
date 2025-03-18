@@ -822,12 +822,13 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
   }
 
-  Invocation.getDiagnosticOptions().VerifyMode =
-      options.VerifyMode ? DiagnosticOptions::Verify
-                         : DiagnosticOptions::NoVerify;
-  for (auto &additionalPrefixes : options.VerifyAdditionalPrefixes) {
-    Invocation.getDiagnosticOptions()
-        .AdditionalDiagnosticVerifierPrefixes.push_back(additionalPrefixes);
+  auto &diagVerifierOpts = Invocation.getDiagnosticVerifierOptions();
+  if (options.VerifyMode && !diagVerifierOpts) {
+    diagVerifierOpts.emplace();
+  }
+
+  if (diagVerifierOpts) {
+    diagVerifierOpts->AdditionalPrefixes = options.VerifyAdditionalPrefixes;
   }
 
   ClangImporterOptions &clangImporterOptions =

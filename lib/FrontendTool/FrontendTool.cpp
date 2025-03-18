@@ -2073,9 +2073,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   DH.beginMessage();
 
-  const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
-  bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
-
   std::string InstanceSetupError;
   if (Instance->setup(Invocation, InstanceSetupError, Args)) {
     int ReturnCode = 1;
@@ -2089,6 +2086,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     observer->configuredCompiler(*Instance);
   }
 
+  const bool verifierEnabled =
+      Invocation.getDiagnosticVerifierOptions().has_value();
   if (verifierEnabled) {
     // Suppress printed diagnostic output during the compile if the verifier is
     // enabled.

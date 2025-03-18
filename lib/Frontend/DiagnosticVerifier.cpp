@@ -623,7 +623,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
   // Validate that earlier prefixes are not prefixes of alter
   // prefixes... otherwise, we will never pattern match the later prefix.
-  validatePrefixList(AdditionalExpectedPrefixes);
+  validatePrefixList(Opts.AdditionalPrefixes);
 
   // Scan the memory buffer looking for expected-note/warning/error.
   for (size_t Match = InputFile.find("expected-");
@@ -639,7 +639,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     {
       ExpectedCheckMatchStartParser parser(MatchStart);
       // If we fail to parse... continue.
-      if (!parser.parse(AdditionalExpectedPrefixes)) {
+      if (!parser.parse(Opts.AdditionalPrefixes)) {
         continue;
       }
       MatchStart = parser.MatchStart;
@@ -1232,7 +1232,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     printDiagnostic(Err);
 
   // If auto-apply fixits is on, rewrite the original source file.
-  if (AutoApplyFixes)
+  if (Opts.ApplyFixes)
     autoApplyFixes(SM, BufferID, Errors);
 
   return Result{!Errors.empty(), HadUnexpectedDiag};
@@ -1304,7 +1304,7 @@ bool DiagnosticVerifier::finishProcessing() {
   DiagnosticVerifier::Result Result = {false, false};
 
   SmallVector<unsigned, 4> additionalBufferIDs;
-  for (auto path : AdditionalFilePaths) {
+  for (auto path : Opts.AdditionalFilePaths) {
     auto bufferID = SM.getIDForBufferIdentifier(path);
     if (!bufferID) {
       // Still need to scan this file for expectations.
@@ -1332,7 +1332,7 @@ bool DiagnosticVerifier::finishProcessing() {
       Result.HadError |= FileResult.HadError;
       Result.HadUnexpectedDiag |= FileResult.HadUnexpectedDiag;
     }
-  if (!IgnoreUnknown) {
+  if (!Opts.IgnoreUnknown) {
     bool HadError = verifyUnknown(CapturedDiagnostics);
     Result.HadError |= HadError;
     // For <unknown>, all errors are unexpected.

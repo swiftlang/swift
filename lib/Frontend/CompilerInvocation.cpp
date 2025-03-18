@@ -2460,6 +2460,33 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   return false;
 }
 
+static bool
+ParseDiagnosticVerifierArgs(std::optional<DiagnosticVerifierOptions> &Opts,
+                            ArgList &Args) {
+  using namespace options;
+
+  const bool verify = Args.hasArg(OPT_verify);
+  const bool applyFixes = Args.hasArg(OPT_verify_apply_fixes);
+
+  if (!verify && !applyFixes) {
+    return false;
+  }
+
+  DiagnosticVerifierOptions verifierOpts;
+
+  verifierOpts.ApplyFixes = applyFixes;
+  verifierOpts.IgnoreUnknown = Args.hasArg(OPT_verify_ignore_unknown);
+
+  for (auto *arg : Args.filtered(OPT_verify_additional_file))
+    verifierOpts.AdditionalFilePaths.emplace_back(arg->getValue());
+  for (auto *arg : Args.filtered(OPT_verify_additional_prefix))
+    verifierOpts.AdditionalPrefixes.emplace_back(arg->getValue());
+
+  Opts = std::move(verifierOpts);
+
+  return false;
+}
+
 static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags) {
   // NOTE: This executes at the beginning of parsing the command line and cannot
@@ -2467,19 +2494,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 
   using namespace options;
 
-  if (Args.hasArg(OPT_verify))
-    Opts.VerifyMode = DiagnosticOptions::Verify;
-  if (Args.hasArg(OPT_verify_apply_fixes))
-    Opts.VerifyMode = DiagnosticOptions::VerifyAndApplyFixes;
-  Opts.VerifyIgnoreUnknown |= Args.hasArg(OPT_verify_ignore_unknown);
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
-
-  for (Arg *A : Args.filtered(OPT_verify_additional_file))
-    Opts.AdditionalVerifierFiles.push_back(A->getValue());
-  for (Arg *A : Args.filtered(OPT_verify_additional_prefix))
-    Opts.AdditionalDiagnosticVerifierPrefixes.push_back(A->getValue());
 
   Opts.UseColor |=
       Args.hasFlag(OPT_color_diagnostics,
@@ -3924,6 +3941,9 @@ bool CompilerInvocation::parseArgs(
   // Parse options that control diagnostic behavior as early as possible, so
   // that they can influence the behavior of diagnostics emitted during the
   // rest of parsing.
+  if (ParseDiagnosticVerifierArgs(DiagnosticVerifierOpts, ParsedArgs)) {
+    return true;
+  }
   if (ParseDiagnosticArgs(DiagnosticOpts, ParsedArgs, Diags)) {
     return true;
   }
