@@ -756,6 +756,31 @@ extension Substring.UTF8View {
   public var span: Span<UTF8.CodeUnit> {
     @lifetime(borrow self)
     borrowing get {
+#if _runtime(_ObjC)
+      // handle non-UTF8 Objective-C bridging cases here
+      if !_wholeGuts.isFastUTF8 && _wholeGuts._object.hasObjCBridgeableObject {
+        let foreign = String(_wholeGuts)
+        let dts = foreign.distance(from: foreign.startIndex, to: startIndex)
+        let dte = foreign.distance(from: startIndex, to: endIndex)
+
+        let storage: __StringStorage
+        if let associated = _wholeGuts.getAssociatedStorage() {
+          storage = associated
+        }
+        else {
+          storage = _wholeGuts.getOrAllocateAssociatedStorage()
+        }
+        let native = storage.asString
+        let nativeStart = native.index(native.startIndex, offsetBy: dts)
+        let startOffset = nativeStart._encodedOffset
+        let endOffset = native.index(nativeStart, offsetBy: dte)._encodedOffset
+
+        let (start, count) = unsafe (storage.start, storage.count)
+        var span = unsafe Span(_unsafeStart: start, count: count)
+        span = unsafe span._extracting(unchecked: startOffset..<endOffset)
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+#endif
       let start = _slice._startIndex._encodedOffset
       let end = _slice._endIndex._encodedOffset
       if _wholeGuts.isSmall {
@@ -765,15 +790,11 @@ extension Substring.UTF8View {
         let span = unsafe Span(_unsafeStart: address, count: end &- start)
         return unsafe _overrideLifetime(span, borrowing: self)
       }
-      else if _wholeGuts.isFastUTF8 {
-        let buffer = unsafe _wholeGuts._object.fastUTF8.extracting(start..<end)
-        let count = end &- start
-        _internalInvariant(count == buffer.count)
-        let span = unsafe Span(_unsafeElements: buffer)
-        return unsafe _overrideLifetime(span, borrowing: self)
-      }
-      // handle other Objective-C bridging cases here
-      fatalError("Some bridged Strings are not supported at this time")
+      _precondition(_wholeGuts.isFastUTF8)
+      let buffer = unsafe _wholeGuts._object.fastUTF8.extracting(start..<end)
+      _internalInvariant((end &- start) == buffer.count)
+      let span = unsafe Span(_unsafeElements: buffer)
+      return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 }
