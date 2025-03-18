@@ -154,9 +154,25 @@ def tbd_is_installapi: Flag<["-"], "tbd-is-installapi">,
   HelpText<"If the TBD file should indicate it's being generated during "
            "InstallAPI">;
 
-def verify : Flag<["-"], "verify">,
-  HelpText<"Verify diagnostics against expected-{error|warning|note} "
-           "annotations">;
+def verify
+    : Flag<["-"], "verify">,
+      HelpText<
+          "Verify diagnostics against expected-{error|warning|note|remark} "
+          "annotations">;
+def verify_EQ
+    : Joined<["-"], "verify=">,
+      HelpText<
+          "Verify diagnostics against expected-{error|warning|note|remark} "
+          "annotations, with a comma-separated list of additional options:\n"
+          "  apply-fixes: If there were any verification errors, such as "
+          "differences between expected and actual diagnostics, fix the "
+          "expectations in place.\n"
+          "  ignore-unknown: Ignore diagnostics with an invalid source "
+          "location.">,
+      Alias<verify>,
+      MetaVarName<"options">,
+      Flags<[HelpHidden]>;
+
 def verify_additional_file : Separate<["-"], "verify-additional-file">,
   HelpText<"Verify diagnostics in this file in addition to source files">;
 def verify_additional_prefix : Separate<["-"], "verify-additional-prefix">,

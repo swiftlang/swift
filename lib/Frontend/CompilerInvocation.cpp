@@ -2466,14 +2466,14 @@ ParseDiagnosticVerifierArgs(std::optional<DiagnosticVerifierOptions> &Opts,
                             llvm::opt::OptTable &Table) {
   using namespace options;
 
-  const bool verify = Args.hasArg(OPT_verify);
+  const auto verifyArgs = Args.filtered(OPT_verify);
   const bool applyFixes = Args.hasArg(OPT_verify_apply_fixes);
   const bool ignoreUnknown = Args.hasArg(OPT_verify_ignore_unknown);
 
   auto additionalFilePathArgs = Args.filtered(OPT_verify_additional_file);
   auto additionalPrefixArgs = Args.filtered(OPT_verify_additional_prefix);
 
-  if (!verify && !applyFixes) {
+  if (verifyArgs.empty() && !applyFixes) {
     if (ignoreUnknown) {
       Diags.diagnose(
           SourceLoc(), diag::ignoring_option_requires_option,
@@ -2500,6 +2500,27 @@ ParseDiagnosticVerifierArgs(std::optional<DiagnosticVerifierOptions> &Opts,
 
   verifierOpts.ApplyFixes = applyFixes;
   verifierOpts.IgnoreUnknown = ignoreUnknown;
+
+  for (auto *arg : verifyArgs) {
+    auto &values = arg->getValues();
+    if (values.empty()) {
+      continue;
+    }
+
+    for (StringRef value : values) {
+      if (value == "ignore-unknown") {
+        verifierOpts.IgnoreUnknown = true;
+      } else if (value == "apply-fixes") {
+        verifierOpts.ApplyFixes = true;
+      } else {
+        Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                       arg->getOption().getPrefixedName(), value);
+
+        // Keep going. This error does not pose a risk to argument parsing.
+        continue;
+      }
+    }
+  }
 
   for (auto *arg : additionalFilePathArgs)
     verifierOpts.AdditionalFilePaths.emplace_back(arg->getValue());
