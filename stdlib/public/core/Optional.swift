@@ -395,12 +395,13 @@ extension Optional where Wrapped: ~Escapable {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// - Returns: `unsafelyUnwrapped`.
   ///
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
   @_alwaysEmitIntoClient
+  @lifetime(copy self)
   internal consuming func _consumingUncheckedUnwrapped() -> Wrapped {
     if let x = self {
       return x
