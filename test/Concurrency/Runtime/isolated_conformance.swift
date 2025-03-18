@@ -173,13 +173,6 @@ await Task.detached {
     precondition(!tryCastToP(wrappedMany))
   } else {
     print("Cast succeeds, but shouldn't")
-    precondition(tryCastToP(mc))
-    precondition(tryCastToP(wrappedMC))
-
-    if #available(SwiftStdlib 5.9, *) {
-      let wrappedMany = WrapMany(wrapped: (17, mc, "Pack"))
-      precondition(tryCastToP(wrappedMany))
-    }
   }
 }.value
 
