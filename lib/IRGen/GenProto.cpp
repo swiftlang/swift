@@ -1780,9 +1780,6 @@ public:
       auto associatedWitness = entry.getAssociatedConformanceWitness();
       assert(associatedWitness.Requirement == requirement.getAssociation()
              && "sil witness table does not match protocol");
-      assert(associatedWitness.Protocol ==
-               requirement.getAssociatedRequirement()
-             && "sil witness table does not match protocol");
       auto piIndex = PI.getAssociatedConformanceIndex(requirement);
       assert((size_t)piIndex.getValue() ==
               Table.size() - WitnessTableFirstRequirementOffset &&
@@ -1792,10 +1789,8 @@ public:
       if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
         // In Embedded Swift associated-conformance entries simply point to the witness table
         // of the associated conformance.
-        ProtocolConformanceRef assocConf =
-          SILWT->getConformance()->getAssociatedConformance(requirement.getAssociation(),
-                                                            requirement.getAssociatedRequirement());
-        llvm::Constant *witnessEntry = IGM.getAddrOfWitnessTable(assocConf.getConcrete());
+        ProtocolConformance *assocConf = associatedWitness.Witness.getConcrete();
+        llvm::Constant *witnessEntry = IGM.getAddrOfWitnessTable(assocConf);
         auto &schema = IGM.getOptions().PointerAuth
                           .ProtocolAssociatedTypeWitnessTableAccessFunctions;
         Table.addSignedPointer(witnessEntry, schema, requirement);
@@ -2030,10 +2025,11 @@ void ResilientWitnessTableBuilder::collectResilientWitnesses(
 
       ProtocolConformanceRef associatedConformance =
         ConformanceInContext.getAssociatedConformance(witness.Requirement,
-                                                      witness.Protocol);
+                                                      witness.Witness.getRequirement());
+
       AssociatedConformance requirement(SILWT->getProtocol(),
                                         witness.Requirement,
-                                        witness.Protocol);
+                                        witness.Witness.getRequirement());
 
       llvm::Constant *witnessEntry =
         getAssociatedConformanceWitness(requirement, associate,
@@ -2353,7 +2349,7 @@ namespace {
 
           AssociatedConformance requirement(SILWT->getProtocol(),
                                             witness.Requirement,
-                                            witness.Protocol);
+                                            witness.Witness.getRequirement());
           auto assocConformanceDescriptor =
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
               LinkEntity::forAssociatedConformanceDescriptor(requirement));

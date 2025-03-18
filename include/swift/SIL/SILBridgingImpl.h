@@ -1832,8 +1832,8 @@ BridgedCanType BridgedWitnessTableEntry::getAssociatedConformanceRequirement() c
   return unbridged().getAssociatedConformanceWitness().Requirement;
 }
 
-BridgedDeclObj BridgedWitnessTableEntry::getAssociatedConformanceDecl() const {
-  return {unbridged().getAssociatedConformanceWitness().Protocol};
+BridgedCanType BridgedWitnessTableEntry::getAssociatedConformanceSubstType() const {
+  return {unbridged().getAssociatedConformanceWitness().SubstType};
 }
 
 BridgedConformance BridgedWitnessTableEntry::getAssociatedConformanceWitness() const {
@@ -1867,11 +1867,11 @@ BridgedWitnessTableEntry BridgedWitnessTableEntry::createAssociatedType(BridgedD
 }
 
 BridgedWitnessTableEntry BridgedWitnessTableEntry::createAssociatedConformance(BridgedCanType requirement,
-                                                                               BridgedDeclObj protocolDecl,
+                                                                               BridgedCanType substType,
                                                                                BridgedConformance witness) {
   return bridge(swift::SILWitnessTable::Entry(
     swift::SILWitnessTable::AssociatedConformanceWitness{requirement.unbridged(),
-                                                         protocolDecl.getAs<swift::ProtocolDecl>(),
+                                                         substType.unbridged(),
                                                          witness.unbridged()}));
 }
 
