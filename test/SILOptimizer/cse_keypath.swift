@@ -45,10 +45,26 @@ public func concrete2() {
   generic([String].self)
 }
 
+class C {}
+
+extension C: Equatable {
+  static func ==(lhs: C, rhs: C) -> Bool {
+    true
+  }
+}
+
+extension C: Hashable {
+  func hash(into hasher: inout Hasher) {}
+}
+
 struct Dumb {
   let x: Int
 
   subscript(_: Int) -> Int {
+    123
+  }
+
+  subscript(_: C) -> Int {
     123
   }
 }
@@ -92,4 +108,13 @@ public func dumb2() {
 public func dumb3() {
   takeDumbKp(\Dumb.[0])
   takeDumbKp(\Dumb.[1])
+}
+
+// CHECK-LABEL: sil @$s11cse_keypath5dumb4yyF : $@convention(thin) () -> () {
+// CHECK:         keypath $KeyPath<Dumb, Int>
+// CHECK:         keypath $KeyPath<Dumb, Int>
+// CHECK-LABEL: } // end sil function '$s11cse_keypath5dumb4yyF'
+public func dumb4() {
+  takeDumbKp(\Dumb.[C()])
+  takeDumbKp(\Dumb.[C()])
 }
