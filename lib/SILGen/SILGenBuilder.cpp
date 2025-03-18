@@ -442,7 +442,11 @@ ManagedValue SILGenBuilder::createUncheckedEnumData(SILLocation loc,
                                                     ManagedValue operand,
                                                     EnumElementDecl *element) {
   CleanupCloner cloner(*this, operand);
-  SILValue result = createUncheckedEnumData(loc, operand.forward(SGF), element);
+  SILValue result = createUncheckedEnumData(loc, operand.getValue(), element);
+  if (operand.hasCleanup() && !operand.getValue()->getType().isTrivial(SGF.F) &&
+      !result->getType().isTrivial(SGF.F)) {
+    operand.forwardCleanup(SGF);
+  }
   return cloner.clone(result);
 }
 
@@ -451,7 +455,11 @@ ManagedValue SILGenBuilder::createUncheckedTakeEnumDataAddr(
     SILType ty) {
   CleanupCloner cloner(*this, operand);
   SILValue result =
-      createUncheckedTakeEnumDataAddr(loc, operand.forward(SGF), element);
+      createUncheckedTakeEnumDataAddr(loc, operand.getValue(), element);
+  if (operand.hasCleanup() && !operand.getValue()->getType().isTrivial(SGF.F) &&
+    !result->getType().isTrivial(SGF.F)) {
+    operand.forwardCleanup(SGF);
+  }
   return cloner.clone(result);
 }
 
