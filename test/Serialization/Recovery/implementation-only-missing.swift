@@ -63,6 +63,24 @@ public protocol HiddenProtocolWithOverride {
 
 public class HiddenClass {}
 
+public struct HiddenRawType: ExpressibleByStringLiteral, Equatable, CustomStringConvertible {
+
+    fileprivate var staticValue: String
+
+    public init(stringLiteral value: String) {
+        self.init(value)
+    }
+
+    public init(_ value: String) {
+        self.staticValue = value
+    }
+
+    public static func == (lhs: HiddenRawType, rhs: HiddenRawType) -> Bool {
+        return lhs.staticValue == rhs.staticValue
+    }
+
+    public var description: String { self.staticValue }
+}
 
 //--- PublicLib.swift
 
@@ -125,6 +143,10 @@ struct StructInheritingFromComposition : CompositionMemberInheriting & Compositi
 class ClassInheritingFromComposition : CompositionMemberInheriting & CompositionMemberSimple {}
 protocol InheritingFromCompositionDirect : CompositionMemberSimple & HiddenProtocol2 {}
 
+// rdar://147091863
+enum InternalEnumWithRawType: HiddenRawType {
+    case a
+}
 
 //--- Client.swift
 
