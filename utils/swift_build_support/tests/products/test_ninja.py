@@ -45,7 +45,6 @@ class NinjaTestCase(unittest.TestCase):
 
         # Setup args
         self.args = argparse.Namespace(
-            build_ninja=True,
             darwin_deployment_version_osx="10.9")
 
         # Setup shell
@@ -89,6 +88,7 @@ class NinjaTestCase(unittest.TestCase):
         ninja_build.build()
 
         self.assertEqual(self.stdout.getvalue(), f"""\
+--- Local Ninja Build ---
 + {self.toolchain.cmake} \
 -S {self.workspace.source_dir('ninja')} \
 -B {self.workspace.build_dir('build', 'ninja')} \
