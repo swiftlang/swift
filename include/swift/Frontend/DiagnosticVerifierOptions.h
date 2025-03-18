@@ -29,6 +29,10 @@ struct DiagnosticVerifierOptions {
   /// expected and actual diagnostics, fix the expectations in place.
   bool ApplyFixes = false;
 
+  /// Do not allow error expectations. This is useful to guard tests that verify
+  /// valid code from being mixed with invalid code.
+  bool NoErrors = false;
+
   /// Additional paths to non-source files which will have diagnostics emitted
   /// in them, and which should be scanned for expectations by the diagnostic
   /// verifier.

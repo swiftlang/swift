@@ -168,7 +168,10 @@ def verify_EQ
           "differences between expected and actual diagnostics, fix the "
           "expectations in place.\n"
           "  ignore-unknown: Ignore diagnostics with an invalid source "
-          "location.">,
+          "location.\n"
+          "  no-errors: Do not allow error expectations. This is useful to "
+          "guard tests that verify valid code from being mixed with invalid "
+          "code.">,
       Alias<verify>,
       MetaVarName<"options">,
       Flags<[HelpHidden]>;

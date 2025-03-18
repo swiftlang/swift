@@ -2512,6 +2512,8 @@ ParseDiagnosticVerifierArgs(std::optional<DiagnosticVerifierOptions> &Opts,
         verifierOpts.IgnoreUnknown = true;
       } else if (value == "apply-fixes") {
         verifierOpts.ApplyFixes = true;
+      } else if (value == "no-errors") {
+        verifierOpts.NoErrors = true;
       } else {
         Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
                        arg->getOption().getPrefixedName(), value);

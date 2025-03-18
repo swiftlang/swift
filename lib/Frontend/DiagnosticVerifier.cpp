@@ -649,6 +649,22 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     assert(ClassificationStartLoc);
     assert(bool(ExpectedClassification));
 
+    // Complain about error expectations if instructed to, but keep going and
+    // don't waste the opportunity to complain about other things in this
+    // expectation.
+    if (Opts.NoErrors) {
+      switch (*ExpectedClassification) {
+      case DiagnosticKind::Error:
+        addError(DiagnosticLoc,
+                 "verification options are set to disallow error expectations");
+        break;
+      case DiagnosticKind::Warning:
+      case DiagnosticKind::Remark:
+      case DiagnosticKind::Note:
+        break;
+      }
+    }
+
     // Skip any whitespace before the {{.
     MatchStart = MatchStart.substr(MatchStart.find_first_not_of(" \t"));
 
