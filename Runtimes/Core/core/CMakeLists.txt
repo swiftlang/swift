@@ -72,6 +72,7 @@ add_library(swiftCore
   DropWhile.swift
   Dump.swift
   EmptyCollection.swift
+  EnumeratedSequence.swift
   Equatable.swift
   ErrorType.swift
   ExistentialCollection.swift
