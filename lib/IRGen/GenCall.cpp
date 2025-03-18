@@ -5099,11 +5099,14 @@ void irgen::emitYieldOnceCoroutineEntry(
     // Use malloc as our allocator.
     allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
   }
+
+  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(), IGF.Builder);
   emitRetconCoroutineEntry(IGF, fnType, buffer,
                            llvm::Intrinsic::coro_id_retcon_once,
                            getYieldOnceCoroutineBufferSize(IGF.IGM),
                            getYieldOnceCoroutineBufferAlignment(IGF.IGM), {},
                            allocFn, deallocFn, finalArgs);
+
 }
 
 void irgen::emitYieldManyCoroutineEntry(
