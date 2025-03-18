@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-experimental-feature ExecutionAttribute -enable-experimental-feature AsyncCallerExecution:adoption
+// RUN: %target-typecheck-verify-swift -verify=no-errors -target %target-swift-5.1-abi-triple -enable-experimental-feature ExecutionAttribute -enable-experimental-feature AsyncCallerExecution:adoption
 
 // REQUIRES: swift_feature_ExecutionAttribute
 // REQUIRES: swift_feature_AsyncCallerExecution
