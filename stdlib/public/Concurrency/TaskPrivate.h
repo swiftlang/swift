@@ -90,10 +90,15 @@ AsyncTask *_swift_task_setCurrent(AsyncTask *newTask);
 
 /// Cancel all the child tasks that belong to `group`.
 ///
-/// The caller must guarantee that this is either called from the
-/// owning task of the task group or while holding the owning task's
-/// status record lock.
+/// The caller must guarantee that this is called while holding the owning
+/// task's status record lock.
 void _swift_taskGroup_cancelAllChildren(TaskGroup *group);
+
+/// Cancel all the child tasks that belong to `group`.
+///
+/// The caller must guarantee that this is called from the owning task.
+void _swift_taskGroup_cancelAllChildren_unlocked(TaskGroup *group,
+                                                 AsyncTask *owningTask);
 
 /// Remove the given task from the given task group.
 ///
