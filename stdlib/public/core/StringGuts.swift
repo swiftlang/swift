@@ -50,7 +50,7 @@ extension _StringGuts {
     self.init(_StringObject(smol))
   }
   
-  @inlinable @inline(__always)
+  @_alwaysEmitIntoClient @inline(__always)
   internal init(
     nullTerminatedImmortal bufPtr: UnsafeBufferPointer<UInt8>,
     isASCII: Bool

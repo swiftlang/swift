@@ -791,7 +791,7 @@ extension _StringObject.CountAndFlags {
     return 0x0800_0000_0000_0000
   }
   
-  @_alwaysEmitIntoClient // Swift 6.1
+  @_alwaysEmitIntoClient // Swift 6.2
   @inline(__always)
   internal static var isKnownNullTerminatedMask: UInt64 {
     return 0x0400_0000_0000_0000
@@ -865,7 +865,7 @@ extension _StringObject.CountAndFlags {
       isTailAllocated: true,
       isKnownNullTerminated: false)
   }
-  @inlinable @inline(__always)
+  @_alwaysEmitIntoClient @inline(__always)
   internal init(nullTerminatedImmortalCount immortalCount: Int, isASCII: Bool) {
     self.init(
       count: immortalCount,
@@ -940,7 +940,7 @@ extension _StringObject.CountAndFlags {
   }
   
   @_alwaysEmitIntoClient
-  @inline(__always) // Swift 6.1
+  @inline(__always) // Swift 6.2
   internal var isKnownNullTerminated: Bool {
     return 0 != _storage & _StringObject.CountAndFlags.isKnownNullTerminatedMask
   }
@@ -1180,7 +1180,7 @@ extension _StringObject {
   }
   
   @_alwaysEmitIntoClient
-  @inline(__always) // Swift 6.1
+  @inline(__always) // Swift 6.2
   internal var isKnownNullTerminated: Bool {
     if isSmall { return true }
     return _countAndFlags.isKnownNullTerminated
@@ -1267,7 +1267,7 @@ extension _StringObject {
 
 // Object creation
 extension _StringObject {
-  @inlinable @inline(__always)
+  @_alwaysEmitIntoClient @inline(__always)
   internal init(
     nullTerminatedImmortal bufPtr: UnsafeBufferPointer<UInt8>,
     isASCII: Bool
