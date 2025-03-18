@@ -98,7 +98,6 @@ extension Task where Failure == ${FAILURE_TYPE} {
 %end
 
 %{
-OPERATION_PARAM = 'operation: sending @escaping () async throws -> ChildTaskResult'
 GROUP_AND_OP_INFO = [
    (
      'TaskGroup',
