@@ -834,12 +834,15 @@ Expr *addImplicitLoadExpr(
     std::function<void(Expr *, Type)> setType =
         [](Expr *E, Type type) { E->setType(type); });
 
-/// Determine whether the given type contains the given protocol.
+/// Determine whether the given type either conforms to, or itself an
+/// existential subtype of, the given protocol.
 ///
-/// \returns the conformance, if \c T conforms to the protocol \c Proto, or
-/// an empty optional.
-ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
-                                        bool allowMissing=false);
+/// \returns if the first element of the pair is true, T is an existential
+/// subtype of Proto, and the second element is ignored; if the first element
+/// is false, the second element is the result of the conformance lookup.
+std::pair<bool, ProtocolConformanceRef>
+containsProtocol(Type T, ProtocolDecl *Proto,
+                 bool allowMissing=false);
 
 /// Check whether the type conforms to a given known protocol.
 bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol,
