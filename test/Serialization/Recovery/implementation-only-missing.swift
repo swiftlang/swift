@@ -61,7 +61,7 @@ public protocol HiddenProtocolWithOverride {
   func hiddenOverride()
 }
 
-public class HiddenClass {}
+open class HiddenClass {}
 
 public struct HiddenRawType: ExpressibleByStringLiteral, Equatable, CustomStringConvertible {
 
@@ -147,6 +147,14 @@ protocol InheritingFromCompositionDirect : CompositionMemberSimple & HiddenProto
 enum InternalEnumWithRawType: HiddenRawType {
     case a
 }
+
+class InternalSubclass: HiddenClass {}
+class GenericBase<T> {}
+class Sub: GenericBase<Sub.Nested> {
+  class Nested: HiddenClass {}
+}
+
+func InternalFuncWithParam(a: HiddenRawType)  {}
 
 //--- Client.swift
 
