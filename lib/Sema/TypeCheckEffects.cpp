@@ -4420,7 +4420,8 @@ private:
       return;
     }
 
-    Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe);
+    Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe)
+      .fixItRemove(E->getUnsafeLoc());
   }
   
   std::pair<SourceLoc, std::string>

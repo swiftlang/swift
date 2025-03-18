@@ -195,7 +195,7 @@ func unsafeFun() {
   acceptBoolsUnsafeLabel(unsafe: unsafe, unsafe)
 
   let color: Color
-  // expected-warning@+1{{no unsafe operations occur within 'unsafe' expression}}
+  // expected-warning@+1{{no unsafe operations occur within 'unsafe' expression}}{{11-18=}}
   color = unsafe .red
   _ = color
 
