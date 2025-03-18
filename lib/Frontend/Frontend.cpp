@@ -1398,8 +1398,7 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
   llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *> domainMap;
   auto createAndInsertDomain = [&](const std::string &name,
                                    CustomAvailabilityDomain::Kind kind) {
-    auto *domain = CustomAvailabilityDomain::get(
-        name, mainModule, CustomAvailabilityDomain::Kind::Enabled, ctx);
+    auto *domain = CustomAvailabilityDomain::get(name, mainModule, kind, ctx);
     bool inserted = domainMap.insert({domain->getName(), domain}).second;
     ASSERT(inserted); // Domains must be unique.
   };

@@ -121,10 +121,8 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
 bool AvailabilityDomain::isActiveForTargetPlatform(
     const ASTContext &ctx) const {
   if (isPlatform()) {
-    if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx)) {
-      auto compatibleDomain = targetDomain->getABICompatibilityDomain();
-      return compatibleDomain.contains(*this);
-    }
+    if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx))
+      return targetDomain->getRootDomain().contains(*this);
   }
   return false;
 }
@@ -212,14 +210,31 @@ bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
   }
 }
 
-AvailabilityDomain AvailabilityDomain::getABICompatibilityDomain() const {
+bool AvailabilityDomain::isRoot() const {
+  switch (getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return true;
+  case AvailabilityDomain::Kind::Platform:
+    return getRootDomain() == *this;
+  case AvailabilityDomain::Kind::Custom:
+    // For now, all custom domains are their own root.
+    return true;
+  }
+}
+
+AvailabilityDomain AvailabilityDomain::getRootDomain() const {
   if (!isPlatform())
     return *this;
 
+  // iOS specifically contains a few other platforms.
   auto iOSDomain = AvailabilityDomain::forPlatform(PlatformKind::iOS);
   if (iOSDomain.contains(*this))
     return iOSDomain;
 
+  // App Extension domains are contained by their base platform domain.
   if (auto basePlatform = basePlatformForExtensionPlatform(getPlatformKind()))
     return AvailabilityDomain::forPlatform(*basePlatform);
 

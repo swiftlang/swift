@@ -1,12 +1,12 @@
-// RUN: %target-swift-emit-silgen -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -target arm64-apple-xros1.0 | %FileCheck %s --check-prefixes=CHECK
-// RUN: %target-swift-emit-silgen -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -target arm64-apple-xros1.0 -application-extension | %FileCheck %s --check-prefixes=CHECK
+// RUN: %target-swift-emit-silgen -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -target %target-cpu-apple-xros1.0 | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-EXTENSION
+// RUN: %target-swift-emit-silgen -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -target %target-cpu-apple-xros1.0 -application-extension | %FileCheck %s --check-prefixes=CHECK,CHECK-EXTENSION
 
 // REQUIRES: OS=xros
 
 public struct S {}
 
 // CHECK-LABEL: sil{{.*}}@$s4Test19visionOSUnavailableAA1SVyF
-// CHECK-NOT:     ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+// CHECK-NOT:     _diagnoseUnavailableCodeReached
 // CHECK:       } // end sil function '$s4Test19visionOSUnavailableAA1SVyF'
 @available(visionOS, unavailable)
 public func visionOSUnavailable() -> S {
@@ -23,7 +23,7 @@ public func iOSUnavailable() -> S {
 }
 
 // CHECK-LABEL: sil{{.*}}@$s4Test16macOSUnavailableAA1SVyF
-// CHECK-NOT:     ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+// CHECK-NOT:     _diagnoseUnavailableCodeReached
 // CHECK:       } // end sil function '$s4Test16macOSUnavailableAA1SVyF'
 @available(macOS, unavailable)
 public func macOSUnavailable() -> S {
@@ -31,7 +31,7 @@ public func macOSUnavailable() -> S {
 }
 
 // CHECK-LABEL: sil{{.*}}@$s4Test31iOSUnavailableVisionOSAvailableAA1SVyF
-// CHECK-NOT:     ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+// CHECK-NOT:     _diagnoseUnavailableCodeReached
 // CHECK:       } // end sil function '$s4Test31iOSUnavailableVisionOSAvailableAA1SVyF'
 @available(iOS, unavailable)
 @available(visionOS, introduced: 1.0)
@@ -50,7 +50,9 @@ public func iOSAndVisionOSUnavailable() -> S {
 }
 
 // CHECK-LABEL: sil{{.*}}@$s4Test20iOSAppExtensionsOnlyAA1SVyF
-// CHECK-NOT:     ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+// CHECK-NO-EXTENSION:         [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+// CHECK-NO-EXTENSION-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK-EXTENSION-NOT:        _diagnoseUnavailableCodeReached
 // CHECK:       } // end sil function '$s4Test20iOSAppExtensionsOnlyAA1SVyF'
 @available(iOS, unavailable)
 @available(visionOS, unavailable)
@@ -60,7 +62,9 @@ public func iOSAppExtensionsOnly() -> S {
 }
 
 // CHECK-LABEL: sil{{.*}}@$s4Test25visionOSAppExtensionsOnlyAA1SVyF
-// CHECK-NOT:     ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+// CHECK-NO-EXTENSION:         [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+// CHECK-NO-EXTENSION-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK-EXTENSION-NOT:        _diagnoseUnavailableCodeReached
 // CHECK:       } // end sil function '$s4Test25visionOSAppExtensionsOnlyAA1SVyF'
 @available(iOS, unavailable)
 @available(visionOS, unavailable)
@@ -72,7 +76,7 @@ public func visionOSAppExtensionsOnly() -> S {
 @available(visionOS, unavailable)
 public struct UnavailableOnVisionOS {
   // CHECK-LABEL: sil{{.*}}@$s4Test21UnavailableOnVisionOSV14noAvailabilityAA1SVyF
-  // CHECK-NOT:     ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+  // CHECK-NOT:     _diagnoseUnavailableCodeReached
   // CHECK:       } // end sil function '$s4Test21UnavailableOnVisionOSV14noAvailabilityAA1SVyF'
   public func noAvailability() -> S {
     return S()
