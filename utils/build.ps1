@@ -1454,7 +1454,8 @@ enum SPMBuildAction {
 
 function Build-SPMProject {
   [CmdletBinding(PositionalBinding = $false)]
-  param(
+  param
+  (
     [SPMBuildAction] $Action,
     [string] $Src,
     [string] $Bin,
@@ -1524,10 +1525,6 @@ function Build-SPMProject {
   if (-not $ToBatch) {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
     Write-Host ""
-  }
-
-  if ($Summary) {
-    Add-TimingData $BuildArch.LLVMName "Windows" $Src.Replace($SourceCache, '') $Stopwatch.Elapsed
   }
 }
 
