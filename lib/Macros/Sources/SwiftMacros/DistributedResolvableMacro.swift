@@ -45,6 +45,9 @@ extension DistributedResolvableMacro {
       return []
     }
 
+    let attributes = proto.attributes.filter { attr in
+      attr.as(AttributeSyntax.self)?.attributeName.trimmed.description == "_spi"
+    }
     let accessModifiers = proto.accessControlModifiers
 
     let requirementStubs =
@@ -64,6 +67,7 @@ extension DistributedResolvableMacro {
 
     let extensionDecl: DeclSyntax =
       """
+      \(raw: attributes.map({$0.description}).joined(separator: "\n"))
       extension \(proto.name.trimmed) where Self: Distributed._DistributedActorStub {
         \(raw: requirementStubs)
       }
@@ -133,6 +137,15 @@ extension DistributedResolvableMacro {
     var isGenericOverActorSystem = false
     var specificActorSystemRequirement: TypeSyntax?
 
+    let attributes = proto.attributes.filter {
+      guard let attr = $0.as(AttributeSyntax.self) else {
+        return false
+      }
+      guard let ident = attr.attributeName.as(IdentifierTypeSyntax.self) else {
+        return false
+      }
+      return ident.name.text == "_spi"
+    }
     let accessModifiers = proto.accessControlModifiers
 
     for req in proto.genericWhereClause?.requirements ?? [] {
@@ -232,6 +245,7 @@ extension DistributedResolvableMacro {
 
     return [
       """
+      \(attributes)
       \(proto.modifiers) distributed actor $\(proto.name.trimmed)\(raw: typeParamsClause): \(proto.name.trimmed), 
         Distributed._DistributedActorStub \(raw: whereClause)
       {
