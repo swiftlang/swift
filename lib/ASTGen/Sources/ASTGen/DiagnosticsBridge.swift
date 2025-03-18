@@ -241,14 +241,11 @@ public func addQueuedSourceFile(
 public func addQueuedDiagnostic(
   queuedDiagnosticsPtr: UnsafeMutableRawPointer,
   perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
-  text: UnsafePointer<UInt8>,
-  textLength: Int,
+  text: BridgedStringRef,
   severity: BridgedDiagnosticSeverity,
   cLoc: BridgedSourceLoc,
-  categoryName: UnsafePointer<UInt8>?,
-  categoryLength: Int,
-  documentationPath: UnsafePointer<UInt8>?,
-  documentationPathLength: Int,
+  categoryName: BridgedStringRef,
+  documentationPath: BridgedStringRef,
   highlightRangesPtr: UnsafePointer<BridgedSourceLoc>?,
   numHighlightRanges: Int
 ) {
@@ -349,10 +346,10 @@ public func addQueuedDiagnostic(
     }
   }
 
-  let category: DiagnosticCategory? = categoryName.flatMap { categoryNamePtr in
+  let category: DiagnosticCategory? = categoryName.data.flatMap { categoryNamePtr in
     let categoryNameBuffer = UnsafeBufferPointer(
       start: categoryNamePtr,
-      count: categoryLength
+      count: categoryName.count
     )
     let categoryName = String(decoding: categoryNameBuffer, as: UTF8.self)
 
@@ -363,10 +360,10 @@ public func addQueuedDiagnostic(
       return nil
     }
 
-    let documentationURL = documentationPath.map { documentationPathPtr in
+    let documentationURL = documentationPath.data.map { documentationPathPtr in
       let documentationPathBuffer = UnsafeBufferPointer(
         start: documentationPathPtr,
-        count: documentationPathLength
+        count: documentationPath.count
       )
 
       let documentationPath = String(decoding: documentationPathBuffer, as: UTF8.self)
@@ -390,7 +387,11 @@ public func addQueuedDiagnostic(
     diagnosticState.pointee.referencedCategories.insert(category)
   }
 
-  let textBuffer = UnsafeBufferPointer(start: text, count: textLength)
+  guard let textPtr = text.data, !text.isEmpty else {
+    return
+  }
+  
+  let textBuffer = UnsafeBufferPointer(start: textPtr, count: text.count)
   let diagnostic = Diagnostic(
     node: node,
     position: position,

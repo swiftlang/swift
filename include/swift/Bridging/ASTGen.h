@@ -27,11 +27,10 @@ void swift_ASTGen_addQueuedSourceFile(
     intptr_t displayNameLength, ssize_t parentID, ssize_t positionInParent);
 void swift_ASTGen_addQueuedDiagnostic(
     void *_Nonnull queued, void *_Nonnull state,
-    const char *_Nonnull text, ptrdiff_t textLength,
+    BridgedStringRef text,
     BridgedDiagnosticSeverity severity, const void *_Nullable sourceLoc,
-    const char *_Nullable categoryName, ptrdiff_t categoryNameLength,
-    const char *_Nullable documentationPath,
-    ptrdiff_t documentationPathLength,
+    BridgedStringRef categoryName,
+    BridgedStringRef documentationPath,
     const void *_Nullable *_Nullable highlightRanges,
     ptrdiff_t numHighlightRanges);
 void swift_ASTGen_renderQueuedDiagnostics(
