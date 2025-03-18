@@ -818,7 +818,7 @@ public:
     DestroyCleanup = SGF.Cleanups.getTopCleanup();
 
     // If the binding has an addressable buffer forced, it should be cleaned
-    // up here.
+    // up at this scope.
     SGF.enterLocalVariableAddressableBufferScope(vd);
   }
 
@@ -2461,6 +2461,8 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
 
 void
 SILGenFunction::enterLocalVariableAddressableBufferScope(VarDecl *decl) {
+  auto marker = B.createTuple(decl, {});
+  AddressableBuffers[decl] = marker;
   Cleanups.pushCleanup<DeallocateLocalVariableAddressableBuffer>(decl);
 }
 
@@ -2513,7 +2515,28 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
   SILValue reabstraction, allocStack, storeBorrow;
   {
     SavedInsertionPointRAII save(B);
-    B.setInsertionPoint(value->getNextInstruction());
+    auto insertPoint = AddressableBuffers[decl].insertPoint;
+    B.setInsertionPoint(insertPoint);
+    auto allocStackTy = fullyAbstractedTy;
+    if (value->getType().isMoveOnlyWrapped()) {
+      allocStackTy = allocStackTy.addingMoveOnlyWrapper();
+    }
+    allocStack = B.createAllocStack(decl,
+                                allocStackTy,
+                                std::nullopt,
+                                DoesNotHaveDynamicLifetime,
+                                IsNotLexical,
+                                IsNotFromVarDecl,
+                                DoesNotUseMoveableValueDebugInfo,
+                                /*skipVarDeclAssert*/ true);
+  }
+  {
+    SavedInsertionPointRAII save(B);
+    if (isa<ParamDecl>(decl)) {
+      B.setInsertionPoint(allocStack->getNextInstruction());
+    } else {
+      B.setInsertionPoint(value->getNextInstruction());
+    }
     auto declarationLoc = value->getDefiningInsertionPoint()->getLoc();
     
     // Reabstract if necessary.
@@ -2528,14 +2551,6 @@ SILGenFunction::getLocalVariableAddressableBuffer(VarDecl *decl,
       reabstraction = reabstracted.forward(*this);
       newValue = reabstraction;
     }
-    // TODO: reabstract
-    allocStack = B.createAllocStack(declarationLoc, newValue->getType(),
-                                    std::nullopt,
-                                    DoesNotHaveDynamicLifetime,
-                                    IsNotLexical,
-                                    IsNotFromVarDecl,
-                                    DoesNotUseMoveableValueDebugInfo,
-                                    /*skipVarDeclAssert*/ true);
     storeBorrow = B.createStoreBorrow(declarationLoc, newValue, allocStack);
   }
   
