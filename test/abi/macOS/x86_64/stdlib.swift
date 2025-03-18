@@ -910,3 +910,6 @@ Added: _$ss12SwiftSettingVABycfC
 Added: _$ss12SwiftSettingVMa
 Added: _$ss12SwiftSettingVMn
 Added: _$ss12SwiftSettingVN
+
+// Shared string creation for Foundation, again
+Added: _$ss53_SwiftCreateNonTerminatedImmortalString_ForFoundation6buffer7isASCIISSSgSRys5UInt8VG_SbtF
