@@ -323,7 +323,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   ///
   /// Returns the result of executing the closure.
   @available(SwiftStdlib 6.2, *)
-  public func withUnsafeExecutorPrivateData<R>(body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
+  public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
     let base = unsafe _jobGetExecutorPrivateData(self.context)
     let size = unsafe 2 * MemoryLayout<OpaquePointer>.stride
     return unsafe try body(UnsafeMutableRawBufferPointer(start: base,

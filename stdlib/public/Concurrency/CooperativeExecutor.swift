@@ -74,9 +74,9 @@ extension ExecutorJob {
       let ptr: UnsafeMutablePointer<CooperativeExecutor.Timestamp>
       // Try to use the task allocator if it has one
       if let allocator {
-        ptr = unsafe allocator.allocate(as: CooperativeExecutor.Timestamp.self)
+        unsafe ptr = allocator.allocate(as: CooperativeExecutor.Timestamp.self)
       } else {
-        ptr = .allocate(capacity: 1)
+        unsafe ptr = .allocate(capacity: 1)
       }
       unsafe self.cooperativeExecutorTimestampPointer = ptr
     }
