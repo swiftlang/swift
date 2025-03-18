@@ -83,3 +83,27 @@ suite.test("Span from Large Native String's Substring")
     expectEqual(span[i], u[i])
   }
 }
+
+import Foundation
+
+let strings: [NSString: String] = [
+  "Hello, World!" as NSString: "Hello, World!",
+  "A long ASCII string exceeding 16 code units." as NSString: "A long ASCII string exceeding 16 code units.",
+  "🇯🇵" as NSString: "🇯🇵",
+  NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")!: "🏂☃❅❆❄︎⛄️❄️",
+]
+
+strings.forEach { string, expected in
+  suite.test("Span from Bridged String: \(expected)")
+  .require(.stdlib_6_2).code {
+    guard #available(SwiftStdlib 6.2, *) else { return }
+
+    let bridged = String(string)
+    let utf8 = bridged.utf8
+    let span = utf8.span
+    expectEqual(span.count, expected.utf8.count)
+    for (i,j) in zip(span.indices, expected.utf8.indices) {
+      expectEqual(span[i], expected.utf8[j])
+    }
+  }
+}
