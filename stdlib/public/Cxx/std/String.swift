@@ -82,21 +82,27 @@ extension std.u32string {
 
 // MARK: Initializing C++ string from a Swift String literal
 
-extension std.string: ExpressibleByStringLiteral {
+extension std.string: ExpressibleByStringLiteral,
+  ExpressibleByStringInterpolation {
+
   @_alwaysEmitIntoClient
   public init(stringLiteral value: String) {
     unsafe self.init(value)
   }
 }
 
-extension std.u16string: ExpressibleByStringLiteral {
+extension std.u16string: ExpressibleByStringLiteral,
+  ExpressibleByStringInterpolation {
+
   @_alwaysEmitIntoClient
   public init(stringLiteral value: String) {
     unsafe self.init(value)
   }
 }
 
-extension std.u32string: ExpressibleByStringLiteral {
+extension std.u32string: ExpressibleByStringLiteral,
+  ExpressibleByStringInterpolation {
+
   @_alwaysEmitIntoClient
   public init(stringLiteral value: String) {
     unsafe self.init(value)
