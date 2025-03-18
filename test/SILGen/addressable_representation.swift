@@ -134,9 +134,9 @@ func test4(_ c: CO1, _ c1: Bool, _ c2: Bool) {
 
 // CHECK-LABEL: sil {{.*}} @$s{{.*}}5test5
 func test5(_ f: @escaping () -> ()) {
+    // CHECK: [[ADDRESSABLE:%.*]] = alloc_stack
     // CHECK: [[THUNKED:%.*]] = partial_apply
     // CHECK: [[CONV:%.*]] = convert_function [[THUNKED]]
-    // CHECK: [[ADDRESSABLE:%.*]] = alloc_stack
     // CHECK: [[ADDRESSABLE_BORROW:%.*]] = store_borrow [[CONV]] to [[ADDRESSABLE]]
 
     // CHECK: function_ref @$s{{.*}}22addressableFunctionArg
@@ -181,6 +181,30 @@ func test7(_ c: CO1) {
   print(v)
 }
 
+// CHECK-LABEL: sil {{.*}} @$s{{.*}}5test8
+func test8() {
+  guard #available(Span 0.1, *) else { return }
+
+  var s = "A long string that is absolutely not smol at all."
+  let u = Array(s.utf8)
+
+  // CHECK: [[C_ADDRESSABLE:%.*]] = alloc_stack $CO2<String>
+  // CHECK: [[C_ADDRESSABLE_BORROW:%.*]] = store_borrow {{%.*}} to [[C_ADDRESSABLE]]
+  let c = CO2(consume s)
+  s = ""
+  // CHECK: [[GET_STORAGE:%.*]] = function_ref @$s{{.*}}7storage{{.*}}Gvg
+  // CHECK: apply [[GET_STORAGE]]<String>([[C_ADDRESSABLE_BORROW]]
+  let span = c.storage
+
+  _ = span.count == 1
+
+  // CHECK: function_ref @$s{{.*}}4utf8
+  let v = Array(span[0].utf8)
+  _ = u == v
+  // CHECK: end_borrow [[C_ADDRESSABLE_BORROW]]
+}
+
+
 func addressableFunctionArg(_ f: @_addressable @escaping () -> ()) {}
 
 @available(Span 0.1, *)
@@ -199,6 +223,26 @@ struct CO1 {
 
     @lifetime(borrow self)
     func getStorage() -> Span<String> {
+        fatalError()
+    }
+}
+
+@available(Span 0.1, *)
+@_addressableForDependencies
+struct CO2<T> {
+    var s: T
+
+    init(_ s: T) { self.s = s }
+
+    var storage: Span<T> {
+        @lifetime(borrow self)
+        borrowing get {
+            fatalError()
+        }
+    }
+
+    @lifetime(borrow self)
+    func getStorage() -> Span<T> {
         fatalError()
     }
 }

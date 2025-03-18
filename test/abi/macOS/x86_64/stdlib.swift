@@ -910,3 +910,23 @@ Added: _$ss12SwiftSettingVABycfC
 Added: _$ss12SwiftSettingVMa
 Added: _$ss12SwiftSettingVMn
 Added: _$ss12SwiftSettingVN
+
+// EnumeratedSequence Collection conformances
+Added: _$ss18EnumeratedSequenceVyxGSksSkRzrlMc
+Added: _$ss18EnumeratedSequenceVyxGSlsSlRzrlMc
+Added: _$ss18EnumeratedSequenceVsSlRzrlE10startIndexABsSlRzrlE0D0Vyx_GvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV4baseACQzvg
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV4baseACQzvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV7_offsetSivg
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexV7_offsetSivpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVMa
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVMn
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSLsMc
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSLsWP
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSQsMc
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5IndexVyx_GSQsWP
+Added: _$ss18EnumeratedSequenceVsSlRzrlE5countSivpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE7isEmptySbvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlE8endIndexABsSlRzrlE0D0Vyx_GvpMV
+Added: _$ss18EnumeratedSequenceVsSlRzrlEySi6offset_7ElementQz7elementtABsSlRzrlE5IndexVyx_GcipMV
+Added: _$ss18EnumeratedSequenceVyxGSKsSkRzrlMc

@@ -2,6 +2,39 @@
 
 import Synchronization
 
+// CHECK-LABEL: sil{{.*}} @$s19inlinearray_literal12emptyTrivials11InlineArrayVy$_SiGyF : $@convention(thin) () -> InlineArray<0, Int> {
+// CHECK:         [[EMPTY_TUPLE:%.*]] = tuple ()
+// CHECK-NEXT:    [[IA:%.*]] = unchecked_trivial_bit_cast [[EMPTY_TUPLE]] to $InlineArray<0, Int>
+// CHECK-NEXT:    return [[IA]]
+// CHECK-LABEL: } // end sil function '$s19inlinearray_literal12emptyTrivials11InlineArrayVy$_SiGyF'
+func emptyTrivial() -> InlineArray<0, Int> {
+  []
+}
+
+// CHECK-LABEL: sil{{.*}} @$s19inlinearray_literal15emptyNontrivials11InlineArrayVy$_SSGyF : $@convention(thin) () -> @owned InlineArray<0, String> {
+// CHECK:         [[EMPTY_TUPLE:%.*]] = tuple ()
+// CHECK-NEXT:    [[IA:%.*]] = unchecked_bitwise_cast [[EMPTY_TUPLE]] to $InlineArray<0, String>
+// CHECK-NEXT:    [[COPY_IA:%.*]] = copy_value [[IA]]
+// CHECK-NEXT:    return [[COPY_IA]]
+// CHECK-LABEL: } // end sil function '$s19inlinearray_literal15emptyNontrivials11InlineArrayVy$_SSGyF'
+func emptyNontrivial() -> InlineArray<0, String> {
+  []
+}
+
+// CHECK-LABEL: sil{{.*}} @$s19inlinearray_literal16emptyNoncopyables11InlineArrayVy$_15Synchronization6AtomicVySiGGyF : $@convention(thin) () -> @out InlineArray<0, Atomic<Int>> {
+// CHECK:       bb0([[IA_RETURN:%.*]] : $*InlineArray<0, Atomic<Int>>):
+// CHECK-NEXT:    [[IA_ALLOC:%.*]] = alloc_stack $InlineArray<0, Atomic<Int>>
+// CHECK:         [[IA_CAST:%.*]] = unchecked_addr_cast [[IA_ALLOC]] to $*InlineArray<0, Atomic<Int>>
+// CHECK-NEXT:    [[IA_BOX:%.*]] = alloc_box
+// CHECK-NEXT:    [[BORROW_BOX:%.*]] =  begin_borrow [lexical] [[IA_BOX]]
+// CHECK-NEXT:    [[PROJECT_BOX:%.*]] = project_box [[BORROW_BOX]], 0
+// CHECK-NEXT:    copy_addr [take] [[IA_CAST]] to [init] [[PROJECT_BOX]]
+// CHECK-NEXT:    dealloc_stack [[IA_ALLOC]]
+// CHECK-LABEL: } // end sil function '$s19inlinearray_literal16emptyNoncopyables11InlineArrayVy$_15Synchronization6AtomicVySiGGyF'
+func emptyNoncopyable() -> InlineArray<0, Atomic<Int>> {
+  []
+}
+
 // CHECK-LABEL: sil{{.*}} @$s19inlinearray_literal7trivials11InlineArrayVy$3_SiGyF : $@convention(thin) () -> InlineArray<4, Int> {
 // CHECK:         [[SLAB_ALLOC:%.*]] = alloc_stack $InlineArray<4, Int>
 // CHECK-NEXT:    [[ELEMENT_PTR:%.*]] = unchecked_addr_cast [[SLAB_ALLOC]] to $*Int
