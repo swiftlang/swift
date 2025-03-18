@@ -2524,7 +2524,7 @@ parseLifetimeDescriptor(Parser &P,
     // In SIL, lifetimes explicitly state whether they are dependent on a
     // memory location in addition to the value stored at that location.
     if (P.isInSILMode()
-        && name.str() == "address"
+        && (name.str() == "address" || name.str() == "address_for_deps")
         && P.Tok.is(tok::integer_literal)) {
       SourceLoc orderedLoc;
       unsigned index;
@@ -2534,7 +2534,9 @@ parseLifetimeDescriptor(Parser &P,
         return std::nullopt;
       }
       return LifetimeDescriptor::forOrdered(index, lifetimeDependenceKind, loc,
-                                            /*addressable*/ true);
+        name.str() == "address_for_deps"
+          ? LifetimeDescriptor::IsConditionallyAddressable
+          : LifetimeDescriptor::IsAddressable);
     }
     
     return LifetimeDescriptor::forNamed(name, lifetimeDependenceKind, loc);

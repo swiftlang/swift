@@ -1578,6 +1578,7 @@ class DestructureInputs {
   SmallVectorImpl<SILParameterInfo> &Inputs;
   SmallVectorImpl<int> &ParameterMap;
   SmallBitVector &AddressableLoweredParameters;
+  SmallBitVector &ConditionallyAddressableLoweredParameters;
   unsigned NextOrigParamIndex = 0;
 
   void addLoweredParameter(SILParameterInfo parameter,
@@ -1593,11 +1594,13 @@ public:
                     std::optional<ActorIsolation> isolationInfo,
                     SmallVectorImpl<SILParameterInfo> &inputs,
                     SmallVectorImpl<int> &parameterMap,
-                    SmallBitVector &addressableParams)
-      : expansion(expansion), TC(TC), Convs(conventions), Foreign(foreign),
-        IsolationInfo(isolationInfo), Inputs(inputs),
-        ParameterMap(parameterMap),
-        AddressableLoweredParameters(addressableParams)
+                    SmallBitVector &addressableParams,
+                    SmallBitVector &conditionallyAddressableParams)
+    : expansion(expansion), TC(TC), Convs(conventions), Foreign(foreign),
+      IsolationInfo(isolationInfo), Inputs(inputs),
+      ParameterMap(parameterMap),
+      AddressableLoweredParameters(addressableParams),
+      ConditionallyAddressableLoweredParameters(conditionallyAddressableParams)
   {}
 
   void destructure(AbstractionPattern origType,
@@ -1768,7 +1771,9 @@ private:
     
     // Any parameters not yet marked addressable shouldn't be.
     assert(AddressableLoweredParameters.size() <= ParameterMap.size());
+    assert(ConditionallyAddressableLoweredParameters.size() <= ParameterMap.size());
     AddressableLoweredParameters.resize(ParameterMap.size(), false);
+    ConditionallyAddressableLoweredParameters.resize(ParameterMap.size(), false);
   }
 
   void visit(AbstractionPattern origType, AnyFunctionType::Param substParam,
@@ -1809,8 +1814,8 @@ private:
     if (origFlags.isAddressable()) {
       origType = AbstractionPattern::getOpaque();
       
-      // Remember that this lowered parameter is addressable in the
-      // addressable parameters vector.
+      // Remember that this lowered parameter is unconditionally addressable in
+      // the addressable parameters vector.
       AddressableLoweredParameters.resize(ParameterMap.size() + 1, false);
       AddressableLoweredParameters[ParameterMap.size()] = true;
     } else if (hasScopedDependency) {
@@ -1821,10 +1826,14 @@ private:
       if (initialSubstTL.getRecursiveProperties().isAddressableForDependencies()) {
         origType = AbstractionPattern::getOpaque();
 
-        // Remember that this lowered parameter is addressable in the
-        // addressable parameters vector.
+        // Remember that this lowered parameter is conditionally addressable in
+        // the addressable parameters vector.
         AddressableLoweredParameters.resize(ParameterMap.size() + 1, false);
         AddressableLoweredParameters[ParameterMap.size()] = true;
+
+        ConditionallyAddressableLoweredParameters
+          .resize(ParameterMap.size() + 1, false);
+        ConditionallyAddressableLoweredParameters[ParameterMap.size()] = true;
       }
     }
 
@@ -2565,6 +2574,7 @@ static CanSILFunctionType getSILFunctionType(
   SmallVector<SILParameterInfo, 8> inputs;
   SmallVector<int, 8> parameterMap;
   SmallBitVector addressableParams;
+  SmallBitVector conditionallyAddressableParams;
   {
     std::optional<ActorIsolation> actorIsolation;
     if (constant) {
@@ -2587,7 +2597,9 @@ static CanSILFunctionType getSILFunctionType(
     }
     DestructureInputs destructurer(expansionContext, TC, conventions,
                                    foreignInfo, actorIsolation, inputs,
-                                   parameterMap, addressableParams);
+                                   parameterMap,
+                                   addressableParams,
+                                   conditionallyAddressableParams);
     destructurer.destructure(origType, substFnInterfaceType.getParams(),
                              extInfoBuilder, unimplementable);
   }
@@ -2668,11 +2680,19 @@ static CanSILFunctionType getSILFunctionType(
       IndexSubset *addressableSet = addressableDeps.any()
         ? IndexSubset::get(TC.Context, addressableDeps)
         : nullptr;
+        
+      SmallBitVector condAddressableDeps = scopeIndicesSet
+        ? scopeIndicesSet->getBitVector() & conditionallyAddressableParams
+        : SmallBitVector(1, false);
+      IndexSubset *condAddressableSet = condAddressableDeps.any()
+        ? IndexSubset::get(TC.Context, condAddressableDeps)
+        : nullptr;
       
       return LifetimeDependenceInfo(inheritIndicesSet,
                                     scopeIndicesSet,
                                     target, /*immortal*/ false,
-                                    addressableSet);
+                                    addressableSet,
+                                    condAddressableSet);
     };
   // Lower parameter dependencies.
   for (unsigned i = 0; i < parameterMap.size(); ++i) {
@@ -2759,10 +2779,12 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
     std::optional<ActorIsolation> actorIsolation; // For now always null.
     SmallVector<int, 8> unusedParameterMap;
     SmallBitVector unusedAddressableParams;
+    SmallBitVector unusedConditionalAddressableParams;
     DestructureInputs destructurer(context, TC, conventions, foreignInfo,
                                    actorIsolation, inputs,
                                    unusedParameterMap,
-                                   unusedAddressableParams);
+                                   unusedAddressableParams,
+                                   unusedConditionalAddressableParams);
     destructurer.destructure(
         origType, substAccessorType.getParams(),
         extInfoBuilder.withRepresentation(SILFunctionTypeRepresentation::Thin),
