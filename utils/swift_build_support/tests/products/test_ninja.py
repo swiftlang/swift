@@ -93,6 +93,7 @@ class NinjaTestCase(unittest.TestCase):
 -S {self.workspace.source_dir('ninja')} \
 -B {self.workspace.build_dir('build', 'ninja')} \
 -DCMAKE_BUILD_TYPE=Release \
+-DBUILD_TESTING=OFF \
 -DCMAKE_C_COMPILER=/path/to/cc \
 -DCMAKE_CXX_COMPILER=/path/to/cxx
 + {self.toolchain.cmake} --build {self.workspace.build_dir('build', 'ninja')}

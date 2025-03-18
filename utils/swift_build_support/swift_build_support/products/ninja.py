@@ -57,6 +57,7 @@ class NinjaBuilder(product.ProductBuilder):
             "-S", self.source_dir,
             "-B", self.build_dir,
             "-DCMAKE_BUILD_TYPE=Release",
+            "-DBUILD_TESTING=OFF",
             f"-DCMAKE_C_COMPILER={self.toolchain.cc}",
             f"-DCMAKE_CXX_COMPILER={self.toolchain.cxx}"])
         shell.call([self.toolchain.cmake, "--build", self.build_dir])
