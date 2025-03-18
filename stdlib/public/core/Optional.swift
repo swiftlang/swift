@@ -365,6 +365,7 @@ extension Optional where Wrapped: ~Escapable {
 extension Optional where Wrapped: ~Copyable & ~Escapable {
   // FIXME(NCG): Do we want this? It seems like we do. Make this public.
   @_alwaysEmitIntoClient
+  @lifetime(copy self)
   public consuming func _consumingUnsafelyUnwrap() -> Wrapped {
     switch consume self {
     case .some(let x):
@@ -384,6 +385,7 @@ extension Optional where Wrapped: ~Escapable {
   @_preInverseGenerics
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
+    @lifetime(copy self)
     get {
       if let x = self {
         return x
@@ -476,11 +478,13 @@ extension Optional: CustomReflectable {
 
 @_transparent
 public // COMPILER_INTRINSIC
-func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
-                                    _filenameLength: Builtin.Word,
-                                    _filenameIsASCII: Builtin.Int1,
-                                    _line: Builtin.Word,
-                                    _isImplicitUnwrap: Builtin.Int1) {
+func _diagnoseUnexpectedNilOptional(
+  _filenameStart: Builtin.RawPointer,
+  _filenameLength: Builtin.Word,
+  _filenameIsASCII: Builtin.Int1,
+  _line: Builtin.Word,
+  _isImplicitUnwrap: Builtin.Int1
+) {
   // Cannot use _preconditionFailure as the file and line info would not be
   // printed.
   if Bool(_isImplicitUnwrap) {
