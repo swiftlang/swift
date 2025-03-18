@@ -1257,7 +1257,8 @@ emitConditionalConformancesBuffer(IRGenFunction &IGF,
 }
 
 static llvm::Value *emitWitnessTableAccessorCall(
-    IRGenFunction &IGF, const ProtocolConformance *conformance,
+    IRGenFunction &IGF, CanType conformingType,
+    const ProtocolConformance *conformance,
     llvm::Value **srcMetadataCache) {
   auto conformanceDescriptor =
     IGF.IGM.getAddrOfProtocolConformanceDescriptor(
@@ -1265,8 +1266,7 @@ static llvm::Value *emitWitnessTableAccessorCall(
 
   // Emit the source metadata if we haven't yet.
   if (!*srcMetadataCache) {
-    *srcMetadataCache = IGF.emitAbstractTypeMetadataRef(
-      conformance->getType()->getCanonicalType());
+    *srcMetadataCache = IGF.emitAbstractTypeMetadataRef(conformingType);
   }
 
   auto conditionalTables =
@@ -1290,8 +1290,8 @@ static llvm::Value *emitWitnessTableAccessorCall(
 /// given type.
 static llvm::Function *
 getWitnessTableLazyAccessFunction(IRGenModule &IGM,
+                                  CanType conformingType,
                                   const ProtocolConformance *conformance) {
-  auto conformingType = conformance->getType()->getCanonicalType();
   assert(!conformingType->hasArchetype());
 
   auto rootConformance = conformance->getRootNormalConformance();
@@ -1315,7 +1315,7 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
       [&](IRGenFunction &IGF, Explosion &params) {
         llvm::Value *conformingMetadataCache = nullptr;
         return MetadataResponse::forComplete(emitWitnessTableAccessorCall(
-            IGF, conformance, &conformingMetadataCache));
+            IGF, conformingType, conformance, &conformingMetadataCache));
       });
 
   return accessor;
@@ -1414,16 +1414,23 @@ public:
 
   llvm::Value *getTable(IRGenFunction &IGF,
                         llvm::Value **typeMetadataCache) const override {
+    auto conformingType = Conformance->getType()->getCanonicalType();
+
+    if (isa<NormalProtocolConformance>(Conformance)) {
+      conformingType = conformingType->getReducedType(
+        Conformance->getGenericSignature());
+    }
+
     // If we're looking up a dependent type, we can't cache the result.
-    if (Conformance->getType()->hasArchetype() ||
-        Conformance->getType()->hasDynamicSelfType()) {
-      return emitWitnessTableAccessorCall(IGF, Conformance,
+    if (conformingType->hasArchetype() ||
+        conformingType->hasDynamicSelfType()) {
+      return emitWitnessTableAccessorCall(IGF, conformingType, Conformance,
                                           typeMetadataCache);
     }
 
     // Otherwise, call a lazy-cache function.
     auto accessor =
-      getWitnessTableLazyAccessFunction(IGF.IGM, Conformance);
+      getWitnessTableLazyAccessFunction(IGF.IGM, conformingType, Conformance);
     llvm::CallInst *call =
         IGF.Builder.CreateCall(accessor->getFunctionType(), accessor, {});
     call->setCallingConv(IGF.IGM.DefaultCC);
@@ -2238,6 +2245,7 @@ namespace {
         Flags = Flags.withIsSynthesizedNonUnique(conf->isSynthesizedNonUnique());
         Flags = Flags.withIsConformanceOfProtocol(conf->isConformanceOfProtocol());
         Flags = Flags.withHasGlobalActorIsolation(isolation.isGlobalActor());
+        Flags = withSerialExecutorCheckingModeFlags(Flags, conf);
       } else {
         Flags = Flags.withIsRetroactive(false)
                      .withIsSynthesizedNonUnique(false);
@@ -2458,6 +2466,32 @@ namespace {
             LinkEntity::forProtocolConformanceDescriptor(
               rootGlobalActorConformance));
       B.addRelativeAddress(globalActorConformanceDescriptor);
+    }
+
+    static ConformanceFlags
+    withSerialExecutorCheckingModeFlags(ConformanceFlags Flags, const NormalProtocolConformance *conf) {
+      ProtocolDecl *proto = conf->getProtocol();
+      auto &C = proto->getASTContext();
+
+      ConformanceFlags UpdatedFlags = Flags;
+      if (proto->isSpecificProtocol(swift::KnownProtocolKind::SerialExecutor)) {
+        conf->forEachValueWitness([&](const ValueDecl *req,
+                                      Witness witness) {
+          bool nameMatch = witness.getDecl()->getBaseIdentifier() == C.Id_isIsolatingCurrentContext;
+          if (nameMatch) {
+            if (DeclContext *NominalOrExtension = witness.getDecl()->getDeclContext()) {
+              // If the witness is NOT the default implementation in the _Concurrency library,
+              // we should record that this is an user provided implementation and we should call it.
+              bool hasNonDefaultIsIsolatingCurrentContext =
+                  !NominalOrExtension->getParentModule()->isConcurrencyModule();
+              UpdatedFlags = UpdatedFlags.withHasNonDefaultSerialExecutorIsIsolatingCurrentContext(
+                            hasNonDefaultIsIsolatingCurrentContext);
+            }
+          }
+        });
+      }
+
+      return UpdatedFlags;
     }
   };
 }

@@ -124,19 +124,31 @@ TEST_F(AvailabilityDomainLattice, Contains) {
   EXPECT_FALSE(visionOSAppExt.contains(macOSAppExt));
 }
 
-TEST_F(AvailabilityDomainLattice, ABICompatibilityDomain) {
-  EXPECT_EQ(Universal.getABICompatibilityDomain(), Universal);
-  EXPECT_EQ(Swift.getABICompatibilityDomain(), Swift);
-  EXPECT_EQ(Package.getABICompatibilityDomain(), Package);
-  EXPECT_EQ(Embedded.getABICompatibilityDomain(), Embedded);
-  EXPECT_EQ(macOS.getABICompatibilityDomain(), macOS);
-  EXPECT_EQ(macOSAppExt.getABICompatibilityDomain(), macOS);
-  EXPECT_EQ(iOS.getABICompatibilityDomain(), iOS);
-  EXPECT_EQ(iOSAppExt.getABICompatibilityDomain(), iOS);
-  EXPECT_EQ(macCatalyst.getABICompatibilityDomain(), iOS);
-  EXPECT_EQ(macCatalystAppExt.getABICompatibilityDomain(), iOS);
-  EXPECT_EQ(visionOS.getABICompatibilityDomain(), iOS);
-  EXPECT_EQ(visionOSAppExt.getABICompatibilityDomain(), iOS);
+TEST_F(AvailabilityDomainLattice, RootDomain) {
+  EXPECT_EQ(Universal.getRootDomain(), Universal);
+  EXPECT_TRUE(Universal.isRoot());
+  EXPECT_EQ(Swift.getRootDomain(), Swift);
+  EXPECT_TRUE(Swift.isRoot());
+  EXPECT_EQ(Package.getRootDomain(), Package);
+  EXPECT_TRUE(Package.isRoot());
+  EXPECT_EQ(Embedded.getRootDomain(), Embedded);
+  EXPECT_TRUE(Embedded.isRoot());
+  EXPECT_EQ(macOS.getRootDomain(), macOS);
+  EXPECT_TRUE(macOS.isRoot());
+  EXPECT_EQ(macOSAppExt.getRootDomain(), macOS);
+  EXPECT_FALSE(macOSAppExt.isRoot());
+  EXPECT_EQ(iOS.getRootDomain(), iOS);
+  EXPECT_TRUE(iOS.isRoot());
+  EXPECT_EQ(iOSAppExt.getRootDomain(), iOS);
+  EXPECT_FALSE(iOSAppExt.isRoot());
+  EXPECT_EQ(macCatalyst.getRootDomain(), iOS);
+  EXPECT_FALSE(macCatalyst.isRoot());
+  EXPECT_EQ(macCatalystAppExt.getRootDomain(), iOS);
+  EXPECT_FALSE(macCatalystAppExt.isRoot());
+  EXPECT_EQ(visionOS.getRootDomain(), iOS);
+  EXPECT_FALSE(visionOS.isRoot());
+  EXPECT_EQ(visionOSAppExt.getRootDomain(), iOS);
+  EXPECT_FALSE(visionOSAppExt.isRoot());
 }
 
 TEST(AvailabilityDomain, TargetPlatform) {

@@ -95,7 +95,10 @@ extension InlineArray where Element: ~Copyable {
   @_transparent
   internal var _mutableBuffer: UnsafeMutableBufferPointer<Element> {
     mutating get {
-      unsafe UnsafeMutableBufferPointer<Element>(start: _mutableAddress, count: count)
+      unsafe UnsafeMutableBufferPointer<Element>(
+        start: _mutableAddress,
+        count: count
+      )
     }
   }
 
@@ -121,14 +124,18 @@ extension InlineArray where Element: ~Copyable {
 @available(SwiftStdlib 6.2, *)
 extension InlineArray where Element: ~Copyable {
   /// Initializes every element in this array, by calling the given closure
-  /// for each index.
+  /// with each index.
   ///
   /// This will call the closure `count` times, where `count` is the static
   /// count of the array, to initialize every element by passing the closure
-  /// the index of the current element being initialized. The closure is allowed
-  /// to throw an error at any point during initialization at which point the
-  /// array will stop initialization, deinitialize every currently initialized
-  /// element, and throw the given error back out to the caller.
+  /// the index of the current element being initialized.
+  ///
+  ///     InlineArray<4, Int> { 1 << $0 }  //-> [1, 2, 4, 8]
+  ///
+  /// The closure is allowed to throw an error at any point during
+  /// initialization at which point the array will stop initialization,
+  /// deinitialize every currently initialized element, and throw the given
+  /// error back out to the caller.
   ///
   /// - Parameter body: A closure that returns an owned `Element` to emplace at
   ///   the passed in index.
@@ -139,9 +146,7 @@ extension InlineArray where Element: ~Copyable {
   public init<E: Error>(_ body: (Index) throws(E) -> Element) throws(E) {
 #if $BuiltinEmplaceTypedThrows
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = InlineArray<count, Element>._initializationBuffer(
-        start: rawPtr
-      )
+      let buffer = Self._initializationBuffer(start: rawPtr)
 
       for i in 0 ..< count {
         do throws(E) {
@@ -164,19 +169,23 @@ extension InlineArray where Element: ~Copyable {
   }
 
   /// Initializes every element in this array, by calling the given closure
-  /// for each previously initialized element.
+  /// with each preceding element.
   ///
   /// This will call the closure `count - 1` times, where `count` is the static
   /// count of the array, to initialize every element by passing the closure an
-  /// immutable borrow reference to the previous element. The closure is allowed
-  /// to throw an error at any point during initialization at which point the
-  /// array will stop initialization, deinitialize every currently initialized
-  /// element, and throw the given error back out to the caller.
+  /// immutable borrow reference to the preceding element.
+  ///
+  ///     InlineArray<4, Int>(first: 1) { $0 << 1 }  //-> [1, 2, 4, 8]
+  ///
+  /// The closure is allowed to throw an error at any point during
+  /// initialization at which point the array will stop initialization,
+  /// deinitialize every currently initialized element, and throw the given
+  /// error back out to the caller.
   ///
   /// - Parameters:
   ///   - first: The first value to emplace into the array.
   ///   - next: A closure that takes an immutable borrow reference to the
-  ///     previous element, and returns an owned `Element` instance to emplace
+  ///     preceding element, and returns an owned `Element` instance to emplace
   ///     into the array.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the array.
@@ -194,11 +203,16 @@ extension InlineArray where Element: ~Copyable {
     var o: Element? = first
 
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = InlineArray<count, Element>._initializationBuffer(
-        start: rawPtr
-      )
+      let buffer = Self._initializationBuffer(start: rawPtr)
 
-      unsafe buffer.initializeElement(at: 0, to: o.take()._consumingUncheckedUnwrapped())
+      guard Self.count > 0 else {
+        return
+      }
+
+      unsafe buffer.initializeElement(
+        at: 0,
+        to: o.take()._consumingUncheckedUnwrapped()
+      )
 
       for i in 1 ..< count {
         do throws(E) {
@@ -232,7 +246,7 @@ extension InlineArray where Element: Copyable {
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
     self = Builtin.emplace {
-      let buffer = InlineArray<count, Element>._initializationBuffer(start: $0)
+      let buffer = Self._initializationBuffer(start: $0)
 
       unsafe buffer.initialize(repeating: value)
     }
@@ -431,8 +445,8 @@ extension InlineArray where Element: ~Copyable {
       return
     }
 
-    _precondition(indices.contains(i), "Index out of bounds")
-    _precondition(indices.contains(j), "Index out of bounds")
+    _checkIndex(i)
+    _checkIndex(j)
 
     let ithElement = unsafe _mutableBuffer.moveElement(from: i)
     let jthElement = unsafe _mutableBuffer.moveElement(from: j)

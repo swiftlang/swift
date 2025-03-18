@@ -4153,6 +4153,10 @@ enum class DeclRuntimeAvailability : uint8_t {
   /// with strong references. To preserve ABI stability, the decl must still be
   /// emitted.
   AlwaysUnavailableABICompatible,
+
+  /// The decl is always unavailable and should never be reachable at runtime
+  /// nor be required at load time.
+  AlwaysUnavailable,
 };
 
 class DeclRuntimeAvailabilityRequest

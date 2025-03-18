@@ -61,6 +61,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -2029,6 +2030,10 @@ StringRef ModuleDecl::getModuleLoadedFilename() const {
 
 bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
+}
+
+bool ModuleDecl::isConcurrencyModule() const {
+  return !getParent() && getName() == getASTContext().Id_Concurrency;
 }
 
 bool ModuleDecl::hasStandardSubstitutions() const {
@@ -4191,11 +4196,19 @@ version::Version ModuleDecl::getLanguageVersionBuiltWith() const {
 //                            MARK: SwiftSettings
 //===----------------------------------------------------------------------===//
 
+static llvm::cl::opt<bool> AllowForDuplicateSwiftSettings(
+    "swift-settings-allow-duplicates",
+    llvm::cl::desc("Option that allows for duplicate SwiftSettings. Just for "
+                   "compiler testing"),
+    llvm::cl::Hidden);
+
 namespace {
 
 enum class SwiftSettingKind {
   Unknown = 0,
   DefaultIsolation,
+
+  LastKind = DefaultIsolation,
 };
 
 struct SwiftSettingsWalker : ASTWalker {
@@ -4203,8 +4216,21 @@ struct SwiftSettingsWalker : ASTWalker {
   ASTContext &ctx;
   SourceFileLangOptions result;
 
+  SmallVector<Expr *, 1> swiftSettingIndexToOriginalExprMap;
+
   SwiftSettingsWalker(SourceFile &sf, ASTContext &ctx)
-      : sf(sf), ctx(ctx), result() {}
+      : sf(sf), ctx(ctx), result() {
+    // NOTE: We do not store a value for Unknown.
+    for (unsigned i : range(unsigned(SwiftSettingKind::LastKind))) {
+      (void)i;
+      swiftSettingIndexToOriginalExprMap.push_back(nullptr);
+    }
+  }
+
+  Expr *&getOriginalSwiftSetting(SwiftSettingKind kind) {
+    assert(kind != SwiftSettingKind::Unknown);
+    return swiftSettingIndexToOriginalExprMap[unsigned(kind) - 1];
+  }
 
   /// Given a specific CallExpr, pattern matches the CallExpr's first argument
   /// to validate it is MainActor.self. Returns CanType() if the CallExpr has
@@ -4263,13 +4289,30 @@ struct SwiftSettingsWalker : ASTWalker {
         continue;
 
       case SwiftSettingKind::DefaultIsolation:
+        auto *&expr =
+            getOriginalSwiftSetting(SwiftSettingKind::DefaultIsolation);
+
+        // If we already have an expr, emit an error and continue.
+        if (!AllowForDuplicateSwiftSettings && expr) {
+          ctx.Diags.diagnose(arg.getStartLoc(),
+                             diag::swift_settings_duplicate_setting);
+          ctx.Diags.diagnose(
+              expr->getLoc(),
+              diag::swift_settings_duplicate_setting_original_loc);
+          foundValidArg = true;
+          continue;
+        }
+
+        // Otherwise, set things up appropriately.
         if (auto actor = patternMatchDefaultIsolationMainActor(callExpr)) {
+          expr = callExpr;
           result.defaultIsolation = actor;
           foundValidArg = true;
           continue;
         }
 
         if (isa<NilLiteralExpr>(callExpr->getArgs()->getExpr(0))) {
+          expr = callExpr;
           result.defaultIsolation = {Type()};
           foundValidArg = true;
           continue;
@@ -4284,11 +4327,6 @@ struct SwiftSettingsWalker : ASTWalker {
 };
 
 } // namespace
-
-static bool isConcurrencyModule(DeclContext *dc) {
-  auto *m = dc->getParentModule();
-  return !m->getParent() && m->getName() == m->getASTContext().Id_Concurrency;
-}
 
 bool SwiftSettingsWalker::isSwiftSettingsMacroExpr(
     MacroExpansionExpr *macroExpr) {
@@ -4345,7 +4383,7 @@ SwiftSettingsWalker::getSwiftSettingArgDecl(Argument arg) {
     return {};
 
   // Now lookup our swiftSettingDecl.
-  NominalTypeDecl *swiftSettingsDecl;
+  NominalTypeDecl *swiftSettingsDecl = nullptr;
   {
     SmallVector<ValueDecl *, 1> decls;
     ctx.lookupInSwiftModule("SwiftSetting", decls);
@@ -4406,7 +4444,8 @@ SwiftSettingsWalker::patternMatchDefaultIsolationMainActor(CallExpr *callExpr) {
   if (!nomDecl)
     return CanType();
   auto *nomDeclDC = nomDecl->getDeclContext();
-  if (!nomDeclDC->isModuleScopeContext() || !isConcurrencyModule(nomDeclDC))
+  auto *nomDeclModule = nomDecl->getParentModule();
+  if (!nomDeclDC->isModuleScopeContext() || !nomDeclModule->isConcurrencyModule())
     return CanType();
 
   return nomDecl->getDeclaredType()->getCanonicalType();

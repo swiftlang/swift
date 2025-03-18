@@ -45,18 +45,25 @@ enum class ParsedLifetimeDependenceKind : uint8_t {
 enum class LifetimeDependenceKind : uint8_t { Inherit = 0, Scope };
 
 struct LifetimeDescriptor {
+  enum IsAddressable_t {
+    IsNotAddressable,
+    IsConditionallyAddressable,
+    IsAddressable,
+  };
+
   union Value {
     struct {
       Identifier name;
     } Named;
     struct {
       unsigned index;
-      bool isAddress;
+      IsAddressable_t isAddress;
     } Ordered;
     struct {
     } Self;
     Value(Identifier name) : Named({name}) {}
-    Value(unsigned index, bool isAddress) : Ordered({index, isAddress}) {}
+    Value(unsigned index, IsAddressable_t isAddress)
+      : Ordered({index, isAddress}) {}
     Value() : Self() {}
   } value;
 
@@ -72,7 +79,7 @@ private:
                      SourceLoc loc)
       : value{name}, kind(DescriptorKind::Named),
         parsedLifetimeDependenceKind(parsedLifetimeDependenceKind), loc(loc) {}
-  LifetimeDescriptor(unsigned index, bool isAddress,
+  LifetimeDescriptor(unsigned index, IsAddressable_t isAddress,
                      ParsedLifetimeDependenceKind parsedLifetimeDependenceKind,
                      SourceLoc loc)
       : value{index, isAddress}, kind(DescriptorKind::Ordered),
@@ -93,7 +100,7 @@ public:
   forOrdered(unsigned index,
              ParsedLifetimeDependenceKind parsedLifetimeDependenceKind,
              SourceLoc loc,
-             bool isAddress = false) {
+             IsAddressable_t isAddress = IsNotAddressable) {
     return {index, isAddress, parsedLifetimeDependenceKind, loc};
   }
   static LifetimeDescriptor
@@ -116,10 +123,10 @@ public:
     return value.Ordered.index;
   }
   
-  bool isAddressable() const {
+  IsAddressable_t isAddressable() const {
     return kind == DescriptorKind::Ordered
       ? value.Ordered.isAddress
-      : false;
+      : IsNotAddressable;
   }
 
   DescriptorKind getDescriptorKind() const { return kind; }
@@ -216,6 +223,8 @@ class LifetimeDependenceInfo {
   IndexSubset *scopeLifetimeParamIndices;
   llvm::PointerIntPair<IndexSubset *, 1, bool>
     addressableParamIndicesAndImmortal;
+  IndexSubset *conditionallyAddressableParamIndices;
+
   unsigned targetIndex;
 
   static LifetimeDependenceInfo getForIndex(AbstractFunctionDecl *afd,
@@ -249,16 +258,23 @@ public:
                          IndexSubset *scopeLifetimeParamIndices,
                          unsigned targetIndex, bool isImmortal,
                          // set during SIL type lowering
-                         IndexSubset *addressableParamIndices = nullptr)
+                         IndexSubset *addressableParamIndices = nullptr,
+                         IndexSubset *conditionallyAddressableParamIndices = nullptr)
       : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
         scopeLifetimeParamIndices(scopeLifetimeParamIndices),
         addressableParamIndicesAndImmortal(addressableParamIndices, isImmortal),
+        conditionallyAddressableParamIndices(conditionallyAddressableParamIndices),
         targetIndex(targetIndex) {
     assert(this->isImmortal() || inheritLifetimeParamIndices ||
            scopeLifetimeParamIndices);
     assert(!inheritLifetimeParamIndices ||
            !inheritLifetimeParamIndices->isEmpty());
     assert(!scopeLifetimeParamIndices || !scopeLifetimeParamIndices->isEmpty());
+    assert((!conditionallyAddressableParamIndices
+            || (addressableParamIndices
+                && conditionallyAddressableParamIndices
+                    ->isSubsetOf(addressableParamIndices)))
+     && "conditionally-addressable params not a subset of addressable params?");
   }
 
   operator bool() const { return !empty(); }
@@ -286,8 +302,25 @@ public:
 
   IndexSubset *getScopeIndices() const { return scopeLifetimeParamIndices; }
 
+  /// Return the set of parameters which have addressable dependencies.
+  ///
+  /// This indicates that any dependency on the parameter value is dependent
+  /// not only on the value, but the memory location of a particular instance
+  /// of the value.
   IndexSubset *getAddressableIndices() const {
     return addressableParamIndicesAndImmortal.getPointer();
+  }
+  /// Return the set of parameters which may have addressable dependencies
+  /// depending on the type of the parameter.
+  ///
+  /// Generic parameters need to be conservatively treated as addressable in
+  /// situations where the substituted type may end up being addressable-for-
+  /// dependencies. If substitution at a call site or specialization results
+  /// in the type becoming concretely non-addressable-for-dependencies,
+  /// then the lifetime dependency can be considered a normal value
+  /// dependency.
+  IndexSubset *getConditionallyAddressableIndices() const {
+    return conditionallyAddressableParamIndices;
   }
 
   bool checkInherit(int index) const {

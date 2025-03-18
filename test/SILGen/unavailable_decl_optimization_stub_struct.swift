@@ -11,6 +11,7 @@ public struct ImplicitInitStruct {
   // CHECK:       } // end sil function '$s4Test18ImplicitInitStructVACycfC'
 }
 
+// CHECK-LABEL: sil{{.*}}@$s4Test23testImplicitConstructoryyF
 @available(*, unavailable)
 public func testImplicitConstructor() {
   // Force s4Test18ImplicitInitStructVACycfC to be emitted.

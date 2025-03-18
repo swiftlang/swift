@@ -8389,6 +8389,28 @@ ERROR(invalid_function_conversion_with_non_sendable,none,
 NOTE(type_does_not_conform_to_Sendable,none,
      "type %0 does not conform to 'Sendable' protocol", (Type))
 
+GROUPED_WARNING(
+    attr_execution_nonisolated_behavior_will_change_decl, AsyncCallerExecution,
+    none,
+    "feature '%0' will cause nonisolated async %kindbase1 to run on the "
+    "caller's actor; use %2 to preserve behavior",
+    (StringRef, const AbstractFunctionDecl *, DeclAttribute))
+
+GROUPED_WARNING(
+    attr_execution_nonisolated_behavior_will_change_closure,
+    AsyncCallerExecution, none,
+    "feature '%0' will cause nonisolated async closure to run on the caller's "
+    "actor; use %1 to preserve behavior",
+    (StringRef, DeclAttribute))
+
+GROUPED_WARNING(
+    attr_execution_nonisolated_behavior_will_change_typerepr,
+    AsyncCallerExecution, none,
+    "feature '%0' will cause nonisolated async function type to be treated as "
+    "specified to run on the caller's actor; use %1 to preserve "
+    "behavior",
+    (StringRef, DeclAttribute))
+
 //===----------------------------------------------------------------------===//
 //                            MARK: SwiftSettings
 //===----------------------------------------------------------------------===//
@@ -8398,6 +8420,11 @@ ERROR(swift_settings_invalid_setting, none,
 
 ERROR(swift_settings_must_be_top_level, none,
       "#SwiftSettings can only be invoked as a top level declaration", ())
+
+ERROR(swift_settings_duplicate_setting, none,
+      "duplicate setting passed to #SwiftSettings", ())
+NOTE(swift_settings_duplicate_setting_original_loc, none,
+     "setting originally passed here", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
