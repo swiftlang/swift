@@ -19,6 +19,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -101,6 +102,7 @@ public:
     return !isInvalid() && Union.is<ProtocolConformance*>();
   }
   ProtocolConformance *getConcrete() const {
+    ASSERT(isConcrete());
     return Union.get<ProtocolConformance*>();
   }
 
@@ -108,6 +110,7 @@ public:
     return !isInvalid() && Union.is<PackConformance*>();
   }
   PackConformance *getPack() const {
+    ASSERT(isPack());
     return Union.get<PackConformance*>();
   }
 
@@ -116,6 +119,7 @@ public:
   }
 
   ProtocolDecl *getAbstract() const {
+    ASSERT(isAbstract());
     return Union.get<ProtocolDecl*>();
   }
 
