@@ -20,7 +20,7 @@ struct SimpleExecutorFactory: ExecutorFactory {
   }
   public static var defaultExecutor: any TaskExecutor {
     print("Creating task executor")
-    return DispatchGlobalTaskExecutor()
+    return SimpleTaskExecutor()
   }
 }
 
@@ -62,9 +62,9 @@ final class SimpleMainExecutor: MainExecutor, @unchecked Sendable {
 }
 
 @available(SwiftStdlib 6.2, *)
-final class FatalExecutor: TaskExecutor, @unchecked Sendable {
+final class SimpleTaskExecutor: TaskExecutor, @unchecked Sendable {
   func enqueue(_ job: consuming ExecutorJob) {
-    fatalError("We should never get here")
+    MainActor.executor.enqueue(job)
   }
 }
 
@@ -84,9 +84,9 @@ func myAsyncFunction() async {
 // CHECK: Creating main executor
 // CHECK-NEXT: Creating task executor
 // CHECK-NEXT: Hello
-// CHECK-NEXT: Running
-// CHECK-NEXT: Hello World
 // CHECK-NEXT: Enqueued job
+// CHECK-NEXT: Running
 // CHECK-NEXT: Running job
+// CHECK-NEXT: Hello World
 // CHECK-NEXT: Goodbye
 

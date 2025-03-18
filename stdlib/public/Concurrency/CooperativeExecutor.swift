@@ -71,7 +71,13 @@ extension ExecutorJob {
   fileprivate mutating func setupCooperativeExecutorTimestamp() {
     // If a Timestamp won't fit, allocate
     if cooperativeExecutorTimestampIsIndirect {
-      let ptr = unsafe allocator!.allocate(as: CooperativeExecutor.Timestamp.self)
+      let ptr: UnsafeMutablePointer<CooperativeExecutor.Timestamp>
+      // Try to use the task allocator if it has one
+      if let allocator {
+        ptr = unsafe allocator.allocate(as: CooperativeExecutor.Timestamp.self)
+      } else {
+        ptr = .allocate(capacity: 1)
+      }
       unsafe self.cooperativeExecutorTimestampPointer = ptr
     }
   }
@@ -80,7 +86,11 @@ extension ExecutorJob {
     // If a Timestamp won't fit, deallocate
     if cooperativeExecutorTimestampIsIndirect {
       let ptr = unsafe self.cooperativeExecutorTimestampPointer
-      unsafe allocator!.deallocate(ptr)
+      if let allocator {
+        unsafe allocator.deallocate(ptr)
+      } else {
+        unsafe ptr.deallocate()
+      }
     }
   }
 }
