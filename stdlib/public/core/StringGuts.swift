@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -416,6 +416,87 @@ extension _StringGuts {
     return r._knownUTF16
   }
 }
+
+#if _runtime(_ObjC)
+extension _StringGuts {
+
+  private static var associationKey: UnsafeRawPointer {
+    // We never dereference this, we just use this address as a unique key
+    // TODO: perhaps use the address of a metatype instead
+    unsafe UnsafeRawPointer(Builtin.addressof(&_swiftEmptyArrayStorage))
+  }
+
+  internal func getAssociatedStorage() -> __StringStorage? {
+    let getter = unsafe unsafeBitCast(
+      getGetAssociatedObjectPtr(),
+      to: (@convention(c)(
+        AnyObject,
+        UnsafeRawPointer
+      ) -> UnsafeRawPointer?).self
+    )
+    _precondition(_object.hasObjCBridgeableObject)
+    // print("has ObjC Bridgeable Object")
+    if let assocPtr = unsafe getter(
+      _object.objCBridgeableObject,
+      Self.associationKey
+    ) {
+      let storage: __StringStorage
+      storage = unsafe Unmanaged.fromOpaque(assocPtr).takeUnretainedValue()
+      return storage
+    }
+    return nil
+  }
+
+  internal func setAssociatedStorage(_ storage: __StringStorage) {
+    let setter = unsafe unsafeBitCast(
+      getSetAssociatedObjectPtr(),
+      to: (@convention(c)(
+        AnyObject,
+        UnsafeRawPointer,
+        AnyObject?,
+        UInt
+      ) -> Void).self
+    )
+
+    unsafe setter(
+      _object.objCBridgeableObject,
+      Self.associationKey,
+      storage,
+      1 //OBJC_ASSOCIATION_RETAIN_NONATOMIC
+    )
+  }
+
+  internal func getOrAllocateAssociatedStorage() -> __StringStorage {
+    _precondition(_object.hasObjCBridgeableObject)
+    let unwrapped: __StringStorage
+    // libobjc already provides the necessary memory barriers for
+    // double checked locking to be safe, per comments on
+    // https://github.com/swiftlang/swift/pull/75148
+    if let storage = getAssociatedStorage() {
+      unwrapped = storage
+    } else {
+      let lock = _object.objCBridgeableObject
+      objc_sync_enter(lock)
+      if let storage  = getAssociatedStorage() {
+        unwrapped = storage
+      } else {
+        var contents = String.UnicodeScalarView()
+        // always reserve a size larger than a small string
+        contents.reserveCapacity(Swift.max(31, 1 + count + count >> 1))
+        for c in String.UnicodeScalarView(self) {
+          contents.append(c)
+        }
+        _precondition(contents._guts._object.hasNativeStorage)
+        unwrapped = (consume contents)._guts._object.nativeStorage
+        setAssociatedStorage(unwrapped)
+      }
+      defer { _fixLifetime(unwrapped) }
+      objc_sync_exit(lock)
+    }
+    return unwrapped
+  }
+}
+#endif
 
 // Old SPI(corelibs-foundation)
 extension _StringGuts {
