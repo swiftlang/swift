@@ -535,6 +535,37 @@ public:
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
   
+  // Represents an addressable buffer that has been allocated but not yet used.
+  struct PreparedAddressableBuffer {
+    SILInstruction *insertPoint = nullptr;
+    
+    PreparedAddressableBuffer() = default;
+    
+    PreparedAddressableBuffer(SILInstruction *insertPoint)
+      : insertPoint(insertPoint)
+    {}
+    
+    PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
+      : insertPoint(other.insertPoint)
+    {
+      other.insertPoint = nullptr;
+    }
+    
+    PreparedAddressableBuffer &operator=(PreparedAddressableBuffer &&other) {
+      insertPoint = other.insertPoint;
+      other.insertPoint = nullptr;
+      return *this;
+    }
+    
+    ~PreparedAddressableBuffer() {
+      if (insertPoint) {
+        // Remove the insertion point if it went unused.
+        insertPoint->eraseFromParent();
+      }
+    }
+  };
+  llvm::DenseMap<VarDecl *, PreparedAddressableBuffer> AddressableBuffers;
+  
   /// Establish the scope for the addressable buffer that might be allocated
   /// for a local variable binding.
   ///
