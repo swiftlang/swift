@@ -301,14 +301,12 @@ public:
 
   SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);
 
-#define PASS(ID, TAG, DESCRIPTION)
-#define SWIFT_FUNCTION_PASS(ID, TAG, DESCRIPTION)
-#define SWIFT_SILCOMBINE_PASS(INST) \
+#define INSTRUCTION_SIMPLIFICATION(INST) \
   SILInstruction *visit##INST(INST *);
-#define SWIFT_SILCOMBINE_PASS_WITH_LEGACY(INST) \
+#define INSTRUCTION_SIMPLIFICATION_WITH_LEGACY(INST) \
   SILInstruction *visit##INST(INST *);          \
   SILInstruction *legacyVisit##INST(INST *);
-#include "swift/SILOptimizer/PassManager/Passes.def"
+#include "Simplifications.def"
 
   /// Instruction visitor helpers.
 

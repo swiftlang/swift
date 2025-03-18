@@ -1202,8 +1202,7 @@ enum class IRGenPasses : uint8_t {
 } // end anonymous namespace
 
 void SILPassManager::addPass(PassKind Kind) {
-  assert(unsigned(PassKind::AllPasses_Last) >= unsigned(Kind) &&
-         "Invalid pass kind");
+  ASSERT(unsigned(PassKind::numPasses) > unsigned(Kind) && "Invalid pass kind");
   switch (Kind) {
 #define PASS(ID, TAG, NAME)                                                    \
   case PassKind::ID: {                                                         \
