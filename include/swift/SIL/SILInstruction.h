@@ -911,6 +911,9 @@ public:
   void dump() const;
   void print(raw_ostream &OS) const;
 
+  /// Pretty-print the value with DebugInfo.
+  void dump(bool DebugInfo) const;
+
   /// Pretty-print the value in context, preceded by its operands (if the
   /// value represents the result of an instruction) and followed by its
   /// users.
