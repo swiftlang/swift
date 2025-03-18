@@ -2,6 +2,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
+// REQUIRES: libdispatch
 
 // rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
