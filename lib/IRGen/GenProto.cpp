@@ -3402,8 +3402,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
   }
 
   case Component::Kind::OutOfLineBaseProtocol: {
-    auto conformance = sourceKey.Kind.getProtocolConformance();
-    auto protocol = conformance.getRequirement();
+    auto protocol = sourceKey.Kind.getConformedProtocol();
     auto &pi = IGF.IGM.getProtocolInfo(protocol,
                                        ProtocolInfoKind::RequirementSignature);
 
@@ -3413,9 +3412,10 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
     sourceKey.Kind =
       LocalTypeDataKind::forAbstractProtocolWitnessTable(inheritedProtocol);
-    if (conformance.isConcrete()) {
+    if (sourceKey.Kind.isConcreteProtocolConformance()) {
       auto inheritedConformance =
-        conformance.getConcrete()->getInheritedConformance(inheritedProtocol);
+        sourceKey.Kind.getConcreteProtocolConformance()
+          ->getInheritedConformance(inheritedProtocol);
       if (inheritedConformance) {
         sourceKey.Kind = LocalTypeDataKind::forConcreteProtocolWitnessTable(
                                                           inheritedConformance);
@@ -3438,8 +3438,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
   case Component::Kind::AssociatedConformance: {
     auto sourceType = sourceKey.Type;
-    auto sourceConformance = sourceKey.Kind.getProtocolConformance();
-    auto sourceProtocol = sourceConformance.getRequirement();
+    auto sourceConformance = sourceKey.Kind.getProtocolConformance(sourceType);
+    auto sourceProtocol = sourceKey.Kind.getConformedProtocol();
     auto &pi = IGF.IGM.getProtocolInfo(sourceProtocol,
                                        ProtocolInfoKind::RequirementSignature);
 
@@ -3473,7 +3473,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       // In Embedded Swift associated-conformance entries simply point to the witness table
       // of the associated conformance.
       llvm::Value *sourceWTable = source.getMetadata();
-      llvm::Value *associatedWTable = emitAssociatedConformanceValue(IGF, sourceWTable, associatedConformanceRef);
+      llvm::Value *associatedWTable = emitAssociatedConformanceValue(
+          IGF, sourceWTable, associatedConformanceRef);
       return MetadataResponse::forComplete(associatedWTable);
     }
 
@@ -3562,13 +3563,13 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
   }
 
   case Component::Kind::ConditionalConformance: {
-    auto sourceConformance = sourceKey.Kind.getProtocolConformance();
+    auto sourceConformance = sourceKey.Kind.getConcreteProtocolConformance();
 
     auto reqtIndex = component.getPrimaryIndex();
 
     ProtocolDecl *conformingProto;
     auto found = SILWitnessTable::enumerateWitnessTableConditionalConformances(
-        sourceConformance.getConcrete(),
+        sourceConformance,
         [&](unsigned index, CanType type, ProtocolDecl *proto) {
           if (reqtIndex == index) {
             conformingProto = proto;
