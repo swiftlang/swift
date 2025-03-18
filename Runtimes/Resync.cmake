@@ -8,39 +8,21 @@ cmake_minimum_required(VERSION 3.21)
 # Where the standard library lives today
 set(StdlibSources "${CMAKE_CURRENT_LIST_DIR}/../stdlib")
 
-message(STATUS "Source dir: ${StdlibSources}")
-
-# Copy the files under the "name" directory in the standard library into the new
-# location under Runtimes
-function(copy_library_sources name from_prefix to_prefix)
-  message(STATUS "${name}[${StdlibSources}/${from_prefix}/${name}] -> ${to_prefix}/${name} ")
+# Copy a list of files
+function(copy_files from_prefix to_prefix)
+  cmake_parse_arguments(ARG "" "ROOT" "FILES" ${ARGN})
+  if(NOT ARG_ROOT)
+    set(ARG_ROOT ${StdlibSources})
+  endif()
 
   set(full_to_prefix "${CMAKE_CURRENT_LIST_DIR}/${to_prefix}")
 
-  file(GLOB_RECURSE filenames
-    FOLLOW_SYMLINKS
-    LIST_DIRECTORIES FALSE
-    RELATIVE "${StdlibSources}/${from_prefix}"
-    "${StdlibSources}/${from_prefix}/${name}/*.swift"
-    "${StdlibSources}/${from_prefix}/${name}/*.h"
-    "${StdlibSources}/${from_prefix}/${name}/*.cpp"
-    "${StdlibSources}/${from_prefix}/${name}/*.c"
-    "${StdlibSources}/${from_prefix}/${name}/*.mm"
-    "${StdlibSources}/${from_prefix}/${name}/*.m"
-    "${StdlibSources}/${from_prefix}/${name}/*.def"
-    "${StdlibSources}/${from_prefix}/${name}/*.gyb"
-    "${StdlibSources}/${from_prefix}/${name}/*.apinotes"
-    "${StdlibSources}/${from_prefix}/${name}/*.yaml"
-    "${StdlibSources}/${from_prefix}/${name}/*.inc"
-    "${StdlibSources}/${from_prefix}/${name}/*.modulemap"
-    "${StdlibSources}/${from_prefix}/${name}/*.json")
-
-  foreach(file ${filenames})
+  foreach(file ${ARG_FILES})
     # Get and create the directory
     get_filename_component(dirname ${file} DIRECTORY)
     file(MAKE_DIRECTORY "${full_to_prefix}/${dirname}")
     file(COPY_FILE
-      "${StdlibSources}/${from_prefix}/${file}"         # From
+      "${ARG_ROOT}/${from_prefix}/${file}"              # From
       "${full_to_prefix}/${file}"                       # To
       RESULT _output
       ONLY_IF_DIFFERENT)
@@ -49,6 +31,42 @@ function(copy_library_sources name from_prefix to_prefix)
         "Copy ${from_prefix}/${file} -> ${full_to_prefix}/${file} Failed: ${_output}")
     endif()
   endforeach()
+endfunction()
+
+# Copy the files under the "name" directory in the standard library into the new
+# location under Runtimes
+function(copy_library_sources name from_prefix to_prefix)
+  cmake_parse_arguments(ARG "" "ROOT" "" ${ARGN})
+
+  if(NOT ARG_ROOT)
+    set(ARG_ROOT ${StdlibSources})
+  endif()
+
+  message(STATUS "${name}[${ARG_ROOT}/${from_prefix}/${name}] -> ${to_prefix}/${name} ")
+
+  set(full_to_prefix "${CMAKE_CURRENT_LIST_DIR}/${to_prefix}")
+
+  file(GLOB_RECURSE filenames
+    FOLLOW_SYMLINKS
+    LIST_DIRECTORIES FALSE
+    RELATIVE "${ARG_ROOT}/${from_prefix}"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.swift"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.h"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.cpp"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.c"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.mm"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.m"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.def"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.gyb"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.apinotes"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.yaml"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.inc"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.modulemap"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.json")
+
+  copy_files("${from_prefix}" "${to_prefix}"
+    ROOT "${ARG_ROOT}"
+    FILES ${filenames})
 endfunction()
 
 # Directories in the existing standard library that make up the Core project
