@@ -3293,7 +3293,7 @@ if (-not $IsCrossCompiling) {
     Build-Testing Windows $HostArch -Test
   }
   if ($Test -contains "llbuild") { Build-LLBuild $HostArch -Test }
-  if ($Test -contains "swiftpm") { Test-PackageManager $HostArch }
+  if ($Test -contains "swiftpm") { Test-PackageManager }
   if ($Test -contains "swift-format") { Test-Format }
   if ($Test -contains "sourcekit-lsp") { Test-SourceKitLSP }
 
