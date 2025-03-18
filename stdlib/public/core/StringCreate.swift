@@ -391,7 +391,7 @@ extension String {
           isNFC: isASCII,
           isNativelyStored: false,
           isTailAllocated: false,
-          isKnownNullTerminated: false
+          isNullTerminated: false
         )
       )
     }
