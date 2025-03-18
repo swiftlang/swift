@@ -1818,7 +1818,7 @@ function Build-mimalloc() {
   foreach ($Tool in $Tools) {
     $Binary = [IO.Path]::Combine($Arch.ToolchainInstallRoot, "usr", "bin", $Tool)
     # Binary-patch in place
-    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-f" "-i" "-v" "$Binary"
+    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-f" "-i" "$Binary"
     # Log the import table
     $LogFile = "$BinaryCache\$($Arch.LLVMTarget)\mimalloc\minject-log-$Tool.txt"
     $ErrorFile = "$BinaryCache\$($Arch.LLVMTarget)\mimalloc\minject-log-$Tool-error.txt"
