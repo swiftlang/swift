@@ -838,6 +838,10 @@ Added: _$ss13KeyValuePairsV4spans4SpanVyx3key_q_5valuetGvpMV
 Added: _$ss15CollectionOfOneV4spans4SpanVyxGvpMV
 Added: _$ss15ContiguousArrayV4spans4SpanVyxGvpMV
 Added: _$ss4SpanVss15BitwiseCopyableRzlE5bytess03RawA0VvpMV
+Added: _$sSS8UTF8ViewV4spans4SpanVys5UInt8VGvg
+Added: _$sSS8UTF8ViewV4spans4SpanVys5UInt8VGvpMV
+Added: _$sSs8UTF8ViewV4spans4SpanVys5UInt8VGvg
+Added: _$sSs8UTF8ViewV4spans4SpanVys5UInt8VGvpMV
 
 // SE-0467 mutableSpan properties
 Added: _$sSa11mutableSpans07MutableB0VyxGvr
