@@ -5138,7 +5138,8 @@ void AttributeChecker::checkBackDeployedAttrs(
     }
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (!AFD->hasBody()) {
+      // Ignore this for ABI-only decls; ABIDeclChecker will diagnose it better.
+      if (!AFD->hasBody() && ABIRoleInfo(AFD).providesAPI()) {
         diagnoseAndRemoveAttr(Attr, diag::back_deployed_requires_body, Attr,
                               VD);
         continue;
