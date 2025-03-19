@@ -39,11 +39,18 @@ struct C {
 
 // rdar://109287447
 public func testKeypath<V: ~Copyable>(m: consuming M<V>) {
-  _ = m[keyPath: \.nc] // expected-error {{key path cannot refer to noncopyable type 'NC'}}
-  _ = m[keyPath: \.nc.data] // expected-error {{key path cannot refer to noncopyable type 'NC'}}
-  _ = m[keyPath: \.ncg] // expected-error {{key path cannot refer to noncopyable type 'V'}}
-  _ = m[keyPath: \.ncg.protocolProp] // expected-error {{key path cannot refer to noncopyable type 'V'}}
+  _ = m[keyPath: \.nc]
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'M<V>'}}
+  // expected-error@-2 {{key path cannot refer to noncopyable type 'NC'}}
+  _ = m[keyPath: \.nc.data]
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'M<V>'}}
+  _ = m[keyPath: \.ncg]
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'M<V>'}}
+  // expected-error@-2 {{key path cannot refer to noncopyable type 'V'}}
+  _ = m[keyPath: \.ncg.protocolProp]
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'M<V>'}}
   _ = m[keyPath: \.string]
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'M<V>'}}
 
   let b = Box(NC())
   _ = b.with(\.data)

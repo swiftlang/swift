@@ -4176,6 +4176,21 @@ public:
   bool resolveTapBody(TypeVariableType *typeVar, Type contextualType,
                       ConstraintLocatorBuilder locator);
 
+  /// Bind key path expression to the given contextual type and generate
+  /// constraints for its requirements.
+  ///
+  /// \param typeVar The type variable representing the key path expression.
+  /// \param contextualType The contextual type this key path expression
+  /// would be bound to.
+  /// \param flags The flags associated with this assignment.
+  /// \param locator The locator associated with contextual type.
+  ///
+  /// \returns `true` if it was possible to generate constraints for
+  /// the requirements and assign fixed type to the key path expression,
+  /// `false` otherwise.
+  bool resolveKeyPath(TypeVariableType *typeVar, Type contextualType,
+                      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
+
   /// Assign a fixed type to the given type variable.
   ///
   /// \param typeVar The type variable to bind.

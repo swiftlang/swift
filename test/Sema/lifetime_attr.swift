@@ -44,3 +44,18 @@ func invalidTarget(_ result: inout NE, _ source: consuming NE) { // expected-err
 func immortalConflict(_ immortal: Int) -> NE { // expected-error{{conflict between the parameter name and 'immortal' contextual keyword}}
   NE()
 }
+
+do {
+  struct Test: ~Escapable {
+    var v1: Int
+    var v2: NE
+  }
+
+  _ = \Test.v1 // expected-error {{key path cannot refer to nonescapable type 'Test'}}
+  _ = \Test.v2 // expected-error {{key path cannot refer to nonescapable type 'Test'}} expected-error {{key path cannot refer to nonescapable type 'NE'}}
+
+  func use(t: Test) {
+    t[keyPath: \.v1] // expected-error {{key path cannot refer to nonescapable type 'Test'}}
+    t[keyPath: \.v2] // expected-error {{key path cannot refer to nonescapable type 'Test'}} expected-error {{key path cannot refer to nonescapable type 'NE'}}
+  }
+}
