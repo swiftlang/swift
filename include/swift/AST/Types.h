@@ -752,6 +752,10 @@ public:
     return getRecursiveProperties().hasOpenedExistential();
   }
 
+  /// True if this type is an existential or an archetype which may be an
+  /// existential.
+  bool canBeExistential();
+
   /// Determine whether the type involves an opened element archetype.
   bool hasElementArchetype() const {
     return getRecursiveProperties().hasElementArchetype();
