@@ -1780,9 +1780,6 @@ public:
       auto associatedWitness = entry.getAssociatedConformanceWitness();
       assert(associatedWitness.Requirement == requirement.getAssociation()
              && "sil witness table does not match protocol");
-      assert(associatedWitness.Protocol ==
-               requirement.getAssociatedRequirement()
-             && "sil witness table does not match protocol");
       auto piIndex = PI.getAssociatedConformanceIndex(requirement);
       assert((size_t)piIndex.getValue() ==
               Table.size() - WitnessTableFirstRequirementOffset &&
@@ -1792,10 +1789,8 @@ public:
       if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
         // In Embedded Swift associated-conformance entries simply point to the witness table
         // of the associated conformance.
-        ProtocolConformanceRef assocConf =
-          SILWT->getConformance()->getAssociatedConformance(requirement.getAssociation(),
-                                                            requirement.getAssociatedRequirement());
-        llvm::Constant *witnessEntry = IGM.getAddrOfWitnessTable(assocConf.getConcrete());
+        ProtocolConformance *assocConf = associatedWitness.Witness.getConcrete();
+        llvm::Constant *witnessEntry = IGM.getAddrOfWitnessTable(assocConf);
         auto &schema = IGM.getOptions().PointerAuth
                           .ProtocolAssociatedTypeWitnessTableAccessFunctions;
         Table.addSignedPointer(witnessEntry, schema, requirement);
@@ -2030,10 +2025,11 @@ void ResilientWitnessTableBuilder::collectResilientWitnesses(
 
       ProtocolConformanceRef associatedConformance =
         ConformanceInContext.getAssociatedConformance(witness.Requirement,
-                                                      witness.Protocol);
+                                                      witness.Witness.getRequirement());
+
       AssociatedConformance requirement(SILWT->getProtocol(),
                                         witness.Requirement,
-                                        witness.Protocol);
+                                        witness.Witness.getRequirement());
 
       llvm::Constant *witnessEntry =
         getAssociatedConformanceWitness(requirement, associate,
@@ -2353,7 +2349,7 @@ namespace {
 
           AssociatedConformance requirement(SILWT->getProtocol(),
                                             witness.Requirement,
-                                            witness.Protocol);
+                                            witness.Witness.getRequirement());
           auto assocConformanceDescriptor =
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
               LinkEntity::forAssociatedConformanceDescriptor(requirement));
@@ -3402,8 +3398,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
   }
 
   case Component::Kind::OutOfLineBaseProtocol: {
-    auto conformance = sourceKey.Kind.getProtocolConformance();
-    auto protocol = conformance.getRequirement();
+    auto protocol = sourceKey.Kind.getConformedProtocol();
     auto &pi = IGF.IGM.getProtocolInfo(protocol,
                                        ProtocolInfoKind::RequirementSignature);
 
@@ -3413,9 +3408,10 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
     sourceKey.Kind =
       LocalTypeDataKind::forAbstractProtocolWitnessTable(inheritedProtocol);
-    if (conformance.isConcrete()) {
+    if (sourceKey.Kind.isConcreteProtocolConformance()) {
       auto inheritedConformance =
-        conformance.getConcrete()->getInheritedConformance(inheritedProtocol);
+        sourceKey.Kind.getConcreteProtocolConformance()
+          ->getInheritedConformance(inheritedProtocol);
       if (inheritedConformance) {
         sourceKey.Kind = LocalTypeDataKind::forConcreteProtocolWitnessTable(
                                                           inheritedConformance);
@@ -3438,8 +3434,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
   case Component::Kind::AssociatedConformance: {
     auto sourceType = sourceKey.Type;
-    auto sourceConformance = sourceKey.Kind.getProtocolConformance();
-    auto sourceProtocol = sourceConformance.getRequirement();
+    auto sourceConformance = sourceKey.Kind.getProtocolConformance(sourceType);
+    auto sourceProtocol = sourceKey.Kind.getConformedProtocol();
     auto &pi = IGF.IGM.getProtocolInfo(sourceProtocol,
                                        ProtocolInfoKind::RequirementSignature);
 
@@ -3473,7 +3469,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       // In Embedded Swift associated-conformance entries simply point to the witness table
       // of the associated conformance.
       llvm::Value *sourceWTable = source.getMetadata();
-      llvm::Value *associatedWTable = emitAssociatedConformanceValue(IGF, sourceWTable, associatedConformanceRef);
+      llvm::Value *associatedWTable = emitAssociatedConformanceValue(
+          IGF, sourceWTable, associatedConformanceRef);
       return MetadataResponse::forComplete(associatedWTable);
     }
 
@@ -3562,13 +3559,13 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
   }
 
   case Component::Kind::ConditionalConformance: {
-    auto sourceConformance = sourceKey.Kind.getProtocolConformance();
+    auto sourceConformance = sourceKey.Kind.getConcreteProtocolConformance();
 
     auto reqtIndex = component.getPrimaryIndex();
 
     ProtocolDecl *conformingProto;
     auto found = SILWitnessTable::enumerateWitnessTableConditionalConformances(
-        sourceConformance.getConcrete(),
+        sourceConformance,
         [&](unsigned index, CanType type, ProtocolDecl *proto) {
           if (reqtIndex == index) {
             conformingProto = proto;

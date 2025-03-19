@@ -5551,23 +5551,24 @@ void swift::diagnoseConformanceFailure(Type T,
 
   // If we're checking conformance of an existential type to a protocol,
   // do a little bit of extra work to produce a better diagnostic.
-  if (T->isExistentialType() &&
-      TypeChecker::containsProtocol(T, Proto)) {
+  if (T->isExistentialType()) {
+    auto pair = TypeChecker::containsProtocol(T, Proto);
+    if (pair.first || pair.second) {
+      if (!T->isObjCExistentialType()) {
+        Type constraintType = T;
+        if (auto existential = T->getAs<ExistentialType>())
+          constraintType = existential->getConstraintType();
+        diags.diagnose(ComplainLoc, diag::type_cannot_conform,
+                       T, Proto->getDeclaredInterfaceType());
+        diags.diagnose(ComplainLoc,
+                       diag::only_concrete_types_conform_to_protocols);
+        return;
+      }
 
-    if (!T->isObjCExistentialType()) {
-      Type constraintType = T;
-      if (auto existential = T->getAs<ExistentialType>())
-        constraintType = existential->getConstraintType();
-      diags.diagnose(ComplainLoc, diag::type_cannot_conform,
+      diags.diagnose(ComplainLoc, diag::protocol_does_not_conform_static,
                      T, Proto->getDeclaredInterfaceType());
-      diags.diagnose(ComplainLoc,
-                     diag::only_concrete_types_conform_to_protocols);
       return;
     }
-
-    diags.diagnose(ComplainLoc, diag::protocol_does_not_conform_static,
-                   T, Proto->getDeclaredInterfaceType());
-    return;
   }
 
   // Special case: diagnose conversion to ExpressibleByNilLiteral, since we
@@ -5685,7 +5686,7 @@ void swift::diagnoseConformanceFailure(Type T,
                  T, Proto->getDeclaredInterfaceType());
 }
 
-ProtocolConformanceRef
+std::pair<bool, ProtocolConformanceRef>
 TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
                               bool allowMissing) {
   // Existential types don't need to conform, i.e., they only need to
@@ -5699,7 +5700,8 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
     if (constraint->isEqual(Proto->getDeclaredInterfaceType()) &&
         Proto->requiresSelfConformanceWitnessTable()) {
       auto &ctx = T->getASTContext();
-      return ProtocolConformanceRef(ctx.getSelfConformance(Proto));
+      auto conformance = ProtocolConformanceRef(ctx.getSelfConformance(Proto));
+      return std::make_pair(false, conformance);
     }
 
     auto layout = T->getExistentialLayout();
@@ -5711,35 +5713,28 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
     // would result in a missing conformance if type is `& Sendable`
     // protocol composition. It's handled for type as a whole below.
     if (auto superclass = layout.getSuperclass()) {
-      auto result =lookupConformance(superclass, Proto,
-                                     /*allowMissing=*/false);
-      if (result) {
-        return result;
-      }
+      auto conformance = lookupConformance(superclass, Proto,
+                                           /*allowMissing=*/false);
+      if (conformance)
+        return std::make_pair(false, conformance);
     }
 
     // Next, check if the existential contains the protocol in question.
     for (auto *PD : layout.getProtocols()) {
-      // If we found the protocol we're looking for, return an abstract
-      // conformance to it.
-      if (PD == Proto) {
-        // FIXME: Passing an empty Type() here temporarily.
-        return ProtocolConformanceRef::forAbstract(Type(), Proto);
-      }
-
-      // Now check refined protocols.
-      if (PD->inheritsFrom(Proto)) {
-        // FIXME: Passing an empty Type() here temporarily.
-        return ProtocolConformanceRef::forAbstract(Type(), Proto);
-      }
+      // If we found the protocol we're looking for, return the special value.
+      if (PD == Proto || PD->inheritsFrom(Proto))
+        return std::make_pair(true, ProtocolConformanceRef::forInvalid());
     }
 
-    return allowMissing ? ProtocolConformanceRef::forMissingOrInvalid(T, Proto)
-                        : ProtocolConformanceRef::forInvalid();
+    auto conformance =
+        (allowMissing ? ProtocolConformanceRef::forMissingOrInvalid(T, Proto)
+                      : ProtocolConformanceRef::forInvalid());
+    return std::make_pair(false, conformance);
   }
 
   // For non-existential types, this is equivalent to checking conformance.
-  return lookupConformance(T, Proto, allowMissing);
+  auto conformance = lookupConformance(T, Proto, allowMissing);
+  return std::make_pair(false, conformance);
 }
 
 bool TypeChecker::conformsToKnownProtocol(

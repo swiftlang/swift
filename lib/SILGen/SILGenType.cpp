@@ -670,12 +670,13 @@ public:
     auto assocConformance =
       Conformance->getAssociatedConformance(req.getAssociation(),
                                             req.getAssociatedRequirement());
+    auto substType =
+      Conformance->getAssociatedType(req.getAssociation())->getCanonicalType();
 
     SGM.useConformance(assocConformance);
 
     Entries.push_back(SILWitnessTable::AssociatedConformanceWitness{
-        req.getAssociation(), req.getAssociatedRequirement(),
-        assocConformance});
+        req.getAssociation(), substType, assocConformance});
   }
 
   void addConditionalRequirements() {
@@ -1105,7 +1106,7 @@ public:
       return addMissingDefault();
 
     auto entry = SILWitnessTable::AssociatedConformanceWitness{
-        req.getAssociation(), req.getAssociatedRequirement(), witness};
+        req.getAssociation(), req.getAssociation(), witness};
     DefaultWitnesses.push_back(entry);
   }
 };

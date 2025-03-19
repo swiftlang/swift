@@ -1884,8 +1884,7 @@ SubstitutionMap getApplySubstitutionsFromParsed(
                       proto->getDeclaredInterfaceType());
         failed = true;
 
-        // FIXME: Passing an empty Type() here temporarily.
-        return ProtocolConformanceRef::forAbstract(Type(), proto);
+        return ProtocolConformanceRef::forInvalid();
       });
 
   return failed ? SubstitutionMap() : subMap;
@@ -8169,23 +8168,47 @@ static bool parseSILWitnessTableEntry(
         P.parseToken(tok::colon, diag::expected_sil_witness_colon))
       return true;
 
-    // FIXME: Passing an empty Type() here temporarily.
-    auto conformance = ProtocolConformanceRef::forAbstract(Type(), proto);
+    CanType substType;
+    ProtocolConformanceRef conformance;
     if (P.Tok.getText() != "dependent") {
       auto concrete =
         witnessState.parseProtocolConformance();
       // Ignore invalid and abstract witness entries.
       if (concrete.isInvalid() || !concrete.isConcrete())
         return false;
+      substType = concrete.getConcrete()->getType()->getCanonicalType();
       conformance = concrete;
     } else {
       P.consumeToken();
+
+      // Parse AST type.
+      ParserResult<TypeRepr> TyR = P.parseType();
+      if (TyR.isNull())
+        return true;
+
+      SILTypeResolutionContext silContext(/*isSILType=*/false,
+                                          witnessParams,
+                                          /*openedPacks=*/nullptr);
+      auto Ty =
+          swift::performTypeResolution(TyR.get(), P.Context,
+                                       witnessSig, &silContext,
+                                       &P.SF);
+      if (witnessSig) {
+        Ty = witnessSig.getGenericEnvironment()->mapTypeIntoContext(Ty);
+      }
+
+      if (Ty->hasError())
+        return true;
+
+      substType = Ty->getCanonicalType();
+      conformance = ProtocolConformanceRef::forAbstract(
+          Ty->getCanonicalType(), proto);
     }
 
     if (EntryKeyword.str() == "associated_conformance")
       witnessEntries.push_back(
           SILWitnessTable::AssociatedConformanceWitness{assocOrSubject,
-                                                        proto,
+                                                        substType,
                                                         conformance});
     else
       conditionalConformances.push_back(

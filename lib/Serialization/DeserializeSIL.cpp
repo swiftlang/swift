@@ -4446,16 +4446,16 @@ void SILDeserializer::readWitnessTableEntries(
         proto, conformance.getConcrete()
       });
     } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
-      TypeID assocId;
-      DeclID protoId;
+      TypeID origTypeId;
+      DeclID substTypeId;
       ProtocolConformanceID conformanceId;
-      WitnessAssocProtocolLayout::readRecord(scratch, assocId, protoId,
+      WitnessAssocProtocolLayout::readRecord(scratch, origTypeId, substTypeId,
                                              conformanceId);
-      CanType type = MF->getType(assocId)->getCanonicalType();
-      ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
+      CanType origType = MF->getType(origTypeId)->getCanonicalType();
+      CanType substType = MF->getType(substTypeId)->getCanonicalType();
       auto conformance = MF->getConformance(conformanceId);
       witnessEntries.push_back(SILWitnessTable::AssociatedConformanceWitness{
-        type, proto, conformance
+        origType, substType, conformance
       });
     } else if (kind == SIL_WITNESS_ASSOC_ENTRY) {
       DeclID assocId;

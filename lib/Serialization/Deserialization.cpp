@@ -8734,6 +8734,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     for (const auto &req : proto->getRequirementSignature().getRequirements()) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
+      ASSERT(req.getFirstType()->isEqual(proto->getSelfInterfaceType()));
       ProtocolDecl *proto = req.getProtocolDecl();
       auto iter = conformancesForProtocols.find(proto);
       if (iter != conformancesForProtocols.end()) {
@@ -8745,10 +8746,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
         // conformance to an Objective-C protocol for anything important.
         // There are no associated types and we don't emit a Swift conformance
         // record.
-        //
-        // FIXME: Passing an empty Type() here temporarily.
         reqConformances.push_back(ProtocolConformanceRef::forAbstract(
-            Type(), proto));
+            conformance->getType(), proto));
       }
     }
   } else {
