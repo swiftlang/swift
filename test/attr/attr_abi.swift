@@ -1,7 +1,21 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature ABIAttribute -parse-as-library
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature ABIAttribute -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature LifetimeDependence -enable-experimental-feature CImplementation -enable-experimental-feature ExecutionAttribute -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -Rabi-inference -debugger-support
 
 // REQUIRES: swift_feature_ABIAttribute
+// REQUIRES: swift_feature_AddressableParameters
+// REQUIRES: swift_feature_CImplementation
+// REQUIRES: swift_feature_ExecutionAttribute
 // REQUIRES: swift_feature_Extern
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_NoImplicitCopy
+// REQUIRES: swift_feature_StrictMemorySafety
+// REQUIRES: swift_feature_SymbolLinkageMarkers
+
+import _Differentiation
+
+import Distributed
+
+@available(SwiftStdlib 5.7, *)
+typealias DefaultDistributedActorSystem = LocalTestingDistributedActorSystem
 
 //
 // Same-kind checking
@@ -1033,6 +1047,1136 @@ struct FailableInits {
 
   @abi(init!(i33: Void))
   init!(i33: Void) {}
+}
+
+//
+// Attributes
+//
+
+// @_originallyDefinedIn -- allowed to vary
+@abi(@_originallyDefinedIn(module: "Other", macOS 14) func originallyDefinedIn1())
+@available(macOS 12, *) @_originallyDefinedIn(module: "Other", macOS 14) public func originallyDefinedIn1() {}
+
+@abi(func originallyDefinedIn2())
+@available(macOS 12, *) @_originallyDefinedIn(module: "Other", macOS 14) public func originallyDefinedIn2() {}
+
+@abi(@_originallyDefinedIn(module: "Other", macOS 14) func originallyDefinedIn3())
+@available(macOS 12, *) public func originallyDefinedIn3() {}
+
+@abi(@_originallyDefinedIn(module: "Different", macOS 12) func originallyDefinedIn4())
+@available(macOS 12, *) @_originallyDefinedIn(module: "Other", macOS 14) public func originallyDefinedIn4() {}
+
+// @Sendable -- allowed to vary
+@abi(@Sendable func sendable1())
+@Sendable func sendable1() {}
+
+@abi(@Sendable func sendable2())
+func sendable2() {}
+
+@abi(func sendable3())
+@Sendable func sendable3() {}
+
+// @preconcurrency -- allowed to vary
+@abi(@preconcurrency func preconcurrency1())
+@preconcurrency func preconcurrency1() {}
+
+@abi(@preconcurrency func preconcurrency2())
+func preconcurrency2() {}
+
+@abi(func preconcurrency3())
+@preconcurrency func preconcurrency3() {}
+
+// @_preInverseGenerics -- allowed to vary
+struct PreInverseGenerics<T: ~Copyable> {
+  @abi(@_preInverseGenerics func fn1(_: consuming T))
+  @_preInverseGenerics func fn1(_: consuming T) {}
+
+  @abi(@_preInverseGenerics func fn2(_: consuming T))
+  func fn2(_: consuming T) {}
+
+  @abi(func fn3(_: consuming T))
+  @_preInverseGenerics func fn3(_: consuming T) {}
+}
+
+// 'nonisolated', 'isolated' arguments, global actors -- allowed to vary
+@abi(@MainActor func isolation1())
+@MainActor func isolation1() {}
+
+@abi(func isolation2())
+@MainActor func isolation2() {}
+
+@abi(@MainActor func isolation3())
+func isolation3() {}
+
+@abi(nonisolated func isolation4())
+@MainActor func isolation4() {}
+
+@abi(@MainActor func isolation5())
+nonisolated func isolation5() {}
+
+@abi(func isolation6(_: isolated some Actor))
+@MainActor func isolation6(_: some Actor) {}
+
+@abi(func isolation7(_: some Actor))
+func isolation7(_: isolated some Actor) {}
+
+@abi(@execution(concurrent) func isolation8() async)
+@execution(concurrent) func isolation8() async {}
+
+@abi(func isolation9() async)
+@execution(concurrent) func isolation9() async {}
+
+@abi(@execution(concurrent) func isolation10() async)
+func isolation10() async {}
+
+@abi(nonisolated func isolation11() async)
+@execution(concurrent) func isolation11() async {}
+
+@abi(@execution(concurrent) func isolation12() async)
+nonisolated func isolation12() async {}
+
+@abi(@execution(caller) func isolation13() async)
+@execution(caller) func isolation13() async {}
+
+@abi(func isolation14() async)
+@execution(caller) func isolation14() async {}
+
+@abi(@execution(caller) func isolation15() async)
+func isolation15() async {}
+
+@abi(nonisolated func isolation16() async)
+@execution(caller) func isolation16() async {}
+
+@abi(@execution(caller) func isolation17() async)
+nonisolated func isolation17() async {}
+
+@abi(@execution(caller) func isolation18() async)
+@execution(concurrent) func isolation18() async {}
+
+@abi(@execution(concurrent) func isolation19() async)
+@execution(caller) func isolation19() async {}
+
+// NSCopying - see attr/attr_abi_objc.swift
+
+// @LLDBDebuggerFunction -- banned in @abi
+@abi(@LLDBDebuggerFunction func lldbDebuggerFunction1()) // expected-error {{unused 'LLDBDebuggerFunction' attribute in '@abi'}} {{6-27=}}
+@LLDBDebuggerFunction func lldbDebuggerFunction1() {}
+
+@abi(@LLDBDebuggerFunction func lldbDebuggerFunction2()) // expected-error {{unused 'LLDBDebuggerFunction' attribute in '@abi'}} {{6-27=}}
+func lldbDebuggerFunction2() {}
+
+@abi(func lldbDebuggerFunction3())
+@LLDBDebuggerFunction func lldbDebuggerFunction3() {}
+
+// @_compilerInitialized -- banned in @abi
+class CompilerInitialized {
+  @abi(@_compilerInitialized let v1: Int) // expected-error {{unused '_compilerInitialized' attribute in '@abi'}} {{8-29=}}
+  @_compilerInitialized let v1: Int
+
+  @abi(@_compilerInitialized let v2: Int) // expected-error {{unused '_compilerInitialized' attribute in '@abi'}} {{8-29=}}
+  let v2: Int
+
+  @abi(let v3: Int)
+  @_compilerInitialized let v3: Int
+
+  init() {}
+}
+
+// @_hasStorage -- banned in @abi
+struct HasStorage {
+  @abi(@_hasStorage let v1: Int) // expected-error {{unused '_hasStorage' attribute in '@abi'}} {{8-20=}}
+  @_hasStorage let v1: Int
+
+  @abi(@_hasStorage let v2: Int) // expected-error {{unused '_hasStorage' attribute in '@abi'}} {{8-20=}}
+  let v2: Int
+
+  @abi(let v3: Int)
+  @_hasStorage let v3: Int
+
+  init() {}
+}
+
+// @discardableResult -- banned in @abi
+@abi(@discardableResult func discardableResult1() -> Int) // expected-error {{unused 'discardableResult' attribute in '@abi'}} {{6-24=}}
+@discardableResult func discardableResult1() -> Int { 0 }
+
+@abi(@discardableResult func discardableResult2() -> Int) // expected-error {{unused 'discardableResult' attribute in '@abi'}} {{6-24=}}
+func discardableResult2() -> Int { 0 }
+
+@abi(func lldbDebuggerFunction3() -> Int)
+@discardableResult func discardableResult3() -> Int { 0 }
+
+// @warn_unqualified_access -- banned in @abi
+struct WarnUnqualifiedAccess {
+  @abi(@warn_unqualified_access func fn1()) // expected-error {{unused 'warn_unqualified_access' attribute in '@abi'}} {{8-32=}}
+  @warn_unqualified_access func fn1() {}
+
+  @abi(@warn_unqualified_access func fn2()) // expected-error {{unused 'warn_unqualified_access' attribute in '@abi'}} {{8-32=}}
+  func fn2() {}
+
+  @abi(func fn3())
+  @warn_unqualified_access func fn3() {}
+}
+
+// @_disfavoredOverload -- banned in @abi
+@abi(@_disfavoredOverload func disfavoredOverload1()) // expected-error {{unused '_disfavoredOverload' attribute in '@abi'}} {{6-26=}}
+@_disfavoredOverload func disfavoredOverload1() {}
+
+@abi(@_disfavoredOverload func disfavoredOverload2()) // expected-error {{unused '_disfavoredOverload' attribute in '@abi'}} {{6-26=}}
+func disfavoredOverload2() {}
+
+@abi(func disfavoredOverload3())
+@_disfavoredOverload func disfavoredOverload3() {}
+
+// @_nonEphemeral -- banned in @abi
+@abi(func nonEphemeral1(@_nonEphemeral _: UnsafeRawPointer)) // expected-error {{unused '_nonEphemeral' attribute in '@abi'}} {{25-39=}}
+func nonEphemeral1(@_nonEphemeral _: UnsafeRawPointer) {}
+
+@abi(func nonEphemeral2(@_nonEphemeral _: UnsafeRawPointer)) // expected-error {{unused '_nonEphemeral' attribute in '@abi'}} {{25-39=}}
+func nonEphemeral2(_: UnsafeRawPointer) {}
+
+@abi(func disfavoredOverload3(_: UnsafeRawPointer))
+func nonEphemeral3(@_nonEphemeral _: UnsafeRawPointer) {}
+
+// @_inheritActorContext -- banned in @abi
+@abi(func inheritActorContext1(@_inheritActorContext fn: @Sendable @escaping () async -> Void)) // expected-error {{unused '_inheritActorContext' attribute in '@abi'}} {{32-53=}}
+func inheritActorContext1(@_inheritActorContext fn: @Sendable @escaping () async -> Void) {}
+
+@abi(func inheritActorContext2(@_inheritActorContext fn: @Sendable @escaping () async -> Void)) // expected-error {{unused '_inheritActorContext' attribute in '@abi'}} {{32-53=}}
+func inheritActorContext2(fn: @Sendable @escaping () async -> Void) {}
+
+@abi(func inheritActorContext3(fn: @Sendable @escaping () async -> Void))
+func inheritActorContext3(@_inheritActorContext fn: @Sendable @escaping () async -> Void) {}
+
+// @excusivity(checked/unchecked) -- banned in @abi
+class Exclusivity {
+  @abi(var checked00: Int)
+  var checked00: Int = 0
+
+  @abi(@exclusivity(checked) var checked10: Int) // expected-error {{unused 'exclusivity(checked)' attribute in '@abi'}} {{8-29=}}
+  var checked10: Int = 0
+
+  @abi(@exclusivity(unchecked) var checked20: Int) // expected-error {{unused 'exclusivity(unchecked)' attribute in '@abi'}} {{8-31=}}
+  var checked20: Int = 0
+
+  @abi(var checked01: Int)
+  @exclusivity(checked) var checked01: Int = 0
+
+  @abi(@exclusivity(checked) var checked11: Int) // expected-error {{unused 'exclusivity(checked)' attribute in '@abi'}} {{8-29=}}
+  @exclusivity(checked) var checked11: Int = 0
+
+  @abi(@exclusivity(unchecked) var checked21: Int) // expected-error {{unused 'exclusivity(unchecked)' attribute in '@abi'}} {{8-31=}}
+  @exclusivity(checked) var checked21: Int = 0
+
+  @abi(var checked02: Int)
+  @exclusivity(unchecked) var checked02: Int = 0
+
+  @abi(@exclusivity(checked) var checked12: Int) // expected-error {{unused 'exclusivity(checked)' attribute in '@abi'}} {{8-29=}}
+  @exclusivity(unchecked) var checked12: Int = 0
+
+  @abi(@exclusivity(unchecked) var checked22: Int) // expected-error {{unused 'exclusivity(unchecked)' attribute in '@abi'}} {{8-31=}}
+  @exclusivity(unchecked) var checked22: Int = 0
+}
+
+// @_noAllocation -- banned in @abi
+@abi(@_noAllocation func noAllocation1()) // expected-error {{unused '_noAllocation' attribute in '@abi'}} {{6-20=}}
+@_noAllocation func noAllocation1() {}
+
+@abi(@_noAllocation func noAllocation2()) // expected-error {{unused '_noAllocation' attribute in '@abi'}} {{6-20=}}
+func noAllocation2() {}
+
+@abi(func noAllocation3())
+@_noAllocation func noAllocation3() {}
+
+// @_noLocks -- banned in @abi
+@abi(@_noLocks func noLocks1()) // expected-error {{unused '_noLocks' attribute in '@abi'}} {{6-15=}}
+@_noLocks func noLocks1() {}
+
+@abi(@_noLocks func noLocks2()) // expected-error {{unused '_noLocks' attribute in '@abi'}} {{6-15=}}
+func noLocks2() {}
+
+@abi(func noLocks3())
+@_noLocks func noLocks3() {}
+
+// @_noImplicitCopy -- banned in @abi
+struct NoImplicitCopy {
+  @abi(@_noImplicitCopy func fn1()) // expected-error {{unused '_noImplicitCopy' attribute in '@abi'}} {{8-24=}}
+  @_noImplicitCopy func fn1() {}
+
+  @abi(@_noImplicitCopy func fn2()) // expected-error {{unused '_noImplicitCopy' attribute in '@abi'}} {{8-24=}}
+  func fn2() {}
+
+  @abi(func fn3())
+  @_noImplicitCopy func fn3() {}
+
+  @abi(func fn4(@_noImplicitCopy _: Int)) // expected-error {{unused '_noImplicitCopy' attribute in '@abi'}} {{17-33=}}
+  func fn4(@_noImplicitCopy _: Int) {}
+
+  @abi(func fn5(@_noImplicitCopy _: Int)) // expected-error {{unused '_noImplicitCopy' attribute in '@abi'}} {{17-33=}}
+  func fn5(_: Int) {}
+
+  @abi(func fn6(_: Int))
+  func fn6(@_noImplicitCopy _: Int) {}
+}
+
+// @_noObjCBridging -- banned in @abi
+@abi(@_noObjCBridging func noObjCBridging1()) // expected-error {{unused '_noObjCBridging' attribute in '@abi'}} {{6-22=}}
+@_noObjCBridging func noObjCBridging1() {}
+
+@abi(@_noObjCBridging func noObjCBridging2()) // expected-error {{unused '_noObjCBridging' attribute in '@abi'}} {{6-22=}}
+func noObjCBridging2() {}
+
+@abi(func noObjCBridging3())
+@_noObjCBridging func noObjCBridging3() {}
+
+// @_noExistentials -- banned in @abi
+@abi(@_noExistentials func noExistentials1()) // expected-error {{unused '_noExistentials' attribute in '@abi'}} {{6-22=}}
+@_noExistentials func noExistentials1() {}
+
+@abi(@_noExistentials func noExistentials2()) // expected-error {{unused '_noExistentials' attribute in '@abi'}} {{6-22=}}
+func noExistentials2() {}
+
+@abi(func noExistentials3())
+@_noExistentials func noExistentials3() {}
+
+// @_noRuntime -- banned in @abi
+@abi(@_noRuntime func noRuntime1()) // expected-error {{unused '_noRuntime' attribute in '@abi'}} {{6-17=}}
+@_noRuntime func noRuntime1() {}
+
+@abi(@_noRuntime func noRuntime2()) // expected-error {{unused '_noRuntime' attribute in '@abi'}} {{6-17=}}
+func noRuntime2() {}
+
+@abi(func noRuntime3())
+@_noRuntime func noRuntime3() {}
+
+// @_noEagerMove -- banned in @abi
+struct NoEagerMove {
+  @abi(@_noEagerMove func fn1()) // expected-error {{unused '_noEagerMove' attribute in '@abi'}} {{8-21=}}
+  @_noEagerMove func fn1() {}
+
+  @abi(@_noEagerMove func fn2()) // expected-error {{unused '_noEagerMove' attribute in '@abi'}} {{8-21=}}
+  func fn2() {}
+
+  @abi(func fn3())
+  @_noEagerMove func fn3() {}
+
+  @abi(func fn4(@_noEagerMove _: Int)) // expected-error {{unused '_noEagerMove' attribute in '@abi'}} {{17-30=}}
+  func fn4(@_noEagerMove _: Int) {}
+
+  @abi(func fn5(@_noEagerMove _: Int)) // expected-error {{unused '_noEagerMove' attribute in '@abi'}} {{17-30=}}
+  func fn5(_: Int) {}
+
+  @abi(func fn6(_: Int))
+  func fn6(@_noEagerMove _: Int) {}
+}
+
+// @_eagerMove -- banned in @abi
+struct EagerMove {
+  @abi(@_eagerMove func fn1()) // expected-error {{unused '_eagerMove' attribute in '@abi'}} {{8-19=}}
+  @_eagerMove func fn1() {}
+
+  @abi(@_eagerMove func fn2()) // expected-error {{unused '_eagerMove' attribute in '@abi'}} {{8-19=}}
+  func fn2() {}
+
+  @abi(func fn3())
+  @_eagerMove func fn3() {}
+
+  @abi(func fn4(@_eagerMove _: Int)) // expected-error {{unused '_eagerMove' attribute in '@abi'}} {{17-28=}}
+  func fn4(@_eagerMove _: Int) {}
+
+  @abi(func fn5(@_eagerMove _: Int)) // expected-error {{unused '_eagerMove' attribute in '@abi'}} {{17-28=}}
+  func fn5(_: Int) {}
+
+  @abi(func fn6(_: Int))
+  func fn6(@_eagerMove _: Int) {}
+}
+
+// @_lexicalLifetimes -- banned in @abi
+@abi(@_lexicalLifetimes func lexicalLifetimes1()) // expected-error {{unused '_lexicalLifetimes' attribute in '@abi'}} {{6-24=}}
+@_lexicalLifetimes func lexicalLifetimes1() {}
+
+@abi(@_lexicalLifetimes func lexicalLifetimes2()) // expected-error {{unused '_lexicalLifetimes' attribute in '@abi'}} {{6-24=}}
+func lexicalLifetimes2() {}
+
+@abi(func lexicalLifetimes3())
+@_lexicalLifetimes func lexicalLifetimes3() {}
+
+// @_assemblyVision -- banned in @abi
+@abi(@_assemblyVision func assemblyVision1()) // expected-error {{unused '_assemblyVision' attribute in '@abi'}} {{6-22=}}
+@_assemblyVision func assemblyVision1() {}
+
+@abi(@_assemblyVision func assemblyVision2()) // expected-error {{unused '_assemblyVision' attribute in '@abi'}} {{6-22=}}
+func assemblyVision2() {}
+
+@abi(func assemblyVision3())
+@_assemblyVision func assemblyVision3() {}
+
+// @_extern -- banned in @abi
+@abi(@_extern(c) @_extern(wasm, module: "foo", name: "bar") func extern1()) // expected-error {{unused '_extern' attribute in '@abi'}} {{18-61=}}  expected-error {{unused '_extern' attribute in '@abi'}} {{6-17=}}
+@_extern(c) @_extern(wasm, module: "foo", name: "bar") func extern1()
+
+@abi(@_extern(c) @_extern(wasm, module: "foo", name: "bar") func extern2()) // expected-error {{unused '_extern' attribute in '@abi'}} {{18-61=}} expected-error {{unused '_extern' attribute in '@abi'}} {{6-17=}}
+func extern2() {}
+
+@abi(func extern3())
+@_extern(c) @_extern(wasm, module: "foo", name: "bar") func extern3()
+
+// @_used -- banned in @abi
+@abi(@_used func used1()) // expected-error {{unused '_used' attribute in '@abi'}} {{6-12=}}
+@_used func used1() {}
+
+@abi(@_used func used2()) // expected-error {{unused '_used' attribute in '@abi'}} {{6-12=}}
+func used2() {}
+
+@abi(func used3())
+@_used func used3() {}
+
+// weak, unowned, unowned(unsafe) -- banned in @abi
+class ReferenceOwnership {
+  @abi(var v00: AnyObject?)
+  var v00: AnyObject? = nil
+
+  @abi(weak var v10: AnyObject?) // expected-error {{unused 'weak' modifier in '@abi'}} {{8-12=}}
+  var v10: AnyObject? = nil
+
+  @abi(unowned var v20: AnyObject?) // expected-error {{unused 'unowned' modifier in '@abi'}} {{8-15=}}
+  var v20: AnyObject? = nil
+
+  @abi(unowned(unsafe) var v30: AnyObject?) // expected-error {{unused 'unowned(unsafe)' modifier in '@abi'}} {{8-23=}}
+  var v30: AnyObject? = nil
+
+  @abi(var v01: AnyObject?)
+  weak var v01: AnyObject? = nil
+
+  @abi(weak var v11: AnyObject?) // expected-error {{unused 'weak' modifier in '@abi'}} {{8-12=}}
+  weak var v11: AnyObject? = nil
+
+  @abi(unowned var v21: AnyObject?) // expected-error {{unused 'unowned' modifier in '@abi'}} {{8-15=}}
+  weak var v21: AnyObject? = nil
+
+  @abi(unowned(unsafe) var v31: AnyObject?) // expected-error {{unused 'unowned(unsafe)' modifier in '@abi'}} {{8-23=}}
+  weak var v31: AnyObject? = nil
+
+  @abi(var v02: AnyObject?)
+  unowned var v02: AnyObject? = nil
+
+  @abi(weak var v12: AnyObject?) // expected-error {{unused 'weak' modifier in '@abi'}} {{8-12=}}
+  unowned var v12: AnyObject? = nil
+
+  @abi(unowned var v22: AnyObject?) // expected-error {{unused 'unowned' modifier in '@abi'}} {{8-15=}}
+  unowned var v22: AnyObject? = nil
+
+  @abi(unowned(unsafe) var v32: AnyObject?) // expected-error {{unused 'unowned(unsafe)' modifier in '@abi'}} {{8-23=}}
+  unowned var v32: AnyObject? = nil
+
+  @abi(var v03: AnyObject?)
+  unowned(unsafe) var v03: AnyObject? = nil
+
+  @abi(weak var v13: AnyObject?) // expected-error {{unused 'weak' modifier in '@abi'}} {{8-12=}}
+  unowned(unsafe) var v13: AnyObject? = nil
+
+  @abi(unowned var v23: AnyObject?) // expected-error {{unused 'unowned' modifier in '@abi'}} {{8-15=}}
+  unowned(unsafe) var v23: AnyObject? = nil
+
+  @abi(unowned(unsafe) var v33: AnyObject?) // expected-error {{unused 'unowned(unsafe)' modifier in '@abi'}} {{8-23=}}
+  unowned(unsafe) var v33: AnyObject? = nil
+}
+
+// @abi -- banned in @abi (no recursion)
+@abi(
+  @abi(func abiRecursion()) // expected-error {{unused 'abi' attribute in '@abi'}} {{3-29=}}
+  func abiRecursion()
+)
+func abiRecursion() {}
+
+// @unsafe -- banned in @abi
+@abi(@unsafe func unsafe1()) // expected-error {{unused 'unsafe' attribute in '@abi'}} {{6-13=}}
+@unsafe func unsafe1() {}
+
+@abi(@unsafe func unsafe2()) // expected-error {{unused 'unsafe' attribute in '@abi'}} {{6-13=}}
+func unsafe2() {}
+
+@abi(func unsafe3())
+@unsafe func unsafe3() {}
+
+// @safe -- banned in @abi
+@abi(@safe func safe1()) // expected-error {{unused 'safe' attribute in '@abi'}} {{6-11=}}
+@safe func safe1() {}
+
+@abi(@safe func safe2()) // expected-error {{unused 'safe' attribute in '@abi'}} {{6-11=}}
+func safe2() {}
+
+@abi(func safe3())
+@safe func safe3() {}
+
+// Access control, @usableFromInline, @_spi -- banned in @abi
+// An ABI-only decl gets its access control from its counterpart.
+@abi(internal func accessControl1()) // expected-error {{unused 'internal' modifier in '@abi'}} {{6-14=}}
+func accessControl1() {}
+
+@abi(func accessControl2())
+public func accessControl2() {}
+
+@abi(@usableFromInline func accessControl3()) // expected-error {{'@usableFromInline' attribute can only be applied to internal or package declarations, but global function 'accessControl3()' is public}}
+public func accessControl3() {}
+
+@abi(private(set) var setterAccess1: Int) // expected-error {{unused 'private' modifier in '@abi'}} {{6-18=}}
+var setterAccess1: Int = 42
+
+@abi(var setterAccess2: Int)
+private(set) var setterAccess2: Int = 42
+
+@abi(@usableFromInline func usableFromInline1()) // expected-error {{unused 'usableFromInline' attribute in '@abi'}} {{6-23=}}
+@usableFromInline func usableFromInline1() {}
+
+@abi(func usableFromInline2())
+@usableFromInline func usableFromInline2() {}
+
+@_spi(foo) public struct SPIType {} // expected-note 2 {{struct declared here}}
+
+@abi(@_spi(foo) func spi1(_: SPIType)) // expected-error {{unused '_spi' attribute in '@abi'}} {{6-16=}}
+@_spi(foo) public func spi1(_: SPIType) {}
+
+@abi(func spi2(_: SPIType))
+@_spi(foo) public func spi2(_: SPIType) {}
+
+@abi(func spi3(_: SPIType)) // expected-error {{cannot use struct 'SPIType' here; it is SPI}}
+public func spi3(_: SPIType) {} // expected-error {{cannot use struct 'SPIType' here; it is SPI}}
+
+// @available, @_unavailable*, @backDeployed -- banned in @abi 
+// An ABI-only decl gets its availability from its counterpart.
+@abi(@available(macOS 14, iOS 16, *) func available1()) // expected-error {{unused 'available' attribute in '@abi'}} {{6-37=}}
+@available(macOS 14, iOS 16, *) func available1() {}
+
+@abi(@available(macOS 14, iOS 16, *) func available2()) // expected-error {{unused 'available' attribute in '@abi'}} {{6-37=}}
+func available2() {}
+
+@abi(func available3())
+@available(macOS 14, iOS 16, *) func available3() {}
+
+@abi(
+  @available(macOS, unavailable) // expected-error {{unused 'available' attribute in '@abi'}} {{3-34=}}
+  @available(iOS, deprecated) // expected-error {{unused 'available' attribute in '@abi'}} {{3-31=}}
+  func available4()
+)
+@available(macOS 14, iOS 16, *) func available4() {}
+
+// Additional tests in attr/attr_abi_objc.swift
+
+@abi(@_unavailableFromAsync func unavailableFromAsync1()) // expected-error {{unused '_unavailableFromAsync' attribute in '@abi'}} {{6-28=}}
+@_unavailableFromAsync func unavailableFromAsync1() {}
+
+@abi(@_unavailableFromAsync func unavailableFromAsync2()) // expected-error {{unused '_unavailableFromAsync' attribute in '@abi'}} {{6-28=}}
+func unavailableFromAsync2() {}
+
+@abi(func unavailableFromAsync3())
+@_unavailableFromAsync func unavailableFromAsync3() {}
+
+// FIXME: Test @_unavailableInEmbedded (it gets rewritten in the parser)
+
+@abi(@backDeployed(before: macOS 14) func backDeployed1()) // expected-error {{unused 'backDeployed' attribute in '@abi'}} {{6-37=}}
+@backDeployed(before: macOS 14) public func backDeployed1() {}
+
+@abi(@backDeployed(before: macOS 14) func backDeployed2()) // expected-error {{unused 'backDeployed' attribute in '@abi'}} {{6-37=}}
+public func backDeployed2() {}
+
+@abi(func backDeployed3())
+@backDeployed(before: macOS 14) public func backDeployed3() {}
+
+// override, @_nonoverride -- banned in @abi
+// An ABI-only decl gets its overrides from its counterpart; no marker modifiers
+// are required.
+class Overridden {
+  func fn1() {}
+
+  func fn2() {} // expected-note 2 {{overridden declaration is here}}
+
+  func fn3() {}
+}
+
+class Override: Overridden {
+  @abi(override func fn1()) // expected-error {{unused 'override' modifier in '@abi'}} {{8-16=}}
+  override func fn1() {}
+
+  @abi(override func fn2()) // expected-error {{unused 'override' modifier in '@abi'}} {{8-16=}}
+  func fn2() {} // expected-error {{overriding declaration requires an 'override' keyword}}
+
+  @abi(func fn3())
+  override func fn3() {}
+}
+
+class NonOverride: Overridden {
+  @abi(@_nonoverride func fn1()) // expected-error {{unused '_nonoverride' attribute in '@abi'}} {{8-21=}}
+  @_nonoverride func fn1() {}
+
+  @abi(@_nonoverride func fn2()) // expected-error {{unused '_nonoverride' attribute in '@abi'}} {{8-21=}}
+  func fn2() {} // expected-error {{overriding declaration requires an 'override' keyword}}
+
+  @abi(func fn3())
+  @_nonoverride func fn3() {}
+}
+
+// @_silgen_name -- banned in @abi *and* on declarations with @abi
+// Becuase of the way @_silgen_name is implemented, these would interact oddly
+// if they were allowed on the same decl.
+@_silgen_name("conflictingAttrsSilgenName")
+@abi(func silgenName1())
+func silgenName1() {} // expected-error@-2 {{cannot use '@_silgen_name' and '@abi' on the same global function because they serve the same purpose}} {{1-44=}}
+
+@abi(@_silgen_name("silgenNameWithABI") func silgenName2()) // expected-error {{unused '_silgen_name' attribute in '@abi'}} {{6-40=}}
+func silgenName2() {}
+
+// @_documentation(visibility:metadata:) -- banned in @abi
+@abi(@_documentation(visibility: public) func documentation1()) // expected-error {{unused '_documentation' attribute in '@abi'}} {{6-41=}}
+@_documentation(visibility: public) func documentation1() {}
+
+@abi(@_documentation(visibility: public) func documentation2()) // expected-error {{unused '_documentation' attribute in '@abi'}} {{6-41=}}
+func documentation2() {}
+
+@abi(func documentation3())
+@_documentation(visibility: public) func documentation3() {}
+
+// @_allowFeatureSuppression -- banned in @abi
+// Feature suppression should be applied to the API since we can't put `#if`
+// inside `@abi`.
+@abi(@_allowFeatureSuppression(IsolatedAny) func allowFeatureSuppression1()) // expected-error {{unused '_allowFeatureSuppression' attribute in '@abi'}} {{6-44=}}
+@_allowFeatureSuppression(IsolatedAny) func allowFeatureSuppression1() {}
+
+@abi(@_allowFeatureSuppression(IsolatedAny) func allowFeatureSuppression2()) // expected-error {{unused '_allowFeatureSuppression' attribute in '@abi'}} {{6-44=}}
+func allowFeatureSuppression2() {}
+
+@abi(func allowFeatureSuppression3())
+@_allowFeatureSuppression(IsolatedAny) func allowFeatureSuppression3() {}
+
+// @objc -- tested in attr/attr_abi_objc.swift
+// @IBAction -- tested in attr/attr_abi_objc.swift
+// @IBInspectable -- tested in attr/attr_abi_objc.swift
+// @GKInspectable -- tested in attr/attr_abi_objc.swift
+// @IBOutlet -- tested in attr/attr_abi_objc.swift
+// @IBSegueAction -- tested in attr/attr_abi_objc.swift
+// @NSManaged -- tested in attr/attr_abi_objc.swift
+// @nonobjc -- tested in attr/attr_abi_objc.swift
+// optional -- tested in attr/attr_abi_objc.swift
+// dynamic -- tested in attr/attr_abi_objc.swift
+
+// @_cdecl -- banned in @abi
+// ABI-only decls inherit cdecl-ness from their counterpart
+@abi(@_cdecl("cdecl1") func cdecl1()) // expected-error {{unused '_cdecl' attribute in '@abi'}} {{6-23=}}
+@_cdecl("cdecl1") func cdecl1() {}
+
+@abi(@_cdecl("cdecl2") func cdecl2()) // expected-error {{unused '_cdecl' attribute in '@abi'}} {{6-23=}}
+func cdecl2() {}
+
+@abi(func cdecl3())
+@_cdecl("cdecl3") func cdecl3() {}
+
+// @implementation -- banned in @abi
+// ABI-only decls inherit implementation-ness from their counterpart
+@abi(@implementation func implementation1()) // expected-error {{unused 'implementation' attribute in '@abi'}} {{6-21=}}
+@_cdecl("implementation1") @implementation func implementation1() {}
+
+@abi(@implementation func implementation2()) // expected-error {{unused 'implementation' attribute in '@abi'}} {{6-21=}}
+@_cdecl("implementation2") func implementation2() {}
+
+@abi(func implementation3())
+@_cdecl("implementation3") @implementation func implementation3() {}
+
+// @_expose -- banned in @abi
+// ABI-only decls inherit exposure from their counterpart
+@abi(@_expose(Cxx) func expose1()) // expected-error {{unused '_expose' attribute in '@abi'}} {{6-19=}}
+@_expose(Cxx) func expose1() {}
+
+@abi(@_expose(Cxx) func expose2()) // expected-error {{unused '_expose' attribute in '@abi'}} {{6-19=}}
+func expose2() {}
+
+@abi(func expose3())
+@_expose(Cxx) func expose3() {}
+
+// @_section -- banned in @abi
+@abi(@_section("fnord") func section1()) // expected-error {{unused '_section' attribute in '@abi'}} {{6-24=}}
+@_section("fnord") func section1() {}
+
+@abi(@_section("fnord") func section2()) // expected-error {{unused '_section' attribute in '@abi'}} {{6-24=}}
+func section2() {}
+
+@abi(func section3())
+@_section("fnord") func section3() {}
+
+// @inlinable -- automatically cloned into @abi
+@abi(@inlinable func inlinable1())
+@inlinable func inlinable1() {}
+
+@abi(@inlinable func inlinable2()) // expected-error {{extra 'inlinable' attribute in '@abi'}} {{6-16=}}
+func inlinable2() {}
+
+@abi(func inlinable3()) // expected-remark {{inferred '@inlinable' in '@abi' to match attribute on API}}
+@inlinable func inlinable3() {} // expected-note {{matches attribute here}}
+
+// @inline -- automatically cloned into @abi
+@abi(@inline(never) func inline1())
+@inline(never) func inline1() {}
+
+@abi(@inline(never) func inline2()) // expected-error {{extra 'inline(never)' attribute in '@abi'}} {{6-20=}}
+func inline2() {}
+
+@abi(func inline3()) // expected-remark {{inferred '@inline(never)' in '@abi' to match attribute on API}}
+@inline(never) func inline3() {} // expected-note {{matches attribute here}}
+
+// @_transparent -- automatically cloned into @abi
+@abi(@_transparent func transparent1())
+@_transparent func transparent1() {}
+
+@abi(@_transparent func transparent2()) // expected-error {{extra '_transparent' attribute in '@abi'}} {{6-19=}}
+func transparent2() {}
+
+@abi(func transparent3()) // expected-remark {{inferred '@_transparent' in '@abi' to match attribute on API}}
+@_transparent func transparent3() {} // expected-note {{matches attribute here}}
+
+// @_alwaysEmitIntoClient -- automatically cloned into @abi
+@abi(@_alwaysEmitIntoClient func alwaysEmitIntoClient1())
+@_alwaysEmitIntoClient func alwaysEmitIntoClient1() {}
+
+@abi(@_alwaysEmitIntoClient func alwaysEmitIntoClient2()) // expected-error {{extra '_alwaysEmitIntoClient' attribute in '@abi'}} {{6-28=}}
+func alwaysEmitIntoClient2() {}
+
+@abi(func alwaysEmitIntoClient3()) // expected-remark {{inferred '@_alwaysEmitIntoClient' in '@abi' to match attribute on API}}
+@_alwaysEmitIntoClient func alwaysEmitIntoClient3() {} // expected-note {{matches attribute here}}
+
+// @_optimize(none) -- banned in @abi
+@abi(@_optimize(none) func optimize1()) // expected-error {{unused '_optimize(none)' attribute in '@abi'}} {{6-22=}}
+@_optimize(none) func optimize1() {}
+
+@abi(@_optimize(none) func optimize2()) // expected-error {{unused '_optimize(none)' attribute in '@abi'}} {{6-22=}}
+func optimize2() {}
+
+@abi(func optimize3())
+@_optimize(none) func optimize3() {}
+
+// convenience -- must match in @abi
+// This doesn't have direct mangling impact, but a future direction where
+// convenience inits could fake designated inits or vice versa might be useful.
+class Convenience {
+  @abi(convenience init(i1: Void))
+  convenience init(i1: Void) { fatalError() }
+
+  @abi(convenience init(i2: Void))  // expected-error {{extra 'convenience' modifier in '@abi'}} {{8-19=}}
+  init(i2: Void) { fatalError() }
+
+  @abi(init(i3: Void)) // expected-error {{missing 'convenience' modifier in '@abi'}} {{8-8=convenience }}
+  convenience init(i3: Void) { fatalError() } // expected-note {{should match modifier here}}
+}
+
+// required -- must match in @abi
+// This doesn't have direct mangling impact, but a future direction where
+// required inits could fake normal inits or vice versa might be useful.
+class Required {
+  @abi(required init(i1: Void))
+  required init(i1: Void) { fatalError() }
+
+  @abi(required init(i2: Void))  // expected-error {{extra 'required' modifier in '@abi'}} {{8-16=}}
+  init(i2: Void) { fatalError() }
+
+  @abi(init(i3: Void)) // expected-error {{missing 'required' modifier in '@abi'}} {{8-8=required }}
+  required init(i3: Void) { fatalError() } // expected-note {{should match modifier here}}
+}
+
+// lazy -- automatically cloned into @abi
+class Lazy {
+  @abi(lazy var v1: Int)
+  lazy var v1: Int = 0
+
+  @abi(lazy var v2: Int) // expected-error {{extra 'lazy' modifier in '@abi'}} {{8-12=}}
+  var v2: Int = 0
+
+  @abi(var v3: Int) // expected-remark {{inferred 'lazy' in '@abi' to match modifier on API}}
+  lazy var v3: Int = 0 // expected-note {{matches modifier here}}
+}
+
+// @_fixed_layout -- banned in @abi
+class FixedLayoutVars {
+  @abi(@_fixed_layout var v1: Int) // expected-error {{unused '_fixed_layout' attribute in '@abi'}} {{8-22=}}
+  @_fixed_layout public var v1: Int = 0
+
+  @abi(@_fixed_layout var v2: Int) // expected-error {{unused '_fixed_layout' attribute in '@abi'}} {{8-22=}}
+  public var v2: Int = 0
+
+  @abi(var v3: Int)
+  @_fixed_layout public var v3: Int = 0
+}
+
+// @_specialize -- banned in @abi
+// TODO: Maybe use @_specialize in @abi to tweak the ABI of specializations.
+// Ban it for now, since there's nothing useful you can do with it yet.
+@abi(@_specialize(where T == Int) func specialize1<T>(_: T)) // expected-error {{unused '_specialize' attribute in '@abi'}} {{6-34=}}
+@_specialize(where T == Int) func specialize1<T>(_: T) {}
+
+@abi(@_specialize(where T == Int) func specialize2<T>(_: T)) // expected-error {{unused '_specialize' attribute in '@abi'}} {{6-34=}}
+func specialize2<T>(_: T) {}
+
+@abi(func specialize3<T>(_: T))
+@_specialize(where T == Int) func specialize3<T>(_: T) {}
+
+// @_effects -- banned in @abi
+@abi(@_effects(readonly) func effects1()) // expected-error {{unused '_effects(readonly)' attribute in '@abi'}} {{6-25=}}
+@_effects(readonly) func effects1() {}
+
+@abi(@_effects(readonly) func effects2()) // expected-error {{unused '_effects(readonly)' attribute in '@abi'}} {{6-25=}}
+func effects2() {}
+
+@abi(func effects3())
+@_effects(readonly) func effects3() {}
+
+// @_implements -- banned in @abi
+protocol ImplementsProto {
+  func f1()
+  func f2()
+  func f3()
+}
+
+class Implements: ImplementsProto {
+  @abi(@_implements(ImplementsProto, f1) func f1()) // expected-error {{unused '_implements' attribute in '@abi'}} {{8-41=}}
+  @_implements(ImplementsProto, f1) func f1() {}
+
+  @abi(@_implements(ImplementsProto, f2) func f2()) // expected-error {{unused '_implements' attribute in '@abi'}} {{8-41=}}
+  func f2() {}
+
+  @abi(func f3())
+  @_implements(ImplementsProto, f3) func f3() {}
+}
+
+// @_dynamicReplacement -- banned in @abi
+struct DynamicReplacement {
+  dynamic func f1Original() {}
+  dynamic func f2Original() {}
+  dynamic func f3Original() {}
+}
+
+extension DynamicReplacement {
+  @abi(@_dynamicReplacement(for: f1Original) func f1()) // expected-error {{unused '_dynamicReplacement' attribute in '@abi'}} {{8-45=}}
+  @_dynamicReplacement(for: f1Original) func f1() {}
+
+  @abi(@_dynamicReplacement(for: f2Original) func f2()) // expected-error {{unused '_dynamicReplacement' attribute in '@abi'}} {{8-45=}}
+  func f2() {}
+
+  @abi(func f3())
+  @_dynamicReplacement(for: f3Original) func f3() {}
+}
+
+// @_weakLinked -- tested in attr/attr_weaklinked.swift
+
+// @_borrowed -- automatically cloned into @abi
+protocol BorrowedAttr {
+  @abi(@_borrowed var v1: Int)
+  @_borrowed var v1: Int { get set }
+
+  @abi(var v2: Int) // expected-remark {{inferred '@_borrowed' in '@abi' to match attribute on API}}
+  @_borrowed var v2: Int { get set } // expected-note {{matches attribute here}}
+
+  @abi(@_borrowed var v3: Int) // expected-error {{extra '_borrowed' attribute in '@abi'}} {{8-18=}}
+  var v3: Int { get set }
+}
+
+// @lifetime -- must match in @abi
+// TODO: Probably possible to make these unconstrained as long as we ensure
+// that `@_addressableForDependencies` doesn't cause a calling convention
+// change.
+struct Lifetime: ~Escapable {
+  @abi(@lifetime(borrow i1) init(i1: UnsafeRawPointer))
+  @lifetime(borrow i1) init(i1: UnsafeRawPointer) {}
+
+  @abi(@lifetime(borrow i2) init(i2: UnsafeRawPointer)) // expected-error {{extra 'lifetime' attribute in '@abi'}} {{8-28=}}
+  init(i2: UnsafeRawPointer) {} // expected-error {{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
+
+  @abi(init(i3: UnsafeRawPointer)) // expected-error {{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}} expected-error {{missing 'lifetime' attribute in '@abi'}} {{8-8=@lifetime(borrow i3) }}
+  @lifetime(borrow i3) init(i3: UnsafeRawPointer) {} // expected-note {{should match attribute here}}
+
+  @abi(@lifetime(borrow i4) init(i4: UnsafeRawPointer, i4a: UnsafeRawPointer)) // expected-error {{'lifetime' attribute in '@abi' should match '@lifetime(borrow i4a)'}} {{8-28=@lifetime(borrow i4a)}}
+  @lifetime(borrow i4a) init(i4: UnsafeRawPointer, i4a: UnsafeRawPointer) {} // expected-note {{should match attribute here}}
+}
+
+// @_unsafeNonescapableResult -- must match in @abi
+// TODO: This could probably be allowed to vary in some circumstances.
+struct UnsafeNonescapableResult: ~Escapable {
+  @abi(@_unsafeNonescapableResult init(i1: UnsafeRawPointer))
+  @_unsafeNonescapableResult init(i1: UnsafeRawPointer) {}
+
+  @abi(@_unsafeNonescapableResult init(i2: UnsafeRawPointer)) // expected-error {{extra '_unsafeNonescapableResult' attribute in '@abi'}} {{8-34=}}
+  init(i2: UnsafeRawPointer) {} // expected-error {{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
+
+  @abi(init(i3: UnsafeRawPointer)) // expected-error {{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}} expected-error {{missing '_unsafeNonescapableResult' attribute in '@abi'}} {{8-8=@_unsafeNonescapableResult }}
+  @_unsafeNonescapableResult init(i3: UnsafeRawPointer) {} // expected-note {{should match attribute here}}
+}
+
+// distributed -- must match in @abi
+@available(SwiftStdlib 5.7, *)
+distributed actor Local {
+  @abi(distributed func fn1())
+  distributed func fn1() {}
+
+  @abi(distributed func fn2()) // expected-error {{extra 'distributed' modifier in '@abi'}} {{8-19=}}
+  func fn2() {}
+
+  @abi(func fn3()) // expected-error {{missing 'distributed' modifier in '@abi'}} {{8-8=distributed }}
+  distributed func fn3() {} // expected-note {{should match modifier here}}
+}
+
+// _const -- allowed to vary
+@abi(func const1(_: _const Int))
+func const1(_: _const Int) {}
+
+@abi(func const2(_: _const Int))
+func const2(_: Int) {}
+
+@abi(func const3(_: Int))
+func const3(_: _const Int) {}
+
+// @derivative, @differentiable, @transpose, @_noDerivative -- banned in @abi
+// Too complex to infer or check
+// TODO: Figure out if there's something we could do here.
+@abi(@differentiable(reverse) func differentiable1(_ x: Float) -> Float) // expected-error {{unused 'differentiable' attribute in '@abi'}} {{6-30=}}
+@differentiable(reverse) func differentiable1(_ x: Float) -> Float { x }
+
+@abi(@differentiable(reverse) func differentiable2(_ x: Float) -> Float) // expected-error {{unused 'differentiable' attribute in '@abi'}} {{6-30=}}
+func differentiable2(_ x: Float) -> Float { x }
+
+@abi(func differentiable3(_ x: Float) -> Float)
+@differentiable(reverse) func differentiable3(_ x: Float) -> Float { x }
+
+@abi(
+  @derivative(of: differentiable1(_:)) // expected-error {{unused 'derivative' attribute in '@abi'}} {{3-40=}}
+  func derivative1(_: Float) -> (value: Float, differential: (Float) -> (Float))
+)
+@derivative(of: differentiable1(_:))
+func derivative1(_ x: Float) -> (value: Float, differential: (Float) -> (Float)) {
+  return (x, { $0 })
+}
+
+@abi(
+  @derivative(of: differentiable2(_:)) // expected-error {{unused 'derivative' attribute in '@abi'}} {{3-40=}}
+  func derivative2(_: Float) -> (value: Float, differential: (Float) -> (Float))
+)
+func derivative2(_ x: Float) -> (value: Float, differential: (Float) -> (Float)) {
+  return (x, { $0 })
+}
+
+@abi(
+  func derivative3(_: Float) -> (value: Float, differential: (Float) -> (Float))
+)
+@derivative(of: differentiable3(_:))
+func derivative3(_ x: Float) -> (value: Float, differential: (Float) -> (Float)) {
+  return (x, { $0 })
+}
+
+struct Transpose<T: Differentiable & AdditiveArithmetic> where T == T.TangentVector {
+  func fn1(_ x: T, _ y: T) -> T { x + y }
+  func fn2(_ x: T, _ y: T) -> T { x + y }
+  func fn3(_ x: T, _ y: T) -> T { x + y }
+
+  @abi(
+    @transpose(of: fn1, wrt: (0, 1)) // expected-error {{unused 'transpose' attribute in '@abi'}} {{5-38=}}
+    func t_fn1(_ result: T) -> (T, T)
+  )
+  @transpose(of: fn1, wrt: (0, 1))
+  func t_fn1(_ result: T) -> (T, T) { (result, result) }
+
+  @abi(
+    @transpose(of: fn2, wrt: (0, 1)) // expected-error {{unused 'transpose' attribute in '@abi'}} {{5-38=}}
+    func t_fn2(_ result: T) -> (T, T)
+  )
+  func t_fn2(_ result: T) -> (T, T) { (result, result) }
+
+  @abi(
+    func t_fn3(_ result: T) -> (T, T)
+  )
+  @transpose(of: fn3, wrt: (0, 1))
+  func t_fn3(_ result: T) -> (T, T) { (result, result) }
+}
+
+struct NoDerivative {
+  @abi(@noDerivative func fn1()) // expected-error {{unused 'noDerivative' attribute in '@abi'}} {{8-21=}}
+  @noDerivative func fn1() {}
+
+  @abi(@noDerivative func fn2()) // expected-error {{unused 'noDerivative' attribute in '@abi'}} {{8-21=}}
+  func fn2() {}
+
+  @abi(func fn3())
+  @noDerivative func fn3() {}
+}
+
+// prefix, postfix -- allowed to vary
+// Essentially part of the name, which is unconstrained.
+prefix operator ←
+prefix operator ↑ // expected-note {{prefix operator found here}}
+prefix operator → // expected-note {{prefix operator found here}}
+prefix operator ↓
+
+struct Prefix {
+  @abi(static prefix func ← (value: Self) -> Self)
+  static prefix func ← (value: Self) -> Self { value }
+
+  @abi(static prefix func ↑ (value: Self) -> Self)
+  static func ↑ (value: Self) -> Self { value } // expected-error {{prefix unary operator missing 'prefix' modifier}}
+
+  @abi(static func → (value: Self) -> Self) // expected-error {{prefix unary operator missing 'prefix' modifier}}
+  static prefix func → (value: Self) -> Self { value }
+
+  // Test ABI-preserving replacement code pattern:
+
+  @abi(static prefix func ↓ (value: Self) -> Self)
+  static func __oldDownArrow(value: Self) -> Self { value }
+
+  @abi(static func __newDownArrow(value: Self) -> Self)
+  static prefix func ↓ (value: Self) -> Self { value }
+}
+
+postfix operator ←←
+postfix operator ↑↑ // expected-note {{postfix operator found here}}
+postfix operator →→ // expected-note {{postfix operator found here}}
+postfix operator ↓↓
+
+struct Postfix {
+  @abi(static postfix func ←← (value: Self) -> Self)
+  static postfix func ←← (value: Self) -> Self { value }
+
+  @abi(static postfix func ↑↑ (value: Self) -> Self)
+  static func ↑↑ (value: Self) -> Self { value } // expected-error {{postfix unary operator missing 'postfix' modifier}}
+
+  @abi(static func →→ (value: Self) -> Self) // expected-error {{postfix unary operator missing 'postfix' modifier}}
+  static postfix func →→ (value: Self) -> Self { value }
+
+  // Test ABI-preserving replacement code pattern:
+
+  @abi(static postfix func ↓↓ (value: Self) -> Self)
+  static func __oldDownArrow(value: Self) -> Self { value }
+
+  @abi(static func __newDownArrow(value: Self) -> Self)
+  static postfix func ↓↓ (value: Self) -> Self { value }
+}
+
+// Not testing `infix`; it's not *really* valid on funcs.
+
+// nonmutating, borrowing, consuming, __consuming, mutating -- allowed to vary
+// Act like param modifiers; checked against each other separately
+struct SelfParamOwnership {
+  @abi(func fn00())
+  func fn00() {}
+
+  @abi(nonmutating func fn10())
+  func fn10() {}
+
+  @abi(borrowing func fn20())
+  func fn20() {}
+
+  @abi(consuming func fn30()) // expected-error {{instance method modifier 'consuming' in '@abi' is not compatible with default}} {{none}}
+  func fn30() {} // expected-note {{should match modifier here}}
+
+  @abi(__consuming func fn40()) // expected-error {{instance method modifier '__consuming' in '@abi' is not compatible with default}} {{none}}
+  func fn40() {} // expected-note {{should match modifier here}}
+
+  @abi(mutating func fn50()) // expected-error {{instance method modifier 'mutating' in '@abi' is not compatible with default}} {{none}}
+  func fn50() {} // expected-note {{should match modifier here}}
+
+  @abi(func fn01())
+  nonmutating func fn01() {}
+
+  @abi(nonmutating func fn11())
+  nonmutating func fn11() {}
+
+  @abi(borrowing func fn21())
+  nonmutating func fn21() {}
+
+  @abi(consuming func fn31()) // expected-error {{instance method modifier 'consuming' in '@abi' is not compatible with default}} {{none}}
+  nonmutating func fn31() {} // expected-note {{should match modifier here}}
+
+  @abi(__consuming func fn41()) // expected-error {{instance method modifier '__consuming' in '@abi' is not compatible with default}} {{none}}
+  nonmutating func fn41() {} // expected-note {{should match modifier here}}
+
+  @abi(mutating func fn51()) // expected-error {{instance method modifier 'mutating' in '@abi' is not compatible with default}} {{none}}
+  nonmutating func fn51() {} // expected-note {{should match modifier here}}
+
+  @abi(func fn02())
+  borrowing func fn02() {}
+
+  @abi(nonmutating func fn12())
+  borrowing func fn12() {}
+
+  @abi(borrowing func fn22())
+  borrowing func fn22() {}
+
+  @abi(consuming func fn32()) // expected-error {{instance method modifier 'consuming' in '@abi' is not compatible with 'borrowing'}} {{none}}
+  borrowing func fn32() {} // expected-note {{should match modifier here}}
+
+  @abi(__consuming func fn42()) // expected-error {{instance method modifier '__consuming' in '@abi' is not compatible with 'borrowing'}} {{none}}
+  borrowing func fn42() {} // expected-note {{should match modifier here}}
+
+  @abi(mutating func fn52()) // expected-error {{instance method modifier 'mutating' in '@abi' is not compatible with 'borrowing'}} {{none}}
+  borrowing func fn52() {} // expected-note {{should match modifier here}}
+
+  @abi(func fn03()) // expected-error {{default instance method modifier in '@abi' is not compatible with 'consuming'}} {{none}}
+  consuming func fn03() {} // expected-note {{should match modifier here}}
+
+  @abi(nonmutating func fn13()) // expected-error {{default instance method modifier in '@abi' is not compatible with 'consuming'}} {{none}}
+  consuming func fn13() {} // expected-note {{should match modifier here}}
+
+  @abi(borrowing func fn23()) // expected-error {{instance method modifier 'borrowing' in '@abi' is not compatible with 'consuming'}} {{none}}
+  consuming func fn23() {} // expected-note {{should match modifier here}}
+
+  @abi(consuming func fn33())
+  consuming func fn33() {}
+
+  @abi(__consuming func fn43())
+  consuming func fn43() {}
+
+  @abi(mutating func fn53()) // expected-error {{instance method modifier 'mutating' in '@abi' is not compatible with 'consuming'}} {{none}}
+  consuming func fn53() {} // expected-note {{should match modifier here}}
+
+  @abi(func fn04()) // expected-error {{default instance method modifier in '@abi' is not compatible with '__consuming'}} {{none}}
+  __consuming func fn04() {} // expected-note {{should match modifier here}}
+
+  @abi(nonmutating func fn14()) // expected-error {{default instance method modifier in '@abi' is not compatible with '__consuming'}} {{none}}
+  __consuming func fn14() {} // expected-note {{should match modifier here}}
+
+  @abi(borrowing func fn24()) // expected-error {{instance method modifier 'borrowing' in '@abi' is not compatible with '__consuming'}} {{none}}
+  __consuming func fn24() {} // expected-note {{should match modifier here}}
+
+  @abi(consuming func fn34())
+  __consuming func fn34() {}
+
+  @abi(__consuming func fn44())
+  __consuming func fn44() {}
+
+  @abi(mutating func fn54()) // expected-error {{instance method modifier 'mutating' in '@abi' is not compatible with '__consuming'}} {{none}}
+  __consuming func fn54() {} // expected-note {{should match modifier here}}
+
+  @abi(func fn05()) // expected-error {{default instance method modifier in '@abi' is not compatible with 'mutating'}} {{none}}
+  mutating func fn05() {} // expected-note {{should match modifier here}}
+
+  @abi(nonmutating func fn15()) // expected-error {{default instance method modifier in '@abi' is not compatible with 'mutating'}} {{none}}
+  mutating func fn15() {} // expected-note {{should match modifier here}}
+
+  @abi(borrowing func fn25()) // expected-error {{instance method modifier 'borrowing' in '@abi' is not compatible with 'mutating'}} {{none}}
+  mutating func fn25() {} // expected-note {{should match modifier here}}
+
+  @abi(consuming func fn35()) // expected-error {{instance method modifier 'consuming' in '@abi' is not compatible with 'mutating'}} {{none}}
+  mutating func fn35() {} // expected-note {{should match modifier here}}
+
+  @abi(__consuming func fn45()) // expected-error {{instance method modifier '__consuming' in '@abi' is not compatible with 'mutating'}} {{none}}
+  mutating func fn45() {} // expected-note {{should match modifier here}}
+
+  @abi(mutating func fn55())
+  mutating func fn55() {}
+}
+
+// @_addressableSelf -- act like type attribute on `self`
+struct AddressableSelf {
+  @abi(@_addressableSelf func fn1())
+  @_addressableSelf func fn1() {}
+
+  @abi(@_addressableSelf func fn2()) // expected-error {{instance method attribute '_addressableSelf' in '@abi' is not compatible with default}} {{none}}
+  func fn2() {} // expected-note {{should match attribute here}}
+
+  @abi(func fn3()) // expected-error {{default instance method attribute in '@abi' is not compatible with '_addressableSelf'}} {{none}}
+  @_addressableSelf func fn3() {} // expected-note {{should match attribute here}}
 }
 
 //

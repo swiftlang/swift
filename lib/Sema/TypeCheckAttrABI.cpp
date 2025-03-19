@@ -20,6 +20,7 @@
 #include "swift/AST/Effects.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Parse/Lexer.h"
@@ -129,6 +130,40 @@ void fixItReplaceKeywords(InFlightDiagnostic &diag,
   return fixItReplaceKeywords(diag, charRange, newText);
 }
 
+/// Returns a string representation of \p attr suitable to either replace an
+/// existing attribute or be inserted as a new attribute, depending on the
+/// value of \p toInsert .
+StringRef printAttr(DeclAttribute *attr,
+                    Decl *decl,
+                    SmallVectorImpl<char> &scratch,
+                    bool toInsert = false) {
+  auto &ctx = decl->getASTContext();
+  auto opts = PrintOptions::printForDiagnostics(AccessLevel::Private,
+                              ctx.TypeCheckerOpts.PrintFullConvention);
+  opts.PrintLongAttrsOnSeparateLines = false;
+
+  llvm::raw_svector_ostream os{scratch};
+  StreamPrinter printer{os};
+  attr->print(printer, opts, decl);
+
+  auto str = StringRef(scratch.begin(), scratch.size());
+  if (!toInsert)
+    str = str.trim(' ');
+  return str;
+}
+
+/// Emit \c diag::attr_abi_matching_attr_here in the best available location.
+void noteAttrHere(DeclAttribute *attr, Decl *decl, bool isMatch = false) {
+  auto &ctx = decl->getASTContext();
+  SourceLoc loc = attr->getLocation();
+  if (loc.isValid())
+    ctx.Diags.diagnose(loc, diag::attr_abi_matching_attr_here,
+                       isMatch, attr->isDeclModifier(), attr->isImplicit());
+  else
+    ctx.Diags.diagnose(decl, diag::attr_abi_matching_attr_here,
+                       isMatch, attr->isDeclModifier(), attr->isImplicit());
+}
+
 /// Get the best available \c SourceLoc representing the type in \p storage .
 SourceLoc getTypeLoc(AbstractStorageDecl *storage, Decl *owner = nullptr) {
   auto loc = storage->getTypeSourceRangeForDiagnostics().Start;
@@ -187,7 +222,11 @@ public:
     bool didDiagnose = false;
 
     auto noteShouldMatch = [&](bool isModifier) {
-      ctx.Diags.diagnose(apiTypeLoc, diag::attr_abi_should_match_type_here);
+      if (isSelfParam)
+        ctx.Diags.diagnose(apiTypeLoc, diag::attr_abi_matching_attr_here,
+                           /*matches=*/false, isModifier, /*isImplicit=*/false);
+      else
+        ctx.Diags.diagnose(apiTypeLoc, diag::attr_abi_should_match_type_here);
     };
 
     // These assertions represent values that should have been normalized.
@@ -646,11 +685,185 @@ public:
 
   // MARK: @abi checking - attributes
 
+  /// Are these attributes similar enough that they should be checked against
+  /// one another? At minimum this means they're of the same kind, but for some
+  /// attrs there are additional criteria.
+  bool canCompareAttrs(DeclAttribute *api, DeclAttribute *abi,
+                       Decl *apiDecl, Decl *abiDecl) {
+    if (api->getKind() != abi->getKind())
+      return false;
+
+    auto getAvailableDomain = [](Decl *D, DeclAttribute *A) {
+      return D->getSemanticAvailableAttr(cast<AvailableAttr>(A))->getDomain();
+    };
+
+    // Extra logic for specific attributes.
+    switch (api->getKind()) {
+    case DeclAttrKind::Expose:
+      return cast<ExposeAttr>(api)->getExposureKind()
+                  == cast<ExposeAttr>(abi)->getExposureKind();
+
+    case DeclAttrKind::Extern:
+      return cast<ExternAttr>(api)->getExternKind()
+                  == cast<ExternAttr>(abi)->getExternKind();
+
+    case DeclAttrKind::Available:
+      return getAvailableDomain(apiDecl, api)
+                  == getAvailableDomain(abiDecl, abi);
+      return true;
+
+    default:
+      break;
+    }
+
+    return true;
+  }
+
+  /// Check two attribute lists against one another.
+  /// 
+  /// This pairs up attributes which are sufficiently similar (as determined by
+  /// \c canCompareAttrs() ) and then checks them. Attributes which
+  /// have no counterpart are checked individually. 
   bool checkAttrs(DeclAttributes api, DeclAttributes abi,
                   Decl *apiDecl, Decl *abiDecl) {
     bool didDiagnose = false;
-    // TODO: Actually check attributes
+
+    // Collect all ABI attrs.
+    SmallVector<DeclAttribute*, 32> remainingABIDeclAttrs;
+    for (auto *abiDeclAttr : abi) {
+      remainingABIDeclAttrs.push_back(abiDeclAttr);
+    }
+
+    // Visit each API attr, pairing it with an ABI attr if possible.
+    // Note that this will visit even invalid attributes.
+    for (auto *apiDeclAttr : api) {
+      auto abiAttrIter = llvm::find_if(remainingABIDeclAttrs,
+                                        [&](DeclAttribute *abiDeclAttr) {
+        return abiDeclAttr && canCompareAttrs(apiDeclAttr, abiDeclAttr,
+                                              apiDecl, abiDecl);
+      });
+      DeclAttribute *abiDeclAttr = nullptr;
+      if (abiAttrIter != remainingABIDeclAttrs.end()) {
+        // Found a matching ABI attr. Claim and use it.
+        std::swap(abiDeclAttr, *abiAttrIter);
+      }
+      didDiagnose |= checkAttr(apiDeclAttr, abiDeclAttr, apiDecl, abiDecl);
+    }
+
+    // Visit leftover ABI attrs.
+    for (auto *abiDeclAttr : remainingABIDeclAttrs) {
+      if (abiDeclAttr)
+        didDiagnose |= checkAttr(nullptr, abiDeclAttr, apiDecl, abiDecl);
+    }
     return didDiagnose;
+  }
+
+  /// Check a single attribute against its counterpart. If an attribute has no
+  /// counterpart, the counterpart may be \c nullptr ; either \p abi or \p abi
+  /// may be \c nullptr , but never both. 
+  bool checkAttr(DeclAttribute *api, DeclAttribute *abi,
+                 Decl *apiDecl, Decl *abiDecl) {
+    ASSERT(api || abi && "checkAttr() should have at least one attribute");
+
+    // If either attribute has already been diagnosed, don't check here.
+    if ((api && api->isInvalid()) || (abi && abi->isInvalid()))
+      return true;
+
+    auto kind = api ? api->getKind() : abi->getKind();
+    auto behaviors = DeclAttribute::getBehaviors(kind);
+
+    switch (behaviors & DeclAttribute::InABIAttrMask) {
+    case DeclAttribute::UnreachableInABIAttr:
+      ASSERT(abiAttr->canAppearOnDecl(apiDecl)
+                && "checking @abi on decl that can't have it???");
+      ASSERT(!abiAttr->canAppearOnDecl(apiDecl)
+                 && "unreachable-in-@abi attr on reachable decl???");
+
+      // If the asserts are disabled, fall through to no checking.
+      LLVM_FALLTHROUGH;
+
+    case DeclAttribute::UnconstrainedInABIAttr:
+      // No checking required.
+      return false;
+
+    case DeclAttribute::ForbiddenInABIAttr:
+      // Diagnose if ABI has attribute.
+      if (abi) {
+        // A shorthand `@available(foo 1, bar 2, *)` attribute gets parsed into
+        // several separate `AvailableAttr`s, each with the full range of the
+        // shorthand attribute. If we've already diagnosed one of them, don't
+        // diagnose the rest; otherwise, record that we've diagnosed this one.
+        if (isa<AvailableAttr>(abi) &&
+              !diagnosedAvailableAttrSourceLocs.insert(abi->getLocation()))
+          return true;
+
+        diagnoseAndRemoveAttr(abi, diag::attr_abi_forbidden_attr,
+                              abi->getAttrName(), abi->isDeclModifier());
+        return true;
+      }
+
+      return false;
+
+    case DeclAttribute::InferredInABIAttr:
+      if (!abi && api->canClone()) {
+        // Infer an identical attribute.
+        abi = api->clone(ctx);
+        abi->setImplicit(true);
+        abiDecl->getAttrs().add(abi);
+
+        if (ctx.LangOpts.EnableABIInferenceRemarks) {
+          SmallString<64> scratch;
+          auto abiAttrAsString = printAttr(abi, abiDecl, scratch);
+
+          abiDecl->diagnose(diag::abi_attr_inferred_attribute,
+                            abiAttrAsString, api->isDeclModifier());
+          noteAttrHere(api, apiDecl, /*isMatch=*/true);
+        }
+      }
+
+      // Other than the cloning behavior, Inferred behaves like Equivalent.
+      LLVM_FALLTHROUGH;
+
+    case DeclAttribute::EquivalentInABIAttr:
+      // Diagnose if API doesn't have attribute.
+      if (!api) {
+        diagnoseAndRemoveAttr(abi, diag::attr_abi_extra_attr,
+                              abi->getAttrName(), abi->isDeclModifier(),
+                              abi->isImplicit());
+        return true;
+      }
+
+      // Diagnose if ABI doesn't have attribute.
+      if (!abi) {
+        SmallString<64> scratch;
+        auto apiAttrAsString = printAttr(api, apiDecl, scratch,
+                                         /*toInsert=*/true);
+
+        ctx.Diags.diagnose(abiDecl, diag::attr_abi_missing_attr,
+                           api->getAttrName(), api->isDeclModifier())
+          .fixItInsert(abiDecl->getAttributeInsertionLoc(api->isDeclModifier()),
+                       apiAttrAsString);
+        noteAttrHere(api, apiDecl);
+        return true;
+      }
+
+      // Diagnose if two attributes are mismatched.
+      if (!api->isEquivalent(abi, apiDecl)) {
+        SmallString<64> scratch;
+        auto apiAttrAsString = printAttr(api, apiDecl, scratch);
+
+        ctx.Diags.diagnose(abi->getLocation(), diag::attr_abi_mismatched_attr,
+                           abi->getAttrName(), abi->isDeclModifier(),
+                           apiAttrAsString)
+          .fixItReplace(abi->getRangeWithAt(), apiAttrAsString);
+        noteAttrHere(api, apiDecl);
+        return true;
+      }
+
+      return false;
+    }
+
+    llvm_unreachable("unknown InABIAttrMask behavior");
   }
 
   // MARK: @abi checking - types

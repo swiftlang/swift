@@ -8376,6 +8376,27 @@ ERROR(attr_abi_incompatible_with_silgen_name,none,
       "the same purpose",
       (DescriptiveDeclKind))
 
+ERROR(attr_abi_missing_attr,none,
+      "missing '%0' %select{attribute|modifier}1 in '@abi'",
+      (StringRef, bool))
+ERROR(attr_abi_extra_attr,none,
+      "extra %select{|implicit }2'%0' %select{attribute|modifier}1 in '@abi'",
+      (StringRef, bool, /*isImplicit=*/bool))
+ERROR(attr_abi_forbidden_attr,none,
+      "unused '%0' %select{attribute|modifier}1 in '@abi'",
+      (StringRef, bool))
+REMARK(abi_attr_inferred_attribute,none,
+       "inferred '%0' in '@abi' to match %select{attribute|modifier}1 on API",
+       (StringRef, bool))
+
+ERROR(attr_abi_mismatched_attr,none,
+      "'%0' %select{attribute|modifier}1 in '@abi' should match '%2'",
+      (StringRef, bool, StringRef))
+NOTE(attr_abi_matching_attr_here,none,
+     "%select{should match|matches}0 %select{attribute|modifier}1 "
+     "%select{|implicitly added }2here",
+     (/*matches=*/bool, /*isModifier=*/bool, /*isImplicit=*/bool))
+
 ERROR(attr_abi_mismatched_type,none,
       "type %0 in '@abi' should match %1",
       (Type, Type))
