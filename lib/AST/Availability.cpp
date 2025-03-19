@@ -411,6 +411,11 @@ bool Decl::isAvailableAsSPI() const {
 
 SemanticAvailableAttributes
 Decl::getSemanticAvailableAttrs(bool includeInactive) const {
+  // A decl in an @abi gets its availability from the decl it's attached to.
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getSemanticAvailableAttrs(includeInactive);
+
   return SemanticAvailableAttributes(getAttrs(), this, includeInactive);
 }
 
