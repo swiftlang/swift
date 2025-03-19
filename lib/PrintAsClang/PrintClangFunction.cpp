@@ -1322,7 +1322,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   signature.visitParameterList(
       [&](const LoweredFunctionSignature::IndirectResultValue &) {},
       [&](const LoweredFunctionSignature::DirectParameter &param) {
-        if (isConsumedParameterInCaller(param.getConvention()))
+        if (isConsumedParameterInCaller(param.getConvention()) &&
+            !hasKnownOptionalNullableCxxMapping(
+                param.getParamDecl().getInterfaceType()))
           emitParamCopyForConsume(param.getParamDecl());
         ++paramIndex;
       },
@@ -1394,7 +1396,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         },
         [&](const LoweredFunctionSignature::DirectParameter &param) {
           printParamUse(param.getParamDecl(), /*isIndirect=*/false,
-                        isConsumedParameterInCaller(param.getConvention()),
+                        isConsumedParameterInCaller(param.getConvention()) &&
+                            !hasKnownOptionalNullableCxxMapping(
+                                param.getParamDecl().getInterfaceType()),
                         encodeTypeInfo(param, moduleContext, typeMapping));
         },
         [&](const LoweredFunctionSignature::IndirectParameter &param) {
@@ -1756,11 +1760,13 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
 bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
     Type type) {
   if (auto optionalObjectType = type->getOptionalObjectType()) {
-    if (optionalObjectType->getNominalOrBoundGenericNominal()) {
+    if (const auto *nominal =
+            optionalObjectType->getNominalOrBoundGenericNominal()) {
       if (auto typeInfo = typeMapping.getKnownCxxTypeInfo(
               optionalObjectType->getNominalOrBoundGenericNominal())) {
         return typeInfo->canBeNullable;
       }
+      return isa_and_nonnull<clang::ObjCInterfaceDecl>(nominal->getClangDecl());
     }
   }
   return false;
