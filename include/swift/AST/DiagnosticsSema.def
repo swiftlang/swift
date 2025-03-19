@@ -8397,9 +8397,11 @@ NOTE(attr_abi_matching_attr_here,none,
      "%select{|implicitly added }2here",
      (/*matches=*/bool, /*isModifier=*/bool, /*isImplicit=*/bool))
 
+#define TYPE_ORIGIN(KIND_IDX, DECL_IDX) "%select{|%kind" #DECL_IDX " |" \
+                            "self parameter |result |thrown |%error}" #KIND_IDX
 ERROR(attr_abi_mismatched_type,none,
-      "type %0 in '@abi' should match %1",
-      (Type, Type))
+      TYPE_ORIGIN(0, 1) "type %2 in '@abi' should match %3",
+      (unsigned, Decl *, Type, Type))
 NOTE(attr_abi_should_match_type_here,none,
      "should match type here", ())
 
@@ -8416,9 +8418,10 @@ ERROR(attr_abi_extra_generic_signature,none,
       (Decl *))
 
 ERROR(attr_abi_mismatched_param_modifier,none,
-      "%select{default |}0%3 %select{attribute|modifier}2 "
-      "%select{|'%0' }0in '@abi' is not compatible with %select{default|'%1'}1",
-      (StringRef, StringRef, /*isModifier=*/bool, DescriptiveDeclKind))
+      "%select{default |}0%select{attribute|modifier}2 %select{|'%0' }0"
+      "on " TYPE_ORIGIN(3, 4) "in '@abi' is not compatible with "
+      "%select{default|'%1'}1",
+      (StringRef, StringRef, /*isModifier=*/bool, unsigned, Decl *))
 ERROR(attr_abi_no_default_arguments,none,
       "%kind0 in '@abi' should not have a default argument; it does not "
       "affect the parameter's ABI",
