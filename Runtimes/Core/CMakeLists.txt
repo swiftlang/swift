@@ -29,7 +29,7 @@
 #   -- Will need shadow invocations to generate swiftmodules for Swift parts
 # Install *.abi.json, swiftdoc, and swiftsourceinfo
 
-cmake_minimum_required(VERSION 3.26...3.29)
+cmake_minimum_required(VERSION 3.29)
 
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
