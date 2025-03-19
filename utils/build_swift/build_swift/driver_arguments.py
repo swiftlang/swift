@@ -852,7 +852,7 @@ def create_argument_parser():
            help='install playground support')
 
     option('--build-ninja', toggle_true,
-           help='build the Ninja tool')
+           help='build the Ninja tool [deprecated: Ninja is built when necessary]')
 
     option(['--build-lld'], toggle_true('build_lld'), default=True,
            help='build lld as part of llvm')

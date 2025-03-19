@@ -745,10 +745,6 @@ def main_normal():
         sys.stdout.write("Cleaning install destdir!\n")
         shell.rmtree(args.install_destdir)
 
-    # Build ninja if required, which will update the toolchain.
-    if args.build_ninja:
-        invocation.build_ninja()
-
     # Execute the underlying build script implementation.
     invocation.execute()
 
