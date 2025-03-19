@@ -15,7 +15,7 @@
 
 namespace swift {
 
-enum class AddressUseKind { NonEscaping, Dependent, PointerEscape, Unknown };
+enum class AddressUseKind { NonEscaping, Dependent, PointerEscape };
 
 inline AddressUseKind meet(AddressUseKind lhs, AddressUseKind rhs) {
   return (lhs > rhs) ? lhs : rhs;

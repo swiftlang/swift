@@ -3829,12 +3829,7 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(state);
     // FIXME: should check AddressUseKind::NonEscaping != walk() to handle
     // PointerEscape.
-    if (AddressUseKind::Unknown ==
-        std::move(copiedLoadBorrowEliminator).walk(markedAddress)) {
-      LLVM_DEBUG(llvm::dbgs() << "Failed copied load borrow eliminator visit: "
-                              << *markedAddress);
-      return false;
-    }
+    std::move(copiedLoadBorrowEliminator).walk(markedAddress);
     state.process();
   }
 
@@ -3873,11 +3868,7 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     visitor.reset(markedAddress);
     // FIXME: should check walkResult != AddressUseKind::NonEscaping to handle
     // PointerEscape.
-    if (AddressUseKind::Unknown == std::move(visitor).walk(markedAddress)) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "Failed access path visit: " << *markedAddress);
-      return false;
-    }
+    std::move(visitor).walk(markedAddress);
   }
 
   // If we found a load [copy] or copy_addr that requires multiple copies or an

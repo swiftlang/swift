@@ -615,8 +615,7 @@ bool siloptimizer::eliminateTemporaryAllocationsFromLet(
 
       // FIXME: should check AddressUseKind::NonEscaping != walk() to handle
       // PointerEscape.
-      if (AddressUseKind::Unknown == std::move(visitor).walk(cai->getDest()))
-        return false;
+      std::move(visitor).walk(cai->getDest());
 
       // If we did not find a nextCAI, do not have a final use, and we already
       // saw at least one allocation, make cai our last user. We treat that last

@@ -874,33 +874,12 @@ struct ImmutableAddressUseVerifier {
   }
 };
 
-static void checkAddressWalkerCanVisitAllTransitiveUses(SILValue address) {
-  SmallVector<SILInstruction *, 8> badUsers;
-  struct Visitor : TransitiveAddressWalker<Visitor> {
-    SmallVectorImpl<SILInstruction *> &badUsers;
-    Visitor(SmallVectorImpl<SILInstruction *> &badUsers)
-        : TransitiveAddressWalker<Visitor>(), badUsers(badUsers) {}
-    bool visitUse(Operand *use) { return true; }
-    void onError(Operand *use) {
-      badUsers.push_back(use->getUser());
-    }
-  };
-
-  Visitor visitor(badUsers);
-  if (std::move(visitor).walk(address) != AddressUseKind::Unknown)
-    return;
-
-  llvm::errs() << "TransitiveAddressWalker walker failed to know how to visit "
-                  "a user when visiting: "
-               << *address;
-  if (badUsers.size()) {
-    llvm::errs() << "Bad Users:\n";
-    for (auto *user : badUsers) {
-      llvm::errs() << "    " << *user;
-    }
+struct AddressChecker : TransitiveAddressWalker<AddressChecker> {
+  bool visitUse(Operand *use) { return true; }
+  TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
+    return TransitiveUseVisitation::OnlyUser;
   }
-  llvm::report_fatal_error("invoking standard assertion failure");
-}
+};
 
 /// The SIL verifier walks over a SIL function / basic block / instruction,
 /// checking and enforcing its invariants.
@@ -1297,8 +1276,6 @@ public:
     // If we are not in lowered SIL and have an in_guaranteed function argument,
     // verify that we do not mutate or consume it.
     auto *fArg = cast<SILFunctionArgument>(arg);
-    if (fArg->getType().isAddress())
-      checkAddressWalkerCanVisitAllTransitiveUses(fArg);
 
     if (fArg->getModule().getStage() == SILStage::Lowered ||
         !fArg->getType().isAddress() ||
@@ -1383,6 +1360,10 @@ public:
         auto operands = userI->getAllOperands();
         require(operands.begin() <= use && use <= operands.end(),
                 "use doesn't actually belong to instruction it claims to");
+      }
+
+      if (result->getType().isAddress()) {
+        AddressChecker().walk(result);
       }
     }
 
@@ -1792,8 +1773,6 @@ public:
     require(!AI->isVarInfoInvalidated() || !bool(AI->getVarInfo()),
             "AllocStack Var Info should be None if invalidated");
 
-    checkAddressWalkerCanVisitAllTransitiveUses(AI);
-
     // There used to be a check if all uses of ASI are inside the alloc-dealloc
     // range. But apparently it can be the case that ASI has uses after the
     // dealloc_stack. This can come up if the source contains a
@@ -1805,7 +1784,6 @@ public:
     requireAddressType(SILPackType, AI->getType(),
                        "result of alloc_pack must be an address of "
                        "lowered pack type");
-    checkAddressWalkerCanVisitAllTransitiveUses(AI);
   }
 
   void checkAllocRefBase(AllocRefInstBase *ARI) {
@@ -2603,7 +2581,6 @@ public:
     require(!GAI->getReferencedGlobal()->isInitializedObject(),
             "global_addr cannot refer to a statically initialized object");
     checkGlobalAccessInst(GAI);
-    checkAddressWalkerCanVisitAllTransitiveUses(GAI);
     if (SILValue token = GAI->getDependencyToken()) {
       require(token->getType().is<SILTokenType>(),
               "depends_on operand of global_addr must be a token");
@@ -3527,13 +3504,12 @@ public:
     // our only user. This is a requirement that is asserted by allocbox to
     // stack. This check just embeds the requirement into the IR.
     require(I->hasOneUse() ||
-            none_of(I->getUses(),
-                    [](Operand *Op) -> bool {
-                      return isa<MarkUninitializedInst>(Op->getUser());
-                    }),
+                none_of(I->getUses(),
+                        [](Operand *Op) -> bool {
+                          return isa<MarkUninitializedInst>(Op->getUser());
+                        }),
             "project_box with more than one user when a user is a "
             "mark_uninitialized");
-    checkAddressWalkerCanVisitAllTransitiveUses(I);
   }
 
   void checkProjectExistentialBoxInst(ProjectExistentialBoxInst *PEBI) {
@@ -4054,8 +4030,7 @@ public:
           loweredFieldTy, EI->getType(),
           "result of ref_element_addr does not match type of field");
     }
-    EI->getFieldIndex();  // Make sure we can access the field without crashing.
-    checkAddressWalkerCanVisitAllTransitiveUses(EI);
+    EI->getFieldIndex(); // Make sure we can access the field without crashing.
   }
 
   void checkRefTailAddrInst(RefTailAddrInst *RTAI) {
@@ -4068,7 +4043,6 @@ public:
     require(!checkResilience(cd, F),
             "cannot access storage of resilient class");
     require(cd, "ref_tail_addr operand must be a class instance");
-    checkAddressWalkerCanVisitAllTransitiveUses(RTAI);
   }
 
   void checkDestructureStructInst(DestructureStructInst *DSI) {
@@ -6651,8 +6625,6 @@ public:
     require(i->getModule().getStage() == SILStage::Raw,
             "Only valid in Raw SIL! Should have been eliminated by /some/ "
             "diagnostic pass");
-    if (i->getType().isAddress())
-      checkAddressWalkerCanVisitAllTransitiveUses(i);
   }
 
   void checkMarkUnresolvedReferenceBindingInst(

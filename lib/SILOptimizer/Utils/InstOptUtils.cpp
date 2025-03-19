@@ -2212,7 +2212,6 @@ bool swift::findUnreferenceableStorage(StructDecl *decl, SILType structType,
 
 namespace {
 struct AddressWalkerState {
-  bool foundError = false;
   InstructionSet writes;
   AddressWalkerState(SILFunction *fn) : writes(fn) {}
 };
@@ -2457,16 +2456,12 @@ SILValue swift::getInitOfTemporaryAllocStack(AllocStackInst *asi) {
         return TransitiveUseVisitation::OnlyUser;
       return TransitiveUseVisitation::OnlyUses;
     }
-
-    void onError(Operand *use) { state.foundError = true; }
   };
 
   AddressWalkerState state(asi->getFunction());
   AddressWalker walker(state);
   // Note: ignore pointer escapes for the purpose of finding initializers.
-  if (std::move(walker).walk(asi) == AddressUseKind::Unknown ||
-      state.foundError)
-    return SILValue();
+  std::move(walker).walk(asi);
 
   if (asi->getType().is<TupleType>())
     return findRootValueForTupleTempAllocation(asi, state);

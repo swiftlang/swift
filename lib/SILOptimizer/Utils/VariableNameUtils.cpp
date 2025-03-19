@@ -21,7 +21,6 @@ using namespace swift;
 
 namespace {
 struct AddressWalkerState {
-  bool foundError = false;
   InstructionSet writes;
   AddressWalkerState(SILFunction *fn) : writes(fn) {}
 };
@@ -264,15 +263,11 @@ SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
         return TransitiveUseVisitation::OnlyUser;
       return TransitiveUseVisitation::OnlyUses;
     }
-
-    void onError(Operand *use) { state.foundError = true; }
   };
 
   AddressWalkerState state(allocInst->getFunction());
   AddressWalker walker(state);
-  if (std::move(walker).walk(allocInst) == AddressUseKind::Unknown ||
-      state.foundError)
-    return SILValue();
+  std::move(walker).walk(allocInst);
 
   if (allocInst->getType().is<TupleType>())
     return findRootValueForTupleTempAllocation(allocInst, state);
