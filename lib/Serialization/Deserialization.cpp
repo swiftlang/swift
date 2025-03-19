@@ -873,7 +873,8 @@ ProtocolConformanceDeserializer::readSpecializedProtocolConformance(
   auto subMap = subMapOrError.get();
 
   ProtocolConformanceRef genericConformance;
-  UNWRAP(MF.getConformanceChecked(conformanceID), genericConformance);
+  SET_OR_RETURN_ERROR(genericConformance,
+                      MF.getConformanceChecked(conformanceID));
 
   PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
   ++NumNormalProtocolConformancesLoaded;
@@ -906,7 +907,8 @@ ProtocolConformanceDeserializer::readInheritedProtocolConformance(
                              conformingType);
 
   ProtocolConformanceRef inheritedConformance;
-  UNWRAP(MF.getConformanceChecked(conformanceID), inheritedConformance);
+  SET_OR_RETURN_ERROR(inheritedConformance,
+                      MF.getConformanceChecked(conformanceID));
   PrettyStackTraceDecl traceTo("... to",
                                inheritedConformance.getRequirement());
 
@@ -957,12 +959,12 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
                                             moduleID);
 
   Decl *maybeNominal;
-  UNWRAP(MF.getDeclChecked(nominalID), maybeNominal);
+  SET_OR_RETURN_ERROR(maybeNominal, MF.getDeclChecked(nominalID));
   auto nominal = cast<NominalTypeDecl>(maybeNominal);
   PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
 
   Decl *maybeProto;
-  UNWRAP(MF.getDeclChecked(protoID), maybeProto);
+  SET_OR_RETURN_ERROR(maybeProto, MF.getDeclChecked(protoID));
   auto proto = cast<ProtocolDecl>(maybeProto);
   PrettyStackTraceDecl traceTo("... to", proto);
 
@@ -7915,7 +7917,8 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   ProtocolConformanceRef witnessMethodConformance;
   if (*representation == swift::SILFunctionTypeRepresentation::WitnessMethod) {
     auto conformanceID = variableData[nextVariableDataIndex++];
-    UNWRAP(MF.getConformanceChecked(conformanceID), witnessMethodConformance);
+    SET_OR_RETURN_ERROR(witnessMethodConformance,
+                        MF.getConformanceChecked(conformanceID));
   }
 
   GenericSignature invocationSig =
