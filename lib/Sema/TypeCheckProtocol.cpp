@@ -804,10 +804,10 @@ RequirementMatch swift::matchWitness(
       return RequirementMatch(witness, MatchKind::TypeConflict, 
                               witnessType);
 
-    ParameterList *witnessParamList = getParameterList(witness);
+    ParameterList *witnessParamList = witness->getParameterList();
     assert(witnessParamList->size() == witnessParams.size());
 
-    ParameterList *reqParamList = getParameterList(req);
+    ParameterList *reqParamList = req->getParameterList();
     assert(reqParamList->size() == reqParams.size());
 
     // Match each of the parameters.
@@ -2837,10 +2837,8 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
   }
 
   // For parameter adjustments, dig out the pattern.
-  ParameterList *params = nullptr;
-  if (isa<AbstractFunctionDecl>(witness) || isa<SubscriptDecl>(witness)) {
-    params = getParameterList(witness);
-  } else {
+  auto *params = witness->getParameterList();
+  if (!params) {
     return SourceLoc();
   }
 
@@ -6010,14 +6008,11 @@ static bool isGeneric(ValueDecl *decl) {
 
 /// Determine whether this is an unlabeled initializer or subscript.
 static bool isUnlabeledInitializerOrSubscript(ValueDecl *value) {
-  ParameterList *paramList = nullptr;
-  if (isa<ConstructorDecl>(value) || isa<SubscriptDecl>(value)) {
-    paramList = getParameterList(value);
-  } else {
+  if (!(isa<ConstructorDecl>(value) || isa<SubscriptDecl>(value))) {
     return false;
   }
 
-  for (auto param : *paramList) {
+  for (auto param : *value->getParameterList()) {
     if (!param->getArgumentName().empty()) return false;
   }
 

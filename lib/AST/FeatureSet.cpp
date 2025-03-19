@@ -497,7 +497,7 @@ static bool usesFeatureExecutionAttribute(Decl *decl) {
   };
 
   // Check if any parameters that have `@execution` attribute.
-  if (auto *PL = getParameterList(VD)) {
+  if (auto *PL = VD->getParameterList()) {
     for (auto *P : *PL) {
       if (hasExecutionAttr(P->getTypeRepr()))
         return true;

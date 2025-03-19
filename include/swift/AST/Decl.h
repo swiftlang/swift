@@ -3320,6 +3320,14 @@ public:
   /// parameter lists, for example an enum element without associated values.
   bool hasParameterList() const;
 
+  /// Returns the parameter list directly associated with this declaration,
+  /// or `nullptr` if there is none.
+  ///
+  /// Note that some declarations with function interface types do not have
+  /// parameter lists. For example, an enum element without associated values.
+  ParameterList *getParameterList();
+  const ParameterList *getParameterList() const;
+
   /// Returns the number of curry levels in the declaration's interface type.
   unsigned getNumCurryLevels() const;
 
@@ -9720,14 +9728,6 @@ inline bool ValueDecl::hasCurriedSelf() const {
   return false;
 }
 
-inline bool ValueDecl::hasParameterList() const {
-  if (auto *eed = dyn_cast<EnumElementDecl>(this))
-    return eed->hasAssociatedValues();
-  if (auto *macro = dyn_cast<MacroDecl>(this))
-    return macro->parameterList != nullptr;
-  return isa<AbstractFunctionDecl>(this) || isa<SubscriptDecl>(this);
-}
-
 inline unsigned ValueDecl::getNumCurryLevels() const {
   unsigned curryLevels = 0;
   if (hasParameterList())
@@ -9814,10 +9814,6 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   }
   return result;
 }
-
-/// Retrieve the parameter list for a given declaration, or nullptr if there
-/// is none.
-ParameterList *getParameterList(ValueDecl *source);
 
 /// Retrieve the parameter list for a given declaration context, or nullptr if
 /// there is none.

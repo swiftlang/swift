@@ -501,7 +501,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       dc = dc->getParent();
 
       auto *VD = cast<ValueDecl>(dc->getAsDecl());
-      assert(VD->hasParameterList());
+      ASSERT(VD->hasParameterList());
 
       if (VD->getDeclContext()->isLocalContext()) {
         auto kind = VD->getDeclContext()->getFragileFunctionKind();

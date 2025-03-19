@@ -398,7 +398,7 @@ public:
                  .getParameterType();
 
     case Kind::Function: {
-      auto params = getParameterList(static_cast<ValueDecl *>(getFunction()));
+      auto *params = getFunction()->getParameters();
       auto origIndex = params->getOrigParamIndex(getSubstitutions(), substIndex);
       return params->get(origIndex)->getInterfaceType();
     }

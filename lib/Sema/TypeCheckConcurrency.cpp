@@ -5644,7 +5644,7 @@ static OverrideIsolationResult validOverrideIsolation(
 /// Retrieve the index of the first isolated parameter of the given
 /// declaration, if there is one.
 static std::optional<unsigned> getIsolatedParamIndex(ValueDecl *value) {
-  auto params = getParameterList(value);
+  auto *params = value->getParameterList();
   if (!params)
     return std::nullopt;
 
@@ -5864,7 +5864,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   if (auto paramIdx = getIsolatedParamIndex(value)) {
     checkDeclWithIsolatedParameter(value);
 
-    ParamDecl *param = getParameterList(value)->get(*paramIdx);
+    ParamDecl *param = value->getParameterList()->get(*paramIdx);
     Type paramType = param->getDeclContext()->mapTypeIntoContext(
         param->getInterfaceType());
     Type actorType;
