@@ -814,6 +814,12 @@ Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
+// Span-providing properties
+Added: _$sSS8UTF8ViewV4spans4SpanVys5UInt8VGvg
+Added: _$sSS8UTF8ViewV4spans4SpanVys5UInt8VGvpMV
+Added: _$sSs8UTF8ViewV4spans4SpanVys5UInt8VGvg
+Added: _$sSs8UTF8ViewV4spans4SpanVys5UInt8VGvpMV
+
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
 Added: _$ss13_SwiftifyExprO6returnyA2BmFWC
