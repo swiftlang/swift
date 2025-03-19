@@ -43,7 +43,10 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include <fstream>
+#include <set>
 
 using namespace swift;
 
@@ -702,4 +705,30 @@ void SwiftPassInvocation::eraseInstruction(SILInstruction *inst) {
       inst->eraseFromParent();
     }
   }
+}
+
+static llvm::cl::opt<std::string> CondFailConfigFile(
+    "cond-fail-config-file", llvm::cl::init(""),
+    llvm::cl::desc("read the cond_fail message strings to elimimate from file"));
+
+static std::set<std::string> CondFailsToRemove;
+
+bool SILCombiner::shouldRemoveCondFail(CondFailInst &CFI) {
+  if (CondFailConfigFile.empty())
+    return false;
+
+  std::fstream fs(CondFailConfigFile);
+  if (!fs) {
+    llvm::errs() << "cannot cond_fail disablement config file\n";
+    exit(1);
+  }
+  if (CondFailsToRemove.empty()) {
+    std::string line;
+    while (std::getline(fs, line)) {
+      CondFailsToRemove.insert(line);
+    }
+    fs.close();
+  }
+  auto message = CFI.getMessage();
+  return CondFailsToRemove.find(message.str()) != CondFailsToRemove.end();
 }
