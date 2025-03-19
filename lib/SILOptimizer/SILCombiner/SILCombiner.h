@@ -136,6 +136,8 @@ public:
 
   bool runOnFunction(SILFunction &F);
 
+  bool shouldRemoveCondFail(CondFailInst &);
+
   void clear() {
     Iteration = 0;
     Worklist.resetChecked();
