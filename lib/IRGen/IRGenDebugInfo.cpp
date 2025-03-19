@@ -1226,8 +1226,7 @@ private:
     return DITy;
   }
 
-  std::pair<bool, Type>
-  getUnsubstituedType(Type Ty, StringRef MangledName) {
+  std::pair<bool, Type> getUnsubstitutedType(Type Ty, StringRef MangledName) {
     if (!Ty)
       return {false,{}};
     // Go from Pair<Int, Double> to Pair<T, U>.
@@ -1252,7 +1251,7 @@ private:
                             llvm::DIScope *Scope, llvm::DIFile *File,
                             unsigned Line, llvm::DINode::DIFlags Flags) {
     auto [IsUnsubstituted, UnsubstitutedTy] =
-        getUnsubstituedType(EnumTy, MangledName);
+        getUnsubstitutedType(EnumTy, MangledName);
     auto UnsubstitutedDbgTy = DebugTypeInfo::getFromTypeInfo(
         UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
     if (IsUnsubstituted)
@@ -1301,7 +1300,7 @@ private:
         Name);
 
     auto [IsUnsubstitued, UnsubstitutedType] =
-        getUnsubstituedType(Type, MangledName);
+        getUnsubstitutedType(Type, MangledName);
     auto UnsubstitutedDbgTy = DebugTypeInfo::getFromTypeInfo(
         UnsubstitutedType, IGM.getTypeInfoForUnlowered(UnsubstitutedType), IGM);
     if (IsUnsubstitued)
@@ -1326,19 +1325,24 @@ private:
       }
     }
 
-    // Recursive types such as `class A<B> { let a : A<A<B>> }` would produce an
-    // infinite chain of expansions for the type of `a`. Break these cycles by
-    // emitting any bound generics that still have type parameters as forward
-    // declarations.
-    if (Type->hasTypeParameter() || Type->hasPrimaryArchetype())
-      return createOpaqueStructWithSizedContainer(
-          Scope, Decl ? Decl->getNameStr() : "", File, Line, SizeInBits,
-          AlignInBits, Flags, MangledName, collectGenericParams(Type, true),
-          UnsubstitutedDITy);
+    // Generally, we don't emit members of a specialized bound generic, because
+    // these can be reconstructed by substituting the "template parameters" in
+    // the unspecialized type. We make an exception for inline arrays, because
+    // DWARF has special support for arrays.
+    if (Type->isInlineArray() && !Type->hasTypeParameter() &&
+        !Type->hasPrimaryArchetype())
+      // Create the substituted type.
+      return createStructType(Type, Decl, Scope, File, Line, SizeInBits,
+                              AlignInBits, Flags, MangledName,
+                              UnsubstitutedDITy);
 
-    // Create the substituted type.
-    return createStructType(Type, Decl, Scope, File, Line, SizeInBits,
-                            AlignInBits, Flags, MangledName, UnsubstitutedDITy);
+    // Create the substituted type (without members).
+    llvm::DIType *SpecializedDITy = createOpaqueStructWithSizedContainer(
+        Scope, Decl ? Decl->getNameStr() : "", File, Line, SizeInBits,
+        AlignInBits, Flags, MangledName, collectGenericParams(Type),
+        UnsubstitutedDITy);
+    DBuilder.replaceTemporary(std::move(FwdDecl), SpecializedDITy);
+    return SpecializedDITy;
   }
 
   /// Create debug information for an enum with a raw type (enum E : Int {}).
@@ -1600,6 +1604,10 @@ private:
 
     llvm::Metadata *Elements[] = {DBuilder.createMemberType(
         Scope, "", File, 0, SizeInBits, AlignInBits, 0, Flags, UniqueType)};
+    // FIXME: It's a limitation of LLVM that a forward declaration cannot have a
+    // specificationOf, so this attritbute is put on the sized container type
+    // instead. This is confusing consumers, and LLDB has to go out of its way
+    // to parse these confusing types as intended.
     return DBuilder.createStructType(
         Scope, "", File, Line, SizeInBits, AlignInBits, Flags,
         /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
@@ -2338,7 +2346,7 @@ private:
     if (!isa<llvm::DICompositeType>(CachedType))
       return true;
     bool IsUnsubstituted =
-        getUnsubstituedType(DbgTy.getType(), getMangledName(DbgTy).Canonical)
+        getUnsubstitutedType(DbgTy.getType(), getMangledName(DbgTy).Canonical)
             .first;
     std::optional<uint64_t> SizeInBits;
     if (!IsUnsubstituted)
