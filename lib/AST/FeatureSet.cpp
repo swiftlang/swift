@@ -466,12 +466,12 @@ static bool usesFeatureBuiltinEmplaceTypedThrows(Decl *decl) {
 }
 
 static bool usesFeatureExecutionAttribute(Decl *decl) {
+  if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Execution, decl)) {
+    return false;
+  }
+
   if (decl->getAttrs().hasAttribute<ExecutionAttr>())
     return true;
-
-  auto VD = dyn_cast<ValueDecl>(decl);
-  if (!VD)
-    return false;
 
   auto hasExecutionAttr = [](TypeRepr *R) {
     if (!R)
@@ -489,6 +489,8 @@ static bool usesFeatureExecutionAttribute(Decl *decl) {
       return false;
     });
   };
+
+  auto *VD = cast<ValueDecl>(decl);
 
   // Check if any parameters that have `@execution` attribute.
   if (auto *PL = VD->getParameterList()) {
