@@ -468,7 +468,7 @@ struct CxxSpanReturnThunkBuilder: BoundsCheckedThunkBuilder {
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
     let call = try base.buildFunctionCall(pointerArgs)
-    return "_unsafeRemoveLifetime(Span(_unsafeCxxSpan: \(call)))"
+    return "_cxxOverrideLifetime(Span(_unsafeCxxSpan: \(call)), copying: ())"
   }
 }
 
