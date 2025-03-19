@@ -450,6 +450,7 @@ public:
 
   static bool isPassDisabled(StringRef passName);
   static bool isInstructionPassDisabled(StringRef instName);
+  static bool isAnyPassDisabled();
   static bool disablePassesForFunction(SILFunction *function);
 
   /// Runs the SIL verifier which is implemented in the SwiftCompilerSources.
