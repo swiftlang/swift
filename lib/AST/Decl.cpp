@@ -4156,6 +4156,10 @@ void ValueDecl::setIsObjC(bool value) {
 }
 
 Identifier ExtensionDecl::getObjCCategoryName() const {
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getObjCCategoryName();
+
   // If there's an @objc attribute, it's authoritative. (ClangImporter
   // attaches one automatically.)
   if (auto objcAttr = getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid*/true)) {
@@ -4409,6 +4413,10 @@ StringRef ValueDecl::getCDeclName() const {
       return clangDecl->getName();
   }
 
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getCDeclName();
+
   // Handle explicit cdecl attributes.
   if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
     return cdeclAttr->Name;
@@ -4447,6 +4455,10 @@ ValueDecl::getObjCRuntimeName(bool skipIsObjCResolution) const {
 
 std::optional<ObjCSelector>
 Decl::getExplicitObjCName(bool allowInvalid) const {
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getExplicitObjCName();
+
   auto objcAttr = getAttrs().getAttribute<ObjCAttr>(allowInvalid);
   if (objcAttr && !objcAttr->isNameImplicit())
     return objcAttr->getName();
@@ -5141,6 +5153,10 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
 static bool
 isObjCMemberImplementation(const ValueDecl *VD,
                            llvm::function_ref<AccessLevel()> getAccessLevel) {
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return isObjCMemberImplementation(abiRole.getCounterpart(), getAccessLevel);
+
   if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
     if (ED->isObjCImplementation() && !isa<TypeDecl>(VD)) {
       auto attrDecl = isa<AccessorDecl>(VD)
@@ -6620,6 +6636,10 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
 
 StringRef ClassDecl::getObjCRuntimeName(
                        llvm::SmallVectorImpl<char> &buffer) const {
+   auto abiRole = ABIRoleInfo(this);
+   if (!abiRole.providesAPI() && abiRole.getCounterpart())
+     return abiRole.getCounterpart()->getObjCRuntimeName(buffer);
+
   // If there is a Clang declaration, use it's runtime name.
   if (auto objcClass
         = dyn_cast_or_null<clang::ObjCInterfaceDecl>(getClangDecl()))
@@ -7128,6 +7148,10 @@ ProtocolDecl::getPrimaryAssociatedTypes() const {
 
 StringRef ProtocolDecl::getObjCRuntimeName(
                           llvm::SmallVectorImpl<char> &buffer) const {
+   auto abiRole = ABIRoleInfo(this);
+   if (!abiRole.providesAPI() && abiRole.getCounterpart())
+     return abiRole.getCounterpart()->getObjCRuntimeName(buffer);
+
   // If there is an 'objc' attribute with a name, use that name.
   if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = objc->getName())
@@ -7600,6 +7624,10 @@ getNameFromObjcAttribute(const ObjCAttr *attr, DeclName preferredName) {
 
 ObjCSelector
 AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
+   auto abiRole = ABIRoleInfo(this);
+   if (!abiRole.providesAPI() && abiRole.getCounterpart())
+     return abiRole.getCounterpart()->getObjCGetterSelector(preferredName);
+
   // If the getter has an @objc attribute with a name, use that.
   if (auto getter = getAccessor(AccessorKind::Get)) {
       if (auto name = getNameFromObjcAttribute(getter->getAttrs().
@@ -7630,6 +7658,10 @@ AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
 
 ObjCSelector
 AbstractStorageDecl::getObjCSetterSelector(Identifier preferredName) const {
+   auto abiRole = ABIRoleInfo(this);
+   if (!abiRole.providesAPI() && abiRole.getCounterpart())
+     return abiRole.getCounterpart()->getObjCSetterSelector(preferredName);
+
   // If the setter has an @objc attribute with a name, use that.
   auto setter = getAccessor(AccessorKind::Set);
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
@@ -8617,6 +8649,10 @@ Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
 }
 
 Identifier VarDecl::getObjCPropertyName() const {
+   auto abiRole = ABIRoleInfo(this);
+   if (!abiRole.providesAPI() && abiRole.getCounterpart())
+     return abiRole.getCounterpart()->getObjCPropertyName();
+
   if (auto attr = getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = attr->getName())
       return name->getSelectorPieces()[0];
@@ -10221,6 +10257,11 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
 ObjCSelector
 AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
                                       bool skipIsObjCResolution) const {
+   auto abiRole = ABIRoleInfo(this);
+   if (!abiRole.providesAPI() && abiRole.getCounterpart())
+     return abiRole.getCounterpart()->getObjCSelector(preferredName,
+                                                      skipIsObjCResolution);
+
   // FIXME: Forces computation of the Objective-C selector.
   if (!skipIsObjCResolution)
     (void)isObjC();
@@ -11652,7 +11693,12 @@ bool ClassDecl::isNonDefaultExplicitDistributedActor(ModuleDecl *M,
 bool ClassDecl::isNativeNSObjectSubclass() const {
   // @objc actors implicitly inherit from NSObject.
   if (isActor()) {
-    if (getAttrs().hasAttribute<ObjCAttr>()) {
+    DeclAttributes attrs = getAttrs();
+    auto abiRole = ABIRoleInfo(this);
+    if (!abiRole.providesAPI() && abiRole.getCounterpart())
+      attrs = abiRole.getCounterpart()->getAttrs();
+
+    if (attrs.hasAttribute<ObjCAttr>()) {
       return true;
     }
     ClassDecl *superclass = getSuperclassDecl();
