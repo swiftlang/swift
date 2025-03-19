@@ -757,7 +757,7 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
   if (!(funcDecl && funcDecl->isGeneric()))
     return;
 
-  if (!funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
+  if (!funcDecl->isDistributedWitnessWithAdHocSerializationRequirement(/*allowRequirement=*/false))
     return;
 
   Type genericParam;
@@ -766,7 +766,8 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
 
   // DistributedActorSystem.remoteCall
   if (funcDecl->isDistributedActorSystemRemoteCall(
-          /*isVoidReturn=*/false)) {
+          /*isVoidReturn=*/false,
+          /*allowRequirement=*/true)) {
     genericParam = funcDecl->getResultInterfaceType();
   } else {
     // DistributedTargetInvocationEncoder.record{Argument, ReturnType}
@@ -779,8 +780,6 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
     return;
 
   auto protocols = sig->getRequiredProtocols(genericParam);
-  if (protocols.empty())
-    return;
 
   auto archetypeTy = getTypeInContext(genericParam->getCanonicalType());
   llvm::Value *metadata = IGF.emitTypeMetadataRef(archetypeTy);
@@ -794,6 +793,10 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
     auto *witnessTable = IGF.Builder.CreateCall(
         IGM.getConformsToProtocolFunctionPointer(),
         {metadata, IGM.getAddrOfProtocolDescriptor(proto)});
+
+    // TODO: insufficient for lookup conformance
+
+    // TODO: dynamic is fine, but also put the requiremtn in the witness thunk
 
     IGF.setUnscopedLocalTypeData(
         archetypeTy,

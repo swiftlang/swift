@@ -103,6 +103,13 @@ public:
                          ClassDecl *covariantSelf,
                          RootProtocolConformance *conformance);
 
+  RequirementEnvironment(DeclContext *conformanceDC,
+                         ValueDecl *reqDecl,
+                         GenericSignature reqSig,
+                         ProtocolDecl *proto,
+                         ClassDecl *covariantSelf,
+                         RootProtocolConformance *conformance);
+
   /// Retrieve the generic signature of the requirement.
   GenericSignature getRequirementSignature() const {
     return reqSig;

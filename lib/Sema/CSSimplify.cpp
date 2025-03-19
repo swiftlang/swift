@@ -8801,7 +8801,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
         if (witness->isGeneric()) {
           // `DistributedActorSystem.remoteCall`
-          if (witness->isDistributedActorSystemRemoteCall(/*isVoidReturn=*/false)) {
+          if (witness->isDistributedActorSystemRemoteCall(/*isVoidReturn=*/false, /*allowRequirement=*/true)) {
             if (GP->isEqual(cast<FuncDecl>(witness)->getResultInterfaceType()))
               return synthesizeConformance();
           }
@@ -8809,11 +8809,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           // `DistributedTargetInvocationEncoder.record{Argument, ResultType}`
           // `DistributedTargetInvocationDecoder.decodeNextArgument`
           // `DistributedTargetInvocationResultHandler.onReturn`
-          if (witness->isDistributedTargetInvocationEncoderRecordArgument() ||
-              witness->isDistributedTargetInvocationEncoderRecordReturnType() ||
-              witness
-                  ->isDistributedTargetInvocationDecoderDecodeNextArgument() ||
-              witness->isDistributedTargetInvocationResultHandlerOnReturn()) {
+          if (witness->isDistributedTargetInvocationEncoderRecordArgument(/*allowRequirement=*/true) ||
+              witness->isDistributedTargetInvocationEncoderRecordReturnType(/*allowRequirement=*/true) ||
+              witness->isDistributedTargetInvocationDecoderDecodeNextArgument(/*allowRequirement=*/true) ||
+              witness->isDistributedTargetInvocationResultHandlerOnReturn(/*allowRequirement=*/true)) {
             auto genericParams = witness->getGenericParams()->getParams();
             if (GP->isEqual(genericParams.front()->getDeclaredInterfaceType()))
               return synthesizeConformance();

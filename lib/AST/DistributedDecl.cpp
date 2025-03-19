@@ -51,6 +51,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/Basic/StringExtras.h"
 
 #include "clang/Basic/CharInfo.h"
@@ -470,11 +471,45 @@ AbstractFunctionDecl::getDistributedMethodWitnessedProtocolRequirements() const 
       GetDistributedMethodWitnessedProtocolRequirements(mutableThis), {});
 }
 
+void
+swift::injectAdHocDistributedSerializationRequirementForWitnessThunk(
+    const ValueDecl *requirementDecl, const FuncDecl *witnessDecl,
+    SmallVectorImpl<Requirement> &Requirements) {
+  auto sig = witnessDecl->getGenericSignature();
+
+  Type genericParam;
+  // DistributedActorSystem.remoteCall
+  if (witnessDecl->isDistributedActorSystemRemoteCall(
+          /*isVoidReturn=*/false,
+          /*allowRequirement=*/false)) {
+    genericParam = witnessDecl->getResultInterfaceType();
+  } else {
+    // DistributedTargetInvocationEncoder.record{Argument, ReturnType}
+    // DistributedTargetInvocationDecoder.decodeNextArgument
+    // DistributedTargetInvocationResultHandler.onReturn
+    genericParam = sig.getInnermostGenericParams().front();
+  }
+
+  // We want to copy the requirements from the witness method signature
+  // onto the witness thunk. The witness is enforced by the compiler to have the "right" signature elsewhere, so here we only copy it over to the witness.
+  for (auto *proto : sig->getRequiredProtocols(genericParam)) {
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
+      continue;
+
+    auto adHocSerializationRequirement =
+        Requirement(RequirementKind::Conformance,
+                    genericParam,
+                    proto->getDeclaredInterfaceType());
+
+    Requirements.push_back(adHocSerializationRequirement);
+  }
+}
+
 /******************************************************************************/
 /********************* Ad-hoc protocol requirement checks *********************/
 /******************************************************************************/
 
-bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn) const {
+bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn, bool allowRequirement) const {
   auto &C = getASTContext();
   auto *DC = getDeclContext();
 
@@ -487,16 +522,24 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
     return false;
   }
 
-  // === Must be declared in a 'DistributedActorSystem' conforming type
-  ProtocolDecl *systemProto =
-      C.getDistributedActorSystemDecl();
+  // === Must be declared in specific protocol conforming type
+  auto requiredProtocolID = KnownProtocolKind::DistributedActorSystem;
+  ProtocolDecl *requiredProtocol = C.getProtocol(requiredProtocolID);
 
-  auto systemNominal = DC->getSelfNominalTypeDecl();
-  auto distSystemConformance = lookupConformance(
-      systemNominal->getDeclaredInterfaceType(), systemProto);
-
-  if (distSystemConformance.isInvalid()) {
-    return false;
+  auto nominal = getDeclContext()->getSelfNominalTypeDecl();
+  if (auto P = dyn_cast<ProtocolDecl>(nominal)) {
+    if (!allowRequirement)
+      return false;
+    if (P != requiredProtocol && !P->inheritsFrom(requiredProtocol))
+      return false;
+  } else {
+    bool conformsToRequiredProtocol =
+        std::any_of(nominal->getAllProtocols().begin(),
+                    nominal->getAllProtocols().end(), [&](ProtocolDecl *proto) {
+                      return proto->isSpecificProtocol(requiredProtocolID);
+                    });
+    if (!conformsToRequiredProtocol)
+      return false;
   }
 
   auto *func = dyn_cast<FuncDecl>(this);
@@ -534,169 +577,191 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   // === Get the SerializationRequirement
-  SmallPtrSet<ProtocolDecl*, 2> requirementProtos;
-  if (!getDistributedSerializationRequirements(
-          systemNominal, systemProto, requirementProtos)) {
-    return false;
-  }
+  //
+  // Don't check generic requirements on ProtocolDecl since they will be missing
+  // the ad-hoc bits, and we know there is only ONE remoteCall(Void) anyway in
+  // the specific protocol that the requirement is declared on and it is
+  // declared in the stdlib, so there cannot be arbitrary requirements declared
+  // elsewhere.
+  if (!isa<ProtocolDecl>(nominal)) {
+    SmallPtrSet<ProtocolDecl *, 2> requirementProtos;
+    if (!getDistributedSerializationRequirements(nominal, requiredProtocol,
+                                                 requirementProtos)) {
+      if (!(allowRequirement && isa<ProtocolDecl>(nominal))) {
+        return false;
+      }
+    }
 
-  // -- Check number of generic requirements
-  size_t expectedRequirementsNum = 3;
-  size_t serializationRequirementsNum = 0;
-  if (!isVoidReturn) {
-    serializationRequirementsNum = requirementProtos.size();
-    expectedRequirementsNum += serializationRequirementsNum;
-  }
+    // -- Check number of generic requirements
+    size_t expectedRequirementsNum = 3;
+    size_t serializationRequirementsNum = 0;
+    if (!isVoidReturn) {
+      serializationRequirementsNum = requirementProtos.size();
+      expectedRequirementsNum += serializationRequirementsNum;
+    }
 
-  // === Check all parameters
-  auto params = getParameters();
+    // === Check all parameters
+    auto params = getParameters();
 
-  // --- Count of parameters depends on if we're void returning or not
-  unsigned int expectedParamNum = isVoidReturn ? 4 : 5;
-  if (!params || params->size() != expectedParamNum) {
-    return false;
-  }
-
-  // --- Check parameter: on: Actor
-  auto actorParam = params->get(0);
-  if (actorParam->getArgumentName() != C.Id_on) {
-    return false;
-  }
-
-  // --- Check parameter: target RemoteCallTarget
-  auto targetParam = params->get(1);
-  if (targetParam->getArgumentName() != C.Id_target) {
-    return false;
-  }
-
-  // --- Check parameter: invocation: inout InvocationEncoder
-  auto invocationParam = params->get(2);
-  if (invocationParam->getArgumentName() != C.Id_invocation) {
-    return false;
-  }
-  if (!invocationParam->isInOut()) {
-    return false;
-  }
-
-  // --- Check parameter: throwing: Err.Type
-  auto thrownTypeParam = params->get(3);
-  if (thrownTypeParam->getArgumentName() != C.Id_throwing) {
-    return false;
-  }
-
-  // --- Check parameter: returning: Res.Type
-  if (!isVoidReturn) {
-    auto returnedTypeParam = params->get(4);
-    if (returnedTypeParam->getArgumentName() != C.Id_returning) {
+    // --- Count of parameters depends on if we're void returning or not
+    unsigned int expectedParamNum = isVoidReturn ? 4 : 5;
+    if (!params || params->size() != expectedParamNum) {
       return false;
     }
-  }
 
-  // === Check generic parameters in detail
-  // --- Check: Act: DistributedActor,
-  //            Act.ID == Self.ActorID
-  GenericTypeParamDecl *ActParam = genericParams->getParams()[0];
-  auto ActConformance = lookupConformance(
-      mapTypeIntoContext(ActParam->getDeclaredInterfaceType()),
-      C.getProtocol(KnownProtocolKind::DistributedActor));
-  if (ActConformance.isInvalid()) {
-    return false;
-  }
+    // --- Check parameter: on: Actor
+    auto actorParam = params->get(0);
+    if (actorParam->getArgumentName() != C.Id_on) {
+      return false;
+    }
 
-  // --- Check: Err: Error
-  GenericTypeParamDecl *ErrParam = genericParams->getParams()[1];
-  auto ErrConformance = lookupConformance(
-      mapTypeIntoContext(ErrParam->getDeclaredInterfaceType()),
-      C.getProtocol(KnownProtocolKind::Error));
-  if (ErrConformance.isInvalid()) {
-    return false;
-  }
+    // --- Check parameter: target RemoteCallTarget
+    auto targetParam = params->get(1);
+    if (targetParam->getArgumentName() != C.Id_target) {
+      return false;
+    }
 
-  // --- Check: Res: SerializationRequirement
-  // We could have the `SerializationRequirement = Any` in which case there are
-  // no requirements to check on `Res`
-  GenericTypeParamDecl *ResParam = nullptr;
-  if (!isVoidReturn) {
-    ResParam = genericParams->getParams().back();
-  }
+    // --- Check parameter: invocation: inout InvocationEncoder
+    auto invocationParam = params->get(2);
+    if (invocationParam->getArgumentName() != C.Id_invocation) {
+      return false;
+    }
+    if (!invocationParam->isInOut()) {
+      return false;
+    }
 
-  auto sig = getGenericSignature();
+    // --- Check parameter: throwing: Err.Type
+    auto thrownTypeParam = params->get(3);
+    if (thrownTypeParam->getArgumentName() != C.Id_throwing) {
+      return false;
+    }
 
-  SmallVector<Requirement, 2> reqs;
-  SmallVector<InverseRequirement, 2> inverseReqs;
-  sig->getRequirementsWithInverses(reqs, inverseReqs);
-  assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
-
-  if (reqs.size() != expectedRequirementsNum) {
-    return false;
-  }
-
-  // --- Check the expected requirements
-  // conforms_to: Act DistributedActor
-  // conforms_to: Err Error
-  // --- all the Res requirements ---
-  // conforms_to: Res Decodable
-  // conforms_to: Res Encodable
-  // ...
-  // --------------------------------
-  // same_type: Act.ID FakeActorSystem.ActorID // LAST one
-
-  // --- Check requirement: conforms_to: Act DistributedActor
-  auto actorReq = reqs[0];
-  if (actorReq.getKind() != RequirementKind::Conformance) {
-    return false;
-  }
-  if (!actorReq.getProtocolDecl()->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
-    return false;
-  }
-
-  // --- Check requirement: conforms_to: Err Error
-  auto errorReq = reqs[1];
-  if (errorReq.getKind() != RequirementKind::Conformance) {
-    return false;
-  }
-  if (!errorReq.getProtocolDecl()->isSpecificProtocol(KnownProtocolKind::Error)) {
-    return false;
-  }
-
-  // --- Check requirement: Res either Void or all SerializationRequirements
-  if (isVoidReturn) {
-    if (auto func = dyn_cast<FuncDecl>(this)) {
-      if (!func->getResultInterfaceType()->isVoid()) {
+    // --- Check parameter: returning: Res.Type
+    if (!isVoidReturn) {
+      auto returnedTypeParam = params->get(4);
+      if (returnedTypeParam->getArgumentName() != C.Id_returning) {
         return false;
       }
     }
-  } else if (ResParam) {
-    assert(ResParam && "Non void function, yet no Res generic parameter found");
-    if (auto func = dyn_cast<FuncDecl>(this)) {
-      auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())
-                            ->getMetatypeInstanceType();
-      auto resultParamType = func->mapTypeIntoContext(
-          ResParam->getDeclaredInterfaceType());
-      // The result of the function must be the `Res` generic argument.
-      if (!resultType->isEqual(resultParamType)) {
+
+    // === Check generic parameters in detail
+    if (!isa<ProtocolDecl>(nominal)) {
+      // Conformance checks would not work on the protocol function itself
+
+      // --- Check: Act: DistributedActor,
+      //            Act.ID == Self.ActorID
+      GenericTypeParamDecl *ActParam = genericParams->getParams()[0];
+      auto ActConformance = lookupConformance(
+          mapTypeIntoContext(ActParam->getDeclaredInterfaceType()),
+          C.getProtocol(KnownProtocolKind::DistributedActor));
+      if (ActConformance.isInvalid()) {
         return false;
       }
 
-      for (auto requirementProto : requirementProtos) {
-        auto conformance = lookupConformance(resultType, requirementProto);
-        if (conformance.isInvalid()) {
+      // --- Check: Err: Error
+      GenericTypeParamDecl *ErrParam = genericParams->getParams()[1];
+      auto ErrConformance = lookupConformance(
+          mapTypeIntoContext(ErrParam->getDeclaredInterfaceType()),
+          C.getProtocol(KnownProtocolKind::Error));
+      if (ErrConformance.isInvalid()) {
+        return false;
+      }
+    }
+
+    // --- Check: Res: SerializationRequirement
+    // We could have the `SerializationRequirement = Any` in which case there
+    // are no requirements to check on `Res`
+    GenericTypeParamDecl *ResParam = nullptr;
+    if (!isVoidReturn) {
+      ResParam = genericParams->getParams().back();
+    }
+
+    auto sig = getGenericSignature();
+
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    sig->getRequirementsWithInverses(reqs, inverseReqs);
+    assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
+
+    if (reqs.size() != expectedRequirementsNum) {
+      if (!isa<ProtocolDecl>(nominal)) {
+        // The protocol requirement would expectedly have too few requirements,
+        // since they are ad-hoc added on later
+        return false;
+      }
+    }
+
+    // --- Check the expected requirements
+    // conforms_to: Act DistributedActor
+    // conforms_to: Err Error
+    // --- all the Res requirements ---
+    // conforms_to: Res Decodable
+    // conforms_to: Res Encodable
+    // ...
+    // --------------------------------
+    // same_type: Act.ID FakeActorSystem.ActorID // LAST one
+
+    // --- Check requirement: conforms_to: Act DistributedActor
+    auto actorReq = reqs[0];
+    if (actorReq.getKind() != RequirementKind::Conformance) {
+      return false;
+    }
+    if (!actorReq.getProtocolDecl()->isSpecificProtocol(
+            KnownProtocolKind::DistributedActor)) {
+      return false;
+    }
+
+    // --- Check requirement: conforms_to: Err Error
+    auto errorReq = reqs[1];
+    if (errorReq.getKind() != RequirementKind::Conformance) {
+      return false;
+    }
+    if (!errorReq.getProtocolDecl()->isSpecificProtocol(
+            KnownProtocolKind::Error)) {
+      return false;
+    }
+
+    // --- Check requirement: Res either Void or all SerializationRequirements
+    if (isVoidReturn) {
+      if (auto func = dyn_cast<FuncDecl>(this)) {
+        if (!func->getResultInterfaceType()->isVoid()) {
           return false;
         }
       }
-    } else {
+    } else if (ResParam) {
+      assert(ResParam &&
+             "Non void function, yet no Res generic parameter found");
+      if (auto func = dyn_cast<FuncDecl>(this)) {
+        auto resultType =
+            func->mapTypeIntoContext(func->getResultInterfaceType())
+                ->getMetatypeInstanceType();
+        auto resultParamType =
+            func->mapTypeIntoContext(ResParam->getDeclaredInterfaceType());
+        // The result of the function must be the `Res` generic argument.
+        if (!resultType->isEqual(resultParamType)) {
+          return false;
+        }
+
+        for (auto requirementProto : requirementProtos) {
+          auto conformance = lookupConformance(resultType, requirementProto);
+          if (conformance.isInvalid()) {
+            return false;
+          }
+        }
+      } else {
+        return false;
+      }
+    }
+
+    // -- Check requirement: same_type Actor.ID Self.ActorID
+    auto actorIdReq = reqs.back();
+    if (actorIdReq.getKind() != RequirementKind::SameType) {
       return false;
     }
-  }
-
-  // -- Check requirement: same_type Actor.ID Self.ActorID
-  auto actorIdReq = reqs.back();
-  if (actorIdReq.getKind() != RequirementKind::SameType) {
-    return false;
-  }
-  auto expectedActorIdTy = getDistributedActorSystemActorIDType(systemNominal);
-  if (!actorIdReq.getSecondType()->isEqual(expectedActorIdTy)) {
-    return false;
+    auto expectedActorIdTy = getDistributedActorSystemActorIDType(nominal);
+    if (!actorIdReq.getSecondType()->isEqual(expectedActorIdTy)) {
+      return false;
+    }
   }
 
   return true;
@@ -734,9 +799,10 @@ AbstractFunctionDecl::isDistributedActorSystemMakeInvocationEncoder() const {
 }
 
 bool
-AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitution() const {
+AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitution(bool allowRequirement) const {
   auto &C = getASTContext();
 
+  // === Check base name
   if (getBaseIdentifier() != C.Id_recordGenericSubstitution) {
     return false;
   }
@@ -745,6 +811,27 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitut
   if (!fd) {
     return false;
   }
+
+  // === Must be declared in specific protocol conforming type
+  auto requiredProtocolID = KnownProtocolKind::DistributedTargetInvocationEncoder;
+  ProtocolDecl *requiredProtocol = C.getProtocol(requiredProtocolID);
+
+  auto nominal = getDeclContext()->getSelfNominalTypeDecl();
+  if (auto P = dyn_cast<ProtocolDecl>(nominal)) {
+    if (!allowRequirement)
+      return false;
+    if (P != requiredProtocol && !P->inheritsFrom(requiredProtocol))
+      return false;
+  } else {
+    bool conformsToRequiredProtocol =
+        std::any_of(nominal->getAllProtocols().begin(),
+                    nominal->getAllProtocols().end(), [&](ProtocolDecl *proto) {
+                      return proto->isSpecificProtocol(requiredProtocolID);
+                    });
+    if (!conformsToRequiredProtocol)
+      return false;
+  }
+
   if (fd->getParameters()->size() != 1) {
     return false;
   }
@@ -754,7 +841,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitut
   if (!fd->hasThrows()) {
     return false;
   }
-  // TODO(distributed): more checks
 
   // A single generic parameter.
   auto genericParamList = fd->getGenericParams();
@@ -778,7 +864,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitut
 }
 
 bool
-AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const {
+AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument(bool allowRequirement) const {
   auto &C = getASTContext();
 
   auto func = dyn_cast<FuncDecl>(this);
@@ -791,16 +877,24 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
     return false;
   }
 
-  // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
-  ProtocolDecl *encoderProto =
-      C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  // === Must be declared in specific protocol conforming type
+  auto requiredProtocolID = KnownProtocolKind::DistributedTargetInvocationEncoder;
+  ProtocolDecl *requiredProtocol = C.getProtocol(requiredProtocolID);
 
-  auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
-  auto protocolConformance = lookupConformance(
-      encoderNominal->getDeclaredInterfaceType(), encoderProto);
-
-  if (protocolConformance.isInvalid()) {
-    return false;
+  auto nominal = getDeclContext()->getSelfNominalTypeDecl();
+  if (auto P = dyn_cast<ProtocolDecl>(nominal)) {
+    if (!allowRequirement)
+      return false;
+    if (P != requiredProtocol && !P->inheritsFrom(requiredProtocol))
+      return false;
+  } else {
+    bool conformsToRequiredProtocol =
+        std::any_of(nominal->getAllProtocols().begin(),
+                    nominal->getAllProtocols().end(), [&](ProtocolDecl *proto) {
+                      return proto->isSpecificProtocol(requiredProtocolID);
+                    });
+    if (!conformsToRequiredProtocol)
+      return false;
   }
 
   // === Check modifiers
@@ -836,8 +930,10 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
     // === Get the SerializationRequirement
     SmallPtrSet<ProtocolDecl*, 2> requirementProtos;
     if (!getDistributedSerializationRequirements(
-            encoderNominal, encoderProto, requirementProtos)) {
-      return false;
+            nominal, requiredProtocol, requirementProtos)) {
+      if (!(allowRequirement && isa<ProtocolDecl>(nominal))) {
+        return false;
+      }
     }
 
     // -- Check number of generic requirements
@@ -875,12 +971,13 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
           ArgumentParam->getDeclaredInterfaceType());
 
       if (!remoteCallArgValueGenericTy->isEqual(expectedGenericParamTy)) {
-            return false;
-          }
+        if (!(allowRequirement && isa<ProtocolDecl>(nominal))) {
+          return false;
+        }
+      }
     } else {
       return false;
     }
-
 
     auto sig = getGenericSignature();
 
@@ -889,7 +986,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
     sig->getRequirementsWithInverses(reqs, inverseReqs);
     assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
 
-    if (reqs.size() != expectedRequirementsNum) {
+    if (!isa<ProtocolDecl>(nominal) && reqs.size() != expectedRequirementsNum) {
       return false;
     }
 
@@ -909,7 +1006,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
 }
 
 bool
-AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() const {
+AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType(bool allowRequirement) const {
   auto &C = getASTContext();
 
   auto func = dyn_cast<FuncDecl>(this);
@@ -922,16 +1019,24 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
     return false;
   }
 
-  // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
-  ProtocolDecl *encoderProto =
-      C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  // === Must be declared in specific protocol conforming type
+  auto requiredProtocolID = KnownProtocolKind::DistributedTargetInvocationEncoder;
+  ProtocolDecl *requiredProtocol = C.getProtocol(requiredProtocolID);
 
-  auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
-  auto protocolConformance = lookupConformance(
-      encoderNominal->getDeclaredInterfaceType(), encoderProto);
-
-  if (protocolConformance.isInvalid()) {
-    return false;
+  auto nominal = getDeclContext()->getSelfNominalTypeDecl();
+  if (auto P = dyn_cast<ProtocolDecl>(nominal)) {
+    if (!allowRequirement)
+      return false;
+    if (P != requiredProtocol && !P->inheritsFrom(requiredProtocol))
+      return false;
+  } else {
+    bool conformsToRequiredProtocol =
+        std::any_of(nominal->getAllProtocols().begin(),
+                    nominal->getAllProtocols().end(), [&](ProtocolDecl *proto) {
+                      return proto->isSpecificProtocol(requiredProtocolID);
+                    });
+    if (!conformsToRequiredProtocol)
+      return false;
   }
 
   // === Check modifiers
@@ -967,8 +1072,10 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   // === Get the SerializationRequirement
   SmallPtrSet<ProtocolDecl*, 2> requirementProtos;
   if (!getDistributedSerializationRequirements(
-          encoderNominal, encoderProto, requirementProtos)) {
-    return false;
+          nominal, requiredProtocol, requirementProtos)) {
+    if (!(allowRequirement && isa<ProtocolDecl>(nominal))) {
+      return false;
+    }
   }
 
   // -- Check number of generic requirements
@@ -998,7 +1105,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   sig->getRequirementsWithInverses(reqs, inverseReqs);
   assert(inverseReqs.empty() && "Non-copyable generics not supported here!");
 
-  if (reqs.size() != expectedRequirementsNum) {
+  if (!isa<ProtocolDecl>(nominal) && reqs.size() != expectedRequirementsNum) {
     return false;
   }
 
@@ -1035,7 +1142,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
 }
 
 bool
-AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() const {
+AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType(bool allowRequirement) const {
     auto &C = getASTContext();
 
     auto func = dyn_cast<FuncDecl>(this);
@@ -1048,16 +1155,24 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
       return false;
     }
 
-    // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
-    ProtocolDecl *encoderProto =
-        C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+    // === Must be declared in specific protocol conforming type
+    auto requiredProtocolID = KnownProtocolKind::DistributedTargetInvocationEncoder;
+    ProtocolDecl *requiredProtocol = C.getProtocol(requiredProtocolID);
 
-    auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
-    auto protocolConformance = lookupConformance(
-        encoderNominal->getDeclaredInterfaceType(), encoderProto);
-
-    if (protocolConformance.isInvalid()) {
-      return false;
+    auto nominal = getDeclContext()->getSelfNominalTypeDecl();
+    if (auto P = dyn_cast<ProtocolDecl>(nominal)) {
+      if (!allowRequirement)
+        return false;
+      if (P != requiredProtocol && !P->inheritsFrom(requiredProtocol))
+        return false;
+    } else {
+      bool conformsToRequiredProtocol = std::any_of(
+          nominal->getAllProtocols().begin(), nominal->getAllProtocols().end(),
+          [&](ProtocolDecl *proto) {
+            return proto->isSpecificProtocol(requiredProtocolID);
+          });
+      if (!conformsToRequiredProtocol)
+        return false;
     }
 
     // === Check modifiers
@@ -1142,7 +1257,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
 }
 
 bool
-AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() const {
+AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument(bool allowRequirement) const {
     auto &C = getASTContext();
 
     auto func = dyn_cast<FuncDecl>(this);
@@ -1155,16 +1270,24 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
       return false;
     }
 
-    // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
-    ProtocolDecl *decoderProto =
-        C.getProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder);
+    // === Must be declared in specific protocol conforming type
+    auto requiredProtocolID = KnownProtocolKind::DistributedTargetInvocationDecoder;
+    ProtocolDecl *requiredProtocol = C.getProtocol(requiredProtocolID);
 
-    auto decoderNominal = getDeclContext()->getSelfNominalTypeDecl();
-    auto protocolConformance = lookupConformance(
-        decoderNominal->getDeclaredInterfaceType(), decoderProto);
-
-    if (protocolConformance.isInvalid()) {
-      return false;
+    auto nominal = getDeclContext()->getSelfNominalTypeDecl();
+    if (auto P = dyn_cast<ProtocolDecl>(nominal)) {
+      if (!allowRequirement)
+        return false;
+      if (P != requiredProtocol && !P->inheritsFrom(requiredProtocol))
+        return false;
+    } else {
+      bool conformsToRequiredProtocol = std::any_of(
+          nominal->getAllProtocols().begin(), nominal->getAllProtocols().end(),
+          [&](ProtocolDecl *proto) {
+            return proto->isSpecificProtocol(requiredProtocolID);
+          });
+      if (!conformsToRequiredProtocol)
+        return false;
     }
 
     // === Check modifiers
@@ -1184,7 +1307,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
       return false;
     }
 
-
     // === Check generics
     if (!isGeneric()) {
       return false;
@@ -1201,8 +1323,10 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
     // === Get the SerializationRequirement
     SmallPtrSet<ProtocolDecl*, 2> requirementProtos;
     if (!getDistributedSerializationRequirements(
-            decoderNominal, decoderProto, requirementProtos)) {
-      return false;
+            nominal, requiredProtocol, requirementProtos)) {
+      if (!(allowRequirement && isa<ProtocolDecl>(nominal))) {
+        return false;
+      }
     }
 
     // === No parameters
@@ -1235,7 +1359,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
 }
 
 bool
-AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const {
+AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn(bool allowRequirement) const {
     auto &C = getASTContext();
 
     auto func = dyn_cast<FuncDecl>(this);
@@ -1248,16 +1372,24 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
       return false;
     }
 
-    // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
-    ProtocolDecl *decoderProto =
-        C.getProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler);
+    // === Must be declared in specific protocol conforming type
+    auto requiredProtocolID = KnownProtocolKind::DistributedTargetInvocationResultHandler;
+    ProtocolDecl *requiredProtocol = C.getProtocol(requiredProtocolID);
 
-    auto decoderNominal = getDeclContext()->getSelfNominalTypeDecl();
-    auto protocolConformance = lookupConformance(
-        decoderNominal->getDeclaredInterfaceType(), decoderProto);
-
-    if (protocolConformance.isInvalid()) {
-      return false;
+    auto nominal = getDeclContext()->getSelfNominalTypeDecl();
+    if (auto P = dyn_cast<ProtocolDecl>(nominal)) {
+      if (!allowRequirement)
+        return false;
+      if (P != requiredProtocol && !P->inheritsFrom(requiredProtocol))
+        return false;
+    } else {
+      bool conformsToRequiredProtocol = std::any_of(
+          nominal->getAllProtocols().begin(), nominal->getAllProtocols().end(),
+          [&](ProtocolDecl *proto) {
+            return proto->isSpecificProtocol(requiredProtocolID);
+          });
+      if (!conformsToRequiredProtocol)
+        return false;
     }
 
     // === Check modifiers
@@ -1291,9 +1423,11 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
 
     // === Get the SerializationRequirement
     SmallPtrSet<ProtocolDecl *, 2> requirementProtos;
-    if (!getDistributedSerializationRequirements(decoderNominal, decoderProto,
+    if (!getDistributedSerializationRequirements(nominal, requiredProtocol,
                                                  requirementProtos)) {
-      return false;
+      if (!(allowRequirement && isa<ProtocolDecl>(nominal))) {
+        return false;
+      }
     }
 
     // === Check all parameters
@@ -1488,7 +1622,7 @@ FuncDecl *swift::getRecordGenericSubstitutionOnDistributedInvocationEncoder(
   for (auto result : nominal->lookupDirect(ctx.Id_recordGenericSubstitution)) {
     auto *func = dyn_cast<FuncDecl>(result);
     if (func &&
-        func->isDistributedTargetInvocationEncoderRecordGenericSubstitution()) {
+        func->isDistributedTargetInvocationEncoderRecordGenericSubstitution(/*allowRequirement=*/false)) {
       return func;
     }
   }

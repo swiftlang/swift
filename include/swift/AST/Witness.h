@@ -180,6 +180,7 @@ public:
 
   /// Retrieve the witness thunk generic signature.
   GenericSignature getWitnessThunkSignature() const {
+    // TODO: find what creates/sets that
     if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
       return storedWitness->witnessThunkSig;
     return nullptr;
