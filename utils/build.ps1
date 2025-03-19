@@ -2186,7 +2186,7 @@ function Test-Runtime([Platform]$Platform, $Arch) {
   if (-not (Test-Path (Get-ProjectBinaryCache $Arch Runtime))) {
     throw "Swift runtime tests are supposed to reconfigure the existing build"
   }
-  $CompilersBinaryCache = Get-HostProjectBinaryCache Compilers
+  $CompilersBinaryCache = Get-ProjectBinaryCache $BuildArch Compilers
   if (-not (Test-Path "$CompilersBinaryCache\bin\FileCheck.exe")) {
     # These will exist if we test any of llvm/clang/lldb/lld/swift as well
     throw "LIT test utilities not found in $CompilersBinaryCache\bin"
