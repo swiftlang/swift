@@ -6594,6 +6594,9 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
 
 ObjCInterfaceAndImplementation ObjCInterfaceAndImplementationRequest::
 evaluate(Evaluator &evaluator, Decl *decl) const {
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "@interface request for ABI-only decl?");
+
   // Types and extensions have direct links to their counterparts through the
   // `@_objcImplementation` attribute. Let's resolve that.
   // (Also directing nulls here, where they'll early-return.)
@@ -6633,6 +6636,21 @@ llvm::TinyPtrVector<Decl *> Decl::getAllImplementedObjCDecls() const {
     // This *is* the interface, if there is one.
     return {};
 
+  // ABI-only attributes don't have an `@implementation`, so query the API
+  // counterpart and map the results back to ABI decls.
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart()) {
+    auto interfaceDecls =
+        abiRole.getCounterpart()->getAllImplementedObjCDecls();
+
+    // Map the APIs back to their ABI counterparts (often a no-op)
+    for (auto &interfaceDecl : interfaceDecls) {
+      interfaceDecl = ABIRoleInfo(interfaceDecl).getCounterpart();
+    }
+
+    return interfaceDecls;
+  }
+
   ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
   auto result = evaluateOrDefault(getASTContext().evaluator, req, {});
   return result.interfaceDecls;
@@ -6649,6 +6667,14 @@ Decl *Decl::getObjCImplementationDecl() const {
   if (!hasClangNode())
     // This *is* the implementation, if it has one.
     return nullptr;
+
+  // ABI-only attributes don't have an `@implementation`, so query the API
+  // counterpart and map the results back to ABI decls.
+  auto abiRole = ABIRoleInfo(this);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart()) {
+    auto implDecl = abiRole.getCounterpart()->getObjCImplementationDecl();
+    return ABIRoleInfo(implDecl).getCounterpart();
+  }
 
   ObjCInterfaceAndImplementationRequest req{const_cast<Decl *>(this)};
   auto result = evaluateOrDefault(getASTContext().evaluator, req, {});
