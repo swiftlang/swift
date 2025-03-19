@@ -52,9 +52,19 @@ void swift::simple_display(llvm::raw_ostream &out,
   simple_display(out, desc.SM);
 }
 
+void swift::simple_display(llvm::raw_ostream &out, const SILFunction *F) {
+  out << "SILFunction '" << F->getName() << "' in ";
+  simple_display(out, &F->getModule());
+}
+
 SourceLoc
 swift::extractNearestSourceLoc(const SILPipelineExecutionDescriptor &desc) {
   return extractNearestSourceLoc(desc.SM);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const SILFunction *F) {
+  return F->hasLocation() ? F->getLocation().getSourceLoc() : SourceLoc();
 }
 
 //----------------------------------------------------------------------------//

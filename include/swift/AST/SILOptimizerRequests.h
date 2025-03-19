@@ -87,6 +87,26 @@ private:
                                       ASTLoweringDescriptor desc) const;
 };
 
+class IsSelfRecursiveRequest
+    : public SimpleRequest<IsSelfRecursiveRequest, bool(SILFunction *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, SILFunction *F) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out, const SILFunction *);
+SourceLoc extractNearestSourceLoc(const SILFunction *);
+
 /// Report that a request of the given kind is being evaluated, so it
 /// can be recorded by the stats reporter.
 template <typename Request>
