@@ -3644,6 +3644,43 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
 #endif
 }
 
+static void installOverrideInVTable(
+    ClassDescriptor::MethodOverrideDescriptor const &descriptor,
+    ClassDescriptor::OverrideTableHeader const *overrideTable,
+    void **classWords) {
+  // Get the base class and method.
+  auto *baseClass = cast_or_null<ClassDescriptor>(descriptor.Class.get());
+  auto *baseMethod = descriptor.Method.get();
+
+  // If the base method is null, it's an unavailable weak-linked
+  // symbol.
+  if (baseClass == nullptr || baseMethod == nullptr)
+    return;
+
+  // Calculate the base method's vtable offset from the
+  // base method descriptor. The offset will be relative
+  // to the base class's vtable start offset.
+  auto baseClassMethods = baseClass->getMethodDescriptors();
+
+  // If the method descriptor doesn't land within the bounds of the
+  // method table, abort.
+  if (baseMethod < baseClassMethods.begin() ||
+      baseMethod >= baseClassMethods.end()) {
+    fatalError(0,
+               "resilient vtable at %p contains out-of-bounds "
+               "method descriptor %p\n",
+               overrideTable, baseMethod);
+  }
+
+  // Install the method override in our vtable.
+  auto baseVTable = baseClass->getVTableDescriptor();
+  auto offset = (baseVTable->getVTableOffset(baseClass) +
+                 (baseMethod - baseClassMethods.data()));
+  swift_ptrauth_init_code_or_data(&classWords[offset], descriptor.getImpl(),
+                                  baseMethod->Flags.getExtraDiscriminator(),
+                                  !baseMethod->Flags.isData());
+}
+
 /// Using the information in the class context descriptor, fill in in the
 /// immediate vtable entries for the class and install overrides of any
 /// superclass vtable entries.
@@ -3667,40 +3704,10 @@ static void initClassVTable(ClassMetadata *self) {
   if (description->hasOverrideTable()) {
     auto *overrideTable = description->getOverrideTable();
     auto overrideDescriptors = description->getMethodOverrideDescriptors();
-
     for (unsigned i = 0, e = overrideTable->NumEntries; i < e; ++i) {
       auto &descriptor = overrideDescriptors[i];
 
-      // Get the base class and method.
-      auto *baseClass = cast_or_null<ClassDescriptor>(descriptor.Class.get());
-      auto *baseMethod = descriptor.Method.get();
-
-      // If the base method is null, it's an unavailable weak-linked
-      // symbol.
-      if (baseClass == nullptr || baseMethod == nullptr)
-        continue;
-
-      // Calculate the base method's vtable offset from the
-      // base method descriptor. The offset will be relative
-      // to the base class's vtable start offset.
-      auto baseClassMethods = baseClass->getMethodDescriptors();
-
-      // If the method descriptor doesn't land within the bounds of the
-      // method table, abort.
-      if (baseMethod < baseClassMethods.begin() ||
-          baseMethod >= baseClassMethods.end()) {
-        fatalError(0, "resilient vtable at %p contains out-of-bounds "
-                   "method descriptor %p\n",
-                   overrideTable, baseMethod);
-      }
-
-      // Install the method override in our vtable.
-      auto baseVTable = baseClass->getVTableDescriptor();
-      auto offset = (baseVTable->getVTableOffset(baseClass) +
-                     (baseMethod - baseClassMethods.data()));
-      swift_ptrauth_init_code_or_data(&classWords[offset], descriptor.getImpl(),
-                                      baseMethod->Flags.getExtraDiscriminator(),
-                                      !baseMethod->Flags.isData());
+      installOverrideInVTable(descriptor, overrideTable, classWords);
     }
   }
 }
