@@ -409,7 +409,7 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
   }
   // Someone else is responsible for building the module. Wait for them to
   // finish.
-  switch (Locked.waitForUnlockFor(std::chrono::seconds(256))) {
+  switch (Lock.waitForUnlockFor(std::chrono::seconds(256))) {
   case llvm::WaitForUnlockResult::Success: {
     // This process may have a different module output path. If the other
     // process doesn't build the interface to this output path, we should try
@@ -432,7 +432,7 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
       diagnose(diag::interface_file_lock_timed_out, interfacePath);
     }
     // Clear the lock file so that future invocations can make progress.
-    Locked.unsafeMaybeUnlock();
+    Lock.unsafeMaybeUnlock();
     continue;
   }
   }
