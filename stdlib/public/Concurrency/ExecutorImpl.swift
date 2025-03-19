@@ -20,12 +20,14 @@
 
 import Swift
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_asyncMainDrainQueueImpl")
 internal func drainMainQueue() {
   try! MainActor.executor.run()
   _exit(result: 0)
 }
+#endif
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_donateThreadToGlobalExecutorUntilImpl")
@@ -40,6 +42,7 @@ internal func dontateToGlobalExecutor(
   }
 }
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_getMainExecutorImpl")
 internal func getMainExecutor() -> UnownedSerialExecutor {
@@ -51,6 +54,7 @@ internal func getMainExecutor() -> UnownedSerialExecutor {
 internal func enqueueOnMainExecutor(job unownedJob: UnownedJob) {
   MainActor.executor.enqueue(unownedJob)
 }
+#endif
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueGlobalImpl")
@@ -58,7 +62,7 @@ internal func enqueueOnGlobalExecutor(job unownedJob: UnownedJob) {
   Task.defaultExecutor.enqueue(unownedJob)
 }
 
-#if !$Embedded
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueGlobalWithDelayImpl")
 internal func enqueueOnGlobalExecutor(delay: CUnsignedLongLong,

@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
 import Swift
 
 // Store the Timestamp in the executor private data, if it will fit; otherwise,
@@ -255,3 +257,5 @@ extension CooperativeExecutor: TaskExecutor {}
 
 @available(SwiftStdlib 6.2, *)
 extension CooperativeExecutor: MainExecutor {}
+
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

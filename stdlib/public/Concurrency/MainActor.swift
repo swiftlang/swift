@@ -22,12 +22,12 @@ import Swift
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    return unsafe UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    return unsafe UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
   }
 
   @inlinable

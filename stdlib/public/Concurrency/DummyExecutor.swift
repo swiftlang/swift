@@ -26,9 +26,15 @@ public final class DummyMainExecutor: MainExecutor, @unchecked Sendable {
     fatalError("There is no executor implementation active")
   }
 
+  #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  public func enqueue(_ job: UnownedJob) {
+    fatalError("There is no executor implementation active")
+  }
+  #else
   public func enqueue(_ job: consuming ExecutorJob) {
     fatalError("There is no executor implementation active")
   }
+  #endif
 
   public var isMainExecutor: Bool { true }
 
@@ -43,9 +49,15 @@ public final class DummyMainExecutor: MainExecutor, @unchecked Sendable {
 public final class DummyTaskExecutor: TaskExecutor, @unchecked Sendable {
   public init() {}
 
+  #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  public func enqueue(_ job: UnownedJob) {
+    fatalError("There is no executor implementation active")
+  }
+  #else
   public func enqueue(_ job: consuming ExecutorJob) {
     fatalError("There is no executor implementation active")
   }
+  #endif
 
   public var isMainExecutor: Bool { false }
 }

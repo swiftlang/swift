@@ -36,7 +36,7 @@ public protocol Executor: AnyObject, Sendable {
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  #if !$Embedded
+  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   // The functions below could have been added to a separate protocol,
   // but doing that would then mean doing an `as?` cast in e.g.
   // enqueueOnGlobalExecutor (in ExecutorBridge.swift), which is
@@ -51,7 +51,7 @@ public protocol Executor: AnyObject, Sendable {
 @available(SwiftStdlib 6.2, *)
 public protocol SchedulableExecutor: Executor {
 
-  #if !$Embedded
+  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   /// Enqueue a job to run after a specified delay.
   ///
@@ -94,7 +94,7 @@ public protocol SchedulableExecutor: Executor {
                          tolerance: C.Duration?,
                          clock: C)
 
-  #endif // !$Embedded
+  #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 }
 
@@ -125,7 +125,7 @@ extension Executor where Self: Equatable {
 
 extension Executor {
 
-  #if !$Embedded
+  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   // This defaults to `false` so that existing third-party Executor
   // implementations will work as expected.
   @available(SwiftStdlib 6.2, *)
@@ -138,7 +138,7 @@ extension Executor {
 @available(SwiftStdlib 6.2, *)
 extension SchedulableExecutor {
 
-  #if !$Embedded
+  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   @available(SwiftStdlib 6.2, *)
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
@@ -162,7 +162,7 @@ extension SchedulableExecutor {
             tolerance: tolerance, clock: clock)
   }
 
-  #endif // !$Embedded
+  #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
 /// A service that executes jobs.
@@ -331,7 +331,7 @@ public protocol SerialExecutor: Executor {
 @available(SwiftStdlib 6.0, *)
 extension SerialExecutor {
 
-  #if !$Embedded
+  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(SwiftStdlib 6.2, *)
   public var isMainExecutor: Bool { return MainActor.executor._isSameExecutor(self) }
   #endif
@@ -542,13 +542,13 @@ public protocol ExecutorFactory {
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_createExecutors")
 public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
-  #if !$Embedded
+  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   MainActor._executor = factory.mainExecutor
   #endif
   Task._defaultExecutor = factory.defaultExecutor
 }
 
-#if !$Embedded
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 extension MainActor {
   @available(SwiftStdlib 6.2, *)
   static var _executor: (any MainExecutor)? = nil
@@ -566,7 +566,7 @@ extension MainActor {
     return _executor!
   }
 }
-#endif // !$Embedded
+#endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 extension Task where Success == Never, Failure == Never {
   @available(SwiftStdlib 6.2, *)

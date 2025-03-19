@@ -21,7 +21,7 @@ import Swift
 @_silgen_name("_swift_exit")
 internal func _exit(result: CInt)
 
-#if !$Embedded
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("_swift_task_isMainExecutorSwift")
 internal func _isMainExecutor<E>(_ executor: E) -> Bool where E: SerialExecutor {
@@ -79,7 +79,7 @@ internal func _jobGetExecutorPrivateData(
   _ job: Builtin.Job
 ) -> UnsafeMutableRawPointer
 
-#if !$Embedded
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_getMainExecutor")
 internal func _getMainExecutor() -> any MainExecutor {

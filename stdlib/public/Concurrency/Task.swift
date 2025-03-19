@@ -1254,7 +1254,7 @@ extension Task where Success == Never, Failure == Never {
           priority: Int(Task.currentPriority.rawValue),
           continuation: continuation)
 
-      #if !$Embedded
+      #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
       if #available(SwiftStdlib 6.2, *) {
         let executor = Task.currentExecutor
 
