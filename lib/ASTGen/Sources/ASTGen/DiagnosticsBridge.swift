@@ -246,7 +246,7 @@ public func addQueuedDiagnostic(
   cLoc: BridgedSourceLoc,
   categoryName: BridgedStringRef,
   documentationPath: BridgedStringRef,
-  highlightRangesPtr: UnsafePointer<BridgedSourceLoc>?,
+  highlightRangesPtr: UnsafePointer<BridgedCharSourceRange>?,
   numHighlightRanges: Int
 ) {
   let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(
@@ -299,14 +299,16 @@ public func addQueuedDiagnostic(
 
   // Map the highlights.
   var highlights: [Syntax] = []
-  let highlightRanges = UnsafeBufferPointer<BridgedSourceLoc>(
+  let highlightRanges = UnsafeBufferPointer<BridgedCharSourceRange>(
     start: highlightRangesPtr,
-    count: numHighlightRanges * 2
+    count: numHighlightRanges
   )
   for index in 0..<numHighlightRanges {
+    let range = highlightRanges[index]
+
     // Make sure both the start and the end land within this source file.
-    guard let start = highlightRanges[index * 2].getOpaquePointerValue(),
-      let end = highlightRanges[index * 2 + 1].getOpaquePointerValue()
+    guard let start = range.start.getOpaquePointerValue(),
+      let end = range.start.advanced(by: range.byteLength).getOpaquePointerValue()
     else {
       continue
     }

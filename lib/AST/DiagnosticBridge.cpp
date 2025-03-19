@@ -56,13 +56,10 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
   }
 
   // Map the highlight ranges.
-  SmallVector<const void *, 2> highlightRanges;
+  SmallVector<BridgedCharSourceRange, 2> highlightRanges;
   for (const auto &range : info.Ranges) {
-    if (range.isInvalid())
-      continue;
-
-    highlightRanges.push_back(range.getStart().getOpaquePointerValue());
-    highlightRanges.push_back(range.getEnd().getOpaquePointerValue());
+    if (range.isValid())
+      highlightRanges.push_back(range);
   }
 
   StringRef documentationPath;
@@ -76,7 +73,7 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
                                    info.Category,
                                    documentationPath,
                                    highlightRanges.data(),
-                                   highlightRanges.size() / 2);
+                                   highlightRanges.size());
 
   // TODO: A better way to do this would be to pass the notes as an
   // argument to `swift_ASTGen_addQueuedDiagnostic` but that requires
