@@ -903,6 +903,10 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
   if (!clangModule)
     return nullptr;
 
+  // Swift groups all submodules of a Clang module together, and imports them as
+  // a single top-level module.
+  clangModule = clangModule->getTopLevelModule();
+
   return ctx.getClangModuleLoader()->getWrapperForModule(clangModule);
 }
 
