@@ -541,11 +541,9 @@ public:
           if (!eltTL.isAddressOnly()) {
             auto load = eltTL.emitLoad(SGF.B, loc, eltAddr,
                                        LoadOwnershipQualifier::Take);
-            eltMV = SGF.emitManagedRValueWithCleanup(load, eltTL);
-          } else {
-            eltMV = SGF.emitManagedBufferWithCleanup(eltAddr, eltTL);
+            return SGF.emitManagedRValueWithCleanup(load, eltTL);
           }
-          return eltMV;
+          return SGF.emitManagedBufferWithCleanup(eltAddr, eltTL);
         }();
 
         // Finish in the normal way for scalar results.
