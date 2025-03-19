@@ -269,7 +269,9 @@ if(SwiftCore_ENABLE_VECTOR_TYPES)
     "${CMAKE_CURRENT_BINARY_DIR}/SIMDVectorTypes.swift")
 endif()
 
-set_target_properties(swiftCore PROPERTIES Swift_MODULE_NAME Swift)
+set_target_properties(swiftCore PROPERTIES
+  Swift_MODULE_NAME Swift
+  LINKER_LANGUAGE CXX)
 
 target_compile_definitions(swiftCore
   PRIVATE
