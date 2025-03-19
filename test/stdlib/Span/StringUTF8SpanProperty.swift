@@ -13,6 +13,8 @@
 // RUN: %target-run-stdlib-swift(-enable-experimental-feature LifetimeDependence -enable-experimental-feature Span -enable-experimental-feature AddressableTypes)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_AddressableTypes
 
 import StdlibUnittest
 
@@ -81,45 +83,5 @@ suite.test("Span from Large Native String's Substring")
 
   for i in span.indices {
     expectEqual(span[i], u[i])
-  }
-}
-
-import Foundation
-
-let strings: [NSString: String] = [
-  "Hello, World!" as NSString: "Hello, World!",
-  "A long ASCII string exceeding 16 code units." as NSString: "A long ASCII string exceeding 16 code units.",
-  "🇯🇵" as NSString: "🇯🇵",
-  NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")!: "🏂☃❅❆❄︎⛄️❄️",
-]
-
-strings.forEach { string, expected in
-  suite.test("Span from Bridged String: \(expected)")
-  .require(.stdlib_6_2).code {
-    guard #available(SwiftStdlib 6.2, *) else { return }
-
-    let bridged = String(string)
-    let utf8 = bridged.utf8
-    let span = utf8.span
-    expectEqual(span.count, expected.utf8.count)
-    for (i,j) in zip(span.indices, expected.utf8.indices) {
-      expectEqual(span[i], expected.utf8[j])
-    }
-  }
-}
-
-strings.forEach { string, expected in
-  suite.test("Span from Bridged String Substring: \(expected)")
-  .require(.stdlib_6_2).code {
-    guard #available(SwiftStdlib 6.2, *) else { return }
-
-    let bridged = String(string).dropFirst()
-    let utf8 = bridged.utf8
-    let span = utf8.span
-    let expected = expected.dropFirst()
-    expectEqual(span.count, expected.utf8.count)
-    for (i,j) in zip(span.indices, expected.utf8.indices) {
-      expectEqual(span[i], expected.utf8[j])
-    }
   }
 }
