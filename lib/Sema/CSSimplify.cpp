@@ -4675,6 +4675,12 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
+  if (typeVar->getImpl().isKeyPathType()) {
+    return resolveKeyPath(typeVar, type, flags, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
+  }
+
   assignFixedType(typeVar, type, /*updateState=*/true,
                   /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
@@ -12255,6 +12261,30 @@ bool ConstraintSystem::resolveTapBody(TypeVariableType *typeVar,
   // With all of the contextual information recorded in the constraint system,
   // it's time to generate constraints for the body of this tap expression.
   return !generateConstraints(tapExpr);
+}
+
+bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
+                                      Type contextualType,
+                                      TypeMatchOptions flags,
+                                      ConstraintLocatorBuilder locator) {
+  // Key path types recently gained Copyable, Escapable requirements.
+  // The solver cannot account for that during inference because Root
+  // and Value types are required to be only resolved enough to infer
+  // a capability of a key path itself.
+  if (auto *BGT = contextualType->getAs<BoundGenericType>()) {
+    auto keyPathTy = openUnboundGenericType(
+        BGT->getDecl(), BGT->getParent(), locator, /*isTypeResolution=*/false);
+
+    assignFixedType(
+        typeVar, keyPathTy, /*updateState=*/true,
+        /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
+    addConstraint(ConstraintKind::Equal, keyPathTy, contextualType, locator);
+    return true;
+  }
+
+  assignFixedType(typeVar, contextualType, /*updateState=*/true,
+                  /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
+  return true;
 }
 
 ConstraintSystem::SolutionKind
