@@ -714,10 +714,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                         /*unboundTyOpener*/ nullptr,
                                         /*placeholderHandler*/ nullptr,
                                         /*packElementOpener*/ nullptr);
-      auto params = func ? func->getParameters()
-                      : subscr ? subscr->getIndices()
-                      : macro->parameterList;
-      for (auto param : *params) {
+
+      for (auto param : *VD->getParameterList()) {
         auto *typeRepr = param->getTypeRepr();
         if (typeRepr == nullptr)
             continue;

@@ -7262,7 +7262,7 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
 
   SmallVector<AnyFunctionType::Param, 4> newTypeParams;
   auto typeParams = fnType->getParams();
-  auto paramDecls = func ? func->getParameters() : subscript->getIndices();
+  auto paramDecls = decl->getParameterList();
   assert(typeParams.size() == paramDecls->size());
   bool knownUnsafeParams = func && hasKnownUnsafeSendableFunctionParams(func);
   bool stripConcurrency =
