@@ -28,7 +28,8 @@ void swift_ASTGen_addQueuedSourceFile(
 void swift_ASTGen_addQueuedDiagnostic(
     void *_Nonnull queued, void *_Nonnull state,
     BridgedStringRef text,
-    BridgedDiagnosticSeverity severity, const void *_Nullable sourceLoc,
+    BridgedDiagnosticSeverity severity,
+    BridgedSourceLoc sourceLoc,
     BridgedStringRef categoryName,
     BridgedStringRef documentationPath,
     const void *_Nullable *_Nullable highlightRanges,

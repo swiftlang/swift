@@ -72,7 +72,7 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
   // FIXME: Translate Fix-Its.
   swift_ASTGen_addQueuedDiagnostic(queuedDiagnostics, perFrontendState,
                                    text.str(),
-                                   severity, info.Loc.getOpaquePointerValue(),
+                                   severity, info.Loc,
                                    info.Category,
                                    documentationPath,
                                    highlightRanges.data(),
