@@ -60,6 +60,17 @@
 public protocol ResilientWrapping {
   associatedtype Wrapped
   var wrapped: Wrapped { read set }
+  var wrapped2: Wrapped { read set }
+}
+extension ResilientWrapping {
+  public var wrapped2: Wrapped {
+    read {
+      yield wrapped
+    }
+    modify {
+      yield &wrapped
+    }
+  }
 }
 
 public struct ResilientBoxtional<T> : ResilientWrapping {
@@ -80,6 +91,7 @@ public struct ResilientBoxtional<T> : ResilientWrapping {
 }
 
 open class ResilientWrappingClass<Wrapped> {
+  public init() {}
   open var wrapped: Wrapped {
     read {
       fatalError()
@@ -158,6 +170,39 @@ struct MaybePtrBox<T> {
       }
       yield &val
       set(val)
+    }
+  }
+}
+
+struct Boxtional<T> : ResilientWrapping {
+  var storage: T?
+  init(_ t: T?) {
+    self.storage = t
+  }
+  typealias Wrapped = T?
+
+  var wrapped : T? {
+    read {
+      yield storage
+    }
+    modify {
+      yield &storage
+    }
+  }
+}
+
+class NonresilientResilientWrappingSubclass<X : ResilientWrapping> : ResilientWrappingClass<X.Wrapped> {
+  init(_ impl: X) { 
+    self.impl = impl
+    super.init()
+  }
+  var impl: X
+  override var wrapped: X.Wrapped {
+    read {
+      yield impl.wrapped
+    }
+    modify {
+      yield &impl.wrapped
     }
   }
 }
@@ -333,6 +378,24 @@ struct M {
     // CHECK: "hihi"
     print(v2.wrapped)
   }
+  static func mutateResilientWrapped2<T : ResilientWrapping>(_ t: inout T) where T.Wrapped : Mutatable {
+    t.wrapped2.mutate()
+  }
+  static func resilient_proto_default_main() {
+    var v1 = Boxtional(Optional<Stringgg>.none)
+    // CHECK: nil
+    print(v1.wrapped)
+    mutateResilientWrapped(&v1)
+    // CHECK: nil
+    print(v1.wrapped)
+
+    var v2 = Boxtional(Stringgg(value: "hi"))
+    // CHECK: "hi"
+    print(v2.wrapped)
+    mutateResilientWrapped(&v2)
+    // CHECK: "hihi"
+    print(v2.wrapped)
+  }
   static func mutateWrappedInResilientClass<T : Mutatable>(_ t: ResilientWrappingClass<T>) {
     t.wrapped.mutate()
   }
@@ -350,12 +413,28 @@ struct M {
     // CHECK: "hihi"
     print(v2.wrapped)
   }
+  static func resilient_subclass_main() {
+    let v1 = MaybePtrBox(Optional<Stringgg>.none)
+    // CHECK: nil
+    print(v1.wrapped)
+    mutateWrappedInResilientClass(NonresilientResilientWrappingSubclass(v1))
+    // CHECK: nil
+    print(v1.wrapped)
+    let v2 = MaybePtrBox(Stringgg(value: "hi"))
+    // CHECK: "hi"
+    print(v2.wrapped)
+    mutateWrappedInResilientClass(NonresilientResilientWrappingSubclass(v2))
+    // CHECK: "hihi"
+    print(v2.wrapped)
+  }
   static func main() async {
     sync_main()
     await async_main()
     proto_main()
     class_main()
     resilient_proto_main()
+    resilient_proto_default_main()
     resilient_class_main()
+    resilient_subclass_main()
   }
 }
