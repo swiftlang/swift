@@ -109,6 +109,9 @@ The architecture where the toolchain will execute.
 .PARAMETER Variant
 The toolchain variant to build. Defaults to `Asserts`.
 
+.PARAMETER FoundationTestConfiguration
+Whether to run swift-foundation and swift-corelibs-foundation tests in a debug or release configuration.
+
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -165,6 +168,8 @@ param
   [switch] $Clean,
   [switch] $DebugInfo,
   [switch] $EnableCaching,
+  [ValidateSet("debug", "release")]
+  [string] $FoundationTestConfiguration = "debug",
   [string] $Cache = "",
   [switch] $Summary,
   [switch] $ToBatch
@@ -1454,6 +1459,7 @@ function Build-SPMProject {
     [string] $Src,
     [string] $Bin,
     [hashtable] $Arch,
+    [string] $Configuration = "release",
     [Parameter(ValueFromRemainingArguments)]
     [string[]] $AdditionalArguments
   )
@@ -1483,7 +1489,7 @@ function Build-SPMProject {
     $Arguments = @(
         "--scratch-path", $Bin,
         "--package-path", $Src,
-        "-c", "release",
+        "-c", $Configuration,
         "-Xbuild-tools-swiftc", "-I$(Get-SwiftSDK Windows)\usr\lib\swift",
         "-Xbuild-tools-swiftc", "-L$(Get-SwiftSDK Windows)\usr\lib\swift\windows",
         "-Xcc", "-I$(Get-SwiftSDK Windows)\usr\lib\swift",
@@ -2321,7 +2327,8 @@ function Build-Foundation {
       -Action Test `
       -Src $SourceCache\swift-foundation `
       -Bin "$BinaryCache\$($Arch.LLVMTarget)\CoreFoundationTests" `
-      -Arch $HostArch
+      -Arch $HostArch `
+      -Configuration $FoundationTestConfiguration
 
     $ShortArch = $Arch.LLVMName
     Invoke-IsolatingEnvVars {
@@ -2335,7 +2342,8 @@ function Build-Foundation {
         -Action Test `
         -Src $SourceCache\swift-corelibs-foundation `
         -Bin "$BinaryCache\$($Arch.LLVMTarget)\FoundationTests" `
-        -Arch $HostArch
+        -Arch $HostArch `
+        -Configuration $FoundationTestConfiguration
     }
   } else {
     $FoundationBinaryCache = if ($Static) {
