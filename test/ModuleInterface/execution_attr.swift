@@ -30,5 +30,37 @@ public struct Test {
   // CHECK-NEXT:  public func other(_: () async -> Swift.Void)
   // CHECK-NEXT:  #endif
   public func other(_: @execution(caller) () async -> Void) {}
+
+  // CHECK: #if compiler(>=5.3) && $ExecutionAttribute
+  // CHECK-NEXT: @execution(caller) public var testOnVar: Swift.Int {
+  // CHECK-NEXT:   get async
+  // CHECK-NEXT: }
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: public var testOnVar: Swift.Int {
+  // CHECK-NEXT:   get async
+  // CHECK-NEXT: }
+  // CHECK-NEXT: #endif
+  @execution(caller)
+  public var testOnVar: Int {
+    get async {
+      42
+    }
+  }
+
+  // CHECK: #if compiler(>=5.3) && $ExecutionAttribute
+  // CHECK-NEXT: @execution(caller) public subscript(onSubscript _: Swift.Int) -> Swift.Bool {
+  // CHECK-NEXT:   get async
+  // CHECK-NEXT: }
+  // CHECK-NEXT: #else
+  // CHECK-NEXT: public subscript(onSubscript _: Swift.Int) -> Swift.Bool {
+  // CHECK-NEXT:   get async
+  // CHECK-NEXT: }
+  // CHECK-NEXT: #endif
+  @execution(caller)
+  public subscript(onSubscript _: Int) -> Bool {
+    get async {
+      false
+    }
+  }
 }
 
