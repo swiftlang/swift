@@ -421,9 +421,11 @@ extension _StringGuts {
 extension _StringGuts {
 
   private static var associationKey: UnsafeRawPointer {
-    // We never dereference this, we just use this address as a unique key
-    // TODO: perhaps use the address of a metatype instead
-    unsafe UnsafeRawPointer(Builtin.addressof(&_swiftEmptyArrayStorage))
+    // We never dereference this, we only use this address as a unique key
+    unsafe unsafeBitCast(
+      ObjectIdentifier(_StringGuts.self),
+      to: UnsafeRawPointer.self
+    )
   }
 
   internal func getAssociatedStorage() -> __StringStorage? {
