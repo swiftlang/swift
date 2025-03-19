@@ -412,6 +412,8 @@ SWIFT_MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
      "Dump the results of FunctionUses")
 SWIFT_MODULE_PASS(MandatoryPerformanceOptimizations, "mandatory-performance-optimizations",
      "Performs optimizations for performance-annotated functions")
+SWIFT_MODULE_PASS(ConstGlobalVariableFoldingPass, "const-global-variable-folding",
+     "Performs simplification and folding of @const global variable initializers")
 SWIFT_MODULE_PASS(ReadOnlyGlobalVariablesPass, "read-only-global-variables",
      "Converts read-only var-globals to let-globals")
 SWIFT_MODULE_PASS(StackProtection, "stack-protection",
@@ -517,6 +519,8 @@ PASS(DiagnoseUnnecessaryPreconcurrencyImports, "sil-diagnose-unnecessary-preconc
      "Diagnose any preconcurrency imports that Sema and TransferNonSendable did not use")
 PASS(ThunkLowering, "sil-thunk-lowering",
      "Lower thunk instructions to actual thunks")
+PASS(DiagnoseUnknownCompileTimeValues, "sil-diagnose-unknown-compiletime-values",
+     "Diagnose any '@const' entities which could not be simplified to a compile-time value")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AliasInfoDumper, PruneVTables)

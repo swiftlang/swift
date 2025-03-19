@@ -262,6 +262,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addDeadFunctionAndGlobalElimination();
   }
 
+  P.addConstGlobalVariableFoldingPass();
+  P.addOnoneSimplification();
+  P.addDiagnoseUnknownCompileTimeValues();
+
   P.addPerformanceDiagnostics();
 }
 

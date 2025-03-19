@@ -5898,6 +5898,7 @@ public:
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
   bool isCompileTimeLiteral() const;
+  bool isConstVal() const;
 
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
