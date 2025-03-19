@@ -633,12 +633,12 @@ void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
   runSwiftInstructionPass(inst, runFunction);                              \
   return nullptr;                                                          \
 
-#define SWIFT_SILCOMBINE_PASS(INST) \
+#define INSTRUCTION_SIMPLIFICATION(INST) \
 SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
   _RUN_SWIFT_SIMPLIFICATON(INST)                                           \
 }                                                                          \
 
-#define SWIFT_SILCOMBINE_PASS_WITH_LEGACY(INST) \
+#define INSTRUCTION_SIMPLIFICATION_WITH_LEGACY(INST) \
 SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
   if (auto *result = legacyVisit##INST(inst))                              \
     return result;                                                         \
@@ -648,9 +648,7 @@ SILInstruction *SILCombiner::visit##INST(INST *inst) {                     \
   return nullptr;                                                          \
 }                                                                          \
 
-#define PASS(ID, TAG, DESCRIPTION)
-
-#include "swift/SILOptimizer/PassManager/Passes.def"
+#include "Simplifications.def"
 
 #undef _RUN_SWIFT_SIMPLIFICATON
 
