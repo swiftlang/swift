@@ -49,8 +49,6 @@ bool ProtocolConformanceRef::isInvalid() const {
 }
 
 ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
-  assert(!isInvalid());
-
   if (isConcrete()) {
     return getConcrete()->getProtocol();
   } else if (isPack()) {

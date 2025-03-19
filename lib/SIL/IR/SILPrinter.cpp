@@ -4269,13 +4269,18 @@ void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
   case WitnessKind::AssociatedConformance: {
     // associated_conformance (AssociatedTypeName: Protocol): <conformance>
     auto &assocProtoWitness = getAssociatedConformanceWitness();
+    if (assocProtoWitness.Witness.isInvalid())
+      return;
     out << "associated_conformance (";
     (void) printAssociatedTypePath(out, assocProtoWitness.Requirement);
-    out << ": " << assocProtoWitness.Protocol->getName() << "): ";
-    if (assocProtoWitness.Witness.isConcrete())
-      assocProtoWitness.Witness.getConcrete()->printName(out, options);
-    else
-      out << "dependent";
+    auto conformance = assocProtoWitness.Witness;
+    out << ": " << conformance.getRequirement()->getName() << "): ";
+    if (conformance.isConcrete())
+      conformance.getConcrete()->printName(out, options);
+    else {
+      out << "dependent ";
+      assocProtoWitness.SubstType->print(out, options);
+    }
     break;
   }
   case WitnessKind::BaseProtocol: {
@@ -4316,14 +4321,19 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   for (auto conditionalConformance : getConditionalConformances()) {
     // conditional_conformance (TypeName: Protocol):
     // <conformance>
+    if (conditionalConformance.Conformance.isInvalid())
+      continue;
+
     OS << "  conditional_conformance (";
     conditionalConformance.Requirement.print(OS, Options);
     OS << ": " << conditionalConformance.Conformance.getRequirement()->getName()
        << "): ";
     if (conditionalConformance.Conformance.isConcrete())
       conditionalConformance.Conformance.getConcrete()->printName(OS, Options);
-    else
-      OS << "dependent";
+    else {
+      OS << "dependent ";
+      conditionalConformance.Requirement->print(OS, Options);
+    }
 
     OS << '\n';
   }

@@ -19,6 +19,8 @@
 #ifndef SWIFT_IRGEN_LOCALTYPEDATAKIND_H
 #define SWIFT_IRGEN_LOCALTYPEDATAKIND_H
 
+#include "swift/AST/PackConformance.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
 #include "swift/IRGen/ValueWitness.h"
@@ -183,13 +185,23 @@ public:
     return reinterpret_cast<PackConformance*>(Value - Kind_PackConformance);
   }
 
-  ProtocolConformanceRef getProtocolConformance() const {
+  ProtocolDecl *getConformedProtocol() const {
     assert(!isSingletonKind());
     if ((Value & KindMask) == Kind_Decl) {
-      // FIXME: Passing an empty Type() here temporarily while staging in
-      // new representation for abstract conformances
+      return getAbstractProtocolConformance();
+    } else if ((Value & KindMask) == Kind_PackConformance) {
+      return getPackProtocolConformance()->getProtocol();
+    } else {
+      assert((Value & KindMask) == Kind_Conformance);
+      return getConcreteProtocolConformance()->getProtocol();
+    }
+  }
+
+  ProtocolConformanceRef getProtocolConformance(Type conformingType) const {
+    assert(!isSingletonKind());
+    if ((Value & KindMask) == Kind_Decl) {
       return ProtocolConformanceRef::forAbstract(
-          Type(), getAbstractProtocolConformance());
+          conformingType, getAbstractProtocolConformance());
     } else if ((Value & KindMask) == Kind_PackConformance) {
       return ProtocolConformanceRef(getPackProtocolConformance());
     } else {
