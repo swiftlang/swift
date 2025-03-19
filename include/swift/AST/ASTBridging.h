@@ -2057,6 +2057,13 @@ BridgedKeyPathExpr BridgedKeyPathExpr_createParsed(
     BridgedNullableExpr cParsedRoot, BridgedNullableExpr cParsedPath,
     bool hasLeadingDot);
 
+SWIFT_NAME("BridgedKeyPathExpr.createParsedPoundKeyPath(_:poundLoc:lParenLoc:"
+           "names:nameLocs:rParenLoc:)")
+BridgedKeyPathExpr BridgedKeyPathExpr_createParsedPoundKeyPath(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedSourceLoc cLParenLoc, BridgedArrayRef cNames,
+    BridgedArrayRef cNameLocs, BridgedSourceLoc cRParenLoc);
+
 SWIFT_NAME("BridgedMacroExpansionExpr.createParsed(_:poundLoc:macroNameRef:"
            "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")
 BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
@@ -2086,6 +2093,20 @@ SWIFT_NAME("BridgedNilLiteralExpr.createParsed(_:nilKeywordLoc:)")
 BridgedNilLiteralExpr
 BridgedNilLiteralExpr_createParsed(BridgedASTContext cContext,
                                    BridgedSourceLoc cNilKeywordLoc);
+
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedObjCSelectorKind {
+  BridgedObjCSelectorKindMethod,
+  BridgedObjCSelectorKindGetter,
+  BridgedObjCSelectorKindSetter,
+};
+
+SWIFT_NAME("BridgedObjCSelectorExpr.createParsed(_:kind:keywordLoc:lParenLoc:"
+           "modifierLoc:subExpr:rParenLoc:)")
+BridgedObjCSelectorExpr BridgedObjCSelectorExpr_createParsed(
+    BridgedASTContext cContext, BridgedObjCSelectorKind cKind,
+    BridgedSourceLoc cKeywordLoc, BridgedSourceLoc cLParenLoc,
+    BridgedSourceLoc cModifierLoc, BridgedExpr cSubExpr,
+    BridgedSourceLoc cRParenLoc);
 
 enum ENUM_EXTENSIBILITY_ATTR(open) BridgedObjectLiteralKind : size_t {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) BridgedObjectLiteralKind_##Name,
