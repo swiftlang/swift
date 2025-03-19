@@ -374,10 +374,10 @@ func fn() {
 // Type differences
 //
 
-@abi(func floatForIntParam(_: Float) -> Int) // expected-error @:31 {{type 'Float' in '@abi' should match 'Int'}}
+@abi(func floatForIntParam(_ a: Float) -> Int) // expected-error @:33 {{parameter 'a' type 'Float' in '@abi' should match 'Int'}}
 func intForFloatParam(_: Int) -> Int { fatalError() } // expected-note @:26 {{should match type here}}
 
-@abi(func floatForIntResult(_: Int) -> Float) // expected-error @:40 {{type 'Float' in '@abi' should match 'Int'}}
+@abi(func floatForIntResult(_ a: Int) -> Float) // expected-error @:42 {{result type 'Float' in '@abi' should match 'Int'}}
 func intForFloatResult(_: Int) -> Int { fatalError() } // expected-note @:35 {{should match type here}}
 
 @abi(func labeledForUnlabeledTuple(_: (x: Int, y: Int)))
@@ -404,22 +404,22 @@ func testDefaultArguments(
   d: Int = 2
 ) {}
 
-@abi(func arrayForVariadicParam(a: [Int], b: Set<Float>)) // expected-error @:46 {{type 'Set<Float>' in '@abi' should match 'Float...'}}
+@abi(func arrayForVariadicParam(a: [Int], b: Set<Float>)) // expected-error @:46 {{parameter 'b' type 'Set<Float>' in '@abi' should match 'Float...'}}
 func arrayForVariadicParam(a: Int..., b: Float...) {} // expected-note @:42 {{should match type here}}
 
 struct DefaultParamOwnership {
   @abi(
     func method(
-      _: AnyObject,
-      _: inout AnyObject, // expected-error {{parameter modifier 'inout' in '@abi' is not compatible with default}}
-      _: borrowing AnyObject,
-      _: consuming AnyObject, // expected-error {{parameter modifier 'consuming' in '@abi' is not compatible with default}}
-      _: __shared AnyObject,
-      _: __owned AnyObject, // expected-error {{parameter modifier '__owned' in '@abi' is not compatible with default}}
-      _: sending AnyObject, // expected-error {{parameter modifier 'sending' in '@abi' is not compatible with default}}
-      _: (AnyObject) -> Void,
-      _: (borrowing AnyObject) -> Void,
-      _: (consuming AnyObject) -> Void // expected-error {{type '(consuming AnyObject) -> Void' in '@abi' should match '(AnyObject) -> Void'}}
+      _ a: AnyObject,
+      _ b: inout AnyObject, // expected-error {{modifier 'inout' on parameter 'b' in '@abi' is not compatible with default}}
+      _ c: borrowing AnyObject,
+      _ d: consuming AnyObject, // expected-error {{modifier 'consuming' on parameter 'd' in '@abi' is not compatible with default}}
+      _ e: __shared AnyObject,
+      _ f: __owned AnyObject, // expected-error {{modifier '__owned' on parameter 'f' in '@abi' is not compatible with default}}
+      _ g: sending AnyObject, // expected-error {{modifier 'sending' on parameter 'g' in '@abi' is not compatible with default}}
+      _ h: (AnyObject) -> Void,
+      _ i: (borrowing AnyObject) -> Void,
+      _ j: (consuming AnyObject) -> Void // expected-error {{parameter 'j' type '(consuming AnyObject) -> Void' in '@abi' should match '(AnyObject) -> Void'}}
     )
   )
   func method(
@@ -437,16 +437,16 @@ struct DefaultParamOwnership {
 
   @abi(
     init(
-      _: AnyObject,
-      _: inout AnyObject, // expected-error {{parameter modifier 'inout' in '@abi' is not compatible with default}}
-      _: borrowing AnyObject, // expected-error {{parameter modifier 'borrowing' in '@abi' is not compatible with default}}
-      _: consuming AnyObject,
-      _: __shared AnyObject, // expected-error {{parameter modifier '__shared' in '@abi' is not compatible with default}}
-      _: __owned AnyObject,
-      _: sending AnyObject,
-      _: (AnyObject) -> Void,
-      _: (borrowing AnyObject) -> Void,
-      _: (consuming AnyObject) -> Void // expected-error {{type '(consuming AnyObject) -> Void' in '@abi' should match '(AnyObject) -> Void'}}
+      _ a: AnyObject,
+      _ b: inout AnyObject, // expected-error {{modifier 'inout' on parameter 'b' in '@abi' is not compatible with default}}
+      _ c: borrowing AnyObject, // expected-error {{modifier 'borrowing' on parameter 'c' in '@abi' is not compatible with default}}
+      _ d: consuming AnyObject,
+      _ e: __shared AnyObject, // expected-error {{modifier '__shared' on parameter 'e' in '@abi' is not compatible with default}}
+      _ f: __owned AnyObject,
+      _ g: sending AnyObject,
+      _ h: (AnyObject) -> Void,
+      _ i: (borrowing AnyObject) -> Void,
+      _ j: (consuming AnyObject) -> Void // expected-error {{parameter 'j' type '(consuming AnyObject) -> Void' in '@abi' should match '(AnyObject) -> Void'}}
     )
   )
   init(
@@ -466,16 +466,16 @@ struct DefaultParamOwnership {
 struct InoutParamOwnership {
   @abi(
     func method(
-      _: AnyObject, // expected-error {{default parameter modifier in '@abi' is not compatible with 'inout'}}
-      _: inout AnyObject,
-      _: borrowing AnyObject, // expected-error {{parameter modifier 'borrowing' in '@abi' is not compatible with 'inout'}}
-      _: consuming AnyObject, // expected-error {{parameter modifier 'consuming' in '@abi' is not compatible with 'inout'}}
-      _: __shared AnyObject, // expected-error {{parameter modifier '__shared' in '@abi' is not compatible with 'inout'}}
-      _: __owned AnyObject, // expected-error {{parameter modifier '__owned' in '@abi' is not compatible with 'inout'}}
-      _: sending AnyObject, // expected-error {{parameter modifier 'sending' in '@abi' is not compatible with 'inout'}}
-      _: (AnyObject) -> Void, // expected-error {{type '(AnyObject) -> Void' in '@abi' should match '(inout AnyObject) -> Void'}}
-      _: (borrowing AnyObject) -> Void, // expected-error {{type '(borrowing AnyObject) -> Void' in '@abi' should match '(inout AnyObject) -> Void'}}
-      _: (consuming AnyObject) -> Void // expected-error {{type '(consuming AnyObject) -> Void' in '@abi' should match '(inout AnyObject) -> Void'}}
+      _ a: AnyObject, // expected-error {{default modifier on parameter 'a' in '@abi' is not compatible with 'inout'}}
+      _ b: inout AnyObject,
+      _ c: borrowing AnyObject, // expected-error {{modifier 'borrowing' on parameter 'c' in '@abi' is not compatible with 'inout'}}
+      _ d: consuming AnyObject, // expected-error {{modifier 'consuming' on parameter 'd' in '@abi' is not compatible with 'inout'}}
+      _ e: __shared AnyObject, // expected-error {{modifier '__shared' on parameter 'e' in '@abi' is not compatible with 'inout'}}
+      _ f: __owned AnyObject, // expected-error {{modifier '__owned' on parameter 'f' in '@abi' is not compatible with 'inout'}}
+      _ g: sending AnyObject, // expected-error {{modifier 'sending' on parameter 'g' in '@abi' is not compatible with 'inout'}}
+      _ h: (AnyObject) -> Void, // expected-error {{parameter 'h' type '(AnyObject) -> Void' in '@abi' should match '(inout AnyObject) -> Void'}}
+      _ i: (borrowing AnyObject) -> Void, // expected-error {{parameter 'i' type '(borrowing AnyObject) -> Void' in '@abi' should match '(inout AnyObject) -> Void'}}
+      _ j: (consuming AnyObject) -> Void // expected-error {{parameter 'j' type '(consuming AnyObject) -> Void' in '@abi' should match '(inout AnyObject) -> Void'}}
     )
   )
   func method(
@@ -493,16 +493,16 @@ struct InoutParamOwnership {
 
   @abi(
     init(
-      _: AnyObject, // expected-error {{default parameter modifier in '@abi' is not compatible with 'inout'}}
-      _: inout AnyObject,
-      _: borrowing AnyObject, // expected-error {{parameter modifier 'borrowing' in '@abi' is not compatible with 'inout'}}
-      _: consuming AnyObject, // expected-error {{parameter modifier 'consuming' in '@abi' is not compatible with 'inout'}}
-      _: __shared AnyObject, // expected-error {{parameter modifier '__shared' in '@abi' is not compatible with 'inout'}}
-      _: __owned AnyObject, // expected-error {{parameter modifier '__owned' in '@abi' is not compatible with 'inout'}}
-      _: sending AnyObject, // expected-error {{parameter modifier 'sending' in '@abi' is not compatible with 'inout'}}
-      _: (AnyObject) -> Void, // expected-error {{type '(AnyObject) -> Void' in '@abi' should match '(inout AnyObject) -> Void'}}
-      _: (borrowing AnyObject) -> Void, // expected-error {{type '(borrowing AnyObject) -> Void' in '@abi' should match '(inout AnyObject) -> Void'}}
-      _: (consuming AnyObject) -> Void // expected-error {{type '(consuming AnyObject) -> Void' in '@abi' should match '(inout AnyObject) -> Void'}}
+      _ a: AnyObject, // expected-error {{default modifier on parameter 'a' in '@abi' is not compatible with 'inout'}}
+      _ b: inout AnyObject,
+      _ c: borrowing AnyObject, // expected-error {{modifier 'borrowing' on parameter 'c' in '@abi' is not compatible with 'inout'}}
+      _ d: consuming AnyObject, // expected-error {{modifier 'consuming' on parameter 'd' in '@abi' is not compatible with 'inout'}}
+      _ e: __shared AnyObject, // expected-error {{modifier '__shared' on parameter 'e' in '@abi' is not compatible with 'inout'}}
+      _ f: __owned AnyObject, // expected-error {{modifier '__owned' on parameter 'f' in '@abi' is not compatible with 'inout'}}
+      _ g: sending AnyObject, // expected-error {{modifier 'sending' on parameter 'g' in '@abi' is not compatible with 'inout'}}
+      _ h: (AnyObject) -> Void, // expected-error {{parameter 'h' type '(AnyObject) -> Void' in '@abi' should match '(inout AnyObject) -> Void'}}
+      _ i: (borrowing AnyObject) -> Void, // expected-error {{parameter 'i' type '(borrowing AnyObject) -> Void' in '@abi' should match '(inout AnyObject) -> Void'}}
+      _ j: (consuming AnyObject) -> Void // expected-error {{parameter 'j' type '(consuming AnyObject) -> Void' in '@abi' should match '(inout AnyObject) -> Void'}}
     )
   )
   init(
@@ -522,16 +522,16 @@ struct InoutParamOwnership {
 struct BorrowingParamOwnership {
   @abi(
     func method(
-      _: AnyObject,
-      _: inout AnyObject, // expected-error {{parameter modifier 'inout' in '@abi' is not compatible with 'borrowing'}}
-      _: borrowing AnyObject,
-      _: consuming AnyObject, // expected-error {{parameter modifier 'consuming' in '@abi' is not compatible with 'borrowing'}}
-      _: __shared AnyObject,
-      _: __owned AnyObject, // expected-error {{parameter modifier '__owned' in '@abi' is not compatible with 'borrowing'}}
-      _: sending AnyObject, // expected-error {{parameter modifier 'sending' in '@abi' is not compatible with 'borrowing'}}
-      _: (AnyObject) -> Void,
-      _: (borrowing AnyObject) -> Void,
-      _: (consuming AnyObject) -> Void // expected-error {{type '(consuming AnyObject) -> Void' in '@abi' should match '(borrowing AnyObject) -> Void'}}
+      _ a: AnyObject,
+      _ b: inout AnyObject, // expected-error {{modifier 'inout' on parameter 'b' in '@abi' is not compatible with 'borrowing'}}
+      _ c: borrowing AnyObject,
+      _ d: consuming AnyObject, // expected-error {{modifier 'consuming' on parameter 'd' in '@abi' is not compatible with 'borrowing'}}
+      _ e: __shared AnyObject,
+      _ f: __owned AnyObject, // expected-error {{modifier '__owned' on parameter 'f' in '@abi' is not compatible with 'borrowing'}}
+      _ g: sending AnyObject, // expected-error {{modifier 'sending' on parameter 'g' in '@abi' is not compatible with 'borrowing'}}
+      _ h: (AnyObject) -> Void,
+      _ i: (borrowing AnyObject) -> Void,
+      _ j: (consuming AnyObject) -> Void // expected-error {{parameter 'j' type '(consuming AnyObject) -> Void' in '@abi' should match '(borrowing AnyObject) -> Void'}}
     )
   )
   func method(
@@ -549,16 +549,16 @@ struct BorrowingParamOwnership {
 
   @abi(
     init(
-      _: AnyObject, // expected-error {{default parameter modifier in '@abi' is not compatible with 'borrowing'}}
-      _: inout AnyObject, // expected-error {{parameter modifier 'inout' in '@abi' is not compatible with 'borrowing'}}
-      _: borrowing AnyObject,
-      _: consuming AnyObject, // expected-error {{parameter modifier 'consuming' in '@abi' is not compatible with 'borrowing'}}
-      _: __shared AnyObject,
-      _: __owned AnyObject, // expected-error {{parameter modifier '__owned' in '@abi' is not compatible with 'borrowing'}}
-      _: sending AnyObject, // expected-error {{parameter modifier 'sending' in '@abi' is not compatible with 'borrowing'}}
-      _: (AnyObject) -> Void,
-      _: (borrowing AnyObject) -> Void,
-      _: (consuming AnyObject) -> Void // expected-error {{type '(consuming AnyObject) -> Void' in '@abi' should match '(borrowing AnyObject) -> Void'}}
+      _ a: AnyObject, // expected-error {{default modifier on parameter 'a' in '@abi' is not compatible with 'borrowing'}}
+      _ b: inout AnyObject, // expected-error {{modifier 'inout' on parameter 'b' in '@abi' is not compatible with 'borrowing'}}
+      _ c: borrowing AnyObject,
+      _ d: consuming AnyObject, // expected-error {{modifier 'consuming' on parameter 'd' in '@abi' is not compatible with 'borrowing'}}
+      _ e: __shared AnyObject,
+      _ f: __owned AnyObject, // expected-error {{modifier '__owned' on parameter 'f' in '@abi' is not compatible with 'borrowing'}}
+      _ g: sending AnyObject, // expected-error {{modifier 'sending' on parameter 'g' in '@abi' is not compatible with 'borrowing'}}
+      _ h: (AnyObject) -> Void,
+      _ i: (borrowing AnyObject) -> Void,
+      _ j: (consuming AnyObject) -> Void // expected-error {{parameter 'j' type '(consuming AnyObject) -> Void' in '@abi' should match '(borrowing AnyObject) -> Void'}}
     )
   )
   init(
@@ -578,16 +578,16 @@ struct BorrowingParamOwnership {
 struct ConsumingParamOwnership {
   @abi(
     func method(
-      _: AnyObject, // expected-error {{default parameter modifier in '@abi' is not compatible with 'consuming'}}
-      _: inout AnyObject, // expected-error {{parameter modifier 'inout' in '@abi' is not compatible with 'consuming'}}
-      _: borrowing AnyObject, // expected-error {{parameter modifier 'borrowing' in '@abi' is not compatible with 'consuming'}}
-      _: consuming AnyObject,
-      _: __shared AnyObject, // expected-error {{parameter modifier '__shared' in '@abi' is not compatible with 'consuming'}}
-      _: __owned AnyObject,
-      _: sending AnyObject,
-      _: (AnyObject) -> Void, // expected-error {{type '(AnyObject) -> Void' in '@abi' should match '(consuming AnyObject) -> Void'}}
-      _: (borrowing AnyObject) -> Void, // expected-error {{type '(borrowing AnyObject) -> Void' in '@abi' should match '(consuming AnyObject) -> Void'}}
-      _: (consuming AnyObject) -> Void
+      _ a: AnyObject, // expected-error {{default modifier on parameter 'a' in '@abi' is not compatible with 'consuming'}}
+      _ b: inout AnyObject, // expected-error {{modifier 'inout' on parameter 'b' in '@abi' is not compatible with 'consuming'}}
+      _ c: borrowing AnyObject, // expected-error {{modifier 'borrowing' on parameter 'c' in '@abi' is not compatible with 'consuming'}}
+      _ d: consuming AnyObject,
+      _ e: __shared AnyObject, // expected-error {{modifier '__shared' on parameter 'e' in '@abi' is not compatible with 'consuming'}}
+      _ f: __owned AnyObject,
+      _ g: sending AnyObject,
+      _ h: (AnyObject) -> Void, // expected-error {{parameter 'h' type '(AnyObject) -> Void' in '@abi' should match '(consuming AnyObject) -> Void'}}
+      _ i: (borrowing AnyObject) -> Void, // expected-error {{parameter 'i' type '(borrowing AnyObject) -> Void' in '@abi' should match '(consuming AnyObject) -> Void'}}
+      _ j: (consuming AnyObject) -> Void
     )
   )
   func method(
@@ -605,16 +605,16 @@ struct ConsumingParamOwnership {
 
   @abi(
     init(
-      _: AnyObject,
-      _: inout AnyObject, // expected-error {{parameter modifier 'inout' in '@abi' is not compatible with 'consuming'}}
-      _: borrowing AnyObject, // expected-error {{parameter modifier 'borrowing' in '@abi' is not compatible with 'consuming'}}
-      _: consuming AnyObject,
-      _: __shared AnyObject, // expected-error {{parameter modifier '__shared' in '@abi' is not compatible with 'consuming'}}
-      _: __owned AnyObject,
-      _: sending AnyObject,
-      _: (AnyObject) -> Void, // expected-error {{type '(AnyObject) -> Void' in '@abi' should match '(consuming AnyObject) -> Void'}}
-      _: (borrowing AnyObject) -> Void, // expected-error {{type '(borrowing AnyObject) -> Void' in '@abi' should match '(consuming AnyObject) -> Void'}}
-      _: (consuming AnyObject) -> Void
+      _ a: AnyObject,
+      _ b: inout AnyObject, // expected-error {{modifier 'inout' on parameter 'b' in '@abi' is not compatible with 'consuming'}}
+      _ c: borrowing AnyObject, // expected-error {{modifier 'borrowing' on parameter 'c' in '@abi' is not compatible with 'consuming'}}
+      _ d: consuming AnyObject,
+      _ e: __shared AnyObject, // expected-error {{modifier '__shared' on parameter 'e' in '@abi' is not compatible with 'consuming'}}
+      _ f: __owned AnyObject,
+      _ g: sending AnyObject,
+      _ h: (AnyObject) -> Void, // expected-error {{parameter 'h' type '(AnyObject) -> Void' in '@abi' should match '(consuming AnyObject) -> Void'}}
+      _ i: (borrowing AnyObject) -> Void, // expected-error {{parameter 'i' type '(borrowing AnyObject) -> Void' in '@abi' should match '(consuming AnyObject) -> Void'}}
+      _ j: (consuming AnyObject) -> Void
     )
   )
   init(
@@ -634,16 +634,16 @@ struct ConsumingParamOwnership {
 struct SharedParamOwnership {
   @abi(
     func method(
-      _: AnyObject,
-      _: inout AnyObject, // expected-error {{parameter modifier 'inout' in '@abi' is not compatible with '__shared'}}
-      _: borrowing AnyObject,
-      _: consuming AnyObject, // expected-error {{parameter modifier 'consuming' in '@abi' is not compatible with '__shared'}}
-      _: __shared AnyObject,
-      _: __owned AnyObject, // expected-error {{parameter modifier '__owned' in '@abi' is not compatible with '__shared'}}
-      _: sending AnyObject, // expected-error {{parameter modifier 'sending' in '@abi' is not compatible with '__shared'}}
-      _: (AnyObject) -> Void,
-      _: (borrowing AnyObject) -> Void,
-      _: (consuming AnyObject) -> Void // expected-error {{type '(consuming AnyObject) -> Void' in '@abi' should match '(__shared AnyObject) -> Void'}}
+      _ a: AnyObject,
+      _ b: inout AnyObject, // expected-error {{modifier 'inout' on parameter 'b' in '@abi' is not compatible with '__shared'}}
+      _ c: borrowing AnyObject,
+      _ d: consuming AnyObject, // expected-error {{modifier 'consuming' on parameter 'd' in '@abi' is not compatible with '__shared'}}
+      _ e: __shared AnyObject,
+      _ f: __owned AnyObject, // expected-error {{modifier '__owned' on parameter 'f' in '@abi' is not compatible with '__shared'}}
+      _ g: sending AnyObject, // expected-error {{modifier 'sending' on parameter 'g' in '@abi' is not compatible with '__shared'}}
+      _ h: (AnyObject) -> Void,
+      _ i: (borrowing AnyObject) -> Void,
+      _ j: (consuming AnyObject) -> Void // expected-error {{parameter 'j' type '(consuming AnyObject) -> Void' in '@abi' should match '(__shared AnyObject) -> Void'}}
     )
   )
   func method(
@@ -661,16 +661,16 @@ struct SharedParamOwnership {
 
   @abi(
     init(
-      _: AnyObject, // expected-error {{default parameter modifier in '@abi' is not compatible with '__shared'}}
-      _: inout AnyObject, // expected-error {{parameter modifier 'inout' in '@abi' is not compatible with '__shared'}}
-      _: borrowing AnyObject,
-      _: consuming AnyObject, // expected-error {{parameter modifier 'consuming' in '@abi' is not compatible with '__shared'}}
-      _: __shared AnyObject,
-      _: __owned AnyObject, // expected-error {{parameter modifier '__owned' in '@abi' is not compatible with '__shared'}}
-      _: sending AnyObject, // expected-error {{parameter modifier 'sending' in '@abi' is not compatible with '__shared'}}
-      _: (AnyObject) -> Void,
-      _: (borrowing AnyObject) -> Void,
-      _: (consuming AnyObject) -> Void // expected-error {{type '(consuming AnyObject) -> Void' in '@abi' should match '(__shared AnyObject) -> Void'}}
+      _ a: AnyObject, // expected-error {{default modifier on parameter 'a' in '@abi' is not compatible with '__shared'}}
+      _ b: inout AnyObject, // expected-error {{modifier 'inout' on parameter 'b' in '@abi' is not compatible with '__shared'}}
+      _ c: borrowing AnyObject,
+      _ d: consuming AnyObject, // expected-error {{modifier 'consuming' on parameter 'd' in '@abi' is not compatible with '__shared'}}
+      _ e: __shared AnyObject,
+      _ f: __owned AnyObject, // expected-error {{modifier '__owned' on parameter 'f' in '@abi' is not compatible with '__shared'}}
+      _ g: sending AnyObject, // expected-error {{modifier 'sending' on parameter 'g' in '@abi' is not compatible with '__shared'}}
+      _ h: (AnyObject) -> Void,
+      _ i: (borrowing AnyObject) -> Void,
+      _ j: (consuming AnyObject) -> Void // expected-error {{parameter 'j' type '(consuming AnyObject) -> Void' in '@abi' should match '(__shared AnyObject) -> Void'}}
     )
   )
   init(
@@ -690,16 +690,16 @@ struct SharedParamOwnership {
 struct OwnedParamOwnership {
   @abi(
     func method(
-      _: AnyObject, // expected-error {{default parameter modifier in '@abi' is not compatible with '__owned'}}
-      _: inout AnyObject, // expected-error {{parameter modifier 'inout' in '@abi' is not compatible with '__owned'}}
-      _: borrowing AnyObject, // expected-error {{parameter modifier 'borrowing' in '@abi' is not compatible with '__owned'}}
-      _: consuming AnyObject,
-      _: __shared AnyObject, // expected-error {{parameter modifier '__shared' in '@abi' is not compatible with '__owned'}}
-      _: __owned AnyObject,
-      _: sending AnyObject,
-      _: (AnyObject) -> Void, // expected-error {{type '(AnyObject) -> Void' in '@abi' should match '(__owned AnyObject) -> Void'}}
-      _: (borrowing AnyObject) -> Void, // expected-error {{type '(borrowing AnyObject) -> Void' in '@abi' should match '(__owned AnyObject) -> Void'}}
-      _: (consuming AnyObject) -> Void
+      _ a: AnyObject, // expected-error {{default modifier on parameter 'a' in '@abi' is not compatible with '__owned'}}
+      _ b: inout AnyObject, // expected-error {{modifier 'inout' on parameter 'b' in '@abi' is not compatible with '__owned'}}
+      _ c: borrowing AnyObject, // expected-error {{modifier 'borrowing' on parameter 'c' in '@abi' is not compatible with '__owned'}}
+      _ d: consuming AnyObject,
+      _ e: __shared AnyObject, // expected-error {{modifier '__shared' on parameter 'e' in '@abi' is not compatible with '__owned'}}
+      _ f: __owned AnyObject,
+      _ g: sending AnyObject,
+      _ h: (AnyObject) -> Void, // expected-error {{parameter 'h' type '(AnyObject) -> Void' in '@abi' should match '(__owned AnyObject) -> Void'}}
+      _ i: (borrowing AnyObject) -> Void, // expected-error {{parameter 'i' type '(borrowing AnyObject) -> Void' in '@abi' should match '(__owned AnyObject) -> Void'}}
+      _ j: (consuming AnyObject) -> Void
     )
   )
   func method(
@@ -717,16 +717,16 @@ struct OwnedParamOwnership {
 
   @abi(
     init(
-      _: AnyObject,
-      _: inout AnyObject, // expected-error {{parameter modifier 'inout' in '@abi' is not compatible with '__owned'}}
-      _: borrowing AnyObject, // expected-error {{parameter modifier 'borrowing' in '@abi' is not compatible with '__owned'}}
-      _: consuming AnyObject,
-      _: __shared AnyObject, // expected-error {{parameter modifier '__shared' in '@abi' is not compatible with '__owned'}}
-      _: __owned AnyObject,
-      _: sending AnyObject,
-      _: (AnyObject) -> Void, // expected-error {{type '(AnyObject) -> Void' in '@abi' should match '(__owned AnyObject) -> Void'}}
-      _: (borrowing AnyObject) -> Void, // expected-error {{type '(borrowing AnyObject) -> Void' in '@abi' should match '(__owned AnyObject) -> Void'}}
-      _: (consuming AnyObject) -> Void
+      _ a: AnyObject,
+      _ b: inout AnyObject, // expected-error {{modifier 'inout' on parameter 'b' in '@abi' is not compatible with '__owned'}}
+      _ c: borrowing AnyObject, // expected-error {{modifier 'borrowing' on parameter 'c' in '@abi' is not compatible with '__owned'}}
+      _ d: consuming AnyObject,
+      _ e: __shared AnyObject, // expected-error {{modifier '__shared' on parameter 'e' in '@abi' is not compatible with '__owned'}}
+      _ f: __owned AnyObject,
+      _ g: sending AnyObject,
+      _ h: (AnyObject) -> Void, // expected-error {{parameter 'h' type '(AnyObject) -> Void' in '@abi' should match '(__owned AnyObject) -> Void'}}
+      _ i: (borrowing AnyObject) -> Void, // expected-error {{parameter 'i' type '(borrowing AnyObject) -> Void' in '@abi' should match '(__owned AnyObject) -> Void'}}
+      _ j: (consuming AnyObject) -> Void
     )
   )
   init(
@@ -746,16 +746,16 @@ struct OwnedParamOwnership {
 struct SendingParamOwnership {
   @abi(
     func method(
-      _: AnyObject, // expected-error {{default parameter modifier in '@abi' is not compatible with 'sending'}}
-      _: inout AnyObject, // expected-error {{parameter modifier 'inout' in '@abi' is not compatible with 'sending'}}
-      _: borrowing AnyObject, // expected-error {{parameter modifier 'borrowing' in '@abi' is not compatible with 'sending'}}
-      _: consuming AnyObject,
-      _: __shared AnyObject, // expected-error {{parameter modifier '__shared' in '@abi' is not compatible with 'sending'}}
-      _: __owned AnyObject,
-      _: sending AnyObject,
-      _: (AnyObject) -> Void, // expected-error {{type '(AnyObject) -> Void' in '@abi' should match '(sending AnyObject) -> Void'}}
-      _: (borrowing AnyObject) -> Void, // expected-error {{type '(borrowing AnyObject) -> Void' in '@abi' should match '(sending AnyObject) -> Void'}}
-      _: (consuming AnyObject) -> Void
+      _ a: AnyObject, // expected-error {{default modifier on parameter 'a' in '@abi' is not compatible with 'sending'}}
+      _ b: inout AnyObject, // expected-error {{modifier 'inout' on parameter 'b' in '@abi' is not compatible with 'sending'}}
+      _ c: borrowing AnyObject, // expected-error {{modifier 'borrowing' on parameter 'c' in '@abi' is not compatible with 'sending'}}
+      _ d: consuming AnyObject,
+      _ e: __shared AnyObject, // expected-error {{modifier '__shared' on parameter 'e' in '@abi' is not compatible with 'sending'}}
+      _ f: __owned AnyObject,
+      _ g: sending AnyObject,
+      _ h: (AnyObject) -> Void, // expected-error {{parameter 'h' type '(AnyObject) -> Void' in '@abi' should match '(sending AnyObject) -> Void'}}
+      _ i: (borrowing AnyObject) -> Void, // expected-error {{parameter 'i' type '(borrowing AnyObject) -> Void' in '@abi' should match '(sending AnyObject) -> Void'}}
+      _ j: (consuming AnyObject) -> Void
     )
   )
   func method(
@@ -773,16 +773,16 @@ struct SendingParamOwnership {
 
   @abi(
     init(
-      _: AnyObject,
-      _: inout AnyObject, // expected-error {{parameter modifier 'inout' in '@abi' is not compatible with 'sending'}}
-      _: borrowing AnyObject, // expected-error {{parameter modifier 'borrowing' in '@abi' is not compatible with 'sending'}}
-      _: consuming AnyObject,
-      _: __shared AnyObject, // expected-error {{parameter modifier '__shared' in '@abi' is not compatible with 'sending'}}
-      _: __owned AnyObject,
-      _: sending AnyObject,
-      _: (AnyObject) -> Void, // expected-error {{type '(AnyObject) -> Void' in '@abi' should match '(sending AnyObject) -> Void'}}
-      _: (borrowing AnyObject) -> Void, // expected-error {{type '(borrowing AnyObject) -> Void' in '@abi' should match '(sending AnyObject) -> Void'}}
-      _: (consuming AnyObject) -> Void
+      _ a: AnyObject,
+      _ b: inout AnyObject, // expected-error {{modifier 'inout' on parameter 'b' in '@abi' is not compatible with 'sending'}}
+      _ c: borrowing AnyObject, // expected-error {{modifier 'borrowing' on parameter 'c' in '@abi' is not compatible with 'sending'}}
+      _ d: consuming AnyObject,
+      _ e: __shared AnyObject, // expected-error {{modifier '__shared' on parameter 'e' in '@abi' is not compatible with 'sending'}}
+      _ f: __owned AnyObject,
+      _ g: sending AnyObject,
+      _ h: (AnyObject) -> Void, // expected-error {{parameter 'h' type '(AnyObject) -> Void' in '@abi' should match '(sending AnyObject) -> Void'}}
+      _ i: (borrowing AnyObject) -> Void, // expected-error {{parameter 'i' type '(borrowing AnyObject) -> Void' in '@abi' should match '(sending AnyObject) -> Void'}}
+      _ j: (consuming AnyObject) -> Void
     )
   )
   init(
@@ -856,22 +856,22 @@ func constTest(
 ) {}
 
 // @noDerivative should match
-@abi(func noDerivativeTest1(_: @differentiable(reverse) (@noDerivative Double, Double) -> Double))
+@abi(func noDerivativeTest1(_ a: @differentiable(reverse) (@noDerivative Double, Double) -> Double))
 func noDerivativeTest1(_: @differentiable(reverse) (@noDerivative Double, Double) -> Double) {}
 
-@abi(func noDerivativeTest2(_: @differentiable(reverse) (Double, Double) -> Double)) // expected-error {{type '@differentiable(reverse) (Double, Double) -> Double' in '@abi' should match '@differentiable(reverse) (@noDerivative Double, Double) -> Double'}}
+@abi(func noDerivativeTest2(_ a: @differentiable(reverse) (Double, Double) -> Double)) // expected-error {{parameter 'a' type '@differentiable(reverse) (Double, Double) -> Double' in '@abi' should match '@differentiable(reverse) (@noDerivative Double, Double) -> Double'}}
 func noDerivativeTest2(_: @differentiable(reverse) (@noDerivative Double, Double) -> Double) {} // expected-note {{should match type here}}
 
-@abi(func noDerivativeTest3(_: @differentiable(reverse) (@noDerivative Double, Double) -> Double)) // expected-error {{type '@differentiable(reverse) (@noDerivative Double, Double) -> Double' in '@abi' should match '@differentiable(reverse) (Double, Double) -> Double'}}
+@abi(func noDerivativeTest3(_ a: @differentiable(reverse) (@noDerivative Double, Double) -> Double)) // expected-error {{parameter 'a' type '@differentiable(reverse) (@noDerivative Double, Double) -> Double' in '@abi' should match '@differentiable(reverse) (Double, Double) -> Double'}}
 func noDerivativeTest3(_: @differentiable(reverse) (Double, Double) -> Double) {} // expected-note {{should match type here}}
 
 // @_addressable should match
 @abi(
   func addressableTest(
-    _: @_addressable String,
-    _: String, // expected-error {{default parameter attribute in '@abi' is not compatible with '_addressable'}}
-    _: @_addressable String, // expected-error {{parameter attribute '_addressable' in '@abi' is not compatible with default}}
-    _: String
+    _ a: @_addressable String,
+    _ b: String, // expected-error {{default attribute on parameter 'b' in '@abi' is not compatible with '_addressable'}}
+    _ c: @_addressable String, // expected-error {{attribute '_addressable' on parameter 'c' in '@abi' is not compatible with default}}
+    _ d: String
   )
 )
 func addressableTest(
@@ -884,27 +884,27 @@ func addressableTest(
 // Flattening of function type ExtInfo
 @abi(
   func fnExtInfoTest(
-    _: @escaping () -> AnyObject,
-    _: @Sendable () -> AnyObject,
-    _: () -> sending AnyObject,
-    _: () -> AnyObject,
-    _: @MainActor () -> AnyObject,
-    _: (isolated MainActor) -> AnyObject,
-    _: @isolated(any) () -> AnyObject, // expected-error {{type '@isolated(any) () -> AnyObject' in '@abi' should match '() -> AnyObject'}}
-    _: @execution(caller) () async -> AnyObject,
-    _: () -> AnyObject, // expected-error {{type '() -> AnyObject' in '@abi' should match '@isolated(any) () -> AnyObject'}}
-    _: () async -> Void,
-    _: () -> Void, // expected-error {{type '() -> Void' in '@abi' should match '() async -> Void'}}
-    _: () async -> Void, // expected-error {{type '() async -> Void' in '@abi' should match '() -> Void'}}
-    _: () -> Void,
-    _: () throws -> Void,
-    _: () -> Void, // expected-error {{type '() -> Void' in '@abi' should match '() throws -> Void'}}
-    _: () throws -> Void, // expected-error {{type '() throws -> Void' in '@abi' should match '() -> Void'}}
-    _: () -> Void,
-    _: () -> Void,
-    _: @convention(block) () -> Void, // expected-error {{type '@convention(block) () -> Void' in '@abi' should match '() -> Void'}}
-    _: @convention(thin) () -> Void, // expected-error {{type '@convention(thin) () -> Void' in '@abi' should match '() -> Void'}}
-    _: @convention(c) () -> Void // expected-error {{type '@convention(c) () -> Void' in '@abi' should match '() -> Void'}}
+    _ a: @escaping () -> AnyObject,
+    _ b: @Sendable () -> AnyObject,
+    _ c: () -> sending AnyObject,
+    _ d: () -> AnyObject,
+    _ e: @MainActor () -> AnyObject,
+    _ f: (isolated MainActor) -> AnyObject,
+    _ g: @isolated(any) () -> AnyObject, // expected-error {{parameter 'g' type '@isolated(any) () -> AnyObject' in '@abi' should match '() -> AnyObject'}}
+    _ h: @execution(caller) () async -> AnyObject,
+    _ i: () -> AnyObject, // expected-error {{parameter 'i' type '() -> AnyObject' in '@abi' should match '@isolated(any) () -> AnyObject'}}
+    _ j: () async -> Void,
+    _ k: () -> Void, // expected-error {{parameter 'k' type '() -> Void' in '@abi' should match '() async -> Void'}}
+    _ l: () async -> Void, // expected-error {{parameter 'l' type '() async -> Void' in '@abi' should match '() -> Void'}}
+    _ m: () -> Void,
+    _ n: () throws -> Void,
+    _ o: () -> Void, // expected-error {{parameter 'o' type '() -> Void' in '@abi' should match '() throws -> Void'}}
+    _ p: () throws -> Void, // expected-error {{parameter 'p' type '() throws -> Void' in '@abi' should match '() -> Void'}}
+    _ q: () -> Void,
+    _ r: () -> Void,
+    _ s: @convention(block) () -> Void, // expected-error {{parameter 's' type '@convention(block) () -> Void' in '@abi' should match '() -> Void'}}
+    _ t: @convention(thin) () -> Void, // expected-error {{parameter 't' type '@convention(thin) () -> Void' in '@abi' should match '() -> Void'}}
+    _ u: @convention(c) () -> Void // expected-error {{parameter 'u' type '@convention(c) () -> Void' in '@abi' should match '() -> Void'}}
   )
 )
 func fnExtInfoTest(
@@ -950,12 +950,12 @@ func testMarkerProtocols<A: Sendable, B>(
 
 @abi(
   func testNormalProtocols(
-    _: Any, // expected-error {{type 'Any' in '@abi' should match 'any CustomStringConvertible'}}
-    _: CustomStringConvertible, // expected-error {{type 'any CustomStringConvertible' in '@abi' should match 'Any'}}
-    _: AnyKeyPath, // expected-error {{type 'AnyKeyPath' in '@abi' should match 'any AnyKeyPath & CustomStringConvertible'}}
-    _: AnyKeyPath & CustomStringConvertible, // expected-error {{type 'any AnyKeyPath & CustomStringConvertible' in '@abi' should match 'AnyKeyPath'}}
-    _: Any, // expected-error {{type 'Any' in '@abi' should match 'any CustomDebugStringConvertible & CustomStringConvertible'}}
-    _: CustomStringConvertible & CustomDebugStringConvertible // expected-error {{type 'any CustomDebugStringConvertible & CustomStringConvertible' in '@abi' should match 'Any'}}
+    _ a: Any, // expected-error {{parameter 'a' type 'Any' in '@abi' should match 'any CustomStringConvertible'}}
+    _ b: CustomStringConvertible, // expected-error {{parameter 'b' type 'any CustomStringConvertible' in '@abi' should match 'Any'}}
+    _ c: AnyKeyPath, // expected-error {{parameter 'c' type 'AnyKeyPath' in '@abi' should match 'any AnyKeyPath & CustomStringConvertible'}}
+    _ d: AnyKeyPath & CustomStringConvertible, // expected-error {{parameter 'd' type 'any AnyKeyPath & CustomStringConvertible' in '@abi' should match 'AnyKeyPath'}}
+    _ e: Any, // expected-error {{parameter 'e' type 'Any' in '@abi' should match 'any CustomDebugStringConvertible & CustomStringConvertible'}}
+    _ f: CustomStringConvertible & CustomDebugStringConvertible // expected-error {{parameter 'f' type 'any CustomDebugStringConvertible & CustomStringConvertible' in '@abi' should match 'Any'}}
   )
 )
 func testNormalProtocols(
@@ -982,7 +982,7 @@ extension ErsatzResult where Failure == Swift.Error {
   // FIXME: The where clause makes this ABI-compatible, but we can't tell that.
   @abi(
     init(
-      catching body: () throws -> Success // expected-error {{type '() throws -> Success' in '@abi' should match '() throws(Failure) -> Success'}}
+      catching body: () throws -> Success // expected-error {{parameter 'body' type '() throws -> Success' in '@abi' should match '() throws(Failure) -> Success'}}
     )
   )
   init(
@@ -2136,13 +2136,13 @@ struct SelfParamOwnership {
   @abi(borrowing func fn20())
   func fn20() {}
 
-  @abi(consuming func fn30()) // expected-error {{instance method modifier 'consuming' in '@abi' is not compatible with default}} {{none}}
+  @abi(consuming func fn30()) // expected-error {{modifier 'consuming' on self parameter in '@abi' is not compatible with default}} {{none}}
   func fn30() {} // expected-note {{should match modifier here}}
 
-  @abi(__consuming func fn40()) // expected-error {{instance method modifier '__consuming' in '@abi' is not compatible with default}} {{none}}
+  @abi(__consuming func fn40()) // expected-error {{modifier '__consuming' on self parameter in '@abi' is not compatible with default}} {{none}}
   func fn40() {} // expected-note {{should match modifier here}}
 
-  @abi(mutating func fn50()) // expected-error {{instance method modifier 'mutating' in '@abi' is not compatible with default}} {{none}}
+  @abi(mutating func fn50()) // expected-error {{modifier 'mutating' on self parameter in '@abi' is not compatible with default}} {{none}}
   func fn50() {} // expected-note {{should match modifier here}}
 
   @abi(func fn01())
@@ -2154,13 +2154,13 @@ struct SelfParamOwnership {
   @abi(borrowing func fn21())
   nonmutating func fn21() {}
 
-  @abi(consuming func fn31()) // expected-error {{instance method modifier 'consuming' in '@abi' is not compatible with default}} {{none}}
+  @abi(consuming func fn31()) // expected-error {{modifier 'consuming' on self parameter in '@abi' is not compatible with default}} {{none}}
   nonmutating func fn31() {} // expected-note {{should match modifier here}}
 
-  @abi(__consuming func fn41()) // expected-error {{instance method modifier '__consuming' in '@abi' is not compatible with default}} {{none}}
+  @abi(__consuming func fn41()) // expected-error {{modifier '__consuming' on self parameter in '@abi' is not compatible with default}} {{none}}
   nonmutating func fn41() {} // expected-note {{should match modifier here}}
 
-  @abi(mutating func fn51()) // expected-error {{instance method modifier 'mutating' in '@abi' is not compatible with default}} {{none}}
+  @abi(mutating func fn51()) // expected-error {{modifier 'mutating' on self parameter in '@abi' is not compatible with default}} {{none}}
   nonmutating func fn51() {} // expected-note {{should match modifier here}}
 
   @abi(func fn02())
@@ -2172,22 +2172,22 @@ struct SelfParamOwnership {
   @abi(borrowing func fn22())
   borrowing func fn22() {}
 
-  @abi(consuming func fn32()) // expected-error {{instance method modifier 'consuming' in '@abi' is not compatible with 'borrowing'}} {{none}}
+  @abi(consuming func fn32()) // expected-error {{modifier 'consuming' on self parameter in '@abi' is not compatible with 'borrowing'}} {{none}}
   borrowing func fn32() {} // expected-note {{should match modifier here}}
 
-  @abi(__consuming func fn42()) // expected-error {{instance method modifier '__consuming' in '@abi' is not compatible with 'borrowing'}} {{none}}
+  @abi(__consuming func fn42()) // expected-error {{modifier '__consuming' on self parameter in '@abi' is not compatible with 'borrowing'}} {{none}}
   borrowing func fn42() {} // expected-note {{should match modifier here}}
 
-  @abi(mutating func fn52()) // expected-error {{instance method modifier 'mutating' in '@abi' is not compatible with 'borrowing'}} {{none}}
+  @abi(mutating func fn52()) // expected-error {{modifier 'mutating' on self parameter in '@abi' is not compatible with 'borrowing'}} {{none}}
   borrowing func fn52() {} // expected-note {{should match modifier here}}
 
-  @abi(func fn03()) // expected-error {{default instance method modifier in '@abi' is not compatible with 'consuming'}} {{none}}
+  @abi(func fn03()) // expected-error {{default modifier on self parameter in '@abi' is not compatible with 'consuming'}} {{none}}
   consuming func fn03() {} // expected-note {{should match modifier here}}
 
-  @abi(nonmutating func fn13()) // expected-error {{default instance method modifier in '@abi' is not compatible with 'consuming'}} {{none}}
+  @abi(nonmutating func fn13()) // expected-error {{default modifier on self parameter in '@abi' is not compatible with 'consuming'}} {{none}}
   consuming func fn13() {} // expected-note {{should match modifier here}}
 
-  @abi(borrowing func fn23()) // expected-error {{instance method modifier 'borrowing' in '@abi' is not compatible with 'consuming'}} {{none}}
+  @abi(borrowing func fn23()) // expected-error {{modifier 'borrowing' on self parameter in '@abi' is not compatible with 'consuming'}} {{none}}
   consuming func fn23() {} // expected-note {{should match modifier here}}
 
   @abi(consuming func fn33())
@@ -2196,16 +2196,16 @@ struct SelfParamOwnership {
   @abi(__consuming func fn43())
   consuming func fn43() {}
 
-  @abi(mutating func fn53()) // expected-error {{instance method modifier 'mutating' in '@abi' is not compatible with 'consuming'}} {{none}}
+  @abi(mutating func fn53()) // expected-error {{modifier 'mutating' on self parameter in '@abi' is not compatible with 'consuming'}} {{none}}
   consuming func fn53() {} // expected-note {{should match modifier here}}
 
-  @abi(func fn04()) // expected-error {{default instance method modifier in '@abi' is not compatible with '__consuming'}} {{none}}
+  @abi(func fn04()) // expected-error {{default modifier on self parameter in '@abi' is not compatible with '__consuming'}} {{none}}
   __consuming func fn04() {} // expected-note {{should match modifier here}}
 
-  @abi(nonmutating func fn14()) // expected-error {{default instance method modifier in '@abi' is not compatible with '__consuming'}} {{none}}
+  @abi(nonmutating func fn14()) // expected-error {{default modifier on self parameter in '@abi' is not compatible with '__consuming'}} {{none}}
   __consuming func fn14() {} // expected-note {{should match modifier here}}
 
-  @abi(borrowing func fn24()) // expected-error {{instance method modifier 'borrowing' in '@abi' is not compatible with '__consuming'}} {{none}}
+  @abi(borrowing func fn24()) // expected-error {{modifier 'borrowing' on self parameter in '@abi' is not compatible with '__consuming'}} {{none}}
   __consuming func fn24() {} // expected-note {{should match modifier here}}
 
   @abi(consuming func fn34())
@@ -2214,22 +2214,22 @@ struct SelfParamOwnership {
   @abi(__consuming func fn44())
   __consuming func fn44() {}
 
-  @abi(mutating func fn54()) // expected-error {{instance method modifier 'mutating' in '@abi' is not compatible with '__consuming'}} {{none}}
+  @abi(mutating func fn54()) // expected-error {{modifier 'mutating' on self parameter in '@abi' is not compatible with '__consuming'}} {{none}}
   __consuming func fn54() {} // expected-note {{should match modifier here}}
 
-  @abi(func fn05()) // expected-error {{default instance method modifier in '@abi' is not compatible with 'mutating'}} {{none}}
+  @abi(func fn05()) // expected-error {{default modifier on self parameter in '@abi' is not compatible with 'mutating'}} {{none}}
   mutating func fn05() {} // expected-note {{should match modifier here}}
 
-  @abi(nonmutating func fn15()) // expected-error {{default instance method modifier in '@abi' is not compatible with 'mutating'}} {{none}}
+  @abi(nonmutating func fn15()) // expected-error {{default modifier on self parameter in '@abi' is not compatible with 'mutating'}} {{none}}
   mutating func fn15() {} // expected-note {{should match modifier here}}
 
-  @abi(borrowing func fn25()) // expected-error {{instance method modifier 'borrowing' in '@abi' is not compatible with 'mutating'}} {{none}}
+  @abi(borrowing func fn25()) // expected-error {{modifier 'borrowing' on self parameter in '@abi' is not compatible with 'mutating'}} {{none}}
   mutating func fn25() {} // expected-note {{should match modifier here}}
 
-  @abi(consuming func fn35()) // expected-error {{instance method modifier 'consuming' in '@abi' is not compatible with 'mutating'}} {{none}}
+  @abi(consuming func fn35()) // expected-error {{modifier 'consuming' on self parameter in '@abi' is not compatible with 'mutating'}} {{none}}
   mutating func fn35() {} // expected-note {{should match modifier here}}
 
-  @abi(__consuming func fn45()) // expected-error {{instance method modifier '__consuming' in '@abi' is not compatible with 'mutating'}} {{none}}
+  @abi(__consuming func fn45()) // expected-error {{modifier '__consuming' on self parameter in '@abi' is not compatible with 'mutating'}} {{none}}
   mutating func fn45() {} // expected-note {{should match modifier here}}
 
   @abi(mutating func fn55())
@@ -2241,10 +2241,10 @@ struct AddressableSelf {
   @abi(@_addressableSelf func fn1())
   @_addressableSelf func fn1() {}
 
-  @abi(@_addressableSelf func fn2()) // expected-error {{instance method attribute '_addressableSelf' in '@abi' is not compatible with default}} {{none}}
+  @abi(@_addressableSelf func fn2()) // expected-error {{attribute '_addressableSelf' on self parameter in '@abi' is not compatible with default}} {{none}}
   func fn2() {} // expected-note {{should match attribute here}}
 
-  @abi(func fn3()) // expected-error {{default instance method attribute in '@abi' is not compatible with '_addressableSelf'}} {{none}}
+  @abi(func fn3()) // expected-error {{default attribute on self parameter in '@abi' is not compatible with '_addressableSelf'}} {{none}}
   @_addressableSelf func fn3() {} // expected-note {{should match attribute here}}
 }
 
