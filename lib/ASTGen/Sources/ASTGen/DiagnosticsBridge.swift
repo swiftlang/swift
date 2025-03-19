@@ -348,57 +348,37 @@ public func addQueuedDiagnostic(
     }
   }
 
-  let category: DiagnosticCategory? = categoryName.data.flatMap { categoryNamePtr in
-    let categoryNameBuffer = UnsafeBufferPointer(
-      start: categoryNamePtr,
-      count: categoryName.count
-    )
-    let categoryName = String(decoding: categoryNameBuffer, as: UTF8.self)
-
-    // If the data comes from serialized diagnostics, it's possible that
-    // the category name is empty because StringRef() is serialized into
-    // an empty string.
-    guard !categoryName.isEmpty else {
-      return nil
-    }
-
-    let documentationURL = documentationPath.data.map { documentationPathPtr in
-      let documentationPathBuffer = UnsafeBufferPointer(
-        start: documentationPathPtr,
-        count: documentationPath.count
-      )
-
-      let documentationPath = String(decoding: documentationPathBuffer, as: UTF8.self)
-
+  let documentationPath = String(bridged: documentationPath)
+  let documentationURL: String? = if !documentationPath.isEmpty {
       // If this looks doesn't look like a URL, prepend file://.
-      if !documentationPath.looksLikeURL {
-        return "file://\(documentationPath)"
-      }
-
-      return documentationPath
+      documentationPath.looksLikeURL ? documentationPath : "file://\(documentationPath)"
+    } else {
+      nil
     }
 
-    return DiagnosticCategory(
-      name: categoryName,
-      documentationURL: documentationURL
-    )
-  }
+  let categoryName = String(bridged: categoryName)
+  // If the data comes from serialized diagnostics, it's possible that
+  // the category name is empty because StringRef() is serialized into
+  // an empty string.
+  let category: DiagnosticCategory? = if !categoryName.isEmpty {
+      DiagnosticCategory(
+        name: categoryName,
+        documentationURL: documentationURL
+      )
+    } else {
+      nil
+    }
 
   // Note that we referenced this category.
   if let category {
     diagnosticState.pointee.referencedCategories.insert(category)
   }
 
-  guard let textPtr = text.data, !text.isEmpty else {
-    return
-  }
-  
-  let textBuffer = UnsafeBufferPointer(start: textPtr, count: text.count)
   let diagnostic = Diagnostic(
     node: node,
     position: position,
     message: SimpleDiagnostic(
-      message: String(decoding: textBuffer, as: UTF8.self),
+      message: String(bridged: text),
       severity: severity.asSeverity,
       category: category
     ),
