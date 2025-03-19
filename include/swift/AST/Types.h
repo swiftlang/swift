@@ -6464,6 +6464,13 @@ public:
 
   void getRequirements(Type baseType, SmallVectorImpl<Requirement> &reqs) const;
 
+  /// Extracts the type arguments from both the parameterized protocol type
+  /// and the concrete base type. These arguments must match in order to
+  /// satisfy the protocol's requirements.
+  void getMatchingTypeArguments(Type baseType,
+                                SmallVectorImpl<Type> &subjectArgTypes,
+                                SmallVectorImpl<Type> &protoArgTypes) const;
+
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Base, getArgs());
   }

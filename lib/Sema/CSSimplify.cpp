@@ -3819,6 +3819,64 @@ static bool matchSendableExistentialToAnyInGenericArgumentPosition(
   return true;
 }
 
+// Add binding constraints between the provided generic arguments and apply a
+// fix if any mismatches occur.
+static ConstraintSystem::TypeMatchResult matchGenericArgumentsAndFix(
+    ConstraintSystem &cs, ConstraintSystem::TypeMatchOptions argMatchingFlags,
+    Type type1, Type type2, ArrayRef<Type> args1, ArrayRef<Type> args2,
+    ConstraintLocatorBuilder locator, ConstraintLocator *baseLoc,
+    llvm::function_ref<ConstraintFix *(ArrayRef<unsigned>, ConstraintLocator *)>
+        createFix) {
+  SmallVector<unsigned, 4> mismatches;
+  // Attempt to match generic arguments, tracking positions where mismatches
+  // occur.
+  auto result = matchDeepTypeArguments(
+      cs, argMatchingFlags, args1, args2, baseLoc ? baseLoc : locator,
+      [&mismatches](unsigned position) { mismatches.push_back(position); });
+  // If no mismatches were found, return the result immediately.
+  if (mismatches.empty())
+    return result;
+  // Retrieve the constraint locator and its path for further analysis.
+  auto *loc = cs.getConstraintLocator(locator);
+  auto path = loc->getPath();
+  if (!path.empty()) {
+    // If we have something like ... -> type req # -> pack element #, we're
+    // solving a requirement of the form T : P where T is a type parameter
+    // pack
+    if (path.back().is<LocatorPathElt::PackElement>())
+      path = path.drop_back();
+    // Check if the mismatch violates a type requirement.
+    if (path.back().is<LocatorPathElt::AnyRequirement>()) {
+      if (auto *fix = fixRequirementFailure(cs, type1, type2, locator)) {
+        if (cs.recordFix(fix))
+          return cs.getTypeMatchFailure(locator);
+
+        cs.increaseScore(SK_Fix, loc, mismatches.size());
+        return cs.getTypeMatchSuccess();
+      }
+    }
+  }
+  // Calculate the impact score for this mismatch.
+  unsigned impact = 1;
+  if (type1->getAnyPointerElementType() && type2->getAnyPointerElementType()) {
+    // If this is a pointer <-> pointer conversion of different kind,
+    // there is a dedicated restriction/fix for that in some cases.
+    // To accommodate that, let's increase the impact of this fix.
+    impact += 2;
+  } else {
+    // Increase the solution's score for each mismatch this fixes.
+    impact += mismatches.size() - 1;
+  }
+  // Attempt to create a fix for the mismatches.
+  auto *fix = createFix(mismatches, loc);
+  if (!fix)
+    return cs.getTypeMatchFailure(locator);
+  if (!cs.recordFix(fix, impact))
+    return cs.getTypeMatchSuccess();
+  // Return the original result if a fix was not applied.
+  return result;
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
                                          ConstraintLocatorBuilder locator) {
@@ -3841,28 +3899,16 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       // Match up the replacement types of the respective substitution maps.
       return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
     }
-
-    unsigned numMismatches = 0;
-    auto result =
-        matchDeepTypeArguments(*this, subflags, args1, args2, locator,
-                               [&numMismatches](unsigned) { ++numMismatches; });
-
-    if (numMismatches > 0) {
-      auto anchor = locator.getAnchor();
-      // TODO(diagnostics): Only assignments are supported at the moment.
-      if (!isExpr<AssignExpr>(anchor))
-        return getTypeMatchFailure(locator);
-
-      auto *fix = IgnoreAssignmentDestinationType::create(
-          *this, type1, type2, getConstraintLocator(locator));
-
-      if (recordFix(fix, /*impact=*/numMismatches))
-        return getTypeMatchFailure(locator);
-
-      return getTypeMatchSuccess();
-    }
-
-    return result;
+    return matchGenericArgumentsAndFix(
+        *this, subflags, type1, type2, args1, args2, locator,
+        /*baseLoc=*/nullptr, [&](auto, auto *loc) {
+          ConstraintFix *fix = nullptr;
+          // TODO(diagnostics): Only assignments are supported at the moment.
+          if (isExpr<AssignExpr>(locator.getAnchor()))
+            fix = IgnoreAssignmentDestinationType::create(*this, type1, type2,
+                                                          loc);
+          return fix;
+        });
   }
 
   // Handle opened archetype types.
@@ -4005,54 +4051,12 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       return matchDeepTypeArguments(*this, argMatchingFlags, args1, args2,
                                     baseLoc);
 
-    SmallVector<unsigned, 4> mismatches;
-    auto result = matchDeepTypeArguments(
-        *this, argMatchingFlags, args1, args2, baseLoc,
-        [&mismatches](unsigned position) { mismatches.push_back(position); });
-
-    if (mismatches.empty())
-      return result;
-
-    auto *loc = getConstraintLocator(locator);
-
-    auto path = loc->getPath();
-    if (!path.empty()) {
-      // If we have something like ... -> type req # -> pack element #, we're
-      // solving a requirement of the form T : P where T is a type parameter pack
-      if (path.back().is<LocatorPathElt::PackElement>())
-        path = path.drop_back();
-
-      if (path.back().is<LocatorPathElt::AnyRequirement>()) {
-        if (auto *fix = fixRequirementFailure(*this, type1, type2, locator)) {
-          if (recordFix(fix))
-            return getTypeMatchFailure(locator);
-
-          increaseScore(SK_Fix, loc, mismatches.size());
-          return getTypeMatchSuccess();
-        }
-      }
-    }
-
-    unsigned impact = 1;
-
-    if (type1->getAnyPointerElementType() &&
-        type2->getAnyPointerElementType()) {
-      // If this is a pointer <-> pointer conversion of different kind,
-      // there is a dedicated restriction/fix for that in some cases.
-      // To accommodate that, let's increase the impact of this fix.
-      impact += 2;
-    } else {
-      // Increase the solution's score for each mismatch this fixes.
-      impact += mismatches.size() - 1;
-    }
-
-    auto *fix = GenericArgumentsMismatch::create(
-        *this, type1, type2, mismatches, loc);
-
-    if (!recordFix(fix, impact))
-      return getTypeMatchSuccess();
-
-    return result;
+    return matchGenericArgumentsAndFix(
+        *this, argMatchingFlags, type1, type2, args1, args2, locator, baseLoc,
+        [&](auto mismatches, auto *loc) {
+          return GenericArgumentsMismatch::create(*this, type1, type2,
+                                                  mismatches, loc);
+        });
   }
   return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
 }
@@ -4349,21 +4353,29 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
       } else {
         // The source type is a concrete type.
         //
-        // Substitute the source into the requirements of the parameterized type
-        // and discharge the requirements of the parameterized protocol.
+        // Extract the type arguments from the parameterized protocol
+        // and match them directly against the concrete type arguments.
         //
-        // FIXME: Extend the locator path to point to the argument
-        // inducing the requirement.
-        SmallVector<Requirement, 2> reqs;
-        parameterizedType->getRequirements(type1, reqs);
-        for (const auto &req : reqs) {
-          assert(req.getKind() == RequirementKind::SameType);
-          auto result = matchTypes(req.getFirstType(), req.getSecondType(),
-                                   ConstraintKind::Bind,
-                                   subflags, locator);
-          if (result.isFailure())
-            return result;
-        }
+        // The locator is extended within `matchDeepTypeArguments` to
+        // precisely track which generic argument is causing a mismatch.
+        SmallVector<Type> subjectArgs, protoArgs;
+        subflags |= TMF_MatchingGenericArguments;
+        parameterizedType->getMatchingTypeArguments(type1, subjectArgs,
+                                                    protoArgs);
+        if (!shouldAttemptFixes())
+          return matchDeepTypeArguments(*this, subflags, subjectArgs, protoArgs,
+                                        locator);
+
+        return matchGenericArgumentsAndFix(
+            *this, subflags, type1, type2, subjectArgs, protoArgs, locator,
+            /*baseLoc=*/nullptr, [&](auto, auto *loc) {
+              ConstraintFix *fix = nullptr;
+              if (isExpr<AssignExpr>(locator.getAnchor())) {
+                fix = IgnoreAssignmentDestinationType::create(*this, type1,
+                                                              type2, loc);
+              }
+              return fix;
+            });
       }
     }
   }
@@ -7405,8 +7417,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       auto *tuple1 = cast<TupleType>(desugar1);
       auto *tuple2 = cast<TupleType>(desugar2);
-      if (delayMatching(tuple1) || delayMatching(tuple2)) {
-        return formUnsolvedResult();
+      // If these tuples are generic arguments,
+      // delaying matching will result in ambiguity.
+      if (!flags.contains(TMF_MatchingGenericArguments)) {
+        if (delayMatching(tuple1) || delayMatching(tuple2)) {
+          return formUnsolvedResult();
+        }
       }
 
       // Closure result is allowed to convert to Void in certain circumstances,

@@ -3786,12 +3786,19 @@ void ParameterizedProtocolType::Profile(llvm::FoldingSetNodeID &ID,
     ID.AddPointer(arg.getPointer());
 }
 
-void ParameterizedProtocolType::getRequirements(
-    Type baseType, SmallVectorImpl<Requirement> &reqs) const {
-  auto *protoDecl = getProtocol();
+// Extract either the `SameType` requirements between a parameterized
+// protocol and a concrete type, or the corresponding type arguments
+// from both the protocol and the concrete type, which must match to
+// satisfy the protocol's requirements.
+static void extractParameterizedProtocolTypes(
+    Type baseType, const ParameterizedProtocolType *paramProto,
+    SmallVectorImpl<Type> *subjectArgTypes,
+    SmallVectorImpl<Type> *protoArgTypes, SmallVectorImpl<Requirement> *reqs) {
+  assert((subjectArgTypes && protoArgTypes) || reqs);
+  auto *protoDecl = paramProto->getProtocol();
 
   auto assocTypes = protoDecl->getPrimaryAssociatedTypes();
-  auto argTypes = getArgs();
+  auto argTypes = paramProto->getArgs();
   assert(argTypes.size() <= assocTypes.size());
 
   auto conformance = lookupConformance(baseType, protoDecl);
@@ -3812,9 +3819,26 @@ void ParameterizedProtocolType::getRequirements(
       // conformance path.
       subjectType = assocType->getDeclaredInterfaceType().subst(subMap);
     }
-
-    reqs.emplace_back(RequirementKind::SameType, subjectType, argType);
+    if (reqs) {
+      reqs->emplace_back(RequirementKind::SameType, subjectType, argType);
+    } else {
+      subjectArgTypes->emplace_back(subjectType);
+      protoArgTypes->emplace_back(argType);
+    }
   }
+}
+
+void ParameterizedProtocolType::getRequirements(
+    Type baseType, SmallVectorImpl<Requirement> &reqs) const {
+  extractParameterizedProtocolTypes(baseType, this, /*subjectArgTypes=*/nullptr,
+                                    /*protoArgTypes=*/nullptr, &reqs);
+}
+
+void ParameterizedProtocolType::getMatchingTypeArguments(
+    Type baseType, SmallVectorImpl<Type> &subjectArgTypes,
+    SmallVectorImpl<Type> &protoArgTypes) const {
+  extractParameterizedProtocolTypes(baseType, this, &subjectArgTypes,
+                                    &protoArgTypes, /*reqs=*/nullptr);
 }
 
 bool ProtocolType::requiresClass() {

@@ -124,3 +124,23 @@ do {
   _ = Foo(nil) // expected-error {{'nil' requires a contextual type}}
   _ = Foo(nil, 1) // expected-error {{'nil' requires a contextual type}}
 }
+// https://github.com/swiftlang/swift/issues/79920
+protocol P<V> {
+  associatedtype V
+}
+do {
+  struct Q: P { enum V {} }
+  struct R<V>: P {}
+  struct S {}
+  struct A<each T> {
+    var x: any P<(Any, repeat each T)>
+    mutating func f() {
+      self.x = Q()
+      // expected-error@-1 {{cannot assign value of type 'Q' to type 'any P<(Any, repeat each T)>'}}
+      self.x = R<Void>()
+      // expected-error@-1 {{cannot assign value of type 'R<Void>' to type 'any P<(Any, repeat each T)>'}}
+      self.x = S()
+      // expected-error@-1 {{cannot assign value of type 'S' to type 'any P<(Any, repeat each T)>'}}
+    }
+  }
+}
