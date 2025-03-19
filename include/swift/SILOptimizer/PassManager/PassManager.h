@@ -252,7 +252,7 @@ class SILPassManager {
   /// A mask which has one bit for each pass. A one for a pass-bit means that
   /// the pass doesn't need to run, because nothing has changed since the
   /// previous run of that pass.
-  typedef std::bitset<(size_t)PassKind::AllPasses_Last + 1> CompletedPasses;
+  typedef std::bitset<(size_t)PassKind::numPasses> CompletedPasses;
   
   /// A completed-passes mask for each function.
   llvm::DenseMap<SILFunction *, CompletedPasses> CompletedPassesMap;
