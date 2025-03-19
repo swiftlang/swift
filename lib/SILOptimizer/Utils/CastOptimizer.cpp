@@ -1450,7 +1450,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
   auto &Mod = Inst->getModule();
 
   if (TargetType->isAnyExistentialType() &&
-      !SourceType->isAnyExistentialType()) {
+      !SourceType->canBeExistential()) {
     auto &Ctx = Mod.getASTContext();
 
     auto *Proto = dyn_cast_or_null<ProtocolDecl>(TargetType->getAnyNominal());
