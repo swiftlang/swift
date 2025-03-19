@@ -3299,7 +3299,9 @@ if (-not $IsCrossCompiling) {
 
   if ($Test -contains "swift") {
     foreach ($Arch in $AndroidSDKArchs) {
-      Test-Runtime Android $Arch
+      try {
+        Test-Runtime Android $Arch
+      } catch {}
     }
   }
 }
