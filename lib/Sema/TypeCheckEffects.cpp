@@ -644,7 +644,10 @@ public:
           break;
         }
       }
+    } else if (auto TE = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
+      recurse = asImpl().checkTemporarilyEscapable(TE);
     }
+
     // Error handling validation (via checkTopLevelEffects) happens after
     // type checking. If an unchecked expression is still around, the code was
     // invalid.
@@ -1087,6 +1090,15 @@ public:
     Classification result;
     result.AsyncKind = conditionalKind;
     result.AsyncReason = reason;
+    return result;
+  }
+
+  /// Return a potentially-unsafe classification by recording all of the
+  /// provided unsafe uses.
+  static Classification forUnsafe(ArrayRef<UnsafeUse> unsafeUses) {
+    Classification result;
+    for (const auto &unsafeUse : unsafeUses)
+      result.recordUnsafeUse(unsafeUse);
     return result;
   }
 
@@ -1856,6 +1868,38 @@ public:
     return result;
   }
 
+  Classification classifyTemporarilyEscapable(MakeTemporarilyEscapableExpr *E) {
+    auto opaqueValue = E->getOpaqueValue();
+    if (!opaqueValue)
+      return Classification();
+
+    auto type = opaqueValue->getType();
+    if (!type)
+      return Classification();
+
+    auto fnType = type->getAs<AnyFunctionType>();
+    if (!fnType)
+      return Classification();
+
+    // Runtime safety checks for temporarily-escapable functions aren't
+    // always available.
+    switch (fnType->getRepresentation()) {
+    case FunctionTypeRepresentation::Swift:
+      // Swift performs runtime checking to ensure that the function did not
+      // escape.
+      return Classification();
+
+    case FunctionTypeRepresentation::Block:
+      return Classification::forUnsafe({UnsafeUse::forTemporarilyEscaping(E)});
+
+    case FunctionTypeRepresentation::Thin:
+    case FunctionTypeRepresentation::CFunctionPointer:
+      // Thin and C functions cannot carry any state with them, so escaping
+      // the pointers does not introduce a memory-safety issue.
+      return Classification();
+    }
+  }
+
 private:
   /// Classify a throwing or async function according to our local
   /// knowledge of its implementation.
@@ -2073,6 +2117,10 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkTemporarilyEscapable(MakeTemporarilyEscapableExpr *E) {
+      return ShouldRecurse;
+    }
+
     ConditionalEffectKind checkExhaustiveDoBody(DoCatchStmt *S) {
       // All errors thrown by the do body are caught, but any errors thrown
       // by the catch bodies are bounded by the throwing kind of the do body.
@@ -2214,6 +2262,10 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkTemporarilyEscapable(MakeTemporarilyEscapableExpr *E) {
+      return ShouldRecurse;
+    }
+
     void visitExprPre(Expr *expr) { return; }
   };
 
@@ -2324,6 +2376,11 @@ private:
             Classification::forType(type, loc).onlyUnsafe());
       }
 
+      return ShouldRecurse;
+    }
+
+    ShouldRecurse_t checkTemporarilyEscapable(MakeTemporarilyEscapableExpr *E) {
+      classification.merge(Self.classifyTemporarilyEscapable(E));
       return ShouldRecurse;
     }
 
@@ -3774,6 +3831,13 @@ private:
     return ShouldRecurse;
   }
 
+  ShouldRecurse_t checkTemporarilyEscapable(MakeTemporarilyEscapableExpr *E) {
+    auto classification = getApplyClassifier().
+        classifyTemporarilyEscapable(E);
+    checkEffectSite(E, /*requiresTry=*/false, classification);
+    return ShouldRecurse;
+  }
+
   ConditionalEffectKind checkExhaustiveDoBody(DoCatchStmt *S) {
     // This is a context where errors are handled.
     ContextScope scope(*this, CurContext.withHandlesErrors());
@@ -4356,7 +4420,8 @@ private:
       return;
     }
 
-    Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe);
+    Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe)
+      .fixItRemove(E->getUnsafeLoc());
   }
   
   std::pair<SourceLoc, std::string>

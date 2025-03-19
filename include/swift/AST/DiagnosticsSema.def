@@ -8204,6 +8204,8 @@ NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
      (Type, const ValueDecl *))
 NOTE(note_unsafe_storage,none,
      "%kindbase1 involves unsafe type %2", (bool, const ValueDecl *, Type))
+NOTE(note_unsafe_temporarily_escaping,none,
+     "'withoutActuallyEscaping' function of type %0 is unsafe", (Type))
 
 GROUPED_WARNING(decl_unsafe_storage,StrictMemorySafety,none,
       "%kindbase0 has storage involving unsafe types",
@@ -8240,9 +8242,9 @@ GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
       "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
-WARNING(no_unsafe_in_unsafe,none,
+GROUPED_WARNING(no_unsafe_in_unsafe,StrictMemorySafety,none,
         "no unsafe operations occur within 'unsafe' expression", ())
-WARNING(no_unsafe_in_unsafe_for,none,
+GROUPED_WARNING(no_unsafe_in_unsafe_for,StrictMemorySafety,none,
         "no unsafe operations occur within 'unsafe' for-in loop", ())
 NOTE(make_subclass_unsafe,none,
      "make class %0 @unsafe to allow unsafe overrides of safe superclass methods",
