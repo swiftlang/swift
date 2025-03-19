@@ -68,6 +68,15 @@ static_assert(IsTriviallyDestructible<DeclAttributes>::value,
   static_assert(TypeAttrKind::Id <= TypeAttrKind::Last_TypeAttr);
 #include "swift/AST/TypeAttr.def"
 
+LLVM_ATTRIBUTE_USED StringRef swift::getDeclAttrKindID(DeclAttrKind kind) {
+    switch (kind) {
+#define DECL_ATTR(_, CLASS, ...)                               \
+  case DeclAttrKind::CLASS:                                    \
+    return #CLASS;
+#include "swift/AST/DeclAttr.def"
+  }
+}
+
 StringRef swift::getAccessLevelSpelling(AccessLevel value) {
   switch (value) {
   case AccessLevel::Private: return "private";
@@ -1688,8 +1697,26 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       abiDecl = cast<PatternBindingDecl>(abiDecl)
                     ->getVarAtSimilarStructuralPosition(
                                       const_cast<VarDecl *>(cast<VarDecl>(D)));
-    if (abiDecl)
-      abiDecl->print(Printer, Options);
+    if (abiDecl) {
+      auto optionsCopy = Options;
+
+      // Don't print any attributes marked with `ForbiddenInABIAttr`.
+      // (Reminder: There is manual logic in `PrintAST::printAttributes()`
+      // to handle non-ABI attributes when `PrintImplicitAttrs` is set.)
+      for (auto rawAttrKind : range(0, unsigned(DeclAttrKind::Last_DeclAttr))) {
+        DeclAttrKind attrKind{rawAttrKind}; 
+        if (!(DeclAttribute::getBehaviors(attrKind)
+                & DeclAttribute::ForbiddenInABIAttr))
+          continue;
+
+        if (attrKind == DeclAttrKind::AccessControl)
+          optionsCopy.PrintAccess = false;
+        else
+          optionsCopy.ExcludeAttrList.push_back(attrKind);
+      }
+
+      abiDecl->print(Printer, optionsCopy);
+    }
     Printer << ")";
 
     break;
@@ -1754,7 +1781,7 @@ uint64_t DeclAttribute::getBehaviors(DeclAttrKind DK) {
     return BEHAVIORS;
 #include "swift/AST/DeclAttr.def"
   }
-  llvm_unreachable("bad DeclAttrKind");
+  return 0;
 }
 
 std::optional<Feature> DeclAttribute::getRequiredFeature(DeclAttrKind DK) {
