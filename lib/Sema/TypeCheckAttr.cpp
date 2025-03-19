@@ -4638,7 +4638,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 
     // Complain if this isn't the primary result-builder attribute.
     auto attached = decl->getAttachedResultBuilder();
-    if (attached != attr) {
+    if (attached && attached != attr) {
       diagnose(attr->getLocation(), diag::result_builder_multiple,
                isa<ParamDecl>(decl));
       diagnose(attached->getLocation(), diag::previous_result_builder_here);
