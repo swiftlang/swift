@@ -485,7 +485,8 @@ public:
   bridgeClangModuleDependencies(
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      StringRef moduleOutputPath, RemapPathCallback remapPath = nullptr);
+      StringRef moduleOutputPath, StringRef stableModuleOutputPath,
+      RemapPathCallback remapPath = nullptr);
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,

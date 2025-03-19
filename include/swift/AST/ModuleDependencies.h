@@ -1202,8 +1202,8 @@ public:
   void addSeenClangModule(clang::tooling::dependencies::ModuleID newModule) {
     alreadySeenClangModules.insert(newModule);
   }
-  std::string getModuleOutputPath() const { return moduleOutputPath; }
-  std::string getSDKModuleOutputPath() const { return sdkModuleOutputPath; }
+  StringRef getModuleOutputPath() const { return moduleOutputPath; }
+  StringRef getSDKModuleOutputPath() const { return sdkModuleOutputPath; }
 
   /// Query all dependencies
   ModuleDependencyIDSetVector
