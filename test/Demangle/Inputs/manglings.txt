@@ -489,9 +489,10 @@ $s7ToolKit10TypedValueOACs5Error_pIgHTnTrzo_A2CsAD_pIegHiTrzr_TR ---> {T:} reabs
 $s16sending_mangling16NonSendableKlassCACIegTiTr_A2CIegTxTo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed (@in sending sending_mangling.NonSendableKlass) -> sending (@out sending_mangling.NonSendableKlass) to @escaping @callee_guaranteed (@owned sending sending_mangling.NonSendableKlass) -> sending (@owned sending_mangling.NonSendableKlass)
 $s3red7MyActorC3runyxxyYaKYCXEYaKlFZ ---> static red.MyActor.run<A>(@execution(caller) () async throws -> A) async throws -> A
 $s5thing1PP1sAA1SVvxTwc ---> coro function pointer to thing.P.s.modify2 : thing.S
-
 _$s15raw_identifiers0020foospace_liaADEDGcjayyF ---> raw_identifiers.`foo space`() -> ()
 _$s15raw_identifiers0018_3times_pgaIGJCFbhayyF ---> raw_identifiers.`3 times`() -> ()
 _$s15raw_identifiers0019test_yeaIIBCEapkagayyF ---> raw_identifiers.`test +`() -> ()
 _$s15raw_identifiers0020pathfoo_yuEHaaCiJskayyF ---> raw_identifiers.`path://foo`() -> ()
 _$s15raw_identifiers10FontWeightO009_100_FpEpdyyFZ ---> static raw_identifiers.FontWeight.`100`() -> ()
+$s7Library1BC1iSivxTwd ---> default override of Library.B.i.modify2 : Swift.Int
+$s7Library1BC1iSivxTwdTwc ---> coro function pointer to default override of Library.B.i.modify2 : Swift.Int
