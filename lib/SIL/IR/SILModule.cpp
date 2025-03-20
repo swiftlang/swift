@@ -308,6 +308,13 @@ SILModule::lookUpDefaultOverrideTable(const ClassDecl *decl,
   auto found = DefaultOverrideTableMap.find(decl);
   if (found == DefaultOverrideTableMap.end()) {
     if (deserializeLazily) {
+      SILLinkage linkage = getSILLinkage(getDeclLinkage(decl), ForDefinition);
+      SILDefaultOverrideTable *otable =
+          SILDefaultOverrideTable::declare(*this, linkage, decl);
+      otable = getSILLoader()->lookupDefaultOverrideTable(otable);
+      if (otable)
+        DefaultOverrideTableMap[decl] = otable;
+      return otable;
     }
 
     return nullptr;

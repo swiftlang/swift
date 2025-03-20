@@ -102,19 +102,21 @@ namespace sil_index_block {
     SIL_WITNESS_TABLE_OFFSETS,
     SIL_DEFAULT_WITNESS_TABLE_NAMES,
     SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
+    SIL_DEFAULT_OVERRIDE_TABLE_NAMES,
+    SIL_DEFAULT_OVERRIDE_TABLE_OFFSETS,
     SIL_PROPERTY_OFFSETS,
     SIL_DIFFERENTIABILITY_WITNESS_NAMES,
     SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
   };
 
   using ListLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    BCFixed<5>,  // record ID
     BCVBR<16>,  // table offset within the blob
     BCBlob      // map from identifier strings to IDs.
   >;
 
   using OffsetLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    BCFixed<5>,  // record ID
     BCArray<BitOffsetField>
   >;
 
@@ -155,6 +157,8 @@ namespace sil_block {
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
+    SIL_DEFAULT_OVERRIDE_TABLE,
+    SIL_DEFAULT_OVERRIDE_TABLE_ENTRY,
     SIL_DIFFERENTIABILITY_WITNESS,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
@@ -270,6 +274,19 @@ namespace sil_block {
 
   using DefaultWitnessTableNoEntryLayout = BCRecordLayout<
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY
+  >;
+
+  using DefaultOverrideTableLayout = BCRecordLayout<
+    SIL_DEFAULT_OVERRIDE_TABLE,
+    DeclIDField,  // ID of ClassDecl
+    SILLinkageField  // Linkage
+    // Default override table entries will be serialized after.
+  >;
+
+  using DefaultOverrideTableEntryLayout = BCRecordLayout<
+    SIL_DEFAULT_OVERRIDE_TABLE_ENTRY,
+    DeclIDField,  // SILFunction name
+    BCArray<ValueIDField> // SILDeclRef(method) + SILDeclRef(original)
   >;
 
   using SILGlobalVarLayout = BCRecordLayout<
