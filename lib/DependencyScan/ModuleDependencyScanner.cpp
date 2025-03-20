@@ -259,6 +259,19 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
       *scanningASTDelegate, prefixMapper, false);
 }
 
+ModuleDependencyVector
+ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
+    ArrayRef<StringRef> moduleNames, StringRef moduleOutputPath,
+    const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
+        &alreadySeenModules,
+    llvm::PrefixMapper *prefixMapper, llvm::StringSet<> &successModules,
+    llvm::StringSet<> &notFoundModules, llvm::StringSet<> &errorModules) {
+  return clangScannerModuleLoader->getModuleDependencies(
+      moduleNames, moduleOutputPath, alreadySeenModules, clangScanningTool,
+      *scanningASTDelegate, prefixMapper, successModules, notFoundModules,
+      errorModules, false);
+}
+
 template <typename Function, typename... Args>
 auto ModuleDependencyScanner::withDependencyScanningWorker(Function &&F,
                                                            Args &&...ArgList) {
@@ -849,48 +862,98 @@ ModuleDependencyScanner::resolveAllClangModuleDependencies(
   const llvm::DenseSet<clang::tooling::dependencies::ModuleID> seenClangModules =
       cache.getAlreadySeenClangModules();
   std::mutex cacheAccessLock;
-  auto scanForClangModuleDependency =
-      [this, &cache, &moduleLookupResult,
-       &cacheAccessLock, &seenClangModules](Identifier moduleIdentifier) {
-        auto moduleName = moduleIdentifier.str();
+
+  auto scanDependencyForListOfClangModules =
+      [this, &cache, &moduleLookupResult, &cacheAccessLock,
+       &seenClangModules](ArrayRef<StringRef> moduleIDs) {
+        std::vector<StringRef> unresolvedModules;
         {
           std::lock_guard<std::mutex> guard(cacheAccessLock);
-          if (cache.hasDependency(moduleName, ModuleDependencyKind::Clang))
+          // Check to see if there are any modules not resolved yet.
+          for (const auto &ID : moduleIDs) {
+            if (!cache.hasDependency(ID, ModuleDependencyKind::Clang))
+              unresolvedModules.push_back(ID);
+          }
+
+          // No unresolved modules remaining.
+          if (!unresolvedModules.size())
             return;
         }
 
+        llvm::StringSet<> successModules;
+        llvm::StringSet<> notFoundModules;
+        llvm::StringSet<> errorModules;
         auto moduleDependencies = withDependencyScanningWorker(
-            [&cache, &seenClangModules,
-             moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
-              return ScanningWorker->scanFilesystemForClangModuleDependency(
-                  moduleIdentifier, cache.getModuleOutputPath(),
-                  seenClangModules, cache.getScanService().getPrefixMapper());
+            [&cache, &seenClangModules, &unresolvedModules, &successModules,
+             &notFoundModules,
+             &errorModules](ModuleDependencyScanningWorker *scanningWorker) {
+              return scanningWorker->scanFilesystemForClangModuleDependency(
+                  unresolvedModules, cache.getModuleOutputPath(),
+                  seenClangModules, cache.getScanService().getPrefixMapper(),
+                  successModules, notFoundModules, errorModules);
             });
 
-        // Update the `moduleLookupResult` and cache all discovered dependencies
-        // so that subsequent queries do not have to call into the scanner
-        // if looking for a module that was discovered as a transitive dependency
-        // in this scan.
         {
           std::lock_guard<std::mutex> guard(cacheAccessLock);
-          moduleLookupResult.insert_or_assign(moduleName, moduleDependencies);
-          if (!moduleDependencies.empty())
-            cache.recordDependencies(moduleDependencies);
+          for (const auto &N : successModules.keys()) {
+            moduleLookupResult.insert_or_assign(N, moduleDependencies);
+            if (!moduleDependencies.empty())
+              cache.recordDependencies(moduleDependencies);
+          }
+
+          // FIXME: document the reason why we use an empty dependency
+          // vector as a placeholder for modules not found.
+          for (const auto &N : notFoundModules.keys()) {
+            moduleLookupResult.insert_or_assign(N, ModuleDependencyVector());
+          }
+
+          for (const auto &N : errorModules.keys()) {
+            moduleLookupResult.insert_or_assign(N, ModuleDependencyVector());
+          }
         }
       };
 
-  // Enque asynchronous lookup tasks
-  for (const auto &unresolvedIdentifier : unresolvedImportIdentifiers)
-    ScanningThreadPool.async(
-        scanForClangModuleDependency,
-        getModuleImportIdentifier(unresolvedIdentifier.getKey()));
-  for (const auto &unresolvedIdentifier : unresolvedOptionalImportIdentifiers)
-    ScanningThreadPool.async(
-        scanForClangModuleDependency,
-        getModuleImportIdentifier(unresolvedIdentifier.getKey()));
+  auto batchResolveModuleDependencies = [&](const auto &unreslovedModuleIDs) {
+    std::vector<StringRef> unresolvedModuleNames(
+        unreslovedModuleIDs.keys().begin(), unreslovedModuleIDs.keys().end());
+    std::transform(unresolvedModuleNames.begin(), unresolvedModuleNames.end(),
+                   unresolvedModuleNames.begin(), [&](auto Key) {
+                     return getModuleImportIdentifier(Key).str();
+                   });
+    auto chunkResults = std::div((int)unreslovedModuleIDs.size(), NumThreads);
+    const size_t chunkSize = chunkResults.quot;
+    const size_t remainingSize = chunkResults.rem;
+
+    auto unresolvedModuleNamesIt = unresolvedModuleNames.begin();
+    size_t numOfUnresolvedModules = unresolvedModuleNames.size();
+    for (size_t i = 0; i + remainingSize < numOfUnresolvedModules;
+         i += chunkSize) {
+      std::vector<StringRef> batchedNames(
+          unresolvedModuleNamesIt, (unresolvedModuleNamesIt + chunkSize));
+      ScanningThreadPool.async(scanDependencyForListOfClangModules,
+                               batchedNames);
+      unresolvedModuleNamesIt += chunkSize;
+    }
+
+    if (remainingSize) {
+      std::vector<StringRef> remainingNames(
+          unresolvedModuleNamesIt, (unresolvedModuleNamesIt + remainingSize));
+      ScanningThreadPool.async(scanDependencyForListOfClangModules,
+                               remainingNames);
+    }
+  };
+
+  batchResolveModuleDependencies(unresolvedImportIdentifiers);
+  batchResolveModuleDependencies(unresolvedOptionalImportIdentifiers);
   ScanningThreadPool.wait();
 
   // Use the computed scan results to update the dependency info
+  // Four things
+  // 1. For each unresolved import, update the direct dependencies. Stored in
+  // importedClangDependencies.
+  // 2. Every single module we discovered goes into allDiscoveredClangModules.
+  // 3. Every single module we discovered goes into the `cache`. Happened above.
+  // 4. Record every single module that failed to resolve.
   for (const auto &moduleID : swiftModuleDependents) {
     std::vector<ScannerImportStatementInfo> failedToResolveImports;
     ModuleDependencyIDSetVector importedClangDependencies;
@@ -923,6 +986,7 @@ ModuleDependencyScanner::resolveAllClangModuleDependencies(
 
     for (const auto &unresolvedImport : unresolvedImportsMap[moduleID])
       recordResolvedClangModuleImport(unresolvedImport, false);
+
     for (const auto &unresolvedImport : unresolvedOptionalImportsMap[moduleID])
       recordResolvedClangModuleImport(unresolvedImport, true);
 

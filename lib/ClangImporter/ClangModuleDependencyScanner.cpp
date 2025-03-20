@@ -422,16 +422,16 @@ ClangImporter::getModuleDependencies(Identifier moduleName,
 
   auto lookupModuleOutput =
       [moduleOutputPath](const ModuleID &MID,
-                        ModuleOutputKind MOK) -> std::string {
+                         ModuleOutputKind MOK) -> std::string {
     return moduleCacheRelativeLookupModuleOutput(MID, MOK, moduleOutputPath);
   };
 
-  auto clangModuleDependencies =
+  auto [Error, clangModuleDependencies] =
       clangScanningTool.getModuleDependencies(
           moduleName.str(), commandLineArgs, workingDir,
           alreadySeenClangModules, lookupModuleOutput);
-  if (!clangModuleDependencies) {
-    auto errorStr = toString(clangModuleDependencies.takeError());
+  if (Error) {
+    auto errorStr = toString(std::move(Error));
     // We ignore the "module 'foo' not found" error, the Swift dependency
     // scanner will report such an error only if all of the module loaders
     // fail as well.
@@ -443,7 +443,76 @@ ClangImporter::getModuleDependencies(Identifier moduleName,
   }
 
   return bridgeClangModuleDependencies(clangScanningTool,
-                                       *clangModuleDependencies,
+                                       clangModuleDependencies,
+                                       moduleOutputPath, [&](StringRef path) {
+                                         if (mapper)
+                                           return mapper->mapToString(path);
+                                         return path.str();
+                                       });
+}
+
+ModuleDependencyVector ClangImporter::getModuleDependencies(
+    ArrayRef<StringRef> moduleNames, StringRef moduleOutputPath,
+    const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
+        &alreadySeenClangModules,
+    clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
+    InterfaceSubContextDelegate &delegate, llvm::PrefixMapper *mapper,
+    llvm::StringSet<> &successModules, llvm::StringSet<> &notFoundModules,
+    llvm::StringSet<> &errorModules, bool isTestableImport) {
+  auto &ctx = Impl.SwiftContext;
+  // Determine the command-line arguments for dependency scanning.
+  std::vector<std::string> commandLineArgs =
+      getClangDepScanningInvocationArguments(ctx);
+  auto optionalWorkingDir = computeClangWorkingDirectory(commandLineArgs, ctx);
+  if (!optionalWorkingDir) {
+    ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
+                       "Missing '-working-directory' argument");
+    return {};
+  }
+  std::string workingDir = *optionalWorkingDir;
+
+  auto lookupModuleOutput =
+      [moduleOutputPath](const ModuleID &MID,
+                         ModuleOutputKind MOK) -> std::string {
+    return moduleCacheRelativeLookupModuleOutput(MID, MOK, moduleOutputPath);
+  };
+
+  auto [error, clangModuleDependencies] =
+      clangScanningTool.getModuleDependencies(
+          moduleNames, commandLineArgs, workingDir, alreadySeenClangModules,
+          lookupModuleOutput);
+  if (error) {
+    auto errorStr = toString(std::move(error));
+    bool showError = false;
+
+    // We partition the modules into three sets, modules successfully scanned,
+    // modules not found, and modules that incur scanning errors.
+    for (const auto &N : moduleNames) {
+      // We ignore the "module 'foo' not found" error, the Swift dependency
+      // scanner will report such an error only if all of the module loaders
+      // fail as well.
+      if (errorStr.find("error: module '" + N.str() + "' not found") ==
+          std::string::npos) {
+        if (errorStr.find("'" + N.str() + "'") != std::string::npos) {
+          showError = true;
+          errorModules.insert(N);
+        } else
+          successModules.insert(N);
+      } else
+        notFoundModules.insert(N);
+    }
+
+    if (showError)
+      ctx.Diags.diagnose(SourceLoc(), diag::clang_dependency_scan_error,
+                         errorStr);
+  } else
+    successModules.insert(moduleNames.begin(), moduleNames.end());
+
+  if (!clangModuleDependencies.size())
+    return {};
+
+  return bridgeClangModuleDependencies(clangScanningTool,
+                                       clangModuleDependencies,
                                        moduleOutputPath, [&](StringRef path) {
                                          if (mapper)
                                            return mapper->mapToString(path);

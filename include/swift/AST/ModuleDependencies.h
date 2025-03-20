@@ -1255,7 +1255,7 @@ public:
                         ModuleDependencyInfo dependencies);
 
   /// Record dependencies for the given module collection.
-  void recordDependencies(ModuleDependencyVector moduleDependencies);
+  void recordDependencies(const ModuleDependencyVector &moduleDependencies);
 
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,

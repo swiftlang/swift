@@ -875,7 +875,7 @@ void ModuleDependenciesCache::recordDependency(
 }
 
 void ModuleDependenciesCache::recordDependencies(
-    ModuleDependencyVector dependencies) {
+    const ModuleDependencyVector &dependencies) {
   for (const auto &dep : dependencies) {
     if (!hasDependency(dep.first))
       recordDependency(dep.first.ModuleName, dep.second);

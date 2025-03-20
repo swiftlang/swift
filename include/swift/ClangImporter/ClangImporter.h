@@ -495,6 +495,18 @@ public:
                         llvm::PrefixMapper *mapper,
                         bool isTestableImport = false) override;
 
+  // The moduleOutputPath specifies a directory where the precompiled modules
+  // reside in. It should not vary accross the list of modules.
+  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
+  getModuleDependencies(
+      ArrayRef<StringRef> moduleNames, StringRef moduleOutputPath,
+      const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
+          &alreadySeenClangModules,
+      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
+      InterfaceSubContextDelegate &delegate, llvm::PrefixMapper *mapper,
+      llvm::StringSet<> &successModules, llvm::StringSet<> &notFoundModules,
+      llvm::StringSet<> &errorModules, bool isTestableImport = false);
+
   void recordBridgingHeaderOptions(
       ModuleDependencyInfo &MDI,
       const clang::tooling::dependencies::TranslationUnitDeps &deps);

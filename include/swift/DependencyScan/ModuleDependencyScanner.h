@@ -43,6 +43,15 @@ private:
                                          const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenModules,
                                          llvm::PrefixMapper *prefixMapper);
 
+  /// Retrieve the module dependencies for a list of Clang modules given a list
+  /// of names.
+  ModuleDependencyVector scanFilesystemForClangModuleDependency(
+      ArrayRef<StringRef> moduleNames, StringRef moduleOutputPath,
+      const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
+          &alreadySeenModules,
+      llvm::PrefixMapper *prefixMapper, llvm::StringSet<> &successModules,
+      llvm::StringSet<> &notFoundModules, llvm::StringSet<> &errorModules);
+
   /// Retrieve the module dependencies for the Swift module with the given name.
   ModuleDependencyVector
   scanFilesystemForSwiftModuleDependency(Identifier moduleName, StringRef moduleOutputPath,
