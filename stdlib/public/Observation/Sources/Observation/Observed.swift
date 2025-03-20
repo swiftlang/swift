@@ -172,7 +172,11 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
       return try result.get()
     }
     
-    fileprivate mutating func terminate(throwing failure: Failure? = nil) throws(Failure) -> Element? {
+    fileprivate mutating func terminate(throwing failure: Failure? = nil, id: Int) throws(Failure) -> Element? {
+      // this is purely defensive to any leaking out of iteration generation ids
+      state?.withCriticalRegion { state in
+        state.continuations.removeValue(forKey: id)
+      }?.resume()
       // flag the sequence as terminal by nil'ing out the state
       state = nil
       if let failure {
@@ -182,15 +186,15 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
       }
     }
     
-    fileprivate mutating func trackEmission(isolation iterationIsolation: isolated (any Actor)?, state: SharedState<State>) async throws(Failure) -> Element? {
+    fileprivate mutating func trackEmission(isolation iterationIsolation: isolated (any Actor)?, state: SharedState<State>, id: Int) async throws(Failure) -> Element? {
       guard !Task.isCancelled else {
         // the task was cancelled while awaiting a willChange so ensure a proper termination
-        return try terminate()
+        return try terminate(id: id)
       }
       // start by directly tracking the emission via a withObservation tracking on the isolation specified fro mthe init
       guard let element = try await Iterator.trackEmission(isolation: emit.isolation, state: state, emit: emit) else {
         // the user returned a nil from the closure so terminate the sequence
-        return try terminate()
+        return try terminate(id: id)
       }
       return element
     }
@@ -198,15 +202,16 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     public mutating func next(isolation iterationIsolation: isolated (any Actor)? = #isolation) async throws(Failure) -> Element? {
       // early exit if the sequence is terminal already
       guard let state else { return nil }
+      // set up an id for this generation
+      let id = State.generation(state)
       do {
         // there are two versions;
         // either the tracking has never yet started at all and we need to prime the pump
         // or the tracking has already started and we are going to await a change
         if State.startTracking(state) {
-          return try await trackEmission(isolation: iterationIsolation, state: state)
+          return try await trackEmission(isolation: iterationIsolation, state: state, id: id)
         } else {
-          // set up an id for this generation
-          let id = State.generation(state)
+          
           // wait for the willChange (and NOT the value itself)
           // since this is going to be on the isolation of the object (e.g. the isolation specified in the initialization)
           // this will mean our next await for the emission will ensure the suspension return of the willChange context
@@ -218,11 +223,11 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
             // ensure to clean out our continuation uon cancellation
             State.cancel(state, id: id)
           }
-          return try await trackEmission(isolation: iterationIsolation, state: state)
+          return try await trackEmission(isolation: iterationIsolation, state: state, id: id)
         }
       } catch {
         // the user threw a failure in the closure so propigate that outwards and terminate the sequence
-        return try terminate(throwing: error)
+        return try terminate(throwing: error, id: id)
       }
     }
   }
