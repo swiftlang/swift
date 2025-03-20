@@ -250,7 +250,9 @@ if(NOT LINUX AND NOT ANDROID)
   target_sources(swiftCore PRIVATE ObjectIdentifier+DebugDescription.swift)
 endif()
 
-set_target_properties(swiftCore PROPERTIES Swift_MODULE_NAME Swift)
+set_target_properties(swiftCore PROPERTIES
+  Swift_MODULE_NAME Swift
+  LINKER_LANGUAGE CXX)
 
 if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
   target_sources(swiftCore PRIVATE CommandLine.swift)
@@ -313,8 +315,6 @@ target_link_libraries(swiftCore
     $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>
   PUBLIC
     swiftShims)
-target_link_options(swiftCore PRIVATE
-  -nostartfiles)
 if(NOT POLICY CMP0157)
   target_compile_options(swiftCore PRIVATE
     $<TARGET_OBJECTS:swiftRuntime>
