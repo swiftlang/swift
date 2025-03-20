@@ -943,6 +943,35 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
   });
 }
 
+/// Cancel all the child tasks that belong to `group`.
+///
+/// The caller must guarantee that this is called while holding the owning
+/// task's status record lock.
+void swift::_swift_taskGroup_cancelAllChildren(TaskGroup *group) {
+  // Because only the owning task of the task group can modify the
+  // child list of a task group status record, and it can only do so
+  // while holding the owning task's status record lock, we do not need
+  // any additional synchronization within this function.
+  for (auto childTask : group->getTaskRecord()->children())
+    swift_task_cancel(childTask);
+}
+
+/// Cancel all the child tasks that belong to `group`.
+///
+/// The caller must guarantee that this is called from the owning task.
+void swift::_swift_taskGroup_cancelAllChildren_unlocked(TaskGroup *group,
+                                                        AsyncTask *owningTask) {
+  // Early out. If there are no children, there's nothing to do. We can safely
+  // check this without locking, since this can only be concurrently mutated
+  // from a child task. If there are no children then no more can be added.
+  if (!group->getTaskRecord()->getFirstChild())
+    return;
+
+  withStatusRecordLock(owningTask, [&group](ActiveTaskStatus status) {
+    _swift_taskGroup_cancelAllChildren(group);
+  });
+}
+
 /**************************************************************************/
 /****************************** CANCELLATION ******************************/
 /**************************************************************************/
