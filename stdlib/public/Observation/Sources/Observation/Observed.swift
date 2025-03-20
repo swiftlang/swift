@@ -37,9 +37,19 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
   }
   
   struct State {
+    enum Continuation {
+      case cancelled
+      case active(UnsafeContinuation<Void, Never>)
+      func resume() {
+        switch self {
+        case .cancelled: break
+        case .active(let continuation): continuation.resume()
+        }
+      }
+    }
     var id = 0
     var tracking = false
-    var continuations: [Int: UnsafeContinuation<Void, Never>] = [:]
+    var continuations: [Int: Continuation] = [:]
     
     // create a generation id for the unique identification of the continuations
     // this allows the shared awaiting of the willSets.
@@ -58,7 +68,14 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     // cancelled after awaiting the willSet to act accordingly.
     static func cancel(_ state: SharedState<State>, id: Int) {
       state.withCriticalRegion { state in
-        return state.continuations.removeValue(forKey: id)
+        guard let continuation = state.continuations.removeValue(forKey: id) else {
+          // if there was no continuation yet active (e.g. it was cancelled at
+          // the start of the invocation, then put a tombstone in to gate that
+          // resuming later
+          state.continuations[id] = .cancelled
+          return nil as Continuation?
+        }
+        return continuation
       }?.resume()
     }
     
@@ -92,10 +109,19 @@ public struct Observed<Element: Sendable, Failure: Error>: AsyncSequence, Sendab
     // install a willChange continuation into the set of continuations
     // this must take a locally unique id (to the active calls of next)
     static func willChange(_ state: SharedState<State>, id: Int) async {
-      await withUnsafeContinuation { continuation in
+      return await withUnsafeContinuation { continuation in
         state.withCriticalRegion { state in
-          state.continuations[id] = continuation
-        }
+          // first check if a cancelled tombstone exists, remove it,
+          // and then return the freshly minted continuation to
+          // be immediately resumed
+          if case .cancelled = state.continuations[id] {
+            state.continuations[id] = nil
+            return continuation as UnsafeContinuation<Void, Never>?
+          } else {
+            state.continuations[id] = .active(continuation)
+            return nil as UnsafeContinuation<Void, Never>?
+          }
+        }?.resume()
       }
     }
   }
