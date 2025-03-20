@@ -558,12 +558,34 @@ function Get-InstallDir([Hashtable] $Platform) {
 $HostPlatform.ToolchainInstallRoot = "$(Get-InstallDir $HostPlatform)\Toolchains\$ProductVersion+$Variant"
 
 # Build functions
-function Invoke-BuildStep([string] $Name, [Hashtable] $Platform) {
+function Invoke-BuildStep {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position=0, Mandatory)]
+    [string] $Name,
+    [Parameter(Position=1, Mandatory)]
+    [Hashtable] $Platform,
+    [Parameter(ValueFromRemainingArguments)]
+    $RemainingArgs
+  )
+
   if ($Summary) {
     $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
   }
 
-  & $Name $Platform @Args
+  $SplatArgs = @{}
+  foreach ($Arg in $RemainingArgs) {
+    if ($Arg -is [Hashtable]) {
+      $SplatArgs += $Arg
+    } elseif ($Arg -is [string]) {
+      $SplatArgs[$Arg.TrimStart('-')] = $true
+    } else {
+      throw "$Arg is unknown type: $($Arg.GetType())"
+    }
+  }
+
+  & $Name $Platform @SplatArgs
 
   if ($Summary) {
     Add-TimingData $Platform $Name $Stopwatch.Elapsed
@@ -3273,9 +3295,7 @@ if (-not $IsCrossCompiling) {
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
     }
-    Write-Host "`$HostPlatform = $($HostPlatform | ConvertTo-Json)" -ForegroundColor Blue
-    Write-Host "`$Tests = $($Tests)" -ForegroundColor Magenta
-    Invoke-BuildStep Build-Compilers $HostPlatform @Tests
+    Invoke-BuildStep Build-Compilers $HostPlatform $Tests
   }
 
   if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch }
