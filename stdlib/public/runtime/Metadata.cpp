@@ -3644,13 +3644,13 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
 #endif
 }
 
-static void installOverrideInVTable(
-    ClassDescriptor::MethodOverrideDescriptor const &descriptor,
-    ClassDescriptor::OverrideTableHeader const *overrideTable,
-    void **classWords) {
+template <typename GetImpl>
+static void installOverrideInVTable(ContextDescriptor const *baseContext,
+                                    MethodDescriptor const *baseMethod,
+                                    GetImpl getImpl, void const *table,
+                                    void **classWords) {
   // Get the base class and method.
-  auto *baseClass = cast_or_null<ClassDescriptor>(descriptor.Class.get());
-  auto *baseMethod = descriptor.Method.get();
+  auto *baseClass = cast_or_null<ClassDescriptor>(baseContext);
 
   // If the base method is null, it's an unavailable weak-linked
   // symbol.
@@ -3669,14 +3669,14 @@ static void installOverrideInVTable(
     fatalError(0,
                "resilient vtable at %p contains out-of-bounds "
                "method descriptor %p\n",
-               overrideTable, baseMethod);
+               table, baseMethod);
   }
 
   // Install the method override in our vtable.
   auto baseVTable = baseClass->getVTableDescriptor();
   auto offset = (baseVTable->getVTableOffset(baseClass) +
                  (baseMethod - baseClassMethods.data()));
-  swift_ptrauth_init_code_or_data(&classWords[offset], descriptor.getImpl(),
+  swift_ptrauth_init_code_or_data(&classWords[offset], getImpl(),
                                   baseMethod->Flags.getExtraDiscriminator(),
                                   !baseMethod->Flags.isData());
 }
@@ -3707,7 +3707,10 @@ static void initClassVTable(ClassMetadata *self) {
     for (unsigned i = 0, e = overrideTable->NumEntries; i < e; ++i) {
       auto &descriptor = overrideDescriptors[i];
 
-      installOverrideInVTable(descriptor, overrideTable, classWords);
+      installOverrideInVTable(
+          descriptor.Class.get(), descriptor.Method.get(),
+          [&descriptor]() { return descriptor.getImpl(); }, overrideTable,
+          classWords);
     }
   }
 }
