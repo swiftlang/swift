@@ -474,9 +474,8 @@ public:
   bool statusCancel();
 
   /// Cancel the group and all of its child tasks recursively.
-  /// This also sets
-  bool cancelAll();
-
+  /// This also sets the cancelled bit in the group status.
+  bool cancelAll(AsyncTask *task);
 };
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
@@ -1378,7 +1377,8 @@ void DiscardingTaskGroup::offer(AsyncTask *completedTask, AsyncContext *context)
     // Discarding results mode immediately treats a child failure as group cancellation.
     // "All for one, one for all!" - any task failing must cause the group and all sibling tasks to be cancelled,
     // such that the discarding group can exit as soon as possible.
-    cancelAll();
+    auto parent = completedTask->childFragment()->getParent();
+    cancelAll(parent);
 
     if (afterComplete.hasWaitingTask() && afterComplete.pendingTasks(this) == 0) {
       // We grab the waiting task while holding the group lock, because this
@@ -2097,10 +2097,12 @@ static bool swift_taskGroup_isCancelledImpl(TaskGroup *group) {
 
 SWIFT_CC(swift)
 static void swift_taskGroup_cancelAllImpl(TaskGroup *group) {
-  asBaseImpl(group)->cancelAll();
+  // TaskGroup is not a Sendable type, so this can only be called from the
+  // owning task.
+  asBaseImpl(group)->cancelAll(swift_task_getCurrent());
 }
 
-bool TaskGroupBase::cancelAll() {
+bool TaskGroupBase::cancelAll(AsyncTask *owningTask) {
   SWIFT_TASK_DEBUG_LOG("cancel all tasks in group = %p", this);
 
   // Flag the task group itself as cancelled.  If this was already
@@ -2114,8 +2116,8 @@ bool TaskGroupBase::cancelAll() {
 
   // Cancel all the child tasks.  TaskGroup is not a Sendable type,
   // so cancelAll() can only be called from the owning task.  This
-  // satisfies the precondition on cancelAllChildren().
-  _swift_taskGroup_cancelAllChildren(asAbstract(this));
+  // satisfies the precondition on cancelAllChildren_unlocked().
+  _swift_taskGroup_cancelAllChildren_unlocked(asAbstract(this), owningTask);
 
   return true;
 }
@@ -2124,22 +2126,8 @@ SWIFT_CC(swift)
 static void swift_task_cancel_group_child_tasksImpl(TaskGroup *group) {
   // TaskGroup is not a Sendable type, and so this operation (which is not
   // currently exposed in the API) can only be called from the owning
-  // task.  This satisfies the precondition on cancelAllChildren().
-  _swift_taskGroup_cancelAllChildren(group);
-}
-
-/// Cancel all the children of the given task group.
-///
-/// The caller must guarantee that this is either called from the
-/// owning task of the task group or while holding the owning task's
-/// status record lock.
-void swift::_swift_taskGroup_cancelAllChildren(TaskGroup *group) {
-  // Because only the owning task of the task group can modify the
-  // child list of a task group status record, and it can only do so
-  // while holding the owning task's status record lock, we do not need
-  // any additional synchronization within this function.
-  for (auto childTask: group->getTaskRecord()->children())
-    swift_task_cancel(childTask);
+  // task.  This satisfies the precondition on cancelAllChildren_unlocked().
+  _swift_taskGroup_cancelAllChildren_unlocked(group, swift_task_getCurrent());
 }
 
 // =============================================================================
