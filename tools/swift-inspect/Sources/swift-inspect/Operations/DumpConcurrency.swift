@@ -57,6 +57,7 @@ fileprivate class ConcurrencyDumper {
     var hasIsRunning: Bool
     var isRunning: Bool
     var isEnqueued: Bool
+    var isComplete: Bool
     var threadPort: UInt32?
     var id: UInt64
     var runJob: swift_reflection_ptr_t
@@ -213,6 +214,7 @@ fileprivate class ConcurrencyDumper {
       hasIsRunning: reflectionInfo.HasIsRunning,
       isRunning: reflectionInfo.IsRunning,
       isEnqueued: reflectionInfo.IsEnqueued,
+      isComplete: reflectionInfo.IsComplete,
       threadPort: reflectionInfo.HasThreadPort
                 ? reflectionInfo.ThreadPort
                 : nil,
@@ -275,6 +277,7 @@ fileprivate class ConcurrencyDumper {
     if info.isEscalated { flags.append("escalated") }
     if info.hasIsRunning && info.isRunning { flags.append("running") }
     if info.isEnqueued { flags.append("enqueued") }
+    if info.isComplete { flags.append("complete") }
 
     let flagsStr = flags.isEmpty ? "0" : flags.joined(separator: "|")
     return flagsStr
