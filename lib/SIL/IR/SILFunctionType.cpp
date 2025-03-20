@@ -16,6 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Expr.h"
+#include "swift/AST/Type.h"
 #define DEBUG_TYPE "libsil"
 
 #include "swift/AST/AnyFunctionRef.h"
@@ -4296,12 +4298,10 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
   // The type of the native-to-foreign thunk for a swift closure.
   if (constant.isForeign && constant.hasClosureExpr() &&
       shouldStoreClangType(TC.getDeclRefRepresentation(constant))) {
-    auto clangType = TC.Context.getClangFunctionType(
-        origLoweredInterfaceType->getParams(),
-        origLoweredInterfaceType->getResult(),
-        FunctionTypeRepresentation::CFunctionPointer);
-    AbstractionPattern pattern =
-        AbstractionPattern(origLoweredInterfaceType, clangType);
+    assert(!extInfoBuilder.getClangTypeInfo().empty() &&
+           "clang type not found");
+    AbstractionPattern pattern = AbstractionPattern(
+        origLoweredInterfaceType, extInfoBuilder.getClangTypeInfo().getType());
     return getSILFunctionTypeForAbstractCFunction(
         TC, pattern, origLoweredInterfaceType, extInfoBuilder, constant);
   }
@@ -4809,9 +4809,25 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
   if (!constant.isForeign)
     return AbstractionPattern(fnType);
 
+  if (const auto *closure = dyn_cast_or_null<ClosureExpr>(
+          constant.loc.dyn_cast<AbstractClosureExpr *>())) {
+    if (const auto *convertedTo = closure->getConvertedTo()) {
+      auto clangInfo = convertedTo->getType()
+                           ->castTo<AnyFunctionType>()
+                           ->getExtInfo()
+                           .getClangTypeInfo();
+      if (!clangInfo.empty())
+        return AbstractionPattern(fnType, clangInfo.getType());
+    }
+  }
+
+  if (constant.thunkType)
+    return AbstractionPattern(fnType, constant.thunkType);
+
   auto bridgedFn = getBridgedFunction(constant);
   if (!bridgedFn)
     return AbstractionPattern(fnType);
+
   const clang::Decl *clangDecl = bridgedFn->getClangDecl();
   if (!clangDecl)
     return AbstractionPattern(fnType);
