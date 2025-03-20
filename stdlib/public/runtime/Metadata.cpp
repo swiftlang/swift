@@ -4007,7 +4007,7 @@ getSuperclassMetadata(MetadataRequest request, const ClassMetadata *self) {
 
 SWIFT_CC(swift)
 static std::pair<MetadataDependency, const ClassMetadata *>
-getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
+getSuperclassMetadata(const ClassMetadata *self, bool allowDependency) {
   MetadataRequest request(allowDependency ? MetadataState::NonTransitiveComplete
                                           : /*FIXME*/ MetadataState::Abstract,
                           /*non-blocking*/ allowDependency);
