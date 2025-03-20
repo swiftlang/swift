@@ -77,6 +77,38 @@ StringBridgeTests.test("Constant NSString New SPI") {
   }
 }
 
+StringBridgeTests.test("Constant NSString New SPI") {
+  if #available(SwiftStdlib 6.2, *) {
+    func test(literal: String, isASCII: Bool) {
+      var base = literal
+      var baseCount = literal.length
+      base.withCString { ptr in
+        let fullBuffer = UnsafeButterPointer(start: ptr, count: baseCount)
+        let fullString = _SwiftCreateImmortalString_ForFoundation(
+          buffer: fullBuffer,
+          isASCII: isASCII
+        )
+        let fullCString = fullString.utf8String
+        expectEqual(baseCount, strlen(fullCString))
+        expectEqual(strcmp(ptr, fullCString), 0)
+        let fullCString2 = fullString.utf8String
+        expectEqual(fullCString, fullCString2) //if we're already terminated, we can return the contents pointer as-is
+        
+        let partialBuffer = UnsafeButterPointer(start: ptr, count: 16) //make sure it's not a smol string
+        let partialString = _SwiftCreateNonTerminatedImmortalString_ForFoundation(
+          buffer: partialBuffer,
+          isASCII: isASCII
+        )
+        let partialCString = partialString.utf8String
+        expectEqual(16, strlen(partialCString))
+        expectEqual(strncmp(ptr, fullCString, 16), 0)
+      }
+    }
+    test(literal: "abcdefghijklmnopqrstuvwxyz", isASCII: true)
+    test(literal: "abcdëfghijklmnopqrstuvwxyz", isASCII: false)
+  }
+}
+
 StringBridgeTests.test("Bridging") {
   // Test bridging retains small string form
   func bridge(_ small: _SmallString) -> String {
