@@ -45,4 +45,7 @@ Added: _$ss24_RuntimeFunctionCountersV07runtimeB11NameToIndexSDySSSiGvpZMV
 Added: _$ss24_RuntimeFunctionCountersV07runtimeB5NamesSaySSGvpZMV
 Added: _$ss24_RuntimeFunctionCountersV07runtimebC7OffsetsSPys6UInt16VGvpZMV
 
+Added: _$ss13_StringObjectV13CountAndFlagsV16isNullTerminatedSbvpMV
+Added: _$ss13_StringObjectV13CountAndFlagsV20isNullTerminatedMasks6UInt64VvpZMV
+
 // Runtime Symbols
