@@ -29,6 +29,7 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckUnsafe.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AccessScope.h"
@@ -2352,6 +2353,10 @@ static bool hasRuntimeConformanceInfo(ProtocolDecl *proto) {
       || proto->isSpecificProtocol(KnownProtocolKind::Escapable);
 }
 
+static void diagnoseConformanceIsolationErrors(
+    const NormalProtocolConformance *conformance
+);
+
 static void ensureRequirementsAreSatisfied(ASTContext &ctx,
                                            NormalProtocolConformance *conformance);
 
@@ -2685,6 +2690,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
         diagnoseUnsafeUse(unsafeUse);
     }
   }
+
+  diagnoseConformanceIsolationErrors(conformance);
 }
 
 /// Add the next associated type deduction to the string representation
@@ -3543,61 +3550,14 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     }
   }
 
-  // Complain that this witness cannot conform to the requirement due to
-  // actor isolation.
-  witness
-      ->diagnose(diag::actor_isolated_witness,
-                 isDistributed && !isDistributedDecl(witness),
-                 refResult.isolation, witness, requirementIsolation,
-                 Conformance->getProtocol())
-      .limitBehaviorUntilSwiftVersion(behavior, 6);
-
-  // If we need 'distributed' on the witness, add it.
-  if (missingOptions.contains(MissingFlags::WitnessDistributed)) {
-    witness->diagnose(
-        diag::note_add_distributed_to_decl, witness)
-      .fixItInsert(witness->getAttributeInsertionLoc(true),
-                              "distributed ");
-    missingOptions -= MissingFlags::WitnessDistributed;
-  }
-
-  // If 'nonisolated' or 'preconcurrency' might help us, provide those as
-  // options.
-  if (!isDistributedDecl(requirement) && !isDistributedDecl(witness)) {
-    // One way to address the issue is to make the witness function nonisolated.
-    if ((isa<AbstractFunctionDecl>(witness) || isa<SubscriptDecl>(witness)) &&
-        !hasExplicitGlobalActorAttr(witness)) {
-      witness->diagnose(diag::note_add_nonisolated_to_decl, witness)
-            .fixItInsert(witness->getAttributeInsertionLoc(true), "nonisolated ");
-    }
-    
-    // Another way to address the issue is to mark the conformance as
-    // isolated to the global actor or "@preconcurrency".
-    if (Conformance->getSourceKind() == ConformanceEntryKind::Explicit &&
-        !Conformance->isIsolated() &&
-        !Conformance->isPreconcurrency() &&
-        !suggestedPreconcurrencyOrIsolated &&
-        !requirementIsolation.isActorIsolated()) {
-      if (Context.LangOpts.hasFeature(Feature::IsolatedConformances) &&
-          refResult.isolation.isGlobalActor()) {
-        std::string globalActorStr = "@" +
-            refResult.isolation.getGlobalActor().getString();
-        Context.Diags.diagnose(Conformance->getProtocolNameLoc(),
-                               diag::add_isolated_to_conformance,
-                               globalActorStr,
-                               Proto->getName(), refResult.isolation)
-            .fixItInsert(Conformance->getProtocolNameLoc(),
-                         globalActorStr + " ");
-      }
-
-      Context.Diags.diagnose(Conformance->getProtocolNameLoc(),
-                             diag::add_preconcurrency_to_conformance,
-                             Proto->getName())
-          .fixItInsert(Conformance->getProtocolNameLoc(), "@preconcurrency ");
-      
-      suggestedPreconcurrencyOrIsolated = true;
-    }
-  }
+  // Note the isolation issue with this witness, to be diagnosed later.
+  ASTContext &ctx = DC->getASTContext();
+  ctx.getGlobalCache().conformanceIsolationErrors[Conformance].push_back(
+      WitnessIsolationError{
+        requirement, witness, behavior,
+        missingOptions.contains(MissingFlags::WitnessDistributed),
+        requirementIsolation, refResult.isolation
+      });
 
   return std::nullopt;
 }
@@ -4829,6 +4789,140 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   }
 }
 
+void WitnessIsolationError::diagnose(
+    const NormalProtocolConformance *conformance,
+    bool &suggestedPreconcurrencyOrIsolated
+) const {
+  bool isDistributed = referenceIsolation.isDistributedActor() &&
+      !witness->getAttrs().hasAttribute<NonisolatedAttr>();
+
+  // Complain that this witness cannot conform to the requirement due to
+  // actor isolation.
+  witness
+      ->diagnose(diag::actor_isolated_witness,
+                 isDistributed && !isDistributedDecl(witness),
+                 referenceIsolation, witness, requirementIsolation,
+                 conformance->getProtocol())
+      .limitBehaviorUntilSwiftVersion(behavior, 6);
+
+  // If we need 'distributed' on the witness, add it.
+  if (isMissingDistributed) {
+    witness->diagnose(
+        diag::note_add_distributed_to_decl, witness)
+      .fixItInsert(witness->getAttributeInsertionLoc(true), "distributed ");
+  }
+
+  // If either of these are distributed, there's nothing more to say.
+  if (isDistributedDecl(requirement) || isDistributedDecl(witness))
+    return;
+
+  // If 'nonisolated' or 'preconcurrency' might help us, provide those as
+  // options.
+  // One way to address the issue is to make the witness function nonisolated.
+  if ((isa<AbstractFunctionDecl>(witness) || isa<SubscriptDecl>(witness)) &&
+      !hasExplicitGlobalActorAttr(witness)) {
+    witness->diagnose(diag::note_add_nonisolated_to_decl, witness)
+          .fixItInsert(witness->getAttributeInsertionLoc(true), "nonisolated ");
+  }
+
+  // Another way to address the issue is to mark the conformance as
+  // isolated to the global actor or "@preconcurrency".
+  if (conformance->getSourceKind() == ConformanceEntryKind::Explicit &&
+      !conformance->isIsolated() &&
+      !conformance->isPreconcurrency() &&
+      !suggestedPreconcurrencyOrIsolated &&
+      !requirementIsolation.isActorIsolated()) {
+    auto proto = conformance->getProtocol();
+    ASTContext &ctx = proto->getASTContext();
+    if (ctx.LangOpts.hasFeature(Feature::IsolatedConformances) &&
+        referenceIsolation.isGlobalActor()) {
+      std::string globalActorStr = "@" +
+          referenceIsolation.getGlobalActor().getString();
+      ctx.Diags.diagnose(conformance->getProtocolNameLoc(),
+                         diag::add_isolated_to_conformance,
+                         globalActorStr,
+                         proto->getName(), referenceIsolation)
+          .fixItInsert(conformance->getProtocolNameLoc(),
+                       globalActorStr + " ");
+    }
+
+    ctx.Diags.diagnose(conformance->getProtocolNameLoc(),
+                       diag::add_preconcurrency_to_conformance,
+                       proto->getName())
+        .fixItInsert(conformance->getProtocolNameLoc(), "@preconcurrency ");
+
+    suggestedPreconcurrencyOrIsolated = true;
+  }
+}
+
+void AssociatedConformanceIsolationError::diagnose(
+    const NormalProtocolConformance *conformance
+) const {
+  auto outerIsolation = conformance->getIsolation();
+  auto innerIsolation = isolatedConformance->getIsolation();
+
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
+
+  // If the conformance we're checking isn't isolated at all, it
+  // needs to be isolated to the given global actor.
+  if (!outerIsolation.isGlobalActor()) {
+    std::string globalActorStr = "@" +
+    innerIsolation.getGlobalActor().getString();
+    ctx.Diags.diagnose(
+        conformance->getLoc(),
+        diag::nonisolated_conformance_depends_on_isolated_conformance,
+        conformance->getType(),
+        conformance->getProtocol()->getName(),
+        innerIsolation,
+        isolatedConformance->getType(),
+        isolatedConformance->getProtocol()->getName(),
+        globalActorStr
+   ).fixItInsert(conformance->getProtocolNameLoc(),
+                 globalActorStr + " ");
+
+    return;
+  }
+
+  assert(outerIsolation != innerIsolation);
+  ctx.Diags.diagnose(
+      conformance->getLoc(),
+      diag::isolated_conformance_mismatch_with_associated_isolation,
+      outerIsolation,
+      conformance->getType(),
+      conformance->getProtocol()->getName(),
+      innerIsolation,
+      isolatedConformance->getType(),
+      isolatedConformance->getProtocol()->getName()
+  );
+}
+
+static void diagnoseConformanceIsolationErrors(
+    const NormalProtocolConformance *conformance
+) {
+  // Check whether we have any conformance isolation errors.
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
+  auto &globalCache = ctx.getGlobalCache();
+  auto known = globalCache.conformanceIsolationErrors.find(conformance);
+  if (known == globalCache.conformanceIsolationErrors.end())
+    return;
+
+  // Take the isolation errors out of the global cache.
+  auto isolationErrors = std::move(known->second);
+  globalCache.conformanceIsolationErrors.erase(known);
+
+  bool suggestedPreconcurrencyOrIsolated = false;
+  for (const auto &error : isolationErrors) {
+    if (std::holds_alternative<WitnessIsolationError>(error)) {
+      const auto &witnessError = std::get<WitnessIsolationError>(error);
+      witnessError.diagnose(conformance, suggestedPreconcurrencyOrIsolated);
+    } else {
+      const auto &assocConformanceError =
+          std::get<AssociatedConformanceIsolationError>(error);
+      assocConformanceError.diagnose(conformance);
+    }
+  }
+}
+
 /// FIXME: It feels like this could be part of findExistentialSelfReferences().
 static std::optional<Requirement>
 hasInvariantSelfRequirement(const ProtocolDecl *proto,
@@ -5136,8 +5230,6 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   if (where.isImplicit())
     return;
 
-  bool diagnosedIsolatedConformanceIssue = false;
-
   conformance->forEachAssociatedConformance(
     [&](Type depTy, ProtocolDecl *proto, unsigned index) {
       auto assocConf = conformance->getAssociatedConformance(depTy, proto);
@@ -5161,54 +5253,23 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
             where.withRefinedAvailability(availability), depTy, replacementTy);
       }
 
-      if (!diagnosedIsolatedConformanceIssue) {
-        auto outerIsolation = conformance->getIsolation();
-        bool foundIssue = ProtocolConformanceRef(assocConf)
-          .forEachIsolatedConformance(
-            [&](ProtocolConformance *isolatedConformance) {
-              auto innerIsolation = isolatedConformance->getIsolation();
+      auto outerIsolation = conformance->getIsolation();
+      ProtocolConformanceRef(assocConf).forEachIsolatedConformance(
+          [&](ProtocolConformance *isolatedConformance) {
+            auto innerIsolation = isolatedConformance->getIsolation();
 
-              // If the conformance we're checking isn't isolated at all, it
-              // needs "isolated".
-              if (!outerIsolation.isGlobalActor()) {
-                std::string globalActorStr = "@" +
-                innerIsolation.getGlobalActor().getString();
-                ctx.Diags.diagnose(
-                    conformance->getLoc(),
-                    diag::nonisolated_conformance_depends_on_isolated_conformance,
-                    typeInContext, conformance->getProtocol()->getName(),
-                    innerIsolation,
-                    isolatedConformance->getType(),
-                    isolatedConformance->getProtocol()->getName(),
-                    globalActorStr
-               ).fixItInsert(conformance->getProtocolNameLoc(),
-                             globalActorStr + " ");
-
-                return true;
-              }
-
-              // The conformance is isolated, but we need it to have the same
-              // isolation as the other isolated conformance we found.
-              if (outerIsolation != innerIsolation) {
-                ctx.Diags.diagnose(
-                    conformance->getLoc(),
-                    diag::isolated_conformance_mismatch_with_associated_isolation,
-                    outerIsolation,
-                    typeInContext, conformance->getProtocol()->getName(),
-                    innerIsolation,
-                    isolatedConformance->getType(),
-                    isolatedConformance->getProtocol()->getName()
-                );
-
-                return true;
-              }
-
-              return false;
+            // If the isolation doesn't match, record an error.
+            if (!outerIsolation.isGlobalActor() ||
+                outerIsolation != innerIsolation) {
+              ctx.getGlobalCache().conformanceIsolationErrors[conformance]
+                .push_back(
+                  AssociatedConformanceIsolationError{isolatedConformance});
+              return true;
             }
-        );
 
-        diagnosedIsolatedConformanceIssue = foundIssue;
-      }
+            return false;
+          }
+      );
 
       return false;
     });

@@ -112,9 +112,6 @@ enum class ResolveWitnessResult {
 /// This helper class handles most of the details of checking whether a
 /// given type (\c Adoptee) conforms to a protocol (\c Proto).
 class ConformanceChecker : public WitnessChecker {
-  /// Whether we already suggested adding `@preconcurrency` or 'isolated'.
-  bool suggestedPreconcurrencyOrIsolated = false;
-
 public:
   NormalProtocolConformance *Conformance;
   SourceLoc Loc;
