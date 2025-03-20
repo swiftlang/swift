@@ -707,6 +707,27 @@ void SwiftPassInvocation::eraseInstruction(SILInstruction *inst) {
   }
 }
 
+// The standard library uses _precondition calls which have a message argument.
+//
+// Allow disabling the generated cond_fail by these message arguments.
+//
+// For example:
+//
+//  _precondition(source >= (0 as T), "Negative value is not representable")
+// results in a cond_fail "Negative value is not representable".
+//
+// This commit allows for specifying a file that contains these messages on each
+// line.
+//
+// /path/to/disable_cond_fails:
+//
+// ```
+// Negative value is not representable
+// Array index is out of range
+// ```
+//
+// The optimizer will remove these cond_fails if the swift frontend is invoked
+// with -Xllvm -cond-fail-config-file=/path/to/disable_cond_fails.
 static llvm::cl::opt<std::string> CondFailConfigFile(
     "cond-fail-config-file", llvm::cl::init(""),
     llvm::cl::desc("read the cond_fail message strings to elimimate from file"));
