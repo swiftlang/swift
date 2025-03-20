@@ -630,7 +630,6 @@ extension Substring: LosslessStringConvertible {
 
 extension Substring {
   @frozen
-  @_addressableForDependencies
   public struct UTF8View: Sendable {
     @usableFromInline
     internal var _slice: Slice<String.UTF8View>
@@ -771,11 +770,7 @@ extension Substring.UTF8View {
       let first = _slice._startIndex._encodedOffset
       let end = _slice._endIndex._encodedOffset
       if _wholeGuts.isSmall {
-        let a = Builtin.addressOfBorrow(self)
-        let offset = first &+ (2 &* MemoryLayout<String.Index>.stride)
-        let start = unsafe UnsafePointer<UTF8.CodeUnit>(a).advanced(by: offset)
-        let span = unsafe Span(_unsafeStart: start, count: end &- first)
-        return unsafe _overrideLifetime(span, borrowing: self)
+        fatalError("Span over the small string form is not supported yet.")
       }
       _internalInvariant(_wholeGuts.isFastUTF8)
       let buffer = unsafe _wholeGuts._object.fastUTF8.extracting(

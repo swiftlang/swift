@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift(-enable-experimental-feature LifetimeDependence -enable-experimental-feature Span -enable-experimental-feature AddressableTypes)
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature LifetimeDependence -enable-experimental-feature AddressableTypes)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_LifetimeDependence
@@ -22,11 +22,13 @@ var suite = TestSuite("StringUTF8StorageProperty")
 defer { runAllTests() }
 
 suite.test("Span from Small String")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   let s = "A small string.".utf8
   let u = Array(s)
+  expectCrashLater()
   let span = s.span
 
   let count = span.count
@@ -54,11 +56,13 @@ suite.test("Span from Large Native String")
 }
 
 suite.test("Span from Small String's Substring")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   let s = "A small string.".dropFirst(8).utf8
   let u = Array("string.".utf8)
+  expectCrashLater()
   let span = s.span
 
   let count = span.count
