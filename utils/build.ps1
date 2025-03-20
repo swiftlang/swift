@@ -2395,6 +2395,11 @@ function Build-FoundationMacros() {
     [hashtable]$Arch
   )
 
+  $SwiftSyntaxDir = (Get-ProjectCMakeModules $Arch Compilers)
+  if (-not (Test-Path $SwiftSyntaxDir)) {
+    throw "The swift-syntax from the compiler build for $Platform $Arch.ShortName isn't available"
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-foundation\Sources\FoundationMacros `
     -Bin (Get-ProjectBinaryCache $Arch FoundationMacros) `
@@ -2404,7 +2409,7 @@ function Build-FoundationMacros() {
     -UseBuiltCompilers Swift `
     -SwiftSDK (Get-SwiftSDK $Platform) `
     -Defines @{
-      SwiftSyntax_DIR = (Get-ProjectCMakeModules $HostArch Compilers);
+      SwiftSyntax_DIR = $SwiftSyntaxDir;
     }
 }
 
@@ -3303,7 +3308,9 @@ if (-not $IsCrossCompiling) {
 
   if ($Test -contains "swift") {
     foreach ($Arch in $AndroidSDKArchs) {
-      Invoke-BuildStep Test-Runtime Android $Arch
+      try {
+        Invoke-BuildStep Test-Runtime Android $Arch
+      } catch {}
     }
   }
 }

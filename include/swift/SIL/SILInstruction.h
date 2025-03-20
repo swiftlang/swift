@@ -3524,17 +3524,18 @@ public:
       return Value.DeclRef;
     }
   };
-  
-  enum class Kind: unsigned {
+
+  enum class Kind : unsigned {
     StoredProperty,
     GettableProperty,
     SettableProperty,
+    Method,
     TupleElement,
     OptionalChain,
     OptionalForce,
     OptionalWrap,
   };
-  
+
   // Description of a captured index value and its Hashable conformance for a
   // subscript keypath.
   struct Index {
@@ -3560,6 +3561,7 @@ private:
       return PackedStored;
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return PackedComputed;
     case Kind::OptionalChain:
     case Kind::OptionalForce:
@@ -3588,7 +3590,7 @@ private:
     SILFunction *Hash;
   } IndexEquality;
   CanType ComponentType;
-  AbstractStorageDecl *ExternalStorage;
+  ValueDecl *ExternalStorage;
   SubstitutionMap ExternalSubstitutions;
 
   /// Constructor for stored components
@@ -3598,26 +3600,18 @@ private:
       ComponentType(ComponentType) {}
 
   /// Constructor for computed components
-  KeyPathPatternComponent(ComputedPropertyId id,
-                          SILFunction *getter,
-                          SILFunction *setter,
-                          ArrayRef<Index> indices,
-                          SILFunction *indicesEqual,
-                          SILFunction *indicesHash,
-                          AbstractStorageDecl *externalStorage,
+  KeyPathPatternComponent(ComputedPropertyId id, SILFunction *getter,
+                          SILFunction *setter, ArrayRef<Index> indices,
+                          SILFunction *indicesEqual, SILFunction *indicesHash,
+                          ValueDecl *externalStorage,
                           SubstitutionMap externalSubstitutions,
                           CanType ComponentType)
-    : ValueAndKind(getter, PackedComputed),
-      SetterAndIdKind{setter, id.Kind},
-      IdValue{id.Value},
-      Indices(indices),
-      IndexEquality{indicesEqual, indicesHash},
-      ComponentType(ComponentType),
-      ExternalStorage(externalStorage),
-      ExternalSubstitutions(externalSubstitutions)
-  {
-  }
-  
+      : ValueAndKind(getter, PackedComputed),
+        SetterAndIdKind{setter, id.Kind}, IdValue{id.Value},
+        Indices(indices), IndexEquality{indicesEqual, indicesHash},
+        ComponentType(ComponentType), ExternalStorage(externalStorage),
+        ExternalSubstitutions(externalSubstitutions) {}
+
   /// Constructor for optional components.
   KeyPathPatternComponent(Kind kind, CanType componentType)
     : ValueAndKind((void*)((uintptr_t)kind << KindPackingBits), Unpacked),
@@ -3647,9 +3641,21 @@ public:
     case PackedStored:
       return TupleIndex
         ? Kind::TupleElement : Kind::StoredProperty;
-    case PackedComputed:
-      return SetterAndIdKind.getPointer()
-        ? Kind::SettableProperty : Kind::GettableProperty;
+    case PackedComputed: {
+      if (SetterAndIdKind.getPointer()) {
+        return Kind::SettableProperty;
+      }
+      // Filter out AccessorDecls like subscript getter/setter to only handle
+      // methods.
+      auto computedId = ComputedPropertyId(IdValue, SetterAndIdKind.getInt());
+      if (computedId.getKind() == ComputedPropertyId::DeclRef) {
+        auto decl = computedId.getDeclRef().getDecl();
+        if (dyn_cast<AbstractFunctionDecl>(decl) && !isa<AccessorDecl>(decl)) {
+          return Kind::Method;
+        }
+      }
+      return Kind::GettableProperty;
+    }
     case Unpacked:
       return (Kind)((uintptr_t)ValueAndKind.getPointer() >> KindPackingBits);
     }
@@ -3666,6 +3672,7 @@ public:
       return static_cast<VarDecl*>(ValueAndKind.getPointer());
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
@@ -3685,13 +3692,14 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return ComputedPropertyId(IdValue,
                                 SetterAndIdKind.getInt());
     }
     llvm_unreachable("unhandled kind");
   }
 
-  SILFunction *getComputedPropertyGetter() const {
+  SILFunction *getComputedPropertyForGettable() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3701,15 +3709,17 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return static_cast<SILFunction*>(ValueAndKind.getPointer());
     }
     llvm_unreachable("unhandled kind");
   }
 
-  SILFunction *getComputedPropertySetter() const {
+  SILFunction *getComputedPropertyForSettable() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::GettableProperty:
+    case Kind::Method:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
@@ -3721,7 +3731,7 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
-  ArrayRef<Index> getSubscriptIndices() const {
+  ArrayRef<Index> getArguments() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3731,12 +3741,13 @@ public:
       return {};
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return Indices;
     }
     llvm_unreachable("unhandled kind");
   }
 
-  SILFunction *getSubscriptIndexEquals() const {
+  SILFunction *getIndexEquals() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3746,11 +3757,12 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return IndexEquality.Equal;
     }
     llvm_unreachable("unhandled kind");
   }
-  SILFunction *getSubscriptIndexHash() const {
+  SILFunction *getIndexHash() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3760,6 +3772,7 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return IndexEquality.Hash;
     }
     llvm_unreachable("unhandled kind");
@@ -3771,8 +3784,8 @@ public:
                                                    CanType ty) {
     return KeyPathPatternComponent(property, ty);
   }
-  
-  AbstractStorageDecl *getExternalDecl() const {
+
+  ValueDecl *getExternalDecl() const {
     switch (getKind()) {
     case Kind::StoredProperty:
     case Kind::OptionalChain:
@@ -3782,6 +3795,7 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return ExternalStorage;
     }
     llvm_unreachable("unhandled kind");
@@ -3797,6 +3811,7 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       return ExternalSubstitutions;
     }
     llvm_unreachable("unhandled kind");
@@ -3810,11 +3825,22 @@ public:
     case Kind::OptionalWrap:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
       llvm_unreachable("not a tuple element");
     case Kind::TupleElement:
       return TupleIndex - 1;
     }
     llvm_unreachable("unhandled kind");
+  }
+
+  static KeyPathPatternComponent
+  forMethod(ComputedPropertyId identifier, SILFunction *method,
+            ArrayRef<Index> args, SILFunction *argsEquals,
+            SILFunction *argsHash, AbstractFunctionDecl *externalDecl,
+            SubstitutionMap externalSubs, CanType ty) {
+    return KeyPathPatternComponent(identifier, method, nullptr, args,
+                                   argsEquals, argsHash, externalDecl,
+                                   externalSubs, ty);
   }
 
   static KeyPathPatternComponent
@@ -3863,6 +3889,7 @@ public:
     case Kind::StoredProperty:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
+    case Kind::Method:
     case Kind::TupleElement:
       llvm_unreachable("not an optional kind");
     }

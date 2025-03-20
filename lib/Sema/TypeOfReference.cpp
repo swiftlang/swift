@@ -1900,13 +1900,10 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
   return type;
 }
 
-
-
-void ConstraintSystem::bindOverloadType(
-    const SelectedOverload &overload, Type boundType,
-    ConstraintLocator *locator, DeclContext *useDC,
-    llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
-        verifyThatArgumentIsHashable) {
+void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
+                                        Type boundType,
+                                        ConstraintLocator *locator,
+                                        DeclContext *useDC) {
   auto &ctx = getASTContext();
   auto choice = overload.choice;
   auto openedType = overload.adjustedOpenedType;
@@ -1952,7 +1949,8 @@ void ConstraintSystem::bindOverloadType(
 
     if (isExpr<KeyPathExpr>(locator->getAnchor())) {
       auto paramTy = fnTy->getParams()[0].getParameterType();
-      verifyThatArgumentIsHashable(/*idx*/ 0, paramTy, locator);
+      verifyThatArgumentIsHashable(/*idx*/ 0, paramTy, locator,
+                                   choice.getDecl()->getLoc());
     }
   };
   switch (choice.getKind()) {
@@ -2133,8 +2131,6 @@ void ConstraintSystem::bindOverloadType(
   }
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
 }
-
-
 
 static unsigned getApplicationLevel(ConstraintSystem &CS, Type baseTy,
                                     UnresolvedDotExpr *UDE) {
@@ -2346,24 +2342,8 @@ void ConstraintSystem::recordResolvedOverload(ConstraintLocator *locator,
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
-                                       Type boundType,
-                                       OverloadChoice choice,
+                                       Type boundType, OverloadChoice choice,
                                        DeclContext *useDC) {
-  // Add a conformance constraint to make sure that given type conforms
-  // to Hashable protocol, which is important for key path subscript
-  // components.
-  auto verifyThatArgumentIsHashable = [&](unsigned index, Type argType,
-                                          ConstraintLocator *locator) {
-    if (auto *hashable = TypeChecker::getProtocol(
-            argType->getASTContext(), choice.getDecl()->getLoc(),
-            KnownProtocolKind::Hashable)) {
-      addConstraint(ConstraintKind::ConformsTo, argType,
-                    hashable->getDeclaredInterfaceType(),
-                    getConstraintLocator(
-                        locator, LocatorPathElt::TupleElement(index)));
-    }
-  };
-
   // Determine the type to which we'll bind the overload set's type.
   Type openedType;
   Type adjustedOpenedType;
@@ -2514,7 +2494,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         // Hashable, because it would be used as a component inside key path.
         for (auto index : indices(subscriptTy->getParams())) {
           const auto &param = subscriptTy->getParams()[index];
-          verifyThatArgumentIsHashable(index, param.getParameterType(), locator);
+          verifyThatArgumentIsHashable(index, param.getParameterType(), locator,
+                                       choice.getDecl()->getLoc());
         }
       }
     }
@@ -2603,8 +2584,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   recordResolvedOverload(locator, overload);
 
   // Add the constraints necessary to bind the overload type.
-  bindOverloadType(overload, boundType, locator, useDC,
-                   verifyThatArgumentIsHashable);
+  bindOverloadType(overload, boundType, locator, useDC);
 
   if (isDebugMode()) {
     PrintOptions PO;
@@ -2680,5 +2660,18 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
   if (choice.isFallbackMemberOnUnwrappedBase()) {
     increaseScore(SK_UnresolvedMemberViaOptional, locator);
+  }
+}
+
+void ConstraintSystem::verifyThatArgumentIsHashable(unsigned index,
+                                                    Type argType,
+                                                    ConstraintLocator *locator,
+                                                    SourceLoc loc) {
+  if (auto *hashable = TypeChecker::getProtocol(argType->getASTContext(), loc,
+                                                KnownProtocolKind::Hashable)) {
+    addConstraint(
+        ConstraintKind::ConformsTo, argType,
+        hashable->getDeclaredInterfaceType(),
+        getConstraintLocator(locator, LocatorPathElt::TupleElement(index)));
   }
 }

@@ -219,13 +219,13 @@ struct OpTest {
 
 struct E {}
 struct NE : ~Escapable {}
-@lifetime(ne) func derive(_ ne: NE) -> NE { ne }
-@lifetime(borrow ne1, ne2) func derive(_ ne1: NE, _ ne2: NE) -> NE {
+@lifetime(copy ne) func derive(_ ne: NE) -> NE { ne }
+@lifetime(borrow ne1, copy ne2) func derive(_ ne1: NE, _ ne2: NE) -> NE {
   if (Int.random(in: 1..<100) < 50) { return ne1 }
   return ne2
 }
 @lifetime(borrow borrow) func testNameConflict(_ borrow: E) -> NE { NE() }
-@lifetime(result: source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
+@lifetime(result: copy source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
 
 actor MyActor {
   nonisolated let constFlag: Bool = false

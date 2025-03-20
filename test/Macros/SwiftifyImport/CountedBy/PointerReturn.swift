@@ -28,7 +28,7 @@ func lifetimeDependentBorrow(_ p: borrowing UnsafePointer<CInt>, _ len1: CInt, _
 // CHECK-NEXT: func nonEscaping(_ len: CInt) -> UnsafeBufferPointer<CInt> {
 // CHECK-NEXT:     return unsafe UnsafeBufferPointer<CInt> (start: nonEscaping(len), count: Int(len))
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(p)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy p)
 // CHECK-NEXT: func lifetimeDependentCopy(_ p: Span<CInt>, _ len2: CInt) -> Span<CInt> {
 // CHECK-NEXT:     return unsafe Span<CInt> (_unsafeStart:   p.withUnsafeBufferPointer { _pPtr in
 // CHECK-NEXT:         return unsafe lifetimeDependentCopy(_pPtr.baseAddress!, CInt(exactly: p.count)!, len2)

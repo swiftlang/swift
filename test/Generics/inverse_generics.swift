@@ -249,6 +249,7 @@ struct BuggerView<T: ~Copyable>: ~Escapable, Copyable {}
 
 struct MutableBuggerView<T: ~Copyable>: ~Copyable, ~Escapable {}
 
+@lifetime(mutRef: copy mutRef)
 func checkNominals(_ mutRef: inout MutableBuggerView<NC>,
                    _ ref: BuggerView<NC>,
                    _ intMutRef: borrowing MutableBuggerView<Int>,

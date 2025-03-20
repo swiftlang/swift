@@ -884,8 +884,8 @@ SILSerializer::writeKeyPathPatternComponent(
       ListOfValues.push_back(S.addDeclRef(component.getExternalDecl()));
       ListOfValues.push_back(
         S.addSubstitutionMapRef(component.getExternalSubstitutions()));
-  
-      auto indices = component.getSubscriptIndices();
+
+      auto indices = component.getArguments();
       ListOfValues.push_back(indices.size());
       for (auto &index : indices) {
         ListOfValues.push_back(index.Operand);
@@ -896,14 +896,15 @@ SILSerializer::writeKeyPathPatternComponent(
         ListOfValues.push_back(S.addConformanceRef(index.Hashable));
       }
       if (!indices.empty()) {
-        ListOfValues.push_back(
-          addSILFunctionRef(component.getSubscriptIndexEquals()));
-        ListOfValues.push_back(
-          addSILFunctionRef(component.getSubscriptIndexHash()));
+        ListOfValues.push_back(addSILFunctionRef(component.getIndexEquals()));
+        ListOfValues.push_back(addSILFunctionRef(component.getIndexHash()));
       }
     };
 
   switch (component.getKind()) {
+  case KeyPathPatternComponent::Kind::Method:
+    printf("SerializeSIL:writeKeyPathPatternComponent");
+    break;
   case KeyPathPatternComponent::Kind::StoredProperty:
     handleComponentCommon(KeyPathComponentKindEncoding::StoredProperty);
     ListOfValues.push_back(S.addDeclRef(component.getStoredPropertyDecl()));
@@ -912,16 +913,16 @@ SILSerializer::writeKeyPathPatternComponent(
     handleComponentCommon(KeyPathComponentKindEncoding::GettableProperty);
     handleComputedId(component.getComputedPropertyId());
     ListOfValues.push_back(
-                  addSILFunctionRef(component.getComputedPropertyGetter()));
+        addSILFunctionRef(component.getComputedPropertyForGettable()));
     handleComputedExternalReferenceAndIndices(component);
     break;
   case KeyPathPatternComponent::Kind::SettableProperty:
     handleComponentCommon(KeyPathComponentKindEncoding::SettableProperty);
     handleComputedId(component.getComputedPropertyId());
     ListOfValues.push_back(
-                  addSILFunctionRef(component.getComputedPropertyGetter()));
+        addSILFunctionRef(component.getComputedPropertyForGettable()));
     ListOfValues.push_back(
-                  addSILFunctionRef(component.getComputedPropertySetter()));
+        addSILFunctionRef(component.getComputedPropertyForSettable()));
     handleComputedExternalReferenceAndIndices(component);
     break;
   case KeyPathPatternComponent::Kind::OptionalChain:

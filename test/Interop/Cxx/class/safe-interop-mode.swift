@@ -21,7 +21,7 @@ module Test {
 struct SWIFT_NONESCAPABLE View {
     __attribute__((swift_attr("@lifetime(immortal)")))
     View() : member(nullptr) {}
-    __attribute__((swift_attr("@lifetime(p)")))
+    __attribute__((swift_attr("@lifetime(copy p)")))
     View(const int *p [[clang::lifetimebound]]) : member(p) {}
     View(const View&) = default;
 private:

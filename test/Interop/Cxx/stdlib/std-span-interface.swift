@@ -35,11 +35,11 @@ import CxxStdlib
 // CHECK-NEXT:   mutating func foo(_ s: std.{{.*}}span<__cxxConst<CInt>, _C{{.*}}_{{.*}}>)
 // CHECK-NEXT: }
 // CHECK: @_alwaysEmitIntoClient public func funcWithSafeWrapper(_ s: Span<CInt>)
-// CHECK-NEXT: @lifetime(s)
+// CHECK-NEXT: @lifetime(copy s)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func funcWithSafeWrapper2(_ s: Span<CInt>) -> Span<CInt>
 // CHECK-NEXT: @lifetime(borrow v)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcWithSafeWrapper3(_ v: borrowing VecOfInt) -> Span<CInt>
-// CHECK-NEXT: @lifetime(p)
+// CHECK-NEXT: @lifetime(copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func mixedFuncWithSafeWrapper1(_ p: Span<Int32>) -> Span<CInt>
 // CHECK-NEXT: @lifetime(borrow v)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func mixedFuncWithSafeWrapper2(_ v: borrowing VecOfInt, _ len: Int32) -> Span<Int32>
