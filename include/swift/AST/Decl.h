@@ -3197,6 +3197,11 @@ public:
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
 
+  /// Returns whether accesses to this declaration are asynchronous.
+  /// If the declaration is neither `AbstractFunctionDecl` nor
+  /// `AbstractStorageDecl`, returns `false`.
+  bool isAsync() const;
+
 private:
   bool isObjCDynamic() const {
     return isObjC() && isDynamic();

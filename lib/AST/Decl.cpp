@@ -4180,6 +4180,24 @@ bool ValueDecl::isDynamic() const {
     getAttrs().hasAttribute<DynamicAttr>());
 }
 
+bool ValueDecl::isAsync() const {
+  if (auto *function = dyn_cast<AbstractFunctionDecl>(this)) {
+    return function->hasAsync();
+  }
+
+  // Async storage declarations must be get-only. Don't consider it async
+  // otherwise, even if it has an async getter.
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(this)) {
+    if (storage->getAllAccessors().size() == 1) {
+      if (auto *getter = storage->getAccessor(AccessorKind::Get)) {
+        return getter->hasAsync();
+      }
+    }
+  }
+
+  return false;
+}
+
 bool ValueDecl::isObjCDynamicInGenericClass() const {
   if (!isObjCDynamic())
     return false;

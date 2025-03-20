@@ -7607,7 +7607,7 @@ void AttributeChecker::visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr) {
 
 void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
   if ((isa<AbstractFunctionDecl>(D) || isa<AbstractStorageDecl>(D)) &&
-      !isAsyncDecl(cast<ValueDecl>(D))) {
+      !cast<ValueDecl>(D)->isAsync()) {
     auto value = cast<ValueDecl>(D);
     ActorIsolation isolation = getActorIsolation(value);
     if (isolation.isActorIsolated()) {
