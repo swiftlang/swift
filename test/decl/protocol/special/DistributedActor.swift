@@ -55,7 +55,6 @@ distributed actor D4 {
 
 protocol P1: DistributedActor {
   distributed func dist() -> String
-  // expected-note@-1{{requirement 'dist()' declared here}}
 }
 
 distributed actor D5: P1 {
@@ -78,7 +77,6 @@ func testConformance() {
 // https://github.com/apple/swift/issues/69244
 protocol P {
   func foo() -> Void
-  // expected-note@-1{{mark the protocol requirement 'foo()' 'async throws' to allow actor-isolated conformances}}{{13-13= async throws}}
 }
 
 distributed actor A: P {

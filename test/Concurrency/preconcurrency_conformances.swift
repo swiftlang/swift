@@ -96,7 +96,6 @@ extension MyActor : @preconcurrency TestSendability {
 
 protocol Initializable {
   init()
-  // expected-note@-1{{mark the protocol requirement 'init()' 'async' to allow actor-isolated conformances}}
 }
 
 final class K : @preconcurrency Initializable {
@@ -130,10 +129,8 @@ struct GlobalActor {
 protocol WithIndividuallyIsolatedRequirements {
   @MainActor var a: Int { get set }
   @GlobalActor var b: Int { get set }
-  // expected-note@-1 {{requirement 'b' declared here}}
 
   @GlobalActor func test()
-  // expected-note@-1 {{mark the protocol requirement 'test()' 'async' to allow actor-isolated conformances}}
 }
 
 do {
@@ -158,9 +155,7 @@ do {
 @MainActor
 protocol WithNonIsolated {
   var prop: Int { get set }
-  // expected-note@-1 {{requirement 'prop' declared here}}
   nonisolated func test()
-  // expected-note@-1 {{mark the protocol requirement 'test()' 'async' to allow actor-isolated conformances}}
 }
 
 do {
@@ -212,7 +207,7 @@ do {
 do {
   protocol P1 {}
   protocol P2 {
-    func foo() // expected-note 2 {{mark the protocol requirement 'foo()' 'async' to allow actor-isolated conformances}}
+    func foo()
   }
   protocol P3: P1, P2 {}
 
@@ -278,7 +273,7 @@ do {
 do {
   protocol P1 {}
   protocol P2 {
-    func foo() // expected-note {{mark the protocol requirement 'foo()' 'async' to allow actor-isolated conformances}}
+    func foo()
   }
   protocol P3: P1, P2 {}
   protocol P5: P3 {}

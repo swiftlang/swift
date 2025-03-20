@@ -18,9 +18,9 @@ protocol P1 {
   associatedtype Assoc
 
   @GlobalActor func method1()
-  @GenericGlobalActor<Int> func method2()  // expected-note{{}}
+  @GenericGlobalActor<Int> func method2()
   @GenericGlobalActor<Assoc> func method3()
-  func method4() // expected-note{{mark the protocol requirement 'method4()' 'async' to allow actor-isolated conformances}}
+  func method4()
 }
 
 protocol P2 {
@@ -47,7 +47,6 @@ class C1 : P1, P2 {
 }
 
 protocol NonIsolatedRequirement {
-  // expected-note@+1 {{mark the protocol requirement 'requirement()' 'async' to allow actor-isolated conformances}}
   func requirement()
 }
 

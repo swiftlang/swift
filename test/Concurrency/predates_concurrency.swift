@@ -227,7 +227,6 @@ nonisolated func blah() {
 
 protocol NotIsolated {
   func requirement()
-  // expected-complete-tns-note@-1 {{mark the protocol requirement 'requirement()' 'async' to allow actor-isolated conformances}}
 }
 
 extension MainActorPreconcurrency: NotIsolated {

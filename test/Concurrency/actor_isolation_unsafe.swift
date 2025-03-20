@@ -23,7 +23,7 @@ actor SomeGlobalActor {
 // ----------------------------------------------------------------------
 protocol P1 {
   // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
-  @MainActor(unsafe) func onMainActor() // expected-note 2{{mark the protocol requirement 'onMainActor()' 'async' to allow actor-isolated conformances}}
+  @MainActor(unsafe) func onMainActor()
 }
 
 struct S1_P1: P1 {

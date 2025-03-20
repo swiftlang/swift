@@ -96,13 +96,10 @@ func outside_good_ext<DP: DistProtocol>(dp: DP) async throws {
 /// A distributed actor could only conform to this by making everything 'nonisolated':
 protocol StrictlyLocal {
   func local()
-  // expected-note@-1 2{{mark the protocol requirement 'local()' 'async throws' to allow actor-isolated conformances}}{{15-15= async throws}}
 
   func localThrows() throws
-  // expected-note@-1 2{{mark the protocol requirement 'localThrows()' 'async' to allow actor-isolated conformances}}{{22-22=async }}
 
   func localAsync() async
-  // expected-note@-1 2{{mark the protocol requirement 'localAsync()' 'throws' to allow actor-isolated conformances}}
 }
 
 distributed actor Nope1_StrictlyLocal: StrictlyLocal {
@@ -141,7 +138,6 @@ actor MyServer : Server {
 
 protocol AsyncThrowsAll {
   func maybe(param: String, int: Int) async throws -> Int
-  // expected-note@-1{{'maybe(param:int:)' declared here}}
 }
 
 actor LocalOK_AsyncThrowsAll: AsyncThrowsAll {
@@ -191,7 +187,6 @@ func testAsyncThrowsAll(p: AsyncThrowsAll,
 
 protocol TerminationWatchingA {
   func terminated(a: String) async
-  // expected-note@-1{{mark the protocol requirement 'terminated(a:)' 'throws' to allow actor-isolated conformances}}
 }
 
 protocol TerminationWatchingDA: DistributedActor {

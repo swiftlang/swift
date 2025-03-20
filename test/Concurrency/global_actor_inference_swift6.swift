@@ -155,7 +155,7 @@ struct S: InferMainActor {
 }
 
 protocol InferMainActorInherited: InferMainActor {
-  func f() // expected-note{{mark the protocol requirement 'f()' 'async' to allow actor-isolated conformances}}
+  func f()
   func g()
 }
 
@@ -198,7 +198,6 @@ class C1: MainActorSuperclass, InferMainFromSuperclass {
 
 protocol InferenceConflictWithSuperclass: MainActorSuperclass, InferSomeGlobalActor {
   func g()
-  // expected-note@-1 {{mark the protocol requirement 'g()' 'async' to allow actor-isolated conformances}}
 }
 
 

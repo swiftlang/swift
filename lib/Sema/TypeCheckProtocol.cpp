@@ -3599,64 +3599,6 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     }
   }
 
-  // If there are remaining options, they are missing async/throws on the
-  // requirement itself. If we have a source location for the requirement,
-  // provide those in a note.
-
-  if (requirement->getLoc().isInvalid()) {
-    return std::nullopt;
-  }
-
-  if (missingOptions && isa<AbstractFunctionDecl>(requirement)) {
-    int suggestAddingModifiers = 0;
-    std::string modifiers;
-    if (missingOptions.contains(MissingFlags::RequirementAsync)) {
-      suggestAddingModifiers += 1;
-      modifiers += "async ";
-    }
-
-    if (missingOptions.contains(MissingFlags::RequirementThrows)) {
-      suggestAddingModifiers += 2;
-      modifiers += "throws ";
-    }
-
-    auto diag = requirement->diagnose(diag::note_add_async_and_throws_to_decl,
-                                      witness, suggestAddingModifiers);
-
-    // Figure out where to insert the modifiers so we can emit a Fix-It.
-    SourceLoc insertLoc;
-    bool insertAfter = false;
-    if (auto requirementAbstractFunc =
-            dyn_cast<AbstractFunctionDecl>(requirement)) {
-      if (requirementAbstractFunc->getAsyncLoc().isValid()) {
-        // Insert before the "async" (we only have throws).
-        insertLoc = requirementAbstractFunc->getAsyncLoc();
-        insertAfter = true;
-        modifiers = " throws";
-      } else if (requirementAbstractFunc->getThrowsLoc().isValid()) {
-        // Insert before the "throws" (we only have async)".
-        insertLoc = requirementAbstractFunc->getThrowsLoc();
-      }
-
-      // Insert after the parentheses.
-      if (insertLoc.isInvalid()) {
-        insertLoc = requirementAbstractFunc->getParameters()->getRParenLoc();
-        insertAfter = true;
-        modifiers = " " + modifiers.substr(0, modifiers.size() - 1);
-      }
-    }
-
-    if (insertLoc.isValid()) {
-      if (insertAfter)
-        diag.fixItInsertAfter(insertLoc, modifiers);
-      else
-        diag.fixItInsert(insertLoc, modifiers);
-    }
-  } else {
-    requirement->diagnose(diag::protocol_requirement_declared_here,
-                          requirement);
-  }
-
   return std::nullopt;
 }
 

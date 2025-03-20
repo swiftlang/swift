@@ -1504,7 +1504,7 @@ class MA {
 @SomeGlobalActor class SGA: MA {} // expected-error {{global actor 'SomeGlobalActor'-isolated class 'SGA' has different actor isolation from main actor-isolated superclass 'MA'}}
 
 protocol SGA_Proto {
-  @SomeGlobalActor func method() // expected-note {{mark the protocol requirement 'method()' 'async' to allow actor-isolated conformances}}
+  @SomeGlobalActor func method()
 }
 
 // try to override a MA method with inferred isolation from a protocol requirement
@@ -1614,7 +1614,7 @@ class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
 class NonSendable {}
 
 protocol NonisolatedProtocol {
-  var ns: NonSendable { get } // expected-note {{requirement 'ns' declared here}}
+  var ns: NonSendable { get }
 }
 
 actor ActorWithNonSendableLet: NonisolatedProtocol {

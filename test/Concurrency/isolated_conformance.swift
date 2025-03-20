@@ -4,7 +4,7 @@
 // REQUIRES: concurrency
 
 protocol P {
-  func f() // expected-note{{mark the protocol requirement 'f()' 'async' to allow actor-isolated conformances}}
+  func f()
 }
 
 // ----------------------------------------------------------------------------
