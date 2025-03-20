@@ -1,9 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -o /dev/null \
-// RUN:   -verify \
-// RUN:   -sil-verify-all \
+// RUN: %target-typecheck-verify-swift \
 // RUN:   -disable-availability-checking \
-// RUN:   -module-name test \
 // RUN:   -enable-experimental-feature LifetimeDependence
 
 // REQUIRES: swift_feature_LifetimeDependence

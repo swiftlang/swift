@@ -18,7 +18,7 @@ struct BufferView : ~Escapable {
 @lifetime(borrow x) 
 func derive(_ x: borrowing BufferView) -> BufferView
 
-@lifetime(x) 
+@lifetime(copy x)
 func consumeAndCreate(_ x: consuming BufferView) -> BufferView
 
 sil hidden [unsafe_nonescapable_result] @bufferviewinit1 : $@convention(method) (UnsafeRawBufferPointer, @thin BufferView.Type) -> @owned BufferView {
