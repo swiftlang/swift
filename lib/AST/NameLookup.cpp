@@ -2317,6 +2317,13 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
   if (!ObjCMethodLookup && !createObjCMethodLookup())
     return;
 
+  // Only record API decls.
+  Decl *abiRoleDecl = method;
+  if (auto accessor = dyn_cast<AccessorDecl>(method))
+    abiRoleDecl = accessor->getStorage();
+  if (!ABIRoleInfo(abiRoleDecl).providesAPI())
+    return;
+
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
