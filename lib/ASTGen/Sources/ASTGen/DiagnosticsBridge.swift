@@ -241,15 +241,12 @@ public func addQueuedSourceFile(
 public func addQueuedDiagnostic(
   queuedDiagnosticsPtr: UnsafeMutableRawPointer,
   perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
-  text: UnsafePointer<UInt8>,
-  textLength: Int,
+  text: BridgedStringRef,
   severity: BridgedDiagnosticSeverity,
   cLoc: BridgedSourceLoc,
-  categoryName: UnsafePointer<UInt8>?,
-  categoryLength: Int,
-  documentationPath: UnsafePointer<UInt8>?,
-  documentationPathLength: Int,
-  highlightRangesPtr: UnsafePointer<BridgedSourceLoc>?,
+  categoryName: BridgedStringRef,
+  documentationPath: BridgedStringRef,
+  highlightRangesPtr: UnsafePointer<BridgedCharSourceRange>?,
   numHighlightRanges: Int
 ) {
   let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(
@@ -302,14 +299,16 @@ public func addQueuedDiagnostic(
 
   // Map the highlights.
   var highlights: [Syntax] = []
-  let highlightRanges = UnsafeBufferPointer<BridgedSourceLoc>(
+  let highlightRanges = UnsafeBufferPointer<BridgedCharSourceRange>(
     start: highlightRangesPtr,
-    count: numHighlightRanges * 2
+    count: numHighlightRanges
   )
   for index in 0..<numHighlightRanges {
+    let range = highlightRanges[index]
+
     // Make sure both the start and the end land within this source file.
-    guard let start = highlightRanges[index * 2].getOpaquePointerValue(),
-      let end = highlightRanges[index * 2 + 1].getOpaquePointerValue()
+    guard let start = range.start.getOpaquePointerValue(),
+      let end = range.start.advanced(by: range.byteLength).getOpaquePointerValue()
     else {
       continue
     }
@@ -349,53 +348,37 @@ public func addQueuedDiagnostic(
     }
   }
 
-  let category: DiagnosticCategory? = categoryName.flatMap { categoryNamePtr in
-    let categoryNameBuffer = UnsafeBufferPointer(
-      start: categoryNamePtr,
-      count: categoryLength
-    )
-    let categoryName = String(decoding: categoryNameBuffer, as: UTF8.self)
-
-    // If the data comes from serialized diagnostics, it's possible that
-    // the category name is empty because StringRef() is serialized into
-    // an empty string.
-    guard !categoryName.isEmpty else {
-      return nil
-    }
-
-    let documentationURL = documentationPath.map { documentationPathPtr in
-      let documentationPathBuffer = UnsafeBufferPointer(
-        start: documentationPathPtr,
-        count: documentationPathLength
-      )
-
-      let documentationPath = String(decoding: documentationPathBuffer, as: UTF8.self)
-
+  let documentationPath = String(bridged: documentationPath)
+  let documentationURL: String? = if !documentationPath.isEmpty {
       // If this looks doesn't look like a URL, prepend file://.
-      if !documentationPath.looksLikeURL {
-        return "file://\(documentationPath)"
-      }
-
-      return documentationPath
+      documentationPath.looksLikeURL ? documentationPath : "file://\(documentationPath)"
+    } else {
+      nil
     }
 
-    return DiagnosticCategory(
-      name: categoryName,
-      documentationURL: documentationURL
-    )
-  }
+  let categoryName = String(bridged: categoryName)
+  // If the data comes from serialized diagnostics, it's possible that
+  // the category name is empty because StringRef() is serialized into
+  // an empty string.
+  let category: DiagnosticCategory? = if !categoryName.isEmpty {
+      DiagnosticCategory(
+        name: categoryName,
+        documentationURL: documentationURL
+      )
+    } else {
+      nil
+    }
 
   // Note that we referenced this category.
   if let category {
     diagnosticState.pointee.referencedCategories.insert(category)
   }
 
-  let textBuffer = UnsafeBufferPointer(start: text, count: textLength)
   let diagnostic = Diagnostic(
     node: node,
     position: position,
     message: SimpleDiagnostic(
-      message: String(decoding: textBuffer, as: UTF8.self),
+      message: String(bridged: text),
       severity: severity.asSeverity,
       category: category
     ),
