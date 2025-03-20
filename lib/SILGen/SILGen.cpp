@@ -799,7 +799,8 @@ static ActorIsolation getActorIsolationForFunction(SILFunction &fn) {
 }
 
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
-                                       ForDefinition_t forDefinition) {
+                                       ForDefinition_t forDefinition,
+                                       const clang::Type *foreignType) {
   // If we already emitted the function, return it.
   if (auto emitted = getEmittedFunction(constant, forDefinition))
     return emitted;
@@ -819,9 +820,11 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   auto &IGM = *this;
   auto *F = builder.getOrCreateFunction(
       getBestLocation(constant), constant, forDefinition,
-      [&IGM](SILLocation loc, SILDeclRef constant) -> SILFunction * {
-        return IGM.getFunction(constant, NotForDefinition);
-      });
+      [&IGM, foreignType](SILLocation loc,
+                          SILDeclRef constant) -> SILFunction * {
+        return IGM.getFunction(constant, NotForDefinition, foreignType);
+      },
+      ProfileCounter(), foreignType);
 
   F->setDeclRef(constant);
   F->setActorIsolation(getActorIsolationForFunction(*F));

@@ -106,10 +106,11 @@ void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
   emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
 
-void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
+void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk,
+                                            const clang::Type *foreignType) {
   // Thunks are always emitted by need, so don't need delayed emission.
   assert(thunk.isNativeToForeignThunk() && "native-to-foreign thunks only");
-  emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
+  emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition, foreignType));
 }
 
 void SILGenModule::emitDistributedThunkForDecl(
@@ -175,11 +176,11 @@ struct DistributedThunkDiffChecker
 
 } // namespace
 
-SILValue
-SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
-                                      SILConstantInfo constantInfo,
-                                      bool callPreviousDynamicReplaceableImpl) {
-  assert(constantInfo == getConstantInfo(getTypeExpansionContext(), constant));
+SILValue SILGenFunction::emitGlobalFunctionRef(
+    SILLocation loc, SILDeclRef constant, SILConstantInfo constantInfo,
+    bool callPreviousDynamicReplaceableImpl, const clang::Type *foreignType) {
+  assert(constantInfo ==
+         getConstantInfo(getTypeExpansionContext(), constant, foreignType));
 
   // Builtins must be fully applied at the point of reference.
   if (constant.hasDecl() &&
@@ -194,11 +195,11 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
     if (constant.isForeignToNativeThunk()) {
       SGM.emitForeignToNativeThunk(constant);
     } else if (constant.isNativeToForeignThunk()) {
-      SGM.emitNativeToForeignThunk(constant);
+      SGM.emitNativeToForeignThunk(constant, foreignType);
     }
   }
 
-  auto f = SGM.getFunction(constant, NotForDefinition);
+  auto f = SGM.getFunction(constant, NotForDefinition, foreignType);
 
   auto constantFnTypeInContext =
       SGM.Types

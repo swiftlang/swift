@@ -16,6 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Expr.h"
+#include "swift/AST/Type.h"
 #define DEBUG_TYPE "libsil"
 
 #include "swift/AST/AnyFunctionRef.h"
@@ -4320,10 +4322,12 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
   // The type of the native-to-foreign thunk for a swift closure.
   if (constant.isForeign && constant.hasClosureExpr() &&
       shouldStoreClangType(TC.getDeclRefRepresentation(constant))) {
-    auto clangType = TC.Context.getClangFunctionType(
-        origLoweredInterfaceType->getParams(),
-        origLoweredInterfaceType->getResult(),
-        FunctionTypeRepresentation::CFunctionPointer);
+    auto clangType = extInfoBuilder.getClangTypeInfo().getType();
+    if (!clangType)
+      clangType = TC.Context.getClangFunctionType(
+          origLoweredInterfaceType->getParams(),
+          origLoweredInterfaceType->getResult(),
+          FunctionTypeRepresentation::CFunctionPointer);
     AbstractionPattern pattern =
         AbstractionPattern(origLoweredInterfaceType, clangType);
     return getSILFunctionTypeForAbstractCFunction(
@@ -4478,7 +4482,8 @@ getLoweredResultIndices(const SILFunctionType *functionType,
 
 const SILConstantInfo &
 TypeConverter::getConstantInfo(TypeExpansionContext expansion,
-                               SILDeclRef constant) {
+                               SILDeclRef constant,
+                               const clang::Type *foreignType) {
   if (!DisableConstantInfoCache) {
     auto found = ConstantTypes.find(std::make_pair(expansion, constant));
     if (found != ConstantTypes.end())
@@ -4491,7 +4496,8 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
 
   // The lowered type is the formal type, but uncurried and with
   // parameters automatically turned into their bridged equivalents.
-  auto bridgedTypes = getLoweredFormalTypes(constant, formalInterfaceType);
+  auto bridgedTypes =
+      getLoweredFormalTypes(constant, formalInterfaceType, foreignType);
 
   CanAnyFunctionType loweredInterfaceType = bridgedTypes.Uncurried;
 
@@ -4826,16 +4832,19 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   llvm_unreachable("bad SILDeclRef kind");
 }
 
-static AbstractionPattern
-getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
-                                 CanAnyFunctionType fnType,
-                                 unsigned numParameterLists) {
+static AbstractionPattern getAbstractionPatternForConstant(
+    ASTContext &ctx, SILDeclRef constant, CanAnyFunctionType fnType,
+    unsigned numParameterLists, const clang::Type *foreignType) {
   if (!constant.isForeign)
     return AbstractionPattern(fnType);
+
+  if (foreignType)
+    return AbstractionPattern(fnType, foreignType);
 
   auto bridgedFn = getBridgedFunction(constant);
   if (!bridgedFn)
     return AbstractionPattern(fnType);
+
   const clang::Decl *clangDecl = bridgedFn->getClangDecl();
   if (!clangDecl)
     return AbstractionPattern(fnType);
@@ -4870,7 +4879,8 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
 
 TypeConverter::LoweredFormalTypes
 TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
-                                     CanAnyFunctionType fnType) {
+                                     CanAnyFunctionType fnType,
+                                     const clang::Type *foreignType) {
   // We always use full bridging when importing a constant because we can
   // directly bridge its arguments and results when calling it.
   auto bridging = Bridgeability::Full;
@@ -4878,9 +4888,8 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   unsigned numParameterLists = constant.getParameterListCount();
 
   // Form an abstraction pattern for bridging purposes.
-  AbstractionPattern bridgingFnPattern =
-    getAbstractionPatternForConstant(Context, constant, fnType,
-                                     numParameterLists);
+  AbstractionPattern bridgingFnPattern = getAbstractionPatternForConstant(
+      Context, constant, fnType, numParameterLists, foreignType);
 
   auto extInfo = fnType->getExtInfo();
   SILFunctionTypeRepresentation rep = getDeclRefRepresentation(constant);

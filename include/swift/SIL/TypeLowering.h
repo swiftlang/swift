@@ -875,8 +875,9 @@ public:
 
   /// Returns the formal type, lowered AST type, and SILFunctionType
   /// for a constant reference.
-  const SILConstantInfo &getConstantInfo(TypeExpansionContext context,
-                                         SILDeclRef constant);
+  const SILConstantInfo &
+  getConstantInfo(TypeExpansionContext context, SILDeclRef constant,
+                  const clang::Type *foreignType = nullptr);
 
   /// Get the generic signature for a constant.
   GenericSignatureWithCapturedEnvironments
@@ -904,11 +905,12 @@ public:
   }
 
   /// Returns the SILFunctionType for the given declaration.
-  CanSILFunctionType getConstantFunctionType(TypeExpansionContext context,
-                                             SILDeclRef constant) {
-    return getConstantInfo(context, constant).SILFnType;
+  CanSILFunctionType
+  getConstantFunctionType(TypeExpansionContext context, SILDeclRef constant,
+                          const clang::Type *foreignType = nullptr) {
+    return getConstantInfo(context, constant, foreignType).SILFnType;
   }
-  
+
   /// Returns the SILParameterInfo for the given declaration's `self` parameter.
   /// `constant` must refer to a method.
   SILParameterInfo getConstantSelfParameter(TypeExpansionContext context,
@@ -977,8 +979,9 @@ public:
   };
 
   /// Derive the lowered formal type of the given constant.
-  LoweredFormalTypes getLoweredFormalTypes(SILDeclRef constant,
-                                           CanAnyFunctionType formalType);
+  LoweredFormalTypes
+  getLoweredFormalTypes(SILDeclRef constant, CanAnyFunctionType formalType,
+                        const clang::Type *foreignType = nullptr);
 
   /// Given a function type, yield its bridged formal type.
   CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
