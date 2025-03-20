@@ -37,6 +37,9 @@ public struct Conformance: CustomStringConvertible, NoReflectionChildren {
     return Type(bridged: bridged.getType())
   }
 
+  public var proto: ProtocolDecl {
+    return bridged.getRequirement().getAs(ProtocolDecl.self)
+  }
   public var isSpecialized: Bool {
     assert(isConcrete)
     return bridged.isSpecializedConformance()

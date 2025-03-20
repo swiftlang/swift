@@ -1425,6 +1425,33 @@ bb0(%0 : $*Error, %1 : $*E1):
   return %2 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @generic_to_existential_cast
+// CHECK:         init_existential_addr
+// CHECK:       } // end sil function 'generic_to_existential_cast'
+sil [ossa] @generic_to_existential_cast : $@convention(thin) <T where T : P> (@in_guaranteed T) -> @out any P {
+bb0(%0: $*any P, %1 : $*T):
+  %29 = alloc_stack $T
+  copy_addr %1 to [init] %29
+  unconditional_checked_cast_addr T in %29 to any P in %0
+  dealloc_stack %29
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @existential_generic_to_existential_cast
+// CHECK:         unconditional_checked_cast_addr
+// CHECK:       } // end sil function 'existential_generic_to_existential_cast'
+sil [ossa] @existential_generic_to_existential_cast : $@convention(thin) <T where T : Error> (@in_guaranteed T) -> @owned any Error {
+bb0(%0 : $*T):
+  %29 = alloc_stack $T
+  copy_addr %0 to [init] %29
+  %31 = alloc_stack $any Error
+  unconditional_checked_cast_addr T in %29 to any Error in %31
+  %33 = load [take] %31
+  dealloc_stack %31
+  dealloc_stack %29
+  return %33
+}
 // Test constant folding of Builtin.globalStringTablePointer.
 
 // CHECK-LABEL: sil @replace_global_string_table_pointer

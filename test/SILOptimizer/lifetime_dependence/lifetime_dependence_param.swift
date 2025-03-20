@@ -11,7 +11,7 @@
 // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence should be expressed by a builtin that is
 // hidden within the function body.
 @_unsafeNonescapableResult
-@lifetime(source)
+@lifetime(copy source)
 func unsafeLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
   dependent: consuming T, dependsOn source: borrowing U)
   -> T {
@@ -38,7 +38,7 @@ struct BV : ~Escapable {
   public var isEmpty: Bool { i == 0 }
 
   // Test consuming `self`
-  @lifetime(self)
+  @lifetime(copy self)
   consuming func derive() -> BV {
     // Technically, this "new" view does not depend on the 'view' argument.
     // This unsafely creates a new view with no dependence.
@@ -51,7 +51,7 @@ struct BV : ~Escapable {
 struct NE {
   var bv: BV
 
-  @lifetime(bv)
+  @lifetime(copy bv)
   init(_ bv: BV) {
     self.bv = bv
   }

@@ -73,10 +73,14 @@ enum InlineArrayTests {
       let b: InlineArray<_, Int> = [1, 2, 4, 8]
       let c: InlineArray<4, _>   = [1, 2, 4, 8]
       let d: InlineArray         = [1, 2, 4, 8]
+      let e: InlineArray<0, Int> = []
+      let f: InlineArray<_, Int> = []
       _checkInlineArray(a, oracle: [1, 2, 4, 8])
       _checkInlineArray(b, oracle: [1, 2, 4, 8])
       _checkInlineArray(c, oracle: [1, 2, 4, 8])
       _checkInlineArray(d, oracle: [1, 2, 4, 8])
+      _checkInlineArray(e, oracle: [])
+      _checkInlineArray(f, oracle: [])
     }
     do {
       let a = InlineArray<4, Int> { 1 << $0 }
@@ -86,7 +90,6 @@ enum InlineArrayTests {
       let e = InlineArray<0, Int>(repeating: 9)
       _checkInlineArray(c, oracle: [9, 9, 9, 9])
       _checkInlineArray(d, oracle: [9, 9, 9, 9])
-      _checkInlineArray(e, oracle: [])
       c[0] = 1
       c[1] = 2
       c[2] = 4
@@ -99,6 +102,7 @@ enum InlineArrayTests {
       _checkInlineArray(b, oracle: [1, 2, 4, 8])
       _checkInlineArray(c, oracle: [1, 2, 4, 8])
       _checkInlineArray(d, oracle: [1, 2, 4, 8])
+      _checkInlineArray(e, oracle: [])
     }
   }
 
@@ -138,14 +142,12 @@ enum InlineArrayTests {
   /// An *empty* array's elements can be of *uninhabited* type.
   @available(SwiftStdlib 6.2, *)
   static func testUninhabited() {
-#if false // FIXME: Empty array literals aren't supported.
     do {
       let e: InlineArray<0, Never> = []
       let f: InlineArray<_, Never> = []
       _checkInlineArray(e, oracle: [])
       _checkInlineArray(f, oracle: [])
     }
-#endif
     do {
       let e = InlineArray<0, Never> { _ in fatalError() }
       let f = InlineArray<0, _>     { _ in fatalError() }

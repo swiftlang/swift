@@ -607,6 +607,25 @@ bool ConstraintLocator::isKeyPathSubscriptComponent() const {
   });
 }
 
+bool ConstraintLocator::isKeyPathMemberComponent() const {
+  auto *anchor = getAsExpr(getAnchor());
+  auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
+  if (!KPE)
+    return false;
+
+  using ComponentKind = KeyPathExpr::Component::Kind;
+  return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
+    auto keyPathElt = elt.getAs<LocatorPathElt::KeyPathComponent>();
+    if (!keyPathElt)
+      return false;
+
+    auto index = keyPathElt->getIndex();
+    auto &component = KPE->getComponents()[index];
+    return component.getKind() == ComponentKind::Member ||
+           component.getKind() == ComponentKind::UnresolvedMember;
+  });
+}
+
 bool ConstraintLocator::isForKeyPathDynamicMemberLookup() const {
   auto path = getPath();
   return !path.empty() && path.back().isKeyPathDynamicMember();

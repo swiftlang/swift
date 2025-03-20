@@ -22,6 +22,7 @@ struct View : ~Escapable {
     self.ptr = ptr
     self.c = c
   }
+  @lifetime(copy otherBV)
   init(_ otherBV: borrowing View) {
     self.ptr = otherBV.ptr
     self.c = otherBV.c
@@ -32,6 +33,7 @@ struct View : ~Escapable {
   }
   // This overload requires a separate label because overloading
   // on borrowing/consuming attributes is not allowed
+  @lifetime(copy k)
   init(consumingView k: consuming View) {
     self.ptr = k.ptr
     self.c = k.c
@@ -46,6 +48,7 @@ struct MutableView : ~Copyable, ~Escapable {
     self.ptr = ptr
     self.c = c
   }
+  @lifetime(copy otherBV)
   init(_ otherBV: borrowing View) {
     self.ptr = otherBV.ptr
     self.c = otherBV.c
@@ -63,7 +66,7 @@ func consume(_ o : consuming View) {}
 func use(_ o : borrowing MutableView) {}
 func consume(_ o : consuming MutableView) {}
 
-@lifetime(x)
+@lifetime(copy x)
 func getConsumingView(_ x: consuming View) -> View {
   return View(consumingView: x)
 }
@@ -190,13 +193,16 @@ func test8(_ a: Array<Int>) {
 struct Wrapper : ~Escapable {
   var _view: View
   var view: View {
+    @lifetime(copy self)
     _read {
       yield _view
     }
+    @lifetime(borrow self)
     _modify {
       yield &_view
     }
   }
+  @lifetime(copy view)
   init(_ view: consuming View) {
     self._view = view
   }
@@ -212,6 +218,7 @@ func test9() {
   }
 }
 
+@lifetime(copy x)
 func getViewTuple(_ x: borrowing View) -> (View, View) {
   return (View(x.ptr, x.c), View(x.ptr, x.c))
 }
@@ -236,4 +243,5 @@ public func test10() {
 func testPointeeDependenceOnMutablePointer(p: UnsafePointer<Int64>) {
   var ptr = p
   _ = ptr.pointee
+  _ = ptr
 }

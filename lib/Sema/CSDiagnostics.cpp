@@ -684,6 +684,20 @@ bool MissingConformanceFailure::diagnoseAsError() {
     }
   }
 
+  if (isExpr<KeyPathExpr>(anchor)) {
+    if (auto *P = dyn_cast<ProtocolDecl>(protocolType->getAnyNominal())) {
+      if (P->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+        emitDiagnostic(diag::expr_keypath_noncopyable_type, nonConformingType);
+        return true;
+      }
+
+      if (P->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+        emitDiagnostic(diag::expr_keypath_nonescapable_type, nonConformingType);
+        return true;
+      }
+    }
+  }
+
   if (diagnoseAsAmbiguousOperatorRef())
     return true;
 
@@ -6347,7 +6361,8 @@ bool AnyObjectKeyPathRootFailure::diagnoseAsError() {
 SourceLoc KeyPathSubscriptIndexHashableFailure::getLoc() const {
   auto *locator = getLocator();
 
-  if (locator->isKeyPathSubscriptComponent()) {
+  if (locator->isKeyPathSubscriptComponent() ||
+      locator->isKeyPathMemberComponent()) {
     auto *KPE = castToExpr<KeyPathExpr>(getAnchor());
     if (auto kpElt = locator->findFirst<LocatorPathElt::KeyPathComponent>())
       return KPE->getComponents()[kpElt->getIndex()].getLoc();
@@ -6357,7 +6372,9 @@ SourceLoc KeyPathSubscriptIndexHashableFailure::getLoc() const {
 }
 
 bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
-  emitDiagnostic(diag::expr_keypath_subscript_index_not_hashable,
+  auto *locator = getLocator();
+  emitDiagnostic(diag::expr_keypath_arg_or_index_not_hashable,
+                 !locator->isKeyPathMemberComponent(),
                  resolveType(NonConformingType));
   return true;
 }
@@ -6415,8 +6432,20 @@ bool InvalidMemberWithMutatingGetterInKeyPath::diagnoseAsError() {
   return true;
 }
 
-bool InvalidMethodRefInKeyPath::diagnoseAsError() {
+bool UnsupportedMethodRefInKeyPath::diagnoseAsError() {
   emitDiagnostic(diag::expr_keypath_not_property, getMember(),
+                 isForKeyPathDynamicMemberLookup());
+  return true;
+}
+
+bool InvalidMutatingMethodRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(diag::expr_keypath_mutating_method, getMember(),
+                 isForKeyPathDynamicMemberLookup());
+  return true;
+}
+
+bool InvalidAsyncOrThrowsMethodRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(diag::effectful_keypath_component, getKind(),
                  isForKeyPathDynamicMemberLookup());
   return true;
 }

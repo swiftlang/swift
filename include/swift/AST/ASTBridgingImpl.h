@@ -601,6 +601,10 @@ BridgedASTType BridgedConformance::getType() const {
   return {unbridged().getConcrete()->getType().getPointer()};
 }
 
+BridgedDeclObj BridgedConformance::getRequirement() const {
+  return {unbridged().getRequirement()};
+}
+
 BridgedConformance BridgedConformance::getGenericConformance() const {
   auto *specPC = swift::cast<swift::SpecializedProtocolConformance>(unbridged().getConcrete());
   return {swift::ProtocolConformanceRef(specPC->getGenericConformance())};

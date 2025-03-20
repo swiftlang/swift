@@ -13,14 +13,17 @@ struct NE: ~Escapable {
   init() {}
 }
 
+@lifetime(copy ne)
 func transfer(_ ne: NE) -> NE {
   ne
 }
 
+@lifetime(copy ne)
 func applyAnnotatedTransfer(ne: NE, @lifetime(0) transfer: (NE) -> NE) -> NE { // expected-error{{'@lifetime' attribute cannot be applied to this declaration}}
   transfer(ne)
 }
 
+@lifetime(copy ne)
 func applyTransfer(ne: NE, transfer: (NE) ->  NE) -> NE {
   transfer(ne)
 }
@@ -36,6 +39,7 @@ func borrow(_ nc: borrowing NC) -> NE {
   nc.ne
 }
 
+@lifetime(borrow nc)
 func applyBorrow(nc: borrowing NC, borrow: (borrowing NC) -> NE) -> NE {
   borrow(nc)
 }

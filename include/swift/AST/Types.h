@@ -752,6 +752,10 @@ public:
     return getRecursiveProperties().hasOpenedExistential();
   }
 
+  /// True if this type is an existential or an archetype which may be an
+  /// existential.
+  bool canBeExistential();
+
   /// Determine whether the type involves an opened element archetype.
   bool hasElementArchetype() const {
     return getRecursiveProperties().hasElementArchetype();
@@ -5574,6 +5578,8 @@ public:
     return NumLifetimeDependencies != 0;
   }
 
+  // Return lowered lifetime dependencies, which has remapped parameter indices
+  // relative to the original FunctionType.
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     if (!hasLifetimeDependencies())
       return std::nullopt;

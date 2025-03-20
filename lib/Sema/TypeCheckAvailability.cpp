@@ -2524,7 +2524,7 @@ private:
 
     for (auto &component : KP->getComponents()) {
       switch (component.getKind()) {
-      case KeyPathExpr::Component::Kind::Property:
+      case KeyPathExpr::Component::Kind::Member:
       case KeyPathExpr::Component::Kind::Subscript: {
         auto decl = component.getDeclRef();
         auto loc = component.getLoc();
@@ -2539,8 +2539,10 @@ private:
         break;
 
       case KeyPathExpr::Component::Kind::Invalid:
-      case KeyPathExpr::Component::Kind::UnresolvedProperty:
+      case KeyPathExpr::Component::Kind::UnresolvedMember:
       case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+      case KeyPathExpr::Component::Kind::UnresolvedApply:
+      case KeyPathExpr::Component::Kind::Apply:
       case KeyPathExpr::Component::Kind::OptionalChain:
       case KeyPathExpr::Component::Kind::OptionalWrap:
       case KeyPathExpr::Component::Kind::OptionalForce:

@@ -4273,20 +4273,20 @@ public:
             printHead("optional_wrap", ASTNodeColor, label);
             break;
 
-          case KeyPathExpr::Component::Kind::Property:
-            printHead("property", ASTNodeColor, label);
+          case KeyPathExpr::Component::Kind::Member:
+            printHead("member", ASTNodeColor, label);
             printDeclRefField(component.getDeclRef(), Label::always("decl"));
+            break;
+
+          case KeyPathExpr::Component::Kind::UnresolvedMember:
+            printHead("unresolved_member", ASTNodeColor, label);
+            printFieldQuoted(component.getUnresolvedDeclName(),
+                             Label::always("decl_name"), IdentifierColor);
             break;
 
           case KeyPathExpr::Component::Kind::Subscript:
             printHead("subscript", ASTNodeColor, label);
             printDeclRefField(component.getDeclRef(), Label::always("decl"));
-            break;
-
-          case KeyPathExpr::Component::Kind::UnresolvedProperty:
-            printHead("unresolved_property", ASTNodeColor, label);
-            printFieldQuoted(component.getUnresolvedDeclName(),
-                             Label::always("decl_name"), IdentifierColor);
             break;
 
           case KeyPathExpr::Component::Kind::UnresolvedSubscript:
@@ -4309,10 +4309,16 @@ public:
           case KeyPathExpr::Component::Kind::CodeCompletion:
             printHead("completion", ASTNodeColor, label);
             break;
+          case KeyPathExpr::Component::Kind::UnresolvedApply:
+            printHead("unresolved_apply", ASTNodeColor, label);
+            break;
+          case KeyPathExpr::Component::Kind::Apply:
+            printHead("apply", ASTNodeColor, label);
+            break;
           }
           printTypeField(GetTypeOfKeyPathComponent(E, i), Label::always("type"));
-          if (auto *args = component.getSubscriptArgs()) {
-            printRec(args, Label::optional("subscript_args"));
+          if (auto *args = component.getArgs()) {
+            printRec(args, Label::optional("args"));
           }
           printFoot();
         }, Label::optional("component"));

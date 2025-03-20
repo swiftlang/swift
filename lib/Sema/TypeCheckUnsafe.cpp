@@ -154,6 +154,14 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
     return;
   }
 
+  case UnsafeUse::TemporarilyEscaping: {
+    Type type = use.getType();
+    ASTContext &ctx = type->getASTContext();
+    ctx.Diags.diagnose(
+        use.getLocation(), diag::note_unsafe_temporarily_escaping, type);
+    return;
+  }
+
   case UnsafeUse::PreconcurrencyImport: {
     auto importDecl = cast<ImportDecl>(use.getDecl());
     importDecl->diagnose(diag::preconcurrency_import_unsafe);

@@ -4675,6 +4675,12 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
+  if (typeVar->getImpl().isKeyPathType()) {
+    return resolveKeyPath(typeVar, type, flags, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
+  }
+
   assignFixedType(typeVar, type, /*updateState=*/true,
                   /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
@@ -8747,11 +8753,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // separately.
   switch (kind) {
   case ConstraintKind::Subtype: {
-    auto conformance = TypeChecker::containsProtocol(
+    auto pair = TypeChecker::containsProtocol(
         type, protocol, /*allowMissing=*/true);
-    if (conformance) {
-      return recordConformance(conformance);
-    }
+    if (pair.first)
+      return SolutionKind::Solved;
+    if (pair.second)
+      return recordConformance(pair.second);
   } break;
   case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
@@ -9073,8 +9080,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If this is an implicit Hashable conformance check generated for each
     // index argument of the keypath subscript component, we could just treat
     // it as though it conforms.
-    if (loc->isResultOfKeyPathDynamicMemberLookup() ||
-        loc->isKeyPathSubscriptComponent()) {
+    if ((loc->isResultOfKeyPathDynamicMemberLookup() ||
+         loc->isKeyPathSubscriptComponent()) ||
+        loc->isKeyPathMemberComponent()) {
       if (protocol ==
           getASTContext().getProtocol(KnownProtocolKind::Hashable)) {
         auto *fix =
@@ -10825,7 +10833,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // which means MetatypeType has to be added after finding a type variable.
     if (baseLocator->isLastElement<LocatorPathElt::MemberRefBase>())
       baseType = MetatypeType::get(baseType);
-  } else if (isExpr<KeyPathExpr>(anchor)) {
+  } else if (auto *keyPathExpr = getAsExpr<KeyPathExpr>(anchor)) {
     // Key path can't refer to initializers e.g. `\Type.init`
     return AllowInvalidRefInKeyPath::forRef(cs, baseType, init, locator);
   }
@@ -12254,6 +12262,30 @@ bool ConstraintSystem::resolveTapBody(TypeVariableType *typeVar,
   // With all of the contextual information recorded in the constraint system,
   // it's time to generate constraints for the body of this tap expression.
   return !generateConstraints(tapExpr);
+}
+
+bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
+                                      Type contextualType,
+                                      TypeMatchOptions flags,
+                                      ConstraintLocatorBuilder locator) {
+  // Key path types recently gained Copyable, Escapable requirements.
+  // The solver cannot account for that during inference because Root
+  // and Value types are required to be only resolved enough to infer
+  // a capability of a key path itself.
+  if (auto *BGT = contextualType->getAs<BoundGenericType>()) {
+    auto keyPathTy = openUnboundGenericType(
+        BGT->getDecl(), BGT->getParent(), locator, /*isTypeResolution=*/false);
+
+    assignFixedType(
+        typeVar, keyPathTy, /*updateState=*/true,
+        /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
+    addConstraint(ConstraintKind::Equal, keyPathTy, contextualType, locator);
+    return true;
+  }
+
+  assignFixedType(typeVar, contextualType, /*updateState=*/true,
+                  /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
+  return true;
 }
 
 ConstraintSystem::SolutionKind

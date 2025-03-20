@@ -64,13 +64,11 @@ public:
   /// A witness table entry describing the witness for an associated type's
   /// protocol requirement.
   struct AssociatedConformanceWitness {
-    /// The associated type required.  A dependent type in the protocol's
-    /// context.
+    /// The subject type of the associated requirement.
     CanType Requirement;
-    /// The protocol requirement on the type.
-    ProtocolDecl *Protocol;
-    /// The ProtocolConformance satisfying the requirement. Null if the
-    /// conformance is dependent.
+    /// FIXME: Temporary.
+    CanType SubstType;
+    /// The ProtocolConformanceRef satisfying the requirement.
     ProtocolConformanceRef Witness;
   };
   
@@ -160,6 +158,7 @@ public:
   /// conditional. These aren't public, but any witness thunks need to feed them
   /// into the true witness functions.
   struct ConditionalConformance {
+    /// FIXME: Temporary.
     CanType Requirement;
     ProtocolConformanceRef Conformance;
   };

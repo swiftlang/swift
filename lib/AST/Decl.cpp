@@ -10377,6 +10377,50 @@ void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
   BodyParams->setDeclContextOfParamDecls(this);
 }
 
+bool AbstractFunctionDecl::isValidKeyPathComponent() const {
+  // Check whether we're an ABI compatible override of another method. If we
+  // are, then the key path should refer to the base decl instead.
+  auto &ctx = getASTContext();
+  auto isABICompatibleOverride = evaluateOrDefault(
+      ctx.evaluator,
+      IsABICompatibleOverrideRequest{const_cast<AbstractFunctionDecl *>(this)},
+      false);
+  return !isABICompatibleOverride;
+}
+
+bool AbstractFunctionDecl::isResilient() const {
+  // Check for attributes that makes functions non-resilient.
+  if (getAttrs().hasAttribute<InlinableAttr>() &&
+      getAttrs().hasAttribute<UsableFromInlineAttr>())
+    return false;
+
+  // If this is a function of a type, check that type's resilience.
+  if (auto *nominalDecl = getDeclContext()->getSelfNominalTypeDecl())
+    return nominalDecl->isResilient();
+
+  // Functions in non-public access scopes are not resilient.
+  auto accessScope =
+      getFormalAccessScope(/*useDC=*/nullptr,
+                           /*treatUsableFromInlineAsPublic=*/true);
+  if (!accessScope.isPublicOrPackage())
+    return false;
+
+  return getModuleContext()->isResilient();
+}
+
+bool AbstractFunctionDecl::isResilient(ModuleDecl *M,
+                                       ResilienceExpansion expansion) const {
+  switch (expansion) {
+  case ResilienceExpansion::Minimal:
+    return isResilient();
+  case ResilienceExpansion::Maximal:
+    if (M == getModuleContext())
+      return false;
+    return isResilient();
+  }
+  llvm_unreachable("bad resilience expansion");
+}
+
 OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
                                GenericParamList *GenericParams, DeclContext *DC,
                                GenericSignature OpaqueInterfaceGenericSignature,
