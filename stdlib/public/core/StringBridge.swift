@@ -683,7 +683,7 @@ internal func _SwiftCreateBridgedString_DoNotCall(
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 @_spi(Foundation) public func _SwiftCreateNonTerminatedImmortalString_ForFoundation(
   buffer: UnsafeBufferPointer<UInt8>,
   isASCII: Bool
