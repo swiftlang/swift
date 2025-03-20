@@ -82,9 +82,9 @@ extension _AbstractStringStorage {
   @inline(__always)
   @_effects(readonly)
   internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
-    switch (encoding, isASCII) {
-    case (_cocoaASCIIEncoding, true),
-         (_cocoaUTF8Encoding, _):
+    switch (encoding, isASCII, asString._guts._object.isFastZeroTerminated) {
+    case (_cocoaASCIIEncoding, true, true),
+         (_cocoaUTF8Encoding, _, true):
       return unsafe start
     default:
       return unsafe _cocoaCStringUsingEncodingTrampoline(self, encoding)
@@ -197,8 +197,10 @@ extension __StringStorage {
   final internal func _fastCStringContents(
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>? {
-    if isASCII {
-      return unsafe start._asCChar
+    if 0 == requiresNulTermination || asString._guts._object.isFastZeroTerminated {
+      if isASCII {
+        return unsafe start._asCChar
+      }
     }
     return nil
   }
@@ -206,7 +208,10 @@ extension __StringStorage {
   @objc(UTF8String)
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8>? {
-    return unsafe start
+    if asString._guts._object.isFastZeroTerminated {
+      return unsafe start
+    }
+    return unsafe _cocoaUTF8StringTrampoline(self)
   }
 
   @objc(cStringUsingEncoding:)

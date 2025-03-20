@@ -933,3 +933,4 @@ Added: _$ss18EnumeratedSequenceVyxGSKsSkRzrlMc
 
 // Shared string creation for Foundation, again
 Added: _$ss53_SwiftCreateNonTerminatedImmortalString_ForFoundation6buffer7isASCIISSSgSRys5UInt8VG_SbtF
+Added: __swift_stdlib_NSStringUTF8StringTrampoline

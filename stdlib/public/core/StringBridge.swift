@@ -280,6 +280,12 @@ internal func _cocoaCStringUsingEncodingTrampoline(
   return unsafe _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
 }
 
+@_effects(readonly)
+internal func _cocoaUTF8StringTrampoline(_ string: _CocoaString)
+  -> UnsafePointer<UInt8>? {
+  return unsafe _swift_stdlib_NSStringUTF8StringTrampoline(string)
+}
+
 @_effects(releasenone)
 internal func _cocoaGetCStringTrampoline(
   _ string: _CocoaString,
