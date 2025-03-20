@@ -9,8 +9,7 @@
 // RUN:     -module-name Library \
 // RUN:     -parse-as-library  \
 // RUN:     -enable-library-evolution \
-// RUN:     -emit-module-path %t/Library.swiftmodule \
-// RUN:     -validate-tbd-against-ir=none
+// RUN:     -emit-module-path %t/Library.swiftmodule
 
 // RUN: %target-swift-frontend \
 // RUN:     %t/Executable.swift \
@@ -18,8 +17,7 @@
 // RUN:     -parse-as-library \
 // RUN:     -module-name Executable \
 // RUN:     -I %t \
-// RUN:     -o %t/Executable.o \
-// RUN:     -validate-tbd-against-ir=none
+// RUN:     -o %t/Executable.o
 
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Library)) \
 // RUN:     %t/Library.swift \
@@ -28,8 +26,7 @@
 // RUN:     -enable-library-evolution \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN:     -emit-module-path %t/Library.swiftmodule \
-// RUN:     -module-name Library \
-// RUN:     -Xfrontend -validate-tbd-against-ir=none
+// RUN:     -module-name Library
 
 // RUN: %target-build-swift \
 // RUN:     %t/Executable.o \
