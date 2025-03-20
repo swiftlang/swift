@@ -529,7 +529,7 @@ function Invoke-BuildStep([string] $Name) {
   & $Name @Args
 
   if ($Summary) {
-    Add-TimingData $BuildStepArch $BuildStepPlatform ($Name -replace "Build-","") $Stopwatch.Elapsed
+    Add-TimingData $BuildStepArch $BuildStepPlatform $Name $Stopwatch.Elapsed
   }
   if ($Name.Replace("Build-", "") -eq $BuildTo) {
     exit 0
@@ -1454,7 +1454,8 @@ enum SPMBuildAction {
 
 function Build-SPMProject {
   [CmdletBinding(PositionalBinding = $false)]
-  param(
+  param
+  (
     [SPMBuildAction] $Action,
     [string] $Src,
     [string] $Bin,
@@ -1524,10 +1525,6 @@ function Build-SPMProject {
   if (-not $ToBatch) {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
     Write-Host ""
-  }
-
-  if ($Summary) {
-    Add-TimingData $BuildArch.LLVMName "Windows" $Src.Replace($SourceCache, '') $Stopwatch.Elapsed
   }
 }
 
@@ -3295,22 +3292,24 @@ if (-not $IsCrossCompiling) {
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
     }
+    # FIXME(compnerd) this involves fixing the specialised argument handling in
+    # `Invoke-BuildStep` to deal with the additional boolean parameters.
     Build-Compilers $HostArch @Tests
   }
 
-  if ($Test -contains "dispatch") { Test-Dispatch }
-  if ($Test -contains "foundation") { Test-Foundation }
-  if ($Test -contains "xctest") { Test-XCTest }
-  if ($Test -contains "testing") { Test-Testing }
-  if ($Test -contains "llbuild") { Test-LLBuild }
-  if ($Test -contains "swiftpm") { Test-PackageManager }
-  if ($Test -contains "swift-format") { Test-Format }
-  if ($Test -contains "sourcekit-lsp") { Test-SourceKitLSP }
+  if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch }
+  if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation }
+  if ($Test -contains "xctest") { Invoke-BuildStep Test-XCTest }
+  if ($Test -contains "testing") { Invoke-BuildStep Test-Testing }
+  if ($Test -contains "llbuild") { Invoke-BuildStep Test-LLBuild }
+  if ($Test -contains "swiftpm") { Invoke-BuildStep Test-PackageManager }
+  if ($Test -contains "swift-format") { Invoke-BuildStep Test-Format }
+  if ($Test -contains "sourcekit-lsp") { Invoke-BuildStep Test-SourceKitLSP }
 
   if ($Test -contains "swift") {
     foreach ($Arch in $AndroidSDKArchs) {
       try {
-        Test-Runtime Android $Arch
+        Invoke-BuildStep Test-Runtime Android $Arch
       } catch {}
     }
   }
