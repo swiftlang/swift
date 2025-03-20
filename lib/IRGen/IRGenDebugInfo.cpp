@@ -1124,12 +1124,16 @@ private:
       unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
       StringRef MangledName, StringRef Name) {
 #ifndef NDEBUG
-    if (MangledName.empty())
-      assert(!Name.empty() &&
-             "no mangled name and no human readable name given");
-    else
-      assert(swift::Demangle::isMangledName(MangledName) &&
-             "UID is not a mangled name");
+    {
+      if (MangledName.empty())
+        assert(!Name.empty() &&
+               "no mangled name and no human readable name given");
+      else
+        assert(swift::Demangle::isMangledName(MangledName) &&
+               "UID is not a mangled name");
+      auto UID = llvm::MDString::get(IGM.getLLVMContext(), MangledName);
+      assert(DIRefMap.count(UID) == 0 && "type is already cached");
+    }
 #endif
     auto ReplaceableType = DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_structure_type, "", Scope, File, Line,
@@ -1236,14 +1240,17 @@ private:
     SmallVector<llvm::Metadata *, 16> Members;
     for (auto &Member : MemberTypes) {
       unsigned OffsetInBits = 0;
-      Members.push_back(createMemberType(Member.DIType, Member.Name,
+      auto *member = createMemberType(Member.DIType, Member.Name,
                                          OffsetInBits, Member.AlignInBits,
-                                         Scope, File, Flags));
+                                      Scope, File, Flags);
+      member->dump();
+      Members.push_back(member);
     }
 
     llvm::DICompositeType *DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
         DBuilder.getOrCreateArray(Members), RuntimeLang, nullptr, UniqueID);
+      DITy->dump();
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
@@ -1313,20 +1320,15 @@ private:
     if (!Decl)
       return nullptr;
 
-    // This temporary forward decl seems to be redundant. Can it be removed?
-    StringRef Name = Decl->getName().str();
-    auto FwdDecl = createTemporaryReplaceableForwardDecl(
-        Type, Scope, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
-        Name);
-
     auto [IsUnsubstitued, UnsubstitutedType] =
         getUnsubstitutedType(Type, MangledName);
     auto UnsubstitutedDbgTy = DebugTypeInfo::getFromTypeInfo(
         UnsubstitutedType, IGM.getTypeInfoForUnlowered(UnsubstitutedType), IGM);
-    if (IsUnsubstitued)
+    if (IsUnsubstitued) {
       return createUnsubstitutedGenericStructOrClassType(
           UnsubstitutedDbgTy, Decl, UnsubstitutedType, Scope, File, Line, Flags,
           nullptr, llvm::dwarf::DW_LANG_Swift, MangledName);
+    }
 
     // Force the creation of the unsubstituted type, don't create it
     // directly so it goes through all the caching/verification logic.
@@ -1361,7 +1363,7 @@ private:
         Scope, Decl ? Decl->getNameStr() : "", File, Line, SizeInBits,
         AlignInBits, Flags, MangledName, collectGenericParams(Type),
         UnsubstitutedDITy);
-    return DBuilder.replaceTemporary(std::move(FwdDecl), SpecializedDITy);
+    return SpecializedDITy;
   }
 
   /// Create debug information for an enum with a raw type (enum E : Int {}).
@@ -2644,12 +2646,17 @@ private:
         auto *DITy = cast<llvm::DIType>(CachedTy);
         assert(sanityCheckCachedType(DbgTy, DITy));
         return DITy;
+      } else {
+        UID = llvm::MDString::get(IGM.getLLVMContext(), Mangled.Canonical);
+        if (llvm::Metadata *CachedTy = DIRefMap.lookup(UID))
+          return cast<llvm::DIType>(CachedTy);
       }
     }
 
     Scope = updateScope(Scope, DbgTy);
     StringRef MangledName =
         !Mangled.Sugared.empty() ? Mangled.Sugared : Mangled.Canonical;
+
     StringRef Name = MangledName;
     if (auto *Decl = DbgTy.getDecl())
       Name = Decl->getName().str();
@@ -2674,7 +2681,6 @@ private:
       return FwdDecl;
     }
     llvm::DIType *DITy = createType(DbgTy, MangledName, Scope, getFile(Scope));
-
 
     if (!shouldCacheDIType(DITy, DbgTy))
       return DITy;
