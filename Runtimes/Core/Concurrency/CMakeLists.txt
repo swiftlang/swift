@@ -115,10 +115,7 @@ target_link_libraries(swift_Concurrency PRIVATE
   $<$<PLATFORM_ID:Windows>:Synchronization>
   $<$<PLATFORM_ID:Windows>:mincore>
   # Link to the runtime that we are just building.
-  swiftCore
-  $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt>)
-target_link_options(swift_Concurrency PRIVATE
-  -nostartfiles)
+  swiftCore)
 set_target_properties(swift_Concurrency PROPERTIES
   Swift_MODULE_NAME _Concurrency)
 
