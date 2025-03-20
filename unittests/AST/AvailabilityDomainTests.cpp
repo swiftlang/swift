@@ -150,32 +150,3 @@ TEST_F(AvailabilityDomainLattice, RootDomain) {
   EXPECT_EQ(visionOSAppExt.getRootDomain(), iOS);
   EXPECT_FALSE(visionOSAppExt.isRoot());
 }
-
-TEST(AvailabilityDomain, TargetPlatform) {
-  using namespace llvm;
-
-  struct TargetToPlatformKind {
-    Triple target;
-    PlatformKind platformKind;
-  };
-  TargetToPlatformKind tests[] = {
-      {Triple("x86_64", "apple", "macosx10.15"), PlatformKind::macOS},
-      {Triple("arm64", "apple", "ios13"), PlatformKind::iOS},
-      {Triple("arm64_32", "apple", "watchos8"), PlatformKind::watchOS},
-      {Triple("x86_64", "apple", "ios14", "macabi"), PlatformKind::macCatalyst},
-      {Triple("x86_64", "unknown", "windows", "msvc"), PlatformKind::none},
-      {Triple("x86_64", "unknown", "linux", "gnu"), PlatformKind::none},
-  };
-
-  for (TargetToPlatformKind test : tests) {
-    TestContext context{test.target};
-    auto domain = AvailabilityDomain::forTargetPlatform(context.Ctx);
-    if (test.platformKind != PlatformKind::none) {
-      EXPECT_TRUE(domain);
-      if (domain)
-        EXPECT_TRUE(domain->getPlatformKind() == test.platformKind);
-    } else {
-      EXPECT_FALSE(domain);
-    }
-  }
-}

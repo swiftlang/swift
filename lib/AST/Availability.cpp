@@ -552,11 +552,15 @@ getRootTargetDomains(const ASTContext &ctx) {
   if (ctx.LangOpts.hasFeature(Feature::Embedded))
     return domains;
 
-  if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx))
-    domains.insert(targetDomain->getRootDomain());
+  auto targetPlatform = swift::targetPlatform(ctx.LangOpts);
+  if (targetPlatform != PlatformKind::none)
+    domains.insert(
+        AvailabilityDomain::forPlatform(targetPlatform).getRootDomain());
 
-  if (auto variantDomain = AvailabilityDomain::forTargetVariantPlatform(ctx))
-    domains.insert(variantDomain->getRootDomain());
+  auto targetVariantPlatform = swift::targetVariantPlatform(ctx.LangOpts);
+  if (targetVariantPlatform != PlatformKind::none)
+    domains.insert(
+        AvailabilityDomain::forPlatform(targetVariantPlatform).getRootDomain());
 
   return domains;
 }
