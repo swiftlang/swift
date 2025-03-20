@@ -125,6 +125,9 @@ bool IDEInspectionSecondPassRequest::evaluate(
   auto state = parserState->takeIDEInspectionDelayedDeclState();
   auto &Ctx = SF->getASTContext();
 
+  auto inspectionLoc = Ctx.SourceMgr.getIDEInspectionTargetLoc();
+  PrettyStackTraceLocation stackTrace(Ctx, "IDE inspecting", inspectionLoc);
+
   auto BufferID = Ctx.SourceMgr.getIDEInspectionTargetBufferID();
   Parser TheParser(BufferID, *SF, nullptr, parserState);
 
