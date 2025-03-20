@@ -69,6 +69,8 @@ public:
   SILMoveOnlyDeinit *lookupMoveOnlyDeinit(const NominalTypeDecl *nomDecl);
   SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);
   SILDefaultWitnessTable *lookupDefaultWitnessTable(SILDefaultWitnessTable *C);
+  SILDefaultOverrideTable *
+  lookupDefaultOverrideTable(SILDefaultOverrideTable *);
   SILDifferentiabilityWitness *
   lookupDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
 
@@ -104,6 +106,9 @@ public:
 
   /// Deserialize all DefaultWitnessTables in all SILModules.
   void getAllDefaultWitnessTables();
+
+  /// Deserialize all DefaultOverrideTables in all SILModules.
+  void getAllDefaultOverrideTables();
 
   /// Deserialize all Properties in all SILModules.
   void getAllProperties();

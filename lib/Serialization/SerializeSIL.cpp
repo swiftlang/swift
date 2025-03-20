@@ -217,7 +217,13 @@ namespace {
     /// Holds the list of DefaultWitnessTables.
     std::vector<BitOffset> DefaultWitnessTableOffset;
     uint32_t /*DeclID*/ NextDefaultWitnessTableID = 1;
-    
+
+    /// Maps default witness table identifier to an ID.
+    Table DefaultOverrideTableList;
+    /// Holds the list of DefaultOverrideTables.
+    std::vector<BitOffset> DefaultOverrideTableOffset;
+    uint32_t /*DeclID*/ NextDefaultOverrideTableID = 1;
+
     /// Holds the list of Properties.
     std::vector<BitOffset> PropertyOffset;
 
@@ -294,6 +300,10 @@ namespace {
     void writeSILWitnessTableEntry(const SILWitnessTable::Entry &entry,
                                    SerializedKind_t serializedKind);
     void writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt);
+    void writeSILDefaultOverrideTableEntry(
+        const SILDefaultOverrideTable::Entry &entry,
+        SerializedKind_t serializedKind);
+    void writeSILDefaultOverrideTable(const SILDefaultOverrideTable &ot);
     void
     writeSILDifferentiabilityWitness(const SILDifferentiabilityWitness &dw);
     void writeSILProperty(const SILProperty &prop);
@@ -2983,9 +2993,10 @@ static void writeIndexTable(Serializer &S,
           kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
           kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
           kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
+          kind == sil_index_block::SIL_DEFAULT_OVERRIDE_TABLE_NAMES ||
           kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES) &&
-         "SIL function table, global, vtable, (default) witness table, and "
-         "differentiability witness table are supported");
+         "SIL function table, global, vtable, (default) witness table, default "
+         "override table and differentiability witness table are supported");
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
   {
@@ -3046,6 +3057,14 @@ void SILSerializer::writeIndexTables() {
     Offset.emit(ScratchRecord,
                 sil_index_block::SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
                 DefaultWitnessTableOffset);
+  }
+
+  if (!DefaultOverrideTableList.empty()) {
+    writeIndexTable(S, List, sil_index_block::SIL_DEFAULT_OVERRIDE_TABLE_NAMES,
+                    DefaultOverrideTableList);
+    Offset.emit(ScratchRecord,
+                sil_index_block::SIL_DEFAULT_OVERRIDE_TABLE_OFFSETS,
+                DefaultOverrideTableOffset);
   }
 
   if (!PropertyOffset.empty()) {
@@ -3427,6 +3446,47 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
   }
 }
 
+void SILSerializer::writeSILDefaultOverrideTableEntry(
+    const SILDefaultOverrideTable::Entry &entry,
+    SerializedKind_t serializedKind) {
+  SmallVector<uint64_t, 8> ListOfValues;
+  handleSILDeclRef(S, entry.method, ListOfValues);
+  handleSILDeclRef(S, entry.original, ListOfValues);
+
+  IdentifierID implID = 0;
+  SILFunction *impl = entry.impl;
+  if (impl && serializedKind != IsNotSerialized &&
+      impl->hasValidLinkageForFragileRef(serializedKind)) {
+    addReferencedSILFunction(impl, true);
+    implID = S.addUniquedStringRef(impl->getName());
+  }
+  DefaultOverrideTableEntryLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[DefaultOverrideTableEntryLayout::Code],
+      // SILFunction name
+      implID, ListOfValues);
+}
+
+void SILSerializer::writeSILDefaultOverrideTable(
+    const SILDefaultOverrideTable &ot) {
+  if (ot.isDeclaration())
+    return;
+
+  StringRef name = S.addUniquedString(ot.getUniqueName()).first;
+  DefaultOverrideTableList[name] = NextDefaultOverrideTableID++;
+  DefaultOverrideTableOffset.push_back(Out.GetCurrentBitNo());
+
+  DefaultOverrideTableLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[DefaultOverrideTableLayout::Code],
+      S.addDeclRef(ot.getClass()), toStableSILLinkage(ot.getLinkage()));
+
+  for (auto &entry : ot.getEntries()) {
+    // Default override table is not serialized. The IsSerialized
+    // argument is passed here to call hasValidLinkageForFragileRef
+    // to keep the behavior consistent with or without any optimizations.
+    writeSILDefaultOverrideTableEntry(entry, IsSerialized);
+  }
+}
+
 void SILSerializer::writeSILDifferentiabilityWitness(
     const SILDifferentiabilityWitness &dw) {
   Mangle::ASTMangler mangler(dw.getOriginalFunction()->getASTContext());
@@ -3551,6 +3611,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<WitnessConditionalConformanceLayout>();
   registerSILAbbr<DefaultWitnessTableLayout>();
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
+  registerSILAbbr<DefaultOverrideTableLayout>();
+  registerSILAbbr<DefaultOverrideTableEntryLayout>();
   registerSILAbbr<PropertyLayout>();
   registerSILAbbr<DifferentiabilityWitnessLayout>();
   registerSILAbbr<SILDebugValueLayout>();
@@ -3601,6 +3663,13 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     if (SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
                                                               wt.getProtocol()))
       writeSILDefaultWitnessTable(wt);
+  }
+
+  for (const SILDefaultOverrideTable &ot : SILMod->getDefaultOverrideTables()) {
+    if (!SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
+            ot.getClass()))
+      continue;
+    writeSILDefaultOverrideTable(ot);
   }
 
   // Add global variables that must be emitted to the list.
