@@ -37,6 +37,19 @@ $ swiftc -target <target triple> -enable-experimental-feature Embedded -wmo \
   input1.swift input2.swift ... -c -o output.o
 ```
 
+On macOS, it's common to have Xcode installed, which comes with a toolchain that does not support Embedded Swift yet. Unless you download, install, and activate a swift.org toolchain, you'll see this error:
+
+```bash
+$ swiftc input1.swift -enable-experimental-feature Embedded -wmo
+<unknown>:0: error: unable to load standard library for target 'arm64-apple-macosx15.0'
+```
+
+To resolve it, download and install a nightly toolchain from swift.org. Then, don't forget to activate it in your terminal by setting the `TOOLCHAINS` environment variable, for example with this command (if you installed into the `/Library` path):
+
+```bash
+$ export TOOLCHAINS=$(plutil -extract CFBundleIdentifier raw /Library/Developer/Toolchains/swift-latest.xctoolchain/Info.plist)
+```
+
 ## Examples
 
 ### Building Swift firmware for an embedded target
