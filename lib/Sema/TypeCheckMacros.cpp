@@ -1396,6 +1396,12 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     }
   }
 
+  // Macros are so spectacularly not valid in an `@abi` attribute that we cannot
+  // even attempt to expand them.
+  if (!ABIRoleInfo(attachedTo).providesAPI()) {
+    return nullptr;
+  }
+
   ASTContext &ctx = dc->getASTContext();
 
   auto moduleDecl = dc->getParentModule();
