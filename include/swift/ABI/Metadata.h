@@ -582,6 +582,7 @@ struct TargetMethodDescriptor {
   union {
     TargetCompactFunctionPointer<Runtime, void> Impl;
     TargetRelativeDirectPointer<Runtime, void> AsyncImpl;
+    TargetRelativeDirectPointer<Runtime, void> CoroImpl;
   };
 
   // TODO: add method types or anything else needed for reflection.
@@ -589,6 +590,8 @@ struct TargetMethodDescriptor {
   void *getImpl() const {
     if (Flags.isAsync()) {
       return AsyncImpl.get();
+    } else if (Flags.isCalleeAllocatedCoroutine()) {
+      return CoroImpl.get();
     } else {
       return Impl.get();
     }
@@ -665,6 +668,7 @@ struct TargetMethodOverrideDescriptor {
   union {
     TargetCompactFunctionPointer<Runtime, void, /*nullable*/ true> Impl;
     TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> AsyncImpl;
+    TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> CoroImpl;
   };
 
   void *getImpl() const {
@@ -672,6 +676,8 @@ struct TargetMethodOverrideDescriptor {
     assert(baseMethod && "no base method");
     if (baseMethod->Flags.isAsync()) {
       return AsyncImpl.get();
+    } else if (baseMethod->Flags.isCalleeAllocatedCoroutine()) {
+      return CoroImpl.get();
     } else {
       return Impl.get();
     }
@@ -5170,6 +5176,7 @@ class DynamicReplacementDescriptor {
   union {
     TargetCompactFunctionPointer<InProcess, void, false> replacementFunction;
     TargetRelativeDirectPointer<InProcess, void, false> replacementAsyncFunction;
+    TargetRelativeDirectPointer<InProcess, void, false> replacementCoroFunction;
   };
   RelativeDirectPointer<DynamicReplacementChainEntry, false> chainEntry;
   uint32_t flags;
@@ -5179,6 +5186,8 @@ class DynamicReplacementDescriptor {
   void *getReplacementFunction() const {
     if (replacedFunctionKey->isAsync()) {
       return replacementAsyncFunction.get();
+    } else if (replacedFunctionKey->isCalleeAllocatedCoroutine()) {
+      return replacementCoroFunction.get();
     } else {
       return replacementFunction.get();
     }
