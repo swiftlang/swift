@@ -287,9 +287,8 @@ public func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
     }
   }
 
-  // If we didn't find anything, complain and fail.
+  // If we didn't find anything, return nil.
   guard var resultSyntax else {
-    print("unable to find node: \(token.debugDescription)")
     return nil
   }
 
