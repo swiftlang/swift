@@ -107,6 +107,9 @@ The memory allocator used in the toolchain binaries, if it's
 `mimalloc`, it uses mimalloc. Otherwise, it uses the default
 allocator.
 
+.PARAMETER FoundationTestConfiguration
+Whether to run swift-foundation and swift-corelibs-foundation tests in a debug or release configuration.
+
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -142,6 +145,8 @@ param(
   [switch] $Clean,
   [switch] $DebugInfo,
   [switch] $EnableCaching,
+  [ValidateSet("debug", "release")]
+  [string] $FoundationTestConfiguration = "debug",
   [string] $Cache = "",
   [string] $Allocator = "",
   [switch] $Summary,
@@ -1262,6 +1267,7 @@ function Build-SPMProject {
     [string] $Src,
     [string] $Bin,
     [hashtable] $Arch,
+    [string] $Configuration = "release",
     [Parameter(ValueFromRemainingArguments)]
     [string[]] $AdditionalArguments
   )
@@ -1291,7 +1297,7 @@ function Build-SPMProject {
     $Arguments = @(
         "--scratch-path", $Bin,
         "--package-path", $Src,
-        "-c", "release",
+        "-c", $Configuration,
         "-Xbuild-tools-swiftc", "-I$SDKInstallRoot\usr\lib\swift",
         "-Xbuild-tools-swiftc", "-L$SDKInstallRoot\usr\lib\swift\windows",
         "-Xcc", "-I$SDKInstallRoot\usr\lib\swift",
@@ -1891,7 +1897,8 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -Action Test `
         -Src $SourceCache\swift-foundation `
         -Bin $OutDir `
-        -Arch $HostArch
+        -Arch $HostArch `
+        -Configuration $FoundationTestConfiguration
     }
 
     $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath foundation-tests
@@ -1909,7 +1916,8 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -Action Test `
         -Src $SourceCache\swift-corelibs-foundation `
         -Bin $OutDir `
-        -Arch $HostArch
+        -Arch $HostArch `
+        -Configuration $FoundationTestConfiguration
     }
   } else {
     $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
