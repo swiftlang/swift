@@ -57,7 +57,7 @@ if #available(SwiftStdlib 5.8, *) {
 #if !os(Windows) 
 // FIXME in Windows, non-trivial C++ class with trivial ABI is not yet available in Swift
 VirtualMethodsTestSuite.test("C++ virtual method with complex parameter") {
-  @available(macOS 13.3, *)
+  @available(SwiftStdlib 5.8, *)
   func f(simpleClass: HasDestructor, immortalClass: Immortal2) {
     immortalClass.virtualMethod(simpleClass)
   }
