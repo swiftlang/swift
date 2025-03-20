@@ -476,6 +476,8 @@ private:
 
   /// Return the size reported by a type.
   static unsigned getSizeInBits(llvm::DIType *Ty) {
+    if (!Ty)
+      return 0;
     // Follow derived types until we reach a type that
     // reports back a size.
     while (isa<llvm::DIDerivedType>(Ty) && !Ty->getSizeInBits()) {
@@ -1103,20 +1105,17 @@ private:
             BumpAllocatedString(CanonicalName)};
   }
 
-  llvm::DIDerivedType *createMemberType(DebugTypeInfo DbgTy, StringRef Name,
-                                        unsigned &OffsetInBits,
-                                        llvm::DIScope *Scope,
-                                        llvm::DIFile *File,
-                                        llvm::DINode::DIFlags Flags) {
-    unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
-    auto *Ty = getOrCreateType(DbgTy);
-    auto SizeInBits = getSizeInBits(Ty);
-    auto *DITy = DBuilder.createMemberType(
-        Scope, Name, File, 0, SizeInBits, 0, OffsetInBits, Flags, Ty);
+  llvm::DIDerivedType *
+  createMemberType(llvm::DIType *DITy, StringRef Name, unsigned &OffsetInBits,
+                   unsigned AlignInBits, llvm::DIScope *Scope,
+                   llvm::DIFile *File, llvm::DINode::DIFlags Flags) {
+    auto SizeInBits = getSizeInBits(DITy);
+    llvm::DIDerivedType *DIMemberTy = DBuilder.createMemberType(
+        Scope, Name, File, 0, SizeInBits, 0, OffsetInBits, Flags, DITy);
     OffsetInBits += SizeInBits;
-    OffsetInBits = llvm::alignTo(OffsetInBits,
-                                 SizeOfByte * DbgTy.getAlignment().getValue());
-    return DITy;
+    if (AlignInBits)
+      OffsetInBits = llvm::alignTo(OffsetInBits, AlignInBits);
+    return DIMemberTy;
   }
 
   /// Creates a temporary replaceable forward decl to protect against recursion.
@@ -1146,6 +1145,17 @@ private:
     return FwdDecl;
   }
 
+  using TrackingDIType = llvm::TypedTrackingMDRef<llvm::DIType>;
+  struct MemberDIType {
+    StringRef Name;
+    unsigned AlignInBits;
+    TrackingDIType DIType;
+    MemberDIType(StringRef Name, unsigned AlignInBits, llvm::DIType *DIType)
+        : Name(Name), AlignInBits(AlignInBits), DIType(DIType) {}
+  };
+
+  unsigned getByteSize() { return CI.getTargetInfo().getCharWidth(); }
+
   llvm::DICompositeType *createStructType(
       NominalOrBoundGenericNominalType *Type, NominalTypeDecl *Decl,
       llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
@@ -1156,8 +1166,7 @@ private:
         Type, Scope, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
         Name);
     // Collect the members.
-    SmallVector<llvm::Metadata *, 16> Elements;
-    unsigned OffsetInBits = 0;
+    SmallVector<MemberDIType, 16> MemberTypes;
     for (VarDecl *VD : Decl->getStoredProperties()) {
       auto memberTy = Type->getTypeOfMember(VD);
       if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
@@ -1165,8 +1174,10 @@ private:
               IGM.getTypeInfoForUnlowered(
                   IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
               IGM))
-        Elements.push_back(createMemberType(*DbgTy, VD->getName().str(),
-                                            OffsetInBits, Scope, File, Flags));
+        MemberTypes.emplace_back(VD->getName().str(),
+                                 getByteSize() *
+                                     DbgTy->getAlignment().getValue(),
+                                 getOrCreateType(*DbgTy));
       else
         // Without complete type info we can only create a forward decl.
         return DBuilder.createForwardDecl(
@@ -1174,10 +1185,17 @@ private:
             llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
     }
 
+    SmallVector<llvm::Metadata *, 16> Members;
+    unsigned OffsetInBits = 0;
+    for (auto &Member : MemberTypes)
+      Members.push_back(createMemberType(Member.DIType, Member.Name,
+                                         OffsetInBits, Member.AlignInBits,
+                                         Scope, File, Flags));
+
     llvm::DINodeArray BoundParams = collectGenericParams(Type);
     llvm::DICompositeType *DITy = createStruct(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
-        DBuilder.getOrCreateArray(Elements), BoundParams, SpecificationOf);
+        DBuilder.getOrCreateArray(Members), BoundParams, SpecificationOf);
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
@@ -1203,24 +1221,29 @@ private:
         DbgTy.getType(), Scope, File, Line, SizeInBits, AlignInBits, Flags,
         UniqueID, Name);
     // Collect the members.
-    SmallVector<llvm::Metadata *, 16> Elements;
+    SmallVector<MemberDIType, 16> MemberTypes;
     for (VarDecl *VD : Decl->getStoredProperties()) {
-      auto memberTy =
-          UnsubstitutedType->getTypeOfMember(VD);
+      Type memberTy = UnsubstitutedType->getTypeOfMember(VD);
       auto DbgTy = DebugTypeInfo::getFromTypeInfo(
           memberTy,
           IGM.getTypeInfoForUnlowered(
               IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
           IGM);
+      MemberTypes.emplace_back(VD->getName().str(),
+                               getByteSize() * DbgTy.getAlignment().getValue(),
+                               getOrCreateType(DbgTy));
+    }
+    SmallVector<llvm::Metadata *, 16> Members;
+    for (auto &Member : MemberTypes) {
       unsigned OffsetInBits = 0;
-      llvm::DIType *DITy = createMemberType(DbgTy, VD->getName().str(),
-                                            OffsetInBits, Scope, File, Flags);
-      Elements.push_back(DITy);
+      Members.push_back(createMemberType(Member.DIType, Member.Name,
+                                         OffsetInBits, Member.AlignInBits,
+                                         Scope, File, Flags));
     }
 
     llvm::DICompositeType *DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
-        DBuilder.getOrCreateArray(Elements), RuntimeLang, nullptr, UniqueID);
+        DBuilder.getOrCreateArray(Members), RuntimeLang, nullptr, UniqueID);
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
@@ -1410,7 +1433,8 @@ private:
     auto FwdDecl = createTemporaryReplaceableForwardDecl(
         DbgTy.getType(), Scope, File, Line, SizeInBits, AlignInBits, Flags,
         MangledName, Name);
-    SmallVector<llvm::Metadata *, 16> Elements;
+
+    SmallVector<MemberDIType, 16> MemberTypes;
     for (auto *ElemDecl : Decl->getAllElements()) {
       std::optional<CompletedDebugTypeInfo> ElemDbgTy;
       if (auto PayloadTy = ElemDecl->getPayloadInterfaceType()) {
@@ -1429,23 +1453,27 @@ private:
               llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
               llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, MangledName);
         }
-        unsigned Offset = 0;
-        auto MTy =
-            createMemberType(*ElemDbgTy, ElemDecl->getBaseIdentifier().str(),
-                             Offset, Scope, File, Flags);
-        Elements.push_back(MTy);
+        MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(),
+                                 getByteSize() *
+                                     ElemDbgTy->getAlignment().getValue(),
+                                 TrackingDIType(getOrCreateType(*ElemDbgTy)));
       } else {
         // A variant with no payload.
-        auto MTy = DBuilder.createMemberType(
-            Scope, ElemDecl->getBaseIdentifier().str(), File, 0, 0, 0, 0, Flags,
-            nullptr);
-        Elements.push_back(MTy);
+        MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(), 0,
+                                 nullptr);
       }
+    }
+    SmallVector<llvm::Metadata *, 16> Members;
+    for (auto &Member : MemberTypes) {
+      unsigned Offset = 0;
+      Members.push_back(createMemberType(Member.DIType, Member.Name, Offset,
+                                         Member.AlignInBits, Scope, File,
+                                         Flags));
     }
 
     auto VPTy = DBuilder.createVariantPart(
         Scope, {}, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
-        DBuilder.getOrCreateArray(Elements), /*UniqueIdentifier=*/"");
+        DBuilder.getOrCreateArray(Members), /*UniqueIdentifier=*/"");
 
     llvm::DICompositeType *DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
@@ -1474,7 +1502,7 @@ private:
         DbgTy.getType(), Scope, File, Line, SizeInBits, AlignInBits, Flags,
         MangledName, Name);
 
-    SmallVector<llvm::Metadata *, 16> Elements;
+    SmallVector<MemberDIType, 16> MemberTypes;
     for (auto *ElemDecl : Decl->getAllElements()) {
       std::optional<DebugTypeInfo> ElemDbgTy;
       if (auto PayloadTy = ElemDecl->getPayloadInterfaceType()) {
@@ -1482,23 +1510,27 @@ private:
         PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoContext(PayloadTy);
         ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
             PayloadTy, IGM.getTypeInfoForUnlowered(PayloadTy), IGM);
-        unsigned Offset = 0;
-        auto MTy =
-            createMemberType(*ElemDbgTy, ElemDecl->getBaseIdentifier().str(),
-                             Offset, Scope, File, Flags);
-        Elements.push_back(MTy);
+        MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(),
+                                 getByteSize() *
+                                     ElemDbgTy->getAlignment().getValue(),
+                                 TrackingDIType(getOrCreateType(*ElemDbgTy)));
       } else {
         // A variant with no payload.
-        auto MTy = DBuilder.createMemberType(
-            Scope, ElemDecl->getBaseIdentifier().str(), File, 0, 0, 0, 0, Flags,
-            nullptr);
-        Elements.push_back(MTy);
+        MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(), 0,
+                                 nullptr);
       }
+    }
+    SmallVector<llvm::Metadata *, 16> Members;
+    for (auto &Member : MemberTypes) {
+      unsigned Offset = 0;
+      Members.push_back(createMemberType(Member.DIType, Member.Name, Offset,
+                                         Member.AlignInBits, Scope, File,
+                                         Flags));
     }
 
     auto VPTy = DBuilder.createVariantPart(Scope, {}, File, Line, SizeInBits,
                                            AlignInBits, Flags, nullptr,
-                                           DBuilder.getOrCreateArray(Elements));
+                                           DBuilder.getOrCreateArray(Members));
 
     llvm::DICompositeType *DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
@@ -1721,31 +1753,37 @@ private:
                             unsigned SizeInBits, unsigned AlignInBits,
                             llvm::DINode::DIFlags Flags,
                             StringRef MangledName) {
+    auto FwdDecl = createTemporaryReplaceableForwardDecl(
+        DbgTy.getType(), Scope, MainFile, 0, SizeInBits, AlignInBits, Flags,
+        MangledName, MangledName);
+
     TypeBase *BaseTy = DbgTy.getType();
     auto *TupleTy = BaseTy->castTo<TupleType>();
 
-    SmallVector<llvm::Metadata *, 16> Elements;
-    unsigned OffsetInBits = 0;
+    SmallVector<MemberDIType, 16> MemberTypes;
     auto genericSig = IGM.getCurGenericContext();
     for (auto ElemTy : TupleTy->getElementTypes()) {
       auto &elemTI = IGM.getTypeInfoForUnlowered(
           AbstractionPattern(genericSig, ElemTy->getCanonicalType()), ElemTy);
       auto DbgTy =
             DebugTypeInfo::getFromTypeInfo(ElemTy, elemTI, IGM);
-        Elements.push_back(
-            createMemberType(DbgTy, "", OffsetInBits, Scope, MainFile, Flags));
+      MemberTypes.emplace_back("",
+                               getByteSize() * DbgTy.getAlignment().getValue(),
+                               getOrCreateType(DbgTy));
     }
+    SmallVector<llvm::Metadata *, 16> Members;
+    unsigned OffsetInBits = 0;
+    for (auto &Member : MemberTypes)
+      Members.emplace_back(createMemberType(Member.DIType, Member.Name,
+                                            OffsetInBits, Member.AlignInBits,
+                                            Scope, MainFile, Flags));
     // FIXME: assert that SizeInBits == OffsetInBits.
-
-    auto FwdDecl = createTemporaryReplaceableForwardDecl(
-        DbgTy.getType(), Scope, MainFile, 0, SizeInBits, AlignInBits, Flags,
-        MangledName, MangledName);
 
     llvm::DICompositeType *DITy = DBuilder.createStructType(
         Scope, MangledName, MainFile, 0, SizeInBits, AlignInBits, Flags,
         nullptr, // DerivedFrom
-        DBuilder.getOrCreateArray(Elements), llvm::dwarf::DW_LANG_Swift,
-        nullptr, MangledName);
+        DBuilder.getOrCreateArray(Members), llvm::dwarf::DW_LANG_Swift, nullptr,
+        MangledName);
 
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
