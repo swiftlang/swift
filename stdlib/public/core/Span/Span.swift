@@ -498,7 +498,7 @@ extension Span where Element: BitwiseCopyable {
 extension Span where Element: BitwiseCopyable {
 
   public var bytes: RawSpan {
-    @lifetime(self)
+    @lifetime(copy self)
     @_alwaysEmitIntoClient
     get {
       let rawSpan = RawSpan(_elements: self)

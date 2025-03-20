@@ -310,7 +310,7 @@ extension RawSpan {
   ///   - span: An existing `Span<T>`, which will define both this
   ///           `RawSpan`'s lifetime and the memory it represents.
   @_alwaysEmitIntoClient
-  @lifetime(span)
+  @lifetime(copy span)
   public init<Element: BitwiseCopyable>(
     _elements span: Span<Element>
   ) {
