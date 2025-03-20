@@ -334,7 +334,7 @@ protected:
     // TODO: remove this check once all compilers that are rev-locked to the
     // stdlib print the 'copy' dependence kind in the interface (Aug '25)
     if (auto *sf = afd->getParentSourceFile()) {
-      if (sf->Kind == SourceFileKind::SIL) {
+      if (sf->Kind == SourceFileKind::Interface) {
         return true;
       }
     }
@@ -971,7 +971,7 @@ protected:
 
   // Infer a mutating accessor's non-Escapable 'self' dependencies.
   void inferMutatingAccessor(AccessorDecl *accessor) {
-    if (!isImplicitOrSIL()) {
+    if (!isImplicitOrSIL() && !useLazyInference()) {
       // Explicit setters require explicit lifetime dependencies.
       return;
     }

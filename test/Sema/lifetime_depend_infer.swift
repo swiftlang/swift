@@ -1,8 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -o /dev/null \
-// RUN:   -verify \
-// RUN:   -sil-verify-all \
-// RUN:   -module-name test \
+// RUN: %target-typecheck-verify-swift \
 // RUN:   -enable-experimental-feature LifetimeDependence
 
 // REQUIRES: swift_feature_LifetimeDependence
@@ -312,7 +308,9 @@ struct NonescapableSelfAccessors: ~Escapable {
   var ne: NE
 
   @lifetime(immortal)
-  init() {}
+  init() {
+    ne = NE()
+  }
 
   var neComputed: NE {
     get { // expected-error{{cannot infer the lifetime dependence scope on a method with a ~Escapable parameter, specify '@lifetime(borrow self)' or '@lifetime(copy self)'}}

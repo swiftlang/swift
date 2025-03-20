@@ -1,9 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-sil \
-// RUN:   -o /dev/null \
-// RUN:   -verify \
-// RUN:   -sil-verify-all \
-// RUN:   -disable-availability-checking \
-// RUN:   -module-name test
+// RUN: %target-typecheck-verify-swift \
+// RUN:   -disable-availability-checking
 
 // These tests complement lifetime_depend_noattr.swift. If you add a test here, add one there.
 
