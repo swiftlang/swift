@@ -583,15 +583,22 @@ func expandAttachedMacro(
     return 1
   }
 
-  // Dig out the node for the declaration to which the custom attribute is
-  // attached.
-  guard
-    let declarationNode = findSyntaxNodeInSourceFile(
+  func findNode<T: SyntaxProtocol>(type: T.Type) -> T? {
+    findSyntaxNodeInSourceFile(
       sourceFilePtr: declarationSourceFilePtr,
       sourceLocationPtr: declarationSourceLocPointer,
-      type: Syntax.self
+      type: T.self
     )
-  else {
+  }
+
+  // Dig out the node for the closure or declaration to which the custom
+  // attribute is attached.
+  let node: Syntax
+  if let closureNode = findNode(type: ClosureExprSyntax.self) {
+    node = Syntax(closureNode)
+  } else if let declNode = findNode(type: DeclSyntax.self) {
+    node = Syntax(declNode)
+  } else {
     return 1
   }
 
@@ -622,7 +629,7 @@ func expandAttachedMacro(
     customAttrSourceFilePtr: customAttrSourceFilePtr,
     customAttrNode: customAttrNode,
     declarationSourceFilePtr: declarationSourceFilePtr,
-    attachedTo: declarationNode,
+    attachedTo: node,
     parentDeclSourceFilePtr: parentDeclSourceFilePtr,
     parentDeclNode: parentDeclNode
   )
