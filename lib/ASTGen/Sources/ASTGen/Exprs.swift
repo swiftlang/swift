@@ -736,9 +736,29 @@ extension ASTGenVisitor {
           additionalTrailingClosures: nil
         )
       ).asExpr
+      
+    case .method(let method):
+      let dotLoc = self.generateSourceLoc(node.period)
+      let declNameRef = self.generateDeclNameRef(declReferenceExpr: method.declName)
+      let unresolvedDotExpr = BridgedUnresolvedDotExpr.createParsed(
+          self.ctx,
+          base: baseExpr,
+          dotLoc: dotLoc,
+          name: declNameRef.name,
+          nameLoc: declNameRef.loc
+      ).asExpr
 
-    case .method(_):
-      fatalError("unimplemented (method keypath)")
+      let args = self.generateArgumentList(
+          leftParen: method.leftParen,
+          labeledExprList: method.arguments,
+          rightParen: method.rightParen,
+          trailingClosure: nil,
+          additionalTrailingClosures: nil)
+      return BridgedCallExpr.createParsed(
+          self.ctx,
+          fn: unresolvedDotExpr,
+          args: args
+      ).asExpr
     }
   }
 

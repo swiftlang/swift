@@ -209,7 +209,8 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     case KeyPathExpr::Component::Kind::CodeCompletion:
       continue;
 
-    case KeyPathExpr::Component::Kind::UnresolvedProperty:
+    case KeyPathExpr::Component::Kind::UnresolvedMember:
+    case KeyPathExpr::Component::Kind::UnresolvedApply:
       break;
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
     case KeyPathExpr::Component::Kind::OptionalChain:
@@ -220,8 +221,9 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
                      (unsigned)kind);
       continue;
     case KeyPathExpr::Component::Kind::OptionalWrap:
-    case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::Member:
     case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::Apply:
     case KeyPathExpr::Component::Kind::DictionaryKey:
       llvm_unreachable("already resolved!");
     }
@@ -331,8 +333,8 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       // Updates currentType
       updateState(/*isProperty=*/true, varTy);
 
-      auto resolved = KeyPathExpr::Component::forProperty(varRef, currentType,
-                                                          componentNameLoc);
+      auto resolved = KeyPathExpr::Component::forMember(varRef, currentType,
+                                                        componentNameLoc);
       resolvedComponents.push_back(resolved);
 
       // Check that the property is @objc.
@@ -390,8 +392,8 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       // Resolve this component to the type we found.
       auto typeRef = ConcreteDeclRef(type);
-      auto resolved = KeyPathExpr::Component::forProperty(typeRef, currentType,
-                                                          componentNameLoc);
+      auto resolved = KeyPathExpr::Component::forMember(typeRef, currentType,
+                                                        componentNameLoc);
       resolvedComponents.push_back(resolved);
 
       continue;

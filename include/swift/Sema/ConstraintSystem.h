@@ -4464,11 +4464,8 @@ public:
 
 private:
   /// Add the constraints needed to bind an overload's type variable.
-  void bindOverloadType(
-      const SelectedOverload &overload, Type boundType,
-      ConstraintLocator *locator, DeclContext *useDC,
-      llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
-          verifyThatArgumentIsHashable);
+  void bindOverloadType(const SelectedOverload &overload, Type boundType,
+                        ConstraintLocator *locator, DeclContext *useDC);
 
   /// Describes a direction of optional wrapping, either increasing optionality
   /// or decreasing optionality.
@@ -4944,6 +4941,12 @@ public:
   /// no type erasure is needed.
   Expr *buildTypeErasedExpr(Expr *expr, DeclContext *dc, Type contextualType,
                             ContextualTypePurpose purpose);
+
+  /// Ensures that the given argument type conforms to the `Hashable` protocol
+  /// and adds a conformance constraint if it does not. This is required for
+  /// arguments used as key path components, as they serve as lookup keys.
+  void verifyThatArgumentIsHashable(unsigned index, Type argType,
+                                    ConstraintLocator *locator, SourceLoc loc);
 
 private:
   /// Determines whether or not a given conversion at a given locator requires

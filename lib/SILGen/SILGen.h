@@ -420,24 +420,17 @@ public:
   /// Is the self method of the given nonmutating method passed indirectly?
   bool isNonMutatingSelfIndirect(SILDeclRef method);
 
-  SILDeclRef getAccessorDeclRef(AccessorDecl *accessor,
-                                ResilienceExpansion expansion);
+  SILDeclRef getFuncDeclRef(FuncDecl *funcDecl, ResilienceExpansion expansion);
 
   bool canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
                                            ResilienceExpansion expansion);
 
-  KeyPathPatternComponent
-  emitKeyPathComponentForDecl(SILLocation loc,
-                              GenericEnvironment *genericEnv,
-                              ResilienceExpansion expansion,
-                              unsigned &baseOperand,
-                              bool &needsGenericContext,
-                              SubstitutionMap subs,
-                              AbstractStorageDecl *storage,
-                              ArrayRef<ProtocolConformanceRef> indexHashables,
-                              CanType baseTy,
-                              DeclContext *useDC,
-                              bool forPropertyDescriptor);
+  KeyPathPatternComponent emitKeyPathComponentForDecl(
+      SILLocation loc, GenericEnvironment *genericEnv,
+      ResilienceExpansion expansion, unsigned &baseOperand,
+      bool &needsGenericContext, SubstitutionMap subs, ValueDecl *decl,
+      ArrayRef<ProtocolConformanceRef> indexHashables, CanType baseTy,
+      DeclContext *useDC, bool forPropertyDescriptor, bool isApplied = false);
 
   /// Emit all differentiability witnesses for the given function, visiting its
   /// `@differentiable` and `@derivative` attributes.
