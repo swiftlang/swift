@@ -253,7 +253,7 @@ SILDefaultWitnessTable *
 SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
                                      bool deserializeLazily) {
   // Note: we only ever look up default witness tables in the translation unit
-  // that is currently being compiled, since they SILGen generates them when it
+  // that is currently being compiled, since SILGen generates them when it
   // visits the protocol declaration, and IRGen emits them when emitting the
   // protocol descriptor metadata for the protocol.
 
