@@ -3363,7 +3363,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
     // Witnessing `async` requirement with an isolated synchronous
     // declaration is done via async witness thunk which requires
     // a hop to the expected concurrency domain.
-    if (isAsyncDecl(requirement) && !isAsyncDecl(witness))
+    if (requirement->isAsync() && !witness->isAsync())
       return refResult.isolation;
 
     // Otherwise, we're done.
@@ -3410,8 +3410,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
   // FIXME: feels like ActorReferenceResult should be reporting this back to
   // us somehow.
   // To enter the actor, we always need the requirement to be `async`.
-  if (!sameConcurrencyDomain &&
-      !isAsyncDecl(requirement) &&
+  if (!sameConcurrencyDomain && !requirement->isAsync() &&
       !isAccessibleAcrossActors(witness, refResult.isolation, DC))
     missingOptions |= MissingFlags::RequirementAsync;
 
@@ -3502,7 +3501,7 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
       return std::nullopt;
 
     if (refResult.isolation.isActorIsolated()) {
-      if (isAsyncDecl(requirement) && !isAsyncDecl(witness))
+      if (requirement->isAsync() && !witness->isAsync())
         return refResult.isolation;
 
       // Always treat `@preconcurrency` witnesses as isolated.

@@ -3307,19 +3307,6 @@ public:
   }
 
 private:
-  static bool hasAsync(ValueDecl *member) {
-    if (!member)
-      return false;
-
-    if (auto func = dyn_cast<AbstractFunctionDecl>(member))
-      return func->hasAsync();
-
-    if (auto storage = dyn_cast<AbstractStorageDecl>(member))
-      return hasAsync(storage->getEffectfulGetAccessor());
-
-    return false;
-  }
-
   static ValueDecl *getAsyncAlternative(ValueDecl *req) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(req)) {
       auto asyncFunc = func->getAsyncAlternative();
@@ -3394,7 +3381,7 @@ private:
 
     // Skip async versions of members. We'll match against the completion
     // handler versions, hopping over to `getAsyncAlternative()` if needed.
-    if (hasAsync(VD))
+    if (VD->isAsync())
       return;
 
     auto inserted = unmatchedRequirements.insert(VD);
@@ -3859,7 +3846,7 @@ private:
                        ObjCSelector explicitObjCName) const {
     // If the candidate we're considering is async, see if the requirement has
     // an async alternate and try to match against that instead.
-    if (hasAsync(cand))
+    if (cand->isAsync())
       if (auto asyncAltReq = getAsyncAlternative(req))
         return matchesImpl(asyncAltReq, cand, explicitObjCName);
 
