@@ -119,6 +119,15 @@ extension ASTGenVisitor {
       // return
     }
 
+    guard
+      node.genericArgumentClause == nil,
+      node.trailingClosure == nil,
+      node.additionalTrailingClosures.isEmpty
+    else {
+      // TODO: Diagnose.
+      fatalError("#error/#warning with generic specialization")
+    }
+
     guard node.arguments.count == 1,
           let arg = node.arguments.first,
           arg.label == nil,
@@ -195,6 +204,15 @@ extension ASTGenVisitor {
   }
 
   func generateObjCSelectorExpr(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedExpr {
+    guard
+      node.genericArgumentClause == nil,
+      node.trailingClosure == nil,
+      node.additionalTrailingClosures.isEmpty
+    else {
+      // TODO: Diagnose.
+      fatalError("#selector with generic specialization")
+    }
+
     var args = node.arguments[...]
     guard let arg = args.popFirst() else {
       // TODO: Diagnose
@@ -229,6 +247,14 @@ extension ASTGenVisitor {
   }
 
   func generateObjCKeyPathExpr(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedExpr {
+    guard
+      node.genericArgumentClause == nil,
+      node.trailingClosure == nil,
+      node.additionalTrailingClosures.isEmpty
+    else {
+      // TODO: Diagnose.
+      fatalError("#keyPath with generic specialization")
+    }
 
     var names: [BridgedDeclNameRef] = []
     var nameLocs: [BridgedDeclNameLoc] = []
