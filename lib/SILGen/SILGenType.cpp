@@ -112,10 +112,18 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
 
   // If the base method is less visible than the derived method, we need
   // a thunk.
+  //
+  // Note that we check the visibility of the derived method's immediate base
+  // here, rather than the ultimate base of the vtable entry, because it is
+  // possible through import visibility for an intermediate base class in one
+  // file to have public visibility to the ultimate base via a public import,
+  // but then in turn be overridden by a derived class in another file in
+  // the same module that either doesn't import the ultimate base class's
+  // module or else imports it non-publicly in its file.
   bool baseLessVisibleThanDerived =
     (!usesObjCDynamicDispatch &&
      !derivedDecl->isFinal() &&
-     derivedDecl->isMoreVisibleThan(baseDecl));
+     derivedDecl->isMoreVisibleThan(derivedDecl->getOverriddenDecl()));
 
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
