@@ -1153,6 +1153,7 @@ void checkABIAttrPBD(PatternBindingDecl *APBD, VarDecl *VD) {
   }
 
   // Check that each pattern has the same number of variables.
+  bool didDiagnose = false;
   for (auto i : range(PBD->getNumPatternEntries())) {
     SmallVector<VarDecl *, 8> VDs;
     SmallVector<VarDecl *, 8> AVDs;
@@ -1162,18 +1163,24 @@ void checkABIAttrPBD(PatternBindingDecl *APBD, VarDecl *VD) {
 
     if (VDs.size() < AVDs.size()) {
       for (auto AVD : drop_begin(AVDs, VDs.size())) {
-        AVD->diagnose(diag::attr_abi_mismatched_var,
-                      AVD, /*isABI=*/true);
+        AVD->diagnose(diag::attr_abi_mismatched_var, AVD, /*isABI=*/true);
+        didDiagnose = true;
       }
     }
     else if (VDs.size() > AVDs.size()) {
       for (auto VD : drop_begin(VDs, AVDs.size())) {
-        VD->diagnose(diag::attr_abi_mismatched_var,
-                     VD, /*isABI=*/false);
+        VD->diagnose(diag::attr_abi_mismatched_var, VD, /*isABI=*/false);
+        didDiagnose = true;
       }
     }
   }
+  if (didDiagnose)
+    return;
+
+  // Check the ABI PBD--this is what checks the underlying vars.
+  TypeChecker::typeCheckDecl(APBD);
 }
+
 } // end anonymous namespace
 
 void TypeChecker::checkDeclABIAttribute(Decl *D, ABIAttr *attr) {
