@@ -971,7 +971,7 @@ protected:
 
   // Infer a mutating accessor's non-Escapable 'self' dependencies.
   void inferMutatingAccessor(AccessorDecl *accessor) {
-    if (!isImplicitOrSIL()) {
+    if (!isImplicitOrSIL() && !useLazyInference()) {
       // Explicit setters require explicit lifetime dependencies.
       return;
     }
