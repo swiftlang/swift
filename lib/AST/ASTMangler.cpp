@@ -377,19 +377,16 @@ std::string ASTMangler::mangleGlobalVariableFull(const VarDecl *decl) {
 }
 
 std::string ASTMangler::mangleKeyPathGetterThunkHelper(
-                                            const AbstractStorageDecl *property,
-                                            GenericSignature signature,
-                                            CanType baseType,
-                                            SubstitutionMap subs,
-                                            ResilienceExpansion expansion) {
+    const AbstractStorageDecl *property, GenericSignature signature,
+    CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion) {
   beginMangling();
   appendEntity(property);
   if (signature)
     appendGenericSignature(signature);
   appendType(baseType, signature);
   if (isa<SubscriptDecl>(property)) {
-    // Subscripts can be generic, and different key paths could capture the same
-    // subscript at different generic arguments.
+    // Subscripts can be generic, and different key paths could
+    // capture the same subscript at different generic arguments.
     for (auto sub : subs.getReplacementTypes()) {
       sub = sub->mapTypeOutOfContext();
 
@@ -443,6 +440,74 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
     }
   }
   appendOperator("Tk");
+  if (expansion == ResilienceExpansion::Minimal)
+    appendOperator("q");
+  return finalize();
+}
+
+std::string ASTMangler::mangleKeyPathAppliedMethodThunkHelper(
+    const AbstractFunctionDecl *method, GenericSignature signature,
+    CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion) {
+  beginMangling();
+  isa<ConstructorDecl>(method)
+      ? appendConstructorEntity(cast<ConstructorDecl>(method), false)
+      : appendEntity(method);
+
+  if (signature)
+    appendGenericSignature(signature);
+  appendType(baseType, signature);
+  if (isa<FuncDecl>(method) || isa<ConstructorDecl>(method)) {
+    // Methods can be generic, and different key paths could capture the same
+    // method at different generic arguments.
+    for (auto sub : subs.getReplacementTypes()) {
+      sub = sub->mapTypeOutOfContext();
+
+      // FIXME: This seems wrong. We used to just mangle opened archetypes as
+      // their interface type. Let's make that explicit now.
+      sub = sub.transformRec([](Type t) -> std::optional<Type> {
+        if (auto *openedExistential = t->getAs<ExistentialArchetypeType>())
+          return openedExistential->getInterfaceType();
+        return std::nullopt;
+      });
+
+      appendType(sub->getCanonicalType(), signature);
+    }
+  }
+  appendOperator("TkMA");
+  if (expansion == ResilienceExpansion::Minimal)
+    appendOperator("q");
+  return finalize();
+}
+
+std::string ASTMangler::mangleKeyPathUnappliedMethodThunkHelper(
+    const AbstractFunctionDecl *method, GenericSignature signature,
+    CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion) {
+  beginMangling();
+  isa<ConstructorDecl>(method)
+      ? appendConstructorEntity(cast<ConstructorDecl>(method), false)
+      : appendEntity(method);
+
+  if (signature)
+    appendGenericSignature(signature);
+  appendType(baseType, signature);
+  if (isa<FuncDecl>(method) || isa<ConstructorDecl>(method)) {
+    // Methods can be generic, and different key paths could capture the same
+    // method at different generic arguments.
+    for (auto sub : subs.getReplacementTypes()) {
+      sub = sub->mapTypeOutOfContext();
+
+      // FIXME: This seems wrong. We used to just mangle opened archetypes as
+      // their interface type. Let's make that explicit now.
+      sub = sub.transformRec([](Type t) -> std::optional<Type> {
+        if (auto *openedExistential = t->getAs<ExistentialArchetypeType>())
+          return openedExistential->getInterfaceType();
+        return std::nullopt;
+      });
+
+      appendType(sub->getCanonicalType(), signature);
+    }
+  }
+  appendOperator("Tkmu");
   if (expansion == ResilienceExpansion::Minimal)
     appendOperator("q");
   return finalize();

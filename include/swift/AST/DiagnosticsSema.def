@@ -689,6 +689,9 @@ NOTE(keypath_static_member_access_from_unsupported_module_note,none,
 ERROR(expr_keypath_enum_case,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to enum case %0",
       (const ValueDecl *, bool))
+ERROR(expr_keypath_mutating_method,none,
+      "%select{key path|dynamic key path member lookup}1 cannot refer to mutating method %0",
+      (const ValueDecl *, bool))
 ERROR(expr_keypath_empty,none,
       "empty key path does not refer to a property", ())
 ERROR(expr_unsupported_objc_key_path_component,none,
@@ -718,8 +721,8 @@ ERROR(expr_swift_keypath_empty, none,
       "key path must have at least one component", ())
 ERROR(expr_string_interpolation_outside_string,none,
       "string interpolation can only appear inside a string literal", ())
-ERROR(expr_keypath_subscript_index_not_hashable, none,
-      "subscript index of type %0 in a key path must be Hashable", (Type))
+ERROR(expr_keypath_arg_or_index_not_hashable, none,
+      "%select{method argument|subscript index}0 of type %1 in a key path must be Hashable", (bool, Type))
 ERROR(expr_smart_keypath_application_type_mismatch,none,
       "key path of type %0 cannot be applied to a base of type %1",
       (Type, Type))
@@ -1560,6 +1563,8 @@ ERROR(cannot_pass_inout_arg_to_subscript,none,
       "cannot pass an inout argument to a subscript; use "
       "'withUnsafeMutablePointer' to explicitly convert argument "
       "to a pointer", ())
+ERROR(cannot_pass_inout_arg_to_keypath_method,none,
+      "cannot pass an inout argument to a keypath method", ())
 
 ERROR(incorrect_property_wrapper_reference,none,
       "cannot convert value %0 of type %1 to expected type %2, "
@@ -5596,8 +5601,8 @@ ERROR(actor_isolated_keypath_component,none,
       "cannot form key path to %0 %kind1",
       (ActorIsolation, const ValueDecl *))
 ERROR(effectful_keypath_component,none,
-      "cannot form key path to %0 with 'throws' or 'async'",
-      (DescriptiveDeclKind))
+      "cannot form %select{key path|dynamic key path member lookup}1 to %0 with 'throws' or 'async'",
+      (DescriptiveDeclKind, bool))
 ERROR(local_function_executed_concurrently,none,
       "concurrently-executed %kind0 must be marked as '@Sendable'",
       (const ValueDecl *))

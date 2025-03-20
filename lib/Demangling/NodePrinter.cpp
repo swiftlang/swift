@@ -456,6 +456,8 @@ private:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::KeyPathGetterThunkHelper:
     case Node::Kind::KeyPathSetterThunkHelper:
+    case Node::Kind::KeyPathUnappliedMethodThunkHelper:
+    case Node::Kind::KeyPathAppliedMethodThunkHelper:
     case Node::Kind::KeyPathEqualsThunkHelper:
     case Node::Kind::KeyPathHashThunkHelper:
     case Node::Kind::LazyProtocolWitnessTableAccessor:
@@ -2104,10 +2106,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::KeyPathGetterThunkHelper:
   case Node::Kind::KeyPathSetterThunkHelper:
+  case Node::Kind::KeyPathUnappliedMethodThunkHelper:
+  case Node::Kind::KeyPathAppliedMethodThunkHelper:
     if (Node->getKind() == Node::Kind::KeyPathGetterThunkHelper)
       Printer << "key path getter for ";
-    else
+    else if (Node->getKind() == Node::Kind::KeyPathSetterThunkHelper)
       Printer << "key path setter for ";
+    else if (Node->getKind() == Node::Kind::KeyPathUnappliedMethodThunkHelper)
+      Printer << "key path unapplied method ";
+    else if (Node->getKind() == Node::Kind::KeyPathAppliedMethodThunkHelper)
+      Printer << "key path applied method ";
 
     print(Node->getChild(0), depth + 1);
     Printer << " : ";
