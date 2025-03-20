@@ -14,7 +14,7 @@ import CountedByNoEscapeClang
 // CHECK:      @_alwaysEmitIntoClient public func complexExpr(_ len: Int{{.*}}, _ offset: Int{{.*}}, _ p: MutableSpan<Int{{.*}}>)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nonnull(_  p: MutableSpan<Int{{.*}}>)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nullUnspecified(_  p: MutableSpan<Int{{.*}}>)
-// CHECK-NEXT: @lifetime(p)
+// CHECK-NEXT: @lifetime(copy p)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func returnLifetimeBound(_ len1: Int32, _ p: MutableSpan<Int32>) -> MutableSpan<Int32>
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_  len: Int{{.*}}) -> UnsafeMutableBufferPointer<Int{{.*}}>
 // CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int{{.*}}, _ p1: MutableSpan<Int{{.*}}>, _ p2: MutableSpan<Int{{.*}}>)
