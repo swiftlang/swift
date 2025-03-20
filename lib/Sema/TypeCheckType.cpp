@@ -4679,7 +4679,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   }
 
   auto lifetimeDependencies =
-      LifetimeDependenceInfo::get(repr, params, results, getDeclContext());
+      LifetimeDependenceInfo::getFromSIL(repr, params, results,
+                                         getDeclContext());
   if (lifetimeDependencies.has_value()) {
     extInfoBuilder =
         extInfoBuilder.withLifetimeDependencies(*lifetimeDependencies);

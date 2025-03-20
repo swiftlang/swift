@@ -21,7 +21,7 @@ internal func _overrideLifetime<
 }
 
 @_unsafeNonescapableResult
-@lifetime(source)
+@lifetime(copy source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -56,12 +56,12 @@ struct BufferView : ~Escapable {
     self.ptr = ptr
   }
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_AA7WrapperVtcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Wrapper, @thin BufferView.Type) -> @lifetime(copy 1)  @owned BufferView {
-  @lifetime(a)
+  @lifetime(copy a)
   init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Wrapper) {
     self.ptr = ptr
   }
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSW_AA7WrapperVSaySiGhtcfC : $@convention(method) (UnsafeRawBufferPointer, @owned Wrapper, @guaranteed Array<Int>, @thin BufferView.Type) -> @lifetime(copy 1, borrow 2)  @owned BufferView {
-  @lifetime(a, borrow b)
+  @lifetime(copy a, borrow b)
   init(_ ptr: UnsafeRawBufferPointer, _ a: consuming Wrapper, _ b: borrowing Array<Int>) {
     self.ptr = ptr
   }
@@ -93,14 +93,14 @@ func derive(_ x: borrowing BufferView) -> BufferView {
 }
 
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16consumeAndCreateyAA10BufferViewVADnF : $@convention(thin) (@owned BufferView) -> @lifetime(copy 0)  @owned BufferView {
-@lifetime(x)
+@lifetime(copy x)
 func consumeAndCreate(_ x: consuming BufferView) -> BufferView {
   let bv = BufferView(independent: x.ptr)
   return _overrideLifetime(bv, copying: x)
 }
 
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers17deriveThisOrThat1yAA10BufferViewVAD_ADtF : $@convention(thin) (@guaranteed BufferView, @guaranteed BufferView) -> @lifetime(copy 1, borrow 0)  @owned BufferView {
-@lifetime(borrow this, that)
+@lifetime(borrow this, copy that)
 func deriveThisOrThat1(_ this: borrowing BufferView, _ that: borrowing BufferView) -> BufferView {
   if (Int.random(in: 1..<100) == 0) {
     return BufferView(independent: this.ptr)
@@ -109,7 +109,7 @@ func deriveThisOrThat1(_ this: borrowing BufferView, _ that: borrowing BufferVie
 }
 
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers17deriveThisOrThat2yAA10BufferViewVAD_ADntF : $@convention(thin) (@guaranteed BufferView, @owned BufferView) -> @lifetime(copy 1, borrow 0)  @owned BufferView {
-@lifetime(borrow this, that)
+@lifetime(borrow this, copy that)
 func deriveThisOrThat2(_ this: borrowing BufferView, _ that: consuming BufferView) -> BufferView {
   if (Int.random(in: 1..<100) == 0) {
     return BufferView(independent: this.ptr)
@@ -122,6 +122,7 @@ func use(_ x: borrowing BufferView) {}
 
 struct Wrapper : ~Escapable {
   let view: BufferView
+  @lifetime(copy view)
   init(_ view: consuming BufferView) {
     self.view = view
   }
@@ -132,7 +133,7 @@ struct Wrapper : ~Escapable {
   }
 
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers7WrapperV8getView2AA10BufferViewVyF : $@convention(method) (@owned Wrapper) -> @lifetime(copy 0)  @owned BufferView {
-  @lifetime(self)
+  @lifetime(copy self)
   consuming func getView2() -> BufferView {
     return view
   }
@@ -147,7 +148,7 @@ struct Container : ~Escapable {
 }
 
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers16getConsumingViewyAA06BufferG0VAA9ContainerVnF : $@convention(thin) (@owned Container) -> @lifetime(copy 0)  @owned BufferView {
-@lifetime(x)
+@lifetime(copy x)
 func getConsumingView(_ x: consuming Container) -> BufferView {
   let bv = BufferView(independent: x.ptr)
   return _overrideLifetime(bv, copying: x)

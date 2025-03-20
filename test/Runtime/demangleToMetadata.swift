@@ -1,9 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -parse-stdlib %s -module-name main -o %t/a.out \
+// RUN:     -enable-experimental-feature LifetimeDependence
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_LifetimeDependence
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 

@@ -716,7 +716,7 @@ static bool parseDeclSILOptional(
       *useStackForPackMetadata = DoNotUseStackForPackMetadata;
     else if (hasUnsafeNonEscapableResult &&
              SP.P.Tok.getText() == "unsafe_nonescapable_result")
-      *useStackForPackMetadata = DoNotUseStackForPackMetadata;
+      *hasUnsafeNonEscapableResult = hasUnsafeNonEscapableResult;
     else if (isExactSelfClass && SP.P.Tok.getText() == "exact_self_class")
       *isExactSelfClass = IsExactSelfClass;
     else if (isCanonical && SP.P.Tok.getText() == "canonical")
