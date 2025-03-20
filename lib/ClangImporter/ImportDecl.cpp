@@ -3028,6 +3028,10 @@ namespace {
               /*Obsoleted=*/{});
           classDecl->getAttrs().add(AvAttr);
         }
+
+        if (decl->isEffectivelyFinal())
+          classDecl->getAttrs().add(new (Impl.SwiftContext)
+                                    FinalAttr(/*IsImplicit=*/true));
       }
 
       // If this module is declared as a C++ module, try to synthesize

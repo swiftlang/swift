@@ -109,7 +109,7 @@ DerivedFromValueTypeAndAnnotated *returnDerivedFromValueTypeAndAnnotated() { // 
     return new DerivedFromValueTypeAndAnnotated();
 }
 
-struct DerivedFromRefType : RefType {};
+struct DerivedFromRefType final : RefType {};
 DerivedFromRefType *returnDerivedFromRefType() {
     return new DerivedFromRefType();
 }
@@ -180,7 +180,7 @@ __attribute__((swift_attr("release:RCRelease"))) RefType {};
 
 RefType *returnRefType() { return new RefType(); }; // expected-warning {{'returnRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENC}}
 
-struct DerivedFromRefType : RefType {};
+struct DerivedFromRefType final : RefType {};
 DerivedFromRefType *returnDerivedFromRefType() { // TODO: rdar://145098078 Missing SWIFT_RETURNS_(UN)RETAINED annotation warning should trigger for inferred foreeign reference types as well
   return new DerivedFromRefType();
 };
