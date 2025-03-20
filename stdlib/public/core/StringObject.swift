@@ -796,9 +796,27 @@ extension _StringObject.CountAndFlags {
   internal static var isNullTerminatedMask: UInt64 {
     return 0x0400_0000_0000_0000
   }
+  
+  @inlinable @inline(__always)
+  internal init(
+    count: Int,
+    isASCII: Bool,
+    isNFC: Bool,
+    isNativelyStored: Bool,
+    isTailAllocated: Bool
+  ) {
+    self.init(
+      count: count,
+      isASCII: isASCII,
+      isNFC: isNFC,
+      isNativelyStored: isNativelyStored,
+      isTailAllocated: isTailAllocated,
+      isNullTerminated: false
+    )
+  }
 
   // General purpose bottom initializer
-  @inlinable @inline(__always)
+  @_alwaysEmitIntoClient @inline(__always)
   internal init(
     count: Int,
     isASCII: Bool,
