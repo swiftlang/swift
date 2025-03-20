@@ -5890,10 +5890,7 @@ public:
     using namespace decls_block;
 
     auto resultType = S.addTypeRef(fnTy->getResult());
-    auto clangType =
-      S.getASTContext().LangOpts.UseClangFunctionTypes
-      ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
-      : ClangTypeID(0);
+    auto clangType = S.addClangTypeRef(fnTy->getClangTypeInfo().getType());
 
     auto isolation = encodeIsolation(fnTy->getIsolation());
 

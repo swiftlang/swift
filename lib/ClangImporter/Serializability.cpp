@@ -302,19 +302,25 @@ namespace {
     void writeUInt64(uint64_t value) {}
     void writeIdentifier(const clang::IdentifierInfo *ident) {}
     void writeStmtRef(const clang::Stmt *stmt) {
-      if (stmt != nullptr)
+      if (stmt != nullptr) {
         IsSerializable = false;
+        llvm::errs() << "Foo\n";
+      }
     }
     void writeDeclRef(const clang::Decl *decl) {
-      if (decl && !Impl.findStableSerializationPath(decl))
+      if (decl && !Impl.findStableSerializationPath(decl)) {
         IsSerializable = false;
+        llvm::errs() << "Foo\n";
+      }
     }
     void writeSourceLocation(clang::SourceLocation loc) {
       // If a source location is written into a type, it's likely to be
       // something like the location of a VLA which we shouldn't simply
       // replace with a meaningless location.
-      if (loc.isValid())
+      if (loc.isValid()) {
         IsSerializable = false;
+        llvm::errs() << "Foo\n";
+      }
     }
 
     void writeAttr(const clang::Attr *attr) {}
