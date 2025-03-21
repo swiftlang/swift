@@ -883,6 +883,9 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
 
   auto *d = getDecl();
 
+  ASSERT(ABIRoleInfo(d).providesAPI()
+            && "should not get serialization info from ABI-only decl");
+
   // Default and property wrapper argument generators are serialized if the
   // containing declaration is public.
   if (isDefaultArgGenerator() || (isPropertyWrapperBackingInitializer() &&
@@ -1021,6 +1024,9 @@ bool SILDeclRef::isNoinline() const {
     return false;
 
   auto *decl = getDecl();
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "should not get inline attr from ABI-only decl");
+
   if (auto *attr = decl->getAttrs().getAttribute<InlineAttr>())
     if (attr->getKind() == InlineKind::Never)
       return true;
@@ -1051,6 +1057,9 @@ bool SILDeclRef::isAlwaysInline() const {
     return false;
   }
 
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "should not get inline attr from ABI-only decl");
+
   if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
     if (attr->getKind() == InlineKind::Always)
       return true;
@@ -1070,6 +1079,10 @@ bool SILDeclRef::isBackDeployed() const {
     return false;
 
   auto *decl = getDecl();
+
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "should not get backDeployed from ABI-only decl");
+
   if (auto afd = dyn_cast<AbstractFunctionDecl>(decl))
     return afd->isBackDeployed(getASTContext());
 
@@ -1198,6 +1211,9 @@ static std::string mangleClangDecl(Decl *decl, bool isForeign) {
 }
 
 std::string SILDeclRef::mangle(ManglingKind MKind) const {
+  ASSERT(!hasDecl() || ABIRoleInfo(getDecl()).providesAPI()
+            && "SILDeclRef mangling ABI decl directly?");
+
   using namespace Mangle;
   ASTMangler mangler(getASTContext());
 
@@ -1267,9 +1283,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::Func:
     if (auto *ACE = getAbstractClosureExpr())
       return mangler.mangleClosureEntity(ACE, SKind);
-
-    ASSERT(ABIRoleInfo(getDecl()).providesAPI()
-              && "SILDeclRef mangling ABI decl directly?");
 
     // As a special case, functions can have manually mangled names.
     // Use the SILGen name only for the original non-thunked, non-curried entry
