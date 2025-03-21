@@ -1,7 +1,8 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature NonescapableTypes)
+// RUN: %target-run-simple-swift(-enable-experimental-feature NonescapableTypes -enable-experimental-feature LifetimeDependence)
 // REQUIRES: executable_test
 // REQUIRES: reflection
 // REQUIRES: swift_feature_NonescapableTypes
+// REQUIRES: swift_feature_LifetimeDependence
 
 import StdlibUnittest
 import Swift
@@ -65,3 +66,29 @@ suite.test("Escapability") {
   expectFalse(isEscapable(Optional<NonescapableNontrivialStruct>.self))
 }
 #endif
+
+func apply<T, U>(
+  _ input: T,
+  _ body: (T) -> U
+) -> U {
+  body(input)
+}
+
+func apply2<T: ~Copyable, U: ~Copyable>(
+  _ input: consuming T,
+  _ body: (consuming T) -> U
+) -> U {
+  body(input)
+}
+
+suite.test("Initializer references") {
+  do {
+    let r = apply(TrivialStruct(), Optional.init)
+    expectTrue(r != nil)
+  }
+
+  do {
+    let r = apply2(NoncopyableStruct(), Optional.init)
+    expectTrue(r != nil)
+  }
+}
