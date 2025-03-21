@@ -272,11 +272,13 @@ public:
     isResilient = theClass->isResilient();
   }
 
+  /// Populate our list of base methods and overrides.
+  void collectMethods() { visitAncestor(theClass); }
+
   void emitVTable() {
     PrettyStackTraceDecl("silgen emitVTable", theClass);
 
-    // Populate our list of base methods and overrides.
-    visitAncestor(theClass);
+    collectMethods();
 
     SmallVector<SILVTable::Entry, 8> vtableEntries;
     vtableEntries.reserve(vtableMethods.size() + 2);
