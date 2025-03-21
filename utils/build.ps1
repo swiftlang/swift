@@ -544,7 +544,6 @@ function Get-InstallDir([Hashtable] $Platform) {
   } elseif (($HostPlatform -eq $KnownPlatforms["WindowsARM64"]) -and ($Platform -eq $KnownPlatforms["WindowsX64"])) {
     # x64 programs actually install under "Program Files" on arm64,
     # but this would conflict with the native installation.
-
     $ProgramFilesName = "Program Files (Amd64)"
   } else {
     # arm64 cannot be installed on x64
@@ -1069,9 +1068,9 @@ function Get-Dependencies {
         $WinSDKPlatforms += $HostPlatform
       }
 
-      foreach ($Plat in $WinSDKPlatforms) {
-        Invoke-Program nuget install $Package.$($Plat.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
-        Copy-Directory "$NugetRoot\$Package.$($Plat.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
+      foreach ($Platform in $WinSDKPlatforms) {
+        Invoke-Program nuget install $Package.$($Platform.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
+        Copy-Directory "$NugetRoot\$Package.$($Platform.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
       }
     }
   }
@@ -1105,7 +1104,8 @@ function Get-PinnedToolchainToolsDir() {
     return $VariantToolchainPath
   }
 
-  return "$BinaryCache\toolchains\$PinnedToolchain\Library\Developer\Toolchains\unknown-$PinnedToolchainVariant-development.xctoolchain\usr\bin"
+  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $PinnedToolchain,
+    "Library", "Developer", "Toolchains", "unknown-$PinnedToolchainVariant-development.xctoolchain", "usr", "bin")
 }
 
 function Get-PinnedToolchainSDK() {
@@ -1161,12 +1161,14 @@ function Get-PlatformRoot([OS] $OS) {
   return ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms", "$($OS.ToString()).platform"))
 }
 
-function Get-SwiftSDK([OS] $OS, [switch] $Experimental) {
-  $PlatformStr = $OS.ToString()
-  if ($Experimental) {
-    $PlatformStr += "Experimental"
-  }
-  return ([IO.Path]::Combine((Get-PlatformRoot $OS), "Developer", "SDKs", "$PlatformStr.sdk"))
+function Get-SwiftSDK {
+  param
+  (
+    [Parameter(Mandatory)]
+    [OS] $OS,
+    [string] $Identifier = $OS.ToString()
+  )
+  return ([IO.Path]::Combine((Get-PlatformRoot $OS), "Developer", "SDKs", "$Identifier.sdk"))
 }
 
 function Build-CMakeProject {
@@ -2285,7 +2287,7 @@ function Build-ExperimentalRuntime {
     Build-CMakeProject `
       -Src $SourceCache\swift\Runtimes\Core `
       -Bin (Get-ProjectBinaryCache $Platform ExperimentalRuntime) `
-      -InstallTo "$(Get-SwiftSDK $Platform.OS -Experimental)\usr" `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
       -Platform $Platform `
       -UseBuiltCompilers C,CXX,Swift `
       -UseGNUDriver `
@@ -2376,7 +2378,7 @@ function Build-Foundation {
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-foundation `
     -Bin $FoundationBinaryCache `
-    -InstallTo $(if ($Static) { "$(Get-SwiftSDK $Platform.OS -Experimental)\usr" } else { "$(Get-SwiftSDK $Platform.OS)\usr" }) `
+    -InstallTo $(if ($Static) { "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" } else { "$(Get-SwiftSDK $Platform.OS)\usr" }) `
     -Platform $Platform `
     -UseBuiltCompilers ASM,C,CXX,Swift `
     -SwiftSDK (Get-SwiftSDK $Platform.OS) `
@@ -2539,11 +2541,11 @@ function Install-Platform([Hashtable[]] $Platforms, [OS] $OS) {
   }
 
   # Copy files from the arch subdirectory, including "*.swiftmodule" which need restructuring
-  foreach ($Plat in $Platforms) {
-    $PlatformResources = "$(Get-SwiftSDK $Plat.OS)\usr\lib\swift\$($Plat.OS.ToString().ToLowerInvariant())"
-    Get-ChildItem -Recurse "$PlatformResources\$($Plat.Architecture.LLVMName)" | ForEach-Object {
+  foreach ($Platform in $Platforms) {
+    $PlatformResources = "$(Get-SwiftSDK $Platform.OS)\usr\lib\swift\$($Platform.OS.ToString().ToLowerInvariant())"
+    Get-ChildItem -Recurse "$PlatformResources\$($Platform.Architecture.LLVMName)" | ForEach-Object {
       if (".swiftmodule", ".swiftdoc", ".swiftinterface" -contains $_.Extension) {
-        Copy-File $_.FullName "$PlatformResources\$($_.BaseName).swiftmodule\$(Get-ModuleTriple $Plat)$($_.Extension)"
+        Copy-File $_.FullName "$PlatformResources\$($_.BaseName).swiftmodule\$(Get-ModuleTriple $Platform)$($_.Extension)"
       }
     }
   }
@@ -3110,10 +3112,10 @@ function Build-Installer([Hashtable] $Platform) {
     }
   }
 
-  foreach ($Plat in $WindowsSDKPlatforms) {
-    $Properties["INCLUDE_WINDOWS_$($Plat.Architecture.VSName.ToUpperInvariant())_SDK"] = "true"
-    $Properties["PLATFORM_ROOT_$($Plat.Architecture.VSName.ToUpperInvariant())"] = "$(Get-PlatformRoot Windows)\";
-    $Properties["SDK_ROOT_$($Plat.Architecture.VSName.ToUpperInvariant())"] = "$(Get-SwiftSDK Windows)\"
+  foreach ($SDKPlatform in $WindowsSDKPlatforms) {
+    $Properties["INCLUDE_WINDOWS_$($SDKPlatform.Architecture.VSName.ToUpperInvariant())_SDK"] = "true"
+    $Properties["PLATFORM_ROOT_$($SDKPlatform.Architecture.VSName.ToUpperInvariant())"] = "$(Get-PlatformRoot Windows)\";
+    $Properties["SDK_ROOT_$($SDKPlatform.Architecture.VSName.ToUpperInvariant())"] = "$(Get-SwiftSDK Windows)\"
   }
 
   Build-WiXProject bundle\installer.wixproj -Platform $Platform -Bundle -Properties $Properties
@@ -3122,10 +3124,10 @@ function Build-Installer([Hashtable] $Platform) {
 function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.cab" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.msi" $Stage
-  foreach ($Plat in $WindowsSDKPlatforms) {
-    Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Plat.Architecture.VSName)\sdk.windows.$($Plat.Architecture.VSName).cab" $Stage
-    Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Plat.Architecture.VSName)\sdk.windows.$($Plat.Architecture.VSName).msi" $Stage
-    Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Plat.Architecture.VSName)\rtl.$($Plat.Architecture.VSName).msm" $Stage
+  foreach ($SDKPlatform in $WindowsSDKPlatforms) {
+    Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($SDKPlatform.Architecture.VSName)\sdk.windows.$($SDKPlatform.Architecture.VSName).cab" $Stage
+    Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($SDKPlatform.Architecture.VSName)\sdk.windows.$($SDKPlatform.Architecture.VSName).msi" $Stage
+    Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($SDKPlatform.Architecture.VSName)\rtl.$($SDKPlatform.Architecture.VSName).msm" $Stage
   }
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" $Stage
   # Extract installer engine to ease code-signing on swift.org CI
@@ -3147,11 +3149,11 @@ if ($Clean) {
 
   # In case of a previous test run, clear out the swiftmodules as they are not a stable format.
   Remove-Item -Force -Recurse -Path "$($HostPlatform.ToolchainInstallRoot)\usr\lib\swift\windows\*.swiftmodule" -ErrorAction Ignore
-  foreach ($Plat in $WindowsSDKPlatforms) {
-    Remove-Item -Force -Recurse -Path "$BinaryCache\$($Plat.Triple)\" -ErrorAction Ignore
+  foreach ($Platform in $WindowsSDKPlatforms) {
+    Remove-Item -Force -Recurse -Path "$BinaryCache\$($Platform.Triple)\" -ErrorAction Ignore
   }
-  foreach ($Plat in $AndroidSDKPlatforms) {
-    Remove-Item -Force -Recurse -Path "$BinaryCache\$($Plat.Triple)\" -ErrorAction Ignore
+  foreach ($Platform in $AndroidSDKPlatforms) {
+    Remove-Item -Force -Recurse -Path "$BinaryCache\$($Platform.Triple)\" -ErrorAction Ignore
   }
 
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Runtimes", $ProductVersion)) -ErrorAction Ignore
@@ -3178,31 +3180,31 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-XML2 $HostPlatform
   Invoke-BuildStep Build-Compilers $HostPlatform
 
-  foreach ($Plat in $WindowsSDKPlatforms) {
-    Invoke-BuildStep Build-ZLib $Plat
-    Invoke-BuildStep Build-XML2 $Plat
-    Invoke-BuildStep Build-CURL $Plat
-    Invoke-BuildStep Build-LLVM $Plat
+  foreach ($Platform in $WindowsSDKPlatforms) {
+    Invoke-BuildStep Build-ZLib $Platform
+    Invoke-BuildStep Build-XML2 $Platform
+    Invoke-BuildStep Build-CURL $Platform
+    Invoke-BuildStep Build-LLVM $Platform
 
     # Build platform: SDK, Redist and XCTest
-    Invoke-BuildStep Build-Runtime $Plat
-    Invoke-BuildStep Build-Dispatch $Plat
+    Invoke-BuildStep Build-Runtime $Platform
+    Invoke-BuildStep Build-Dispatch $Platform
     # FIXME(compnerd) ensure that the _build_ is the first arch and don't rebuild on each arch
-    if ($Plat -eq $BuildPlatform) {
+    if ($Platform -eq $BuildPlatform) {
       Invoke-BuildStep Build-FoundationMacros $BuildPlatform
       Invoke-BuildStep Build-TestingMacros $BuildPlatform
     }
-    Invoke-BuildStep Build-Foundation $Plat
-    Invoke-BuildStep Build-Sanitizers $Plat
-    Invoke-BuildStep Build-XCTest $Plat
-    Invoke-BuildStep Build-Testing $Plat
-    Invoke-BuildStep Write-SDKSettingsPlist $Plat
+    Invoke-BuildStep Build-Foundation $Platform
+    Invoke-BuildStep Build-Sanitizers $Platform
+    Invoke-BuildStep Build-XCTest $Platform
+    Invoke-BuildStep Build-Testing $Platform
+    Invoke-BuildStep Write-SDKSettingsPlist $Platform
 
-    Invoke-BuildStep Build-ExperimentalRuntime $Plat -Static
-    Invoke-BuildStep Build-Foundation $Plat -Static
+    Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
+    Invoke-BuildStep Build-Foundation $Platform -Static
 
-    Copy-File "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\*.lib" "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Plat.Architecture.LLVMName)\"
-    if ($Plat -eq $HostPlatform) {
+    Copy-File "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\*.lib" "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\"
+    if ($Platform -eq $HostPlatform) {
       Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Runtimes", $ProductVersion))\usr"
     }
   }
@@ -3210,37 +3212,37 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
 
   if ($Android) {
-    foreach ($Plat in $AndroidSDKPlatforms) {
+    foreach ($Platform in $AndroidSDKPlatforms) {
       if ($IncludeDS2) {
-        Invoke-BuildStep Build-DS2 $Plat
+        Invoke-BuildStep Build-DS2 $Platform
       }
-      Invoke-BuildStep Build-ZLib $Plat
-      Invoke-BuildStep Build-XML2 $Plat
-      Invoke-BuildStep Build-CURL $Plat
-      Invoke-BuildStep Build-LLVM $Plat
+      Invoke-BuildStep Build-ZLib $Platform
+      Invoke-BuildStep Build-XML2 $Platform
+      Invoke-BuildStep Build-CURL $Platform
+      Invoke-BuildStep Build-LLVM $Platform
 
       # Build platform: SDK, Redist and XCTest
-      Invoke-BuildStep Build-Runtime $Plat
-      Invoke-BuildStep Build-Dispatch $Plat
-      Invoke-BuildStep Build-Foundation $Plat
-      Invoke-BuildStep Build-Sanitizers $Plat
-      Invoke-BuildStep Build-XCTest $Plat
-      Invoke-BuildStep Build-Testing $Plat
+      Invoke-BuildStep Build-Runtime $Platform
+      Invoke-BuildStep Build-Dispatch $Platform
+      Invoke-BuildStep Build-Foundation $Platform
+      Invoke-BuildStep Build-Sanitizers $Platform
+      Invoke-BuildStep Build-XCTest $Platform
+      Invoke-BuildStep Build-Testing $Platform
 
       # Android swift-inspect only supports 64-bit platforms.
-      if ($Plat.Architecture.ABI -in @("arm64-v8a", "x86_64")) {
-        Invoke-BuildStep Build-Inspect $Plat
+      if ($Platform.Architecture.ABI -in @("arm64-v8a", "x86_64")) {
+        Invoke-BuildStep Build-Inspect $Platform
       }
-      Invoke-BuildStep Write-SDKSettingsPlist $Plat
+      Invoke-BuildStep Write-SDKSettingsPlist $Platform
 
-      Invoke-BuildStep Build-ExperimentalRuntime $Plat -Static
-      Invoke-BuildStep Build-Foundation $Plat -Static
+      Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
+      Invoke-BuildStep Build-Foundation $Platform -Static
 
-      Move-Item "$(Get-SwiftSDK [OS]::Android)\usr\lib\swift\android\*.a" "$(Get-SwiftSDK [OS]::Android)\usr\lib\swift\android\$($Plat.Architecture.LLVMName)\"
-      Move-Item "$(Get-SwiftSDK [OS]::Android)\usr\lib\swift\android\*.so" "$(Get-SwiftSDK [OS]::Android)\usr\lib\swift\android\$($Plat.Architecture.LLVMName)\"
+      Move-Item "$(Get-SwiftSDK [OS]::Android)\usr\lib\swift\android\*.a" "$(Get-SwiftSDK [OS]::Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
+      Move-Item "$(Get-SwiftSDK [OS]::Android)\usr\lib\swift\android\*.so" "$(Get-SwiftSDK [OS]::Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\"
     }
     Install-Platform $AndroidSDKPlatforms Android
-    Invoke-BuildStep Write-PlatformInfoPlist $Plat
+    Invoke-BuildStep Write-PlatformInfoPlist $Platform
   }
 
   # Build Macros for distribution
@@ -3308,9 +3310,9 @@ if (-not $IsCrossCompiling) {
   if ($Test -contains "sourcekit-lsp") { Invoke-BuildStep Test-SourceKitLSP }
 
   if ($Test -contains "swift") {
-    foreach ($Plat in $AndroidSDKPlatforms) {
+    foreach ($Platform in $AndroidSDKPlatforms) {
       try {
-        Invoke-BuildStep Test-Runtime $Plat
+        Invoke-BuildStep Test-Runtime $Platform
       } catch {}
     }
   }
