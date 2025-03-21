@@ -512,6 +512,9 @@ EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 
+/// Allow function body macros applied to closures.
+EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

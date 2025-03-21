@@ -4824,7 +4824,8 @@ static Identifier encodeLocalPrecheckedDiscriminator(
 
 void ASTMangler::appendMacroExpansionContext(
     SourceLoc loc, DeclContext *origDC,
-    const FreestandingMacroExpansion *expansion
+    Identifier macroName,
+    unsigned macroDiscriminator
 ) {
   origDC = MacroDiscriminatorContext::getInnermostMacroContext(origDC);
   BaseEntitySignature nullBase(nullptr);
@@ -4833,9 +4834,9 @@ void ASTMangler::appendMacroExpansionContext(
     if (auto outermostLocalDC = getOutermostLocalContext(origDC)) {
       auto innermostNonlocalDC = outermostLocalDC->getParent();
       appendContext(innermostNonlocalDC, nullBase, StringRef());
-      Identifier name = expansion->getMacroName().getBaseIdentifier();
+      Identifier name = macroName;
       ASTContext &ctx = origDC->getASTContext();
-      unsigned discriminator = expansion->getDiscriminator();
+      unsigned discriminator = macroDiscriminator;
       name = encodeLocalPrecheckedDiscriminator(ctx, name, discriminator);
       appendIdentifier(name.str());
     } else {
@@ -4940,7 +4941,10 @@ void ASTMangler::appendMacroExpansionContext(
     return appendMacroExpansionLoc();
 
   // Append our own context and discriminator.
-  appendMacroExpansionContext(outerExpansionLoc, origDC, expansion);
+  appendMacroExpansionContext(
+      outerExpansionLoc, origDC,
+      macroName,
+      macroDiscriminator);
   appendMacroExpansionOperator(
       baseName.userFacingName(), role, discriminator);
 }
@@ -4967,16 +4971,14 @@ void ASTMangler::appendMacroExpansionOperator(
 }
 
 static StringRef getPrivateDiscriminatorIfNecessary(
-      const MacroExpansionExpr *expansion) {
-  auto dc = MacroDiscriminatorContext::getInnermostMacroContext(
-      expansion->getDeclContext());
-  auto decl = dc->getAsDecl();
+      const DeclContext *macroDC) {
+  auto decl = macroDC->getAsDecl();
   if (decl && !decl->isOutermostPrivateOrFilePrivateScope())
     return StringRef();
 
   // Mangle non-local private declarations with a textual discriminator
   // based on their enclosing file.
-  auto topLevelSubcontext = dc->getModuleScopeContext();
+  auto topLevelSubcontext = macroDC->getModuleScopeContext();
   SourceFile *sf = dyn_cast<SourceFile>(topLevelSubcontext);
   if (!sf)
     return StringRef();
@@ -4990,6 +4992,13 @@ static StringRef getPrivateDiscriminatorIfNecessary(
   assert(!clang::isDigit(discriminator.str().front()) &&
          "not a valid identifier");
   return discriminator.str();
+}
+
+static StringRef getPrivateDiscriminatorIfNecessary(
+    const MacroExpansionExpr *expansion) {
+  auto dc = MacroDiscriminatorContext::getInnermostMacroContext(
+      expansion->getDeclContext());
+  return getPrivateDiscriminatorIfNecessary(dc);
 }
 
 static StringRef getPrivateDiscriminatorIfNecessary(
@@ -5008,7 +5017,8 @@ void
 ASTMangler::appendMacroExpansion(const FreestandingMacroExpansion *expansion) {
   appendMacroExpansionContext(expansion->getPoundLoc(),
                               expansion->getDeclContext(),
-                              expansion);
+                              expansion->getMacroName().getBaseIdentifier(),
+                              expansion->getDiscriminator());
   auto privateDiscriminator = getPrivateDiscriminatorIfNecessary(expansion);
   if (!privateDiscriminator.empty()) {
     appendIdentifier(privateDiscriminator);
@@ -5018,6 +5028,42 @@ ASTMangler::appendMacroExpansion(const FreestandingMacroExpansion *expansion) {
       expansion->getMacroName().getBaseName().userFacingName(),
       MacroRole::Declaration,
       expansion->getDiscriminator());
+}
+
+void ASTMangler::appendMacroExpansion(ClosureExpr *attachedTo,
+                                      CustomAttr *attr,
+                                      MacroDecl *macro) {
+  auto &ctx = attachedTo->getASTContext();
+  auto discriminator =
+      ctx.getNextMacroDiscriminator(attachedTo,
+                                    macro->getBaseName());
+
+  appendMacroExpansionContext(
+      attr->getLocation(),
+      attachedTo,
+      macro->getBaseName().getIdentifier(),
+      discriminator);
+
+  auto privateDiscriminator =
+      getPrivateDiscriminatorIfNecessary(attachedTo);
+  if (!privateDiscriminator.empty()) {
+    appendIdentifier(privateDiscriminator);
+    appendOperator("Ll");
+  }
+
+  appendMacroExpansionOperator(
+      macro->getBaseName().userFacingName(),
+      MacroRole::Body,
+      discriminator);
+}
+
+std::string
+ASTMangler::mangleAttachedMacroExpansion(ClosureExpr *attachedTo,
+                                         CustomAttr *attr,
+                                         MacroDecl *macro) {
+  beginMangling();
+  appendMacroExpansion(attachedTo, attr, macro);
+  return finalize();
 }
 
 std::string

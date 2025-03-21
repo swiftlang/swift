@@ -7843,6 +7843,9 @@ ERROR(conformance_macro,none,
 ERROR(experimental_macro,none,
       "macro %0 is experimental",
       (DeclName))
+ERROR(experimental_closure_body_macro,none,
+      "function body macros on closures is experimental",
+      ())
 
 ERROR(macro_resolve_circular_reference, none,
       "circular reference resolving %select{freestanding|attached}0 macro %1",

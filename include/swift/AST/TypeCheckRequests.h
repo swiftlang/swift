@@ -4708,7 +4708,7 @@ public:
 
 class ExpandBodyMacroRequest
     : public SimpleRequest<ExpandBodyMacroRequest,
-                           std::optional<unsigned>(AbstractFunctionDecl *),
+                           std::optional<unsigned>(AnyFunctionRef),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4717,7 +4717,7 @@ private:
   friend SimpleRequest;
 
   std::optional<unsigned> evaluate(Evaluator &evaluator,
-                                   AbstractFunctionDecl *fn) const;
+                                   AnyFunctionRef fn) const;
 
 public:
   bool isCached() const { return true; }

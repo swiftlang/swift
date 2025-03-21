@@ -360,6 +360,10 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
   return decl->getAttrs().hasAttribute<ConstValAttr>();
 }
 
+static bool usesFeatureClosureBodyMacro(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
   if (decl->getAttrs().hasAttribute<SafeAttr>() ||
       decl->getAttrs().hasAttribute<UnsafeAttr>())
