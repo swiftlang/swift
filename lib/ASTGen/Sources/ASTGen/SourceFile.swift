@@ -249,13 +249,11 @@ public func emitParserDiagnostics(
   }
 }
 
-/// Retrieve a syntax node in the given source file, with the given type.
-public func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
-  sourceFilePtr: UnsafeRawPointer,
-  sourceLocationPtr: UnsafePointer<UInt8>?,
-  type: Node.Type,
-  wantOutermost: Bool = false
-) -> Node? {
+/// Find a token in the given source file at the given location.
+func findToken(
+  in sourceFilePtr: UnsafeRawPointer,
+  at sourceLocationPtr: UnsafePointer<UInt8>?
+) -> TokenSyntax? {
   guard let sourceLocationPtr = sourceLocationPtr else {
     return nil
   }
@@ -274,6 +272,20 @@ public func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   let sf = sourceFilePtr.pointee.syntax
   guard let token = sf.token(at: AbsolutePosition(utf8Offset: offset)) else {
     print("couldn't find token at offset \(offset)")
+    return nil
+  }
+
+  return token
+}
+
+/// Retrieve a syntax node in the given source file, with the given type.
+public func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLocationPtr: UnsafePointer<UInt8>?,
+  type: Node.Type,
+  wantOutermost: Bool = false
+) -> Node? {
+  guard let token = findToken(in: sourceFilePtr, at: sourceLocationPtr) else {
     return nil
   }
 
@@ -307,6 +319,28 @@ public func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   }
 
   return resultSyntax
+}
+
+/// Retrieve a syntax node in the given source file that satisfies the
+/// given predicate.
+public func findSyntaxNodeInSourceFile(
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLocationPtr: UnsafePointer<UInt8>?,
+  where predicate: (Syntax) -> Bool
+) -> Syntax? {
+  guard let token = findToken(in: sourceFilePtr, at: sourceLocationPtr) else {
+    return nil
+  }
+
+  var currentSyntax = Syntax(token)
+  while let parentSyntax = currentSyntax.parent {
+    currentSyntax = parentSyntax
+    if predicate(currentSyntax) {
+      return currentSyntax
+    }
+  }
+
+  return nil
 }
 
 @_cdecl("swift_ASTGen_virtualFiles")
