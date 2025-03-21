@@ -821,7 +821,8 @@ function Invoke-IsolatingEnvVars([scriptblock]$Block) {
 
 function Invoke-VsDevShell([Hashtable] $Platform) {
   if (($Platform.OS -ne [OS]::Windows) -or ($BuildPlatform.OS -ne [OS]::Windows)) {
-    throw "Invoke-VsDevShell is only available on Windows."
+    Write-Warning "Invoke-VsDevShell called on non-Windows platform."
+    return
   }
 
   $DevCmdArguments = "-no_logo -host_arch=$($BuildPlatform.Architecture.VSName) -arch=$($Platform.Architecture.VSName)"
@@ -1105,21 +1106,20 @@ function Get-PinnedToolchainToolsDir() {
   }
 
   return [IO.Path]::Combine("$BinaryCache\", "toolchains", $PinnedToolchain,
-    "Library", "Developer", "Toolchains", "unknown-$PinnedToolchainVariant-development.xctoolchain", "usr", "bin")
+    "Library", "Developer", "Toolchains",
+    "unknown-$PinnedToolchainVariant-development.xctoolchain", "usr", "bin")
 }
 
 function Get-PinnedToolchainSDK() {
-  if (Test-Path "$BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Platforms\$(Get-PinnedToolchainVersion)\Windows.platform\Developer\SDKs\Windows.sdk") {
-    return "$BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Platforms\$(Get-PinnedToolchainVersion)\Windows.platform\Developer\SDKs\Windows.sdk"
-  }
-  return "$BinaryCache\toolchains\$PinnedToolchain\Library\Developer\Platforms\Windows.platform\Developer\SDKs\Windows.sdk"
+  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $PinnedToolchain,
+    "LocalApp", "Programs", "Swift", "Platforms", (Get-PinnedToolchainVersion),
+    "Windows.platform", "Developer", "SDKs", "Windows.sdk")
 }
 
 function Get-PinnedToolchainRuntime() {
-  if (Test-Path "$BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin\swiftCore.dll") {
-    return "$BinaryCache\toolchains\$PinnedToolchain\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin"
-  }
-  return "$BinaryCache\toolchains\$PinnedToolchain\PFiles64\Swift\runtime-development\usr\bin"
+  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $PinnedToolchain,
+    "LocalApp", "Programs", "Swift", "Runtimes", (Get-PinnedToolchainVersion),
+    "usr", "bin")
 }
 
 function Get-PinnedToolchainVersion() {
