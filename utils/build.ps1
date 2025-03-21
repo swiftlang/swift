@@ -3300,14 +3300,14 @@ if (-not $IsCrossCompiling) {
     Invoke-BuildStep Build-Compilers $HostPlatform $Tests
   }
 
-  if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch }
-  if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation }
-  if ($Test -contains "xctest") { Invoke-BuildStep Test-XCTest }
-  if ($Test -contains "testing") { Invoke-BuildStep Test-Testing }
-  if ($Test -contains "llbuild") { Invoke-BuildStep Test-LLBuild }
-  if ($Test -contains "swiftpm") { Invoke-BuildStep Test-PackageManager }
-  if ($Test -contains "swift-format") { Invoke-BuildStep Test-Format }
-  if ($Test -contains "sourcekit-lsp") { Invoke-BuildStep Test-SourceKitLSP }
+  if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
+  if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
+  if ($Test -contains "xctest") { Invoke-BuildStep Test-XCTest $BuildPlatform }
+  if ($Test -contains "testing") { Invoke-BuildStep Test-Testing $BuildPlatform }
+  if ($Test -contains "llbuild") { Invoke-BuildStep Test-LLBuild $BuildPlatform }
+  if ($Test -contains "swiftpm") { Invoke-BuildStep Test-PackageManager $BuildPlatform }
+  if ($Test -contains "swift-format") { Invoke-BuildStep Test-Format $BuildPlatform }
+  if ($Test -contains "sourcekit-lsp") { Invoke-BuildStep Test-SourceKitLSP $BuildPlatform}
 
   if ($Test -contains "swift") {
     foreach ($Platform in $AndroidSDKPlatforms) {
