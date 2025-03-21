@@ -1466,6 +1466,22 @@ protected:
 
       return Builder.createArrayType(base.getType());
     }
+    case NodeKind::SugaredInlineArray: {
+      if (Node->getNumChildren() < 2) {
+        return MAKE_NODE_TYPE_ERROR(Node,
+                                    "fewer children (%zu) than required (2)",
+                                    Node->getNumChildren());
+      }
+      auto count = decodeMangledType(Node->getChild(0), depth + 1);
+      if (count.isError())
+        return count;
+
+      auto element = decodeMangledType(Node->getChild(1), depth + 1);
+      if (element.isError())
+        return element;
+
+      return Builder.createInlineArrayType(count.getType(), element.getType());
+    }
     case NodeKind::SugaredDictionary: {
       if (Node->getNumChildren() < 2)
         return MAKE_NODE_TYPE_ERROR(Node,

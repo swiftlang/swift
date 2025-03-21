@@ -2337,6 +2337,8 @@ namespace {
                                          TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
+    NeverNullType resolveInlineArrayType(InlineArrayTypeRepr *repr,
+                                         TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
                                         TypeResolutionOptions options);
     NeverNullType resolveOptionalType(OptionalTypeRepr *repr,
@@ -2774,6 +2776,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Array:
     return resolveArrayType(cast<ArrayTypeRepr>(repr), options);
+
+  case TypeReprKind::InlineArray:
+    return resolveInlineArrayType(cast<InlineArrayTypeRepr>(repr), options);
 
   case TypeReprKind::Dictionary:
     return resolveDictionaryType(cast<DictionaryTypeRepr>(repr), options);
@@ -5264,6 +5269,53 @@ TypeResolver::resolveCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *repr
   return resolveType(repr->getBase(), options);
 }
 
+NeverNullType
+TypeResolver::resolveInlineArrayType(InlineArrayTypeRepr *repr,
+                                     TypeResolutionOptions options) {
+  ASTContext &ctx = getASTContext();
+  auto argOptions = options.withoutContext().withContext(
+      TypeResolverContext::ValueGenericArgument);
+
+  // It's possible the user accidentally wrote '[Int x 4]', correct that here.
+  auto *countRepr = repr->getCount();
+  auto *eltRepr = repr->getElement();
+  if (!isa<IntegerTypeRepr>(countRepr) && isa<IntegerTypeRepr>(eltRepr)) {
+    std::swap(countRepr, eltRepr);
+    ctx.Diags
+        .diagnose(countRepr->getStartLoc(), diag::inline_array_type_backwards)
+        .fixItExchange(countRepr->getSourceRange(), eltRepr->getSourceRange());
+  }
+
+  auto countTy = resolveType(countRepr, argOptions);
+  if (countTy->hasError())
+    return ErrorType::get(getASTContext());
+
+  auto eltTy = resolveType(eltRepr, argOptions);
+  if (eltTy->hasError())
+    return ErrorType::get(getASTContext());
+
+  {
+    // If the standard library isn't loaded, we ought to let the user know
+    // something has gone terribly wrong, since it will otherwise break
+    // type canonicalization.
+    auto *inlineArrayDecl = ctx.getInlineArrayDecl();
+    if (!inlineArrayDecl) {
+      ctx.Diags.diagnose(repr->getBrackets().Start, diag::sugar_type_not_found,
+                         2);
+      return ErrorType::get(ctx);
+    }
+
+    // Make sure we can substitute the generic args.
+    auto ty = resolution.applyUnboundGenericArguments(
+        inlineArrayDecl,
+        /*parentTy=*/nullptr, repr->getStartLoc(), {countTy, eltTy});
+    if (ty->hasError())
+      return ErrorType::get(ctx);
+  }
+
+  return InlineArrayType::get(countTy, eltTy);
+}
+
 NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
                                              TypeResolutionOptions options) {
   auto baseTy = resolveType(repr->getBase(), options.withoutContext());
@@ -6311,6 +6363,7 @@ private:
     case TypeReprKind::Fixed:
     case TypeReprKind::Self:
     case TypeReprKind::Array:
+    case TypeReprKind::InlineArray:
     case TypeReprKind::SILBox:
     case TypeReprKind::Isolated:
     case TypeReprKind::Sending:

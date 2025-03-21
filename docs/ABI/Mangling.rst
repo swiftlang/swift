@@ -954,6 +954,7 @@ productions:
   type ::= base-type "XSq"                       // sugared Optional type
   type ::= base-type "XSa"                       // sugared Array type
   type ::= key-type value-type "XSD"             // sugared Dictionary type
+  type ::= count-type element-type "XSA"         // sugared InlineArray type
 
 Generics
 ~~~~~~~~

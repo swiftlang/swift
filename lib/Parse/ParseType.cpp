@@ -1311,6 +1311,40 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
                                                 SourceRange(LPLoc, RPLoc)));
 }
 
+ParserResult<TypeRepr> Parser::parseTypeInlineArray(SourceLoc lSquare) {
+  ASSERT(Context.LangOpts.hasFeature(Feature::InlineArrayTypeSugar));
+
+  ParserStatus status;
+
+  // 'isStartOfInlineArrayTypeBody' means we should at least have a type and 'x'
+  // to start with.
+  auto count = parseTypeOrValue();
+  auto *countTy = count.get();
+  status |= count;
+
+  // 'x'
+  consumeToken(tok::identifier);
+
+  // Allow parsing a value for better recovery, Sema will diagnose any
+  // mismatch.
+  auto element = parseTypeOrValue();
+  if (element.hasCodeCompletion() || element.isNull())
+    return element;
+
+  auto *elementTy = element.get();
+  status |= element;
+
+  SourceLoc rSquare;
+  if (parseMatchingToken(tok::r_square, rSquare,
+                         diag::expected_rsquare_inline_array, lSquare)) {
+    status.setIsParseError();
+  }
+
+  SourceRange brackets(lSquare, rSquare);
+  auto *result =
+      InlineArrayTypeRepr::create(Context, countTy, elementTy, brackets);
+  return makeParserResult(status, result);
+}
 
 /// parseTypeArray - Parse the type-array production, given that we
 /// are looking at the initial l_square.  Note that this index
@@ -1363,6 +1397,10 @@ ParserResult<TypeRepr> Parser::parseTypeCollection() {
   assert(Tok.is(tok::l_square));
   Parser::StructureMarkerRAII parsingCollection(*this, Tok);
   SourceLoc lsquareLoc = consumeToken();
+
+  // Check to see if we can parse as InlineArray.
+  if (isStartOfInlineArrayTypeBody())
+    return parseTypeInlineArray(lsquareLoc);
 
   // Parse the element type.
   ParserResult<TypeRepr> firstTy = parseType(diag::expected_element_type);
@@ -1603,6 +1641,8 @@ bool Parser::canParseTypeSimple() {
 
       if (!Tok.is(tok::integer_literal))
         return false;
+
+      consumeToken();
     }
 
     break;
@@ -1736,9 +1776,50 @@ bool Parser::canParseType() {
   return true;
 }
 
+bool Parser::canParseStartOfInlineArrayType() {
+  if (!Context.LangOpts.hasFeature(Feature::InlineArrayTypeSugar))
+    return false;
+
+  // We must have at least '[<type> x', which cannot be any other kind of
+  // expression or type. We specifically look for any type, not just integers
+  // for better recovery in e.g cases where the user writes '[Int x 2]'. We
+  // only do type-scalar since variadics would be ambiguous e.g 'Int...x'.
+  if (!canParseTypeScalar())
+    return false;
+
+  // For now we don't allow multi-line since that would require
+  // disambiguation.
+  if (Tok.isAtStartOfLine() || !Tok.isContextualKeyword("x"))
+    return false;
+
+  consumeToken();
+  return true;
+}
+
+bool Parser::isStartOfInlineArrayTypeBody() {
+  if (!Context.LangOpts.hasFeature(Feature::InlineArrayTypeSugar))
+    return false;
+
+  BacktrackingScope backtrack(*this);
+  return canParseStartOfInlineArrayType();
+}
+
 bool Parser::canParseCollectionType() {
   if (!consumeIf(tok::l_square))
     return false;
+
+  // Check to see if we have an InlineArray sugar type.
+  if (Context.LangOpts.hasFeature(Feature::InlineArrayTypeSugar)) {
+    CancellableBacktrackingScope backtrack(*this);
+    if (canParseStartOfInlineArrayType()) {
+      backtrack.cancelBacktrack();
+      if (!canParseType())
+        return false;
+      if (!consumeIf(tok::r_square))
+        return false;
+      return true;
+    }
+  }
 
   if (!canParseType())
     return false;

@@ -2248,6 +2248,10 @@ bool Traversal::visitArrayTypeRepr(ArrayTypeRepr *T) {
   return doIt(T->getBase());
 }
 
+bool Traversal::visitInlineArrayTypeRepr(InlineArrayTypeRepr *T) {
+  return doIt(T->getCount()) || doIt(T->getElement());
+}
+
 bool Traversal::visitDictionaryTypeRepr(DictionaryTypeRepr *T) {
   return doIt(T->getKey()) || doIt(T->getValue());
 }

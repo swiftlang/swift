@@ -3521,6 +3521,15 @@ ParserResult<Expr> Parser::parseExprCollection() {
                                 *this, LSquareLoc,
                                 StructureMarkerKind::OpenSquare);
 
+  // Check to see if we can parse an InlineArray type.
+  if (isStartOfInlineArrayTypeBody()) {
+    auto result = parseTypeInlineArray(LSquareLoc);
+    if (result.isNull() || result.isParseErrorOrHasCompletion())
+      return ParserStatus(result);
+
+    return makeParserResult(new (Context) TypeExpr(result.get()));
+  }
+
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
     RSquareLoc = consumeToken(tok::r_square);

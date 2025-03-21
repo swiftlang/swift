@@ -4544,6 +4544,13 @@ public:
     printFoot();
   }
 
+  void visitInlineArrayTypeRepr(InlineArrayTypeRepr *T, Label label) {
+    printCommon("type_inline_array", label);
+    printRec(T->getCount(), Label::always("count"));
+    printRec(T->getElement(), Label::always("element"));
+    printFoot();
+  }
+
   void visitDictionaryTypeRepr(DictionaryTypeRepr *T, Label label) {
     printCommon("type_dictionary", label);
     printRec(T->getKey(), Label::optional("key"));
@@ -6385,6 +6392,13 @@ namespace {
     void visitArraySliceType(ArraySliceType *T, Label label) {
       printCommon("array_slice_type", label);
       printRec(T->getBaseType(), Label::optional("base_type"));
+      printFoot();
+    }
+
+    void visitInlineArrayType(InlineArrayType *T, Label label) {
+      printCommon("inline_array_type", label);
+      printRec(T->getCountType(), Label::always("count"));
+      printRec(T->getElementType(), Label::always("element"));
       printFoot();
     }
 
