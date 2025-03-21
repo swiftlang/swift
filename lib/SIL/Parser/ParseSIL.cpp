@@ -8085,7 +8085,7 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
   return retVal;
 }
 
-/// Parser a single SIL vtable entry and add it to either \p witnessEntries
+/// Parser a single SIL wtable entry and add it to either \p witnessEntries
 /// or \c conditionalConformances.
 static bool parseSILWitnessTableEntry(
          Parser &P,
