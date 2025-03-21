@@ -1691,7 +1691,12 @@ public:
   /// and the expression will parse with the '<' as an operator.
   bool canParseAsGenericArgumentList();
 
+  bool canParseTypeSimple();
+  bool canParseTypeSimpleOrComposition();
+  bool canParseTypeScalar();
   bool canParseType();
+
+  bool canParseCollectionType();
 
   /// Returns true if a simple type identifier can be parsed.
   ///

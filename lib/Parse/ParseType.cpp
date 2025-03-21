@@ -1575,23 +1575,7 @@ bool Parser::canParseGenericArguments() {
   }
 }
 
-bool Parser::canParseType() {
-  // 'repeat' starts a pack expansion type.
-  consumeIf(tok::kw_repeat);
-
-  // Accept 'inout' at for better recovery.
-  consumeIf(tok::kw_inout);
-
-  if (Tok.isContextualKeyword("some")) {
-    consumeToken();
-  } else if (Tok.isContextualKeyword("any")) {
-    consumeToken();
-  } else if (Tok.isContextualKeyword("each")) {
-    consumeToken();
-  } else if (Tok.isContextualKeyword("sending")) {
-    consumeToken();
-  }
-
+bool Parser::canParseTypeSimple() {
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::kw_Any:
@@ -1637,14 +1621,7 @@ bool Parser::canParseType() {
     return canParseType();
   }
   case tok::l_square:
-    consumeToken();
-    if (!canParseType())
-      return false;
-    if (consumeIf(tok::colon)) {
-      if (!canParseType())
-        return false;
-    }
-    if (!consumeIf(tok::r_square))
+    if (!canParseCollectionType())
       return false;
     break;
   case tok::kw__:
@@ -1685,13 +1662,43 @@ bool Parser::canParseType() {
     }
     break;
   }
+  return true;
+}
+
+bool Parser::canParseTypeSimpleOrComposition() {
+  auto canParseElement = [&]() -> bool {
+    if (Tok.isContextualKeyword("some")) {
+      consumeToken();
+    } else if (Tok.isContextualKeyword("any")) {
+      consumeToken();
+    } else if (Tok.isContextualKeyword("each")) {
+      consumeToken();
+    }
+
+    return canParseTypeSimple();
+  };
+  if (!canParseElement())
+    return false;
 
   while (Tok.isContextualPunctuator("&")) {
     consumeToken();
-    // FIXME: Should be 'canParseTypeSimple', but we don't have one.
-    if (!canParseType())
+    // Note we include 'some', 'any', and 'each' here for better recovery.
+    if (!canParseElement())
       return false;
   }
+
+  return true;
+}
+
+bool Parser::canParseTypeScalar() {
+  // Accept 'inout' at for better recovery.
+  consumeIf(tok::kw_inout);
+
+  if (Tok.isContextualKeyword("sending"))
+    consumeToken();
+
+  if (!canParseTypeSimpleOrComposition())
+    return false;
 
   if (isAtFunctionTypeArrow()) {
     // Handle type-function if we have an '->' with optional
@@ -1707,20 +1714,41 @@ bool Parser::canParseType() {
 
     if (!consumeIf(tok::arrow))
       return false;
-    
-    if (!canParseType())
+
+    if (!canParseTypeScalar())
       return false;
-    
-    return true;
   }
+  return true;
+}
+
+bool Parser::canParseType() {
+  // 'repeat' starts a pack expansion type.
+  consumeIf(tok::kw_repeat);
+
+  if (!canParseTypeScalar())
+    return false;
 
   // Parse pack expansion 'T...'.
   if (Tok.isEllipsis()) {
     Tok.setKind(tok::ellipsis);
     consumeToken();
   }
-
   return true;
+}
+
+bool Parser::canParseCollectionType() {
+  if (!consumeIf(tok::l_square))
+    return false;
+
+  if (!canParseType())
+    return false;
+
+  if (consumeIf(tok::colon)) {
+    if (!canParseType())
+      return false;
+  }
+
+  return consumeIf(tok::r_square);
 }
 
 bool Parser::canParseTypeIdentifier() {
