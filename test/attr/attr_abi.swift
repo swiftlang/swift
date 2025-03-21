@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature ABIAttribute -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature LifetimeDependence -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -Rabi-inference -debugger-support
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature ABIAttribute -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature LifetimeDependence -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -debugger-support
 
 // REQUIRES: swift_feature_ABIAttribute
 // REQUIRES: swift_feature_AddressableParameters
@@ -2034,15 +2034,15 @@ extension DynamicReplacement {
 
 // @_weakLinked -- tested in attr/attr_weaklinked.swift
 
-// @_borrowed -- automatically cloned into @abi
+// @_borrowed -- banned in @abi
 protocol BorrowedAttr {
-  @abi(@_borrowed var v1: Int)
+  @abi(@_borrowed var v1: Int) // expected-error {{unused '_borrowed' attribute in '@abi'}} {{8-18=}}
   @_borrowed var v1: Int { get set }
 
-  @abi(var v2: Int) // expected-remark {{inferred '@_borrowed' in '@abi' to match attribute on API}}
-  @_borrowed var v2: Int { get set } // expected-note {{matches attribute here}}
+  @abi(var v2: Int)
+  @_borrowed var v2: Int { get set }
 
-  @abi(@_borrowed var v3: Int) // expected-error {{extra '_borrowed' attribute in '@abi'}} {{8-18=}}
+  @abi(@_borrowed var v3: Int) // expected-error {{unused '_borrowed' attribute in '@abi'}} {{8-18=}}
   var v3: Int { get set }
 }
 

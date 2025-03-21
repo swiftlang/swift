@@ -881,26 +881,6 @@ public:
 
       return false;
 
-    case DeclAttribute::InferredInABIAttr:
-      if (!abi && api->canClone()) {
-        // Infer an identical attribute.
-        abi = api->clone(ctx);
-        abi->setImplicit(true);
-        abiDecl->getAttrs().add(abi);
-
-        if (ctx.LangOpts.EnableABIInferenceRemarks) {
-          SmallString<64> scratch;
-          auto abiAttrAsString = printAttr(abi, abiDecl, scratch);
-
-          abiDecl->diagnose(diag::abi_attr_inferred_attribute,
-                            abiAttrAsString, api->isDeclModifier());
-          noteAttrHere(api, apiDecl, /*isMatch=*/true);
-        }
-      }
-
-      // Other than the cloning behavior, Inferred behaves like Equivalent.
-      LLVM_FALLTHROUGH;
-
     case DeclAttribute::EquivalentInABIAttr:
       // Diagnose if API doesn't have attribute.
       if (!api) {
