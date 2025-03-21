@@ -38,14 +38,20 @@ struct S3_P1: P1 {
   nonisolated func onMainActor() { }
 }
 
+// expected-warning@+1{{conformance of 'S4_P1_not_quietly' to protocol 'P1' involves isolation mismatches and can cause data races}}
 struct S4_P1_not_quietly: P1 {
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+
   @SomeGlobalActor func onMainActor() { }
-  // expected-warning @-1 {{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated requirement from protocol 'P1'}}
+  // expected-note @-1 {{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated requirement from protocol 'P1'}}
 }
 
+// expected-warning@+2{{conformance of 'S4_P1' to protocol 'P1' involves isolation mismatches and can cause data races}}
 @SomeGlobalActor
 struct S4_P1: P1 {
-  @SomeGlobalActor func onMainActor() { } // expected-warning{{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated requirement from protocol 'P1'}}
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+
+  @SomeGlobalActor func onMainActor() { } // expected-note{{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated requirement from protocol 'P1'}}
 }
 
 // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}

@@ -11,12 +11,13 @@ protocol P {
 // Definition of isolated conformances
 // ----------------------------------------------------------------------------
 
-// expected-note@+3{{add '@preconcurrency' to the 'P' conformance to defer isolation checking to run time}}{{25-25=@preconcurrency }}
-// expected-note@+2{{add '@MainActor' to the 'P' conformance to restrict it to main actor-isolated code}}{{25-25=@MainActor }}
+// expected-error@+4{{conformance of 'CWithNonIsolated' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+3{{mark all declarations used in the conformance 'nonisolated'}}
+// expected-note@+2{{isolate this conformance to the main actor with '@MainActor'}}{{25-25=@MainActor }}
 @MainActor
 class CWithNonIsolated: P {
-  func f() { } // expected-error{{main actor-isolated instance method 'f()' cannot be used to satisfy nonisolated requirement from protocol 'P'}}
-  // expected-note@-1{{add 'nonisolated' to 'f()' to make this instance method not isolated to the actor}}
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+  func f() { } // expected-note{{main actor-isolated instance method 'f()' cannot be used to satisfy nonisolated requirement from protocol 'P'}}
 }
 
 actor SomeActor { }
@@ -53,9 +54,11 @@ protocol Q {
   associatedtype A: P
 }
 
-// expected-error@+2{{conformance of 'SMissingIsolation' to 'Q' depends on main actor-isolated conformance of 'C' to 'P'; mark it as '@MainActor'}}{{27-27=@MainActor }}
+// expected-error@+2{{conformance of 'SMissingIsolation' to protocol 'Q' crosses into main actor-isolated code and can cause data races}}
 @MainActor
 struct SMissingIsolation: Q {
+  // expected-note@-1{{conformance depends on main actor-isolated conformance of 'C' to protocol 'P'}}
+  // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
   typealias A = C
 }
 
@@ -63,9 +66,11 @@ struct PWrapper<T: P>: P {
   func f() { }
 }
 
-// expected-error@+2{{conformance of 'SMissingIsolationViaWrapper' to 'Q' depends on main actor-isolated conformance of 'C' to 'P'; mark it as '@MainActor'}}
+// expected-error@+2{{conformance of 'SMissingIsolationViaWrapper' to protocol 'Q' crosses into main actor-isolated code and can cause data races}}
 @MainActor
 struct SMissingIsolationViaWrapper: Q {
+  // expected-note@-1{{conformance depends on main actor-isolated conformance of 'C' to protocol 'P'}}
+  // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}{{37-37=@MainActor }}
   typealias A = PWrapper<C>
 }
 
@@ -79,7 +84,8 @@ struct S: @MainActor Q {
   typealias A = C
 }
 
-// expected-error@+2{{main actor-isolated conformance of 'SMismatchedActors' to 'Q' cannot depend on global actor 'SomeGlobalActor'-isolated conformance of 'C2' to 'P'}}
+// expected-error@+3{{conformance of 'SMismatchedActors' to protocol 'Q' crosses into global actor 'SomeGlobalActor'-isolated code and can cause data races}}
+// expected-note@+2{{conformance depends on global actor 'SomeGlobalActor'-isolated conformance of 'C2' to protocol 'P'}}
 @MainActor
 struct SMismatchedActors: @MainActor Q {
   typealias A = C2

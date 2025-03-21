@@ -49,8 +49,7 @@ struct WitnessIsolationError {
   ActorIsolation referenceIsolation;
 
   /// Diagnose this witness isolation error.
-  void diagnose(const NormalProtocolConformance *conformance,
-                bool &suggestedPreconcurrencyOrIsolated) const;
+  void diagnose(const NormalProtocolConformance *conformance) const;
 };
 
 /// Describes an isolation error involving an associated conformance.

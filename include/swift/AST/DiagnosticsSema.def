@@ -2734,8 +2734,6 @@ WARNING(add_predates_concurrency_import,none,
 GROUPED_WARNING(remove_predates_concurrency_import,PreconcurrencyImport,
                 DefaultIgnore,
                 "'@preconcurrency' attribute on module %0 has no effect", (Identifier))
-NOTE(add_preconcurrency_to_conformance,none,
-     "add '@preconcurrency' to the %0 conformance to defer isolation checking to run time", (DeclName))
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",
         (Identifier))
@@ -5435,11 +5433,7 @@ ERROR(async_in_nonasync_function,none,
       (unsigned, bool))
 NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (const ValueDecl *))
-NOTE(note_add_nonisolated_to_decl,none,
-     "add 'nonisolated' to %0 to make this %kindonly0 not isolated to the actor",
-     (const ValueDecl *))
-NOTE(note_add_distributed_to_decl,none,
-     "add 'distributed' to %0 to make this %kindonly0 satisfy the protocol requirement",
+NOTE(note_non_distributed,none, "non-distributed %kind0",
      (const ValueDecl *))
 ERROR(invalid_isolated_calls_in_body,none,
      "calls to '@%0'-isolated' code in %kind1",
@@ -5671,6 +5665,11 @@ ERROR(distributed_actor_func_unsupported_specifier, none,
 ERROR(distributed_actor_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
       (DeclName, const ValueDecl *))
+ERROR(conformance_missing_distributed,none,
+      "conformance of %0 to distributed %kind1 uses non-distributed operations",
+      (Type, const ValueDecl *))
+NOTE(note_add_distributed_multi,none,
+     "mark all declarations used in the conformance 'distributed'", ())
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
      (DescriptiveDeclKind))
@@ -5689,16 +5688,28 @@ NOTE(shared_state_make_immutable,none,
      (const ValueDecl *))
 NOTE(shared_state_nonisolated_unsafe,none,
      "disable concurrency-safety checks if accesses are protected by an external synchronization mechanism", (const ValueDecl *))
-ERROR(actor_isolated_witness,none,
-     "%select{|distributed }0%1 %kind2 cannot be used to satisfy %3 "
-     "requirement from protocol %base4",
-     (bool, ActorIsolation, const ValueDecl *, ActorIsolation,
+NOTE(note_actor_isolated_witness,none,
+     "%0 %kind1 cannot be used to satisfy %2 "
+     "requirement from protocol %base3",
+     (ActorIsolation, const ValueDecl *, ActorIsolation,
       const ValueDecl *))
 ERROR(actor_cannot_conform_to_global_actor_protocol,none,
       "actor %0 cannot conform to global actor isolated protocol %1",
       (Type, Type))
 NOTE(protocol_isolated_to_global_actor_here,none,
      "%0 is isolated to global actor %1 here", (Type, Type))
+ERROR(conformance_mismatched_isolation,none,
+      "conformance of %0 to %kind1 involves isolation mismatches "
+      "and can cause data races",
+      (Type, const ValueDecl *))
+ERROR(conformance_mismatched_isolation_common,none,
+      "conformance of %0 to %kind1 crosses into %2 code and can cause "
+      "data races", (Type, const ValueDecl *, ActorIsolation))
+NOTE(note_make_conformance_preconcurrency,none,
+     "turn data races into runtime errors with '@preconcurrency'",
+     ())
+NOTE(note_make_witnesses_nonisolated,none,
+     "mark all declarations used in the conformance 'nonisolated'", ())
 
 ERROR(isolated_parameter_not_actor,none,
       "'isolated' parameter type %0 does not conform to 'Actor' "
@@ -8318,15 +8329,15 @@ ERROR(attr_abi_incompatible_with_silgen_name,none,
 ERROR(isolated_conformance_experimental_feature,none,
       "isolated conformances require experimental feature "
       " 'IsolatedConformances'", ())
+NOTE(note_isolate_conformance_to_global_actor,none,
+     "isolate this conformance to the %select{global actor %0|main actor}1 "
+     "with '@%2'", (Type, bool, StringRef))
+NOTE(note_depends_on_isolated_conformance,none,
+     "conformance depends on %0 conformance of %1 to %kind2",
+     (ActorIsolation, Type, const ValueDecl *))
 ERROR(nonisolated_conformance_depends_on_isolated_conformance,none,
       "conformance of %0 to %1 depends on %2 conformance of %3 to %4; mark it as '%5'",
       (Type, DeclName, ActorIsolation, Type, DeclName, StringRef))
-ERROR(isolated_conformance_mismatch_with_associated_isolation,none,
-      "%0 conformance of %1 to %2 cannot depend on %3 conformance of %4 to %5",
-      (ActorIsolation, Type, DeclName, ActorIsolation, Type, DeclName))
-NOTE(add_isolated_to_conformance,none,
-     "add '%0' to the %1 conformance to restrict it to %2 code",
-    (StringRef, DeclName, ActorIsolation))
 ERROR(isolated_conformance_with_sendable,none,
       "%4 conformance of %0 to %1 cannot be used to satisfy conformance "
       "requirement for a %select{`Sendable`|`SendableMetatype`}2 type "

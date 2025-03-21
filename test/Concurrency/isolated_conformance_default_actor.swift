@@ -37,10 +37,11 @@ extension CImplicitMainActor: Q {
   func g() { }
 }
 
-// expected-note@+2{{add '@preconcurrency' to the 'P' conformance to defer isolation checking to run time}}
-// expected-note@+1{{add '@MainActor' to the 'P' conformance to restrict it to main actor-isolated code}}
+// expected-error@+3{{conformance of 'CNonIsolated' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+// expected-note@+2{{turn data races into runtime errors with '@preconcurrency'}}
+// expected-note@+1{{isolate this conformance to the main actor with '@MainActor'}}{{33-33=@MainActor }}
 nonisolated class CNonIsolated: P {
-  @MainActor func f() { } // expected-error{{main actor-isolated instance method 'f()' cannot be used to satisfy nonisolated requirement from protocol 'P'}}
+  @MainActor func f() { } // expected-note{{main actor-isolated instance method 'f()' cannot be used to satisfy nonisolated requirement from protocol 'P'}}
 }
 
 func acceptSendablePMeta<T: Sendable & P>(_: T.Type) { }

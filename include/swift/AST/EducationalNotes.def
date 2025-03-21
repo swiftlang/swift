@@ -107,4 +107,9 @@ EDUCATIONAL_NOTES(actor_isolated_call_decl,
 EDUCATIONAL_NOTES(error_in_swift_lang_mode,
                   "error-in-future-swift-version.md")
 
+EDUCATIONAL_NOTES(conformance_mismatched_isolation,
+                  "conformance-isolation.md")
+EDUCATIONAL_NOTES(conformance_mismatched_isolation_common,
+                  "conformance-isolation.md")
+
 #undef EDUCATIONAL_NOTES

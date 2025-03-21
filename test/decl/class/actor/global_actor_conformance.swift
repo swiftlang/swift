@@ -29,16 +29,17 @@ protocol P2 {
   func asyncMethod3() async
 }
 
+// expected-warning@+1{{conformance of 'C1' to protocol 'P1' crosses into global actor 'GlobalActor'-isolated code and can cause data races}}
 class C1 : P1, P2 {
-  // expected-note@-1{{add '@preconcurrency' to the 'P1' conformance to defer isolation checking to run time}}
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
 
   typealias Assoc = String
 
   func method1() { }
 
-  @GenericGlobalActor<String> func method2() { } // expected-warning{{global actor 'GenericGlobalActor<String>'-isolated instance method 'method2()' cannot be used to satisfy global actor 'GenericGlobalActor<Int>'-isolated requirement from protocol 'P1'}}
+  @GenericGlobalActor<String> func method2() { } // expected-note{{global actor 'GenericGlobalActor<String>'-isolated instance method 'method2()' cannot be used to satisfy global actor 'GenericGlobalActor<Int>'-isolated requirement from protocol 'P1'}}
   @GenericGlobalActor<String >func method3() { }
-  @GlobalActor func method4() { } // expected-warning{{global actor 'GlobalActor'-isolated instance method 'method4()' cannot be used to satisfy nonisolated requirement from protocol 'P1'}}
+  @GlobalActor func method4() { } // expected-note{{global actor 'GlobalActor'-isolated instance method 'method4()' cannot be used to satisfy nonisolated requirement from protocol 'P1'}}
 
   // Okay: we can ignore the mismatch in global actor types for 'async' methods.
   func asyncMethod1() async { }
@@ -52,11 +53,11 @@ protocol NonIsolatedRequirement {
 
 @MainActor class OnMain {}
 
+// expected-warning@+1{{conformance of 'OnMain' to protocol 'NonIsolatedRequirement' crosses into main actor-isolated code}}
 extension OnMain: NonIsolatedRequirement {
-  // expected-note@-1{{add '@preconcurrency' to the 'NonIsolatedRequirement' conformance to defer isolation checking to run time}}
-
-  // expected-warning@+2 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated requirement from protocol 'NonIsolatedRequirement'}}
-  // expected-note@+1 {{add 'nonisolated' to 'requirement()' to make this instance method not isolated to the actor}}
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+  // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
+  // expected-note@+1 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated requirement from protocol 'NonIsolatedRequirement'}}
   func requirement() {}
 }
 
