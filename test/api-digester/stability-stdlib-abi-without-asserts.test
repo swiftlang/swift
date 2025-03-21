@@ -477,8 +477,8 @@ Constructor OpaquePointer.init(_:) has generic signature change from <T> to <T w
 Constructor OpaquePointer.init(_:) has mangled name changing from 'Swift.OpaquePointer.init<A>(Swift.Optional<Swift.UnsafePointer<A>>) -> Swift.Optional<Swift.OpaquePointer>' to 'Swift.OpaquePointer.init<A where A: ~Swift.Copyable>(Swift.Optional<Swift.UnsafePointer<A>>) -> Swift.Optional<Swift.OpaquePointer>'
 Constructor OpaquePointer.init(_:) has mangled name changing from 'Swift.OpaquePointer.init<A>(Swift.UnsafePointer<A>) -> Swift.OpaquePointer' to 'Swift.OpaquePointer.init<A where A: ~Swift.Copyable>(Swift.UnsafePointer<A>) -> Swift.OpaquePointer'
 Constructor OpaquePointer.init(_:) is now with @_preInverseGenerics
-Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
-Constructor Optional.init(_:) has mangled name changing from 'Swift.Optional.init(A) -> Swift.Optional<A>' to '(extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.init(A) -> Swift.Optional<A>'
+Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
+Constructor Optional.init(_:) has mangled name changing from 'Swift.Optional.init(A) -> Swift.Optional<A>' to '(extension in Swift):Swift.Optional< where A: ~Swift.Copyable>.init(A) -> Swift.Optional<A>'
 Constructor Optional.init(_:) has parameter 0 changing from Default to Owned
 Constructor Optional.init(_:) is now with @_preInverseGenerics
 Constructor Optional.init(nilLiteral:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
