@@ -194,6 +194,7 @@ public:
     bool HasIsRunning; // If false, the IsRunning flag is not valid.
     bool IsRunning;
     bool IsEnqueued;
+    bool IsComplete;
 
     bool HasThreadPort;
     uint32_t ThreadPort;
@@ -1779,6 +1780,7 @@ private:
         TaskStatusFlags & ActiveTaskStatusFlags::IsStatusRecordLocked;
     Info.IsEscalated = TaskStatusFlags & ActiveTaskStatusFlags::IsEscalated;
     Info.IsEnqueued = TaskStatusFlags & ActiveTaskStatusFlags::IsEnqueued;
+    Info.IsComplete = TaskStatusFlags & ActiveTaskStatusFlags::IsComplete;
 
     setIsRunning(Info, AsyncTaskObj.get());
     std::tie(Info.HasThreadPort, Info.ThreadPort) =
