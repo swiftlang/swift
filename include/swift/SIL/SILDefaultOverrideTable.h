@@ -236,6 +236,12 @@ public:
     /// The default override of `method` to be provided when `original` is
     /// present.
     SILFunction *impl;
+
+    /// Print the entry.
+    void print(llvm::raw_ostream &os, bool verbose = false) const;
+
+    /// Dump the entry to stderr.
+    void dump() const;
   };
 
 private:
@@ -304,6 +310,12 @@ public:
 
   /// Verify that the default override table is well-formed.
   void verify(const SILModule &M) const;
+
+  /// Print the default override table.
+  void print(llvm::raw_ostream &os, bool verbose = false) const;
+
+  /// Dump the default override table to stderr.
+  void dump() const;
 };
 
 } // namespace swift
