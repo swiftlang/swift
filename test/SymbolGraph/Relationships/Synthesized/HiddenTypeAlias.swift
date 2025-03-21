@@ -10,21 +10,7 @@
 // _InnerType's type name should only appear in quotes like this once, in the declaration for OuterType
 // INNER-COUNT-1: "_InnerType"
 
-// _InnerType.someFunc() as synthesized on OuterType
-// CHECK-DAG: "precise": "s:15HiddenTypeAlias06_InnerB0C8someFuncyyF::SYNTHESIZED::s:15HiddenTypeAlias05OuterB0a"
-
-// someFunc is a member of OuterType
-// CHECK-DAG: "kind": "memberOf",{{[[:space:]]*}}"source": "s:15HiddenTypeAlias06_InnerB0C8someFuncyyF::SYNTHESIZED::s:15HiddenTypeAlias05OuterB0a",{{[[:space:]]*}}"target": "s:15HiddenTypeAlias05OuterB0a"
-
-// OuterType conforms to SomeProtocol
-// CHECK-DAG: "kind": "conformsTo",{{[[:space:]]*}}"source": "s:15HiddenTypeAlias05OuterB0a",{{[[:space:]]*}}"target": "s:15HiddenTypeAlias12SomeProtocolP"
-
-// OuterType "inherits from" BaseType
-// CHECK-DAG: "kind": "inheritsFrom",{{[[:space:]]*}}"source": "s:15HiddenTypeAlias05OuterB0a",{{[[:space:]]*}}"target": "s:15HiddenTypeAlias04BaseB0C"
-
-// bonusFunc as a synthesized member of OuterType
-// CHECK-DAG: "precise": "s:15HiddenTypeAlias12SomeProtocolPAAE9bonusFuncyyF::SYNTHESIZED::s:15HiddenTypeAlias05OuterB0a",
-// CHECK-DAG: "kind": "memberOf",{{[[:space:]]*}}"source": "s:15HiddenTypeAlias12SomeProtocolPAAE9bonusFuncyyF::SYNTHESIZED::s:15HiddenTypeAlias05OuterB0a",{{[[:space:]]*}}"target": "s:15HiddenTypeAlias05OuterB0a",
+// CHECK-NOT: someFunc
 
 public protocol SomeProtocol {}
 
