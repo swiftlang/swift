@@ -285,7 +285,9 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-objc-attr-requires-foundation-module>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>")
-
+target_compile_options(swiftCore INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-I \"$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>\">"
+  "$<$<AND:$<COMPILE_LANGUAGE:Swift>,$<PLATFORM_ID:Windows>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>")
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
   # Using these in MinSizeRel would result in a 15% increase in the binary size
   target_compile_options(swiftCore PRIVATE
