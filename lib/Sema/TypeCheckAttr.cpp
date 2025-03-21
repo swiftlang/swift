@@ -33,6 +33,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -8308,6 +8309,25 @@ public:
       }
 
       return; // it's OK
+    }
+
+    auto declRef = evaluateOrDefault(
+      ctx.evaluator,
+      ResolveMacroRequest{attr, closure},
+      ConcreteDeclRef());
+
+    auto *decl = declRef.getDecl();
+    if (auto *macro = dyn_cast_or_null<MacroDecl>(decl)) {
+      if (macro->getMacroRoles().contains(MacroRole::Body)) {
+        if (!ctx.LangOpts.hasFeature(Feature::ClosureBodyMacro)) {
+          ctx.Diags.diagnose(
+              attr->getLocation(),
+              diag::experimental_closure_body_macro);
+        }
+
+        // Function body macros are allowed on closures.
+        return;
+      }
     }
 
     // Otherwise, it's an error.

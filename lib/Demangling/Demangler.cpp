@@ -4486,7 +4486,7 @@ NodePointer Demangler::demangleMacroExpansion() {
     context = popContext();
   NodePointer discriminator = demangleIndexAsNode();
   NodePointer result;
-  if (isAttached) {
+  if (isAttached && attachedName) {
     result = createWithChildren(
         kind, context, attachedName, macroName, discriminator);
   } else {

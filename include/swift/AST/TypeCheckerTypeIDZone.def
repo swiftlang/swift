@@ -531,7 +531,7 @@ SWIFT_REQUEST(TypeChecker, ExpandPreambleMacroRequest,
               ArrayRef<unsigned>(AbstractFunctionDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExpandBodyMacroRequest,
-              std::optional<unsigned>(AbstractFunctionDecl *),
+              std::optional<unsigned>(AnyFunctionRef),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LocalDiscriminatorsRequest,
               unsigned(DeclContext *),
