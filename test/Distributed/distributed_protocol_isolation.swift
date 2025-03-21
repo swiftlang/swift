@@ -108,22 +108,22 @@ distributed actor Nope1_StrictlyLocal: StrictlyLocal {
   // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
 
   func local() {}
-  // expected-note@-1{{actor-isolated instance method 'local()' cannot be used to satisfy nonisolated requirement from protocol 'StrictlyLocal'}}
+  // expected-note@-1{{actor-isolated instance method 'local()' cannot satisfy nonisolated requirement}}
   func localThrows() throws {}
-  // expected-note@-1{{actor-isolated instance method 'localThrows()' cannot be used to satisfy nonisolated requirement from protocol 'StrictlyLocal'}}
+  // expected-note@-1{{actor-isolated instance method 'localThrows()' cannot satisfy nonisolated requirement}}
   func localAsync() async {}
-  // expected-note@-1{{actor-isolated instance method 'localAsync()' cannot be used to satisfy nonisolated requirement from protocol 'StrictlyLocal'}}
+  // expected-note@-1{{actor-isolated instance method 'localAsync()' cannot satisfy nonisolated requirement}}
 }
 
 // expected-error@+1{{conformance of 'Nope2_StrictlyLocal' to protocol 'StrictlyLocal' involves isolation mismatches and can cause data races}}
 distributed actor Nope2_StrictlyLocal: StrictlyLocal {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
   distributed func local() {}
-  // expected-note@-1{{actor-isolated distributed instance method 'local()' cannot be used to satisfy nonisolated requirement from protocol 'StrictlyLocal'}}
+  // expected-note@-1{{actor-isolated distributed instance method 'local()' cannot satisfy nonisolated requirement}}
   distributed func localThrows() throws {}
-  // expected-note@-1{{actor-isolated distributed instance method 'localThrows()' cannot be used to satisfy nonisolated requirement from protocol 'StrictlyLocal'}}
+  // expected-note@-1{{actor-isolated distributed instance method 'localThrows()' cannot satisfy nonisolated requirement}}
   distributed func localAsync() async {}
-  // expected-note@-1{{actor-isolated distributed instance method 'localAsync()' cannot be used to satisfy nonisolated requirement from protocol 'StrictlyLocal'}}
+  // expected-note@-1{{actor-isolated distributed instance method 'localAsync()' cannot satisfy nonisolated requirement}}
 }
 distributed actor OK_StrictlyLocal: StrictlyLocal {
   nonisolated func local() {}
@@ -207,7 +207,7 @@ distributed actor DA_TerminationWatchingA: TerminationWatchingA {
   // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
 
   func terminated(a: String) { }
-  // expected-note@-1{{actor-isolated instance method 'terminated(a:)' cannot be used to satisfy nonisolated requirement from protocol 'TerminationWatchingA'}}
+  // expected-note@-1{{actor-isolated instance method 'terminated(a:)' cannot satisfy nonisolated requirement}}
 }
 
 distributed actor DA_TerminationWatchingDA: TerminationWatchingDA {

@@ -4795,8 +4795,7 @@ void WitnessIsolationError::diagnose(
   // Complain that this witness cannot conform to the requirement due to
   // actor isolation.
   witness->diagnose(diag::note_actor_isolated_witness,
-                    referenceIsolation, witness, requirementIsolation,
-                    conformance->getProtocol());
+                    referenceIsolation, witness, requirementIsolation);
 }
 
 void AssociatedConformanceIsolationError::diagnose(

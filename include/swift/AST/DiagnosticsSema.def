@@ -5689,10 +5689,8 @@ NOTE(shared_state_make_immutable,none,
 NOTE(shared_state_nonisolated_unsafe,none,
      "disable concurrency-safety checks if accesses are protected by an external synchronization mechanism", (const ValueDecl *))
 NOTE(note_actor_isolated_witness,none,
-     "%0 %kind1 cannot be used to satisfy %2 "
-     "requirement from protocol %base3",
-     (ActorIsolation, const ValueDecl *, ActorIsolation,
-      const ValueDecl *))
+     "%0 %kind1 cannot satisfy %2 requirement",
+     (ActorIsolation, const ValueDecl *, ActorIsolation))
 ERROR(actor_cannot_conform_to_global_actor_protocol,none,
       "actor %0 cannot conform to global actor isolated protocol %1",
       (Type, Type))
@@ -8339,11 +8337,11 @@ ERROR(nonisolated_conformance_depends_on_isolated_conformance,none,
       "conformance of %0 to %1 depends on %2 conformance of %3 to %4; mark it as '%5'",
       (Type, DeclName, ActorIsolation, Type, DeclName, StringRef))
 ERROR(isolated_conformance_with_sendable,none,
-      "%4 conformance of %0 to %1 cannot be used to satisfy conformance "
+      "%4 conformance of %0 to %1 cannot satisfy conformance "
       "requirement for a %select{`Sendable`|`SendableMetatype`}2 type "
       "parameter %3", (Type, DeclName, bool, Type, ActorIsolation))
 ERROR(isolated_conformance_with_sendable_simple,none,
-      "%2 conformance of %0 to %1 cannot be used to satisfy "
+      "%2 conformance of %0 to %1 cannot satisfy "
       "conformance requirement for a `Sendable` type parameter ",
       (Type, DeclName, ActorIsolation))
 ERROR(isolated_conformance_wrong_domain,none,

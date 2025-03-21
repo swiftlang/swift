@@ -40,28 +40,28 @@ actor OtherActor: SyncProtocol {
   // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
 
   var propertyB: Int = 17
-  // expected-note@-1{{actor-isolated property 'propertyB' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
+  // expected-note@-1{{actor-isolated property 'propertyB' cannot satisfy nonisolated requirement}}
 
   var propertyA: Int { 17 }
-  // expected-note@-1{{actor-isolated property 'propertyA' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
+  // expected-note@-1{{actor-isolated property 'propertyA' cannot satisfy nonisolated requirement}}
 
   func syncMethodA() { }
-  // expected-note@-1{{actor-isolated instance method 'syncMethodA()' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
+  // expected-note@-1{{actor-isolated instance method 'syncMethodA()' cannot satisfy nonisolated requirement}}
 
   // nonisolated methods are okay.
   nonisolated func syncMethodC() -> Int { 5 }
 
   func syncMethodE() -> Void { }
-  // expected-note@-1{{actor-isolated instance method 'syncMethodE()' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
+  // expected-note@-1{{actor-isolated instance method 'syncMethodE()' cannot satisfy nonisolated requirement}}
 
   func syncMethodF(param: String) -> Int { 5 }
-  // expected-note@-1{{actor-isolated instance method 'syncMethodF(param:)' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
+  // expected-note@-1{{actor-isolated instance method 'syncMethodF(param:)' cannot satisfy nonisolated requirement}}
 
   func syncMethodG() { }
-  // expected-note@-1{{actor-isolated instance method 'syncMethodG()' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
+  // expected-note@-1{{actor-isolated instance method 'syncMethodG()' cannot satisfy nonisolated requirement}}
 
   subscript (index: Int) -> String { "\(index)" }
-  // expected-note@-1{{actor-isolated subscript 'subscript(_:)' cannot be used to satisfy nonisolated requirement from protocol 'SyncProtocol'}}
+  // expected-note@-1{{actor-isolated subscript 'subscript(_:)' cannot satisfy nonisolated requirement}}
 
   // Static methods and properties are okay.
   static func staticMethod() { }

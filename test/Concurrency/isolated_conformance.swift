@@ -17,7 +17,7 @@ protocol P {
 @MainActor
 class CWithNonIsolated: P {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
-  func f() { } // expected-note{{main actor-isolated instance method 'f()' cannot be used to satisfy nonisolated requirement from protocol 'P'}}
+  func f() { } // expected-note{{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
 }
 
 actor SomeActor { }
@@ -108,8 +108,8 @@ struct PSendableMetaWrapper<T: P & SendableMetatype>: P {
 @MainActor
 func testIsolationConformancesInTypes() {
   typealias A1 = PWrapper<C>
-  typealias A2 = PSendableWrapper<C> // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter 'T'}}
-  typealias A3 = PSendableMetaWrapper<C> // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `SendableMetatype` type parameter 'T'}}
+  typealias A2 = PSendableWrapper<C> // expected-error{{isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a `Sendable` type parameter 'T'}}
+  typealias A3 = PSendableMetaWrapper<C> // expected-error{{isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a `SendableMetatype` type parameter 'T'}}
 }
 
 func acceptP<T: P>(_: T) { }
@@ -124,20 +124,20 @@ func acceptSendableMetaP<T: SendableMetatype & P>(_: T) { }
 func testIsolationConformancesInCall(c: C) {
   acceptP(c) // okay
 
-  acceptSendableP(c) // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter}}
-  acceptSendableMetaP(c) // expected-error{{isolated conformance of 'C' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter}}
+  acceptSendableP(c) // expected-error{{main actor-isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a `Sendable` type parameter}}
+  acceptSendableMetaP(c) // expected-error{{isolated conformance of 'C' to 'P' cannot satisfy conformance requirement for a `Sendable` type parameter}}
 }
 
 @MainActor
 func testIsolatedConformancesOfActor(a: SomeActor) {
   acceptP(a)
-  acceptSendableMetaP(a) // expected-error{{main actor-isolated conformance of 'SomeActor' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter}}
+  acceptSendableMetaP(a) // expected-error{{main actor-isolated conformance of 'SomeActor' to 'P' cannot satisfy conformance requirement for a `Sendable` type parameter}}
 }
 
 @SomeGlobalActor
 func testIsolatedConformancesOfOtherGlobalActor(c: CMismatchedIsolation) {
   acceptP(c)
-  acceptSendableMetaP(c)  // expected-error{{global actor 'SomeGlobalActor'-isolated conformance of 'CMismatchedIsolation' to 'P' cannot be used to satisfy conformance requirement for a `Sendable` type parameter}}
+  acceptSendableMetaP(c)  // expected-error{{global actor 'SomeGlobalActor'-isolated conformance of 'CMismatchedIsolation' to 'P' cannot satisfy conformance requirement for a `Sendable` type parameter}}
 }
 
 func testIsolationConformancesFromOutside(c: C) {

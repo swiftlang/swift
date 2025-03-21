@@ -37,9 +37,9 @@ class C1 : P1, P2 {
 
   func method1() { }
 
-  @GenericGlobalActor<String> func method2() { } // expected-note{{global actor 'GenericGlobalActor<String>'-isolated instance method 'method2()' cannot be used to satisfy global actor 'GenericGlobalActor<Int>'-isolated requirement from protocol 'P1'}}
+  @GenericGlobalActor<String> func method2() { } // expected-note{{global actor 'GenericGlobalActor<String>'-isolated instance method 'method2()' cannot satisfy global actor 'GenericGlobalActor<Int>'-isolated requirement}}
   @GenericGlobalActor<String >func method3() { }
-  @GlobalActor func method4() { } // expected-note{{global actor 'GlobalActor'-isolated instance method 'method4()' cannot be used to satisfy nonisolated requirement from protocol 'P1'}}
+  @GlobalActor func method4() { } // expected-note{{global actor 'GlobalActor'-isolated instance method 'method4()' cannot satisfy nonisolated requirement}}
 
   // Okay: we can ignore the mismatch in global actor types for 'async' methods.
   func asyncMethod1() async { }
@@ -57,7 +57,7 @@ protocol NonIsolatedRequirement {
 extension OnMain: NonIsolatedRequirement {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
   // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
-  // expected-note@+1 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated requirement from protocol 'NonIsolatedRequirement'}}
+  // expected-note@+1 {{main actor-isolated instance method 'requirement()' cannot satisfy nonisolated requirement}}
   func requirement() {}
 }
 

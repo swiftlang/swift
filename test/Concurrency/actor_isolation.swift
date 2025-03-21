@@ -1514,7 +1514,7 @@ class SGA_MA: MA, SGA_Proto {
   // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
   
   // expected-error@+2 {{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
-  // expected-note@+1 {{main actor-isolated instance method 'method()' cannot be used to satisfy global actor 'SomeGlobalActor'-isolated requirement from protocol 'SGA_Proto'}}
+  // expected-note@+1 {{main actor-isolated instance method 'method()' cannot satisfy global actor 'SomeGlobalActor'-isolated requirement}}
   override func method() { onions_sga() }
 }
 
@@ -1624,7 +1624,7 @@ protocol NonisolatedProtocol {
 actor ActorWithNonSendableLet: NonisolatedProtocol {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{32-32=@preconcurrency }}
 
-  // expected-note@+1 {{actor-isolated property 'ns' cannot be used to satisfy nonisolated requirement from protocol 'NonisolatedProtocol'}}
+  // expected-note@+1 {{actor-isolated property 'ns' cannot satisfy nonisolated requirement}}
   let ns = NonSendable()
 }
 

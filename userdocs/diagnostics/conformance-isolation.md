@@ -23,7 +23,7 @@ This code will produce an error similar to:
 |        |- note: mark all declarations used in the conformance 'nonisolated'
 |        `- note: turn data races into runtime errors with '@preconcurrency'
 |   func f() { }
-|        `- note: main actor-isolated instance method 'f()' cannot be used to satisfy nonisolated requirement from protocol 'P'
+|        `- note: main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement
 | }
 ```
 

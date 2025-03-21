@@ -180,7 +180,7 @@ struct S3: InferenceConflict {
 extension S3 {
 
   func f() { }
-  // expected-note@-1{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot be used to satisfy main actor-isolated requirement from protocol 'InferMainActorInherited'}}
+  // expected-note@-1{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot satisfy main actor-isolated requirement}}
 }
 
 @MainActor
@@ -211,7 +211,7 @@ class C2: MainActorSuperclass, InferenceConflictWithSuperclass {
   func f() {}
 
   func g() {}
-  // expected-note@-1 {{main actor-isolated instance method 'g()' cannot be used to satisfy nonisolated requirement from protocol 'InferenceConflictWithSuperclass'}}
+  // expected-note@-1 {{main actor-isolated instance method 'g()' cannot satisfy nonisolated requirement}}
 }
 
 

@@ -108,7 +108,7 @@ final class K : @preconcurrency Initializable {
 final class MainActorK: Initializable {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{25-25=@preconcurrency }}
   // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
-  init() { } // expected-note{{main actor-isolated initializer 'init()' cannot be used to satisfy nonisolated requirement from protocol 'Initializable'}}
+  init() { } // expected-note{{main actor-isolated initializer 'init()' cannot satisfy nonisolated requirement}}
 }
 
 protocol WithAssoc {
@@ -143,13 +143,13 @@ do {
     var a: Int = 42
 
     @MainActor var b: Int {
-      // expected-note@-1 {{main actor-isolated property 'b' cannot be used to satisfy global actor 'GlobalActor'-isolated requirement from protocol 'WithIndividuallyIsolatedRequirements'}}
+      // expected-note@-1 {{main actor-isolated property 'b' cannot satisfy global actor 'GlobalActor'-isolated requirement}}
       get { 0 }
       set {}
     }
 
     @MainActor func test() {
-      // expected-note@-1 {{main actor-isolated instance method 'test()' cannot be used to satisfy global actor 'GlobalActor'-isolated requirement from protocol 'WithIndividuallyIsolatedRequirements'}}
+      // expected-note@-1 {{main actor-isolated instance method 'test()' cannot satisfy global actor 'GlobalActor'-isolated requirement}}
     }
   }
 }
@@ -166,10 +166,10 @@ do {
     // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}{{38-54=}}
 
     @GlobalActor var prop: Int = 42
-    // expected-note@-1 {{global actor 'GlobalActor'-isolated property 'prop' cannot be used to satisfy main actor-isolated requirement from protocol 'WithNonIsolated'}}
+    // expected-note@-1 {{global actor 'GlobalActor'-isolated property 'prop' cannot satisfy main actor-isolated requirement}}
 
     @MainActor func test() {}
-    // expected-note@-1 {{main actor-isolated instance method 'test()' cannot be used to satisfy nonisolated requirement from protocol 'WithNonIsolated'}}
+    // expected-note@-1 {{main actor-isolated instance method 'test()' cannot satisfy nonisolated requirement}}
   }
 }
 
@@ -237,7 +237,7 @@ do {
     // expected-note@-2:45 {{turn data races into runtime errors with '@preconcurrency'}}
     // expected-note@-3{{mark all declarations used in the conformance 'nonisolated'}}
     func foo() {}
-    // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot be used to satisfy nonisolated requirement from protocol 'P2'}}
+    // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot satisfy nonisolated requirement}}
   }
   // expected-warning@+1{{conformance of 'S5' to protocol 'P2' crosses into main actor-isolated code and can cause data races; this is an error in the Swift 6 language mode}}
   @MainActor struct S5: P2, @preconcurrency P3 {
@@ -245,7 +245,7 @@ do {
     // expected-note@-2:25 {{turn data races into runtime errors with '@preconcurrency'}}
     // expected-note@-3{{mark all declarations used in the conformance 'nonisolated'}}
     func foo() {}
-    // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot be used to satisfy nonisolated requirement from protocol 'P2'}}
+    // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot satisfy nonisolated requirement}}
   }
   // expected-warning@+1 {{@preconcurrency attribute on conformance to 'P3' has no effect}}
   @MainActor struct S6: @preconcurrency P2, @preconcurrency P3 {
@@ -305,7 +305,7 @@ do {
     // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
     // expected-note@-3{{mark all declarations used in the conformance 'nonisolated'}}
     func foo() {}
-    // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot be used to satisfy nonisolated requirement from protocol 'P2'}}
+    // expected-note@-1 {{main actor-isolated instance method 'foo()' cannot satisfy nonisolated requirement}}
   }
 }
 

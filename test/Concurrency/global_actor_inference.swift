@@ -128,7 +128,7 @@ protocol Interface {
 class Object: Interface {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{15-15=@preconcurrency }}
 
-  var baz: Int = 42 // expected-note{{main actor-isolated property 'baz' cannot be used to satisfy nonisolated requirement from protocol 'Interface'}}
+  var baz: Int = 42 // expected-note{{main actor-isolated property 'baz' cannot satisfy nonisolated requirement}}
 }
 
 

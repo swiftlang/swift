@@ -86,6 +86,6 @@ distributed actor A: P {
   // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
   typealias ActorSystem = LocalTestingDistributedActorSystem
   distributed func foo() { }
-  // expected-note@-1{{actor-isolated distributed instance method 'foo()' cannot be used to satisfy nonisolated requirement from protocol 'P'}}
+  // expected-note@-1{{actor-isolated distributed instance method 'foo()' cannot satisfy nonisolated requirement}}
 }
 // ---
