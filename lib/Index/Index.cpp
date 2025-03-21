@@ -30,10 +30,12 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -431,6 +433,7 @@ struct MappedLoc {
 
 class IndexSwiftASTWalker : public SourceEntityWalker {
   IndexDataConsumer &IdxConsumer;
+  ASTContext &Ctx;
   SourceManager &SrcMgr;
   std::optional<unsigned> BufferID;
   bool enableWarnings;
@@ -467,6 +470,31 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   // to the captured "x" in the enclosing scope. Also includes shorthand if
   // let bindings.
   llvm::DenseMap<ValueDecl *, ValueDecl *> sameNamedCaptures;
+
+  bool isImporterSynthesizedWrapper(ValueDecl *D) {
+    const ClangImporterSynthesizedTypeAttr *attr =
+        D->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>();
+    if (!attr) {
+      const VarDecl *var = dyn_cast_or_null<VarDecl>(D);
+      if (!var) {
+        return false;
+      }
+      const NominalTypeDecl *type =
+          var->getDeclContext()->getSelfNominalTypeDecl();
+      if (!type ||
+          !type->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>()) {
+        return false;
+      }
+      attr = type->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>();
+    }
+    switch (attr->getKind()) {
+    case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapper:
+    case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon:
+      return true;
+    default:
+      return false;
+    }
+  }
 
   bool getNameAndUSR(ValueDecl *D, ExtensionDecl *ExtD,
                      StringRef &name, StringRef &USR) {
@@ -594,7 +622,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
                       SourceFile *SF = nullptr)
-      : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr),
+      : IdxConsumer(IdxConsumer), Ctx(Ctx), SrcMgr(Ctx.SourceMgr),
         BufferID(SF ? std::optional(SF->getBufferID()) : std::nullopt),
         enableWarnings(IdxConsumer.enableWarnings()) {}
 
@@ -899,6 +927,23 @@ private:
         CtorInfo.roles |= (unsigned)SymbolRole::Implicit;
       if (!reportRef(CtorTyRef, Loc, CtorInfo, Data.AccKind))
         return false;
+    }
+
+    if (isImporterSynthesizedWrapper(D)) {
+      auto *Importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+      const ClangNode node = Importer->getEffectiveClangNode(D);
+      if (!node.isNull()) {
+        if (auto named = dyn_cast_or_null<clang::NamedDecl>(node.getAsDecl())) {
+          if (const auto imported = Importer->importDeclCached(named)) {
+            if (imported && imported.has_value()) {
+              if (ValueDecl *VD =
+                      dyn_cast_or_null<ValueDecl>(imported.value())) {
+                D = VD;
+              }
+            }
+          }
+        }
+      }
     }
 
     if (auto *GenParam = dyn_cast<GenericTypeParamDecl>(D)) {

@@ -2000,6 +2000,8 @@ namespace {
             nominal->addMember(decl);
           };
 
+          Impl.ImportedDecls[{constant->getCanonicalDecl(), getVersion()}] =
+              enumeratorDecl;
           addDecl(result, enumeratorDecl);
           for (auto *variant : variantDecls)
             addDecl(result, variant);
