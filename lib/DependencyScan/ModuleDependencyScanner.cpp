@@ -870,7 +870,7 @@ ModuleDependencyScanner::resolveAllClangModuleDependencies(
         {
           std::lock_guard<std::mutex> guard(cacheAccessLock);
           // Check to see if there are any modules not resolved yet.
-          for (const auto &ID : moduleIDs) {
+          for (StringRef ID : moduleIDs) {
             if (!cache.hasDependency(ID, ModuleDependencyKind::Clang))
               unresolvedModules.push_back(ID);
           }
@@ -913,38 +913,42 @@ ModuleDependencyScanner::resolveAllClangModuleDependencies(
         }
       };
 
-  auto batchResolveModuleDependencies = [&](const auto &unreslovedModuleIDs) {
-    std::vector<StringRef> unresolvedModuleNames(
-        unreslovedModuleIDs.keys().begin(), unreslovedModuleIDs.keys().end());
-    std::transform(unresolvedModuleNames.begin(), unresolvedModuleNames.end(),
-                   unresolvedModuleNames.begin(), [&](auto Key) {
-                     return getModuleImportIdentifier(Key).str();
-                   });
-    auto chunkResults = std::div((int)unreslovedModuleIDs.size(), NumThreads);
+  auto batchResolveModuleDependencies = [&](const auto &unresolvedModuleNames) {
+    auto chunkResults = std::div((int)unresolvedModuleNames.size(), NumThreads);
     const size_t chunkSize = chunkResults.quot;
     const size_t remainingSize = chunkResults.rem;
 
-    auto unresolvedModuleNamesIt = unresolvedModuleNames.begin();
     size_t numOfUnresolvedModules = unresolvedModuleNames.size();
+    ArrayRef<StringRef> namesRef(unresolvedModuleNames);
+    size_t current = 0;
     for (size_t i = 0; i + remainingSize < numOfUnresolvedModules;
          i += chunkSize) {
-      std::vector<StringRef> batchedNames(
-          unresolvedModuleNamesIt, (unresolvedModuleNamesIt + chunkSize));
-      ScanningThreadPool.async(scanDependencyForListOfClangModules,
-                               batchedNames);
-      unresolvedModuleNamesIt += chunkSize;
+      ArrayRef<StringRef> batch = namesRef.slice(current, chunkSize);
+      ScanningThreadPool.async(scanDependencyForListOfClangModules, batch);
+      current += chunkSize;
     }
 
     if (remainingSize) {
-      std::vector<StringRef> remainingNames(
-          unresolvedModuleNamesIt, (unresolvedModuleNamesIt + remainingSize));
-      ScanningThreadPool.async(scanDependencyForListOfClangModules,
-                               remainingNames);
+      ArrayRef<StringRef> batch = namesRef.slice(current, remainingSize);
+      ScanningThreadPool.async(scanDependencyForListOfClangModules, batch);
     }
   };
 
-  batchResolveModuleDependencies(unresolvedImportIdentifiers);
-  batchResolveModuleDependencies(unresolvedOptionalImportIdentifiers);
+  auto getModuleNames = [&](const auto &unresolvedIdentifiers,
+                            auto &unresolvedNames) {
+    llvm::for_each(unresolvedIdentifiers.keys(), [&](auto key) {
+      unresolvedNames.emplace_back(getModuleImportIdentifier(key).str());
+    });
+  };
+
+  std::vector<StringRef> unresolvedImportNames;
+  std::vector<StringRef> unresolvedOptionalImportNames;
+  getModuleNames(unresolvedImportIdentifiers, unresolvedImportNames);
+  getModuleNames(unresolvedOptionalImportIdentifiers,
+                 unresolvedOptionalImportNames);
+
+  batchResolveModuleDependencies(unresolvedImportNames);
+  batchResolveModuleDependencies(unresolvedOptionalImportNames);
   ScanningThreadPool.wait();
 
   // Use the computed scan results to update the dependency info
