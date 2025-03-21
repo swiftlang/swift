@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Strings.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -5348,9 +5349,40 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
 
   // Prefer module names earlier in the alphabet.
   if (dc1->isModuleScopeContext() && dc2->isModuleScopeContext()) {
-    auto module1 = dc1->getParentModule();
-    auto module2 = dc2->getParentModule();
-    if (int result = module1->getName().str().compare(module2->getName().str()))
+    // For protocol declarations specifically, the order here is part
+    // of the ABI, and so we must take care to get the correct module
+    // name for the comparison.
+    auto getModuleNameForOrder = [&](const TypeDecl *decl) -> StringRef {
+      // Respect @_originallyDefinedIn on the type itself, so that
+      // moving a protocol across modules does not change its
+      // position in the order.
+      auto alternateName = decl->getAlternateModuleName();
+      if (!alternateName.empty())
+        return alternateName;
+
+      // This used to just call getName(), which caused accidental ABI breaks
+      // when a module is imported under different aliases.
+      //
+      // Note that getRealName() just looks through module aliases, while
+      // getABIName() is what the mangler actually uses.
+      //
+      // Now, we try to use getABIName() for everything, except for one
+      // obvious case where it would cause an ABI break: types in the
+      // _Concurrency module use the module's real name, and not it's ABI
+      // name, which is "Swift". This means the following generic signature,
+      // for example, has the "wrong" requirement order than what we expect
+      // if we look at the mangling, because we mangle the second protocol
+      // as "Swift.Executor":
+      //
+      // <T: Swift.Sequence & _Concurrency.Executor>
+      //
+      auto *module = decl->getDeclContext()->getParentModule();
+      if (module->getRealName().str() == SWIFT_CONCURRENCY_NAME)
+        return module->getRealName().str();
+      return module->getABIName().str();
+    };
+
+    if (int result = getModuleNameForOrder(type1).compare(getModuleNameForOrder(type2)))
       return result;
   }
 
