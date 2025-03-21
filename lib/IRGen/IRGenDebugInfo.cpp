@@ -1175,11 +1175,10 @@ private:
     }
 
     llvm::DINodeArray BoundParams = collectGenericParams(Type);
-    auto DITy = createStruct(
+    llvm::DICompositeType *DITy = createStruct(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
         DBuilder.getOrCreateArray(Elements), BoundParams, SpecificationOf);
-    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
-    return DITy;
+    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
   /// Creates debug info for a generic struct or class with archetypes (e.g.:
@@ -1219,11 +1218,10 @@ private:
       Elements.push_back(DITy);
     }
 
-    auto DITy = DBuilder.createStructType(
+    llvm::DICompositeType *DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
         DBuilder.getOrCreateArray(Elements), RuntimeLang, nullptr, UniqueID);
-    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
-    return DITy;
+    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
   std::pair<bool, Type> getUnsubstitutedType(Type Ty, StringRef MangledName) {
@@ -1265,11 +1263,10 @@ private:
     // Force the creation of the unsubstituted type, don't create it
     // directly so it goes through all the caching/verification logic.
     auto UnsubstitutedDITy = getOrCreateType(UnsubstitutedDbgTy);
-    auto DIType = createOpaqueStruct(
+    llvm::DICompositeType *DIType = createOpaqueStruct(
         Scope, "", File, 0, SizeInBits, AlignInBits, Flags, MangledName,
         collectGenericParams(EnumTy), UnsubstitutedDITy);
-    DBuilder.replaceTemporary(std::move(FwdDecl), DIType);
-    return DIType;
+    return DBuilder.replaceTemporary(std::move(FwdDecl), DIType);
   }
 
   /// Create a DICompositeType from a specialized struct. A specialized type
@@ -1341,8 +1338,7 @@ private:
         Scope, Decl ? Decl->getNameStr() : "", File, Line, SizeInBits,
         AlignInBits, Flags, MangledName, collectGenericParams(Type),
         UnsubstitutedDITy);
-    DBuilder.replaceTemporary(std::move(FwdDecl), SpecializedDITy);
-    return SpecializedDITy;
+    return DBuilder.replaceTemporary(std::move(FwdDecl), SpecializedDITy);
   }
 
   /// Create debug information for an enum with a raw type (enum E : Int {}).
@@ -1385,13 +1381,12 @@ private:
     }
 
     auto EnumType = getOrCreateType(*ElemDbgTy);
-    auto DITy = DBuilder.createEnumerationType(
+    llvm::DICompositeType *DITy = DBuilder.createEnumerationType(
         Scope, Name, File, Line, SizeInBits, AlignInBits,
         DBuilder.getOrCreateArray(Elements), EnumType,
         llvm::dwarf::DW_LANG_Swift, MangledName, false);
 
-    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
-    return DITy;
+    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
   /// Create debug information for an enum with no raw type.
@@ -1452,12 +1447,11 @@ private:
         Scope, {}, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
         DBuilder.getOrCreateArray(Elements), /*UniqueIdentifier=*/"");
 
-    auto DITy = DBuilder.createStructType(
+    llvm::DICompositeType *DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
         DBuilder.getOrCreateArray(VPTy), llvm::dwarf::DW_LANG_Swift, nullptr,
         MangledName, nullptr, NumExtraInhabitants ? *NumExtraInhabitants : 0);
-    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
-    return DITy;
+    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
   // Create debug information for an enum with no raw type.
@@ -1506,12 +1500,11 @@ private:
                                            AlignInBits, Flags, nullptr,
                                            DBuilder.getOrCreateArray(Elements));
 
-    auto DITy = DBuilder.createStructType(
+    llvm::DICompositeType *DITy = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
         DBuilder.getOrCreateArray(VPTy), llvm::dwarf::DW_LANG_Swift, nullptr,
         MangledName, nullptr, NumExtraInhabitants.value_or(0));
-    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
-    return DITy;
+    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
   llvm::DICompositeType *createEnumType(CompletedDebugTypeInfo DbgTy,
@@ -1721,8 +1714,7 @@ private:
       DITy = createPointerSizedStruct(Scope, MangledName, FnTy, MainFile, 0,
                                       Flags, MangledName);
     }
-    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
-    return DITy;
+    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
   llvm::DIType *createTuple(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
@@ -1749,14 +1741,13 @@ private:
         DbgTy.getType(), Scope, MainFile, 0, SizeInBits, AlignInBits, Flags,
         MangledName, MangledName);
 
-    auto DITy = DBuilder.createStructType(
+    llvm::DICompositeType *DITy = DBuilder.createStructType(
         Scope, MangledName, MainFile, 0, SizeInBits, AlignInBits, Flags,
         nullptr, // DerivedFrom
         DBuilder.getOrCreateArray(Elements), llvm::dwarf::DW_LANG_Swift,
         nullptr, MangledName);
 
-    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
-    return DITy;
+    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
   llvm::DICompositeType *
@@ -2124,13 +2115,12 @@ private:
         Protocols.push_back(
             DBuilder.createInheritance(FwdDecl.get(), PDITy, 0, 0, Flags));
       }
-      auto DITy = DBuilder.createStructType(
+      llvm::DICompositeType *DITy = DBuilder.createStructType(
           Scope, MangledName, L.File, FwdDeclLine, SizeInBits, AlignInBits,
           Flags, DerivedFrom, DBuilder.getOrCreateArray(Protocols),
           llvm::dwarf::DW_LANG_Swift, nullptr);
 
-      DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
-      return DITy;
+      return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
     }
 
     case TypeKind::ExistentialMetatype:
