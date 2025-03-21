@@ -47,7 +47,7 @@ struct Allocation<T>: ~Copyable {
       count = initialized.count
     }
     catch {
-      outputBuffer.deinitialize()
+      outputBuffer.removeAll()
       let empty = outputBuffer.relinquishBorrowedMemory()
       assert(empty.baseAddress == allocation)
       assert(empty.count == 0)
@@ -123,7 +123,7 @@ suite.test("append single elements")
     for i in 0...c {
       $0.append(i)
     }
-    let oops = $0.deinitializeLastElement()
+    let oops = $0.removeLast()
     expectEqual(oops, c)
   }
   a.withSpan {
@@ -170,7 +170,7 @@ suite.test("initialize buffer with repeated elements")
   let c = 10
   a.initialize {
     $0.append(repeating: c, count: c)
-    let oops = $0.deinitializeLastElement()
+    let oops = $0.removeLast()
     expectEqual(oops, c)
     expectEqual($0.count, c-1)
   }
