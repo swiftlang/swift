@@ -464,6 +464,8 @@ extension LifetimeDependence.Scope {
         range.insert(inst)
       case let li as LoadInst where li.loadOwnership == .take:
         range.insert(inst)
+      case is EndBorrowInst:
+        range.insert(inst)
       default:
         break
       }
