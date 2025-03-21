@@ -5439,6 +5439,13 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
     // of the ABI, and so we must take care to get the correct module
     // name for the comparison.
     auto getModuleNameForOrder = [&](const TypeDecl *decl) -> StringRef {
+      // Respect @_originallyDefinedIn on the type itself, so that
+      // moving a protocol across modules does not change its
+      // position in the order.
+      auto alternateName = decl->getAlternateModuleName();
+      if (!alternateName.empty())
+        return alternateName;
+
       // This used to just call getName(), which caused accidental ABI breaks
       // when a module is imported under different aliases.
       //
