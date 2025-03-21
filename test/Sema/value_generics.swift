@@ -66,7 +66,9 @@ func h(_: (Int, 123)) {} // expected-error {{expected type}}
 func i(_: () -> 123) {} // expected-error {{expected type}}
 func j(_: (A<123>) -> ()) {} // OK
 func k(_: some 123) {} // expected-error {{expected parameter type following ':'}}
-func l(_: GenericWithIntParam<123, Int>) {} // expected-error {{cannot pass type 'Int' as a value for generic value 'N'}}
+func l(_: GenericWithIntParam<123, Int>) {}
+// expected-error@-1 {{cannot pass type 'Int' as a value for generic value 'N'}}
+// expected-error@-2 {{cannot use value type '123' for generic argument 'T'}}
 func m(_: GenericWithIntParam<Int, 123>) {} // OK
 
 typealias One = 1 // expected-error {{expected type in type alias declaration}}

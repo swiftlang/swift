@@ -9,6 +9,8 @@ let e: InlineArray<2, _> = [1] // expected-error {{expected '2' elements in inli
 
 let f: InlineArray<_, Int> = ["hello"] // expected-error {{cannot convert value of type 'String' to expected element type 'Int'}}
 
+let g: InlineArray<1, 1> // expected-error {{cannot use value type '1' for generic argument 'Element'}}
+
 func takeVectorOf2<T>(_: InlineArray<2, T>) {}
 
 takeVectorOf2([1, 2]) // Ok

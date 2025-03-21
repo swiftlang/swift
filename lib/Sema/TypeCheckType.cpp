@@ -793,6 +793,9 @@ namespace {
         return false;
       }
 
+      if (secondType->is<IntegerType>())
+        return false;
+
       return true;
     }
 
