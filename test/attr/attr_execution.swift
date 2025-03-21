@@ -8,6 +8,14 @@
 @execution(concurrent) @execution(caller) func mutipleAttrs() async {}
 // expected-error@-1 {{duplicate attribute}} expected-note@-1 {{attribute already specified here}}
 
+do {
+  @execution(caller) struct S {}
+  // expected-error@-1 {{'@execution(caller)' attribute cannot be applied to this declaration}}
+
+  func f(@execution(caller) param: Int) {}
+  // expected-error@-1 {{'@execution(caller)' attribute cannot be applied to this declaration}}
+}
+
 @execution(concurrent) func nonAsync1() {}
 // expected-error@-1 {{cannot use '@execution' on non-async global function 'nonAsync1()'}}
 
@@ -20,24 +28,54 @@ struct Test {
   @execution(concurrent) init() {}
   // expected-error@-1 {{cannot use '@execution' on non-async initializer 'init()'}}
 
+  @execution(concurrent) init(async: Void) async {}
+
   @execution(concurrent) func member() {}
   // expected-error@-1 {{cannot use '@execution' on non-async instance method 'member()'}}
 
   @execution(concurrent) func member() async {} // Ok
 
-  // expected-error@+1 {{'@execution(caller)' attribute cannot be applied to this declaration}}
-  @execution(caller) subscript(a: Int) -> Bool {
-    get { false }
-    @execution(concurrent) set { }
-    // expected-error@-1 {{cannot use '@execution' on non-async setter for subscript 'subscript(_:)'}}
+  @execution(concurrent) var syncP: Int {
+  // expected-error@-1 {{cannot use '@execution' on non-async property 'syncP'}}
+    get {}
+  }
+  @execution(concurrent) var asyncP: Int {
+    get async {}
   }
 
-  @execution(caller) var x: Int
-  // expected-error@-1 {{'@execution(caller)' attribute cannot be applied to this declaration}}
+  // expected-error@+1 {{cannot use '@execution' on non-async subscript 'subscript(sync:)'}}
+  @execution(caller) subscript(sync _: Int) -> Bool {
+    @execution(concurrent) get { false }
+    // expected-error@-1 {{@execution(concurrent)' attribute cannot be applied to this declaration}}
+    @execution(concurrent) set { }
+    // expected-error@-1 {{@execution(concurrent)' attribute cannot be applied to this declaration}}
+  }
+  @execution(caller) subscript(async _: Int) -> Bool {
+    get async {}
+  }
+
+  @execution(caller) var storedVar: Int
+  // expected-error@-1 {{'@execution(caller)' must not be used on stored properties}}
+  @execution(caller) let storedLet: Int
+  // expected-error@-1 {{'@execution(caller)' must not be used on stored properties}}
+}
+
+do {
+  class C {
+    @execution(caller) deinit {}
+    // expected-error@-1 {{'@execution(caller)' attribute cannot be applied to this declaration}}
+  }
 }
 
 do {
   @execution(caller) func local() async {} // Ok
+
+  protocol P {
+    @execution(caller) var syncP: Int { get }
+    // expected-error@-1 {{cannot use '@execution' on non-async property 'syncP'}}
+
+    @execution(caller) var asyncP: Int { get async }
+  }
 }
 
 struct TestAttributeCollisions {
@@ -45,9 +83,17 @@ struct TestAttributeCollisions {
 
   @execution(concurrent) func test(arg: isolated MainActor) async {}
   // expected-error@-1 {{cannot use '@execution' on instance method 'test(arg:)' because it has an isolated parameter: 'arg'}}
+  @execution(concurrent) subscript(test arg: isolated MainActor) -> Int {
+  // expected-error@-1 {{cannot use '@execution' on subscript 'subscript(test:)' because it has an isolated parameter: 'arg'}}
+    get async {}
+  }
 
   @execution(concurrent) func testIsolationAny(arg: @isolated(any) () -> Void) async {}
   // expected-error@-1 {{cannot use '@execution' on instance method 'testIsolationAny(arg:)' because it has a dynamically isolated parameter: 'arg'}}
+  @execution(concurrent) subscript(testIsolationAny arg: @isolated(any) () -> Void) -> Int {
+  // expected-error@-1 {{cannot use '@execution' on subscript 'subscript(testIsolationAny:)' because it has a dynamically isolated parameter: 'arg'}}
+    get async {}
+  }
 
   @MainActor @execution(concurrent) func testGlobalActor() async {}
   // expected-warning @-1 {{instance method 'testGlobalActor()' has multiple actor-isolation attributes ('MainActor' and 'execution(concurrent)')}}
@@ -92,22 +138,4 @@ _ = { @execution(concurrent) () -> Int in
 
 _ = { @execution(caller) (x: isolated (any Actor)?) in
   // expected-error@-1 {{cannot use '@execution' together with an isolated parameter}}
-}
-
-struct TestDifferentPositions {
-  @execution(caller)
-  init() async {
-  }
-
-  var x: Int {
-    @execution(concurrent)
-    get async {
-    }
-  }
-
-  subscript(x: Int) -> Bool {
-    @execution(concurrent)
-    get async {
-    }
-  }
 }

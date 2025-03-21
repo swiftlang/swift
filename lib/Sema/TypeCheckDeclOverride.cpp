@@ -648,8 +648,8 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   if ((isa<AbstractFunctionDecl>(derivedDecl) &&
        isa<AbstractFunctionDecl>(baseDecl)) ||
       isa<SubscriptDecl>(baseDecl)) {
-    derivedParams = getParameterList(const_cast<ValueDecl *>(derivedDecl));
-    baseParams = getParameterList(const_cast<ValueDecl *>(baseDecl));
+    derivedParams = derivedDecl->getParameterList();
+    baseParams = baseDecl->getParameterList();
   }
 
   if (!derivedParams && !baseParams) {

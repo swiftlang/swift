@@ -169,7 +169,7 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToDeclPreProper(Decl *D) {
     };
 
     if (isa<AbstractFunctionDecl>(VD) || isa<SubscriptDecl>(VD)) {
-      auto ParamList = getParameterList(VD);
+      auto ParamList = VD->getParameterList();
       if (!ReportParamList(ParamList))
         return Action::Stop();
     }

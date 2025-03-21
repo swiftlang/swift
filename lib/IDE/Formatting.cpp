@@ -518,7 +518,7 @@ private:
         if (!handleBraces(cast<SubscriptDecl>(D)->getBracesRange(), ContextLoc))
           return Action::Stop();
       }
-      auto *PL = getParameterList(cast<ValueDecl>(D));
+      auto *PL = cast<ValueDecl>(D)->getParameterList();
       if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(), ContextLoc))
         return Action::Stop();
     } else if (auto *PGD = dyn_cast<PrecedenceGroupDecl>(D)) {

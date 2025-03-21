@@ -501,7 +501,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       dc = dc->getParent();
 
       auto *VD = cast<ValueDecl>(dc->getAsDecl());
-      assert(VD->hasParameterList());
+      ASSERT(VD->hasParameterList());
 
       if (VD->getDeclContext()->isLocalContext()) {
         auto kind = VD->getDeclContext()->getFragileFunctionKind();
@@ -1615,15 +1615,10 @@ bool DeclContext::isAsyncContext() const {
     return getParent()->isAsyncContext();
   case DeclContextKind::AbstractClosureExpr:
     return cast<AbstractClosureExpr>(this)->isBodyAsync();
-  case DeclContextKind::AbstractFunctionDecl: {
-    const AbstractFunctionDecl *function = cast<AbstractFunctionDecl>(this);
-    return function->hasAsync();
-  }
-  case DeclContextKind::SubscriptDecl: {
-    AccessorDecl *getter =
-        cast<SubscriptDecl>(this)->getAccessor(AccessorKind::Get);
-    return getter != nullptr && getter->hasAsync();
-  }
+  case DeclContextKind::AbstractFunctionDecl:
+    return cast<AbstractFunctionDecl>(this)->hasAsync();
+  case DeclContextKind::SubscriptDecl:
+    return cast<SubscriptDecl>(this)->isAsync();
   }
   llvm_unreachable("Unhandled DeclContextKind switch");
 }
