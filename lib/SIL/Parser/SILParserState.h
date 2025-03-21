@@ -58,6 +58,7 @@ public:
   bool parseSILGlobal(Parser &P) override;
   bool parseSILWitnessTable(Parser &P) override;
   bool parseSILDefaultWitnessTable(Parser &P) override;
+  bool parseSILDefaultOverrideTable(Parser &P) override;
   bool parseSILDifferentiabilityWitness(Parser &P) override;
   bool parseSILCoverageMap(Parser &P) override;
   bool parseSILProperty(Parser &P) override;

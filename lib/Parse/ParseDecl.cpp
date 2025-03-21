@@ -289,6 +289,7 @@ bool Parser::parseTopLevelSIL() {
     CASE_SIL(sil_global, SILGlobal)
     CASE_SIL(sil_witness_table, SILWitnessTable)
     CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
+    CASE_SIL(sil_default_override_table, SILDefaultOverrideTable)
     CASE_SIL(sil_differentiability_witness, SILDifferentiabilityWitness)
     CASE_SIL(sil_coverage_map, SILCoverageMap)
     CASE_SIL(sil_property, SILProperty)
@@ -5944,6 +5945,7 @@ bool Parser::isStartOfSILDecl() {
   case tok::kw_sil_global:
   case tok::kw_sil_witness_table:
   case tok::kw_sil_default_witness_table:
+  case tok::kw_sil_default_override_table:
   case tok::kw_sil_differentiability_witness:
   case tok::kw_sil_coverage_map:
   case tok::kw_sil_scope:
