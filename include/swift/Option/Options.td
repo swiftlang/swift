@@ -985,6 +985,15 @@ def strict_concurrency : Joined<["-"], "strict-concurrency=">,
            "concurrency model, or 'complete' ('Sendable' and other checking is "
            "enabled for all code in the module)">;
 
+def default_isolation : Separate<["-"], "default-isolation">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specify the default actor isolation: MainActor or nonisolated. "
+  "Defaults to nonisolated.">,
+  MetaVarName<"MainActor|nonisolated">;
+def default_isolation_EQ :  Joined<["-"], "default-isolation=">,
+  Flags<[FrontendOption]>,
+  Alias<default_isolation>;
+
 def enable_experimental_feature :
   Separate<["-"], "enable-experimental-feature">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
