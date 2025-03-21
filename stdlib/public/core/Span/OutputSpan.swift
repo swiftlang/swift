@@ -176,6 +176,7 @@ extension OutputSpan where Element: BitwiseCopyable {
 extension OutputSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func append(_ value: consuming Element) {
     _precondition(_initialized < capacity, "Output buffer overflow")
     let p = unsafe _start().advanced(by: _initialized&*MemoryLayout<Element>.stride)
@@ -184,6 +185,7 @@ extension OutputSpan where Element: ~Copyable {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func removeLast() -> Element? {
     guard _initialized > 0 else { return nil }
     _initialized &-= 1
@@ -192,6 +194,7 @@ extension OutputSpan where Element: ~Copyable {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func removeAll() {
     _ = unsafe _start().withMemoryRebound(to: Element.self, capacity: _initialized) {
       unsafe $0.deinitialize(count: _initialized)
@@ -205,6 +208,7 @@ extension OutputSpan where Element: ~Copyable {
 extension OutputSpan {
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func append(repeating repeatedValue: Element, count: Int) {
     let available = capacity &- _initialized
     _precondition(
@@ -220,6 +224,7 @@ extension OutputSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func append<S>(
     from elements: S
   ) -> S.Iterator where S: Sequence, S.Element == Element {
@@ -229,6 +234,7 @@ extension OutputSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func append(
     from elements: inout some IteratorProtocol<Element>
   ) {
@@ -241,11 +247,12 @@ extension OutputSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func append(
     fromContentsOf source: some Collection<Element>
   ) {
     let void: Void? = source.withContiguousStorageIfAvailable {
-      append(fromContentsOf: Span(_unsafeElements: $0))
+      append(fromContentsOf: unsafe Span(_unsafeElements: $0))
     }
     if void != nil {
       return
@@ -267,6 +274,7 @@ extension OutputSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func append(
     fromContentsOf source: Span<Element>
   ) {
@@ -285,6 +293,7 @@ extension OutputSpan {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func append(
     fromContentsOf source: borrowing MutableSpan<Element>
   ) {
@@ -296,6 +305,7 @@ extension OutputSpan {
 extension OutputSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func moveAppend(
     fromContentsOf source: consuming Self
   ) {
@@ -314,6 +324,7 @@ extension OutputSpan where Element: ~Copyable {
   }
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func moveAppend(
     fromContentsOf source: UnsafeMutableBufferPointer<Element>
   ) {
@@ -326,6 +337,7 @@ extension OutputSpan where Element: ~Copyable {
 extension OutputSpan {
 
   @_alwaysEmitIntoClient
+  @lifetime(self: copy self)
   public mutating func moveAppend(
     fromContentsOf source: Slice<UnsafeMutableBufferPointer<Element>>
   ) {
@@ -349,7 +361,7 @@ extension OutputSpan where Element: ~Copyable {
     borrowing get {
       let pointer = unsafe _pointer?.assumingMemoryBound(to: Element.self)
       let buffer = unsafe UnsafeBufferPointer(start: pointer, count: _initialized)
-      let span = Span(_unsafeElements: buffer)
+      let span = unsafe Span(_unsafeElements: buffer)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
@@ -362,7 +374,7 @@ extension OutputSpan where Element: ~Copyable {
       let buffer = unsafe UnsafeMutableBufferPointer(
         start: pointer, count: _initialized
       )
-      let span = MutableSpan(_unsafeElements: buffer)
+      let span = unsafe MutableSpan(_unsafeElements: buffer)
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }
