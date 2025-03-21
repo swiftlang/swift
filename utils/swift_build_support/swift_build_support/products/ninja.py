@@ -34,7 +34,7 @@ class Ninja(product.Product):
         return False
 
     @classmethod
-    def new_builder(cls, args, toolchain, workspace, host):
+    def new_builder(cls, args, toolchain, workspace):
         return NinjaBuilder(cls, args, toolchain, workspace)
 
 
