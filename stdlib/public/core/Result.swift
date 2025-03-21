@@ -311,6 +311,7 @@ extension Result where Success: ~Copyable & ~Escapable {
   /// - Returns: The success value, if the instance represents a success.
   /// - Throws: The failure value, if the instance represents a failure.
   @_alwaysEmitIntoClient
+  @lifetime(copy self)
   public consuming func get() throws(Failure) -> Success {
     switch consume self {
     case let .success(success):
